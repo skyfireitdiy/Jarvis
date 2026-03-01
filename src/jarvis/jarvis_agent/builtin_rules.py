@@ -109,12 +109,9 @@ def get_builtin_rule_path(rule_name: str) -> str | None:
     if builtin_dir is None:
         return None
 
-    # 规则名称在 BUILTIN_RULES 中以小写存储
-    rule_name_lower = rule_name.lower()
-
-    # 从规则名称解析路径
+    # 从规则名称解析路径（保持原始大小写）
     # architecture_design/clean_code.md → architecture_design/clean_code.md
-    path_parts = rule_name_lower
+    path_parts = rule_name
 
     # 在通用规则目录中查找
     general_rules_dir = builtin_dir / "rules"
