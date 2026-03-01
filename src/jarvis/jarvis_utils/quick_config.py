@@ -62,11 +62,23 @@ def quick_config(
     # 测试API连接并获取模型列表
     models = get_models(platform, base_url, api_key)
     if not models:
-        PrettyOutput.auto_print("⚠️  警告：无法获取模型列表，将使用默认模型名称")
-        if platform == "claude":
-            models = ["claude-3-5-sonnet-latest"]
-        else:  # openai
-            models = ["gpt-4o"]
+        PrettyOutput.auto_print("⚠️  无法获取模型列表")
+
+        # 提示用户是否手动输入模型名称
+        use_manual_input = user_confirm("是否手动输入模型名称？", default=True)
+
+        if use_manual_input:
+            model_input = get_single_line_input(
+                "请输入模型名称（多个模型用逗号分隔，如: gpt-4o,gpt-3.5-turbo）:"
+            )
+            # 清理输入并按逗号分割
+            models = [m.strip() for m in model_input.split(",") if m.strip()]
+            if not models:
+                PrettyOutput.auto_print("❌ 未输入有效模型名称，配置已取消")
+                raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("❌ 未提供模型名称，配置已取消")
+            raise typer.Exit(code=0)
 
     PrettyOutput.auto_print(
         f"📋 可用模型: {', '.join(models[:10])}{'...' if len(models) > 10 else ''}"
