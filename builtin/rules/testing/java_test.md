@@ -1,5 +1,5 @@
 ---
-description: Java测试规则。适用于Java项目测试、单元测试、集成测试等场景
+description: 当需要为Java项目编写测试或配置测试框架时使用此规则——Java测试规则，Java项目测试框架使用规范。包括：选择合适的测试框架（JUnit、TestNG）；编写单元测试用例；编写集成测试和端到端测试；配置测试环境和依赖；使用Mockito和PowerMock进行模拟；测试Spring、SpringBoot等框架；编写参数化测试；测试覆盖率分析和报告；处理数据库和JPA测试；遵循Java测试最佳实践；组织测试目录结构；编写测试文档；使用Maven或Gradle运行测试。每当用户提及"Java测试"、"单元测试"、"集成测试"、"JUnit"、"TestNG"、"Mockito"、"测试框架"或需要Java项目测试、单元测试、集成测试时触发，无论项目规模和框架类型如何。如果需要为Java项目编写或配置测试，请使用此规则。
 ---
 
 # Java 测试规则

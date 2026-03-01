@@ -1,5 +1,5 @@
 ---
-description: Jarvis Windows CLI使用指南，Windows桌面程序自动化命令行工具。适用于Windows自动化、桌面程序操作、GUI测试等场景
+description: 当需要在Windows平台进行桌面程序自动化或GUI测试时使用此规则——Jarvis Windows CLI使用指南，Windows桌面程序自动化命令行工具。包括：启动Windows桌面应用程序；连接到已有应用窗口；执行鼠标点击和键盘输入操作；模拟窗口和控件交互；获取应用窗口列表和控件树结构；自动化GUI测试流程；捕获屏幕截图；修改Windows系统配置（主题、电源、代理、注册表等）；处理窗口焦点和状态管理；监控应用运行状态；批量处理桌面任务；跨进程自动化操作；配置自动化脚本和工作流。每当用户提及"Windows自动化"、"桌面程序操作"、"GUI测试"、"pywinauto"、"窗口操作"或需要Windows自动化、桌面程序操作、GUI测试时触发，无论目标应用和操作复杂度如何。如果需要在Windows平台进行桌面程序自动化或GUI测试，请使用此规则。
 ---
 
 # Jarvis Windows CLI (jw) 使用指南

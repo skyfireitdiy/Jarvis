@@ -1,5 +1,5 @@
 ---
-description: Go到Rust转译器规则。适用于Go代码转译、Rust迁移、跨语言开发等场景
+description: 当需要将Go代码转换为Rust代码时使用此规则——Go到Rust转译器规则，指导Go代码到Rust代码的转译过程。包括：分析Go代码的结构和依赖；映射Go类型到Rust类型；转译Go语法到Rust语法；处理Go特有的并发模式（goroutine、channel）；转换Go标准库为Rust等价物；实现Go接口到Rust trait；处理错误处理机制转换；确保内存安全和所有权规则；验证转译后代码的功能一致性；优化转译后的Rust代码性能；处理跨语言调用场景。每当用户提及"Go到Rust"、"Go转Rust"、"代码转译"、"语言迁移"、"Go迁移"、"跨语言开发"或需要Go代码转译、Rust迁移、跨语言开发时触发，无论项目规模和复杂度如何。如果需要将Go代码转换为Rust代码，请使用此规则。
 ---
 
 # Go2Rust 转译规则
