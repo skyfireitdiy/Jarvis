@@ -211,6 +211,7 @@ class BasePlatform(ABC):
         response: str,
         is_completed: bool = False,
         duration: float = 0.0,
+        first_token_time: float = 0.0,
     ) -> None:
         """更新面板的 subtitle，包含 token 使用信息
 
@@ -219,6 +220,7 @@ class BasePlatform(ABC):
             response: 当前响应内容
             is_completed: 是否已完成
             duration: 耗时（秒）
+            first_token_time: 首token响应时间（秒）
         """
         from datetime import datetime
 
@@ -234,16 +236,22 @@ class BasePlatform(ABC):
 
             threshold = get_conversation_turn_threshold()
             if is_completed:
+                # 计算性能指标
+                response_tokens = get_context_token_count(response)
+                generation_time = duration - first_token_time if duration > first_token_time else duration
+                tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
+                
                 if max_tokens > 0 and progress_bar:
                     try:
                         panel.subtitle = (
                             f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
+                            f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
                             f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                         )
                     except Exception:
-                        panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                        panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
                 else:
-                    panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
             else:
                 if max_tokens > 0 and progress_bar:
                     try:
@@ -264,7 +272,7 @@ class BasePlatform(ABC):
 
     def _chat_with_pretty_output(
         self, message: str, start_time: float, max_output: int = 0
-    ) -> str:
+    ) -> Tuple[str, float]:
         """使用 pretty output 模式进行聊天
 
         参数:
@@ -272,11 +280,12 @@ class BasePlatform(ABC):
             start_time: 开始时间
 
         返回:
-            str: 模型响应
+            Tuple[str, float]: (模型响应, 首token时间)
         """
         import time
 
         first_chunk = None
+        first_token_time = 0.0
 
         with Status(
             f"🤔 {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()} 正在思考中...",
@@ -288,10 +297,11 @@ class BasePlatform(ABC):
                 while True:
                     first_chunk = next(chat_iterator)
                     if first_chunk:
+                        first_token_time = time.time() - start_time
                         break
             except StopIteration:
                 self._append_session_history(message, "")
-                return ""
+                return "", 0.0
 
         text_content = Text(overflow="fold")
         panel = Panel(
@@ -438,8 +448,18 @@ class BasePlatform(ABC):
 
             _flush_buffer()
             # 在结束前，将面板内容替换为完整响应，确保最后一次渲染的 panel 显示全部内容
+            # 更新完成状态，包含性能指标
+            end_time = time.time()
+            duration = end_time - start_time
+            _update_panel_content("", update_subtitle=True)
+            # 更新 subtitle 显示完成状态和性能指标
+            with self._panel_lock:
+                self._update_panel_subtitle_with_token(
+                    panel, response, is_completed=True, duration=duration, first_token_time=first_token_time
+                )
+                live.update(panel)
 
-        return response
+        return response, first_token_time
 
     def _chat_with_simple_output(
         self, message: str, start_time: float, max_output: int = 0
@@ -461,7 +481,10 @@ class BasePlatform(ABC):
             soft_wrap=False,
         )
         response = ""
+        first_token_time = 0.0
         for s in self.chat(message):
+            if s and first_token_time == 0.0:
+                first_token_time = time.time() - start_time
             console.print(s, end="")
             response += s
             # 检查是否达到最大输出长度
@@ -474,7 +497,11 @@ class BasePlatform(ABC):
         console.print()
         end_time = time.time()
         duration = end_time - start_time
-        console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
+        # 计算性能指标
+        response_tokens = get_context_token_count(response)
+        generation_time = duration - first_token_time if duration > first_token_time else duration
+        tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
+        console.print(f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s")
         return response
 
     def _chat_with_suppressed_output(self, message: str, max_output: int = 0) -> str:
@@ -530,9 +557,10 @@ class BasePlatform(ABC):
         message = self._truncate_message_if_needed(message)
 
         # 根据输出模式选择不同的处理方式
+        first_token_time = 0.0
         if not self.suppress_output:
             if get_pretty_output():
-                response = self._chat_with_pretty_output(
+                response, first_token_time = self._chat_with_pretty_output(
                     message, start_time, max_output
                 )
             else:
@@ -544,26 +572,26 @@ class BasePlatform(ABC):
             end_time = time.time()
             duration = end_time - start_time
 
+            # 计算性能指标
+            response_tokens = get_context_token_count(response)
+            generation_time = duration - first_token_time if duration > first_token_time else duration
+            tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
+
             # 获取Token使用信息
             try:
                 usage_percent, percent_color, progress_bar = self._get_token_usage_info(
                     response
                 )
-                max_tokens = self._get_platform_max_input_token_count()
-                if max_tokens > 0 and progress_bar:
-                    threshold = get_conversation_turn_threshold()
-                    PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | Token: {usage_percent:.1f}%"
-                    )
-                else:
-                    threshold = get_conversation_turn_threshold()
-                    PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold}"
-                    )
+                threshold = get_conversation_turn_threshold()
+                PrettyOutput.auto_print(
+                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | Token: {usage_percent:.1f}%"
+                )
             except Exception:
                 threshold = get_conversation_turn_threshold()
                 PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold}"
+                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
                 )
         else:
             response = self._chat_with_suppressed_output(message, max_output)
