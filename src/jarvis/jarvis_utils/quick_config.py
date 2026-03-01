@@ -131,6 +131,25 @@ def quick_config(
             PrettyOutput.auto_print("❌ 请输入有效的数字序号")
             raise typer.Exit(code=1)
 
+    # 测试模型API连通性
+    PrettyOutput.auto_print(f"🔍 正在测试模型 {default_model} 的API连通性...")
+    success, error_msg = test_model_connection(
+        platform, base_url, api_key, default_model
+    )
+
+    if success:
+        PrettyOutput.auto_print("✅ API连通性测试通过")
+    else:
+        PrettyOutput.auto_print(f"❌ API连通性测试失败: {error_msg}")
+
+        # 询问用户是否仍要保存配置
+        force_save = user_confirm("测试失败，是否仍要保存配置到文件？", default=False)
+        if not force_save:
+            PrettyOutput.auto_print("👋 已取消配置保存")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("⚠️  将保存配置（未通过测试）")
+
     # 输入默认最大token数
     default_max_tokens = 128000
     while True:
@@ -250,6 +269,80 @@ def quick_config(
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 保存配置失败: {e}")
         raise typer.Exit(code=1)
+
+
+def test_model_connection(
+    platform: str, base_url: str, api_key: str, model: str
+) -> tuple[bool, str]:
+    """测试模型API连通性
+
+    Args:
+        platform: 平台类型 (claude/openai)
+        base_url: API基础URL
+        api_key: API密钥
+        model: 模型名称
+
+    Returns:
+        (是否成功, 错误信息)
+    """
+    try:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        if platform == "openai":
+            # OpenAI API 测试
+            url = f"{base_url.rstrip('/')}/chat/completions"
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": "Hi"}],
+                "max_tokens": 5,
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                return True, ""
+            else:
+                error_msg = (
+                    response.json().get("error", {}).get("message", response.text)
+                )
+                return (
+                    False,
+                    f"API返回错误 (状态码: {response.status_code}): {error_msg}",
+                )
+
+        elif platform == "claude":
+            # Claude API 测试
+            url = f"{base_url.rstrip('/')}/messages"
+            payload = {
+                "model": model,
+                "max_tokens": 5,
+                "messages": [{"role": "user", "content": "Hi"}],
+            }
+            headers["anthropic-version"] = "2023-06-01"
+            # Claude 使用 x-api-key 而不是 Authorization
+            headers.pop("Authorization")
+            headers["x-api-key"] = api_key
+
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                return True, ""
+            else:
+                error_data = response.json()
+                error_msg = error_data.get("error", {}).get("message", response.text)
+                return (
+                    False,
+                    f"API返回错误 (状态码: {response.status_code}): {error_msg}",
+                )
+
+    except requests.exceptions.Timeout:
+        return False, "请求超时，请检查网络连接或API服务是否可用"
+    except requests.exceptions.ConnectionError:
+        return False, "无法连接到API服务，请检查base_url是否正确"
+    except Exception as e:
+        return False, f"测试失败，错误: {str(e)}"
+
+    return False, "未知的平台类型"
 
 
 def get_models(platform: str, base_url: str, api_key: str) -> list:
