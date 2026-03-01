@@ -10,19 +10,11 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import yaml
-
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
@@ -31,13 +23,11 @@ from jarvis.jarvis_utils.config import (
     get_default_encoding,
     get_max_input_token_count,
     read_text_file,
+    set_global_config_data,
     set_llm_group,
 )
-from jarvis.jarvis_utils.config import set_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import get_in_chat
-from jarvis.jarvis_utils.globals import get_interrupt
-from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -561,12 +551,140 @@ def _check_pip_updates() -> bool:
     return False
 
 
+# 大版本更新标记文件管理
+_major_update_lock = threading.Lock()
+_update_reboot_flag_path = None  # 延迟初始化
+
+
+def _get_update_reboot_flag_path() -> Path:
+    """获取更新重启标记文件路径
+
+    返回:
+        Path: 标记文件路径
+    """
+    global _update_reboot_flag_path
+    if _update_reboot_flag_path is None:
+        data_dir = Path(str(get_data_dir()))
+        _update_reboot_flag_path = data_dir / "update_reboot_flag.txt"
+    return _update_reboot_flag_path
+
+
+def _has_update_reboot_flag() -> bool:
+    """检查是否有等待重启的更新标记
+
+    返回:
+        bool: 如果有待重启的更新标记，返回True，否则返回False
+    """
+    flag_path = _get_update_reboot_flag_path()
+    return flag_path.exists()
+
+
+def _set_update_reboot_flag() -> None:
+    """设置更新重启标记"""
+    flag_path = _get_update_reboot_flag_path()
+    try:
+        flag_path.write_text("1")
+    except IOError as e:
+        PrettyOutput.auto_print(f"⚠️ 无法写入更新重启标记: {e}")
+
+
+def _clear_update_reboot_flag() -> None:
+    """清除更新重启标记"""
+    flag_path = _get_update_reboot_flag_path()
+    try:
+        if flag_path.exists():
+            flag_path.unlink()
+    except (IOError, OSError) as e:
+        PrettyOutput.auto_print(f"⚠️ 无法清除更新重启标记: {e}")
+
+
+def _get_major_update_flag_path() -> Path:
+    """获取大版本更新标记文件路径
+
+    返回:
+        Path: 标记文件路径
+    """
+    data_dir = Path(str(get_data_dir()))
+    return data_dir / "major_update_pending.json"
+
+
+def _has_major_update_pending() -> Optional[str]:
+    """检查是否有待处理的大版本更新
+
+    返回:
+        Optional[str]: 如果有待处理的更新，返回远程版本号，否则返回None
+    """
+    flag_path = _get_major_update_flag_path()
+    if not flag_path.exists():
+        return None
+
+    try:
+        with _major_update_lock:
+            with open(flag_path, "r") as f:
+                data: Dict[str, Any] = json.load(f)
+            remote_version = data.get("remote_version")
+            if isinstance(remote_version, str):
+                return remote_version
+            return None
+    except (json.JSONDecodeError, IOError, KeyError):
+        # 标记文件损坏，删除它
+        try:
+            with _major_update_lock:
+                flag_path.unlink()
+        except (IOError, OSError):
+            pass
+        return None
+
+
+def _set_major_update_pending(remote_version: str) -> None:
+    """设置大版本更新标记
+
+    参数:
+        remote_version: 检测到的新版本号（如 v2.1.0）
+    """
+    flag_path = _get_major_update_flag_path()
+    data = {
+        "remote_version": remote_version,
+        "detected_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        with _major_update_lock:
+            with open(flag_path, "w") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+    except IOError as e:
+        PrettyOutput.auto_print(f"⚠️ 无法写入大版本更新标记: {e}")
+
+
+def _clear_major_update_flag() -> None:
+    """清除大版本更新标记"""
+    flag_path = _get_major_update_flag_path()
+    try:
+        with _major_update_lock:
+            if flag_path.exists():
+                flag_path.unlink()
+    except (IOError, OSError) as e:
+        PrettyOutput.auto_print(f"⚠️ 无法清除大版本更新标记: {e}")
+
+
 def _check_jarvis_updates() -> bool:
     """检查并更新Jarvis本身（git仓库或pip包）
 
     返回:
         bool: 是否需要重启进程
     """
+    # 检查是否有等待重启的更新标记（小版本更新已完成）
+    if _has_update_reboot_flag():
+        PrettyOutput.auto_print("\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。")
+        from jarvis.jarvis_utils.input import user_confirm
+
+        if user_confirm("是否现在重启以应用更新？", default=True):
+            _clear_update_reboot_flag()
+            return True
+        else:
+            PrettyOutput.auto_print(
+                "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
+            )
+
     # 从当前文件目录向上查找包含 .git 的仓库根目录，修复原先只检查 src/jarvis 的问题
     try:
         script_path = Path(__file__).resolve()
@@ -582,7 +700,27 @@ def _check_jarvis_updates() -> bool:
     if repo_root and (repo_root / ".git").exists():
         from jarvis.jarvis_utils.git_utils import check_and_update_git_repo
 
-        return check_and_update_git_repo(str(repo_root))
+        # 执行后台更新检查（小版本会自动更新，大版本只写标记）
+        updated = check_and_update_git_repo(str(repo_root))
+
+        # 检查是否有待处理的大版本更新
+        pending_version = _has_major_update_pending()
+        if pending_version:
+            PrettyOutput.auto_print(f"\n🎉 检测到等待的主版本升级: {pending_version}")
+            from jarvis.jarvis_utils.input import user_confirm
+
+            if user_confirm(
+                "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
+                default=True,
+            ):
+                PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+                # 清除标记，执行实际更新
+                _clear_major_update_flag()
+                updated = check_and_update_git_repo(str(repo_root))
+            else:
+                PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+
+        return updated
 
     # 检查是否是pip/uv pip安装的版本
     return _check_pip_updates()
@@ -595,25 +733,25 @@ def _show_usage_stats(welcome_str: str) -> None:
         welcome_str: 欢迎信息字符串
     """
     try:
-        from rich.console import Console
-        from rich.console import Group
+        from rich.align import Align
+        from rich.console import Console, Group
         from rich.panel import Panel
         from rich.text import Text
-        from rich.align import Align
 
         console = Console()
+
+        import os
 
         from jarvis.jarvis_utils.config import (
             get_cheap_model_name,
             get_cheap_platform_name,
+            get_jarvis_gitee_url,
+            get_jarvis_github_url,
             get_normal_model_name,
             get_normal_platform_name,
             get_smart_model_name,
             get_smart_platform_name,
-            get_jarvis_github_url,
-            get_jarvis_gitee_url,
         )
-        import os
 
         # 欢迎信息 Panel
         if welcome_str:
@@ -763,10 +901,126 @@ def init_env(
             # 静默失败，不影响正常使用
             pass
 
-    # 5. 检查Jarvis更新（异步执行，避免阻塞）
+    # 5. 检查Jarvis更新（在后台线程中执行检查）
     if auto_upgrade:
         try:
-            if _check_jarvis_updates():
+
+            def check_updates_background() -> None:
+                """在后台线程中检查更新，只负责标记，不涉及用户交互"""
+                try:
+                    # 从当前文件目录向上查找包含 .git 的仓库根目录
+                    script_path = Path(__file__).resolve()
+                    repo_root: Optional[Path] = None
+                    for d in [script_path.parent] + list(script_path.parents):
+                        if (d / ".git").exists():
+                            repo_root = d
+                            break
+
+                    # 先检查是否是git源码安装
+                    if repo_root and (repo_root / ".git").exists():
+                        from jarvis.jarvis_utils.git_utils import (
+                            check_and_update_git_repo_background,
+                        )
+
+                        check_and_update_git_repo_background(str(repo_root))
+                except Exception:
+                    # 静默失败，不影响正常使用
+                    pass
+
+            update_thread = threading.Thread(
+                target=check_updates_background, daemon=True
+            )
+            update_thread.start()
+        except Exception:
+            # 静默失败，不影响正常使用
+            pass
+
+    # 5.1 检查更新标记（在主线程中执行，涉及用户交互）
+    if auto_upgrade:
+        try:
+            should_restart = False
+
+            # 检查是否有等待重启的更新标记（小版本更新已完成）
+            if _has_update_reboot_flag():
+                PrettyOutput.auto_print(
+                    "\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。"
+                )
+                from jarvis.jarvis_utils.input import user_confirm
+
+                if user_confirm("是否现在重启以应用更新？", default=True):
+                    _clear_update_reboot_flag()
+                    should_restart = True
+                else:
+                    PrettyOutput.auto_print(
+                        "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
+                    )
+
+            # 检查是否有待处理的大版本更新
+            pending_version = _has_major_update_pending()
+            if pending_version:
+                PrettyOutput.auto_print(
+                    f"\n🎉 检测到等待的主版本升级: {pending_version}"
+                )
+                from jarvis.jarvis_utils.input import user_confirm
+
+                if user_confirm(
+                    "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
+                    default=True,
+                ):
+                    PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+                    # 清除标记，执行实际更新
+                    _clear_major_update_flag()
+                    should_restart = _check_jarvis_updates()
+                else:
+                    PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+
+            if should_restart:
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+                sys.exit(0)
+        except Exception:
+            # 静默失败，不影响正常使用
+            pass
+
+    # 5.1 检查更新标记（在主线程中执行，涉及用户交互）
+    if auto_upgrade:
+        try:
+            should_restart = False
+
+            # 检查是否有等待重启的更新标记（小版本更新已完成）
+            if _has_update_reboot_flag():
+                PrettyOutput.auto_print(
+                    "\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。"
+                )
+                from jarvis.jarvis_utils.input import user_confirm
+
+                if user_confirm("是否现在重启以应用更新？", default=True):
+                    _clear_update_reboot_flag()
+                    should_restart = True
+                else:
+                    PrettyOutput.auto_print(
+                        "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
+                    )
+
+            # 检查是否有待处理的大版本更新
+            pending_version = _has_major_update_pending()
+            if pending_version:
+                PrettyOutput.auto_print(
+                    f"\n🎉 检测到等待的主版本升级: {pending_version}"
+                )
+                from jarvis.jarvis_utils.input import user_confirm
+
+                if user_confirm(
+                    "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
+                    default=True,
+                ):
+                    PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+                    # 清除标记，执行实际更新
+                    _clear_major_update_flag()
+                    should_restart = _check_jarvis_updates()
+                else:
+                    PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+
+            if should_restart:
                 os.execv(sys.executable, [sys.executable] + sys.argv)
                 sys.exit(0)
         except Exception:
@@ -796,11 +1050,11 @@ def _interactive_config_setup(config_file_path: Path) -> None:
 
     try:
         # 导入 quick_config 模块
-        from jarvis.jarvis_utils import quick_config
-
         # 调用 quick_config 的主函数，传入输出文件参数
         # 注意：quick_config 使用 typer，需要模拟命令行参数
         import sys
+
+        from jarvis.jarvis_utils import quick_config
 
         original_argv = sys.argv
         try:
@@ -1143,7 +1397,7 @@ def _read_old_config_file(config_file: Union[str, Path]) -> None:
     config_data = {}
     current_key = None
     current_value = []
-    content = read_text_file(config_file, errors="ignore")
+    content = read_text_file(str(config_file), errors="ignore")
     for line in content.splitlines():
         line = line.rstrip()
         if not line or line.startswith(("#", ";")):
