@@ -183,6 +183,8 @@ dependencies = [
     jw = "jarvis.jarvis_windows.cli:app"
     jarvis-quick-config = "jarvis.jarvis_utils.quick_config:app"
     jqc = "jarvis.jarvis_utils.quick_config:app"
+    jarvis-rules-index = "jarvis.jarvis_rules_index.cli:main"
+    jri = "jarvis.jarvis_rules_index.cli:main"
 
 
 
