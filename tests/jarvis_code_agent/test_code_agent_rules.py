@@ -173,7 +173,7 @@ class TestRulesManager:
 
         # builtin_rules_index 会自动加载
         assert "builtin_rules_index" in loaded_names
-        assert "# Jarvis 内置规则列表" in merged_rules
+        assert "# Jarvis 规则索引" in merged_rules
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_global_and_project(self, mock_get_data_dir, tmp_path):
@@ -240,7 +240,7 @@ class TestRulesManager:
 
         # builtin_rules_index 会自动加载
         assert "builtin_rules_index" in loaded_names
-        assert "# Jarvis 内置规则列表" in merged_rules
+        assert "# Jarvis 规则索引" in merged_rules
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_combined(self, mock_get_data_dir, tmp_path):
