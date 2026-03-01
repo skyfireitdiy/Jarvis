@@ -6,7 +6,7 @@ Jarvis built-in rules index.
 
 import typer
 
-from jarvis.jarvis_rules_index.core import format_rules_index, get_rules_index
+from jarvis.jarvis_rules_index.core import get_rules_index_formatted
 from jarvis.jarvis_utils.output import PrettyOutput
 
 app = typer.Typer(help="Jarvis 规则索引命令行工具")
@@ -17,12 +17,11 @@ def show(
     as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
     raw: bool = typer.Option(False, "--raw", help="原始输出（无格式化）"),
 ) -> None:
-    """显示所有内置规则索引
+    """显示所有可用规则索引
 
-    列出所有可用的Jarvis内置规则及其描述。
+    列出所有可用的Jarvis规则及其描述，包括内置规则、项目规则、全局规则等。
     """
-    index = get_rules_index()
-    formatted_output = format_rules_index(index, as_json=as_json)
+    formatted_output = get_rules_index_formatted(as_json=as_json)
 
     if raw:
         # 原始输出，不使用PrettyOutput格式化

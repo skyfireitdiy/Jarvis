@@ -177,6 +177,160 @@ class RulesManager:
             pass
         return None
 
+    def _get_all_rules_index(self) -> Optional[str]:
+        """获取所有可用规则的索引
+
+        扫描所有规则来源（内置、项目、全局、中心库等），
+        生成包含描述和路径的索引内容。
+
+        返回:
+            str: 索引内容，如果未找到规则则返回 None
+        """
+        try:
+            from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
+
+            # 获取所有可用规则
+            all_rules = self.get_all_available_rule_names()
+
+            if not all_rules:
+                return None
+
+            # 调用内部方法格式化输出
+            return self._format_rules_index(all_rules)
+
+        except Exception as e:
+            # 生成索引失败时忽略，不影响主流程
+            PrettyOutput.auto_print(f"⚠️ 生成规则索引失败: {e}")
+            return None
+
+    def _format_rules_index(self, index: dict) -> str:
+        """格式化规则索引为 Markdown 输出
+
+        Args:
+            index: 规则索引字典（来自 get_all_available_rule_names）
+
+        Returns:
+            格式化后的 Markdown 字符串
+        """
+        from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
+
+        if not index:
+            return "❌ 未找到任何规则"
+
+        # 格式化为 Markdown 输出
+        output_lines = ["# Jarvis 规则索引\n"]
+
+        # 内置规则
+        if index.get("builtin"):
+            output_lines.append("## 📦 内置规则 (builtin)\n")
+            for rule_name in index["builtin"]:
+                # 去掉 builtin: 前缀
+                name = rule_name.split(":", 1)[1] if ":" in rule_name else rule_name
+                # 获取内置规则路径
+                rule_path = get_builtin_rule_path(name)
+                description = (
+                    self._extract_rule_description(rule_path) if rule_path else ""
+                )
+                if description:
+                    output_lines.append(f"- [{description}]({rule_path})")
+                else:
+                    # 即使没有描述，也要显示路径或名称
+                    if rule_path:
+                        output_lines.append(f"- {rule_path}")
+                    else:
+                        # 如果路径获取失败，显示规则名称
+                        output_lines.append(f"- builtin:{name}")
+            output_lines.append("")
+
+        # 文件规则（项目、全局、中心库等）
+        if index.get("files"):
+            output_lines.append("## 📁 规则文件 (files)\n")
+            # 按来源分组
+            by_source: dict[str, list[tuple[str, str]]] = {}
+            for rule_name in index["files"]:
+                if ":" in rule_name:
+                    prefix = rule_name.split(":", 1)[0]
+                    name = rule_name.split(":", 1)[1]
+                else:
+                    prefix = "unknown"
+                    name = rule_name
+
+                source_labels = {
+                    "project": "项目",
+                    "global": "全局",
+                    "central": "中心库",
+                    "config0": "配置目录",
+                }
+                label = source_labels.get(prefix, prefix)
+                if label not in by_source:
+                    by_source[label] = []
+                by_source[label].append((rule_name, name))
+
+            # 按来源输出
+            for source, rules_list in sorted(by_source.items()):
+                output_lines.append(f"### {source}\n")
+                for full_name, rel_name in sorted(rules_list, key=lambda x: x[1]):
+                    # 根据前缀确定实际文件路径
+                    rule_path = ""
+                    if full_name.startswith("project:"):
+                        rule_path = os.path.join(
+                            self.root_dir, ".jarvis", "rules", rel_name
+                        )
+                    elif full_name.startswith("global:"):
+                        rule_path = os.path.join(get_data_dir(), "rules", rel_name)
+                    elif full_name.startswith("central:") and self.central_repo_path:
+                        rule_path = os.path.join(
+                            self.central_repo_path, "rules", rel_name
+                        )
+                    elif full_name.startswith("config0:"):
+                        rule_path = os.path.join(self.root_dir, rel_name)
+
+                    description = (
+                        self._extract_rule_description(rule_path) if rule_path else ""
+                    )
+                    if description:
+                        output_lines.append(f"- [{description}]({rule_path})")
+                    else:
+                        # 即使没有描述，也要显示绝对路径
+                        output_lines.append(f"- {rule_path}")
+                output_lines.append("")
+
+        # YAML 规则
+        if index.get("yaml"):
+            output_lines.append("## 📝 YAML 规则\n")
+            for rule_name in sorted(index["yaml"]):
+                output_lines.append(f"- {rule_name}")
+            output_lines.append("")
+
+        return "\n".join(output_lines)
+
+    def _extract_rule_description(self, rule_path: str) -> str:
+        """从规则文件中提取描述
+
+        Args:
+            rule_path: 规则文件的绝对路径
+
+        Returns:
+            描述字符串，如果未找到则返回空字符串
+        """
+        try:
+            if not os.path.exists(rule_path):
+                return ""
+            with open(rule_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            # 提取 YAML Front Matter 中的 description
+            if content.startswith("---"):
+                lines = content.split("\n")
+                for i, line in enumerate(lines[1:], 1):
+                    if line.strip() == "---":
+                        break
+                    if line.startswith("description:"):
+                        description = line.split(":", 1)[1].strip()
+                        return description
+            return ""
+        except Exception:
+            return ""
+
     def _get_builtin_rules_index(self) -> Optional[str]:
         """自动从规则文件生成索引（规则名：描述）
 
@@ -844,11 +998,11 @@ class RulesManager:
             self._active_rules.add("project_rule")
             self.loaded_rules.add("project_rule")
 
-        # 加载内置规则索引
-        builtin_rules_index = self._get_builtin_rules_index()
-        if builtin_rules_index:
+        # 加载所有规则索引（内置、项目、全局、中心库等）
+        all_rules_index = self._get_all_rules_index()
+        if all_rules_index:
             # 使用 builtin_rules 作为键名（与 BUILTIN_RULES 字典保持一致）
-            self._loaded_rules["builtin_rules"] = builtin_rules_index
+            self._loaded_rules["builtin_rules"] = all_rules_index
             self._active_rules.add("builtin_rules")
             self.loaded_rules.add("builtin_rules")
 
