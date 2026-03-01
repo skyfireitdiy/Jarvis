@@ -9,6 +9,7 @@
 
 import json
 import os
+import threading
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -144,8 +145,15 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
                 except Exception as e:
                     PrettyOutput.auto_print(f"❌ 克隆中心方法论仓库失败: {str(e)}")
 
-    # --- 全局每日更新检查 ---
-    daily_check_git_updates(methodology_dirs, "methodologies")
+    # --- 全局每日更新检查（后台线程执行，避免阻塞）---
+    def check_methodology_updates() -> None:
+        try:
+            daily_check_git_updates(methodology_dirs, "methodologies")
+        except Exception:
+            # 静默失败，不影响正常使用
+            pass
+
+    threading.Thread(target=check_methodology_updates, daemon=True).start()
 
     import glob
 

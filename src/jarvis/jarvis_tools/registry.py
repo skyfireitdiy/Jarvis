@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -396,8 +397,15 @@ class ToolRegistry(OutputHandlerProtocol):
                     except Exception as e:
                         PrettyOutput.auto_print(f"❌ 克隆中心工具仓库失败: {str(e)}")
 
-        # --- 全局每日更新检查 ---
-        daily_check_git_updates(tool_dirs, "tools")
+        # --- 全局每日更新检查（后台线程执行，避免阻塞）---
+        def check_tool_updates() -> None:
+            try:
+                daily_check_git_updates(tool_dirs, "tools")
+            except Exception:
+                # 静默失败，不影响正常使用
+                pass
+
+        threading.Thread(target=check_tool_updates, daemon=True).start()
 
         for tool_dir in tool_dirs:
             p_tool_dir = Path(tool_dir)

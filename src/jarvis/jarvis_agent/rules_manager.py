@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import threading
 from pathlib import Path
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -77,11 +78,19 @@ class RulesManager:
                     except Exception as e:
                         PrettyOutput.auto_print(f"❌ 克隆中心规则仓库失败: {str(e)}")
 
-        # 执行每日更新检查（包括中心库）
+        # 执行每日更新检查（后台线程执行，避免阻塞）
         all_dirs_for_update = self.rules_dirs.copy()
         if self.central_repo_path:
             all_dirs_for_update.append(self.central_repo_path)
-        daily_check_git_updates(all_dirs_for_update, "rules")
+
+        def check_rules_updates() -> None:
+            try:
+                daily_check_git_updates(all_dirs_for_update, "rules")
+            except Exception:
+                # 静默失败，不影响正常使用
+                pass
+
+        threading.Thread(target=check_rules_updates, daemon=True).start()
 
     def read_project_rule(self) -> Optional[str]:
         """读取 .jarvis/rule 文件内容，如果存在则返回字符串，否则返回 None"""
