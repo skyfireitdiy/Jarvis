@@ -12,22 +12,15 @@ Git工具模块
 import datetime
 import os
 
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import re
 import subprocess
 import sys
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Set
-from typing import Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 
 # 全局标记：记录 confirm_add_new_files 是否已在当前流程中被调用
@@ -636,8 +629,206 @@ def is_file_in_git_repo(filepath: str) -> bool:
         return False
 
 
+def check_and_update_git_repo_background(repo_path: str) -> None:
+    """在后台线程中检查并更新git仓库（不进行用户交互）
+
+    此函数用于后台线程执行更新检查：
+    - 小版本更新：自动执行 git checkout 和 pip install
+    - 大版本更新：只写入标记文件，不执行更新
+    - 不进行用户确认，不要求重启
+
+    参数:
+        repo_path: 仓库路径
+    """
+    # 检查上次检查日期
+    last_check_file = os.path.join(get_data_dir(), "last_git_check")
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    if os.path.exists(last_check_file):
+        with open(last_check_file, "r") as f:
+            last_check_date = f.read().strip()
+        if last_check_date == today_str:
+            return
+
+    curr_dir = os.path.abspath(os.getcwd())
+    try:
+        git_root = find_git_root_and_cd(repo_path)
+    except Exception:
+        return
+
+    try:
+        # 检查是否有未提交的修改
+        if has_uncommitted_changes():
+            return
+
+        # 获取远程tag更新
+        subprocess.run(
+            ["git", "fetch", "--tags"], cwd=git_root, check=True, capture_output=True
+        )
+        # 获取最新本地tag
+        local_tag_result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        # 获取最新远程tag
+        remote_tag_result = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", "origin"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        if remote_tag_result.returncode == 0:
+            # 提取最新的tag名称
+            tags = [
+                ref.split("/")[-1]
+                for ref in decode_output(remote_tag_result.stdout).splitlines()
+            ]
+            tags = sorted(
+                tags,
+                key=lambda x: [
+                    int(i) if i.isdigit() else i for i in re.split(r"([0-9]+)", x)
+                ],
+            )
+            remote_tag = tags[-1] if tags else ""
+
+        if (
+            local_tag_result.returncode == 0
+            and remote_tag_result.returncode == 0
+            and decode_output(local_tag_result.stdout).strip() != remote_tag
+        ):
+            # 检查是否为主版本升级(主版本号不同)
+            local_tag = decode_output(local_tag_result.stdout).strip()
+            try:
+                from packaging import version
+
+                # 移除tag前缀'v'后比较
+                local_ver = version.parse(local_tag.lstrip("v"))
+                remote_ver = version.parse(remote_tag.lstrip("v"))
+                is_major_upgrade = remote_ver.major != local_ver.major
+
+                if is_major_upgrade:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 检测到主版本升级: v{local_ver} -> v{remote_ver}"
+                    )
+                    PrettyOutput.auto_print(
+                        "主版本升级可能包含不兼容的API变更，将在后台记录更新标记。"
+                    )
+                    PrettyOutput.auto_print("ℹ️ 下次启动时将询问您是否执行主版本升级。")
+                    # 写入大版本更新标记
+                    from jarvis.jarvis_utils.utils import _set_major_update_pending
+
+                    _set_major_update_pending(remote_tag)
+                    # 更新检查日期，避免重复提示
+                    os.chdir(curr_dir)
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return
+            except Exception:
+                # 版本解析失败时，保持原有行为继续升级
+                pass
+
+            # 执行小版本更新：git checkout
+            subprocess.run(
+                ["git", "checkout", remote_tag],
+                cwd=git_root,
+                check=True,
+                stderr=subprocess.PIPE,
+            )
+            PrettyOutput.auto_print(f"✅ Jarvis已更新到tag {remote_tag}")
+
+            # 执行pip安装更新代码
+            try:
+                PrettyOutput.auto_print("ℹ️ 正在安装更新后的代码...")
+
+                # 检查是否在虚拟环境中
+                in_venv = hasattr(sys, "real_prefix") or (
+                    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+                )
+
+                # 检测 uv 可用性
+                from shutil import which as _which
+
+                uv_executable = None
+                if sys.platform == "win32":
+                    venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                else:
+                    venv_uv = os.path.join(sys.prefix, "bin", "uv")
+                if os.path.exists(venv_uv):
+                    uv_executable = venv_uv
+                else:
+                    path_uv = _which("uv")
+                    if path_uv:
+                        uv_executable = path_uv
+
+                # 根据环境选择安装命令
+                if uv_executable:
+                    install_cmd = [uv_executable, "pip", "install", "-e", "."]
+                else:
+                    install_cmd = [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-e",
+                        ".",
+                    ]
+
+                # 尝试安装
+                result = subprocess.run(install_cmd, cwd=git_root, capture_output=True)
+
+                if result.returncode == 0:
+                    PrettyOutput.auto_print("✅ 代码更新安装成功")
+                    PrettyOutput.auto_print(
+                        "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                    )
+                    # 写入重启标记，下次启动时提示用户重启
+                    from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                    _set_update_reboot_flag()
+                    # 更新检查日期
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return
+
+                # 处理权限错误
+                error_msg = decode_output(result.stderr).strip()
+                if not in_venv and (
+                    "Permission denied" in error_msg or "not writeable" in error_msg
+                ):
+                    # 后台线程不进行用户交互，直接尝试用户级安装
+                    user_result = subprocess.run(
+                        install_cmd + ["--user"],
+                        cwd=git_root,
+                        capture_output=True,
+                    )
+                    if user_result.returncode == 0:
+                        PrettyOutput.auto_print("✅ 用户级代码安装成功")
+                        PrettyOutput.auto_print(
+                            "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                        )
+                        # 写入重启标记
+                        from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                        _set_update_reboot_flag()
+                        # 更新检查日期
+                        with open(last_check_file, "w") as f:
+                            f.write(today_str)
+                        return
+
+                PrettyOutput.auto_print(f"❌ 代码安装失败: {error_msg}")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 安装过程中发生意外错误: {str(e)}")
+
+        # 更新检查日期文件
+        with open(last_check_file, "w") as f:
+            f.write(today_str)
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
+    finally:
+        os.chdir(curr_dir)
+
+
 def check_and_update_git_repo(repo_path: str) -> bool:
-    """检查并更新git仓库
+    """检查并更新git仓库（带用户交互）
 
     参数:
         repo_path: 仓库路径
@@ -716,20 +907,21 @@ def check_and_update_git_repo(repo_path: str) -> bool:
 
                 if is_major_upgrade:
                     PrettyOutput.auto_print(
-                        f"⚠️ 主版本升级警告: v{local_ver} -> v{remote_ver}"
+                        f"⚠️ 检测到主版本升级: v{local_ver} -> v{remote_ver}"
                     )
                     PrettyOutput.auto_print(
-                        "主版本升级可能包含不兼容的API变更,建议查看发布说明。"
+                        "主版本升级可能包含不兼容的API变更,将在后台记录更新标记。"
                     )
-                    if not user_confirm("是否继续升级? (默认为升级)", default=True):
-                        PrettyOutput.auto_print(
-                            "ℹ️ 已取消升级,将在下次启动时再次检查更新。"
-                        )
-                        # 更新检查日期,避免重复提示
-                        os.chdir(curr_dir)
-                        with open(last_check_file, "w") as f:
-                            f.write(today_str)
-                        return False
+                    PrettyOutput.auto_print("ℹ️ 下次启动时将询问您是否执行主版本升级。")
+                    # 写入大版本更新标记
+                    from jarvis.jarvis_utils.utils import _set_major_update_pending
+
+                    _set_major_update_pending(remote_tag)
+                    # 更新检查日期,避免重复提示
+                    os.chdir(curr_dir)
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return False
             except Exception:
                 # 版本解析失败时,保持原有行为继续升级
                 pass
@@ -784,7 +976,14 @@ def check_and_update_git_repo(repo_path: str) -> bool:
 
                 if result.returncode == 0:
                     PrettyOutput.auto_print("✅ 代码更新安装成功")
-                    return True
+                    PrettyOutput.auto_print(
+                        "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                    )
+                    # 写入重启标记，下次启动时提示用户重启
+                    from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                    _set_update_reboot_flag()
+                    return False
 
                 # 处理权限错误
                 error_msg = decode_output(result.stderr).strip()
@@ -801,7 +1000,16 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                         )
                         if user_result.returncode == 0:
                             PrettyOutput.auto_print("✅ 用户级代码安装成功")
-                            return True
+                            PrettyOutput.auto_print(
+                                "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                            )
+                            # 写入重启标记，下次启动时提示用户重启
+                            from jarvis.jarvis_utils.utils import (
+                                _set_update_reboot_flag,
+                            )
+
+                            _set_update_reboot_flag()
+                            return False
                         error_msg = decode_output(user_result.stderr).strip()
 
                 PrettyOutput.auto_print(f"❌ 代码安装失败: {error_msg}")
