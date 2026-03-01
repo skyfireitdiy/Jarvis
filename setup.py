@@ -53,7 +53,7 @@ setup(
         "python-Levenshtein==0.25.1",
         "tiktoken==0.7.0",
         "markitdown>=0.0.1",
-        "defusedxml>=2.0.0",
+        "defusedxml",
         "pillow==10.2.0",
         "openai==1.78.1",
         "python-lsp-server>=1.14.0",
