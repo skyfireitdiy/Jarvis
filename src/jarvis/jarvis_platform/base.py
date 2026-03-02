@@ -238,9 +238,15 @@ class BasePlatform(ABC):
             if is_completed:
                 # 计算性能指标
                 response_tokens = get_context_token_count(response)
-                generation_time = duration - first_token_time if duration > first_token_time else duration
-                tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
-                
+                generation_time = (
+                    duration - first_token_time
+                    if duration > first_token_time
+                    else duration
+                )
+                tokens_per_second = (
+                    response_tokens / generation_time if generation_time > 0 else 0
+                )
+
                 if max_tokens > 0 and progress_bar:
                     try:
                         panel.subtitle = (
@@ -295,6 +301,10 @@ class BasePlatform(ABC):
             chat_iterator = self.chat(message)
             try:
                 while True:
+                    # 检查是否请求中断
+                    if is_immediate_abort() and get_interrupt():
+                        self._append_session_history(message, "")
+                        return "", 0.0
                     first_chunk = next(chat_iterator)
                     if first_chunk:
                         first_token_time = time.time() - start_time
@@ -455,7 +465,11 @@ class BasePlatform(ABC):
             # 更新 subtitle 显示完成状态和性能指标
             with self._panel_lock:
                 self._update_panel_subtitle_with_token(
-                    panel, response, is_completed=True, duration=duration, first_token_time=first_token_time
+                    panel,
+                    response,
+                    is_completed=True,
+                    duration=duration,
+                    first_token_time=first_token_time,
                 )
                 live.update(panel)
 
@@ -499,9 +513,15 @@ class BasePlatform(ABC):
         duration = end_time - start_time
         # 计算性能指标
         response_tokens = get_context_token_count(response)
-        generation_time = duration - first_token_time if duration > first_token_time else duration
-        tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
-        console.print(f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s")
+        generation_time = (
+            duration - first_token_time if duration > first_token_time else duration
+        )
+        tokens_per_second = (
+            response_tokens / generation_time if generation_time > 0 else 0
+        )
+        console.print(
+            f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+        )
         return response
 
     def _chat_with_suppressed_output(self, message: str, max_output: int = 0) -> str:
@@ -574,8 +594,12 @@ class BasePlatform(ABC):
 
             # 计算性能指标
             response_tokens = get_context_token_count(response)
-            generation_time = duration - first_token_time if duration > first_token_time else duration
-            tokens_per_second = response_tokens / generation_time if generation_time > 0 else 0
+            generation_time = (
+                duration - first_token_time if duration > first_token_time else duration
+            )
+            tokens_per_second = (
+                response_tokens / generation_time if generation_time > 0 else 0
+            )
 
             # 获取Token使用信息
             try:
