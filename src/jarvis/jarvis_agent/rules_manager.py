@@ -1304,24 +1304,17 @@ class RulesManager:
             # 调用规则选择方法
             selected_rules = self.select_rule_by_task(task_description)
 
-            # 如果成功选择了规则，将其添加到已加载规则列表中
+            # 如果成功选择了规则，将其激活
             if selected_rules:
-                # 遍历选中的规则列表
+                # 遍历选中的规则列表并激活
                 for rule_name in selected_rules:
-                    # 检查规则是否已经在集合中
-                    if rule_name not in agent.loaded_rule_names:
-                        agent.loaded_rule_names.add(rule_name)
-
-                        # 重新加载所有规则，包括新选择的规则
-                        agent.loaded_rules, _ = self.load_all_rules(
-                            ",".join(agent.loaded_rule_names)
-                        )
-
+                    # 使用 activate_rule 方法激活规则（内部会检查重复并自动合并）
+                    if self.activate_rule(rule_name):
                         PrettyOutput.auto_print(
                             f"✅ 已根据任务自动选择规则: {rule_name}"
                         )
                     else:
-                        PrettyOutput.auto_print(f"ℹ️ 规则已存在: {rule_name}")
+                        PrettyOutput.auto_print(f"ℹ️ 规则已存在或激活失败: {rule_name}")
         except Exception as e:
             # 规则选择失败不影响主流程，静默处理
             PrettyOutput.auto_print(f"⚠️ 自动选择规则失败: {e}")
