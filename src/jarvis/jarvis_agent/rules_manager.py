@@ -18,6 +18,7 @@ import yaml
 
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.template_utils import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.config import get_data_dir
@@ -1169,3 +1170,73 @@ class RulesManager:
         rules_info.sort(key=lambda x: (x[2], x[0]))
 
         return rules_info
+
+    def select_rule_by_task(self, task_description: str) -> Optional[str]:
+        """根据任务描述，让模型自动选择最合适的规则
+
+        参数:
+            task_description: 任务描述字符串
+
+        返回:
+            Optional[str]: 推荐的规则名称，如果无法选择则返回 None
+        """
+        try:
+            # 获取规则索引
+            rules_index = self._get_all_rules_index()
+            if not rules_index:
+                PrettyOutput.auto_print("⚠️  无法获取规则索引")
+                return None
+
+            # 创建 normal 类型的模型
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = registry.create_platform(platform_type="normal")
+            if model is None:
+                PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
+                return None
+
+            # 构造 prompt
+            prompt = f"""请根据以下任务描述，从规则索引中选择最合适的规则。
+
+任务描述：
+{task_description}
+
+可用规则索引：
+{rules_index}
+
+要求：
+1. 仔细分析任务描述，选择最匹配的规则
+2. 如果有多个规则相关，选择最相关的一个
+3. 如果没有合适的规则，返回 "NONE"
+4. 只返回规则名称（如 architecture_design/clean_code.md），不要包含其他内容
+5. 规则名称必须是索引中存在的完整名称
+
+选择的规则名称："""
+
+            # 调用模型
+            response = ""
+            for chunk in model.chat(prompt):
+                response += chunk
+
+            # 清理响应
+            rule_name = response.strip()
+
+            # 验证返回的规则名称是否有效
+            if not rule_name or rule_name == "NONE":
+                return None
+
+            # 去除可能的前缀（如 "选择的规则名称："）
+            if "：" in rule_name:
+                rule_name = rule_name.split("：", 1)[1].strip()
+            if ":" in rule_name:
+                rule_name = rule_name.split(":", 1)[1].strip()
+
+            # 验证规则是否存在
+            if self.get_named_rule(rule_name):
+                return rule_name
+            else:
+                PrettyOutput.auto_print(f"⚠️  模型返回的规则不存在: {rule_name}")
+                return None
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
+            return None
