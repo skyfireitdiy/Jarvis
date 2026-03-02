@@ -17,47 +17,94 @@ _PROMPTS_DIR = (
     / "prompts"
     / "code_agent_system"
 )
-_SCENARIOS_FILE = _PROMPTS_DIR / "scenarios.yaml"
 
 
 def _load_scenario_types() -> Dict[str, Dict[str, str]]:
-    """从文件加载场景类型定义
+    """从 md 文件的 YAML front matter 加载场景类型定义
 
     返回:
         Dict[str, Dict[str, str]]: 场景类型字典，格式为 {scenario_id: {"name": "...", "description": "..."}}
 
     异常:
-        FileNotFoundError: 如果文件不存在
+        FileNotFoundError: 如果提示词目录不存在
         IOError: 如果文件读取失败
         ValueError: 如果文件格式不正确
     """
-    if not _SCENARIOS_FILE.exists():
+    if not _PROMPTS_DIR.exists():
         raise FileNotFoundError(
-            f"场景类型定义文件不存在: {_SCENARIOS_FILE}。请确保文件存在于 {_PROMPTS_DIR} 目录下。"
+            f"提示词目录不存在: {_PROMPTS_DIR}"
         )
 
+    scenarios = {}
+
     try:
-        with open(_SCENARIOS_FILE, "r", encoding="utf-8") as f:
-            scenarios = yaml.safe_load(f)
-            if not isinstance(scenarios, dict):
-                raise ValueError(f"场景类型定义文件格式不正确: {_SCENARIOS_FILE}")
+        # 扫描所有 .md 文件（排除 README.md）
+        for md_file in _PROMPTS_DIR.glob("*.md"):
+            # 跳过 README.md
+            if md_file.name.lower() == "readme.md":
+                continue
 
-            # 验证每个场景都有 name 和 description
-            for scenario_id, scenario_info in scenarios.items():
-                if not isinstance(scenario_info, dict):
+            # 场景 ID 使用文件名（不含扩展名）
+            scenario_id = md_file.stem
+
+            try:
+                with open(md_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                # 解析 YAML front matter
+                # 格式：---\nname: xxx\ndescription: yyy\n---\nprompt 正文
+                front_matter = None
+                if content.startswith("---"):
+                    # 找到第二个 '---'
+                    end_marker = content.find("\n---", 4)
+                    if end_marker != -1:
+                        front_matter_text = content[4:end_marker]
+                        front_matter = yaml.safe_load(front_matter_text)
+
+                if front_matter is None:
                     raise ValueError(
-                        f"场景 '{scenario_id}' 的定义格式不正确，应为字典格式"
-                    )
-                if "name" not in scenario_info or "description" not in scenario_info:
-                    raise ValueError(
-                        f"场景 '{scenario_id}' 缺少必需的字段 'name' 或 'description'"
+                        f"文件 '{md_file.name}' 缺少 YAML front matter 或格式不正确"
                     )
 
-            return scenarios
-    except yaml.YAMLError as e:
-        raise IOError(f"解析场景类型定义文件失败 ({_SCENARIOS_FILE}): {e}") from e
+                if not isinstance(front_matter, dict):
+                    raise ValueError(
+                        f"文件 '{md_file.name}' 的 front matter 不是有效的字典"
+                    )
+
+                if "name" not in front_matter or "description" not in front_matter:
+                    raise ValueError(
+                        f"文件 '{md_file.name}' 的 front matter 缺少必需的字段 'name' 或 'description'"
+                    )
+
+                scenarios[scenario_id] = {
+                    "name": front_matter["name"],
+                    "description": front_matter["description"],
+                }
+
+            except yaml.YAMLError as e:
+                raise IOError(
+                    f"解析文件 '{md_file.name}' 的 YAML front matter 失败: {e}"
+                ) from e
+            except ValueError:
+                raise
+            except Exception as e:
+                raise IOError(
+                    f"加载文件 '{md_file.name}' 失败: {e}"
+                ) from e
+
+        if not scenarios:
+            raise FileNotFoundError(
+                f"在目录 {_PROMPTS_DIR} 中未找到有效的提示词文件"
+            )
+
+        return scenarios
+
+    except FileNotFoundError:
+        raise
+    except ValueError:
+        raise
     except Exception as e:
-        raise IOError(f"加载场景类型定义文件失败 ({_SCENARIOS_FILE}): {e}") from e
+        raise IOError(f"加载场景类型定义失败: {e}") from e
 
 
 def _get_scenario_types() -> Dict[str, str]:
@@ -150,7 +197,7 @@ def _load_prompt_from_file(scenario: str) -> str:
         scenario: 场景类型
 
     返回:
-        str: 提示词内容
+        str: 提示词内容（不包括 YAML front matter）
 
     异常:
         FileNotFoundError: 如果文件不存在
@@ -164,10 +211,21 @@ def _load_prompt_from_file(scenario: str) -> str:
 
     try:
         with open(prompt_file, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if not content:
-                raise ValueError(f"提示词文件为空: {prompt_file}")
-            return content
+            content = f.read()
+
+        # 跳过 YAML front matter（如果存在）
+        # 格式：---\nname: xxx\ndescription: yyy\n---\nprompt 正文
+        if content.startswith("---"):
+            # 找到第二个 '---' 的位置
+            end_marker = content.find("\n---", 4)
+            if end_marker != -1:
+                # 跳过 front matter，返回后面的内容
+                content = content[end_marker + 4:]  # +4 跳过 "\n---"
+
+        content = content.strip()
+        if not content:
+            raise ValueError(f"提示词文件为空: {prompt_file}")
+        return content
     except Exception as e:
         raise IOError(f"加载提示词文件失败 ({prompt_file}): {e}") from e
 
