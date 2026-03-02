@@ -23,7 +23,8 @@ class LoadRuleTool:
     name = "load_rule"
     description = (
         "读取规则文件内容并使用 jinja2 渲染模板变量。"
-        "支持的变量包括：current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir"
+        "支持的变量包括：current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir。"
+        "使用 'jri' 命令可以获取完整的规则列表。"
     )
     parameters = {
         "type": "object",
