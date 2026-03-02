@@ -1048,6 +1048,52 @@ def get_html_template() -> str:
                 const itemsContainer = document.getElementById('array-items-' + fullPathStr);
                 if (itemsContainer) {
                     itemsContainer.dataset.schema = JSON.stringify(prop.items || {});
+                    
+                    // 初始化已有的数组项
+                    if (Array.isArray(defaultValue) && defaultValue.length > 0) {
+                        const schema = prop.items || {};
+                        defaultValue.forEach(function(itemValue) {
+                            const index = arrayCounters[fullPathStr]++;
+                            const itemPath = fullPathStr + '[' + index + ']';
+
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'array-item';
+                            itemDiv.dataset.index = index;
+
+                            let fieldHTML = '';
+                            if (schema.type === 'object') {
+                                for (const propName in schema.properties || {}) {
+                                    const propSchema = schema.properties[propName];
+                                    // 为对象类型的数组项创建元数据,包含默认值
+                                    const propMeta = {
+                                        default: itemValue && itemValue[propName] !== undefined ? itemValue[propName] : propSchema.default,
+                                        description: propSchema.description,
+                                        enum: propSchema.enum
+                                    };
+                                    const propRequired = (schema.required || []).includes(propName);
+                                    fieldHTML += createFieldHTML(propName, propSchema, propMeta, propRequired, [itemPath]);
+                                }
+                            } else {
+                                // 为简单类型的数组项直接创建输入框,不显示标签
+                                if (schema.enum) {
+                                    fieldHTML += createSelectHTML(itemPath, schema.enum, itemValue !== undefined ? itemValue : schema.default);
+                                } else if (schema.type === 'boolean') {
+                                    fieldHTML += createSwitchHTML(itemPath, itemValue !== undefined ? itemValue : schema.default);
+                                } else if (schema.type === 'string' && schema.format === 'textarea') {
+                                    fieldHTML += createTextareaHTML(itemPath, schema, itemValue !== undefined ? itemValue : schema.default);
+                                } else if (schema.type === 'number' || schema.type === 'integer') {
+                                    fieldHTML += createNumberInputHTML(itemPath, schema, itemValue !== undefined ? itemValue : schema.default);
+                                } else {
+                                    fieldHTML += createTextInputHTML(itemPath, schema, itemValue !== undefined ? itemValue : schema.default);
+                                }
+                            }
+
+                            itemDiv.innerHTML = fieldHTML;
+                            itemDiv.innerHTML += '<button type="button" class="btn btn-danger btn-sm btn-icon" onclick="removeArrayItem(\'' + fullPathStr + '\', ' + index + ')" style="margin-top: 16px;">×</button>';
+
+                            itemsContainer.appendChild(itemDiv);
+                        });
+                    }
                 }
             }, 0);
 
@@ -1075,8 +1121,18 @@ def get_html_template() -> str:
                     fieldHTML += createFieldHTML(propName, propSchema, propMeta, propRequired, [itemPath]);
                 }
             } else {
-                const meta = schema._meta || {};
-                fieldHTML += createFieldHTML('value', schema, meta, false, [itemPath]);
+                // 为简单类型的数组项直接创建输入框,不显示标签
+                if (schema.enum) {
+                    fieldHTML += createSelectHTML(itemPath, schema.enum, schema._meta?.default);
+                } else if (schema.type === 'boolean') {
+                    fieldHTML += createSwitchHTML(itemPath, schema._meta?.default);
+                } else if (schema.type === 'string' && schema.format === 'textarea') {
+                    fieldHTML += createTextareaHTML(itemPath, schema, schema._meta?.default);
+                } else if (schema.type === 'number' || schema.type === 'integer') {
+                    fieldHTML += createNumberInputHTML(itemPath, schema, schema._meta?.default);
+                } else {
+                    fieldHTML += createTextInputHTML(itemPath, schema, schema._meta?.default);
+                }
             }
 
             itemDiv.innerHTML = fieldHTML;
