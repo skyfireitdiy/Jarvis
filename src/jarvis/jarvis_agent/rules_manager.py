@@ -1178,13 +1178,22 @@ class RulesManager:
             task_description: 任务描述字符串
 
         返回:
-            Optional[str]: 推荐的规则名称，如果无法选择则返回 None
+            Optional[str]: 推荐的规则名称（带前缀，如 builtin:xxx.md），如果无法选择则返回 None
         """
         try:
-            # 获取规则索引
-            rules_index = self._get_all_rules_index()
-            if not rules_index:
+            # 获取所有可用规则
+            all_rules_dict = self.get_all_available_rule_names()
+            if not all_rules_dict:
                 PrettyOutput.auto_print("⚠️  无法获取规则索引")
+                return None
+
+            # 将所有规则扁平化为列表，用于编号
+            all_rules_list = []
+            for category, rules in all_rules_dict.items():
+                all_rules_list.extend(rules)
+
+            if not all_rules_list:
+                PrettyOutput.auto_print("⚠️  没有可用的规则")
                 return None
 
             # 创建 normal 类型的模型
@@ -1194,47 +1203,72 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
                 return None
 
-            # 构造 prompt
-            prompt = f"""请根据以下任务描述，从规则索引中选择最合适的规则。
+            # 构造编号列表
+            numbered_rules = ""
+            for i, rule_name in enumerate(all_rules_list, 1):
+                numbered_rules += f"{i}. {rule_name}\n"
+
+            # 构造 prompt，要求模型返回编号
+            prompt = f"""请根据以下任务描述，从可用规则中选择最合适的规则。
 
 任务描述：
 {task_description}
 
-可用规则索引：
-{rules_index}
+可用规则列表：
+{numbered_rules}
 
 要求：
 1. 仔细分析任务描述，选择最匹配的规则
 2. 如果有多个规则相关，选择最相关的一个
 3. 如果没有合适的规则，返回 "NONE"
-4. 只返回规则名称（如 architecture_design/clean_code.md），不要包含其他内容
-5. 规则名称必须是索引中存在的完整名称
+4. 严格按照以下格式返回序号：<NUM>序号</NUM>
+5. 例如：<NUM>5</NUM> 或 <NUM>none</NUM>
+6. 只返回<NUM>标签内的内容，不要有其他任何输出
 
-选择的规则名称："""
+选择的规则序号："""
 
-            # 调用模型
-            response = ""
-            for chunk in model.chat(prompt):
-                response += chunk
+            # 调用模型，限制输出长度
+            model.set_suppress_output(True)
+            response = model.chat_until_success(prompt, max_output=50).strip()
+            model.set_suppress_output(False)
 
-            # 清理响应
-            rule_name = response.strip()
+            # 从响应中提取<NUM>标签内的内容
+            import re
 
-            # 验证返回的规则名称是否有效
-            if not rule_name or rule_name == "NONE":
+            num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
+
+            if not num_match:
+                # 如果没有找到<NUM>标签，尝试直接解析响应
+                selected_index_str = response.strip()
+            else:
+                selected_index_str = num_match.group(1).strip()
+
+            # 验证返回值
+            if not selected_index_str or selected_index_str.lower() == "none":
                 return None
 
-            # 去除可能的前缀（如 "选择的规则名称："）
-            if "：" in rule_name:
-                rule_name = rule_name.split("：", 1)[1].strip()
-            if ":" in rule_name:
-                rule_name = rule_name.split(":", 1)[1].strip()
+            # 解析编号
+            try:
+                selected_index = int(selected_index_str)
+            except ValueError:
+                PrettyOutput.auto_print(
+                    f"⚠️  模型返回的编号格式错误: {selected_index_str}"
+                )
+                return None
+
+            # 验证编号范围
+            if not (1 <= selected_index <= len(all_rules_list)):
+                PrettyOutput.auto_print(f"⚠️  模型返回的编号超出范围: {selected_index}")
+                return None
+
+            # 获取规则名称（带前缀）
+            rule_name = all_rules_list[selected_index - 1]
 
             # 验证规则是否存在
             if self.get_named_rule(rule_name):
                 return rule_name
             else:
-                PrettyOutput.auto_print(f"⚠️  模型返回的规则不存在: {rule_name}")
+                PrettyOutput.auto_print(f"⚠️  选中的规则不存在: {rule_name}")
                 return None
 
         except Exception as e:
