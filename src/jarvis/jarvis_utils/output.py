@@ -20,6 +20,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from datetime import datetime
+import threading
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
@@ -553,15 +554,19 @@ class ConsoleOutputSink(OutputSink):
 # 模块级输出分发器（默认注册控制台后端）
 _output_sinks: List[OutputSink] = [ConsoleOutputSink()]
 
+# 输出锁，确保多线程输出不会混乱
+_output_lock = threading.Lock()
+
 
 def emit_output(event: OutputEvent) -> None:
     """向所有已注册的输出后端广播事件。"""
-    for sink in list(_output_sinks):
-        try:
-            sink.emit(event)
-        except Exception as e:
-            # 后端故障不影响其他后端
-            console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
+    with _output_lock:
+        for sink in list(_output_sinks):
+            try:
+                sink.emit(event)
+            except Exception as e:
+                # 后端故障不影响其他后端
+                console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
 
 
 class PrettyOutput:
@@ -707,17 +712,19 @@ class PrettyOutput:
     @staticmethod
     def add_sink(sink: OutputSink) -> None:
         """注册一个新的输出后端。"""
-        _output_sinks.append(sink)
+        with _output_lock:
+            _output_sinks.append(sink)
 
     @staticmethod
     def clear_sinks(keep_default: bool = True) -> None:
         """清空已注册的输出后端；可选择保留默认控制台后端。"""
-        if keep_default:
-            globals()["_output_sinks"] = [
-                s for s in _output_sinks if isinstance(s, ConsoleOutputSink)
-            ]
-        else:
-            _output_sinks.clear()
+        with _output_lock:
+            if keep_default:
+                globals()["_output_sinks"] = [
+                    s for s in _output_sinks if isinstance(s, ConsoleOutputSink)
+                ]
+            else:
+                _output_sinks.clear()
 
     @staticmethod
     def get_sinks() -> List[OutputSink]:
