@@ -1739,33 +1739,8 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             timeout=10,
         )
         if decode_output(status_result.stdout):
-            from jarvis.jarvis_utils.input import user_confirm
-
-            if user_confirm(
-                f"检测到 '{repo_path.name}' 存在未提交的更改，是否放弃这些更改并更新？"
-            ):
-                try:
-                    subprocess.run(
-                        ["git", "checkout", "."],
-                        cwd=repo_path,
-                        capture_output=True,
-                        check=True,
-                        timeout=10,
-                    )
-                except (
-                    subprocess.CalledProcessError,
-                    subprocess.TimeoutExpired,
-                    FileNotFoundError,
-                ) as e:
-                    PrettyOutput.auto_print(
-                        f"❌ 放弃 '{repo_path.name}' 的更改失败: {str(e)}"
-                    )
-                    return
-            else:
-                PrettyOutput.auto_print(
-                    f"ℹ️ 跳过更新 '{repo_path.name}' 以保留未提交的更改。"
-                )
-                return
+            # 后台线程不询问用户，直接跳过有未提交更改的仓库
+            return
 
         # 获取更新前的commit hash
         before_hash_result = subprocess.run(
