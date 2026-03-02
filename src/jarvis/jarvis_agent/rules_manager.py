@@ -8,6 +8,7 @@ from pathlib import Path
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -1171,14 +1172,15 @@ class RulesManager:
 
         return rules_info
 
-    def select_rule_by_task(self, task_description: str) -> Optional[str]:
-        """根据任务描述，让模型自动选择最合适的规则
+    def select_rule_by_task(self, task_description: str) -> Optional[List[str]]:
+        """根据任务描述，让模型自动选择最合适的规则（最多3个）
 
         参数:
             task_description: 任务描述字符串
 
         返回:
-            Optional[str]: 推荐的规则名称（带前缀，如 builtin:xxx.md），如果无法选择则返回 None
+            Optional[List[str]]: 推荐的规则名称列表（带前缀，如 builtin:xxx.md），
+                                如果无法选择则返回 None，最多返回3个规则
         """
         try:
             # 获取所有可用规则
@@ -1219,17 +1221,18 @@ class RulesManager:
 
 要求：
 1. 仔细分析任务描述，选择最匹配的规则
-2. 如果有多个规则相关，选择最相关的一个
+2. 如果有多个规则相关，选择最相关的1-3个规则
 3. 如果没有合适的规则，返回 "NONE"
-4. 严格按照以下格式返回序号：<NUM>序号</NUM>
-5. 例如：<NUM>5</NUM> 或 <NUM>none</NUM>
-6. 只返回<NUM>标签内的内容，不要有其他任何输出
+4. 严格按照以下格式返回序号：<NUM>序号1,序号2,序号3</NUM>
+5. 例如：<NUM>5</NUM> 或 <NUM>3,5,7</NUM> 或 <NUM>none</NUM>
+6. 多个序号之间用逗号分隔，不要有空格
+7. 只返回<NUM>标签内的内容，不要有其他任何输出
 
 选择的规则序号："""
 
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
-            response = model.chat_until_success(prompt, max_output=50).strip()
+            response = model.chat_until_success(prompt, max_output=100).strip()
             model.set_suppress_output(False)
 
             # 从响应中提取<NUM>标签内的内容
@@ -1247,30 +1250,77 @@ class RulesManager:
             if not selected_index_str or selected_index_str.lower() == "none":
                 return None
 
-            # 解析编号
+            # 解析编号（支持多个编号，用逗号分隔）
             try:
-                selected_index = int(selected_index_str)
+                # 尝试按逗号分割编号
+                index_strings = selected_index_str.split(",")
+                selected_indices = []
+                for idx_str in index_strings:
+                    idx = int(idx_str.strip())
+                    # 验证编号范围
+                    if 1 <= idx <= len(all_rules_list):
+                        selected_indices.append(idx)
+                    else:
+                        PrettyOutput.auto_print(f"⚠️  模型返回的编号超出范围: {idx}")
+
+                # 如果没有有效编号，返回None
+                if not selected_indices:
+                    return None
+
+                # 限制最多返回3个规则
+                selected_indices = selected_indices[:3]
             except ValueError:
                 PrettyOutput.auto_print(
                     f"⚠️  模型返回的编号格式错误: {selected_index_str}"
                 )
                 return None
 
-            # 验证编号范围
-            if not (1 <= selected_index <= len(all_rules_list)):
-                PrettyOutput.auto_print(f"⚠️  模型返回的编号超出范围: {selected_index}")
-                return None
+            # 获取规则名称列表（带前缀）
+            rule_names = []
+            for index in selected_indices:
+                rule_name = all_rules_list[index - 1]
+                # 验证规则是否存在
+                if self.get_named_rule(rule_name):
+                    rule_names.append(rule_name)
+                else:
+                    PrettyOutput.auto_print(f"⚠️  选中的规则不存在: {rule_name}")
 
-            # 获取规则名称（带前缀）
-            rule_name = all_rules_list[selected_index - 1]
-
-            # 验证规则是否存在
-            if self.get_named_rule(rule_name):
-                return rule_name
-            else:
-                PrettyOutput.auto_print(f"⚠️  选中的规则不存在: {rule_name}")
-                return None
+            # 返回规则名称列表
+            return rule_names if rule_names else None
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
             return None
+
+    def auto_select_and_load_rules(self, task_description: str, agent: Any) -> None:
+        """根据任务描述自动选择并加载规则（最多3个）
+
+        参数:
+            task_description: 任务描述字符串
+            agent: Agent实例，用于访问 loaded_rule_names
+        """
+        try:
+            # 调用规则选择方法
+            selected_rules = self.select_rule_by_task(task_description)
+
+            # 如果成功选择了规则，将其添加到已加载规则列表中
+            if selected_rules:
+                # 遍历选中的规则列表
+                for rule_name in selected_rules:
+                    # 检查规则是否已经在集合中
+                    if rule_name not in agent.loaded_rule_names:
+                        agent.loaded_rule_names.add(rule_name)
+
+                        # 重新加载所有规则，包括新选择的规则
+                        agent.loaded_rules, _ = self.load_all_rules(
+                            ",".join(agent.loaded_rule_names)
+                        )
+
+                        PrettyOutput.auto_print(
+                            f"✅ 已根据任务自动选择规则: {rule_name}"
+                        )
+                    else:
+                        PrettyOutput.auto_print(f"ℹ️ 规则已存在: {rule_name}")
+        except Exception as e:
+            # 规则选择失败不影响主流程，静默处理
+            PrettyOutput.auto_print(f"⚠️ 自动选择规则失败: {e}")
