@@ -1,7 +1,3 @@
----
-description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索、信息检索等场景
----
-
 # Hacker News 搜索规则
 
 ## 规则简介
