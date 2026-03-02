@@ -187,8 +187,6 @@ class RulesManager:
             str: 索引内容，如果未找到规则则返回 None
         """
         try:
-            from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
-
             # 获取所有可用规则
             all_rules = self.get_all_available_rule_names()
 
@@ -233,13 +231,6 @@ class RulesManager:
                 )
                 if description:
                     output_lines.append(f"- [{description}]({rule_path})")
-                else:
-                    # 即使没有描述，也要显示路径或名称
-                    if rule_path:
-                        output_lines.append(f"- {rule_path}")
-                    else:
-                        # 如果路径获取失败，显示规则名称
-                        output_lines.append(f"- builtin:{name}")
             output_lines.append("")
 
         # 文件规则（项目、全局、中心库等）
@@ -290,9 +281,6 @@ class RulesManager:
                     )
                     if description:
                         output_lines.append(f"- [{description}]({rule_path})")
-                    else:
-                        # 即使没有描述，也要显示绝对路径
-                        output_lines.append(f"- {rule_path}")
                 output_lines.append("")
 
         # YAML 规则
