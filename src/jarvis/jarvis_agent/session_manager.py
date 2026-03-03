@@ -1115,6 +1115,7 @@ class SessionManager:
                 "recent_memories": getattr(self.agent, "recent_memories", []),
                 "MAX_RECENT_MEMORIES": getattr(self.agent, "MAX_RECENT_MEMORIES", 10),
                 "memory_tags": list(getattr(self.agent, "memory_tags", set())),
+                "first": getattr(self.agent, "first", True),
             },
             "metadata": {
                 "agent_name": self.agent_name,
@@ -1283,6 +1284,8 @@ class SessionManager:
                     PrettyOutput.auto_print(
                         f"✅ 已恢复 {len(self.agent.recent_memories)} 条最近记忆"
                     )
+                # 恢复首次运行标志
+                self.agent.first = agent_runtime_state.get("first", True)
                 PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
 
             # 恢复CodeAgent特定状态
