@@ -10,7 +10,6 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 from rich.status import Status
 from jarvis.jarvis_utils.globals import console
-from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -182,7 +181,6 @@ class RulesManager:
         Returns:
             格式化后的 Markdown 字符串
         """
-        from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 
         if not index:
             return "❌ 未找到任何规则"
@@ -922,12 +920,93 @@ class RulesManager:
         combined_parts = []
         for rule_name in sorted(self._active_rules):
             if rule_name in self._loaded_rules:
-                combined_parts.append(self._loaded_rules[rule_name])
+                # 获取规则文件路径
+                rule_path = self.get_rule_file_path(rule_name)
+                # 格式化规则内容和路径
+                if rule_path and rule_path != "--":
+                    rule_content = f"## 规则文件路径: {rule_path}\n\n{self._loaded_rules[rule_name]}"
+                else:
+                    rule_content = self._loaded_rules[rule_name]
+                combined_parts.append(rule_content)
 
         if combined_parts:
             self._merged_rules = "\n\n".join(combined_parts)
         else:
             self._merged_rules = ""
+
+    def get_rule_file_path(self, rule_name: str) -> str:
+        """获取规则文件的绝对路径
+
+        参数:
+            rule_name: 规则名称（可能包含前缀，如 builtin:, project:, global: 等）
+
+        返回:
+            str: 规则文件的绝对路径，如果无法获取则返回 "--"
+        """
+        try:
+            # 解析前缀
+            if ":" in rule_name:
+                prefix, actual_name = rule_name.split(":", 1)
+
+                # 处理 builtin 前缀
+                if prefix == "builtin":
+                    try:
+                        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+                        builtin_dir = _get_builtin_dir()
+                        if builtin_dir is not None:
+                            builtin_rules_dir = builtin_dir / "rules"
+                            return str(builtin_rules_dir / actual_name)
+                    except Exception:
+                        pass
+
+                # 处理 project 前缀
+                elif prefix == "project":
+                    return os.path.join(self.root_dir, ".jarvis", "rules", actual_name)
+
+                # 处理 global 前缀
+                elif prefix == "global":
+                    return os.path.join(get_data_dir(), "rules", actual_name)
+
+                # 处理 central 和 config 前缀
+                elif prefix == "central" or prefix.startswith("config"):
+                    all_rules_dirs = self._get_all_rules_dirs()
+                    target_idx = -1
+                    if prefix == "central" and len(all_rules_dirs) > 0:
+                        target_idx = 0
+                    elif prefix.startswith("config"):
+                        try:
+                            config_num = int(prefix[6:])
+                            target_idx = 2 + config_num
+                        except ValueError:
+                            pass
+
+                    if 0 <= target_idx < len(all_rules_dirs):
+                        return os.path.join(all_rules_dirs[target_idx], actual_name)
+
+                # 处理 yaml 规则
+                elif prefix in ["central_yaml", "project_yaml", "global_yaml"]:
+                    for desc, yaml_path in self._get_all_rules_yaml_files():
+                        if (
+                            (prefix == "central_yaml" and desc == "中心库")
+                            or (prefix == "global_yaml" and desc == "全局")
+                            or (prefix == "project_yaml" and desc == "项目")
+                        ):
+                            return yaml_path
+
+            # 对于内置规则，尝试获取路径
+            try:
+                from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
+
+                path = get_builtin_rule_path(rule_name)
+                if path:
+                    return path
+            except Exception:
+                pass
+
+            return "--"
+        except Exception:
+            return "--"
 
     def get_rule_preview(self, rule_name: str) -> str:
         """获取规则内容的前100个字符作为预览
@@ -960,45 +1039,8 @@ class RulesManager:
         返回:
             List[Tuple[str, str, bool, str]]: (规则名称, 内容预览, 是否已加载, 文件路径) 列表
         """
-        import os
-        from jarvis.jarvis_utils.config import get_data_dir
-
         rules_info = []
         available_rules = self.get_all_available_rule_names()
-
-        # 辅助函数：根据规则名称获取文件路径
-        def get_rule_file_path(rule_name: str) -> str:
-            """获取规则文件的绝对路径"""
-            # 处理带前缀的规则名称
-            if ":" in rule_name:
-                prefix, actual_name = rule_name.split(":", 1)
-                if prefix == "project":
-                    return os.path.join(self.root_dir, ".jarvis", "rules", actual_name)
-                elif prefix == "global":
-                    return os.path.join(get_data_dir(), "rules", actual_name)
-                elif prefix == "central":
-                    if self.central_repo_path:
-                        return os.path.join(
-                            self.central_repo_path, "rules", actual_name
-                        )
-                elif prefix.startswith("config"):
-                    all_dirs = self._get_all_rules_dirs()
-                    try:
-                        config_num = int(prefix[6:])
-                        if config_num + 2 < len(all_dirs):
-                            return os.path.join(all_dirs[config_num + 2], actual_name)
-                    except ValueError:
-                        pass
-                elif prefix.endswith("_yaml"):
-                    # YAML规则显示为规则文件路径
-                    for desc, yaml_path in self._get_all_rules_yaml_files():
-                        if (
-                            (prefix == "project_yaml" and desc == "项目")
-                            or (prefix == "global_yaml" and desc == "全局")
-                            or (prefix == "central_yaml" and desc == "中心库")
-                        ):
-                            return yaml_path
-            return "--"
 
         # 处理内置规则
         for rule_name in available_rules.get("builtin", []):
@@ -1034,17 +1076,22 @@ class RulesManager:
                 or actual_rule_name in self.loaded_rules
             )
             # 获取内置规则的实际文件路径
-            file_path = get_builtin_rule_path(actual_rule_name) or "内置规则"
+            try:
+                from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
+
+                file_path = get_builtin_rule_path(actual_rule_name) or "内置规则"
+            except Exception:
+                file_path = self.get_rule_file_path(rule_name)
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理文件规则
         for rule_name in available_rules.get("files", []):
             preview = self.get_rule_preview(rule_name)
+            file_path = self.get_rule_file_path(rule_name)
             # 检查状态：只有明确激活的规则才显示为已激活
             is_loaded = rule_name in self._active_rules
             # 向后兼容：也检查旧的 loaded_rules
             is_loaded = is_loaded or rule_name in self.loaded_rules
-            file_path = get_rule_file_path(rule_name)
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理YAML规则
@@ -1054,7 +1101,6 @@ class RulesManager:
             is_loaded = rule_name in self._active_rules
             # 向后兼容：也检查旧的 loaded_rules
             is_loaded = is_loaded or rule_name in self.loaded_rules
-            file_path = get_rule_file_path(rule_name)
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理项目单个规则文件 .jarvis/rule
