@@ -8,6 +8,8 @@ from pathlib import Path
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from rich.status import Status
+from jarvis.jarvis_utils.globals import console
 from typing import Any
 from typing import Dict
 from typing import List
@@ -1231,7 +1233,15 @@ class RulesManager:
 
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
-            response = model.chat_until_success(prompt, max_output=100).strip()
+
+            # 使用 Status 显示进度
+            with Status(
+                "🔍 正在分析任务并选择规则...",
+                spinner="dots",
+                console=console,
+            ):
+                response = model.chat_until_success(prompt, max_output=100).strip()
+
             model.set_suppress_output(False)
 
             # 从响应中提取<NUM>标签内的内容
@@ -1402,7 +1412,15 @@ class RulesManager:
 
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
-            response = model.chat_until_success(prompt, max_output=200).strip()
+
+            # 使用 Status 显示进度
+            with Status(
+                "🔍 正在分析规则内容并过滤...",
+                spinner="dots",
+                console=console,
+            ):
+                response = model.chat_until_success(prompt, max_output=200).strip()
+
             model.set_suppress_output(False)
 
             # 从响应中提取<VALID>标签内的内容

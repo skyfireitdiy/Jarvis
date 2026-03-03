@@ -1,0 +1,8 @@
+{
+  "id": "20260303_201649_211808",
+  "type": "project_long_term",
+  "tags": ["规则管理", "进度显示"],
+  "content": "Jarvis规则自动选择功能的进度提示实现：\n\n1. 初始规则选择阶段（select_rule_by_task方法）：\n   - 位置：src/jarvis/jarvis_agent/rules_manager.py 1173-1292行\n   - 进度提示：\"🔍 正在分析任务并选择规则...\"\n   - 操作：分析任务描述，从可用规则中选择最匹配的规则\n\n2. 规则内容过滤阶段（_filter_rules_by_content方法）：\n   - 位置：src/jarvis/jarvis_agent/rules_manager.py 1338-1439行\n   - 进度提示：\"🔍 正在分析规则内容并过滤...\"\n   - 操作：加载选定规则的内容，过滤掉不相关的规则\n\n3. 技术实现：\n   - 使用模型.set_suppress_output(True) 静默执行\n   - Status 组件自动管理显示状态\n   - 复用 jarvis.jarvis_utils.globals.console 实例\n   - spinner=\"dots\" 提供统一的视觉风格",
+  "created_at": "2026-03-03T20:16:49.211829",
+  "updated_at": "2026-03-03T20:16:49.211832"
+}
