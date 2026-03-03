@@ -84,6 +84,11 @@ class ScriptTool:
         """检测是否为 Windows 系统（Windows 没有 script 命令）"""
         return sys.platform == "win32"
 
+    @staticmethod
+    def _is_macos() -> bool:
+        """检测是否为 macOS 系统（macOS 的 script 命令语法与 Linux 不同）"""
+        return sys.platform == "darwin"
+
     def _get_windows_command(
         self, interpreter: str, script_path: str, extension: str
     ) -> List[str]:
@@ -441,9 +446,16 @@ class ScriptTool:
                     )
                 else:
                     # Unix/Linux: 使用 script 命令捕获 stdout 和 stderr
-                    tee_command = (
-                        f"script -q -c '{interpreter} {script_path}' {output_file}"
-                    )
+                    if self._is_macos():
+                        # macOS (BSD script): script [-q] [file [command ...]]
+                        tee_command = (
+                            f"script -q {output_file} {interpreter} {script_path}"
+                        )
+                    else:
+                        # Linux (util-linux script): script [-q] [-c command] [file]
+                        tee_command = (
+                            f"script -q -c '{interpreter} {script_path}' {output_file}"
+                        )
                     timed_out = False
                     if is_non_interactive():
                         proc = None
