@@ -1358,22 +1358,28 @@ class RulesManager:
             List[str]: 过滤后的相关规则名称列表
         """
         try:
-            # 加载所有选中规则的内容
-            rules_content = []
-            for rule_name in rule_names:
-                rule_content = self.get_named_rule(rule_name)
-                if rule_content:
-                    # 只使用前 2000 个字符，避免上下文过长
-                    content_preview = (
-                        rule_content[:2000] + "..."
-                        if len(rule_content) > 2000
-                        else rule_content
-                    )
-                    rules_content.append(
-                        f"规则名称：{rule_name}\n规则内容：\n{content_preview}"
-                    )
-                else:
-                    PrettyOutput.auto_print(f"⚠️  无法加载规则内容: {rule_name}")
+            # 使用 Status 显示加载规则内容的进度
+            with Status(
+                "📚 正在加载规则内容...",
+                spinner="dots",
+                console=console,
+            ):
+                # 加载所有选中规则的内容
+                rules_content = []
+                for rule_name in rule_names:
+                    rule_content = self.get_named_rule(rule_name)
+                    if rule_content:
+                        # 只使用前 2000 个字符，避免上下文过长
+                        content_preview = (
+                            rule_content[:2000] + "..."
+                            if len(rule_content) > 2000
+                            else rule_content
+                        )
+                        rules_content.append(
+                            f"规则名称：{rule_name}\n规则内容：\n{content_preview}"
+                        )
+                    else:
+                        PrettyOutput.auto_print(f"⚠️  无法加载规则内容: {rule_name}")
 
             if not rules_content:
                 return rule_names  # 如果无法加载内容，返回原始规则
