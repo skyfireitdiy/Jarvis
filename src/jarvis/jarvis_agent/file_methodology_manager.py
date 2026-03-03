@@ -51,6 +51,3 @@ class FileMethodologyManager:
                 f"以下是历史类似问题的执行经验，可参考：\n{methodology}",
             ]
         )
-
-        # 方法论加载完成后，自动选择规则
-        self.agent.rules_manager.auto_select_and_load_rules(msg, self.agent)
