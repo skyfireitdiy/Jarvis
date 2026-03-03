@@ -861,10 +861,8 @@ class RulesManager:
             loaded_rule_names.add("global_rule")
         if "project_rule" in self._active_rules:
             loaded_rule_names.add("project_rule")
-        # 为了向后兼容，同时返回 builtin_rules_index（旧名称）和 builtin_rules（新名称）
         if "builtin_rules" in self._active_rules:
             loaded_rule_names.add("builtin_rules")
-            loaded_rule_names.add("builtin_rules_index")  # 向后兼容
 
         # 如果指定了 rule_names，激活这些规则
         if rule_names:
