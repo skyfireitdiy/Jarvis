@@ -1792,6 +1792,23 @@ class Agent:
         # 获取任务列表信息
         task_list_info = self._get_task_list_info()
 
+        # 获取激活的规则信息（文件路径和描述）
+        rules_section = ""
+        active_rule_infos = []
+        for rule_name in sorted(self.rules_manager._active_rules):
+            rule_path = self.rules_manager.get_rule_file_path(rule_name)
+            description = self.rules_manager._extract_rule_description(rule_path)
+            if description:
+                active_rule_infos.append(
+                    f"- {rule_name}: {description} (路径: {rule_path})"
+                )
+            else:
+                active_rule_infos.append(f"- {rule_name} (路径: {rule_path})")
+
+        if active_rule_infos:
+            rules_info = "\n".join(active_rule_infos)
+            rules_section = f"\n\n\n**📋 当前激活的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详细内容，请使用 `load_rule` 工具加载对应的规则文件。\n\n"
+
         # 获取会话文件路径信息
         session_file_info = ""
         try:
@@ -1820,7 +1837,7 @@ class Agent:
 
 <content>
 {summary}
-</content>
+</content>{rules_section}
 
 **⚠️ 重要系统约束提醒（总结后必须严格遵守）：**
 1. **每次只能执行一个工具调用**：每个响应必须包含且仅包含一个工具调用（任务完成时除外）。同时调用多个工具会导致错误。
