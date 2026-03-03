@@ -63,10 +63,11 @@ def cli(
             "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
-    # Initialize环境
+    # Initialize环境（传入 llm_group，确保欢迎面板显示正确的模型组）
     init_env(
         """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
+        llm_group=llm_group,
     )
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:

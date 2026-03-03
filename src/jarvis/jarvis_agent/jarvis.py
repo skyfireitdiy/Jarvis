@@ -1023,10 +1023,11 @@ def run_cli(
     # 传入 config_file 以便在检查前加载配置
     check_and_launch_tmux(config_file=config_file)
 
-    # 初始化环境
+    # 初始化环境（传入 llm_group，确保欢迎面板显示正确的模型组）
     init_env(
         """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
+        llm_group=llm_group,
     )
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
