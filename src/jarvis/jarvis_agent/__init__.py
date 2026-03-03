@@ -17,11 +17,6 @@ from typing import Tuple
 from typing import Union
 
 # 第三方库导入
-from rich.align import Align
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.events import AFTER_ADDON_PROMPT
@@ -209,27 +204,11 @@ def show_agent_startup_stats(
                 f"💭  短期记忆: [bold blue]{short_term_memory_count}[/bold blue]"
             )
 
-        stats_text = Text.from_markup(" | ".join(stats_parts), justify="center")
-
-        # 创建包含欢迎信息和统计信息的面板内容
-        panel_content = Text()
-        panel_content.append(welcome_message, style="bold white")
-        panel_content.append("\n")
-        panel_content.append(f"📁  工作目录: {current_dir}", style="dim white")
-        panel_content.append("\n\n")
-        panel_content.append(stats_text)
-        panel_content.justify = "center"
-
-        panel = Panel(
-            panel_content,
-            title="✨ Jarvis 资源概览 ✨",
-            title_align="center",
-            border_style="blue",
-            expand=False,
+        PrettyOutput.print_resource_overview_panel(
+            welcome_message=welcome_message,
+            current_dir=current_dir,
+            stats_parts=stats_parts,
         )
-
-        console = Console()
-        console.print(Align.center(panel))
 
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 加载统计信息失败: {e}")

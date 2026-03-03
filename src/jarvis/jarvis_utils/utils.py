@@ -734,11 +734,8 @@ def _show_usage_stats(welcome_str: str) -> None:
     """
     try:
         from rich.align import Align
-        from rich.console import Console, Group
-        from rich.panel import Panel
+        from rich.console import Group
         from rich.text import Text
-
-        console = Console()
 
         import os
 
@@ -805,21 +802,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 ),
             )
 
-            # 计算panel宽度：max(2/3终端宽度，文字最大宽度)
-            terminal_width = console.width
-            # 渲染内容获取实际宽度（考虑多行情况）
-            content_width = max(
-                len(str(line)) for line in str(welcome_panel_content).split("\\n")
-            )
-            panel_width = max(terminal_width * 2 // 3, content_width)
-
-            welcome_panel = Panel(
-                welcome_panel_content,
-                border_style="cyan",
-                expand=False,
-                width=panel_width,
-            )
-            console.print(Align.center(welcome_panel))
+            PrettyOutput.print_welcome_panel(welcome_panel_content)
     except Exception:
         # 静默失败，不影响正常使用
         pass

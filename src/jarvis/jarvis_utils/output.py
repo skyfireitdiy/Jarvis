@@ -15,7 +15,9 @@ from dataclasses import dataclass
 from enum import Enum
 import re
 from typing import Any
+from typing import Callable
 from typing import Dict
+from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -841,3 +843,445 @@ class PrettyOutput:
 
         # 打印Panel
         console.print(panel)
+
+    @staticmethod
+    def print_centered_panel(
+        renderable: Any,
+        title: Optional[str] = None,
+        title_align: str = "center",
+        border_style: str = "blue",
+        **kwargs: Any,
+    ) -> None:
+        """
+        使用居中的Panel显示内容。
+
+        参数：
+            renderable: 要显示的内容（Text、Group等Rich可渲染对象）
+            title: Panel标题（可选）
+            title_align: 标题对齐方式（默认"center"）
+            border_style: 边框样式（默认"blue"）
+            **kwargs: 传递给Panel的其他参数
+        """
+        from rich.align import Align
+        from rich.panel import Panel
+
+        panel = Panel(
+            renderable,
+            title=title,
+            title_align=title_align,
+            border_style=border_style,
+            **kwargs,
+        )
+        console.print(Align.center(panel))
+
+    @staticmethod
+    def print_script_panel(
+        content: str,
+        title: str,
+        lang: str = "python",
+        theme: str = "monokai",
+    ) -> None:
+        """
+        使用Panel显示带语法高亮的脚本内容。
+
+        参数：
+            content: 脚本内容
+            title: Panel标题
+            lang: 语法高亮语言（默认"python"）
+            theme: 高亮主题（默认"monokai"）
+        """
+        from rich.panel import Panel
+
+        syntax = Syntax(
+            content,
+            lang,
+            theme=theme,
+            line_numbers=True,
+            word_wrap=True,
+        )
+        panel = Panel(syntax, title=title, border_style="cyan")
+        console.print(panel)
+
+    @staticmethod
+    def print_resource_overview_panel(
+        welcome_message: str,
+        current_dir: str,
+        stats_parts: List[str],
+    ) -> None:
+        """
+        显示Jarvis资源概览面板（居中）。
+
+        参数：
+            welcome_message: 欢迎信息
+            current_dir: 当前工作目录
+            stats_parts: 统计信息列表（每项为带markup的字符串）
+        """
+        stats_text = Text.from_markup(" | ".join(stats_parts), justify="center")
+        panel_content = Text()
+        panel_content.append(welcome_message, style="bold white")
+        panel_content.append("\n")
+        panel_content.append(f"📁  工作目录: {current_dir}", style="dim white")
+        panel_content.append("\n\n")
+        panel_content.append(stats_text)
+        panel_content.justify = "center"
+        PrettyOutput.print_centered_panel(
+            panel_content,
+            title="✨ Jarvis 资源概览 ✨",
+            title_align="center",
+            border_style="blue",
+            expand=False,
+        )
+
+    @staticmethod
+    def print_welcome_panel(content: Any) -> None:
+        """
+        显示欢迎信息面板（居中）。
+
+        参数：
+            content: 欢迎内容（Group、Text等Rich可渲染对象）
+        """
+        from rich.align import Align
+        from rich.panel import Panel
+
+        terminal_width = console.width
+        content_width = max(
+            len(str(line)) for line in str(content).split("\n")
+        )
+        panel_width = max(terminal_width * 2 // 3, content_width)
+        welcome_panel = Panel(
+            content,
+            border_style="cyan",
+            expand=False,
+            width=panel_width,
+        )
+        console.print(Align.center(welcome_panel))
+
+    @staticmethod
+    def stream_chat_with_panel(
+        chat_iterator: Generator[str, None, None],
+        title: str,
+        status_message: str,
+        get_used_token_count: Callable[[], int],
+        get_conversation_turn: Callable[[], int],
+        get_platform_max_input_token_count: Callable[[], int],
+        get_context_token_count: Callable[[str], int],
+        append_session_history: Callable[[str, str], None],
+        start_time: float,
+        message: str = "",
+        max_output: int = 0,
+        check_interrupt: Callable[[], bool] = lambda: False,
+        panel_lock: Optional[threading.RLock] = None,
+    ) -> Tuple[str, float]:
+        """
+        使用Live+Panel进行流式聊天输出（pretty output模式）。
+
+        参数：
+            chat_iterator: 聊天响应迭代器
+            title: 面板标题（模型名称）
+            status_message: 等待首token时显示的Status消息
+            get_used_token_count: 获取已用token数的回调
+            get_conversation_turn: 获取对话轮次的回调
+            get_platform_max_input_token_count: 获取平台最大token数的回调
+            get_context_token_count: 计算文本token数的回调
+            append_session_history: 追加会话历史的回调
+            start_time: 开始时间戳
+            message: 用户消息（用于中断时保存历史）
+            max_output: 最大输出长度，0表示无限制
+            check_interrupt: 检查是否请求中断的回调
+            panel_lock: 用于保护panel更新的线程锁（可选）
+
+        返回：
+            Tuple[str, float]: (模型响应, 首token时间)
+        """
+        import time
+
+        from rich import box
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.status import Status
+        from rich.text import Text
+
+        from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+        from jarvis.jarvis_utils.config import is_immediate_abort
+        from jarvis.jarvis_utils.globals import get_interrupt
+
+        first_chunk = None
+        first_token_time = 0.0
+
+        with Status(
+            status_message,
+            spinner="dots",
+            console=console,
+        ):
+            try:
+                while True:
+                    if is_immediate_abort() and check_interrupt():
+                        append_session_history(message, "")
+                        return "", 0.0
+                    first_chunk = next(chat_iterator)
+                    if first_chunk:
+                        first_token_time = time.time() - start_time
+                        break
+            except StopIteration:
+                append_session_history(message, "")
+                return "", 0.0
+
+        _lock = panel_lock if panel_lock is not None else threading.RLock()
+
+        def _format_progress_bar(percent: float, width: int = 15) -> str:
+            percent = max(0, min(100, percent))
+            filled = int(width * percent / 100)
+            empty = width - filled
+            return "█" * filled + "░" * empty
+
+        def _get_token_usage_info(current_response: str) -> Tuple[float, str, str]:
+            try:
+                history_tokens = get_used_token_count()
+                current_response_tokens = get_context_token_count(current_response)
+                total_tokens = history_tokens + current_response_tokens
+                max_tokens = get_platform_max_input_token_count()
+                if max_tokens > 0:
+                    usage_percent = (total_tokens / max_tokens) * 100
+                    percent_color = (
+                        "red" if usage_percent >= 90 else "yellow" if usage_percent >= 80 else "green"
+                    )
+                    progress_bar = _format_progress_bar(usage_percent, width=15)
+                    return usage_percent, percent_color, progress_bar
+                return 0.0, "green", ""
+            except Exception:
+                return 0.0, "green", ""
+
+        def _update_panel_subtitle(
+            pnl: Panel,
+            response: str,
+            is_completed: bool = False,
+            duration: float = 0.0,
+            first_tok_time: float = 0.0,
+        ) -> None:
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            threshold = get_conversation_turn_threshold()
+            try:
+                usage_percent, percent_color, progress_bar = _get_token_usage_info(
+                    response
+                )
+                max_tokens = get_platform_max_input_token_count()
+                total_tokens = get_used_token_count() + get_context_token_count(
+                    response
+                )
+                if is_completed:
+                    response_tokens = get_context_token_count(response)
+                    generation_time = (
+                        duration - first_tok_time
+                        if duration > first_tok_time
+                        else duration
+                    )
+                    tokens_per_second = (
+                        response_tokens / generation_time if generation_time > 0 else 0
+                    )
+                    if max_tokens > 0 and progress_bar:
+                        pnl.subtitle = (
+                            f"[bold green]✓ {current_time_str} | ({get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
+                            f"首token: {first_tok_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
+                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
+                        )
+                    else:
+                        pnl.subtitle = f"[bold green]✓ {current_time_str} | ({get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_tok_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
+                else:
+                    if max_tokens > 0 and progress_bar:
+                        pnl.subtitle = (
+                            f"[yellow]{current_time_str} | ({get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
+                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
+                        )
+                    else:
+                        pnl.subtitle = f"[yellow]{current_time_str} | ({get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+            except Exception:
+                if is_completed:
+                    pnl.subtitle = f"[bold green]✓ {current_time_str} | ({get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                else:
+                    pnl.subtitle = f"[yellow]{current_time_str} | ({get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+
+        text_content = Text(overflow="fold")
+        panel = Panel(
+            text_content,
+            title=f"[bold cyan]{title}[/bold cyan]",
+            subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
+            border_style="cyan",
+            box=box.ROUNDED,
+            expand=True,
+        )
+
+        response = ""
+        last_subtitle_update_time = time.time()
+        subtitle_update_interval = 1
+        update_count = 0
+
+        with Live(panel, refresh_per_second=10, transient=True) as live:
+
+            def _update_panel_content(content: str, update_subtitle: bool = False):
+                nonlocal response, last_subtitle_update_time, update_count, text_content, panel
+
+                current_text = text_content.plain
+                new_content = current_text + content
+                new_text_obj = Text(new_content, overflow="fold", style="bright_white")
+                update_count += 1
+
+                max_text_height = console.height - 5
+                if max_text_height <= 0:
+                    max_text_height = 1
+
+                lines = new_text_obj.wrap(
+                    console,
+                    console.width - 4 if console.width > 4 else 1,
+                )
+
+                final_text = new_text_obj
+                if len(lines) > max_text_height:
+                    final_text = Text(
+                        "\n".join([line.plain for line in lines[-max_text_height:]]),
+                        overflow="fold",
+                    )
+
+                with _lock:
+                    text_content = final_text
+                    current_subtitle = panel.subtitle
+                    panel = Panel(
+                        text_content,
+                        title=panel.title,
+                        subtitle=current_subtitle,
+                        border_style="cyan",
+                        box=box.ROUNDED,
+                        expand=True,
+                    )
+
+                    current_time = time.time()
+                    should_update_subtitle = (
+                        update_subtitle
+                        or update_count % 10 == 0
+                        or (current_time - last_subtitle_update_time) >= subtitle_update_interval
+                    )
+
+                    if should_update_subtitle:
+                        _update_panel_subtitle(panel, response, is_completed=False)
+                        last_subtitle_update_time = current_time
+
+                    try:
+                        live.update(panel)
+                    except (IndexError, RuntimeError):
+                        pass
+
+            response += first_chunk
+            if first_chunk:
+                _update_panel_content(first_chunk, update_subtitle=True)
+
+            buffer = ""
+            last_update_time = time.time()
+            update_interval = 1
+            min_buffer_size = 1
+
+            def _flush_buffer():
+                nonlocal buffer, last_update_time
+                if buffer:
+                    _update_panel_content(buffer)
+                    buffer = ""
+                    last_update_time = time.time()
+
+            for s in chat_iterator:
+                if not s:
+                    continue
+                response += s
+                buffer += s
+
+                if max_output > 0 and len(response) >= max_output:
+                    _flush_buffer()
+                    append_session_history(message, response)
+                    break
+
+                current_time = time.time()
+                should_update = (
+                    len(buffer) >= min_buffer_size
+                    or (current_time - last_update_time) >= update_interval
+                )
+
+                if should_update:
+                    _flush_buffer()
+
+                if is_immediate_abort() and check_interrupt():
+                    _flush_buffer()
+                    append_session_history(message, response)
+                    break
+
+            _flush_buffer()
+            end_time = time.time()
+            duration = end_time - start_time
+            _update_panel_content("", update_subtitle=True)
+            with _lock:
+                _update_panel_subtitle(
+                    panel,
+                    response,
+                    is_completed=True,
+                    duration=duration,
+                    first_tok_time=first_token_time,
+                )
+                live.update(panel)
+
+        return response, first_token_time
+
+    @staticmethod
+    def stream_chat_simple(
+        chat_iterator: Generator[str, None, None],
+        prefix: str,
+        start_time: float,
+        message: str = "",
+        max_output: int = 0,
+        check_interrupt: Callable[[], bool] = lambda: False,
+        append_session_history: Callable[[str, str], None] = lambda a, b: None,
+        get_context_token_count: Optional[Callable[[str], int]] = None,
+    ) -> Tuple[str, float]:
+        """
+        使用简单模式进行流式聊天输出（逐字符打印）。
+
+        参数：
+            chat_iterator: 聊天响应迭代器
+            prefix: 输出前缀（如"🤖 模型输出 - xxx"）
+            start_time: 开始时间戳
+            message: 用户消息（用于中断时保存历史）
+            max_output: 最大输出长度，0表示无限制
+            check_interrupt: 检查是否请求中断的回调
+            append_session_history: 追加会话历史的回调
+            get_context_token_count: 计算文本token数的回调（用于显示速度，可选）
+
+        返回：
+            Tuple[str, float]: (模型响应, 首token时间)
+        """
+        import time
+
+        console.print(prefix, soft_wrap=False)
+        response = ""
+        first_token_time = 0.0
+        for s in chat_iterator:
+            if s and first_token_time == 0.0:
+                first_token_time = time.time() - start_time
+            console.print(s, end="")
+            response += s
+            if max_output > 0 and len(response) >= max_output:
+                append_session_history(message, response)
+                return response, first_token_time
+            if check_interrupt():
+                append_session_history(message, response)
+                return response, first_token_time
+        console.print()
+        end_time = time.time()
+        duration = end_time - start_time
+        response_tokens = (
+            get_context_token_count(response) if get_context_token_count else 0
+        )
+        generation_time = (
+            duration - first_token_time if duration > first_token_time else duration
+        )
+        tokens_per_second = (
+            response_tokens / generation_time if generation_time > 0 else 0
+        )
+        console.print(
+            f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+        )
+        return response, first_token_time

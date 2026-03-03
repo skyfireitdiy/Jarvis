@@ -410,25 +410,14 @@ class ScriptTool:
                 with open(script_path, "w", encoding=enc, errors="ignore") as f:
                     f.write(script_content)
 
-                # Display script content using rich panel before execution
-                from rich.console import Console
-                from rich.panel import Panel
-                from rich.syntax import Syntax
+                # Display script content using PrettyOutput before execution
+                from jarvis.jarvis_utils.output import PrettyOutput
 
-                console = Console()
-                syntax = Syntax(
-                    script_content,
-                    interpreter,
-                    theme="monokai",
-                    line_numbers=True,
-                    word_wrap=True,
-                )
-                panel = Panel(
-                    syntax,
+                PrettyOutput.print_script_panel(
+                    content=script_content,
                     title=f"📜 执行脚本 ({interpreter})",
-                    border_style="cyan",
+                    lang=interpreter,
                 )
-                console.print(panel)
 
                 import subprocess
 
