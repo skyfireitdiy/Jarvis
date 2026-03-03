@@ -773,20 +773,6 @@ def get_agent_definition_dirs() -> List[str]:
     ]
 
 
-def get_multi_agent_dirs() -> List[str]:
-    """
-    获取 multi_agent 的加载目录。
-
-    返回:
-        List[str]: multi_agent 加载目录列表
-    """
-    return [
-        os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("multi_agent_dirs", [])
-        if p
-    ]
-
-
 def get_roles_dirs() -> List[str]:
     """
     获取 roles 的加载目录。

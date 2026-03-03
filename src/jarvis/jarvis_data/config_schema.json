@@ -186,14 +186,6 @@
       },
       "default": []
     },
-    "multi_agent_dirs": {
-      "type": "array",
-      "description": "multi_agent 加载目录",
-      "items": {
-        "type": "string"
-      },
-      "default": []
-    },
     "roles_dirs": {
       "type": "array",
       "description": "roles 加载目录",
