@@ -96,38 +96,6 @@ class RulesManager:
 
         threading.Thread(target=check_rules_updates, daemon=True).start()
 
-    def read_project_rule(self) -> Optional[str]:
-        """读取 .jarvis/rule 文件内容，如果存在则返回字符串，否则返回 None"""
-        try:
-            rules_path = os.path.join(self.root_dir, ".jarvis", "rule")
-            if os.path.exists(rules_path) and os.path.isfile(rules_path):
-                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read().strip()
-                # 使用jinja2渲染规则模板
-                if content:
-                    content = render_rule_template(content, os.path.dirname(rules_path))
-                return content if content else None
-        except Exception:
-            # 读取规则失败时忽略，不影响主流程
-            pass
-        return None
-
-    def read_global_rules(self) -> Optional[str]:
-        """读取数据目录 rules 内容，如果存在则返回字符串，否则返回 None"""
-        try:
-            rules_path = os.path.join(get_data_dir(), "rule")
-            if os.path.exists(rules_path) and os.path.isfile(rules_path):
-                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read().strip()
-                # 使用jinja2渲染规则模板
-                if content:
-                    content = render_rule_template(content, os.path.dirname(rules_path))
-                return content if content else None
-        except Exception:
-            # 读取规则失败时忽略，不影响主流程
-            pass
-        return None
-
     def _read_rule_from_dir(self, rules_dir: str, rule_name: str) -> Optional[str]:
         """从 rules 目录中读取指定名称的规则文件
 
@@ -853,18 +821,7 @@ class RulesManager:
         返回:
             (merged_rules, loaded_rule_names): 合并后的规则字符串和已加载的规则名称列表
         """
-        # 加载默认规则
-        self._load_default_rules()
-
         loaded_rule_names: Set[str] = set()
-
-        # 默认规则已通过 _load_default_rules 加载
-        if "global_rule" in self._active_rules:
-            loaded_rule_names.add("global_rule")
-        if "project_rule" in self._active_rules:
-            loaded_rule_names.add("project_rule")
-        if "builtin_rules" in self._active_rules:
-            loaded_rule_names.add("builtin_rules")
 
         # 如果指定了 rule_names，激活这些规则
         if rule_names:
@@ -971,25 +928,6 @@ class RulesManager:
             self._merged_rules = "\n\n".join(combined_parts)
         else:
             self._merged_rules = ""
-
-    def _load_default_rules(self) -> None:
-        """加载默认规则（global_rule 和 project_rule）"""
-        # 加载全局规则
-        global_rules = self.read_global_rules()
-        if global_rules:
-            self._loaded_rules["global_rule"] = global_rules
-            self._active_rules.add("global_rule")
-            self.loaded_rules.add("global_rule")
-
-        # 加载项目规则
-        project_rules = self.read_project_rule()
-        if project_rules:
-            self._loaded_rules["project_rule"] = project_rules
-            self._active_rules.add("project_rule")
-            self.loaded_rules.add("project_rule")
-
-        # 合并激活的规则
-        self._merge_active_rules()
 
     def get_rule_preview(self, rule_name: str) -> str:
         """获取规则内容的前100个字符作为预览
