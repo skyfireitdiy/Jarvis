@@ -988,14 +988,6 @@ class RulesManager:
             self._active_rules.add("project_rule")
             self.loaded_rules.add("project_rule")
 
-        # 加载所有规则索引（内置、项目、全局、中心库等）
-        all_rules_index = self._get_all_rules_index()
-        if all_rules_index:
-            # 使用 builtin_rules 作为键名（与 BUILTIN_RULES 字典保持一致）
-            self._loaded_rules["builtin_rules"] = all_rules_index
-            self._active_rules.add("builtin_rules")
-            self.loaded_rules.add("builtin_rules")
-
         # 合并激活的规则
         self._merge_active_rules()
 
@@ -1300,4 +1292,3 @@ class RulesManager:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
             return None
-

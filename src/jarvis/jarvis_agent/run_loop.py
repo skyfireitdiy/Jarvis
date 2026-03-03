@@ -306,10 +306,6 @@ class AgentRunLoop:
                     run_input_handlers = True
                     ag.run_input_handlers_next_turn = False
 
-                # 首次运行初始化
-                if ag.first:
-                    ag._first_run()
-
                 # 在调用模型前检查并执行压缩
                 # 计算当前消息的token数
                 current_message_tokens = (
