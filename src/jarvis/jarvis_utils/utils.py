@@ -1767,7 +1767,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
         after_hash = decode_output(after_hash_result.stdout).strip()
 
         if before_hash != after_hash:
-            PrettyOutput.auto_print(f"✅ {repo_type}库 '{repo_path.name}' 已更新。")
+            pass  # 静默更新，不打印任何信息
 
     except FileNotFoundError:
         PrettyOutput.auto_print(f"⚠️ git 命令未找到，跳过更新 '{repo_path.name}'。")
