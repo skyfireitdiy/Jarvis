@@ -522,7 +522,6 @@ def _check_pip_updates() -> bool:
                     timeout=600,
                 )
                 if result.returncode == 0:
-                    PrettyOutput.auto_print("✅ 更新成功，正在重启以应用新版本...")
                     # 更新检查日期，避免重复触发
                     last_check_file.write_text(today_str)
                     return True
@@ -674,7 +673,7 @@ def _check_jarvis_updates() -> bool:
     """
     # 检查是否有等待重启的更新标记（小版本更新已完成）
     if _has_update_reboot_flag():
-        PrettyOutput.auto_print("\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。")
+        # 静默处理，不打印任何信息
         from jarvis.jarvis_utils.input import user_confirm
 
         if user_confirm("是否现在重启以应用更新？", default=True):
@@ -1725,16 +1724,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             # 后台线程不询问用户，直接跳过有未提交更改的仓库
             return
 
-        # 获取更新前的commit hash
-        before_hash_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-            check=True,
-            timeout=10,
-        )
-        before_hash = decode_output(before_hash_result.stdout).strip()
-
         # 检查是否是空仓库
         ls_remote_result = subprocess.run(
             ["git", "ls-remote", "--heads", "origin"],
@@ -1755,19 +1744,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             check=True,
             timeout=60,
         )
-
-        # 获取更新后的commit hash
-        after_hash_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-            check=True,
-            timeout=10,
-        )
-        after_hash = decode_output(after_hash_result.stdout).strip()
-
-        if before_hash != after_hash:
-            pass  # 静默更新，不打印任何信息
 
     except FileNotFoundError:
         PrettyOutput.auto_print(f"⚠️ git 命令未找到，跳过更新 '{repo_path.name}'。")
