@@ -13,7 +13,7 @@ description: 当需要开发或扩展Jarvis Skill功能时使用此规则——S
 - **Git仓库技能添加**：从远程Git仓库克隆并注册技能
 - **本地路径技能添加**：验证并注册本地技能路径
 
-技能可以是本地路径或Git仓库，添加后将在 `{{ jarvis_data_dir }}/rule` 中注册技能信息，供后续使用。
+技能可以是本地路径或Git仓库。Git仓库技能将直接克隆到 `{{ jarvis_data_dir }}/rules/` 目录，技能注册信息将记录在 `{{ jarvis_data_dir }}/rule` 中，供后续使用。
 
 ## Jinja2 变量使用指南
 
@@ -36,7 +36,7 @@ description: 当需要开发或扩展Jarvis Skill功能时使用此规则——S
 ```markdown
 ### 技能文件位置
 
-技能文件位于：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/my_skill/`
+技能文件位于：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/my_skill/`
 ```
 
 #### 示例 2：动态生成路径
@@ -44,8 +44,8 @@ description: 当需要开发或扩展Jarvis Skill功能时使用此规则——S
 ```markdown
 ### 文档路径
 
-- 技能文档：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/[skill_name].md`
-- 技能目录：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/[skill_name]/`
+- 技能目录：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/[skill_name]/`
+- 技能规则文件：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/[skill_name]/SKILL.md`
 ```
 
 #### 示例 3：在代码示例中使用变量
@@ -54,7 +54,7 @@ description: 当需要开发或扩展Jarvis Skill功能时使用此规则——S
 ### 安装命令
 
 `` `bash
-cd {% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/my_skill/
+cd {% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/my_skill/
 pip install -r requirements.txt `` `
 ```
 
@@ -97,12 +97,12 @@ pip install -r requirements.txt `` `
 
 ### 阶段2：Git仓库处理
 
-1. **检查技能目录**：验证`{{ jarvis_data_dir }}/skills`目录是否存在，不存在则创建
+1. **检查规则目录**：验证`{{ jarvis_data_dir }}/rules`目录是否存在，不存在则创建
 2. **提取仓库名称**：从Git URL中提取仓库名称（例如：`https://github.com/user/repo.git` → `repo`）
 3. **执行克隆操作**：
 
    ```bash
-   git clone <url> {{ jarvis_data_dir }}/skills/<repo_name>
+   git clone <url> {{ jarvis_data_dir }}/rules/<repo_name>
    ```
 
 4. **处理克隆失败**：询问用户处理方法（重试、更换URL或放弃）
@@ -144,24 +144,9 @@ pip install -r requirements.txt `` `
 - 文档缺失时基于目录结构推断
 - 推断困难时使用基础描述：`[技能名称] - 功能待完善`
 
-### 阶段4.5：创建技能文档文件
-
-1. **检查规则目录**：验证`{{ jarvis_data_dir }}/rules`目录是否存在，不存在则创建
-2. **创建技能文档文件**：在`{{ jarvis_data_dir }}/rules`目录下创建`[skill_name].md`文件
-3. **编写文档内容**：在文件中详细记录技能的详细介绍和使用方法
-
-   文档内容应包含：
-   - 技能名称和功能概述
-   - 详细的功能描述
-   - 使用方法和示例
-   - 适用场景
-   - 其他必要说明
-
-4. **验证文档格式**：确保Markdown格式正确
-
 ### 阶段5：询问用户是否需要注册
 
-1. **告知用户完成情况**：明确告知用户技能已添加，文档文件已创建
+1. **告知用户完成情况**：明确告知用户技能已添加到 `{{ jarvis_data_dir }}/rules/` 目录
 2. **询问注册意愿**：询问用户是否要将技能注册到技能索引中
 3. **等待用户确认**：根据用户选择决定是否进入注册阶段
 
@@ -194,7 +179,7 @@ pip install -r requirements.txt `` `
 
    - **功能描述**：[技能的核心功能描述]
    - **位置**：[技能的完整路径]
-   - **规则文件**：`{{ jarvis_data_dir }}/rules/[skill_name].md`
+   - **规则文件**：`{{ jarvis_data_dir }}/rules/[skill_name]/SKILL.md` 或skill仓库内的其他规则文件
    ```
 
 4. **格式验证**：确保Markdown格式正确
@@ -216,7 +201,7 @@ pip install -r requirements.txt `` `
 
 ### 2. Git操作规范
 
-- **克隆目录结构**：`{{ jarvis_data_dir }}/skills/<repo_name>`
+- **克隆目录结构**：`{{ jarvis_data_dir }}/rules/<repo_name>`
 - **克隆失败处理**：必须提供重试、更换URL、放弃等选项
 - **仓库名称提取**：必须从URL中正确解析仓库名称
 - **shallow clone优化**：大仓库必须使用`--depth 1`参数
@@ -233,7 +218,7 @@ pip install -r requirements.txt `` `
 - **注册前提**：必须询问用户并获得确认后才进行注册
 - **注册文件位置**：`{{ jarvis_data_dir }}/rule`
 - **技能信息格式**：必须包含功能描述、位置、规则文件
-- **技能文档位置**：`{{ jarvis_data_dir }}/rules/[skill_name].md`
+- **技能规则文件**：`{{ jarvis_data_dir }}/rules/[skill_name]/` 目录下的规则文件（如SKILL.md）
 - **路径规范**：必须使用绝对路径，禁止相对路径
 
 ### 5. 错误处理规范
@@ -276,7 +261,7 @@ pip install -r requirements.txt `` `
 
 ### Git操作检查
 
-- [ ] 技能目录结构创建正确（`{{ jarvis_data_dir }}/skills/`）
+- [ ] 规则目录结构检查正确（`{{ jarvis_data_dir }}/rules/`）
 - [ ] 仓库名称提取准确
 - [ ] Git克隆操作执行成功
 - [ ] 克隆失败处理机制生效
@@ -290,8 +275,7 @@ pip install -r requirements.txt `` `
 
 ### 注册规范检查
 
-- [ ] 技能文档文件创建成功（`{{ jarvis_data_dir }}/rules/[skill_name].md`）
-- [ ] 技能文档内容完整详细
+- [ ] 技能已成功添加到 `{{ jarvis_data_dir }}/rules/` 目录
 - [ ] 已询问用户是否需要将技能注册到索引
 - [ ] 如果用户选择注册，注册文件存在或创建成功
 - [ ] 如果用户选择注册，技能信息格式符合标准
@@ -346,5 +330,4 @@ pip install -r requirements.txt `` `
 
 - **参考规则**：`{{ rule_file_dir }}/../tool_config/add_rule.md`
 - **技能注册文件**：`{{ jarvis_data_dir }}/rule`
-- **技能文档目录**：`{{ jarvis_data_dir }}/rules/`
-- **技能存储目录**：`{{ jarvis_data_dir }}/skills/`
+- **技能目录**：`{{ jarvis_data_dir }}/rules/`（Git仓库技能和本地技能的统一存储位置）
