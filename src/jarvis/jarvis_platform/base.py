@@ -15,11 +15,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Type
 
-from rich import box
-from rich.live import Live
-from rich.panel import Panel
-from rich.status import Status
-from rich.text import Text
 from typing_extensions import Self
 
 import jarvis.jarvis_utils.globals as G
@@ -37,7 +32,6 @@ from jarvis.jarvis_utils.config import is_immediate_abort
 from jarvis.jarvis_utils.config import is_print_prompt
 from jarvis.jarvis_utils.config import is_save_session_history
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_in_chat
@@ -205,322 +199,39 @@ class BasePlatform(ABC):
         except Exception:
             return 0.0, "green", ""
 
-    def _update_panel_subtitle_with_token(
-        self,
-        panel: Panel,
-        response: str,
-        is_completed: bool = False,
-        duration: float = 0.0,
-        first_token_time: float = 0.0,
-    ) -> None:
-        """更新面板的 subtitle，包含 token 使用信息
-
-        参数:
-            panel: 要更新的面板
-            response: 当前响应内容
-            is_completed: 是否已完成
-            duration: 耗时（秒）
-            first_token_time: 首token响应时间（秒）
-        """
-        from datetime import datetime
-
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            usage_percent, percent_color, progress_bar = self._get_token_usage_info(
-                response
-            )
-            max_tokens = self._get_platform_max_input_token_count()
-            total_tokens = self.get_used_token_count() + get_context_token_count(
-                response
-            )
-
-            threshold = get_conversation_turn_threshold()
-            if is_completed:
-                # 计算性能指标
-                response_tokens = get_context_token_count(response)
-                generation_time = (
-                    duration - first_token_time
-                    if duration > first_token_time
-                    else duration
-                )
-                tokens_per_second = (
-                    response_tokens / generation_time if generation_time > 0 else 0
-                )
-
-                if max_tokens > 0 and progress_bar:
-                    try:
-                        panel.subtitle = (
-                            f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
-                            f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
-                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
-                        )
-                    except Exception:
-                        panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
-                else:
-                    panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
-            else:
-                if max_tokens > 0 and progress_bar:
-                    try:
-                        panel.subtitle = (
-                            f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
-                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
-                        )
-                    except Exception:
-                        panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
-                else:
-                    panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
-        except Exception:
-            threshold = get_conversation_turn_threshold()
-            if is_completed:
-                panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
-            else:
-                panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
-
     def _chat_with_pretty_output(
         self, message: str, start_time: float, max_output: int = 0
     ) -> Tuple[str, float]:
-        """使用 pretty output 模式进行聊天
-
-        参数:
-            message: 用户消息
-            start_time: 开始时间
-
-        返回:
-            Tuple[str, float]: (模型响应, 首token时间)
-        """
-        import time
-
-        first_chunk = None
-        first_token_time = 0.0
-
-        with Status(
-            f"🤔 {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()} 正在思考中...",
-            spinner="dots",
-            console=console,
-        ):
-            chat_iterator = self.chat(message)
-            try:
-                while True:
-                    # 检查是否请求中断
-                    if is_immediate_abort() and get_interrupt():
-                        self._append_session_history(message, "")
-                        return "", 0.0
-                    first_chunk = next(chat_iterator)
-                    if first_chunk:
-                        first_token_time = time.time() - start_time
-                        break
-            except StopIteration:
-                self._append_session_history(message, "")
-                return "", 0.0
-
-        text_content = Text(overflow="fold")
-        panel = Panel(
-            text_content,
-            title=f"[bold cyan]{self.name()}[/bold cyan]",
-            subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
-            border_style="cyan",
-            box=box.ROUNDED,
-            expand=True,
+        """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
+        return PrettyOutput.stream_chat_with_panel(
+            chat_iterator=self.chat(message),
+            title=self.name(),
+            status_message=f"🤔 {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()} 正在思考中...",
+            get_used_token_count=self.get_used_token_count,
+            get_conversation_turn=self.get_conversation_turn,
+            get_platform_max_input_token_count=self._get_platform_max_input_token_count,
+            get_context_token_count=get_context_token_count,
+            append_session_history=self._append_session_history,
+            start_time=start_time,
+            message=message,
+            max_output=max_output,
+            check_interrupt=get_interrupt,
+            panel_lock=self._panel_lock,
         )
-
-        response = ""
-        last_subtitle_update_time = time.time()
-        subtitle_update_interval = (
-            1  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
-        )
-        update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
-        with Live(panel, refresh_per_second=10, transient=True) as live:
-
-            def _update_panel_content(content: str, update_subtitle: bool = False):
-                nonlocal \
-                    response, \
-                    last_subtitle_update_time, \
-                    update_count, \
-                    text_content, \
-                    panel
-
-                # 在锁外进行文本拼接和wrap计算，避免与console内部锁冲突
-                # 获取当前文本并添加新内容，创建新的 Text 对象
-                # 避免在原 Text 对象上调用 append()，防止与 Live 内部线程并发访问导致不一致
-                current_text = text_content.plain
-                new_content = current_text + content
-                new_text_obj = Text(new_content, overflow="fold", style="bright_white")
-                update_count += 1
-
-                # Scrolling Logic - 只在内容超过一定行数时才应用滚动
-                max_text_height = console.height - 5
-                if max_text_height <= 0:
-                    max_text_height = 1
-
-                lines = new_text_obj.wrap(
-                    console,
-                    console.width - 4 if console.width > 4 else 1,
-                )
-
-                # 只在内容超过最大高度时才截取，减少不必要的操作
-                final_text = new_text_obj
-                if len(lines) > max_text_height:
-                    # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
-                    # 这确保了Rich内部spans列表与文本内容保持同步
-                    final_text = Text(
-                        "\n".join([line.plain for line in lines[-max_text_height:]]),
-                        overflow="fold",
-                    )
-
-                # 使用锁保护 panel 更新，避免与 Live 内部线程冲突
-                with self._panel_lock:
-                    # 在锁内只更新text_content和panel
-                    text_content = final_text
-
-                    # 重建panel对象，确保panel始终引用最新的text_content
-                    # 这样无论内容是否超出高度，流式输出都能正常刷新
-                    current_subtitle = panel.subtitle
-                    panel = Panel(
-                        text_content,
-                        title=panel.title,
-                        subtitle=current_subtitle,
-                        border_style="cyan",
-                        box=box.ROUNDED,
-                        expand=True,
-                    )
-
-                    # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
-                    # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
-                    current_time = time.time()
-                    should_update_subtitle = (
-                        update_subtitle
-                        or update_count % 10 == 0  # 每 10 次更新一次
-                        or (current_time - last_subtitle_update_time)
-                        >= subtitle_update_interval
-                    )
-
-                    if should_update_subtitle:
-                        self._update_panel_subtitle_with_token(
-                            panel, response, is_completed=False
-                        )
-                        last_subtitle_update_time = current_time
-
-                    # 更新 panel（只更新内容，subtitle 更新频率已降低）
-                    # 添加异常处理，防止 rich 内部线程冲突导致的 IndexError
-                    try:
-                        live.update(panel)
-                    except (IndexError, RuntimeError):
-                        # 忽略 rich 内部错误，避免影响主流程
-                        # 这些错误通常是由于 Live 内部线程与主线程的时序冲突导致的
-                        pass
-
-            # Process first chunk
-            response += first_chunk
-            if first_chunk:
-                _update_panel_content(
-                    first_chunk, update_subtitle=True
-                )  # 第一次更新时更新 subtitle
-
-            # 缓存机制：降低更新频率，减少界面闪烁
-            buffer = ""
-            last_update_time = time.time()
-            update_interval = 1
-            min_buffer_size = 1
-
-            def _flush_buffer():
-                nonlocal buffer, last_update_time
-                if buffer:
-                    _update_panel_content(buffer)
-                    buffer = ""
-                    last_update_time = time.time()
-
-            # Process rest of the chunks
-            for s in chat_iterator:
-                if not s:
-                    continue
-                response += s
-                buffer += s
-
-                # 检查是否达到最大输出长度
-                if max_output > 0 and len(response) >= max_output:
-                    _flush_buffer()
-                    self._append_session_history(message, response)
-                    break
-
-                current_time = time.time()
-                should_update = (
-                    len(buffer) >= min_buffer_size
-                    or (current_time - last_update_time) >= update_interval
-                )
-
-                if should_update:
-                    _flush_buffer()
-
-                if is_immediate_abort() and get_interrupt():
-                    _flush_buffer()
-                    self._append_session_history(message, response)
-                    break  # 跳出循环，让Live自然结束
-
-            _flush_buffer()
-            # 在结束前，将面板内容替换为完整响应，确保最后一次渲染的 panel 显示全部内容
-            # 更新完成状态，包含性能指标
-            end_time = time.time()
-            duration = end_time - start_time
-            _update_panel_content("", update_subtitle=True)
-            # 更新 subtitle 显示完成状态和性能指标
-            with self._panel_lock:
-                self._update_panel_subtitle_with_token(
-                    panel,
-                    response,
-                    is_completed=True,
-                    duration=duration,
-                    first_token_time=first_token_time,
-                )
-                live.update(panel)
-
-        return response, first_token_time
 
     def _chat_with_simple_output(
         self, message: str, start_time: float, max_output: int = 0
     ) -> str:
-        """使用简单输出模式进行聊天
-
-        参数:
-            message: 用户消息
-            start_time: 开始时间
-            max_output: 最大输出长度，0表示无限制
-
-        返回:
-            str: 模型响应
-        """
-        import time
-
-        console.print(
-            f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
-            soft_wrap=False,
-        )
-        response = ""
-        first_token_time = 0.0
-        for s in self.chat(message):
-            if s and first_token_time == 0.0:
-                first_token_time = time.time() - start_time
-            console.print(s, end="")
-            response += s
-            # 检查是否达到最大输出长度
-            if max_output > 0 and len(response) >= max_output:
-                self._append_session_history(message, response)
-                return response
-            if is_immediate_abort() and get_interrupt():
-                self._append_session_history(message, response)
-                return response
-        console.print()
-        end_time = time.time()
-        duration = end_time - start_time
-        # 计算性能指标
-        response_tokens = get_context_token_count(response)
-        generation_time = (
-            duration - first_token_time if duration > first_token_time else duration
-        )
-        tokens_per_second = (
-            response_tokens / generation_time if generation_time > 0 else 0
-        )
-        console.print(
-            f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+        """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
+        response, _ = PrettyOutput.stream_chat_simple(
+            chat_iterator=self.chat(message),
+            prefix=f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
+            start_time=start_time,
+            message=message,
+            max_output=max_output,
+            check_interrupt=lambda: is_immediate_abort() and get_interrupt(),
+            append_session_history=self._append_session_history,
+            get_context_token_count=get_context_token_count,
         )
         return response
 
