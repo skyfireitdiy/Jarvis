@@ -357,6 +357,7 @@ class CodeAgent(Agent):
 
             # 保存原始用户输入（用于会话名称生成）
             self._raw_user_input = user_input
+            self.original_user_input = user_input
 
             # 存储 prefix 和 suffix，供 commit 命令使用
             self.prefix = prefix
