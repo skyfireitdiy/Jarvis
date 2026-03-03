@@ -2149,6 +2149,11 @@ class Agent:
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
 
+            # 首次运行初始化（包括自动规则选择）
+            # 必须在获取规则内容之前执行，否则规则索引会被错误的规则内容覆盖
+            if self.first:
+                self._first_run()
+
             # 将已激活的规则内容添加到用户输入的最前面
             active_rules_content = self.rules_manager.get_active_rules_content()
             if active_rules_content:
