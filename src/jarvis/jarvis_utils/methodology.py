@@ -14,6 +14,7 @@ import threading
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.globals import console
 from typing import Any
 from typing import Dict
 from typing import List
@@ -254,7 +255,12 @@ def load_methodology(
 """
 
         # 获取大模型选择的方法论序号（限制输出最大50字）
-        response = platform.chat_until_success(selection_prompt, max_output=50).strip()
+        with console.status(
+            "[bold blue]🔍 正在分析需求并推荐方法论...", spinner="dots"
+        ):
+            response = platform.chat_until_success(
+                selection_prompt, max_output=50
+            ).strip()
 
         # 重置平台，恢复输出
         platform.reset()
