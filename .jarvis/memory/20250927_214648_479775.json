@@ -1,0 +1,12 @@
+{
+  "id": "20250927_214648_479775",
+  "type": "project_long_term",
+  "tags": [
+    "release_note",
+    "git_workflow",
+    "automation"
+  ],
+  "content": "Release Note 自动生成流程（v0.3.31）：\n1. 检查未提交代码：git status --porcelain\n2. 获取最新tag：git describe --tags `git rev-list --tags --max-count=1`\n3. 获取当前日期：date +\"%Y-%m-%d\"\n4. 获取完整diff：git diff <tag>..HEAD | cat -\n5. 基于diff内容分类生成Release Note与多风格朋友圈文案\n\n关键配置项变更记录：\n- JARVIS_PATCH_FORMAT：新增补丁格式控制，支持all/search/search_range\n- JARVIS_FORCE_SAVE_MEMORY：默认值改为false，减少冗余提示\n- JARVIS_PRETTY_OUTPUT：Windows下默认关闭，其他平台默认开启\n- 新增多目录加载配置：JARVIS_METHODOLOGY_DIRS、JARVIS_AGENT_DEFINITION_DIRS等\n",
+  "created_at": "2025-09-27T21:46:48.479831",
+  "updated_at": "2025-09-27T21:46:48.479838"
+}

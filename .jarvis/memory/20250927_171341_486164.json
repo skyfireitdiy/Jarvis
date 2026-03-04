@@ -1,0 +1,15 @@
+{
+  "id": "20250927_171341_486164",
+  "type": "project_long_term",
+  "tags": [
+    "patching",
+    "edit_file_handler",
+    "range",
+    "order",
+    "minimal_change",
+    "defensive_programming"
+  ],
+  "content": "规则：当PATCH包含RANGE时，若存在多个补丁，应按行号从后往前应用（根据RANGE的起始/结束行进行逆序处理），以避免前面补丁影响后续RANGE的行号。需在edit_file_handler的补丁应用逻辑中实现该顺序控制。\n",
+  "created_at": "2025-09-27T17:13:41.486179",
+  "updated_at": "2025-09-27T17:13:41.486181"
+}
