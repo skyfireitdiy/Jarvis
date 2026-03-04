@@ -2149,6 +2149,10 @@ class Agent:
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
 
+            # 先设置 session.prompt，确保 _first_run() 中可以访问到用户输入
+            # 注意：此时还没有添加已激活的规则内容，规则内容会在之后追加
+            self.session.prompt = enhanced_input
+
             # 首次运行初始化（包括自动规则选择）
             # 必须在获取规则内容之前执行，否则规则索引会被错误的规则内容覆盖
             if self.first:
@@ -2160,8 +2164,8 @@ class Agent:
                 enhanced_input = (
                     f"<rules>\n{active_rules_content}\n</rules>\n\n{enhanced_input}"
                 )
-
-            self.session.prompt = enhanced_input
+                # 更新 session.prompt，添加规则内容
+                self.session.prompt = enhanced_input
 
             # 关键流程：直接调用 memory_manager 重置任务状态
             try:
