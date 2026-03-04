@@ -1192,18 +1192,22 @@ class RulesManager:
                 if not description:
                     preview = self.get_rule_preview(rule_name)
                     description = (
-                        f"（内容预览: {preview}）" if preview and preview != "--" else "（无描述）"
+                        f"（内容预览: {preview}）"
+                        if preview and preview != "--"
+                        else "（无描述）"
                     )
                 numbered_rules += f"{i}. {rule_name}\n   描述: {description}\n"
 
             # 构造 prompt，要求模型返回编号
             prompt = f"""请根据以下任务描述，从可用规则中选择最合适的规则。
 
-任务描述：
+<task_description>
 {task_description}
+</task_description>
 
-可用规则列表：
+<available_rules>
 {numbered_rules}
+</available_rules>
 
 要求：
 1. 仔细分析任务描述，选择最匹配的规则

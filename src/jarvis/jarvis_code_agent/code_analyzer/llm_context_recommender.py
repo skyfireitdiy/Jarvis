@@ -466,9 +466,17 @@ class ContextRecommender:
 
 {project_overview}
 
-任务描述：{user_input}
-搜索关键词：{", ".join(keywords)}
-候选符号列表（已编号）：{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
+<task_description>
+{user_input}
+</task_description>
+
+<keywords>
+{", ".join(keywords)}
+</keywords>
+
+<candidate_symbols>
+{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
+</candidate_symbols>
 
 返回最相关符号的序号（Jsonnet数组），按相关性排序，用<SELECTED_INDICES>标签包裹。示例：
 <SELECTED_INDICES>
