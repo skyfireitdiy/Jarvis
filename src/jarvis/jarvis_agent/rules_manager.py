@@ -1283,9 +1283,126 @@ class RulesManager:
                 else:
                     PrettyOutput.auto_print(f"⚠️  选中的规则不存在: {rule_name}")
 
-            # 返回规则名称列表
-            return rule_names if rule_names else None
+            # 返回规则名称列表前，进行内容过滤
+            if rule_names:
+                PrettyOutput.auto_print(f"🔍 初始选择的规则: {', '.join(rule_names)}")
+                # 加载规则内容并进行过滤
+                filtered_rules = self._filter_rules_by_content(
+                    task_description, rule_names
+                )
+                if filtered_rules:
+                    PrettyOutput.auto_print(
+                        f"✅ 过滤后的规则: {', '.join(filtered_rules)}"
+                    )
+                    return filtered_rules
+
+            return None
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
             return None
+
+    def _filter_rules_by_content(
+        self, task_description: str, rule_names: List[str]
+    ) -> List[str]:
+        """根据规则内容过滤掉不相关的规则
+
+        参数:
+            task_description: 任务描述字符串
+            rule_names: 待过滤的规则名称列表
+
+        返回:
+            List[str]: 过滤后的相关规则名称列表
+        """
+        try:
+            # 加载所有选中规则的内容
+            rules_content = []
+            for rule_name in rule_names:
+                rule_content = self.get_named_rule(rule_name)
+                if rule_content:
+                    # 只使用前 2000 个字符，避免上下文过长
+                    content_preview = (
+                        rule_content[:2000] + "..."
+                        if len(rule_content) > 2000
+                        else rule_content
+                    )
+                    rules_content.append(
+                        f"规则名称：{rule_name}\n规则内容：\n{content_preview}"
+                    )
+                else:
+                    PrettyOutput.auto_print(f"⚠️  无法加载规则内容: {rule_name}")
+
+            if not rules_content:
+                return rule_names  # 如果无法加载内容，返回原始规则
+
+            # 构造过滤 prompt
+            all_rules_text = "\n\n".join(
+                [f"规则{i + 1}:\n{content}" for i, content in enumerate(rules_content)]
+            )
+
+            prompt = f"""请根据任务描述，从以下规则中选择真正相关的规则。
+
+<task_description>
+{task_description}
+</task_description>
+
+<candidate_rules>
+{all_rules_text}
+</candidate_rules>
+
+要求：
+1. 仔细分析每个规则的完整内容，判断其是否真正与任务相关
+2. **保守策略**：如果不确定规则是否相关，倾向于保留该规则
+3. 只选择规则内容确实与任务匹配的规则
+4. 如果没有相关的规则，返回 "none"
+5. 严格按照以下格式返回规则名称：<VALID>规则名称1,规则名称2</VALID>
+6. 例如：<VALID>builtin:xxx.md</VALID> 或 <VALID>project:yyy.md,global:zzz.md</VALID>
+7. 多个规则名称之间用逗号分隔，不要有空格
+8. 只返回<VALID>标签内的内容，不要有其他任何输出
+
+选择的规则名称："""
+
+            # 调用模型进行过滤
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = registry.create_platform(platform_type="normal")
+            if model is None:
+                PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型，跳过过滤")
+                return rule_names
+
+            # 调用模型，限制输出长度
+            model.set_suppress_output(True)
+            response = model.chat_until_success(prompt, max_output=200).strip()
+            model.set_suppress_output(False)
+
+            # 从响应中提取<VALID>标签内的内容
+            import re
+
+            valid_match = re.search(r"<VALID>(.*?)</VALID>", response, re.DOTALL)
+
+            if not valid_match:
+                # 如果没有找到<VALID>标签，尝试直接解析响应
+                valid_rules_str = response.strip()
+            else:
+                valid_rules_str = valid_match.group(1).strip()
+
+            # 验证返回值
+            if not valid_rules_str or valid_rules_str.lower() == "none":
+                return []
+
+            # 解析规则名称
+            valid_rule_names = []
+            for rule_name in valid_rules_str.split(","):
+                rule_name = rule_name.strip()
+                # 验证规则名称是否在原始列表中
+                if rule_name in rule_names:
+                    valid_rule_names.append(rule_name)
+                else:
+                    PrettyOutput.auto_print(
+                        f"⚠️  模型返回的规则名称不在原始列表中: {rule_name}"
+                    )
+
+            return valid_rule_names if valid_rule_names else rule_names
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  规则内容过滤失败: {e}，使用原始规则列表")
+            return rule_names
