@@ -469,6 +469,7 @@ class Agent:
         allow_savesession: bool = False,
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
+        enable_auto_rule_select: bool = True,
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
@@ -491,6 +492,7 @@ class Agent:
             allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
             rule_names: 规则名称列表（逗号分隔），用于加载指定的规则
             optimize_system_prompt: 如果为True，将在第一次run()时使用用户输入来优化系统提示词
+            enable_auto_rule_select: 是否启用自动规则选择（默认True）
         """
         # 基础属性初始化
         self._init_base_attributes(
@@ -529,7 +531,13 @@ class Agent:
         )
 
         # 事件总线和管理器初始化
-        self._init_managers(rule_names)
+        self._init_managers()
+        # 保存是否启用自动规则选择的标志
+        self._enable_auto_rule_select = enable_auto_rule_select
+        # 加载规则内容（确保 loaded_rules 和 loaded_rule_names 被初始化）
+        self.loaded_rules, self.loaded_rule_names = self.rules_manager.load_all_rules(
+            rule_names
+        )
 
         # 工具和系统提示词设置
         self._setup_tools_and_prompt()
@@ -756,12 +764,8 @@ class Agent:
                 self.auto_complete or (self.non_interactive or False)
             )
 
-    def _init_managers(self, rule_names: Optional[str] = None) -> None:
-        """初始化事件总线和管理器
-
-        参数:
-            rule_names: 规则名称列表（逗号分隔）
-        """
+    def _init_managers(self) -> None:
+        """初始化事件总线和管理器"""
         # 初始化事件总线（需先于管理器，以便管理器在构造中安全订阅事件）
         self.event_bus = EventBus()
 
@@ -780,10 +784,6 @@ class Agent:
         # 初始化规则管理器（如果子类已经创建，则不覆盖）
         if not hasattr(self, "rules_manager"):
             self.rules_manager = RulesManager(root_dir)
-        # 无条件加载规则内容（确保 loaded_rules 和 loaded_rule_names 被初始化）
-        self.loaded_rules, self.loaded_rule_names = self.rules_manager.load_all_rules(
-            rule_names
-        )
 
     def _setup_tools_and_prompt(self) -> None:
         """设置工具和系统提示词"""
@@ -2358,8 +2358,8 @@ class Agent:
         # 处理文件上传和方法论加载
         self.file_methodology_manager.handle_files_and_methodology()
 
-        # 自动选择并加载规则（如果用户未指定规则）
-        if self.session.prompt:
+        # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
+        if self.session.prompt and self._enable_auto_rule_select:
             self.auto_select_and_load_rules(self.session.prompt)
 
         # 添加记忆标签提示
