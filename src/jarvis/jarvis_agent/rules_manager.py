@@ -1181,10 +1181,20 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
                 return None
 
-            # 构造编号列表
+            # 构造编号列表（包含规则名称和描述，供模型选择）
             numbered_rules = ""
             for i, rule_name in enumerate(all_rules_list, 1):
-                numbered_rules += f"{i}. {rule_name}\n"
+                # 获取规则描述：优先从 YAML Front Matter 提取，否则用内容预览
+                rule_path = self.get_rule_file_path(rule_name)
+                description = ""
+                if rule_path and rule_path != "--":
+                    description = self._extract_rule_description(rule_path)
+                if not description:
+                    preview = self.get_rule_preview(rule_name)
+                    description = (
+                        f"（内容预览: {preview}）" if preview and preview != "--" else "（无描述）"
+                    )
+                numbered_rules += f"{i}. {rule_name}\n   描述: {description}\n"
 
             # 构造 prompt，要求模型返回编号
             prompt = f"""请根据以下任务描述，从可用规则中选择最合适的规则。
@@ -1218,8 +1228,6 @@ class RulesManager:
             ):
                 response = model.chat_until_success(prompt, max_output=100).strip()
 
-            model.set_suppress_output(False)
-
             # 从响应中提取<NUM>标签内的内容
             import re
 
@@ -1233,6 +1241,7 @@ class RulesManager:
 
             # 验证返回值
             if not selected_index_str or selected_index_str.lower() == "none":
+                PrettyOutput.auto_print("⚠️  模型返回的编号为空或为 none")
                 return None
 
             # 解析编号（支持多个编号，用逗号分隔）
