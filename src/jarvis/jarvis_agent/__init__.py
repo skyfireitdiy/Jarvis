@@ -2496,11 +2496,13 @@ class Agent:
 
             prompt = f"""请根据任务描述，从以下规则中选择真正相关的规则。
 
-任务描述：
+<task_description>
 {task_description}
+</task_description>
 
-候选规则列表：
+<candidate_rules>
 {all_rules_text}
+</candidate_rules>
 
 要求：
 1. 仔细分析每个规则的完整内容，判断其是否真正与任务相关

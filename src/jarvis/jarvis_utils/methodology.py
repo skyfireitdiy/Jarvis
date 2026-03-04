@@ -230,17 +230,23 @@ def load_methodology(
         methodology_titles = [title for title, _ in methodologies]
 
         # 步骤2：让大模型选择相关性高的方法论
-        selection_prompt = """以下是所有可用的方法论标题：
+        methodology_titles_text = "\n".join(
+            [f"{i}. {title}" for i, title in enumerate(methodology_titles, 1)]
+        )
 
-"""
-        for i, title in enumerate(methodology_titles, 1):
-            selection_prompt += f"{i}. {title}\n"
+        selection_prompt = f"""以下是所有可用的方法论标题：
 
-        selection_prompt += f"""
-以下是可用的工具列表：
+<methodology_titles>
+{methodology_titles_text}
+</methodology_titles>
+
+<available_tools>
 {prompt}
+</available_tools>
 
-用户需求：{user_input}
+<user_requirement>
+{user_input}
+</user_requirement>
 
 请分析用户需求，从上述方法论中选择出与需求相关性较高的方法论（可以选择多个）。
 
