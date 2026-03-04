@@ -1241,7 +1241,7 @@ class RulesManager:
 
             # 验证返回值
             if not selected_index_str or selected_index_str.lower() == "none":
-                PrettyOutput.auto_print("⚠️  模型返回的编号为空或为 none")
+                PrettyOutput.auto_print("⚠️  未匹配到合适的规则")
                 return None
 
             # 解析编号（支持多个编号，用逗号分隔）
