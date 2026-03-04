@@ -1256,16 +1256,9 @@ class SessionManager:
 
             # 恢复Agent运行时状态
             agent_runtime_state = state_data.get("agent_runtime", {})
+            # 恢复会话后，将 first 标志设置为 False，避免重复执行首次运行初始化
+            self.agent.first = False
             if agent_runtime_state:
-                self.agent._addon_prompt_skip_rounds = agent_runtime_state.get(
-                    "addon_prompt_skip_rounds", 0
-                )
-                self.agent._no_tool_call_count = agent_runtime_state.get(
-                    "no_tool_call_count", 0
-                )
-                self.agent._last_response_content = agent_runtime_state.get(
-                    "last_response_content", ""
-                )
                 # 恢复最近记忆队列
                 self.agent.recent_memories = agent_runtime_state.get(
                     "recent_memories", []
@@ -1284,8 +1277,6 @@ class SessionManager:
                     PrettyOutput.auto_print(
                         f"✅ 已恢复 {len(self.agent.recent_memories)} 条最近记忆"
                     )
-                # 恢复首次运行标志
-                self.agent.first = agent_runtime_state.get("first", True)
                 PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
 
             # 恢复CodeAgent特定状态
