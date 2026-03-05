@@ -5,6 +5,7 @@ import os
 import subprocess
 from datetime import datetime
 from rich.status import Status
+from jarvis.jarvis_utils.globals import console
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
@@ -86,7 +87,7 @@ class SessionManager:
 
             # 调用模型生成
             response = ""
-            with Status("正在生成会话名称...") as status:
+            with Status("正在生成会话名称...", console=console) as status:
                 for chunk in cheap_model.chat(prompt):
                     response += chunk
                     status.update(f"正在生成会话名称... ({len(response)} 字符)")
