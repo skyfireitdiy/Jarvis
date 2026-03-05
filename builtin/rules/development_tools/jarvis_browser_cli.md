@@ -1,5 +1,5 @@
 ---
-description: Jarvis Browser CLI使用指南，浏览器自动化命令行工具，支持35+命令和守护进程模式。适用于浏览器自动化、网页测试、数据采集等场景
+description: 当需要使用Jarvis Browser CLI进行浏览器自动化时使用此规则——Jarvis Browser CLI使用指南，浏览器自动化命令行工具，支持35+命令和守护进程模式。包括：启动和管理浏览器会话；执行页面导航和URL跳转；获取页面文本和元素内容；执行点击、输入等页面交互；进行页面截图和PDF导出；执行JavaScript代码；处理cookie和localStorage；使用守护进程模式管理会话；进行网页自动化测试；执行数据采集和爬虫任务；处理动态页面和异步加载。每当用户提及"浏览器自动化"、"网页测试"、" jb "、" jarvis-browser "、" Playwright "、"浏览器测试"、"网页爬虫"、"数据采集"或需要浏览器自动化、网页操作、Playwright使用时触发，无论网页类型和自动化复杂度如何。如果需要使用Jarvis Browser CLI进行浏览器自动化，请使用此规则。
 ---
 
 # Jarvis Browser CLI (jb) 使用指南
