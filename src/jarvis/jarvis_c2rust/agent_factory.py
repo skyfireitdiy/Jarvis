@@ -62,6 +62,7 @@ def create_agent(
         use_analysis=use_analysis,
         need_summary=need_summary,
         rule_names=rule_names,
+        enable_auto_rule_select=False,
         **kwargs,
     )
 
@@ -127,5 +128,6 @@ def create_code_agent(
         force_save_memory=force_save_memory,
         tool_group=tool_group,
         rule_names=rule_names,
+        enable_auto_rule_select=False,
         **kwargs,
     )
