@@ -135,7 +135,10 @@ class ScriptTool:
         self, argv: List[str], env: Dict[str, str], get_timeout: Any
     ) -> Dict[str, Any]:
         """使用 pywinpty (ConPTY) 实现：用户可交互 + 可捕获输出，类似 Unix script 命令"""
-        from winpty import PtyProcess
+        try:
+            from winpty import PtyProcess
+        except (ImportError, ModuleNotFoundError):
+            PtyProcess = None
 
         import threading
 
@@ -188,6 +191,16 @@ class ScriptTool:
                 exc_holder.append(e)
             finally:
                 read_done.set()
+
+        # 检查 winpty 是否可用
+        if PtyProcess is None:
+            PrettyOutput.auto_print("❌ Windows 交互模式需要 pywinpty 库")
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Windows 交互模式需要 pywinpty 库，请运行: pip install pywinpty\n"
+                        "或者使用非交互模式（is_non_interactive=True）",
+            }
 
         try:
             proc = PtyProcess.spawn(argv, cwd=os.getcwd(), env=env)
