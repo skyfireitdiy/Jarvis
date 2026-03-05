@@ -13,8 +13,6 @@ from typing import Tuple
 from typing import cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
-from rich.status import Status
-from jarvis.jarvis_utils.globals import console
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform
@@ -71,11 +69,10 @@ class SessionManager:
 
         # 使用cheap模型生成会话名称
         try:
-            with Status("⏳ 正在连接AI模型...", spinner="dots", console=console):
-                registry = PlatformRegistry.get_global_platform_registry()
-                cheap_model = registry.create_platform(platform_type="cheap")
-                if cheap_model is None:
-                    return "未命名会话"
+            registry = PlatformRegistry.get_global_platform_registry()
+            cheap_model = registry.create_platform(platform_type="cheap")
+            if cheap_model is None:
+                return "未命名会话"
             prompt = f"""请根据以下用户输入，生成一个简洁的会话名称（3-8个中文字符）。
 要求：
 1. 名称要能概括会话主题
@@ -87,12 +84,9 @@ class SessionManager:
 会话名称："""
 
             # 调用模型生成
-            with Status(
-                "⏳ 正在生成会话名称，请稍候...", spinner="dots", console=console
-            ):
-                response = ""
-                for chunk in cheap_model.chat(prompt):
-                    response += chunk
+            response = ""
+            for chunk in cheap_model.chat(prompt):
+                response += chunk
 
             # 清理响应
             session_name = response.strip()
@@ -340,8 +334,7 @@ class SessionManager:
                 user_input = self.agent.get_user_origin_input().strip()
 
             if user_input:
-                with Status("⏳ 正在生成会话名称...", spinner="dots", console=console):
-                    session_name = self._generate_session_name(user_input)
+                session_name = self._generate_session_name(user_input)
                 PrettyOutput.auto_print(f"📝 生成会话名称: {session_name}")
             else:
                 session_name = "未命名会话"
