@@ -2328,7 +2328,7 @@ class Agent:
             LoopAction.CONTINUE 或 LoopAction.COMPLETE（兼容旧字符串值 "continue"/"complete"）
         """
         user_input = self._multiline_input(
-            f"{self.name}: 请输入，或输入空行来结束当前任务", False
+            f"{self.name}: 请输入（Ctrl+C 结束当前任务）", False
         )
 
         if user_input:
