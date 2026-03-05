@@ -1112,7 +1112,7 @@ def run_cli(
 
                 # 获取用户输入，循环直到需要传递给 agent
                 while True:
-                    user_input = get_multiline_input("请输入你的任务（输入空行退出）")
+                    user_input = get_multiline_input("请输入你的任务（Ctrl+C 退出）")
                     if not user_input:
                         break
                     # 先经过 builtin_input_handler 处理

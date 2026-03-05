@@ -370,7 +370,7 @@ class CodeAgent(Agent):
                 processed_input, is_handled = builtin_input_handler(user_input, self)
                 if is_handled:
                     # 内置命令已处理完成，直接返回
-                    user_input = get_multiline_input("请输入你的需求（输入空行退出）")
+                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
                     if not user_input:
                         # 用户取消输入，不保存会话
                         _should_save_session = False
@@ -1664,7 +1664,7 @@ def cli(
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
-                    user_input = get_multiline_input("请输入你的需求（输入空行退出）")
+                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
                     if not user_input:
                         raise typer.Exit(code=0)
 
