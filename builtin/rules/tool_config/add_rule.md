@@ -357,6 +357,15 @@ license: MIT
 - 数据目录使用 `{% raw %}{{ jarvis_data_dir }}{% endraw %}`
 - 当前规则目录使用 `{% raw %}{{ rule_file_dir }}{% endraw %}`
 
+**⚠️ 重要提示：`rule_file_dir` 的正确使用**
+
+`{% raw %}{{ rule_file_dir }}{% endraw %}` 变量表示**当前规则文件所在目录**的绝对路径。使用时请注意：
+
+- **引用同目录下的文件**：直接使用 `{% raw %}{{ rule_file_dir }}{% endraw %}/文件名.md`，**不要**重复添加目录层级
+- **错误示例**：如果规则文件在 `builtin/rules/development_workflow/` 目录下，引用同目录的子规则时，**错误**写法是 `{{ rule_file_dir }}/development_workflow/sub_rule.md`
+- **正确示例**：直接写 `{{ rule_file_dir }}/sub_rule.md` 即可
+- **常见错误**：因为 `rule_file_dir` 已经包含了完整的目录路径（如 `/path/to/builtin/rules/development_workflow/`），所以不应该再添加目录前缀
+
 ### 变量使用示例
 
 #### 示例 1：引用其他规则文件
