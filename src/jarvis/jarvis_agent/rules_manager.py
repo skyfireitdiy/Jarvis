@@ -1211,11 +1211,11 @@ class RulesManager:
 
 要求：
 1. 仔细分析任务描述，选择最匹配的规则
-2. **数量限制**：最多只能选择1-3个规则，严禁超过3个
-3. 如果有多个规则相关，选择最相关的1-3个规则，不要选择过多
+2. **数量限制**：最多只能选择1-5个规则，严禁超过5个
+3. 如果有多个规则相关，选择最相关的1-5个规则，不要选择过多
 4. **重要**：如果没有合适的规则或规则与任务无关，可以直接返回 "NONE" 或 "none"
-5. 严格按照以下格式返回序号：<NUM>序号1,序号2,序号3</NUM>
-6. 例如：<NUM>5</NUM> 或 <NUM>3,5,7</NUM> 或 <NUM>none</NUM>
+5. 严格按照以下格式返回序号：<NUM>序号1,序号2,序号3,序号4,序号5</NUM>
+6. 例如：<NUM>5</NUM> 或 <NUM>2,3,5,7,9</NUM> 或 <NUM>none</NUM>
 7. 多个序号之间用逗号分隔，不要有空格
 8. 只返回<NUM>标签内的内容，不要有其他任何输出
 
@@ -1265,8 +1265,8 @@ class RulesManager:
                 if not selected_indices:
                     return None
 
-                # 限制最多返回3个规则
-                selected_indices = selected_indices[:3]
+                # 限制最多返回5个规则
+                selected_indices = selected_indices[:5]
             except ValueError:
                 PrettyOutput.auto_print(
                     f"⚠️  模型返回的编号格式错误: {selected_index_str}"
