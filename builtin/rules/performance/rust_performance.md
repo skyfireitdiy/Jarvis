@@ -1,4 +1,5 @@
 ---
+name: rust_performance
 description: 当需要优化Rust代码性能、进行Rust性能分析或调优时使用此规则——Rust代码性能优化策略和最佳实践。包括：分析Rust代码的性能瓶颈；使用Perf等工具进行性能分析；优化Rust的内存管理；减少不必要的内存分配；优化算法和数据结构；利用Rust的零成本抽象；使用并发和异步提升性能；优化编译期计算；减少不必要的拷贝和克隆；遵循Rust性能优化最佳实践。每当用户提及"Rust性能"、"Rust优化"、"Rust调优"、"Rust性能分析"、"Rust代码性能"、"Perf分析"或需要Rust性能优化、Rust代码调优、Rust性能分析时触发，无论代码的规模和复杂度如何。如果需要优化Rust代码的性能或进行性能分析，请使用此规则。
 ---
 
@@ -31,7 +32,7 @@ codegen-units = 1    # 单一代码生成单元以获得更好的优化
 
 ### 2. Perf 数据采集步骤（必须执行）
 
-**步骤 1：编译程序**
+#### 步骤 1：编译程序
 
 ```bash
 # 编译带调试符号的 release 版本
@@ -42,7 +43,7 @@ file target/release/your_binary
 # 输出应包含 "not stripped"
 ```
 
-**步骤 2：运行 Perf 采集**
+#### 步骤 2：运行 Perf 采集
 
 ```bash
 # 基本性能采集（CPU 热点）
@@ -61,7 +62,7 @@ perf record -e cache-misses,cache-references -g ./target/release/your_binary
 perf record -e branch-misses,branches -g ./target/release/your_binary
 ```
 
-**步骤 3：分析性能数据**
+#### 步骤 3：分析性能数据
 
 ```bash
 # 生成文本格式性能报告（必须执行）
@@ -89,7 +90,7 @@ perf report --stdio --percent-limit 5 > perf_hotspots.txt
 
 **解读文本报告示例：**
 
-```
+```text
 # Overhead  Command  Shared Object      Symbol
 # ........  .......  .................  ......................
     45.23%  binary   binary             [.] hot_function
@@ -138,7 +139,7 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 
 **基础报告格式** (`perf report --stdio`)：
 
-```
+```text
 # Overhead  Command  Shared Object      Symbol
 # ........  .......  .................  ............................
     15.50%  binary   binary             [.] _ZN4core3ops8function6FnOnce9call_once
@@ -153,7 +154,7 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 
 **调用图报告格式** (`perf report --stdio -g graph`)：
 
-```
+```text
     15.50%     0.00%  binary  [.] main
             |
             ---main
@@ -170,9 +171,9 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 
 ### 常见热点模式识别
 
-**模式 1：内存分配热点**
+#### 模式 1：内存分配热点
 
-```
+```text
 15.67%  binary  [.] alloc::vec::Vec::push
 10.23%  binary  [.] __rust_alloc
  8.91%  binary  [.] malloc
@@ -181,9 +182,9 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 **识别要点**：出现 `alloc`、`malloc`、`Vec::push` 等符号
 **优化方向**：预分配容量、使用对象池、减少动态分配
 
-**模式 2：循环/迭代热点**
+#### 模式 2：循环/迭代热点
 
-```
+```text
 25.34%  binary  [.] hot_loop_function
     |
     ---hot_loop_function
@@ -194,9 +195,9 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 **识别要点**：单个函数 overhead 高，内部有边界检查
 **优化方向**：使用迭代器、避免边界检查、循环展开
 
-**模式 3：克隆/复制热点**
+#### 模式 3：克隆/复制热点
 
-```
+```text
 18.45%  binary  [.] <T as Clone>::clone
 12.30%  binary  [.] memcpy
 ```
@@ -204,9 +205,9 @@ perf stat -e cache-misses,cache-references,branch-misses,branches ./binary
 **识别要点**：出现 `Clone::clone`、`memcpy` 符号
 **优化方向**：使用引用、避免不必要的克隆、使用 Cow
 
-**模式 4：缓存未命中**
+#### 模式 4：缓存未命中
 
-```
+```text
 cache-references:      10,000,000
 cache-misses:           3,000,000  # 30% cache miss rate
 ```
@@ -530,7 +531,7 @@ perf diff perf.data.before perf.data.after > perf_comparison.txt
 
 ### 解读 perf diff 输出
 
-```
+```text
 # Baseline  Delta Abs  Shared Object      Symbol
 # ........  .........  .................  ........................
     15.50%    -10.23%  binary             [.] hot_function_optimized
@@ -637,7 +638,7 @@ echo "性能分析完成，报告位于 $OUTPUT_DIR"
 
 基于热点类型，生成具体的优化建议代码示例：
 
-```
+```text
 热点函数: Vec::push (overhead: 15.67%)
 调用位置: process_data() -> loop
 问题类型: 内存分配热点
