@@ -30,6 +30,12 @@ description: 当需要开发或扩展Jarvis Skill功能时使用此规则——S
 | `{% raw %}{{ jarvis_src_dir }}{% endraw %}`  | Jarvis 源码目录      | `/home/user/jarvis`      |
 | `{% raw %}{{ jarvis_data_dir }}{% endraw %}` | Jarvis 数据目录      | `/home/user/.jarvis`     |
 
+**⚠️ 重要提示：**
+
+`{% raw %}{{ rule_file_dir }}{% endraw %}` 表示**当前规则文件所在目录**的绝对路径。引用同目录下的文件时，直接使用 `{% raw %}{{ rule_file_dir }}{% endraw %}/文件名.md`，**不要**重复添加目录层级。
+
+**示例**：如果规则文件在 `builtin/rules/tool_config/` 目录下，引用同目录的 `add_rule.md`，应该写 `{% raw %}{{ rule_file_dir }}{% endraw %}/add_rule.md`，**错误**写法是 `{{ rule_file_dir }}/tool_config/add_rule.md`。
+
 ### 变量使用示例
 
 #### 示例 1：在技能文档中引用路径
