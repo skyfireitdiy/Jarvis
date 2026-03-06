@@ -67,6 +67,8 @@ FZF_INSERT_SENTINEL_PREFIX = "__FZF_INSERT__::"
 FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 # Sentinel to request running fzf outside the prompt for all-files mode (exclude .git)
 FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
+# Sentinel value to indicate that Ctrl+C was pressed
+CTRL_C_SENTINEL = "__CTRL_C_PRESSED__"
 
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
@@ -1187,7 +1189,7 @@ def _get_multiline_input_internal(
         )
         return str(result).strip() if result else ""
     except (KeyboardInterrupt, EOFError):
-        return ""
+        return CTRL_C_SENTINEL
 
 
 def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
@@ -1293,6 +1295,11 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             continue
         else:
-            if not user_input and print_on_empty:
-                PrettyOutput.auto_print("ℹ️ 输入已取消")
-            return user_input
+            if user_input == CTRL_C_SENTINEL:
+                # Ctrl+C pressed, allow exit and return empty string
+                return ""
+            elif not user_input:
+                # Empty submission, require user to input something
+                continue
+            else:
+                return user_input

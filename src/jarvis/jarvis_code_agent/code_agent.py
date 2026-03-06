@@ -7,6 +7,8 @@ import hashlib
 import os
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from rich.status import Status
+from jarvis.jarvis_utils.globals import console
 
 # -*- coding: utf-8 -*-
 import subprocess
@@ -370,7 +372,7 @@ class CodeAgent(Agent):
                 processed_input, is_handled = builtin_input_handler(user_input, self)
                 if is_handled:
                     # 内置命令已处理完成，直接返回
-                    user_input = get_multiline_input("请输入你的需求（输入空行退出）")
+                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
                     if not user_input:
                         # 用户取消输入，不保存会话
                         _should_save_session = False
@@ -381,7 +383,12 @@ class CodeAgent(Agent):
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
             if self.first:
-                scenario = classify_user_request(user_input)
+                with Status(
+                    "🔍 正在分析需求类型...",
+                    spinner="dots",
+                    console=console,
+                ):
+                    scenario = classify_user_request(user_input)
 
                 # 根据分类结果获取对应的系统提示词并更新
                 scenario_system_prompt = get_system_prompt(scenario)
@@ -1664,7 +1671,7 @@ def cli(
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
-                    user_input = get_multiline_input("请输入你的需求（输入空行退出）")
+                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
                     if not user_input:
                         raise typer.Exit(code=0)
 
