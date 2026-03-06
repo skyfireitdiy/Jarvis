@@ -163,6 +163,8 @@ pip install -r requirements.txt `` `
 ### 4. 规则文件格式规范
 
 - **技能规则文件**：`{{ jarvis_data_dir }}/rules/[skill_name]/` 目录下的规则文件（如SKILL.md）
+- **顶层规则必须**：作为Skill主入口的规则文件必须包含 YAML front matter header
+- **子规则可选**：被主规则引用的详细子规则文件可以不包含 header
 - **触发条件说明**：必须在技能规则文件的 YAML front matter 的 description 字段中明确说明触发条件，包括触发关键词、用户意图或适用场景
 
 **触发条件描述要求：**
