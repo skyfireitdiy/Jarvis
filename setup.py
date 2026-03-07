@@ -65,6 +65,7 @@ setup(
         "jinja2>=3.0.0",
         "lxml==6.0.0",
         "markdownify>=1.1.0",
+        "beautifulsoup4>=4.0.0",
         "typer",
         "plotext==5.2.8",
         "packaging",

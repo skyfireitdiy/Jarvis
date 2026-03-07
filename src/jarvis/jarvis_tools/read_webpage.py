@@ -2,6 +2,7 @@
 from typing import Any
 from typing import Dict
 
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from markdownify import markdownify as md
 
@@ -25,9 +26,33 @@ class WebpageTool:
         "type": "object",
         "properties": {
             "url": {"type": "string", "description": "要读取的网页URL"},
+            "mode": {
+                "type": "string",
+                "description": "读取模式：text=只提取文本（移除链接URL，保留文字），complete=完整内容（保留链接）",
+                "default": "text",
+            },
         },
         "required": ["url"],
     }
+
+    @staticmethod
+    def _process_html_for_text_mode(html: str) -> str:
+        """使用BeautifulSoup处理HTML，解包链接标签，只保留文本。
+
+        Args:
+            html: 原始HTML内容
+
+        Returns:
+            处理后的HTML，<a>标签被解包，<link>标签被移除
+        """
+        soup = BeautifulSoup(html, "lxml")
+        # 解包所有 <a> 标签，保留文字内容
+        for a_tag in soup.find_all("a"):
+            a_tag.unwrap()
+        # 移除 <link> 标签
+        for link_tag in soup.find_all("link"):
+            link_tag.decompose()
+        return str(soup)
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -39,6 +64,12 @@ class WebpageTool:
 
             if not url:
                 return {"success": False, "stdout": "", "stderr": "缺少必需参数：url"}
+
+            # 解析读取模式参数
+            mode = str(args.get("mode", "text")).strip().lower()
+            if mode not in ["text", "complete"]:
+                PrettyOutput.auto_print(f"⚠️ 无效的 mode 值 '{mode}'，使用默认值 'text'")
+                mode = "text"
 
             # 使用 Playwright 无头浏览器抓取网页内容
             try:
@@ -60,6 +91,10 @@ class WebpageTool:
 
                     # 关闭浏览器
                     browser.close()
+
+                # 根据模式处理HTML
+                if mode == "text":
+                    html_content = self._process_html_for_text_mode(html_content)
 
                 # 将HTML转换为Markdown
                 content_md = md(html_content, strip=["script", "style"])
@@ -91,8 +126,15 @@ class WebpageTool:
                     )
                     response.raise_for_status()
 
-                    # 直接使用 markdownify 转换，strip 参数会移除 script 和 style
-                    content_md = md(response.text, strip=["script", "style"])
+                    # 根据模式处理HTML
+                    html_to_convert = response.text
+                    if mode == "text":
+                        html_to_convert = self._process_html_for_text_mode(
+                            html_to_convert
+                        )
+
+                    # 使用 markdownify 转换，strip 参数会移除 script 和 style
+                    content_md = md(html_to_convert, strip=["script", "style"])
 
                 except Exception as req_error:
                     return {
@@ -129,8 +171,15 @@ class WebpageTool:
                     )
                     response.raise_for_status()
 
-                    # 直接使用 markdownify 转换，strip 参数会移除 script 和 style
-                    content_md = md(response.text, strip=["script", "style"])
+                    # 根据模式处理HTML
+                    html_to_convert = response.text
+                    if mode == "text":
+                        html_to_convert = self._process_html_for_text_mode(
+                            html_to_convert
+                        )
+
+                    # 使用 markdownify 转换，strip 参数会移除 script 和 style
+                    content_md = md(html_to_convert, strip=["script", "style"])
 
                 except Exception as req_error:
                     return {
