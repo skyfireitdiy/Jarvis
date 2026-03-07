@@ -912,6 +912,7 @@ Rule 系统用于将“行为约束、编码规范、流程定义”等以规则
 
 - 项目规则建议放在 `.jarvis/rules/` 下（可按子目录分类）；全局规则在 `~/.jarvis/rules/`；内置规则在 Jarvis 的 `builtin/rules/`，通过 `builtin/rules/rule.md` 及 `get_builtin_rule` 暴露。
 - 规则内容支持 Markdown 与 Jinja2 模板；新增规则可参考 `add_rule` 规范（如 builtin/rules/tool_config/add_rule.md），区分项目规则与全局规则、目录与命名约定。
+- **与 Skills 生态兼容**：Jarvis 的 rule 格式与 Cursor 的 skills 格式兼容，可直接将 skills 生态中的规则作为 Jarvis 规则使用，实现无缝继承。
 
 **规则自动选择流程**
 
