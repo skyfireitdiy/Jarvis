@@ -2393,13 +2393,15 @@ class Agent:
 
         用户指定规则的方式：
         1. 命令行参数 rule_names
-        2. input 标记 '<'rule:xxx'>'>'
+        2. input 标记 '<rule:xxx>'
 
         返回:
             bool: 如果用户已指定规则（非默认规则），返回 True
         """
-        # 默认规则（这些总是加载的，不视为用户指定）
-        default_rules = {"global_rule", "project_rule", "builtin_rules"}
+        from jarvis.jarvis_utils.config import get_default_rule_names
+
+        # 默认规则（来自配置 default_rule_names，不视为用户指定）
+        default_rules = set(get_default_rule_names())
 
         # 检查 loaded_rule_names 中是否有非默认规则
         for rule_name in self.loaded_rule_names:

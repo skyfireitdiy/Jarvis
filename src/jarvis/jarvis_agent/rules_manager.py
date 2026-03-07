@@ -16,8 +16,6 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
-import yaml
-
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -253,13 +251,6 @@ class RulesManager:
                         output_lines.append(f"- [{description}]({rule_path})")
                 output_lines.append("")
 
-        # YAML 规则
-        if index.get("yaml"):
-            output_lines.append("## 📝 YAML 规则\n")
-            for rule_name in sorted(index["yaml"]):
-                output_lines.append(f"- {rule_name}")
-            output_lines.append("")
-
         return "\n".join(output_lines)
 
     def _extract_rule_description(self, rule_path: str) -> str:
@@ -479,32 +470,8 @@ class RulesManager:
         all_dirs.extend(self.rules_dirs)
         return all_dirs
 
-    def _get_all_rules_yaml_files(self) -> List[tuple[str, str]]:
-        """获取所有 rules.yaml 文件路径（描述，文件路径）
-
-        返回:
-            List[tuple[str, str]]: (描述, 文件路径) 列表，按优先级排序（中心库 > 项目 > 全局）
-        """
-        yaml_files = []
-        # 优先级 1: 中心规则仓库的 rules.yaml（如果有同名规则，以中心仓库为准）
-        if self.central_repo_path and os.path.exists(self.central_repo_path):
-            central_rules_yaml = os.path.join(self.central_repo_path, "rules.yaml")
-            if os.path.exists(central_rules_yaml) and os.path.isfile(
-                central_rules_yaml
-            ):
-                yaml_files.append(("中心库", central_rules_yaml))
-        # 优先级 2: 项目 rules.yaml
-        project_rules_yaml = os.path.join(self.root_dir, ".jarvis", "rules.yaml")
-        if os.path.exists(project_rules_yaml) and os.path.isfile(project_rules_yaml):
-            yaml_files.append(("项目", project_rules_yaml))
-        # 优先级 3: 全局 rules.yaml
-        global_rules_yaml = os.path.join(get_data_dir(), "rules.yaml")
-        if os.path.exists(global_rules_yaml) and os.path.isfile(global_rules_yaml):
-            yaml_files.append(("全局", global_rules_yaml))
-        return yaml_files
-
     def get_named_rule(self, rule_name: str) -> Optional[str]:
-        """从 rules.yaml 文件和 rules 目录中获取指定名称的规则
+        """从 rules 目录中获取指定名称的规则
 
         规则名称格式：前缀:规则名
         前缀说明：
@@ -513,10 +480,7 @@ class RulesManager:
         - global: - 全局 ~/.jarvis/rules 目录文件
         - central: - 中心规则仓库文件
         - config1:, config2: - 配置的规则目录文件
-        - central_yaml: - 中心库 rules.yaml
-        - project_yaml: - 项目 rules.yaml
-        - global_yaml: - 全局 rules.yaml
-        - 无前缀 - 内置规则或 rule.md 索引文件中的规则
+        - 无前缀 - builtin/rules/rule.md 索引或内置规则
 
         参数:
             rule_name: 规则名称（可能包含前缀）
@@ -588,127 +552,16 @@ class RulesManager:
                             return self._read_rule_from_dir(rules_dir, actual_name)
                     return None
 
-                # 处理 yaml 规则
-                elif prefix in ["central_yaml", "project_yaml", "global_yaml"]:
-                    for desc, yaml_path in self._get_all_rules_yaml_files():
-                        if (prefix == "central_yaml" and desc == "中心库") or (
-                            prefix == "project_yaml" and desc == "项目"
-                        ):
-                            if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
-                                try:
-                                    with open(
-                                        yaml_path,
-                                        "r",
-                                        encoding="utf-8",
-                                        errors="replace",
-                                    ) as f:
-                                        rules = yaml.safe_load(f) or {}
-                                    if actual_name in rules:
-                                        rule_value = rules[actual_name]
-                                        if isinstance(rule_value, str):
-                                            content = rule_value.strip()
-                                        else:
-                                            content = str(rule_value).strip()
-                                        # 使用jinja2渲染规则模板
-                                        if content:
-                                            content = render_rule_template(
-                                                content, os.path.dirname(yaml_path)
-                                            )
-                                        return content if content else None
-                                except Exception:
-                                    continue
-                        elif prefix == "global_yaml" and desc == "全局":
-                            if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
-                                try:
-                                    with open(
-                                        yaml_path,
-                                        "r",
-                                        encoding="utf-8",
-                                        errors="replace",
-                                    ) as f:
-                                        rules = yaml.safe_load(f) or {}
-                                    if actual_name in rules:
-                                        rule_value = rules[actual_name]
-                                        if isinstance(rule_value, str):
-                                            content = rule_value.strip()
-                                        else:
-                                            content = str(rule_value).strip()
-                                        # 使用jinja2渲染规则模板
-                                        if content:
-                                            content = render_rule_template(
-                                                content, os.path.dirname(yaml_path)
-                                            )
-                                        return content if content else None
-                                except Exception:
-                                    continue
-                    return None
-
                 # 未知前缀
                 return None
 
-            # 无前缀：按优先级查找（项目 rules.yaml > 全局 rules.yaml > rule.md > 内置规则）
-            # 优先级 1: 从项目 rules.yaml 文件中查找
-            for desc, yaml_path in self._get_all_rules_yaml_files():
-                if desc == "项目":
-                    if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
-                        try:
-                            with open(
-                                yaml_path,
-                                "r",
-                                encoding="utf-8",
-                                errors="replace",
-                            ) as f:
-                                rules = yaml.safe_load(f) or {}
-                            if rule_name in rules:
-                                rule_value = rules[rule_name]
-                                if isinstance(rule_value, str):
-                                    content = rule_value.strip()
-                                else:
-                                    content = str(rule_value).strip()
-                                # 使用jinja2渲染规则模板
-                                if content:
-                                    content = render_rule_template(
-                                        content, os.path.dirname(yaml_path)
-                                    )
-                                if content:
-                                    return content
-                        except Exception:
-                            continue
-
-            # 优先级 2: 从全局 rules.yaml 文件中查找
-            for desc, yaml_path in self._get_all_rules_yaml_files():
-                if desc == "全局":
-                    if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
-                        try:
-                            with open(
-                                yaml_path,
-                                "r",
-                                encoding="utf-8",
-                                errors="replace",
-                            ) as f:
-                                rules = yaml.safe_load(f) or {}
-                            if rule_name in rules:
-                                rule_value = rules[rule_name]
-                                if isinstance(rule_value, str):
-                                    content = rule_value.strip()
-                                else:
-                                    content = str(rule_value).strip()
-                                # 使用jinja2渲染规则模板
-                                if content:
-                                    content = render_rule_template(
-                                        content, os.path.dirname(yaml_path)
-                                    )
-                                if content:
-                                    return content
-                        except Exception:
-                            continue
-
-            # 优先级 3: 从 rule.md 索引文件中查找
+            # 无前缀：按优先级查找（rule.md 索引 > 内置规则）
+            # 优先级 1: 从 rule.md 索引文件中查找
             indexed_rule = self._get_rule_from_builtin_index(rule_name)
             if indexed_rule:
                 return indexed_rule
 
-            # 优先级 4: 从内置规则中查找
+            # 优先级 2: 从内置规则中查找
             builtin_rule = get_builtin_rule(rule_name)
             if builtin_rule:
                 return builtin_rule
@@ -726,14 +579,12 @@ class RulesManager:
             dict[str, List[str]]: 按来源分类的规则名称字典
                 - "builtin": 内置规则列表
                 - "files": 规则目录中的文件规则列表（带来源前缀）
-                - "yaml": rules.yaml 文件中的规则列表（带来源前缀）
         """
         from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
         result = {
             "builtin": [f"builtin:{rule}" for rule in list_builtin_rules()],
             "files": [],
-            "yaml": [],
         }
 
         # 收集规则目录中的文件规则（支持递归遍历子目录）
@@ -780,29 +631,6 @@ class RulesManager:
                                     # 规则名称带来源前缀（如 project:deployment/version_release.md）
                                     prefixed_name = prefix + rel_path
                                     result["files"].append(prefixed_name)
-                except Exception:
-                    continue
-
-        # 收集 rules.yaml 文件中的规则
-        for desc, yaml_path in self._get_all_rules_yaml_files():
-            if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
-                # 根据描述确定前缀
-                if desc == "中心库":
-                    prefix = "central_yaml:"
-                elif desc == "项目":
-                    prefix = "project_yaml:"
-                elif desc == "全局":
-                    prefix = "global_yaml:"
-                else:
-                    continue
-
-                try:
-                    with open(yaml_path, "r", encoding="utf-8", errors="replace") as f:
-                        rules = yaml.safe_load(f) or {}
-                        if isinstance(rules, dict):
-                            for rule_name in rules.keys():
-                                prefixed_name = prefix + rule_name
-                                result["yaml"].append(prefixed_name)
                 except Exception:
                     continue
 
@@ -984,16 +812,6 @@ class RulesManager:
                     if 0 <= target_idx < len(all_rules_dirs):
                         return os.path.join(all_rules_dirs[target_idx], actual_name)
 
-                # 处理 yaml 规则
-                elif prefix in ["central_yaml", "project_yaml", "global_yaml"]:
-                    for desc, yaml_path in self._get_all_rules_yaml_files():
-                        if (
-                            (prefix == "central_yaml" and desc == "中心库")
-                            or (prefix == "global_yaml" and desc == "全局")
-                            or (prefix == "project_yaml" and desc == "项目")
-                        ):
-                            return yaml_path
-
             # 对于内置规则，尝试获取路径
             try:
                 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
@@ -1093,35 +911,6 @@ class RulesManager:
             # 向后兼容：也检查旧的 loaded_rules
             is_loaded = is_loaded or rule_name in self.loaded_rules
             rules_info.append((rule_name, preview, is_loaded, file_path))
-
-        # 处理YAML规则
-        for rule_name in available_rules.get("yaml", []):
-            preview = self.get_rule_preview(rule_name)
-            # 检查状态：只有明确激活的规则才显示为已激活
-            is_loaded = rule_name in self._active_rules
-            # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = is_loaded or rule_name in self.loaded_rules
-            rules_info.append((rule_name, preview, is_loaded, file_path))
-
-        # 处理项目单个规则文件 .jarvis/rule
-        project_rule_path = os.path.join(self.root_dir, ".jarvis", "rule")
-        if os.path.exists(project_rule_path):
-            preview = self.get_rule_preview("project_rule")
-            # 检查状态：使用新的状态管理机制
-            is_loaded = "project_rule" in self._active_rules
-            # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = is_loaded or "project_rule" in self.loaded_rules
-            rules_info.append(("project_rule", preview, is_loaded, project_rule_path))
-
-        # 处理全局单个规则文件 ~/.jarvis/rule
-        global_rule_path = os.path.join(get_data_dir(), "rule")
-        if os.path.exists(global_rule_path):
-            preview = self.get_rule_preview("global_rule")
-            # 检查状态：使用新的状态管理机制
-            is_loaded = "global_rule" in self._active_rules
-            # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = is_loaded or "global_rule" in self.loaded_rules
-            rules_info.append(("global_rule", preview, is_loaded, global_rule_path))
 
         # 处理内置规则索引文件 builtin/rules/rule.md
         try:
