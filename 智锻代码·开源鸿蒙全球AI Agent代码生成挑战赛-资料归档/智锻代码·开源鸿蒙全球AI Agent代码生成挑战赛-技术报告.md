@@ -116,9 +116,9 @@ package "专业应用层" #LightBlue {
 
 **使用方式**：
 
-- **CLI 交互模式**：提供 `config` 和 `scan` 两个子命令，支持配置文件管理（`.jarvis/jsec/config.json`）和零参数执行扫描
+- **CLI 交互模式**：提供 `config`、`scan`、`analyze` 三个子命令，支持配置文件管理（`.jarvis/jsec/config.json`）和零参数执行扫描；`analyze` 支持从外部 JSON 文件分析安全问题（支持标准格式或非标准格式自动转换）
 - **启发式扫描**：纯 Python 本地扫描，不依赖 Agent，采用模块化检查器架构
-- **C/C++ 检查器**：按功能域拆分为 6 个独立模块（memory_checker、io_checker、pointer_checker、thread_checker、api_checker、cpp_checker），包含 82 个正则表达式规则，按 9 个类别组织
+- **C/C++ 与 Rust 检查器**：按语言拆分为 C/C++ 检查器（`c_checker.py`）和 Rust 检查器（`rust_checker.py`），C/C++ 检查器包含多种启发式规则（内存管理、缓冲区操作、错误处理、线程安全、格式串风险、命令执行等），覆盖不安全 API、边界类、内存管理类、错误处理与并发类、输入/权限/敏感信息等
 - **Agent 验证**：使用 Agent 进行逐条验证（只读工具：代码读取工具/脚本执行工具）
 - **报告聚合**：将 Agent 验证结果聚合为 JSON + Markdown 报告
 
@@ -148,7 +148,7 @@ package "专业应用层" #LightBlue {
   - 测试失败信息反馈：测试失败时获取完整的测试失败信息并通过专门的标签传递给修复Agent
   - 测试代码删除检测：基于事件订阅机制（工具调用前事件和工具调用后事件），在每次工具调用后立即检测测试代码是否被错误删除，若检测到问题则立即回退，确保测试代码不会被意外删除（工具调用前回调方法、工具调用后回调方法，优化器模块中同样实现）
 
-**CLI 交互模式**：提供 **config**、**run**（一键流水线）以及分阶段子命令 **scan**、**lib-replace**、**prepare**、**transpile**、**optimize**、**verify**。config 管理 `.jarvis/c2rust/config.json`（含 root_symbols、disabled_libraries、additional_notes、enable_ffi_export_validation 等）；run 依次执行 scan → lib-replace → prepare → transpile → optimize（支持断点续跑，状态记录于 run_state.json）；verify 为可选功能对齐验证（独立子命令）。
+**CLI 交互模式**：提供 **config**、**run**、**verify** 三个子命令。config 管理 `.jarvis/c2rust/config.json`（含 root_symbols、disabled_libraries、additional_notes、enable_ffi_export_validation 等）；run 为一键流水线，内部依次执行 scan → lib-replace → prepare → transpile → optimize（支持断点续跑，状态记录于 run_state.json）；verify 为可选功能对齐验证（独立子命令）。scan、lib-replace、prepare、transpile、optimize 为 run 内部的阶段步骤，非独立 CLI 子命令。
 
 **工作流程**：
 
@@ -404,8 +404,8 @@ MainEntry --> Agent : 代理入口
     - 返回值：`success/stdout/stderr` 结构，其中 `stdout` 会包含生成结果说明和新工具文件的绝对路径
   - 源码位置：`src/jarvis/jarvis_tools/meta_agent.py`
 - **RulesManager**（规则管理）
-  - 职责：加载、合并与激活/停用规则，为系统提示提供“已加载规则”内容；支持多来源（全局/项目/内置/中心库/配置目录、rules.yaml）与命名规则解析（含前缀）
-  - 聚焦：规则目录优先级（中心库 > 项目 > 配置）；默认规则（global_rule、project_rule、builtin_rules）；activate_rule/deactivate_rule 与合并结果注入 PromptManager
+  - 职责：加载、合并与激活/停用规则，为系统提示提供“已加载规则”内容；支持多来源（全局/项目/内置/中心库/配置目录）与命名规则解析（含前缀）
+  - 聚焦：规则目录优先级（中心库 > 项目 > 配置）；特殊规则名（builtin_rules 对应内置 rule.md 索引）；activate_rule/deactivate_rule 与合并结果注入 PromptManager
   - 源码位置：RulesManager 模块（`src/jarvis/jarvis_agent/rules_manager.py`）
 
 **3.1.3 工具执行模块（Tool Execution）**
@@ -628,6 +628,7 @@ start
 :确定自动完成策略（多智能体模式 vs 非交互模式）;
 :创建 EventBus（需先于 Managers，以便 Managers 在构造中订阅事件）;
 :创建 Managers（MemoryManager/TaskAnalyzer/FileMethodologyManager/\nPromptManager/TaskListManager/RulesManager）;
+:加载规则 load_all_rules(rule_names)（rule_names 来自 AgentManager._merge_rule_names：\n合并 get_default_rule_names() 与命令行 rule_names）;
 :设置系统提示词（通过 PromptManager，含 RulesManager 的 loaded_rules，见 3.5.1）;
 if (存在 after_tool_call 回调目录?) then (是)
   :扫描 after_tool_call_cb_dirs 配置指定的目录;
@@ -644,7 +645,7 @@ stop
   - 轻量协调者：初始化组件、构建系统/附加提示、委派主循环、广播事件
   - 通过 Registry 与事件总线实现可插拔能力与旁路扩展
 - 核心方法：
-  - **init**: 解析参数与配置；初始化 Platform（get_normal_platform）/Session/Handlers/Managers（含 TaskListManager、RulesManager，见 3.5.1）/Prompt；设置系统提示；加载 after_tool_call 回调
+  - **init**: 解析参数与配置；初始化 Platform/Session/Handlers/Managers（含 RulesManager）；load_all_rules(rule_names) 加载规则（rule_names 来自配置与命令行合并）；设置系统提示；加载 after_tool_call 回调
   - run/\_main_loop: 进入主循环，委派 AgentRunLoop
   - \_call_model/\_invoke_model: 输入处理、附加提示拼接、上下文计数与模型调用（含 BEFORE/AFTER_MODEL_CALL 事件）
   - \_call_tools: 工具执行委派至 execute_tool_call
@@ -780,7 +781,7 @@ stop
     3. 自动摘要检查：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
        - **Git diff 集成优化**：在触发总结前，如果 Agent 是 CodeAgent 类型（有 `start_commit` 属性），自动获取并缓存 git diff 信息
     4. 更新输入处理器标志（run_input_handlers_next_turn）
-    5. 首次运行处理（Agent.\_first_run：工具筛选、记忆标签提示注入、文件/方法论处理）
+    5. 首次运行处理（Agent.\_first_run：工具筛选、规则自动选择、记忆标签提示注入、文件/方法论处理）
     6. \_call_model → 获取响应（含输入处理器链处理）
     7. 检查响应中的 <!!!SUMMARY!!!> 标记（`ot('!!!SUMMARY!!!')` 是等价的封装形式）：如果检测到该标记，触发摘要与历史清理，移除标记后继续处理响应
        - **Git diff 集成优化**：主动总结标记触发时，同样会获取并缓存 git diff 信息（仅对 CodeAgent 类型）
@@ -827,7 +828,7 @@ if (剩余token低于输入窗口25%?) then (是)
 endif
 :更新输入处理器标志;
 if (首次运行?) then (是)
-  :触发 Agent._first_run（工具筛选/文件/方法论）;
+  :触发 Agent._first_run（工具筛选/规则自动选择/记忆标签/文件/方法论）;
 endif
 :调用模型获取响应（含输入处理器链）;
 if (响应包含 <!!!SUMMARY!!!> 标记?) then (是)
@@ -881,19 +882,19 @@ Rule 系统用于将“行为约束、编码规范、流程定义”等以规则
 **设计目标与定位**
 
 - **统一规则入口**：规则内容通过 RulesManager 加载与合并，由 PromptManager 写入系统提示的 `<loaded_rules>` 块，与系统提示词、工具提示等一起下发给模型。
-- **多来源、可扩展**：支持全局规则（`~/.jarvis/rule`）、项目规则（`.jarvis/rule`）、项目/全局/中心库的 `rules` 目录与 `rules.yaml`、内置规则索引（builtin_rules.md）及配置的规则目录；支持中心规则仓库（Git）的克隆与每日更新检查。
+- **多来源、可扩展**：支持项目/全局/中心库的 `rules` 目录、内置规则（`builtin/rules/` 及 `builtin/rules/rule.md`）及配置的规则目录；支持中心规则仓库（Git）的克隆与每日更新检查。
 - **按需激活与运行时注入**：启动时通过 Agent 参数 `rule_names`（逗号分隔）指定要加载的命名规则；支持通过 `load_rule` 工具按文件路径加载并渲染规则，以及通过输入标记 `<rule:规则名>` 在当轮将规则内容注入用户输入。
 
 **规则来源与优先级**
 
-- **默认加载（无 `rule_names` 时）**：依次加载并合并（1）全局单文件规则 `read_global_rules()`（`~/.jarvis/rule`）、（2）项目单文件规则 `read_project_rule()`（`.jarvis/rule`）、（3）内置规则索引 `_get_builtin_rules_index()`（builtin_rules.md）。合并结果写入 `loaded_rules`，供 PromptManager 使用。
-- **命名规则解析（get_named_rule）**：规则名可带前缀以指定来源：`builtin:`、`project:`、`global:`、`central:`、`configN:`、`central_yaml:`、`project_yaml:`、`global_yaml:`；无前缀时按优先级从项目/全局 rules.yaml、builtin_rules.md 索引、内置规则文件中查找。
+- **默认规则与按需激活**：`load_all_rules(rule_names)` 根据传入的 `rule_names`（逗号分隔）激活对应规则；未指定时返回空。常用规则名为 `builtin_rules`（`builtin/rules/rule.md`），调用方（如 Agent）可按需传入以加载。
+- **命名规则解析（get_named_rule）**：规则名可带前缀以指定来源：`builtin:`、`project:`、`global:`、`central:`、`configN:`；无前缀时按 `builtin/rules/rule.md` 索引、内置规则查找。
 - **规则目录优先级（_get_all_rules_dirs）**：中心规则仓库（若配置）> 项目 `.jarvis/rules` > 配置的规则目录；同名规则以优先级高的为准。
 
 **RulesManager 职责与状态**
 
 - **加载与缓存**：从各来源读取规则内容，经 Jinja2 渲染（支持 current_dir、git_root_dir、jarvis_src_dir、jarvis_data_dir、rule_file_dir 等变量）后写入 `_loaded_rules`（name → content）。
-- **激活与合并**：默认规则与 `rule_names` 中指定的规则被加入 `_active_rules`；`activate_rule(name)` / `deactivate_rule(name)` 可动态增删激活集合；`_merge_active_rules()` 将当前激活规则按名排序后拼接为 `_merged_rules`。
+- **激活与合并**：`rule_names` 中指定的规则通过 `activate_rule(name)` 加入 `_active_rules`；`deactivate_rule(name)` 可动态移除；`_merge_active_rules()` 将当前激活规则按名排序后拼接为 `_merged_rules`。
 - **对外接口**：`load_all_rules(rule_names)` 返回 `(merged_rules, loaded_rule_names)`，供 Agent 初始化时得到 `loaded_rules`（字符串）与 `loaded_rule_names`；`get_named_rule(rule_name)` 供工具与输入处理器按名取内容；`get_all_available_rule_names()`、`get_all_rules_with_status()` 支持列表与状态展示。
 
 **规则注入流程**
@@ -909,8 +910,17 @@ Rule 系统用于将“行为约束、编码规范、流程定义”等以规则
 
 **规则文件与规范**
 
-- 项目规则建议放在 `.jarvis/rules/` 下（可按子目录分类）；全局规则在 `~/.jarvis/rules/` 或单文件 `~/.jarvis/rule`；内置规则在 Jarvis 的 `builtin/rules/`，通过 `builtin_rules.md` 索引与 `get_builtin_rule` 暴露。
+- 项目规则建议放在 `.jarvis/rules/` 下（可按子目录分类）；全局规则在 `~/.jarvis/rules/`；内置规则在 Jarvis 的 `builtin/rules/`，通过 `builtin/rules/rule.md` 及 `get_builtin_rule` 暴露。
 - 规则内容支持 Markdown 与 Jinja2 模板；新增规则可参考 `add_rule` 规范（如 builtin/rules/tool_config/add_rule.md），区分项目规则与全局规则、目录与命名约定。
+
+**规则自动选择流程**
+
+- **触发时机**：Agent 首次运行（`_first_run`）时，若 `enable_auto_rule_select=True` 且 `session.prompt` 非空，则调用 `auto_select_and_load_rules(task_description)`。
+- **前置条件**：`_has_user_specified_rules()` 为 False 时执行；用户已通过命令行 `rule_names` 或输入标记 `<rule:xxx>` 指定规则则跳过。
+- **两阶段流程**（RulesManager.select_rule_by_task + _filter_rules_by_content）：
+  1. **规则选择**：调用 `get_all_available_rule_names()` 获取可用规则索引，构造编号列表，通过临时模型根据任务描述选择最匹配的规则（最多 5 个），返回序号并映射为规则名。
+  2. **内容过滤**：对选中规则加载内容，通过 `_filter_rules_by_content` 让模型根据任务与规则内容过滤不相关规则，得到最终规则列表。
+- **激活**：对过滤后的规则依次调用 `activate_rule(name)` 激活，合并到 `_merged_rules` 并刷新系统提示。
 
 **小结**
 
@@ -3336,7 +3346,7 @@ rectangle "阶段4: 报告\n(JSON+Markdown)" as 报告 #LightGreen
 
 - 五阶段依次执行：启发式扫描 → 聚类 → 复核 → 分析 → 报告，每阶段产物作为下一阶段输入。
 - 复核阶段：对聚类Agent标记为无效的告警进行复核，如果理由不充分，将候选重新加入验证流程。
-- CLI 提供 agent 子命令（完整四阶段），当 Agent 分析失败或无输出时自动回退到直扫基线（仅阶段1）。
+- CLI 的 scan 子命令执行完整四阶段流水线，当 Agent 分析失败或无输出时自动回退到直扫基线（仅阶段1）。
 - 数据产物在各阶段生成并复用，形成稳定的"分析上下文"。
 - Agent 仅使用只读工具，确保分析过程不修改仓库状态。
 
@@ -3371,11 +3381,9 @@ rectangle "阶段4: 报告\n(JSON+Markdown)" as 报告 #LightGreen
 
 命令行子命令（CLI）
 
-- agent：执行完整四阶段流水线（启发式扫描 → 聚类 → 分析 → 报告），输出最终报告
-  - --path/-p：待分析的根目录（可选，默认当前目录）
-  - --llm-group/-g：使用的模型组（可选）
-  - --output/-o：最终Markdown报告输出路径（默认 ./report.md）
-  - --cluster-limit/-c：聚类每批最多处理的告警数（默认 50）
+- config：管理配置文件（.jarvis/jsec/config.json），可设置 target、languages、exclude_dirs、output、cluster_limit、enable_verification、force_save_memory、llm_group 等
+- scan：执行完整四阶段流水线（启发式扫描 → 聚类 → 分析 → 报告），从配置文件读取参数，输出最终报告；Agent 分析失败时自动回退到直扫基线
+- analyze：从外部 JSON 文件分析安全问题，支持标准格式直接分析或非标准格式自动转换后分析
 
 四阶段流水线（PlantUML）
 
@@ -4263,7 +4271,7 @@ CLI 子命令主要参数（源码为准）
 
 - **源码位置**：`src/jarvis/jarvis_c2rust/`
   - `__init__.py`：模块说明与导出（scanner、optimizer）
-  - `cli.py`：Typer 命令行入口，提供 `run`（一键流水线，支持断点续跑）和 `config`（配置管理）命令
+  - `cli.py`：Typer 命令行入口，提供 `config`（配置管理）、`run`（一键流水线，支持断点续跑）、`verify`（功能对齐验证）三个命令
   - `scanner.py`：libclang 驱动的 C/C++ 函数与类型扫描、引用图生成、转译顺序计算
   - `collector.py`：头文件函数名采集（使用 libclang 解析函数声明，由 config 命令内部调用）
   - `library_replacer.py`：基于 LLM 的库替代评估与剪枝（子树评估、断点续跑）
@@ -4282,7 +4290,7 @@ CLI 子命令主要参数（源码为准）
     - `translation_order.jsonl`：通用别名，由 `scanner.compute_translation_order_jsonl` 计算；按引用关系排序函数转译顺序
     - `translation_order_prune.jsonl`：库替代阶段基于剪枝表计算的顺序（兼容别名指向通用顺序）
   - **配置与状态**：
-    - `config.json`：配置文件（root_symbols、disabled_libraries、additional_notes），由 config 命令管理
+    - `config.json`：配置文件（root_symbols、disabled_libraries、additional_notes、enable_ffi_export_validation），由 config 命令管理
     - `run_state.json`：流水线状态文件（记录各阶段完成状态与时间戳），支持断点续跑
   - **库替代映射**：
     - `library_replacements.jsonl`：LLM 评估生成的库替代与剪枝结果（每行一个 JSON 对象）
@@ -4361,7 +4369,7 @@ Transpiler --> Optimizer : 已生成的 crate 源码
 - 转译顺序
   - translation_order.jsonl：由 scanner.compute_translation_order_jsonl 计算；按引用关系排序函数转译顺序
 - 配置
-  - config.json：根函数名列表（root_symbols）、禁用库列表（disabled_libraries）和附加说明（additional_notes），由 config 命令管理
+  - config.json：根函数名列表（root_symbols）、禁用库列表（disabled_libraries）、附加说明（additional_notes）、FFI 导出验证开关（enable_ffi_export_validation），由 config 命令管理
 - 库替代映射
   - library_replacements.jsonl：LLM 评估生成的库替代与剪枝结果
 - 进度与映射
@@ -4372,8 +4380,8 @@ Transpiler --> Optimizer : 已生成的 crate 源码
 
 **命令行子命令（CLI）**
 
-- **config**：管理配置文件（`.jarvis/c2rust/config.json`），设置根符号列表、禁用库列表和附加说明
-  - 参数：`--files <paths...>`（头文件或函数名列表文件，头文件自动提取函数名），`--root-list-syms <str>`（根符号列表内联，逗号分隔），`--disabled-libs <str>`（禁用库列表，逗号分隔），`--additional-notes <str>`（附加说明，将在所有 agent 的提示词中追加），`--show`（显示当前配置），`--clear`（清空配置）
+- **config**：管理配置文件（`.jarvis/c2rust/config.json`），设置根符号列表、禁用库列表、附加说明和 FFI 导出验证
+  - 参数：`--files <paths...>`（头文件或函数名列表文件，头文件自动提取函数名），`--root-list-syms <str>`（根符号列表内联，逗号分隔），`--disabled-libs <str>`（禁用库列表，逗号分隔），`--additional-notes <str>`（附加说明，将在所有 agent 的提示词中追加），`--enable-ffi-export-validation`/`--disable-ffi-export-validation`（启用/禁用 FFI 导出验证，默认禁用），`--show`（显示当前配置），`--clear`（清空配置）
   - 功能：从头文件（.h/.hh/.hpp/.hxx）自动提取函数名，或从文本文件逐行读取函数名；支持同时设置多个参数
 - **run**：一键流水线（scan → lib-replace → prepare → transpile → optimize），支持断点续跑
   - 参数：`-g/--llm-group <name>`（LLM 相关阶段使用的模型组），`-m/--max-retries <N>`（transpile 构建/修复最大重试次数，0 表示不限制），`--interactive`（启用交互模式，默认非交互模式），`--reset`（重置状态，从头开始执行所有阶段）
@@ -5646,9 +5654,9 @@ CLI 命令主要参数（源码为准）
 
 系统采用"四阶段流水线"设计：
 
-1. **阶段1：启发式扫描**：通过纯 Python + 启发式检查器提供"可复现、可离线"的安全问题直扫基线，输出候选问题列表（heuristic_issues.jsonl）。
-2. **阶段2：聚类**：将候选问题按文件分组，使用单Agent对每个文件内的告警进行"验证条件一致性"聚类，生成聚类批次（cluster_report.jsonl）。
-3. **阶段3：分析**：将每个聚类批次交由单Agent执行"只读验证"，确认是否存在真实安全风险，输出验证确认问题（agent_issues.jsonl）。
+1. **阶段1：启发式扫描**：通过纯 Python + 启发式检查器提供"可复现、可离线"的安全问题直扫基线，输出候选问题列表（candidates.jsonl，兼容旧版 heuristic_issues.jsonl）。
+2. **阶段2：聚类**：将候选问题按文件分组，使用单Agent对每个文件内的告警进行"验证条件一致性"聚类，生成聚类批次（clusters.jsonl，兼容旧版 cluster_report.jsonl）。
+3. **阶段3：分析**：将每个聚类批次交由单Agent执行"只读验证"，确认是否存在真实安全风险，输出验证确认问题（analysis.jsonl）。
 4. **阶段4：报告**：通过报告聚合器将所有确认问题聚合为 JSON + Markdown 报告，包含统计概览与详细条目。
 
 #### 一、阶段1：启发式扫描算法
@@ -5661,9 +5669,9 @@ CLI 命令主要参数（源码为准）
   - 默认排除目录：.git、build、out、target、third_party、vendor（任一祖先匹配即排除）
   - 以相对 entry_path 的相对路径输出，便于跨平台与报告呈现
 - 语言分派与检查器
-  - C/C++：checkers.c_checker.analyze_files
-  - Rust：checkers.rust_checker.analyze_files
-- 产物：heuristic_issues.jsonl（结构化候选问题列表）
+  - C/C++：checkers.c_checker.analyze_files（导出为 analyze_c_files）
+  - Rust：checkers.rust_checker.analyze_rust_files
+- 产物：candidates.jsonl（结构化候选问题列表，兼容 heuristic_issues.jsonl）
 
 **C/C++ 启发式检测算法（checkers/c_checker.py）**
 
@@ -5740,8 +5748,8 @@ CLI 命令主要参数（源码为准）
     - verification: 字符串（本簇验证条件）
     - gids: 整数数组（属于该簇的全局编号）
 - 断点恢复：
-  - 支持断点恢复：若 cluster_report.jsonl 存在，优先复用已有聚类结果
-- 产物：cluster_report.jsonl（按文件/批次写入聚类结果）
+  - 支持断点恢复：若 clusters.jsonl 存在，优先复用已有聚类结果
+- 产物：clusters.jsonl（按文件/批次写入聚类结果）
 
 **聚类容错机制**
 
@@ -5768,14 +5776,14 @@ CLI 命令主要参数（源码为准）
     - consequences: string（漏洞被触发后可能导致的后果，当 has_risk=true 时必需）
     - suggestions: string（修复或缓解该漏洞的建议，当 has_risk=true 时必需）
 - 解析与校验：
-  - 解析严格校验字段与类型；成功则将"确认风险"的条目增量写入 .jarvis/sec/agent_issues.jsonl
+  - 解析严格校验字段与类型；成功则将"确认风险"的条目增量写入 .jarvis/sec/analysis.jsonl
   - 支持重试：摘要解析失败或关键字段缺失时，最多重试 2 次
 - 工作区保护：
   - 每次运行 Agent 后检测 git 工作区是否有变更；如有通过 git checkout -- . 恢复，记录 meta（workspace_restore）
 - 进度追踪：
   - 记录 batch_status 与 task_status 事件，并将每个候选标记为已处理
   - 基于进度文件跳过已完成的候选（通过 candidate_signature 匹配）
-- 产物：agent_issues.jsonl（验证确认问题列表）
+- 产物：analysis.jsonl（验证确认问题列表）
 
 **验证容错机制**
 
@@ -6485,1068 +6493,3 @@ stop
 - 库替代与剪枝：jarvis_c2rust.library_replacer（resume/disabled_libraries）
 - 转译与闭环：jarvis_c2rust.transpiler（progress/symbol_map/Review 合并审查）
 - 优化与回滚：jarvis_c2rust.optimizer（unsafe/可见性/文档 + git_guard）
-
-## 功能实现说明
-
-### bzip2代码分析能力描述
-
-bzip2 是一个基于 Burrows-Wheeler 算法和 Huffman 编码的文件压缩工具，其代码库包含 C/C++ 源文件，涵盖核心压缩库（libbzip2）和命令行工具（bzip2、bzip2recover 等）。本节基于最新一次对该项目的安全扫描产物（见 test_cases 中的报告与 JSONL 结果），展示 jarvis-sec 系统的分析能力。
-
-#### 分析过程概述
-
-采用 jarvis-sec 的四阶段流水线对 bzip2 项目进行了全面安全分析：
-
-1. **启发式扫描阶段**：通过纯 Python 实现的 C/C++ 检查器对项目进行静态扫描，识别潜在安全问题模式，生成候选问题列表（heuristic_issues.jsonl）。
-
-2. **聚类阶段**：将候选问题按文件分组，使用 AI Agent 对每个文件内的告警进行验证条件一致性聚类，生成聚类批次（cluster_report.jsonl），将相关告警合并为统一的验证任务。
-
-3. **分析阶段**：对每个聚类批次使用 AI Agent 执行只读验证，通过代码上下文分析和逻辑推理，确认是否存在真实安全风险，最终输出验证确认的问题（agent_issues.jsonl）。
-
-4. **报告阶段**：聚合所有确认问题，生成包含统计概览和详细条目的 JSON + Markdown 报告。
-
-#### 分析结果统计
-
-本次扫描聚合报告检出并确认 **10 个安全问题**，覆盖多个典型类别与文件，体现了系统的覆盖度与有效性。
-
-**问题分布统计：**
-
-- **扫描范围**：扫描根目录 `/home/skyfire/code/bzip2`，扫描文件数 15 个
-- **按语言**：c/cpp=10, rust=0
-- **按类别**：
-  - `unsafe_api`: 7 个（主要为字符串拼接/拷贝导致的溢出风险）
-  - `memory_mgmt`: 2 个（整数溢出、空指针解引用）
-  - `error_handling`: 1 个（I/O 写入未检查返回值）
-- **按风险文件**：
-  - `bzip2.c`（4 个问题）
-  - `bzlib.c`（4 个问题）
-  - `bzip2recover.c`（1 个问题）
-  - `dlltest.c`（1 个问题）
-- **按严重性（聚合评估）**：
-  - `high`: 9 个
-  - `medium`: 1 个
-
-#### 发现的主要安全问题
-
-##### 1. 不安全 API 使用与缓冲区溢出（7 个）
-
-- `bzip2.c:1136`（`strcat`）
-  - 在 `mapSuffix()` 函数中使用 `strcat` 追加新后缀，未检查目标缓冲区剩余空间；当输入文件名长度加上后缀长度超过 `FILE_NAME_LEN`（1034）时可能导致缓冲区溢出。触发路径：`mapSuffix()` -> `strcat()`，文件名作为输入参数传递，未进行长度校验。建议使用 `snprintf` 替代 `strcat`，或在操作前检查目标缓冲区剩余空间。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzip2.c:1163`（`strcat`）
-  - 在 `compress()` 流程中使用 `strcat` 追加固定后缀 " "，当输入文件名长度接近上限时存在越界风险。触发路径：`compress()` -> `strcat()`，数据流未进行长度校验。建议在追加前验证可用空间或使用安全拼接策略。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzip2.c:1351`（`strcat`）
-  - 在 `uncompress()` 流程中，当不可识别后缀时使用 `strcat` 追加固定后缀 " "，可能越界。触发路径：`uncompress()` -> `strcat()`，未对目标缓冲区剩余空间进行检查。建议在多次映射后重新评估剩余空间。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzip2.c:1744`（`strcpy`）
-  - 在 `snocString()` 函数中使用 `strcpy` 复制字符串，虽然动态分配了缓冲区（5+strlen(name)），但未验证输入字符串 `name` 的有效性。触发路径：`snocString()` -> `strcpy()`，输入字符串作为参数传递，未进行有效性检查。建议添加输入字符串有效性检查，或使用 `strncpy` 限制复制长度。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzlib.c:1417`（`strcat`）
-  - 在 `BZ2_bzopen()` 函数中使用 `strcat` 追加字符，`mode2` 缓冲区在连续调用两次 `strcat` 时未检查剩余空间是否足够。触发路径：调用者函数 -> `BZ2_bzopen()` -> `strcat()`，`mode2` 缓冲区初始化为空字符串，连续追加可能导致溢出。建议使用 `strncat` 替代 `strcat`，或使用 `snprintf` 进行格式化输出，或增加缓冲区长度检查。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzlib.c:1418`（`strcat`）
-  - 在 `BZ2_bzopen()` 函数中第二次使用 `strcat` 追加字符，与上述问题相关，连续操作可能导致缓冲区溢出。建议同上。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-- `bzip2recover.c:482`（`sprintf`）
-  - 使用 `sprintf` 格式化字符串写入 `split` 缓冲区，当 `wrBlock+1` 的值大于等于 `split` 缓冲区大小时可能导致溢出。触发路径：`main()` -> 处理块分割逻辑 -> `sprintf(split, "rec%5d", wrBlock+1)`，`wrBlock` 是内部计数器，通过循环递增。建议使用 `snprintf()` 替代 `sprintf()`，并确保指定正确的缓冲区大小。
-  - 置信度: 0.9, 严重性: high, 评分: 2.7
-
-##### 2. 内存管理问题（2 个）
-
-- `bzlib.c:104`（整数溢出）
-  - 在 `default_bzalloc()` 函数中，`malloc(items * size)` 未检查 `items` 和 `size` 的乘积是否超过 `INT32_MAX`，可能导致整数溢出。触发路径：`BZ2_bzCompressInit()` -> `BZALLOC` 宏 -> `default_bzalloc()` -> `malloc()`，通过 `BZ2_bzCompressInit()` 的参数间接控制 `items` 和 `size` 的值。后果：整数溢出导致分配错误大小的内存，可能引发堆溢出或程序崩溃。建议在 `default_bzalloc()` 中添加整数溢出检查，或使用安全的乘法包装函数。
-  - 置信度: 0.6, 严重性: medium, 评分: 1.2
-
-- `bzlib.c:1564`（空指针解引用）
-  - 在 `BZ2_bzerror()` 函数中，对 `errnum` 指针进行解引用操作，但未检查指针是否为 NULL。触发路径：外部调用者 -> `BZ2_bzerror()` -> `*errnum` 解引用，外部调用者直接调用 `BZ2_bzerror()` 函数并传入 `errnum` 指针，函数内部未对 `errnum` 进行非空检查即解引用。后果：空指针解引用导致程序崩溃。建议在 `BZ2_bzerror()` 函数开始处添加 `errnum` 指针的非空检查，或明确在函数文档中要求调用者必须传入非空指针。
-  - 置信度: 0.6, 严重性: high, 评分: 1.8
-
-##### 3. 错误处理缺失（1 个）
-
-- `dlltest.c:138`（I/O 写入未校验）
-  - `fwrite` 操作未检查返回值，当写入失败（如磁盘空间不足、文件系统错误等）时未被检测到。触发路径：`main()` -> 参数解析 -> `fopen(fn_w)` -> `BZ2_bzread()` -> `fwrite()`，`fopen()` 和 `BZ2_bzopen()` 有错误检查，但 `fwrite()` 未检查返回值。后果：数据写入失败未被检测到，可能导致数据丢失或程序状态不一致。建议检查 `fwrite` 返回值，若写入失败应进行错误处理（如关闭文件、输出错误信息、退出程序等）。
-  - 置信度: 0.65, 严重性: medium, 评分: 1.3
-
-#### 系统分析能力体现
-
-1. **精准的启发式规则**：系统能够识别 C/C++ 代码中的不安全 API 使用（如 `strcpy`、`strcat`、`sprintf`）、内存管理问题（整数溢出、空指针解引用）以及错误处理缺失等常见安全模式。
-
-2. **智能的聚类与验证**：通过 AI Agent 对候选问题进行聚类和验证，系统能够：
-   - 识别同一文件内的相关告警，合并为统一的验证任务
-   - 理解代码上下文，分析触发路径和前置条件
-   - 评估问题的真实性和严重性，有效降低误报率
-
-3. **全面的分析报告**：生成的报告包含：
-   - 统计概览（按语言、类别、文件分布）
-   - 详细问题条目（包含位置、证据、触发路径、后果、修复建议）
-   - 置信度和严重性评分，便于优先处理高风险问题
-
-4. **上下文感知的分析**：系统能够理解代码逻辑，例如：
-   - 识别 `strcat` 连续操作可能导致缓冲区溢出
-   - 分析函数调用链，追踪从 API 入口到问题点的完整路径（如 `BZ2_bzCompressInit()` -> `BZALLOC` 宏 -> `default_bzalloc()` -> `malloc()`）
-   - 评估前置条件的合理性，判断问题的可触发性（如文件名长度加上后缀长度超过缓冲区大小）
-
-5. **数据流分析能力**：系统能够追踪数据流，例如：
-   - 识别文件名作为输入参数传递，未进行长度校验直接使用 `strcat` 追加后缀
-   - 分析 `mode2` 缓冲区初始化为空字符串，在 `BZ2_bzopen()` 中被连续调用两次 `strcat` 追加字符
-   - 追踪 `wrBlock` 作为内部计数器通过循环递增，可能导致格式化字符串溢出
-
-#### 结论
-
-通过 bzip2 项目的最新分析实践，验证了 jarvis-sec 系统在以下方面的能力：
-
-- **高风险识别能力**：本次共确认 10 个问题，其中 high 严重性 9 个，覆盖关键路径与多类缺陷。
-- **全面性**：覆盖缓冲区溢出、内存管理（整数溢出、空指针解引用）、错误处理等多类安全风险。
-- **实用性**：提供位置、证据、触发路径、后果与修复建议，便于快速定位与修复。
-- **可扩展性**：基于启发式规则与 AI 验证的混合架构，适配不同规模与复杂度的代码库。
-
-该分析结果展示了 jarvis-sec 系统在实际项目中的安全分析能力，为 C/C++ 项目的安全审计提供了有效的工具支持。
-
-### OpenHarmony库改进方案
-
-#### commonlibrary_c_utils
-
-commonlibrary_c_utils 是 OpenHarmony 的基础工具库，提供了系统级的基础功能支持，包括内存管理、I/O 事件处理、线程管理、引用计数等核心组件。基于安全扫描结果，共检出 **20 个安全问题**（high 严重性 8 个，medium 严重性 12 个），主要分布在 `base/src/rust/ashmem.rs`、`base/src/io_event_handler.cpp`、`base/src/parcel.cpp`、`base/include/sorted_vector.h`、`base/src/file_ex.cpp`、`base/src/thread_ex.cpp`、`base/include/refbase.h`、`base/include/safe_queue.h`、`base/src/event_demultiplexer.cpp`、`base/src/ashmem.cpp` 等核心文件中。按语言分布：C/C++ 16 个，Rust 4 个；按类别分布：memory_mgmt 8 个、error_handling 5 个、unsafe_usage 3 个、buffer_overflow 2 个、type_safety 2 个。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（8 个问题）
-
-**空指针解引用防护体系：**
-
-针对检测到的 5 个空指针解引用问题，建立分层的空指针防护机制：
-
-- **参数验证层**：在公共 API 入口处统一添加参数空指针检查，特别是 `IOEventHandler` 的 `Start`、`Stop`、`Update` 方法（`io_event_handler.cpp:46, 57, 68`），确保外部传入的 `reactor` 指针参数在函数入口即被验证，对于 NULL 指针返回错误码。
-
-- **容器访问安全化**：对于 `SafeQueue::Erase` 方法（`safe_queue.h:55`），在解引用迭代器前添加空指针检查，或使用智能指针替代原始指针，避免在队列包含空指针时解引用导致崩溃。
-
-- **内存分配失败处理**：对于 `Parcel::Parcel()` 构造函数（`parcel.cpp:64`）和 `Thread::Start()` 中的 `CreatePThread()`（`thread_ex.cpp:66`）以及 `MakeSptr` 模板函数（`refbase.h:895`），建立内存分配失败的处理流程，在 `new` 操作失败时返回错误状态或抛出异常，避免对 `nullptr` 进行后续操作。
-
-**资源泄漏防护：**
-
-- **RAII 模式应用**：在涉及资源分配的函数中，采用 RAII（Resource Acquisition Is Initialization）模式，使用智能指针或作用域守卫（scope guard）管理资源生命周期，确保在异常路径或失败路径中资源能够自动释放。
-
-###### 2. 错误处理机制改进方案（5 个问题）
-
-**系统调用返回值检查规范：**
-
-建立统一的系统调用错误处理规范，对所有可能失败的系统调用进行返回值检查：
-
-- **资源关闭操作**：在 `EventDemultiplexer::CleanUp()`（`event_demultiplexer.cpp:58`）和 `LoadBufferFromNodeFile()`（`file_ex.cpp:269, 280`）中，对 `close()` 和 `fclose()` 系统调用的返回值进行检查，失败时记录错误日志，并在可能的情况下进行重试或标记资源状态。
-
-- **同步原语错误处理**：在 `AshmemOpen()`（`ashmem.cpp:84`）中，对 `pthread_mutex_lock()` 的返回值进行检查，失败时返回错误码，避免在锁获取失败时继续执行可能导致竞态条件的代码。
-
-**Rust FFI 错误处理：**
-
-- **字符串转换错误处理**：在 `create_ashmem_instance()`（`ashmem.rs:194`）中，使用 `match` 表达式或 `?` 操作符正确处理 `CString::new()` 可能返回的错误，将错误转换为适当的错误码，而不是使用 `expect()` 强制解包导致程序 panic。
-
-###### 3. 缓冲区溢出防护方案（2 个问题）
-
-**容器边界检查机制：**
-
-- **安全访问接口**：对于 `SortedVector` 的 `operator[]`（`sorted_vector.h:152, 209`），提供两种访问接口：`operator[]` 用于性能关键路径（假设调用者已确保索引有效），`at()` 方法用于需要边界检查的场景（抛出异常）。同时，在文档中明确说明各接口的使用场景和前置条件。
-
-- **边界检查函数**：在访问容器元素前进行范围验证，对于越界访问返回错误状态或抛出异常，避免未定义行为。在 `operator[]` 和 `EditItemAt` 函数内部添加边界检查，确保索引在有效范围内。
-
-###### 4. 类型安全改进方案（2 个问题）
-
-**const 正确性重构：**
-
-- **参数设计优化**：对于 `WriteRemoteObject()` 和 `WriteParcelable()`（`parcel.cpp:755, 787`），将参数类型从 `const Parcelable*` 改为非 `const Parcelable*`，或提供函数重载版本，明确区分只读和可写场景，避免使用 `const_cast` 移除常量限定符，违反 const 正确性。
-
-###### 5. 不安全代码使用改进方案（3 个问题）
-
-**Rust unsafe 代码安全化：**
-
-- **原始指针参数验证**：在 `CreateAshmemStd()`（`ashmem.rs:40`）、`ReadFromAshmem()`（`ashmem.rs:101`）和 `write_to_ashmem()`（`ashmem.rs:168`）等 unsafe 函数中，添加对输入参数的完整验证：
-  - 对于 `size` 参数，确保其为合理正值，不超过系统限制
-  - 对于 `offset` 参数，确保其在有效范围内
-  - 对于 `data` 指针，确保其非空且指向有效内存区域
-  - 在验证失败时返回明确的错误码，而不是继续执行可能导致未定义行为的操作
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：8 个 high 严重性问题，特别是：
-   - 空指针解引用风险：`io_event_handler.cpp`（3 个问题，评分 1.8）、`thread_ex.cpp`（1 个问题，评分 2.4）、`refbase.h`（1 个问题，评分 2.4）、`safe_queue.h`（1 个问题，评分 1.8）
-   - 类型安全问题：`parcel.cpp`（2 个 const_cast 问题，评分 1.95）
-
-2. **中优先级**（近期修复）：12 个 medium 严重性问题，主要是：
-   - 错误处理缺失：`file_ex.cpp`（2 个 fclose 未检查）、`event_demultiplexer.cpp`（1 个 close 未检查）、`ashmem.cpp`（1 个 pthread_mutex_lock 未检查）、`ashmem.rs`（1 个 expect 使用）
-   - 缓冲区溢出风险：`sorted_vector.h`（2 个越界访问问题）
-   - 内存分配失败处理：`parcel.cpp`（1 个 new 未检查）
-   - Rust unsafe 代码：`ashmem.rs`（3 个原始指针参数未验证）
-
-3. **长期优化**：
-   - 建立代码审查规范和静态分析工具集成，在开发阶段预防类似问题的引入
-   - 定期进行安全审计，特别是对内存管理、FFI 边界和 unsafe 代码进行重点审查
-   - 对于 C/C++ 和 Rust 混合项目，建立 FFI 安全使用指南，明确如何安全地在两种语言之间传递数据
-
-#### commonlibrary_rust_ylong_runtime
-
-commonlibrary_rust_ylong_runtime 是 OpenHarmony 的 Rust 异步运行时库，提供了任务调度、IO 驱动、同步原语等核心功能。基于安全扫描结果，共检出 **39 个安全问题**（按语言：rust=39；按类别：error_handling 32 个、unsafe_usage 7 个），主要分布在 `ylong_runtime/src/executor/blocking_pool.rs`、`ylong_runtime/src/executor/sleeper.rs`、`ylong_runtime/src/ffrt/ffrt_task.rs`、`ylong_runtime/src/time/wheel.rs`、`ylong_ffrt/build.rs`、`ylong_runtime/src/net/sys/udp.rs`、`ylong_runtime/src/sync/mpsc/unbounded/queue.rs`、`ylong_io/src/sys/windows/afd.rs`、`ylong_runtime/src/net/schedule_io.rs`、`ylong_runtime/src/fs/async_file.rs` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 错误处理机制改进方案（32 个问题）
-
-**unwrap/expect 安全化改造：**
-
-针对检测到的 30+ 个 `unwrap()` 和 `expect()` 使用问题，建立分层的错误处理机制：
-
-- **锁获取错误处理**：对于 `Mutex::lock()` 等可能返回 `PoisonError` 的同步原语，统一使用 `match` 表达式或 `?` 操作符处理错误，而不是直接 `unwrap()`。对于锁中毒的情况，使用 `PoisonError::into_inner()` 恢复锁状态，或记录错误日志后继续执行，避免程序直接 panic。涉及文件包括：
-  - `ylong_runtime/src/executor/blocking_pool.rs`（多处 shared.lock().unwrap()、shutdown_shared.lock().unwrap()，共 10 个锁获取问题，加上条件变量等待和线程 join 错误处理，共 12 个问题）
-  - `ylong_runtime/src/executor/sleeper.rs`（多处 idle_list.lock().unwrap()、wake_by_search.lock().unwrap()，共 5 个问题）
-  - `ylong_runtime/src/net/schedule_io.rs`（waiters.lock().unwrap()，1 个问题）
-  - `ylong_io/src/sys/windows/afd.rs`（afd_group.lock().unwrap()，共 2 个问题）
-
-- **系统调用错误处理**：对于 `fs::canonicalize()`、`env::var_os()`、`env::join_paths()` 等可能失败的系统调用，使用 `Result` 类型传播错误，而不是使用 `unwrap()` 导致程序崩溃。在关键路径（如构建脚本）无法处理错误时，使用 `expect()` 提供有意义的错误信息，便于调试和问题定位。涉及文件包括：
-  - `ylong_ffrt/build.rs`（env::var_os().unwrap()、fs::canonicalize().unwrap()、env::join_paths().unwrap().to_str().unwrap()，共 3 个问题）
-  - `ylong_io/src/waker.rs`（Poll::new().unwrap()、Waker::new().unwrap()，共 2 个问题，测试代码）
-
-- **条件变量等待错误处理**：对于 `Condvar::wait_timeout()` 等可能返回 `PoisonError` 的操作，使用错误处理机制，而不是直接 `unwrap()`。涉及文件包括：
-  - `ylong_runtime/src/executor/blocking_pool.rs`（wait_timeout().unwrap()，1 个问题）
-
-- **线程 join 错误处理**：对于 `thread::join()` 返回的 `Result`，应处理可能的 panic 信息，而不是使用 `let _ = ...` 忽略错误。涉及文件包括：
-  - `ylong_runtime/src/executor/blocking_pool.rs`（handle.1.join() 结果被忽略，1 个问题）
-
-- **系统调用返回值验证**：对于 `set_current_affinity()` 等系统调用，检查返回值并记录错误日志，而不是使用 `let _ = ...` 忽略错误。涉及文件包括：
-  - `ylong_runtime/src/executor/async_pool.rs`（set_current_affinity() 结果被忽略）
-
-- **测试代码错误处理**：对于测试代码中的 `unwrap()` 使用，应使用 `expect()` 提供有意义的错误信息，或使用 `?` 将错误传播给测试框架。涉及文件包括：
-  - `ylong_runtime/src/net/sys/udp.rs`（udp_try_bind_connect().await.unwrap()，共 4 个问题，测试代码）
-
-**panic/unreachable 替换策略：**
-
-针对检测到的 2 个 `unreachable!()` 使用问题，建立优雅的错误处理机制：
-
-- **状态机错误处理**：对于文件状态等状态转换场景，使用 `Result<T, StateError>` 类型返回错误，而不是使用 `unreachable!()`。在状态不匹配时返回明确的错误信息，允许调用者进行恢复或重试。涉及文件包括：
-  - `ylong_runtime/src/fs/async_file.rs`（FileState 匹配中的 unreachable!()）
-  - `ylong_runtime/src/sync/mpsc/bounded/mod.rs`（SendPosition::Full 匹配中的 unreachable!()）
-
-###### 2. 不安全代码使用改进方案（7 个问题）
-
-**原始指针安全化：**
-
-针对检测到的 3 个原始指针使用问题，建立安全的指针管理机制：
-
-- **空指针检查机制**：在所有解引用原始指针前，添加空指针检查，使用 `NonNull` 类型包装指针，或使用 `if ptr.is_null() { return error; }` 模式。涉及文件包括：
-  - `ylong_runtime/src/ffrt/ffrt_task.rs`（ffrt_get_current_task() 返回的原始指针未检查，共 2 个问题）
-  - `ylong_runtime/src/ffrt/ffrt_task.rs`（RawTaskCtx 类型定义，原始指针类型）
-
-- **指针有效性验证**：对于从 FFI 函数获取的原始指针，在使用前进行有效性检查，确保指针非空且指向有效内存。在 `FfrtTaskCtx::get_current()` 中对 `ffrt_get_current_task()` 返回值进行空指针检查，在 `FfrtTaskCtx::wake_task()` 中添加指针有效性检查。
-
-**unsafe trait 实现安全化：**
-
-针对检测到的 2 个 unsafe trait 实现问题，建立安全的不变量保证机制：
-
-- **内存布局稳定性保证**：对于 `unsafe impl Link for Clock` 和 `unsafe fn node()` 的实现，需要确保 Clock 结构体的内存布局稳定，且 `NonNull` 指针有效。涉及文件包括：
-  - `ylong_runtime/src/time/wheel.rs`（unsafe impl Link for Clock，共 2 个问题）
-
-- **安全前提条件文档化**：添加详细的文档说明安全前提条件，明确调用者需要保证的不变量，包括指针有效性、内存布局稳定性等要求。考虑添加运行时检查（如 `NonNull` 指针有效性验证）。
-
-**MaybeUninit 安全初始化：**
-
-针对检测到的 2 个 `MaybeUninit` 使用问题，建立安全的未初始化内存处理机制：
-
-- **显式初始化替代 assume_init**：对于数组和结构体的初始化，使用显式循环初始化或 `array::from_fn`，而不是使用 `MaybeUninit::zeroed().assume_init()`。涉及文件包括：
-  - `ylong_runtime/src/sync/mpsc/unbounded/queue.rs`（Block::new 中的数组初始化，共 2 个问题：MaybeUninit::zeroed().assume_init() 和 uninit/zeroed 模式）
-
-- **初始化验证机制**：确保所有数组元素在使用前被显式初始化，或使用 `MaybeUninit::uninit()` 并手动初始化每个元素，避免读取未初始化的内存导致未定义行为。
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：7 个 unsafe_usage 问题中的 high 严重性问题，特别是：
-   - `ylong_runtime/src/ffrt/ffrt_task.rs`：空指针解引用风险（ffrt_get_current_task() 返回的原始指针未检查，评分 2.4，共 2 个问题）
-   - `ylong_runtime/src/time/wheel.rs`：unsafe trait 实现安全问题（unsafe impl Link for Clock，评分 2.4，共 2 个问题）
-   - `ylong_runtime/src/sync/mpsc/unbounded/queue.rs`：MaybeUninit 未初始化内存风险（评分 1.6 和 1.5，共 2 个问题）
-
-2. **中优先级**（近期修复）：32 个 error_handling 问题，主要是：
-   - 锁获取错误处理：`ylong_runtime/src/executor/blocking_pool.rs`（12 个问题，包括 10 个锁获取、1 个条件变量等待、1 个线程 join）、`ylong_runtime/src/executor/sleeper.rs`（5 个问题）、`ylong_runtime/src/net/schedule_io.rs`（1 个问题）、`ylong_io/src/sys/windows/afd.rs`（2 个问题）
-   - 系统调用错误处理：`ylong_ffrt/build.rs`（3 个问题）、`ylong_io/src/waker.rs`（2 个问题，测试代码）
-   - 系统调用返回值验证：`ylong_runtime/src/executor/async_pool.rs`（1 个问题，set_current_affinity() 结果被忽略）
-   - 测试代码错误处理：`ylong_runtime/src/net/sys/udp.rs`（4 个问题，测试代码）
-   - panic/unreachable 替换：`ylong_runtime/src/fs/async_file.rs`（1 个问题）、`ylong_runtime/src/sync/mpsc/bounded/mod.rs`（1 个问题）
-
-3. **长期优化**：
-   - 建立 Rust 代码审查规范，重点关注 unsafe 代码的使用
-   - 集成 clippy 和 miri 等静态分析工具，在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对 unsafe 代码块和 FFI 边界进行重点审查
-   - 建立 unsafe 代码使用指南，明确何时可以使用 unsafe 以及如何安全使用
-
-#### security_asset
-
-security_asset 是 OpenHarmony 的安全资产管理系统，提供了密钥管理、数据加密、权限控制等核心安全功能。基于安全扫描结果，共检出 **87 个安全问题**（按语言：C/C++ 49 个、Rust 38 个；按类别：memory_mgmt 49 个、error_handling 27 个、unsafe_usage 8 个、concurrency 1 个、ffi 2 个），主要分布在 `services/crypto_manager/src/huks_wrapper.c`、`services/core_service/src/common_event/listener.rs`、`interfaces/inner_kits/c/src/lib.rs`、`services/os_dependency/src/os_account_wrapper.cpp` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（49 个问题）
-
-**C/C++ 空指针解引用防护体系：**
-
-针对检测到的 35+ 个 C/C++ 空指针解引用问题，建立分层的空指针防护机制：
-
-- **API 入口参数验证层**：在 `huks_wrapper.c` 中的所有加密操作函数（`GenerateKey`、`DeleteKey`、`IsKeyExist`、`EncryptData`、`DecryptData`、`InitKey`、`ExecCrypt`、`Drop`、`RenameKeyAlias`）入口处统一添加 `keyId` 指针的 NULL 检查，对于 NULL 指针返回明确的错误码（如 `ASSET_INVALID_ARGUMENT`），避免直接解引用导致程序崩溃。涉及文件包括：
-  - `services/crypto_manager/src/huks_wrapper.c`（35 个 possible_null_deref 问题）
-  - `services/crypto_manager/src/huks_wrapper.h`（2 个 wild_pointer_deref 问题）
-
-- **缓冲区参数验证机制**：对于 `HksBlob` 结构体指针参数（如 `inData`、`outData`、`aad`、`authToken`），在函数入口处添加双重验证：首先检查指针本身是否为 NULL，然后检查指针指向的结构体中的 `data` 字段和 `size` 字段的有效性，确保 `size` 大于 0 且 `data` 不为 NULL。涉及文件包括：
-  - `services/crypto_manager/src/huks_wrapper.c`（多处 HksBlob 参数未验证）
-  - `services/crypto_manager/src/huks_wrapper.h`（函数声明中缺少参数验证文档）
-
-- **缓冲区边界检查机制**：在 `DecryptData` 和 `ExecCrypt` 函数中，在使用 `inData->size` 进行指针运算前（如 `inData->data + (inData->size - NONCE_SIZE - TAG_SIZE)`），先验证 `inData->size` 是否大于等于 `NONCE_SIZE + TAG_SIZE`，避免缓冲区越界访问。涉及文件包括：
-  - `services/crypto_manager/src/huks_wrapper.c`（6 个缓冲区越界风险）
-
-- **智能指针安全传递**：在 `asset_napi_post_query.cpp` 中，对于通过 `std::unique_ptr` 管理的 `context` 指针，在传递给 `CreateSyncWork()` 前，使用 `context.get()` 获取原始指针后，在 `CreateSyncWork()` 函数内部添加 NULL 检查，或使用 `context.release()` 转移所有权，确保指针在传递过程中保持有效。涉及文件包括：
-  - `frameworks/js/napi/src/asset_napi_post_query.cpp`（smart_ptr_get_unsafe 问题）
-
-- **输出参数指针验证**：在 `os_account_wrapper.cpp` 中的所有输出参数函数（`GetUserIdByUid`、`IsUserIdExist`、`GetUserIds`、`GetFirstUnlockUserIds`、`GetUsersSize`）入口处，添加输出指针参数的 NULL 检查，对于 NULL 指针返回错误码，避免解引用导致崩溃。涉及文件包括：
-  - `services/os_dependency/src/os_account_wrapper.cpp`（5 个 possible_null_deref 问题）
-  - `services/os_dependency/src/file_operator_wrapper.cpp`（1 个 possible_null_deref 问题）
-
-**Rust FFI 边界内存安全：**
-
-针对检测到的 8+ 个 Rust FFI 边界内存安全问题，建立安全的 FFI 接口设计：
-
-- **原始指针有效性验证**：在 `listener.rs` 的 `delete_data_by_owner()` 和 `on_package_removed()` 函数中，在使用 `slice::from_raw_parts()` 前，添加对 `owner.data`、`owner.size`、`bundle_name.data`、`bundle_name.size` 的完整验证，包括：指针非空检查、size 非零检查、size 不超过合理上限检查（如 1MB）。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（3 个 unsafe 代码块未验证输入）
-
-- **C 字符串安全转换**：在 `on_app_restore()` 函数中，在使用 `CStr::from_ptr()` 前，添加对 `bundle_name` 指针的 NULL 检查，对于 NULL 指针返回错误或使用默认值，避免空指针解引用。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（CStr::from_ptr 未检查 NULL）
-
-- **FFI 函数指针参数验证**：在 `construct_calling_infos()` 函数中，在调用 `GetUninstallGroups()` 等 FFI 函数前，不仅检查指针非空，还验证指针指向的内存区域是否可读，使用 `NonNull` 类型包装指针，或使用 `std::ptr::read_volatile()` 进行试探性读取验证。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（raw_pointer 问题）
-
-- **Blob 数据边界验证**：在 `lib.rs` 的 `into_map()` 函数中，在使用 `slice::from_raw_parts()` 创建 blob 切片前，不仅检查 `blob.data` 非空和 `blob.size` 非零，还验证 `blob.size` 与实际分配的内存大小匹配，考虑在 C 端维护元数据或使用 Rust 的 `Box` 管理内存。涉及文件包括：
-  - `interfaces/inner_kits/c/src/lib.rs`（from_raw_parts 边界验证不足）
-
-###### 2. 错误处理机制改进方案（27 个问题）
-
-**Rust unwrap/expect 安全化改造：**
-
-针对检测到的 20+ 个 `unwrap()` 和 `expect()` 使用问题，建立分层的错误处理机制：
-
-- **锁获取错误处理**：对于 `Mutex::lock()` 等可能返回 `PoisonError` 的同步原语，统一使用 `match` 表达式或 `?` 操作符处理错误，而不是直接 `unwrap()`。对于锁中毒的情况，使用 `PoisonError::into_inner()` 恢复锁状态，或记录错误日志后继续执行。涉及文件包括：
-  - `services/crypto_manager/src/db_key_operator.rs`（2 个 lock().unwrap()）
-  - `services/common/src/counter.rs`（2 个 lock().unwrap()）
-  - `services/core_service/src/operations/operation_post_query.rs`（1 个 lock().unwrap()）
-  - `interfaces/inner_kits/c/src/lib.rs`（7 个 lock().unwrap()）
-
-- **容器访问安全化**：对于 `Vec::first()`、`Iterator::next()` 等可能返回 `None` 的操作，使用 `if let Some(item) = ...` 或 `match` 模式，避免在空容器上调用 `unwrap()`。涉及文件包括：
-  - `services/core_service/src/upgrade_operator.rs`（2 个 datas.first().unwrap()）
-  - `services/common/src/calling_info.rs`（1 个 owner_info_vec.last().unwrap()）
-  - `services/plugin/src/asset_plugin.rs`（2 个 parts.next().unwrap()）
-
-- **字符串转换错误处理**：对于 `CString::new()`、`String::from_utf8_lossy()` 等可能失败的操作，使用 `match` 或 `unwrap_or_else` 处理错误，而不是使用 `unwrap()` 导致程序 panic。涉及文件包括：
-  - `services/core_service/src/upgrade_operator.rs`（CString::new().unwrap()）
-  - `services/core_service/src/common_event/listener.rs`（CString::new().unwrap()）
-  - `services/core_service/src/operations/operation_add.rs`（CString::new().unwrap()）
-
-- **整数转换边界检查**：对于 `try_into()` 等可能失败的整数转换操作，添加边界检查，确保转换值在目标类型的范围内，失败时返回错误而不是 panic。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（2 个 try_into().unwrap()）
-
-**忽略结果处理规范：**
-
-针对检测到的 5+ 个忽略结果问题，建立错误结果检查机制：
-
-- **文件系统操作结果检查**：对于 `fs::set_permissions()` 等文件系统操作，检查返回值并在失败时记录日志或返回错误，而不是使用 `let _ = ...` 忽略错误。涉及文件包括：
-  - `frameworks/os_dependency/file/src/de_operator.rs`（2 个 set_permissions 结果被忽略）
-  - `frameworks/os_dependency/file/src/ce_operator.rs`（2 个 set_permissions 结果被忽略）
-
-- **关键操作错误传播**：对于 `upgrade_execute()`、`upload_system_event()` 等关键操作，检查返回值并向上层传播错误，而不是忽略错误导致系统状态不一致。涉及文件包括：
-  - `services/core_service/src/upgrade_operator.rs`（upgrade_execute 结果被忽略）
-  - `services/core_service/src/lib.rs`（upload_system_event 结果被忽略）
-
-###### 3. 不安全代码使用改进方案（8 个问题）
-
-**unsafe 代码块安全化：**
-
-针对检测到的 8 个 unsafe 代码使用问题，建立安全的 unsafe 代码管理机制：
-
-- **unsafe 代码最小化原则**：将 unsafe 代码块的范围最小化，只将必要的操作放在 unsafe 块中，其他操作放在安全代码中。对于 `listener.rs` 中的 `slice::from_raw_parts()` 使用，将指针验证逻辑放在 unsafe 块外，只在确认安全后进入 unsafe 块进行实际的内存访问。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（3 个 unsafe 代码块）
-
-- **原始指针生命周期管理**：对于传递给 FFI 的原始指针，使用 `Arc` 或 `Pin` 确保指针在回调期间保持有效，避免 use-after-free。在 `listener.rs` 的 FFI 函数调用中，确保传递给 C 端的指针在 C 端使用期间保持有效。涉及文件包括：
-  - `services/core_service/src/common_event/listener.rs`（raw_pointer 问题）
-
-- **Send/Sync 实现安全化**：对于 `AssetPlugin` 的 `unsafe impl Sync`，如果确实需要跨线程共享，将内部的 `RefCell<Option<libloading::Library>>` 替换为 `Mutex<Option<libloading::Library>>`，确保线程安全后再实现 `Sync`。涉及文件包括：
-  - `services/plugin/src/asset_plugin.rs`（unsafe impl Sync 问题）
-
-###### 4. 并发安全问题改进方案（1 个问题）
-
-**线程安全保证机制：**
-
-针对检测到的 1 个并发安全问题，建立线程安全保证：
-
-- **内部同步原语替换**：对于 `AssetPlugin` 结构体，将内部的 `RefCell<Option<libloading::Library>>` 字段替换为 `Mutex<Option<libloading::Library>>` 或 `RwLock<Option<libloading::Library>>`，确保多线程环境下对 `lib` 字段的访问是线程安全的，然后再实现 `Sync` trait。涉及文件包括：
-  - `services/plugin/src/asset_plugin.rs`（unsafe impl Sync for AssetPlugin）
-
-- **文档化线程安全保证**：如果确实需要 `unsafe impl Sync`，添加详细的文档说明线程安全保证，包括哪些操作是线程安全的，哪些操作需要外部同步，以及如何正确使用该类型。
-
-###### 5. FFI 安全问题改进方案（2 个问题）
-
-**FFI 接口安全设计：**
-
-针对检测到的 2 个 FFI 安全问题，建立安全的 FFI 接口设计：
-
-- **CString 转换错误处理**：对于 `upgrade_operator.rs` 和 `operation_add.rs` 中的 `CString::new()` 使用，使用 `match` 或 `unwrap_or_else` 处理可能的 null 字节错误，而不是使用 `unwrap()` 导致程序 panic。涉及文件包括：
-  - `services/core_service/src/upgrade_operator.rs`（CString::new().unwrap()）
-  - `services/core_service/src/operations/operation_add.rs`（CString::new().unwrap()）
-
-- **FFI 边界输入验证**：在 Rust FFI 边界处，对所有传入的字符串参数进行验证，检查是否包含 null 字节等非法字符，在验证失败时返回明确的错误码，而不是使用 `expect` 导致程序崩溃。
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：49 个 memory_mgmt 问题中的 high 严重性问题（约 40+ 个），特别是：
-   - C/C++ 空指针解引用风险（huks_wrapper.c、os_account_wrapper.cpp、file_operator_wrapper.cpp）
-   - Rust FFI 边界内存安全问题（listener.rs、lib.rs）
-   - 缓冲区越界访问风险（huks_wrapper.c 中的 DecryptData/ExecCrypt）
-
-2. **中优先级**（近期修复）：27 个 error_handling 问题，主要是：
-   - 锁获取错误处理（db_key_operator.rs、counter.rs、lib.rs）
-   - 容器访问安全化（upgrade_operator.rs、calling_info.rs、asset_plugin.rs）
-   - 字符串转换错误处理（upgrade_operator.rs、listener.rs、operation_add.rs）
-   - 忽略结果处理（de_operator.rs、ce_operator.rs、upgrade_operator.rs）
-
-3. **不安全代码优化**（中期修复）：8 个 unsafe_usage 问题，包括：
-   - unsafe 代码块安全化（listener.rs）
-   - Send/Sync 实现安全化（asset_plugin.rs）
-
-4. **并发安全优化**（中期修复）：1 个 concurrency 问题，包括：
-   - 线程安全保证机制（asset_plugin.rs）
-
-5. **长期优化**：
-   - 建立 C/C++ 和 Rust 混合项目的代码审查规范，重点关注 FFI 边界的安全性
-   - 集成静态分析工具（如 clang-tidy、clippy、miri），在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对加密操作、权限检查、FFI 边界进行重点审查
-   - 建立 FFI 安全使用指南，明确如何安全地在 C/C++ 和 Rust 之间传递数据
-   - 对于关键安全模块（如密钥管理、加密操作），考虑引入形式化验证或更严格的代码审查流程
-
-#### hiviewdfx_hilog
-
-hiviewdfx_hilog 是 OpenHarmony 的日志系统核心组件，提供了日志打印、日志持久化、日志参数管理等核心功能。基于安全扫描结果，共检出 **55 个安全问题**（按语言：C/C++ 55 个；按类别：memory_mgmt 22 个、error_handling 17 个、buffer_overflow 12 个、concurrency 2 个、type_safety 1 个、unsafe_api 1 个），主要分布在 `frameworks/libhilog/param/properties.cpp`、`interfaces/ets/ani/hilog/src/hilog_ani_base.cpp`、`services/hilogd/log_persister_rotator.cpp`、`frameworks/libhilog/socket/socket.cpp`、`services/hilogd/main.cpp`、`frameworks/include/hilog_inner.h`、`interfaces/ets/ani/hilog/src/hilog_ani.cpp`、`services/hilogd/include/log_persister.h`、`frameworks/libhilog/hilog_printf.cpp`、`services/hilogd/service_controller.cpp` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（22 个问题）
-
-**内存分配失败处理机制：**
-
-针对检测到的 15+ 个内存分配未检查问题，建立分层的内存分配失败处理机制：
-
-- **静态初始化内存分配安全化**：对于 `properties.cpp` 中所有静态初始化中的 `new` 操作（共 15 个问题），采用懒加载模式或异常处理机制：
-  - 对于 `g_propResources`（`properties.cpp:97`）等关键资源，使用 `std::unique_ptr` 或 `std::shared_ptr` 管理，在首次访问时进行分配，分配失败时返回错误状态
-  - 对于 `switchCache`、`logLevelCache`、`levelMtx`、`domainMap`、`tagMap` 等静态缓存对象，使用 `std::call_once` 或单例模式确保线程安全的懒加载，在分配失败时记录错误日志并返回默认值或错误状态
-  - 对于高严重性问题（评分 2.4），如 `switchCache`（`properties.cpp:304, 313, 322, 451, 460`）和 `logLevelCache`（`properties.cpp:359`），优先使用 `std::nothrow` 版本的 `new` 操作并检查返回值，失败时使用备用方案或返回错误
-
-- **动态内存分配验证**：对于 `properties.cpp` 中的动态分配（`properties.cpp:385, 412, 426, 432, 438, 444`），在 `new` 操作后立即检查返回值，对于 NULL 指针返回错误码，避免后续解引用导致崩溃
-
-**空指针解引用防护体系：**
-
-针对检测到的 7 个空指针解引用问题，建立分层的空指针防护机制：
-
-- **API 入口参数验证层**：在 `hilog_inner.h` 的 `HiLogPrintDictNew` 和 `HiLogPrintComm` 函数（`hilog_inner.h:28, 30`）入口处统一添加 `fmt` 参数的非空检查，对于 NULL 指针返回错误码，避免在 `vsnprintfp_s` 中解引用导致崩溃
-
-- **FFI 接口参数验证**：在 `hilog_ani.cpp` 的 `ANI_Constructor` 函数（`hilog_ani.cpp:26, 50`）入口处添加对 `vm` 和 `result` 参数的空指针检查，对于 NULL 指针返回 `ANI_ERROR`，避免空指针解引用导致程序崩溃
-
-- **环境指针验证机制**：在 `hilog_ani_base.cpp` 的 `HilogImpl` 方法（`hilog_ani_base.cpp:131, 143`）开始处添加对 `env` 指针的非空检查，对于 NULL 指针返回错误状态，避免调用 `Array_GetLength` 和 `Array_Get_Ref` 时崩溃
-
-- **命令处理空指针检查**：在 `hilogtool/main.cpp` 的 `HilogEntry` 函数（`hilogtool/main.cpp:1170`）中，在调用 `cmdEntry->handler` 前添加空指针检查，确保 `GetOptEntry()` 返回非 NULL，对于 NULL 指针返回 `ERR_INVALID_CMD`
-
-###### 2. 错误处理机制改进方案（17 个问题）
-
-**系统调用返回值检查规范：**
-
-建立统一的系统调用错误处理规范，对所有可能失败的系统调用进行返回值检查：
-
-- **文件描述符操作错误处理**：在 `socket.cpp` 的 `Write()`、`Read()` 和析构函数（`socket.cpp:88, 121, 150`）中，对 `write()`、`read()` 和 `close()` 系统调用的返回值进行检查，失败时记录错误日志并返回错误码。在 IO 操作前验证 `socketHandler` 是否为有效文件描述符（>0），对于无效文件描述符返回错误
-
-- **日志写入错误处理**：在 `hilog_printf.cpp` 的 `LogToKmsg` 函数（`hilog_printf.cpp:230, 232`）中，检查 `write()` 返回值，对于写入失败的情况记录错误日志，考虑添加重试机制或备用日志路径，向上层调用者返回适当的错误码
-
-- **文件操作错误处理**：在 `log_persister_rotator.cpp` 的所有文件操作函数中，检查 `open()`、`write()`、`close()` 操作的返回值或状态：
-  - `OpenInfoFile()`（`log_persister_rotator.cpp:90`）：检查 `m_infoFile.open()` 是否成功，失败时返回错误状态
-  - `Input()`（`log_persister_rotator.cpp:105`）：检查 `m_currentLogOutput.write()` 返回值，确保写入成功
-  - `Rotate()`（`log_persister_rotator.cpp:154, 156, 169`）：检查 `m_currentLogOutput.close()` 和 `m_currentLogOutput.open()` 操作是否成功，失败时记录错误日志
-
-- **文件读取错误处理**：在 `service_controller.cpp` 的 `RestorePersistJobs` 函数（`service_controller.cpp:998`）中，检查 `fread()` 返回值，确保读取成功，对于读取失败的情况进行错误处理，避免使用未初始化的内存数据
-
-- **资源关闭错误处理**：在 `main.cpp` 的所有 `close()` 操作（`main.cpp:57, 86, 103`）后添加错误处理逻辑，至少记录错误日志，对于关键文件描述符，考虑重试机制或更严格的错误处理
-
-- **控制文件关闭错误处理**：在 `log_kmsg.cpp` 的析构函数（`log_kmsg.cpp:153`）中，检查 `close()` 返回值并记录错误日志，或使用 RAII 包装器管理文件描述符
-
-**Socket 接口参数验证：**
-
-- **缓冲区参数验证**：在 `socket.h` 的 `Read()` 函数（`socket.h:41`）中，添加对 `buffer` 指针的 NULL 检查，对于 NULL 指针返回错误码，同时验证 `socketHandler` 的有效性
-
-###### 3. 缓冲区溢出防护方案（12 个问题）
-
-**数组边界检查机制：**
-
-针对检测到的 12 个缓冲区溢出问题，建立分层的边界检查机制：
-
-- **向量访问边界检查**：在 `hilog_ani_base.cpp` 的 `ProcessLogContent` 函数中，在使用 `params[contentPos.count]` 前添加边界检查，确保 `contentPos.count < params.size()`，对于越界访问返回错误状态。涉及问题包括：
-  - `hilog_ani_base.cpp:60-63`（4 个问题）：整数类型参数访问
-  - `hilog_ani_base.cpp:69-73`（4 个问题）：字符串类型参数访问
-  - `hilog_ani_base.cpp:80-81`（2 个问题）：对象类型参数访问
-
-- **文件名验证增强**：在 `service_controller.cpp` 的 `IsValidFileName` 函数（`service_controller.cpp:558`）中，增强文件名验证逻辑：
-  - 添加对 `.` 和 `..` 的检查，拒绝路径遍历字符
-  - 拒绝绝对路径（以 `/` 开头）
-  - 限制文件名长度，防止缓冲区溢出
-  - 检查文件名是否为空或仅包含空格
-  - 验证文件名中不包含特殊字符（如 `\0`、`/`、`\` 等）
-
-###### 4. 并发安全问题改进方案（2 个问题）
-
-**线程安全保证机制：**
-
-针对检测到的 2 个并发安全问题，建立线程安全保证：
-
-- **时间函数线程安全化**：在 `log_persister_rotator.cpp` 的 `CreateLogFile` 函数（`log_persister_rotator.cpp:144`）中，将非线程安全的 `localtime()` 函数替换为线程安全的 `localtime_r()` 函数，确保在多线程环境下时间数据正确
-
-- **volatile 变量线程安全化**：在 `log_persister.h` 的 `LogPersister` 类中，将 `m_stopThread` 变量（`log_persister.h:96`）从 `volatile bool` 改为 `std::atomic<bool>` 类型，确保多线程环境下的原子访问，避免数据竞争和未定义行为
-
-- **静态方法线程安全化**：在 `log_persister.h` 的 `Clear()` 静态方法（`log_persister.h:58`）中，添加互斥锁保护文件操作，或确保该方法仅在单线程环境下调用，避免文件系统操作冲突
-
-###### 5. 类型安全改进方案（1 个问题）
-
-**类型转换安全化：**
-
-针对检测到的 1 个类型安全问题，建立安全的类型转换机制：
-
-- **reinterpret_cast 安全化**：在 `service_controller.h` 的 `RequestHandler` 模板函数（`service_controller.h:113`）中，在 `reinterpret_cast` 转换前添加类型安全检查：
-  - 验证 `hdr.len >= sizeof(T)`，确保缓冲区足够容纳目标类型
-  - 确保数据缓冲区与 `T` 类型对齐（使用 `alignof` 检查）
-  - 对于不满足条件的情况返回错误码，避免缓冲区溢出或类型不对齐导致的未定义行为
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：22 个 memory_mgmt 问题中的 high 严重性问题（约 10+ 个），特别是：
-   - 空指针解引用风险：`hilog_inner.h`（2 个问题，评分 1.95）、`hilog_ani.cpp`（2 个问题，评分 1.8）、`hilog_ani_base.cpp`（2 个问题，评分 1.8）、`hilogtool/main.cpp`（1 个问题，评分 1.8）
-   - 内存分配失败处理：`properties.cpp` 中的静态初始化问题（15 个问题，其中 5 个 high 严重性，评分 2.4）
-   - 类型安全问题：`service_controller.h`（1 个 reinterpret_cast 问题，评分 2.4）
-
-2. **中优先级**（近期修复）：17 个 error_handling 问题和 12 个 buffer_overflow 问题，主要是：
-   - 系统调用返回值检查：`socket.cpp`（3 个问题）、`hilog_printf.cpp`（2 个问题）、`log_persister_rotator.cpp`（5 个问题）、`main.cpp`（3 个问题）、`log_kmsg.cpp`（1 个问题）、`service_controller.cpp`（1 个问题）、`socket.h`（1 个问题）
-   - 缓冲区溢出风险：`hilog_ani_base.cpp`（10 个向量越界访问问题）、`service_controller.cpp`（1 个文件名验证问题）
-
-3. **并发安全优化**（中期修复）：2 个 concurrency 问题，包括：
-   - 时间函数线程安全化：`log_persister_rotator.cpp`（1 个 localtime 问题）
-   - volatile 变量线程安全化：`log_persister.h`（1 个 volatile 问题，评分 2.1）
-   - 静态方法线程安全化：`log_persister.h`（1 个 Clear 方法问题）
-
-4. **长期优化**：
-   - 建立日志系统的代码审查规范，重点关注内存管理、错误处理和并发安全
-   - 集成静态分析工具（如 clang-tidy、cppcheck），在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对日志持久化、参数管理、FFI 接口进行重点审查
-   - 对于关键日志操作（如日志写入、文件操作），建立统一的错误处理框架，确保所有错误都能被正确捕获和处理
-   - 考虑引入 RAII 模式管理文件描述符和资源，减少资源泄漏风险
-
-#### communication_ipc
-
-communication_ipc 是 OpenHarmony 的进程间通信（IPC）核心组件，提供了跨进程通信、远程对象调用、消息序列化等核心功能。基于安全扫描结果，共检出 **679 个安全问题**（按语言：C/C++ 673 个，Rust 6 个；按类别：memory_mgmt 548 个、concurrency 97 个、error_handling 14 个、unsafe_usage 5 个），主要分布在 `ipc/native/src/napi_common/source/napi_message_sequence_write.cpp`、`interfaces/innerkits/cj/src/ipc_ffi.cpp`、`interfaces/innerkits/cj/src/message_sequence_impl.cpp`、`ipc/native/src/napi_common/source/napi_message_parcel_write.cpp`、`ipc/native/src/napi_common/source/napi_message_sequence_read.cpp`、`ipc/native/c/ipc/src/liteos_a/ipc_invoker.c`、`ipc/native/src/napi_common/source/napi_remote_object.cpp`、`ipc/native/c/ipc/src/linux/ipc_invoker.c`、`dbinder/dbinder_service/src/dbinder_service.cpp`、`ipc/native/c/rpc/ipc_adapter/mini/ipc_proxy_inner.c` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（548 个问题）
-
-**空指针解引用防护体系：**
-
-针对检测到的大量空指针解引用问题，建立分层的空指针防护机制：
-
-- **链表操作安全化**：在 `utils/include/doubly_linked_list.h` 中的所有链表操作函数（`DLListInit`、`DLListAdd`、`DLListRemove`、`DLListIsEmpty`、`DLListSwap` 等）中，添加统一的空指针检查机制：
-  - 在函数入口处验证 `list` 和 `node` 参数是否为 NULL
-  - 对于空指针情况，返回错误码或使用断言记录错误，避免程序继续执行
-  - 确保所有调用者在调用链表操作函数前进行空指针检查，或使用包装函数统一处理
-
-- **IPC 调用路径空指针检查**：在 `ipc/native/c/ipc/src/linux/ipc_invoker.c` 和 `ipc/native/c/ipc/src/liteos_a/ipc_invoker.c` 的 IPC 调用处理函数中：
-  - 在 `OnRemoteRequestInner()` 调用前检查 `objectStub` 指针是否为空
-  - 对 IPC 消息结构体中的指针字段进行验证，确保在解引用前进行空指针检查
-  - 在函数指针调用前验证函数指针是否已初始化（如 `ISocketListener` 结构体中的 `OnNegotiate` 和 `OnNegotiate2` 函数指针）
-
-- **消息序列化空指针防护**：在 `ipc/native/src/napi_common/source/napi_message_sequence_write.cpp`、`napi_message_parcel_write.cpp`、`napi_message_sequence_read.cpp` 等消息序列化相关文件中：
-  - 在序列化/反序列化操作前验证输入参数（如 `MessageSequence`、`MessageParcel` 指针）是否为空
-  - 对序列化缓冲区指针进行有效性检查，避免对无效内存区域进行操作
-  - 在访问消息结构体成员前进行空指针检查
-
-- **内存分配失败处理**：在 `ipc/native/c/manager/src/ipc_process_skeleton.c` 中：
-  - 对 `pthread_mutex_init()` 的返回值进行检查，失败时进行错误处理，避免使用未初始化的互斥锁
-  - 考虑使用 `PTHREAD_MUTEX_INITIALIZER` 进行静态初始化，或使用 RAII 模式管理互斥锁生命周期
-
-- **整数溢出防护**：在 `ipc/native/c/manager/src/serializer.c` 的 `ReadBoolVector()` 等函数中：
-  - 在内存分配前检查 `size` 参数，确保 `(*size) * sizeof(bool)` 不会发生整数溢出
-  - 使用安全的乘法包装函数（如 `checked_mul`）检查整数溢出
-  - 对分配大小设置合理的上限，防止恶意输入导致的内存分配失败
-
-**资源泄漏防护：**
-
-- **RAII 模式应用**：在涉及资源分配的函数中，采用 RAII 模式管理资源生命周期：
-  - 使用智能指针管理动态分配的内存
-  - 使用作用域守卫（scope guard）确保文件描述符、互斥锁等资源在异常路径中能够自动释放
-  - 对于 IPC 连接和会话对象，使用引用计数机制确保资源正确释放
-
-###### 2. 并发安全问题改进方案（97 个问题）
-
-**线程安全保证机制：**
-
-针对检测到的 97 个并发安全问题，建立线程安全保证：
-
-- **全局变量线程安全化**：在 `ipc/native/c/ipc/src/liteos_a/ipc_invoker.c` 和 `ipc/native/c/ipc/src/linux/ipc_invoker.c` 中：
-  - 为全局变量 `g_connector` 和 `g_ipcInvoker` 的访问添加互斥锁保护
-  - 在 `GetIpcInvoker()` 和 `InitIpcConnector()` 函数中，使用互斥锁保护全局变量的读写操作
-  - 考虑使用原子操作或线程局部存储（TLS）替代全局变量，减少锁竞争
-
-- **线程池资源同步**：在 `ipc/native/c/manager/src/ipc_thread_pool.c` 中：
-  - 为 `g_invoker` 数组的访问添加互斥锁保护，确保多线程环境下的安全访问
-  - 在 `InitThreadPool()`、`ThreadHandler()`、`TlsDestructor()` 等函数中，统一使用锁机制保护共享资源
-  - 考虑使用读写锁（rwlock）优化读多写少的场景
-
-- **回调分发线程安全**：在 `ipc/native/c/ipc/src/liteos_a/ipc_invoker.c` 的 `StartCallbackDispatch()` 和 `CallbackDispatch()` 函数中：
-  - 确保所有对共享资源（如 `g_connector`、`g_ipcCallback`）的访问都使用互斥锁保护
-  - 在回调函数执行过程中，确保回调队列的访问是线程安全的
-  - 使用条件变量或信号量协调线程间的同步，避免竞态条件
-
-- **Rust 并发安全**：在 `interfaces/innerkits/rust/src/parcel/msg.rs` 中：
-  - 对于 `MsgParcel` 的 `unsafe impl Send` 实现，确保 `ParcelMem` 枚举的所有变体都满足线程安全要求
-  - 如果内部包含未同步的原始指针或文件描述符，考虑使用 `Arc<Mutex<MsgParcel>>` 等同步机制
-  - 在文档中明确说明 `MsgParcel` 的线程安全保证和使用约束
-
-###### 3. 错误处理机制改进方案（14 个问题）
-
-**系统调用返回值检查规范：**
-
-建立统一的系统调用错误处理规范，对所有可能失败的系统调用进行返回值检查：
-
-- **IPC 系统调用错误处理**：在 IPC 相关的系统调用中：
-  - 对 `ioctl()`、`read()`、`write()` 等系统调用的返回值进行检查
-  - 失败时返回适当的错误码，并在日志中记录错误信息
-  - 对于可重试的操作，实现重试机制
-
-- **资源管理错误处理**：在资源分配和释放操作中：
-  - 对内存分配函数（`malloc`、`calloc`）的返回值进行检查
-  - 对文件操作函数（`open`、`close`）的返回值进行检查
-  - 对同步原语操作（`pthread_mutex_init`、`pthread_mutex_lock`）的返回值进行检查
-
-- **Rust 错误处理**：在 Rust 代码中：
-  - 使用 `Result` 类型正确处理可能失败的操作
-  - 避免使用 `expect()` 或 `unwrap()` 强制解包，使用 `match` 表达式或 `?` 操作符处理错误
-  - 在 FFI 边界处，将 Rust 错误转换为 C 错误码，确保错误信息能够正确传递
-
-###### 4. 不安全代码使用改进方案（5 个问题）
-
-**Rust unsafe 代码安全化：**
-
-针对检测到的 5 个 unsafe 代码使用问题，建立安全的使用规范：
-
-- **FFI 边界参数验证**：在 `interfaces/innerkits/rust/src/remote/wrapper.rs` 中：
-  - 在 `on_remote_request()` 函数中，对通过 FFI 传入的 `MessageParcel` 指针进行有效性检查
-  - 使用安全方法替代 `get_unchecked_mut()`，或在使用前添加边界检查
-  - 在文档中明确说明 FFI 接口的前置条件和调用约束
-
-- **文件描述符安全管理**：在 `interfaces/innerkits/rust/src/remote/wrapper.rs` 和 `interfaces/innerkits/rust/src/parcel/msg.rs` 中：
-  - 在 `File::from_raw_fd()` 调用前，验证文件描述符的有效性
-  - 考虑使用 `OwnedFd` 类型代替原始文件描述符，确保所有权转移
-  - 在文档中明确说明调用者必须转移文件描述符的所有权，避免双重释放
-
-- **unsafe 函数封装**：在 `interfaces/innerkits/rust/src/remote/obj.rs` 中：
-  - 为 `new_unchecked()` 函数添加参数 null 检查
-  - 限制 `unsafe` 函数只能被内部安全代码调用，或提供安全的封装函数替代直接调用
-  - 在文档中明确说明 unsafe 函数的使用场景和安全保证
-
-- **类型转换安全化**：在 `dbinder/dbinder_service/src/dbinder_service.cpp` 中：
-  - 对于 `reinterpret_cast` 类型转换，使用 `dynamic_cast` 进行安全类型转换
-  - 添加类型验证方法，确保转换前的对象类型正确
-  - 考虑修改设计，避免使用危险的类型转换
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：548 个 memory_mgmt 问题中的 high 严重性问题（约 200+ 个），特别是：
-   - 空指针解引用风险：`doubly_linked_list.h`（大量链表操作问题，评分 1.8）、`ipc_invoker.c`（IPC 调用路径问题，评分 1.8）、`napi_message_sequence_write.cpp` 等消息序列化文件（评分 1.8）
-   - 内存分配失败处理：`ipc_process_skeleton.c` 中的 `pthread_mutex_init` 未检查问题（评分 1.8）
-   - 整数溢出风险：`serializer.c` 中的 `alloc_size_overflow` 问题（评分 1.2）
-   - 类型安全问题：`dbinder_service.cpp` 中的 `reinterpret_cast_unsafe` 问题（评分 2.4）
-
-2. **中优先级**（近期修复）：97 个 concurrency 问题和 14 个 error_handling 问题，主要是：
-   - 并发安全问题：`ipc_invoker.c` 中的全局变量访问问题（评分 1.2）、`ipc_thread_pool.c` 中的线程池资源同步问题（评分 1.2）
-   - 系统调用返回值检查：IPC 相关的系统调用未检查返回值
-   - Rust 并发安全：`parcel/msg.rs` 中的 `unsafe impl Send` 问题（评分 2.4）
-
-3. **不安全代码优化**（中期修复）：5 个 unsafe_usage 问题，包括：
-   - FFI 边界参数验证：`remote/wrapper.rs` 中的 `get_unchecked_mut` 问题（评分 2.4）
-   - 文件描述符安全管理：`remote/wrapper.rs` 和 `parcel/msg.rs` 中的 `from_raw_fd` 问题（评分 2.4）
-   - unsafe 函数封装：`remote/obj.rs` 中的 `new_unchecked` 问题（评分 2.4）
-
-4. **长期优化**：
-   - 建立 IPC 系统的代码审查规范，重点关注内存管理、并发安全和错误处理
-   - 集成静态分析工具（如 clang-tidy、cppcheck、rust-clippy），在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对 IPC 调用路径、消息序列化、FFI 接口进行重点审查
-   - 对于关键 IPC 操作（如远程对象调用、消息传递），建立统一的错误处理框架，确保所有错误都能被正确捕获和处理
-   - 考虑引入 RAII 模式管理 IPC 连接、会话对象和资源，减少资源泄漏风险
-   - 对于 C/C++ 和 Rust 混合项目，建立 FFI 安全使用指南，明确如何安全地在两种语言之间传递数据和调用函数
-   - 建立线程安全设计规范，明确哪些数据结构需要线程安全保证，哪些可以在单线程环境下使用
-
-#### hiviewdfx_hisysevent
-
-hiviewdfx_hisysevent 是 OpenHarmony 的系统事件管理核心组件，提供了系统事件记录、查询、监听等核心功能。基于安全扫描结果，共检出 **123 个安全问题**（按语言：C/C++ 102 个，Rust 21 个；按类别：memory_mgmt 94 个、error_handling 14 个、unsafe_usage 9 个、buffer_overflow 1 个、ffi 4 个、concurrency 0 个），主要分布在 `interfaces/ets/ani/hisysevent/src/hisysevent_ani_util.cpp`、`interfaces/rust/innerkits/src/sys_event_manager.rs`、`interfaces/native/innerkits/hisysevent_manager/hisysevent_record_c.cpp`、`interfaces/ets/ani/hisysevent/src/ani_hisysevent_querier.cpp`、`interfaces/js/kits/napi/src/napi_hisysevent_querier.cpp`、`interfaces/native/innerkits/hisysevent_easy/easy_socket_writer.c`、`frameworks/native/c_wrapper/source/hisysevent_rust_querier.cpp`、`interfaces/ets/ani/hisysevent/include/hisysevent_ani_util.h`、`interfaces/ets/ani/hisysevent/src/hisysevent_ani.cpp`、`interfaces/js/kits/napi/src/napi_hisysevent_js.cpp` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（94 个问题）
-
-**空指针解引用防护体系：**
-
-针对检测到的大量空指针解引用问题，建立分层的空指针防护机制：
-
-- **ANI 环境指针统一验证**：在 `interfaces/ets/ani/hisysevent/src/hisysevent_ani_util.cpp` 中的所有方法中，统一添加 `ani_env *env` 参数的非空检查：
-  - 在所有使用 `env` 指针的方法入口处（如 `IsArray()`、`ParseBigintValue()`、`ParseBooleanValue()`、`ParseIntValue()`、`ParseDoubleValue()` 等）添加 `if (env == nullptr) { return ...; }` 检查
-  - 对于 `FindClass()`、`Object_CallMethodByName_Ref()`、`String_GetUTF8()`、`String_NewUTF8()` 等所有 ANI API 调用，确保在调用前 `env` 指针已通过非空验证
-  - 在静态方法（如 `CreateDoubleUint32()`、`CreateStringValue()`、`ThrowAniError()` 等）中，同样添加 `env` 指针的非空检查
-
-- **回调上下文空指针检查**：在 `interfaces/ets/ani/hisysevent/src/ani_hisysevent_querier.cpp` 和 `interfaces/js/kits/napi/src/napi_hisysevent_querier.cpp` 中：
-  - 在 `AniHiSysEventQuerier` 构造函数中添加 `callbackContextAni` 参数的非空校验
-  - 在析构函数和 `OnComplete()` 方法中，添加防御性空指针检查（如 `if (callbackContextAni == nullptr || callbackContextAni->vm == nullptr) { return; }`）
-  - 在 `NapiHiSysEventQuerier` 构造函数中添加 `callbackContext` 参数的非空校验，在所有使用 `callbackContext` 的成员方法中添加判空检查
-  - 在 `NapiHiSysEventListener` 析构函数中添加 `callbackContext` 的空指针检查
-
-- **查询结果指针验证**：在 `frameworks/native/c_wrapper/source/hisysevent_rust_querier.cpp` 的 `HiSysEventRustQuerier::OnQuery()` 方法中：
-  - 在方法入口处添加 `sysEvents` 指针的非空校验，对于 `nullptr` 情况返回错误或记录日志
-  - 在访问 `sysEvents->size()` 和 `sysEvents->at(i)` 前确保指针已通过验证
-
-- **记录对象空指针检查**：在 `interfaces/native/innerkits/hisysevent_manager/hisysevent_record_c.cpp` 的所有 `OH_HiSysEvent_GetParam*()` 函数中：
-  - 在函数入口处添加对 `record` 指针的非空检查，对于 `nullptr` 情况返回错误码（如 `HISYSEVENT_ERR_INVALID_PARAM`）
-  - 在调用 `GetParamNames()`、`GetParamInt64Value()`、`GetParamUint64Value()` 等内部函数前，确保 `record` 指针已通过验证
-
-- **内存分配失败处理**：在 `interfaces/ets/ani/hisysevent/src/hisysevent_ani.cpp` 和 `interfaces/js/kits/napi/src/napi_hisysevent_js.cpp` 中：
-  - 对 `new CallbackContextAni()` 和 `new CallbackContext()` 操作添加空指针检查，使用 `new(std::nothrow)` 替代普通 `new`，失败时返回错误码
-  - 考虑使用智能指针（如 `std::unique_ptr`）管理回调上下文生命周期，自动处理内存分配失败情况
-
-- **缓存项指针验证**：在 `interfaces/ets/ani/hisysevent/include/hisysevent_ani_util.h` 的 `CompareAndReturnCacheItem()` 函数中：
-  - 在调用 `AttachAniEnv()` 后检查返回的 `env` 指针是否为 `nullptr`
-  - 在解引用 `iter` 指针前验证 `iter != resources.end()`，避免访问无效迭代器
-  - 在调用 `env->Reference_StrictEquals()` 前确保 `env` 指针已通过验证
-
-- **字符串指针验证**：在 `interfaces/ets/ani/hisysevent/src/hisysevent_ani_util.cpp` 的 `AniStringToStdString()` 函数中：
-  - 在调用 `env->String_GetUTF8Size()` 和 `env->String_GetUTF8()` 前，验证 `aniStr` 参数是否为 `nullptr`
-  - 对于空指针情况，返回空字符串或错误状态，避免空指针解引用
-
-**资源泄漏防护：**
-
-- **RAII 模式应用**：在涉及资源分配的函数中，采用 RAII 模式管理资源生命周期：
-  - 使用智能指针管理动态分配的回调上下文对象
-  - 使用作用域守卫确保 ANI 引用和 NAPI 引用在异常路径中能够正确释放
-  - 对于回调上下文中的 `vm` 和 `ref` 成员，使用引用计数机制确保资源正确释放
-
-###### 2. 错误处理机制改进方案（14 个问题）
-
-**系统调用返回值检查规范：**
-
-建立统一的系统调用错误处理规范，对所有可能失败的系统调用进行返回值检查：
-
-- **Socket 操作错误处理**：在 `interfaces/native/innerkits/hisysevent_easy/easy_socket_writer.c` 的 `Write()` 函数中：
-  - 移除行 69 的无效 `close()` 调用（在 `socketId < 0` 时不应调用 `close()`）
-  - 在其他 `close()` 调用点（行 74、80、92、95）添加返回值检查，失败时记录错误日志
-  - 建议使用包装函数安全关闭 socket，统一处理错误情况
-
-- **参数验证错误处理**：在 `interfaces/native/innerkits/hisysevent/hisysevent_c.cpp` 的 `HiSysEvent_Write()` 函数中：
-  - 在调用 `HiSysEvent::Write()` 前，验证 `HiSysEventParam` 结构体中的字符串指针（`s`）和数组指针（`array`）是否为 `nullptr`
-  - 验证 `arraySize` 参数的合理性，确保不超过合理范围
-  - 对于无效参数，返回适当的错误码（如 `HISYSEVENT_ERR_INVALID_PARAM`）
-
-- **Rust 错误处理**：在 `interfaces/rust/innerkits/src/sys_event_manager.rs` 中：
-  - 将 `std::str::from_utf8().expect()` 替换为 `from_utf8_lossy()` 或使用 `match` 表达式处理错误，避免在无效 UTF-8 序列时 panic
-  - 在 `get_domain()`、`get_event_name()`、`get_time_zone()` 等方法中，使用 `from_utf8_lossy()` 处理可能的 UTF-8 转换错误
-  - 在 `get_level()`、`get_tag()`、`get_json_str()` 等方法中，添加指针非空检查，使用 `from_utf8_lossy()` 替代 `expect()`
-  - 在 `query()` 函数中，将 `CString::new().expect()` 替换为 `unwrap_or_default()` 或过滤掉 null 字节，避免 panic
-
-- **FFI 错误处理**：在 `interfaces/rust/innerkits/src/utils.rs` 的 `trans_slice_to_array()` 函数中：
-  - 将 `CString::new().unwrap()` 替换为 `expect()` 提供更有意义的错误信息，或使用 `match`/`Result` 进行显式错误处理
-  - 添加输入长度校验，确保字符串长度不超过目标缓冲区大小
-  - 在调用点（如 `sys_event.rs` 中的 `write` 函数）添加输入长度校验
-
-###### 3. 不安全代码使用改进方案（9 个问题）
-
-**Rust unsafe 代码安全化：**
-
-针对检测到的 9 个 unsafe 代码使用问题，建立安全的使用规范：
-
-- **原始指针安全转换**：在 `interfaces/rust/innerkits/src/sys_event_manager.rs` 的 `get_level()`、`get_tag()`、`get_json_str()` 方法中：
-  - 在调用 `CString::from_raw()` 前验证指针是否为 `nullptr`，对于空指针返回默认值或错误
-  - 确保指针指向有效的、以 null 结尾的 C 字符串，考虑使用 `CStr` 而不是 `CString` 来避免所有权问题
-  - 考虑使用 `Option<*mut c_char>` 类型明确表示可能为空的指针，在类型层面强制检查
-
-- **FFI 边界参数验证**：在 `interfaces/rust/innerkits/src/sys_event_manager.rs` 中：
-  - 在 `get_level()`、`get_tag()`、`get_json_str()` 方法中，明确指针所有权协议，确保 C/C++ 端传入的指针有效且生命周期正确
-  - 考虑使用更安全的 FFI 包装器或自动生成绑定，减少手动 unsafe 代码的使用
-  - 在文档中明确说明 FFI 接口的前置条件和调用约束，包括指针有效性要求和所有权转移规则
-
-- **类型转换安全化**：在 `interfaces/native/innerkits/hisysevent/event_socket_factory.cpp` 的 `ParseEventInfo()` 函数中：
-  - 对于 `reinterpret_cast` 类型转换，添加指针对齐检查，确保数据缓冲区与 `HiSysEventHeader` 结构体对齐（使用 `alignof` 检查）
-  - 验证数据长度足够（`sizeof(int32_t) + sizeof(HiSysEventHeader)`），确保不会发生缓冲区溢出
-  - 考虑使用 `memcpy()` 代替指针转换，或添加结构体字段有效性验证（如字符串 null 终止符）
-
-###### 4. 缓冲区溢出防护方案（1 个问题）
-
-**数组边界检查机制：**
-
-针对检测到的 1 个缓冲区溢出问题，建立边界检查机制：
-
-- **数组长度验证**：在 `frameworks/native/c_wrapper/source/hisysevent_rust_manager.cpp` 的 `OhHiSysEventAddRustWatcher()` 函数中：
-  - 在调用 `HiSysEventAddWatcher()` 前，验证 `ruleSize` 参数与 `watchRules` 数组长度的匹配关系
-  - 在 `HiSysEventAddWatcher()` 函数内部添加对 `ruleSize` 和 `rules` 数组长度的验证逻辑
-  - 确保所有调用者正确维护参数一致性，或使用结构体封装数组和长度，避免参数不匹配
-
-###### 5. FFI 边界安全改进方案（4 个问题）
-
-**FFI 接口安全化：**
-
-针对检测到的 4 个 FFI 边界问题，建立安全的 FFI 使用规范：
-
-- **C 字符串转换安全化**：在 `interfaces/rust/innerkits/src/sys_event_manager.rs` 中：
-  - 在 `CString::from_raw()` 调用前验证指针是否为 `nullptr`，确保指针指向有效的、以 null 结尾的 C 字符串
-  - 考虑使用 `CStr` 而不是 `CString` 来避免所有权问题，特别是在只读场景下
-  - 在文档中明确说明 C 端必须保证传入的字符串是有效的、以 null 结尾的，且生命周期足够长
-
-- **FFI 参数验证**：在 `interfaces/rust/innerkits/src/utils.rs` 的 `trans_slice_to_array()` 函数中：
-  - 添加输入长度校验，确保字符串长度不超过目标缓冲区大小
-  - 使用 `expect()` 替代 `unwrap()` 提供更有意义的错误信息
-  - 确保所有调用点都进行输入长度校验，特别是在 `sys_event.rs` 中的 `write` 函数
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：94 个 memory_mgmt 问题中的 high 严重性问题（约 60+ 个），特别是：
-   - 空指针解引用风险：`hisysevent_ani_util.cpp`（大量 ANI 环境指针问题，评分 1.8）、`ani_hisysevent_querier.cpp`（回调上下文问题，评分 1.8）、`napi_hisysevent_querier.cpp`（回调上下文问题，评分 1.8）、`hisysevent_rust_querier.cpp`（查询结果指针问题，评分 1.8）、`hisysevent_record_c.cpp`（记录对象指针问题，评分 1.8）
-   - 内存分配失败处理：`hisysevent_ani.cpp`（2 个问题，评分 2.4）、`napi_hisysevent_js.cpp`（2 个问题，评分 2.4）
-   - 类型安全问题：`event_socket_factory.cpp` 中的 `reinterpret_cast_unsafe` 问题（评分 2.4）
-
-2. **中优先级**（近期修复）：14 个 error_handling 问题和 9 个 unsafe_usage 问题，主要是：
-   - 系统调用返回值检查：`easy_socket_writer.c`（5 个 close 调用问题，评分 1.3）、`hisysevent_c.cpp`（参数验证问题，评分 1.3）
-   - Rust 错误处理：`sys_event_manager.rs`（大量 `expect()` 和 `unwrap()` 问题，评分 1.3）、`utils.rs`（`unwrap()` 问题，评分 1.3）
-   - Rust unsafe 代码：`sys_event_manager.rs`（原始指针转换问题，评分 2.55/2.4）、`utils.rs`（FFI 边界问题，评分 1.3）
-
-3. **缓冲区溢出防护**（中期修复）：1 个 buffer_overflow 问题，包括：
-   - 数组长度验证：`hisysevent_rust_manager.cpp` 中的 `vector_bounds_check` 问题（评分 1.2）
-
-4. **FFI 边界优化**（中期修复）：4 个 ffi 问题，包括：
-   - C 字符串转换安全化：`sys_event_manager.rs` 中的 `CString/CStr` 问题（评分 1.3）
-   - FFI 参数验证：`utils.rs` 中的 `CString/CStr` 问题（评分 1.3）
-
-5. **长期优化**：
-   - 建立系统事件管理系统的代码审查规范，重点关注内存管理、错误处理和 FFI 安全
-   - 集成静态分析工具（如 clang-tidy、cppcheck、rust-clippy），在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对 ANI/NAPI 接口、Rust FFI 边界、回调机制进行重点审查
-   - 对于关键系统事件操作（如事件记录、查询、监听），建立统一的错误处理框架，确保所有错误都能被正确捕获和处理
-   - 考虑引入 RAII 模式管理回调上下文、ANI/NAPI 引用和资源，减少资源泄漏风险
-   - 对于 C/C++ 和 Rust 混合项目，建立 FFI 安全使用指南，明确如何安全地在两种语言之间传递数据和调用函数，特别是原始指针和字符串的处理
-   - 建立回调上下文生命周期管理规范，明确回调上下文的创建、使用和释放时机，避免悬空指针和资源泄漏
-
-#### request_request
-
-request_request 是 OpenHarmony 的网络请求管理核心组件，提供了网络请求任务创建、执行、回调管理等核心功能。基于安全扫描结果，共检出 **649 个安全问题**（按语言：C/C++ 268 个，Rust 381 个；按类别：memory_mgmt 251 个、error_handling 369 个、unsafe_usage 23 个、buffer_overflow 1 个、concurrency 0 个、ffi 0 个、unsafe_api 0 个），主要分布在 `services/src/cxx/c_request_database.cpp`、`frameworks/ets/ani/request/src/api10/callback.rs`、`frameworks/ets/ani/request/src/api9/callback.rs`、`frameworks/native/request_next/src/proxy/task.rs`、`frameworks/native/request_next/src/proxy/query.rs`、`common/request_core/src/info.rs`、`frameworks/cj/ffi/src/cj_request_impl.cpp`、`frameworks/js/napi/request/src/upload/curl_adp.cpp`、`frameworks/cj/ffi/src/cj_initialize.cpp`、`frameworks/js/ani/include/ani_utils.h` 等核心文件中。以下针对主要问题类别提出系统化的改进方案。
-
-##### 改进方案
-
-###### 1. 内存管理问题改进方案（251 个问题）
-
-**空指针解引用防护体系：**
-
-针对检测到的大量空指针解引用问题，建立分层的空指针防护机制：
-
-- **配置参数统一验证**：在 `frameworks/cj/ffi/src/cj_request_impl.cpp` 的 `FfiOHOSRequestCreateTask()` 和 `CreateTask()` 函数中：
-  - 在函数入口处添加对 `config` 参数的非空检查，对于 `nullptr` 情况返回错误码
-  - 在 `Convert2Config()` 和 `ConvertCArr2Map()` 函数内部添加指针有效性验证，确保在解引用 `config` 指针前进行非空检查
-  - 对于 `ConvertCArr2Map()` 函数，验证 `cheaders` 指针和 `cheaders->headers` 数组的有效性，避免访问无效内存
-
-- **任务映射表安全访问**：在 `frameworks/cj/ffi/src/cj_app_state_callback.cpp` 的 `OnAbilityForeground()` 函数中：
-  - 在遍历 `taskMap_` 时，检查 `task->second` 是否为 `nullptr`，对于空指针跳过处理或记录错误日志
-  - 确保 `AddTaskMap()` 函数不会插入 `nullptr` 值，或在插入前进行验证
-  - 考虑使用智能指针（如 `std::shared_ptr`）管理 `CJRequestTask` 对象，自动处理空指针情况
-
-- **数据库记录参数验证**：在 `services/src/cxx/c_request_database.cpp` 的 `RecordRequestTask()` 函数中：
-  - 在函数入口处添加对 `taskConfig` 指针的非空检查，对于 `nullptr` 情况返回错误码
-  - 在 `RecordRequestTaskConfig()` 函数内部，在访问 `taskConfig->commonData` 等成员前确保指针已通过验证
-  - 考虑使用智能指针管理 `taskConfig` 对象生命周期，减少空指针风险
-
-- **响应对象指针验证**：在 `frameworks/cj/ffi/src/cj_response_listener.cpp` 的 `OnResponseReceive()` 方法中：
-  - 在方法入口处添加对 `response` 指针的非空检查，对于 `nullptr` 情况返回错误或记录日志
-  - 在访问 `response->taskId` 前验证指针有效性，并检查 `taskId` 是否为空字符串
-  - 确保所有调用 `OnResponseReceive()` 的地方传入有效的 `response` 对象
-
-**资源泄漏防护：**
-
-- **RAII 模式应用**：在涉及资源分配的函数中，采用 RAII 模式管理资源生命周期：
-  - 使用智能指针管理动态分配的任务对象和配置对象
-  - 使用作用域守卫确保文件描述符、网络连接等资源在异常路径中能够自动释放
-  - 对于任务映射表和回调管理器，使用引用计数机制确保资源正确释放
-
-###### 2. 错误处理机制改进方案（369 个问题）
-
-**系统调用返回值检查规范：**
-
-建立统一的系统调用错误处理规范，对所有可能失败的系统调用进行返回值检查：
-
-- **文件操作错误处理**：在 `frameworks/cj/ffi/src/cj_initialize.cpp` 的所有 `close()` 调用点中：
-  - 检查 `close()` 系统调用的返回值，失败时记录错误日志
-  - 在 `UploadBodyFileProc()` 和 `GetFD()` 函数中，对所有 `close()` 调用添加返回值检查
-  - 建议使用 RAII 模式封装文件描述符，使用作用域守卫确保文件描述符在异常路径中能够自动关闭
-
-- **Rust 错误处理规范化**：在 `frameworks/ets/ani/request/src/api10/callback.rs` 和 `frameworks/ets/ani/request/src/api9/callback.rs` 中：
-  - 将所有 `Mutex::lock().unwrap()` 替换为适当的错误处理，使用 `match` 表达式或 `?` 操作符处理 `Result` 类型
-  - 对于 `CallbackManager` 中的 `tasks.lock().unwrap()` 调用，使用 `lock().unwrap_or_else(|e| { /* 错误处理 */ })` 或模式匹配处理锁毒化情况
-  - 考虑使用 `parking_lot` 等更健壮的锁实现，提供更好的错误处理机制
-  - 对于所有回调函数（如 `on_progress`、`on_complete`、`on_pause`、`on_resume` 等），统一使用安全的锁获取方式
-
-- **Result 类型正确使用**：在 Rust 代码中：
-  - 避免使用 `unwrap()` 或 `expect()` 强制解包，使用 `match` 表达式或 `?` 操作符处理错误
-  - 对于可能失败的操作，返回 `Result<T, E>` 类型，确保错误信息能够正确传递
-  - 在 FFI 边界处，将 Rust 错误转换为 C 错误码，确保错误信息能够正确传递到 C/C++ 层
-
-- **网络操作错误处理**：在 `frameworks/js/napi/request/src/upload/curl_adp.cpp` 中：
-  - 检查所有 libcurl API 调用的返回值，失败时记录错误日志并返回适当的错误码
-  - 对于文件上传、下载等网络操作，实现重试机制和错误恢复策略
-  - 确保所有网络资源（如 curl handle）在异常路径中能够正确释放
-
-###### 3. 不安全代码使用改进方案（23 个问题）
-
-**Rust unsafe 代码安全化：**
-
-针对检测到的 23 个 unsafe 代码使用问题，建立安全的使用规范：
-
-- **FFI 边界参数验证**：在 `common/netstack_rs/src/wrapper.rs` 和 `services/src/utils/c_wrapper.rs` 中：
-  - 在 `on_data_receive()` 等 FFI 函数中，对通过 FFI 传入的原始指针进行有效性检查
-  - 验证指针大小参数，确保不会发生缓冲区溢出
-  - 使用安全方法替代 `unsafe` 块中的直接内存访问，或在使用前添加边界检查
-
-- **原始指针安全转换**：在 `common/request_core/src/config.rs`、`services/src/task/config.rs` 和 `services/src/task/files.rs` 中：
-  - 在调用 `CString::from_raw()` 或类似函数前，验证指针是否为 `nullptr`
-  - 确保指针指向有效的、以 null 结尾的 C 字符串
-  - 考虑使用 `CStr` 而不是 `CString` 来避免所有权问题，特别是在只读场景下
-
-- **unsafe 函数封装**：在 `services/src/ability.rs` 和 `services/src/lib.rs` 中：
-  - 为所有 `unsafe` 函数添加参数有效性检查
-  - 限制 `unsafe` 函数只能被内部安全代码调用，或提供安全的封装函数替代直接调用
-  - 在文档中明确说明 unsafe 函数的使用场景和安全保证
-
-- **内存操作安全化**：在 `frameworks/native/request_next/src/listen/uds.rs` 中：
-  - 对于 Unix Domain Socket 相关的 unsafe 操作，添加参数验证和边界检查
-  - 确保所有内存操作都在安全的边界内，避免缓冲区溢出和未定义行为
-
-###### 4. 缓冲区溢出防护方案（1 个问题）
-
-**数组边界检查机制：**
-
-针对检测到的 1 个缓冲区溢出问题，建立边界检查机制：
-
-- **数组长度验证**：在相关函数中：
-  - 在访问数组元素前，验证索引是否在有效范围内
-  - 对于通过 FFI 传入的数组，验证数组长度参数与数组实际大小的匹配关系
-  - 使用安全的数组访问方法，避免直接使用原始指针进行数组操作
-
-##### 实施优先级建议
-
-基于问题严重性和影响范围，建议按以下优先级实施改进：
-
-1. **高优先级**（立即修复）：251 个 memory_mgmt 问题中的 high 严重性问题（约 150+ 个），特别是：
-   - 空指针解引用风险：`cj_request_impl.cpp`（大量 config 指针问题，评分 1.8）、`c_request_database.cpp`（大量 taskConfig 指针问题，评分 1.8）、`cj_app_state_callback.cpp`（task->second 指针问题，评分 1.8）、`cj_response_listener.cpp`（response 指针问题，评分 1.8）
-
-2. **中优先级**（近期修复）：369 个 error_handling 问题，主要是：
-   - 系统调用返回值检查：`cj_initialize.cpp`（大量 close 调用问题，评分 1.3）
-   - Rust 错误处理：`api10/callback.rs` 和 `api9/callback.rs`（大量 `unwrap()` 问题，特别是 Mutex 锁操作，评分 1.3）、其他 Rust 文件中的 `unwrap/expect` 使用
-   - 网络操作错误处理：`curl_adp.cpp`（libcurl API 返回值检查）
-
-3. **不安全代码优化**（中期修复）：23 个 unsafe_usage 问题，包括：
-   - FFI 边界参数验证：`wrapper.rs`（FFI 函数参数验证，评分 2.4）、`c_wrapper.rs`（原始指针转换问题）
-   - 原始指针安全转换：`config.rs`、`task/config.rs`、`task/files.rs`（CString 转换问题）
-   - unsafe 函数封装：`ability.rs`、`lib.rs`（unsafe 函数参数检查）
-
-4. **缓冲区溢出防护**（中期修复）：1 个 buffer_overflow 问题，包括：
-   - 数组长度验证：相关函数中的数组边界检查
-
-5. **长期优化**：
-   - 建立网络请求管理系统的代码审查规范，重点关注内存管理、错误处理和 FFI 安全
-   - 集成静态分析工具（如 clang-tidy、cppcheck、rust-clippy），在 CI/CD 中自动检测安全问题
-   - 定期进行安全审计，特别是对 FFI 接口、回调机制、网络操作进行重点审查
-   - 对于关键网络请求操作（如任务创建、执行、回调），建立统一的错误处理框架，确保所有错误都能被正确捕获和处理
-   - 考虑引入 RAII 模式管理任务对象、配置对象、文件描述符和网络资源，减少资源泄漏风险
-   - 对于 C/C++ 和 Rust 混合项目，建立 FFI 安全使用指南，明确如何安全地在两种语言之间传递数据和调用函数
-   - 建立回调机制生命周期管理规范，明确回调的注册、执行和清理时机，避免悬空指针和资源泄漏
-   - 对于 Rust 代码，建立错误处理最佳实践指南，避免过度使用 `unwrap()` 和 `expect()`，特别是对于 Mutex 锁操作
-
-### 预期的安全问题检出率和性能指标
-
-基于当前实现和实际测试数据，本节说明系统在安全问题检出率和性能方面的预期指标。
-
-#### 安全问题检出率
-
-系统采用"启发式扫描 + AI 验证"的混合模式，通过四阶段流水线（启发式扫描 → 聚类 → 分析 → 报告）实现高准确率的安全问题检测。
-
-**检出能力：**
-
-1. **覆盖范围**：
-   - 支持 C/C++ 和 Rust 语言的安全问题检测
-   - 覆盖常见安全问题类别：`unsafe_api`（不安全 API 使用）、`memory_mgmt`（内存管理）、`error_handling`（错误处理）、`unsafe_usage`（不安全代码使用）、`concurrency`（并发安全）等
-   - 通过启发式规则识别潜在问题模式，生成候选问题列表
-
-2. **实际测试数据**（基于多个项目的扫描结果）：
-   - `security_asset` 项目：检出 87 个安全问题
-   - `commonlibrary_rust_ylong_runtime` 项目：检出 39 个安全问题
-   - `commonlibrary_c_utils` 项目：检出 20 个安全问题
-   - `bzip2` 项目：检出 10 个安全问题（覆盖 15 个文件）
-
-3. **误报控制机制**：
-   - **二次验证机制**：分析 Agent 确认告警后，验证 Agent 进行二次验证，特别验证调用路径推导是否正确，只有验证通过的告警才会写入文件
-   - **聚类验证**：通过条件一致性聚类，将相关告警合并为统一验证任务，减少重复分析和误报
-   - **上下文过滤**：通过上下文检测（如 `_has_null_check_around`、`_has_len_bound_around`）识别邻近上下文中的保护措施，降低误报
-   - **注释移除**：移除注释内容避免注释中的 API 命中导致误报
-   - **声明行跳过**：跳过头文件声明行（typedef/extern），避免将函数原型误报为调用
-
-4. **预期检出率**：
-   - 启发式扫描阶段：能够识别大部分常见安全问题模式，覆盖率预计达到 80-90%
-   - AI 验证阶段：通过上下文分析和逻辑推理，对候选问题进行验证，准确率预计达到 85-95%
-   - 整体误报率：通过多级验证机制，预期误报率控制在 10-15% 以下
-
-#### 性能指标
-
-**当前实现特点：**
-
-1. **单线程顺序执行**：
-   - 当前实现采用单线程顺序执行模式，在验证阶段通过 `for bidx, batch in enumerate(batches, start=1):` 循环逐个处理批次
-   - 此设计主要考虑以下因素：
-     - **流程确认**：确保每个批次的处理流程正确，便于调试和问题定位
-     - **用户交互体验**：顺序执行能够提供清晰的进度反馈，用户可以实时了解当前处理状态
-     - **状态管理**：便于实现断点续扫功能，支持从进度文件中恢复执行状态
-     - **资源控制**：避免并发执行带来的资源竞争和 LLM API 调用频率限制问题
-
-2. **性能表现**（基于实际测试）：
-   - 启发式扫描阶段：速度较快，主要受文件数量和大小影响，通常可在数秒内完成
-   - 聚类阶段：每个文件的聚类处理需要调用 LLM，耗时主要取决于候选问题数量和 LLM 响应时间
-   - 验证阶段：每个批次的验证需要调用 LLM 进行上下文分析，耗时主要取决于批次大小和代码复杂度
-   - 整体耗时：对于中等规模项目（如 bzip2，15 个文件），完整扫描通常需要数分钟到数十分钟，具体取决于 LLM 响应时间
-
-3. **性能优化方向**：
-   - **并发执行**：后续可修改为并发执行模式，将独立的批次处理任务并行化，预计可提升 2-5 倍性能（具体提升取决于批次数量和系统资源）
-   - **批量处理优化**：优化批次大小和聚类策略，减少 LLM 调用次数
-   - **缓存机制**：对重复的代码上下文分析结果进行缓存，避免重复计算
-   - **增量扫描**：基于文件修改时间进行增量扫描，只处理变更的文件
-
-**性能指标预期**（并发优化后）：
-
-- 小规模项目（< 50 文件）：预计在 5-15 分钟内完成
-- 中等规模项目（50-200 文件）：预计在 15-60 分钟内完成
-- 大规模项目（> 200 文件）：预计在 1-3 小时内完成（具体取决于项目复杂度和 LLM 响应时间）
