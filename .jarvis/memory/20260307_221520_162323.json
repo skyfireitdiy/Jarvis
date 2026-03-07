@@ -1,0 +1,8 @@
+{
+  "id": "20260307_221520_162323",
+  "type": "project_long_term",
+  "tags": ["功能开发", "search_web", "playwright", "降级方案", "验证完成"],
+  "content": "【功能已完成验证】Playwright 降级搜索方案\n\n功能描述：当 ddgr 搜索失败时自动降级使用 Playwright + Bing 搜索\n\n核心实现：\n- 文件：src/jarvis/jarvis_tools/search_web.py\n- 新增方法：_search_with_playwright(query, agent, site=None)\n- 降级触发点：ddgr 命令执行失败/JSON 解析失败/无结果/超时/其他异常\n\n验证结果（全部通过）：\n✅ ruff 静态检查通过\n✅ mypy 类型检查通过  \n✅ 依赖检查：BeautifulSoup ✅, Playwright ✅, lxml ✅\n✅ 编译状态：无错误\n✅ 功能测试：成功访问 Bing 并解析 10 条结果\n✅ 打印格式：输出清晰（序号 + 标题 + URL + 摘要）\n✅ 格式兼容：与 ddgr 输出格式完全一致\n\n技术要点：\n- 使用可选依赖设计（PLAYWRIGHT_AVAILABLE 标志）\n- 支持 site 参数进行站点过滤\n- 使用 BeautifulSoup 解析 HTML（选择器：li.b_algo）\n- Headless 模式运行，性能优化\n\nGit 初始提交：d8506fe61440c0e3c005caea2c794e7292e2615c\n\n完成时间：2025-06-17\n状态：已交付",
+  "created_at": "2026-03-07T22:15:20.162352",
+  "updated_at": "2026-03-07T22:15:20.162355"
+}
