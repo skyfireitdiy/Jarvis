@@ -180,28 +180,4 @@ case "$INSTALL_TYPE" in
     ;;
 esac
 
-echo -e "\n--- 6. 安装自动补全 (可选) ---"
-echo "您可以为常用命令安装自动补全功能，以提高使用效率。"
-read -r -p "是否安装命令行自动补全功能? [y/N]: " choice
-case "$choice" in
-    y|Y )
-        echo "正在安装自动补全..."
 
-        # 使用循环来安装所有工具的自动补全
-        tools=("jvs" "jvsd" "ja" "jca" "jcad" "jgc" "jgs" "jsec" "jc2r" "jpm" "jt" "jm" "jss" "jmo")
-        for tool in "${tools[@]}"; do
-            echo "正在为 $tool 安装自动补全..."
-            if "$tool" --install-completion > /dev/null 2>&1; then
-                echo "$tool 自动补全安装成功。"
-            else
-                echo "警告: $tool 自动补全安装失败。"
-            fi
-        done
-
-        echo "所有工具的自动补全已尝试安装。"
-        echo "请重新启动您的 shell 以使更改生效。"
-        ;;
-    * )
-        echo "跳过安装自动补全。"
-        ;;
-esac
