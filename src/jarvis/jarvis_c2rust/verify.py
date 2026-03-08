@@ -201,7 +201,6 @@ def _run_alignment_analysis(
     返回包含 is_aligned 和 summary 的字典。
     """
     from jarvis.jarvis_c2rust.agent_factory import create_agent
-    from jarvis.jarvis_c2rust.agent_factory import create_code_agent
 
     # 定义报告文件路径（保存到 crate 根目录）
     report_file = crate_dir / "alignment_report.md"

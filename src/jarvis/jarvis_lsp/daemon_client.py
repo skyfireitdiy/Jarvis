@@ -12,11 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_lsp.client import LocationInfo, SymbolInfo
 from jarvis.jarvis_lsp.daemon import (
-    LSP_DAEMON_PORT_FILE,
-    LSP_DAEMON_TCP_PORT,
     _get_lsp_daemon_addr,
 )
 from jarvis.jarvis_lsp.protocol import (
@@ -45,6 +42,7 @@ class LSPDaemonClient:
 
     async def _ensure_daemon_running(self) -> None:
         """确保守护进程正在运行"""
+
         async def _try_connect() -> bool:
             try:
                 if self._is_unix:
@@ -71,9 +69,7 @@ class LSPDaemonClient:
             return
 
         # 启动守护进程
-        daemon_script = str(
-            Path(__file__).resolve().parent / "daemon.py"
-        )
+        daemon_script = str(Path(__file__).resolve().parent / "daemon.py")
         if not os.path.exists(daemon_script):
             raise FileNotFoundError(f"守护进程脚本不存在: {daemon_script}")
 
@@ -106,8 +102,12 @@ class LSPDaemonClient:
                 return
 
         raise RuntimeError(
-            f"守护进程启动失败。"
-            + (f"socket 未创建: {self.addr}" if self._is_unix else f"TCP 无法连接: {self.addr[0]}:{self.addr[1]}")
+            "守护进程启动失败。"
+            + (
+                f"socket 未创建: {self.addr}"
+                if self._is_unix
+                else f"TCP 无法连接: {self.addr[0]}:{self.addr[1]}"
+            )
         )
 
     async def _send_request(
@@ -119,9 +119,7 @@ class LSPDaemonClient:
         await self._ensure_daemon_running()
 
         if self._is_unix and not os.path.exists(self.addr):
-            raise RuntimeError(
-                f"守护进程启动失败。socket 文件不存在: {self.addr}"
-            )
+            raise RuntimeError(f"守护进程启动失败。socket 文件不存在: {self.addr}")
 
         request = {"method": method, "params": params}
         request_json = json.dumps(request, ensure_ascii=False)
@@ -679,10 +677,10 @@ class LSPDaemonClient:
             for loc in locations_data
         ]
 
-    async def callers_by_name(
+    async def callees_by_name(
         self, language: str, project_path: str, file_path: str, symbol_name: str
     ) -> list[Dict[str, Any]]:
-        """查询指定函数内部调用了哪些其他函数"""
+        """查询指定函数内部调用了哪些其他函数（outgoing calls）"""
         response = await self._send_request(
             "callers_by_name",
             {

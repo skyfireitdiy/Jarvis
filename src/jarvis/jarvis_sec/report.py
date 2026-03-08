@@ -144,7 +144,7 @@ def _normalize_issue(i: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _make_issue_id(base: str, lang: str) -> str:
-    h = hashlib.sha1(base.encode("utf-8")).hexdigest()[:6]
+    h = hashlib.sha1(base.encode("utf-8"), usedforsecurity=False).hexdigest()[:6]
     prefix = "C" if lang.startswith("c") else "R"
     return f"{prefix}{h.upper()}"
 

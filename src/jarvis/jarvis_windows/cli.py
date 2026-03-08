@@ -26,8 +26,10 @@ if sys.platform != "win32":
 else:
     _NOT_WINDOWS_MSG = ""
 
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_default_encoding
+# These imports are after platform check intentionally
+# They use typer.app which is defined above
+from jarvis.jarvis_utils.config import get_data_dir  # noqa: E402
+from jarvis.jarvis_utils.config import get_default_encoding  # noqa: E402
 
 app = typer.Typer(
     help="Windows App CLI Tool - Desktop application automation (Windows only)",
@@ -324,7 +326,7 @@ def start(
     """Start an application and register the session."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -454,7 +456,7 @@ def connect(
 ) -> None:
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -672,7 +674,7 @@ def click(
     """Click a control or menu item."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -875,7 +877,7 @@ def double_click_cmd(
     """Double-click a control."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -927,7 +929,7 @@ def right_click_cmd(
     """Right-click a control or the window."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -984,7 +986,7 @@ def hover(
     """Move mouse to control center or to (x, y) coordinates."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -1058,7 +1060,7 @@ def drag(
     """Drag mouse from one point to another."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -1138,7 +1140,7 @@ def type_text(
     """Type text into a control."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -1194,7 +1196,7 @@ def type_keys_cmd(
     """Send keyboard key sequence."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -1231,7 +1233,7 @@ def screenshot(
     """Capture window screenshot."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
         from datetime import datetime
     except ImportError:
         _output(
@@ -1278,7 +1280,7 @@ def get_tree_cmd(
     """Get control tree with #N indexes (use with click/type -i N or -c #N)."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {
@@ -1344,7 +1346,7 @@ def menu(
     """Execute menu selection."""
     _ensure_windows()
     try:
-        from pywinauto import Application
+        from pywinauto import Application  # noqa: F401 - Check availability only
     except ImportError:
         _output(
             {

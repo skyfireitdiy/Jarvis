@@ -370,5 +370,6 @@ class GitManager:
                 agent.memory_manager.prompt_memory_save()
         elif start_commit and commits:
             if user_confirm("是否要重置到初始提交？", True):
-                os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
+                # Git操作：重置到指定提交（已用户确认，commit ID来自git）
+                os.system(f"git reset --hard {str(start_commit)}")  # nosec B605
                 PrettyOutput.auto_print("ℹ️ 已重置到初始提交")

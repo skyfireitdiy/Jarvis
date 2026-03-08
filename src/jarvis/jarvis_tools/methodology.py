@@ -99,7 +99,9 @@ class MethodologyTool:
         """
         methodology_dir = self._get_methodology_dir(scope)
         # 使用MD5哈希作为文件名，避免文件名中的特殊字符
-        safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
+        safe_filename = hashlib.md5(
+            problem_type.encode("utf-8"), usedforsecurity=False
+        ).hexdigest()
         return os.path.join(methodology_dir, f"{safe_filename}.json")
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:

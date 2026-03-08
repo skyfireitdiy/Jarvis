@@ -41,10 +41,11 @@ class ConfigEditor:
 
         if editor:
             try:
+                # 编辑器调用：Windows需要shell=True（editor是系统编辑器）
                 subprocess.run(
                     [editor, str(config_file_path)],
                     check=True,
-                    shell=(platform.system() == "Windows"),
+                    shell=(platform.system() == "Windows"),  # nosec B602
                 )
                 raise typer.Exit(code=0)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:

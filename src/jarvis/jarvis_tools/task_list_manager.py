@@ -302,7 +302,6 @@ class task_list_manager:
             Agent: 验证 Agent 实例
         """
         from jarvis.jarvis_agent import Agent
-        from jarvis.jarvis_utils.config import get_llm_group
 
         # 构建验证方法说明部分
         verification_method_section = ""

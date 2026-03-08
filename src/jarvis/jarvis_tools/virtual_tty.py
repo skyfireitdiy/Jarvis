@@ -242,13 +242,13 @@ class VirtualTTYTool:
             import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
             import threading as _threading  # pylint: disable=import-outside-toplevel
 
-            # 创建子进程
+            # 创建子进程（核心功能：启动TTY会话，shell=True支持shell命令）
             process = _subprocess.Popen(
                 agent.tty_sessions[tty_id]["shell"],
                 stdin=_subprocess.PIPE,
                 stdout=_subprocess.PIPE,
                 stderr=_subprocess.STDOUT,
-                shell=True,
+                shell=True,  # nosec B602
                 text=True,
                 bufsize=0,
                 encoding="utf-8",
