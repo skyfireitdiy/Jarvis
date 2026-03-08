@@ -9,7 +9,7 @@
 
 _您的智能开发和系统交互助手_
 
-[快速开始](#quick-start) • [核心功能](#core-features) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [Wiki文档](docs/jarvis_book/1.项目介绍.md) • [贡献指南](#contributing) • [许可证](#license)
+[快速开始](#quick-start) • [系统架构](#architecture) • [关键组件](#components) • [配置说明](#configuration) • [Jarvis Book](#jarvis-book) • [贡献指南](#contributing) • [许可证](#license)
 
 </div>
 
@@ -17,93 +17,92 @@ _您的智能开发和系统交互助手_
 
 ## 🎯 定位与优势
 
-Jarvis 的定位是**AI应用开发SDK**，提供强大而灵活的基础组件，帮助开发者快速构建专业的AI应用。与传统的`workflow`形式Agent平台（如Dify）不同，Jarvis以Python SDK的形式提供，强调可编程性和可扩展性，让开发者能够自由定制AI应用的行为和逻辑。
+Jarvis 是**本地化 AI 助手平台**，以 CLI 与 Python SDK 双形态交付：既有开箱即用的专业套件（通用代理、代码代理、安全分析、C→Rust 迁移等），也支持可编程的二次开发。采用分层架构与可复用组件，支持即用即走或深度定制，有别于固定工作流的 Agent 平台；规则与 Skills 标准兼容，可无缝迁移。
 
-### Jarvis 的核心优势
+| 维度 | 能力 |
+|------|------|
+| **本地化** | 可操作本机任意资源（文件、命令、进程等） |
+| **方法论** | 成功经验自动沉淀为可复用方法论 |
+| **记忆管理** | 标签化分层（短期/项目/全局），无向量计算，更轻量 |
+| **代码开发** | 全自动 Git、Worktree 并行、波及分析、交叉引用、上下文推荐、独立 Agent 验证、静态检查、代码格式化 |
+| **上下文压缩** | Git 上下文、任务列表、近期记忆、关键信息等多机制，保证任务目标不偏离 |
+| **任务列表** | 支线流程与主流程分离，不污染主 Agent 上下文 |
+| **会话管理** | 自动保存、手动恢复，退出可继续 |
+| **人格与规则** | 内置多种人格与开发规则，高效开发兼顾情绪价值 |
+| **规则加载** | 前期固定流程筛选，后期按需自主加载，确保规则能被有效运用 |
+| **Windows 支持** | 支持 Windows，可自动化操作 Windows GUI 程序 |
 
-1. **强大而灵活的基础组件**: 提供 `Agent` 和 `CodeAgent` 等精心设计的基础组件，开发者可以快速基于这些组件构建专业的AI应用，无需从零开始。
-2. **高度可编程的SDK**: 以纯Python SDK形式提供，开发者可以自由组合各种能力，编写符合自己业务逻辑的AI应用，而非受限于固定的工作流。
-3. **开箱即用的工具生态**: 内置丰富的工具集（代码分析、文件操作、命令执行等），开发者可以直接使用，也可以轻松扩展自定义工具。
+### 与同类项目对比
 
-### 💡 Jarvis 的价值：工作流对比
+| 项目 | 定位 | 形态 | 核心场景 |
+|------|------|------|----------|
+| **Jarvis** | AI 助手平台 | CLI + Python SDK | 代码开发、安全分析、C→Rust 迁移 |
+| **LangChain** | LLM 应用框架 | Python 库 | 通用 Agent、RAG、工作流编排 |
+| **AutoGPT** | 自主 AI Agent | 独立应用 | 目标驱动的自主任务执行 |
+| **OpenClaw** | 个人 AI 助手框架 | Node.js 应用 | 多通道消息、24/7 自主运行 |
+| **ZeroClaw** | OpenClaw 轻量替代 | Rust 二进制 | 同 OpenClaw |
 
-#### 示例一：开发代码分析Agent
+- **Jarvis**：面向代码开发，分层架构（Agent/CodeAgent），本地化、轻量记忆、任务分离、规则按需加载，支持 Windows GUI 自动化。
+- **LangChain**：通用编排框架，1000+ 集成，LangGraph 图编排，侧重生产级 RAG 与工作流，记忆以向量存储为主。
+- **AutoGPT**：早期自主 Agent，目标驱动、有会话保存，但易陷入循环、成本较高、任务上下文分离不足。
+- **OpenClaw / ZeroClaw**：消息渠道与日常自动化，Skills 兼容，OpenClaw 支持 Windows GUI，ZeroClaw 极致轻量（~3MB）。
 
-**传统开发方式 (没有 Jarvis SDK):**
+---
 
-1. **设计Agent架构**: 从零开始设计Agent的决策流程、工具调用机制、上下文管理等核心模块。
-2. **实现工具系统**: 手动实现工具注册、参数解析、结果处理等基础设施。
-3. **集成LLM**: 编写代码调用各种大模型API，处理流式输出、错误重试等复杂逻辑。
-4. **开发特定能力**: 针对代码分析需求，实现代码解析、符号查找、编辑操作等专门功能。
-5. **测试与调试**: 反复测试Agent行为，修复各种边界情况和错误场景。
+## 🏗️ 系统架构 <a id="architecture"></a>
 
-> 这个过程需要大量时间和精力投入在基础设施开发上，而非核心业务逻辑。
+Jarvis 采用**分层架构**：以通用 Agent 为核心，通过继承构建 CodeAgent 增强层，再实现专业应用（安全分析、C→Rust 迁移等）。
 
-**使用 Jarvis SDK 开发:**
+```mermaid
+flowchart TB
+    subgraph 专业应用层["专业应用层"]
+        jsec["jarvis-sec (jsec) 安全分析"]
+        jc2r["jarvis-c2rust (jc2r) C→Rust 迁移"]
+    end
 
-```python
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+    subgraph 功能增强层["功能增强层 CodeAgent"]
+        code["代码结构分析 | 文件编辑 | 变更影响分析"]
+    end
 
-# 创建CodeAgent实例，内置代码分析、编辑、执行等能力
-agent = CodeAgent()
+    subgraph 核心基础层["核心基础层 Agent"]
+        agent["对话与工具执行 | 会话管理 | 工具注册 | 平台适配 | 事件总线"]
+    end
 
-# 让Agent自主完成任务，自动使用内置工具
-result = agent.run('为 user/service.py 添加用户profile接口')
-
-# CodeAgent会自动：
-# 1. 分析代码结构，定位相关文件
-# 2. 使用read_code读取文件内容
-# 3. 使用edit_file精确修改代码
-# 4. 使用execute_script运行测试
-# 5. 验证修改是否成功
+    专业应用层 -->|使用| 功能增强层
+    功能增强层 -->|继承| 核心基础层
 ```
 
-> 通过 Jarvis SDK，开发者只需几行代码就能构建功能完善的AI应用，将精力集中在**业务逻辑和用户体验**等高价值活动上，而非重复造轮子。
+### 核心基础层：Agent
 
-#### 示例二：开发文档生成Agent
+Jarvis 的核心执行实体，提供对话、工具执行、会话管理等基础能力：统一入口、会话管理、工具注册、平台适配、事件总线与输入/输出处理链，支持非交互模式与多 Agent 编排。
 
-基于Jarvis SDK，您可以轻松构建文档生成Agent，自动维护项目文档。
+### 功能增强层：CodeAgent
 
-```python
-from jarvis import Agent
+继承自 Agent，叠加代码相关能力：代码结构分析（文件/函数/类层次）、文件编辑（`edit_file` 支持 search/replace 与整文件重写）、变更影响分析（依赖与调用链）、基于构建错误的自动迭代修复。被 jarvis-c2rust 用于代码生成与修复，也可独立使用（`jca`）。
 
-# 创建文档生成Agent，通过system_prompt定制行为
-agent = Agent(
-    system_prompt="""你是一个专业的文档维护助手。
-能够分析现有文档，并根据指令改进文档内容。
-""",
-    name="DocGenerator"
-)
+### 专业应用层
 
-# 让Agent自主完成文档维护任务
-agent.run('分析README.md，补充用户群体和应用场景信息')
+| 应用 | 命令 | 说明 |
+|------|------|------|
+| **jarvis-sec** | `jsec` | 安全分析套件：启发式扫描 → 聚类 → Agent 验证 → 报告聚合，支持 C/C++ 与 Rust |
+| **jarvis-c2rust** | `jc2r` | C→Rust 迁移套件：scan → lib-replace → prepare → transpile → optimize，支持断点续跑 |
 
-# 继续迭代文档
-agent.run('在README中增加一个工作流对比示例')
+---
 
-# Agent会自动：
-# 1. 使用read_code读取文档内容
-# 2. 分析现有结构和风格
-# 3. 使用edit_file精确修改文档
-# 4. 确保格式和风格一致
-```
+## 🔧 关键组件 <a id="components"></a>
 
-> 通过简单的SDK调用，就能构建出功能完善的文档生成Agent，将文档维护从手动操作转为自动化流程。
-
-### 👥 目标用户
-
-**谁适合使用 Jarvis？**
-
-- **个人开发者和极客**: 希望通过AI提升个人开发、学习和探索效率的用户。
-- **需要处理碎片化任务的工程师**: 面对各种一次性、非标准化的技术任务，例如快速编写脚本、调试代码、搭建新环境等。
-- **AI应用探索者**: 希望有一个灵活的本地框架来实验和集成不同的大语言模型和工具。
-
-**谁可能不适合？**
-
-- **寻求固定工作流自动化的人**: 如果您的需求是高度固定和重复的，例如“每天定时抓取数据并生成报告”，那么编写一个专门的、功能单一的脚本可能是更直接、更高效的解决方案。Jarvis 更擅长处理多变和探索性的任务。
-- **企业级团队协作者**: Jarvis 被设计为个人工具，不包含团队管理、权限控制等面向企业级协作的功能。
-
-总之，Jarvis 是为每一位开发者量身打造的个人助手，而非用于团队协作的集中式平台。
+| 组件 | 用途 |
+|------|------|
+| **AgentRunLoop** | 主运行循环，驱动「模型思考 → 工具执行 → 结果拼接」迭代 |
+| **SessionManager** | 会话状态管理，支持保存、恢复、清理历史 |
+| **PromptManager** | 构建系统提示与附加提示（工具规范、记忆引导等） |
+| **EventBus** | 事件总线，关键节点广播，支持旁路扩展 |
+| **ToolRegistry** | 工具注册表，发现、加载、执行工具（内置、外部、MCP） |
+| **MemoryManager** | 记忆管理，短期/项目/全局三层架构 |
+| **TaskAnalyzer** | 任务分析，满意度收集与方法论沉淀 |
+| **PlatformRegistry / BasePlatform** | 平台适配层，屏蔽不同 LLM 服务商差异 |
+| **RulesManager** | 规则管理，多来源加载与激活，与 Skills 标准兼容 |
+| **输入处理器链** | 内置、Shell、文件上下文处理器，处理特殊标记、命令、文件引用 |
 
 ---
 
@@ -111,449 +110,138 @@ agent.run('在README中增加一个工作流对比示例')
 
 ### 系统要求
 
-- **操作系统**: Jarvis 的许多核心工具依赖于Linux环境，因此目前主要支持在 **Linux** 系统下使用。
-- **Windows用户**: 虽然未经原生测试，但 Windows 10/11 用户可以通过 **WSL (Windows Subsystem for Linux)** 来完整地体验 Jarvis 的所有功能。
-- **Python版本**: 需要 Python 3.12。
-- **Docker**（可选）: 支持通过 Docker 镜像使用，无需本地安装 Python/Rust 环境。
+- **操作系统**：Linux（主要）、Windows 10/11（WSL 或原生，支持 GUI 自动化）
+- **Python**：3.12
+- **Docker**（可选）：镜像已预装依赖，无需本地 Python/Rust
 
 ### 安装
 
-#### 一键安装 (推荐)
-
-只需一行命令即可完成所有安装和配置：
-
-**Linux/macOS:**
+**一键安装（推荐）**
 
 ```bash
-# GitHub（推荐）
+# Linux/macOS
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
 
-# 或者使用 Gitee 镜像（国内访问更快）
-bash -c "$(curl -fsSL https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.sh)"
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# GitHub（推荐）
+# Windows PowerShell
 iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
-
-# 或者使用 Gitee 镜像（国内访问更快）
-iex ((New-Object System.Net.WebClient).DownloadString('https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.ps1'))
 ```
 
-> 该脚本会自动检测Python环境、克隆项目、安装依赖并设置好路径。
-
-#### 手动安装
+**手动安装**
 
 ```bash
-# 1. 克隆仓库（选择以下任一方式）
-# GitHub（推荐）
 git clone https://github.com/skyfireitdiy/Jarvis.git
-
-# 或者使用 Gitee 镜像（国内访问更快）
-git clone https://gitee.com/skyfireitdiy/Jarvis.git
-
-# 2. 进入项目目录
 cd Jarvis
-
-# 3. 安装项目为可编辑模式
 pip3 install -e .
 ```
 
-> **提示**: 使用 `-e .` (可编辑模式) 安装后，您对源码的任何修改都会立刻生效，非常适合开发者。
-
-或者从PyPI安装 (可能不是最新版):
+**Docker**
 
 ```bash
-pip3 install jarvis-ai-assistant
-```
-
-**通过 uv 安装 (推荐)**
-
-```bash
-# 1. 安装 uv (如果未安装)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 2. 使用 uv tool 安装 jarvis（推荐）
-# 从 GitHub 仓库安装
-uv tool install git+https://github.com/skyfireitdiy/Jarvis.git
-
-# 或从 Gitee 镜像安装（国内访问更快）
-# uv tool install git+https://gitee.com/skyfireitdiy/Jarvis.git
-```
-
-> **提示**: `uv tool` 会自动管理工具的虚拟环境，无需手动创建和激活。安装完成后，jarvis 的所有命令（如 `jvs`、`jca` 等）将立即可用。
-
-#### Docker 镜像安装 (推荐用于隔离环境)
-
-使用 Docker 镜像可以避免本地环境配置，所有依赖都已预装。镜像已发布到 GitHub Container Registry (GHCR)，**公开可用，无需登录**。
-
-**从 GitHub Container Registry 拉取镜像：**
-
-```bash
-# 拉取最新版本
 docker pull ghcr.io/skyfireitdiy/jarvis:latest
-
-# 或拉取特定版本（例如 v1.0.0）
-docker pull ghcr.io/skyfireitdiy/jarvis:v1.0.0
-```
-
-> **提示**:
->
-> - 镜像默认公开，无需登录即可拉取
-> - 每次发布新版本时，会自动生成多个标签：`latest`、`v1.0.0`、`1.0`、`1` 等
-> - 建议使用 `latest` 标签获取最新版本
-
-**使用 Docker Compose（推荐）：**
-
-Docker Compose 配置默认使用**非 root 用户**（jarvis 用户，UID 1000），避免文件权限问题：
-
-```bash
-# 运行容器（使用预构建镜像，无需本地构建）
 docker-compose run --rm jarvis
 ```
 
-> **说明**:
->
-> - 容器使用 jarvis 用户（UID 1000）运行，GID 可通过环境变量 `GID` 设置（默认 1000），建议设置为当前用户的组 ID 以避免文件权限问题
-> - 容器内创建的文件将属于 jarvis 用户，如果 GID 匹配宿主机组，外部可以直接访问，无需调整权限
-> - 配置文件（`.jarvis` 和 `.gitconfig`）会自动挂载到容器内用户的主目录
+### 主要命令
 
-**直接使用 Docker 命令：**
+| 命令 | 快捷方式 | 功能 |
+|------|----------|------|
+| `jarvis` | `jvs` | 通用 AI 代理 |
+| `jarvis-code-agent` | `jca` | 代码代理（分析、修改、生成） |
+| `jarvis-sec` | `jsec` | 安全分析套件 |
+| `jarvis-c2rust` | `jc2r` | C→Rust 迁移套件 |
+| `jarvis-git-commit` | `jgc` | 自动生成 Git 提交信息 |
+| `jarvis-platform-manager` | `jpm` | 管理大语言模型平台 |
 
-**使用非 root 用户（推荐，避免权限问题）：**
+完整命令列表见 [使用指南](docs/jarvis_book/4.使用指南.md)。
 
-```bash
-# 使用当前用户运行（推荐）
-docker run -it --rm \
-  --user "$(id -u):$(id -g)" \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/jarvis/.jarvis \
-  -v $HOME/.gitconfig:/home/jarvis/.gitconfig:ro \
-  -w /workspace \
-  ghcr.io/skyfireitdiy/jarvis:latest
-```
-
-**使用 root 用户（简单但不推荐，可能产生权限问题）：**
-
-```bash
-# 基本运行（root 用户）
-docker run -it --rm ghcr.io/skyfireitdiy/jarvis:latest
-
-# 挂载当前目录到容器（root 用户）
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/root/.jarvis \
-  -v $HOME/.gitconfig:/root/.gitconfig:ro \
-  -w /workspace \
-  ghcr.io/skyfireitdiy/jarvis:latest
-```
-
-> **注意**：使用 root 用户时，容器内创建的文件将属于 root，在宿主机上可能需要使用 `sudo` 或调整文件权限。
-
-**本地构建镜像（可选）：**
-
-```bash
-# 克隆仓库（选择以下任一方式）
-# GitHub（推荐）
-git clone https://github.com/skyfireitdiy/Jarvis.git
-
-# 或者使用 Gitee 镜像（国内访问更快）
-git clone https://gitee.com/skyfireitdiy/Jarvis.git
-
-cd Jarvis
-
-# 构建镜像
-docker build -t jarvis:latest .
-
-# 运行容器（非 root 用户，推荐）
-docker run -it --rm \
-  --user "$(id -u):$(id -g)" \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/jarvis/.jarvis \
-  -v $HOME/.gitconfig:/home/jarvis/.gitconfig:ro \
-  -w /workspace \
-  jarvis:latest
-
-# 或使用 root 用户
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/root/.jarvis \
-  -v $HOME/.gitconfig:/root/.gitconfig:ro \
-  -w /workspace \
-  jarvis:latest
-```
-
-> **提示**:
->
-> - `$(pwd)` 可以替换为其他工程目录
-> - `.gitconfig` 文件可以保留 Git 用户信息，方便在容器内使用 Git
-> - `.jarvis` 文件可以保留主机 Jarvis 配置信息，方便在容器内使用 Jarvis
-> - Docker 镜像已预装所有工具（Python 3.12、Rust、Clang、Fish shell 等），开箱即用
-> - 容器启动后会自动进入 fish shell，虚拟环境已激活
-> - 使用 `-v` 挂载目录可以方便地在容器内处理本地代码
-> - **推荐使用非 root 用户**，避免文件权限问题，容器内创建的文件可直接在宿主机访问
-> - 使用 Docker Compose 是最简单的方式，自动处理用户权限配置和文件挂载
-> - 推荐直接使用 GHCR 上的预构建镜像，无需本地构建
-
-### 基本使用
-
-Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及其快捷方式：
-
-| 命令                           | 快捷方式 | 功能描述                                                                 |
-| ------------------------------ | -------- | ------------------------------------------------------------------------ |
-| `jarvis`                       | `jvs`    | 通用AI代理，适用于多种任务（支持 -f/-c/-T/-g/-n 等参数）                 |
-| `jarvis-agent-dispatcher`      | `jvsd`   | jvs 的便捷封装，支持任务派发和交互模式                                   |
-| `jarvis-agent`                 | `ja`     | AI代理基础功能，处理会话和任务                                           |
-| `jarvis-code-agent`            | `jca`    | 专注于代码分析、修改和生成的代码代理（支持 -g/-G/-f/-T/-n/-w/-d 等参数） |
-| `jarvis-code-agent-dispatcher` | `jcad`   | jca 的便捷封装，支持任务派发和交互模式                                   |
-| `jarvis-git-commit`            | `jgc`    | 自动化分析代码变更并生成规范的Git提交信息                                |
-| `jarvis-git-squash`            | `jgs`    | Git提交历史整理工具                                                      |
-| `jarvis-platform-manager`      | `jpm`    | 管理和测试不同的大语言模型平台                                           |
-| `jarvis-tool`                  | `jt`     | 工具管理与调用系统                                                       |
-| `jarvis-methodology`           | `jm`     | 方法论知识库管理                                                         |
-| `jarvis-smart-shell`           | `jss`    | 实验性的智能Shell功能                                                    |
-| `jarvis-memory-organizer`      | `jmo`    | 记忆管理工具，支持整理、合并、导入导出记忆                               |
-| `jarvis-sec`                   | `jsec`   | 安全分析套件，结合启发式扫描和 AI 深度验证，支持 C/C++ 和 Rust 语言      |
-| `jarvis-c2rust`                | `jc2r`   | C→Rust 迁移套件，支持渐进式迁移、断点续跑和智能库替代                    |
-| `jarvis-config`                | `jcfg`   | 配置管理工具，基于 JSON Schema 动态生成配置 Web 页面，提供可视化配置界面 |
-| `jarvis-quick-config`          | `jqc`    | 快速配置 LLM 平台信息（Claude/OpenAI）到 Jarvis 配置文件的 llms 部分     |
-| `jarvis-lsp`                   | `jlsp`   | LSP 服务端，提供语言服务器协议支持                                       |
-| `jarvis-browser`               | `jb`     | 浏览器自动化工具，支持 35+ 命令和守护进程模式                            |
-| `jarvis-windows`               | `jw`     | Windows 桌面程序自动化工具，支持启动/连接应用、点击、输入、截图、控件树  |
-
-更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
-
-### SDK 快速开始
-
-Jarvis SDK 可以轻松集成到您的 Python 项目中。以下是一些快速上手的示例：
-
-#### 使用 CodeAgent 处理代码任务
+### SDK 示例
 
 ```python
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
-# 创建 CodeAgent
 agent = CodeAgent()
-
-# 执行代码修改任务
 agent.run('修复 user/service.py 中的登录验证 bug')
 ```
-
-#### 使用 Agent 构建专用应用
 
 ```python
 from jarvis import Agent
 
-# 创建定制化的 Agent
 agent = Agent(
-    system_prompt="你是一个数据分析师，专注于数据清洗和可视化。",
-    name="DataAnalyst"
+    system_prompt="你是一个专业的文档维护助手。",
+    name="DocGenerator"
 )
-
-# 执行数据分析任务
-agent.run('分析 sales.csv 数据，生成月度销售趋势图')
+agent.run('分析 README.md，补充用户群体信息')
 ```
-
-#### 在 Python 脚本中使用
-
-```python
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
-import os
-
-# 设置工作目录
-os.chdir('/path/to/your/project')
-
-# 创建并运行 Agent
-agent = CodeAgent()
-result = agent.run('优化代码性能，减少数据库查询次数')
-
-print(f"任务完成: {result}")
-```
-
-> 💡 更多 SDK 使用示例和高级用法，请参阅 [开发者文档](docs/jarvis_book/)
-
----
-
-## 🌟 核心功能 <a id="core-features"></a>
-
-Jarvis SDK 提供强大的基础组件和可扩展能力，帮助开发者快速构建专业的AI应用。
-
-### 基础组件
-
-- **Agent (通用AI代理)**: 提供完整的任务执行能力，支持工具调用、记忆管理、任务规划等核心功能。开发者只需通过 system_prompt 定义行为，即可快速定制专用Agent。
-- **CodeAgent (代码专用代理)**: 继承自 Agent，专为代码任务优化。内置代码分析、符号查找、精确编辑、构建验证等专业能力，大幅简化代码类AI应用的开发。
-
-### 工具系统
-
-- **丰富内置工具**: SDK内置 `read_code`、`edit_file`、`execute_script` 等30+工具，覆盖文件操作、代码分析、命令执行等常见场景。
-- **轻松扩展自定义工具**: 通过简单接口即可添加自定义工具，无缝集成到Agent的工具链中，实现个性化能力扩展。
-
-### 能力模块
-
-- **记忆系统**: 三层记忆架构（短期、项目长期、全局长期），支持知识持久化和智能检索，让Agent能够记住并复用关键信息。
-- **RAG增强**: 内置RAG功能，可将本地文档作为知识库，实现精准的上下文增强和问答。
-- **方法论系统**: 将成功经验沉淀为可复用的方法论，支持本地和中心化共享，提升任务执行效率。
-
-### 可扩展性
-
-- **多模型支持**: 支持 OpenAI、Claude 等多种模型平台，可根据需求灵活切换。
-- **自定义模型平台**: 提供统一的平台接口，开发者可轻松集成新的LLM提供商。
-
-### 专业套件
-
-- **安全分析**: 内置安全扫描套件（jsec），支持启发式扫描和AI深度验证，适用于C/C++和Rust语言。
-- **代码迁移**: C→Rust迁移套件（jc2r），支持渐进式迁移和断点续跑。
-- **代码审查**: 智能代码审查工具，自动化检查代码质量和潜在问题。
 
 ---
 
 ## ⚙️ 配置说明 <a id="configuration"></a>
 
-Jarvis 的主要配置文件位于 `~/.jarvis/config.yaml`。您可以在此文件中配置模型、平台和其他行为。
+配置文件位于 `~/.jarvis/config.yaml`，首次运行将启动交互式配置向导。
 
-**首次运行配置：**
-
-首次运行任何 Jarvis 命令时，系统会检测是否缺少配置文件。如果未找到配置，Jarvis 将自动启动交互式配置向导，引导您完成所有必要设置。
-
-**基本配置示例（推荐使用新的配置方式）：**
+**示例**
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/docs/schema/config.schema.json
-
-# ====== 基础配置 ======
-# 设置默认使用的模型组
 llm_group: default
 
-# ====== 模型组配置 ======
-# 可以定义多个模型组，通过llm_group切换
 llm_groups:
-  default: # 默认模型组
-    normal_llm: gpt-5 # 引用下面llms中定义的模型
-    # 可选配置廉价模型和智能模型
-    # cheap_llm: gpt-3.5-turbo
-    # smart_llm: gpt-5
+  default:
+    normal_llm: gpt-5
 
-# ====== 模型定义 ======
 llms:
   gpt-5:
-    platform: openai # 平台类型
-    model: gpt-5 # 模型名称
-    max_input_token_count: 128000 # 模型最大输入token数
-
-    # 模型特定配置 (llm_config)
+    platform: openai
+    model: gpt-5
+    max_input_token_count: 128000
     llm_config:
-      openai_api_key: "your-api-key-here" # 替换为你的API密钥
-      openai_api_base: "https://api.openai.com/v1" # API基础地址，可用于代理
-      openai_extra_headers: '{"X-Source": "jarvis"}' # 额外的HTTP头（可选）
-
-  claude-opus-4: # Claude 配置示例
-    platform: claude # 平台类型
-    model: claude-opus-4-20250514 # 模型名称
-    max_input_token_count: 200000 # 模型最大输入token数
-
-    # Claude 特定配置 (llm_config)
-    llm_config:
-      anthropic_api_key: "your-api-key-here" # 替换为你的API密钥
-      anthropic_base_url: "https://api.anthropic.com" # API基础地址，可用于代理
+      openai_api_key: "your-api-key-here"
 ```
 
-> **注意**: 推荐使用 `llm_groups` 和 `llms` 配置方式，它提供了更灵活的模型管理能力。
-
-提示：错误回溯输出控制
-
-- 默认情况下，当 PrettyOutput 打印错误信息（OutputType.ERROR）时，不会自动打印回溯调用链。
-- 如需全局启用错误回溯，请在配置中设置：
-
-```yaml
-print_error_traceback: true
-```
-
-- 也可以在单次调用时通过传入 `traceback=True` 临时开启回溯打印。
-
-提示：AI 工具筛选阈值
-
-- 当可用工具数量过多时，可能会干扰模型的决策。Jarvis 支持在可用工具数量超过阈值时，先让 AI 自动筛选相关工具再启动，以专注于本次任务。
-- 默认阈值为 30，可在配置中调整：
-
-```yaml
-# ~/.jarvis/config.yaml
-tool_filter_threshold: 30
-```
-
-Jarvis 支持多种平台，包括 **OpenAI**、**Claude** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
-
-> **模型推荐**: 目前效果较好的模型是 `claude-opus-4-20250514`，可以通过国内代理商购买，例如 [FoxiAI](https://foxi-ai.top)。
+更多配置项见 [使用指南](docs/jarvis_book/4.使用指南.md)。
 
 ---
 
 ## 🛠️ 扩展开发 <a id="extensions"></a>
 
-Jarvis SDK 提供强大的可扩展能力，让您能够快速开发专业的AI应用。
+- **自定义工具**：在 `~/.jarvis/tools/` 下创建并注册
+- **新 LLM 平台**：在 `~/.jarvis/platforms/` 下添加适配器
+- **MCP 集成**：通过配置文件接入命令协议
 
-### 快速开发专业Agent
-
-基于 `Agent` 和 `CodeAgent` 基础组件，您可以快速构建各种专业Agent：
-
-- **文档助手**: 基于 Agent 定制 system_prompt，实现文档生成、维护和优化
-- **代码分析器**: 基于 CodeAgent，利用内置代码分析能力，快速构建代码审查、重构工具
-- **自动化测试**: 集成测试工具，自动化执行测试用例并分析结果
-- **数据处理**: 扩展数据处理工具，实现自动化数据清洗、转换和分析
-
-### 扩展能力
-
-- **自定义工具**: 在 `~/.jarvis/tools/` 目录下创建新的工具实现，无缝集成到Agent
-- **集成新LLM平台**: 在 `~/.jarvis/platforms/` 目录下添加新的平台适配器
-- **定义MCP**: 通过配置文件集成外部或自定义的命令协议
-
-有关扩展开发的详细指南和[**技术细节**](docs/technical_documentation.md)，请访问我们的 [**开发者文档**](docs/jarvis_book/5.功能扩展.md)。
+详见 [功能扩展](docs/jarvis_book/5.功能扩展.md)。
 
 ---
 
 ## 📖 Jarvis Book <a id="jarvis-book"></a>
 
-欢迎阅读 Jarvis 的官方文档，这本开源书籍旨在为您提供从入门到精通的全方位指南。
-
-- **[第一章：项目介绍](docs/jarvis_book/1.项目介绍.md)**
-- **[第二章：快速开始](docs/jarvis_book/2.快速开始.md)**
-- **[第三章：核心概念与架构](docs/jarvis_book/3.核心概念与架构.md)**
-- **[第四章：使用指南](docs/jarvis_book/4.使用指南.md)**
-- **[第五章：功能扩展](docs/jarvis_book/5.功能扩展.md)**
-- **[第六章：高级主题](docs/jarvis_book/6.高级主题.md)**
-- **[第七章：参与贡献](docs/jarvis_book/7.参与贡献.md)**
-- **[第八章：常见问题](docs/jarvis_book/8.常见问题.md)**
-- **[第九章：附录](docs/jarvis_book/9.附录.md)**
+[项目介绍](docs/jarvis_book/1.项目介绍.md) · [快速开始](docs/jarvis_book/2.快速开始.md) · [核心概念与架构](docs/jarvis_book/3.核心概念与架构.md) · [使用指南](docs/jarvis_book/4.使用指南.md) · [功能扩展](docs/jarvis_book/5.功能扩展.md) · [高级主题](docs/jarvis_book/6.高级主题.md) · [参与贡献](docs/jarvis_book/7.参与贡献.md) · [常见问题](docs/jarvis_book/8.常见问题.md)
 
 ---
 
 ## 🤝 贡献指南 <a id="contributing"></a>
 
-我们欢迎任何形式的贡献！
-
-Jarvis 在 GitHub 和 Gitee 都有镜像仓库，您可以选择其中任一平台进行贡献：
+欢迎贡献！仓库镜像：
 
 - **GitHub**: https://github.com/skyfireitdiy/Jarvis.git
 - **Gitee**: https://gitee.com/skyfireitdiy/Jarvis.git
 
-1. Fork 本仓库（选择您偏好的平台）
-2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个 Pull Request
+1. Fork 仓库
+2. 创建特性分支：`git checkout -b feature/AmazingFeature`
+3. 提交更改：`git commit -m 'Add some AmazingFeature'`
+4. 推送分支：`git push origin feature/AmazingFeature`
+5. 开启 Pull Request
 
 ---
 
 ## ⚠️ 免责声明 <a id="disclaimer"></a>
 
-- **模型使用风险**: 请确保您在使用各模型平台时遵守其服务条款。合理使用，并自行承担相应风险。
-- **命令执行风险**: Jarvis具备执行系统命令的能力。请确保您了解将要执行的命令，并避免输入可能导致系统风险的指令。为了增强安全性，您可以在配置文件中启用工具执行确认（`execute_tool_confirm: true`），以便在执行每个工具前进行手动确认。
+- **模型使用**：请遵守各模型平台服务条款，合理使用。
+- **命令执行**：Jarvis 具备执行系统命令能力，请谨慎输入；可启用 `execute_tool_confirm: true` 进行执行前确认。
 
 ---
 
 ## 📄 许可证 <a id="license"></a>
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+MIT 许可证，详见 [LICENSE](LICENSE)。
 
 ---
 
