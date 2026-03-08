@@ -77,8 +77,6 @@ COMMAND_MAPPING = {
     "jpm": "jarvis-platform-manager",
     # Git提交
     "jgc": "jarvis-git-commit",
-    # 代码审查
-    "jcr": "jarvis-code-review",
     # Git压缩
     "jgs": "jarvis-git-squash",
     # 代理

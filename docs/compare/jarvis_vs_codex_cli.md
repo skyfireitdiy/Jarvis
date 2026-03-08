@@ -45,7 +45,7 @@
 
 ### 2. 命令体系
 
-#### Jarvis CLI 命令列表（20个核心命令）
+#### Jarvis CLI 命令列表（19个核心命令）
 
 | 命令                           | 快捷方式 | 功能描述                   |
 | ------------------------------ | -------- | -------------------------- |
@@ -54,7 +54,6 @@
 | `jarvis-agent`                 | `ja`     | AI 代理基础功能            |
 | `jarvis-code-agent`            | `jca`    | 代码分析、修改和生成       |
 | `jarvis-code-agent-dispatcher` | `jcad`   | 代码任务派发               |
-| `jarvis-code-review`           | `jcr`    | 智能代码审查               |
 | `jarvis-git-commit`            | `jgc`    | 生成 Git 提交信息          |
 | `jarvis-git-squash`            | `jgs`    | Git 提交历史整理           |
 | `jarvis-platform-manager`      | `jpm`    | 管理大语言模型平台         |
