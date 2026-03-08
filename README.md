@@ -163,6 +163,7 @@ docker-compose run --rm jarvis
 | `jarvis-c2rust`           | `jc2r`   | C→Rust 迁移套件              |
 | `jarvis-git-commit`       | `jgc`    | 自动生成 Git 提交信息        |
 | `jarvis-platform-manager` | `jpm`    | 管理大语言模型平台           |
+| `jarvis-quick-config`     | `jqc`    | 快速配置工具                 |
 
 完整命令列表见 [使用指南](docs/jarvis_book/4.使用指南.md)。
 
