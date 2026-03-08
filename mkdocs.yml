@@ -37,6 +37,13 @@ nav:
       - jarvis_config.md
   - 对比分析:
       - Jarvis vs Codex CLI: compare/jarvis_vs_codex_cli.md
+  - 技术文档:
+      - 技术概览: technical/README.md
+      - 实现细节: technical/implementation/README.md
+      - 上下文压缩策略: technical/implementation/context_compression_strategies.md
+      - 上下文压缩流程: technical/implementation/context_compression_flow.md
+  - 竞赛资料:
+      - 智锻代码·开源鸿蒙全球AI Agent代码生成挑战赛-技术报告: 智锻代码·开源鸿蒙全球AI Agent代码生成挑战赛-资料归档/智锻代码·开源鸿蒙全球AI Agent代码生成挑战赛-技术报告.md
 
 # Theme configuration
 theme:
