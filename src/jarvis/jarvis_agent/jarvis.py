@@ -106,7 +106,6 @@ def print_commands_overview() -> None:
             "jcad",
             "jca 的便捷封装，支持任务派发和交互模式",
         )
-        cmd_table.add_row("jarvis-code-review", "jcr", "智能代码审查工具")
         cmd_table.add_row(
             "jarvis-git-commit",
             "jgc",
@@ -118,6 +117,11 @@ def print_commands_overview() -> None:
             "jcfg",
             "配置管理工具，基于 JSON Schema 动态生成配置 Web 页面",
         )
+        cmd_table.add_row("jarvis-quick-config", "jqc", "快速配置 LLM 平台")
+        cmd_table.add_row("jarvis-lsp", "jlsp", "LSP 语言服务器")
+        cmd_table.add_row("jarvis-browser", "jb", "浏览器自动化")
+        cmd_table.add_row("jarvis-windows", "jw", "Windows GUI 自动化")
+        cmd_table.add_row("jarvis-rules-index", "jri", "规则索引管理")
         cmd_table.add_row(
             "jarvis-platform-manager",
             "jpm",
