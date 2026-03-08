@@ -45,10 +45,10 @@ class PostProcessManager:
                 if not os.path.exists(abs_file_path):
                     continue
 
-                # 执行变更后处理命令
+                # 执行变更后处理命令（command来自配置文件）
                 result = subprocess.run(
                     command,
-                    shell=True,
+                    shell=True,  # nosec B602
                     cwd=self.root_dir,
                     capture_output=True,
                     text=True,

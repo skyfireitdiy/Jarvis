@@ -96,7 +96,9 @@ class LSPDaemon:
             try:
                 loop = asyncio.get_running_loop()
                 for sig in (signal.SIGTERM, signal.SIGINT):
-                    loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+                    loop.add_signal_handler(
+                        sig, lambda: asyncio.create_task(self.stop())
+                    )
             except NotImplementedError:
                 pass
 
@@ -961,8 +963,8 @@ class LSPDaemon:
         }
         return result
 
-    async def callers_by_name(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """查询指定函数内部调用了哪些其他函数"""
+    async def callees_by_name(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """查询指定函数内部调用了哪些其他函数（outgoing calls）"""
         language = params.get("language")
         project_path = params.get("project_path")
         file_path = params.get("file_path")

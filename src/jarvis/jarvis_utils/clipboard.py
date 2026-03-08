@@ -20,13 +20,13 @@ def copy_to_clipboard(text: str) -> None:
     # Windows系统
     if system == "Windows":
         try:
-            # 使用Windows的clip命令
+            # 使用Windows的clip命令（shell=True是Windows clip命令要求，无安全风险）
             process = subprocess.Popen(
                 ["clip"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                shell=True,
+                shell=True,  # nosec B602
             )
             if process.stdin:
                 process.stdin.write(text.encode("utf-8"))

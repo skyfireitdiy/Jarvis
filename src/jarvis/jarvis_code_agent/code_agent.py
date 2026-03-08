@@ -59,7 +59,6 @@ from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
 from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
-from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tag import ot
@@ -1537,9 +1536,7 @@ def cli(
     # worktree 模式下不需要创建文件锁，因为 worktree 本身就是为了隔离不同任务
     if not worktree:
         try:
-            lock_name = (
-                f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
-            )
+            lock_name = f"code_agent_{hashlib.md5(repo_root.encode('utf-8'), usedforsecurity=False).hexdigest()}.lock"
             _acquire_single_instance_lock(lock_name=lock_name)
         except Exception:
             # 回退到全局锁，确保至少有互斥保护

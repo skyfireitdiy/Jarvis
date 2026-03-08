@@ -18,7 +18,6 @@ from jarvis.jarvis_c2rust.optimizer_utils import cargo_check_full
 from jarvis.jarvis_c2rust.optimizer_utils import check_missing_safety_doc_warnings
 from jarvis.jarvis_c2rust.optimizer_utils import run_cargo_fmt
 from jarvis.jarvis_c2rust.agent_factory import create_code_agent
-from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 
 
 class UnsafeOptimizer:

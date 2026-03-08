@@ -25,7 +25,6 @@ from jarvis.jarvis_c2rust.optimizer_utils import run_cmd
 
 # 使用抽象接口，解耦对具体实现的依赖
 from jarvis.jarvis_c2rust.agent_factory import create_code_agent
-from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 
 
 class ClippyOptimizer:

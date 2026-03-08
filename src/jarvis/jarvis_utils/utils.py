@@ -1600,8 +1600,8 @@ def get_file_md5(filepath: str) -> str:
     返回:
         str: 文件内容的MD5哈希值（为降低内存占用，仅读取前100MB进行计算）
     """
-    # 采用流式读取，避免一次性加载100MB到内存
-    h = hashlib.md5()
+    # 采用流式读取，避免一次性加载100MB到内存（MD5用于文件校验，非安全用途）
+    h = hashlib.md5(usedforsecurity=False)
     max_bytes = 100 * 1024 * 1024  # 与原实现保持一致：仅读取前100MB
     buf_size = 8 * 1024 * 1024  # 8MB缓冲
     read_bytes = 0

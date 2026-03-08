@@ -944,9 +944,7 @@ class PrettyOutput:
         from rich.panel import Panel
 
         terminal_width = console.width
-        content_width = max(
-            len(str(line)) for line in str(content).split("\n")
-        )
+        content_width = max(len(str(line)) for line in str(content).split("\n"))
         panel_width = max(terminal_width * 2 // 3, content_width)
         welcome_panel = Panel(
             content,
@@ -1003,7 +1001,6 @@ class PrettyOutput:
 
         from jarvis.jarvis_utils.config import get_conversation_turn_threshold
         from jarvis.jarvis_utils.config import is_immediate_abort
-        from jarvis.jarvis_utils.globals import get_interrupt
 
         first_chunk = None
         first_token_time = 0.0
@@ -1043,7 +1040,11 @@ class PrettyOutput:
                 if max_tokens > 0:
                     usage_percent = (total_tokens / max_tokens) * 100
                     percent_color = (
-                        "red" if usage_percent >= 90 else "yellow" if usage_percent >= 80 else "green"
+                        "red"
+                        if usage_percent >= 90
+                        else "yellow"
+                        if usage_percent >= 80
+                        else "green"
                     )
                     progress_bar = _format_progress_bar(usage_percent, width=15)
                     return usage_percent, percent_color, progress_bar
@@ -1118,7 +1119,12 @@ class PrettyOutput:
         with Live(panel, refresh_per_second=10, transient=True) as live:
 
             def _update_panel_content(content: str, update_subtitle: bool = False):
-                nonlocal response, last_subtitle_update_time, update_count, text_content, panel
+                nonlocal \
+                    response, \
+                    last_subtitle_update_time, \
+                    update_count, \
+                    text_content, \
+                    panel
 
                 current_text = text_content.plain
                 new_content = current_text + content
@@ -1157,7 +1163,8 @@ class PrettyOutput:
                     should_update_subtitle = (
                         update_subtitle
                         or update_count % 10 == 0
-                        or (current_time - last_subtitle_update_time) >= subtitle_update_interval
+                        or (current_time - last_subtitle_update_time)
+                        >= subtitle_update_interval
                     )
 
                     if should_update_subtitle:

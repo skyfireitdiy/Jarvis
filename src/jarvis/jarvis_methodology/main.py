@@ -69,7 +69,9 @@ def import_methodology(
 
         # 保存合并后的方法论
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
+            safe_filename = hashlib.md5(
+                problem_type.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
@@ -326,7 +328,9 @@ def extract_methodology(
 
         # 保存合并后的方法论
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
+            safe_filename = hashlib.md5(
+                problem_type.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
@@ -445,7 +449,9 @@ def extract_methodology_from_url(
 
         # 保存合并后的方法论
         for problem_type, content in merged_data.items():
-            safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
+            safe_filename = hashlib.md5(
+                problem_type.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:

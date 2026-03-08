@@ -27,7 +27,8 @@ def execute_command(command: str, should_run: bool) -> None:
     """Print command without execution"""
     PrettyOutput.auto_print(command)
     if should_run:
-        os.system(command)
+        # 核心功能：执行shell命令（用户提供）
+        os.system(command)  # nosec B605
 
 
 def _get_config_file() -> str:
