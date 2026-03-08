@@ -148,52 +148,7 @@ date +%Y-%m-%d
 
 **预期输出：** 日期字符串（如 `2026-01-12`）
 
-### 操作3：检查wechat.png文件修改时间
-
-> ⚠️ **重要**：此检查必须在更新ReleaseNote前完成。如果wechat.png修改时间超过7天，必须先更新该文件，否则拒绝更新。
-
-**执行步骤：**
-
-1. 检查文件是否存在：
-
-```bash
-ls -lh docs/images/wechat.png
-```
-
-1. 获取文件修改时间（Unix时间戳）：
-
-```bash
-stat -c %Y docs/images/wechat.png
-```
-
-1. 获取当前时间戳：
-
-```bash
-date +%s
-```
-
-1. 计算文件修改天数：
-
-```python
-# 使用Python计算天数差
-import time
-
-file_mtime = int(<文件修改时间戳>)
-current_time = int(<当前时间戳>)
-days_diff = (current_time - file_mtime) // 86400
-print(f"wechat.png修改天数: {days_diff}天")
-```
-
-1. 判断检查结果：
-   - 如果 `days_diff > 7`：**拒绝更新**，提示用户：`⚠️ wechat.png文件已超过{days_diff}天未更新，请先更新该文件后再进行ReleaseNote更新`
-   - 如果 `days_diff <= 7`：继续执行后续操作
-
-**预期输出：**
-
-- 文件存在且修改时间未超过7天：继续流程
-- 文件不存在或修改时间超过7天：停止流程并提示更新
-
-### 操作4：运行pytest测试
+### 操作3：运行pytest测试
 
 > ⚠️ **重要**：此步骤确保所有测试用例通过，否则禁止发布。必须在获取代码变更前完成。
 
@@ -226,7 +181,7 @@ pytest -v --tb=short
 - 测试全部通过：继续流程
 - 测试失败：停止流程并禁止发布
 
-### 操作5：获取代码变更
+### 操作4：获取代码变更
 
 **执行步骤：**
 
@@ -247,7 +202,7 @@ git diff <latest_tag> HEAD
 - `<latest_tag>` 替换为操作1获取的版本号
 - 如果输出过大，可以限制行数（如 `| head -n 500`）
 
-### 操作6：学习ReleaseNote格式
+### 操作5：学习ReleaseNote格式
 
 **执行步骤：**
 
@@ -266,7 +221,7 @@ head -n 200 {{ git_root_dir }}/ReleaseNote.md
 
 2. **特别注意**：参考历史版本时，重点关注用户视角和内容简洁性，不要包含技术细节
 
-### 操作7：生成新版本ReleaseNote
+### 操作6：生成新版本ReleaseNote
 
 **执行步骤：**
 
@@ -319,7 +274,7 @@ else:
   - 确保git历史清晰可读
 - ⚠️ **重要：在edit_file更新ReleaseNote.md后，立即使用jgs <起始commit_id>提交，不要让edit_file的自动提交保留在git历史中**
 
-### 操作8：执行版本发布
+### 操作7：执行版本发布
 
 > ⚠️ **重要**：此步骤在ReleaseNote更新完成后执行，用于完成完整的版本发布流程。
 
@@ -378,7 +333,7 @@ jgs <保存的commit id>
 - [ ] 当前commit id已记录（必须在第一步执行）
 - [ ] 最新版本号获取成功（格式正确：vX.Y.Z）
 - [ ] 日期获取成功（格式正确：YYYY-MM-DD）
-- [ ] wechat.png修改时间检查通过（未超过7天）
+
 - [ ] pytest测试全部通过（无失败用例）
 - [ ] 代码变更已获取（使用了git diff而非git log）
 - [ ] ReleaseNote格式已学习（了解分类和图标使用）
@@ -435,7 +390,7 @@ jgs <保存的commit id>
 
 ### Q5：ReleaseNote内容如何生成？
 
-根据操作4获取的代码变更，结合操作5学习的格式，人工分析并生成ReleaseNote内容。
+根据操作3获取的代码变更，结合操作4学习的格式，人工分析并生成ReleaseNote内容。
 
 **关键要点**：
 
@@ -443,10 +398,6 @@ jgs <保存的commit id>
 2. 使用**用户视角**重写功能描述（参考 3.1 节）
 3. 每个条目控制在 2-3 个子条目，突出核心价值
 4. 参考历史版本格式，保持风格一致
-
-### Q6：为什么要检查wechat.png文件的修改时间？
-
-为确保项目宣传材料的时效性，要求 `docs/images/wechat.png` 文件必须在7天内更新过。如果文件修改时间超过7天，必须先更新该文件（如截图新的二维码、更新联系信息等），否则拒绝更新ReleaseNote。
 
 ## 相关资源
 
