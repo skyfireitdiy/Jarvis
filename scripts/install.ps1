@@ -199,28 +199,4 @@ switch ($INSTALL_TYPE) {
     }
 }
 
-Write-Host "`n--- 6. Install command completion (optional) ---" -ForegroundColor Green
-Write-Host "You can install command-line auto-completion for common commands to improve efficiency."
-$choice = Read-Host "Would you like to install command-line auto-completion? [y/N]"
-if ($choice -eq 'y' -or $choice -eq 'Y') {
-    Write-Host "Installing auto-completion..."
 
-    # Install completion for all tools
-    $tools = @("jvs", "jvsd", "ja", "jca", "jcad", "jgc", "jgs", "jsec", "jc2r", "jpm", "jt", "jm", "jss", "jmo")
-    foreach ($tool in $tools) {
-        Write-Host "Installing auto-completion for $tool..."
-        try {
-            & $tool --install-completion | Out-Null
-            Write-Host "$tool auto-completion installed successfully." -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Warning: $tool auto-completion installation failed." -ForegroundColor Yellow
-        }
-    }
-
-    Write-Host "Auto-completion installation has been attempted for all tools."
-    Write-Host "Please restart your PowerShell session for changes to take effect."
-}
-else {
-    Write-Host "Skipping auto-completion installation."
-}
