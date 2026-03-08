@@ -323,7 +323,10 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
-    session: PromptSession[Any] = PromptSession(history=None)
+    history_dir = get_data_dir()
+    session: PromptSession[Any] = PromptSession(
+        history=FileHistory(os.path.join(history_dir, "single_line_input_history"))
+    )
     style = PromptStyle.from_dict(
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
