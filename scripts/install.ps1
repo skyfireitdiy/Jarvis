@@ -59,144 +59,68 @@ Write-Host "Found uv: $(uv --version)"
 $GITEE_URL = "https://gitee.com/skyfireitdiy/Jarvis.git"
 $GITHUB_URL = "https://github.com/skyfireitdiy/Jarvis.git"
 $DEST_DIR = "$env:USERPROFILE\Jarvis"
-$VENV_DIR = "$DEST_DIR\.venv"
 
-Write-Host "`n--- 2. Select installation method ---" -ForegroundColor Green
-Write-Host "Please select installation method:"
-Write-Host "  1) Direct install (recommended) - Fast and simple, no source code download"
-Write-Host "  2) Clone install - Download source code locally for viewing and modification"
-$choice = Read-Host "Please enter your choice [1/2, default 1]"
-$INSTALL_TYPE = "direct"
-switch ($choice) {
-    "2" {
-        $INSTALL_TYPE = "clone"
-        Write-Host "Selected: Clone install (source will be downloaded to $DEST_DIR)" -ForegroundColor Yellow
-    }
-    default {
-        Write-Host "Selected: Direct install (fast, no source code)" -ForegroundColor Yellow
-    }
-}
-
-Write-Host "`n--- 3. Clone or update Jarvis repository ---" -ForegroundColor Green
-if ($INSTALL_TYPE -eq "clone") {
-    if (Test-Path $DEST_DIR) {
-        Write-Host "Directory $DEST_DIR exists, checking for updates..."
+Write-Host "`n--- 2. Clone or update Jarvis repository ---" -ForegroundColor Green
+if (Test-Path $DEST_DIR) {
+    Write-Host "Directory $DEST_DIR exists" -ForegroundColor Yellow
+    
+    # Check if it's a git repository
+    if (Test-Path "$DEST_DIR\.git") {
+        Write-Host "Detected existing Jarvis source code repository" -ForegroundColor Cyan
         Push-Location $DEST_DIR
+        
+        # Check for uncommitted changes
         $status = git status --porcelain
         if ($status) {
             $choice = Read-Host "Detected uncommitted changes in '$DEST_DIR', discard changes and update? [y/N]"
             if ($choice -eq 'y' -or $choice -eq 'Y') {
-                Write-Host "Discarding changes..."
+                Write-Host "Discarding changes..." -ForegroundColor Yellow
                 git checkout .
-                Write-Host "Pulling latest code..."
+                Write-Host "Pulling latest code..." -ForegroundColor Yellow
                 git pull
             }
             else {
-                Write-Host "Skipping update to preserve uncommitted changes."
+                Write-Host "Keeping uncommitted changes, skipping update." -ForegroundColor Yellow
             }
         }
         else {
-            Write-Host "Pulling latest code..."
+            Write-Host "Pulling latest code..." -ForegroundColor Yellow
             git pull
         }
         Pop-Location
     }
     else {
-        Write-Host "Cloning repository to $DEST_DIR..."
-        # Try Gitee mirror first, fallback to GitHub
+        Write-Host "Warning: '$DEST_DIR' exists but is not a git repository" -ForegroundColor Red
+        Write-Host "Please manually backup or delete this directory and run the installer again," -ForegroundColor Yellow
+        Write-Host "or run 'uv tool install -e .' in that directory directly." -ForegroundColor Yellow
+        exit 1
+    }
+}
+else {
+    Write-Host "Cloning repository to $DEST_DIR..." -ForegroundColor Yellow
+    # Try Gitee mirror first, fallback to GitHub
+    try {
+        git clone $GITEE_URL $DEST_DIR
+        Write-Host "Gitee mirror clone successful" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Gitee mirror clone failed, trying from GitHub..." -ForegroundColor Yellow
         try {
-            git clone $GITEE_URL $DEST_DIR
-            Write-Host "Gitee mirror clone successful" -ForegroundColor Green
+            git clone $GITHUB_URL $DEST_DIR
+            Write-Host "GitHub clone successful" -ForegroundColor Green
         }
         catch {
-            Write-Host "Gitee mirror clone failed, trying from GitHub..." -ForegroundColor Yellow
-            try {
-                git clone $GITHUB_URL $DEST_DIR
-                Write-Host "GitHub clone successful" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "GitHub clone also failed, please check network connection or download manually." -ForegroundColor Red
-                exit 1
-            }
+            Write-Host "GitHub clone also failed, please check network connection or download manually." -ForegroundColor Red
+            exit 1
         }
     }
 }
 
-Write-Host "`n--- 4. Globally install Jarvis ---" -ForegroundColor Green
+Write-Host "`n--- 3. Install Jarvis from source ---" -ForegroundColor Green
+Set-Location $DEST_DIR
+Write-Host "Installing project using uv from source..." -ForegroundColor Yellow
+uv tool install -e .
 
-Write-Host "Installing project and dependencies using uv globally..."
-
-$ragChoice = Read-Host "Install RAG features? (This will install heavy dependencies like PyTorch) [y/N]"
-
-switch ($INSTALL_TYPE) {
-    "clone" {
-        Set-Location $DEST_DIR
-        switch ($ragChoice) {
-            { $_ -eq 'y' -or $_ -eq 'Y' } {
-                Write-Host "Installing core features and RAG dependencies from local..."
-                uv tool install '.[rag]'
-            }
-            default {
-                Write-Host "Installing core features from local..."
-                uv tool install .
-            }
-        }
-    }
-    "direct" {
-        switch ($ragChoice) {
-            { $_ -eq 'y' -or $_ -eq 'Y' } {
-                Write-Host "Installing core features and RAG dependencies from repository..."
-                # Try Gitee first, fallback to GitHub
-                try {
-                    uv tool install "git+$GITEE_URL[rag]"
-                    Write-Host "Installed from Gitee successfully" -ForegroundColor Green
-                }
-                catch {
-                    Write-Host "Gitee installation failed, trying from GitHub..." -ForegroundColor Yellow
-                    try {
-                        uv tool install "git+$GITHUB_URL[rag]"
-                        Write-Host "Installed from GitHub successfully" -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "GitHub installation also failed, please check network connection." -ForegroundColor Red
-                        exit 1
-                    }
-                }
-            }
-            default {
-                Write-Host "Installing core features from repository..."
-                # Try Gitee first, fallback to GitHub
-                try {
-                    uv tool install "git+$GITEE_URL"
-                    Write-Host "Installed from Gitee successfully" -ForegroundColor Green
-                }
-                catch {
-                    Write-Host "Gitee installation failed, trying from GitHub..." -ForegroundColor Yellow
-                    try {
-                        uv tool install "git+$GITHUB_URL"
-                        Write-Host "Installed from GitHub successfully" -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "GitHub installation also failed, please check network connection." -ForegroundColor Red
-                        exit 1
-                    }
-                }
-            }
-        }
-    }
-}
-
-Write-Host "`n--- 5. Installation complete! ---" -ForegroundColor Green
-switch ($INSTALL_TYPE) {
-    "clone" {
-        Write-Host "Jarvis has been globally installed successfully! You can now use the jarvis command directly."
-        Write-Host "Source code has been downloaded to: $DEST_DIR"
-    }
-    "direct" {
-        Write-Host "Jarvis has been globally installed successfully! You can now use the jarvis command directly."
-        Write-Host "Note: Using direct install method, source code is not downloaded locally."
-        Write-Host "To view or modify the source code, manually clone the repository: git clone $GITHUB_URL"
-    }
-}
-
-
+Write-Host "`n--- 4. Installation complete! ---" -ForegroundColor Green
+Write-Host "Jarvis has been globally installed successfully! You can now use the jarvis command directly." -ForegroundColor Cyan
+Write-Host "Source directory: $DEST_DIR" -ForegroundColor Cyan
