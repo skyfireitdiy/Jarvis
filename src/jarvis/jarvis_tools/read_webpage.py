@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
+import subprocess
+import sys
 from typing import Any
 from typing import Dict
 
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 from markdownify import markdownify as md
+
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 # 降级方案依赖
 try:
@@ -16,6 +22,7 @@ except ImportError:
 
 from jarvis.jarvis_utils.config import calculate_content_token_limit
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -34,6 +41,74 @@ class WebpageTool:
         },
         "required": ["url"],
     }
+
+    def __init__(self) -> None:
+        self._ensure_playwright_ready(prompt_user=True)
+
+    @staticmethod
+    def _install_playwright_package() -> bool:
+        PrettyOutput.auto_print("🔧 检测到 Playwright Python 包未安装，正在自动安装...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "playwright"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            PrettyOutput.auto_print("✅ Playwright Python 包安装成功！")
+            return True
+        except subprocess.CalledProcessError as e:
+            PrettyOutput.auto_print(f"❌ Playwright Python 包安装失败: {e.stderr or e}")
+            return False
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 安装 Playwright Python 包时发生错误: {e}")
+            return False
+
+    @staticmethod
+    def _ensure_playwright_ready(prompt_user: bool = False) -> bool:
+        global sync_playwright
+
+        if sync_playwright is None:
+            PrettyOutput.auto_print("⚠️ Playwright Python包未安装")
+            if prompt_user and not user_confirm(
+                "是否现在自动安装 playwright 和 chromium？", default=True
+            ):
+                return False
+            if not WebpageTool._install_playwright_package():
+                return False
+            try:
+                from playwright.sync_api import (
+                    sync_playwright as imported_sync_playwright,
+                )
+
+                sync_playwright = imported_sync_playwright
+            except ImportError:
+                return False
+
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                browser.close()
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            if "executable doesn't exist" in error_msg or "driver" in error_msg.lower():
+                PrettyOutput.auto_print("⚠️ 检测到浏览器驱动未安装")
+                if prompt_user and not user_confirm(
+                    "是否现在自动安装 Chromium 浏览器驱动？", default=True
+                ):
+                    return False
+                try:
+                    from jarvis.scripts.install_playwright import install_chromium
+
+                    install_chromium()
+                    return WebpageTool._ensure_playwright_ready(prompt_user=False)
+                except SystemExit:
+                    return False
+                except Exception as install_error:
+                    PrettyOutput.auto_print(f"❌ 自动安装失败: {install_error}")
+                    return False
+            return False
 
     @staticmethod
     def _process_html_for_text_mode(html: str) -> str:
@@ -73,6 +148,9 @@ class WebpageTool:
 
             # 使用 Playwright 无头浏览器抓取网页内容
             try:
+                if not self._ensure_playwright_ready(prompt_user=True):
+                    raise ImportError("Playwright not available")
+
                 with sync_playwright() as p:
                     # 启动无头浏览器
                     browser = p.chromium.launch(headless=True)
@@ -246,50 +324,18 @@ class WebpageTool:
 
     @staticmethod
     def check() -> bool:
-        """工具可用性检查：检查Playwright或requests降级方案是否可用。
-
-        优先检查Playwright，如果不可用则检查requests降级方案。
-        如果浏览器驱动未安装，会自动尝试安装。
-
-        Returns:
-            bool: 工具是否可用（Playwright或requests至少一个可用）
-        """
-        # 首先尝试 Playwright
-        try:
-            from playwright.sync_api import sync_playwright
-
-            with sync_playwright() as p:
-                browser = p.chromium.launch()
-                browser.close()
+        """工具可用性检查：检查Playwright或requests降级方案是否可用。"""
+        if WebpageTool._ensure_playwright_ready(prompt_user=False):
             return True
-        except ImportError:
-            PrettyOutput.auto_print("⚠️ Playwright Python包未安装")
-        except Exception as e:
-            error_msg = str(e)
-            # 检测是否是浏览器驱动未安装
-            if "executable doesn't exist" in error_msg or "driver" in error_msg.lower():
-                PrettyOutput.auto_print("🔧 检测到浏览器驱动未安装，正在自动安装...")
-                try:
-                    from jarvis.scripts.install_playwright import install_chromium
 
-                    install_chromium()
-                    PrettyOutput.auto_print("✅ 浏览器驱动安装成功，正在重试...")
-                    # 重试检查
-                    return WebpageTool.check()
-                except Exception as install_error:
-                    PrettyOutput.auto_print(f"❌ 自动安装失败: {install_error}")
-            else:
-                PrettyOutput.auto_print(f"⚠️ Playwright 运行时错误: {e}")
-
-        # Playwright 不可用，检查降级方案
         if REQUESTS_AVAILABLE:
             PrettyOutput.auto_print(
                 "✅ requests 降级方案可用（不支持JavaScript动态渲染）"
             )
             return True
-        else:
-            PrettyOutput.auto_print("❌ Playwright 和 requests 均不可用")
-            PrettyOutput.auto_print("💡 请安装至少一个方案：")
-            PrettyOutput.auto_print("   - pip install playwright")
-            PrettyOutput.auto_print("   - pip install requests beautifulsoup4")
-            return False
+
+        PrettyOutput.auto_print("❌ Playwright 和 requests 均不可用")
+        PrettyOutput.auto_print("💡 请安装至少一个方案：")
+        PrettyOutput.auto_print("   - pip install playwright")
+        PrettyOutput.auto_print("   - pip install requests beautifulsoup4")
+        return False
