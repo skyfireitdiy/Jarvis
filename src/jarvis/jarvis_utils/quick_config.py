@@ -5,7 +5,7 @@ Quick Config CLI 工具
 """
 
 import json
-import yaml  # type: ignore[import-untyped]
+import yaml
 from pathlib import Path
 from typing import Optional
 import typer
@@ -221,25 +221,34 @@ def quick_config(
         else:
             PrettyOutput.auto_print("⚠️  将保存配置（未通过测试）")
 
-    # 输入默认最大token数
+    # 为每个实际使用的模型分别输入最大token数；同一模型被多个角色复用时只设置一次
     default_max_tokens = 128000
-    while True:
-        max_tokens_input = get_single_line_input(
-            f"请输入默认最大token数 (默认: {default_max_tokens}):"
-        )
-        if not max_tokens_input.strip():
-            max_tokens = default_max_tokens
-            PrettyOutput.auto_print(f"✅ 使用默认最大token数: {max_tokens}")
-            break
-        try:
-            max_tokens = int(max_tokens_input.strip())
-            if max_tokens <= 0:
-                PrettyOutput.auto_print("❌ 最大token数必须为正整数")
-                continue
-            PrettyOutput.auto_print(f"✅ 设置最大token数为: {max_tokens}")
-            break
-        except ValueError:
-            PrettyOutput.auto_print("❌ 请输入有效的正整数")
+    unique_role_models = list(dict.fromkeys([normal_model, smart_model, cheap_model]))
+    model_max_tokens = {}
+
+    for model in unique_role_models:
+        while True:
+            max_tokens_input = get_single_line_input(
+                f"请输入模型 {model} 的最大token数 (默认: {default_max_tokens}):"
+            )
+            if not max_tokens_input.strip():
+                model_max_tokens[model] = default_max_tokens
+                PrettyOutput.auto_print(
+                    f"✅ 模型 {model} 使用默认最大token数: {default_max_tokens}"
+                )
+                break
+            try:
+                max_tokens = int(max_tokens_input.strip())
+                if max_tokens <= 0:
+                    PrettyOutput.auto_print("❌ 最大token数必须为正整数")
+                    continue
+                model_max_tokens[model] = max_tokens
+                PrettyOutput.auto_print(
+                    f"✅ 模型 {model} 最大token数设置为: {max_tokens}"
+                )
+                break
+            except ValueError:
+                PrettyOutput.auto_print("❌ 请输入有效的正整数")
 
     # 设置默认输出文件
     if output_file is None:
@@ -273,8 +282,8 @@ def quick_config(
 
     model_config_names = {}
 
-    # 为每个选择的模型创建配置
-    for i, model in enumerate(selected_models):
+    # 为每个实际使用的模型创建配置
+    for model in unique_role_models:
         # 统一使用配置名称+模型名的方式避免命名冲突，保持单模型和多模型配置结构一致
         model_config_name = f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
 
@@ -298,7 +307,7 @@ def quick_config(
         llm_config = {
             "platform": platform,
             "model": model,
-            "max_input_token_count": max_tokens,
+            "max_input_token_count": model_max_tokens[model],
             "llm_config": llm_config_dict,
         }
 
@@ -306,7 +315,7 @@ def quick_config(
         config["llms"][model_config_name] = llm_config
         model_config_names[model] = model_config_name
 
-    PrettyOutput.auto_print(f"✅ 已为 {len(selected_models)} 个模型创建配置")
+    PrettyOutput.auto_print(f"✅ 已为 {len(unique_role_models)} 个模型创建配置")
 
     # 创建模型组配置
     group_name = normal_model.replace(".", "_").replace("-", "_")
