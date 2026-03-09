@@ -718,6 +718,15 @@ class PrettyOutput:
             _output_sinks.append(sink)
 
     @staticmethod
+    def remove_sink(sink: OutputSink) -> None:
+        """移除指定输出后端；若不存在则忽略。"""
+        with _output_lock:
+            try:
+                _output_sinks.remove(sink)
+            except ValueError:
+                pass
+
+    @staticmethod
     def clear_sinks(keep_default: bool = True) -> None:
         """清空已注册的输出后端；可选择保留默认控制台后端。"""
         with _output_lock:
