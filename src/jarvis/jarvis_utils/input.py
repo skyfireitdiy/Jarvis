@@ -51,6 +51,7 @@ from prompt_toolkit.styles import Style as PromptStyle
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_replace_map
+from jarvis.jarvis_utils.config import get_submit_keys
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import decode_output
@@ -108,7 +109,10 @@ class InputProvider(ABC):
 
     @abstractmethod
     def get_multiline_input(
-        self, tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+        self,
+        tip: str,
+        preset: Optional[str] = None,
+        preset_cursor: Optional[int] = None,
     ) -> str:
         raise NotImplementedError
 
@@ -117,7 +121,10 @@ class CLIInputProvider(InputProvider):
     """默认本地 CLI 输入提供者，复用既有 prompt_toolkit 实现。"""
 
     def get_multiline_input(
-        self, tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+        self,
+        tip: str,
+        preset: Optional[str] = None,
+        preset_cursor: Optional[int] = None,
     ) -> str:
         return _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
@@ -135,12 +142,10 @@ def register_input_provider(provider_id: str, provider: InputProvider) -> None:
         _input_providers[provider_id] = provider
 
 
-
 def unregister_input_provider(provider_id: str) -> None:
     """移除命名输入提供者；若不存在则忽略。"""
     with _input_provider_lock:
         _input_providers.pop(provider_id, None)
-
 
 
 def set_default_input_provider(provider: InputProvider) -> None:
@@ -150,12 +155,10 @@ def set_default_input_provider(provider: InputProvider) -> None:
         _default_input_provider = provider
 
 
-
 def get_default_input_provider() -> InputProvider:
     """获取当前默认输入提供者。"""
     with _input_provider_lock:
         return _default_input_provider
-
 
 
 def _resolve_input_provider_key(agent: Optional[Any]) -> Optional[str]:
@@ -171,7 +174,6 @@ def _resolve_input_provider_key(agent: Optional[Any]) -> Optional[str]:
     return None
 
 
-
 def get_current_input_provider() -> InputProvider:
     """获取当前 Agent 对应的输入提供者；未命中时回退到默认 CLI。"""
     agent = _get_current_agent_for_input()
@@ -180,7 +182,6 @@ def get_current_input_provider() -> InputProvider:
         if provider_key and provider_key in _input_providers:
             return _input_providers[provider_key]
         return _default_input_provider
-
 
 
 def _display_width(s: str) -> int:
@@ -1064,9 +1065,15 @@ def _get_multiline_input_internal(
         if not first_enter_hint_shown and not _multiline_hint_already_shown():
             first_enter_hint_shown = True
 
+            # 生成快捷键显示文本
+            submit_keys = get_submit_keys()
+            submit_keys_display = " 或 ".join(
+                [k.replace("c-", "Ctrl+").upper() for k in submit_keys]
+            )
+
             def _show_notice() -> None:
                 PrettyOutput.auto_print(
-                    "ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 或 Ctrl+] 确认；Enter 仅用于换行。"
+                    f"ℹ️ 提示：当前支持多行输入。输入完成请使用 {submit_keys_display} 确认；Enter 仅用于换行。"
                 )
                 try:
                     input("按回车继续...")
@@ -1090,13 +1097,13 @@ def _get_multiline_input_internal(
         else:
             event.current_buffer.insert_text("\n")
 
-    @bindings.add("c-j", filter=has_focus(DEFAULT_BUFFER))
-    def _(event: KeyPressEvent) -> None:
-        event.current_buffer.validate_and_handle()
+    # 从配置获取提交快捷键列表
+    submit_keys = get_submit_keys()
+    for key in submit_keys:
 
-    @bindings.add("c-]", filter=has_focus(DEFAULT_BUFFER))
-    def _(event: KeyPressEvent) -> None:
-        event.current_buffer.validate_and_handle()
+        @bindings.add(key, filter=has_focus(DEFAULT_BUFFER))
+        def _(event: KeyPressEvent) -> None:
+            event.current_buffer.validate_and_handle()
 
     @bindings.add("c-o", filter=has_focus(DEFAULT_BUFFER))
     def _(event: KeyPressEvent) -> None:
@@ -1223,6 +1230,13 @@ def _get_multiline_input_internal(
         }
     )
 
+    # 获取提交快捷键显示文本
+    submit_keys = get_submit_keys()
+    # 将快捷键转换为显示格式（如 "c-j" -> "Ctrl+J"）
+    submit_keys_display = "/".join(
+        [k.replace("c-", "Ctrl+").upper() for k in submit_keys]
+    )
+
     def _bottom_toolbar() -> Any:
         return FormattedText(
             [
@@ -1230,7 +1244,7 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "@"),
                 ("class:bt.label", " 文件补全 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+J / Ctrl+]"),
+                ("class:bt.key", submit_keys_display),
                 ("class:bt.label", " 提交 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+O"),
@@ -1296,6 +1310,12 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         tip: 提示文本，将显示在底部工具栏中
         print_on_empty: 当输入为空字符串时，是否打印“输入已取消”提示。默认打印。
     """
+    # 获取提交快捷键配置，用于生成提示文本
+    submit_keys = get_submit_keys()
+    submit_keys_display = "/".join(
+        [k.replace("c-", "Ctrl+").upper() for k in submit_keys]
+    )
+
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     while True:
@@ -1317,7 +1337,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
-            tip = "请继续输入（或按Ctrl+J/Ctrl+]确认）:"
+            tip = f"请继续输入（或按{submit_keys_display}确认）:"
             continue
         if user_input == CTRL_X_SENTINEL:
             PrettyOutput.auto_print("🛑 用户请求退出程序...")
@@ -1342,7 +1362,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 preset, preset_cursor = _insert_file_path(
                     text, cursor, selected_path, "@"
                 )
-                tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
+                tip = f"已插入文件，继续编辑或按{submit_keys_display}确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
@@ -1372,7 +1392,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 preset, preset_cursor = _insert_file_path(
                     text, cursor, selected_path, "#"
                 )
-                tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
+                tip = f"已插入文件，继续编辑或按{submit_keys_display}确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
@@ -1396,7 +1416,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 sys.stdout.flush()
             except Exception:
                 pass
-            tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
+            tip = f"已插入文件，继续编辑或按{submit_keys_display}确认:"
             continue
         else:
             if user_input == CTRL_C_SENTINEL:
