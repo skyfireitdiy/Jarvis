@@ -215,7 +215,7 @@ class BasePlatform(ABC):
             start_time=start_time,
             message=message,
             max_output=max_output,
-            check_interrupt=get_interrupt,
+            check_interrupt=lambda: bool(get_interrupt()),
             panel_lock=self._panel_lock,
         )
 
@@ -229,7 +229,7 @@ class BasePlatform(ABC):
             start_time=start_time,
             message=message,
             max_output=max_output,
-            check_interrupt=lambda: is_immediate_abort() and get_interrupt(),
+            check_interrupt=lambda: bool(is_immediate_abort() and get_interrupt()),
             append_session_history=self._append_session_history,
             get_context_token_count=get_context_token_count,
         )
@@ -305,11 +305,14 @@ class BasePlatform(ABC):
 
             # 计算性能指标
             response_tokens = get_context_token_count(response)
-            generation_time = (
-                duration - first_token_time if duration > first_token_time else duration
+            generation_time = max(
+                0.0,
+                duration - first_token_time
+                if duration > first_token_time
+                else duration,
             )
             tokens_per_second = (
-                response_tokens / generation_time if generation_time > 0 else 0
+                response_tokens / generation_time if generation_time > 0 else 0.0
             )
 
             # 获取Token使用信息
