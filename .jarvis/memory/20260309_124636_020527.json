@@ -1,0 +1,14 @@
+{
+  "id": "20260309_124636_020527",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "详细设计",
+    "系统设计",
+    "WebSocket网关",
+    "execute_script"
+  ],
+  "content": "Jarvis WebSocket 交互网关设计摘要：在保持现有 CLI 行为兼容的前提下，为 output.py 新增基于 OutputSink 的 WebSocketOutputSink，实现 OutputEvent 到 WebSocket 消息的结构化广播；为 input.py 引入输入提供者抽象，保留 CLI prompt_toolkit 路径，新增 WebSocketInputProvider 供远端会话输入；为 execute_script.py 采用双后端架构：保留现有标准捕获后端用于兼容 stdout/stderr 结果模式，并新增基于虚拟 TTY/PTTY/ConPTY 的交互流后端用于 WebSocket 实时终端桥接。设计强调能力分级、平台差异显式化、会话隔离、消息顺序、断连处理与安全控制。",
+  "created_at": "2026-03-09T12:46:36.020550",
+  "updated_at": "2026-03-09T12:46:36.020554"
+}
