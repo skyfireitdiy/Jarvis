@@ -1005,10 +1005,24 @@ class SessionManager:
             ) in self.agent.task_list_manager.task_lists.items():
                 task_lists_data[task_list_id] = task_list.to_dict()
 
+            # 同步保存任务管理器的薄脆全局状态，避免恢复后ID冲突
+            from jarvis.jarvis_agent.task_list import TaskListManager
+
+            manager_state = {
+                "global_task_counter": TaskListManager._global_task_counter,
+                "global_tasklist_counter": TaskListManager._global_tasklist_counter,
+            }
+
             # 保存到文件
             with open(tasklist_file, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"task_lists": task_lists_data}, f, ensure_ascii=False, indent=2
+                    {
+                        "task_lists": task_lists_data,
+                        "manager_state": manager_state,
+                    },
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
                 )
 
             return True
@@ -1027,6 +1041,7 @@ class SessionManager:
         """
         import json
         import os
+        import re
 
         try:
             if not self.agent:
@@ -1045,9 +1060,10 @@ class SessionManager:
                 data = json.load(f)
 
             task_lists_data = data.get("task_lists", {})
+            manager_state = data.get("manager_state", {})
 
-            # 导入TaskList（避免循环导入）
-            from jarvis.jarvis_agent.task_list import TaskList
+            # 导入TaskList和TaskListManager（避免循环导入）
+            from jarvis.jarvis_agent.task_list import TaskList, TaskListManager
 
             # 清空当前的任务列表，然后从文件中恢复
             self.agent.task_list_manager.task_lists.clear()
@@ -1056,6 +1072,43 @@ class SessionManager:
             for task_list_id, task_list_data in task_lists_data.items():
                 task_list = TaskList.from_dict(task_list_data)
                 self.agent.task_list_manager.task_lists[task_list_id] = task_list
+
+            # 恢复任务ID/任务列表ID计数器；旧格式文件则从现有数据推导安全下界
+            inferred_task_counter = 0
+            inferred_tasklist_counter = 0
+
+            for (
+                task_list_id,
+                task_list,
+            ) in self.agent.task_list_manager.task_lists.items():
+                match = re.fullmatch(r"tasklist-(\d+)", str(task_list_id))
+                if match:
+                    inferred_tasklist_counter = max(
+                        inferred_tasklist_counter, int(match.group(1))
+                    )
+
+                for task_id in task_list.tasks.keys():
+                    match = re.fullmatch(r"task-(\d+)", str(task_id))
+                    if match:
+                        inferred_task_counter = max(
+                            inferred_task_counter, int(match.group(1))
+                        )
+
+            saved_task_counter = int(manager_state.get("global_task_counter", 0) or 0)
+            saved_tasklist_counter = int(
+                manager_state.get("global_tasklist_counter", 0) or 0
+            )
+
+            TaskListManager._global_task_counter = max(
+                TaskListManager._global_task_counter,
+                saved_task_counter,
+                inferred_task_counter,
+            )
+            TaskListManager._global_tasklist_counter = max(
+                TaskListManager._global_tasklist_counter,
+                saved_tasklist_counter,
+                inferred_tasklist_counter,
+            )
 
             return True
         except Exception as e:
