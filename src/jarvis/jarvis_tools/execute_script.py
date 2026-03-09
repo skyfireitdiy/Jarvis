@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import select
+import subprocess
 import sys
 import tempfile
+import threading
 import time
+import uuid
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -52,6 +57,8 @@ class ExecutionRequest:
     execution_mode: str
     session_id: Optional[str] = None
     stream_publisher: Optional[ExecutionStreamPublisher] = None
+    execution_id: Optional[str] = None
+    input_callback: Optional[Callable[[float], Optional[str]]] = None
 
 
 class ExecutionBackend(ABC):
@@ -188,15 +195,50 @@ class ScriptTool:
         *,
         stream: str,
         session_id: Optional[str],
+        execution_id: Optional[str] = None,
+        sequence: Optional[int] = None,
     ) -> None:
         if not publisher or not chunk:
             return
         publisher.publish(
             {
                 "type": "tool_stream",
+                "message_type": "tool_stream",
                 "tool": self.name,
                 "stream": stream,
                 "chunk": chunk,
+                "execution_id": execution_id,
+                "sequence": sequence,
+            },
+            session_id=session_id,
+        )
+
+    def _publish_execution_event(
+        self,
+        publisher: Optional[ExecutionStreamPublisher],
+        *,
+        message_type: str,
+        session_id: Optional[str],
+        execution_id: Optional[str],
+        stream: str = "tty",
+        chunk: str = "",
+        sequence: Optional[int] = None,
+        exit_code: Optional[int] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        if not publisher:
+            return
+        publisher.publish(
+            {
+                "type": message_type,
+                "message_type": message_type,
+                "tool": self.name,
+                "stream": stream,
+                "chunk": chunk,
+                "execution_id": execution_id,
+                "sequence": sequence,
+                "exit_code": exit_code,
+                "reason": reason,
             },
             session_id=session_id,
         )
@@ -363,6 +405,271 @@ class ScriptTool:
             "stderr": "" if exit_code == 0 else f"退出码: {exit_code}",
         }
 
+    def _execute_on_unix_interactive_pty(
+        self,
+        argv: List[str],
+        env: Dict[str, str],
+        get_timeout: Any,
+        stream_publisher: Optional[ExecutionStreamPublisher] = None,
+        session_id: Optional[str] = None,
+        execution_id: Optional[str] = None,
+        input_callback: Optional[Callable[[float], Optional[str]]] = None,
+    ) -> Dict[str, Any]:
+        import pty
+
+        captured: List[str] = []
+        captured_lock = threading.Lock()
+        stop_event = threading.Event()
+        exc_holder: List[BaseException] = []
+        sequence_lock = threading.Lock()
+        sequence = 0
+
+        def next_sequence() -> int:
+            nonlocal sequence
+            with sequence_lock:
+                sequence += 1
+                return sequence
+
+        master_fd, slave_fd = pty.openpty()
+        old_stdin_attrs = None
+        stdin_fd: Optional[int] = None
+        stdin_is_tty = False
+        if hasattr(sys.stdin, "fileno"):
+            try:
+                stdin_fd = sys.stdin.fileno()
+                stdin_is_tty = os.isatty(stdin_fd)
+            except Exception:
+                stdin_fd = None
+                stdin_is_tty = False
+
+        def reader(proc: subprocess.Popen[Any]) -> None:
+            try:
+                while not stop_event.is_set():
+                    if proc.poll() is not None:
+                        ready, _, _ = select.select([master_fd], [], [], 0.1)
+                        if not ready:
+                            break
+                    else:
+                        ready, _, _ = select.select([master_fd], [], [], 0.1)
+                    if not ready:
+                        continue
+                    try:
+                        data = os.read(master_fd, 4096)
+                    except OSError:
+                        break
+                    if not data:
+                        break
+                    text = self._strip_ansi(data.decode("utf-8", errors="replace"))
+                    if not text:
+                        continue
+                    with captured_lock:
+                        captured.append(text)
+                    self._publish_stream_message(
+                        stream_publisher,
+                        text,
+                        stream="tty",
+                        session_id=session_id,
+                        execution_id=execution_id,
+                        sequence=next_sequence(),
+                    )
+                    sys.stdout.write(text)
+                    sys.stdout.flush()
+            except Exception as e:
+                exc_holder.append(e)
+            finally:
+                stop_event.set()
+
+        def write_input_chunk(chunk: str) -> None:
+            if not chunk:
+                return
+            try:
+                os.write(master_fd, chunk.encode("utf-8", errors="ignore"))
+                self._publish_execution_event(
+                    stream_publisher,
+                    message_type="tool_input",
+                    session_id=session_id,
+                    execution_id=execution_id,
+                    stream="stdin",
+                    chunk=chunk,
+                    sequence=next_sequence(),
+                )
+            except OSError:
+                stop_event.set()
+
+        def stdin_forward(proc: subprocess.Popen[Any]) -> None:
+            try:
+                if input_callback is not None:
+                    while not stop_event.is_set() and proc.poll() is None:
+                        try:
+                            chunk = input_callback(0.1)
+                        except Exception as e:
+                            exc_holder.append(e)
+                            break
+                        if chunk:
+                            write_input_chunk(chunk)
+                    return
+
+                if stdin_fd is None:
+                    return
+
+                if stdin_is_tty:
+                    import termios
+                    import tty
+
+                    try:
+                        old_attrs = termios.tcgetattr(stdin_fd)
+                        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_attrs)
+                    except Exception:
+                        old_attrs = None
+                    if old_attrs is not None:
+                        nonlocal old_stdin_attrs
+                        old_stdin_attrs = old_attrs
+                        tty.setraw(stdin_fd)
+
+                while not stop_event.is_set() and proc.poll() is None:
+                    try:
+                        ready, _, _ = select.select([stdin_fd], [], [], 0.1)
+                    except Exception:
+                        break
+                    if not ready:
+                        continue
+                    try:
+                        data = os.read(stdin_fd, 1024)
+                    except OSError:
+                        break
+                    if not data:
+                        break
+                    write_input_chunk(data.decode("utf-8", errors="ignore"))
+            except Exception as e:
+                exc_holder.append(e)
+            finally:
+                if stdin_is_tty and stdin_fd is not None and old_stdin_attrs is not None:
+                    try:
+                        import termios
+
+                        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_attrs)
+                    except Exception:
+                        pass
+
+        try:
+            proc = subprocess.Popen(
+                argv,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                cwd=os.getcwd(),
+                env=env,
+                start_new_session=True,
+                close_fds=True,
+            )
+        except Exception as e:
+            os.close(master_fd)
+            os.close(slave_fd)
+            PrettyOutput.auto_print(f"❌ Unix PTY 启动失败: {str(e)}")
+            return {"success": False, "stdout": "", "stderr": str(e)}
+        finally:
+            try:
+                os.close(slave_fd)
+            except Exception:
+                pass
+
+        self._publish_execution_event(
+            stream_publisher,
+            message_type="tool_stream_start",
+            session_id=session_id,
+            execution_id=execution_id,
+            stream="tty",
+            sequence=next_sequence(),
+        )
+
+        reader_t = threading.Thread(target=reader, args=(proc,), daemon=True)
+        stdin_t = threading.Thread(target=stdin_forward, args=(proc,), daemon=True)
+        reader_t.start()
+        stdin_t.start()
+
+        timeout = get_timeout()
+        timed_out = False
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            stop_event.set()
+            try:
+                proc.terminate()
+                proc.wait(timeout=2)
+            except Exception:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=2)
+                except Exception:
+                    pass
+        except Exception as e:
+            exc_holder.append(e)
+            stop_event.set()
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        stop_event.set()
+        reader_t.join(timeout=2)
+        stdin_t.join(timeout=2)
+        try:
+            os.close(master_fd)
+        except Exception:
+            pass
+
+        output = "".join(captured).strip()
+        exit_code = proc.returncode if proc.returncode is not None else -1
+        if timed_out:
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="tty",
+                sequence=next_sequence(),
+                exit_code=exit_code,
+                reason="timeout",
+            )
+            return {
+                "success": False,
+                "stdout": output,
+                "stderr": f"执行超时（超过{timeout}秒），进程已被终止。",
+            }
+        if exc_holder:
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="tty",
+                sequence=next_sequence(),
+                exit_code=exit_code,
+                reason="error",
+            )
+            return {
+                "success": False,
+                "stdout": output,
+                "stderr": str(exc_holder[0]),
+            }
+
+        self._publish_execution_event(
+            stream_publisher,
+            message_type="tool_stream_end",
+            session_id=session_id,
+            execution_id=execution_id,
+            stream="tty",
+            sequence=next_sequence(),
+            exit_code=exit_code,
+            reason="completed" if exit_code == 0 else "error",
+        )
+        return {
+            "success": exit_code == 0,
+            "stdout": output,
+            "stderr": "" if exit_code == 0 else f"退出码: {exit_code}",
+        }
+
     def _execute_on_windows(
         self,
         interpreter: str,
@@ -514,7 +821,6 @@ class ScriptTool:
                     lang=interpreter,
                 )
 
-                import subprocess
                 from jarvis.jarvis_utils.config import get_script_execution_timeout
 
                 if self._is_windows():
@@ -528,13 +834,12 @@ class ScriptTool:
                         session_id=request.session_id,
                     )
 
-                if self._is_macos():
-                    tee_command = f"script -q {output_file} {interpreter} {script_path}"
-                else:
-                    tee_command = f"script -q -c '{interpreter} {script_path}' {output_file}"
-
-                timed_out = False
                 if force_non_interactive:
+                    if self._is_macos():
+                        tee_command = f"script -q {output_file} {interpreter} {script_path}"
+                    else:
+                        tee_command = f"script -q -c '{interpreter} {script_path}' {output_file}"
+                    timed_out = False
                     proc = None
                     try:
                         proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
@@ -589,32 +894,39 @@ class ScriptTool:
                                     proc.stderr.close()
                             except Exception:
                                 pass
-                else:
-                    if request.stream_publisher is not None:
-                        self._publish_stream_message(
-                            request.stream_publisher,
-                            "interactive stream bridge is not yet available on Unix; falling back to legacy terminal execution\n",
-                            stream="stderr",
-                            session_id=request.session_id,
-                        )
-                    os.system(tee_command)  # nosec B605
 
-                try:
-                    output = self.get_display_output(output_file)
-                except Exception as e:
-                    output = f"读取输出文件失败: {str(e)}"
+                    try:
+                        output = self.get_display_output(output_file)
+                    except Exception as e:
+                        output = f"读取输出文件失败: {str(e)}"
 
-                if force_non_interactive and timed_out:
+                    if timed_out:
+                        return {
+                            "success": False,
+                            "stdout": output,
+                            "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
+                        }
                     return {
-                        "success": False,
+                        "success": True,
                         "stdout": output,
-                        "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
+                        "stderr": "",
                     }
-                return {
-                    "success": True,
-                    "stdout": output,
-                    "stderr": "",
-                }
+
+                env = os.environ.copy()
+                if interpreter in ("python", "python2", "python3"):
+                    env["PYTHONIOENCODING"] = "utf-8"
+                argv = [interpreter, script_path]
+                if interpreter in ("python", "python2", "python3"):
+                    argv = [interpreter, "-u", script_path]
+                return self._execute_on_unix_interactive_pty(
+                    argv=argv,
+                    env=env,
+                    get_timeout=get_script_execution_timeout,
+                    stream_publisher=request.stream_publisher,
+                    session_id=request.session_id,
+                    execution_id=request.execution_id,
+                    input_callback=request.input_callback,
+                )
             finally:
                 Path(script_path).unlink(missing_ok=True)
                 Path(output_file).unlink(missing_ok=True)
@@ -629,6 +941,8 @@ class ScriptTool:
         execution_mode: str = "auto",
         session_id: Optional[str] = None,
         stream_publisher: Optional[ExecutionStreamPublisher] = None,
+        execution_id: Optional[str] = None,
+        input_callback: Optional[Callable[[float], Optional[str]]] = None,
     ) -> Dict[str, Any]:
         request = ExecutionRequest(
             interpreter=interpreter,
@@ -636,6 +950,8 @@ class ScriptTool:
             execution_mode=execution_mode,
             session_id=session_id,
             stream_publisher=stream_publisher,
+            execution_id=execution_id,
+            input_callback=input_callback,
         )
         backend = self._select_backend(execution_mode)
         return backend.execute(self, request)
@@ -665,6 +981,8 @@ class ScriptTool:
             execution_mode = str(args.get("execution_mode", "auto"))
             session_id = args.get("session_id")
             stream_publisher = args.get("stream_publisher")
+            execution_id = args.get("execution_id")
+            input_callback = args.get("input_callback")
             if stream_publisher is not None and not isinstance(
                 stream_publisher, ExecutionStreamPublisher
             ):
@@ -672,6 +990,12 @@ class ScriptTool:
                     "success": False,
                     "stdout": "",
                     "stderr": "stream_publisher must implement ExecutionStreamPublisher",
+                }
+            if input_callback is not None and not callable(input_callback):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "input_callback must be callable",
                 }
 
             # Execute the script with the specified interpreter
@@ -681,6 +1005,8 @@ class ScriptTool:
                 execution_mode=execution_mode,
                 session_id=session_id if isinstance(session_id, str) else None,
                 stream_publisher=stream_publisher,
+                execution_id=execution_id if isinstance(execution_id, str) else uuid.uuid4().hex,
+                input_callback=input_callback,
             )
 
         except Exception as e:
