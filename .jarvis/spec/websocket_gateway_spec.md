@@ -89,9 +89,9 @@
 - Windows 非交互：`subprocess.PIPE`，可捕获输出，不可交互
 - Windows 交互：`winpty.PtyProcess`，可读取输出并转发 stdin
 - Unix 非交互：通过 `script` 录制输出文件后解析
-- Unix 交互：`os.system()` 继承当前终端，难以程序化桥接
+- Unix 交互：当前仍通过继承当前终端执行，尚未形成程序化 PTY 双向桥接
 
-**结论**：`execute_script` 需要抽象为双执行后端，并引入虚拟 TTY 执行模式。
+**结论**：`execute_script` 需要抽象为双执行后端，并在 Unix/Linux 交互模式中补齐基于 PTY 的实时 stdout/stderr 发布与 stdin 写回能力；不再接受仅发送降级提示后回退到 legacy terminal execution 的方案。
 
 ## 4. 功能需求
 
@@ -118,9 +118,15 @@
 
 1. `execute_script` 应支持保留现有结果模式
 2. 在 WebSocket 场景下应支持流式输出推送
-3. 在支持的平台上应支持脚本 stdin 透传
+3. 应支持脚本 stdin 透传，不仅限于 Windows
 4. 应区分“结果模式”和“终端流模式”
-5. 应明确平台能力差异与降级规则
+5. 应明确平台能力差异，但 Unix/Linux interactive 模式不得再以纯降级替代真实桥接
+6. interactive 模式必须建立 `execution_id` 级别的双向流会话，至少覆盖：
+   - stdout chunk 推送
+   - stderr chunk 推送或统一终端流语义说明
+   - stdin input 回灌
+   - start/end/exit 事件
+   - timeout/disconnect/error 事件
 
 ### 4.4 会话管理需求
 
@@ -177,8 +183,9 @@
 ### 6.2 平台约束
 
 - Windows：优先支持虚拟 TTY 交互流
-- Unix/Linux：首版允许结果模式优先，交互流能力可条件支持
-- macOS：视 Unix 路径实现兼容
+- Unix/Linux：interactive 模式必须通过 PTY/TTY 实现真实双向桥接，不允许仅提示后降级到 `os.system()` 或等价 legacy terminal execution
+- macOS：沿 Unix PTY 路径实现兼容，若存在系统差异需在实现中显式处理
+- 所有平台均必须保留 captured/result 模式，确保未启用 WebSocket 时 CLI 默认行为兼容
 
 ### 6.3 协议约束
 
@@ -237,14 +244,118 @@
 - `ScriptExecutionBackend`
 - `CapturedExecutionBackend`
 - `VirtualTTYExecutionBackend`
+- `ExecutionStreamPublisher`
+- `ExecutionInputBridge`（可作为 `VirtualTTYExecutionBackend` 内部能力或配套抽象）
 
 职责：
 
 - 统一执行模型
 - 区分结果模式与终端流模式
 - 提供交互式 stdin/stdout 桥接能力
+- 在 Unix/Linux 上通过 PTY 建立真实终端会话，而不是简单继承父终端
+- 将远端输入按 `session_id + execution_id` 写回子进程 stdin
+- 在执行结束、断连、超时、异常时发送明确的结束态消息并清理 PTY 资源
+
+#### 7.4.1 Unix/Linux PTY 实时桥接方案
+
+`VirtualTTYExecutionBackend` 在 Unix/Linux 平台必须采用 PTY 方案创建子进程，并维护一个 `execution_id` 级别的执行会话，推荐流程如下：
+
+1. 创建 PTY master/slave
+2. 使用 `subprocess.Popen(..., stdin=slave, stdout=slave, stderr=slave, start_new_session=True)` 或等价方式启动解释器进程
+3. 父进程关闭 slave，仅持有 master
+4. 启动输出读取循环，从 master 持续读取终端字节流
+5. 将读取到的数据按顺序封装为流式消息，通过 `ExecutionStreamPublisher` 发布
+6. 启动输入转发循环，将远端输入事件写入 master，实现 stdin 回灌
+7. 监听子进程退出、超时、断连和显式关闭事件，输出结束消息并释放 PTY
+
+#### 7.4.2 流式消息协议要求
+
+interactive 模式下，消息体至少包含如下字段：
+
+- `message_type`：如 `tool_stream_start`、`tool_stream`、`tool_input`、`tool_stream_end`、`tool_error`
+- `session_id`：会话标识
+- `execution_id`：单次脚本执行标识
+- `tool`：固定为 `execute_script`
+- `stream`：`stdout` / `stderr` / `tty` / `stdin`
+- `chunk`：当前数据块
+- `timestamp`：消息生成时间
+- `sequence`：同一执行流内的单调递增序号
+
+说明：
+
+- Unix PTY 默认读到的是终端复用流，如无法稳定拆分 stdout/stderr，可将 `stream` 标记为 `tty`，但必须在协议中显式声明。
+- 输入回灌消息使用 `message_type=tool_input`，其 `stream` 固定为 `stdin`。
+- 执行结束时必须发送 `tool_stream_end`，并携带 `exit_code`、`reason`（completed/timeout/disconnected/error/killed）等字段。
+
+#### 7.4.3 兼容性约束
+
+- `CapturedExecutionBackend` 保留现有 stdout/stderr 结果字典返回语义。
+- `VirtualTTYExecutionBackend` 在未提供 `stream_publisher` 时，仍可保留本地 CLI 交互体验，但内部实现应优先复用 PTY 路径，避免形成两套行为完全割裂的交互模型。
+- 未启用 WebSocket 时不得破坏当前 CLI 默认可用性。
 
 ## 8. 接口定义
+
+### 8.0 脚本执行流接口
+
+#### 流开始消息
+
+```json
+{
+  "message_type": "tool_stream_start",
+  "session_id": "sess-001",
+  "execution_id": "exec-001",
+  "tool": "execute_script",
+  "stream": "tty",
+  "sequence": 1,
+  "timestamp": "2026-03-09T14:00:00Z"
+}
+```
+
+#### 流数据消息
+
+```json
+{
+  "message_type": "tool_stream",
+  "session_id": "sess-001",
+  "execution_id": "exec-001",
+  "tool": "execute_script",
+  "stream": "tty",
+  "chunk": "hello world\r\n",
+  "sequence": 2,
+  "timestamp": "2026-03-09T14:00:01Z"
+}
+```
+
+#### 输入回灌消息
+
+```json
+{
+  "message_type": "tool_input",
+  "session_id": "sess-001",
+  "execution_id": "exec-001",
+  "tool": "execute_script",
+  "stream": "stdin",
+  "chunk": "yes\n",
+  "sequence": 3,
+  "timestamp": "2026-03-09T14:00:02Z"
+}
+```
+
+#### 流结束消息
+
+```json
+{
+  "message_type": "tool_stream_end",
+  "session_id": "sess-001",
+  "execution_id": "exec-001",
+  "tool": "execute_script",
+  "stream": "tty",
+  "sequence": 99,
+  "exit_code": 0,
+  "reason": "completed",
+  "timestamp": "2026-03-09T14:00:10Z"
+}
+```
 
 ### 8.1 WebSocket 连接接口
 
@@ -402,16 +513,19 @@
 ### 10.1 能力级别定义
 
 #### Level 1：结果模式
+
 - 适用于现有兼容执行
 - 保留 `stdout/stderr` 结果语义
 - 不要求实时交互
 
 #### Level 2：流式输出模式
+
 - 输出按片段实时推送
 - 可用于 WebSocket 实时展示
 - 仍可能不支持 stdin 透传
 
 #### Level 3：终端流交互模式
+
 - 基于虚拟 TTY
 - 支持实时输出
 - 支持交互式 stdin 透传
@@ -549,18 +663,22 @@
 ## 17. 建议的实现阶段
 
 ### 阶段 1
+
 - 输出 WebSocket sink
 - WebSocket 基础连接与会话管理
 
 ### 阶段 2
+
 - 输入抽象层
 - WebSocket 输入消费
 
 ### 阶段 3
+
 - `execute_script` 双后端抽象
 - 虚拟 TTY 模式接入
 
 ### 阶段 4
+
 - 兼容性回归
 - 平台差异验证
 - 性能与稳定性测试
