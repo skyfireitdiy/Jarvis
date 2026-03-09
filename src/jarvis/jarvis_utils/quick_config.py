@@ -117,7 +117,9 @@ def quick_config(
                     model_input = get_single_line_input(
                         "请输入模型名称（多个模型用逗号分隔，如: gpt-4o,gpt-3.5-turbo）:"
                     )
-                    manual_models = [m.strip() for m in model_input.split(",") if m.strip()]
+                    manual_models = [
+                        m.strip() for m in model_input.split(",") if m.strip()
+                    ]
                     if not manual_models:
                         PrettyOutput.auto_print("❌ 未输入有效模型名称")
                         raise typer.Exit(code=1)
@@ -138,32 +140,72 @@ def quick_config(
         f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
     )
 
-    # 选择默认模型
+    # 选择 normal/smart/cheap 模型
     if len(selected_models) == 1:
-        default_model = selected_models[0]
-        PrettyOutput.auto_print(f"🎯 默认模型: {default_model}")
+        normal_model = selected_models[0]
+        smart_model = selected_models[0]
+        cheap_model = selected_models[0]
+        PrettyOutput.auto_print(f"🎯 Normal模型: {normal_model}")
+        PrettyOutput.auto_print(f"🧠 Smart模型: {smart_model}")
+        PrettyOutput.auto_print(f"💰 Cheap模型: {cheap_model}")
     else:
-        console.print("[bold]请选择默认模型:[/]")
+        console.print("[bold]请选择 Normal 模型（大多数场景）:[/]")
         for i, model in enumerate(selected_models, 1):
             console.print(f"  {i}. {model}")
 
-        default_choice = get_single_line_input("请输入默认模型序号:")
+        normal_choice = get_single_line_input("请输入 Normal 模型序号:")
         try:
-            default_idx = int(default_choice.strip()) - 1
-            if 0 <= default_idx < len(selected_models):
-                default_model = selected_models[default_idx]
-                PrettyOutput.auto_print(f"🎯 默认模型: {default_model}")
+            normal_idx = int(normal_choice.strip()) - 1
+            if 0 <= normal_idx < len(selected_models):
+                normal_model = selected_models[normal_idx]
+                PrettyOutput.auto_print(f"🎯 Normal模型: {normal_model}")
             else:
-                PrettyOutput.auto_print(f"❌ 无效的模型序号: {default_choice}")
+                PrettyOutput.auto_print(f"❌ 无效的模型序号: {normal_choice}")
                 raise typer.Exit(code=1)
         except ValueError:
             PrettyOutput.auto_print("❌ 请输入有效的数字序号")
             raise typer.Exit(code=1)
 
-    # 测试模型API连通性
-    PrettyOutput.auto_print(f"🔍 正在测试模型 {default_model} 的API连通性...")
+        console.print("[bold]请选择 Smart 模型（代码生成）:[/]")
+        for i, model in enumerate(selected_models, 1):
+            console.print(f"  {i}. {model}")
+
+        smart_choice = get_single_line_input("请输入 Smart 模型序号:")
+        try:
+            smart_idx = int(smart_choice.strip()) - 1
+            if 0 <= smart_idx < len(selected_models):
+                smart_model = selected_models[smart_idx]
+                PrettyOutput.auto_print(f"🧠 Smart模型: {smart_model}")
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的模型序号: {smart_choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            PrettyOutput.auto_print("❌ 请输入有效的数字序号")
+            raise typer.Exit(code=1)
+
+        console.print(
+            "[bold]请选择 Cheap 模型（低要求、大数据量场景，如 git 信息、方法论筛选等）:[/]"
+        )
+        for i, model in enumerate(selected_models, 1):
+            console.print(f"  {i}. {model}")
+
+        cheap_choice = get_single_line_input("请输入 Cheap 模型序号:")
+        try:
+            cheap_idx = int(cheap_choice.strip()) - 1
+            if 0 <= cheap_idx < len(selected_models):
+                cheap_model = selected_models[cheap_idx]
+                PrettyOutput.auto_print(f"💰 Cheap模型: {cheap_model}")
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的模型序号: {cheap_choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            PrettyOutput.auto_print("❌ 请输入有效的数字序号")
+            raise typer.Exit(code=1)
+
+    # 测试 normal 模型API连通性
+    PrettyOutput.auto_print(f"🔍 正在测试模型 {normal_model} 的API连通性...")
     success, error_msg = test_model_connection(
-        platform, base_url, api_key, default_model
+        platform, base_url, api_key, normal_model
     )
 
     if success:
@@ -229,6 +271,8 @@ def quick_config(
     if "llm_groups" not in config:
         config["llm_groups"] = {}
 
+    model_config_names = {}
+
     # 为每个选择的模型创建配置
     for i, model in enumerate(selected_models):
         # 统一使用配置名称+模型名的方式避免命名冲突，保持单模型和多模型配置结构一致
@@ -260,23 +304,24 @@ def quick_config(
 
         # 添加模型配置
         config["llms"][model_config_name] = llm_config
-
-        # 如果是默认模型，创建llm_groups配置
-        if model == default_model:
-            # 使用模型名称作为组名，替换特殊字符
-            group_name = model.replace(".", "_").replace("-", "_")
-            # 创建模型组配置
-            config["llm_groups"][group_name] = {"normal_llm": model_config_name}
-            PrettyOutput.auto_print(
-                f"✅ 已创建模型组 '{group_name}'，使用 {model_config_name} 作为默认模型"
-            )
+        model_config_names[model] = model_config_name
 
     PrettyOutput.auto_print(f"✅ 已为 {len(selected_models)} 个模型创建配置")
 
+    # 创建模型组配置
+    group_name = normal_model.replace(".", "_").replace("-", "_")
+    config["llm_groups"][group_name] = {
+        "normal_llm": model_config_names[normal_model],
+        "smart_llm": model_config_names[smart_model],
+        "cheap_llm": model_config_names[cheap_model],
+    }
+    PrettyOutput.auto_print(
+        f"✅ 已创建模型组 '{group_name}'，normal={normal_model}, smart={smart_model}, cheap={cheap_model}"
+    )
+
     # 设置默认模型组
-    default_group_name = default_model.replace(".", "_").replace("-", "_")
-    config["llm_group"] = default_group_name
-    PrettyOutput.auto_print(f"✅ 已设置默认模型组为 '{default_group_name}'")
+    config["llm_group"] = group_name
+    PrettyOutput.auto_print(f"✅ 已设置默认模型组为 '{group_name}'")
 
     # 保存配置文件
     try:
