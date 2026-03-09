@@ -1244,3 +1244,21 @@ def get_diff_large_file_threshold() -> int:
         int: 大文件阈值，默认为 300
     """
     return 300
+
+
+def get_submit_keys() -> List[str]:
+    """
+    获取多行输入的提交快捷键列表。
+
+    返回:
+        List[str]: 提交快捷键列表，默认为 ["c-j", "c-]"]（Ctrl+J 和 Ctrl+]）
+    """
+    value = GLOBAL_CONFIG_DATA.get("submit_keys")
+    # 如果配置是列表，直接返回
+    if isinstance(value, list):
+        return cast(List[str], [str(k) for k in value if k])
+    # 如果配置是字符串（支持逗号分隔），按逗号分割
+    if isinstance(value, str) and value.strip():
+        return [key.strip() for key in value.split(",") if key.strip()]
+    # 默认值
+    return ["c-j", "c-]"]
