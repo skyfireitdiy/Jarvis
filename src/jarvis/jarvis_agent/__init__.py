@@ -2115,10 +2115,13 @@ class Agent:
                 self._system_prompt_optimized = True
 
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
+        # 延迟导入CodeAgent以避免循环依赖
         try:
-            # 延迟导入CodeAgent以避免循环依赖
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
+        except ImportError:
+            CodeAgent = None
 
+        try:
             # 保存原始任务目标（用于长期运行时的上下文保持）
             # 只在第一次运行时设置原始任务目标，确保交互模式下后续输入不会覆盖原始目标
             if not self.original_user_input:
