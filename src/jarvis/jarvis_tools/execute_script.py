@@ -8,6 +8,8 @@ import tempfile
 import threading
 import time
 import uuid
+from datetime import datetime
+from datetime import timezone
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -188,6 +190,10 @@ class ScriptTool:
         s = _OSC_PAYLOAD_ORPHAN.sub("", s)
         return s
 
+    @staticmethod
+    def _get_event_timestamp() -> str:
+        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
     def _publish_stream_message(
         self,
         publisher: Optional[ExecutionStreamPublisher],
@@ -209,6 +215,7 @@ class ScriptTool:
                 "chunk": chunk,
                 "execution_id": execution_id,
                 "sequence": sequence,
+                "timestamp": self._get_event_timestamp(),
             },
             session_id=session_id,
         )
@@ -239,6 +246,7 @@ class ScriptTool:
                 "sequence": sequence,
                 "exit_code": exit_code,
                 "reason": reason,
+                "timestamp": self._get_event_timestamp(),
             },
             session_id=session_id,
         )
@@ -250,16 +258,38 @@ class ScriptTool:
         get_timeout: Any,
         stream_publisher: Optional[ExecutionStreamPublisher] = None,
         session_id: Optional[str] = None,
+        execution_id: Optional[str] = None,
+        input_callback: Optional[Callable[[float], Optional[str]]] = None,
     ) -> Dict[str, Any]:
         """使用 pywinpty (ConPTY) 实现：用户可交互 + 可捕获输出，类似 Unix script 命令"""
         from winpty import PtyProcess
-
-        import threading
 
         captured: List[str] = []
         capture_lock = threading.Lock()
         read_done = threading.Event()
         exc_holder: List[BaseException] = []
+        sequence_lock = threading.Lock()
+        sequence = 0
+
+        def next_sequence() -> int:
+            nonlocal sequence
+            with sequence_lock:
+                sequence += 1
+                return sequence
+
+        def publish_input_chunk(chunk: str) -> None:
+            if not chunk:
+                return
+            proc.write(chunk)
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_input",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="stdin",
+                chunk=chunk,
+                sequence=next_sequence(),
+            )
 
         def reader(pty_proc: Any) -> None:
             try:
@@ -272,6 +302,8 @@ class ScriptTool:
                                     data if isinstance(data, bytes) else data.encode()
                                 )
                             )
+                            if not text:
+                                continue
                             with capture_lock:
                                 captured.append(text)
                             self._publish_stream_message(
@@ -279,13 +311,13 @@ class ScriptTool:
                                 text,
                                 stream="stdout",
                                 session_id=session_id,
+                                execution_id=execution_id,
+                                sequence=next_sequence(),
                             )
                             sys.stdout.write(text)
                             sys.stdout.flush()
                     except (EOFError, OSError):
                         break
-                # 进程结束后，再尝试多次读取剩余数据（包括 OSC 残留）
-                # ConPTY 可能在进程退出后仍输出 OSC 序列
                 for _ in range(3):
                     try:
                         remaining_data = pty_proc.read(4096)
@@ -297,7 +329,6 @@ class ScriptTool:
                                     else remaining_data.encode()
                                 )
                             )
-                            # 只输出非空内容，避免输出清理后的空行
                             if text.strip():
                                 with capture_lock:
                                     captured.append(text)
@@ -306,6 +337,8 @@ class ScriptTool:
                                     text,
                                     stream="stdout",
                                     session_id=session_id,
+                                    execution_id=execution_id,
+                                    sequence=next_sequence(),
                                 )
                                 sys.stdout.write(text)
                                 sys.stdout.flush()
@@ -328,19 +361,39 @@ class ScriptTool:
                 "stderr": str(e),
             }
 
+        self._publish_execution_event(
+            stream_publisher,
+            message_type="tool_stream_start",
+            session_id=session_id,
+            execution_id=execution_id,
+            stream="stdout",
+            sequence=next_sequence(),
+        )
+
         reader_t = threading.Thread(target=reader, args=(proc,), daemon=True)
         reader_t.start()
 
         def stdin_forward() -> None:
             """使用 msvcrt.kbhit 轮询而非 readline 阻塞，确保脚本结束后能及时退出，不抢占后续 stdin"""
             try:
+                if input_callback is not None:
+                    while proc.isalive():
+                        try:
+                            chunk = input_callback(0.1)
+                        except Exception as e:
+                            exc_holder.append(e)
+                            break
+                        if chunk:
+                            publish_input_chunk(chunk)
+                    return
+
                 import msvcrt
 
                 while proc.isalive():
                     if msvcrt.kbhit():  # type: ignore[attr-defined]
                         try:
-                            ch = msvcrt.getwch()  # type: ignore[attr-defined]
-                            proc.write(ch)
+                            input_char = msvcrt.getwch()  # type: ignore[attr-defined]
+                            publish_input_chunk(input_char)
                         except (EOFError, OSError, UnicodeEncodeError):
                             break
                     else:
@@ -355,11 +408,11 @@ class ScriptTool:
             timeout = get_timeout()
             reader_t.join(timeout=timeout)
             if reader_t.is_alive():
-                for m in ("terminate", "kill"):
-                    fn = getattr(proc, m, None)
-                    if callable(fn):
+                for method_name in ("terminate", "kill"):
+                    terminate_method = getattr(proc, method_name, None)
+                    if callable(terminate_method):
                         try:
-                            fn()
+                            terminate_method()
                             break
                         except Exception:
                             pass
@@ -368,20 +421,44 @@ class ScriptTool:
                 except Exception:
                     pass
                 read_done.wait(timeout=2)
+                self._publish_execution_event(
+                    stream_publisher,
+                    message_type="tool_stream_end",
+                    session_id=session_id,
+                    execution_id=execution_id,
+                    stream="stdout",
+                    sequence=next_sequence(),
+                    exit_code=getattr(proc, "exitstatus", None)
+                    or getattr(proc, "returncode", None)
+                    or -1,
+                    reason="timeout",
+                )
                 return {
                     "success": False,
                     "stdout": "".join(captured),
                     "stderr": f"执行超时（超过{timeout}秒），进程已被终止。",
                 }
         except Exception as e:
-            for m in ("terminate", "kill"):
-                fn = getattr(proc, m, None)
-                if callable(fn):
+            for method_name in ("terminate", "kill"):
+                terminate_method = getattr(proc, method_name, None)
+                if callable(terminate_method):
                     try:
-                        fn()
+                        terminate_method()
                         break
                     except Exception:
                         pass
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="stdout",
+                sequence=next_sequence(),
+                exit_code=getattr(proc, "exitstatus", None)
+                or getattr(proc, "returncode", None)
+                or -1,
+                reason="error",
+            )
             return {
                 "success": False,
                 "stdout": "".join(captured),
@@ -394,11 +471,31 @@ class ScriptTool:
         read_done.wait(timeout=2)
         output = "".join(captured).strip()
         if exc_holder:
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="stdout",
+                sequence=next_sequence(),
+                exit_code=exit_code,
+                reason="error",
+            )
             return {
                 "success": False,
                 "stdout": output,
                 "stderr": str(exc_holder[0]),
             }
+        self._publish_execution_event(
+            stream_publisher,
+            message_type="tool_stream_end",
+            session_id=session_id,
+            execution_id=execution_id,
+            stream="stdout",
+            sequence=next_sequence(),
+            exit_code=exit_code,
+            reason="completed" if exit_code == 0 else "error",
+        )
         return {
             "success": exit_code == 0,
             "stdout": output,
@@ -679,6 +776,8 @@ class ScriptTool:
         get_timeout: Any,
         stream_publisher: Optional[ExecutionStreamPublisher] = None,
         session_id: Optional[str] = None,
+        execution_id: Optional[str] = None,
+        input_callback: Optional[Callable[[float], Optional[str]]] = None,
     ) -> Dict[str, Any]:
         """Windows 平台执行脚本（使用 subprocess，无 script 命令）
 
@@ -741,6 +840,8 @@ class ScriptTool:
                     get_timeout=get_timeout,
                     stream_publisher=stream_publisher,
                     session_id=session_id,
+                    execution_id=execution_id,
+                    input_callback=input_callback,
                 )
         except FileNotFoundError as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")
@@ -832,6 +933,8 @@ class ScriptTool:
                         get_timeout=get_script_execution_timeout,
                         stream_publisher=request.stream_publisher,
                         session_id=request.session_id,
+                        execution_id=request.execution_id,
+                        input_callback=request.input_callback,
                     )
 
                 if force_non_interactive:
