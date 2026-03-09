@@ -4,10 +4,14 @@ import re
 import sys
 import tempfile
 import time
+from abc import ABC
+from abc import abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -24,6 +28,52 @@ _ANSI_ESCAPE = re.compile(
 _OSC_PAYLOAD_ORPHAN = re.compile(
     r"^\s*0;(?:\d+/\d+;?)?(?:[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*)?\s*"
 )
+
+
+class ExecutionStreamPublisher(ABC):
+    """脚本执行流式消息发布器抽象。"""
+
+    @abstractmethod
+    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+        raise NotImplementedError
+
+
+class NullExecutionStreamPublisher(ExecutionStreamPublisher):
+    """默认空发布器，保持原有行为。"""
+
+    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+        del message, session_id
+
+
+@dataclass(frozen=True)
+class ExecutionRequest:
+    interpreter: str
+    script_content: str
+    execution_mode: str
+    session_id: Optional[str] = None
+    stream_publisher: Optional[ExecutionStreamPublisher] = None
+
+
+class ExecutionBackend(ABC):
+    """脚本执行后端抽象。"""
+
+    @abstractmethod
+    def execute(self, tool: Any, request: ExecutionRequest) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+class CapturedExecutionBackend(ExecutionBackend):
+    """标准结果模式后端，保持现有 stdout/stderr 返回结构。"""
+
+    def execute(self, tool: Any, request: ExecutionRequest) -> Dict[str, Any]:
+        return tool._execute_script_captured(request)
+
+
+class VirtualTTYExecutionBackend(ExecutionBackend):
+    """交互流/TTY 模式后端。"""
+
+    def execute(self, tool: Any, request: ExecutionRequest) -> Dict[str, Any]:
+        return tool._execute_script_interactive(request)
 
 
 class ScriptTool:
@@ -131,8 +181,33 @@ class ScriptTool:
         s = _OSC_PAYLOAD_ORPHAN.sub("", s)
         return s
 
+    def _publish_stream_message(
+        self,
+        publisher: Optional[ExecutionStreamPublisher],
+        chunk: str,
+        *,
+        stream: str,
+        session_id: Optional[str],
+    ) -> None:
+        if not publisher or not chunk:
+            return
+        publisher.publish(
+            {
+                "type": "tool_stream",
+                "tool": self.name,
+                "stream": stream,
+                "chunk": chunk,
+            },
+            session_id=session_id,
+        )
+
     def _execute_on_windows_interactive_pty(
-        self, argv: List[str], env: Dict[str, str], get_timeout: Any
+        self,
+        argv: List[str],
+        env: Dict[str, str],
+        get_timeout: Any,
+        stream_publisher: Optional[ExecutionStreamPublisher] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """使用 pywinpty (ConPTY) 实现：用户可交互 + 可捕获输出，类似 Unix script 命令"""
         from winpty import PtyProcess
@@ -157,6 +232,12 @@ class ScriptTool:
                             )
                             with capture_lock:
                                 captured.append(text)
+                            self._publish_stream_message(
+                                stream_publisher,
+                                text,
+                                stream="stdout",
+                                session_id=session_id,
+                            )
                             sys.stdout.write(text)
                             sys.stdout.flush()
                     except (EOFError, OSError):
@@ -178,6 +259,12 @@ class ScriptTool:
                             if text.strip():
                                 with capture_lock:
                                     captured.append(text)
+                                self._publish_stream_message(
+                                    stream_publisher,
+                                    text,
+                                    stream="stdout",
+                                    session_id=session_id,
+                                )
                                 sys.stdout.write(text)
                                 sys.stdout.flush()
                         else:
@@ -283,6 +370,8 @@ class ScriptTool:
         extension: str,
         is_non_interactive: bool,
         get_timeout: Any,
+        stream_publisher: Optional[ExecutionStreamPublisher] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Windows 平台执行脚本（使用 subprocess，无 script 命令）
 
@@ -343,6 +432,8 @@ class ScriptTool:
                     argv=cmd,
                     env=env,
                     get_timeout=get_timeout,
+                    stream_publisher=stream_publisher,
+                    session_id=session_id,
                 )
         except FileNotFoundError as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")
@@ -380,23 +471,30 @@ class ScriptTool:
                 cleaned.append(stripped)
         return "\n".join(cleaned[1:-1])
 
-    def _execute_script_with_interpreter(
-        self, interpreter: str, script_content: str
+    def _select_backend(self, execution_mode: str) -> ExecutionBackend:
+        normalized_mode = (execution_mode or "auto").strip().lower()
+        if normalized_mode == "interactive":
+            return VirtualTTYExecutionBackend()
+        if normalized_mode == "captured":
+            return CapturedExecutionBackend()
+
+        from jarvis.jarvis_utils.config import is_non_interactive
+
+        return CapturedExecutionBackend() if is_non_interactive() else VirtualTTYExecutionBackend()
+
+    def _execute_script_captured(self, request: ExecutionRequest) -> Dict[str, Any]:
+        return self._execute_script_with_interpreter_internal(request, force_non_interactive=True)
+
+    def _execute_script_interactive(self, request: ExecutionRequest) -> Dict[str, Any]:
+        return self._execute_script_with_interpreter_internal(request, force_non_interactive=False)
+
+    def _execute_script_with_interpreter_internal(
+        self, request: ExecutionRequest, force_non_interactive: bool
     ) -> Dict[str, Any]:
-        """Execute a script with the specified interpreter
-
-        Args:
-            interpreter: The interpreter to use (any valid interpreter command)
-            script_content: Content of the script
-
-        Returns:
-            Dictionary with execution results
-        """
+        interpreter = request.interpreter
+        script_content = request.script_content
         try:
-            # Get file extension for the interpreter
             extension = self.INTERPRETER_EXTENSIONS.get(interpreter, "script")
-
-            # Create temporary script file
             script_path = os.path.join(
                 tempfile.gettempdir(),
                 f"jarvis_{interpreter.replace('/', '_')}_{os.getpid()}.{extension}",
@@ -405,14 +503,11 @@ class ScriptTool:
                 tempfile.gettempdir(), f"jarvis_output_{os.getpid()}.log"
             )
             try:
-                # PowerShell 需 UTF-8 BOM 才能正确识别中文；Python 等用 UTF-8 即可
                 enc = "utf-8-sig" if interpreter in ("powershell", "pwsh") else "utf-8"
                 with open(script_path, "w", encoding=enc, errors="ignore") as f:
                     f.write(script_content)
 
-                # Display script content using PrettyOutput before execution
                 from jarvis.jarvis_utils.output import PrettyOutput
-
                 PrettyOutput.print_script_panel(
                     content=script_content,
                     title=f"📜 执行脚本 ({interpreter})",
@@ -420,117 +515,130 @@ class ScriptTool:
                 )
 
                 import subprocess
-
                 from jarvis.jarvis_utils.config import get_script_execution_timeout
-                from jarvis.jarvis_utils.config import is_non_interactive
 
                 if self._is_windows():
-                    # Windows 没有 script 命令，使用 subprocess 直接捕获输出
                     return self._execute_on_windows(
                         interpreter=interpreter,
                         script_path=script_path,
                         extension=extension,
-                        is_non_interactive=is_non_interactive(),
+                        is_non_interactive=force_non_interactive,
                         get_timeout=get_script_execution_timeout,
+                        stream_publisher=request.stream_publisher,
+                        session_id=request.session_id,
                     )
+
+                if self._is_macos():
+                    tee_command = f"script -q {output_file} {interpreter} {script_path}"
                 else:
-                    # Unix/Linux: 使用 script 命令捕获 stdout 和 stderr
-                    if self._is_macos():
-                        # macOS (BSD script): script [-q] [file [command ...]]
-                        tee_command = (
-                            f"script -q {output_file} {interpreter} {script_path}"
-                        )
-                    else:
-                        # Linux (util-linux script): script [-q] [-c command] [file]
-                        tee_command = (
-                            f"script -q -c '{interpreter} {script_path}' {output_file}"
-                        )
-                    timed_out = False
-                    if is_non_interactive():
-                        proc = None
+                    tee_command = f"script -q -c '{interpreter} {script_path}' {output_file}"
+
+                timed_out = False
+                if force_non_interactive:
+                    proc = None
+                    try:
+                        proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
                         try:
-                            # 核心功能：执行脚本，shell=True支持复杂命令（已审计输入）
-                            proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
+                            proc.wait(timeout=get_script_execution_timeout())
+                        except subprocess.TimeoutExpired:
+                            timed_out = True
                             try:
-                                proc.wait(timeout=get_script_execution_timeout())
+                                proc.terminate()
+                                proc.wait(timeout=2)
                             except subprocess.TimeoutExpired:
-                                timed_out = True
                                 try:
-                                    proc.terminate()
-                                    proc.wait(timeout=2)
-                                except subprocess.TimeoutExpired:
-                                    try:
-                                        proc.kill()
-                                        proc.wait()
-                                    except Exception:
-                                        pass
-                                except Exception:
-                                    try:
-                                        proc.kill()
-                                        proc.wait()
-                                    except Exception:
-                                        pass
-                        except Exception as e:
-                            if proc is not None:
-                                try:
-                                    proc.terminate()
-                                    proc.wait(timeout=1)
-                                except Exception:
-                                    try:
-                                        proc.kill()
-                                        proc.wait()
-                                    except Exception:
-                                        pass
-                            PrettyOutput.auto_print(f"❌ {str(e)}")
-                            try:
-                                output = self.get_display_output(output_file)
-                            except Exception as ee:
-                                output = f"读取输出文件失败: {str(ee)}"
-                            return {
-                                "success": False,
-                                "stdout": output,
-                                "stderr": f"执行脚本失败: {str(e)}",
-                            }
-                        finally:
-                            if proc is not None:
-                                try:
-                                    if proc.stdin:
-                                        proc.stdin.close()
-                                    if proc.stdout:
-                                        proc.stdout.close()
-                                    if proc.stderr:
-                                        proc.stderr.close()
+                                    proc.kill()
+                                    proc.wait()
                                 except Exception:
                                     pass
-                    else:
-                        # 核心功能：交互模式执行脚本（已审计输入）
-                        os.system(tee_command)  # nosec B605
-
-                    try:
-                        output = self.get_display_output(output_file)
+                            except Exception:
+                                try:
+                                    proc.kill()
+                                    proc.wait()
+                                except Exception:
+                                    pass
                     except Exception as e:
-                        output = f"读取输出文件失败: {str(e)}"
-
-                    if is_non_interactive() and timed_out:
+                        if proc is not None:
+                            try:
+                                proc.terminate()
+                                proc.wait(timeout=1)
+                            except Exception:
+                                try:
+                                    proc.kill()
+                                    proc.wait()
+                                except Exception:
+                                    pass
+                        PrettyOutput.auto_print(f"❌ {str(e)}")
+                        try:
+                            output = self.get_display_output(output_file)
+                        except Exception as ee:
+                            output = f"读取输出文件失败: {str(ee)}"
                         return {
                             "success": False,
                             "stdout": output,
-                            "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
+                            "stderr": f"执行脚本失败: {str(e)}",
                         }
-                    return {
-                        "success": True,
-                        "stdout": output,
-                        "stderr": "",
-                    }
+                    finally:
+                        if proc is not None:
+                            try:
+                                if proc.stdin:
+                                    proc.stdin.close()
+                                if proc.stdout:
+                                    proc.stdout.close()
+                                if proc.stderr:
+                                    proc.stderr.close()
+                            except Exception:
+                                pass
+                else:
+                    if request.stream_publisher is not None:
+                        self._publish_stream_message(
+                            request.stream_publisher,
+                            "interactive stream bridge is not yet available on Unix; falling back to legacy terminal execution\n",
+                            stream="stderr",
+                            session_id=request.session_id,
+                        )
+                    os.system(tee_command)  # nosec B605
 
+                try:
+                    output = self.get_display_output(output_file)
+                except Exception as e:
+                    output = f"读取输出文件失败: {str(e)}"
+
+                if force_non_interactive and timed_out:
+                    return {
+                        "success": False,
+                        "stdout": output,
+                        "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
+                    }
+                return {
+                    "success": True,
+                    "stdout": output,
+                    "stderr": "",
+                }
             finally:
-                # Clean up temporary files
                 Path(script_path).unlink(missing_ok=True)
                 Path(output_file).unlink(missing_ok=True)
-
         except Exception as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
+
+    def _execute_script_with_interpreter(
+        self,
+        interpreter: str,
+        script_content: str,
+        execution_mode: str = "auto",
+        session_id: Optional[str] = None,
+        stream_publisher: Optional[ExecutionStreamPublisher] = None,
+    ) -> Dict[str, Any]:
+        request = ExecutionRequest(
+            interpreter=interpreter,
+            script_content=script_content,
+            execution_mode=execution_mode,
+            session_id=session_id,
+            stream_publisher=stream_publisher,
+        )
+        backend = self._select_backend(execution_mode)
+        return backend.execute(self, request)
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute script based on interpreter and content
@@ -554,9 +662,26 @@ class ScriptTool:
             interpreter = args.get(
                 "interpreter", "powershell" if self._is_windows() else "bash"
             )
+            execution_mode = str(args.get("execution_mode", "auto"))
+            session_id = args.get("session_id")
+            stream_publisher = args.get("stream_publisher")
+            if stream_publisher is not None and not isinstance(
+                stream_publisher, ExecutionStreamPublisher
+            ):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "stream_publisher must implement ExecutionStreamPublisher",
+                }
 
             # Execute the script with the specified interpreter
-            return self._execute_script_with_interpreter(interpreter, script_content)
+            return self._execute_script_with_interpreter(
+                interpreter,
+                script_content,
+                execution_mode=execution_mode,
+                session_id=session_id if isinstance(session_id, str) else None,
+                stream_publisher=stream_publisher,
+            )
 
         except Exception as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")

@@ -11,10 +11,14 @@
 import base64
 import os
 import sys
+import threading
+from abc import ABC
+from abc import abstractmethod
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from typing import Dict
 from typing import Iterable
 from typing import List
 from typing import Any
@@ -89,6 +93,94 @@ BUILTIN_COMMANDS = [
     ("FixToolCall", "修复工具调用"),
     ("SwitchModel", "切换模型组"),
 ]
+
+
+class InputProviderTimeoutError(TimeoutError):
+    """输入提供者等待用户输入超时。"""
+
+
+class InputProviderDisconnectedError(RuntimeError):
+    """输入提供者对应的远端会话已断开。"""
+
+
+class InputProvider(ABC):
+    """用户输入提供者抽象。"""
+
+    @abstractmethod
+    def get_multiline_input(
+        self, tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+    ) -> str:
+        raise NotImplementedError
+
+
+class CLIInputProvider(InputProvider):
+    """默认本地 CLI 输入提供者，复用既有 prompt_toolkit 实现。"""
+
+    def get_multiline_input(
+        self, tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+    ) -> str:
+        return _get_multiline_input_internal(
+            tip, preset=preset, preset_cursor=preset_cursor
+        )
+
+
+_default_input_provider: InputProvider = CLIInputProvider()
+_input_provider_lock = threading.RLock()
+_input_providers: Dict[str, InputProvider] = {}
+
+
+def register_input_provider(provider_id: str, provider: InputProvider) -> None:
+    """注册命名输入提供者，供远端会话或特定 Agent 绑定。"""
+    with _input_provider_lock:
+        _input_providers[provider_id] = provider
+
+
+
+def unregister_input_provider(provider_id: str) -> None:
+    """移除命名输入提供者；若不存在则忽略。"""
+    with _input_provider_lock:
+        _input_providers.pop(provider_id, None)
+
+
+
+def set_default_input_provider(provider: InputProvider) -> None:
+    """设置全局默认输入提供者。"""
+    global _default_input_provider
+    with _input_provider_lock:
+        _default_input_provider = provider
+
+
+
+def get_default_input_provider() -> InputProvider:
+    """获取当前默认输入提供者。"""
+    with _input_provider_lock:
+        return _default_input_provider
+
+
+
+def _resolve_input_provider_key(agent: Optional[Any]) -> Optional[str]:
+    if agent is None:
+        return None
+    for attr_name in ("input_provider_key", "session_id"):
+        try:
+            value = getattr(agent, attr_name, None)
+        except Exception:
+            value = None
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+
+def get_current_input_provider() -> InputProvider:
+    """获取当前 Agent 对应的输入提供者；未命中时回退到默认 CLI。"""
+    agent = _get_current_agent_for_input()
+    provider_key = _resolve_input_provider_key(agent)
+    with _input_provider_lock:
+        if provider_key and provider_key in _input_providers:
+            return _input_providers[provider_key]
+        return _default_input_provider
+
 
 
 def _display_width(s: str) -> int:
@@ -1210,9 +1302,18 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
         if _is_non_interactive_for_current_agent():
             return _get_non_interactive_response(_is_auto_complete_for_current_agent())
-        user_input = _get_multiline_input_internal(
-            tip, preset=preset, preset_cursor=preset_cursor
-        )
+
+        provider = get_current_input_provider()
+        try:
+            user_input = provider.get_multiline_input(
+                tip, preset=preset, preset_cursor=preset_cursor
+            )
+        except InputProviderTimeoutError:
+            PrettyOutput.auto_print("⚠️ 输入等待超时，已取消本次输入")
+            return ""
+        except InputProviderDisconnectedError:
+            PrettyOutput.auto_print("⚠️ 远端输入连接已断开，已取消本次输入")
+            return ""
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
