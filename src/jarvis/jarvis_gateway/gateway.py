@@ -43,6 +43,13 @@ class IGateway(ABC):
     ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
         """获取执行输入回调（用于交互式终端）。"""
 
+    @abstractmethod
+    def get_execution_resize_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[], Optional[Tuple[int, int]]]]:
+        """获取执行终端尺寸变更回调。"""
+
 
 class BaseGateway(IGateway):
     """基础网关实现，便于扩展自定义交互方式。"""
@@ -92,5 +99,12 @@ class BaseGateway(IGateway):
         self,
         execution_id: str,
     ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+        del execution_id
+        return None
+
+    def get_execution_resize_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[], Optional[Tuple[int, int]]]]:
         del execution_id
         return None
