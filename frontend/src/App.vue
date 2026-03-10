@@ -94,7 +94,7 @@ const inputTip = ref('')
 const outputList = ref(null)
 // 多终端管理：每个 executionId 对应一个终端实例
 const terminalHosts = ref(new Map())
-const terminals = ref([]) // [{ executionId, terminal, active, hostEl }]
+const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize }]
 
 const connectionStatus = computed(() => {
   if (connecting.value) return 'connecting'
@@ -281,13 +281,55 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+function computeTerminalSize(terminal, hostEl) {
+  const core = terminal?._core
+  const dims = core?._renderService?.dimensions
+  const cellWidth = dims?.actualCellWidth
+  const cellHeight = dims?.actualCellHeight
+  if (!cellWidth || !cellHeight) return null
+  const rect = hostEl.getBoundingClientRect()
+  if (!rect.width || !rect.height) return null
+  const cols = Math.max(2, Math.floor(rect.width / cellWidth))
+  const rows = Math.max(1, Math.floor(rect.height / cellHeight))
+  return { cols, rows }
+}
+
+function syncTerminalSize(executionId, termInfo) {
+  if (!termInfo?.terminal || !termInfo?.hostEl) return
+  const size = computeTerminalSize(termInfo.terminal, termInfo.hostEl)
+  if (!size) return
+  const same = termInfo.lastSize &&
+    termInfo.lastSize.cols === size.cols &&
+    termInfo.lastSize.rows === size.rows
+  if (same) return
+  termInfo.lastSize = size
+  try {
+    termInfo.terminal.resize(size.cols, size.rows)
+  } catch (error) {
+    console.warn('[terminal] resize failed', error)
+  }
+  if (!socket.value) return
+  const message = {
+    type: 'terminal_resize',
+    payload: {
+      execution_id: executionId,
+      rows: size.rows,
+      cols: size.cols,
+    },
+  }
+  socket.value.send(JSON.stringify(message))
+}
+
 // 动态绑定终端 DOM 元素
 function setTerminalRef(executionId, el) {
+  const termInfo = terminals.value.find(t => t.executionId === executionId)
   if (el) {
     console.log(`[terminal] Setting ref for execution ${executionId}`)
     terminalHosts.value.set(executionId, el)
+    if (termInfo) {
+      termInfo.hostEl = el
+    }
     // 立即初始化终端
-    const termInfo = terminals.value.find(t => t.executionId === executionId)
     if (termInfo && !termInfo.terminal) {
       console.log(`[terminal] Initializing terminal for execution ${executionId}`)
       termInfo.terminal = new Terminal({
@@ -309,10 +351,33 @@ function setTerminalRef(executionId, el) {
         }
         socket.value.send(JSON.stringify(message))
       })
+      if (typeof ResizeObserver !== 'undefined') {
+        termInfo.resizeObserver = new ResizeObserver(() => {
+          syncTerminalSize(executionId, termInfo)
+        })
+        termInfo.resizeObserver.observe(el)
+      }
+      requestAnimationFrame(() => {
+        syncTerminalSize(executionId, termInfo)
+        try {
+          termInfo.terminal.focus()
+        } catch (error) {
+          // ignore focus errors
+        }
+      })
       termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
+    } else if (termInfo) {
+      syncTerminalSize(executionId, termInfo)
     }
   } else {
     terminalHosts.value.delete(executionId)
+    if (termInfo?.resizeObserver) {
+      termInfo.resizeObserver.disconnect()
+      termInfo.resizeObserver = null
+    }
+    if (termInfo) {
+      termInfo.hostEl = null
+    }
   }
 }
 
