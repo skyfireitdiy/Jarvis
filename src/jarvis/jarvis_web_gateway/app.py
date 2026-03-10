@@ -211,6 +211,22 @@ def _extract_session_id(context: Optional[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
+def _resolve_active_session_id(
+    auth_store: Dict[str, Optional[Dict[str, Any]]]
+) -> Optional[str]:
+    """在缺少显式 session_id 时，选择一个可用的会话。
+
+    优先挑选已完成认证的会话（auth_payload 非 None）。
+    """
+    preferred = None
+    for session_id, auth_payload in auth_store.items():
+        if auth_payload is not None:
+            return session_id
+        if preferred is None:
+            preferred = session_id
+    return preferred
+
+
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(payload, dict):
         return None
