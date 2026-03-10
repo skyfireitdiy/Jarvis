@@ -60,7 +60,14 @@ class WebGateway(BaseGateway):
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         metadata = dict(request.metadata) if request.metadata else {}
-        session_id = metadata.get("session_id") or "default"
+        session_id = metadata.get("session_id")
+        if not session_id:
+            session_id = _resolve_active_session_id(self._auth_store)
+            if session_id:
+                metadata["session_id"] = session_id
+            else:
+                session_id = "default"
+                metadata["session_id"] = session_id
         auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
