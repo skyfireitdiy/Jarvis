@@ -116,6 +116,7 @@ function connect() {
   connecting.value = true
   const ws = new WebSocket(url)
   ws.onopen = () => {
+    console.log('[ws] open')
     connecting.value = false
     socket.value = ws
     const payload = {}
@@ -123,6 +124,7 @@ function connect() {
     if (auth.value.password) payload.password = auth.value.password
     if (Object.keys(payload).length > 0) {
       ws.send(JSON.stringify({ type: 'auth', payload }))
+      console.log('[ws] auth sent', payload)
     }
   }
   ws.onmessage = (event) => {
@@ -130,15 +132,19 @@ function connect() {
     try {
       message = JSON.parse(event.data)
     } catch (error) {
+      console.warn('[ws] message parse failed', event.data)
       return
     }
+    console.log('[ws] message', message)
     handleMessage(message)
   }
   ws.onclose = () => {
+    console.log('[ws] close')
     socket.value = null
     connecting.value = false
   }
   ws.onerror = () => {
+    console.error('[ws] error')
     connecting.value = false
   }
 }
@@ -153,18 +159,21 @@ function handleMessage(message) {
   if (!message || typeof message !== 'object') return
   const { type, payload } = message
   if (type === 'ready') {
+    console.log('[ws] ready payload', payload)
     if (payload?.session_id) {
       sessionId.value = payload.session_id
     }
   } else if (type === 'output') {
     appendOutput(payload)
   } else if (type === 'input_request') {
+    console.log('[ws] input_request', payload)
     inputTip.value = payload.tip || ''
     inputMode.value = payload.metadata?.mode || 'single'
     inputText.value = payload.preset || ''
   } else if (type === 'execution') {
     appendExecution(payload)
   } else if (type === 'error') {
+    console.warn('[ws] error payload', payload)
     appendOutput({
       output_type: 'ERROR',
       text: payload?.message || '未知错误',
@@ -198,17 +207,17 @@ function appendExecution(payload) {
 
 function submitInput() {
   if (!socket.value) return
-  socket.value.send(
-    JSON.stringify({
-      type: 'input_result',
-      payload: {
-        text: inputText.value,
-        metadata: {
-          session_id: sessionId.value || undefined,
-        },
+  const message = {
+    type: 'input_result',
+    payload: {
+      text: inputText.value,
+      metadata: {
+        session_id: sessionId.value || undefined,
       },
-    }),
-  )
+    },
+  }
+  console.log('[ws] send input_result', message)
+  socket.value.send(JSON.stringify(message))
   inputText.value = ''
 }
 
