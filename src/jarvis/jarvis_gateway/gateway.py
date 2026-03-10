@@ -6,6 +6,7 @@ from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import Tuple
@@ -34,6 +35,13 @@ class IGateway(ABC):
         session_id: Optional[str] = None,
     ) -> None:
         """发布执行流事件。"""
+
+    @abstractmethod
+    def get_execution_input_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+        """获取执行输入回调（用于交互式终端）。"""
 
 
 class BaseGateway(IGateway):
@@ -79,3 +87,10 @@ class BaseGateway(IGateway):
     ) -> None:
         del event, session_id
         raise NotImplementedError
+
+    def get_execution_input_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+        del execution_id
+        return None

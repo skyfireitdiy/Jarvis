@@ -297,6 +297,18 @@ function setTerminalRef(executionId, el) {
         fontSize: 12,
       })
       termInfo.terminal.open(el)
+      termInfo.terminal.onData(data => {
+        if (!termInfo.active) return
+        if (!socket.value) return
+        const message = {
+          type: 'terminal_input',
+          payload: {
+            execution_id: executionId,
+            data,
+          },
+        }
+        socket.value.send(JSON.stringify(message))
+      })
       termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
     }
   } else {
