@@ -570,6 +570,39 @@ def emit_output(event: OutputEvent) -> None:
                 # 后端故障不影响其他后端
                 console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
 
+    context = event.context or {}
+    if context.get("_gateway_skip"):
+        return
+
+    try:
+        from jarvis.jarvis_gateway.events import GatewayOutputEvent
+        from jarvis.jarvis_gateway.manager import get_current_gateway
+    except Exception:
+        return
+
+    gateway = get_current_gateway()
+    if gateway is None:
+        return
+
+    gateway_context = dict(context) if context else None
+    if gateway_context:
+        gateway_context.pop("_gateway_skip", None)
+
+    try:
+        gateway.emit_output(
+            GatewayOutputEvent(
+                text=event.text,
+                output_type=event.output_type.value,
+                timestamp=event.timestamp,
+                lang=event.lang,
+                traceback=event.traceback,
+                section=event.section,
+                context=gateway_context,
+            )
+        )
+    except Exception as e:
+        console.print(f"[网关输出错误] {gateway.__class__.__name__}: {e}")
+
 
 class PrettyOutput:
     """

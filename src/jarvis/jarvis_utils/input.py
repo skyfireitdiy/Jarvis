@@ -1323,17 +1323,44 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
         if _is_non_interactive_for_current_agent():
             return _get_non_interactive_response(_is_auto_complete_for_current_agent())
 
-        provider = get_current_input_provider()
-        try:
-            user_input = provider.get_multiline_input(
+        def _get_input_via_provider() -> str:
+            provider = get_current_input_provider()
+            return provider.get_multiline_input(
                 tip, preset=preset, preset_cursor=preset_cursor
             )
+
+        gateway = None
+        GatewayInputRequest = None
+        try:
+            from jarvis.jarvis_gateway.events import (
+                GatewayInputRequest as _GatewayInputRequest,
+            )
+            from jarvis.jarvis_gateway.manager import get_current_gateway
+
+            gateway = get_current_gateway()
+            GatewayInputRequest = _GatewayInputRequest
+        except Exception:
+            gateway = None
+
+        try:
+            if gateway is not None and GatewayInputRequest is not None:
+                request = GatewayInputRequest(
+                    tip=tip,
+                    preset=preset,
+                    preset_cursor=preset_cursor,
+                )
+                result = gateway.request_input(request)
+                user_input = result.text if result is not None else ""
+            else:
+                user_input = _get_input_via_provider()
         except InputProviderTimeoutError:
             PrettyOutput.auto_print("⚠️ 输入等待超时，已取消本次输入")
             return ""
         except InputProviderDisconnectedError:
             PrettyOutput.auto_print("⚠️ 远端输入连接已断开，已取消本次输入")
             return ""
+        except Exception:
+            user_input = _get_input_via_provider()
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
