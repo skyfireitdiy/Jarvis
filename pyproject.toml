@@ -26,7 +26,7 @@ dependencies = [
     "pygments==2.19.1",
     "fuzzywuzzy==0.18.0",
     "fastapi==0.115.12",
-    "uvicorn==0.33.0",
+    "uvicorn[standard]==0.33.0",
     "rich==14.0.0",
     "python-Levenshtein==0.25.1",
     "tiktoken==0.7.0",
@@ -182,6 +182,8 @@ dependencies = [
     jb = "jarvis.jarvis_browser.cli:app"
     jarvis-windows = "jarvis.jarvis_windows.cli:app"
     jw = "jarvis.jarvis_windows.cli:app"
+    jarvis-web-gateway = "jarvis.jarvis_web_gateway.cli:app"
+    jwg = "jarvis.jarvis_web_gateway.cli:app"
     jarvis-quick-config = "jarvis.jarvis_utils.quick_config:app"
     jqc = "jarvis.jarvis_utils.quick_config:app"
     jarvis-rules-index = "jarvis.jarvis_rules_index.cli:main"

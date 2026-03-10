@@ -29,6 +29,12 @@ class CLIGateway(BaseGateway):
         self._execution_event_handler = execution_event_handler
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
+        auth_payload = None
+        if event.context:
+            auth_payload = event.context.get("auth")
+        authorized, _ = self._check_auth(auth_payload)
+        if not authorized:
+            return
         context = dict(event.context) if event.context else {}
         context["_gateway_skip"] = True
         output_event = OutputEvent(
@@ -43,6 +49,12 @@ class CLIGateway(BaseGateway):
         emit_output(output_event)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
+        auth_payload = None
+        if request.metadata:
+            auth_payload = request.metadata.get("auth")
+        authorized, reason = self._check_auth(auth_payload)
+        if not authorized:
+            return GatewayInputResult(text="", metadata={"error": reason})
         provider = get_current_input_provider()
         text = provider.get_multiline_input(
             request.tip,
@@ -56,6 +68,12 @@ class CLIGateway(BaseGateway):
         event: GatewayExecutionEvent,
         session_id: Optional[str] = None,
     ) -> None:
+        auth_payload = None
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        auth_payload = payload.get("auth")
+        authorized, _ = self._check_auth(auth_payload)
+        if not authorized:
+            return
         if self._execution_event_handler is None:
             return
         self._execution_event_handler(event, session_id)
