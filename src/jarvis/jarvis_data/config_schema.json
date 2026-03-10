@@ -258,6 +258,31 @@
       "description": "是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）",
       "default": false
     },
+    "gateway_auth": {
+      "type": "object",
+      "description": "Gateway 认证配置（固定 token 或密码）",
+      "properties": {
+        "enable": {
+          "type": "boolean",
+          "description": "是否启用 Gateway 认证",
+          "default": false
+        },
+        "token": {
+          "type": "string",
+          "description": "固定 token（可选）"
+        },
+        "password": {
+          "type": "string",
+          "description": "固定密码（可选）"
+        },
+        "allow_unset": {
+          "type": "boolean",
+          "description": "未配置认证信息时是否允许访问（默认允许，保持本地 CLI 兼容）",
+          "default": true
+        }
+      },
+      "default": {}
+    },
     "save_session_history": {
       "type": "boolean",
       "description": "是否保存会话记录",

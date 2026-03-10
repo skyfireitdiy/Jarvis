@@ -41,15 +41,49 @@ class ExecutionStreamPublisher(ABC):
     """脚本执行流式消息发布器抽象。"""
 
     @abstractmethod
-    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+    def publish(
+        self, message: Dict[str, Any], session_id: Optional[str] = None
+    ) -> None:
         raise NotImplementedError
 
 
 class NullExecutionStreamPublisher(ExecutionStreamPublisher):
     """默认空发布器，保持原有行为。"""
 
-    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+    def publish(
+        self, message: Dict[str, Any], session_id: Optional[str] = None
+    ) -> None:
         del message, session_id
+
+
+class GatewayExecutionStreamPublisher(ExecutionStreamPublisher):
+    """将执行流事件转发到 Gateway。"""
+
+    def __init__(self, gateway: Any) -> None:
+        self._gateway = gateway
+
+    def publish(
+        self, message: Dict[str, Any], session_id: Optional[str] = None
+    ) -> None:
+        if self._gateway is None:
+            return
+        try:
+            from jarvis.jarvis_gateway.events import GatewayExecutionEvent
+        except Exception:
+            return
+
+        event_type = (
+            message.get("message_type") or message.get("type") or "execution_event"
+        )
+        try:
+            event = GatewayExecutionEvent(
+                event_type=str(event_type),
+                payload=dict(message),
+                timestamp=message.get("timestamp"),
+            )
+            self._gateway.publish_execution_event(event, session_id=session_id)
+        except Exception:
+            return
 
 
 @dataclass(frozen=True)
@@ -640,7 +674,11 @@ class ScriptTool:
             except Exception as e:
                 exc_holder.append(e)
             finally:
-                if stdin_is_tty and stdin_fd is not None and old_stdin_attrs is not None:
+                if (
+                    stdin_is_tty
+                    and stdin_fd is not None
+                    and old_stdin_attrs is not None
+                ):
                     try:
                         import termios
 
@@ -888,13 +926,21 @@ class ScriptTool:
 
         from jarvis.jarvis_utils.config import is_non_interactive
 
-        return CapturedExecutionBackend() if is_non_interactive() else VirtualTTYExecutionBackend()
+        return (
+            CapturedExecutionBackend()
+            if is_non_interactive()
+            else VirtualTTYExecutionBackend()
+        )
 
     def _execute_script_captured(self, request: ExecutionRequest) -> Dict[str, Any]:
-        return self._execute_script_with_interpreter_internal(request, force_non_interactive=True)
+        return self._execute_script_with_interpreter_internal(
+            request, force_non_interactive=True
+        )
 
     def _execute_script_interactive(self, request: ExecutionRequest) -> Dict[str, Any]:
-        return self._execute_script_with_interpreter_internal(request, force_non_interactive=False)
+        return self._execute_script_with_interpreter_internal(
+            request, force_non_interactive=False
+        )
 
     def _execute_script_with_interpreter_internal(
         self, request: ExecutionRequest, force_non_interactive: bool
@@ -916,6 +962,7 @@ class ScriptTool:
                     f.write(script_content)
 
                 from jarvis.jarvis_utils.output import PrettyOutput
+
                 PrettyOutput.print_script_panel(
                     content=script_content,
                     title=f"📜 执行脚本 ({interpreter})",
@@ -939,9 +986,13 @@ class ScriptTool:
 
                 if force_non_interactive:
                     if self._is_macos():
-                        tee_command = f"script -q {output_file} {interpreter} {script_path}"
+                        tee_command = (
+                            f"script -q {output_file} {interpreter} {script_path}"
+                        )
                     else:
-                        tee_command = f"script -q -c '{interpreter} {script_path}' {output_file}"
+                        tee_command = (
+                            f"script -q -c '{interpreter} {script_path}' {output_file}"
+                        )
                     timed_out = False
                     proc = None
                     try:
@@ -1086,6 +1137,16 @@ class ScriptTool:
             stream_publisher = args.get("stream_publisher")
             execution_id = args.get("execution_id")
             input_callback = args.get("input_callback")
+
+            if stream_publisher is None:
+                try:
+                    from jarvis.jarvis_gateway.manager import get_current_gateway
+
+                    gateway = get_current_gateway()
+                except Exception:
+                    gateway = None
+                if gateway is not None:
+                    stream_publisher = GatewayExecutionStreamPublisher(gateway)
             if stream_publisher is not None and not isinstance(
                 stream_publisher, ExecutionStreamPublisher
             ):
@@ -1108,7 +1169,9 @@ class ScriptTool:
                 execution_mode=execution_mode,
                 session_id=session_id if isinstance(session_id, str) else None,
                 stream_publisher=stream_publisher,
-                execution_id=execution_id if isinstance(execution_id, str) else uuid.uuid4().hex,
+                execution_id=execution_id
+                if isinstance(execution_id, str)
+                else uuid.uuid4().hex,
                 input_callback=input_callback,
             )
 

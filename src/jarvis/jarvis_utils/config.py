@@ -966,6 +966,19 @@ def get_mcp_config() -> List[Dict[str, Any]]:
     return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("mcp", []))
 
 
+def get_gateway_auth_config() -> Dict[str, Any]:
+    """
+    获取 Gateway 认证配置。
+
+    返回:
+        Dict[str, Any]: Gateway 认证配置字典，未配置返回空字典
+    """
+    value = GLOBAL_CONFIG_DATA.get("gateway_auth", {})
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
 # ==============================================================================
 # Web Search Configuration
 # ==============================================================================
