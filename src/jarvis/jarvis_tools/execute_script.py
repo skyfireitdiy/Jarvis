@@ -332,24 +332,24 @@ class ScriptTool:
                     try:
                         data = pty_proc.read(4096)
                         if data:
-                            text = self._strip_ansi(
-                                self._decode_windows_output(
-                                    data if isinstance(data, bytes) else data.encode()
-                                )
+                            raw_text = self._decode_windows_output(
+                                data if isinstance(data, bytes) else data.encode()
                             )
-                            if not text:
+                            if not raw_text:
                                 continue
-                            with capture_lock:
-                                captured.append(text)
+                            display_text = self._strip_ansi(raw_text)
+                            if display_text:
+                                with capture_lock:
+                                    captured.append(display_text)
                             self._publish_stream_message(
                                 stream_publisher,
-                                text,
+                                raw_text,
                                 stream="stdout",
                                 session_id=session_id,
                                 execution_id=execution_id,
                                 sequence=next_sequence(),
                             )
-                            sys.stdout.write(text)
+                            sys.stdout.write(raw_text)
                             sys.stdout.flush()
                     except (EOFError, OSError):
                         break
@@ -357,25 +357,25 @@ class ScriptTool:
                     try:
                         remaining_data = pty_proc.read(4096)
                         if remaining_data:
-                            text = self._strip_ansi(
-                                self._decode_windows_output(
-                                    remaining_data
-                                    if isinstance(remaining_data, bytes)
-                                    else remaining_data.encode()
-                                )
+                            raw_text = self._decode_windows_output(
+                                remaining_data
+                                if isinstance(remaining_data, bytes)
+                                else remaining_data.encode()
                             )
-                            if text.strip():
+                            display_text = self._strip_ansi(raw_text)
+                            if display_text.strip():
                                 with capture_lock:
-                                    captured.append(text)
+                                    captured.append(display_text)
+                            if raw_text:
                                 self._publish_stream_message(
                                     stream_publisher,
-                                    text,
+                                    raw_text,
                                     stream="stdout",
                                     session_id=session_id,
                                     execution_id=execution_id,
                                     sequence=next_sequence(),
                                 )
-                                sys.stdout.write(text)
+                                sys.stdout.write(raw_text)
                                 sys.stdout.flush()
                         else:
                             break
@@ -591,20 +591,22 @@ class ScriptTool:
                         break
                     if not data:
                         break
-                    text = self._strip_ansi(data.decode("utf-8", errors="replace"))
-                    if not text:
+                    raw_text = data.decode("utf-8", errors="replace")
+                    if not raw_text:
                         continue
-                    with captured_lock:
-                        captured.append(text)
+                    display_text = self._strip_ansi(raw_text)
+                    if display_text:
+                        with captured_lock:
+                            captured.append(display_text)
                     self._publish_stream_message(
                         stream_publisher,
-                        text,
+                        raw_text,
                         stream="tty",
                         session_id=session_id,
                         execution_id=execution_id,
                         sequence=next_sequence(),
                     )
-                    sys.stdout.write(text)
+                    sys.stdout.write(raw_text)
                     sys.stdout.flush()
             except Exception as e:
                 exc_holder.append(e)
