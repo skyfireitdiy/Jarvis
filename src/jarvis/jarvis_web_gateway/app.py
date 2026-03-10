@@ -10,6 +10,7 @@ import asyncio
 import uuid
 import time
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import Tuple
@@ -26,6 +27,7 @@ from jarvis.jarvis_gateway.gateway import BaseGateway
 from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
+from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 
 
 class WebGateway(BaseGateway):
@@ -36,10 +38,12 @@ class WebGateway(BaseGateway):
         router: SessionOutputRouter,
         input_registry: InputSessionRegistry,
         auth_store: Dict[str, Optional[Dict[str, Any]]],
+        terminal_input_registry: TerminalInputRegistry,
     ) -> None:
         self._router = router
         self._input_registry = input_registry
         self._auth_store = auth_store
+        self._terminal_input_registry = terminal_input_registry
         self._current_session_id: Optional[str] = None
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
@@ -171,6 +175,12 @@ class WebGateway(BaseGateway):
         message = {"type": "execution", "payload": message_payload}
         self._router.publish(message, session_id=session_id)
 
+    def get_execution_input_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+        return self._terminal_input_registry.get_input_callback(execution_id)
+
 
 class WebSocketConnectionManager:
     """WebSocket 连接管理。"""
@@ -179,11 +189,13 @@ class WebSocketConnectionManager:
         self,
         router: SessionOutputRouter,
         input_registry: InputSessionRegistry,
+        terminal_input_registry: TerminalInputRegistry,
         gateway: WebGateway,
         auth_store: Dict[str, Optional[Dict[str, Any]]],
     ) -> None:
         self._router = router
         self._input_registry = input_registry
+        self._terminal_input_registry = terminal_input_registry
         self._gateway = gateway
         self._auth_store = auth_store
 
@@ -266,6 +278,14 @@ class WebSocketConnectionManager:
                 f"🔍 [DEBUG] WebSocketConnectionManager._handle_message: Received input_result for session_id={session_id}, text={repr(text[:50]) if text else ''}"
             )
             self._input_registry.submit_input(session_id, text)
+            return
+        if message_type == "terminal_input":
+            execution_id = payload.get("execution_id")
+            data = payload.get("data", "")
+            if not execution_id:
+                return
+            self._terminal_input_registry.submit_terminal_input(execution_id, data)
+            return
 
 
 def create_app() -> FastAPI:
@@ -273,9 +293,12 @@ def create_app() -> FastAPI:
 
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
+    terminal_input_registry = TerminalInputRegistry()
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
-    gateway = WebGateway(router, input_registry, auth_store)
-    manager = WebSocketConnectionManager(router, input_registry, gateway, auth_store)
+    gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
+    manager = WebSocketConnectionManager(
+        router, input_registry, terminal_input_registry, gateway, auth_store
+    )
 
     set_current_gateway(gateway)
 

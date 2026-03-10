@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import cast
 from typing import List
 from typing import Optional
 
@@ -109,14 +110,14 @@ class CapturedExecutionBackend(ExecutionBackend):
     """标准结果模式后端，保持现有 stdout/stderr 返回结构。"""
 
     def execute(self, tool: Any, request: ExecutionRequest) -> Dict[str, Any]:
-        return tool._execute_script_captured(request)
+        return cast(Dict[str, Any], tool._execute_script_captured(request))
 
 
 class VirtualTTYExecutionBackend(ExecutionBackend):
     """交互流/TTY 模式后端。"""
 
     def execute(self, tool: Any, request: ExecutionRequest) -> Dict[str, Any]:
-        return tool._execute_script_interactive(request)
+        return cast(Dict[str, Any], tool._execute_script_interactive(request))
 
 
 class ScriptTool:
@@ -1137,6 +1138,7 @@ class ScriptTool:
             stream_publisher = args.get("stream_publisher")
             execution_id = args.get("execution_id")
             input_callback = args.get("input_callback")
+            gateway = None
 
             if stream_publisher is None:
                 try:
@@ -1162,6 +1164,20 @@ class ScriptTool:
                     "stderr": "input_callback must be callable",
                 }
 
+            execution_id_value = (
+                execution_id if isinstance(execution_id, str) else uuid.uuid4().hex
+            )
+            if input_callback is None:
+                if gateway is None:
+                    try:
+                        from jarvis.jarvis_gateway.manager import get_current_gateway
+
+                        gateway = get_current_gateway()
+                    except Exception:
+                        gateway = None
+                if gateway is not None:
+                    input_callback = gateway.get_execution_input_callback(execution_id_value)
+
             # Execute the script with the specified interpreter
             return self._execute_script_with_interpreter(
                 interpreter,
@@ -1169,9 +1185,7 @@ class ScriptTool:
                 execution_mode=execution_mode,
                 session_id=session_id if isinstance(session_id, str) else None,
                 stream_publisher=stream_publisher,
-                execution_id=execution_id
-                if isinstance(execution_id, str)
-                else uuid.uuid4().hex,
+                execution_id=execution_id_value,
                 input_callback=input_callback,
             )
 
