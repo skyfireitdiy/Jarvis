@@ -44,11 +44,17 @@ class WebGateway(BaseGateway):
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         session_id = _extract_session_id(event.context)
-        print(f"🔍 [DEBUG] WebGateway.emit_output called, text={repr(event.text[:50]) if event.text else ''}, session_id from context={session_id}")
+        print(
+            f"🔍 [DEBUG] WebGateway.emit_output called, text={repr(event.text[:50]) if event.text else ''}, session_id from context={session_id}"
+        )
         # 如果没有 session_id，使用保存的 session 或默认的活跃 session
         if not session_id:
-            session_id = self._current_session_id or _resolve_active_session_id(self._auth_store)
-            print(f"🔍 [DEBUG] WebGateway.emit_output: Using saved/resolved session_id={session_id}")
+            session_id = self._current_session_id or _resolve_active_session_id(
+                self._auth_store
+            )
+            print(
+                f"🔍 [DEBUG] WebGateway.emit_output: Using saved/resolved session_id={session_id}"
+            )
         auth_payload = self._auth_store.get(session_id) if session_id else None
         authorized, _ = self._check_auth(auth_payload)
         print(f"🔍 [DEBUG] WebGateway.emit_output: authorized={authorized}")
@@ -64,17 +70,21 @@ class WebGateway(BaseGateway):
             "context": dict(event.context) if event.context else {},
         }
         message = {"type": "output", "payload": payload}
-        print(f"🔍 [DEBUG] WebGateway.emit_output: Publishing output to session_id={session_id}")
+        print(
+            f"🔍 [DEBUG] WebGateway.emit_output: Publishing output to session_id={session_id}"
+        )
         self._router.publish(message, session_id=session_id)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         print(f"🔍 [DEBUG] WebGateway.request_input called, tip={request.tip}")
         metadata = dict(request.metadata) if request.metadata else {}
         session_id = metadata.get("session_id")
-        print(f"🔍 [DEBUG] WebGateway.request_input: session_id from metadata={session_id}")
+        print(
+            f"🔍 [DEBUG] WebGateway.request_input: session_id from metadata={session_id}"
+        )
         if not session_id:
-            print(f"\n⏳ 正在等待浏览器连接 WebSocket...")
-            print(f"   请在浏览器中打开页面: http://localhost:5005\n")
+            print("\n⏳ 正在等待浏览器连接 WebSocket...")
+            print("   请在浏览器中打开页面: http://localhost:5005\n")
             session_id = _wait_for_active_session_id(self._auth_store)
             print(f"🔍 [DEBUG] WebGateway.request_input: Got session_id={session_id}")
             if session_id:
@@ -85,7 +95,7 @@ class WebGateway(BaseGateway):
             else:
                 session_id = "default"
                 metadata["session_id"] = session_id
-                print(f"🔍 [DEBUG] WebGateway.request_input: Using default session_id")
+                print("🔍 [DEBUG] WebGateway.request_input: Using default session_id")
         auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
@@ -98,12 +108,18 @@ class WebGateway(BaseGateway):
             "metadata": metadata,
         }
         message = {"type": "input_request", "payload": payload}
-        print(f"🔍 [DEBUG] WebGateway.request_input: Publishing input_request to session_id={session_id}")
+        print(
+            f"🔍 [DEBUG] WebGateway.request_input: Publishing input_request to session_id={session_id}"
+        )
         self._router.publish(message, session_id=session_id)
         session = self._input_registry.get_or_create(session_id)
-        print(f"🔍 [DEBUG] WebGateway.request_input: Waiting for input from session_id={session_id}")
+        print(
+            f"🔍 [DEBUG] WebGateway.request_input: Waiting for input from session_id={session_id}"
+        )
         text = session.wait_for_input()
-        print(f"🔍 [DEBUG] WebGateway.request_input: Got input text={repr(text[:50]) if text else ''}")
+        print(
+            f"🔍 [DEBUG] WebGateway.request_input: Got input text={repr(text[:50]) if text else ''}"
+        )
         return GatewayInputResult(text=text, metadata=metadata)
 
     def publish_execution_event(
@@ -113,15 +129,45 @@ class WebGateway(BaseGateway):
     ) -> None:
         payload = dict(event.payload) if event.payload else {}
         session_id = session_id or payload.get("session_id")
+        # 如果没有 session_id，使用保存的 session 或默认的活跃 session（与 emit_output 一致）
+        if not session_id:
+            session_id = self._current_session_id or _resolve_active_session_id(
+                self._auth_store
+            )
+            print(
+                f"🔍 [DEBUG] WebGateway.publish_execution_event: Using saved/resolved session_id={session_id}"
+            )
         auth_payload = payload.get("auth") or (
             self._auth_store.get(session_id) if session_id else None
         )
         authorized, _ = self._check_auth(auth_payload)
         if not authorized:
             return
-        message_payload = {"event_type": event.event_type, **payload}
+
+        # 🔧 适配前端期望的消息结构
+        # 前端期望: { event_type: 'stdout'|'stderr', data: '...' }
+        # 后端原始: { stream: 'stdout', chunk: '...' }
+        stream = payload.get("stream", "stdout")  # "stdout" 或 "stderr" 或 "tty"
+        chunk = payload.get("chunk", "")  # 实际输出内容
+        # 🔧 将 'tty' 映射为 'stdout'，以便前端能正确处理
+        if stream == "tty":
+            stream = "stdout"
+
+        message_payload = {
+            "event_type": stream,  # 使用 stream 作为 event_type
+            "data": chunk,  # 使用 chunk 作为 data
+            "tool": payload.get("tool"),
+            "sequence": payload.get("sequence"),
+            "execution_id": payload.get("execution_id"),
+        }
         if event.timestamp:
             message_payload["timestamp"] = event.timestamp
+        if "message_type" in payload:
+            message_payload["message_type"] = payload["message_type"]
+
+        print(
+            f"🔍 [DEBUG] WebGateway.publish_execution_event: event_type={stream}, chunk_len={len(chunk)}"
+        )
         message = {"type": "execution", "payload": message_payload}
         self._router.publish(message, session_id=session_id)
 
@@ -142,20 +188,26 @@ class WebSocketConnectionManager:
         self._auth_store = auth_store
 
     async def handle(self, websocket: WebSocket) -> None:
-        print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Connection started")
+        print("🔍 [DEBUG] WebSocketConnectionManager.handle: Connection started")
         await websocket.accept()
         session_id = websocket.query_params.get("session_id") or str(uuid.uuid4())
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
-        print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: session_id={session_id}, connection_id={connection_id}")
+        print(
+            f"🔍 [DEBUG] WebSocketConnectionManager.handle: session_id={session_id}, connection_id={connection_id}"
+        )
         auth_payload = _extract_auth_from_headers(websocket)
         authorized, reason = self._gateway._check_auth(auth_payload)
-        print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Initial auth check, authorized={authorized}")
+        print(
+            f"🔍 [DEBUG] WebSocketConnectionManager.handle: Initial auth check, authorized={authorized}"
+        )
         if not authorized:
             auth_payload, authorized, reason = await _await_auth_message(
                 websocket, self._gateway
             )
-            print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Await auth message, authorized={authorized}")
+            print(
+                f"🔍 [DEBUG] WebSocketConnectionManager.handle: Await auth message, authorized={authorized}"
+            )
         if not authorized:
             await _send_error(websocket, "AUTH_FAILED", reason or "auth failed")
             await websocket.close()
@@ -167,28 +219,40 @@ class WebSocketConnectionManager:
             session_id=session_id,
         )
         self._input_registry.register_provider(session_id)
-        print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Registered router and provider for session_id={session_id}")
-        await websocket.send_json({"type": "ready", "payload": {"session_id": session_id}})
-        print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Sent ready message for session_id={session_id}")
+        print(
+            f"🔍 [DEBUG] WebSocketConnectionManager.handle: Registered router and provider for session_id={session_id}"
+        )
+        await websocket.send_json(
+            {"type": "ready", "payload": {"session_id": session_id}}
+        )
+        print(
+            f"🔍 [DEBUG] WebSocketConnectionManager.handle: Sent ready message for session_id={session_id}"
+        )
         try:
             while True:
                 message = await websocket.receive_json()
                 await self._handle_message(session_id, message)
         except WebSocketDisconnect:
-            print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: WebSocket disconnected for session_id={session_id}")
+            print(
+                f"🔍 [DEBUG] WebSocketConnectionManager.handle: WebSocket disconnected for session_id={session_id}"
+            )
             pass
         finally:
             self._router.unregister(connection_id, session_id=session_id)
             self._input_registry.unregister_provider(session_id)
             self._auth_store.pop(session_id, None)
-            print(f"🔍 [DEBUG] WebSocketConnectionManager.handle: Cleaned up session_id={session_id}")
+            print(
+                f"🔍 [DEBUG] WebSocketConnectionManager.handle: Cleaned up session_id={session_id}"
+            )
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
         if not isinstance(message, dict):
             return
         message_type = message.get("type")
         payload = message.get("payload") or {}
-        print(f"🔍 [DEBUG] WebSocketConnectionManager._handle_message: type={message_type}, session_id={session_id}")
+        print(
+            f"🔍 [DEBUG] WebSocketConnectionManager._handle_message: type={message_type}, session_id={session_id}"
+        )
         if message_type == "auth":
             auth_payload = _normalize_auth_payload(payload)
             authorized, _ = self._gateway._check_auth(auth_payload)
@@ -198,7 +262,9 @@ class WebSocketConnectionManager:
             return
         if message_type == "input_result":
             text = payload.get("text", "")
-            print(f"🔍 [DEBUG] WebSocketConnectionManager._handle_message: Received input_result for session_id={session_id}, text={repr(text[:50]) if text else ''}")
+            print(
+                f"🔍 [DEBUG] WebSocketConnectionManager._handle_message: Received input_result for session_id={session_id}, text={repr(text[:50]) if text else ''}"
+            )
             self._input_registry.submit_input(session_id, text)
 
 
@@ -244,7 +310,7 @@ def _extract_session_id(context: Optional[Dict[str, Any]]) -> Optional[str]:
 
 
 def _resolve_active_session_id(
-    auth_store: Dict[str, Optional[Dict[str, Any]]]
+    auth_store: Dict[str, Optional[Dict[str, Any]]],
 ) -> Optional[str]:
     """在缺少显式 session_id 时，选择一个可用的会话。
 
@@ -265,7 +331,7 @@ def _wait_for_active_session_id(
     interval: float = 0.5,
 ) -> Optional[str]:
     """等待 WebSocket 会话建立，避免首次输入请求丢失。
-    
+
     Args:
         auth_store: 认证存储，用于查找活跃会话
         timeout: 超时时间（秒），None 表示无限等待
@@ -323,4 +389,6 @@ async def _await_auth_message(
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
-    await websocket.send_json({"type": "error", "payload": {"code": code, "message": message}})
+    await websocket.send_json(
+        {"type": "error", "payload": {"code": code, "message": message}}
+    )
