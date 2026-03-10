@@ -14,7 +14,7 @@ from typing import Optional
 from typing import Tuple
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 from rich.console import Console
 from rich.table import Table
 
