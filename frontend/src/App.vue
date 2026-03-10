@@ -51,6 +51,10 @@
             <span v-if="item.section" class="section">{{ item.section }}</span>
           </div>
           <div class="output-body" v-html="item.html"></div>
+          <!-- 如果这是执行事件，嵌入对应的终端 -->
+          <div v-if="item.output_type === 'execution' && item.execution_id" class="terminal-wrapper">
+            <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
+          </div>
         </article>
       </div>
     </section>
@@ -67,20 +71,6 @@
         <button class="primary" @click="submitInput">提交</button>
       </div>
       <div v-if="inputTip" class="input-tip">提示：{{ inputTip }}</div>
-    </section>
-
-    <section class="panel terminal">
-      <h2>终端输出（xterm.js）</h2>
-      <div v-if="terminals.length === 0" class="terminal-empty">暂无终端</div>
-      <div v-else class="terminals-container">
-        <div v-for="term in terminals" :key="term.executionId" class="terminal-item">
-          <div class="terminal-header">
-            <span class="terminal-id">{{ term.executionId }}</span>
-            <span v-if="!term.active" class="terminal-status badge">已完成</span>
-          </div>
-          <div :ref="el => setTerminalRef(term.executionId, el)" class="terminal-host"></div>
-        </div>
-      </div>
     </section>
   </div>
 </template>
@@ -181,7 +171,30 @@ function handleMessage(message) {
     inputMode.value = payload.metadata?.mode || 'single'
     inputText.value = payload.preset || ''
   } else if (type === 'execution') {
+    console.log('[ws] execution event received:', {
+      event_type: payload?.event_type,
+      execution_id: payload?.execution_id,
+      message_type: payload?.message_type,
+      has_data: 'data' in payload,
+      data_len: payload?.data?.length || 0,
+    })
     appendExecution(payload)
+    // 只在首次创建终端时创建输出项
+    const executionId = payload?.execution_id || 'default'
+    const existingItem = outputs.value.find(
+      item => item.output_type === 'execution' && item.execution_id === executionId
+    )
+    if (!existingItem) {
+      appendOutput({
+        output_type: 'execution',
+        text: '',
+        lang: 'text',
+        payload: payload, // 保存 payload 以便后续使用
+        execution_id: executionId,
+      })
+    } else {
+      console.log('[ws] output item already exists for execution_id:', executionId)
+    }
   } else if (type === 'error') {
     console.warn('[ws] error payload', payload)
     appendOutput({
@@ -220,20 +233,7 @@ function appendExecution(payload) {
       hostEl: null
     }
     terminals.value.push(termInfo)
-    // 等待 DOM 更新后初始化终端
-    nextTick(() => {
-      const hostEl = terminalHosts.value.get(executionId)
-      if (hostEl) {
-        termInfo.terminal = new Terminal({
-          theme: {
-            background: '#0b1220',
-          },
-          fontSize: 12,
-        })
-        termInfo.terminal.open(hostEl)
-        termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
-      }
-    })
+    // 终端初始化移到 setTerminalRef 中，确保 DOM 元素准备好
   }
   
   // 处理执行结束事件
@@ -246,12 +246,16 @@ function appendExecution(payload) {
   }
   
   // 输出到终端
+  console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${payload?.data?.length || 0}`)
   if (termInfo.terminal) {
     if (eventType === 'stdout' || eventType === 'stderr') {
       termInfo.terminal.write(payload.data || '')
+      console.log(`[terminal] Write successful: ${payload.data?.length || 0} bytes`)
     } else if (eventType === 'status') {
       termInfo.terminal.writeln(`\r\n[status] ${payload.data || ''}`)
     }
+  } else {
+    console.log(`[terminal] Terminal not ready, skipping output`)
   }
 }
 
@@ -282,6 +286,19 @@ function setTerminalRef(executionId, el) {
   if (el) {
     console.log(`[terminal] Setting ref for execution ${executionId}`)
     terminalHosts.value.set(executionId, el)
+    // 立即初始化终端
+    const termInfo = terminals.value.find(t => t.executionId === executionId)
+    if (termInfo && !termInfo.terminal) {
+      console.log(`[terminal] Initializing terminal for execution ${executionId}`)
+      termInfo.terminal = new Terminal({
+        theme: {
+          background: '#0b1220',
+        },
+        fontSize: 12,
+      })
+      termInfo.terminal.open(el)
+      termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
+    }
   } else {
     terminalHosts.value.delete(executionId)
   }
@@ -294,10 +311,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.terminal-empty {
-  color: #888;
-  text-align: center;
-  padding: 20px;
+.terminal-wrapper {
+  margin-top: 12px;
 }
 
 .terminals-container {
