@@ -883,8 +883,17 @@ class PrettyOutput:
         # 创建Panel包装Syntax对象
         panel = Panel(syntax, title=title, border_style=border_style, expand=True)
 
-        # 打印Panel
+        # 打印Panel到终端
         console.print(panel)
+        
+        # 通过事件系统输出到Gateway（用于Web界面）
+        event = OutputEvent(
+            text=content,
+            output_type=OutputType.RESULT,
+            lang="markdown",
+            section=title,
+        )
+        emit_output(event)
 
     @staticmethod
     def print_centered_panel(
@@ -943,6 +952,15 @@ class PrettyOutput:
         )
         panel = Panel(syntax, title=title, border_style="cyan")
         console.print(panel)
+        
+        # 通过事件系统输出到Gateway（用于Web界面）
+        event = OutputEvent(
+            text=content,
+            output_type=OutputType.CODE,
+            lang=lang,
+            section=title,
+        )
+        emit_output(event)
 
     @staticmethod
     def print_resource_overview_panel(
