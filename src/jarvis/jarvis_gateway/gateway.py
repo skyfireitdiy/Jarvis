@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from typing import Any
+from typing import Dict
 from typing import Optional
+from typing import Tuple
 
 from .events import GatewayExecutionEvent
 from .events import GatewayInputRequest
@@ -35,6 +38,31 @@ class IGateway(ABC):
 
 class BaseGateway(IGateway):
     """基础网关实现，便于扩展自定义交互方式。"""
+
+    def _check_auth(self, auth: Optional[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+        from jarvis.jarvis_utils.config import get_gateway_auth_config
+
+        config = get_gateway_auth_config()
+        if not config:
+            return True, None
+        if not bool(config.get("enable", False)):
+            return True, None
+        allow_unset = bool(config.get("allow_unset", True))
+        expected_token = config.get("token")
+        expected_password = config.get("password")
+        if not expected_token and not expected_password:
+            if allow_unset:
+                return True, None
+            return False, "gateway auth required"
+        if not auth:
+            return False, "gateway auth missing"
+        token = auth.get("token")
+        password = auth.get("password")
+        token_match = bool(expected_token) and token == expected_token
+        password_match = bool(expected_password) and password == expected_password
+        if token_match or password_match:
+            return True, None
+        return False, "gateway auth failed"
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         del event
