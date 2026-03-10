@@ -71,7 +71,16 @@
 
     <section class="panel terminal">
       <h2>终端输出（xterm.js）</h2>
-      <div ref="terminalHost" class="terminal-host"></div>
+      <div v-if="terminals.length === 0" class="terminal-empty">暂无终端</div>
+      <div v-else class="terminals-container">
+        <div v-for="term in terminals" :key="term.executionId" class="terminal-item">
+          <div class="terminal-header">
+            <span class="terminal-id">{{ term.executionId }}</span>
+            <span v-if="!term.active" class="terminal-status badge">已完成</span>
+          </div>
+          <div :ref="el => setTerminalRef(term.executionId, el)" class="terminal-host"></div>
+        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -93,8 +102,9 @@ const inputText = ref('')
 const inputMode = ref('single')
 const inputTip = ref('')
 const outputList = ref(null)
-const terminalHost = ref(null)
-let terminal
+// 多终端管理：每个 executionId 对应一个终端实例
+const terminalHosts = ref(new Map())
+const terminals = ref([]) // [{ executionId, terminal, active, hostEl }]
 
 const connectionStatus = computed(() => {
   if (connecting.value) return 'connecting'
@@ -196,12 +206,52 @@ function appendOutput(payload) {
 }
 
 function appendExecution(payload) {
-  if (!terminal) return
+  const executionId = payload?.execution_id || 'default'
   const eventType = payload?.event_type
-  if (eventType === 'stdout' || eventType === 'stderr') {
-    terminal.write(payload.data || '')
-  } else if (eventType === 'status') {
-    terminal.writeln(`\r\n[status] ${payload.data || ''}`)
+  
+  // 检查是否需要创建新终端
+  let termInfo = terminals.value.find(t => t.executionId === executionId)
+  if (!termInfo) {
+    console.log(`[terminal] Creating new terminal for execution ${executionId}`)
+    termInfo = {
+      executionId,
+      terminal: null,
+      active: true,
+      hostEl: null
+    }
+    terminals.value.push(termInfo)
+    // 等待 DOM 更新后初始化终端
+    nextTick(() => {
+      const hostEl = terminalHosts.value.get(executionId)
+      if (hostEl) {
+        termInfo.terminal = new Terminal({
+          theme: {
+            background: '#0b1220',
+          },
+          fontSize: 12,
+        })
+        termInfo.terminal.open(hostEl)
+        termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
+      }
+    })
+  }
+  
+  // 处理执行结束事件
+  if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
+    console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
+    termInfo.active = false
+    if (termInfo.terminal) {
+      termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
+    }
+  }
+  
+  // 输出到终端
+  if (termInfo.terminal) {
+    if (eventType === 'stdout' || eventType === 'stderr') {
+      termInfo.terminal.write(payload.data || '')
+    } else if (eventType === 'status') {
+      termInfo.terminal.writeln(`\r\n[status] ${payload.data || ''}`)
+    }
   }
 }
 
@@ -227,16 +277,64 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
-onMounted(() => {
-  terminal = new Terminal({
-    theme: {
-      background: '#0b1220',
-    },
-    fontSize: 12,
-  })
-  if (terminalHost.value) {
-    terminal.open(terminalHost.value)
-    terminal.writeln('Terminal ready.')
+// 动态绑定终端 DOM 元素
+function setTerminalRef(executionId, el) {
+  if (el) {
+    console.log(`[terminal] Setting ref for execution ${executionId}`)
+    terminalHosts.value.set(executionId, el)
+  } else {
+    terminalHosts.value.delete(executionId)
   }
+}
+
+onMounted(() => {
+  // 不再在页面加载时创建终端，改为动态创建
+  console.log('[app] Mounted')
 })
 </script>
+
+<style scoped>
+.terminal-empty {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+}
+
+.terminals-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.terminal-item {
+  border: 1px solid #2a3a50;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #15202b;
+  border-bottom: 1px solid #2a3a50;
+}
+
+.terminal-id {
+  font-family: monospace;
+  font-size: 14px;
+  color: #58a6ff;
+}
+
+.terminal-status {
+  font-size: 12px;
+  color: #3fb950;
+}
+
+.terminal-host {
+  padding: 4px;
+  background: #0b1220;
+  min-height: 200px;
+}
+</style>
