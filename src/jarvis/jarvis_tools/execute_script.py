@@ -1054,6 +1054,7 @@ class ScriptTool:
                         session_id=request.session_id,
                         execution_id=request.execution_id,
                         input_callback=request.input_callback,
+                        resize_callback=request.resize_callback,
                     )
 
                 if force_non_interactive:
