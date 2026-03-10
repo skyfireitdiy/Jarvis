@@ -20,6 +20,7 @@ from typing import Dict
 from typing import cast
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -96,6 +97,7 @@ class ExecutionRequest:
     stream_publisher: Optional[ExecutionStreamPublisher] = None
     execution_id: Optional[str] = None
     input_callback: Optional[Callable[[float], Optional[str]]] = None
+    resize_callback: Optional[Callable[[], Optional[Tuple[int, int]]]] = None
 
 
 class ExecutionBackend(ABC):
@@ -295,6 +297,7 @@ class ScriptTool:
         session_id: Optional[str] = None,
         execution_id: Optional[str] = None,
         input_callback: Optional[Callable[[float], Optional[str]]] = None,
+        resize_callback: Optional[Callable[[], Optional[Tuple[int, int]]]] = None,
     ) -> Dict[str, Any]:
         """使用 pywinpty (ConPTY) 实现：用户可交互 + 可捕获输出，类似 Unix script 命令"""
         from winpty import PtyProcess
@@ -326,9 +329,39 @@ class ScriptTool:
                 sequence=next_sequence(),
             )
 
+        def apply_resize(rows: int, cols: int) -> None:
+            if rows <= 0 or cols <= 0:
+                return
+            set_size = getattr(proc, "set_size", None)
+            if not callable(set_size):
+                return
+            try:
+                set_size(cols, rows)
+            except TypeError:
+                try:
+                    set_size(rows, cols)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        def poll_resize() -> None:
+            if resize_callback is None:
+                return
+            try:
+                size = resize_callback()
+            except Exception as exc:
+                exc_holder.append(exc)
+                return
+            if not size:
+                return
+            rows, cols = size
+            apply_resize(rows, cols)
+
         def reader(pty_proc: Any) -> None:
             try:
                 while pty_proc.isalive():
+                    poll_resize()
                     try:
                         data = pty_proc.read(4096)
                         if data:
@@ -413,6 +446,7 @@ class ScriptTool:
             try:
                 if input_callback is not None:
                     while proc.isalive():
+                        poll_resize()
                         try:
                             chunk = input_callback(0.1)
                         except Exception as e:
@@ -425,6 +459,7 @@ class ScriptTool:
                 import msvcrt
 
                 while proc.isalive():
+                    poll_resize()
                     if msvcrt.kbhit():  # type: ignore[attr-defined]
                         try:
                             input_char = msvcrt.getwch()  # type: ignore[attr-defined]
@@ -546,8 +581,12 @@ class ScriptTool:
         session_id: Optional[str] = None,
         execution_id: Optional[str] = None,
         input_callback: Optional[Callable[[float], Optional[str]]] = None,
+        resize_callback: Optional[Callable[[], Optional[Tuple[int, int]]]] = None,
     ) -> Dict[str, Any]:
+        import fcntl
         import pty
+        import struct
+        import termios
 
         captured: List[str] = []
         captured_lock = threading.Lock()
@@ -574,9 +613,35 @@ class ScriptTool:
                 stdin_fd = None
                 stdin_is_tty = False
 
+        def apply_resize(rows: int, cols: int) -> None:
+            if rows <= 0 or cols <= 0:
+                return
+            try:
+                fcntl.ioctl(
+                    master_fd,
+                    termios.TIOCSWINSZ,
+                    struct.pack("HHHH", rows, cols, 0, 0),
+                )
+            except Exception:
+                pass
+
+        def poll_resize() -> None:
+            if resize_callback is None:
+                return
+            try:
+                size = resize_callback()
+            except Exception as exc:
+                exc_holder.append(exc)
+                return
+            if not size:
+                return
+            rows, cols = size
+            apply_resize(rows, cols)
+
         def reader(proc: subprocess.Popen[Any]) -> None:
             try:
                 while not stop_event.is_set():
+                    poll_resize()
                     if proc.poll() is not None:
                         ready, _, _ = select.select([master_fd], [], [], 0.1)
                         if not ready:
@@ -634,6 +699,7 @@ class ScriptTool:
             try:
                 if input_callback is not None:
                     while not stop_event.is_set() and proc.poll() is None:
+                        poll_resize()
                         try:
                             chunk = input_callback(0.1)
                         except Exception as e:
@@ -661,6 +727,7 @@ class ScriptTool:
                         tty.setraw(stdin_fd)
 
                 while not stop_event.is_set() and proc.poll() is None:
+                    poll_resize()
                     try:
                         ready, _, _ = select.select([stdin_fd], [], [], 0.1)
                     except Exception:
@@ -819,6 +886,7 @@ class ScriptTool:
         session_id: Optional[str] = None,
         execution_id: Optional[str] = None,
         input_callback: Optional[Callable[[float], Optional[str]]] = None,
+        resize_callback: Optional[Callable[[], Optional[Tuple[int, int]]]] = None,
     ) -> Dict[str, Any]:
         """Windows 平台执行脚本（使用 subprocess，无 script 命令）
 
@@ -883,6 +951,7 @@ class ScriptTool:
                     session_id=session_id,
                     execution_id=execution_id,
                     input_callback=input_callback,
+                    resize_callback=resize_callback,
                 )
         except FileNotFoundError as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")
@@ -1083,6 +1152,7 @@ class ScriptTool:
                     session_id=request.session_id,
                     execution_id=request.execution_id,
                     input_callback=request.input_callback,
+                    resize_callback=request.resize_callback,
                 )
             finally:
                 Path(script_path).unlink(missing_ok=True)
@@ -1100,6 +1170,7 @@ class ScriptTool:
         stream_publisher: Optional[ExecutionStreamPublisher] = None,
         execution_id: Optional[str] = None,
         input_callback: Optional[Callable[[float], Optional[str]]] = None,
+        resize_callback: Optional[Callable[[], Optional[Tuple[int, int]]]] = None,
     ) -> Dict[str, Any]:
         request = ExecutionRequest(
             interpreter=interpreter,
@@ -1109,6 +1180,7 @@ class ScriptTool:
             stream_publisher=stream_publisher,
             execution_id=execution_id,
             input_callback=input_callback,
+            resize_callback=resize_callback,
         )
         backend = self._select_backend(execution_mode)
         return backend.execute(self, request)
@@ -1140,6 +1212,7 @@ class ScriptTool:
             stream_publisher = args.get("stream_publisher")
             execution_id = args.get("execution_id")
             input_callback = args.get("input_callback")
+            resize_callback = args.get("resize_callback")
             gateway = None
 
             if stream_publisher is None:
@@ -1165,11 +1238,17 @@ class ScriptTool:
                     "stdout": "",
                     "stderr": "input_callback must be callable",
                 }
+            if resize_callback is not None and not callable(resize_callback):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "resize_callback must be callable",
+                }
 
             execution_id_value = (
                 execution_id if isinstance(execution_id, str) else uuid.uuid4().hex
             )
-            if input_callback is None:
+            if input_callback is None or resize_callback is None:
                 if gateway is None:
                     try:
                         from jarvis.jarvis_gateway.manager import get_current_gateway
@@ -1178,7 +1257,14 @@ class ScriptTool:
                     except Exception:
                         gateway = None
                 if gateway is not None:
-                    input_callback = gateway.get_execution_input_callback(execution_id_value)
+                    if input_callback is None:
+                        input_callback = gateway.get_execution_input_callback(
+                            execution_id_value
+                        )
+                    if resize_callback is None:
+                        resize_callback = gateway.get_execution_resize_callback(
+                            execution_id_value
+                        )
 
             # Execute the script with the specified interpreter
             return self._execute_script_with_interpreter(
@@ -1189,6 +1275,7 @@ class ScriptTool:
                 stream_publisher=stream_publisher,
                 execution_id=execution_id_value,
                 input_callback=input_callback,
+                resize_callback=resize_callback,
             )
 
         except Exception as e:
