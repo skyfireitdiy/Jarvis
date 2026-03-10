@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+import time
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -62,7 +63,7 @@ class WebGateway(BaseGateway):
         metadata = dict(request.metadata) if request.metadata else {}
         session_id = metadata.get("session_id")
         if not session_id:
-            session_id = _resolve_active_session_id(self._auth_store)
+            session_id = _wait_for_active_session_id(self._auth_store)
             if session_id:
                 metadata["session_id"] = session_id
             else:
@@ -225,6 +226,21 @@ def _resolve_active_session_id(
         if preferred is None:
             preferred = session_id
     return preferred
+
+
+def _wait_for_active_session_id(
+    auth_store: Dict[str, Optional[Dict[str, Any]]],
+    timeout: float = 10.0,
+    interval: float = 0.1,
+) -> Optional[str]:
+    """等待 WebSocket 会话建立，避免首次输入请求丢失。"""
+    deadline = time.time() + max(timeout, 0)
+    while time.time() < deadline:
+        session_id = _resolve_active_session_id(auth_store)
+        if session_id:
+            return session_id
+        time.sleep(interval)
+    return _resolve_active_session_id(auth_store)
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
