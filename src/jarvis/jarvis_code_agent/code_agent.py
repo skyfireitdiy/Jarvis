@@ -1388,6 +1388,21 @@ def cli(
         "--optimize-system-prompt",
         help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
     ),
+    web_gateway: bool = typer.Option(
+        False,
+        "--web-gateway",
+        help="启用 Web Gateway 服务（WebSocket 输入输出）",
+    ),
+    web_gateway_host: str = typer.Option(
+        "127.0.0.1",
+        "--web-gateway-host",
+        help="Web Gateway 监听地址",
+    ),
+    web_gateway_port: int = typer.Option(
+        8000,
+        "--web-gateway-port",
+        help="Web Gateway 监听端口",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理任务描述：优先从文件读取
@@ -1397,6 +1412,7 @@ def cli(
 
     # 用于tmux并行任务的状态文件路径
     status_file_path = None
+    web_gateway_server = None
 
     if task_file:
         try:
@@ -1481,6 +1497,37 @@ def cli(
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
+
+    if web_gateway:
+        try:
+            import threading
+
+            import uvicorn
+
+            from jarvis.jarvis_web_gateway.app import create_app
+
+            config = uvicorn.Config(
+                create_app(),
+                host=web_gateway_host,
+                port=web_gateway_port,
+                log_level="info",
+            )
+            web_gateway_server = uvicorn.Server(config)
+            thread = threading.Thread(target=web_gateway_server.run, daemon=True)
+            thread.start()
+            PrettyOutput.auto_print(
+                f"🌐 Web Gateway 已启动: ws://{web_gateway_host}:{web_gateway_port}/ws"
+            )
+        except Exception as web_gateway_err:
+            try:
+                from jarvis.jarvis_gateway.manager import set_current_gateway
+
+                set_current_gateway(None)
+            except Exception:
+                pass
+            PrettyOutput.auto_print(
+                f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}"
+            )
 
     try:
         subprocess.run(
@@ -1687,6 +1734,18 @@ def cli(
                 error_message = str(exec_err)
                 raise
         finally:
+            if web_gateway_server is not None:
+                try:
+                    web_gateway_server.should_exit = True
+                except Exception:
+                    pass
+                try:
+                    from jarvis.jarvis_gateway.manager import set_current_gateway
+
+                    set_current_gateway(None)
+                except Exception:
+                    pass
+
             # 如果是tmux并行任务，写入状态文件
             if status_file_path:
                 import json
