@@ -181,6 +181,12 @@ class WebGateway(BaseGateway):
     ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
         return self._terminal_input_registry.get_input_callback(execution_id)
 
+    def get_execution_resize_callback(
+        self,
+        execution_id: str,
+    ) -> Optional[Callable[[], Optional[Tuple[int, int]]]]:
+        return self._terminal_input_registry.get_resize_callback(execution_id)
+
 
 class WebSocketConnectionManager:
     """WebSocket 连接管理。"""
@@ -285,6 +291,21 @@ class WebSocketConnectionManager:
             if not execution_id:
                 return
             self._terminal_input_registry.submit_terminal_input(execution_id, data)
+            return
+        if message_type == "terminal_resize":
+            execution_id = payload.get("execution_id")
+            rows = payload.get("rows")
+            cols = payload.get("cols")
+            if not execution_id:
+                return
+            try:
+                rows_int = int(rows)
+                cols_int = int(cols)
+            except (TypeError, ValueError):
+                return
+            self._terminal_input_registry.submit_terminal_resize(
+                execution_id, rows_int, cols_int
+            )
             return
 
 
