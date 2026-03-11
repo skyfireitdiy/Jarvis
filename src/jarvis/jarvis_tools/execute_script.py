@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 import os
 import re
 import select
@@ -21,6 +22,7 @@ from typing import cast
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -234,7 +236,7 @@ class ScriptTool:
     def _publish_stream_message(
         self,
         publisher: Optional[ExecutionStreamPublisher],
-        chunk: str,
+        chunk: Union[bytes, str],
         *,
         stream: str,
         session_id: Optional[str],
@@ -243,13 +245,21 @@ class ScriptTool:
     ) -> None:
         if not publisher or not chunk:
             return
+        # 使用 base64 编码传输二进制数据
+        # 支持 bytes 和 str 输入
+        if isinstance(chunk, str):
+            chunk_bytes = chunk.encode('utf-8', errors='replace')
+        else:
+            chunk_bytes = chunk
+        chunk_b64 = base64.b64encode(chunk_bytes).decode('utf-8')
         publisher.publish(
             {
                 "type": "tool_stream",
                 "message_type": "tool_stream",
                 "tool": self.name,
                 "stream": stream,
-                "chunk": chunk,
+                "chunk": chunk_b64,
+                "encoded": True,  # 标记数据已编码
                 "execution_id": execution_id,
                 "sequence": sequence,
                 "timestamp": self._get_event_timestamp(),
@@ -656,6 +666,16 @@ class ScriptTool:
                         break
                     if not data:
                         break
+                    # 直接传递原始 bytes 数据给 _publish_stream_message
+                    self._publish_stream_message(
+                        stream_publisher,
+                        data,
+                        stream="tty",
+                        session_id=session_id,
+                        execution_id=execution_id,
+                        sequence=next_sequence(),
+                    )
+                    # 对于本地输出，仍然需要解码
                     raw_text = data.decode("utf-8", errors="replace")
                     if not raw_text:
                         continue
@@ -663,14 +683,6 @@ class ScriptTool:
                     if display_text:
                         with captured_lock:
                             captured.append(display_text)
-                    self._publish_stream_message(
-                        stream_publisher,
-                        raw_text,
-                        stream="tty",
-                        session_id=session_id,
-                        execution_id=execution_id,
-                        sequence=next_sequence(),
-                    )
                     sys.stdout.write(raw_text)
                     sys.stdout.flush()
             except Exception as e:

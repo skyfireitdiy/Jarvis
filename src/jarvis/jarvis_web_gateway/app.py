@@ -149,17 +149,19 @@ class WebGateway(BaseGateway):
             return
 
         # 🔧 适配前端期望的消息结构
-        # 前端期望: { event_type: 'stdout'|'stderr', data: '...' }
-        # 后端原始: { stream: 'stdout', chunk: '...' }
+        # 前端期望: { event_type: 'stdout'|'stderr', data: '...', encoded: true/false }
+        # 后端原始: { stream: 'stdout', chunk: '...', encoded: true }
         stream = payload.get("stream", "stdout")  # "stdout" 或 "stderr" 或 "tty"
-        chunk = payload.get("chunk", "")  # 实际输出内容
+        chunk = payload.get("chunk", "")  # 实际输出内容（可能是 base64 编码的字符串）
+        encoded = payload.get("encoded", False)  # 是否经过 base64 编码
         # 🔧 将 'tty' 映射为 'stdout'，以便前端能正确处理
         if stream == "tty":
             stream = "stdout"
 
         message_payload = {
             "event_type": stream,  # 使用 stream 作为 event_type
-            "data": chunk,  # 使用 chunk 作为 data
+            "data": chunk,  # 使用 chunk 作为 data（可能是 base64）
+            "encoded": encoded,  # 传递编码标记
             "tool": payload.get("tool"),
             "sequence": payload.get("sequence"),
             "execution_id": payload.get("execution_id"),
@@ -170,7 +172,7 @@ class WebGateway(BaseGateway):
             message_payload["message_type"] = payload["message_type"]
 
         print(
-            f"🔍 [DEBUG] WebGateway.publish_execution_event: event_type={stream}, chunk_len={len(chunk)}"
+            f"🔍 [DEBUG] WebGateway.publish_execution_event: event_type={stream}, chunk_len={len(chunk)}, encoded={encoded}"
         )
         message = {"type": "execution", "payload": message_payload}
         self._router.publish(message, session_id=session_id)
