@@ -621,7 +621,6 @@ class LSPClient:
                 f"{error.get('message', 'Unknown error')} (code: {error.get('code', 'unknown')})"
             )
 
-        print(f"[DEBUG] definition: response.result = {response.result}")
         return self._parse_locations(response.result or [])
 
     async def callers_in_range(
@@ -1065,14 +1064,11 @@ class LSPClient:
             LocationInfo 对象（包含代码片段和上下文）
         """
         # LSP Location 格式: {uri: str, range: {start: {line, character}, end: {line, character}}}
-        print(f"[DEBUG] _parse_location: raw location = {location}")
         uri = location.get("uri", "")
-        print(f"[DEBUG] _parse_location: uri = {uri}")
         range_info = location.get("range", {})
         start = range_info.get("start", {})
 
         file_path = self._uri_to_path(uri)
-        print(f"[DEBUG] _parse_location: file_path = {file_path}")
         line = start.get("line", 0)
         column = start.get("character", 0)
 

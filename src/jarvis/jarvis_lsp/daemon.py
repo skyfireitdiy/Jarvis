@@ -675,9 +675,6 @@ class LSPDaemon:
             }
 
         locations = await server.client.definition(file_path, line, column)
-        print(
-            f"[DEBUG] daemon.definition: file_path={file_path}, line={line}, column={column}, locations={locations}"
-        )
 
         if not locations:
             return {"success": True, "location": None}
@@ -935,14 +932,7 @@ class LSPDaemon:
             return symbols_result
 
         symbols = symbols_result.get("symbols", [])
-        print(
-            f"[DEBUG] daemon.definition_by_name: found {len(symbols)} symbols: {[s['name'] + ':' + s['kind'] for s in symbols]}"
-        )
-        print(
-            f"[DEBUG] daemon.definition_by_name: looking for symbol_name={symbol_name}"
-        )
         symbol = self._find_symbol_by_name(symbols, symbol_name, file_path)
-        print(f"[DEBUG] daemon.definition_by_name: symbol = {symbol}")
 
         if symbol is None:
             return {

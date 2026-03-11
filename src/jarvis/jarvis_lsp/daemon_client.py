@@ -630,11 +630,7 @@ class LSPDaemonClient:
         if not response.get("success"):
             raise RuntimeError(response.get("error", "未知错误"))
 
-        print(f"[DEBUG] daemon_client.definition_by_name: response = {response}")
         location_data = response.get("location")
-        print(
-            f"[DEBUG] daemon_client.definition_by_name: location_data = {location_data}"
-        )
         if location_data is None:
             return None
 
