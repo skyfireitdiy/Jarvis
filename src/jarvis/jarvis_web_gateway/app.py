@@ -190,6 +190,15 @@ class WebSocketConnectionManager:
             await websocket.close()
             return
         self._auth_store[session_id] = auth_payload
+
+        # 检查是否已有活跃连接，如果有则拒绝新连接
+        if self._router.has_active_subscribers():
+            await _send_error(
+                websocket, "CONNECTION_REJECTED", "Already have an active connection"
+            )
+            await websocket.close()
+            return
+
         self._router.register(
             connection_id,
             _build_sender(websocket, loop),

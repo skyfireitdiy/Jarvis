@@ -29,7 +29,9 @@ class OutputMessagePublisher(ABC):
     """结构化输出消息发布器抽象。"""
 
     @abstractmethod
-    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+    def publish(
+        self, message: Dict[str, Any], session_id: Optional[str] = None
+    ) -> None:
         raise NotImplementedError
 
 
@@ -66,7 +68,9 @@ class SessionOutputRouter(OutputMessagePublisher):
             if not subscribers:
                 self._subscribers.pop(route_key, None)
 
-    def publish(self, message: Dict[str, Any], session_id: Optional[str] = None) -> None:
+    def publish(
+        self, message: Dict[str, Any], session_id: Optional[str] = None
+    ) -> None:
         callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
         with self._lock:
             for route_key in self._resolve_route_keys(session_id):
@@ -80,6 +84,11 @@ class SessionOutputRouter(OutputMessagePublisher):
         if session_id:
             return [session_id, "*"]
         return ["*"]
+
+    def has_active_subscribers(self) -> bool:
+        """检查是否有活跃的订阅者连接。"""
+        with self._lock:
+            return bool(self._subscribers)
 
 
 def serialize_output_event(
