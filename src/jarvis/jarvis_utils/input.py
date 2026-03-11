@@ -1339,26 +1339,20 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
 
             gateway = get_current_gateway()
             GatewayInputRequest = _GatewayInputRequest
-            print(f"🔍 [DEBUG] get_multiline_input: gateway={type(gateway).__name__ if gateway else None}")
         except Exception as e:
             gateway = None
-            print(f"🔍 [DEBUG] get_multiline_input: Failed to get gateway: {e}")
 
         try:
             if gateway is not None and GatewayInputRequest is not None:
-                print(f"🔍 [DEBUG] get_multiline_input: Using Gateway path, tip={tip}")
                 request = GatewayInputRequest(
                     tip=tip,
-                    mode='multi',
+                    mode="multi",
                     preset=preset,
                     preset_cursor=preset_cursor,
                 )
-                print("🔍 [DEBUG] get_multiline_input: Calling gateway.request_input")
                 result = gateway.request_input(request)
-                print(f"🔍 [DEBUG] get_multiline_input: gateway.request_input returned, text={repr(result.text[:50] if result.text else '') if result else 'None'}")
                 user_input = result.text if result is not None else ""
             else:
-                print(f"🔍 [DEBUG] get_multiline_input: Using provider path (gateway={gateway}, GatewayInputRequest={GatewayInputRequest})")
                 user_input = _get_input_via_provider()
         except InputProviderTimeoutError:
             PrettyOutput.auto_print("⚠️ 输入等待超时，已取消本次输入")
