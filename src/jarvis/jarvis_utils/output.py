@@ -921,13 +921,20 @@ class PrettyOutput:
         console.print(panel)
 
         # 通过事件系统输出到Gateway（用于Web界面）
-        event = OutputEvent(
-            text=content,
-            output_type=OutputType.RESULT,
-            lang="markdown",
-            section=title,
-        )
-        emit_output(event)
+        # 注意：只在 Gateway 模式下发送事件，避免 CLI 模式下重复打印
+        try:
+            from jarvis.jarvis_gateway.manager import get_current_gateway
+        except Exception:
+            return
+
+        if get_current_gateway() is not None:
+            event = OutputEvent(
+                text=content,
+                output_type=OutputType.RESULT,
+                lang="markdown",
+                section=title,
+            )
+            emit_output(event)
 
     @staticmethod
     def print_centered_panel(
@@ -988,14 +995,20 @@ class PrettyOutput:
         console.print(panel)
 
         # 通过事件系统输出到Gateway（用于Web界面）
-        # 注意：不设置 section，避免在 emit 中重复打印 title
-        event = OutputEvent(
-            text=content,
-            output_type=OutputType.CODE,
-            lang=lang,
-            section=None,
-        )
-        emit_output(event)
+        # 注意：只在 Gateway 模式下发送事件，避免 CLI 模式下重复打印
+        try:
+            from jarvis.jarvis_gateway.manager import get_current_gateway
+        except Exception:
+            return
+
+        if get_current_gateway() is not None:
+            event = OutputEvent(
+                text=content,
+                output_type=OutputType.CODE,
+                lang=lang,
+                section=None,
+            )
+            emit_output(event)
 
     @staticmethod
     def print_resource_overview_panel(
