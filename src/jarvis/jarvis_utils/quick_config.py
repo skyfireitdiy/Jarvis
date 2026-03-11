@@ -7,7 +7,6 @@ Quick Config CLI 工具
 import json
 import yaml
 from pathlib import Path
-from typing import Optional
 import typer
 from rich.console import Console
 import requests
@@ -20,28 +19,13 @@ console = Console()
 
 
 @app.command()
-def quick_config(
-    platform: Optional[str] = typer.Option(
-        None, "--platform", "-p", help="LLM平台类型 (claude/openai)"
-    ),
-    base_url: Optional[str] = typer.Option(None, "--url", "-u", help="API基础URL"),
-    api_key: Optional[str] = typer.Option(None, "--key", "-k", help="API密钥"),
-    config_name: Optional[str] = typer.Option(
-        None, "--name", "-n", help="配置名称，如果未指定将使用平台名称"
-    ),
-    output_file: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="输出配置文件路径，默认为~/.jarvis/config.yaml"
-    ),
-):
+def quick_config():
     """快速配置 LLM 平台信息到 Jarvis 配置文件的 llms 部分"""
 
-    # 提示用户输入缺失的参数
-    if platform is None:
-        platform = get_single_line_input("请输入LLM平台类型 (claude/openai):")
-    if base_url is None:
-        base_url = get_single_line_input("请输入API基础URL:")
-    if api_key is None:
-        api_key = get_single_line_input("请输入API密钥:")
+    # 提示用户输入参数
+    platform = get_single_line_input("请输入LLM平台类型 (claude/openai):")
+    base_url = get_single_line_input("请输入API基础URL:")
+    api_key = get_single_line_input("请输入API密钥:")
 
     # 验证平台类型
     platform = platform.lower().strip()
@@ -51,9 +35,8 @@ def quick_config(
         )
         raise typer.Exit(code=1)
 
-    # 如果未指定配置名称，使用平台名称
-    if not config_name:
-        config_name = platform
+    # 使用平台名称作为配置名称
+    config_name = platform
 
     PrettyOutput.auto_print(
         f"🚀 开始配置 {platform.upper()} 平台，配置名称: {config_name}"
@@ -221,6 +204,19 @@ def quick_config(
         else:
             PrettyOutput.auto_print("⚠️  将保存配置（未通过测试）")
 
+    # 输入模型组名称
+    default_group_name = normal_model.replace(".", "_").replace("-", "_")
+    group_name_input = get_single_line_input(
+        f"请输入模型组名称 (默认: {default_group_name}):"
+    )
+    group_name = (
+        group_name_input.strip() if group_name_input.strip() else default_group_name
+    )
+    if not group_name:
+        PrettyOutput.auto_print("❌ 模型组名称不能为空")
+        raise typer.Exit(code=1)
+    PrettyOutput.auto_print(f"✅ 模型组名称: {group_name}")
+
     # 为每个实际使用的模型分别输入最大token数；同一模型被多个角色复用时只设置一次
     default_max_tokens = 128000
     unique_role_models = list(dict.fromkeys([normal_model, smart_model, cheap_model]))
@@ -251,9 +247,8 @@ def quick_config(
                 PrettyOutput.auto_print("❌ 请输入有效的正整数")
 
     # 设置默认输出文件
-    if output_file is None:
-        jarvis_dir = Path.home() / ".jarvis"
-        output_file = jarvis_dir / "config.yaml"
+    jarvis_dir = Path.home() / ".jarvis"
+    output_file = jarvis_dir / "config.yaml"
 
     # 确保输出目录存在
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -318,7 +313,6 @@ def quick_config(
     PrettyOutput.auto_print(f"✅ 已为 {len(unique_role_models)} 个模型创建配置")
 
     # 创建模型组配置
-    group_name = normal_model.replace(".", "_").replace("-", "_")
     config["llm_groups"][group_name] = {
         "normal_llm": model_config_names[normal_model],
         "smart_llm": model_config_names[smart_model],
