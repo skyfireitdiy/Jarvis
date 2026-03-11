@@ -185,12 +185,23 @@ function handleMessage(message) {
       item => item.output_type === 'execution' && item.execution_id === executionId
     )
     if (!existingItem) {
+      console.log(`[ws] Creating new output item for execution ${executionId}`)
       appendOutput({
         output_type: 'execution',
         text: '',
         lang: 'text',
         payload: payload, // 保存 payload 以便后续使用
         execution_id: executionId,
+      })
+      // 等待 DOM 渲染完成后立即初始化终端
+      nextTick(() => {
+        console.log(`[ws] DOM rendered, initializing terminal ${executionId}`)
+        const hostEl = terminalHosts.value.get(executionId)
+        if (hostEl) {
+          setTerminalRef(executionId, hostEl)
+        } else {
+          console.warn(`[ws] terminal-host element not found for execution ${executionId}`)
+        }
       })
     } else {
       console.log('[ws] output item already exists for execution_id:', executionId)
@@ -222,6 +233,30 @@ function appendExecution(payload) {
   const executionId = payload?.execution_id || 'default'
   const eventType = payload?.event_type
   
+  console.log(`[terminal DEBUG] appendExecution: executionId=${executionId}, eventType=${eventType}, hasData=${!!payload?.data}, encoded=${payload?.encoded}`)
+  
+  // 处理 base64 编码的数据
+  let data = payload?.data || ''
+  if (payload?.encoded && data) {
+    try {
+      console.log(`[terminal DEBUG] Decoding base64 data, len=${data.length}`)
+      // 解码 base64 数据
+      const binaryString = atob(data)
+      // 将二进制字符串转换为 Uint8Array，然后解码为 UTF-8
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      // 使用 TextDecoder 处理 UTF-8
+      const decoder = new TextDecoder('utf-8')
+      data = decoder.decode(bytes)
+      console.log(`[terminal DEBUG] Decoded to string, len=${data.length}`)
+    } catch (error) {
+      console.error('[terminal] Failed to decode base64 data:', error)
+      return
+    }
+  }
+  
   // 检查是否需要创建新终端
   let termInfo = terminals.value.find(t => t.executionId === executionId)
   if (!termInfo) {
@@ -238,6 +273,8 @@ function appendExecution(payload) {
     // 终端初始化移到 setTerminalRef 中，确保 DOM 元素准备好
   }
   
+  console.log(`[terminal DEBUG] termInfo: terminal=${!!termInfo.terminal}, pendingChunks=${termInfo.pendingChunks?.length || 0}`)
+  
   // 处理执行结束事件
   if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
     console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
@@ -249,14 +286,21 @@ function appendExecution(payload) {
   }
   
   // 输出到终端
-  console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${payload?.data?.length || 0}`)
+  console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${data.length}`)
   if (eventType === 'stdout' || eventType === 'stderr') {
     if (termInfo.terminal) {
-      termInfo.terminal.write(payload.data || '')
-      console.log(`[terminal] Write successful: ${payload.data?.length || 0} bytes`)
-    } else if (payload?.data) {
-      termInfo.pendingChunks?.push(payload.data)
-      console.log(`[terminal] Terminal not ready, buffered ${payload.data?.length || 0} bytes`)
+      // 显示即将写入的数据（前100字符），用于调试
+      const preview = data.substring(0, 100).replace(/\x1b/g, 'ESC').replace(/\r/g, 'CR').replace(/\n/g, 'LF')
+      console.log(`[terminal] About to write ${data.length} bytes to terminal, preview: ${preview}`)
+      try {
+        termInfo.terminal.write(data)
+        console.log(`[terminal] Write successful: ${data.length} bytes`)
+      } catch (error) {
+        console.error('[terminal] Write failed:', error)
+      }
+    } else if (data) {
+      termInfo.pendingChunks?.push(data)
+      console.log(`[terminal] Terminal not ready, buffered ${data.length} bytes, total pending=${termInfo.pendingChunks.length}`)
     }
   } else if (eventType === 'status') {
     const statusLine = `\r\n[status] ${payload.data || ''}`
@@ -265,8 +309,8 @@ function appendExecution(payload) {
     } else {
       termInfo.pendingChunks?.push(statusLine)
     }
-  } else if (!termInfo.terminal) {
-    console.log(`[terminal] Terminal not ready, skipping output`)
+  } else if (!termInfo.terminal && data) {
+    console.log(`[terminal] Terminal not ready, skipping output for eventType=${eventType}`)
   }
 }
 
@@ -343,13 +387,38 @@ function setTerminalRef(executionId, el) {
     // 立即初始化终端
     if (termInfo && !termInfo.terminal) {
       console.log(`[terminal] Initializing terminal for execution ${executionId}`)
+      console.log(`[terminal] Element size: width=${el.clientWidth}px, height=${el.clientHeight}px`)
+      
+      // 先使用较大的默认尺寸初始化
+      const initialCols = 120
+      const initialRows = 30
+      console.log(`[terminal] Using initial size: cols=${initialCols}, rows=${initialRows}`)
       termInfo.terminal = new Terminal({
         theme: {
           background: '#0b1220',
         },
         fontSize: 12,
+        cols: initialCols,
+        rows: initialRows,
       })
       termInfo.terminal.open(el)
+      console.log(`[terminal] Terminal actual size: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
+      
+      // 延迟调整尺寸，等待 DOM 完全渲染
+      setTimeout(() => {
+        // 使用 xterm.js 的 proposeDimensions API 根据实际元素尺寸计算终端大小
+        const dims = termInfo.terminal.proposeDimensions()
+        if (dims) {
+          console.log(`[terminal] Proposed dimensions: cols=${dims.cols}, rows=${dims.rows}`)
+          termInfo.terminal.resize(dims.cols, dims.rows)
+          console.log(`[terminal] Resized to: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
+          
+          // 同步到后端
+          syncTerminalSize(executionId, termInfo)
+        } else {
+          console.error('[terminal] Failed to propose dimensions')
+        }
+      }, 100)
       termInfo.terminal.onData(data => {
         if (!termInfo.active) return
         if (!socket.value) return
