@@ -27,6 +27,7 @@ class GatewayInputRequest:
     """统一输入请求。"""
 
     tip: str
+    mode: Optional[str] = None  # 'single' or 'multi'
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     metadata: Optional[Dict[str, Any]] = None
