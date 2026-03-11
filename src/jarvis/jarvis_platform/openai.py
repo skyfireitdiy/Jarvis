@@ -98,6 +98,16 @@ class OpenAIModel(BasePlatform):
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 解析 openai_extra_headers 失败: {e}")
 
+        # Optional: Set reasoning effort for o1 series models via llm_config or environment variable
+        # Expected format: openai_reasoning_effort="low" or "medium" or "high" or "xhigh"
+        reasoning_effort_value = llm_config.get("openai_reasoning_effort")
+        if reasoning_effort_value is None:
+            reasoning_effort_value = os.getenv("OPENAI_REASONING_EFFORT")
+
+        self.reasoning_effort: Optional[str] = (
+            reasoning_effort_value if reasoning_effort_value else None
+        )
+
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
             if self.extra_headers:
@@ -233,11 +243,19 @@ class OpenAIModel(BasePlatform):
             self.messages.append({"role": "user", "content": message})
 
             # 循环处理，直到不是因为长度限制而结束
-            response = self.client.chat.completions.create(
-                model=self.model_name,  # Use the configured model name
-                messages=self.messages,  # type: ignore[arg-type]
-                stream=True,
-            )
+            # 构造 API 调用参数
+            api_params: Dict[str, Any] = {
+                "model": self.model_name,
+                "messages": self.messages,
+                "stream": True,
+            }
+            # 只有在配置了 reasoning_effort 时才添加 extra_body 参数
+            if self.reasoning_effort:
+                api_params["extra_body"] = {
+                    "model_reasoning_effort": self.reasoning_effort
+                }
+
+            response = self.client.chat.completions.create(**api_params)
 
             full_response = ""
 
