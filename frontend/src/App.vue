@@ -23,11 +23,17 @@
     <main class="chat-container">
       <div class="messages" ref="outputList">
         <article v-for="(item, index) in outputs" :key="index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
-          <div class="message-meta" v-if="item.output_type">
-            <span class="badge">{{ item.output_type }}</span>
-            <span v-if="item.timestamp" class="timestamp">{{ item.timestamp }}</span>
+          <div class="message-content">
+            <div class="message-meta-left">
+              <span class="badge">{{ item.output_type || '' }}</span>
+              <span class="agent-name">{{ item.agent_name || '' }}</span>
+              <span class="non-interactive" v-if="item.non_interactive">🔕</span>
+              <span class="interactive" v-if="item.non_interactive === false">💬</span>
+              <span class="interactive" v-if="item.non_interactive === undefined"></span>
+              <span class="timestamp">{{ item.timestamp || '' }}</span>
+            </div>
+            <div class="message-body markdown-content" v-html="item.html"></div>
           </div>
-          <div class="message-body markdown-content" v-html="item.html"></div>
           <!-- 终端嵌入 -->
           <div v-if="item.output_type === 'execution' && item.execution_id" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
@@ -324,10 +330,30 @@ function handleMessage(message) {
 
 function appendOutput(payload) {
   const html = payload?.lang === 'markdown' ? marked.parse(payload.text || '') : escapeHtml(payload.text || '')
-  outputs.value.push({
+  
+  // 生成真实时间戳
+  const showTimestamp = payload?.timestamp !== false
+  const now = showTimestamp ? new Date().toLocaleTimeString('zh-CN', { hour12: false }) : ''
+  
+  // 从 context 中提取 agent 信息，但优先使用 payload 顶层的 agent_name
+  const context = payload?.context || {}
+  const agentName = payload?.agent_name || context.agent_name || context.agent || ''
+  const nonInteractive = payload?.non_interactive !== undefined ? payload?.non_interactive : (context.non_interactive || false)
+  
+  const outputItem = {
     ...payload,
     html,
-  })
+    timestamp: now,
+    agent_name: agentName,
+    non_interactive: nonInteractive,
+  }
+  
+  console.log('[DEBUG] appendOutput outputItem:', outputItem)
+  console.log('[DEBUG] output_type:', outputItem.output_type)
+  console.log('[DEBUG] agent_name:', outputItem.agent_name)
+  console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
+  
+  outputs.value.push(outputItem)
   nextTick(() => {
     if (outputList.value) {
       outputList.value.scrollTop = outputList.value.scrollHeight
@@ -429,10 +455,28 @@ function appendExecution(payload) {
 
 function submitInput() {
   if (!socket.value) return
+  
+  // 先将用户输入回显到聊天窗口
+  const userInput = inputText.value.trim()
+  if (userInput) {
+    console.log('[DEBUG] User input payload:', {
+      output_type: 'user_input',
+      agent_name: 'user',
+      text: userInput,
+      lang: 'text',
+    })
+    appendOutput({
+      output_type: 'user_input',
+      agent_name: 'user',
+      text: userInput,
+      lang: 'text',
+    })
+  }
+  
   const message = {
     type: 'input_result',
     payload: {
-      text: inputText.value,
+      text: userInput,
       metadata: {
         session_id: sessionId.value || undefined,
       },
@@ -767,15 +811,141 @@ onMounted(() => {
 .message {
   background: #161b22;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.message-meta {
-  display: flex;
-  align-items: center;
+/* 用户输入消息 - 右对齐样式（必须放在 .message 之后以覆盖） */
+.message.message-user_input {
+  background: #1f6feb !important;
+  border-color: #1f6feb !important;
+  align-self: flex-end;
+  max-width: 80%;
+}
+
+.message.message-user_input .message-meta-left {
+  /* 用户输入消息显示元数据，使用 grid 布局 */
+  min-width: 260px;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
   gap: 8px;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-self: start;
+}
+
+.message.message-user_input .badge {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.message.message-user_input .agent-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+}
+
+.message.message-user_input .timestamp {
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 10px;
+}
+
+.message.message-user_input .message-body {
+  color: #fff !important;
+  font-style: italic !important;
+}
+
+.message-content {
+  display: grid;
+  grid-template-columns: min-content 1fr;
+  gap: 12px;
+  align-items: start;
+  text-align: left;
+}
+
+.message-content .message-meta-left {
+  min-width: 260px;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 8px;
+  align-items: center;
+  justify-self: start;
+}
+
+.message-meta-left .badge,
+.message-meta-left .agent-name,
+.message-meta-left .non-interactive,
+.message-meta-left .interactive,
+.message-meta-left .timestamp {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-meta-left .badge {
+  min-width: 60px;
+  justify-self: start;
+}
+
+.message-meta-left .agent-name {
+  min-width: 80px;
+  justify-self: start;
+}
+
+.message-meta-left .non-interactive,
+.message-meta-left .interactive {
+  min-width: 20px;
+  justify-self: start;
+}
+
+.message-meta-left .timestamp {
+  min-width: 80px;
+  justify-self: start;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 10px;
+}
+
+.message-content .message-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e6edf3;
+  justify-self: start;
+}
+
+.message-meta-left .badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: #21262d;
+  color: #8b949e;
+}
+
+.message-meta-left .agent-name {
+  font-size: 10px;
+  color: #58a6ff;
+  font-weight: 500;
+}
+
+.message-meta-left .non-interactive,
+.message-meta-left .interactive {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.message-meta-left .non-interactive {
+  color: #f0883e;
+}
+
+.message-meta-left .interactive {
+  color: #58a6ff;
+}
+
+.message-meta-left .timestamp {
+  font-size: 10px;
+  color: #8b949e;
 }
 
 .badge {
