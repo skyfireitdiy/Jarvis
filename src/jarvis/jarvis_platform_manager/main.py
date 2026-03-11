@@ -5,6 +5,8 @@
 
 import os
 import sys
+from pathlib import Path
+import yaml
 
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -30,6 +32,505 @@ from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis AI 平台")
+manage_app = typer.Typer(help="管理 LLM 配置和模型组")
+llm_app = typer.Typer(help="LLM 配置管理")
+group_app = typer.Typer(help="模型组管理")
+app.add_typer(manage_app, name="manage")
+manage_app.add_typer(llm_app, name="llm")
+manage_app.add_typer(group_app, name="group")
+
+
+# ============================================================================
+# 配置文件操作辅助函数
+# ============================================================================
+
+
+def _get_config_file_path() -> Path:
+    """获取配置文件路径
+
+    返回:
+        Path: 配置文件路径 (~/.jarvis/config.yaml)
+    """
+    return Path.home() / ".jarvis" / "config.yaml"
+
+
+def _load_config() -> Dict[str, Any]:
+    """加载配置文件
+
+    返回:
+        Dict[str, Any]: 配置字典，如果文件不存在或读取失败返回空字典
+    """
+    config_file = _get_config_file_path()
+    if not config_file.exists():
+        return {}
+
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception as exc:
+        PrettyOutput.auto_print(f"❌ 读取配置文件失败: {exc}")
+        return {}
+
+
+def _save_config(config: Dict[str, Any]) -> bool:
+    """保存配置到文件
+
+    参数:
+        config: 配置字典
+
+    返回:
+        bool: 保存成功返回 True，否则返回 False
+    """
+    config_file = _get_config_file_path()
+
+    # 确保目录存在
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # 备份原配置文件
+    backup_file = config_file.with_suffix(".yaml.bak")
+    if config_file.exists():
+        try:
+            import shutil
+
+            shutil.copy2(config_file, backup_file)
+        except Exception:
+            pass  # 备份失败不影响主流程
+
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True)
+        return True
+    except Exception as exc:
+        PrettyOutput.auto_print(f"❌ 保存配置文件失败: {exc}")
+        # 尝试恢复备份
+        if backup_file.exists():
+            try:
+                import shutil
+
+                shutil.copy2(backup_file, config_file)
+                PrettyOutput.auto_print("ℹ️ 已恢复原配置文件")
+            except Exception:
+                pass
+        return False
+
+
+# ============================================================================
+# LLM 管理子命令
+# ============================================================================
+
+
+@llm_app.command("list")
+def llm_list() -> None:
+    """列出所有 LLM 配置"""
+    config = _load_config()
+    llms = config.get("llms", {})
+
+    if not llms:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何 LLM")
+        return
+
+    PrettyOutput.auto_print("✅ LLM 配置列表:")
+    for name in sorted(llms.keys()):
+        llm_config = llms[name]
+        platform = llm_config.get("platform", "unknown")
+        model = llm_config.get("model", "unknown")
+        PrettyOutput.auto_print(f"  • {name} ({platform}/{model})")
+
+
+@llm_app.command("show")
+def llm_show(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+    """显示指定 LLM 配置详情"""
+    config = _load_config()
+    llms = config.get("llms", {})
+
+    if name not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
+        raise typer.Exit(code=1)
+
+    llm_config = llms[name]
+    PrettyOutput.auto_print(f"✅ LLM 配置: {name}")
+    PrettyOutput.auto_print(f"  平台: {llm_config.get('platform', 'N/A')}")
+    PrettyOutput.auto_print(f"  模型: {llm_config.get('model', 'N/A')}")
+    PrettyOutput.auto_print(
+        f"  最大token数: {llm_config.get('max_input_token_count', 'N/A')}"
+    )
+
+    llm_config_dict = llm_config.get("llm_config", {})
+    if llm_config_dict:
+        PrettyOutput.auto_print("  其他配置:")
+        for key, value in llm_config_dict.items():
+            PrettyOutput.auto_print(f"    {key}: {value}")
+
+
+@llm_app.command("delete")
+def llm_delete(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+    """删除指定的 LLM 配置"""
+    config = _load_config()
+    llms = config.get("llms", {})
+
+    if name not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
+        raise typer.Exit(code=1)
+
+    # 检查是否被模型组引用
+    llm_groups = config.get("llm_groups", {})
+    referenced = False
+    for group_name, group_config in llm_groups.items():
+        for key in ["normal_llm", "cheap_llm", "smart_llm"]:
+            if group_config.get(key) == name:
+                PrettyOutput.auto_print(f"⚠️ 该配置被模型组 '{group_name}' 引用")
+                referenced = True
+
+    # 确认删除
+    from jarvis.jarvis_utils.input import user_confirm
+
+    if not user_confirm(f"确认删除 LLM 配置 '{name}'?", default=False):
+        PrettyOutput.auto_print("ℹ️ 已取消删除")
+        return
+
+    # 删除配置
+    if "llms" not in config:
+        config["llms"] = {}
+    config["llms"].pop(name, None)
+
+    # 保存配置
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已删除 LLM 配置: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+@llm_app.command("add")
+def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+    """添加新的 LLM 配置（交互式）"""
+    from jarvis.jarvis_utils.input import get_single_line_input
+
+    config = _load_config()
+    if "llms" not in config:
+        config["llms"] = {}
+
+    if name in config["llms"]:
+        PrettyOutput.auto_print(f"❌ LLM 配置 '{name}' 已存在")
+        raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"📝 添加 LLM 配置: {name}")
+
+    # 交互式输入
+    platform = get_single_line_input("平台名称 (openai/claude/other): ").strip()
+    if not platform:
+        PrettyOutput.auto_print("❌ 平台名称不能为空")
+        raise typer.Exit(code=1)
+
+    model = get_single_line_input("模型名称 (如: gpt-4o): ").strip()
+    if not model:
+        PrettyOutput.auto_print("❌ 模型名称不能为空")
+        raise typer.Exit(code=1)
+
+    max_tokens_input = get_single_line_input("最大token数 (默认: 128000): ").strip()
+    try:
+        max_tokens = int(max_tokens_input) if max_tokens_input else 128000
+    except ValueError:
+        PrettyOutput.auto_print("❌ 无效的token数，使用默认值 128000")
+        max_tokens = 128000
+
+    # 创建配置
+    llm_config = {
+        "platform": platform,
+        "model": model,
+        "max_input_token_count": max_tokens,
+    }
+
+    # 询问是否添加额外配置
+    from jarvis.jarvis_utils.input import user_confirm
+
+    if user_confirm("是否添加额外配置 (如 API key)?", default=False):
+        PrettyOutput.auto_print("ℹ️ 输入配置键和值 (留空结束)")
+        llm_config["llm_config"] = {}
+        while True:
+            key = get_single_line_input("配置键: ").strip()
+            if not key:
+                break
+            value = get_single_line_input(f"配置值 ({key}): ").strip()
+            llm_config["llm_config"][key] = value
+
+    # 保存配置
+    config["llms"][name] = llm_config
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已添加 LLM 配置: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+@llm_app.command("update")
+def llm_update(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+    """更新指定的 LLM 配置（交互式）"""
+    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
+
+    config = _load_config()
+    if "llms" not in config:
+        config["llms"] = {}
+
+    if name not in config["llms"]:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
+        raise typer.Exit(code=1)
+
+    llm_config = config["llms"][name]
+    PrettyOutput.auto_print(f"📝 更新 LLM 配置: {name}")
+    PrettyOutput.auto_print(
+        f"  当前值 - 平台: {llm_config.get('platform', 'N/A')}, 模型: {llm_config.get('model', 'N/A')}"
+    )
+
+    # 更新各个字段
+    platform = get_single_line_input(
+        f"平台名称 (当前: {llm_config.get('platform', '')}, 留空不变): "
+    ).strip()
+    if platform:
+        llm_config["platform"] = platform
+
+    model = get_single_line_input(
+        f"模型名称 (当前: {llm_config.get('model', '')}, 留空不变): "
+    ).strip()
+    if model:
+        llm_config["model"] = model
+
+    max_tokens_input = get_single_line_input(
+        f"最大token数 (当前: {llm_config.get('max_input_token_count', 128000)}, 留空不变): "
+    ).strip()
+    if max_tokens_input:
+        try:
+            max_tokens = int(max_tokens_input)
+            llm_config["max_input_token_count"] = max_tokens
+        except ValueError:
+            PrettyOutput.auto_print("❌ 无效的token数，保持原值")
+
+    # 保存配置
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已更新 LLM 配置: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+# ============================================================================
+# 模型组管理子命令
+# ============================================================================
+
+
+@group_app.command("list")
+def group_list() -> None:
+    """列出所有模型组"""
+    config = _load_config()
+    llm_groups = config.get("llm_groups", {})
+
+    if not llm_groups:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        return
+
+    PrettyOutput.auto_print("✅ 模型组列表:")
+    for name in sorted(llm_groups.keys()):
+        group_config = llm_groups[name]
+        normal_llm = group_config.get("normal_llm", "N/A")
+        PrettyOutput.auto_print(f"  • {name} (normal: {normal_llm})")
+
+
+@group_app.command("show")
+def group_show(name: str = typer.Argument(..., help="模型组名称")) -> None:
+    """显示指定模型组详情"""
+    config = _load_config()
+    llm_groups = config.get("llm_groups", {})
+
+    if name not in llm_groups:
+        PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
+        raise typer.Exit(code=1)
+
+    group_config = llm_groups[name]
+    PrettyOutput.auto_print(f"✅ 模型组: {name}")
+    PrettyOutput.auto_print(f"  normal_llm: {group_config.get('normal_llm', 'N/A')}")
+    PrettyOutput.auto_print(f"  cheap_llm: {group_config.get('cheap_llm', 'N/A')}")
+    PrettyOutput.auto_print(f"  smart_llm: {group_config.get('smart_llm', 'N/A')}")
+
+
+@group_app.command("delete")
+def group_delete(name: str = typer.Argument(..., help="模型组名称")) -> None:
+    """删除指定的模型组"""
+    config = _load_config()
+    llm_groups = config.get("llm_groups", {})
+
+    if name not in llm_groups:
+        PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
+        raise typer.Exit(code=1)
+
+    # 确认删除
+    from jarvis.jarvis_utils.input import user_confirm
+
+    if not user_confirm(f"确认删除模型组 '{name}'?", default=False):
+        PrettyOutput.auto_print("ℹ️ 已取消删除")
+        return
+
+    # 删除配置
+    if "llm_groups" not in config:
+        config["llm_groups"] = {}
+    config["llm_groups"].pop(name, None)
+
+    # 保存配置
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已删除模型组: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+@group_app.command("add")
+def group_add(name: str = typer.Argument(..., help="模型组名称")) -> None:
+    """添加新的模型组（交互式）"""
+    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
+
+    config = _load_config()
+    if "llm_groups" not in config:
+        config["llm_groups"] = {}
+
+    if name in config["llm_groups"]:
+        PrettyOutput.auto_print(f"❌ 模型组 '{name}' 已存在")
+        raise typer.Exit(code=1)
+
+    # 获取可用的 LLM 配置列表
+    llms = config.get("llms", {})
+    if not llms:
+        PrettyOutput.auto_print("❌ 没有可用的 LLM 配置，请先添加 LLM 配置")
+        raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"📝 添加模型组: {name}")
+    PrettyOutput.auto_print("可用的 LLM 配置:")
+    for llm_name in sorted(llms.keys()):
+        PrettyOutput.auto_print(f"  • {llm_name}")
+
+    # 交互式输入
+    normal_llm = get_single_line_input("Normal LLM 配置名称 (必需): ").strip()
+    if not normal_llm:
+        PrettyOutput.auto_print("❌ Normal LLM 配置名称不能为空")
+        raise typer.Exit(code=1)
+
+    if normal_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
+        raise typer.Exit(code=1)
+
+    # 可选的 cheap 和 smart
+    cheap_llm = get_single_line_input(
+        "Cheap LLM 配置名称 (留空则与 normal 相同): "
+    ).strip()
+    if cheap_llm and cheap_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
+        raise typer.Exit(code=1)
+
+    smart_llm = get_single_line_input(
+        "Smart LLM 配置名称 (留空则与 normal 相同): "
+    ).strip()
+    if smart_llm and smart_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
+        raise typer.Exit(code=1)
+
+    # 创建配置
+    group_config = {
+        "normal_llm": normal_llm,
+    }
+    if cheap_llm:
+        group_config["cheap_llm"] = cheap_llm
+    if smart_llm:
+        group_config["smart_llm"] = smart_llm
+
+    # 保存配置
+    config["llm_groups"][name] = group_config
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已添加模型组: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+@group_app.command("update")
+def group_update(name: str = typer.Argument(..., help="模型组名称")) -> None:
+    """更新指定的模型组（交互式）"""
+    from jarvis.jarvis_utils.input import get_single_line_input
+
+    config = _load_config()
+    if "llm_groups" not in config:
+        config["llm_groups"] = {}
+
+    if name not in config["llm_groups"]:
+        PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
+        raise typer.Exit(code=1)
+
+    # 获取可用的 LLM 配置列表
+    llms = config.get("llms", {})
+
+    group_config = config["llm_groups"][name]
+    PrettyOutput.auto_print(f"📝 更新模型组: {name}")
+    PrettyOutput.auto_print(
+        f"  当前值 - normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, smart: {group_config.get('smart_llm', 'N/A')}"
+    )
+    PrettyOutput.auto_print("可用的 LLM 配置:")
+    for llm_name in sorted(llms.keys()):
+        PrettyOutput.auto_print(f"  • {llm_name}")
+
+    # 更新各个字段
+    normal_llm = get_single_line_input(
+        f"Normal LLM (当前: {group_config.get('normal_llm', '')}, 留空不变): "
+    ).strip()
+    if normal_llm:
+        if normal_llm not in llms:
+            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
+            raise typer.Exit(code=1)
+        group_config["normal_llm"] = normal_llm
+
+    cheap_llm = get_single_line_input(
+        f"Cheap LLM (当前: {group_config.get('cheap_llm', '')}, 留空不变): "
+    ).strip()
+    if cheap_llm:
+        if cheap_llm not in llms:
+            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
+            raise typer.Exit(code=1)
+        group_config["cheap_llm"] = cheap_llm
+
+    smart_llm = get_single_line_input(
+        f"Smart LLM (当前: {group_config.get('smart_llm', '')}, 留空不变): "
+    ).strip()
+    if smart_llm:
+        if smart_llm not in llms:
+            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
+            raise typer.Exit(code=1)
+        group_config["smart_llm"] = smart_llm
+
+    # 保存配置
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已更新模型组: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
+
+
+@group_app.command("set")
+def group_set(name: str = typer.Argument(..., help="模型组名称")) -> None:
+    """设置当前激活的模型组"""
+    config = _load_config()
+    llm_groups = config.get("llm_groups", {})
+
+    if name not in llm_groups:
+        PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
+        raise typer.Exit(code=1)
+
+    # 设置当前模型组
+    if "llm_group" not in config:
+        config["llm_group"] = ""
+    config["llm_group"] = name
+
+    # 保存配置
+    if _save_config(config):
+        PrettyOutput.auto_print(f"✅ 已设置当前模型组: {name}")
+    else:
+        PrettyOutput.auto_print("❌ 保存配置失败")
+        raise typer.Exit(code=1)
 
 
 @app.command("info")
