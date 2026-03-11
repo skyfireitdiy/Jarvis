@@ -248,10 +248,10 @@ class ScriptTool:
         # 使用 base64 编码传输二进制数据
         # 支持 bytes 和 str 输入
         if isinstance(chunk, str):
-            chunk_bytes = chunk.encode('utf-8', errors='replace')
+            chunk_bytes = chunk.encode("utf-8", errors="replace")
         else:
             chunk_bytes = chunk
-        chunk_b64 = base64.b64encode(chunk_bytes).decode('utf-8')
+        chunk_b64 = base64.b64encode(chunk_bytes).decode("utf-8")
         publisher.publish(
             {
                 "type": "tool_stream",
@@ -486,8 +486,11 @@ class ScriptTool:
 
         try:
             timeout = get_timeout()
-            reader_t.join(timeout=timeout)
-            if reader_t.is_alive():
+            if timeout is None:
+                reader_t.join()
+            else:
+                reader_t.join(timeout=timeout)
+            if timeout is not None and reader_t.is_alive():
                 for method_name in ("terminate", "kill"):
                     terminate_method = getattr(proc, method_name, None)
                     if callable(terminate_method):
@@ -807,7 +810,10 @@ class ScriptTool:
         timeout = get_timeout()
         timed_out = False
         try:
-            proc.wait(timeout=timeout)
+            if timeout is None:
+                proc.wait()
+            else:
+                proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
             stop_event.set()
@@ -958,7 +964,7 @@ class ScriptTool:
                 return self._execute_on_windows_interactive_pty(
                     argv=cmd,
                     env=env,
-                    get_timeout=get_timeout,
+                    get_timeout=None,
                     stream_publisher=stream_publisher,
                     session_id=session_id,
                     execution_id=execution_id,
@@ -1160,7 +1166,7 @@ class ScriptTool:
                 return self._execute_on_unix_interactive_pty(
                     argv=argv,
                     env=env,
-                    get_timeout=get_script_execution_timeout,
+                    get_timeout=None,
                     stream_publisher=request.stream_publisher,
                     session_id=request.session_id,
                     execution_id=request.execution_id,
