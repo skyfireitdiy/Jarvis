@@ -94,7 +94,7 @@ const inputTip = ref('')
 const outputList = ref(null)
 // 多终端管理：每个 executionId 对应一个终端实例
 const terminalHosts = ref(new Map())
-const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize }]
+const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
 
 const connectionStatus = computed(() => {
   if (connecting.value) return 'connecting'
@@ -230,7 +230,9 @@ function appendExecution(payload) {
       executionId,
       terminal: null,
       active: true,
-      hostEl: null
+      hostEl: null,
+      pendingChunks: [],
+      ended: false,
     }
     terminals.value.push(termInfo)
     // 终端初始化移到 setTerminalRef 中，确保 DOM 元素准备好
@@ -240,6 +242,7 @@ function appendExecution(payload) {
   if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
     console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
     termInfo.active = false
+    termInfo.ended = true
     if (termInfo.terminal) {
       termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
     }
@@ -247,14 +250,22 @@ function appendExecution(payload) {
   
   // 输出到终端
   console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${payload?.data?.length || 0}`)
-  if (termInfo.terminal) {
-    if (eventType === 'stdout' || eventType === 'stderr') {
+  if (eventType === 'stdout' || eventType === 'stderr') {
+    if (termInfo.terminal) {
       termInfo.terminal.write(payload.data || '')
       console.log(`[terminal] Write successful: ${payload.data?.length || 0} bytes`)
-    } else if (eventType === 'status') {
-      termInfo.terminal.writeln(`\r\n[status] ${payload.data || ''}`)
+    } else if (payload?.data) {
+      termInfo.pendingChunks?.push(payload.data)
+      console.log(`[terminal] Terminal not ready, buffered ${payload.data?.length || 0} bytes`)
     }
-  } else {
+  } else if (eventType === 'status') {
+    const statusLine = `\r\n[status] ${payload.data || ''}`
+    if (termInfo.terminal) {
+      termInfo.terminal.writeln(statusLine)
+    } else {
+      termInfo.pendingChunks?.push(statusLine)
+    }
+  } else if (!termInfo.terminal) {
     console.log(`[terminal] Terminal not ready, skipping output`)
   }
 }
@@ -365,6 +376,19 @@ function setTerminalRef(executionId, el) {
           // ignore focus errors
         }
       })
+      if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
+        termInfo.pendingChunks.forEach(chunk => {
+          try {
+            termInfo.terminal.write(chunk)
+          } catch (error) {
+            console.warn('[terminal] flush chunk failed', error)
+          }
+        })
+        termInfo.pendingChunks = []
+      }
+      if (termInfo.ended) {
+        termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
+      }
       termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
     } else if (termInfo) {
       syncTerminalSize(executionId, termInfo)
