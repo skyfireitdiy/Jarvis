@@ -485,7 +485,7 @@ class ScriptTool:
         stdin_t.start()
 
         try:
-            timeout = get_timeout()
+            timeout = get_timeout() if callable(get_timeout) else None
             if timeout is None:
                 reader_t.join()
             else:
@@ -807,7 +807,7 @@ class ScriptTool:
         reader_t.start()
         stdin_t.start()
 
-        timeout = get_timeout()
+        timeout = get_timeout() if callable(get_timeout) else None
         timed_out = False
         try:
             if timeout is None:
