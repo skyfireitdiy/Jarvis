@@ -1339,7 +1339,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
 
             gateway = get_current_gateway()
             GatewayInputRequest = _GatewayInputRequest
-        except Exception as e:
+        except Exception:
             gateway = None
 
         try:
@@ -1358,6 +1358,11 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             PrettyOutput.auto_print("⚠️ 输入等待超时，已取消本次输入")
             return ""
         except InputProviderDisconnectedError:
+            # Web Gateway 模式：断开连接时不退出，继续等待重连
+            if gateway is not None:
+                PrettyOutput.auto_print("⚠️ 远端输入连接已断开，等待重连...")
+                continue
+            # CLI 模式：保持原样，返回空字符串触发退出
             PrettyOutput.auto_print("⚠️ 远端输入连接已断开，已取消本次输入")
             return ""
         except Exception:
