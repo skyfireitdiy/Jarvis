@@ -28,6 +28,7 @@ from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
+from jarvis.jarvis_utils.globals import set_interrupt
 
 
 class WebGateway(BaseGateway):
@@ -107,6 +108,7 @@ class WebGateway(BaseGateway):
             return GatewayInputResult(text="", metadata={"error": reason})
         payload = {
             "tip": request.tip,
+            "mode": request.mode or "multi",  # 默认多行模式
             "preset": request.preset,
             "preset_cursor": request.preset_cursor,
             "metadata": metadata,
@@ -308,6 +310,11 @@ class WebSocketConnectionManager:
             self._terminal_input_registry.submit_terminal_resize(
                 execution_id, rows_int, cols_int
             )
+            return
+        if message_type == "manual_interrupt":
+            print(f"🔍 [DEBUG] Received manual_interrupt from session_id={session_id}")
+            set_interrupt(True)
+            print(f"✅ [INFO] Manual interrupt triggered by user from session_id={session_id}")
             return
 
 

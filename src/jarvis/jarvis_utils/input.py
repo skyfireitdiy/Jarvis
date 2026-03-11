@@ -1349,6 +1349,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 print(f"🔍 [DEBUG] get_multiline_input: Using Gateway path, tip={tip}")
                 request = GatewayInputRequest(
                     tip=tip,
+                    mode='multi',
                     preset=preset,
                     preset_cursor=preset_cursor,
                 )
