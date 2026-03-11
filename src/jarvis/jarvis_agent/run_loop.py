@@ -344,13 +344,9 @@ class AgentRunLoop:
                     )
                     # 只有在过滤后仍有内容时才打印
                     if filtered_response:
-                        import jarvis.jarvis_utils.globals as G
-
-                        # 获取模型名称：优先使用model.get_model_name()，如果不存在则回退到'LLM'
-                        model_name = ag.model.model_name
-                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{model_name}[/bold cyan]"
+                        # 不显示标题，直接打印内容
                         PrettyOutput.print_markdown(
-                            filtered_response, title=title, border_style="bright_blue"
+                            filtered_response, border_style="bright_blue"
                         )
 
                 if ot("!!!SUMMARY!!!") in current_response:
