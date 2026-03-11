@@ -715,18 +715,42 @@ class PrettyOutput:
         timestamp: bool = True,
         lang: Optional[str] = None,
         traceback: bool = False,
+        context: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         使用样式和语法高亮打印格式化输出（已抽象为事件 + Sink 机制）。
         内部接口，不建议直接使用，请使用 auto_print 代替。
         保持对现有调用方的向后兼容，同时为TUI/日志等前端预留扩展点。
         """
+        # 自动获取上下文信息
+        if context is None:
+            context = {}
+        
+        # 获取当前 agent 名称
+        try:
+            from jarvis.jarvis_utils.globals import get_current_agent_name
+            agent_name = get_current_agent_name()
+            if agent_name and "agent_name" not in context:
+                context["agent_name"] = agent_name
+        except Exception:
+            pass
+        
+        # 获取是否无交互模式
+        try:
+            from jarvis.jarvis_utils.config import is_non_interactive
+            non_interactive = is_non_interactive()
+            if "non_interactive" not in context:
+                context["non_interactive"] = non_interactive
+        except Exception:
+            pass
+        
         event = OutputEvent(
             text=text,
             output_type=output_type,
             timestamp=timestamp,
             lang=lang,
             traceback=traceback,
+            context=context if context else None,
         )
         emit_output(event)
 
@@ -811,7 +835,7 @@ class PrettyOutput:
 
     @staticmethod
     def auto_print(
-        text: str, timestamp: bool = True, lang: Optional[str] = None
+        text: str, timestamp: bool = True, lang: Optional[str] = None, context: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         自动根据打印信息的前缀emoji判断类型并着色输出。
@@ -834,6 +858,7 @@ class PrettyOutput:
             text: 要打印的文本
             timestamp: 是否显示时间戳
             lang: 语言类型（用于语法高亮）
+            context: 额外上下文信息（用于前端显示 agent_name 等）
         """
         # 检测emoji前缀（使用统一的emoji映射）
         output_type = OutputType.INFO  # 默认类型
@@ -856,7 +881,7 @@ class PrettyOutput:
 
         # 使用现有的print方法进行着色输出
         PrettyOutput._print(
-            text=text, output_type=output_type, timestamp=timestamp, lang=lang
+            text=text, output_type=output_type, timestamp=timestamp, lang=lang, context=context
         )
 
     @staticmethod
