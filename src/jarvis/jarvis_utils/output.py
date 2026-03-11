@@ -725,25 +725,27 @@ class PrettyOutput:
         # 自动获取上下文信息
         if context is None:
             context = {}
-        
+
         # 获取当前 agent 名称
         try:
             from jarvis.jarvis_utils.globals import get_current_agent_name
+
             agent_name = get_current_agent_name()
             if agent_name and "agent_name" not in context:
                 context["agent_name"] = agent_name
         except Exception:
             pass
-        
+
         # 获取是否无交互模式
         try:
             from jarvis.jarvis_utils.config import is_non_interactive
+
             non_interactive = is_non_interactive()
             if "non_interactive" not in context:
                 context["non_interactive"] = non_interactive
         except Exception:
             pass
-        
+
         event = OutputEvent(
             text=text,
             output_type=output_type,
@@ -835,7 +837,10 @@ class PrettyOutput:
 
     @staticmethod
     def auto_print(
-        text: str, timestamp: bool = True, lang: Optional[str] = None, context: Optional[Dict[str, Any]] = None
+        text: str,
+        timestamp: bool = True,
+        lang: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         自动根据打印信息的前缀emoji判断类型并着色输出。
@@ -881,7 +886,11 @@ class PrettyOutput:
 
         # 使用现有的print方法进行着色输出
         PrettyOutput._print(
-            text=text, output_type=output_type, timestamp=timestamp, lang=lang, context=context
+            text=text,
+            output_type=output_type,
+            timestamp=timestamp,
+            lang=lang,
+            context=context,
         )
 
     @staticmethod
@@ -910,7 +919,7 @@ class PrettyOutput:
 
         # 打印Panel到终端
         console.print(panel)
-        
+
         # 通过事件系统输出到Gateway（用于Web界面）
         event = OutputEvent(
             text=content,
@@ -977,13 +986,14 @@ class PrettyOutput:
         )
         panel = Panel(syntax, title=title, border_style="cyan")
         console.print(panel)
-        
+
         # 通过事件系统输出到Gateway（用于Web界面）
+        # 注意：不设置 section，避免在 emit 中重复打印 title
         event = OutputEvent(
             text=content,
             output_type=OutputType.CODE,
             lang=lang,
-            section=title,
+            section=None,
         )
         emit_output(event)
 
