@@ -462,16 +462,6 @@ def handle_builtin_config_selector(
                         seen.add(key)
                         unique_dirs.append(Path(d))
 
-                # 可选调试输出：查看每类的搜索目录
-                try:
-                    if os.environ.get("debug_builtin_selector") == "1":
-                        PrettyOutput.auto_print(
-                            f"ℹ️ DEBUG: category={cat} search_dirs="
-                            + ", ".join(str(p) for p in unique_dirs)
-                        )
-                except Exception:
-                    pass
-
                 for dir_path in unique_dirs:
                     if not dir_path.exists():
                         continue
@@ -1016,12 +1006,8 @@ def run_cli(
     # 在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）
     # 如果指定了 -T/--task 参数或 --web-gateway 参数，跳过自动切换
     if not non_interactive and not task and not web_gateway:
-        print(f"🔍 [DEBUG] Calling try_switch_to_jca_if_git_repo, keep_jvs={keep_jvs}")
         try_switch_to_jca_if_git_repo(
             llm_group, tool_group, config_file, restore_session, task, keep_jvs
-        )
-        print(
-            "🔍 [DEBUG] try_switch_to_jca_if_git_repo returned (process not replaced)"
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
@@ -1078,9 +1064,6 @@ def run_cli(
 
             from jarvis.jarvis_web_gateway.app import create_app
 
-            print(
-                f"🔍 [DEBUG] Starting WebGateway on {web_gateway_host}:{web_gateway_port}"
-            )
             config = uvicorn.Config(
                 create_app(),
                 host=web_gateway_host,
@@ -1098,9 +1081,8 @@ def run_cli(
                 from jarvis.jarvis_gateway.manager import get_current_gateway
 
                 current_gateway = get_current_gateway()
-                print(f"🔍 [DEBUG] Current gateway: {type(current_gateway).__name__}")
             except Exception as e:
-                print(f"🔍 [DEBUG] Failed to get current gateway: {e}")
+                pass
         except Exception as web_gateway_err:
             try:
                 from jarvis.jarvis_gateway.manager import set_current_gateway
@@ -1176,7 +1158,6 @@ def run_cli(
                         # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
 
                 # 获取用户输入，循环直到需要传递给 agent
-                print("🔍 [DEBUG] Entering input loop, calling get_multiline_input")
                 while True:
                     user_input = get_multiline_input("请输入你的任务（Ctrl+C 退出）")
                     if not user_input:

@@ -461,8 +461,6 @@ class SchemaParser:
             schema: Schema 定义
             path: 当前路径
         """
-        # 调试信息：打印转换路径和类型
-        # print(f"[DEBUG TYPE] Converting path: {path}, value type: {type(value).__name__}, schema type: {schema.get('type', 'N/A')}", file=sys.stderr)
         # 处理 oneOf/anyOf：找到匹配的 schema 并转换
         if "oneOf" in schema:
             for sub_schema in schema["oneOf"]:
@@ -540,10 +538,6 @@ class SchemaParser:
                             type_value if type_value is not None else "string",
                         )
                         if converted is not None and converted is not field_value:
-                            PrettyOutput.auto_print(
-                                f"🔍 [DEBUG TYPE] Converted {field_path}: {type(field_value).__name__} -> {type(converted).__name__}, value: {field_value} -> {converted}",
-                                timestamp=False,
-                            )
                             value[field] = converted
                             field_value = converted
                         # 递归处理嵌套结构
