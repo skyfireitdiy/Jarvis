@@ -1014,13 +1014,15 @@ def run_cli(
         pass
 
     # 在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）
-    # 如果指定了 -T/--task 参数，跳过自动切换
-    if not non_interactive and not task:
+    # 如果指定了 -T/--task 参数或 --web-gateway 参数，跳过自动切换
+    if not non_interactive and not task and not web_gateway:
         print(f"🔍 [DEBUG] Calling try_switch_to_jca_if_git_repo, keep_jvs={keep_jvs}")
         try_switch_to_jca_if_git_repo(
             llm_group, tool_group, config_file, restore_session, task, keep_jvs
         )
-        print("🔍 [DEBUG] try_switch_to_jca_if_git_repo returned (process not replaced)")
+        print(
+            "🔍 [DEBUG] try_switch_to_jca_if_git_repo returned (process not replaced)"
+        )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     try:
@@ -1076,7 +1078,9 @@ def run_cli(
 
             from jarvis.jarvis_web_gateway.app import create_app
 
-            print(f"🔍 [DEBUG] Starting WebGateway on {web_gateway_host}:{web_gateway_port}")
+            print(
+                f"🔍 [DEBUG] Starting WebGateway on {web_gateway_host}:{web_gateway_port}"
+            )
             config = uvicorn.Config(
                 create_app(),
                 host=web_gateway_host,
@@ -1086,10 +1090,13 @@ def run_cli(
             web_gateway_server = uvicorn.Server(config)
             thread = threading.Thread(target=web_gateway_server.run, daemon=True)
             thread.start()
-            print(f"🌐 Web Gateway 已启动: ws://{web_gateway_host}:{web_gateway_port}/ws")
+            print(
+                f"🌐 Web Gateway 已启动: ws://{web_gateway_host}:{web_gateway_port}/ws"
+            )
             # 验证 gateway 是否设置成功
             try:
                 from jarvis.jarvis_gateway.manager import get_current_gateway
+
                 current_gateway = get_current_gateway()
                 print(f"🔍 [DEBUG] Current gateway: {type(current_gateway).__name__}")
             except Exception as e:
@@ -1101,9 +1108,7 @@ def run_cli(
                 set_current_gateway(None)
             except Exception:
                 pass
-            PrettyOutput.auto_print(
-                f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}"
-            )
+            PrettyOutput.auto_print(f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}")
 
     # 运行主流程
     try:
