@@ -979,20 +979,18 @@ onMounted(() => {
 }
 
 .message-content {
-  display: grid;
-  grid-template-columns: min-content 1fr;
-  gap: 12px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
   text-align: left;
 }
 
 .message-content .message-meta-left {
-  min-width: 260px;
-  display: grid;
-  grid-template-columns: repeat(4, auto);
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   align-items: center;
-  justify-self: start;
 }
 
 .message-meta-left .badge,
@@ -1032,7 +1030,7 @@ onMounted(() => {
   font-size: 13px;
   line-height: 1.5;
   color: #e6edf3;
-  justify-self: start;
+  width: 100%;
 }
 
 .message-meta-left .badge {
@@ -1550,6 +1548,15 @@ onMounted(() => {
   
   .message {
     padding: 10px 12px;
+  }
+  
+  .message-content {
+    gap: 6px;
+  }
+  
+  .message-content .message-meta-left {
+    gap: 6px 8px;
+    font-size: 11px;
   }
   
   .modal {
