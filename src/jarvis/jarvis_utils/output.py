@@ -440,6 +440,14 @@ class ConsoleOutputSink(OutputSink):
             )
 
     def emit(self, event: OutputEvent) -> None:
+        # 流式输出类型由 Gateway 处理，CLI 模式忽略
+        if event.output_type in (
+            OutputType.STREAM_START,
+            OutputType.STREAM_CHUNK,
+            OutputType.STREAM_END,
+        ):
+            return
+
         # 章节输出
         if event.section is not None:
             # 使用带背景色和样式的Text替代Panel
@@ -1307,16 +1315,18 @@ class PrettyOutput:
                         if "(" in parts[1]:
                             model_name = parts[1].split("(")[1].rstrip(")").strip()
                 # 发送流式开始事件
-                emit_output(OutputEvent(
-                    text="",
-                    output_type=OutputType.STREAM_START,
-                    timestamp=False,
-                    context={
-                        "agent_name": agent_name,
-                        "model_name": model_name,
-                        "start_time": start_time
-                    }
-                ))
+                emit_output(
+                    OutputEvent(
+                        text="",
+                        output_type=OutputType.STREAM_START,
+                        timestamp=False,
+                        context={
+                            "agent_name": agent_name,
+                            "model_name": model_name,
+                            "start_time": start_time,
+                        },
+                    )
+                )
 
             buffer = ""
             last_update_time = time.time()
@@ -1337,11 +1347,11 @@ class PrettyOutput:
                 buffer += s
                 # 发送流式 chunk 事件
                 if s:
-                    emit_output(OutputEvent(
-                        text=s,
-                        output_type=OutputType.STREAM_CHUNK,
-                        timestamp=False
-                    ))
+                    emit_output(
+                        OutputEvent(
+                            text=s, output_type=OutputType.STREAM_CHUNK, timestamp=False
+                        )
+                    )
 
                 if max_output > 0 and len(response) >= max_output:
                     _flush_buffer()
@@ -1386,17 +1396,19 @@ class PrettyOutput:
         tokens_per_second = (
             response_tokens / generation_time if generation_time > 0 else 0
         )
-        emit_output(OutputEvent(
-            text="",
-            output_type=OutputType.STREAM_END,
-            timestamp=False,
-            context={
-                "duration": duration,
-                "first_token_time": first_token_time,
-                "tokens": response_tokens,
-                "tokens_per_second": tokens_per_second
-            }
-        ))
+        emit_output(
+            OutputEvent(
+                text="",
+                output_type=OutputType.STREAM_END,
+                timestamp=False,
+                context={
+                    "duration": duration,
+                    "first_token_time": first_token_time,
+                    "tokens": response_tokens,
+                    "tokens_per_second": tokens_per_second,
+                },
+            )
+        )
 
         return response, first_token_time
 
@@ -1439,23 +1451,25 @@ class PrettyOutput:
                 agent_name = parts[0].replace("🤖 模型输出 - ", "").strip()
                 if "(" in parts[1]:
                     model_name = parts[1].split("(")[1].rstrip(")").strip()
-        
+
         console.print(prefix, soft_wrap=False)
         response = ""
         first_token_time = 0.0
-        
+
         # 发送流式开始事件
-        emit_output(OutputEvent(
-            text="",
-            output_type=OutputType.STREAM_START,
-            timestamp=False,
-            context={
-                "agent_name": agent_name,
-                "model_name": model_name,
-                "start_time": start_time
-            }
-        ))
-        
+        emit_output(
+            OutputEvent(
+                text="",
+                output_type=OutputType.STREAM_START,
+                timestamp=False,
+                context={
+                    "agent_name": agent_name,
+                    "model_name": model_name,
+                    "start_time": start_time,
+                },
+            )
+        )
+
         for s in chat_iterator:
             if s and first_token_time == 0.0:
                 first_token_time = time.time() - start_time
@@ -1463,11 +1477,11 @@ class PrettyOutput:
             response += s
             # 发送流式 chunk 事件
             if s:
-                emit_output(OutputEvent(
-                    text=s,
-                    output_type=OutputType.STREAM_CHUNK,
-                    timestamp=False
-                ))
+                emit_output(
+                    OutputEvent(
+                        text=s, output_type=OutputType.STREAM_CHUNK, timestamp=False
+                    )
+                )
             if max_output > 0 and len(response) >= max_output:
                 append_session_history(message, response)
                 return response, first_token_time
@@ -1489,18 +1503,20 @@ class PrettyOutput:
         console.print(
             f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
         )
-        
+
         # 发送流式结束事件
-        emit_output(OutputEvent(
-            text="",
-            output_type=OutputType.STREAM_END,
-            timestamp=False,
-            context={
-                "duration": duration,
-                "first_token_time": first_token_time,
-                "tokens": response_tokens,
-                "tokens_per_second": tokens_per_second
-            }
-        ))
-        
+        emit_output(
+            OutputEvent(
+                text="",
+                output_type=OutputType.STREAM_END,
+                timestamp=False,
+                context={
+                    "duration": duration,
+                    "first_token_time": first_token_time,
+                    "tokens": response_tokens,
+                    "tokens_per_second": tokens_per_second,
+                },
+            )
+        )
+
         return response, first_token_time
