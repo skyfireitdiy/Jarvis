@@ -178,7 +178,7 @@ class WebSocketConnectionManager:
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        session_id = websocket.query_params.get("session_id") or str(uuid.uuid4())
+        session_id = "default"  # 固定使用 default session，简化重连逻辑
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
         auth_payload = _extract_auth_from_headers(websocket)
@@ -212,9 +212,14 @@ class WebSocketConnectionManager:
         )
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
+        print(
+            f"[RECONNECT] session_id={session_id}, pending_request={pending_request is not None}"
+        )
         if pending_request:
             session = self._input_registry.get_or_create(session_id)
+            print(f"[RECONNECT] Got session, reconnecting...")
             session.reconnect()
+            print(f"[RECONNECT] Sending input_request: {pending_request}")
             await websocket.send_json(pending_request)
         try:
             while True:

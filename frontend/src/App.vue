@@ -193,7 +193,7 @@ function connect() {
   if (socket.value) return
   const host = backendHost.value || window.location.hostname || '127.0.0.1'
   const port = backendPort.value || '8000'
-  const url = `ws://${host}:${port}/ws${sessionId.value ? `?session_id=${sessionId.value}` : ''}`
+  const url = `ws://${host}:${port}/ws`  // 固定使用 default session
   connecting.value = true
   const ws = new WebSocket(url)
   ws.onopen = () => {
@@ -278,11 +278,33 @@ function handleMessage(message) {
     inputTip.value = payload.tip || ''
     inputMode.value = payload.mode || 'multi'  // 默认多行
     inputText.value = payload.preset || ''
+    
+    // 在显示输入框前判断是否在底部
+    const threshold = 100
+    let shouldScrollAfterInputShow = false
+    if (outputList.value) {
+      const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
+      shouldScrollAfterInputShow = distanceToBottom < threshold
+      console.log('[INPUT_REQUEST] Before show - distanceToBottom:', distanceToBottom, 'shouldScroll:', shouldScrollAfterInputShow)
+    }
+    
     showInput.value = true // 显示输入框
     nextTick(() => {
       // 聚焦到输入框
       const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
       inputEl?.focus()
+      
+      // 输入框显示后，如果之前在底部，就滚动到底部
+      if (shouldScrollAfterInputShow && outputList.value) {
+        requestAnimationFrame(() => {
+          const scrollHeight = outputList.value.scrollHeight
+          const scrollTop = outputList.value.scrollTop
+          const clientHeight = outputList.value.clientHeight
+          console.log('[INPUT_REQUEST] After show - Before scroll - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight)
+          outputList.value.scrollTop = scrollHeight
+          console.log('[INPUT_REQUEST] After show - After scroll - scrollTop:', outputList.value.scrollTop)
+        })
+      }
     })
   } else if (type === 'confirm') {
     console.log('[ws] confirm', payload)
@@ -378,15 +400,25 @@ function appendOutput(payload) {
   }
   
   outputs.value.push(outputItem)
+  console.log('[DEBUG] Pushed output, outputs.length:', outputs.value.length, 'type:', outputItem.output_type)
   
   // DOM更新后，如果之前在底部，就滚动到底部
+  // 使用双 nextTick + requestAnimationFrame 确保布局完全计算后再滚动
   nextTick(() => {
-    if (shouldAutoScroll && outputList.value) {
-      console.log('[SCROLL] Auto-scrolling to bottom')
-      outputList.value.scrollTop = outputList.value.scrollHeight
-    } else {
-      console.log('[SCROLL] Not auto-scrolling (user was not at bottom)')
-    }
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        if (shouldAutoScroll && outputList.value) {
+          const scrollHeight = outputList.value.scrollHeight
+          const scrollTop = outputList.value.scrollTop
+          const clientHeight = outputList.value.clientHeight
+          console.log('[SCROLL] Before scroll - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight)
+          outputList.value.scrollTop = scrollHeight
+          console.log('[SCROLL] After scroll - scrollTop:', outputList.value.scrollTop, 'scrollHeight:', outputList.value.scrollHeight)
+        } else {
+          console.log('[SCROLL] Not auto-scrolling (user was not at bottom)')
+        }
+      })
+    })
   })
 }
 
