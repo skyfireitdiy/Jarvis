@@ -65,7 +65,9 @@ class RemoteInputSession:
             try:
                 message = self._queue.get(timeout=timeout)
             except Empty as exc:
-                raise InputProviderTimeoutError("timed out waiting for remote input") from exc
+                raise InputProviderTimeoutError(
+                    "timed out waiting for remote input"
+                ) from exc
             with self._state_lock:
                 disconnect_reason = self._disconnect_reason
             if disconnect_reason is not None and message.text == "":
@@ -76,12 +78,17 @@ class RemoteInputSession:
 class WebSocketInputProvider(InputProvider):
     """供 WebSocket/远端会话使用的输入提供者。"""
 
-    def __init__(self, session: RemoteInputSession, timeout: Optional[float] = None) -> None:
+    def __init__(
+        self, session: RemoteInputSession, timeout: Optional[float] = None
+    ) -> None:
         self.session = session
         self.timeout = timeout
 
     def get_multiline_input(
-        self, tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+        self,
+        tip: str,
+        preset: Optional[str] = None,
+        preset_cursor: Optional[int] = None,
     ) -> str:
         del tip, preset, preset_cursor
         return self.session.wait_for_input(timeout=self.timeout)
@@ -103,13 +110,17 @@ class InputSessionRegistry:
                 self._sessions[session_id] = session
             return session
 
-    def register_provider(self, session_id: str, timeout: Optional[float] = None) -> WebSocketInputProvider:
+    def register_provider(
+        self, session_id: str, timeout: Optional[float] = None
+    ) -> WebSocketInputProvider:
         session = self.get_or_create(session_id)
         provider = WebSocketInputProvider(session=session, timeout=timeout)
         register_input_provider(session_id, provider)
         return provider
 
-    def unregister_provider(self, session_id: str, disconnect_reason: str = "remote session disconnected") -> None:
+    def unregister_provider(
+        self, session_id: str, disconnect_reason: str = "remote session disconnected"
+    ) -> None:
         with self._lock:
             session = self._sessions.pop(session_id, None)
         unregister_input_provider(session_id)
@@ -126,11 +137,18 @@ class InputSessionRegistry:
         """保存输入请求，用于重连后恢复。"""
         with self._lock:
             self._pending_input_requests[session_id] = request
+            print(
+                f"[INPUT_REGISTRY] Saved input_request for session={session_id}, total={len(self._pending_input_requests)}"
+            )
 
     def get_input_request(self, session_id: str) -> Optional[dict]:
         """获取并清除保存的输入请求。"""
         with self._lock:
-            return self._pending_input_requests.pop(session_id, None)
+            request = self._pending_input_requests.pop(session_id, None)
+            print(
+                f"[INPUT_REGISTRY] Got input_request for session={session_id}, found={request is not None}, remaining={len(self._pending_input_requests)}"
+            )
+            return request
 
     def clear_input_request(self, session_id: str) -> None:
         """清除保存的输入请求。"""
