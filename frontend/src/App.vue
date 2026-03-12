@@ -3,7 +3,7 @@
     <!-- 顶部栏 -->
     <header class="app-header">
       <div class="header-title">
-        <h1>Jarvis Web Gateway</h1>
+        <!-- 标题已移除 -->
       </div>
       <div class="header-actions">
         <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
@@ -796,8 +796,6 @@ function confirmClearHistory() {
         // 重置历史加载状态
         historyOffset.value = 0
         hasMoreHistory.value = true
-        // 重新加载历史（如果有的话）
-        loadHistoryMessages(false)
       } else {
         console.error('[HISTORY] Failed to clear history')
       }
