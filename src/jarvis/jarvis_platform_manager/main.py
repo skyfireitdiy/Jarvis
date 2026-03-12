@@ -138,10 +138,29 @@ def llm_list() -> None:
 
 
 @llm_app.command("show")
-def llm_show(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+def llm_show(
+    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+) -> None:
     """显示指定 LLM 配置详情"""
     config = _load_config()
     llms = config.get("llms", {})
+
+    if not llms:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何 LLM")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{llm_name} ({llm_config.get('platform', 'unknown')}/{llm_config.get('model', 'unknown')})"
+            for llm_name, llm_config in sorted(llms.items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择 LLM 配置 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：name (platform/model)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in llms:
         PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
@@ -163,10 +182,29 @@ def llm_show(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
 
 
 @llm_app.command("delete")
-def llm_delete(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+def llm_delete(
+    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+) -> None:
     """删除指定的 LLM 配置"""
     config = _load_config()
     llms = config.get("llms", {})
+
+    if not llms:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何 LLM")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{llm_name} ({llm_config.get('platform', 'unknown')}/{llm_config.get('model', 'unknown')})"
+            for llm_name, llm_config in sorted(llms.items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择要删除的 LLM 配置 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：name (platform/model)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in llms:
         PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
@@ -174,12 +212,10 @@ def llm_delete(name: str = typer.Argument(..., help="LLM 配置名称")) -> None
 
     # 检查是否被模型组引用
     llm_groups = config.get("llm_groups", {})
-    referenced = False
     for group_name, group_config in llm_groups.items():
         for key in ["normal_llm", "cheap_llm", "smart_llm"]:
             if group_config.get(key) == name:
                 PrettyOutput.auto_print(f"⚠️ 该配置被模型组 '{group_name}' 引用")
-                referenced = True
 
     # 确认删除
     from jarvis.jarvis_utils.input import user_confirm
@@ -235,7 +271,7 @@ def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
         max_tokens = 128000
 
     # 创建配置
-    llm_config = {
+    llm_config: Dict[str, Any] = {
         "platform": platform,
         "model": model,
         "max_input_token_count": max_tokens,
@@ -264,13 +300,32 @@ def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
 
 
 @llm_app.command("update")
-def llm_update(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+def llm_update(
+    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+) -> None:
     """更新指定的 LLM 配置（交互式）"""
-    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
+    from jarvis.jarvis_utils.input import get_single_line_input
 
     config = _load_config()
     if "llms" not in config:
         config["llms"] = {}
+
+    if not config["llms"]:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何 LLM")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{llm_name} ({llm_config.get('platform', 'unknown')}/{llm_config.get('model', 'unknown')})"
+            for llm_name, llm_config in sorted(config["llms"].items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择要更新的 LLM 配置 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：name (platform/model)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in config["llms"]:
         PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {name}")
@@ -336,10 +391,29 @@ def group_list() -> None:
 
 
 @group_app.command("show")
-def group_show(name: str = typer.Argument(..., help="模型组名称")) -> None:
+def group_show(
+    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+) -> None:
     """显示指定模型组详情"""
     config = _load_config()
     llm_groups = config.get("llm_groups", {})
+
+    if not llm_groups:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{group_name} (normal: {group_config.get('normal_llm', 'N/A')})"
+            for group_name, group_config in sorted(llm_groups.items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择模型组 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in llm_groups:
         PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
@@ -353,10 +427,29 @@ def group_show(name: str = typer.Argument(..., help="模型组名称")) -> None:
 
 
 @group_app.command("delete")
-def group_delete(name: str = typer.Argument(..., help="模型组名称")) -> None:
+def group_delete(
+    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+) -> None:
     """删除指定的模型组"""
     config = _load_config()
     llm_groups = config.get("llm_groups", {})
+
+    if not llm_groups:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{group_name} (normal: {group_config.get('normal_llm', 'N/A')})"
+            for group_name, group_config in sorted(llm_groups.items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择要删除的模型组 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in llm_groups:
         PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
@@ -385,7 +478,7 @@ def group_delete(name: str = typer.Argument(..., help="模型组名称")) -> Non
 @group_app.command("add")
 def group_add(name: str = typer.Argument(..., help="模型组名称")) -> None:
     """添加新的模型组（交互式）"""
-    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
+    from jarvis.jarvis_utils.input import get_single_line_input
 
     config = _load_config()
     if "llm_groups" not in config:
@@ -450,13 +543,32 @@ def group_add(name: str = typer.Argument(..., help="模型组名称")) -> None:
 
 
 @group_app.command("update")
-def group_update(name: str = typer.Argument(..., help="模型组名称")) -> None:
+def group_update(
+    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+) -> None:
     """更新指定的模型组（交互式）"""
     from jarvis.jarvis_utils.input import get_single_line_input
 
     config = _load_config()
     if "llm_groups" not in config:
         config["llm_groups"] = {}
+
+    if not config["llm_groups"]:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{group_name} (normal: {group_config.get('normal_llm', 'N/A')})"
+            for group_name, group_config in sorted(config["llm_groups"].items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择要更新的模型组 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in config["llm_groups"]:
         PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
@@ -511,10 +623,29 @@ def group_update(name: str = typer.Argument(..., help="模型组名称")) -> Non
 
 
 @group_app.command("set")
-def group_set(name: str = typer.Argument(..., help="模型组名称")) -> None:
+def group_set(
+    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+) -> None:
     """设置当前激活的模型组"""
     config = _load_config()
     llm_groups = config.get("llm_groups", {})
+
+    if not llm_groups:
+        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        raise typer.Exit(code=1)
+
+    # 如果没有指定名称，使用交互式选择
+    if name is None:
+        fzf_options = [
+            f"{group_name} (normal: {group_config.get('normal_llm', 'N/A')})"
+            for group_name, group_config in sorted(llm_groups.items())
+        ]
+        selected_str = fzf_select(fzf_options, prompt="选择要设置的模型组 > ")
+        if not selected_str:
+            PrettyOutput.auto_print("ℹ️ 已取消")
+            raise typer.Exit(code=0)
+        # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
+        name = selected_str.split(" (")[0].strip()
 
     if name not in llm_groups:
         PrettyOutput.auto_print(f"❌ 未找到模型组: {name}")
