@@ -622,25 +622,46 @@ function renderSideBySideDiff(diffData) {
   rows.forEach(row => {
     const { type, old_line_num, old_line, new_line_num, new_line } = row
     
-    html += '<tr class="diff-row diff-row-' + type + '">'
+    // 行背景色类
+    let rowClass = 'diff-row diff-row-' + type
     
     // 旧代码列
-    if (type === 'equal' || type === 'delete') {
+    if (type === 'equal' || type === 'delete' || type === 'replace') {
       html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
-      // 对代码内容应用语法高亮
-      const oldHighlighted = old_line ? hljs.highlight(old_line, { language }).value : ''
-      html += `<td class="diff-content diff-old-content ${type === 'delete' ? 'diff-deleted' : ''}"><code>${oldHighlighted}</code></td>`
+      
+      // 统计并保留缩进
+      let oldContent = ''
+      if (old_line) {
+        const leadingSpaces = old_line.match(/^(\s*)/)[0]
+        const highlighted = hljs.highlight(old_line, { language }).value
+        // 在高亮结果前添加显式的 &nbsp; 来保留缩进
+        oldContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+      }
+      
+      // 对于 replace 和 delete，添加删除背景色到 td
+      const oldClass = (type === 'replace' || type === 'delete') ? 'diff-deleted' : ''
+      html += `<td class="diff-content diff-old-content ${oldClass}"><code>${oldContent}</code></td>`
     } else {
       html += '<td class="diff-line-num diff-old-num"></td>'
       html += '<td class="diff-content diff-old-content"></td>'
     }
     
     // 新代码列
-    if (type === 'equal' || type === 'insert') {
+    if (type === 'equal' || type === 'insert' || type === 'replace') {
       html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
-      // 对代码内容应用语法高亮
-      const newHighlighted = new_line ? hljs.highlight(new_line, { language }).value : ''
-      html += `<td class="diff-content diff-new-content ${type === 'insert' ? 'diff-added' : ''}"><code>${newHighlighted}</code></td>`
+      
+      // 统计并保留缩进
+      let newContent = ''
+      if (new_line) {
+        const leadingSpaces = new_line.match(/^(\s*)/)[0]
+        const highlighted = hljs.highlight(new_line, { language }).value
+        // 在高亮结果前添加显式的 &nbsp; 来保留缩进
+        newContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+      }
+      
+      // 对于 replace 和 insert，添加新增背景色到 td
+      const newClass = (type === 'replace' || type === 'insert') ? 'diff-added' : ''
+      html += `<td class="diff-content diff-new-content ${newClass}"><code>${newContent}</code></td>`
     } else {
       html += '<td class="diff-line-num diff-new-num"></td>'
       html += '<td class="diff-content diff-new-content"></td>'
@@ -1969,6 +1990,7 @@ onMounted(() => {
   border-radius: 8px;
   overflow: hidden;
   margin: 8px 0;
+  width: 100%;
 }
 
 .diff-header {
@@ -2018,53 +2040,52 @@ onMounted(() => {
 }
 
 .diff-row-equal {
-  background: rgba(0, 0, 0, 0.1);
+  /* 背景色移到 td 级别 */
 }
 
 .diff-row-delete {
-  background: rgba(248, 81, 73, 0.05);
+  /* 背景色移到 td 级别 */
 }
 
 .diff-row-insert {
-  background: rgba(63, 185, 80, 0.05);
+  /* 背景色移到 td 级别 */
 }
 
 .diff-line-num {
   color: #8b949e;
-  padding: 4px 8px;
+  padding: 2px 6px;
   text-align: right;
   width: 50px;
   user-select: none;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
+  vertical-align: top;
 }
 
 .diff-content {
-  padding: 4px 8px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  min-width: 200px;
+  padding: 2px 6px;
+  white-space: pre;
+  word-break: break-all;
+  width: 50%;
+  vertical-align: top;
 }
 
 .diff-content code {
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.2;
   background: transparent;
   padding: 0;
-}
-
-.diff-content code * {
-  background: transparent;
+  white-space: pre;
 }
 
 .diff-deleted {
-  background: rgba(248, 81, 73, 0.15);
-  color: #ffa198;
+  background: rgba(248, 81, 73, 0.7);
+  color: #fff;
 }
 
 .diff-added {
-  background: rgba(63, 185, 80, 0.15);
-  color: #7ee787;
+  background: rgba(63, 185, 80, 0.7);
+  color: #fff;
 }
 
 .diff-error {
