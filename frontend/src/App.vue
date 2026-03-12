@@ -421,29 +421,11 @@ function handleMessage(message) {
     } else if (outputType === 'STREAM_END') {
       console.log('[STREAM] End event:', payload)
       if (streamingMessage.value) {
-        streamingMessage.value.isStreaming = false
-        // 保存统计信息到 context
-        if (payload?.context) {
-          streamingMessage.value.context = {
-            ...streamingMessage.value.context,
-            ...payload.context
-          }
-        }
-        // 保存到历史
-        try {
-          const messageToSave = {
-            output_type: streamingMessage.value.output_type,
-            text: streamingMessage.value.text,
-            lang: streamingMessage.value.lang,
-            agent_name: streamingMessage.value.agent_name,
-            non_interactive: streamingMessage.value.non_interactive,
-            timestamp: streamingMessage.value.timestamp,
-            context: streamingMessage.value.context
-          }
-          historyStorage.saveMessage(messageToSave)
-          console.log('[STREAM] Saved to history')
-        } catch (error) {
-          console.warn('[STREAM] Failed to save to history:', error)
+        // 从 outputs 数组中删除流式消息（因为后面会有完整的 RESULT 消息）
+        const index = outputs.value.indexOf(streamingMessage.value)
+        if (index !== -1) {
+          outputs.value.splice(index, 1)
+          console.log('[STREAM] Removed streaming message from outputs')
         }
         // 清除当前流式消息引用
         streamingMessage.value = null
