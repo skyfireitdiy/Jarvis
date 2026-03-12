@@ -143,6 +143,10 @@ class OutputType(Enum):
     CHEAP_MODEL = "CHEAP_MODEL"
     NORMAL_MODEL = "NORMAL_MODEL"
     SMART_MODEL = "SMART_MODEL"
+    # 流式输出类型
+    STREAM_START = "STREAM_START"
+    STREAM_CHUNK = "STREAM_CHUNK"
+    STREAM_END = "STREAM_END"
 
 
 # 输出类型图标映射（统一的图标定义）
@@ -169,6 +173,9 @@ OUTPUT_ICONS = {
     OutputType.CHEAP_MODEL: "💰",
     OutputType.NORMAL_MODEL: "⭐",
     OutputType.SMART_MODEL: "🧠",
+    OutputType.STREAM_START: "⏳",
+    OutputType.STREAM_CHUNK: "▶️",
+    OutputType.STREAM_END: "✅",
 }
 
 
@@ -197,6 +204,9 @@ EMOJI_TO_OUTPUT_TYPE = {
     "💰": OutputType.CHEAP_MODEL,
     "⭐": OutputType.NORMAL_MODEL,
     "🧠": OutputType.SMART_MODEL,
+    "⏳": OutputType.STREAM_START,
+    "▶️": OutputType.STREAM_CHUNK,
+    "✅": OutputType.STREAM_END,
 }
 
 
@@ -1287,6 +1297,26 @@ class PrettyOutput:
             response += first_chunk
             if first_chunk:
                 _update_panel_content(first_chunk, update_subtitle=True)
+                # 解析 title 获取 agent_name 和 model_name
+                agent_name = ""
+                model_name = ""
+                if "·" in title:
+                    parts = title.split("·")
+                    if len(parts) > 1:
+                        agent_name = parts[0].strip()
+                        if "(" in parts[1]:
+                            model_name = parts[1].split("(")[1].rstrip(")").strip()
+                # 发送流式开始事件
+                emit_output(OutputEvent(
+                    text="",
+                    output_type=OutputType.STREAM_START,
+                    timestamp=False,
+                    context={
+                        "agent_name": agent_name,
+                        "model_name": model_name,
+                        "start_time": start_time
+                    }
+                ))
 
             buffer = ""
             last_update_time = time.time()
@@ -1305,6 +1335,13 @@ class PrettyOutput:
                     continue
                 response += s
                 buffer += s
+                # 发送流式 chunk 事件
+                if s:
+                    emit_output(OutputEvent(
+                        text=s,
+                        output_type=OutputType.STREAM_CHUNK,
+                        timestamp=False
+                    ))
 
                 if max_output > 0 and len(response) >= max_output:
                     _flush_buffer()
@@ -1339,6 +1376,28 @@ class PrettyOutput:
                 )
                 live.update(panel)
 
+        # 发送流式结束事件
+        response_tokens = (
+            get_context_token_count(response) if get_context_token_count else 0
+        )
+        generation_time = (
+            duration - first_token_time if duration > first_token_time else duration
+        )
+        tokens_per_second = (
+            response_tokens / generation_time if generation_time > 0 else 0
+        )
+        emit_output(OutputEvent(
+            text="",
+            output_type=OutputType.STREAM_END,
+            timestamp=False,
+            context={
+                "duration": duration,
+                "first_token_time": first_token_time,
+                "tokens": response_tokens,
+                "tokens_per_second": tokens_per_second
+            }
+        ))
+
         return response, first_token_time
 
     @staticmethod
@@ -1364,20 +1423,51 @@ class PrettyOutput:
             check_interrupt: 检查是否请求中断的回调
             append_session_history: 追加会话历史的回调
             get_context_token_count: 计算文本token数的回调（用于显示速度，可选）
+            output_sink: 输出后端（可选），用于 Gateway 模式流式发送
 
         返回：
             Tuple[str, float]: (模型响应, 首token时间)
         """
         import time
 
+        # 解析 prefix 获取 agent_name 和 model_name
+        agent_name = ""
+        model_name = ""
+        if "·" in prefix:
+            parts = prefix.split("·")
+            if len(parts) > 1:
+                agent_name = parts[0].replace("🤖 模型输出 - ", "").strip()
+                if "(" in parts[1]:
+                    model_name = parts[1].split("(")[1].rstrip(")").strip()
+        
         console.print(prefix, soft_wrap=False)
         response = ""
         first_token_time = 0.0
+        
+        # 发送流式开始事件
+        emit_output(OutputEvent(
+            text="",
+            output_type=OutputType.STREAM_START,
+            timestamp=False,
+            context={
+                "agent_name": agent_name,
+                "model_name": model_name,
+                "start_time": start_time
+            }
+        ))
+        
         for s in chat_iterator:
             if s and first_token_time == 0.0:
                 first_token_time = time.time() - start_time
             console.print(s, end="")
             response += s
+            # 发送流式 chunk 事件
+            if s:
+                emit_output(OutputEvent(
+                    text=s,
+                    output_type=OutputType.STREAM_CHUNK,
+                    timestamp=False
+                ))
             if max_output > 0 and len(response) >= max_output:
                 append_session_history(message, response)
                 return response, first_token_time
@@ -1399,4 +1489,18 @@ class PrettyOutput:
         console.print(
             f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
         )
+        
+        # 发送流式结束事件
+        emit_output(OutputEvent(
+            text="",
+            output_type=OutputType.STREAM_END,
+            timestamp=False,
+            context={
+                "duration": duration,
+                "first_token_time": first_token_time,
+                "tokens": response_tokens,
+                "tokens_per_second": tokens_per_second
+            }
+        ))
+        
         return response, first_token_time

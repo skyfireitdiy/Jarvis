@@ -1,0 +1,14 @@
+{
+  "id": "20260312_174841_806311",
+  "type": "project_long_term",
+  "tags": [
+    "流式输出",
+    "Gateway模式",
+    "WebSocket",
+    "OutputSink",
+    "架构设计"
+  ],
+  "content": "## 流式输出架构（方案B：新消息类型）\n\n### 核心设计\n- 后端新增三种输出类型：STREAM_START, STREAM_CHUNK, STREAM_END\n- 通过 emit_output() 统一发送到所有注册的 OutputSink\n- 前端通过 WebSocket 接收并实时更新界面\n\n### 实现文件\n- `src/jarvis/jarvis_utils/output.py`: OutputType 枚举、stream_chat_simple 函数\n- `frontend/src/App.vue`: 流式消息处理逻辑\n\n### 事件格式\n- **STREAM_START**: 创建新消息，包含 agent_name, model_name 等元数据\n- **STREAM_CHUNK**: 追加内容块\n- **STREAM_END**: 标记完成，包含性能指标\n\n### 关键优势\n- 统一的输出架构，CLI 和 Gateway 模式复用同一套逻辑\n- 前端实时显示，用户体验流畅\n- 元数据与内容分离，移动端适配良好\n\n### Git Commit\n- 初始点: ef762d26cea5b1217f1ccfc7170dfefd8d658df6\n- 完成点: 当前 HEAD\n- 变更: 127 行新增，1 行删除",
+  "created_at": "2026-03-12T17:48:41.806331",
+  "updated_at": "2026-03-12T17:48:41.806334"
+}
