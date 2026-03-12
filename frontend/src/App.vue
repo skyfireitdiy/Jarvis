@@ -696,6 +696,7 @@ onMounted(() => {
   background: #0d1117;
   color: #c9d1d9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 /* 顶部栏 */
@@ -801,6 +802,7 @@ onMounted(() => {
 
 .messages {
   flex: 1;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 16px;
   display: flex;
