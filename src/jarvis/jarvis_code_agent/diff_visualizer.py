@@ -15,6 +15,8 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from jarvis.jarvis_utils.output import emit_output, OutputType
+
 LANGUAGE_EXTENSION_MAPPING = {
     "py": "python",
     "js": "javascript",
@@ -301,6 +303,22 @@ class DiffVisualizer:
             title = f"📝 {file_path}" if file_path else "Diff"
             panel = Panel(table, title=title, border_style="cyan", padding=(0, 1))
             self.console.print(panel)
+            
+            # 发送到前端
+            try:
+                from jarvis.jarvis_utils.output import OutputEvent
+                emit_output(
+                    OutputEvent(
+                        text=diff_text,
+                        output_type=OutputType.CODE,
+                        lang="diff",
+                        timestamp=True,
+                        context={"file_path": file_path}
+                    )
+                )
+            except Exception as e:
+                # 忽略输出错误，不影响控制台显示
+                pass
 
     def visualize_statistics(
         self, file_path: str, additions: int, deletions: int, total_changes: int = 0
@@ -366,6 +384,22 @@ class DiffVisualizer:
             self.console.print(panel)
         else:
             self.console.print(syntax)
+        
+        # 发送到前端
+        try:
+            from jarvis.jarvis_utils.output import OutputEvent
+            emit_output(
+                OutputEvent(
+                    text=diff_text,
+                    output_type=OutputType.CODE,
+                    lang="diff",
+                    timestamp=True,
+                    context={"file_path": file_path}
+                )
+            )
+        except Exception:
+            # 忽略输出错误，不影响控制台显示
+            pass
 
     def visualize_compact(
         self,
@@ -421,6 +455,22 @@ class DiffVisualizer:
 
         panel = Panel(syntax, title=title, border_style="cyan", padding=(0, 1))
         self.console.print(panel)
+        
+        # 发送到前端
+        try:
+            from jarvis.jarvis_utils.output import OutputEvent
+            emit_output(
+                OutputEvent(
+                    text=diff_text,
+                    output_type=OutputType.CODE,
+                    lang="diff",
+                    timestamp=True,
+                    context={"file_path": file_path}
+                )
+            )
+        except Exception:
+            # 忽略输出错误，不影响控制台显示
+            pass
 
     def visualize_side_by_side_summary(
         self,
@@ -478,6 +528,9 @@ class DiffVisualizer:
         additions = 0
         deletions = 0
         has_changes = False
+        
+        # 收集用于前端显示的数据
+        diff_rows = []
 
         for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
             if tag == "equal":
@@ -521,6 +574,14 @@ class DiffVisualizer:
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
                                 new_syntax,
                             )
+                            # 收集数据到前端
+                            diff_rows.append({
+                                "type": "equal",
+                                "old_line_num": old_line_num,
+                                "old_line": equal_chunk[k],
+                                "new_line_num": new_line_num,
+                                "new_line": equal_chunk[k]
+                            })
                         # 如果有省略，显示省略标记
                         if equal_len > context_lines * 2:
                             table.add_row(
@@ -563,6 +624,14 @@ class DiffVisualizer:
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
                                 new_syntax,
                             )
+                            # 收集数据到前端
+                            diff_rows.append({
+                                "type": "equal",
+                                "old_line_num": old_line_num,
+                                "old_line": equal_chunk[k],
+                                "new_line_num": new_line_num,
+                                "new_line": equal_chunk[k]
+                            })
                     else:
                         # 第一个块，只显示结尾的上下文
                         start_idx = max(0, equal_len - context_lines)
@@ -597,6 +666,14 @@ class DiffVisualizer:
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
                                 new_syntax,
                             )
+                            # 收集数据到前端
+                            diff_rows.append({
+                                "type": "equal",
+                                "old_line_num": old_line_num,
+                                "old_line": equal_chunk[k],
+                                "new_line_num": new_line_num,
+                                "new_line": equal_chunk[k]
+                            })
                 else:
                     # 如果 equal 块不长，显示所有行
                     for k, line in enumerate(equal_chunk):
@@ -708,6 +785,14 @@ class DiffVisualizer:
                         "",
                         "",
                     )
+                    # 收集数据到前端
+                    diff_rows.append({
+                        "type": "delete",
+                        "old_line_num": old_line_num,
+                        "old_line": line,
+                        "new_line_num": None,
+                        "new_line": None
+                    })
             elif tag == "insert":
                 # 仅新增
                 new_chunk = new_lines[j1:j2]
@@ -733,6 +818,14 @@ class DiffVisualizer:
                         str(new_line_num),
                         new_insert_syntax,
                     )
+                    # 收集数据到前端
+                    diff_rows.append({
+                        "type": "insert",
+                        "old_line_num": None,
+                        "old_line": None,
+                        "new_line_num": new_line_num,
+                        "new_line": line
+                    })
 
         # 如果没有变更，显示提示
         if not has_changes:
@@ -746,6 +839,41 @@ class DiffVisualizer:
         # 包裹在 Panel 中显示 - 最小化padding以最大化内容区域
         panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 0))
         self.console.print(panel)
+        
+        # 发送到前端（发送 side by side 结构化数据）
+        try:
+            import json
+            from jarvis.jarvis_utils.output import OutputEvent
+            
+            # 构造 side by side 数据结构
+            side_by_side_data = {
+                "file_path": file_path,
+                "additions": additions,
+                "deletions": deletions,
+                "diff_type": "side_by_side",
+                "rows": diff_rows
+            }
+            
+            # 作为 JSON 字符串发送
+            diff_text = json.dumps(side_by_side_data, ensure_ascii=False, indent=2)
+            
+            emit_output(
+                OutputEvent(
+                    text=diff_text,
+                    output_type=OutputType.CODE,
+                    lang="json",  # 使用 json lang，前端会特殊处理
+                    timestamp=True,
+                    context={
+                        "file_path": file_path,
+                        "additions": additions,
+                        "deletions": deletions,
+                        "diff_type": "side_by_side"
+                    }
+                )
+            )
+        except Exception:
+            # 忽略输出错误，不影响控制台显示
+            pass
 
 
 def _split_diff_by_files(diff_text: str) -> List[tuple]:
