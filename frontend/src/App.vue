@@ -796,6 +796,8 @@ function confirmClearHistory() {
         // 重置历史加载状态
         historyOffset.value = 0
         hasMoreHistory.value = true
+        // 关闭设置弹窗
+        showSettingsModal.value = false
       } else {
         console.error('[HISTORY] Failed to clear history')
       }
