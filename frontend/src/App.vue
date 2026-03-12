@@ -692,14 +692,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 动画定义 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
 /* 全局布局 */
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0d1117;
-  color: #c9d1d9;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
@@ -708,17 +722,21 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
+  padding: 14px 20px;
+  background: rgba(22, 27, 34, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
 }
 
 .header-title h1 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   margin: 0;
   color: #e6edf3;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .header-actions {
@@ -728,72 +746,99 @@ onMounted(() => {
 }
 
 .icon-btn {
-  background: transparent;
-  border: none;
-  font-size: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px 10px;
   color: #8b949e;
-  transition: color 0.2s;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
   color: #e6edf3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .icon-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .manual-interrupt-btn {
-  background: #f0883e;
-  border: none;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #f0883e 0%, #e37a33 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease-out;
   display: flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 2px 4px rgba(240, 136, 62, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .manual-interrupt-btn:hover:not(:disabled) {
-  background: #e37a33;
+  background: linear-gradient(135deg, #f09955 0%, #f0883e 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(240, 136, 62, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.manual-interrupt-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .manual-interrupt-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  filter: grayscale(0.3);
 }
 
 .status {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
+  font-weight: 500;
   color: #8b949e;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 20px;
+  border: 0.5px solid rgba(255, 255, 255, 0.05);
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
 }
 
 .dot.offline {
   background: #f85149;
+  color: #f85149;
 }
 
 .dot.connecting {
   background: #d29922;
+  color: #d29922;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .dot.online {
   background: #3fb950;
+  color: #3fb950;
 }
 
 /* 聊天容器 */
@@ -802,34 +847,44 @@ onMounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .messages {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 16px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .message {
-  background: #161b22;
-  border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px solid #30363d;
+  background: rgba(22, 27, 34, 0.75);
+  backdrop-filter: blur(12px) saturate(150%);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  transition: all 0.2s ease-out;
+}
+
+.message:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 /* 用户输入消息 - 右对齐样式（必须放在 .message 之后以覆盖） */
 .message.message-user_input {
-  background: #1f6feb !important;
-  border-color: #1f6feb !important;
+  background: linear-gradient(135deg, #1f6feb 0%, #1a60d8 100%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.2) !important;
   align-self: flex-end;
-  max-width: 80%;
+  max-width: 75%;
+  box-shadow: 0 4px 12px rgba(31, 111, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .message.message-user_input .message-meta-left {
@@ -924,9 +979,13 @@ onMounted(() => {
 
 .message-meta-left .badge {
   font-size: 10px;
-  padding: 2px 6px;
-  background: #21262d;
+  padding: 3px 8px;
+  background: rgba(33, 38, 45, 0.8);
   color: #8b949e;
+  border-radius: 6px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 0.5px solid rgba(255, 255, 255, 0.05);
 }
 
 .message-meta-left .agent-name {
@@ -976,19 +1035,23 @@ onMounted(() => {
 }
 
 .message-body.markdown-content :deep(pre) {
-  background: #0d1117;
-  padding: 12px;
-  border-radius: 6px;
+  background: rgba(13, 17, 23, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 14px;
+  border-radius: 8px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
   overflow-x: auto;
-  margin: 8px 0;
+  margin: 10px 0;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .message-body.markdown-content :deep(code) {
-  background: #0d1117;
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(13, 17, 23, 0.7);
+  padding: 3px 7px;
+  border-radius: 5px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 13px;
+  font-size: 12px;
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
 }
 
 .message-body.markdown-content :deep(p) {
@@ -997,17 +1060,19 @@ onMounted(() => {
 
 /* 终端 */
 .terminal-wrapper {
-  margin-top: 12px;
-  border: 1px solid #30363d;
-  border-radius: 6px;
+  margin-top: 14px;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
   overflow: hidden;
   max-height: 600px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  background: rgba(13, 17, 23, 0.6);
 }
 
 .terminal-host {
-  background: #0d1117;
+  background: linear-gradient(180deg, #0a0d12 0%, #0d1117 100%);
   flex: 1;
   min-height: 400px;
   overflow: hidden;
@@ -1015,8 +1080,10 @@ onMounted(() => {
 
 /* 确认对话框 */
 .message-confirm {
-  background: #21262d;
-  border-color: #58a6ff;
+  background: rgba(33, 38, 45, 0.85);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 0.5px solid rgba(88, 166, 255, 0.3);
+  box-shadow: 0 0 20px rgba(88, 166, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .confirm-box {
@@ -1037,34 +1104,44 @@ onMounted(() => {
 }
 
 .confirm-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 9px 18px;
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  border: 1px solid #30363d;
-  background: #21262d;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(33, 38, 45, 0.8);
+  backdrop-filter: blur(8px);
   color: #e6edf3;
-  transition: all 0.2s;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .confirm-btn:hover {
-  background: #30363d;
+  background: rgba(48, 54, 61, 0.9);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .confirm-btn.confirm {
-  background: #238636;
-  border-color: #238636;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .confirm-btn.confirm:hover {
-  background: #2ea043;
+  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 8px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 /* 输入区 */
 .input-area {
-  background: #161b22;
-  border-top: 1px solid #30363d;
+  background: rgba(22, 27, 34, 0.9);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
 
@@ -1086,20 +1163,24 @@ onMounted(() => {
   width: 100%;
   min-height: 120px;
   max-height: 300px;
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  padding: 12px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px;
   color: #e6edf3;
   font-size: 14px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   resize: vertical;
-  box-sizing: border-box; /* 确保 padding 不会增加总宽度 */
+  box-sizing: border-box;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
 }
 
 .input-wrapper.multi-line textarea:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .input-wrapper.multi-line .input-actions {
@@ -1125,18 +1206,22 @@ onMounted(() => {
 
 .input-wrapper.single-line input {
   flex: 1;
-  min-width: 0; /* 允许 flex item 收缩 */
-  padding: 10px 14px;
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 8px;
+  min-width: 0;
+  padding: 11px 15px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
   color: #e6edf3;
   font-size: 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
 }
 
 .input-wrapper.single-line input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .input-wrapper.single-line .send-btn {
@@ -1151,24 +1236,33 @@ onMounted(() => {
 }
 
 .send-btn {
-  background: #238636;
-  border: none;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
   color: #ffffff;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  padding: 11px 22px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease-out;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .send-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .send-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  filter: grayscale(0.3);
 }
 
 .cancel-btn {
@@ -1216,30 +1310,33 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 20px;
 }
 
 .modal {
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 12px;
-  padding: 24px;
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 28px;
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .connect-modal h2,
 .settings-modal h2 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
+  margin: 0 0 24px 0;
+  font-size: 21px;
   font-weight: 600;
   color: #e6edf3;
+  letter-spacing: -0.02em;
 }
 
 .form-group {
@@ -1257,25 +1354,30 @@ onMounted(() => {
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: #8b949e;
+  letter-spacing: 0.01em;
 }
 
 .form-group input {
   width: 100%;
-  padding: 8px 12px;
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 6px;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .modal-header {
@@ -1287,15 +1389,17 @@ onMounted(() => {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 600;
   color: #e6edf3;
+  letter-spacing: -0.02em;
 }
 
 .close-btn {
-  background: transparent;
-  border: none;
-  font-size: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 22px;
   color: #8b949e;
   cursor: pointer;
   padding: 0;
@@ -1304,10 +1408,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s ease-out;
 }
 
 .close-btn:hover {
-  color: #e6edf3;
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  transform: rotate(90deg);
 }
 
 .modal-actions {
@@ -1318,44 +1425,63 @@ onMounted(() => {
 }
 
 .primary-btn {
-  padding: 8px 16px;
-  background: #238636;
-  border: none;
-  border-radius: 6px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
   color: #ffffff;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 2px 6px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .primary-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  filter: grayscale(0.3);
 }
 
 .ghost-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid #30363d;
-  border-radius: 6px;
+  padding: 10px 20px;
+  background: rgba(33, 38, 45, 0.5);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease-out;
+  backdrop-filter: blur(8px);
 }
 
 .ghost-btn:hover {
-  background: #21262d;
+  background: rgba(48, 54, 61, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
+  .app {
+    background: linear-gradient(180deg, #1a1f2e 0%, #0d1117 100%);
+  }
+  
+  .app-header {
+    padding: 12px 16px;
+  }
   .header-title h1 {
     font-size: 16px;
   }
