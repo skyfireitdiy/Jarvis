@@ -356,7 +356,11 @@ function appendOutput(payload) {
   outputs.value.push(outputItem)
   nextTick(() => {
     if (outputList.value) {
-      outputList.value.scrollTop = outputList.value.scrollHeight
+      const threshold = 50
+      const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
+      if (distanceToBottom < threshold) {
+        outputList.value.scrollTop = outputList.value.scrollHeight
+      }
     }
   })
 }
