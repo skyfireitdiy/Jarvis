@@ -1030,15 +1030,15 @@ def _interactive_config_setup(config_file_path: Path) -> None:
 
     try:
         # 导入 quick_config 模块
-        # 调用 quick_config 的主函数，传入输出文件参数
-        # 注意：quick_config 使用 typer，需要模拟命令行参数
+        # 由于 jqc (quick_config) 现在没有任何参数了，直接调用 quick_config.app()
         import sys
 
         from jarvis.jarvis_utils import quick_config
 
         original_argv = sys.argv
         try:
-            sys.argv = ["quick-config", "--output", str(config_file_path)]
+            # 由于 quick_config 函数没有参数，不再传递 --output 参数
+            sys.argv = ["quick-config"]
             quick_config.app()
         finally:
             sys.argv = original_argv
