@@ -538,8 +538,75 @@ function handleMessage(message) {
   }
 }
 
+function renderSideBySideDiff(diffData) {
+  if (!diffData || !diffData.rows) {
+    return '<div class="diff-error">No diff data</div>'
+  }
+  
+  const { file_path, additions, deletions, rows } = diffData
+  
+  let html = '<div class="diff-side-by-side">'
+  
+  // 标题
+  html += '<div class="diff-header">'
+  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || 'Unknown')}</span>`
+  html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`
+  html += '</div>'
+  
+  // 表格
+  html += '<table class="diff-table">'
+  
+  rows.forEach(row => {
+    const { type, old_line_num, old_line, new_line_num, new_line } = row
+    
+    html += '<tr class="diff-row diff-row-' + type + '">'
+    
+    // 旧代码列
+    if (type === 'equal' || type === 'delete') {
+      html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
+      html += `<td class="diff-content diff-old-content ${type === 'delete' ? 'diff-deleted' : ''}">${escapeHtml(old_line || '')}</td>`
+    } else {
+      html += '<td class="diff-line-num diff-old-num"></td>'
+      html += '<td class="diff-content diff-old-content"></td>'
+    }
+    
+    // 新代码列
+    if (type === 'equal' || type === 'insert') {
+      html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
+      html += `<td class="diff-content diff-new-content ${type === 'insert' ? 'diff-added' : ''}">${escapeHtml(new_line || '')}</td>`
+    } else {
+      html += '<td class="diff-line-num diff-new-num"></td>'
+      html += '<td class="diff-content diff-new-content"></td>'
+    }
+    
+    html += '</tr>'
+  })
+  
+  html += '</table>'
+  html += '</div>'
+  
+  return html
+}
+
 function appendOutput(payload) {
-  const html = payload?.lang === 'markdown' ? marked.parse(payload.text || '') : escapeHtml(payload.text || '')
+  let html
+  if (payload?.lang === 'markdown') {
+    html = marked.parse(payload.text || '')
+  } else if (payload?.lang === 'diff') {
+    // 将 diff 包装在 markdown 代码块中，以便语法高亮
+    html = marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
+  } else if (payload?.lang === 'json' && payload?.context?.diff_type === 'side_by_side') {
+    // 解析 side by side diff 数据
+    try {
+      const diffData = JSON.parse(payload.text || '{}')
+      html = renderSideBySideDiff(diffData)
+    } catch (e) {
+      console.error('[DIFF] Failed to parse side by side diff:', e)
+      html = escapeHtml(payload.text || '')
+    }
+  } else {
+    html = escapeHtml(payload.text || '')
+  }
   
   // 生成真实时间戳
   const showTimestamp = payload?.timestamp !== false
@@ -1827,6 +1894,104 @@ onMounted(() => {
   border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Side by side Diff 样式 */
+.diff-side-by-side {
+  background: #1a1f2e;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.diff-header {
+  background: rgba(56, 139, 253, 0.1);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-file-path {
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.diff-stats {
+  color: #8b949e;
+  font-size: 12px;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+}
+
+.diff-additions {
+  color: #3fb950;
+  font-weight: 600;
+}
+
+.diff-deletions {
+  color: #f85149;
+  font-weight: 600;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.diff-row {
+  transition: background-color 0.1s ease-out;
+}
+
+.diff-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diff-row-equal {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.diff-row-delete {
+  background: rgba(248, 81, 73, 0.05);
+}
+
+.diff-row-insert {
+  background: rgba(63, 185, 80, 0.05);
+}
+
+.diff-line-num {
+  color: #8b949e;
+  padding: 4px 8px;
+  text-align: right;
+  width: 50px;
+  user-select: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-content {
+  padding: 4px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-width: 200px;
+}
+
+.diff-deleted {
+  background: rgba(248, 81, 73, 0.15);
+  color: #ffa198;
+}
+
+.diff-added {
+  background: rgba(63, 185, 80, 0.15);
+  color: #7ee787;
+}
+
+.diff-error {
+  color: #f85149;
+  padding: 8px 12px;
+  font-weight: 600;
 }
 
 /* 移动端适配 */
