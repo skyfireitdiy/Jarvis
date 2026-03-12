@@ -19,6 +19,8 @@ from fastapi import FastAPI
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
 
+from jarvis.jarvis_gateway.events import GatewayConfirmRequest
+from jarvis.jarvis_gateway.events import GatewayConfirmResult
 from jarvis.jarvis_gateway.events import GatewayExecutionEvent
 from jarvis.jarvis_gateway.events import GatewayInputRequest
 from jarvis.jarvis_gateway.events import GatewayInputResult
@@ -100,6 +102,38 @@ class WebGateway(BaseGateway):
         session = self._input_registry.get_or_create(session_id)
         text = session.wait_for_input()
         return GatewayInputResult(text=text, metadata=metadata)
+
+    def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
+        metadata = dict(request.metadata) if request.metadata else {}
+        session_id = metadata.get("session_id")
+        if not session_id:
+            session_id = _wait_for_active_session_id(self._auth_store)
+            if session_id:
+                self._current_session_id = session_id
+            if session_id:
+                metadata["session_id"] = session_id
+            else:
+                session_id = "default"
+                metadata["session_id"] = session_id
+        auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
+        authorized, reason = self._check_auth(auth_payload)
+        if not authorized:
+            return GatewayConfirmResult(
+                confirmed=request.default if request.default is not None else False,
+                metadata={"error": reason}
+            )
+        payload = {
+            "message": request.message,
+            "default": request.default,
+            "metadata": metadata,
+        }
+        message = {"type": "confirm", "payload": payload}
+        self._router.publish(message, session_id=session_id)
+        # 保存确认请求，用于重连后恢复
+        self._input_registry.save_confirm_request(session_id, message)
+        session = self._input_registry.get_or_create_confirm_session(session_id)
+        confirmed = session.wait_for_confirm()
+        return GatewayConfirmResult(confirmed=confirmed, metadata=metadata)
 
     def publish_execution_event(
         self,
@@ -221,6 +255,17 @@ class WebSocketConnectionManager:
             session.reconnect()
             print(f"[RECONNECT] Sending input_request: {pending_request}")
             await websocket.send_json(pending_request)
+        # 恢复待处理的确认请求
+        pending_confirm = self._input_registry.get_confirm_request(session_id)
+        print(
+            f"[RECONNECT] session_id={session_id}, pending_confirm={pending_confirm is not None}"
+        )
+        if pending_confirm:
+            confirm_session = self._input_registry.get_or_create_confirm_session(session_id)
+            print(f"[RECONNECT] Got confirm session, reconnecting...")
+            confirm_session.reconnect()
+            print(f"[RECONNECT] Sending confirm_request: {pending_confirm}")
+            await websocket.send_json(pending_confirm)
         try:
             while True:
                 message = await websocket.receive_json()
@@ -230,6 +275,7 @@ class WebSocketConnectionManager:
         finally:
             self._router.unregister(connection_id, session_id=session_id)
             self._input_registry.unregister_provider(session_id)
+            self._input_registry.disconnect_confirm_session(session_id)
             self._auth_store.pop(session_id, None)
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
@@ -247,6 +293,10 @@ class WebSocketConnectionManager:
         if message_type == "input_result":
             text = payload.get("text", "")
             self._input_registry.submit_input(session_id, text)
+            return
+        if message_type == "confirm_result":
+            confirmed = payload.get("confirmed", False)
+            self._input_registry.submit_confirm(session_id, confirmed)
             return
         if message_type == "terminal_input":
             execution_id = payload.get("execution_id")

@@ -42,6 +42,23 @@ class GatewayInputResult:
 
 
 @dataclass(frozen=True)
+class GatewayConfirmRequest:
+    """确认请求。"""
+
+    message: str
+    default: bool = True
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass(frozen=True)
+class GatewayConfirmResult:
+    """确认结果。"""
+
+    confirmed: bool
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass(frozen=True)
 class GatewayExecutionEvent:
     """统一执行事件。"""
 

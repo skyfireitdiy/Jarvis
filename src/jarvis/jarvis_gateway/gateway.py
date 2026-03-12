@@ -11,6 +11,8 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+from .events import GatewayConfirmRequest
+from .events import GatewayConfirmResult
 from .events import GatewayExecutionEvent
 from .events import GatewayInputRequest
 from .events import GatewayInputResult
@@ -27,6 +29,10 @@ class IGateway(ABC):
     @abstractmethod
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         """请求用户输入。"""
+
+    @abstractmethod
+    def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
+        """请求用户确认。"""
 
     @abstractmethod
     def publish_execution_event(
@@ -84,6 +90,10 @@ class BaseGateway(IGateway):
         raise NotImplementedError
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
+        del request
+        raise NotImplementedError
+
+    def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
         del request
         raise NotImplementedError
 

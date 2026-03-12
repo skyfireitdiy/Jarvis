@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import Callable
 from typing import Optional
 
+from jarvis.jarvis_gateway.events import GatewayConfirmRequest
+from jarvis.jarvis_gateway.events import GatewayConfirmResult
 from jarvis.jarvis_gateway.events import GatewayExecutionEvent
 from jarvis.jarvis_gateway.events import GatewayInputRequest
 from jarvis.jarvis_gateway.events import GatewayInputResult
@@ -62,6 +64,21 @@ class CLIGateway(BaseGateway):
             preset_cursor=request.preset_cursor,
         )
         return GatewayInputResult(text=text, metadata=request.metadata)
+
+    def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
+        auth_payload = None
+        if request.metadata:
+            auth_payload = request.metadata.get("auth")
+        authorized, reason = self._check_auth(auth_payload)
+        if not authorized:
+            return GatewayConfirmResult(confirmed=request.default, metadata={"error": reason})
+        provider = get_current_input_provider()
+        # 使用 get_multiline_input 接收用户输入
+        suffix = "[Y/n]" if request.default else "[y/N]"
+        result = provider.get_multiline_input(f"{request.message} {suffix}: ")
+        # 返回确认结果
+        confirmed = request.default if result == "" else result.lower() == "y"
+        return GatewayConfirmResult(confirmed=confirmed, metadata=request.metadata)
 
     def publish_execution_event(
         self,
