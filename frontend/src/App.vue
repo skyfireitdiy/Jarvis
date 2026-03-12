@@ -718,14 +718,8 @@ function appendOutput(payload) {
   console.log('[DEBUG] agent_name:', outputItem.agent_name)
   console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
   
-  // 在插入前判断用户是否在底部
-  const threshold = 100
-  let shouldAutoScroll = false
-  if (outputList.value) {
-    const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
-    shouldAutoScroll = distanceToBottom < threshold
-    console.log('[SCROLL] Before insert - distanceToBottom:', distanceToBottom, 'threshold:', threshold, 'shouldAutoScroll:', shouldAutoScroll)
-  }
+  // 只要 append 就自动滚动到底部，不需要判断位置
+  const shouldAutoScroll = true
   
   outputs.value.push(outputItem)
   console.log('[DEBUG] Pushed output, outputs.length:', outputs.value.length, 'type:', outputItem.output_type)
@@ -749,20 +743,15 @@ function appendOutput(payload) {
     // 不影响正常显示，静默失败
   }
   
-  // DOM更新后，如果之前在底部，就滚动到底部
+  // DOM更新后，自动滚动到底部
   // 使用双 nextTick + requestAnimationFrame 确保布局完全计算后再滚动
   nextTick(() => {
     nextTick(() => {
       requestAnimationFrame(() => {
-        if (shouldAutoScroll && outputList.value) {
+        if (outputList.value) {
           const scrollHeight = outputList.value.scrollHeight
-          const scrollTop = outputList.value.scrollTop
-          const clientHeight = outputList.value.clientHeight
-          console.log('[SCROLL] Before scroll - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight)
           outputList.value.scrollTop = scrollHeight
-          console.log('[SCROLL] After scroll - scrollTop:', outputList.value.scrollTop, 'scrollHeight:', outputList.value.scrollHeight)
-        } else {
-          console.log('[SCROLL] Not auto-scrolling (user was not at bottom)')
+          console.log('[SCROLL] Auto-scrolled to bottom')
         }
       })
     })
@@ -941,6 +930,9 @@ function sendManualInterrupt() {
 }
 
 function confirmClearHistory() {
+  // 先关闭设置弹窗
+  showSettingsModal.value = false
+  
   confirmDialog.value = {
     message: '确定要清除所有历史记录吗？此操作不可撤销。',
     confirmCallback: () => {
@@ -951,11 +943,11 @@ function confirmClearHistory() {
         // 重置历史加载状态
         historyOffset.value = 0
         hasMoreHistory.value = true
-        // 关闭设置弹窗
-        showSettingsModal.value = false
       } else {
         console.error('[HISTORY] Failed to clear history')
       }
+      // 无论清除是否成功，都关闭设置弹窗
+      showSettingsModal.value = false
       confirmDialog.value = null
     },
     cancelCallback: () => {
