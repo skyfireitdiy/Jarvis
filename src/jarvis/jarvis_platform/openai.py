@@ -251,9 +251,7 @@ class OpenAIModel(BasePlatform):
             }
             # 只有在配置了 reasoning_effort 时才添加 extra_body 参数
             if self.reasoning_effort:
-                api_params["extra_body"] = {
-                    "model_reasoning_effort": self.reasoning_effort
-                }
+                api_params["reasoning_effort"] = self.reasoning_effort
 
             response = self.client.chat.completions.create(**api_params)
 
