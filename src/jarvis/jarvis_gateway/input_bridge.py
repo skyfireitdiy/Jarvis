@@ -30,6 +30,13 @@ class RemoteInputMessage:
     text: str
 
 
+@dataclass(frozen=True)
+class RemoteConfirmMessage:
+    """远端确认消息。"""
+
+    confirmed: bool
+
+
 class RemoteInputSession:
     """会话级远端输入缓冲区，支持等待、投递与断连。"""
 
@@ -38,6 +45,51 @@ class RemoteInputSession:
         self._queue: Queue[RemoteInputMessage] = Queue()
         self._disconnect_reason: Optional[str] = None
         self._state_lock = threading.Lock()
+
+
+class RemoteConfirmSession:
+    """会话级远端确认缓冲区，支持等待、投递与断连。"""
+
+    def __init__(self, session_id: str) -> None:
+        self.session_id = session_id
+        self._queue: Queue[RemoteConfirmMessage] = Queue()
+        self._disconnect_reason: Optional[str] = None
+        self._state_lock = threading.Lock()
+
+    def submit_confirm(self, confirmed: bool) -> None:
+        with self._state_lock:
+            if self._disconnect_reason is not None:
+                raise InputProviderDisconnectedError(self._disconnect_reason)
+        self._queue.put(RemoteConfirmMessage(confirmed=confirmed))
+
+    def disconnect(self, reason: str = "remote session disconnected") -> None:
+        with self._state_lock:
+            if self._disconnect_reason is None:
+                self._disconnect_reason = reason
+        self._queue.put(RemoteConfirmMessage(confirmed=False))
+
+    def reconnect(self) -> None:
+        """重连时清除断开原因，允许继续等待确认。"""
+        with self._state_lock:
+            self._disconnect_reason = None
+
+    def wait_for_confirm(self, timeout: Optional[float] = None) -> bool:
+        while True:
+            with self._state_lock:
+                disconnect_reason = self._disconnect_reason
+            if disconnect_reason is not None and self._queue.empty():
+                raise InputProviderDisconnectedError(disconnect_reason)
+            try:
+                message = self._queue.get(timeout=timeout)
+            except Empty as exc:
+                raise InputProviderTimeoutError(
+                    "timed out waiting for remote confirm"
+                ) from exc
+            with self._state_lock:
+                disconnect_reason = self._disconnect_reason
+            if disconnect_reason is not None and not message.confirmed:
+                raise InputProviderDisconnectedError(disconnect_reason)
+            return message.confirmed
 
     def submit_input(self, text: str) -> None:
         with self._state_lock:
@@ -100,7 +152,9 @@ class InputSessionRegistry:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._sessions: Dict[str, RemoteInputSession] = {}
+        self._confirm_sessions: Dict[str, RemoteConfirmSession] = {}  # 确认会话
         self._pending_input_requests: Dict[str, dict] = {}  # 保存待处理的输入请求
+        self._pending_confirm_requests: Dict[str, dict] = {}  # 保存待处理的确认请求
 
     def get_or_create(self, session_id: str) -> RemoteInputSession:
         with self._lock:
@@ -154,3 +208,48 @@ class InputSessionRegistry:
         """清除保存的输入请求。"""
         with self._lock:
             self._pending_input_requests.pop(session_id, None)
+
+    def get_or_create_confirm_session(self, session_id: str) -> RemoteConfirmSession:
+        """获取或创建确认会话。"""
+        with self._lock:
+            session = self._confirm_sessions.get(session_id)
+            if session is None:
+                session = RemoteConfirmSession(session_id=session_id)
+                self._confirm_sessions[session_id] = session
+            return session
+
+    def submit_confirm(self, session_id: str, confirmed: bool) -> None:
+        """提交确认结果。"""
+        session = self.get_or_create_confirm_session(session_id)
+        session.submit_confirm(confirmed)
+        # 提交确认后清除保存的确认请求
+        self.clear_confirm_request(session_id)
+
+    def save_confirm_request(self, session_id: str, request: dict) -> None:
+        """保存确认请求，用于重连后恢复。"""
+        with self._lock:
+            self._pending_confirm_requests[session_id] = request
+            print(
+                f"[CONFIRM_REGISTRY] Saved confirm_request for session={session_id}, total={len(self._pending_confirm_requests)}"
+            )
+
+    def get_confirm_request(self, session_id: str) -> Optional[dict]:
+        """获取并清除保存的确认请求。"""
+        with self._lock:
+            request = self._pending_confirm_requests.pop(session_id, None)
+            print(
+                f"[CONFIRM_REGISTRY] Got confirm_request for session={session_id}, found={request is not None}, remaining={len(self._pending_confirm_requests)}"
+            )
+            return request
+
+    def clear_confirm_request(self, session_id: str) -> None:
+        """清除保存的确认请求。"""
+        with self._lock:
+            self._pending_confirm_requests.pop(session_id, None)
+
+    def disconnect_confirm_session(self, session_id: str, reason: str = "remote session disconnected") -> None:
+        """断开确认会话。"""
+        with self._lock:
+            session = self._confirm_sessions.pop(session_id, None)
+        if session is not None:
+            session.disconnect(reason=reason)

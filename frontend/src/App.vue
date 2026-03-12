@@ -160,10 +160,70 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { marked } from 'marked'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
 import historyStorage from './historyStorage.js'
+
+// 配置 marked 使用 highlight.js 进行语法高亮
+marked.setOptions({
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value
+      } catch (e) {
+        console.error('[highlight.js] Error highlighting code:', e)
+      }
+    }
+    return hljs.highlightAuto(code).value
+  }
+})
+
+// 根据文件扩展名推断语言
+function getLanguageFromFilename(filename) {
+  if (!filename) return 'plaintext'
+  const ext = filename.split('.').pop().toLowerCase()
+  const langMap = {
+    'py': 'python',
+    'js': 'javascript',
+    'ts': 'typescript',
+    'vue': 'vue',
+    'java': 'java',
+    'c': 'c',
+    'cpp': 'cpp',
+    'h': 'cpp',
+    'hpp': 'cpp',
+    'go': 'go',
+    'rs': 'rust',
+    'rb': 'ruby',
+    'php': 'php',
+    'swift': 'swift',
+    'kt': 'kotlin',
+    'scala': 'scala',
+    'sql': 'sql',
+    'sh': 'bash',
+    'bash': 'bash',
+    'zsh': 'bash',
+    'yaml': 'yaml',
+    'yml': 'yaml',
+    'json': 'json',
+    'toml': 'toml',
+    'ini': 'ini',
+    'cfg': 'ini',
+    'conf': 'ini',
+    'xml': 'xml',
+    'html': 'html',
+    'css': 'css',
+    'scss': 'scss',
+    'less': 'less',
+    'md': 'markdown',
+    'txt': 'plaintext',
+    'log': 'plaintext'
+  }
+  return langMap[ext] || 'plaintext'
+}
 
 // 认证和连接配置
 const auth = ref({ token: '', password: '' })
@@ -545,6 +605,9 @@ function renderSideBySideDiff(diffData) {
   
   const { file_path, additions, deletions, rows } = diffData
   
+  // 推断语言类型用于语法高亮
+  const language = getLanguageFromFilename(file_path)
+  
   let html = '<div class="diff-side-by-side">'
   
   // 标题
@@ -564,7 +627,9 @@ function renderSideBySideDiff(diffData) {
     // 旧代码列
     if (type === 'equal' || type === 'delete') {
       html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
-      html += `<td class="diff-content diff-old-content ${type === 'delete' ? 'diff-deleted' : ''}">${escapeHtml(old_line || '')}</td>`
+      // 对代码内容应用语法高亮
+      const oldHighlighted = old_line ? hljs.highlight(old_line, { language }).value : ''
+      html += `<td class="diff-content diff-old-content ${type === 'delete' ? 'diff-deleted' : ''}"><code>${oldHighlighted}</code></td>`
     } else {
       html += '<td class="diff-line-num diff-old-num"></td>'
       html += '<td class="diff-content diff-old-content"></td>'
@@ -573,7 +638,9 @@ function renderSideBySideDiff(diffData) {
     // 新代码列
     if (type === 'equal' || type === 'insert') {
       html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
-      html += `<td class="diff-content diff-new-content ${type === 'insert' ? 'diff-added' : ''}">${escapeHtml(new_line || '')}</td>`
+      // 对代码内容应用语法高亮
+      const newHighlighted = new_line ? hljs.highlight(new_line, { language }).value : ''
+      html += `<td class="diff-content diff-new-content ${type === 'insert' ? 'diff-added' : ''}"><code>${newHighlighted}</code></td>`
     } else {
       html += '<td class="diff-line-num diff-new-num"></td>'
       html += '<td class="diff-content diff-new-content"></td>'
@@ -1976,6 +2043,18 @@ onMounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
   min-width: 200px;
+}
+
+.diff-content code {
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: transparent;
+  padding: 0;
+}
+
+.diff-content code * {
+  background: transparent;
 }
 
 .diff-deleted {
