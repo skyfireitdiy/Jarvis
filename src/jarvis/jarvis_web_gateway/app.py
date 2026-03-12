@@ -95,6 +95,8 @@ class WebGateway(BaseGateway):
         }
         message = {"type": "input_request", "payload": payload}
         self._router.publish(message, session_id=session_id)
+        # 保存输入请求，用于重连后恢复
+        self._input_registry.save_input_request(session_id, message)
         session = self._input_registry.get_or_create(session_id)
         text = session.wait_for_input()
         return GatewayInputResult(text=text, metadata=metadata)
@@ -208,6 +210,12 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
+        # 恢复待处理的输入请求
+        pending_request = self._input_registry.get_input_request(session_id)
+        if pending_request:
+            session = self._input_registry.get_or_create(session_id)
+            session.reconnect()
+            await websocket.send_json(pending_request)
         try:
             while True:
                 message = await websocket.receive_json()

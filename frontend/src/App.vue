@@ -169,6 +169,7 @@ const inputText = ref('')
 const inputMode = ref('single')
 const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
+const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
@@ -256,10 +257,24 @@ function handleMessage(message) {
     if (payload?.session_id) {
       sessionId.value = payload.session_id
     }
+    // 恢复之前的输入请求状态
+    if (lastInputRequest.value) {
+      console.log('[ws] Restoring input request from previous session')
+      inputTip.value = lastInputRequest.value.tip || ''
+      inputMode.value = lastInputRequest.value.mode || 'multi'
+      inputText.value = lastInputRequest.value.preset || ''
+      showInput.value = true
+      nextTick(() => {
+        const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
+        inputEl?.focus()
+      })
+    }
   } else if (type === 'output') {
     appendOutput(payload)
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
+    // 保存输入请求，用于重连后恢复
+    lastInputRequest.value = payload
     inputTip.value = payload.tip || ''
     inputMode.value = payload.mode || 'multi'  // 默认多行
     inputText.value = payload.preset || ''
@@ -500,6 +515,7 @@ function submitInput() {
   socket.value.send(JSON.stringify(message))
   inputText.value = ''
   showInput.value = false // 隐藏输入框
+  lastInputRequest.value = null // 清空保存的输入请求
 }
 
 function sendConfirmResult(confirmed) {

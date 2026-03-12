@@ -51,6 +51,11 @@ class RemoteInputSession:
                 self._disconnect_reason = reason
         self._queue.put(RemoteInputMessage(text=""))
 
+    def reconnect(self) -> None:
+        """重连时清除断开原因，允许继续等待输入。"""
+        with self._state_lock:
+            self._disconnect_reason = None
+
     def wait_for_input(self, timeout: Optional[float] = None) -> str:
         while True:
             with self._state_lock:
@@ -88,6 +93,7 @@ class InputSessionRegistry:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._sessions: Dict[str, RemoteInputSession] = {}
+        self._pending_input_requests: Dict[str, dict] = {}  # 保存待处理的输入请求
 
     def get_or_create(self, session_id: str) -> RemoteInputSession:
         with self._lock:
@@ -113,3 +119,20 @@ class InputSessionRegistry:
     def submit_input(self, session_id: str, text: str) -> None:
         session = self.get_or_create(session_id)
         session.submit_input(text)
+        # 提交输入后清除保存的输入请求
+        self.clear_input_request(session_id)
+
+    def save_input_request(self, session_id: str, request: dict) -> None:
+        """保存输入请求，用于重连后恢复。"""
+        with self._lock:
+            self._pending_input_requests[session_id] = request
+
+    def get_input_request(self, session_id: str) -> Optional[dict]:
+        """获取并清除保存的输入请求。"""
+        with self._lock:
+            return self._pending_input_requests.pop(session_id, None)
+
+    def clear_input_request(self, session_id: str) -> None:
+        """清除保存的输入请求。"""
+        with self._lock:
+            self._pending_input_requests.pop(session_id, None)
