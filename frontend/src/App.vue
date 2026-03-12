@@ -25,7 +25,6 @@
         <article v-for="(item, index) in outputs" :key="index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
           <div class="message-content">
             <div class="message-meta-left">
-              <span class="badge">{{ item.output_type || '' }}</span>
               <span class="agent-name">{{ item.agent_name || '' }}</span>
               <span class="non-interactive" v-if="item.non_interactive">🔕</span>
               <span class="interactive" v-if="item.non_interactive === false">💬</span>
