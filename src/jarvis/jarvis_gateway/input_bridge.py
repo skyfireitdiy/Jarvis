@@ -46,6 +46,41 @@ class RemoteInputSession:
         self._disconnect_reason: Optional[str] = None
         self._state_lock = threading.Lock()
 
+    def submit_input(self, text: str) -> None:
+        with self._state_lock:
+            if self._disconnect_reason is not None:
+                raise InputProviderDisconnectedError(self._disconnect_reason)
+        self._queue.put(RemoteInputMessage(text=text))
+
+    def disconnect(self, reason: str = "remote session disconnected") -> None:
+        with self._state_lock:
+            if self._disconnect_reason is None:
+                self._disconnect_reason = reason
+        self._queue.put(RemoteInputMessage(text=""))
+
+    def reconnect(self) -> None:
+        """重连时清除断开原因，允许继续等待输入。"""
+        with self._state_lock:
+            self._disconnect_reason = None
+
+    def wait_for_input(self, timeout: Optional[float] = None) -> str:
+        while True:
+            with self._state_lock:
+                disconnect_reason = self._disconnect_reason
+            if disconnect_reason is not None and self._queue.empty():
+                raise InputProviderDisconnectedError(disconnect_reason)
+            try:
+                message = self._queue.get(timeout=timeout)
+            except Empty as exc:
+                raise InputProviderTimeoutError(
+                    "timed out waiting for remote input"
+                ) from exc
+            with self._state_lock:
+                disconnect_reason = self._disconnect_reason
+            if disconnect_reason is not None and message.text == "":
+                raise InputProviderDisconnectedError(disconnect_reason)
+            return message.text
+
 
 class RemoteConfirmSession:
     """会话级远端确认缓冲区，支持等待、投递与断连。"""
@@ -90,41 +125,6 @@ class RemoteConfirmSession:
             if disconnect_reason is not None and not message.confirmed:
                 raise InputProviderDisconnectedError(disconnect_reason)
             return message.confirmed
-
-    def submit_input(self, text: str) -> None:
-        with self._state_lock:
-            if self._disconnect_reason is not None:
-                raise InputProviderDisconnectedError(self._disconnect_reason)
-        self._queue.put(RemoteInputMessage(text=text))
-
-    def disconnect(self, reason: str = "remote session disconnected") -> None:
-        with self._state_lock:
-            if self._disconnect_reason is None:
-                self._disconnect_reason = reason
-        self._queue.put(RemoteInputMessage(text=""))
-
-    def reconnect(self) -> None:
-        """重连时清除断开原因，允许继续等待输入。"""
-        with self._state_lock:
-            self._disconnect_reason = None
-
-    def wait_for_input(self, timeout: Optional[float] = None) -> str:
-        while True:
-            with self._state_lock:
-                disconnect_reason = self._disconnect_reason
-            if disconnect_reason is not None and self._queue.empty():
-                raise InputProviderDisconnectedError(disconnect_reason)
-            try:
-                message = self._queue.get(timeout=timeout)
-            except Empty as exc:
-                raise InputProviderTimeoutError(
-                    "timed out waiting for remote input"
-                ) from exc
-            with self._state_lock:
-                disconnect_reason = self._disconnect_reason
-            if disconnect_reason is not None and message.text == "":
-                raise InputProviderDisconnectedError(disconnect_reason)
-            return message.text
 
 
 class WebSocketInputProvider(InputProvider):
