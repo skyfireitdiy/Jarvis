@@ -288,6 +288,14 @@ function loadHistoryMessages(prepend = false) {
           console.log('[HISTORY] Scroll position restored')
         })
       })
+    } else {
+      // 首次加载历史，滚动到底部
+      nextTick(() => {
+        if (outputList.value) {
+          outputList.value.scrollTop = outputList.value.scrollHeight
+          console.log('[HISTORY] Scrolled to bottom on initial load')
+        }
+      })
     }
   } catch (error) {
     console.error('[HISTORY] Failed to load history:', error)
