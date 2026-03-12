@@ -130,6 +130,25 @@
           <label>Session ID</label>
           <input v-model="sessionId" placeholder="留空自动生成" />
         </div>
+        
+        <!-- 历史消息管理 -->
+        <div class="form-group">
+          <div class="history-info">
+            <div class="history-stat">
+              <span class="history-stat-label">历史消息数量:</span>
+              <span class="history-stat-value">{{ historyStorage.getTotalCount() }}</span>
+            </div>
+            <div class="history-stat">
+              <span class="history-stat-label">存储空间:</span>
+              <span class="history-stat-value">{{ historyStorage.getStorageInfo().totalSizeFormatted }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <button class="danger-btn" @click="confirmClearHistory" :disabled="historyStorage.getTotalCount() === 0">
+            清除历史记录
+          </button>
+        </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
           <button class="primary-btn" @click="reconnect">重新连接</button>
@@ -145,6 +164,7 @@ import { marked } from 'marked'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
+import historyStorage from './historyStorage.js'
 
 // 认证和连接配置
 const auth = ref({ token: '', password: '' })
@@ -189,6 +209,91 @@ const connectionLabel = computed(() => {
 
 const inputModeLabel = computed(() => (inputMode.value === 'multi' ? '多行' : '单行'))
 
+// 历史消息加载状态
+const isLoadingHistory = ref(false)
+const historyOffset = ref(0)
+const hasMoreHistory = ref(true)
+
+/**
+ * 加载历史消息
+ * @param {boolean} prepend - 是否插入到消息列表开头
+ */
+function loadHistoryMessages(prepend = false) {
+  if (isLoadingHistory.value) {
+    console.log('[HISTORY] Already loading, skip')
+    return
+  }
+  
+  if (!hasMoreHistory.value) {
+    console.log('[HISTORY] No more history to load')
+    return
+  }
+  
+  isLoadingHistory.value = true
+  console.log('[HISTORY] Loading history (prepend:', prepend, ', offset:', historyOffset.value, ')')
+  
+  try {
+    const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value)
+    
+    if (historyMessages.length === 0) {
+      console.log('[HISTORY] No more history messages')
+      hasMoreHistory.value = false
+      isLoadingHistory.value = false
+      return
+    }
+    
+    // 保存当前的滚动位置（用于 prepend 时）
+    let scrollPosition = 0
+    if (prepend && outputList.value) {
+      scrollPosition = outputList.value.scrollHeight - outputList.value.scrollTop
+    }
+    
+    // 处理每条历史消息
+    const processedMessages = historyMessages.map(msg => {
+      const html = msg.lang === 'markdown' ? marked.parse(msg.text || '') : escapeHtml(msg.text || '')
+      return {
+        ...msg,
+        html,
+        timestamp: msg.timestamp || '',
+        agent_name: msg.agent_name || '',
+        non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false
+      }
+    })
+    
+    if (prepend) {
+      // 插入到消息列表开头
+      outputs.value = [...processedMessages, ...outputs.value]
+    } else {
+      // 添加到消息列表末尾
+      outputs.value = processedMessages
+    }
+    
+    // 更新偏移量
+    historyOffset.value += historyMessages.length
+    
+    // 检查是否还有更多历史
+    const totalCount = historyStorage.getTotalCount()
+    hasMoreHistory.value = historyOffset.value < totalCount
+    
+    console.log('[HISTORY] Loaded', historyMessages.length, 'messages, total loaded:', historyOffset.value, '/', totalCount, 'hasMore:', hasMoreHistory.value)
+    
+    // 恢复滚动位置
+    if (prepend && outputList.value) {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          const newScrollHeight = outputList.value.scrollHeight
+          outputList.value.scrollTop = newScrollHeight - scrollPosition
+          console.log('[HISTORY] Scroll position restored')
+        })
+      })
+    }
+  } catch (error) {
+    console.error('[HISTORY] Failed to load history:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
 function connect() {
   if (socket.value) return
   const host = backendHost.value || window.location.hostname || '127.0.0.1'
@@ -202,6 +307,14 @@ function connect() {
     socket.value = ws
     // 连接成功后关闭连接弹窗
     showConnectModal.value = false
+    
+    // 加载历史消息
+    if (outputs.value.length === 0) {
+      console.log('[HISTORY] Loading history on first connect')
+      loadHistoryMessages(false)
+    } else {
+      console.log('[HISTORY] Skip loading history, messages already exist')
+    }
     const payload = {}
     if (auth.value.token) payload.token = auth.value.token
     if (auth.value.password) payload.password = auth.value.password
@@ -402,6 +515,25 @@ function appendOutput(payload) {
   outputs.value.push(outputItem)
   console.log('[DEBUG] Pushed output, outputs.length:', outputs.value.length, 'type:', outputItem.output_type)
   
+  // 保存消息到本地存储
+  try {
+    // 只保存必要的数据，避免存储过大的内容
+    const messageToSave = {
+      output_type: outputItem.output_type,
+      text: outputItem.text,
+      lang: outputItem.lang,
+      agent_name: outputItem.agent_name,
+      non_interactive: outputItem.non_interactive,
+      timestamp: outputItem.timestamp,
+      execution_id: outputItem.execution_id,
+      context: outputItem.context
+    }
+    historyStorage.saveMessage(messageToSave)
+  } catch (error) {
+    console.warn('[HISTORY] Failed to save message:', error)
+    // 不影响正常显示，静默失败
+  }
+  
   // DOM更新后，如果之前在底部，就滚动到底部
   // 使用双 nextTick + requestAnimationFrame 确保布局完全计算后再滚动
   nextTick(() => {
@@ -593,6 +725,30 @@ function sendManualInterrupt() {
   socket.value.send(JSON.stringify(message))
 }
 
+function confirmClearHistory() {
+  confirmDialog.value = {
+    message: '确定要清除所有历史记录吗？此操作不可撤销。',
+    confirmCallback: () => {
+      if (historyStorage.clearHistory()) {
+        console.log('[HISTORY] History cleared successfully')
+        // 清除当前显示的消息
+        outputs.value = []
+        // 重置历史加载状态
+        historyOffset.value = 0
+        hasMoreHistory.value = true
+        // 重新加载历史（如果有的话）
+        loadHistoryMessages(false)
+      } else {
+        console.error('[HISTORY] Failed to clear history')
+      }
+      confirmDialog.value = null
+    },
+    cancelCallback: () => {
+      confirmDialog.value = null
+    },
+  }
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div')
   div.innerText = text
@@ -746,6 +902,31 @@ function setTerminalRef(executionId, el) {
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
+  
+  // 添加滚动事件监听，实现滚动到顶部时加载更多历史
+  let scrollDebounceTimer = null
+  const SCROLL_THRESHOLD = 50 // 滚动到顶部50px以内触发
+  const DEBOUNCE_DELAY = 500 // 防抖延迟500ms
+  
+  if (outputList.value) {
+    outputList.value.addEventListener('scroll', () => {
+      // 清除之前的定时器
+      if (scrollDebounceTimer) {
+        clearTimeout(scrollDebounceTimer)
+      }
+      
+      // 设置新的定时器
+      scrollDebounceTimer = setTimeout(() => {
+        const scrollTop = outputList.value.scrollTop
+        if (scrollTop <= SCROLL_THRESHOLD && !isLoadingHistory.value && hasMoreHistory.value) {
+          console.log('[HISTORY] Scrolled to top, loading more history')
+          loadHistoryMessages(true) // prepend = true, 插入到开头
+        }
+      }, DEBOUNCE_DELAY)
+    })
+    
+    console.log('[HISTORY] Scroll listener added')
+  }
 })
 </script>
 
@@ -1507,6 +1688,65 @@ onMounted(() => {
   opacity: 0.4;
   cursor: not-allowed;
   filter: grayscale(0.3);
+}
+
+.danger-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 2px 6px rgba(248, 81, 73, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  width: 100%;
+}
+
+.danger-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff6b6b 0%, #f85149 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(248, 81, 73, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.danger-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.danger-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.history-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-stat-label {
+  font-size: 13px;
+  color: #8b949e;
+  font-weight: 500;
+}
+
+.history-stat-value {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 600;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .ghost-btn {
