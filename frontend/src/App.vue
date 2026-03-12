@@ -193,6 +193,9 @@ const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
 
+// 流式消息跟踪
+const streamingMessage = ref(null) // 当前流式消息
+
 // 执行状态
 const isExecuting = ref(false)
 
@@ -382,7 +385,75 @@ function handleMessage(message) {
       })
     }
   } else if (type === 'output') {
-    appendOutput(payload)
+    const outputType = payload?.output_type
+    
+    // 处理流式输出
+    if (outputType === 'STREAM_START') {
+      console.log('[STREAM] Start event:', payload)
+      // 创建新的流式消息
+      streamingMessage.value = {
+        output_type: 'STREAM',
+        text: '',
+        lang: 'markdown',
+        agent_name: payload?.context?.agent_name || payload?.agent_name || '',
+        model_name: payload?.context?.model_name || '',
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+        context: payload?.context || {},
+        isStreaming: true
+      }
+      outputs.value.push(streamingMessage.value)
+      console.log('[STREAM] Created streaming message, total:', outputs.value.length)
+    } else if (outputType === 'STREAM_CHUNK') {
+      console.log('[STREAM] Chunk event:', payload)
+      // 追加到当前流式消息
+      if (streamingMessage.value) {
+        streamingMessage.value.text += payload.text || ''
+        streamingMessage.value.html = marked.parse(streamingMessage.value.text || '')
+        // 自动滚动到底部
+        nextTick(() => {
+          if (outputList.value) {
+            outputList.value.scrollTop = outputList.value.scrollHeight
+          }
+        })
+      } else {
+        console.warn('[STREAM] Received chunk but no streaming message found')
+      }
+    } else if (outputType === 'STREAM_END') {
+      console.log('[STREAM] End event:', payload)
+      if (streamingMessage.value) {
+        streamingMessage.value.isStreaming = false
+        // 保存统计信息到 context
+        if (payload?.context) {
+          streamingMessage.value.context = {
+            ...streamingMessage.value.context,
+            ...payload.context
+          }
+        }
+        // 保存到历史
+        try {
+          const messageToSave = {
+            output_type: streamingMessage.value.output_type,
+            text: streamingMessage.value.text,
+            lang: streamingMessage.value.lang,
+            agent_name: streamingMessage.value.agent_name,
+            non_interactive: streamingMessage.value.non_interactive,
+            timestamp: streamingMessage.value.timestamp,
+            context: streamingMessage.value.context
+          }
+          historyStorage.saveMessage(messageToSave)
+          console.log('[STREAM] Saved to history')
+        } catch (error) {
+          console.warn('[STREAM] Failed to save to history:', error)
+        }
+        // 清除当前流式消息引用
+        streamingMessage.value = null
+      } else {
+        console.warn('[STREAM] Received end but no streaming message found')
+      }
+    } else {
+      // 普通输出
+      appendOutput(payload)
+    }
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
     // 保存输入请求，用于重连后恢复
