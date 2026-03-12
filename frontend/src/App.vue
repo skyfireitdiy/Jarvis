@@ -353,14 +353,24 @@ function appendOutput(payload) {
   console.log('[DEBUG] agent_name:', outputItem.agent_name)
   console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
   
+  // 在插入前判断用户是否在底部
+  const threshold = 100
+  let shouldAutoScroll = false
+  if (outputList.value) {
+    const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
+    shouldAutoScroll = distanceToBottom < threshold
+    console.log('[SCROLL] Before insert - distanceToBottom:', distanceToBottom, 'threshold:', threshold, 'shouldAutoScroll:', shouldAutoScroll)
+  }
+  
   outputs.value.push(outputItem)
+  
+  // DOM更新后，如果之前在底部，就滚动到底部
   nextTick(() => {
-    if (outputList.value) {
-      const threshold = 50
-      const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
-      if (distanceToBottom < threshold) {
-        outputList.value.scrollTop = outputList.value.scrollHeight
-      }
+    if (shouldAutoScroll && outputList.value) {
+      console.log('[SCROLL] Auto-scrolling to bottom')
+      outputList.value.scrollTop = outputList.value.scrollHeight
+    } else {
+      console.log('[SCROLL] Not auto-scrolling (user was not at bottom)')
     }
   })
 }
