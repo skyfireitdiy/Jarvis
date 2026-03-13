@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_sec.checkers import analyze_c_files
 from jarvis.jarvis_sec.checkers import analyze_rust_files
 from jarvis.jarvis_sec.types import Issue
@@ -649,7 +650,9 @@ def analyze_from_json(
                 PrettyOutput.auto_print(
                     "\n🤔 [jarvis-sec] 格式转换失败，是否继续重试？"
                 )
-                user_input = input("请输入 'y' 继续重试，或其他键取消: ")
+                user_input = get_single_line_input(
+                    "请输入 'y' 继续重试，或其他键取消: "
+                )
 
                 if user_input.lower() != "y":
                     PrettyOutput.auto_print("❌ [jarvis-sec] 用户取消操作")

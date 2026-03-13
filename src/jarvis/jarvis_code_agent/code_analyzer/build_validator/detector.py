@@ -10,6 +10,7 @@ import subprocess
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
+from jarvis.jarvis_utils.input import get_single_line_input
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -462,7 +463,7 @@ Git根目录文件列表（前30项）：
 
         while True:
             try:
-                choice = input(
+                choice = get_single_line_input(
                     f"\n请选择 (1-{len(detected_systems_with_prob) + 1}): "
                 ).strip()
                 choice_num = int(choice)
@@ -554,7 +555,9 @@ Git根目录文件列表（前30项）：
 
         while True:
             try:
-                choice = input(f"\n请选择 (1-{len(detected_systems) + 1}): ").strip()
+                choice = get_single_line_input(
+                    f"\n请选择 (1-{len(detected_systems) + 1}): "
+                ).strip()
                 choice_num = int(choice)
 
                 if 1 <= choice_num <= len(detected_systems):

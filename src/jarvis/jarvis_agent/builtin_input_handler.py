@@ -7,6 +7,7 @@ from typing import Tuple
 
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import get_single_line_input
 from rich.table import Table
 from rich.console import Console
 
@@ -633,7 +634,7 @@ def switch_model_group(agent: Any) -> bool:
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
     while True:
-        choice = input("请输入模型组编号 (0 取消): ").strip()
+        choice = get_single_line_input("请输入模型组编号 (0 取消): ").strip()
 
         if choice == "0":
             PrettyOutput.auto_print("🚫 已取消切换")
