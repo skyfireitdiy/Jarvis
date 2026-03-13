@@ -204,9 +204,9 @@ EMOJI_TO_OUTPUT_TYPE = {
     "💰": OutputType.CHEAP_MODEL,
     "⭐": OutputType.NORMAL_MODEL,
     "🧠": OutputType.SMART_MODEL,
-    "⏳": OutputType.STREAM_START,
+    "🎬": OutputType.STREAM_START,
     "▶️": OutputType.STREAM_CHUNK,
-    "✅": OutputType.STREAM_END,
+    "🏁": OutputType.STREAM_END,
 }
 
 
