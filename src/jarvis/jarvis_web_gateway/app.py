@@ -18,6 +18,7 @@ from typing import Tuple
 from fastapi import FastAPI
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_gateway.events import GatewayConfirmRequest
 from jarvis.jarvis_gateway.events import GatewayConfirmResult
@@ -29,8 +30,26 @@ from jarvis.jarvis_gateway.gateway import BaseGateway
 from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
+from jarvis.jarvis_web_gateway.agent_manager import AgentManager
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_utils.globals import set_interrupt
+
+
+# 全局 AgentManager，用于状态变更回调
+_global_agent_manager: Optional[AgentManager] = None
+
+
+def _on_agent_status_change(agent_id: str, status: str, data: Any) -> None:
+    """Agent 状态变更回调，发送 WebSocket 通知。
+
+    Args:
+        agent_id: Agent ID
+        status: 新状态 ("running", "stopped", "error")
+        data: 额外数据
+    """
+    # TODO: 实现 WebSocket 广播，向所有连接的前端发送状态变更通知
+    # 这里需要修改 WebSocketConnectionManager 来支持广播
+    pass
 
 
 class WebGateway(BaseGateway):
@@ -251,7 +270,7 @@ class WebSocketConnectionManager:
         )
         if pending_request:
             session = self._input_registry.get_or_create(session_id)
-            print(f"[RECONNECT] Got session, reconnecting...")
+            print("[RECONNECT] Got session, reconnecting...")
             session.reconnect()
             print(f"[RECONNECT] Sending input_request: {pending_request}")
             await websocket.send_json(pending_request)
@@ -262,7 +281,7 @@ class WebSocketConnectionManager:
         )
         if pending_confirm:
             confirm_session = self._input_registry.get_or_create_confirm_session(session_id)
-            print(f"[RECONNECT] Got confirm session, reconnecting...")
+            print("[RECONNECT] Got confirm session, reconnecting...")
             confirm_session.reconnect()
             print(f"[RECONNECT] Sending confirm_request: {pending_confirm}")
             await websocket.send_json(pending_confirm)
@@ -328,6 +347,14 @@ class WebSocketConnectionManager:
 def create_app() -> FastAPI:
     """创建 FastAPI 应用。"""
 
+    # 创建 AgentManager，并设置状态变更回调
+    agent_manager = AgentManager(
+        on_status_change=_on_agent_status_change
+    )
+    # 保存 agent_manager 到全局，以便回调访问
+    global _global_agent_manager
+    _global_agent_manager = agent_manager
+
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
@@ -341,13 +368,82 @@ def create_app() -> FastAPI:
 
     app = FastAPI()
 
+    # 添加 CORS 中间件，允许前端跨域访问
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # 生产环境应该指定具体域名
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     @app.on_event("shutdown")
-    def _shutdown() -> None:
+    async def _shutdown() -> None:
+        # 清理所有 Agent
+        await agent_manager.cleanup()
         set_current_gateway(None)
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
         await manager.handle(websocket)
+
+    # HTTP API：创建 Agent
+    @app.post("/api/agents")
+    async def create_agent(request: Dict[str, Any]) -> Dict[str, Any]:
+        """创建 Agent。"""
+        try:
+            agent_type = request.get("agent_type")
+            working_dir = request.get("working_dir")
+            llm_group = request.get("llm_group", "default")
+            tool_group = request.get("tool_group", "default")
+            config_file = request.get("config_file")
+            task = request.get("task")
+            additional_args = request.get("additional_args")
+
+            if not agent_type:
+                return {"success": False, "error": {"code": "MISSING_AGENT_TYPE", "message": "agent_type is required"}}
+            if not working_dir:
+                return {"success": False, "error": {"code": "MISSING_WORKING_DIR", "message": "working_dir is required"}}
+
+            agent_info = agent_manager.create_agent(
+                agent_type=agent_type,
+                working_dir=working_dir,
+                llm_group=llm_group,
+                tool_group=tool_group,
+                config_file=config_file,
+                task=task,
+                additional_args=additional_args,
+            )
+
+            return {"success": True, "data": agent_info}
+        except ValueError as e:
+            return {"success": False, "error": {"code": "INVALID_ARGUMENT", "message": str(e)}}
+        except RuntimeError as e:
+            return {"success": False, "error": {"code": "START_FAILED", "message": str(e)}}
+        except Exception as e:
+            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+
+    # HTTP API：获取 Agent 列表
+    @app.get("/api/agents")
+    async def get_agents() -> Dict[str, Any]:
+        """获取 Agent 列表。"""
+        try:
+            agents = agent_manager.get_agent_list()
+            return {"success": True, "data": agents}
+        except Exception as e:
+            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+
+    # HTTP API：停止 Agent
+    @app.delete("/api/agents/{agent_id}")
+    async def stop_agent(agent_id: str) -> Dict[str, Any]:
+        """停止 Agent。"""
+        try:
+            result = agent_manager.stop_agent(agent_id)
+            return {"success": True, "data": result}
+        except KeyError as e:
+            return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": str(e)}}
+        except Exception as e:
+            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
 
     return app
 
