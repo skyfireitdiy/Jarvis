@@ -527,9 +527,9 @@ async function createAgent() {
       showCreateAgentModal.value = false
       newAgentDir.value = ''
       
-      // 自动切换到新创建的 Agent
+      // 自动切换到新创建的 Agent（等待连接成功）
       if (agent.status === 'running') {
-        switchAgent(agent)
+        await switchAgent(agent)
       }
       
       // 开始定时刷新列表
@@ -603,8 +603,8 @@ async function stopAgent(agentId) {
   }
 }
 
-// 切换 Agent
-function switchAgent(agent) {
+// 切换 Agent（带重试机制）
+async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
   if (agent.agent_id === currentAgentId.value) return
   
   console.log('[AGENT] Switching to:', agent)
@@ -621,38 +621,71 @@ function switchAgent(agent) {
   // 更新当前 Agent
   currentAgentId.value = agent.agent_id
   
-  // 连接到新 Agent 的 WebSocket（使用分配的端口）
+  // 连接到新 Agent 的 WebSocket（使用分配的端口），带重试机制
   const host = backendHost.value || window.location.hostname || '127.0.0.1'
   const agentPort = agent.port
   const url = `ws://${host}:${agentPort}/ws`
   
-  connecting.value = true
-  const ws = new WebSocket(url)
+  let retryCount = 0
+  let lastError = null
   
-  ws.onopen = () => {
-    console.log('[AGENT] Connected to', url)
-    connecting.value = false
-    socket.value = ws
-    
-    // 发送认证
-    const payload = {}
-    if (auth.value.token) payload.token = auth.value.token
-    if (auth.value.password) payload.password = auth.value.password
-    if (Object.keys(payload).length > 0) {
-      ws.send(JSON.stringify({ type: 'auth', payload }))
+  const attemptConnection = () => {
+    return new Promise((resolve, reject) => {
+      connecting.value = true
+      const ws = new WebSocket(url)
+      
+      ws.onopen = () => {
+        console.log('[AGENT] Connected to', url)
+        connecting.value = false
+        socket.value = ws
+        
+        // 发送认证
+        const payload = {}
+        if (auth.value.token) payload.token = auth.value.token
+        if (auth.value.password) payload.password = auth.value.password
+        if (Object.keys(payload).length > 0) {
+          ws.send(JSON.stringify({ type: 'auth', payload }))
+        }
+        
+        resolve(ws)
+      }
+      
+      ws.onclose = () => {
+        console.log('[AGENT] Disconnected')
+        socket.value = null
+        connecting.value = false
+      }
+      
+      ws.onerror = (error) => {
+        console.error('[AGENT] Connection error', error)
+        connecting.value = false
+        ws.close()
+        reject(error)
+      }
+    })
+  }
+  
+  // 重试循环
+  while (retryCount < maxRetries) {
+    try {
+      await attemptConnection()
+      console.log('[AGENT] Connection successful')
+      return
+    } catch (error) {
+      lastError = error
+      retryCount++
+      console.log(`[AGENT] Connection attempt ${retryCount}/${maxRetries} failed, retrying in ${retryDelay}ms...`)
+      
+      if (retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
+      }
     }
   }
   
-  ws.onclose = () => {
-    console.log('[AGENT] Disconnected')
-    socket.value = null
-    connecting.value = false
-  }
-  
-  ws.onerror = () => {
-    console.error('[AGENT] Connection error')
-    connecting.value = false
-  }
+  // 所有重试都失败
+  console.error('[AGENT] All connection attempts failed:', lastError)
+  alert(`连接 Agent 失败：Agent 可能还未启动完成，请稍后重试`)
+  connecting.value = false
 }
 
 // 定时刷新 Agent 列表
