@@ -8,10 +8,12 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 
 import json
+from urllib.parse import quote
 
 try:
     from bs4 import BeautifulSoup
     from playwright.sync_api import sync_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -188,11 +190,13 @@ class SearchWebTool:
 
         try:
             # 构建搜索 URL
-            search_url = f"https://www.bing.com/search?q={query}"
+            search_url = f"https://www.bing.com/search?q={quote(query)}"
             if site:
-                search_url += f"+site%3A{site}"
+                search_url += f"+site%3A{quote(site)}"
 
-            PrettyOutput.auto_print("⚠️ ddgr 搜索失败，正在降级使用 Playwright + Bing 搜索...")
+            PrettyOutput.auto_print(
+                "⚠️ ddgr 搜索失败，正在降级使用 Playwright + Bing 搜索..."
+            )
             PrettyOutput.auto_print(f"🌐 访问搜索页面: {search_url}")
 
             with sync_playwright() as p:
@@ -228,14 +232,18 @@ class SearchWebTool:
 
                     # 提取摘要
                     abstract_elem = item.select_one("p")
-                    abstract = abstract_elem.get_text(strip=True) if abstract_elem else ""
+                    abstract = (
+                        abstract_elem.get_text(strip=True) if abstract_elem else ""
+                    )
 
                     if title and url:
-                        results.append({
-                            "title": str(title),
-                            "url": str(url),
-                            "abstract": str(abstract),
-                        })
+                        results.append(
+                            {
+                                "title": str(title),
+                                "url": str(url),
+                                "abstract": str(abstract),
+                            }
+                        )
                 except Exception:
                     continue
 
