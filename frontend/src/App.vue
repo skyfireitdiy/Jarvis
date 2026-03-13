@@ -615,8 +615,12 @@ async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
     socket.value = null
   }
   
-  // 清空消息
+  // 清空消息和输入状态
   outputs.value = []
+  showInput.value = false
+  lastInputRequest.value = null
+  inputText.value = ''
+  inputTip.value = ''
   
   // 更新当前 Agent
   currentAgentId.value = agent.agent_id
@@ -634,6 +638,19 @@ async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
       connecting.value = true
       const ws = new WebSocket(url)
       
+      // 绑定消息处理
+      ws.onmessage = (event) => {
+        let message = null
+        try {
+          message = JSON.parse(event.data)
+        } catch (error) {
+          console.warn('[AGENT] message parse failed', event.data)
+          return
+        }
+        console.log('[AGENT] message', message)
+        handleMessage(message)
+      }
+      
       ws.onopen = () => {
         console.log('[AGENT] Connected to', url)
         connecting.value = false
@@ -646,6 +663,9 @@ async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
         if (Object.keys(payload).length > 0) {
           ws.send(JSON.stringify({ type: 'auth', payload }))
         }
+        
+        // 发送一个空的 input 请求，触发 Agent 发送 input_request 消息
+        ws.send(JSON.stringify({ type: 'start_session' }))
         
         resolve(ws)
       }
