@@ -3,7 +3,9 @@
     <!-- 顶部栏 -->
     <header class="app-header">
       <div class="header-title">
-        <!-- 标题已移除 -->
+        <button class="icon-btn" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
+          📋
+        </button>
       </div>
       <div class="header-actions">
         <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
@@ -18,6 +20,31 @@
         </div>
       </div>
     </header>
+
+    <!-- Agent 侧边栏 -->
+    <aside class="agent-sidebar" v-if="showAgentSidebar">
+      <div class="agent-sidebar-header">
+        <h3>Agent 列表</h3>
+        <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
+      </div>
+      <div class="agent-list">
+        <div v-for="agent in agentList" :key="agent.agent_id" 
+             class="agent-item" 
+             :class="{ active: currentAgentId === agent.agent_id }"
+             @click="switchAgent(agent)">
+          <div class="agent-info">
+            <span class="agent-type">{{ agent.agent_type === 'agent' ? '🤖' : '💻' }}</span>
+            <span class="agent-status" :class="agent.status">{{ agent.status }}</span>
+            <span class="agent-port">:{{ agent.port }}</span>
+          </div>
+          <div class="agent-dir">{{ agent.working_dir }}</div>
+          <button class="icon-btn stop-btn" @click.stop="stopAgent(agent.agent_id)" title="停止 Agent">✕</button>
+        </div>
+        <div v-if="agentList.length === 0" class="agent-empty">
+          暂无 Agent，点击 + 创建
+        </div>
+      </div>
+    </aside>
 
     <!-- 消息列表 -->
     <main class="chat-container">
@@ -71,6 +98,28 @@
         </div>
       </div>
     </footer>
+
+    <!-- 创建 Agent 弹窗 -->
+    <div class="modal-overlay" v-if="showCreateAgentModal">
+      <div class="modal create-agent-modal">
+        <h2>创建 Agent</h2>
+        <div class="form-group">
+          <label>Agent 类型</label>
+          <select v-model="newAgentType" class="form-control">
+            <option value="agent">通用 Agent (agent)</option>
+            <option value="codeagent">代码 Agent (codeagent)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>工作目录</label>
+          <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
+          <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 连接弹窗 -->
     <div class="modal-overlay" v-if="showConnectModal">
@@ -236,6 +285,8 @@ const connecting = ref(false)
 // 弹窗控制
 const showConnectModal = ref(true)  // 初始显示连接弹窗
 const showSettingsModal = ref(false) // 设置弹窗
+const showAgentSidebar = ref(true)    // Agent 侧边栏
+const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 
 // 消息和终端
 const outputs = ref([])
@@ -249,6 +300,12 @@ const inputMode = ref('single')
 const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
+
+// Agent 管理
+const agentList = ref([])        // Agent 列表
+const currentAgentId = ref(null) // 当前连接的 Agent ID
+const newAgentType = ref('agent') // 新 Agent 类型
+const newAgentDir = ref('')       // 新 Agent 工作目录
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
@@ -431,6 +488,198 @@ function reconnect() {
   // 重新连接
   connect()
 }
+
+// ========== Agent 管理方法 ==========
+
+// 创建 Agent
+async function createAgent() {
+  if (!newAgentDir.value.trim()) return
+  
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent_type: newAgentType.value,
+        working_dir: newAgentDir.value
+      })
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`创建失败: ${error.error?.message || error.detail || '未知错误'}`)
+      return
+    }
+    
+    const result = await response.json()
+    console.log('[AGENT] Created:', result)
+    
+    // 后端返回格式: { success: true, data: agent }
+    if (result.success && result.data) {
+      const agent = result.data
+      
+      // 添加到列表
+      agentList.value.push(agent)
+      
+      // 关闭创建弹窗
+      showCreateAgentModal.value = false
+      newAgentDir.value = ''
+      
+      // 自动切换到新创建的 Agent
+      if (agent.status === 'running') {
+        switchAgent(agent)
+      }
+      
+      // 开始定时刷新列表
+      startAgentListRefresh()
+    } else {
+      alert('创建失败：返回数据格式错误')
+    }
+  } catch (error) {
+    console.error('[AGENT] Create failed:', error)
+    alert(`创建失败: ${error.message}`)
+  }
+}
+
+// 获取 Agent 列表
+async function fetchAgentList() {
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/agents`)
+    
+    if (!response.ok) return
+    
+    const result = await response.json()
+    console.log('[AGENT] List:', result)
+    
+    // 更新列表（后端返回格式: { success: true, data: agents }）
+    if (result.success && result.data) {
+      agentList.value = result.data
+    }
+    
+    // 更新当前 Agent 状态
+    const currentAgent = agentList.value.find(a => a.agent_id === currentAgentId.value)
+    if (currentAgent && currentAgent.status !== 'running') {
+      console.log('[AGENT] Current agent stopped:', currentAgent)
+    }
+  } catch (error) {
+    console.error('[AGENT] Fetch list failed:', error)
+  }
+}
+
+// 停止 Agent
+async function stopAgent(agentId) {
+  if (!confirm('确认停止该 Agent?')) return
+  
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/agents/${agentId}`, {
+      method: 'DELETE'
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`停止失败: ${error.detail || '未知错误'}`)
+      return
+    }
+    
+    console.log('[AGENT] Stopped:', agentId)
+    
+    // 刷新列表
+    await fetchAgentList()
+    
+    // 如果是当前 Agent，断开连接
+    if (currentAgentId.value === agentId) {
+      currentAgentId.value = null
+      disconnect()
+    }
+  } catch (error) {
+    console.error('[AGENT] Stop failed:', error)
+    alert(`停止失败: ${error.message}`)
+  }
+}
+
+// 切换 Agent
+function switchAgent(agent) {
+  if (agent.agent_id === currentAgentId.value) return
+  
+  console.log('[AGENT] Switching to:', agent)
+  
+  // 断开旧连接
+  if (socket.value) {
+    socket.value.close()
+    socket.value = null
+  }
+  
+  // 清空消息
+  outputs.value = []
+  
+  // 更新当前 Agent
+  currentAgentId.value = agent.agent_id
+  
+  // 连接到新 Agent 的 WebSocket（使用分配的端口）
+  const host = backendHost.value || window.location.hostname || '127.0.0.1'
+  const agentPort = agent.port
+  const url = `ws://${host}:${agentPort}/ws`
+  
+  connecting.value = true
+  const ws = new WebSocket(url)
+  
+  ws.onopen = () => {
+    console.log('[AGENT] Connected to', url)
+    connecting.value = false
+    socket.value = ws
+    
+    // 发送认证
+    const payload = {}
+    if (auth.value.token) payload.token = auth.value.token
+    if (auth.value.password) payload.password = auth.value.password
+    if (Object.keys(payload).length > 0) {
+      ws.send(JSON.stringify({ type: 'auth', payload }))
+    }
+  }
+  
+  ws.onclose = () => {
+    console.log('[AGENT] Disconnected')
+    socket.value = null
+    connecting.value = false
+  }
+  
+  ws.onerror = () => {
+    console.error('[AGENT] Connection error')
+    connecting.value = false
+  }
+}
+
+// 定时刷新 Agent 列表
+let agentListRefreshInterval = null
+
+function startAgentListRefresh() {
+  if (agentListRefreshInterval) {
+    clearInterval(agentListRefreshInterval)
+  }
+  
+  // 每 3 秒刷新一次
+  agentListRefreshInterval = setInterval(() => {
+    fetchAgentList()
+  }, 3000)
+  
+  // 立即执行一次
+  fetchAgentList()
+}
+
+function stopAgentListRefresh() {
+  if (agentListRefreshInterval) {
+    clearInterval(agentListRefreshInterval)
+    agentListRefreshInterval = null
+  }
+}
+
+// ========== Agent 管理方法结束 ==========
 
 function handleMessage(message) {
   if (!message || typeof message !== 'object') return
@@ -1110,6 +1359,9 @@ onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
   
+  // 启动 Agent 列表刷新
+  startAgentListRefresh()
+  
   // 添加滚动事件监听，实现滚动到顶部时加载更多历史
   let scrollDebounceTimer = null
   const SCROLL_THRESHOLD = 50 // 滚动到顶部50px以内触发
@@ -1285,6 +1537,205 @@ onMounted(() => {
 .dot.online {
   background: #3fb950;
   color: #3fb950;
+}
+
+/* Agent 侧边栏 */
+.agent-sidebar {
+  width: 280px;
+  background: rgba(22, 27, 34, 0.95);
+  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.agent-sidebar-header {
+  padding: 16px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.agent-sidebar-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.agent-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-item {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.agent-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.agent-item.active {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.4);
+}
+
+.agent-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.agent-type {
+  font-size: 16px;
+}
+
+.agent-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.agent-status.running {
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
+}
+
+.agent-status.stopped {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.agent-port {
+  font-size: 12px;
+  color: #8b949e;
+  margin-left: auto;
+}
+
+.agent-dir {
+  font-size: 11px;
+  color: #8b949e;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.agent-item .stop-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+  border: 0.5px solid rgba(248, 81, 73, 0.3);
+}
+
+.agent-item:hover .stop-btn {
+  opacity: 1;
+}
+
+.agent-item .stop-btn:hover {
+  background: rgba(248, 81, 73, 0.3);
+}
+
+.agent-empty {
+  text-align: center;
+  color: #8b949e;
+  padding: 40px 20px;
+  font-size: 13px;
+}
+
+/* 创建 Agent 弹窗 */
+.create-agent-modal {
+  max-width: 400px;
+  width: 90%;
+}
+
+.create-agent-modal h2 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #e6edf3;
+}
+
+.create-agent-modal .form-control {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.create-agent-modal .form-control:focus {
+  outline: none;
+  border-color: rgba(63, 185, 80, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.create-agent-modal select.form-control option {
+  background: #1a1f2e;
+  color: #e6edf3;
+}
+
+.create-agent-modal .modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.create-agent-modal .btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.create-agent-modal .btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+}
+
+.create-agent-modal .btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.create-agent-modal .btn.primary {
+  background: linear-gradient(135deg, #3fb950 0%, #2ea043 100%);
+  color: white;
+}
+
+.create-agent-modal .btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(63, 185, 80, 0.4);
+}
+
+.create-agent-modal .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 /* 聊天容器 */
