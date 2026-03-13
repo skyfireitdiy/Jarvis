@@ -669,6 +669,12 @@ def _check_jarvis_updates() -> bool:
     返回:
         bool: 是否需要重启进程
     """
+    # 非交互模式下跳过自动更新检查
+    from jarvis.jarvis_utils.input import _is_non_interactive_for_current_agent
+
+    if _is_non_interactive_for_current_agent():
+        return False
+
     # 检查是否有等待重启的更新标记（小版本更新已完成）
     if _has_update_reboot_flag():
         # 静默处理，不打印任何信息
