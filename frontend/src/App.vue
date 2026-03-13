@@ -289,7 +289,8 @@ const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 
 // 消息和终端
-const outputs = ref([])
+const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
+const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
 const terminalHosts = ref(new Map())
 const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
@@ -379,12 +380,14 @@ function loadHistoryMessages(prepend = false) {
       }
     })
     
+    // 获取当前 Agent 的消息列表
+    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (prepend) {
       // 插入到消息列表开头
-      outputs.value = [...processedMessages, ...outputs.value]
+      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...currentOutputs])
     } else {
       // 添加到消息列表末尾
-      outputs.value = processedMessages
+      allOutputs.value.set(currentAgentId.value, processedMessages)
     }
     
     // 更新偏移量
@@ -436,7 +439,8 @@ function connect() {
     showConnectModal.value = false
     
     // 加载历史消息
-    if (outputs.value.length === 0) {
+    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+    if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
       loadHistoryMessages(false)
     } else {
@@ -615,8 +619,12 @@ async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
     socket.value = null
   }
   
-  // 清空消息和输入状态
-  outputs.value = []
+  // 初始化当前 Agent 的消息记录（如果不存在）
+  if (!allOutputs.value.has(agent.agent_id)) {
+    allOutputs.value.set(agent.agent_id, [])
+  }
+  
+  // 清空输入状态（不清空消息，保留各 Agent 的消息记录）
   showInput.value = false
   lastInputRequest.value = null
   inputText.value = ''
@@ -761,6 +769,7 @@ function handleMessage(message) {
     if (outputType === 'STREAM_START') {
       console.log('[STREAM] Start event:', payload)
       // 创建新的流式消息
+      const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
       streamingMessage.value = {
         output_type: 'STREAM',
         text: '',
@@ -771,8 +780,8 @@ function handleMessage(message) {
         context: payload?.context || {},
         isStreaming: true
       }
-      outputs.value.push(streamingMessage.value)
-      console.log('[STREAM] Created streaming message, total:', outputs.value.length)
+      currentOutputs.push(streamingMessage.value)
+      console.log('[STREAM] Created streaming message, total:', currentOutputs.length)
     } else if (outputType === 'STREAM_CHUNK') {
       console.log('[STREAM] Chunk event:', payload)
       // 追加到当前流式消息
@@ -792,9 +801,10 @@ function handleMessage(message) {
       console.log('[STREAM] End event:', payload)
       if (streamingMessage.value) {
         // 从 outputs 数组中删除流式消息（因为后面会有完整的 RESULT 消息）
-        const index = outputs.value.indexOf(streamingMessage.value)
+        const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+        const index = currentOutputs.indexOf(streamingMessage.value)
         if (index !== -1) {
-          outputs.value.splice(index, 1)
+          currentOutputs.splice(index, 1)
           console.log('[STREAM] Removed streaming message from outputs')
         }
         // 清除当前流式消息引用
@@ -865,7 +875,8 @@ function handleMessage(message) {
     appendExecution(payload)
     // 只在首次创建终端时创建输出项
     const executionId = payload?.execution_id || 'default'
-    const existingItem = outputs.value.find(
+    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+    const existingItem = currentOutputs.find(
       item => item.output_type === 'execution' && item.execution_id === executionId
     )
     if (!existingItem) {
@@ -1023,8 +1034,10 @@ function appendOutput(payload) {
   // 只要 append 就自动滚动到底部，不需要判断位置
   const shouldAutoScroll = true
   
-  outputs.value.push(outputItem)
-  console.log('[DEBUG] Pushed output, outputs.length:', outputs.value.length, 'type:', outputItem.output_type)
+  // 添加到当前 Agent 的消息列表
+  const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+  currentOutputs.push(outputItem)
+  console.log('[DEBUG] Pushed output, outputs.length:', currentOutputs.length, 'type:', outputItem.output_type)
   
   // 保存消息到本地存储
   try {
@@ -1240,8 +1253,8 @@ function confirmClearHistory() {
     confirmCallback: () => {
       if (historyStorage.clearHistory()) {
         console.log('[HISTORY] History cleared successfully')
-        // 清除当前显示的消息
-        outputs.value = []
+        // 清除当前 Agent 的消息
+        allOutputs.value.set(currentAgentId.value, [])
         // 重置历史加载状态
         historyOffset.value = 0
         hasMoreHistory.value = true
