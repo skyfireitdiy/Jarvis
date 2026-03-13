@@ -580,17 +580,19 @@ _output_lock = threading.Lock()
 
 def emit_output(event: OutputEvent) -> None:
     """向所有已注册的输出后端广播事件。"""
-    with _output_lock:
-        for sink in list(_output_sinks):
-            try:
-                sink.emit(event)
-            except Exception as e:
-                # 后端故障不影响其他后端
-                console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
-
+    # 先检查是否需要跳过控制台输出（避免向终端打印 Gateway 专用数据）
     context = event.context or {}
-    if context.get("_gateway_skip"):
-        return
+    skip_console = context.get("_gateway_skip", False)
+
+    # 如果没有设置跳过标记，向所有输出后端广播事件
+    if not skip_console:
+        with _output_lock:
+            for sink in list(_output_sinks):
+                try:
+                    sink.emit(event)
+                except Exception as e:
+                    # 后端故障不影响其他后端
+                    console.print(f"[输出后端错误] {sink.__class__.__name__}: {e}")
 
     try:
         from jarvis.jarvis_gateway.events import GatewayOutputEvent

@@ -314,7 +314,10 @@ class DiffVisualizer:
                         output_type=OutputType.CODE,
                         lang="diff",
                         timestamp=True,
-                        context={"file_path": file_path},
+                        context={
+                            "file_path": file_path,
+                            "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
+                        },
                     )
                 )
             except Exception:
@@ -396,7 +399,10 @@ class DiffVisualizer:
                     output_type=OutputType.CODE,
                     lang="diff",
                     timestamp=True,
-                    context={"file_path": file_path},
+                    context={
+                        "file_path": file_path,
+                        "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
+                    },
                 )
             )
         except Exception:
@@ -468,7 +474,10 @@ class DiffVisualizer:
                     output_type=OutputType.CODE,
                     lang="diff",
                     timestamp=True,
-                    context={"file_path": file_path},
+                    context={
+                        "file_path": file_path,
+                        "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
+                    },
                 )
             )
         except Exception:
@@ -905,6 +914,7 @@ class DiffVisualizer:
                         "additions": additions,
                         "deletions": deletions,
                         "diff_type": "side_by_side",
+                        "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
                     },
                 )
             )
