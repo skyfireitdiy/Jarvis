@@ -8,6 +8,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import get_single_line_input
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -103,7 +104,9 @@ class BuildValidator:
 
         while True:
             try:
-                choice = input(f"\n请选择 (1-{len(detected_systems) + 1}): ").strip()
+                choice = get_single_line_input(
+                    f"\n请选择 (1-{len(detected_systems) + 1}): "
+                ).strip()
                 choice_num = int(choice)
 
                 if 1 <= choice_num <= len(detected_systems):

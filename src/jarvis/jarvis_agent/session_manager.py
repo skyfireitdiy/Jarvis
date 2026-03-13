@@ -15,6 +15,7 @@ from typing import Tuple
 from typing import cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import get_single_line_input
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform
@@ -291,7 +292,7 @@ class SessionManager:
 
         try:
             while True:
-                choice = input(
+                choice = get_single_line_input(
                     "\n是否恢复会话？（输入序号恢复，直接回车跳过）: "
                 ).strip()
 
@@ -578,7 +579,7 @@ class SessionManager:
 
             # 交互模式：询问用户
             while True:
-                choice = input(
+                choice = get_single_line_input(
                     "请选择操作: [1] Reset 到保存的 commit  [2] 继续恢复（可能不一致）: "
                 ).strip()
 
@@ -599,7 +600,11 @@ class SessionManager:
                     else:
                         PrettyOutput.auto_print(f"❌ Reset 失败: {reset_result.stderr}")
                         # reset 失败，询问是否继续
-                        cont = input("是否仍然继续恢复会话？[y/N]: ").strip().lower()
+                        cont = (
+                            get_single_line_input("是否仍然继续恢复会话？[y/N]: ")
+                            .strip()
+                            .lower()
+                        )
                         if cont in ["y", "yes"]:
                             PrettyOutput.auto_print("⚠️  继续恢复会话（状态可能不一致）")
                             return True
@@ -881,7 +886,9 @@ class SessionManager:
 
         try:
             while True:
-                choice = input("请选择要恢复的会话（输入序号，直接回车取消）: ").strip()
+                choice = get_single_line_input(
+                    "请选择要恢复的会话（输入序号，直接回车取消）: "
+                ).strip()
 
                 # 直接回车或输入0表示取消恢复
                 if not choice or choice == "0":
