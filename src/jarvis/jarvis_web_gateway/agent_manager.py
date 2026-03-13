@@ -132,17 +132,25 @@ class AgentManager:
             task=task,
             additional_args=additional_args,
         )
+        
+        # 打印启动信息
+        print("[AGENT MANAGER] Creating agent:")
+        print(f"  Agent ID: {agent_id}")
+        print(f"  Type: {agent_type}")
+        print(f"  Working Dir: {working_dir}")
+        print(f"  Port: {port}")
+        print(f"  Command: {' '.join(cmd)}")
 
-        # 启动子进程
+        # 启动子进程（不重定向 stdin/stdout/stderr，允许 TTY 环境）
         try:
+            print("[AGENT MANAGER] Starting subprocess...")
             process = subprocess.Popen(
                 cmd,
                 cwd=working_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE,
             )
+            print(f"[AGENT MANAGER] Process started with PID: {process.pid}")
         except Exception as e:
+            print(f"[AGENT MANAGER] Failed to start agent: {e}")
             raise RuntimeError(f"Failed to start agent: {e}")
 
         # 创建 AgentInfo
@@ -157,6 +165,7 @@ class AgentManager:
 
         # 保存到内存
         self._agents[agent_id] = agent_info
+        print(f"[AGENT MANAGER] Agent created successfully: {agent_id}")
 
         # 启动监控任务
         agent_info._monitor_task = asyncio.create_task(
@@ -292,11 +301,9 @@ class AgentManager:
 
         # 添加参数
         cmd = base_cmd.copy()
-        cmd.extend(["--web-gateway-host", "127.0.0.1"])
+        cmd.extend(["--web-gateway-host", "0.0.0.0"])  # 允许来自任何 IP 的连接
         cmd.extend(["--web-gateway-port", str(port)])
-        cmd.extend(["--llm-group", llm_group])
-        cmd.extend(["--tool-group", tool_group])
-        cmd.extend(["--non-interactive"])  # 必须是非交互模式
+        cmd.append("--web-gateway")  # 启动为 WebSocket Gateway 模式
 
         if config_file:
             cmd.extend(["--config-file", config_file])
@@ -330,6 +337,7 @@ class AgentManager:
             # 检查是否异常退出
             if return_code != 0:
                 agent_info.status = "error"
+                print(f"[AGENT MANAGER] Agent {agent_id} exited with code {return_code}")
                 if self._on_status_change:
                     self._on_status_change(
                         agent_id,
@@ -341,11 +349,15 @@ class AgentManager:
                             "message": f"Agent exited with code {return_code}",
                         },
                     )
+            else:
+                print(f"[AGENT MANAGER] Agent {agent_id} exited normally")
         except asyncio.CancelledError:
             # 任务被取消，正常情况
+            print(f"[AGENT MANAGER] Monitor task cancelled for agent {agent_id}")
             pass
         except Exception as e:
             # 监控出错
+            print(f"[AGENT MANAGER] Monitor error for agent {agent_id}: {e}")
             agent_info.status = "error"
             if self._on_status_change:
                 self._on_status_change(
