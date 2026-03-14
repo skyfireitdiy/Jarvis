@@ -482,6 +482,12 @@ const hasMoreHistory = ref(true)
  * @param {boolean} prepend - 是否插入到消息列表开头
  */
 function loadHistoryMessages(prepend = false) {
+  // 没有激活的 agent 时，不加载历史记录
+  if (!currentAgentId.value) {
+    console.log('[HISTORY] No active agent, skip loading history')
+    return
+  }
+  
   if (isLoadingHistory.value) {
     console.log('[HISTORY] Already loading, skip')
     return
