@@ -20,10 +20,17 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# 检查是否设置了网关密码环境变量
+GATEWAY_PASSWORD=""
+if [ -n "$JARVIS_GATEWAY_PASSWORD" ]; then
+    echo "🔐 检测到网关密码环境变量"
+    GATEWAY_PASSWORD="--gateway-password $JARVIS_GATEWAY_PASSWORD"
+fi
+
 # 启动网关（后台运行）
 echo "📡 启动网关服务..."
 cd "$PROJECT_ROOT"
-python -m uvicorn jarvis.jarvis_web_gateway.app:create_app --host 0.0.0.0 --port 8000 &
+python -m uvicorn jarvis.jarvis_web_gateway.app:create_app --host 0.0.0.0 --port 8000 $GATEWAY_PASSWORD &
 GATEWAY_PID=$!
 
 echo "✅ 网关已启动 (PID: $GATEWAY_PID)"
