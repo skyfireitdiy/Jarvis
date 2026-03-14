@@ -422,7 +422,6 @@ const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value: 内容）
-const completionRequested = ref(false) // 是否缓存了完成信号
 const hasBufferedInput = computed(() => {
   const agentId = currentAgentId.value
   return agentId ? inputBuffers.value.has(agentId) : false
@@ -1149,22 +1148,21 @@ function handleMessage(message, agentId = null) {
     
     // 检查缓冲区是否有内容
     if (agentId && inputBuffers.value.has(agentId)) {
-      console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
+      // 完成信号 (__CTRL_C_PRESSED__) 只发送给多行输入
       const bufferedText = inputBuffers.value.get(agentId)
-      // 清空缓冲区
-      inputBuffers.value.delete(agentId)
-      // 发送缓冲区内容
-      sendInputResult(bufferedText, payload.request_id)
-      return
-    }
-    
-    // 检查是否缓存了完成信号（只针对多行输入）
-    if (completionRequested.value && payload.mode === 'multi') {
-      console.log('[INPUT_REQUEST] Found cached completion signal, sending __CTRL_C_PRESSED__')
-      // 清空完成请求标志
-      completionRequested.value = false
-      // 发送 Ctrl+C 信号
-      sendInputResult('__CTRL_C_PRESSED__', payload.request_id)
+      const isCompletionSignal = bufferedText === '__CTRL_C_PRESSED__'
+      const isMultiLineRequest = payload.mode === 'multi'
+      
+      if (isCompletionSignal && !isMultiLineRequest) {
+        // 完成信号不能发送给单行输入（如确认对话框），清空缓冲区
+        console.log('[INPUT_REQUEST] Completion signal in buffer but request is single-line, discarding')
+        inputBuffers.value.delete(agentId)
+      } else {
+        // 普通输入或匹配的多行输入，发送缓冲区内容
+        console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
+        inputBuffers.value.delete(agentId)
+        sendInputResult(bufferedText, payload.request_id)
+      }
       return
     }
     
@@ -1639,13 +1637,13 @@ function submitCompletion() {
     console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend')
     sendInputDirectly('__CTRL_C_PRESSED__')
   } else if (!showInput.value) {
-    // 后端没有等待输入，缓存完成信号，等下次请求输入时再发送
-    console.log('[SUBMIT] Backend is not waiting for input, caching completion signal')
-    completionRequested.value = true
+    // 后端没有等待输入，将完成信号保存到缓冲区（与普通输入统一机制）
+    console.log('[SUBMIT] Backend is not waiting for input, caching completion signal to buffer')
+    inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
     appendOutput({
       output_type: 'system',
       agent_name: 'system',
-      text: '✅ 已缓存完成信号，下次需要输入时自动触发',
+      text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
       lang: 'text',
     })
   } else {
