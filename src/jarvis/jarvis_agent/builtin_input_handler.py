@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import io
 import re
 from typing import Any
 from typing import List
@@ -240,7 +241,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("📋 未找到任何规则")
             else:
                 # 使用 rich.Table 创建美观的表格
-                console = Console()
+                # 捕获输出到字符串，然后通过 PrettyOutput.auto_print() 发送到前端
+                # 使用纯文本模式，不生成 ANSI 控制字符
+                string_io = io.StringIO()
+                console = Console(file=string_io, force_terminal=False, no_color=True, legacy_windows=False, width=100)
                 table = Table(
                     title="📋 所有可用规则",
                     show_header=True,
@@ -262,15 +266,19 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     if len(file_path) > 37:
                         file_path = file_path[:37] + "..."
                     status = (
-                        "✅ [green]已激活[/green]"
+                        "✅ 已激活"
                         if is_loaded
-                        else "🔴 [dim]未激活[/dim]"
+                        else "🔴 未激活"
                     )
                     table.add_row(rule_name, preview, file_path, status)
 
                 # 打印表格和统计信息
                 console.print(table)
                 console.print(f"\n总计: {len(rules_info)} 个规则\n")
+                
+                # 将捕获的输出通过 PrettyOutput.auto_print() 发送到前端
+                table_text = string_io.getvalue()
+                PrettyOutput.auto_print(table_text, timestamp=False)
 
             return "", True
         elif tag == "SaveSession":
