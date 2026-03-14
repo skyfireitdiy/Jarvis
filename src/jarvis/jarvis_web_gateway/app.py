@@ -394,6 +394,7 @@ def create_app() -> FastAPI:
         try:
             agent_type = request.get("agent_type")
             working_dir = request.get("working_dir")
+            name = request.get("name")
             llm_group = request.get("llm_group", "default")
             tool_group = request.get("tool_group", "default")
             config_file = request.get("config_file")
@@ -408,6 +409,7 @@ def create_app() -> FastAPI:
             agent_info = agent_manager.create_agent(
                 agent_type=agent_type,
                 working_dir=working_dir,
+                name=name,
                 llm_group=llm_group,
                 tool_group=tool_group,
                 config_file=config_file,
