@@ -967,7 +967,7 @@ function getStatusText(agent) {
   
   // 如果 Agent 已停止，只显示停止状态
   if (agentStatus === 'stopped') {
-    return '已停止'
+    return '已完成'
   }
   
   // 如果没有运行状态数据，显示 Agent 状态
@@ -2426,8 +2426,8 @@ body::-webkit-scrollbar {
 }
 
 .current-agent-info .agent-status.stopped {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
 }
 
 .current-agent-info .agent-status.waiting_multi {
@@ -2632,8 +2632,8 @@ body::-webkit-scrollbar {
 }
 
 .agent-item .agent-status.stopped {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
 }
 
 .agent-item .agent-status.waiting_multi {
