@@ -88,11 +88,6 @@ class AgentStateManager:
         with self._lock:
             old_status = self._status
             self._status = status
-            print(
-                f"[DEBUG] AgentStateManager: status changed from {old_status.value} to {status.value}",
-                file=sys.stderr,
-                flush=True,
-            )
 
     def set_running(self) -> None:
         """设置为运行状态。"""
@@ -1141,32 +1136,12 @@ def run_cli(
 
             def on_status_update(status_str: str) -> None:
                 """Web Gateway 请求输入时的状态更新回调。"""
-                import sys
-
-                print(
-                    f"[DEBUG] on_status_update called with status={status_str}",
-                    file=sys.stderr,
-                    flush=True,
-                )
                 # 根据 status_str 更新状态
                 if status_str == "running":
-                    print(
-                        "[DEBUG] Setting status to RUNNING", file=sys.stderr, flush=True
-                    )
                     status_manager.set_running()
                 elif status_str == "waiting_multi":
-                    print(
-                        "[DEBUG] Setting status to WAITING_MULTI",
-                        file=sys.stderr,
-                        flush=True,
-                    )
                     status_manager.set_waiting_multi()
                 elif status_str == "waiting_single":
-                    print(
-                        "[DEBUG] Setting status to WAITING_SINGLE",
-                        file=sys.stderr,
-                        flush=True,
-                    )
                     status_manager.set_waiting_single()
 
             # 注册回调

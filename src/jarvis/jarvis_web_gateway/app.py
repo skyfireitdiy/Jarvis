@@ -68,24 +68,10 @@ def _update_status(status: str) -> None:
     # 1. 调用回调函数更新本地状态
     if _status_update_callback:
         try:
-            print(
-                f"[DEBUG] _update_status calling callback with status={status}",
-                file=sys.stderr,
-                flush=True,
-            )
             _status_update_callback(status)
         except Exception as e:
             # 静默忽略状态更新失败，不影响主流程
-            print(
-                f"[DEBUG] _update_status callback failed: {e}",
-                file=sys.stderr,
-                flush=True,
-            )
             pass
-    else:
-        print(
-            "[DEBUG] _update_status no callback registered", file=sys.stderr, flush=True
-        )
 
     # 2. 通过 WebSocket 推送状态变化给前端
     if _router:
@@ -103,17 +89,7 @@ def _update_status(status: str) -> None:
             # 推送状态变化消息
             message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
-            print(
-                f"[DEBUG] Status update pushed via WebSocket: status={status}, session_id={session_id}",
-                file=sys.stderr,
-                flush=True,
-            )
         except Exception as e:
-            print(
-                f"[DEBUG] Failed to push status update via WebSocket: {e}",
-                file=sys.stderr,
-                flush=True,
-            )
             pass
 
 
@@ -198,33 +174,15 @@ class WebGateway(BaseGateway):
         self._input_registry.save_input_request(session_id, message)
 
         # 更新状态为等待输入
-        import sys
-
-        print(
-            f"[DEBUG] request_input called, mode={request.mode}",
-            file=sys.stderr,
-            flush=True,
-        )
         if request.mode == "single":
-            print(
-                "[DEBUG] Setting status to waiting_single", file=sys.stderr, flush=True
-            )
             _update_status("waiting_single")
         else:
-            print(
-                "[DEBUG] Setting status to waiting_multi", file=sys.stderr, flush=True
-            )
             _update_status("waiting_multi")
 
         session = self._input_registry.get_or_create(session_id)
         text = session.wait_for_input()
 
         # 输入完成，恢复为运行状态
-        print(
-            "[DEBUG] Input completed, setting status to running",
-            file=sys.stderr,
-            flush=True,
-        )
         _update_status("running")
 
         return GatewayInputResult(text=text, metadata=metadata)
@@ -799,10 +757,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     @app.get("/api/directories")
     async def list_directories(path: str = "") -> Dict[str, Any]:
         """获取指定路径下的目录列表。
-        
+
         Args:
             path: 目录路径，默认为用户主目录
-        
+
         Returns:
             {
                 "success": True,
@@ -818,35 +776,41 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         """
         import os
         import pathlib
-        
+
         try:
             # 解析路径，如果为空则使用用户主目录
             if not path or path == "~":
                 target_path = pathlib.Path.home()
             else:
                 target_path = pathlib.Path(path).expanduser()
-            
+
             # 规范化为绝对路径
             target_path = target_path.resolve()
-            
+
             # 检查路径是否存在且是目录
             if not target_path.exists():
                 return {
                     "success": False,
-                    "error": {"code": "NOT_FOUND", "message": f"Path does not exist: {path}"},
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Path does not exist: {path}",
+                    },
                 }
-            
+
             if not target_path.is_dir():
                 return {
                     "success": False,
-                    "error": {"code": "NOT_A_DIRECTORY", "message": f"Path is not a directory: {path}"},
+                    "error": {
+                        "code": "NOT_A_DIRECTORY",
+                        "message": f"Path is not a directory: {path}",
+                    },
                 }
-            
+
             # 获取父目录路径（如果存在）
             parent_path = None
             if target_path.parent != target_path:  # 不是根目录
                 parent_path = str(target_path.parent)
-            
+
             # 获取子目录列表
             directories = []
             try:
@@ -855,16 +819,18 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     if entry.is_dir():
                         # 过滤隐藏文件（以 . 开头）
                         if not entry.name.startswith("."):
-                            directories.append({
-                                "name": entry.name,
-                                "path": str(entry),
-                            })
+                            directories.append(
+                                {
+                                    "name": entry.name,
+                                    "path": str(entry),
+                                }
+                            )
                 # 按名称排序
                 directories.sort(key=lambda x: x["name"])
             except PermissionError:
                 # 忽略权限错误，返回空列表
                 pass
-            
+
             return {
                 "success": True,
                 "data": {
