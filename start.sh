@@ -27,10 +27,18 @@ if [ -n "$JARVIS_GATEWAY_PASSWORD" ]; then
     GATEWAY_PASSWORD="--gateway-password $JARVIS_GATEWAY_PASSWORD"
 fi
 
+# 检查网关 host 和 port 环境变量
+GATEWAY_HOST="${JARVIS_GATEWAY_HOST:-127.0.0.1}"
+GATEWAY_PORT="${JARVIS_GATEWAY_PORT:-8000}"
+
+# 检查前端 host 和 port 环境变量
+FRONTEND_HOST="${JARVIS_FRONTEND_HOST:-127.0.0.1}"
+FRONTEND_PORT="${JARVIS_FRONTEND_PORT:-5173}"
+
 # 启动网关（后台运行）
 echo "📡 启动网关服务..."
 cd "$PROJECT_ROOT"
-python -m uvicorn jarvis.jarvis_web_gateway.app:create_app --host 0.0.0.0 --port 8000 $GATEWAY_PASSWORD &
+python -m uvicorn jarvis.jarvis_web_gateway.app:create_app --host $GATEWAY_HOST --port $GATEWAY_PORT $GATEWAY_PASSWORD &
 GATEWAY_PID=$!
 
 echo "✅ 网关已启动 (PID: $GATEWAY_PID)"
@@ -42,7 +50,7 @@ sleep 5
 # 启动前端（开发模式）
 echo "🎨 启动前端服务..."
 cd "$PROJECT_ROOT/frontend"
-npm run dev &
+npm run dev -- --host $FRONTEND_HOST --port $FRONTEND_PORT &
 FRONTEND_PID=$!
 
 echo "✅ 前端已启动 (PID: $FRONTEND_PID)"
@@ -50,8 +58,8 @@ echo ""
 echo "========================================="
 echo "✨ Jarvis 服务已全部启动！"
 echo "========================================="
-echo "📡 网关地址: http://localhost:8000"
-echo "🎨 前端地址: http://localhost:5173"
+echo "📡 网关地址: http://$GATEWAY_HOST:$GATEWAY_PORT"
+echo "🎨 前端地址: http://$FRONTEND_HOST:$FRONTEND_PORT"
 echo "========================================="
 echo ""
 echo "💡 提示: 按 Ctrl+C 停止所有服务"
