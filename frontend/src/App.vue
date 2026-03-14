@@ -1907,14 +1907,20 @@ function submitInput() {
     return
   }
   
+  // 获取当前运行状态
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  
   // 判断是发送到缓冲区还是直接发送
-  if (showInput.value) {
-    // 后端正在等待输入，直接发送
-    console.log('[SUBMIT] Sending input directly to backend')
+  // 只有当运行状态是 waiting_multi（等待多行输入）时，才直接发送
+  // 其他情况（running、waiting_single）都保存到缓冲区
+  if (executionStatus === 'waiting_multi') {
+    // 后端正在等待多行输入，直接发送
+    console.log('[SUBMIT] Sending input directly to backend (execution_status: waiting_multi)')
     sendInputDirectly(userInput)
   } else {
     // 后端没有等待输入，保存到缓冲区
-    console.log('[SUBMIT] Saving input to buffer')
+    console.log('[SUBMIT] Saving input to buffer (execution_status:', executionStatus, ')')
     inputBuffers.value.set(agentId, userInput)
     appendOutput({
       output_type: 'system',
@@ -1934,29 +1940,24 @@ function submitCompletion() {
     return
   }
   
+  // 获取当前运行状态
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  
   // 发送 Ctrl+C 信号作为完成信号（与 CLI 模式按 Ctrl+C 行为一致）
   // 注意：完成信号只针对多行输入，单行输入（如确认对话框）不使用完成按钮
-  if (showInput.value && inputMode.value === 'multi') {
+  if (executionStatus === 'waiting_multi') {
     // 后端正在等待多行输入，直接发送 Ctrl+C 信号
-    console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend')
+    console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend (execution_status: waiting_multi)')
     sendInputDirectly('__CTRL_C_PRESSED__')
-  } else if (!showInput.value) {
-    // 后端没有等待输入，将完成信号保存到缓冲区（与普通输入统一机制）
-    console.log('[SUBMIT] Backend is not waiting for input, caching completion signal to buffer')
+  } else {
+    // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
+    console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
     inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
     appendOutput({
       output_type: 'system',
       agent_name: 'system',
       text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
-      lang: 'text',
-    })
-  } else {
-    // 后端在等待单行输入（如确认对话框），不处理完成信号
-    console.log('[SUBMIT] Backend is waiting for single-line input, completion signal ignored')
-    appendOutput({
-      output_type: 'system',
-      agent_name: 'system',
-      text: 'ℹ️ 当前是单行输入模式，完成按钮不可用',
       lang: 'text',
     })
   }
