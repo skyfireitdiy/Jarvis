@@ -38,6 +38,69 @@ from jarvis.jarvis_utils.globals import set_interrupt
 # 全局 AgentManager，用于状态变更回调
 _global_agent_manager: Optional[AgentManager] = None
 
+# 状态更新回调函数
+_status_update_callback: Optional[Callable[[str], None]] = None
+
+# 全局 SessionOutputRouter，用于推送状态更新
+_router: Optional[SessionOutputRouter] = None
+
+
+def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
+    """设置状态更新回调函数。
+    
+    Args:
+        callback: 回调函数，接收状态字符串 ("running"/"waiting_multi"/"waiting_single")
+    """
+    global _status_update_callback
+    _status_update_callback = callback
+
+
+def _update_status(status: str) -> None:
+    """更新状态。
+    
+    Args:
+        status: 状态字符串
+    """
+    import sys
+    global _status_update_callback, _router  # 添加 _router 到全局
+    
+    # 1. 调用回调函数更新本地状态
+    if _status_update_callback:
+        try:
+            print(f"[DEBUG] _update_status calling callback with status={status}", file=sys.stderr, flush=True)
+            _status_update_callback(status)
+        except Exception as e:
+            # 静默忽略状态更新失败，不影响主流程
+            print(f"[DEBUG] _update_status callback failed: {e}", file=sys.stderr, flush=True)
+            pass
+    else:
+        print("[DEBUG] _update_status no callback registered", file=sys.stderr, flush=True)
+    
+    # 2. 通过 WebSocket 推送状态变化给前端
+    if _router:
+        try:
+            # 获取当前 agent ID（从状态管理器获取）
+            from jarvis.jarvis_gateway.manager import get_current_gateway
+            gateway = get_current_gateway()
+            
+            # 获取活跃的 session_id
+            session_id = None
+            if gateway and hasattr(gateway, '_current_session_id'):
+                session_id = gateway._current_session_id
+            
+            # 推送状态变化消息
+            message = {
+                "type": "status_update",
+                "payload": {
+                    "execution_status": status
+                }
+            }
+            _router.publish(message, session_id=session_id)
+            print(f"[DEBUG] Status update pushed via WebSocket: status={status}, session_id={session_id}", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"[DEBUG] Failed to push status update via WebSocket: {e}", file=sys.stderr, flush=True)
+            pass
+
 
 def _on_agent_status_change(agent_id: str, status: str, data: Any) -> None:
     """Agent 状态变更回调，发送 WebSocket 通知。
@@ -118,8 +181,24 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存输入请求，用于重连后恢复
         self._input_registry.save_input_request(session_id, message)
+        
+        # 更新状态为等待输入
+        import sys
+        print(f"[DEBUG] request_input called, mode={request.mode}", file=sys.stderr, flush=True)
+        if request.mode == "single":
+            print("[DEBUG] Setting status to waiting_single", file=sys.stderr, flush=True)
+            _update_status("waiting_single")
+        else:
+            print("[DEBUG] Setting status to waiting_multi", file=sys.stderr, flush=True)
+            _update_status("waiting_multi")
+        
         session = self._input_registry.get_or_create(session_id)
         text = session.wait_for_input()
+        
+        # 输入完成，恢复为运行状态
+        print("[DEBUG] Input completed, setting status to running", file=sys.stderr, flush=True)
+        _update_status("running")
+        
         return GatewayInputResult(text=text, metadata=metadata)
 
     def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
@@ -150,8 +229,16 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存确认请求，用于重连后恢复
         self._input_registry.save_confirm_request(session_id, message)
+        
+        # 更新状态为等待单行输入（确认）
+        _update_status("waiting_single")
+        
         session = self._input_registry.get_or_create_confirm_session(session_id)
         confirmed = session.wait_for_confirm()
+        
+        # 确认完成，恢复为运行状态
+        _update_status("running")
+        
         return GatewayConfirmResult(confirmed=confirmed, metadata=metadata)
 
     def publish_execution_event(
@@ -344,8 +431,15 @@ class WebSocketConnectionManager:
             return
 
 
-def create_app() -> FastAPI:
-    """创建 FastAPI 应用。"""
+def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
+    """创建 FastAPI 应用。
+    
+    Args:
+        custom_app: 自定义 FastAPI app，用于添加额外的路由（如状态查询）
+    
+    Returns:
+        FastAPI 应用实例
+    """
 
     # 创建 AgentManager，并设置状态变更回调
     agent_manager = AgentManager(
@@ -358,6 +452,10 @@ def create_app() -> FastAPI:
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
+    
+    # 保存 router 到全局，用于状态更新时推送消息
+    global _router
+    _router = router
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     manager = WebSocketConnectionManager(
@@ -366,7 +464,8 @@ def create_app() -> FastAPI:
 
     set_current_gateway(gateway)
 
-    app = FastAPI()
+    # 使用自定义 app 或创建新 app
+    app = custom_app if custom_app is not None else FastAPI()
 
     # 添加 CORS 中间件，允许前端跨域访问
     app.add_middleware(

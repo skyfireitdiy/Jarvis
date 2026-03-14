@@ -287,7 +287,13 @@ class AgentRunLoop:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
         run_input_handlers = True
 
+        # 导入状态管理器
+        from jarvis.jarvis_agent.jarvis import get_agent_status_manager
+        status_manager = get_agent_status_manager()
+
         while True:
+            # 任务开始，设置为运行状态
+            status_manager.set_running()
             try:
                 current_round = self.agent.model.get_conversation_turn()
                 if current_round % self.tool_reminder_rounds == 0:
