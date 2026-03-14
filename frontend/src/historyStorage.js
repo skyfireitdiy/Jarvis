@@ -117,19 +117,25 @@ function saveMessages(messages) {
  * 读取历史消息（分页）
  * @param {number} count - 要读取的消息数量
  * @param {number} offset - 偏移量（从末尾往前算）
+ * @param {string} agentId - 可选，只返回指定 Agent ID 的消息
  * @returns {Array} - 消息数组（按时间倒序）
  */
-function loadHistory(count = MAX_MESSAGES_PER_PAGE, offset = 0) {
+function loadHistory(count = MAX_MESSAGES_PER_PAGE, offset = 0, agentId = null) {
   try {
-    const messages = getAllMessages()
+    let messages = getAllMessages()
     if (messages.length === 0) return []
+    
+    // 如果指定了 agentId，只返回该 Agent 的消息
+    if (agentId) {
+      messages = messages.filter(msg => msg.agent_id === agentId)
+    }
     
     // 从末尾往前取，跳过 offset 条，取 count 条
     const start = Math.max(0, messages.length - offset - count)
     const end = messages.length - offset
     const result = messages.slice(start, end)
     
-    console.log(`[historyStorage] Loaded ${result.length} messages (offset: ${offset}, total: ${messages.length})`)
+    console.log(`[historyStorage] Loaded ${result.length} messages (offset: ${offset}, agentId: ${agentId}, total: ${messages.length})`)
     return result
   } catch (error) {
     console.error('[historyStorage] Failed to load history:', error)
@@ -139,11 +145,18 @@ function loadHistory(count = MAX_MESSAGES_PER_PAGE, offset = 0) {
 
 /**
  * 获取历史消息总数
+ * @param {string} agentId - 可选，只返回指定 Agent ID 的消息数量
  * @returns {number} - 消息总数
  */
-function getTotalCount() {
+function getTotalCount(agentId = null) {
   try {
-    const messages = getAllMessages()
+    let messages = getAllMessages()
+    
+    // 如果指定了 agentId，只计算该 Agent 的消息
+    if (agentId) {
+      messages = messages.filter(msg => msg.agent_id === agentId)
+    }
+    
     return messages.length
   } catch (error) {
     console.error('[historyStorage] Failed to get count:', error)

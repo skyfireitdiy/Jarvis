@@ -477,7 +477,7 @@ function loadHistoryMessages(prepend = false) {
   console.log('[HISTORY] Loading history (prepend:', prepend, ', offset:', historyOffset.value, ')')
   
   try {
-    const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value)
+    const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value, currentAgentId.value)
     
     if (historyMessages.length === 0) {
       console.log('[HISTORY] No more history messages')
@@ -518,7 +518,7 @@ function loadHistoryMessages(prepend = false) {
     historyOffset.value += historyMessages.length
     
     // 检查是否还有更多历史
-    const totalCount = historyStorage.getTotalCount()
+    const totalCount = historyStorage.getTotalCount(currentAgentId.value)
     hasMoreHistory.value = historyOffset.value < totalCount
     
     console.log('[HISTORY] Loaded', historyMessages.length, 'messages, total loaded:', historyOffset.value, '/', totalCount, 'hasMore:', hasMoreHistory.value)
@@ -937,6 +937,13 @@ async function switchAgent(agent) {
   currentAgentId.value = agent.agent_id
   console.log('[AGENT] Current agent ID updated to:', currentAgentId.value)
   
+  // 重置历史偏移量和消息状态
+  historyOffset.value = 0
+  hasMoreHistory.value = true
+  
+  // 清空当前 Agent 的消息列表
+  allOutputs.value.set(agent.agent_id, [])
+  
   // 连接到目标 Agent（如果还未连接）
   await connectToAgent(agent)
   
@@ -1294,6 +1301,7 @@ function appendOutput(payload, agentId = null) {
   try {
     // 只保存必要的数据，避免存储过大的内容
     const messageToSave = {
+      agent_id: targetAgentId, // 保存当前 Agent ID
       output_type: outputItem.output_type,
       text: outputItem.text,
       lang: outputItem.lang,
