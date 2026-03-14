@@ -283,7 +283,8 @@ const auth = ref({ token: '', password: '' })
 const sessionId = ref('')
 const backendHost = ref('127.0.0.1')
 const backendPort = ref('8000')
-const socket = ref(null)
+const socket = ref(null) // Gateway 连接
+const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
 
 // 弹窗控制
@@ -498,6 +499,29 @@ function reconnect() {
 
 // ========== Agent 管理方法 ==========
 
+// 发送消息到当前 Agent 的 WebSocket 连接
+function sendMessageToAgent(message) {
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    console.warn('[SEND] No current agent ID, cannot send message')
+    return
+  }
+  
+  const ws = sockets.value.get(agentId)
+  if (!ws) {
+    console.warn(`[SEND] No WebSocket connection for agent ${agentId}`)
+    return
+  }
+  
+  if (ws.readyState !== WebSocket.OPEN) {
+    console.warn(`[SEND] WebSocket for agent ${agentId} is not open, state: ${ws.readyState}`)
+    return
+  }
+  
+  console.log(`[SEND] Sending message to agent ${agentId}:`, message)
+  ws.send(JSON.stringify(message))
+}
+
 // 连接到指定的 Agent（建立独立的 WebSocket 连接）
 async function connectToAgent(agent) {
   const agentId = agent.agent_id
@@ -529,7 +553,7 @@ async function connectToAgent(agent) {
         return
       }
       console.log(`[AGENT ${agentId}] message`, message)
-      handleMessage(message)
+      handleMessage(message, agentId)
     }
     
     ws.onopen = () => {
@@ -714,18 +738,8 @@ async function switchAgent(agent) {
   currentAgentId.value = agent.agent_id
   console.log('[AGENT] Current agent ID updated to:', currentAgentId.value)
   
-  // 发送 start_session 消息到 Gateway，指定要使用的 Agent
-  console.log('[AGENT] Socket status:', socket.value ? socket.value.readyState : 'null')
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-    const message = {
-      type: 'start_session',
-      payload: { agent_id: agent.agent_id }
-    }
-    console.log('[AGENT] Sending start_session message:', message)
-    socket.value.send(JSON.stringify(message))
-  } else {
-    console.warn('[AGENT] Socket not connected, skipping start_session')
-  }
+  // 连接到目标 Agent（如果还未连接）
+  await connectToAgent(agent)
   
   // 加载历史消息
   console.log('[AGENT] Loading history messages...')
@@ -758,9 +772,12 @@ function stopAgentListRefresh() {
 
 // ========== Agent 管理方法结束 ==========
 
-function handleMessage(message) {
+function handleMessage(message, agentId = null) {
   if (!message || typeof message !== 'object') return
   const { type, payload } = message
+  
+  // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
+  const targetAgentId = agentId || currentAgentId.value
   if (type === 'ready') {
     console.log('[ws] ready payload', payload)
     if (payload?.session_id) {
@@ -785,7 +802,7 @@ function handleMessage(message) {
     if (outputType === 'STREAM_START') {
       console.log('[STREAM] Start event:', payload)
       // 创建新的流式消息
-      const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+      const currentOutputs = allOutputs.value.get(targetAgentId) || []
       streamingMessage.value = {
         output_type: 'STREAM',
         text: '',
@@ -817,7 +834,7 @@ function handleMessage(message) {
       console.log('[STREAM] End event:', payload)
       if (streamingMessage.value) {
         // 从 outputs 数组中删除流式消息（因为后面会有完整的 RESULT 消息）
-        const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+        const currentOutputs = allOutputs.value.get(targetAgentId) || []
         const index = currentOutputs.indexOf(streamingMessage.value)
         if (index !== -1) {
           currentOutputs.splice(index, 1)
@@ -830,7 +847,7 @@ function handleMessage(message) {
       }
     } else {
       // 普通输出
-      appendOutput(payload)
+      appendOutput(payload, targetAgentId)
     }
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
@@ -891,7 +908,7 @@ function handleMessage(message) {
     appendExecution(payload)
     // 只在首次创建终端时创建输出项
     const executionId = payload?.execution_id || 'default'
-    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
     const existingItem = currentOutputs.find(
       item => item.output_type === 'execution' && item.execution_id === executionId
     )
@@ -903,7 +920,7 @@ function handleMessage(message) {
         lang: 'text',
         payload: payload, // 保存 payload 以便后续使用
         execution_id: executionId,
-      })
+      }, targetAgentId)
       // 等待 DOM 渲染完成后立即初始化终端
       nextTick(() => {
         console.log(`[ws] DOM rendered, initializing terminal ${executionId}`)
@@ -1005,7 +1022,7 @@ function renderSideBySideDiff(diffData) {
   return html
 }
 
-function appendOutput(payload) {
+function appendOutput(payload, agentId = null) {
   let html
   if (payload?.lang === 'markdown') {
     html = marked.parse(payload.text || '')
@@ -1050,8 +1067,11 @@ function appendOutput(payload) {
   // 只要 append 就自动滚动到底部，不需要判断位置
   const shouldAutoScroll = true
   
-  // 添加到当前 Agent 的消息列表
-  const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
+  // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
+  const targetAgentId = agentId || currentAgentId.value
+  
+  // 添加到目标 Agent 的消息列表
+  const currentOutputs = allOutputs.value.get(targetAgentId) || []
   currentOutputs.push(outputItem)
   console.log('[DEBUG] Pushed output, outputs.length:', currentOutputs.length, 'type:', outputItem.output_type)
   
@@ -1182,7 +1202,11 @@ function appendExecution(payload) {
 }
 
 function submitInput() {
-  if (!socket.value) return
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    console.warn('[SUBMIT] No current agent ID, cannot submit input')
+    return
+  }
   
   // 先将用户输入回显到聊天窗口
   const userInput = inputText.value.trim()
@@ -1211,14 +1235,13 @@ function submitInput() {
     },
   }
   console.log('[ws] send input_result', message)
-  socket.send(JSON.stringify(message))
+  sendMessageToAgent(message)
   inputText.value = ''
   showInput.value = false // 隐藏输入框
   lastInputRequest.value = null // 清空保存的输入请求
 }
 
 function sendConfirmResult(confirmed) {
-  if (!socket.value) return
   const message = {
     type: 'confirm_result',
     payload: {
@@ -1229,11 +1252,10 @@ function sendConfirmResult(confirmed) {
     },
   }
   console.log('[ws] send confirm_result', message)
-  socket.send(JSON.stringify(message))
+  sendMessageToAgent(message)
 }
 
 function sendInterrupt() {
-  if (!socket.value) return
   const message = {
     type: 'interrupt',
     payload: {
@@ -1243,11 +1265,10 @@ function sendInterrupt() {
     },
   }
   console.log('[ws] send interrupt', message)
-  socket.value.send(JSON.stringify(message))
+  sendMessageToAgent(message)
 }
 
 function sendManualInterrupt() {
-  if (!socket.value) return
   const message = {
     type: 'manual_interrupt',
     payload: {
@@ -1257,7 +1278,7 @@ function sendManualInterrupt() {
     },
   }
   console.log('[ws] send manual interrupt', message)
-  socket.value.send(JSON.stringify(message))
+  sendMessageToAgent(message)
 }
 
 function confirmClearHistory() {
@@ -1324,7 +1345,6 @@ function syncTerminalSize(executionId, termInfo) {
   }
   
   // 发送 resize 消息到后端
-  if (!socket.value) return
   const message = {
     type: 'terminal_resize',
     payload: {
@@ -1333,7 +1353,7 @@ function syncTerminalSize(executionId, termInfo) {
       cols: newCols,
     },
   }
-  socket.value.send(JSON.stringify(message))
+  sendMessageToAgent(message)
 }
 
 // 动态绑定终端 DOM 元素
@@ -1383,7 +1403,6 @@ function setTerminalRef(executionId, el) {
       
       termInfo.terminal.onData(data => {
         if (!termInfo.active) return
-        if (!socket.value) return
         const message = {
           type: 'terminal_input',
           payload: {
@@ -1391,7 +1410,7 @@ function setTerminalRef(executionId, el) {
             data,
           },
         }
-        socket.value.send(JSON.stringify(message))
+        sendMessageToAgent(message)
       })
       
       // 在下一帧触发初始尺寸计算
