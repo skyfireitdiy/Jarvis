@@ -794,6 +794,9 @@ async function createAgent() {
       newAgentDir.value = ''
       newAgentName.value = ''
       
+      // 立即切换到新创建的 agent
+      await switchAgent(agent)
+      
       // 刷新列表
       await fetchAgentList()
       
