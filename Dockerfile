@@ -33,6 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     ca-certificates \
+    # Node.js 和 npm（前端构建）
+    nodejs \
+    npm \
     # Locale 支持（中文输入）
     locales \
     # Python 基础依赖（用于编译 Python 扩展，基础镜像已包含大部分）
@@ -132,6 +135,10 @@ ENV PATH="/app/.venv/bin:/home/jarvis/.cargo/bin:/usr/local/bin:/usr/bin:/bin" \
 # 复制项目文件到应用目录
 COPY . /app
 
+# 复制启动脚本并设置执行权限
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # 升级 pip 并安装 Jarvis（使用 -e 参数以可编辑模式安装，便于自动更新生效）
 # 同时安装 clang 依赖（用于 C/C++ 代码分析）
 RUN pip install --upgrade pip setuptools wheel \
@@ -154,6 +161,15 @@ RUN pip install \
     && find /usr/local/lib/python3.12 -type f -name "*.pyo" -delete 2>/dev/null || true \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /root/.cache/pip 2>/dev/null || true
+
+# 安装前端依赖
+WORKDIR /app/frontend
+RUN npm install \
+    && echo "✅ 前端依赖安装完成" \
+    && rm -rf /root/.npm
+
+# 切换回 /app 目录
+WORKDIR /app
 
 # 清理所有临时文件和缓存，释放磁盘空间
 RUN rm -rf /tmp/* /var/tmp/* \
@@ -204,6 +220,6 @@ USER jarvis
 # 设置默认工作目录为 /workspace（用户工作目录）
 WORKDIR /workspace
 
-# 设置默认命令为 fish
-CMD ["/usr/bin/fish"]
+# 设置默认命令为启动脚本（启动网关和前端）
+CMD ["/app/start.sh"]
 
