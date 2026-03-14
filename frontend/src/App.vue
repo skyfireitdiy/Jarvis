@@ -21,11 +21,18 @@
       </div>
     </header>
 
-    <!-- Agent 侧边栏 -->
-    <aside class="agent-sidebar" v-if="showAgentSidebar">
-      <div class="agent-sidebar-header">
+    <!-- Agent 浮动窗口 -->
+    <div 
+      class="agent-sidebar" 
+      v-if="showAgentSidebar"
+      :style="{ left: sidebarPosition.x + 'px', top: sidebarPosition.y + 'px' }"
+    >
+      <div class="agent-sidebar-header" @mousedown="startDragSidebar">
         <h3>Agent 列表</h3>
-        <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
+        <div class="sidebar-header-actions">
+          <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
+          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭">✕</button>
+        </div>
       </div>
       <div class="agent-list">
         <div v-for="agent in agentList" :key="agent.agent_id" 
@@ -44,7 +51,7 @@
           暂无 Agent，点击 + 创建
         </div>
       </div>
-    </aside>
+    </div>
 
     <!-- 消息列表 -->
     <main class="chat-container">
@@ -258,6 +265,31 @@ marked.setOptions({
   }
 })
 
+// 拖拽相关函数
+function startDragSidebar(event) {
+  isDraggingSidebar.value = true
+  dragOffset.value = {
+    x: event.clientX - sidebarPosition.value.x,
+    y: event.clientY - sidebarPosition.value.y
+  }
+  document.addEventListener('mousemove', onDragSidebar)
+  document.addEventListener('mouseup', stopDragSidebar)
+}
+
+function onDragSidebar(event) {
+  if (!isDraggingSidebar.value) return
+  sidebarPosition.value = {
+    x: event.clientX - dragOffset.value.x,
+    y: event.clientY - dragOffset.value.y
+  }
+}
+
+function stopDragSidebar() {
+  isDraggingSidebar.value = false
+  document.removeEventListener('mousemove', onDragSidebar)
+  document.removeEventListener('mouseup', stopDragSidebar)
+}
+
 // 根据文件扩展名推断语言
 function getLanguageFromFilename(filename) {
   if (!filename) return 'plaintext'
@@ -316,6 +348,11 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
+
+// 浮动窗口位置
+const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
+const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
+const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
 
 // 消息和终端
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
@@ -1665,6 +1702,38 @@ onMounted(() => {
 })
 </script>
 
+<style>
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+</style>
+
 <style scoped>
 /* 动画定义 */
 @keyframes pulse {
@@ -1683,12 +1752,15 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
   background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
   color: #e6edf3;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* 顶部栏 */
@@ -1815,15 +1887,20 @@ onMounted(() => {
   color: #3fb950;
 }
 
-/* Agent 侧边栏 */
+/* Agent 浮动窗口 */
 .agent-sidebar {
   width: 280px;
+  height: 500px;
   background: rgba(22, 27, 34, 0.95);
-  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  flex-shrink: 0;
+  position: fixed;
+  z-index: 1000;
+  backdrop-filter: blur(20px) saturate(180%);
 }
 
 .agent-sidebar-header {
@@ -1833,6 +1910,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   background: rgba(255, 255, 255, 0.02);
+  cursor: move;
+  user-select: none;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .agent-sidebar-header h3 {
@@ -2017,6 +2101,7 @@ onMounted(() => {
 /* 聊天容器 */
 .chat-container {
   flex: 1;
+  width: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
