@@ -181,6 +181,30 @@ function clearHistory() {
 }
 
 /**
+ * 清除指定 Agent 的历史记录
+ * @param {string} agentId - Agent ID
+ * @returns {boolean} - 是否清除成功
+ */
+function clearHistoryForAgent(agentId) {
+  try {
+    const allMessages = getAllMessages()
+    const filteredMessages = allMessages.filter(msg => msg.agent_id !== agentId)
+    
+    if (filteredMessages.length !== allMessages.length) {
+      saveAllMessages(filteredMessages)
+      console.log(`[historyStorage] Cleared ${allMessages.length - filteredMessages.length} messages for agent ${agentId}`)
+      return true
+    }
+    
+    console.log(`[historyStorage] No messages found for agent ${agentId}`)
+    return true
+  } catch (error) {
+    console.error('[historyStorage] Failed to clear agent history:', error)
+    return false
+  }
+}
+
+/**
  * 获取历史元数据
  * @returns {Object} - 元数据对象
  */
@@ -271,6 +295,7 @@ export default {
   loadHistory,
   getTotalCount,
   clearHistory,
+  clearHistoryForAgent,
   getMetadata,
   updateMetadata,
   getStorageInfo,

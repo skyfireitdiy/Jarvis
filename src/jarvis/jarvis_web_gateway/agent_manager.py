@@ -245,6 +245,51 @@ class AgentManager:
 
         return {"agent_id": agent_id, "status": "stopped"}
 
+    def delete_agent(self, agent_id: str) -> Dict[str, Any]:
+        """删除 Agent。
+
+        Args:
+            agent_id: Agent ID
+
+        Returns:
+            删除结果
+
+        Raises:
+            KeyError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise KeyError(f"Agent not found: {agent_id}")
+
+        agent_info = self._agents[agent_id]
+
+        # 如果正在运行，先停止
+        if agent_info.status == "running" and agent_info.process is not None:
+            agent_info.process.terminate()
+
+            # 等待进程退出（最多 10 秒）
+            try:
+                agent_info.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                # 强制杀死进程
+                agent_info.process.kill()
+                agent_info.process.wait()
+
+        # 取消监控任务
+        if agent_info._monitor_task:
+            agent_info._monitor_task.cancel()
+
+        # 从内存中删除
+        del self._agents[agent_id]
+
+        # 更新持久化文件
+        self._save_agents()
+
+        # 通知状态变更
+        if self._on_status_change:
+            self._on_status_change(agent_id, "deleted", None)
+
+        return {"agent_id": agent_id, "status": "deleted"}
+
     def get_agent_list(self) -> List[Dict[str, Any]]:
         """获取 Agent 列表。
 

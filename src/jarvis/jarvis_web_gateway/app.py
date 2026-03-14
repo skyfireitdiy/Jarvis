@@ -441,11 +441,23 @@ def create_app() -> FastAPI:
             return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
 
     # HTTP API：停止 Agent
-    @app.delete("/api/agents/{agent_id}")
+    @app.delete("/api/agents/{agent_id}/stop")
     async def stop_agent(agent_id: str) -> Dict[str, Any]:
         """停止 Agent。"""
         try:
             result = agent_manager.stop_agent(agent_id)
+            return {"success": True, "data": result}
+        except KeyError as e:
+            return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": str(e)}}
+        except Exception as e:
+            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+
+    # HTTP API：删除 Agent
+    @app.delete("/api/agents/{agent_id}")
+    async def delete_agent(agent_id: str) -> Dict[str, Any]:
+        """删除 Agent。"""
+        try:
+            result = agent_manager.delete_agent(agent_id)
             return {"success": True, "data": result}
         except KeyError as e:
             return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": str(e)}}
