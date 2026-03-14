@@ -287,7 +287,7 @@ const socket = ref(null)
 const connecting = ref(false)
 
 // 弹窗控制
-const showConnectModal = ref(true)  // 初始显示连接弹窗
+const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
@@ -429,21 +429,19 @@ function loadHistoryMessages(prepend = false) {
   }
 }
 
+// 连接到 Gateway
 function connect() {
   if (socket.value) return
   const host = backendHost.value || window.location.hostname || '127.0.0.1'
   const port = backendPort.value || '8000'
-  const url = `ws://${host}:${port}/ws`  // 固定使用 default session
+  const url = `ws://${host}:${port}/ws`
   connecting.value = true
   const ws = new WebSocket(url)
   ws.onopen = () => {
     console.log('[ws] open')
     connecting.value = false
     socket.value = ws
-    // 连接成功后关闭连接弹窗
     showConnectModal.value = false
-    
-    // 加载历史消息
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
@@ -500,6 +498,90 @@ function reconnect() {
 
 // ========== Agent 管理方法 ==========
 
+// 连接到指定的 Agent（建立独立的 WebSocket 连接）
+async function connectToAgent(agent) {
+  const agentId = agent.agent_id
+  
+  // 检查是否已有连接
+  if (sockets.value.has(agentId)) {
+    console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
+    return
+  }
+  
+  console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
+  
+  const host = backendHost.value || window.location.hostname || '127.0.0.1'
+  const agentPort = agent.port
+  const url = `ws://${host}:${agentPort}/ws`
+  
+  connecting.value = true
+  
+  try {
+    const ws = new WebSocket(url)
+    
+    // 绑定消息处理
+    ws.onmessage = (event) => {
+      let message = null
+      try {
+        message = JSON.parse(event.data)
+      } catch (error) {
+        console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
+        return
+      }
+      console.log(`[AGENT ${agentId}] message`, message)
+      handleMessage(message)
+    }
+    
+    ws.onopen = () => {
+      console.log(`[AGENT ${agentId}] Connected to ${url}`)
+      connecting.value = false
+      
+      // 保存连接
+      sockets.value.set(agentId, ws)
+      
+      // 初始化消息记录
+      if (!allOutputs.value.has(agentId)) {
+        allOutputs.value.set(agentId, [])
+      }
+      
+      // 发送认证
+      const payload = {}
+      if (auth.value.token) payload.token = auth.value.token
+      if (auth.value.password) payload.password = auth.value.password
+      if (Object.keys(payload).length > 0) {
+        ws.send(JSON.stringify({ type: 'auth', payload }))
+        console.log(`[AGENT ${agentId}] auth sent`, payload)
+      }
+      
+      // 加载历史消息（如果当前是此 Agent）
+      if (currentAgentId.value === agentId) {
+        const currentOutputs = allOutputs.value.get(agentId) || []
+        if (currentOutputs.length === 0) {
+          console.log(`[AGENT ${agentId}] Loading history on first connect`)
+          loadHistoryMessages(false)
+        } else {
+          console.log(`[AGENT ${agentId}] Skip loading history, messages already exist`)
+        }
+      }
+    }
+    
+    ws.onclose = () => {
+      console.log(`[AGENT ${agentId}] Disconnected`)
+      sockets.value.delete(agentId)
+      if (connecting.value) connecting.value = false
+    }
+    
+    ws.onerror = () => {
+      console.error(`[AGENT ${agentId}] Connection error`)
+      if (connecting.value) connecting.value = false
+    }
+    
+  } catch (error) {
+    console.error(`[AGENT ${agentId}] Failed to connect:`, error)
+    connecting.value = false
+  }
+}
+
 // 创建 Agent
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
@@ -538,10 +620,8 @@ async function createAgent() {
       newAgentDir.value = ''
       newAgentName.value = ''
       
-      // 自动切换到新创建的 Agent（等待连接成功）
-      if (agent.status === 'running') {
-        await switchAgent(agent)
-      }
+      // 刷新列表
+      await fetchAgentList()
       
       // 开始定时刷新列表
       startAgentListRefresh()
@@ -600,127 +680,56 @@ async function stopAgent(agentId) {
     
     console.log('[AGENT] Stopped:', agentId)
     
-    // 刷新列表
-    await fetchAgentList()
-    
-    // 如果是当前 Agent，断开连接
+    // 如果是当前 Agent，清空当前 Agent ID
     if (currentAgentId.value === agentId) {
       currentAgentId.value = null
-      disconnect()
+      outputs.value = []
     }
+    
+    // 刷新列表
+    await fetchAgentList()
   } catch (error) {
     console.error('[AGENT] Stop failed:', error)
     alert(`停止失败: ${error.message}`)
   }
 }
 
-// 切换 Agent（带重试机制）
-async function switchAgent(agent, maxRetries = 5, retryDelay = 1000) {
-  if (agent.agent_id === currentAgentId.value) return
+// 切换当前工作的 Agent
+async function switchAgent(agent) {
+  console.log('[AGENT] switchAgent called with:', agent)
+  if (agent.agent_id === currentAgentId.value) {
+    console.log('[AGENT] Already on this agent, skipping')
+    return
+  }
   
   console.log('[AGENT] Switching to:', agent)
   
-  // 断开旧连接
-  if (socket.value) {
-    socket.value.close()
-    socket.value = null
-  }
-  
-  // 初始化当前 Agent 的消息记录（如果不存在）
-  if (!allOutputs.value.has(agent.agent_id)) {
-    allOutputs.value.set(agent.agent_id, [])
-  }
-  
-  // 清空输入状态（不清空消息，保留各 Agent 的消息记录）
+  // 清空输入状态
   showInput.value = false
   lastInputRequest.value = null
   inputText.value = ''
   inputTip.value = ''
   
-  // 更新当前 Agent
+  // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
+  console.log('[AGENT] Current agent ID updated to:', currentAgentId.value)
   
-  // 连接到新 Agent 的 WebSocket（使用分配的端口），带重试机制
-  const host = backendHost.value || window.location.hostname || '127.0.0.1'
-  const agentPort = agent.port
-  const url = `ws://${host}:${agentPort}/ws`
-  
-  let retryCount = 0
-  let lastError = null
-  
-  const attemptConnection = () => {
-    return new Promise((resolve, reject) => {
-      connecting.value = true
-      const ws = new WebSocket(url)
-      
-      // 绑定消息处理
-      ws.onmessage = (event) => {
-        let message = null
-        try {
-          message = JSON.parse(event.data)
-        } catch (error) {
-          console.warn('[AGENT] message parse failed', event.data)
-          return
-        }
-        console.log('[AGENT] message', message)
-        handleMessage(message)
-      }
-      
-      ws.onopen = () => {
-        console.log('[AGENT] Connected to', url)
-        connecting.value = false
-        socket.value = ws
-        
-        // 发送认证
-        const payload = {}
-        if (auth.value.token) payload.token = auth.value.token
-        if (auth.value.password) payload.password = auth.value.password
-        if (Object.keys(payload).length > 0) {
-          ws.send(JSON.stringify({ type: 'auth', payload }))
-        }
-        
-        // 发送一个空的 input 请求，触发 Agent 发送 input_request 消息
-        ws.send(JSON.stringify({ type: 'start_session' }))
-        
-        resolve(ws)
-      }
-      
-      ws.onclose = () => {
-        console.log('[AGENT] Disconnected')
-        socket.value = null
-        connecting.value = false
-      }
-      
-      ws.onerror = (error) => {
-        console.error('[AGENT] Connection error', error)
-        connecting.value = false
-        ws.close()
-        reject(error)
-      }
-    })
-  }
-  
-  // 重试循环
-  while (retryCount < maxRetries) {
-    try {
-      await attemptConnection()
-      console.log('[AGENT] Connection successful')
-      return
-    } catch (error) {
-      lastError = error
-      retryCount++
-      console.log(`[AGENT] Connection attempt ${retryCount}/${maxRetries} failed, retrying in ${retryDelay}ms...`)
-      
-      if (retryCount < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay))
-      }
+  // 发送 start_session 消息到 Gateway，指定要使用的 Agent
+  console.log('[AGENT] Socket status:', socket.value ? socket.value.readyState : 'null')
+  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
+    const message = {
+      type: 'start_session',
+      payload: { agent_id: agent.agent_id }
     }
+    console.log('[AGENT] Sending start_session message:', message)
+    socket.value.send(JSON.stringify(message))
+  } else {
+    console.warn('[AGENT] Socket not connected, skipping start_session')
   }
   
-  // 所有重试都失败
-  console.error('[AGENT] All connection attempts failed:', lastError)
-  alert(`连接 Agent 失败：Agent 可能还未启动完成，请稍后重试`)
-  connecting.value = false
+  // 加载历史消息
+  console.log('[AGENT] Loading history messages...')
+  loadHistoryMessages(false)
 }
 
 // 定时刷新 Agent 列表
@@ -1202,7 +1211,7 @@ function submitInput() {
     },
   }
   console.log('[ws] send input_result', message)
-  socket.value.send(JSON.stringify(message))
+  socket.send(JSON.stringify(message))
   inputText.value = ''
   showInput.value = false // 隐藏输入框
   lastInputRequest.value = null // 清空保存的输入请求
@@ -1220,7 +1229,7 @@ function sendConfirmResult(confirmed) {
     },
   }
   console.log('[ws] send confirm_result', message)
-  socket.value.send(JSON.stringify(message))
+  socket.send(JSON.stringify(message))
 }
 
 function sendInterrupt() {
