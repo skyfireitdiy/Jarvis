@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-import time
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -75,16 +74,8 @@ def _update_status(status: str) -> None:
     # 2. 通过 WebSocket 推送状态变化给前端
     if _router:
         try:
-            # 获取当前 agent ID（从状态管理器获取）
-            from jarvis.jarvis_gateway.manager import get_current_gateway
-
-            gateway = get_current_gateway()
-
-            # 获取活跃的 session_id
-            session_id = None
-            if gateway and hasattr(gateway, "_current_session_id"):
-                session_id = gateway._current_session_id
-
+            # 单连接模式，固定使用 default session_id
+            session_id = "default"
             # 推送状态变化消息
             message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
@@ -119,16 +110,11 @@ class WebGateway(BaseGateway):
         self._input_registry = input_registry
         self._auth_store = auth_store
         self._terminal_input_registry = terminal_input_registry
-        self._current_session_id: Optional[str] = None
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
-        session_id = _extract_session_id(event.context)
-        # 如果没有 session_id，使用保存的 session 或默认的活跃 session
-        if not session_id:
-            session_id = self._current_session_id or _resolve_active_session_id(
-                self._auth_store
-            )
-        auth_payload = self._auth_store.get(session_id) if session_id else None
+        # 单连接模式，固定使用 default session_id
+        session_id = "default"
+        auth_payload = self._auth_store.get(session_id)
         authorized, _ = self._check_auth(auth_payload)
         if not authorized:
             return
@@ -145,17 +131,10 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
+        # 单连接模式，固定使用 default session_id
+        session_id = "default"
         metadata = dict(request.metadata) if request.metadata else {}
-        session_id = metadata.get("session_id")
-        if not session_id:
-            session_id = _wait_for_active_session_id(self._auth_store)
-            if session_id:
-                self._current_session_id = session_id
-            if session_id:
-                metadata["session_id"] = session_id
-            else:
-                session_id = "default"
-                metadata["session_id"] = session_id
+        metadata["session_id"] = session_id
         auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
@@ -187,17 +166,10 @@ class WebGateway(BaseGateway):
         return GatewayInputResult(text=text, metadata=metadata)
 
     def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
+        # 单连接模式，固定使用 default session_id
+        session_id = "default"
         metadata = dict(request.metadata) if request.metadata else {}
-        session_id = metadata.get("session_id")
-        if not session_id:
-            session_id = _wait_for_active_session_id(self._auth_store)
-            if session_id:
-                self._current_session_id = session_id
-            if session_id:
-                metadata["session_id"] = session_id
-            else:
-                session_id = "default"
-                metadata["session_id"] = session_id
+        metadata["session_id"] = session_id
         auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
@@ -231,13 +203,9 @@ class WebGateway(BaseGateway):
         event: GatewayExecutionEvent,
         session_id: Optional[str] = None,
     ) -> None:
+        # 单连接模式，固定使用 default session_id
+        session_id = "default"
         payload = dict(event.payload) if event.payload else {}
-        session_id = session_id or payload.get("session_id")
-        # 如果没有 session_id，使用保存的 session 或默认的活跃 session（与 emit_output 一致）
-        if not session_id:
-            session_id = self._current_session_id or _resolve_active_session_id(
-                self._auth_store
-            )
         auth_payload = payload.get("auth") or (
             self._auth_store.get(session_id) if session_id else None
         )
@@ -871,71 +839,20 @@ def run(
     uvicorn.run(create_app(), host=host, port=port)
 
 
-def _extract_session_id(context: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not context:
-        return None
-    value = context.get("session_id")
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
-def _resolve_active_session_id(
-    auth_store: Dict[str, Optional[Dict[str, Any]]],
-) -> Optional[str]:
-    """在缺少显式 session_id 时，选择一个可用的会话。
-
-    优先挑选已完成认证的会话（auth_payload 非 None）。
-    """
-    preferred = None
-    for session_id, auth_payload in auth_store.items():
-        if auth_payload is not None:
-            return session_id
-        if preferred is None:
-            preferred = session_id
-    return preferred
-
-
-def _wait_for_active_session_id(
-    auth_store: Dict[str, Optional[Dict[str, Any]]],
-    timeout: Optional[float] = None,
-    interval: float = 0.5,
-) -> Optional[str]:
-    """等待 WebSocket 会话建立，避免首次输入请求丢失。
-
-    Args:
-        auth_store: 认证存储，用于查找活跃会话
-        timeout: 超时时间（秒），None 表示无限等待
-        interval: 检查间隔（秒）
-    """
-    if timeout is not None:
-        deadline = time.time() + max(timeout, 0)
-    else:
-        deadline = None
-    while True:
-        session_id = _resolve_active_session_id(auth_store)
-        if session_id:
-            return session_id
-        if deadline is not None and time.time() >= deadline:
-            return _resolve_active_session_id(auth_store)
-        time.sleep(interval)
-
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(payload, dict):
         return None
     return {
-        "token": payload.get("token"),
         "password": payload.get("password"),
     }
 
 
 def _extract_auth_from_headers(websocket: WebSocket) -> Optional[Dict[str, Any]]:
-    token = websocket.headers.get("x-jarvis-token")
     password = websocket.headers.get("x-jarvis-password")
-    if not token and not password:
+    if not password:
         return None
-    return {"token": token, "password": password}
+    return {"password": password}
 
 
 def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):

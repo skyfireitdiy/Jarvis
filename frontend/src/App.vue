@@ -251,9 +251,8 @@
     <div class="modal-overlay" v-if="showConnectModal">
       <div class="modal connect-modal">
         <h2>连接到 Jarvis</h2>
-        <div class="form-group">
-          <label>Token</label>
-          <input v-model="auth.token" placeholder="可选" />
+        <div v-if="connectErrorMessage" class="error-message">
+          {{ connectErrorMessage }}
         </div>
         <div class="form-group">
           <label>密码</label>
@@ -283,10 +282,6 @@
           <button class="close-btn" @click="showSettingsModal = false">×</button>
         </div>
         <div class="form-group">
-          <label>Token</label>
-          <input v-model="auth.token" placeholder="可选" />
-        </div>
-        <div class="form-group">
           <label>密码</label>
           <input v-model="auth.password" type="password" placeholder="可选" />
         </div>
@@ -299,10 +294,6 @@
             <label>端口</label>
             <input v-model="backendPort" />
           </div>
-        </div>
-        <div class="form-group">
-          <label>Session ID</label>
-          <input v-model="sessionId" placeholder="留空自动生成" />
         </div>
         
         <!-- 历史消息管理 -->
@@ -457,13 +448,13 @@ function getLanguageFromFilename(filename) {
 }
 
 // 认证和连接配置
-const auth = ref({ token: '', password: '' })
-const sessionId = ref('')
+const auth = ref({ password: '' })
 const backendHost = ref(localStorage.getItem('jarvis_backend_host') || '127.0.0.1')
 const backendPort = ref(localStorage.getItem('jarvis_backend_port') || '8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
+const connectErrorMessage = ref('')  // 连接错误信息
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
@@ -685,6 +676,8 @@ function loadHistoryMessages(prepend = false) {
 
 // 连接到 Gateway
 function connect() {
+  // 清空之前的错误信息
+  connectErrorMessage.value = ''
   if (socket.value) return
   const host = backendHost.value || window.location.hostname || '127.0.0.1'
   const port = backendPort.value || '8000'
@@ -1581,9 +1574,6 @@ function handleMessage(message, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
   if (type === 'ready') {
     console.log('[ws] ready payload', payload)
-    if (payload?.session_id) {
-      sessionId.value = payload.session_id
-    }
     // 恢复之前的输入请求状态
     if (lastInputRequest.value) {
       console.log('[ws] Restoring input request from previous session')
@@ -1765,6 +1755,8 @@ function handleMessage(message, agentId = null) {
     
     // 如果是认证失败，重新显示连接对话框
     if (errorCode === 'AUTH_FAILED') {
+      // 显示错误信息
+      connectErrorMessage.value = errorMessage
       // 清空密码输入框
       auth.value.password = ''
       // 重新显示连接对话框
@@ -2208,9 +2200,6 @@ function sendInputDirectly(text) {
     type: 'input_result',
     payload: {
       text: text,
-      metadata: {
-        session_id: sessionId.value || undefined,
-      },
     },
   }
   console.log('[ws] send input_result', message)
@@ -2242,9 +2231,6 @@ function sendInputResult(text, requestId) {
     payload: {
       text: text,
       request_id: requestId,
-      metadata: {
-        session_id: sessionId.value || undefined,
-      },
     },
   }
   console.log('[ws] send input_result (from buffer)', message)
@@ -2282,9 +2268,6 @@ function sendConfirmResult(confirmed) {
     type: 'confirm_result',
     payload: {
       confirmed,
-      metadata: {
-        session_id: sessionId.value || undefined,
-      },
     },
   }
   console.log('[ws] send confirm_result', message)
@@ -2294,11 +2277,7 @@ function sendConfirmResult(confirmed) {
 function sendInterrupt() {
   const message = {
     type: 'interrupt',
-    payload: {
-      metadata: {
-        session_id: sessionId.value || undefined,
-      },
-    },
+    payload: {},
   }
   console.log('[ws] send interrupt', message)
   sendMessageToAgent(message)
@@ -2307,11 +2286,7 @@ function sendInterrupt() {
 function sendManualInterrupt() {
   const message = {
     type: 'manual_interrupt',
-    payload: {
-      metadata: {
-        session_id: sessionId.value || undefined,
-      },
-    },
+    payload: {},
   }
   console.log('[ws] send manual interrupt', message)
   sendMessageToAgent(message)
@@ -4324,5 +4299,15 @@ body::-webkit-scrollbar {
   text-align: center;
   color: #8b949e;
   font-size: 14px;
+}
+
+.error-message {
+  background-color: #f85149;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
 }
 </style>
