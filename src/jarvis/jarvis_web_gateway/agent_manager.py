@@ -72,11 +72,13 @@ class AgentManager:
 
     # 随机端口范围
     PORT_RANGE = (10000, 65535)
-    
+
     # Agent 列表持久化文件路径
     PERSISTENCE_FILE = Path(get_data_dir()) / "gateway" / ".jarvis_agents.json"
 
-    def __init__(self, on_status_change: Optional[Callable[[str, str, Any], None]] = None) -> None:
+    def __init__(
+        self, on_status_change: Optional[Callable[[str, str, Any], None]] = None
+    ) -> None:
         """初始化 AgentManager。
 
         Args:
@@ -84,7 +86,7 @@ class AgentManager:
         """
         self._agents: Dict[str, AgentInfo] = {}
         self._on_status_change = on_status_change
-        
+
         # 加载已保存的 Agent 列表
         self._load_agents()
 
@@ -127,7 +129,7 @@ class AgentManager:
 
         # 展开工作目录中的 ~ 符号
         working_dir = os.path.expanduser(working_dir)
-        
+
         # 验证工作目录
         if not os.path.isdir(working_dir):
             raise ValueError(f"Working directory not found: {working_dir}")
@@ -150,7 +152,7 @@ class AgentManager:
             task=task,
             additional_args=additional_args,
         )
-        
+
         # 打印启动信息
         print("[AGENT MANAGER] Creating agent:")
         print(f"  Agent ID: {agent_id}")
@@ -185,14 +187,12 @@ class AgentManager:
         # 保存到内存
         self._agents[agent_id] = agent_info
         print(f"[AGENT MANAGER] Agent created successfully: {agent_id}")
-        
+
         # 保存到持久化文件
         self._save_agents()
 
         # 启动监控任务
-        agent_info._monitor_task = asyncio.create_task(
-            self._monitor_agent(agent_id)
-        )
+        agent_info._monitor_task = asyncio.create_task(self._monitor_agent(agent_id))
 
         # 返回信息
         return agent_info.to_dict()
@@ -235,7 +235,7 @@ class AgentManager:
 
         # 保留在内存中（不删除），以便重启后恢复历史记录
         # del self._agents[agent_id]
-        
+
         # 更新持久化文件
         self._save_agents()
 
@@ -319,7 +319,9 @@ class AgentManager:
 
         # 尝试 10 次随机分配
         for _ in range(10):
-            port = int(min_port + (max_port - min_port) * (hash(uuid.uuid4()) % 10000) / 10000)
+            port = int(
+                min_port + (max_port - min_port) * (hash(uuid.uuid4()) % 10000) / 10000
+            )
 
             # 检查端口是否被占用
             if self._is_port_available(port):
@@ -401,7 +403,9 @@ class AgentManager:
 
         # 如果进程对象为 None（恢复的情况），直接返回
         if agent_info.process is None:
-            print(f"[AGENT MANAGER] Agent {agent_id} has no process object, skipping monitor")
+            print(
+                f"[AGENT MANAGER] Agent {agent_id} has no process object, skipping monitor"
+            )
             return
 
         try:
@@ -413,7 +417,9 @@ class AgentManager:
             # 检查是否异常退出
             if return_code != 0:
                 agent_info.status = "error"
-                print(f"[AGENT MANAGER] Agent {agent_id} exited with code {return_code}")
+                print(
+                    f"[AGENT MANAGER] Agent {agent_id} exited with code {return_code}"
+                )
                 if self._on_status_change:
                     self._on_status_change(
                         agent_id,
@@ -426,7 +432,25 @@ class AgentManager:
                         },
                     )
             else:
-                print(f"[AGENT MANAGER] Agent {agent_id} exited normally")
+                # 正常退出，更新状态为 stopped
+                agent_info.status = "stopped"
+                print(
+                    f"[AGENT MANAGER] Agent {agent_id} exited normally, status updated to stopped"
+                )
+                # 保存到持久化文件
+                self._save_agents()
+                # 通知状态变更
+                if self._on_status_change:
+                    self._on_status_change(
+                        agent_id,
+                        "stopped",
+                        {
+                            "agent_id": agent_id,
+                            "status": "stopped",
+                            "return_code": return_code,
+                            "message": "Agent exited normally",
+                        },
+                    )
         except asyncio.CancelledError:
             # 任务被取消，正常情况
             print(f"[AGENT MANAGER] Monitor task cancelled for agent {agent_id}")
@@ -454,95 +478,107 @@ class AgentManager:
                 self.stop_agent(agent_id)
             except Exception:
                 pass
-    
+
     async def start_monitoring_for_running_agents(self) -> None:
         """为所有运行中的 Agent 启动监控任务。
-        
+
         这个方法需要在异步上下文中调用（在应用启动后）。
         """
         for agent_id, agent_info in list(self._agents.items()):
-            if agent_info.status == 'running' and agent_info._monitor_task is None:
+            if agent_info.status == "running" and agent_info._monitor_task is None:
                 print(f"[AGENT MANAGER] Starting monitor task for agent {agent_id}")
                 agent_info._monitor_task = asyncio.create_task(
                     self._monitor_agent(agent_id)
                 )
-    
+
     def _load_agents(self) -> None:
         """从文件加载已保存的 Agent 列表。"""
         if not self.PERSISTENCE_FILE.exists():
             print("[AGENT MANAGER] No persistence file found, starting fresh")
             return
-        
+
         try:
-            with open(self.PERSISTENCE_FILE, 'r', encoding='utf-8') as f:
+            with open(self.PERSISTENCE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             if not isinstance(data, list):
                 print("[AGENT MANAGER] Invalid persistence file format")
                 return
-            
-            print(f"[AGENT MANAGER] Loading {len(data)} saved agents from {self.PERSISTENCE_FILE}")
-            
+
+            print(
+                f"[AGENT MANAGER] Loading {len(data)} saved agents from {self.PERSISTENCE_FILE}"
+            )
+
             for agent_data in data:
                 try:
                     # 恢复 AgentInfo
                     agent_info = AgentInfo(
-                        agent_id=agent_data['agent_id'],
-                        agent_type=agent_data['agent_type'],
-                        pid=agent_data.get('pid', 0),
-                        port=agent_data['port'],
-                        working_dir=agent_data['working_dir'],
+                        agent_id=agent_data["agent_id"],
+                        agent_type=agent_data["agent_type"],
+                        pid=agent_data.get("pid", 0),
+                        port=agent_data["port"],
+                        working_dir=agent_data["working_dir"],
                         process=None,  # 进程对象无法恢复，设为 None
-                        name=agent_data.get('name'),
+                        name=agent_data.get("name"),
                     )
-                    
+
                     # 检查进程是否还在运行
-                    pid = agent_data.get('pid')
+                    pid = agent_data.get("pid")
                     if pid and self._is_process_running(pid):
                         # 进程还在运行，恢复为 running 状态
-                        agent_info.status = agent_data.get('status', 'running')
-                        print(f"[AGENT MANAGER] Restored running agent {agent_info.agent_id} (PID: {pid})")
-                        
+                        agent_info.status = agent_data.get("status", "running")
+                        print(
+                            f"[AGENT MANAGER] Restored running agent {agent_info.agent_id} (PID: {pid})"
+                        )
+
                         # 重新启动监控任务（需要异步上下文）
                         # 注意：这里不能直接创建异步任务，需要在异步上下文中调用
                         agent_info._monitor_task = None  # 稍后在异步上下文中创建
                     else:
                         # 进程已停止，恢复为 stopped 状态
-                        agent_info.status = 'stopped'
-                        print(f"[AGENT MANAGER] Restored stopped agent {agent_info.agent_id}")
-                    
+                        agent_info.status = "stopped"
+                        print(
+                            f"[AGENT MANAGER] Restored stopped agent {agent_info.agent_id}"
+                        )
+
                     # 恢复创建时间
-                    agent_info.created_at = agent_data.get('created_at', datetime.now().isoformat())
-                    
+                    agent_info.created_at = agent_data.get(
+                        "created_at", datetime.now().isoformat()
+                    )
+
                     # 保存到内存
                     self._agents[agent_info.agent_id] = agent_info
                 except Exception as e:
-                    print(f"[AGENT MANAGER] Failed to restore agent {agent_data.get('agent_id')}: {e}")
-            
+                    print(
+                        f"[AGENT MANAGER] Failed to restore agent {agent_data.get('agent_id')}: {e}"
+                    )
+
             print(f"[AGENT MANAGER] Loaded {len(self._agents)} agents successfully")
-            
+
         except Exception as e:
             print(f"[AGENT MANAGER] Failed to load agents: {e}")
-    
+
     def _save_agents(self) -> None:
         """保存 Agent 列表到文件。"""
         try:
             # 确保目录存在
             self.PERSISTENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            
+
             data = [agent.to_dict() for agent in self._agents.values()]
-            with open(self.PERSISTENCE_FILE, 'w', encoding='utf-8') as f:
+            with open(self.PERSISTENCE_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"[AGENT MANAGER] Saved {len(data)} agents to {self.PERSISTENCE_FILE}")
+            print(
+                f"[AGENT MANAGER] Saved {len(data)} agents to {self.PERSISTENCE_FILE}"
+            )
         except Exception as e:
             print(f"[AGENT MANAGER] Failed to save agents: {e}")
-    
+
     def _is_process_running(self, pid: int) -> bool:
         """检查进程是否在运行。
-        
+
         Args:
             pid: 进程 ID
-            
+
         Returns:
             True 运行中，False 已停止
         """
