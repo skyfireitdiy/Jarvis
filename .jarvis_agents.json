@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "agent_id": "f2646d58-fdbf-4f9d-b1e8-7e6d27e0b1d9",
+    "agent_type": "agent",
+    "name": "1",
+    "pid": 2105850,
+    "port": 11405,
+    "status": "running",
+    "working_dir": "/home/wangmaobin",
+    "created_at": "2026-03-14T13:13:40.380342"
+  }
+]
