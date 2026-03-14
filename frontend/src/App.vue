@@ -1001,7 +1001,15 @@ async function deleteAgent(agentId) {
 async function switchAgent(agent) {
   console.log('[AGENT] switchAgent called with:', agent)
   if (agent.agent_id === currentAgentId.value) {
-    console.log('[AGENT] Already on this agent, skipping')
+    console.log('[AGENT] Already on this agent, checking connection...')
+    // 检查 WebSocket 连接是否存在
+    const ws = sockets.value.get(agent.agent_id)
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.log('[AGENT] WebSocket not connected, reconnecting...')
+      await connectToAgent(agent)
+    } else {
+      console.log('[AGENT] WebSocket already connected, skipping')
+    }
     return
   }
   
@@ -1683,7 +1691,7 @@ function sendInputDirectly(text) {
   console.log('[ws] send input_result', message)
   sendMessageToAgent(message)
   
-  showInput.value = false // 隐藏输入框
+  // 输入框现在是永久显示的，不需要隐藏
   lastInputRequest.value = null // 清空保存的输入请求
 }
 
