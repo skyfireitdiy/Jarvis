@@ -1756,22 +1756,11 @@ class Agent:
         # 添加用户固定的重要内容
         user_fixed_content = []
 
-        # 优先添加原始任务目标（确保长期运行时不丢失）
-        # 始终使用 original_user_input 作为原始任务目标，确保交互模式下也能保持
-        original_task = ""
-        if hasattr(self, "original_user_input") and self.original_user_input:
-            original_task = self.original_user_input.strip()
-
-        if original_task:
-            user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
-
-        # 添加用户通过 <Pin> 标记固定的其他重要内容（如果与原始任务目标不同）
+        # 添加用户通过 <Pin> 标记固定的其他重要内容
         # pin_content 可能包含用户通过 <Pin> 标记追加的内容，这些内容作为补充
         if self.pin_content.strip():
             pin_content_stripped = self.pin_content.strip()
-            # 如果 pin_content 与原始任务目标不同，说明用户追加了内容
-            if not original_task or pin_content_stripped != original_task:
-                user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
+            user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
 
         # 添加最近的记忆
         if hasattr(self, "recent_memories") and self.recent_memories:
@@ -1782,7 +1771,7 @@ class Agent:
         # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
         if user_fixed_content:
             pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
-            # 将原始任务目标放在最前面，确保最高优先级
+            # 将固定内容放在最前面，确保最高优先级
             formatted_summary = pin_section + formatted_summary
 
         return formatted_summary
