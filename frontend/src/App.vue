@@ -383,8 +383,8 @@ function getLanguageFromFilename(filename) {
 // 认证和连接配置
 const auth = ref({ token: '', password: '' })
 const sessionId = ref('')
-const backendHost = ref('127.0.0.1')
-const backendPort = ref('8000')
+const backendHost = ref(localStorage.getItem('jarvis_backend_host') || '127.0.0.1')
+const backendPort = ref(localStorage.getItem('jarvis_backend_port') || '8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
@@ -606,6 +606,11 @@ function connect() {
     connecting.value = false
     socket.value = ws
     showConnectModal.value = false
+    
+    // 保存连接信息到 localStorage
+    localStorage.setItem('jarvis_backend_host', backendHost.value)
+    localStorage.setItem('jarvis_backend_port', backendPort.value)
+    console.log('[ws] Connection info saved:', backendHost.value, backendPort.value)
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
