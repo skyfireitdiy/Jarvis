@@ -711,10 +711,10 @@ function connect() {
     const payload = {}
     if (auth.value.token) payload.token = auth.value.token
     if (auth.value.password) payload.password = auth.value.password
-    if (Object.keys(payload).length > 0) {
-      ws.send(JSON.stringify({ type: 'auth', payload }))
-      console.log('[ws] auth sent', payload)
-    }
+    // 始终发送 auth 消息，即使没有密码
+    // 这样后端可以立即检测到认证失败，而不需要等待超时
+    ws.send(JSON.stringify({ type: 'auth', payload }))
+    console.log('[ws] auth sent', payload)
   }
   ws.onmessage = (event) => {
     let message = null
@@ -1760,9 +1760,20 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'error') {
     console.warn('[ws] error payload', payload)
+    const errorMessage = payload?.message || '未知错误'
+    const errorCode = payload?.code || ''
+    
+    // 如果是认证失败，重新显示连接对话框
+    if (errorCode === 'AUTH_FAILED') {
+      // 清空密码输入框
+      auth.value.password = ''
+      // 重新显示连接对话框
+      showConnectModal.value = true
+    }
+    
     appendOutput({
       output_type: 'ERROR',
-      text: payload?.message || '未知错误',
+      text: errorMessage,
       lang: 'text',
     })
   } else if (type === 'status_update') {

@@ -880,6 +880,11 @@ def run_cli(
         "--web-gateway-port",
         help="Web Gateway 监听端口",
     ),
+    gateway_password: Optional[str] = typer.Option(
+        None,
+        "--gateway-password",
+        help="Web Gateway 密码（如未设置将禁用密码认证）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1130,6 +1135,15 @@ def run_cli(
 
             from jarvis.jarvis_web_gateway.app import create_app
             from jarvis.jarvis_web_gateway.app import set_status_update_callback
+
+            # 如果提供了密码参数，更新 gateway_auth 配置
+            if gateway_password:
+                from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+                if "gateway_auth" not in GLOBAL_CONFIG_DATA:
+                    GLOBAL_CONFIG_DATA["gateway_auth"] = {}
+                GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
+                GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
+                GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
             # 获取状态管理器并注册状态更新回调
             status_manager = get_agent_status_manager()
