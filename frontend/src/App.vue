@@ -992,7 +992,7 @@ async function createAgent() {
       
       // 关闭创建弹窗
       showCreateAgentModal.value = false
-      newAgentDir.value = ''
+      newAgentDir.value = '~' // 重置为默认值
       newAgentName.value = ''
       
       // 立即切换到新创建的 agent
