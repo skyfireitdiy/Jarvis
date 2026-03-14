@@ -2351,50 +2351,15 @@ onMounted(() => {
 }
 
 .input-wrapper {
-  padding: 16px;
-}
-
-/* 多行输入模式 */
-.input-wrapper.multi-line {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  margin: 0 -16px; /* 抵消父容器 padding */
-  width: calc(100% + 32px); /* 补偿 margin */
-}
-
-.input-wrapper.multi-line textarea {
   width: 100%;
-  min-height: 120px;
-  max-height: 300px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 14px;
-  color: #e6edf3;
-  font-size: 14px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  resize: vertical;
   box-sizing: border-box;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
-.input-wrapper.multi-line textarea:focus {
-  outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.input-wrapper.multi-line .input-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-/* 单行输入模式 */
+/* 单行输入模式（已废弃，统一使用多行） */
 .input-wrapper.single-line {
   display: flex;
   flex-direction: column;
