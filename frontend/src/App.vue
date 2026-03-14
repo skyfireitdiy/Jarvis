@@ -290,6 +290,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Session 选择对话框 -->
+    <div class="modal-overlay" v-if="showSessionDialog">
+      <div class="modal session-modal">
+        <div class="modal-header">
+          <h2>选择会话恢复</h2>
+          <button class="close-btn" @click="cancelSessionDialog">×</button>
+        </div>
+        <div class="session-list" v-if="availableSessions.length > 0">
+          <div
+            v-for="session in availableSessions"
+            :key="session.file"
+            class="session-item"
+            :class="{ active: selectedSession === session.file }"
+            @click="selectedSession = session.file"
+          >
+            <div class="session-name">{{ session.name || '未命名会话' }}</div>
+            <div class="session-time">{{ session.timestamp }}</div>
+          </div>
+        </div>
+        <div class="empty-state" v-else>
+          <p>没有可恢复的会话</p>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost-btn" @click="cancelSessionDialog">跳过</button>
+          <button class="primary-btn" @click="restoreSession(selectedSession)" :disabled="!selectedSession">
+            恢复会话
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -400,6 +431,9 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
+const showSessionDialog = ref(false)   // Session 选择对话框
+const availableSessions = ref([])         // 可恢复的 session 列表
+const selectedSession = ref(null)         // 选中的 session
 
 // 浮动窗口位置
 const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
@@ -1045,6 +1079,43 @@ async function fetchAgentStatus(agent) {
   }
 }
 
+// Session 恢复相关函数
+async function restoreSession(sessionFile) {
+  if (!sessionFile || !currentAgentId.value) {
+    console.error('[SESSION] Invalid parameters:', { sessionFile, agentId: currentAgentId.value })
+    return
+  }
+
+  try {
+    const response = await fetch(`${apiBase.value}/api/agents/${currentAgentId.value}/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_file: sessionFile })
+    })
+
+    const result = await response.json()
+    if (result.success) {
+      console.log('[SESSION] Session restored successfully:', result)
+      showSessionDialog.value = false
+      // 加载历史消息
+      loadHistoryMessages(false)
+    } else {
+      console.error('[SESSION] Failed to restore session:', result.error)
+      alert(`恢复会话失败: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('[SESSION] Error restoring session:', error)
+    alert(`恢复会话失败: ${error.message}`)
+  }
+}
+
+function cancelSessionDialog() {
+  console.log('[SESSION] User cancelled session selection')
+  showSessionDialog.value = false
+  // 加载历史消息（用户不恢复 session）
+  loadHistoryMessages(false)
+}
+
 // 创建 Agent
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
@@ -1329,13 +1400,29 @@ async function switchAgent(agent) {
       console.log('[AGENT] Fetching status after connection...')
       await fetchAgentStatus(agent)
       
-      // 加载历史消息（仅在连接成功后）
+      // 检测可恢复的 session（仅新创建的 Agent）
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
-        console.log('[AGENT] Loading history messages...')
-        loadHistoryMessages(false)
+        console.log('[AGENT] New agent, checking for recoverable sessions...')
+        try {
+          const sessionsResponse = await fetch(`${apiBase.value}/api/agents/${agent.agent_id}/sessions`)
+          const sessionsData = await sessionsResponse.json()
+          if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
+            console.log('[AGENT] Found recoverable sessions:', sessionsData.data)
+            // 显示 session 选择对话框
+            availableSessions.value = sessionsData.data
+            showSessionDialog.value = true
+          } else {
+            console.log('[AGENT] No recoverable sessions found')
+            loadHistoryMessages(false)
+          }
+        } catch (error) {
+          console.error('[AGENT] Failed to fetch sessions:', error)
+          // 加载历史消息（即使在获取 session 列表失败时）
+          loadHistoryMessages(false)
+        }
       } else {
-        console.log('[AGENT] Messages already exist, skip loading history')
+        console.log('[AGENT] Agent has existing messages, skipping session detection')
       }
     } else {
       console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
@@ -2802,6 +2889,104 @@ body::-webkit-scrollbar {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
+}
+
+/* Session 恢复弹窗 */
+.session-modal {
+  max-width: 450px;
+  width: 90%;
+}
+
+.session-modal h2 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #e6edf3;
+}
+
+.session-modal .modal-description {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #8b949e;
+  line-height: 1.5;
+}
+
+.session-list {
+  max-height: 300px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 20px;
+}
+
+.session-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.session-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.session-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.session-item {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.session-item:last-child {
+  border-bottom: none;
+}
+
+.session-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.session-item.selected {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.3);
+}
+
+.session-item.selected:hover {
+  background: rgba(63, 185, 80, 0.2);
+}
+
+.session-name {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.session-path {
+  font-size: 11px;
+  color: #8b949e;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.session-date {
+  font-size: 11px;
+  color: #6e7681;
+  margin-top: 6px;
+}
+
+.session-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 13px;
 }
 
 /* 聊天容器 */
