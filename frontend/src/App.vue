@@ -1,43 +1,11 @@
 <template>
   <div class="app">
-    <!-- 顶部栏 -->
-    <header class="app-header">
-      <div class="header-title">
-        <button class="icon-btn" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
-          📋
-        </button>
-      </div>
-      <div class="current-agent-info" v-if="currentAgent">
-        <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-        <span class="agent-status" :class="currentAgent.status">{{ currentAgent.status }}</span>
-        <span class="agent-port">:{{ currentAgent.port }}</span>
-        <span class="agent-dir">{{ currentAgent.working_dir }}</span>
-      </div>
-      <div class="header-actions">
-        <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
-          👤 人工介入
-        </button>
-        <button class="icon-btn" @click="showSettingsModal = true" :disabled="!socket">
-          ⚙️
-        </button>
-        <div class="status">
-          <span :class="['dot', connectionStatus]"></span>
-          {{ connectionLabel }}
-        </div>
-      </div>
-    </header>
-
-    <!-- Agent 浮动窗口 -->
-    <div 
-      class="agent-sidebar" 
-      v-if="showAgentSidebar"
-      :style="{ left: sidebarPosition.x + 'px', top: sidebarPosition.y + 'px' }"
-    >
-      <div class="agent-sidebar-header" @mousedown="startDragSidebar">
+    <!-- Agent 侧边栏 -->
+    <aside class="agent-sidebar" :class="{ collapsed: !showAgentSidebar }">
+      <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
           <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
-          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭">✕</button>
         </div>
       </div>
       <div class="agent-list">
@@ -57,7 +25,36 @@
           暂无 Agent，点击 + 创建
         </div>
       </div>
-    </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <div class="main-content-wrapper">
+      <!-- 顶部栏 -->
+      <header class="app-header">
+        <div class="header-title">
+          <button class="icon-btn" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
+            📋
+          </button>
+        </div>
+      <div class="current-agent-info" v-if="currentAgent">
+        <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
+        <span class="agent-status" :class="currentAgent.status">{{ currentAgent.status }}</span>
+        <span class="agent-port">:{{ currentAgent.port }}</span>
+        <span class="agent-dir">{{ currentAgent.working_dir }}</span>
+      </div>
+      <div class="header-actions">
+        <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
+          👤 人工介入
+        </button>
+        <button class="icon-btn" @click="showSettingsModal = true" :disabled="!socket">
+          ⚙️
+        </button>
+        <div class="status">
+          <span :class="['dot', connectionStatus]"></span>
+          {{ connectionLabel }}
+        </div>
+      </div>
+    </header>
 
     <!-- 消息列表 -->
     <main class="chat-container">
@@ -150,6 +147,7 @@
         </div>
       </div>
     </footer>
+    </div> <!-- 结束 main-content-wrapper -->
 
     <!-- 补全列表弹窗 -->
     <div class="modal-overlay" v-if="showCompletions">
@@ -2243,7 +2241,7 @@ body::-webkit-scrollbar {
 /* 全局布局 */
 .app {
   display: flex;
-  flex-direction: column;
+  flex-direction: row; /* 改为左右布局 */
   height: 100vh;
   width: 100vw;
   margin: 0;
@@ -2254,6 +2252,15 @@ body::-webkit-scrollbar {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+}
+
+/* 主内容区 */
+.main-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* 占据剩余宽度 */
+  overflow: hidden;
+  min-width: 0; /* 防止 flex 子元素溢出 */
 }
 
 /* 顶部栏 */
@@ -2429,17 +2436,20 @@ body::-webkit-scrollbar {
 /* Agent 浮动窗口 */
 .agent-sidebar {
   width: 280px;
-  height: 500px;
   background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  position: fixed;
-  z-index: 1000;
+  flex-shrink: 0; /* 防止被压缩 */
   backdrop-filter: blur(20px) saturate(180%);
+  transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.agent-sidebar.collapsed {
+  width: 0;
+  border-right: none;
+  overflow: hidden;
 }
 
 .agent-sidebar-header {
@@ -2449,8 +2459,6 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   background: rgba(255, 255, 255, 0.02);
-  cursor: move;
-  user-select: none;
 }
 
 .sidebar-header-actions {
