@@ -61,7 +61,6 @@ def _update_status(status: str) -> None:
     Args:
         status: 状态字符串
     """
-    import sys
 
     global _status_update_callback, _router  # 添加 _router 到全局
 
@@ -69,7 +68,7 @@ def _update_status(status: str) -> None:
     if _status_update_callback:
         try:
             _status_update_callback(status)
-        except Exception as e:
+        except Exception:
             # 静默忽略状态更新失败，不影响主流程
             pass
 
@@ -89,7 +88,7 @@ def _update_status(status: str) -> None:
             # 推送状态变化消息
             message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -774,7 +773,6 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 }
             }
         """
-        import os
         import pathlib
 
         try:
@@ -853,10 +851,22 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     return app
 
 
-def run(host: str = "127.0.0.1", port: int = 8000) -> None:
+def run(
+    host: str = "127.0.0.1", port: int = 8000, password: Optional[str] = None
+) -> None:
     """本地启动入口。"""
 
     import uvicorn
+
+    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+    # 如果提供了密码参数，更新 gateway_auth 配置
+    if password:
+        if "gateway_auth" not in GLOBAL_CONFIG_DATA:
+            GLOBAL_CONFIG_DATA["gateway_auth"] = {}
+        GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = password
+        GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
+        GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
     uvicorn.run(create_app(), host=host, port=port)
 
@@ -950,6 +960,5 @@ async def _await_auth_message(
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
-    await websocket.send_json(
-        {"type": "error", "payload": {"code": code, "message": message}}
-    )
+    error_msg = {"type": "error", "payload": {"code": code, "message": message}}
+    await websocket.send_json(error_msg)
