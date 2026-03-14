@@ -2932,6 +2932,7 @@ body::-webkit-scrollbar {
 .confirm-message {
   margin: 0;
   color: #e6edf3;
+  font-size: 13px;
 }
 
 .confirm-actions {
@@ -2943,7 +2944,7 @@ body::-webkit-scrollbar {
 .confirm-btn {
   padding: 9px 18px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
