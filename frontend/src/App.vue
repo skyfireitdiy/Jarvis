@@ -786,8 +786,8 @@ async function createAgent() {
     if (result.success && result.data) {
       const agent = result.data
       
-      // 添加到列表
-      agentList.value.push(agent)
+      // 添加到列表开头（让后创建的 agent 排在前面）
+      agentList.value.unshift(agent)
       
       // 关闭创建弹窗
       showCreateAgentModal.value = false
@@ -903,7 +903,8 @@ async function fetchAgentList() {
     
     // 更新列表（后端返回格式: { success: true, data: agents }）
     if (result.success && result.data) {
-      agentList.value = result.data
+      // 反转数组，让后创建的 agent 排在前面
+      agentList.value = result.data.slice().reverse()
     }
     
     // 更新当前 Agent 状态
