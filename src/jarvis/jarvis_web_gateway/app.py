@@ -452,6 +452,90 @@ def create_app() -> FastAPI:
         except Exception as e:
             return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
 
+    # HTTP API：获取补全列表
+    @app.get("/api/completions/{agent_id}")
+    async def get_completions(agent_id: str) -> Dict[str, Any]:
+        """获取所有可用补全项（不包括文件）。"""
+        try:
+            from jarvis.jarvis_utils.config import get_replace_map
+            from jarvis.jarvis_utils.tag import ot
+            from jarvis.jarvis_utils.input import BUILTIN_COMMANDS
+            import os
+
+            # 获取 Agent 的工作目录
+            agent = agent_manager.get_agent(agent_id)
+            if not agent:
+                return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"}}
+            working_dir = agent.working_dir
+            os.chdir(working_dir)
+
+            all_completions = []
+
+            # 添加 replace_map
+            try:
+                replace_map = get_replace_map()
+                for tag, info in replace_map.items():
+                    desc = info.get("description", tag) + "(Append)" if info.get("append") else "(Replace)"
+                    all_completions.append({
+                        "type": "replace",
+                        "value": ot(tag),
+                        "display": tag,
+                        "description": desc
+                    })
+            except Exception as e:
+                print(f"[COMPLETIONS] Failed to load replace_map: {e}")
+
+            # 添加内置命令
+            for cmd, desc in BUILTIN_COMMANDS:
+                all_completions.append({
+                    "type": "command",
+                    "value": ot(cmd),
+                    "display": cmd,
+                    "description": desc
+                })
+
+            # 添加规则
+            try:
+                from jarvis.jarvis_agent.rules_manager import RulesManager
+                rules_manager = RulesManager(working_dir)
+                available_rules = rules_manager.get_all_available_rule_names()
+
+                # 内置规则
+                if available_rules.get("builtin"):
+                    for rule_name in available_rules["builtin"]:
+                        all_completions.append({
+                            "type": "rule",
+                            "value": f"<rule:{rule_name}>",
+                            "display": rule_name,
+                            "description": "📚 内置规则"
+                        })
+
+                # 文件规则
+                if available_rules.get("files"):
+                    for rule_name in available_rules["files"]:
+                        all_completions.append({
+                            "type": "rule",
+                            "value": f"<rule:{rule_name}>",
+                            "display": rule_name,
+                            "description": "📄 文件规则"
+                        })
+
+                # YAML 规则
+                if available_rules.get("yaml"):
+                    for rule_name in available_rules["yaml"]:
+                        all_completions.append({
+                            "type": "rule",
+                            "value": f"<rule:{rule_name}>",
+                            "display": rule_name,
+                            "description": "📝 YAML 规则"
+                        })
+            except Exception as e:
+                print(f"[COMPLETIONS] Failed to load rules: {e}")
+
+            return {"success": True, "data": all_completions}
+        except Exception as e:
+            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+
     return app
 
 
