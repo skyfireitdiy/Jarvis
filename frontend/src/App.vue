@@ -64,6 +64,11 @@
           <div v-if="item.output_type === 'execution' && item.execution_id" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
           </div>
+          <!-- 终端内容（历史记录） -->
+          <div v-if="item.output_type === 'terminal_content'" class="terminal-history">
+            <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
+            <pre class="terminal-history-content">{{ item.content }}</pre>
+          </div>
         </article>
         <!-- 确认对话框 -->
         <article v-if="confirmDialog" class="message message-confirm">
@@ -1167,8 +1172,55 @@ function appendExecution(payload) {
     termInfo.active = false
     termInfo.ended = true
     isExecuting.value = false // 更新执行状态
+    
+    // 保存终端内容到消息列表
     if (termInfo.terminal) {
       termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
+      
+      // 获取终端内容并保存
+      try {
+        const buffer = termInfo.terminal.buffer.active
+        const lines = []
+        for (let i = 0; i < buffer.length; i++) {
+          const line = buffer.getLine(i)
+          if (line) {
+            const lineText = line.translateToString(true)
+            lines.push(lineText)
+          }
+        }
+        const terminalContent = lines.join('\n')
+        
+        console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
+        
+        // 删除原来的 execution 消息（避免重复显示）
+        const targetAgentId = currentAgentId.value
+        const currentOutputs = allOutputs.value.get(targetAgentId) || []
+        const execIndex = currentOutputs.findIndex(
+          item => item.output_type === 'execution' && item.execution_id === executionId
+        )
+        if (execIndex !== -1) {
+          currentOutputs.splice(execIndex, 1)
+          console.log(`[terminal] Removed execution message ${executionId}`)
+        }
+        
+        // 保存为消息到当前 Agent 的消息列表
+        const terminalMessage = {
+          output_type: 'terminal_content',
+          content: terminalContent,
+          execution_id: executionId,
+          timestamp: new Date().toISOString(),
+        }
+        
+        // 添加到消息列表
+        if (!allOutputs.value.has(targetAgentId)) {
+          allOutputs.value.set(targetAgentId, [])
+        }
+        allOutputs.value.get(targetAgentId).push(terminalMessage)
+        
+        console.log(`[terminal] Terminal content saved to message list for agent: ${targetAgentId}`)
+      } catch (error) {
+        console.error(`[terminal] Failed to save terminal content:`, error)
+      }
     }
   }
   
@@ -2072,6 +2124,40 @@ onMounted(() => {
   flex: 1;
   min-height: 400px;
   overflow: hidden;
+}
+
+.terminal-history {
+  margin-top: 14px;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  background: rgba(13, 17, 23, 0.6);
+}
+
+.terminal-history-header {
+  padding: 10px 16px;
+  background: rgba(22, 27, 34, 0.9);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminal-history-content {
+  background: linear-gradient(180deg, #0a0d12 0%, #0d1117 100%);
+  padding: 16px;
+  margin: 0;
+  overflow: auto;
+  color: #c9d1d9;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* 确认对话框 */
