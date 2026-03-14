@@ -1306,20 +1306,29 @@ function appendOutput(payload, agentId = null) {
   
   // 保存消息到本地存储
   try {
-    // 只保存必要的数据，避免存储过大的内容
-    const messageToSave = {
-      agent_id: targetAgentId, // 保存当前 Agent ID
-      output_type: outputItem.output_type,
-      text: outputItem.text,
-      lang: outputItem.lang,
-      agent_name: outputItem.agent_name,
-      non_interactive: outputItem.non_interactive,
-      timestamp: outputItem.timestamp,
-      execution_id: outputItem.execution_id,
-      context: outputItem.context
+    // 未完成的 execution 消息不保存，只在结束时保存一次
+    const isUnfinishedExecution = outputItem.output_type === 'execution' && !outputItem.is_finished
+    
+    if (!isUnfinishedExecution) {
+      // 只保存必要的数据，避免存储过大的内容
+      const messageToSave = {
+        agent_id: targetAgentId, // 保存当前 Agent ID
+        output_type: outputItem.output_type,
+        text: outputItem.text,
+        lang: outputItem.lang,
+        agent_name: outputItem.agent_name,
+        non_interactive: outputItem.non_interactive,
+        timestamp: outputItem.timestamp,
+        execution_id: outputItem.execution_id,
+        context: outputItem.context,
+        is_finished: outputItem.is_finished,
+        terminal_content: outputItem.terminal_content,
+      }
+      console.log(`🚨 [appendOutput] Saving message: type=${outputItem.output_type}, execution_id=${outputItem.execution_id}, agent_id=${targetAgentId}`)
+      historyStorage.saveMessage(messageToSave)
+    } else {
+      console.log(`🚨 [appendOutput] Skipping unfinished execution: execution_id=${outputItem.execution_id}`)
     }
-    console.log(`🚨 [appendOutput] Saving message: type=${outputItem.output_type}, execution_id=${outputItem.execution_id}, agent_id=${targetAgentId}`)
-    historyStorage.saveMessage(messageToSave)
   } catch (error) {
     console.warn('[HISTORY] Failed to save message:', error)
     // 不影响正常显示，静默失败
@@ -1436,24 +1445,27 @@ function appendExecution(payload) {
           
           // 触发响应式更新
           allOutputs.value.set(targetAgentId, [...currentOutputs])
+          
+          // 保存到历史记录（更新原有的 execution 消息）
+          try {
+            const updatedMessage = {
+              agent_id: targetAgentId,
+              output_type: 'execution',
+              text: '',
+              lang: 'text',
+              non_interactive: false,
+              timestamp: currentOutputs[execIndex].timestamp,
+              execution_id: executionId,
+              is_finished: true,
+              terminal_content: terminalContent,
+            }
+            historyStorage.saveMessage(updatedMessage)
+            console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}`)
+          } catch (error) {
+            console.warn('[HISTORY] Failed to save terminal content:', error)
+          }
         } else {
           console.warn(`🚨 [terminal] execution message ${executionId} not found`)
-        }
-        
-        // 保存到历史记录
-        try {
-          const messageToSave = {
-            agent_id: targetAgentId,
-            output_type: outputItem.output_type,
-            text: outputItem.text,
-            lang: outputItem.lang,
-            non_interactive: outputItem.non_interactive,
-            timestamp: outputItem.timestamp,
-            execution_id: outputItem.execution_id,
-          }
-          historyStorage.saveMessage(messageToSave)
-        } catch (error) {
-          console.warn('[HISTORY] Failed to save terminal content:', error)
         }
         
         console.log(`[terminal] Terminal content saved to message list and history for agent: ${targetAgentId}`)
