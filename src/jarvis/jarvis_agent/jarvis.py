@@ -50,6 +50,70 @@ from jarvis.jarvis_jck.cli import (
     _perform_check,
 )
 
+# ========== Agent 状态管理 ==========
+from enum import Enum
+import threading
+
+
+class AgentStatus(Enum):
+    """Agent 状态枚举。
+    
+    状态说明：
+    - RUNNING: agent 正在运行中（包括执行任务、空闲等待命令）- 默认状态
+    - WAITING_MULTI: agent 需要多行输入（如代码）
+    - WAITING_SINGLE: agent 需要单行确认（如是否继续）
+    """
+    RUNNING = "running"  # 运行中（默认状态）
+    WAITING_MULTI = "waiting_multi"  # 等待多行输入
+    WAITING_SINGLE = "waiting_single"  # 等待单行确认
+
+
+class AgentStateManager:
+    """Agent 状态管理器（线程安全）。"""
+
+    def __init__(self):
+        self._status = AgentStatus.RUNNING  # 初始状态：运行中
+        self._lock = threading.Lock()
+
+    def get_status(self) -> str:
+        """获取当前状态。"""
+        with self._lock:
+            return self._status.value
+
+    def set_status(self, status: AgentStatus) -> None:
+        """设置当前状态。"""
+        import sys
+        with self._lock:
+            old_status = self._status
+            self._status = status
+            print(f"[DEBUG] AgentStateManager: status changed from {old_status.value} to {status.value}", file=sys.stderr, flush=True)
+
+    def set_running(self) -> None:
+        """设置为运行状态。"""
+        self.set_status(AgentStatus.RUNNING)
+
+    def set_waiting_multi(self) -> None:
+        """设置为等待多行输入状态。"""
+        self.set_status(AgentStatus.WAITING_MULTI)
+
+    def set_waiting_single(self) -> None:
+        """设置为等待单行输入状态。"""
+        self.set_status(AgentStatus.WAITING_SINGLE)
+
+
+# 全局状态管理器实例
+_agent_status_manager: Optional[AgentStateManager] = None
+
+
+def get_agent_status_manager() -> AgentStateManager:
+    """获取全局 Agent 状态管理器实例。"""
+    global _agent_status_manager
+    if _agent_status_manager is None:
+        _agent_status_manager = AgentStateManager()
+    return _agent_status_manager
+
+# ========== Agent 状态管理结束 ==========
+
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
     """
@@ -1063,9 +1127,45 @@ def run_cli(
             import uvicorn
 
             from jarvis.jarvis_web_gateway.app import create_app
-
+            from jarvis.jarvis_web_gateway.app import set_status_update_callback
+            
+            # 获取状态管理器并注册状态更新回调
+            status_manager = get_agent_status_manager()
+            
+            def on_status_update(status_str: str) -> None:
+                """Web Gateway 请求输入时的状态更新回调。"""
+                import sys
+                print(f"[DEBUG] on_status_update called with status={status_str}", file=sys.stderr, flush=True)
+                # 根据 status_str 更新状态
+                if status_str == "running":
+                    print("[DEBUG] Setting status to RUNNING", file=sys.stderr, flush=True)
+                    status_manager.set_running()
+                elif status_str == "waiting_multi":
+                    print("[DEBUG] Setting status to WAITING_MULTI", file=sys.stderr, flush=True)
+                    status_manager.set_waiting_multi()
+                elif status_str == "waiting_single":
+                    print("[DEBUG] Setting status to WAITING_SINGLE", file=sys.stderr, flush=True)
+                    status_manager.set_waiting_single()
+            
+            # 注册回调
+            set_status_update_callback(on_status_update)
+            
+            # 创建自定义 FastAPI app，添加状态查询接口
+            from fastapi import FastAPI
+            
+            custom_app = FastAPI()
+            
+            @custom_app.get("/status")
+            async def get_status():
+                """获取 Agent 运行状态（任务级别）。"""
+                return {
+                    "execution_status": status_manager.get_status(),
+                    "status": "running"  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                }
+            
+            # 将自定义 app 传递给 gateway
             config = uvicorn.Config(
-                create_app(),
+                create_app(custom_app),
                 host=web_gateway_host,
                 port=web_gateway_port,
                 log_level="info",

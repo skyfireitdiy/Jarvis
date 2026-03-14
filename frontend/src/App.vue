@@ -15,7 +15,7 @@
              @click="switchAgent(agent)">
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-            <span class="agent-status" :class="agent.status">{{ agent.status }}</span>
+            <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
             <span class="agent-port">:{{ agent.port }}</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir }}</div>
@@ -38,7 +38,7 @@
         </div>
       <div class="current-agent-info" v-if="currentAgent">
         <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-        <span class="agent-status" :class="currentAgent.status">{{ currentAgent.status }}</span>
+        <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
         <span class="agent-port">:{{ currentAgent.port }}</span>
         <span class="agent-dir">{{ currentAgent.working_dir }}</span>
       </div>
@@ -428,6 +428,7 @@ const hasBufferedInput = computed(() => {
 // Agent 管理
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
+const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
 const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
 })
@@ -957,6 +958,93 @@ async function connectToAgent(agent, retryCount = 0) {
   })
 }
 
+// 获取状态文本（组合显示）
+function getStatusText(agent) {
+  const statusData = agentStatuses.value.get(agent.agent_id)
+  
+  // Agent 状态（进程级别）
+  const agentStatus = agent.status || 'running'
+  
+  // 如果 Agent 已停止，只显示停止状态
+  if (agentStatus === 'stopped') {
+    return '已停止'
+  }
+  
+  // 如果没有运行状态数据，显示 Agent 状态
+  if (!statusData) {
+    return '运行中'
+  }
+  
+  // 组合显示：Agent 状态 + 运行状态
+  const executionStatus = statusData.execution_status || 'running'
+  
+  // 如果运行状态是 running，只显示"运行中"
+  if (executionStatus === 'running') {
+    return '运行中'
+  }
+  
+  // 如果运行状态不是 running，组合显示
+  const labels = {
+    'running': '运行中',
+    'waiting_multi': '等待多行输入',
+    'waiting_single': '等待确认'
+  }
+  const executionStatusText = labels[executionStatus] || '运行中'
+  
+  // 组合显示：运行中（等待状态）
+  return `运行中（${executionStatusText}）`
+}
+
+// 获取状态 CSS 类名
+function getStatusClass(agent) {
+  const statusData = agentStatuses.value.get(agent.agent_id)
+  
+  // 如果 Agent 已停止
+  if (agent.status === 'stopped') {
+    return 'stopped'
+  }
+  
+  // 如果没有运行状态数据，默认 running
+  if (!statusData) {
+    return 'running'
+  }
+  
+  // 返回运行状态的类名
+  return statusData.execution_status || 'running'
+}
+
+// 查询 Agent 状态
+async function fetchAgentStatus(agent) {
+  if (!agent || !agent.port) {
+    console.warn('[AGENT STATUS] Invalid agent:', agent)
+    return 'running' // 默认返回 running
+  }
+  
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = agent.port
+    const response = await fetch(`http://${host}:${port}/status`)
+    
+    if (!response.ok) {
+      console.warn(`[AGENT STATUS] Failed to fetch status for agent ${agent.agent_id}:`, response.status)
+      return 'running' // 默认返回 running
+    }
+    
+    const result = await response.json()
+    // execution_status 是任务级别状态（running/waiting_multi/waiting_single）
+    const executionStatus = result.execution_status || 'running'
+    
+    // 更新状态映射（存储对象格式）
+    agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus})
+    
+    console.log(`[AGENT STATUS] Agent ${agent.agent_id} execution_status:`, executionStatus)
+    return executionStatus
+  } catch (error) {
+    console.error(`[AGENT STATUS] Error fetching status for agent ${agent.agent_id}:`, error)
+    return 'running' // 错误时返回默认状态
+  }
+}
+
 // 创建 Agent
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
@@ -1213,12 +1301,20 @@ async function switchAgent(agent) {
   
   // 连接到目标 Agent（等待连接真正建立）
   try {
+    // 切换后立即查询一次状态（即使 WebSocket 未连接）
+    console.log('[AGENT] Fetching status after switch...')
+    await fetchAgentStatus(agent)
+    
     await connectToAgent(agent)
     
     // 验证连接是否真的成功
     const ws = sockets.value.get(agent.agent_id)
     if (ws && ws.readyState === WebSocket.OPEN) {
       console.log('[AGENT] Connection verified successfully')
+      // 连接成功后再次查询状态，确保同步
+      console.log('[AGENT] Fetching status after connection...')
+      await fetchAgentStatus(agent)
+      
       // 加载历史消息（仅在连接成功后）
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
@@ -1229,11 +1325,14 @@ async function switchAgent(agent) {
       }
     } else {
       console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
+      // WebSocket 未连接，但已经通过 HTTP 查询了状态
+      console.log('[AGENT] Status fetched via HTTP, but WebSocket not connected')
     }
   } catch (error) {
     console.error('[AGENT] Failed to connect to agent:', error)
     // 连接失败，不加载历史消息，但保持当前状态
     // 用户可以看到错误并手动重试
+    // 即使连接失败，状态已通过 HTTP 查询
   }
 }
 
@@ -1455,6 +1554,13 @@ function handleMessage(message, agentId = null) {
       text: payload?.message || '未知错误',
       lang: 'text',
     })
+  } else if (type === 'status_update') {
+    console.log('[ws] status_update payload', payload)
+    // 更新 Agent 执行状态
+    if (payload?.execution_status) {
+      agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
+      console.log('[ws] Agent execution status updated:', payload.execution_status)
+    }
   }
 }
 
@@ -2324,6 +2430,16 @@ body::-webkit-scrollbar {
   color: #f85149;
 }
 
+.current-agent-info .agent-status.waiting_multi {
+  background: rgba(210, 153, 34, 0.2);
+  color: #d29922;
+}
+
+.current-agent-info .agent-status.waiting_single {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
 .current-agent-info .agent-port {
   color: #8b949e;
 }
@@ -2498,8 +2614,36 @@ body::-webkit-scrollbar {
 }
 
 .agent-item.active {
-  background: rgba(63, 185, 80, 0.15);
-  border-color: rgba(63, 185, 80, 0.4);
+  background: rgba(56, 139, 253, 0.15);
+  border-color: rgba(56, 139, 253, 0.4);
+}
+
+.agent-item .agent-status {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-left: 8px;
+}
+
+.agent-item .agent-status.running {
+  background: rgba(56, 139, 253, 0.2);
+  color: #58a6ff;
+}
+
+.agent-item .agent-status.stopped {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.agent-item .agent-status.waiting_multi {
+  background: rgba(210, 153, 34, 0.2);
+  color: #d29922;
+}
+
+.agent-item .agent-status.waiting_single {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
 }
 
 .agent-info {
