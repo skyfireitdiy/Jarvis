@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import socket
 import subprocess
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -29,7 +31,7 @@ class AgentInfo:
         pid: int,
         port: int,
         working_dir: str,
-        process: subprocess.Popen,
+        process: Optional[subprocess.Popen],
         name: Optional[str] = None,
     ) -> None:
         self.agent_id = agent_id
@@ -68,6 +70,9 @@ class AgentManager:
 
     # 随机端口范围
     PORT_RANGE = (10000, 65535)
+    
+    # Agent 列表持久化文件路径
+    PERSISTENCE_FILE = Path(".jarvis_agents.json")
 
     def __init__(self, on_status_change: Optional[Callable[[str, str, Any], None]] = None) -> None:
         """初始化 AgentManager。
@@ -77,6 +82,9 @@ class AgentManager:
         """
         self._agents: Dict[str, AgentInfo] = {}
         self._on_status_change = on_status_change
+        
+        # 加载已保存的 Agent 列表
+        self._load_agents()
 
     def create_agent(
         self,
@@ -172,6 +180,9 @@ class AgentManager:
         # 保存到内存
         self._agents[agent_id] = agent_info
         print(f"[AGENT MANAGER] Agent created successfully: {agent_id}")
+        
+        # 保存到持久化文件
+        self._save_agents()
 
         # 启动监控任务
         agent_info._monitor_task = asyncio.create_task(
@@ -199,15 +210,16 @@ class AgentManager:
         agent_info = self._agents[agent_id]
 
         # 发送 SIGTERM
-        agent_info.process.terminate()
+        if agent_info.process is not None:
+            agent_info.process.terminate()
 
-        # 等待进程退出（最多 10 秒）
-        try:
-            agent_info.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            # 强制杀死进程
-            agent_info.process.kill()
-            agent_info.process.wait()
+            # 等待进程退出（最多 10 秒）
+            try:
+                agent_info.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                # 强制杀死进程
+                agent_info.process.kill()
+                agent_info.process.wait()
 
         # 取消监控任务
         if agent_info._monitor_task:
@@ -218,6 +230,9 @@ class AgentManager:
 
         # 从内存中移除
         del self._agents[agent_id]
+        
+        # 更新持久化文件
+        self._save_agents()
 
         # 通知状态变更
         if self._on_status_change:
@@ -334,6 +349,11 @@ class AgentManager:
         if not agent_info:
             return
 
+        # 如果进程对象为 None（恢复的情况），直接返回
+        if agent_info.process is None:
+            print(f"[AGENT MANAGER] Agent {agent_id} has no process object, skipping monitor")
+            return
+
         try:
             # 等待进程退出
             return_code = await asyncio.get_event_loop().run_in_executor(
@@ -384,3 +404,83 @@ class AgentManager:
                 self.stop_agent(agent_id)
             except Exception:
                 pass
+    
+    def _load_agents(self) -> None:
+        """从文件加载已保存的 Agent 列表。"""
+        if not self.PERSISTENCE_FILE.exists():
+            print("[AGENT MANAGER] No persistence file found, starting fresh")
+            return
+        
+        try:
+            with open(self.PERSISTENCE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not isinstance(data, list):
+                print("[AGENT MANAGER] Invalid persistence file format")
+                return
+            
+            print(f"[AGENT MANAGER] Loading {len(data)} saved agents from {self.PERSISTENCE_FILE}")
+            
+            for agent_data in data:
+                try:
+                    # 检查 Agent 是否还在运行（通过检查进程是否存在）
+                    pid = agent_data.get('pid')
+                    if pid and self._is_process_running(pid):
+                        # 进程还在运行，恢复 AgentInfo
+                        agent_info = AgentInfo(
+                            agent_id=agent_data['agent_id'],
+                            agent_type=agent_data['agent_type'],
+                            pid=pid,
+                            port=agent_data['port'],
+                            working_dir=agent_data['working_dir'],
+                            process=None,  # 进程对象无法恢复，设为 None
+                            name=agent_data.get('name'),
+                        )
+                        # 恢复状态
+                        agent_info.status = agent_data.get('status', 'running')
+                        agent_info.created_at = agent_data.get('created_at', datetime.now().isoformat())
+                        
+                        # 保存到内存
+                        self._agents[agent_info.agent_id] = agent_info
+                        print(f"[AGENT MANAGER] Restored agent {agent_info.agent_id} (PID: {pid})")
+                        
+                        # 重新启动监控任务
+                        agent_info._monitor_task = asyncio.create_task(
+                            self._monitor_agent(agent_info.agent_id)
+                        )
+                    else:
+                        # 进程已停止，不恢复
+                        print(f"[AGENT MANAGER] Agent {agent_data['agent_id']} process not running, skipping")
+                except Exception as e:
+                    print(f"[AGENT MANAGER] Failed to restore agent {agent_data.get('agent_id')}: {e}")
+            
+            print(f"[AGENT MANAGER] Loaded {len(self._agents)} agents successfully")
+            
+        except Exception as e:
+            print(f"[AGENT MANAGER] Failed to load agents: {e}")
+    
+    def _save_agents(self) -> None:
+        """保存 Agent 列表到文件。"""
+        try:
+            data = [agent.to_dict() for agent in self._agents.values()]
+            with open(self.PERSISTENCE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            print(f"[AGENT MANAGER] Saved {len(data)} agents to {self.PERSISTENCE_FILE}")
+        except Exception as e:
+            print(f"[AGENT MANAGER] Failed to save agents: {e}")
+    
+    def _is_process_running(self, pid: int) -> bool:
+        """检查进程是否在运行。
+        
+        Args:
+            pid: 进程 ID
+            
+        Returns:
+            True 运行中，False 已停止
+        """
+        try:
+            # 发送信号 0 检查进程是否存在
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, OSError):
+            return False
