@@ -84,22 +84,41 @@
     </main>
 
     <!-- 底部输入区 -->
-    <footer class="input-area" v-if="showInput || isExecuting">
-      <!-- 多行输入模式 -->
-      <div class="input-wrapper multi-line" v-if="showInput && inputMode === 'multi'">
-        <p class="input-hint" v-if="inputTip">{{ inputTip }}</p>
-        <textarea v-model="inputText" placeholder="多行输入 (Ctrl+Enter 发送)" @keydown.ctrl.enter="submitInput"></textarea>
-        <div class="input-actions">
-          <button class="send-btn" @click="submitInput" :disabled="!inputText.trim()">发送 (Ctrl+Enter)</button>
-        </div>
-      </div>
+    <footer class="input-area">
+      <!-- 输入提示 -->
+      <p class="input-hint" v-if="inputTip">{{ inputTip }}</p>
       
-      <!-- 单行输入模式 -->
-      <div class="input-wrapper single-line" v-if="showInput && inputMode === 'single'">
-        <p class="input-hint" v-if="inputTip">{{ inputTip }}</p>
-        <div class="input-controls">
-          <input v-model="inputText" placeholder="输入内容 (Enter 发送)" @keyup.enter="submitInput" />
-          <button class="send-btn" @click="submitInput" :disabled="!inputText.trim()">发送</button>
+      <!-- 输入框 -->
+      <div class="input-wrapper">
+        <textarea 
+          v-model="inputText" 
+          placeholder="输入内容 (Ctrl+Enter 发送)" 
+          @keydown.ctrl.enter="submitInput"
+        ></textarea>
+        
+        <!-- 缓冲区指示器 -->
+        <div class="buffer-indicator" v-if="hasBufferedInput && !showInput" @click="sendBufferedInput">
+          <span class="buffer-icon">📝</span>
+          <span class="buffer-text">缓冲区有内容，点击发送</span>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="input-actions">
+          <button 
+            v-if="hasBufferedInput && !showInput" 
+            class="action-btn clear-buffer-btn" 
+            @click="clearBuffer"
+            title="清空缓冲区"
+          >
+            清空
+          </button>
+          <button 
+            class="send-btn" 
+            @click="submitInput" 
+            :disabled="!inputText.trim() && (!hasBufferedInput || showInput)"
+          >
+            {{ hasBufferedInput && !showInput ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
+          </button>
         </div>
       </div>
     </footer>
@@ -311,6 +330,11 @@ const inputMode = ref('single')
 const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
+const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value: 内容）
+const hasBufferedInput = computed(() => {
+  const agentId = currentAgentId.value
+  return agentId ? inputBuffers.value.has(agentId) : false
+})
 
 // Agent 管理
 const agentList = ref([])        // Agent 列表
@@ -856,20 +880,24 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
+    const agentId = currentAgentId.value
+    
+    // 检查缓冲区是否有内容
+    if (agentId && inputBuffers.value.has(agentId)) {
+      console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
+      const bufferedText = inputBuffers.value.get(agentId)
+      // 清空缓冲区
+      inputBuffers.value.delete(agentId)
+      // 发送缓冲区内容
+      sendInputResult(bufferedText, payload.request_id)
+      return
+    }
+    
     // 保存输入请求，用于重连后恢复
     lastInputRequest.value = payload
     inputTip.value = payload.tip || ''
     inputMode.value = payload.mode || 'multi'  // 默认多行
     inputText.value = payload.preset || ''
-    
-    // 在显示输入框前判断是否在底部
-    const threshold = 100
-    let shouldScrollAfterInputShow = false
-    if (outputList.value) {
-      const distanceToBottom = outputList.value.scrollHeight - outputList.value.scrollTop - outputList.value.clientHeight
-      shouldScrollAfterInputShow = distanceToBottom < threshold
-      console.log('[INPUT_REQUEST] Before show - distanceToBottom:', distanceToBottom, 'shouldScroll:', shouldScrollAfterInputShow)
-    }
     
     showInput.value = true // 显示输入框
     nextTick(() => {
@@ -1260,27 +1288,52 @@ function submitInput() {
     return
   }
   
-  // 先将用户输入回显到聊天窗口
   const userInput = inputText.value.trim()
-  if (userInput) {
-    console.log('[DEBUG] User input payload:', {
-      output_type: 'user_input',
-      agent_name: 'user',
-      text: userInput,
-      lang: 'text',
-    })
+  if (!userInput) {
+    return
+  }
+  
+  // 判断是发送到缓冲区还是直接发送
+  if (showInput.value) {
+    // 后端正在等待输入，直接发送
+    console.log('[SUBMIT] Sending input directly to backend')
+    sendInputDirectly(userInput)
+  } else {
+    // 后端没有等待输入，保存到缓冲区
+    console.log('[SUBMIT] Saving input to buffer')
+    inputBuffers.value.set(agentId, userInput)
     appendOutput({
-      output_type: 'user_input',
-      agent_name: 'user',
-      text: userInput,
+      output_type: 'system',
+      agent_name: 'system',
+      text: '✓ 输入已保存到缓冲区，等待后端请求',
       lang: 'text',
     })
   }
   
+  inputText.value = ''
+}
+
+function sendInputDirectly(text) {
+  const agentId = currentAgentId.value
+  
+  // 先将用户输入回显到聊天窗口
+  console.log('[DEBUG] User input payload:', {
+    output_type: 'user_input',
+    agent_name: 'user',
+    text: text,
+    lang: 'text',
+  })
+  appendOutput({
+    output_type: 'user_input',
+    agent_name: 'user',
+    text: text,
+    lang: 'text',
+  })
+  
   const message = {
     type: 'input_result',
     payload: {
-      text: userInput,
+      text: text,
       metadata: {
         session_id: sessionId.value || undefined,
       },
@@ -1288,9 +1341,66 @@ function submitInput() {
   }
   console.log('[ws] send input_result', message)
   sendMessageToAgent(message)
-  inputText.value = ''
+  
   showInput.value = false // 隐藏输入框
   lastInputRequest.value = null // 清空保存的输入请求
+}
+
+function sendInputResult(text, requestId) {
+  const agentId = currentAgentId.value
+  
+  // 先将用户输入回显到聊天窗口
+  console.log('[DEBUG] Buffered input payload:', {
+    output_type: 'user_input',
+    agent_name: 'user',
+    text: text,
+    lang: 'text',
+  })
+  appendOutput({
+    output_type: 'user_input',
+    agent_name: 'user',
+    text: text,
+    lang: 'text',
+  })
+  
+  const message = {
+    type: 'input_result',
+    payload: {
+      text: text,
+      request_id: requestId,
+      metadata: {
+        session_id: sessionId.value || undefined,
+      },
+    },
+  }
+  console.log('[ws] send input_result (from buffer)', message)
+  sendMessageToAgent(message)
+}
+
+function sendBufferedInput() {
+  const agentId = currentAgentId.value
+  if (!agentId || !inputBuffers.value.has(agentId)) {
+    return
+  }
+  const bufferedText = inputBuffers.value.get(agentId)
+  // 清空缓冲区
+  inputBuffers.value.delete(agentId)
+  // 发送缓冲区内容
+  sendInputDirectly(bufferedText)
+}
+
+function clearBuffer() {
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    return
+  }
+  inputBuffers.value.delete(agentId)
+  appendOutput({
+    output_type: 'system',
+    agent_name: 'system',
+    text: '🗑️ 缓冲区已清空',
+    lang: 'text',
+  })
 }
 
 function sendConfirmResult(confirmed) {
@@ -2358,6 +2468,99 @@ onMounted(() => {
   opacity: 0.4;
   cursor: not-allowed;
   filter: grayscale(0.3);
+}
+
+/* 输入框统一样式 */
+.input-wrapper textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 300px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  resize: vertical;
+  box-sizing: border-box;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
+}
+
+.input-wrapper textarea:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 缓冲区指示器 */
+.buffer-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(35, 134, 54, 0.15);
+  border: 1px solid rgba(35, 134, 54, 0.4);
+  border-radius: 8px;
+  margin: 8px 0;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.buffer-indicator:hover {
+  background: rgba(35, 134, 54, 0.25);
+  border-color: rgba(35, 134, 54, 0.6);
+  transform: translateY(-1px);
+}
+
+.buffer-icon {
+  font-size: 18px;
+}
+
+.buffer-text {
+  font-size: 13px;
+  color: #3fb950;
+  font-weight: 500;
+}
+
+/* 操作按钮 */
+.action-btn {
+  padding: 11px 20px;
+  background: rgba(48, 54, 61, 0.8);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  color: #8b949e;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  transform: translateY(-1px);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.clear-buffer-btn:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
+  color: #f85149;
+}
+
+/* 输入操作按钮组 */
+.input-wrapper .input-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .cancel-btn {
