@@ -724,6 +724,9 @@ function connect() {
     console.log('[ws] close')
     socket.value = null
     connecting.value = false
+    // 连接断开，重新显示连接对话框
+    showConnectModal.value = true
+    // 不清空连接错误信息，保留错误提示
   }
   ws.onerror = () => {
     console.error('[ws] error')
@@ -1753,8 +1756,8 @@ function handleMessage(message, agentId = null) {
     const errorMessage = payload?.message || '未知错误'
     const errorCode = payload?.code || ''
     
-    // 如果是认证失败，重新显示连接对话框
-    if (errorCode === 'AUTH_FAILED') {
+    // 如果是认证失败或连接被拒绝，重新显示连接对话框
+    if (errorCode === 'AUTH_FAILED' || errorCode === 'CONNECTION_REJECTED') {
       // 显示错误信息
       connectErrorMessage.value = errorMessage
       // 清空密码输入框
