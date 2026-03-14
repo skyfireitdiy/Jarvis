@@ -33,7 +33,7 @@
              :class="{ active: currentAgentId === agent.agent_id }"
              @click="switchAgent(agent)">
           <div class="agent-info">
-            <span class="agent-type">{{ agent.agent_type === 'agent' ? '🤖' : '💻' }}</span>
+            <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="agent.status">{{ agent.status }}</span>
             <span class="agent-port">:{{ agent.port }}</span>
           </div>
@@ -109,6 +109,10 @@
             <option value="agent">通用 Agent (agent)</option>
             <option value="codeagent">代码 Agent (codeagent)</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Agent 名称（可选）</label>
+          <input v-model="newAgentName" type="text" class="form-control" placeholder="例如：开发环境Agent" />
         </div>
         <div class="form-group">
           <label>工作目录</label>
@@ -307,6 +311,7 @@ const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('')       // 新 Agent 工作目录
+const newAgentName = ref('')       // 新 Agent 名称（可选）
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
@@ -507,7 +512,8 @@ async function createAgent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         agent_type: newAgentType.value,
-        working_dir: newAgentDir.value
+        working_dir: newAgentDir.value,
+        name: newAgentName.value || undefined
       })
     })
     
@@ -530,6 +536,7 @@ async function createAgent() {
       // 关闭创建弹窗
       showCreateAgentModal.value = false
       newAgentDir.value = ''
+      newAgentName.value = ''
       
       // 自动切换到新创建的 Agent（等待连接成功）
       if (agent.status === 'running') {

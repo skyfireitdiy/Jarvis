@@ -30,9 +30,11 @@ class AgentInfo:
         port: int,
         working_dir: str,
         process: subprocess.Popen,
+        name: Optional[str] = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
+        self.name = name
         self.pid = pid
         self.port = port
         self.working_dir = working_dir
@@ -46,6 +48,7 @@ class AgentInfo:
         return {
             "agent_id": self.agent_id,
             "agent_type": self.agent_type,
+            "name": self.name,
             "pid": self.pid,
             "port": self.port,
             "status": self.status,
@@ -79,6 +82,7 @@ class AgentManager:
         self,
         agent_type: str,
         working_dir: str,
+        name: Optional[str] = None,
         llm_group: str = "default",
         tool_group: str = "default",
         config_file: Optional[str] = None,
@@ -90,6 +94,7 @@ class AgentManager:
         Args:
             agent_type: Agent 类型 ("agent" 或 "codeagent")
             working_dir: 工作目录
+            name: Agent 名称（可选，用于标识）
             llm_group: LLM 模型组
             tool_group: 工具组
             config_file: 配置文件路径
@@ -161,6 +166,7 @@ class AgentManager:
             port=port,
             working_dir=working_dir,
             process=process,
+            name=name,
         )
 
         # 保存到内存
