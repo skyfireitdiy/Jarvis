@@ -47,7 +47,7 @@ _router: Optional[SessionOutputRouter] = None
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
     """设置状态更新回调函数。
-    
+
     Args:
         callback: 回调函数，接收状态字符串 ("running"/"waiting_multi"/"waiting_single")
     """
@@ -57,48 +57,63 @@ def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> Non
 
 def _update_status(status: str) -> None:
     """更新状态。
-    
+
     Args:
         status: 状态字符串
     """
     import sys
+
     global _status_update_callback, _router  # 添加 _router 到全局
-    
+
     # 1. 调用回调函数更新本地状态
     if _status_update_callback:
         try:
-            print(f"[DEBUG] _update_status calling callback with status={status}", file=sys.stderr, flush=True)
+            print(
+                f"[DEBUG] _update_status calling callback with status={status}",
+                file=sys.stderr,
+                flush=True,
+            )
             _status_update_callback(status)
         except Exception as e:
             # 静默忽略状态更新失败，不影响主流程
-            print(f"[DEBUG] _update_status callback failed: {e}", file=sys.stderr, flush=True)
+            print(
+                f"[DEBUG] _update_status callback failed: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
             pass
     else:
-        print("[DEBUG] _update_status no callback registered", file=sys.stderr, flush=True)
-    
+        print(
+            "[DEBUG] _update_status no callback registered", file=sys.stderr, flush=True
+        )
+
     # 2. 通过 WebSocket 推送状态变化给前端
     if _router:
         try:
             # 获取当前 agent ID（从状态管理器获取）
             from jarvis.jarvis_gateway.manager import get_current_gateway
+
             gateway = get_current_gateway()
-            
+
             # 获取活跃的 session_id
             session_id = None
-            if gateway and hasattr(gateway, '_current_session_id'):
+            if gateway and hasattr(gateway, "_current_session_id"):
                 session_id = gateway._current_session_id
-            
+
             # 推送状态变化消息
-            message = {
-                "type": "status_update",
-                "payload": {
-                    "execution_status": status
-                }
-            }
+            message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
-            print(f"[DEBUG] Status update pushed via WebSocket: status={status}, session_id={session_id}", file=sys.stderr, flush=True)
+            print(
+                f"[DEBUG] Status update pushed via WebSocket: status={status}, session_id={session_id}",
+                file=sys.stderr,
+                flush=True,
+            )
         except Exception as e:
-            print(f"[DEBUG] Failed to push status update via WebSocket: {e}", file=sys.stderr, flush=True)
+            print(
+                f"[DEBUG] Failed to push status update via WebSocket: {e}",
+                file=sys.stderr,
+                flush=True,
+            )
             pass
 
 
@@ -181,24 +196,37 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存输入请求，用于重连后恢复
         self._input_registry.save_input_request(session_id, message)
-        
+
         # 更新状态为等待输入
         import sys
-        print(f"[DEBUG] request_input called, mode={request.mode}", file=sys.stderr, flush=True)
+
+        print(
+            f"[DEBUG] request_input called, mode={request.mode}",
+            file=sys.stderr,
+            flush=True,
+        )
         if request.mode == "single":
-            print("[DEBUG] Setting status to waiting_single", file=sys.stderr, flush=True)
+            print(
+                "[DEBUG] Setting status to waiting_single", file=sys.stderr, flush=True
+            )
             _update_status("waiting_single")
         else:
-            print("[DEBUG] Setting status to waiting_multi", file=sys.stderr, flush=True)
+            print(
+                "[DEBUG] Setting status to waiting_multi", file=sys.stderr, flush=True
+            )
             _update_status("waiting_multi")
-        
+
         session = self._input_registry.get_or_create(session_id)
         text = session.wait_for_input()
-        
+
         # 输入完成，恢复为运行状态
-        print("[DEBUG] Input completed, setting status to running", file=sys.stderr, flush=True)
+        print(
+            "[DEBUG] Input completed, setting status to running",
+            file=sys.stderr,
+            flush=True,
+        )
         _update_status("running")
-        
+
         return GatewayInputResult(text=text, metadata=metadata)
 
     def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
@@ -218,7 +246,7 @@ class WebGateway(BaseGateway):
         if not authorized:
             return GatewayConfirmResult(
                 confirmed=request.default if request.default is not None else False,
-                metadata={"error": reason}
+                metadata={"error": reason},
             )
         payload = {
             "message": request.message,
@@ -229,16 +257,16 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存确认请求，用于重连后恢复
         self._input_registry.save_confirm_request(session_id, message)
-        
+
         # 更新状态为等待单行输入（确认）
         _update_status("waiting_single")
-        
+
         session = self._input_registry.get_or_create_confirm_session(session_id)
         confirmed = session.wait_for_confirm()
-        
+
         # 确认完成，恢复为运行状态
         _update_status("running")
-        
+
         return GatewayConfirmResult(confirmed=confirmed, metadata=metadata)
 
     def publish_execution_event(
@@ -367,7 +395,9 @@ class WebSocketConnectionManager:
             f"[RECONNECT] session_id={session_id}, pending_confirm={pending_confirm is not None}"
         )
         if pending_confirm:
-            confirm_session = self._input_registry.get_or_create_confirm_session(session_id)
+            confirm_session = self._input_registry.get_or_create_confirm_session(
+                session_id
+            )
             print("[RECONNECT] Got confirm session, reconnecting...")
             confirm_session.reconnect()
             print(f"[RECONNECT] Sending confirm_request: {pending_confirm}")
@@ -433,18 +463,16 @@ class WebSocketConnectionManager:
 
 def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     """创建 FastAPI 应用。
-    
+
     Args:
         custom_app: 自定义 FastAPI app，用于添加额外的路由（如状态查询）
-    
+
     Returns:
         FastAPI 应用实例
     """
 
     # 创建 AgentManager，并设置状态变更回调
-    agent_manager = AgentManager(
-        on_status_change=_on_agent_status_change
-    )
+    agent_manager = AgentManager(on_status_change=_on_agent_status_change)
     # 保存 agent_manager 到全局，以便回调访问
     global _global_agent_manager
     _global_agent_manager = agent_manager
@@ -452,7 +480,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
-    
+
     # 保存 router 到全局，用于状态更新时推送消息
     global _router
     _router = router
@@ -506,9 +534,21 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             additional_args = request.get("additional_args")
 
             if not agent_type:
-                return {"success": False, "error": {"code": "MISSING_AGENT_TYPE", "message": "agent_type is required"}}
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "MISSING_AGENT_TYPE",
+                        "message": "agent_type is required",
+                    },
+                }
             if not working_dir:
-                return {"success": False, "error": {"code": "MISSING_WORKING_DIR", "message": "working_dir is required"}}
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "MISSING_WORKING_DIR",
+                        "message": "working_dir is required",
+                    },
+                }
 
             agent_info = agent_manager.create_agent(
                 agent_type=agent_type,
@@ -523,11 +563,20 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
             return {"success": True, "data": agent_info}
         except ValueError as e:
-            return {"success": False, "error": {"code": "INVALID_ARGUMENT", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INVALID_ARGUMENT", "message": str(e)},
+            }
         except RuntimeError as e:
-            return {"success": False, "error": {"code": "START_FAILED", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "START_FAILED", "message": str(e)},
+            }
         except Exception as e:
-            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：获取 Agent 列表
     @app.get("/api/agents")
@@ -537,7 +586,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             agents = agent_manager.get_agent_list()
             return {"success": True, "data": agents}
         except Exception as e:
-            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：停止 Agent
     @app.delete("/api/agents/{agent_id}/stop")
@@ -547,9 +599,15 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             result = agent_manager.stop_agent(agent_id)
             return {"success": True, "data": result}
         except KeyError as e:
-            return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
         except Exception as e:
-            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：删除 Agent
     @app.delete("/api/agents/{agent_id}")
@@ -559,9 +617,79 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             result = agent_manager.delete_agent(agent_id)
             return {"success": True, "data": result}
         except KeyError as e:
-            return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
         except Exception as e:
-            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：获取可恢复的 session 列表
+    @app.get("/api/agents/{agent_id}/sessions")
+    async def list_agent_sessions(agent_id: str) -> Dict[str, Any]:
+        """获取可恢复的 session 列表。"""
+        try:
+            agent_info = agent_manager.get_agent_info(agent_id)
+            if agent_info is None:
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
+
+            # 代理到 Agent 进程的 /sessions 接口
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"http://127.0.0.1:{agent_info.port}/sessions"
+                )
+                return response.json()
+        except KeyError as e:
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：恢复指定的 session
+    @app.post("/api/agents/{agent_id}/sessions")
+    async def restore_agent_session(
+        agent_id: str, request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """恢复指定的 session。"""
+        try:
+            agent_info = agent_manager.get_agent_info(agent_id)
+            if agent_info is None:
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
+
+            # 代理到 Agent 进程的 /sessions 接口
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"http://127.0.0.1:{agent_info.port}/sessions", json=request
+                )
+                return response.json()
+        except KeyError as e:
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：获取补全列表
     @app.get("/api/completions/{agent_id}")
@@ -576,7 +704,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             # 获取 Agent 的工作目录
             agent = agent_manager.get_agent(agent_id)
             if not agent:
-                return {"success": False, "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"}}
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
             working_dir = agent.working_dir
             os.chdir(working_dir)
 
@@ -586,66 +717,84 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             try:
                 replace_map = get_replace_map()
                 for tag, info in replace_map.items():
-                    desc = info.get("description", tag) + "(Append)" if info.get("append") else "(Replace)"
-                    all_completions.append({
-                        "type": "replace",
-                        "value": ot(tag),
-                        "display": tag,
-                        "description": desc
-                    })
+                    desc = (
+                        info.get("description", tag) + "(Append)"
+                        if info.get("append")
+                        else "(Replace)"
+                    )
+                    all_completions.append(
+                        {
+                            "type": "replace",
+                            "value": ot(tag),
+                            "display": tag,
+                            "description": desc,
+                        }
+                    )
             except Exception as e:
                 print(f"[COMPLETIONS] Failed to load replace_map: {e}")
 
             # 添加内置命令
             for cmd, desc in BUILTIN_COMMANDS:
-                all_completions.append({
-                    "type": "command",
-                    "value": ot(cmd),
-                    "display": cmd,
-                    "description": desc
-                })
+                all_completions.append(
+                    {
+                        "type": "command",
+                        "value": ot(cmd),
+                        "display": cmd,
+                        "description": desc,
+                    }
+                )
 
             # 添加规则
             try:
                 from jarvis.jarvis_agent.rules_manager import RulesManager
+
                 rules_manager = RulesManager(working_dir)
                 available_rules = rules_manager.get_all_available_rule_names()
 
                 # 内置规则
                 if available_rules.get("builtin"):
                     for rule_name in available_rules["builtin"]:
-                        all_completions.append({
-                            "type": "rule",
-                            "value": f"<rule:{rule_name}>",
-                            "display": rule_name,
-                            "description": "📚 内置规则"
-                        })
+                        all_completions.append(
+                            {
+                                "type": "rule",
+                                "value": f"<rule:{rule_name}>",
+                                "display": rule_name,
+                                "description": "📚 内置规则",
+                            }
+                        )
 
                 # 文件规则
                 if available_rules.get("files"):
                     for rule_name in available_rules["files"]:
-                        all_completions.append({
-                            "type": "rule",
-                            "value": f"<rule:{rule_name}>",
-                            "display": rule_name,
-                            "description": "📄 文件规则"
-                        })
+                        all_completions.append(
+                            {
+                                "type": "rule",
+                                "value": f"<rule:{rule_name}>",
+                                "display": rule_name,
+                                "description": "📄 文件规则",
+                            }
+                        )
 
                 # YAML 规则
                 if available_rules.get("yaml"):
                     for rule_name in available_rules["yaml"]:
-                        all_completions.append({
-                            "type": "rule",
-                            "value": f"<rule:{rule_name}>",
-                            "display": rule_name,
-                            "description": "📝 YAML 规则"
-                        })
+                        all_completions.append(
+                            {
+                                "type": "rule",
+                                "value": f"<rule:{rule_name}>",
+                                "display": rule_name,
+                                "description": "📝 YAML 规则",
+                            }
+                        )
             except Exception as e:
                 print(f"[COMPLETIONS] Failed to load rules: {e}")
 
             return {"success": True, "data": all_completions}
         except Exception as e:
-            return {"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     return app
 

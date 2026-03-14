@@ -57,12 +57,13 @@ import threading
 
 class AgentStatus(Enum):
     """Agent 状态枚举。
-    
+
     状态说明：
     - RUNNING: agent 正在运行中（包括执行任务、空闲等待命令）- 默认状态
     - WAITING_MULTI: agent 需要多行输入（如代码）
     - WAITING_SINGLE: agent 需要单行确认（如是否继续）
     """
+
     RUNNING = "running"  # 运行中（默认状态）
     WAITING_MULTI = "waiting_multi"  # 等待多行输入
     WAITING_SINGLE = "waiting_single"  # 等待单行确认
@@ -83,10 +84,15 @@ class AgentStateManager:
     def set_status(self, status: AgentStatus) -> None:
         """设置当前状态。"""
         import sys
+
         with self._lock:
             old_status = self._status
             self._status = status
-            print(f"[DEBUG] AgentStateManager: status changed from {old_status.value} to {status.value}", file=sys.stderr, flush=True)
+            print(
+                f"[DEBUG] AgentStateManager: status changed from {old_status.value} to {status.value}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     def set_running(self) -> None:
         """设置为运行状态。"""
@@ -111,6 +117,7 @@ def get_agent_status_manager() -> AgentStateManager:
     if _agent_status_manager is None:
         _agent_status_manager = AgentStateManager()
     return _agent_status_manager
+
 
 # ========== Agent 状态管理结束 ==========
 
@@ -1128,41 +1135,118 @@ def run_cli(
 
             from jarvis.jarvis_web_gateway.app import create_app
             from jarvis.jarvis_web_gateway.app import set_status_update_callback
-            
+
             # 获取状态管理器并注册状态更新回调
             status_manager = get_agent_status_manager()
-            
+
             def on_status_update(status_str: str) -> None:
                 """Web Gateway 请求输入时的状态更新回调。"""
                 import sys
-                print(f"[DEBUG] on_status_update called with status={status_str}", file=sys.stderr, flush=True)
+
+                print(
+                    f"[DEBUG] on_status_update called with status={status_str}",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 # 根据 status_str 更新状态
                 if status_str == "running":
-                    print("[DEBUG] Setting status to RUNNING", file=sys.stderr, flush=True)
+                    print(
+                        "[DEBUG] Setting status to RUNNING", file=sys.stderr, flush=True
+                    )
                     status_manager.set_running()
                 elif status_str == "waiting_multi":
-                    print("[DEBUG] Setting status to WAITING_MULTI", file=sys.stderr, flush=True)
+                    print(
+                        "[DEBUG] Setting status to WAITING_MULTI",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                     status_manager.set_waiting_multi()
                 elif status_str == "waiting_single":
-                    print("[DEBUG] Setting status to WAITING_SINGLE", file=sys.stderr, flush=True)
+                    print(
+                        "[DEBUG] Setting status to WAITING_SINGLE",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                     status_manager.set_waiting_single()
-            
+
             # 注册回调
             set_status_update_callback(on_status_update)
-            
+
             # 创建自定义 FastAPI app，添加状态查询接口
             from fastapi import FastAPI
-            
+            from jarvis.jarvis_utils.globals import get_current_agent
+
             custom_app = FastAPI()
-            
+
             @custom_app.get("/status")
             async def get_status():
                 """获取 Agent 运行状态（任务级别）。"""
                 return {
                     "execution_status": status_manager.get_status(),
-                    "status": "running"  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                    "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
                 }
-            
+
+            @custom_app.get("/sessions")
+            async def list_sessions():
+                """获取可恢复的 session 列表。"""
+                try:
+                    agent = get_current_agent()
+                    if agent is None:
+                        return {"success": False, "error": "No active agent"}
+
+                    # 解析 session 文件
+                    sessions = agent.session._parse_session_files()
+
+                    # 格式化返回
+                    session_list = []
+                    for session_file, timestamp, session_name in sessions:
+                        session_list.append(
+                            {
+                                "file": session_file,
+                                "timestamp": timestamp,
+                                "name": session_name,
+                            }
+                        )
+
+                    return {"success": True, "data": session_list}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
+            @custom_app.post("/sessions")
+            async def do_restore_session(request: dict):
+                """恢复指定的 session。"""
+                try:
+                    session_file = request.get("session_file")
+                    if not session_file:
+                        return {"success": False, "error": "session_file is required"}
+
+                    agent = get_current_agent()
+                    if agent is None:
+                        return {"success": False, "error": "No active agent"}
+
+                    # 读取 session 名称
+                    session_name = agent.session._read_session_name(session_file)
+
+                    # 恢复 session
+                    result = agent.session.restore_session_from_file(
+                        session_file, session_name
+                    )
+
+                    if result:
+                        # 设置 first 标志为 False
+                        agent.first = False
+                        return {
+                            "success": True,
+                            "data": {
+                                "session_file": session_file,
+                                "session_name": session_name,
+                            },
+                        }
+                    else:
+                        return {"success": False, "error": "Failed to restore session"}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
             # 将自定义 app 传递给 gateway
             config = uvicorn.Config(
                 create_app(custom_app),
