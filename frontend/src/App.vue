@@ -705,13 +705,50 @@ function sendMessageToAgent(message) {
 }
 
 // 连接到指定的 Agent（建立独立的 WebSocket 连接）
-async function connectToAgent(agent) {
+async function connectToAgent(agent, retryCount = 0) {
   const agentId = agent.agent_id
+  const maxRetries = 3
+  const retryDelay = 1000 // 1秒重试间隔
+  const connectionTimeout = 5000 // 5秒连接超时
   
   // 检查是否已有连接
   if (sockets.value.has(agentId)) {
-    console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
-    return
+    const existingWs = sockets.value.get(agentId)
+    // 检查现有连接是否仍然有效
+    if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+      console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
+      return
+    }
+    // 连接已断开或正在关闭，确保完全关闭后再清理
+    console.log(`[AGENT] Previous connection to ${agent.name || agentId} was not OPEN, cleaning up...`)
+    
+    // 等待旧连接完全关闭（避免与后端连接冲突）
+    if (existingWs && existingWs.readyState !== WebSocket.CLOSED) {
+      console.log(`[AGENT] Waiting for old connection to close (state: ${existingWs.readyState})`)
+      existingWs.close()
+      // 等待最多 1 秒让连接完全关闭
+      await new Promise((resolve) => {
+        if (existingWs.readyState === WebSocket.CLOSED) {
+          resolve()
+          return
+        }
+        const checkInterval = setInterval(() => {
+          if (existingWs.readyState === WebSocket.CLOSED) {
+            clearInterval(checkInterval)
+            resolve()
+          }
+        }, 50)
+        // 最多等待 1 秒
+        setTimeout(() => {
+          clearInterval(checkInterval)
+          resolve()
+        }, 1000)
+      })
+    }
+    
+    // 清理旧连接
+    sockets.value.delete(agentId)
+    console.log(`[AGENT] Old connection cleaned up`)
   }
   
   console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
@@ -722,70 +759,204 @@ async function connectToAgent(agent) {
   
   connecting.value = true
   
-  try {
-    const ws = new WebSocket(url)
-    
-    // 绑定消息处理
-    ws.onmessage = (event) => {
-      let message = null
-      try {
-        message = JSON.parse(event.data)
-      } catch (error) {
-        console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
-        return
+  // 返回 Promise，等待连接真正建立
+  return new Promise((resolve, reject) => {
+    try {
+      const ws = new WebSocket(url)
+      let connectionHandled = false // 防止重复处理连接结果
+      
+      // 设置连接超时
+      const timeoutId = setTimeout(() => {
+        if (connectionHandled) return
+        connectionHandled = true
+        
+        console.error(`[AGENT ${agentId}] Connection timeout after ${connectionTimeout}ms`)
+        ws.close()
+        
+        // 等待连接关闭后再重试
+        const retryWithCleanup = async () => {
+          // 清理可能存在的旧连接
+          const oldWs = sockets.value.get(agentId)
+          if (oldWs && oldWs !== ws && oldWs.readyState !== WebSocket.CLOSED) {
+            console.log(`[AGENT ${agentId}] Cleaning up old connection before retry`)
+            oldWs.close()
+            await new Promise(resolve => {
+              const check = setInterval(() => {
+                if (oldWs.readyState === WebSocket.CLOSED) {
+                  clearInterval(check)
+                  resolve()
+                }
+              }, 50)
+              setTimeout(() => {
+                clearInterval(check)
+                resolve()
+              }, 500)
+            })
+            sockets.value.delete(agentId)
+          }
+          
+          if (retryCount < maxRetries) {
+            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
+            connecting.value = false
+            setTimeout(() => {
+              connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
+            }, retryDelay)
+          } else {
+            connecting.value = false
+            const error = new Error(`Connection failed after ${maxRetries} retries`)
+            console.error(`[AGENT ${agentId}]`, error.message)
+            reject(error)
+          }
+        }
+        
+        retryWithCleanup()
+      }, connectionTimeout) // 结束 setTimeout
+      
+      // 绑定消息处理
+      ws.onmessage = (event) => {
+        let message = null
+        try {
+          message = JSON.parse(event.data)
+        } catch (error) {
+          console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
+          return
+        }
+        console.log(`[AGENT ${agentId}] message`, message)
+        handleMessage(message, agentId)
       }
-      console.log(`[AGENT ${agentId}] message`, message)
-      handleMessage(message, agentId)
-    }
-    
-    ws.onopen = () => {
-      console.log(`[AGENT ${agentId}] Connected to ${url}`)
-      connecting.value = false
       
-      // 保存连接
-      sockets.value.set(agentId, ws)
-      
-      // 初始化消息记录
-      if (!allOutputs.value.has(agentId)) {
-        allOutputs.value.set(agentId, [])
+      ws.onopen = () => {
+        if (connectionHandled) {
+          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onopen`)
+          return
+        }
+        connectionHandled = true
+        
+        clearTimeout(timeoutId)
+        console.log(`[AGENT ${agentId}] Connected to ${url}`)
+        connecting.value = false
+        
+        // 保存连接
+        sockets.value.set(agentId, ws)
+        
+        // 初始化消息记录
+        if (!allOutputs.value.has(agentId)) {
+          allOutputs.value.set(agentId, [])
+        }
+        
+        // 发送认证
+        const payload = {}
+        if (auth.value.token) payload.token = auth.value.token
+        if (auth.value.password) payload.password = auth.value.password
+        if (Object.keys(payload).length > 0) {
+          ws.send(JSON.stringify({ type: 'auth', payload }))
+          console.log(`[AGENT ${agentId}] auth sent`, payload)
+        }
+        
+        // 连接成功，resolve Promise
+        resolve(ws)
       }
       
-      // 发送认证
-      const payload = {}
-      if (auth.value.token) payload.token = auth.value.token
-      if (auth.value.password) payload.password = auth.value.password
-      if (Object.keys(payload).length > 0) {
-        ws.send(JSON.stringify({ type: 'auth', payload }))
-        console.log(`[AGENT ${agentId}] auth sent`, payload)
-      }
-      
-      // 加载历史消息（如果当前是此 Agent）
-      if (currentAgentId.value === agentId) {
-        const currentOutputs = allOutputs.value.get(agentId) || []
-        if (currentOutputs.length === 0) {
-          console.log(`[AGENT ${agentId}] Loading history on first connect`)
-          loadHistoryMessages(false)
-        } else {
-          console.log(`[AGENT ${agentId}] Skip loading history, messages already exist`)
+      ws.onclose = (event) => {
+        if (connectionHandled) {
+          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onclose`)
+          return
+        }
+        connectionHandled = true
+        
+        clearTimeout(timeoutId)
+        console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason}`)
+        sockets.value.delete(agentId)
+        if (connecting.value) connecting.value = false
+        
+        // 如果连接未完成就关闭，视为失败，触发重试
+        if (!ws._connectionCompleted && retryCount < maxRetries) {
+          console.log(`[AGENT ${agentId}] Connection closed before completion, retrying... (${retryCount + 1}/${maxRetries})`)
+          
+          // 等待当前连接完全关闭后再重试（避免与后端连接冲突）
+          const retryAfterClose = async () => {
+            if (ws.readyState !== WebSocket.CLOSED) {
+              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
+              await new Promise(resolve => {
+                const check = setInterval(() => {
+                  if (ws.readyState === WebSocket.CLOSED) {
+                    clearInterval(check)
+                    resolve()
+                  }
+                }, 50)
+                setTimeout(() => {
+                  clearInterval(check)
+                  resolve()
+                }, 500)
+              })
+            }
+            
+            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
+            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
+          }
+          
+          setTimeout(retryAfterClose, retryDelay)
         }
       }
+      
+      ws.onerror = (error) => {
+        if (connectionHandled) {
+          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onerror`)
+          return
+        }
+        connectionHandled = true
+        
+        clearTimeout(timeoutId)
+        console.error(`[AGENT ${agentId}] Connection error:`, error)
+        if (connecting.value) connecting.value = false
+        
+        // 触发重试
+        if (retryCount < maxRetries) {
+          console.log(`[AGENT ${agentId}] Error occurred, retrying... (${retryCount + 1}/${maxRetries})`)
+          
+          // 关闭并等待连接完全关闭后再重试
+          const retryAfterError = async () => {
+            ws.close()
+            if (ws.readyState !== WebSocket.CLOSED) {
+              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
+              await new Promise(resolve => {
+                const check = setInterval(() => {
+                  if (ws.readyState === WebSocket.CLOSED) {
+                    clearInterval(check)
+                    resolve()
+                  }
+                }, 50)
+                setTimeout(() => {
+                  clearInterval(check)
+                  resolve()
+                }, 500)
+              })
+            }
+            
+            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
+          }
+          
+          setTimeout(retryAfterError, retryDelay)
+        } else {
+          const err = new Error(`Connection failed after ${maxRetries} retries`)
+          reject(err)
+        }
+      }
+      
+    } catch (error) {
+      console.error(`[AGENT ${agentId}] Failed to connect:`, error)
+      connecting.value = false
+      
+      if (retryCount < maxRetries) {
+        console.log(`[AGENT ${agentId}] Exception occurred, retrying... (${retryCount + 1}/${maxRetries})`)
+        setTimeout(() => {
+          connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
+        }, retryDelay)
+      } else {
+        reject(error)
+      }
     }
-    
-    ws.onclose = () => {
-      console.log(`[AGENT ${agentId}] Disconnected`)
-      sockets.value.delete(agentId)
-      if (connecting.value) connecting.value = false
-    }
-    
-    ws.onerror = () => {
-      console.error(`[AGENT ${agentId}] Connection error`)
-      if (connecting.value) connecting.value = false
-    }
-    
-  } catch (error) {
-    console.error(`[AGENT ${agentId}] Failed to connect:`, error)
-    connecting.value = false
-  }
+  })
 }
 
 // 创建 Agent
@@ -1005,7 +1176,18 @@ async function switchAgent(agent) {
     const ws = sockets.value.get(agent.agent_id)
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       console.log('[AGENT] WebSocket not connected, reconnecting...')
-      await connectToAgent(agent)
+      try {
+        await connectToAgent(agent)
+        // 重连成功后加载历史消息
+        const currentOutputs = allOutputs.value.get(agent.agent_id) || []
+        if (currentOutputs.length === 0) {
+          console.log(`[AGENT] Loading history after reconnect`)
+          loadHistoryMessages(false)
+        }
+      } catch (error) {
+        console.error(`[AGENT] Failed to reconnect:`, error)
+        // 不中断流程，让用户看到错误
+      }
     } else {
       console.log('[AGENT] WebSocket already connected, skipping')
     }
@@ -1031,12 +1213,30 @@ async function switchAgent(agent) {
   // 清空当前 Agent 的消息列表
   allOutputs.value.set(agent.agent_id, [])
   
-  // 连接到目标 Agent（如果还未连接）
-  await connectToAgent(agent)
-  
-  // 加载历史消息
-  console.log('[AGENT] Loading history messages...')
-  loadHistoryMessages(false)
+  // 连接到目标 Agent（等待连接真正建立）
+  try {
+    await connectToAgent(agent)
+    
+    // 验证连接是否真的成功
+    const ws = sockets.value.get(agent.agent_id)
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log('[AGENT] Connection verified successfully')
+      // 加载历史消息（仅在连接成功后）
+      const currentOutputs = allOutputs.value.get(agent.agent_id) || []
+      if (currentOutputs.length === 0) {
+        console.log('[AGENT] Loading history messages...')
+        loadHistoryMessages(false)
+      } else {
+        console.log('[AGENT] Messages already exist, skip loading history')
+      }
+    } else {
+      console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
+    }
+  } catch (error) {
+    console.error('[AGENT] Failed to connect to agent:', error)
+    // 连接失败，不加载历史消息，但保持当前状态
+    // 用户可以看到错误并手动重试
+  }
 }
 
 // 定时刷新 Agent 列表
