@@ -123,6 +123,14 @@
             清空
           </button>
           <button 
+            class="action-btn completion-btn" 
+            @click="openCompletions" 
+            :disabled="!currentAgent"
+            title="插入补全 (@)"
+          >
+            @
+          </button>
+          <button 
             class="send-btn" 
             @click="submitInput" 
             :disabled="!inputText.trim() && (!hasBufferedInput || showInput)"
@@ -132,6 +140,39 @@
         </div>
       </div>
     </footer>
+
+    <!-- 补全列表弹窗 -->
+    <div class="modal-overlay" v-if="showCompletions">
+      <div class="modal completions-modal">
+        <div class="modal-header">
+          <h3>插入补全</h3>
+          <button class="icon-btn" @click="showCompletions = false">✕</button>
+        </div>
+        <div class="completions-search">
+          <input 
+            type="text" 
+            v-model="completionSearch" 
+            placeholder="搜索补全..." 
+            ref="completionSearchInput"
+          />
+        </div>
+        <div class="completions-list">
+          <div 
+            v-for="(item, index) in filteredCompletions" 
+            :key="index" 
+            class="completion-item"
+            :class="`completion-${item.type}`"
+            @click="insertCompletion(item)"
+          >
+            <div class="completion-value">{{ item.display }}</div>
+            <div class="completion-desc">{{ item.description }}</div>
+          </div>
+          <div v-if="filteredCompletions.length === 0" class="completion-empty">
+            没有找到匹配的补全
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 创建 Agent 弹窗 -->
     <div class="modal-overlay" v-if="showCreateAgentModal">
@@ -388,6 +429,11 @@ const newAgentName = ref('')       // 新 Agent 名称（可选）
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
+
+// 补全列表
+const showCompletions = ref(false) // 是否显示补全列表
+const completions = ref([]) // 补全列表数据
+const completionSearch = ref('') // 补全搜索关键词
 
 // 流式消息跟踪
 const streamingMessage = ref(null) // 当前流式消息
@@ -730,6 +776,87 @@ async function createAgent() {
   }
 }
 
+// 打开补全列表
+async function openCompletions() {
+  if (!currentAgent.value) {
+    alert('请先选择一个 Agent')
+    return
+  }
+  
+  completionSearch.value = ''
+  showCompletions.value = true
+  
+  // 获取补全列表
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
+    
+    const result = await response.json()
+    console.log('[COMPLETIONS] API response:', result)
+    
+    if (!response.ok) {
+      alert(`获取补全列表失败: ${result.error?.message || result.detail || '未知错误'}`)
+      return
+    }
+    
+    if (result.success && result.data) {
+      completions.value = result.data
+      console.log('[COMPLETIONS] Loaded', result.data.length, 'completions')
+    } else {
+      console.error('[COMPLETIONS] Invalid format:', result)
+      alert('获取补全列表失败：返回数据格式错误')
+    }
+  } catch (error) {
+    console.error('[COMPLETIONS] Fetch failed:', error)
+    alert(`获取补全列表失败: ${error.message}`)
+  }
+  
+  // 聚焦搜索框
+  setTimeout(() => {
+    if (window.completionSearchInput) {
+      window.completionSearchInput.focus()
+    }
+  }, 100)
+}
+
+// 过滤补全列表
+const filteredCompletions = computed(() => {
+  if (!completionSearch.value) {
+    return completions.value
+  }
+  
+  const search = completionSearch.value.toLowerCase()
+  return completions.value.filter(item => 
+    item.display.toLowerCase().includes(search) || 
+    item.description.toLowerCase().includes(search)
+  )
+})
+
+// 插入选中的补全
+function insertCompletion(item) {
+  const textarea = document.querySelector('.input-wrapper textarea')
+  if (!textarea) return
+  
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const text = textarea.value
+  
+  // 在光标位置插入补全（添加单引号包裹）
+  const valueToInsert = `'${item.value}'`
+  const newText = text.substring(0, start) + valueToInsert + text.substring(end)
+  inputText.value = newText
+  
+  // 设置新的光标位置
+  textarea.value = newText
+  const newCursorPos = start + valueToInsert.length
+  textarea.setSelectionRange(newCursorPos, newCursorPos)
+  textarea.focus()
+  
+  // 关闭弹窗
+  showCompletions.value = false
+}
+
 // 获取 Agent 列表
 async function fetchAgentList() {
   try {
@@ -941,6 +1068,18 @@ function handleMessage(message, agentId = null) {
     inputTip.value = payload.tip || ''
     inputMode.value = payload.mode || 'multi'  // 默认多行
     inputText.value = payload.preset || ''
+    
+    // 检查是否在底部（用于判断是否需要在显示输入框后滚动）
+    const SCROLL_THRESHOLD = 50 // 50px 的容差
+    let shouldScrollAfterInputShow = false
+    if (outputList.value) {
+      const scrollTop = outputList.value.scrollTop
+      const scrollHeight = outputList.value.scrollHeight
+      const clientHeight = outputList.value.clientHeight
+      // 如果已经接近底部，则记录需要在显示输入框后滚动
+      shouldScrollAfterInputShow = (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD)
+      console.log('[INPUT_REQUEST] Before show - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'shouldScroll:', shouldScrollAfterInputShow)
+    }
     
     showInput.value = true // 显示输入框
     nextTick(() => {
@@ -3084,5 +3223,118 @@ body::-webkit-scrollbar {
   .send-btn {
     width: 100%;
   }
+}
+
+/* 补全按钮 */
+.completion-btn {
+  min-width: 44px;
+  background: rgba(88, 166, 255, 0.1);
+  border-color: rgba(88, 166, 255, 0.3);
+  color: #58a6ff;
+}
+
+.completion-btn:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.2);
+  border-color: #58a6ff;
+}
+
+.completion-btn:disabled {
+  opacity: 0.3;
+}
+
+/* 补全列表弹窗 */
+.completions-modal {
+  max-width: 520px;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.completions-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.completions-search {
+  margin-bottom: 16px;
+}
+
+.completions-search input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
+}
+
+.completions-search input:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.completions-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.6);
+}
+
+.completion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.completion-item:last-child {
+  border-bottom: none;
+}
+
+.completion-item:hover {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.completion-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+}
+
+.completion-desc {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.completion-item.completion-replace .completion-desc {
+  color: #58a6ff;
+}
+
+.completion-item.completion-command .completion-desc {
+  color: #d29922;
+}
+
+.completion-item.completion-rule .completion-desc {
+  color: #3fb950;
+}
+
+.completion-empty {
+  padding: 24px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 14px;
 }
 </style>
