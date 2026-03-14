@@ -7,6 +7,12 @@
           📋
         </button>
       </div>
+      <div class="current-agent-info" v-if="currentAgent">
+        <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
+        <span class="agent-status" :class="currentAgent.status">{{ currentAgent.status }}</span>
+        <span class="agent-port">:{{ currentAgent.port }}</span>
+        <span class="agent-dir">{{ currentAgent.working_dir }}</span>
+      </div>
       <div class="header-actions">
         <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
           👤 人工介入
@@ -376,6 +382,9 @@ const hasBufferedInput = computed(() => {
 // Agent 管理
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
+const currentAgent = computed(() => {
+  return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
+})
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('')       // 新 Agent 名称（可选）
@@ -1789,6 +1798,52 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* 当前 Agent 信息 */
+.current-agent-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: rgba(35, 134, 54, 0.15);
+  border: 1px solid rgba(56, 139, 253, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.current-agent-info .agent-type {
+  font-weight: 600;
+}
+
+.current-agent-info .agent-status {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.current-agent-info .agent-status.running {
+  background: rgba(56, 139, 253, 0.2);
+  color: #58a6ff;
+}
+
+.current-agent-info .agent-status.stopped {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.current-agent-info .agent-port {
+  color: #8b949e;
+}
+
+.current-agent-info .agent-dir {
+  color: #8b949e;
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .icon-btn {
