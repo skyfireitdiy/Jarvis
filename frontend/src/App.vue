@@ -51,7 +51,7 @@
             <span class="agent-port">:{{ agent.port }}</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir }}</div>
-          <button class="icon-btn stop-btn" @click.stop="stopAgent(agent.agent_id)" title="停止 Agent">✕</button>
+          <button class="icon-btn stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
         </div>
         <div v-if="agentList.length === 0" class="agent-empty">
           暂无 Agent，点击 + 创建
@@ -892,35 +892,50 @@ async function fetchAgentList() {
 }
 
 // 停止 Agent
-async function stopAgent(agentId) {
-  if (!confirm('确认停止该 Agent?')) return
-  
-  try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/agents/${agentId}`, {
-      method: 'DELETE'
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      alert(`停止失败: ${error.detail || '未知错误'}`)
-      return
+// 删除 Agent
+async function deleteAgent(agentId) {
+  confirmDialog.value = {
+    message: '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
+    confirmCallback: async () => {
+      try {
+        const host = backendHost.value || window.location.hostname || '127.0.0.1'
+        const port = backendPort.value || '8000'
+        const response = await fetch(`http://${host}:${port}/api/agents/${agentId}`, {
+          method: 'DELETE'
+        })
+        
+        const result = await response.json()
+        
+        if (!response.ok || !result.success) {
+          alert(`删除失败: ${result.error?.message || '未知错误'}`)
+          return
+        }
+        
+        console.log('[AGENT] Deleted:', agentId)
+        
+        // 清除该 Agent 的历史记录
+        historyStorage.clearHistoryForAgent(agentId)
+        
+        // 如果是当前 Agent，清空当前 Agent ID
+        if (currentAgentId.value === agentId) {
+          currentAgentId.value = null
+          outputs.value = []
+          // 清空当前显示的历史偏移
+          historyOffset.value = 0
+          hasMoreHistory.value = true
+        }
+        
+        // 刷新列表
+        await fetchAgentList()
+      } catch (error) {
+        console.error('[AGENT] Delete failed:', error)
+        alert(`删除失败: ${error.message}`)
+      }
+      confirmDialog.value = null
+    },
+    cancelCallback: () => {
+      confirmDialog.value = null
     }
-    
-    console.log('[AGENT] Stopped:', agentId)
-    
-    // 如果是当前 Agent，清空当前 Agent ID
-    if (currentAgentId.value === agentId) {
-      currentAgentId.value = null
-      outputs.value = []
-    }
-    
-    // 刷新列表
-    await fetchAgentList()
-  } catch (error) {
-    console.error('[AGENT] Stop failed:', error)
-    alert(`停止失败: ${error.message}`)
   }
 }
 
