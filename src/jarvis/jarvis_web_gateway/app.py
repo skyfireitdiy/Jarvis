@@ -377,6 +377,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.on_event("startup")
+    async def _startup() -> None:
+        # 为运行中的 Agent 启动监控任务
+        await agent_manager.start_monitoring_for_running_agents()
+
     @app.on_event("shutdown")
     async def _shutdown() -> None:
         # 清理所有 Agent

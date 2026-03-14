@@ -123,6 +123,9 @@ class AgentManager:
                 f"must be one of {list(self.AGENT_ENTRY_POINTS.keys())}"
             )
 
+        # 展开工作目录中的 ~ 符号
+        working_dir = os.path.expanduser(working_dir)
+        
         # 验证工作目录
         if not os.path.isdir(working_dir):
             raise ValueError(f"Working directory not found: {working_dir}")
@@ -405,6 +408,18 @@ class AgentManager:
             except Exception:
                 pass
     
+    async def start_monitoring_for_running_agents(self) -> None:
+        """为所有运行中的 Agent 启动监控任务。
+        
+        这个方法需要在异步上下文中调用（在应用启动后）。
+        """
+        for agent_id, agent_info in list(self._agents.items()):
+            if agent_info.status == 'running' and agent_info._monitor_task is None:
+                print(f"[AGENT MANAGER] Starting monitor task for agent {agent_id}")
+                agent_info._monitor_task = asyncio.create_task(
+                    self._monitor_agent(agent_id)
+                )
+    
     def _load_agents(self) -> None:
         """从文件加载已保存的 Agent 列表。"""
         if not self.PERSISTENCE_FILE.exists():
@@ -423,34 +438,37 @@ class AgentManager:
             
             for agent_data in data:
                 try:
-                    # 检查 Agent 是否还在运行（通过检查进程是否存在）
+                    # 恢复 AgentInfo
+                    agent_info = AgentInfo(
+                        agent_id=agent_data['agent_id'],
+                        agent_type=agent_data['agent_type'],
+                        pid=agent_data.get('pid', 0),
+                        port=agent_data['port'],
+                        working_dir=agent_data['working_dir'],
+                        process=None,  # 进程对象无法恢复，设为 None
+                        name=agent_data.get('name'),
+                    )
+                    
+                    # 检查进程是否还在运行
                     pid = agent_data.get('pid')
                     if pid and self._is_process_running(pid):
-                        # 进程还在运行，恢复 AgentInfo
-                        agent_info = AgentInfo(
-                            agent_id=agent_data['agent_id'],
-                            agent_type=agent_data['agent_type'],
-                            pid=pid,
-                            port=agent_data['port'],
-                            working_dir=agent_data['working_dir'],
-                            process=None,  # 进程对象无法恢复，设为 None
-                            name=agent_data.get('name'),
-                        )
-                        # 恢复状态
+                        # 进程还在运行，恢复为 running 状态
                         agent_info.status = agent_data.get('status', 'running')
-                        agent_info.created_at = agent_data.get('created_at', datetime.now().isoformat())
+                        print(f"[AGENT MANAGER] Restored running agent {agent_info.agent_id} (PID: {pid})")
                         
-                        # 保存到内存
-                        self._agents[agent_info.agent_id] = agent_info
-                        print(f"[AGENT MANAGER] Restored agent {agent_info.agent_id} (PID: {pid})")
-                        
-                        # 重新启动监控任务
-                        agent_info._monitor_task = asyncio.create_task(
-                            self._monitor_agent(agent_info.agent_id)
-                        )
+                        # 重新启动监控任务（需要异步上下文）
+                        # 注意：这里不能直接创建异步任务，需要在异步上下文中调用
+                        agent_info._monitor_task = None  # 稍后在异步上下文中创建
                     else:
-                        # 进程已停止，不恢复
-                        print(f"[AGENT MANAGER] Agent {agent_data['agent_id']} process not running, skipping")
+                        # 进程已停止，恢复为 stopped 状态
+                        agent_info.status = 'stopped'
+                        print(f"[AGENT MANAGER] Restored stopped agent {agent_info.agent_id}")
+                    
+                    # 恢复创建时间
+                    agent_info.created_at = agent_data.get('created_at', datetime.now().isoformat())
+                    
+                    # 保存到内存
+                    self._agents[agent_info.agent_id] = agent_info
                 except Exception as e:
                     print(f"[AGENT MANAGER] Failed to restore agent {agent_data.get('agent_id')}: {e}")
             

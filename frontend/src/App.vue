@@ -316,7 +316,7 @@ const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const newAgentType = ref('agent') // 新 Agent 类型
-const newAgentDir = ref('')       // 新 Agent 工作目录
+const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('')       // 新 Agent 名称（可选）
 
 // 确认对话框
@@ -1358,6 +1358,19 @@ function confirmClearHistory() {
       confirmDialog.value = null
     },
   }
+  
+  // 滚动到底部
+  nextTick(() => {
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        if (outputList.value) {
+          const scrollHeight = outputList.value.scrollHeight
+          outputList.value.scrollTop = scrollHeight
+          console.log('[SCROLL] Auto-scrolled to bottom')
+        }
+      })
+    })
+  })
 }
 
 function escapeHtml(text) {
