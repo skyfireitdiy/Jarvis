@@ -20,6 +20,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from jarvis.jarvis_utils.config import get_data_dir
+
 
 class AgentInfo:
     """Agent 信息。"""
@@ -72,7 +74,7 @@ class AgentManager:
     PORT_RANGE = (10000, 65535)
     
     # Agent 列表持久化文件路径
-    PERSISTENCE_FILE = Path(".jarvis_agents.json")
+    PERSISTENCE_FILE = Path(get_data_dir()) / "gateway" / ".jarvis_agents.json"
 
     def __init__(self, on_status_change: Optional[Callable[[str, str, Any], None]] = None) -> None:
         """初始化 AgentManager。
@@ -231,8 +233,8 @@ class AgentManager:
         # 更新状态
         agent_info.status = "stopped"
 
-        # 从内存中移除
-        del self._agents[agent_id]
+        # 保留在内存中（不删除），以便重启后恢复历史记录
+        # del self._agents[agent_id]
         
         # 更新持久化文件
         self._save_agents()
@@ -480,6 +482,9 @@ class AgentManager:
     def _save_agents(self) -> None:
         """保存 Agent 列表到文件。"""
         try:
+            # 确保目录存在
+            self.PERSISTENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            
             data = [agent.to_dict() for agent in self._agents.values()]
             with open(self.PERSISTENCE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
