@@ -1305,6 +1305,20 @@ async function switchAgent(agent) {
     console.log('[AGENT] Fetching status after switch...')
     await fetchAgentStatus(agent)
     
+    // 如果 Agent 已停止（已完成），不尝试连接 WebSocket
+    if (agent.status === 'stopped') {
+      console.log('[AGENT] Agent is stopped (completed), skipping WebSocket connection')
+      // 直接加载历史消息
+      const currentOutputs = allOutputs.value.get(agent.agent_id) || []
+      if (currentOutputs.length === 0) {
+        console.log('[AGENT] Loading history messages...')
+        loadHistoryMessages(false)
+      } else {
+        console.log('[AGENT] Messages already exist, skip loading history')
+      }
+      return
+    }
+    
     await connectToAgent(agent)
     
     // 验证连接是否真的成功
