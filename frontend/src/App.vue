@@ -98,14 +98,11 @@
 
     <!-- 底部输入区 -->
     <footer class="input-area">
-      <!-- 输入提示 -->
-      <p class="input-hint" v-if="inputTip">{{ inputTip }}</p>
-      
       <!-- 输入框 -->
       <div class="input-wrapper">
         <textarea 
           v-model="inputText" 
-          placeholder="输入内容 (Ctrl+Enter 发送)" 
+          :placeholder="inputTip || '输入内容 (Ctrl+Enter 发送)'"
           @keydown.ctrl.enter="submitInput"
         ></textarea>
         
