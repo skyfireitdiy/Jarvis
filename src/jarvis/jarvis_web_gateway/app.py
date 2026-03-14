@@ -796,6 +796,94 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.get("/api/directories")
+    async def list_directories(path: str = "") -> Dict[str, Any]:
+        """获取指定路径下的目录列表。
+        
+        Args:
+            path: 目录路径，默认为用户主目录
+        
+        Returns:
+            {
+                "success": True,
+                "data": {
+                    "current_path": "/path/to/dir",
+                    "parent_path": "/path/to",  # 如果存在
+                    "directories": [
+                        {"name": "dir1", "path": "/path/to/dir/dir1"},
+                        ...
+                    ]
+                }
+            }
+        """
+        import os
+        import pathlib
+        
+        try:
+            # 解析路径，如果为空则使用用户主目录
+            if not path or path == "~":
+                target_path = pathlib.Path.home()
+            else:
+                target_path = pathlib.Path(path).expanduser()
+            
+            # 规范化为绝对路径
+            target_path = target_path.resolve()
+            
+            # 检查路径是否存在且是目录
+            if not target_path.exists():
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": f"Path does not exist: {path}"},
+                }
+            
+            if not target_path.is_dir():
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_A_DIRECTORY", "message": f"Path is not a directory: {path}"},
+                }
+            
+            # 获取父目录路径（如果存在）
+            parent_path = None
+            if target_path.parent != target_path:  # 不是根目录
+                parent_path = str(target_path.parent)
+            
+            # 获取子目录列表
+            directories = []
+            try:
+                for entry in target_path.iterdir():
+                    # 只返回目录
+                    if entry.is_dir():
+                        # 过滤隐藏文件（以 . 开头）
+                        if not entry.name.startswith("."):
+                            directories.append({
+                                "name": entry.name,
+                                "path": str(entry),
+                            })
+                # 按名称排序
+                directories.sort(key=lambda x: x["name"])
+            except PermissionError:
+                # 忽略权限错误，返回空列表
+                pass
+            
+            return {
+                "success": True,
+                "data": {
+                    "current_path": str(target_path),
+                    "parent_path": parent_path,
+                    "directories": directories,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     return app
 
 

@@ -199,11 +199,50 @@
         </div>
         <div class="form-group">
           <label>工作目录</label>
-          <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
+          <div class="input-with-button">
+            <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
+            <button class="btn select-dir-btn" @click="openDirDialog">选择目录</button>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
           <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 目录选择对话框 -->
+    <div class="modal-overlay" v-if="showDirDialog">
+      <div class="modal dir-modal">
+        <div class="modal-header">
+          <h2>选择工作目录</h2>
+          <button class="close-btn" @click="cancelDirDialog">×</button>
+        </div>
+        <div class="path-header">
+          <button class="path-btn" @click="fetchDirectories(currentDirPath)">🔄 刷新</button>
+          <button class="path-btn" @click="goToParentDir">⬆️ 返回上级</button>
+        </div>
+        <div class="current-path">{{ currentDirPath }}</div>
+        <div class="dir-list" v-if="dirList.length > 0">
+          <div
+            v-for="dir in dirList"
+            :key="dir.path"
+            class="dir-item"
+            :class="{ selected: selectedDir === dir.path }"
+            @click="selectDirectory(dir.path)"
+            @dblclick="enterDirectory(dir.path)"
+          >
+            <div class="dir-icon">📁</div>
+            <div class="dir-name">{{ dir.name }}</div>
+            <div class="dir-path">{{ dir.path }}</div>
+          </div>
+        </div>
+        <div class="empty-state" v-else>
+          <p>该目录下没有子目录</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" @click="cancelDirDialog">取消</button>
+          <button class="btn primary" @click="confirmDirectory">确认</button>
         </div>
       </div>
     </div>
@@ -434,6 +473,10 @@ const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showSessionDialog = ref(false)   // Session 选择对话框
 const availableSessions = ref([])         // 可恢复的 session 列表
 const selectedSession = ref(null)         // 选中的 session
+const showDirDialog = ref(false)           // 目录选择对话框
+const currentDirPath = ref('')             // 当前浏览的目录路径
+const dirList = ref([])                    // 目录列表
+const selectedDir = ref(null)              // 选中的目录
 
 // 浮动窗口位置
 const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
@@ -1117,6 +1160,73 @@ function cancelSessionDialog() {
 }
 
 // 创建 Agent
+// 目录选择相关函数
+async function openDirDialog() {
+  showDirDialog.value = true
+  selectedDir.value = newAgentDir.value || '~'
+  await fetchDirectories(selectedDir.value)
+}
+
+async function fetchDirectories(path = '') {
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
+    
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('[DIR] 获取目录列表失败:', error)
+      alert(`获取目录列表失败: ${error.error?.message || '未知错误'}`)
+      return
+    }
+    
+    const result = await response.json()
+    if (result.success && result.data) {
+      currentDirPath.value = result.data.current_path
+      dirList.value = result.data.directories || []
+    }
+  } catch (error) {
+    console.error('[DIR] 获取目录列表出错:', error)
+    alert(`获取目录列表出错: ${error.message}`)
+  }
+}
+
+function selectDirectory(path) {
+  selectedDir.value = path
+}
+
+function enterDirectory(path) {
+  fetchDirectories(path)
+}
+
+async function goToParentDir() {
+  try {
+    // 浏览器环境下的路径处理
+    const normalizedPath = currentDirPath.value.replace(/\\/g, '/')
+    const parts = normalizedPath.split('/').filter(p => p)
+    
+    if (parts.length > 0) {
+      parts.pop() // 移除最后一部分
+      const parentPath = '/' + parts.join('/')
+      await fetchDirectories(parentPath)
+    }
+  } catch (error) {
+    console.error('[DIR] 返回上级目录失败:', error)
+  }
+}
+
+async function confirmDirectory() {
+  if (selectedDir.value) {
+    newAgentDir.value = selectedDir.value
+    showDirDialog.value = false
+  }
+}
+
+function cancelDirDialog() {
+  showDirDialog.value = false
+  selectedDir.value = null
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
   
@@ -2987,6 +3097,142 @@ body::-webkit-scrollbar {
   text-align: center;
   color: #8b949e;
   font-size: 13px;
+}
+
+/* 目录选择对话框 */
+.dir-modal {
+  max-width: 700px;
+  width: 95%;
+  min-height: 500px;
+}
+
+.path-header {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.path-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.path-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.current-path {
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  color: #e6edf3;
+  margin-bottom: 16px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.dir-list {
+  max-height: 350px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 20px;
+}
+
+.dir-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dir-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dir-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.dir-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dir-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.dir-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dir-item.selected {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.3);
+}
+
+.dir-item.selected:hover {
+  background: rgba(63, 185, 80, 0.2);
+}
+
+.dir-icon {
+  font-size: 18px;
+  margin-right: 12px;
+}
+
+.dir-name {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 500;
+}
+
+.dir-path {
+  font-size: 11px;
+  color: #8b949e;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* 输入框带按钮 */
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button .form-control {
+  flex: 1;
+}
+
+.select-dir-btn {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.select-dir-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
 }
 
 /* 聊天容器 */
