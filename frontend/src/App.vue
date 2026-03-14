@@ -125,6 +125,14 @@
             清空
           </button>
           <button 
+            class="complete-btn" 
+            @click="submitCompletion" 
+            :disabled="isInputDisabled"
+            title="完成（发送空消息）"
+          >
+            完成
+          </button>
+          <button 
             class="action-btn completion-btn" 
             @click="openCompletions" 
             :disabled="isInputDisabled"
@@ -414,6 +422,7 @@ const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value: 内容）
+const completionRequested = ref(false) // 是否缓存了完成信号
 const hasBufferedInput = computed(() => {
   const agentId = currentAgentId.value
   return agentId ? inputBuffers.value.has(agentId) : false
@@ -448,10 +457,16 @@ function showConfirm(message, confirmCallback, cancelCallback) {
   // 先设置 confirmDialog，让对话框显示
   confirmDialog.value = {
     message,
-    confirmCallback,
-    cancelCallback: cancelCallback || (() => {
+    confirmCallback: () => {
+      confirmCallback()
       confirmDialog.value = null
-    })
+    },
+    cancelCallback: cancelCallback ? () => {
+      cancelCallback()
+      confirmDialog.value = null
+    } : () => {
+      confirmDialog.value = null
+    }
   }
   
   // 等待 DOM 更新后滚动到底部，确保用户能看到确认对话框
@@ -1135,6 +1150,16 @@ function handleMessage(message, agentId = null) {
       return
     }
     
+    // 检查是否缓存了完成信号（只针对多行输入）
+    if (completionRequested.value && payload.mode === 'multi') {
+      console.log('[INPUT_REQUEST] Found cached completion signal, sending __CTRL_C_PRESSED__')
+      // 清空完成请求标志
+      completionRequested.value = false
+      // 发送 Ctrl+C 信号
+      sendInputResult('__CTRL_C_PRESSED__', payload.request_id)
+      return
+    }
+    
     // 保存输入请求，用于重连后恢复
     lastInputRequest.value = payload
     inputTip.value = payload.tip || ''
@@ -1592,22 +1617,59 @@ function submitInput() {
   inputText.value = ''
 }
 
+function submitCompletion() {
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    console.warn('[SUBMIT] No current agent ID, cannot submit completion')
+    return
+  }
+  
+  // 发送 Ctrl+C 信号作为完成信号（与 CLI 模式按 Ctrl+C 行为一致）
+  // 注意：完成信号只针对多行输入，单行输入（如确认对话框）不使用完成按钮
+  if (showInput.value && inputMode.value === 'multi') {
+    // 后端正在等待多行输入，直接发送 Ctrl+C 信号
+    console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend')
+    sendInputDirectly('__CTRL_C_PRESSED__')
+  } else if (!showInput.value) {
+    // 后端没有等待输入，缓存完成信号，等下次请求输入时再发送
+    console.log('[SUBMIT] Backend is not waiting for input, caching completion signal')
+    completionRequested.value = true
+    appendOutput({
+      output_type: 'system',
+      agent_name: 'system',
+      text: '✅ 已缓存完成信号，下次需要输入时自动触发',
+      lang: 'text',
+    })
+  } else {
+    // 后端在等待单行输入（如确认对话框），不处理完成信号
+    console.log('[SUBMIT] Backend is waiting for single-line input, completion signal ignored')
+    appendOutput({
+      output_type: 'system',
+      agent_name: 'system',
+      text: 'ℹ️ 当前是单行输入模式，完成按钮不可用',
+      lang: 'text',
+    })
+  }
+}
+
 function sendInputDirectly(text) {
   const agentId = currentAgentId.value
   
-  // 先将用户输入回显到聊天窗口
-  console.log('[DEBUG] User input payload:', {
-    output_type: 'user_input',
-    agent_name: 'user',
-    text: text,
-    lang: 'text',
-  })
-  appendOutput({
-    output_type: 'user_input',
-    agent_name: 'user',
-    text: text,
-    lang: 'text',
-  })
+  // 先将用户输入回显到聊天窗口（空消息不显示）
+  if (text) {
+    console.log('[DEBUG] User input payload:', {
+      output_type: 'user_input',
+      agent_name: 'user',
+      text: text,
+      lang: 'text',
+    })
+    appendOutput({
+      output_type: 'user_input',
+      agent_name: 'user',
+      text: text,
+      lang: 'text',
+    })
+  }
   
   const message = {
     type: 'input_result',
@@ -2786,6 +2848,36 @@ body::-webkit-scrollbar {
 }
 
 .send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.complete-btn {
+  background: linear-gradient(135deg, #0969da 0%, #1f6feb 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 22px;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(9, 105, 218, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.complete-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(9, 105, 218, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.complete-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.complete-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   filter: grayscale(0.3);
