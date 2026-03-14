@@ -430,6 +430,25 @@ const newAgentName = ref('')       // 新 Agent 名称（可选）
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
 
+// 显示确认对话框（自动滚动到底部）
+function showConfirm(message, confirmCallback, cancelCallback) {
+  // 先设置 confirmDialog，让对话框显示
+  confirmDialog.value = {
+    message,
+    confirmCallback,
+    cancelCallback: cancelCallback || (() => {
+      confirmDialog.value = null
+    })
+  }
+  
+  // 等待 DOM 更新后滚动到底部，确保用户能看到确认对话框
+  nextTick(() => {
+    if (outputList.value) {
+      outputList.value.scrollTop = outputList.value.scrollHeight
+    }
+  })
+}
+
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
 const completions = ref([]) // 补全列表数据
@@ -894,9 +913,9 @@ async function fetchAgentList() {
 // 停止 Agent
 // 删除 Agent
 async function deleteAgent(agentId) {
-  confirmDialog.value = {
-    message: '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
-    confirmCallback: async () => {
+  showConfirm(
+    '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
+    async () => {
       try {
         const host = backendHost.value || window.location.hostname || '127.0.0.1'
         const port = backendPort.value || '8000'
@@ -931,12 +950,8 @@ async function deleteAgent(agentId) {
         console.error('[AGENT] Delete failed:', error)
         alert(`删除失败: ${error.message}`)
       }
-      confirmDialog.value = null
-    },
-    cancelCallback: () => {
-      confirmDialog.value = null
     }
-  }
+  )
 }
 
 // 切换当前工作的 Agent
@@ -1130,17 +1145,15 @@ function handleMessage(message, agentId = null) {
     })
   } else if (type === 'confirm') {
     console.log('[ws] confirm', payload)
-    confirmDialog.value = {
-      message: payload.message || '请确认',
-      confirmCallback: () => {
+    showConfirm(
+      payload.message || '请确认',
+      () => {
         sendConfirmResult(true)
-        confirmDialog.value = null
       },
-      cancelCallback: () => {
+      () => {
         sendConfirmResult(false)
-        confirmDialog.value = null
-      },
-    }
+      }
+    )
   } else if (type === 'execution') {
     console.log('[ws] execution event received:', {
       event_type: payload?.event_type,
@@ -1685,9 +1698,9 @@ function confirmClearHistory() {
   // 先关闭设置弹窗
   showSettingsModal.value = false
   
-  confirmDialog.value = {
-    message: '确定要清除所有历史记录吗？此操作不可撤销。',
-    confirmCallback: () => {
+  showConfirm(
+    '确定要清除所有历史记录吗？此操作不可撤销。',
+    () => {
       if (historyStorage.clearHistory()) {
         console.log('[HISTORY] History cleared successfully')
         // 清除当前 Agent 的消息
@@ -1700,25 +1713,8 @@ function confirmClearHistory() {
       }
       // 无论清除是否成功，都关闭设置弹窗
       showSettingsModal.value = false
-      confirmDialog.value = null
-    },
-    cancelCallback: () => {
-      confirmDialog.value = null
-    },
-  }
-  
-  // 滚动到底部
-  nextTick(() => {
-    nextTick(() => {
-      requestAnimationFrame(() => {
-        if (outputList.value) {
-          const scrollHeight = outputList.value.scrollHeight
-          outputList.value.scrollTop = scrollHeight
-          console.log('[SCROLL] Auto-scrolled to bottom')
-        }
-      })
-    })
-  })
+    }
+  )
 }
 
 function escapeHtml(text) {
