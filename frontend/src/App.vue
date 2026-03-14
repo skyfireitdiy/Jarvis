@@ -74,13 +74,13 @@
             <div class="message-body markdown-content" v-html="item.html"></div>
           </div>
           <!-- 终端嵌入 -->
-          <div v-if="item.output_type === 'execution' && item.execution_id" class="terminal-wrapper">
+          <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'terminal_content'" class="terminal-history">
+          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content">{{ item.content }}</pre>
+            <pre class="terminal-history-content">{{ item.terminal_content }}</pre>
           </div>
         </article>
         <!-- 确认对话框 -->
@@ -493,16 +493,23 @@ function loadHistoryMessages(prepend = false) {
     }
     
     // 处理每条历史消息
+    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages`)
+    const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
+    if (executionMessages.length > 0) {
+      console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))
+    }
+    // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
     const processedMessages = historyMessages.map(msg => {
-      const html = msg.lang === 'markdown' ? marked.parse(msg.text || '') : escapeHtml(msg.text || '')
-      return {
-        ...msg,
-        html,
-        timestamp: msg.timestamp || '',
-        agent_name: msg.agent_name || '',
-        non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false
-      }
-    })
+        const html = msg.lang === 'markdown' ? marked.parse(msg.text || '') : escapeHtml(msg.text || '')
+        return {
+          ...msg,
+          html,
+          timestamp: msg.timestamp || '',
+          agent_name: msg.agent_name || '',
+          non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false
+        }
+      })
+    console.log(`🚨 [loadHistoryMessages] After filtering: ${processedMessages.length} messages`)
     
     // 获取当前 Agent 的消息列表
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
@@ -1311,6 +1318,7 @@ function appendOutput(payload, agentId = null) {
       execution_id: outputItem.execution_id,
       context: outputItem.context
     }
+    console.log(`🚨 [appendOutput] Saving message: type=${outputItem.output_type}, execution_id=${outputItem.execution_id}, agent_id=${targetAgentId}`)
     historyStorage.saveMessage(messageToSave)
   } catch (error) {
     console.warn('[HISTORY] Failed to save message:', error)
@@ -1410,32 +1418,45 @@ function appendExecution(payload) {
         
         console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
         
-        // 删除原来的 execution 消息（避免重复显示）
+        // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
         const targetAgentId = currentAgentId.value
         const currentOutputs = allOutputs.value.get(targetAgentId) || []
+        console.log(`🚨 [terminal] Looking for execution message: ${executionId}`)
+        
         const execIndex = currentOutputs.findIndex(
           item => item.output_type === 'execution' && item.execution_id === executionId
         )
+        
         if (execIndex !== -1) {
-          currentOutputs.splice(execIndex, 1)
-          console.log(`[terminal] Removed execution message ${executionId}`)
+          // 标记 execution 消息为已结束，并保存终端内容
+          currentOutputs[execIndex].is_finished = true
+          currentOutputs[execIndex].terminal_content = terminalContent
+          currentOutputs[execIndex].timestamp = new Date().toISOString()
+          console.log(`🚨 [terminal] Marked execution ${executionId} as finished, content length: ${terminalContent.length}`)
+          
+          // 触发响应式更新
+          allOutputs.value.set(targetAgentId, [...currentOutputs])
+        } else {
+          console.warn(`🚨 [terminal] execution message ${executionId} not found`)
         }
         
-        // 保存为消息到当前 Agent 的消息列表
-        const terminalMessage = {
-          output_type: 'terminal_content',
-          content: terminalContent,
-          execution_id: executionId,
-          timestamp: new Date().toISOString(),
+        // 保存到历史记录
+        try {
+          const messageToSave = {
+            agent_id: targetAgentId,
+            output_type: outputItem.output_type,
+            text: outputItem.text,
+            lang: outputItem.lang,
+            non_interactive: outputItem.non_interactive,
+            timestamp: outputItem.timestamp,
+            execution_id: outputItem.execution_id,
+          }
+          historyStorage.saveMessage(messageToSave)
+        } catch (error) {
+          console.warn('[HISTORY] Failed to save terminal content:', error)
         }
         
-        // 添加到消息列表
-        if (!allOutputs.value.has(targetAgentId)) {
-          allOutputs.value.set(targetAgentId, [])
-        }
-        allOutputs.value.get(targetAgentId).push(terminalMessage)
-        
-        console.log(`[terminal] Terminal content saved to message list for agent: ${targetAgentId}`)
+        console.log(`[terminal] Terminal content saved to message list and history for agent: ${targetAgentId}`)
       } catch (error) {
         console.error(`[terminal] Failed to save terminal content:`, error)
       }
