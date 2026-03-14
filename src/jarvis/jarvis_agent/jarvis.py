@@ -1071,7 +1071,7 @@ def run_cli(
                 log_level="info",
             )
             web_gateway_server = uvicorn.Server(config)
-            thread = threading.Thread(target=web_gateway_server.run, daemon=True)
+            thread = threading.Thread(target=web_gateway_server.run, daemon=False)
             thread.start()
             print(
                 f"🌐 Web Gateway 已启动: ws://{web_gateway_host}:{web_gateway_port}/ws"
@@ -1080,8 +1080,8 @@ def run_cli(
             try:
                 from jarvis.jarvis_gateway.manager import get_current_gateway
 
-                current_gateway = get_current_gateway()
-            except Exception as e:
+                get_current_gateway()
+            except Exception:
                 pass
         except Exception as web_gateway_err:
             try:
@@ -1195,7 +1195,12 @@ def run_cli(
         finally:
             if web_gateway_server is not None:
                 try:
+                    # 设置退出标志，让 uvicorn 服务器优雅关闭
                     web_gateway_server.should_exit = True
+                    # 强制退出标志，不等待连接关闭（避免阻塞）
+                    web_gateway_server.force_exit = True
+                    # 等待 uvicorn 线程结束（最多等待 2 秒）
+                    thread.join(timeout=2)
                 except Exception:
                     pass
                 try:
