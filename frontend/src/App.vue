@@ -102,7 +102,8 @@
       <div class="input-wrapper">
         <textarea 
           v-model="inputText" 
-          :placeholder="inputTip || '输入内容 (Ctrl+Enter 发送)'"
+          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
+          :disabled="isInputDisabled"
           @keydown.ctrl.enter="submitInput"
         ></textarea>
         
@@ -118,6 +119,7 @@
             v-if="hasBufferedInput && !showInput" 
             class="action-btn clear-buffer-btn" 
             @click="clearBuffer"
+            :disabled="isInputDisabled"
             title="清空缓冲区"
           >
             清空
@@ -125,7 +127,7 @@
           <button 
             class="action-btn completion-btn" 
             @click="openCompletions" 
-            :disabled="!currentAgent"
+            :disabled="isInputDisabled"
             title="插入补全 (@)"
           >
             @
@@ -133,7 +135,7 @@
           <button 
             class="send-btn" 
             @click="submitInput" 
-            :disabled="!inputText.trim() && (!hasBufferedInput || showInput)"
+            :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || showInput))"
           >
             {{ hasBufferedInput && !showInput ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
           </button>
@@ -422,6 +424,17 @@ const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
+})
+
+// 判断输入框是否应该禁用（没有激活的 agent 或 agent 状态不是 running）
+const isInputDisabled = computed(() => {
+  if (!currentAgentId.value) {
+    return true // 没有激活的 agent
+  }
+  if (!currentAgent.value || currentAgent.value.status !== 'running') {
+    return true // agent 状态不是 running
+  }
+  return false
 })
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
