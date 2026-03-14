@@ -69,19 +69,16 @@ class BaseGateway(IGateway):
         if not bool(config.get("enable", False)):
             return True, None
         allow_unset = bool(config.get("allow_unset", True))
-        expected_token = config.get("token")
         expected_password = config.get("password")
-        if not expected_token and not expected_password:
+        if not expected_password:
             if allow_unset:
                 return True, None
             return False, "gateway auth required"
         if not auth:
             return False, "gateway auth missing"
-        token = auth.get("token")
         password = auth.get("password")
-        token_match = bool(expected_token) and token == expected_token
         password_match = bool(expected_password) and password == expected_password
-        if token_match or password_match:
+        if password_match:
             return True, None
         return False, "gateway auth failed"
 
