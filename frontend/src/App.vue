@@ -897,6 +897,9 @@ async function connectToAgent(agent, retryCount = 0) {
     // 检查现有连接是否仍然有效
     if (existingWs && existingWs.readyState === WebSocket.OPEN) {
       console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
+      // 已连接，发送 get_status 请求以同步当前状态
+      console.log(`[AGENT] Requesting status update for ${agent.name || agentId}`)
+      existingWs.send(JSON.stringify({ type: 'get_status', payload: {} }))
       return
     }
     // 连接已断开或正在关闭，确保完全关闭后再清理
