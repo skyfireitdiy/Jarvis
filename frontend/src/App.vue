@@ -233,9 +233,19 @@
           <button class="path-btn" @click="goToParentDir">⬆️ 返回上级</button>
         </div>
         <div class="current-path">{{ currentDirPath }}</div>
-        <div class="dir-list" v-if="dirList.length > 0">
+        <div class="dir-search">
+          <input 
+            ref="dirSearchInput"
+            v-model="dirSearchText"
+            type="text" 
+            class="dir-search-input"
+            placeholder="🔍 搜索目录..."
+            @keydown="handleDirSearchKeydown"
+          />
+        </div>
+        <div class="dir-list" v-if="filteredDirList.length > 0">
           <div
-            v-for="dir in dirList"
+            v-for="dir in filteredDirList"
             :key="dir.path"
             class="dir-item"
             :class="{ selected: selectedDir === dir.path }"
@@ -478,6 +488,21 @@ const showDirDialog = ref(false)           // 目录选择对话框
 const currentDirPath = ref('')             // 当前浏览的目录路径
 const dirList = ref([])                    // 目录列表
 const selectedDir = ref(null)              // 选中的目录
+const dirSearchText = ref('')              // 目录搜索文本
+const dirSearchInput = ref(null)           // 目录搜索输入框引用
+const selectedDirIndex = ref(-1)           // 当前选中的目录索引，-1 表示未选中
+
+// 过滤后的目录列表（支持模糊搜索）
+const filteredDirList = computed(() => {
+  if (!dirSearchText.value.trim()) {
+    return dirList.value
+  }
+  const searchText = dirSearchText.value.toLowerCase().trim()
+  return dirList.value.filter(dir => 
+    dir.name.toLowerCase().includes(searchText) ||
+    dir.path.toLowerCase().includes(searchText)
+  )
+})
 
 // 浮动窗口位置
 const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
@@ -1179,7 +1204,12 @@ function cancelSessionDialog() {
 async function openDirDialog() {
   showDirDialog.value = true
   selectedDir.value = newAgentDir.value || '~'
+  dirSearchText.value = '' // 清空搜索
   await fetchDirectories(selectedDir.value)
+  // 自动聚焦到搜索框
+  nextTick(() => {
+    dirSearchInput.value?.focus()
+  })
 }
 
 async function fetchDirectories(path = '') {
@@ -1208,10 +1238,78 @@ async function fetchDirectories(path = '') {
 
 function selectDirectory(path) {
   selectedDir.value = path
+  // 同时更新索引
+  const index = filteredDirList.value.findIndex(dir => dir.path === path)
+  if (index !== -1) {
+    selectedDirIndex.value = index
+  }
 }
 
-function enterDirectory(path) {
-  fetchDirectories(path)
+// 处理目录搜索框的键盘事件
+function handleDirSearchKeydown(event) {
+  const maxIndex = filteredDirList.value.length - 1
+  
+  if (event.key === 'Escape') {
+    // ESC 键关闭对话框
+    cancelDirDialog()
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'ArrowDown') {
+    // 向下键：选择下一个目录
+    if (selectedDirIndex.value < maxIndex) {
+      selectedDirIndex.value++
+    } else if (selectedDirIndex.value === -1) {
+      selectedDirIndex.value = 0
+    }
+    // 选中的目录同时设置为 selectedDir
+    if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
+      selectedDir.value = filteredDirList.value[selectedDirIndex.value].path
+    }
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'ArrowUp') {
+    // 向上键：选择上一个目录
+    if (selectedDirIndex.value > 0) {
+      selectedDirIndex.value--
+    } else if (selectedDirIndex.value === -1) {
+      selectedDirIndex.value = maxIndex
+    } else {
+      selectedDirIndex.value = -1
+    }
+    // 选中的目录同时设置为 selectedDir
+    if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
+      selectedDir.value = filteredDirList.value[selectedDirIndex.value].path
+    }
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'Enter') {
+    // 回车键：确认当前选择的目录并关闭对话框
+    if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
+      confirmDirectory()
+      event.preventDefault()
+    } else if (selectedDir.value) {
+      // 如果没有选中列表项，但已经有选中的目录，也确认
+      confirmDirectory()
+      event.preventDefault()
+    }
+    return
+  }
+}
+
+async function enterDirectory(path) {
+  await fetchDirectories(path)
+  // 清空搜索并聚焦到搜索框
+  dirSearchText.value = ''
+  selectedDirIndex.value = -1
+  nextTick(() => {
+    dirSearchInput.value?.focus()
+  })
 }
 
 async function goToParentDir() {
@@ -3332,6 +3430,33 @@ body::-webkit-scrollbar {
   margin-bottom: 16px;
   word-break: break-all;
   line-height: 1.4;
+}
+
+.dir-search {
+  margin-bottom: 16px;
+}
+
+.dir-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-out;
+}
+
+.dir-search-input:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.dir-search-input::placeholder {
+  color: #8b949e;
 }
 
 .dir-list {
