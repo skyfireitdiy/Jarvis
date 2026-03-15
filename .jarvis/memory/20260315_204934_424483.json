@@ -1,0 +1,11 @@
+{
+  "id": "20260315_204934_424483",
+  "type": "project_long_term",
+  "tags": [
+    "beforeunload",
+    "页面保护"
+  ],
+  "content": "【页面刷新/跳转确认提示】\n功能：当页面连接到Gateway时，用户尝试刷新或跳转会弹出确认提示，防止终端被销毁和Agent记录丢失\n实现：\n1. 定义handleBeforeUnload函数检测socket连接状态\n2. onMounted中添加beforeunload事件监听\n3. onUnmounted中移除beforeunload事件监听\n提交ID：188f2f6, 05cf2be, a91197e",
+  "created_at": "2026-03-15T20:49:34.424492",
+  "updated_at": "2026-03-15T20:49:34.424494"
+}
