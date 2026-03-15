@@ -1,0 +1,13 @@
+{
+  "id": "20260315_202335_581267",
+  "type": "project_long_term",
+  "tags": [
+    "快捷键",
+    "ESC键",
+    "对话框",
+    "用户体验"
+  ],
+  "content": "【ESC键关闭对话框优化】\n需求：在对话框中按下ESC键时，隐藏对话框并退回到主页面\n原因：符合用户习惯，快速退出对话框\n实现：\n在handleGlobalKeydown函数中添加ESC键处理逻辑：\n1. 关闭所有对话框：\n   - showSettingsModal（设置）\n   - showCreateAgentModal（创建Agent）\n   - showSessionDialog（Session选择）\n   - showDirDialog（目录选择）\n2. 关闭移动端菜单（showMobileMenu）\n3. 移动端关闭侧边栏和终端面板（windowWidth <= 768）\n代码位置：frontend/src/App.vue 第3527-3559行\n效果：\n- 桌面端：ESC关闭对话框\n- 移动端：ESC关闭对话框、菜单、侧边栏、终端面板\n- 全局生效，无需焦点在特定元素上\n提交ID：70f0201",
+  "created_at": "2026-03-15T20:23:35.581291",
+  "updated_at": "2026-03-15T20:23:35.581294"
+}
