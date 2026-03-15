@@ -1289,12 +1289,13 @@ function handleDirSearchKeydown(event) {
   }
   
   if (event.key === 'Enter') {
-    // 回车键：确认当前选择的目录并关闭对话框
+    // 回车键：如果选中了列表项，则进入该目录；否则确认当前选择
     if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
-      confirmDirectory()
+      // 有选中列表项，进入该目录
+      enterDirectory(filteredDirList.value[selectedDirIndex.value].path)
       event.preventDefault()
     } else if (selectedDir.value) {
-      // 如果没有选中列表项，但已经有选中的目录，也确认
+      // 没有选中列表项，但已经有选中的目录，确认并关闭
       confirmDirectory()
       event.preventDefault()
     }
