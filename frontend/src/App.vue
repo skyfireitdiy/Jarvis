@@ -2075,9 +2075,8 @@ function handleMessage(message, agentId = null) {
         resizeObserver: null,  // ResizeObserver 实例
         history: []  // 保存历史输出，用于面板隐藏后再显示时恢复
       })
-      if (!activeTerminalId.value) {
-        activeTerminalId.value = terminalId
-      }
+      // 自动切换到新创建的 terminal
+      activeTerminalId.value = terminalId
       // 初始化终端
       nextTick(() => {
         const hostEl = independentTerminalHosts.value.get(terminalId)
