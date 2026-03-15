@@ -436,7 +436,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -3252,6 +3252,26 @@ function sendTerminalResize(terminalId, rows, cols) {
   socket.value.send(JSON.stringify(message))
 }
 
+// 全局键盘事件处理
+function handleGlobalKeydown(event) {
+  // Ctrl + ` 打开/隐藏终端面板
+  if (event.ctrlKey && event.key === '`') {
+    event.preventDefault()
+    
+    // 如果在输入框中，不触发快捷键
+    const tagName = event.target.tagName.toLowerCase()
+    if (tagName === 'textarea' || tagName === 'input') {
+      return
+    }
+    
+    // 切换终端面板显示状态
+    if (socket.value) {
+      showTerminalPanel.value = !showTerminalPanel.value
+      console.log('[app] Toggle terminal panel:', showTerminalPanel.value)
+    }
+  }
+}
+
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
@@ -3283,6 +3303,16 @@ onMounted(() => {
     
     console.log('[HISTORY] Scroll listener added')
   }
+  
+  // 添加全局键盘事件监听
+  document.addEventListener('keydown', handleGlobalKeydown)
+  console.log('[app] Global keyboard listener added')
+})
+
+onUnmounted(() => {
+  // 移除全局键盘事件监听
+  document.removeEventListener('keydown', handleGlobalKeydown)
+  console.log('[app] Global keyboard listener removed')
 })
 </script>
 
