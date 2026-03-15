@@ -144,6 +144,7 @@ class TerminalSessionManager:
         self._max_sessions = max_sessions
         self._lock = threading.RLock()
         self._sessions: Dict[str, TerminalSession] = {}
+        self._closing_sessions: set[str] = set()  # 正在关闭的会话ID集合，防止重复调用
 
     def create_session(
         self,
@@ -333,9 +334,18 @@ class TerminalSessionManager:
             是否成功
         """
         with self._lock:
+            # 检查是否已经在关闭过程中（防止重复调用）
+            if terminal_id in self._closing_sessions:
+                return False
+
             session = self._sessions.pop(terminal_id, None)
             if session is None:
+                # 会话不存在，从关闭集合中移除
+                self._closing_sessions.discard(terminal_id)
                 return False
+
+            # 标记为正在关闭
+            self._closing_sessions.add(terminal_id)
             
             # 发送 terminal_closed 消息通知前端
             if session.stream_publisher is not None:
@@ -352,6 +362,9 @@ class TerminalSessionManager:
                     print(f"[TerminalSessionManager] Failed to send terminal_closed: {e}")
             
             session.close()
+            
+            # 从关闭集合中移除
+            self._closing_sessions.discard(terminal_id)
             return True
 
     def list_sessions(self) -> List[Dict[str, Any]]:
