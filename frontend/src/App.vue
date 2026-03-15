@@ -3589,9 +3589,6 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
   
-  // 移动端历史管理
-  let historyStateCount = 0
-  
   // 移动端：监听返回键（popstate事件）
   const handlePopState = () => {
     console.log('[app] Back button pressed, historyStateCount:', historyStateCount)
