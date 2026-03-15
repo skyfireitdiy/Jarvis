@@ -683,9 +683,18 @@ const isInputDisabled = computed(() => {
 })
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
-const newAgentName = ref('')       // 新 Agent 名称（可选）
+const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为'通用Agent'）
 const modelGroups = ref([])        // 模型组列表
 const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 default）
+
+// 监听 Agent 类型变化，自动填充默认名称
+watch(newAgentType, (newType) => {
+  if (newType === 'agent') {
+    newAgentName.value = '通用Agent'
+  } else if (newType === 'codeagent') {
+    newAgentName.value = '代码Agent'
+  }
+}, { immediate: true })
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
@@ -1558,7 +1567,8 @@ async function createAgent() {
       // 关闭创建弹窗
       showCreateAgentModal.value = false
       newAgentDir.value = '~' // 重置为默认值
-      newAgentName.value = ''
+      // 重置为默认名称（根据当前选中的 agent 类型）
+      newAgentName.value = newAgentType.value === 'agent' ? '通用Agent' : '代码Agent'
       
       // 立即切换到新创建的 agent
       await switchAgent(agent)
