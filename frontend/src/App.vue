@@ -828,6 +828,10 @@ function connect() {
     console.log('[ws] close')
     socket.value = null
     connecting.value = false
+    // 连接断开，销毁所有独立终端
+    console.log('[ws] Closing all independent terminals due to connection close')
+    const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
+    allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
     // 连接断开，重新显示连接对话框
     showConnectModal.value = true
     // 不清空连接错误信息，保留错误提示
