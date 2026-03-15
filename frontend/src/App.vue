@@ -35,32 +35,81 @@
     <div class="main-content-wrapper">
       <!-- 顶部栏 -->
       <header class="app-header">
+        <!-- 移动端菜单按钮 -->
+        <button class="mobile-menu-btn" @click="showMobileMenu = !showMobileMenu">
+          ☰
+        </button>
+        
         <div class="header-title">
-          <button class="icon-btn" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
+          <button class="icon-btn desktop-only" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
             📋
           </button>
         </div>
-      <div class="current-agent-info" v-if="currentAgent">
-        <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-        <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
-        <span class="agent-dir">{{ currentAgent.working_dir }}</span>
-      </div>
-      <div class="header-actions">
-        <button class="icon-btn" @click="showTerminalPanel = !showTerminalPanel" :disabled="!socket" title="终端面板">
-          💻
-        </button>
-        <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
-          👤 人工介入
-        </button>
-        <button class="icon-btn" @click="showSettingsModal = true" :disabled="!socket">
-          ⚙️
-        </button>
-        <div class="status">
-          <span :class="['dot', connectionStatus]"></span>
-          {{ connectionLabel }}
+        
+        <div class="current-agent-info desktop-only" v-if="currentAgent">
+          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
+          <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
+          <span class="agent-dir">{{ currentAgent.working_dir }}</span>
+        </div>
+        
+        <div class="header-actions desktop-only">
+          <button class="icon-btn" @click="showTerminalPanel = !showTerminalPanel" :disabled="!socket" title="终端面板">
+            💻
+          </button>
+          <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
+            👤 人工介入
+          </button>
+          <button class="icon-btn" @click="showSettingsModal = true" :disabled="!socket">
+            ⚙️
+          </button>
+          <div class="status">
+            <span :class="['dot', connectionStatus]"></span>
+            {{ connectionLabel }}
+          </div>
+        </div>
+      </header>
+      
+      <!-- 移动端菜单 -->
+      <div class="mobile-menu-overlay" v-if="showMobileMenu" @click="showMobileMenu = false"></div>
+      <div class="mobile-menu" :class="{ active: showMobileMenu }">
+        <div class="mobile-menu-header">
+          <h3>菜单</h3>
+          <button class="close-btn" @click="showMobileMenu = false">✕</button>
+        </div>
+        
+        <div class="mobile-menu-content">
+          <!-- Agent 侧边栏切换 -->
+          <button class="mobile-menu-item" @click="showAgentSidebar = !showAgentSidebar; showMobileMenu = false">
+            <span class="menu-icon">📋</span>
+            <span class="menu-text">Agent 侧边栏</span>
+          </button>
+          
+          <!-- 终端面板 -->
+          <button class="mobile-menu-item" @click="showTerminalPanel = !showTerminalPanel; showMobileMenu = false" :disabled="!socket">
+            <span class="menu-icon">💻</span>
+            <span class="menu-text">终端面板</span>
+          </button>
+          
+          <!-- 设置 -->
+          <button class="mobile-menu-item" @click="showSettingsModal = true; showMobileMenu = false" :disabled="!socket">
+            <span class="menu-icon">⚙️</span>
+            <span class="menu-text">设置</span>
+          </button>
+          
+          <!-- 人工介入 -->
+          <button class="mobile-menu-item mobile-menu-interrupt" v-if="!showInput" @click="sendManualInterrupt; showMobileMenu = false" :disabled="!socket">
+            <span class="menu-icon">👤</span>
+            <span class="menu-text">人工介入</span>
+          </button>
+          
+          <!-- Agent 信息 -->
+          <div class="mobile-menu-agent" v-if="currentAgent">
+            <div class="menu-agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</div>
+            <div class="menu-agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</div>
+            <div class="menu-agent-dir">{{ currentAgent.working_dir }}</div>
+          </div>
         </div>
       </div>
-    </header>
 
     <!-- 消息列表 -->
     <main class="chat-container">
@@ -109,7 +158,7 @@
     <aside 
       v-show="showTerminalPanel" 
       class="terminal-panel"
-      :style="{ width: terminalPanelSize.width + 'px', height: terminalPanelSize.height + 'px' }"
+      :style="windowWidth.value > 768 ? { width: terminalPanelSize.width + 'px', height: terminalPanelSize.height + 'px' } : {}"
     >
       <div class="terminal-panel-header">
         <h3>终端</h3>
@@ -582,6 +631,8 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
+const showMobileMenu = ref(false)     // 移动端菜单
+const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
 const renamingAgent = ref(null)          // 正在重命名的 Agent
@@ -3488,12 +3539,23 @@ onMounted(() => {
   // 添加全局键盘事件监听
   document.addEventListener('keydown', handleGlobalKeydown)
   console.log('[app] Global keyboard listener added')
+  
+  // 监听窗口resize事件
+  const handleResize = () => {
+    windowWidth.value = window.innerWidth
+  }
+  window.addEventListener('resize', handleResize)
+  console.log('[app] Resize listener added')
 })
 
 onUnmounted(() => {
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown)
   console.log('[app] Global keyboard listener removed')
+  
+  // 移除窗口resize监听
+  window.removeEventListener('resize', handleResize)
+  console.log('[app] Resize listener removed')
 })
 </script>
 
@@ -3595,6 +3657,155 @@ body::-webkit-scrollbar {
   background: rgba(22, 27, 34, 0.85);
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
+}
+
+/* 移动端菜单按钮 */
+.mobile-menu-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px 12px;
+  color: #e6edf3;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 桌面端显示，移动端隐藏 */
+.desktop-only {
+  display: flex;
+}
+
+/* 移动端菜单遮罩层 */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 998;
+  display: none;
+}
+
+/* 移动端菜单 */
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 320px;
+  height: 100%;
+  background: rgba(22, 27, 34, 0.98);
+  z-index: 999;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+  transition: right 0.3s ease;
+  display: none;
+}
+
+.mobile-menu.active {
+  right: 0;
+}
+
+.mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-menu-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.mobile-menu-content {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* 移动端菜单项 */
+.mobile-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.mobile-menu-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mobile-menu-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mobile-menu-item.mobile-menu-interrupt {
+  background: rgba(240, 136, 62, 0.1);
+  border-color: rgba(240, 136, 62, 0.3);
+  color: #f0883e;
+}
+
+.mobile-menu-item.mobile-menu-interrupt:hover:not(:disabled) {
+  background: rgba(240, 136, 62, 0.2);
+}
+
+.menu-icon {
+  font-size: 20px;
+}
+
+.menu-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* 移动端菜单 Agent 信息 */
+.mobile-menu-agent {
+  padding: 14px 16px;
+  background: rgba(35, 134, 54, 0.1);
+  border: 1px solid rgba(56, 139, 253, 0.2);
+  border-radius: 8px;
+}
+
+.menu-agent-type {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 4px;
+}
+
+.menu-agent-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.menu-agent-dir {
+  font-size: 11px;
+  color: #8b949e;
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .header-title h1 {
@@ -5587,5 +5798,255 @@ body::-webkit-scrollbar {
 }
 
 .terminal-resize-handle:hover {
+}
+
+/* ==================== 响应式适配（方案一：渐进式） ==================== */
+
+/* 平板端适配 (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* 侧边栏宽度调整 */
+  .agent-sidebar {
+    width: 280px;
+  }
+  
+  /* 顶部栏优化 */
+  .app-header {
+    padding: 12px 18px;
+  }
+  
+  .header-title h1 {
+    font-size: 16px;
+  }
+  
+  /* 按钮优化 */
+  .icon-btn {
+    padding: 8px 12px;
+    font-size: 17px;
+  }
+  
+  /* 消息区域 */
+  .messages {
+    padding: 18px;
+  }
+}
+
+/* 移动端适配 (< 768px) */
+@media (max-width: 768px) {
+  /* ========== 移动端菜单优化 ========== */
+  .mobile-menu-btn {
+    display: block;
+  }
+  
+  .desktop-only {
+    display: none !important;
+  }
+  
+  .mobile-menu,
+  .mobile-menu-overlay {
+    display: block;
+  }
+  
+  /* ========== 终端面板优化 ========== */
+  .terminal-panel {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    z-index: 2000 !important;
+  }
+  
+  .terminal-resize-handle {
+    display: none !important;
+  }
+  
+  /* ========== 侧边栏优化 ========== */
+  .agent-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    background: rgba(22, 27, 34, 0.98);
+  }
+  
+  .agent-sidebar.collapsed {
+    width: 0;
+  }
+  
+  .agent-sidebar-header {
+    padding: 12px 16px;
+  }
+  
+  .agent-sidebar-header h3 {
+    font-size: 13px;
+  }
+  
+  .agent-list {
+    padding: 8px 12px;
+  }
+  
+  .agent-item {
+    padding: 10px;
+  }
+  
+  /* ========== 顶部栏优化 ========== */
+  .app-header {
+    padding: 10px 14px;
+  }
+  
+  .header-title h1 {
+    font-size: 15px;
+  }
+  
+  /* 隐藏非必要信息 */
+  .current-agent-info .agent-dir {
+    display: none;
+  }
+  
+  .current-agent-info .agent-port {
+    display: none;
+  }
+  
+  /* ========== 按钮优化 ========== */
+  .icon-btn {
+    padding: 12px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 18px;
+  }
+  
+  .manual-interrupt-btn {
+    padding: 10px 14px;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  
+  /* ========== 消息区域优化 ========== */
+  .messages {
+    padding: 12px 10px;
+  }
+  
+  .message {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+  
+  .message-content {
+    gap: 6px;
+  }
+  
+  .message-content .message-body {
+    font-size: 13px;
+  }
+  
+  .message-content .message-meta-left {
+    gap: 6px 8px;
+    flex-wrap: wrap;
+  }
+  
+  .message-meta-left .badge {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  
+  .message-meta-left .agent-name {
+    font-size: 9px;
+  }
+  
+  .message-meta-left .timestamp {
+    font-size: 9px;
+  }
+  
+  /* 用户输入消息优化 */
+  .message.message-user_input {
+    max-width: 85%;
+  }
+  
+  .message.message-user_input .message-meta-left {
+    min-width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  
+  /* ========== 输入区优化 ========== */
+  .input-wrapper {
+    padding: 12px;
+  }
+  
+  .input-wrapper textarea {
+    min-height: 100px;
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .input-wrapper .input-hint {
+    font-size: 12px;
+  }
+  
+  /* 操作按钮优化 */
+  .send-btn,
+  .complete-btn,
+  .action-btn {
+    padding: 10px 16px;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  
+  /* ========== 模态框优化 ========== */
+  .modal {
+    padding: 20px;
+    max-width: 95%;
+    border-radius: 12px;
+  }
+  
+  .modal-header h2,
+  .connect-modal h2,
+  .settings-modal h2 {
+    font-size: 18px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+  }
+  
+  /* ========== 字体优化 ========== */
+  body {
+    font-size: 14px;
+  }
+  
+  /* ========== 终端优化 ========== */
+  .terminal-wrapper {
+    margin-top: 12px;
+    max-height: 400px;
+  }
+  
+  .terminal-host {
+    min-height: 300px;
+  }
+  
+  /* ========== Diff 优化 ========== */
+  .diff-header {
+    padding: 6px 10px;
+  }
+  
+  .diff-file-path {
+    font-size: 13px;
+  }
+  
+  .diff-content {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  
+  .diff-line-num {
+    width: 40px;
+    font-size: 10px;
+  }
 }
 </style>

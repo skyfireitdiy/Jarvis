@@ -1,0 +1,13 @@
+{
+  "id": "20260315_183328_509093",
+  "type": "project_long_term",
+  "tags": [
+    "移动端适配",
+    "终端面板",
+    "响应式检测",
+    "windowWidth"
+  ],
+  "content": "【移动端终端全屏修复】\n问题：移动端终端显示不完整\n原因：\n1. CSS注释未闭合（第5838行）\n2. 内联样式优先级高于CSS媒体查询\n解决方案：\n1. 修复CSS注释闭合：/* ========== 终端面板优化 ========== */\n2. 添加响应式windowWidth变量（ref(window.innerWidth)）\n3. 在onMounted中添加resize事件监听\n4. 在onUnmounted中移除resize监听\n5. 终端面板样式绑定改为：windowWidth.value > 768 ? {...} : {}\n效果：移动端终端全屏显示，桌面端保持固定尺寸\n提交ID：\n- abecbf9（修复CSS注释）\n- 305794d（添加windowWidth变量）\n- 57819ef（添加resize监听）\n- 8ea97f0（移除resize监听）\n- 80119a2（更新样式绑定）",
+  "created_at": "2026-03-15T18:33:28.509108",
+  "updated_at": "2026-03-15T18:33:28.509111"
+}
