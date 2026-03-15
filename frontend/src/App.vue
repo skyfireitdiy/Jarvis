@@ -2110,7 +2110,8 @@ function renderSideBySideDiff(diffData) {
     
     // 旧代码列
     if (type === 'equal' || type === 'delete' || type === 'replace') {
-      html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
+      const oldNumClass = (type === 'replace' || type === 'delete') ? 'diff-deleted' : ''
+      html += `<td class="diff-line-num diff-old-num ${oldNumClass}">${escapeHtml(String(old_line_num || ''))}</td>`
       
       // 统计并保留缩进
       let oldContent = ''
@@ -2131,7 +2132,8 @@ function renderSideBySideDiff(diffData) {
     
     // 新代码列
     if (type === 'equal' || type === 'insert' || type === 'replace') {
-      html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
+      const newNumClass = (type === 'replace' || type === 'insert') ? 'diff-added' : ''
+      html += `<td class="diff-line-num diff-new-num ${newNumClass}">${escapeHtml(String(new_line_num || ''))}</td>`
       
       // 统计并保留缩进
       let newContent = ''
