@@ -389,15 +389,9 @@
           <label>密码</label>
           <input v-model="auth.password" type="password" placeholder="可选" />
         </div>
-        <div class="form-group inline">
-          <div class="form-item">
-            <label>地址</label>
-            <input v-model="backendHost" placeholder="127.0.0.1" />
-          </div>
-          <div class="form-item">
-            <label>端口</label>
-            <input v-model="backendPort" placeholder="8000" />
-          </div>
+        <div class="form-group">
+          <label>网关地址</label>
+          <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
         </div>
         <button class="primary-btn" @click="connect" :disabled="connecting">
           {{ connecting ? '连接中...' : '连接' }}
@@ -416,15 +410,9 @@
           <label>密码</label>
           <input v-model="auth.password" type="password" placeholder="可选" />
         </div>
-        <div class="form-group inline">
-          <div class="form-item">
-            <label>地址</label>
-            <input v-model="backendHost" />
-          </div>
-          <div class="form-item">
-            <label>端口</label>
-            <input v-model="backendPort" />
-          </div>
+        <div class="form-group">
+          <label>网关地址</label>
+          <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
         </div>
         
         <!-- 历史消息管理 -->
@@ -588,12 +576,95 @@ function getLanguageFromFilename(filename) {
 
 // 认证和连接配置
 const auth = ref({ password: '' })
-const backendHost = ref(localStorage.getItem('jarvis_backend_host') || '127.0.0.1')
-const backendPort = ref(localStorage.getItem('jarvis_backend_port') || '8000')
+const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
 const connectErrorMessage = ref('')  // 连接错误信息
+
+// URL 解析辅助函数：支持 HTTPS 协议和域名
+
+// 获取当前页面的 HTTP 协议（http:// 或 https://）
+function getHttpProtocol() {
+  return window.location.protocol === 'https:' ? 'https' : 'http'
+}
+
+// 获取当前页面的 WebSocket 协议（ws:// 或 wss://）
+function getWebSocketProtocol() {
+  return window.location.protocol === 'https:' ? 'wss' : 'ws'
+}
+
+// 解析网关地址，支持完整URL格式（如 ws://example.com:8080/ws 或 example.com:8080）
+function parseGatewayAddress(address) {
+  // 移除首尾空格
+  address = address.trim()
+  
+  // 如果是完整URL（包含协议）
+  if (address.includes('://')) {
+    try {
+      const url = new URL(address)
+      return {
+        protocol: url.protocol.replace(':', ''),  // 'ws', 'wss', 'http', 'https'
+        host: url.hostname,
+        port: url.port || (url.protocol === 'https:' || url.protocol === 'wss:' ? '443' : '80'),
+        path: url.pathname
+      }
+    } catch (e) {
+      console.error('[URL] Failed to parse address:', address, e)
+      return null
+    }
+  }
+  
+  // 如果是 host:port 格式
+  if (address.includes(':')) {
+    const parts = address.split(':')
+    if (parts.length === 2) {
+      return {
+        protocol: null,  // 使用默认协议
+        host: parts[0],
+        port: parts[1],
+        path: ''
+      }
+    }
+  }
+  
+  // 如果只有主机名（使用默认端口）
+  return {
+    protocol: null,
+    host: address,
+    port: '8000',
+    path: ''
+  }
+}
+
+// 构建 WebSocket URL
+function buildWebSocketUrl(host, port, protocol = null) {
+  // 如果没有指定协议，根据当前页面自动检测
+  const wsProtocol = protocol || getWebSocketProtocol()
+  return `${wsProtocol}://${host}:${port}/ws`
+}
+
+// 构建 HTTP URL
+function buildHttpUrl(host, port, path, protocol = null) {
+  // 如果没有指定协议，根据当前页面自动检测
+  const httpProtocol = protocol || getHttpProtocol()
+  return `${httpProtocol}://${host}:${port}${path}`
+}
+
+// 获取网关地址（host和port）
+function getGatewayAddress() {
+  const parsed = parseGatewayAddress(gatewayUrl.value)
+  if (!parsed) {
+    return {
+      host: '127.0.0.1',
+      port: '8000'
+    }
+  }
+  return {
+    host: parsed.host || '127.0.0.1',
+    port: parsed.port || '8000'
+  }
+}
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
@@ -890,9 +961,17 @@ function connect() {
   // 清空之前的错误信息
   connectErrorMessage.value = ''
   if (socket.value) return
-  const host = backendHost.value || window.location.hostname || '127.0.0.1'
-  const port = backendPort.value || '8000'
-  const url = `ws://${host}:${port}/ws`
+  
+  // 解析网关地址
+  const parsed = parseGatewayAddress(gatewayUrl.value)
+  if (!parsed) {
+    connectErrorMessage.value = '无效的网关地址格式'
+    return
+  }
+  
+  const host = parsed.host || window.location.hostname || '127.0.0.1'
+  const port = parsed.port || '8000'
+  const url = buildWebSocketUrl(host, port, parsed.protocol)
   connecting.value = true
   const ws = new WebSocket(url)
   ws.onopen = () => {
@@ -902,9 +981,8 @@ function connect() {
     showConnectModal.value = false
     
     // 保存连接信息到 localStorage
-    localStorage.setItem('jarvis_backend_host', backendHost.value)
-    localStorage.setItem('jarvis_backend_port', backendPort.value)
-    console.log('[ws] Connection info saved:', backendHost.value, backendPort.value)
+    localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
+    console.log('[ws] Connection info saved:', gatewayUrl.value)
     // 获取模型组列表
     fetchModelGroups()
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
@@ -1045,9 +1123,9 @@ async function connectToAgent(agent, retryCount = 0) {
   
   console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
   
-  const host = backendHost.value || window.location.hostname || '127.0.0.1'
+  const { host } = getGatewayAddress()
   const agentPort = agent.port
-  const url = `ws://${host}:${agentPort}/ws`
+  const url = buildWebSocketUrl(host, agentPort)
   
   connecting.value = true
   
@@ -1314,9 +1392,9 @@ async function fetchAgentStatus(agent) {
   }
   
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const { host } = getGatewayAddress()
     const port = agent.port
-    const response = await fetch(`http://${host}:${port}/status`)
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/status`)
     
     if (!response.ok) {
       console.warn(`[AGENT STATUS] Failed to fetch status for agent ${agent.agent_id}:`, response.status)
@@ -1390,9 +1468,8 @@ async function openDirDialog() {
 
 async function fetchDirectories(path = '') {
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
     
     if (!response.ok) {
       const error = await response.json()
@@ -1523,9 +1600,8 @@ function cancelDirDialog() {
 // 获取模型组列表
 async function fetchModelGroups() {
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/model-groups`)
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/model-groups`)
     
     if (!response.ok) {
       console.error('[MODEL GROUP] 获取模型组列表失败:', response.status)
@@ -1559,9 +1635,8 @@ async function createAgent() {
   if (!newAgentDir.value.trim()) return
   
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/agents`, {
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1624,9 +1699,8 @@ async function openCompletions() {
   
   // 获取补全列表
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
     
     const result = await response.json()
     console.log('[COMPLETIONS] API response:', result)
@@ -1771,9 +1845,8 @@ function insertCompletion(item) {
 // 获取 Agent 列表
 async function fetchAgentList() {
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/agents`)
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`)
     
     if (!response.ok) return
     
@@ -1800,9 +1873,8 @@ async function fetchAgentList() {
 // 复制 Agent
 async function copyAgent(agent) {
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
-    const response = await fetch(`http://${host}:${port}/api/agents`, {
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1868,14 +1940,13 @@ async function confirmRename() {
   const newName = renameAgentName.value.trim()
   
   try {
-    const host = backendHost.value || window.location.hostname || '127.0.0.1'
-    const port = backendPort.value || '8000'
+    const { host, port } = getGatewayAddress()
     
     const body = newName === '' 
       ? { name: null } 
       : { name: newName }
     
-    const response = await fetch(`http://${host}:${port}/api/agents/${agent.agent_id}`, {
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -1903,9 +1974,8 @@ async function deleteAgent(agentId) {
     '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
     async () => {
       try {
-        const host = backendHost.value || window.location.hostname || '127.0.0.1'
-        const port = backendPort.value || '8000'
-        const response = await fetch(`http://${host}:${port}/api/agents/${agentId}`, {
+        const { host, port } = getGatewayAddress()
+        const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
           method: 'DELETE'
         })
         
