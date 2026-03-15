@@ -1520,8 +1520,27 @@ def cli(
                 GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
                 GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
+            # 创建自定义 FastAPI app，添加状态查询接口
+            from fastapi import FastAPI
+            from jarvis.jarvis_web_gateway.app import get_current_execution_status
+
+            custom_app = FastAPI()
+
+            @custom_app.get("/status")
+            async def get_status() -> dict:
+                """获取 Agent 运行状态。
+                
+                返回状态说明：
+                - execution_status: 任务执行状态（running/waiting_multi/waiting_single）
+                - status: 进程状态（永远返回 running，因为进程还在运行）
+                """
+                return {
+                    "execution_status": get_current_execution_status(),
+                    "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                }
+
             config = uvicorn.Config(
-                create_app(),
+                create_app(custom_app=custom_app),
                 host=web_gateway_host,
                 port=web_gateway_port,
                 log_level="info",

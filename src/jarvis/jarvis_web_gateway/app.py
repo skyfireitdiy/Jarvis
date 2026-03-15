@@ -52,6 +52,19 @@ _global_agent_manager: Optional[AgentManager] = None
 # 状态更新回调函数
 _status_update_callback: Optional[Callable[[str], None]] = None
 
+# 全局当前执行状态（用于 /status 接口）
+_current_execution_status: str = "running"
+
+
+def get_current_execution_status() -> str:
+    """获取当前执行状态。
+    
+    Returns:
+        str: 当前执行状态（running/waiting_multi/waiting_single）
+    """
+    global _current_execution_status
+    return _current_execution_status
+
 # 全局 SessionOutputRouter，用于推送状态更新
 _router: Optional[SessionOutputRouter] = None
 
@@ -76,7 +89,8 @@ def _update_status(status: str) -> None:
         status: 状态字符串
     """
 
-    global _status_update_callback, _router  # 添加 _router 到全局
+    global _status_update_callback, _router, _current_execution_status  # 添加 _router 到全局
+    _current_execution_status = status  # 更新全局状态
 
     # 1. 调用回调函数更新本地状态
     if _status_update_callback:
