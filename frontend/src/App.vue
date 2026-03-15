@@ -70,6 +70,12 @@
               <span class="interactive" v-if="item.non_interactive === undefined"></span>
               <span class="timestamp">{{ item.timestamp || '' }}</span>
             </div>
+            <button class="icon-btn copy-message-btn" @click="copyToClipboard(item.text, index)" title="复制到剪贴板" v-if="item.text">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
             <div class="message-body markdown-content" v-html="item.html"></div>
           </div>
           <!-- 终端嵌入 -->
@@ -432,6 +438,14 @@
         </div>
       </div>
     </div>
+    
+    <!-- Toast 提示 -->
+    <transition name="toast-fade">
+      <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
+        <span class="toast-icon">{{ toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ' }}</span>
+        <span class="toast-message">{{ toast.message }}</span>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -589,7 +603,32 @@ const inputMode = ref('single')
 const inputTip = ref('')
 const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
-const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value: 内容）
+const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
+
+// Toast 提示
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'success' // success | error | info
+})
+
+let toastTimer = null
+
+function showToast(message, type = 'success') {
+  toast.value = {
+    show: true,
+    message,
+    type
+  }
+  
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+  
+  toastTimer = setTimeout(() => {
+    toast.value.show = false
+  }, 2000)
+}
 const hasBufferedInput = computed(() => {
   const agentId = currentAgentId.value
   return agentId ? inputBuffers.value.has(agentId) : false
@@ -2352,6 +2391,37 @@ function appendOutput(payload, agentId = null) {
       })
     })
   })
+}
+
+// 复制消息内容到剪贴板
+async function copyToClipboard(text, index) {
+  if (!text) {
+    console.warn('[COPY] No text to copy')
+    return
+  }
+  
+  try {
+    await navigator.clipboard.writeText(text)
+    console.log('[COPY] Successfully copied text to clipboard')
+    showToast('已复制到剪贴板', 'success')
+  } catch (err) {
+    console.error('[COPY] Failed to copy text:', err)
+    // 可选：降级方案
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      console.log('[COPY] Fallback: Successfully copied using execCommand')
+    } catch (fallbackErr) {
+      console.error('[COPY] Fallback also failed:', fallbackErr)
+      alert('复制失败，请手动复制')
+    }
+  }
 }
 
 function appendExecution(payload) {
@@ -4235,6 +4305,7 @@ body::-webkit-scrollbar {
   gap: 8px;
   align-items: flex-start;
   text-align: left;
+  position: relative;
 }
 
 .message-content .message-meta-left {
@@ -5281,6 +5352,98 @@ body::-webkit-scrollbar {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.copy-message-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #8b949e;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.copy-message-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.message-content:hover .copy-message-btn {
+  opacity: 1;
+}
+
+.copy-message-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+}
+
+/* Toast 提示 */
+.toast {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e6edf3;
+  font-size: 14px;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-weight: bold;
+  border-radius: 50%;
+}
+
+.toast-success .toast-icon {
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
+}
+
+.toast-error .toast-icon {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.toast-info .toast-icon {
+  background: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
+}
+
+.toast-message {
+  white-space: nowrap;
+}
+
+/* Toast 过渡动画 */
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
 .terminal-empty {
