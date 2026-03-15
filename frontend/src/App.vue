@@ -391,8 +391,8 @@
             :key="dir.path"
             class="dir-item"
             :class="{ selected: selectedDir === dir.path }"
-            @click="selectDirectory(dir.path)"
-            @dblclick="enterDirectory(dir.path)"
+            @click="windowWidth.value <= 768 ? enterDirectory(dir.path, false) : selectDirectory(dir.path)"
+            @dblclick="enterDirectory(dir.path, false)"
           >
             <div class="dir-icon">📁</div>
             <div class="dir-name">{{ dir.name }}</div>
@@ -1510,14 +1510,17 @@ function handleDirSearchKeydown(event) {
   }
 }
 
-async function enterDirectory(path) {
+async function enterDirectory(path, shouldFocus = true) {
   await fetchDirectories(path)
-  // 清空搜索并聚焦到搜索框
+  // 清空搜索
   dirSearchText.value = ''
   selectedDirIndex.value = -1
-  nextTick(() => {
-    dirSearchInput.value?.focus()
-  })
+  // 根据参数决定是否聚焦到搜索框
+  if (shouldFocus) {
+    nextTick(() => {
+      dirSearchInput.value?.focus()
+    })
+  }
 }
 
 async function goToParentDir() {

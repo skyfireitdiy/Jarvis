@@ -1,0 +1,12 @@
+{
+  "id": "20260315_201528_411265",
+  "type": "project_long_term",
+  "tags": [
+    "目录选择",
+    "焦点控制",
+    "用户体验"
+  ],
+  "content": "【目录选择焦点优化】\n需求：双击进入目录时不转移焦点，只有回车进入目录才转移焦点\n原因：双击后用户可能继续浏览目录，不应强制转移到搜索框\n实现：\n1. enterDirectory函数添加shouldFocus参数（默认true）\n2. 双击事件：enterDirectory(dir.path, false) - 不转移焦点\n3. 回车事件：enterDirectory(dir.path) - 使用默认值true，转移焦点\n代码位置：\n- frontend/src/App.vue 第1513-1526行（enterDirectory函数）\n- frontend/src/App.vue 第395行（双击事件）\n效果：\n- 双击：进入目录，焦点保持在目录列表，方便继续浏览\n- 回车：进入目录，焦点转移到搜索框，方便继续搜索\n提交ID：e6cc0f4（函数修改）、718ae0f（事件绑定）",
+  "created_at": "2026-03-15T20:15:28.411287",
+  "updated_at": "2026-03-15T20:15:28.411290"
+}

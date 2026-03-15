@@ -1,0 +1,12 @@
+{
+  "id": "20260315_201631_285309",
+  "type": "project_long_term",
+  "tags": [
+    "移动端优化",
+    "目录选择",
+    "触摸操作"
+  ],
+  "content": "【移动端目录单击进入优化】\n需求：移动端单击就应该进入目录，更符合移动端操作习惯\n原因：移动端主要使用触摸操作，单击更自然\n实现：\n- 移动端（<=768px）：单击直接调用enterDirectory(dir.path, false)\n- 桌面端（>768px）：单击调用selectDirectory(dir.path)，双击进入目录\n代码位置：frontend/src/App.vue 第392行\n单击事件：@click=\"windowWidth.value <= 768 ? enterDirectory(dir.path, false) : selectDirectory(dir.path)\"\n效果：\n- 移动端：单击进入子目录，焦点保持，方便连续浏览\n- 桌面端：单击选中，双击进入，保持原有操作习惯\n提交ID：6a99652",
+  "created_at": "2026-03-15T20:16:31.285326",
+  "updated_at": "2026-03-15T20:16:31.285328"
+}
