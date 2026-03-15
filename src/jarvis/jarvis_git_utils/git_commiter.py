@@ -541,14 +541,8 @@ commit信息
             finally:
                 pass
 
-            self.console.print(
-                Panel(
-                    f"[bold green]✅ 提交成功[/bold green]\n\n"
-                    f"[bold]提交哈希:[/bold] {commit_hash}\n"
-                    f"[bold]提交消息:[/bold]\n{commit_message}",
-                    title="Git Commit Result",
-                    border_style="green",
-                )
+            PrettyOutput.auto_print(
+                f"✅ 提交成功\n\n提交哈希: {commit_hash}\n提交消息:\n{commit_message}"
             )
 
             return {
@@ -560,13 +554,7 @@ commit信息
                 "stderr": "",
             }
         except Exception as e:
-            self.console.print(
-                Panel(
-                    f"[bold red]❌ 提交失败[/bold red]\n\n{str(e)}",
-                    title="Git Commit Error",
-                    border_style="red",
-                )
-            )
+            PrettyOutput.auto_print(f"❌ 提交失败\n\n{str(e)}")
             return {
                 "success": False,
                 "stdout": "",
