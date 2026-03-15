@@ -2036,7 +2036,9 @@ function handleMessage(message, agentId = null) {
     const existingItem = currentOutputs.find(
       item => item.output_type === 'execution' && item.execution_id === executionId
     )
-    if (!existingItem) {
+    // 独立终端（execution_id 以 'terminal_' 开头）不需要创建聊天消息
+    // 因为它们的输出会直接写入终端面板，由 appendExecution 处理
+    if (!existingItem && !executionId.startsWith('terminal_')) {
       console.log(`[ws] Creating new output item for execution ${executionId}`)
       appendOutput({
         output_type: 'execution',
