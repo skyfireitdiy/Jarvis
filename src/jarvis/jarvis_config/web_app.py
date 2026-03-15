@@ -18,8 +18,6 @@ from pydantic import BaseModel
 
 from .schema_parser import SchemaParser
 
-from jarvis.jarvis_utils.output import PrettyOutput
-
 
 # 请求模型
 class SaveConfigRequest(BaseModel):
@@ -262,8 +260,6 @@ def get_html_template() -> str:
             --button-primary-hover: #2C2C2E;
             --error: #DC2626;
             --error-bg: #FEE2E2;
-            --shadow-float: 0 24px 48px -12px rgba(0, 0, 0, 0.08);
-            --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.06);
         }
 
         * {
@@ -314,13 +310,11 @@ def get_html_template() -> str:
         }
 
         .glass-card {
-            background: var(--bg-glass);
-            backdrop-filter: blur(50px);
-            -webkit-backdrop-filter: blur(50px);
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
             padding: 20px;
             border: 1px solid var(--border-inner);
-            box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
             margin-bottom: 12px;
         }
 
@@ -343,8 +337,7 @@ def get_html_template() -> str:
             text-align: center;
             padding: 24px 16px;
             border-radius: 12px;
-            background: var(--bg-glass);
-            backdrop-filter: blur(50px);
+            background: rgba(255, 255, 255, 0.95);
         }
 
         .loading {
@@ -369,12 +362,11 @@ def get_html_template() -> str:
         }
 
         .form-section {
-            background: var(--bg-glass);
-            backdrop-filter: blur(40px);
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
             padding: 0;
             border: 1px solid var(--border-inner);
-            box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
             /* Grid 布局时不再需要 margin-bottom，由 gap 控制 */
         }
         
@@ -409,11 +401,6 @@ def get_html_template() -> str:
         
         .form-section.collapsed .form-section-content {
             display: none;
-        }
-        
-        /* 添加CSS优化以提高性能 */
-        .form-section {
-            will-change: transform;
         }
         
         .form-section-header {
@@ -496,7 +483,6 @@ def get_html_template() -> str:
             font-size: 13px;
             color: var(--text-primary);
             outline: none;
-            transition: all 0.2s ease;
             box-shadow: var(--shadow-inset);
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
         }
@@ -505,7 +491,8 @@ def get_html_template() -> str:
         textarea:focus,
         select:focus {
             background: var(--bg-input-focus);
-            box-shadow: var(--shadow-inset), 0 0 0 3px rgba(0, 122, 255, 0.1);
+            border-color: rgba(0, 122, 255, 0.5);
+            outline: none;
         }
 
         input::placeholder,
@@ -534,18 +521,11 @@ def get_html_template() -> str:
             border: 1px solid var(--border-inner);
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-inset);
         }
 
         .checkbox-item:hover,
         .radio-item:hover {
             background: var(--bg-input-focus);
-        }
-
-        .checkbox-item:active,
-        .radio-item:active {
-            transform: scale(0.98);
         }
 
         .checkbox-item input,
@@ -565,7 +545,6 @@ def get_html_template() -> str:
             background: var(--bg-input);
             border: 1px solid var(--border-inner);
             border-radius: 8px;
-            box-shadow: var(--shadow-inset);
         }
 
         .switch {
@@ -589,7 +568,6 @@ def get_html_template() -> str:
             right: 0;
             bottom: 0;
             background-color: #D1D1D6;
-            transition: 0.3s;
             border-radius: 12px;
         }
 
@@ -601,7 +579,6 @@ def get_html_template() -> str:
             left: 2px;
             bottom: 2px;
             background-color: white;
-            transition: 0.3s;
             border-radius: 50%;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
@@ -612,10 +589,6 @@ def get_html_template() -> str:
 
         .switch input:checked + .switch-slider:before {
             transform: translateX(16px);
-        }
-
-        .switch:active .switch-slider:before {
-            width: 24px;
         }
 
         .nested-object {
@@ -639,7 +612,6 @@ def get_html_template() -> str:
             border-radius: 8px;
             padding: 10px;
             margin-bottom: 8px;
-            box-shadow: var(--shadow-inset);
         }
 
         .dict-item:last-child {
@@ -661,7 +633,8 @@ def get_html_template() -> str:
 
         .dict-key-input:focus {
             background: rgba(243, 244, 246, 0.5);
-            box-shadow: var(--shadow-inset), 0 0 0 3px rgba(0, 122, 255, 0.1);
+            border-color: rgba(0, 122, 255, 0.5);
+            outline: none;
         }
 
         .dict-controls {
@@ -688,7 +661,6 @@ def get_html_template() -> str:
             border-radius: 10px;
             padding: 10px;
             margin-bottom: 8px;
-            box-shadow: var(--shadow-inset);
         }
 
         .array-item:last-child {
@@ -708,12 +680,7 @@ def get_html_template() -> str:
             font-weight: 600;
             font-size: 13px;
             cursor: pointer;
-            transition: all 0.2s ease;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
-        }
-
-        .btn:active {
-            transform: scale(0.98);
         }
 
         .btn-primary {
@@ -723,16 +690,18 @@ def get_html_template() -> str:
 
         .btn-primary:hover {
             background: var(--button-primary-hover);
+            transform: translateY(-1px);
         }
 
         .btn-secondary {
             background: white;
             color: var(--text-primary);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .btn-secondary:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
         }
 
         .btn-danger {
@@ -1352,9 +1321,6 @@ def get_html_template() -> str:
                         }
                     }, 0);
                 }
-                
-                // 强制重排以确保CSS变更被应用
-                void section.offsetWidth;
             }
         }
 
