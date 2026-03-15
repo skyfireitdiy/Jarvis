@@ -76,8 +76,12 @@ class SessionOutputRouter(OutputMessagePublisher):
             for route_key in self._resolve_route_keys(session_id):
                 callbacks.update(self._subscribers.get(route_key, {}))
 
+        print(f"[SessionOutputRouter] Publishing message: type={message.get('type')}, session_id={session_id}, subscribers={len(callbacks)}")
         for sender in callbacks.values():
-            sender(dict(message))
+            try:
+                sender(dict(message))
+            except Exception as e:
+                print(f"[SessionOutputRouter] Sender error: {e}")
 
     @staticmethod
     def _resolve_route_keys(session_id: Optional[str]) -> list[str]:
