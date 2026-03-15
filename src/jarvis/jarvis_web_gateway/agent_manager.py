@@ -309,6 +309,32 @@ class AgentManager:
         """
         return self._agents.get(agent_id)
 
+    def rename_agent(self, agent_id: str, name: Optional[str]) -> Dict[str, Any]:
+        """重命名 Agent。
+
+        Args:
+            agent_id: Agent ID
+            name: 新名称，None 表示删除名称
+
+        Returns:
+            更新后的 Agent 信息字典
+
+        Raises:
+            KeyError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise KeyError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        agent.name = name
+
+        # 保存到文件
+        self._save_agents()
+
+        print(f"[AGENT MANAGER] Renamed agent {agent_id} to {name or '(default)'}")
+
+        return agent.to_dict()
+
     def _allocate_port(self) -> Optional[int]:
         """分配随机端口。
 
