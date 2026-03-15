@@ -184,14 +184,15 @@ class TerminalSessionManager:
                     env["PYTHONIOENCODING"] = "utf-8"
 
                 # 构建命令
-                # 注意：fish shell 在 PTY 环境中无法正常运行（即使使用 -i 参数）
-                # 所以对于 fish shell，fallback 到 bash
-                cmd = [interpreter]
-                actual_interpreter = interpreter
+                # fish 在 PTY 环境中无法直接启动，但可以通过 bash -c exec fish 启动
+                # 这样 fish 会继承正确的进程组设置
                 if interpreter.endswith('fish'):
-                    print("[TerminalSessionManager] Fish shell detected, falling back to bash")
-                    cmd = ['bash']
-                    actual_interpreter = 'bash'
+                    print("[TerminalSessionManager] Fish shell detected, using bash -c exec fish")
+                    cmd = ['bash', '-c', f'exec {interpreter} -i']
+                    actual_interpreter = interpreter
+                else:
+                    cmd = [interpreter]
+                    actual_interpreter = interpreter
 
                 proc = subprocess.Popen(
                     cmd,
