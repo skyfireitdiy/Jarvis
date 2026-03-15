@@ -3277,7 +3277,6 @@ body {
 *::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
-  transition: background 0.2s ease-out;
 }
 
 *::-webkit-scrollbar-thumb:hover {
@@ -3301,16 +3300,6 @@ body::-webkit-scrollbar {
 
 <style scoped>
 /* 动画定义 */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
 
 /* 全局布局 */
 .app {
@@ -3320,7 +3309,7 @@ body::-webkit-scrollbar {
   width: 100vw;
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+  background: #0d1117;
   color: #e6edf3;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -3344,9 +3333,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 14px 20px;
   background: rgba(22, 27, 34, 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 4px 12px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
 }
 
@@ -3429,15 +3416,12 @@ body::-webkit-scrollbar {
   cursor: pointer;
   padding: 6px 10px;
   color: #8b949e;
-  transition: all 0.2s ease-out;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .icon-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   color: #e6edf3;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
 }
 
 .icon-btn:active:not(:disabled) {
@@ -3450,7 +3434,7 @@ body::-webkit-scrollbar {
 }
 
 .manual-interrupt-btn {
-  background: linear-gradient(135deg, #f0883e 0%, #e37a33 100%);
+  background: #f0883e;
   border: 0.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   color: #ffffff;
@@ -3458,17 +3442,14 @@ body::-webkit-scrollbar {
   font-weight: 600;
   padding: 8px 14px;
   cursor: pointer;
-  transition: all 0.2s ease-out;
   display: flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 2px 4px rgba(240, 136, 62, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .manual-interrupt-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #f09955 0%, #f0883e 100%);
+  background: #f0883e;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(240, 136, 62, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .manual-interrupt-btn:active:not(:disabled) {
@@ -3478,7 +3459,6 @@ body::-webkit-scrollbar {
 .manual-interrupt-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(0.3);
 }
 
 .status {
@@ -3498,7 +3478,6 @@ body::-webkit-scrollbar {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  box-shadow: 0 0 8px currentColor;
 }
 
 .dot.offline {
@@ -3509,7 +3488,6 @@ body::-webkit-scrollbar {
 .dot.connecting {
   background: #d29922;
   color: #d29922;
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .dot.online {
@@ -3526,8 +3504,6 @@ body::-webkit-scrollbar {
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0; /* 防止被压缩 */
-  backdrop-filter: blur(20px) saturate(180%);
-  transition: width 0.3s ease, transform 0.3s ease;
 }
 
 .agent-sidebar.collapsed {
@@ -3572,7 +3548,6 @@ body::-webkit-scrollbar {
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
   position: relative;
 }
 
@@ -3661,7 +3636,6 @@ body::-webkit-scrollbar {
   top: 8px;
   right: 50px;
   opacity: 0;
-  transition: opacity 0.2s ease;
   background: rgba(56, 139, 246, 0.2);
   color: #388bfd;
   border: 0.5px solid rgba(56, 139, 246, 0.3);
@@ -3680,7 +3654,6 @@ body::-webkit-scrollbar {
   top: 8px;
   right: 8px;
   opacity: 0;
-  transition: opacity 0.2s ease;
   background: rgba(248, 81, 73, 0.2);
   color: #f85149;
   border: 0.5px solid rgba(248, 81, 73, 0.3);
@@ -3747,7 +3720,6 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
   border: none;
 }
 
@@ -3761,13 +3733,12 @@ body::-webkit-scrollbar {
 }
 
 .create-agent-modal .btn.primary {
-  background: linear-gradient(135deg, #3fb950 0%, #2ea043 100%);
+  background: #3fb950;
   color: white;
 }
 
 .create-agent-modal .btn.primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(63, 185, 80, 0.4);
 }
 
 .create-agent-modal .btn:disabled {
@@ -3792,20 +3763,17 @@ body::-webkit-scrollbar {
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease-out;
 }
 
 .create-agent-modal .radio-label:hover {
   background: rgba(13, 17, 23, 0.8);
   border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .create-agent-modal .radio-label:has(input:checked) {
   background: rgba(56, 139, 253, 0.12);
   border-color: rgba(56, 139, 253, 0.4);
-  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.1), 0 2px 8px rgba(56, 139, 253, 0.15);
 }
 
 .create-agent-modal .radio-label input[type="radio"] {
@@ -3817,7 +3785,6 @@ body::-webkit-scrollbar {
   border-radius: 50%;
   background: rgba(13, 17, 23, 0.8);
   cursor: pointer;
-  transition: all 0.2s ease-out;
   position: relative;
 }
 
@@ -3840,7 +3807,6 @@ body::-webkit-scrollbar {
   height: 8px;
   background: #58a6ff;
   border-radius: 50%;
-  box-shadow: 0 0 8px rgba(88, 166, 255, 0.6);
 }
 
 .create-agent-modal .radio-text {
@@ -3904,7 +3870,6 @@ body::-webkit-scrollbar {
   padding: 12px 14px;
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: all 0.2s ease;
   border-radius: 6px;
   margin: 4px;
 }
@@ -3975,7 +3940,6 @@ body::-webkit-scrollbar {
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .path-btn:hover {
@@ -4007,15 +3971,12 @@ body::-webkit-scrollbar {
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
 .dir-search-input:focus {
   outline: none;
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .dir-search-input::placeholder {
@@ -4053,7 +4014,6 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 12px 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
   border-radius: 6px;
   margin: 4px;
 }
@@ -4107,7 +4067,6 @@ body::-webkit-scrollbar {
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
@@ -4138,29 +4097,24 @@ body::-webkit-scrollbar {
 
 .message {
   background: rgba(22, 27, 34, 0.75);
-  backdrop-filter: blur(12px) saturate(150%);
   border-radius: 12px;
   padding: 14px 16px;
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
-  transition: all 0.2s ease-out;
 }
 
 .message:hover {
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 /* 用户输入消息 - 右对齐样式（必须放在 .message 之后以覆盖） */
 .message.message-user_input {
-  background: linear-gradient(135deg, #1f6feb 0%, #1a60d8 100%) !important;
+  background: #1f6feb !important;
   border: 0.5px solid rgba(255, 255, 255, 0.2) !important;
   align-self: flex-end;
   max-width: 75%;
-  box-shadow: 0 4px 12px rgba(31, 111, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .message.message-user_input .message-meta-left {
@@ -4310,13 +4264,11 @@ body::-webkit-scrollbar {
 
 .message-body.markdown-content :deep(pre) {
   background: rgba(13, 17, 23, 0.9);
-  backdrop-filter: blur(8px);
   padding: 14px;
   border-radius: 8px;
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   overflow-x: auto;
   margin: 10px 0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .message-body.markdown-content :deep(code) {
@@ -4341,12 +4293,11 @@ body::-webkit-scrollbar {
   max-height: 600px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   background: rgba(13, 17, 23, 0.6);
 }
 
 .terminal-host {
-  background: linear-gradient(180deg, #0a0d12 0%, #0d1117 100%);
+  background: #0a0d12;
   flex: 1;
   min-height: 400px;
   overflow: hidden;
@@ -4360,7 +4311,6 @@ body::-webkit-scrollbar {
   max-height: 600px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   background: rgba(13, 17, 23, 0.6);
 }
 
@@ -4374,7 +4324,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-history-content {
-  background: linear-gradient(180deg, #0a0d12 0%, #0d1117 100%);
+  background: #0a0d12;
   padding: 16px;
   margin: 0;
   overflow: auto;
@@ -4389,9 +4339,7 @@ body::-webkit-scrollbar {
 /* 确认对话框 */
 .message-confirm {
   background: rgba(33, 38, 45, 0.85);
-  backdrop-filter: blur(12px) saturate(150%);
   border: 0.5px solid rgba(88, 166, 255, 0.3);
-  box-shadow: 0 0 20px rgba(88, 166, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .confirm-box {
@@ -4420,37 +4368,29 @@ body::-webkit-scrollbar {
   cursor: pointer;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   background: rgba(33, 38, 45, 0.8);
-  backdrop-filter: blur(8px);
   color: #e6edf3;
-  transition: all 0.2s ease-out;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .confirm-btn:hover {
   background: rgba(48, 54, 61, 0.9);
   border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .confirm-btn.confirm {
-  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  background: #238636;
   border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 4px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .confirm-btn.confirm:hover {
-  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  background: #2ea043;
   border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 4px 8px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 /* 输入区 */
 .input-area {
   background: rgba(22, 27, 34, 0.9);
-  backdrop-filter: blur(20px) saturate(180%);
   border-top: 0.5px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
 
@@ -4487,15 +4427,12 @@ body::-webkit-scrollbar {
   border-radius: 10px;
   color: #e6edf3;
   font-size: 14px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
 .input-wrapper.single-line input:focus {
   outline: none;
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .input-wrapper.single-line .send-btn {
@@ -4510,7 +4447,7 @@ body::-webkit-scrollbar {
 }
 
 .send-btn {
-  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  background: #238636;
   border: 0.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: #ffffff;
@@ -4518,15 +4455,12 @@ body::-webkit-scrollbar {
   font-weight: 600;
   padding: 11px 22px;
   cursor: pointer;
-  transition: all 0.2s ease-out;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .send-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  background: #2ea043;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .send-btn:active:not(:disabled) {
@@ -4536,11 +4470,10 @@ body::-webkit-scrollbar {
 .send-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(0.3);
 }
 
 .complete-btn {
-  background: linear-gradient(135deg, #0969da 0%, #1f6feb 100%);
+  background: #0969da;
   border: 0.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: #ffffff;
@@ -4548,15 +4481,12 @@ body::-webkit-scrollbar {
   font-weight: 600;
   padding: 11px 22px;
   cursor: pointer;
-  transition: all 0.2s ease-out;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(9, 105, 218, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .complete-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+  background: #1f6feb;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(9, 105, 218, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .complete-btn:active:not(:disabled) {
@@ -4566,7 +4496,6 @@ body::-webkit-scrollbar {
 .complete-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(0.3);
 }
 
 /* 输入框统一样式 */
@@ -4583,15 +4512,12 @@ body::-webkit-scrollbar {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   resize: vertical;
   box-sizing: border-box;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
 .input-wrapper textarea:focus {
   outline: none;
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* 缓冲区指示器 */
@@ -4605,7 +4531,6 @@ body::-webkit-scrollbar {
   border-radius: 8px;
   margin: 8px 0;
   cursor: pointer;
-  transition: all 0.2s ease-out;
 }
 
 .buffer-indicator:hover {
@@ -4634,7 +4559,6 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease-out;
   white-space: nowrap;
 }
 
@@ -4671,7 +4595,6 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .cancel-btn:hover {
@@ -4693,7 +4616,6 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
 }
 
 .interrupt-btn:hover {
@@ -4708,7 +4630,6 @@ body::-webkit-scrollbar {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4718,13 +4639,11 @@ body::-webkit-scrollbar {
 
 .modal {
   background: rgba(22, 27, 34, 0.95);
-  backdrop-filter: blur(24px) saturate(180%);
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 28px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .connect-modal h2,
@@ -4766,15 +4685,12 @@ body::-webkit-scrollbar {
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .modal-header {
@@ -4805,7 +4721,6 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease-out;
 }
 
 .close-btn:hover {
@@ -4823,21 +4738,18 @@ body::-webkit-scrollbar {
 
 .primary-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+  background: #238636;
   border: 0.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 9px;
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease-out;
-  box-shadow: 0 2px 6px rgba(35, 134, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2ea043 0%, #36ad5a 100%);
+  background: #2ea043;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(35, 134, 54, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .primary-btn:active:not(:disabled) {
@@ -4847,27 +4759,23 @@ body::-webkit-scrollbar {
 .primary-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(0.3);
 }
 
 .danger-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+  background: #f85149;
   border: 0.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 9px;
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease-out;
-  box-shadow: 0 2px 6px rgba(248, 81, 73, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   width: 100%;
 }
 
 .danger-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff6b6b 0%, #f85149 100%);
+  background: #ff6b6b;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(248, 81, 73, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .danger-btn:active:not(:disabled) {
@@ -4877,7 +4785,6 @@ body::-webkit-scrollbar {
 .danger-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  filter: grayscale(0.3);
 }
 
 .history-info {
@@ -4918,15 +4825,12 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease-out;
-  backdrop-filter: blur(8px);
 }
 
 .ghost-btn:hover {
   background: rgba(48, 54, 61, 0.7);
   border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Side by side Diff 样式 */
@@ -4977,7 +4881,6 @@ body::-webkit-scrollbar {
 }
 
 .diff-row {
-  transition: background-color 0.1s ease-out;
 }
 
 .diff-row:hover {
@@ -5042,7 +4945,7 @@ body::-webkit-scrollbar {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .app {
-    background: linear-gradient(180deg, #1a1f2e 0%, #0d1117 100%);
+    background: #0d1117;
   }
   
   .app-header {
@@ -5127,15 +5030,12 @@ body::-webkit-scrollbar {
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-out;
 }
 
 .completions-search input:focus {
   outline: none;
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(13, 17, 23, 0.9);
-  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .completions-list {
@@ -5154,7 +5054,6 @@ body::-webkit-scrollbar {
   padding: 12px 16px;
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: all 0.2s ease-out;
 }
 
 .completion-item:last-child {
@@ -5216,10 +5115,8 @@ body::-webkit-scrollbar {
   top: 60px;
   right: 20px;
   background: rgba(13, 17, 23, 0.95);
-  backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   z-index: 1000;
@@ -5266,7 +5163,6 @@ body::-webkit-scrollbar {
   font-size: 12px;
   color: #8b949e;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .terminal-tab:hover {
@@ -5295,7 +5191,6 @@ body::-webkit-scrollbar {
   color: #f85149;
   border-radius: 3px;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .terminal-tab-close:hover {
@@ -5336,13 +5231,10 @@ body::-webkit-scrollbar {
   width: 20px;
   height: 20px;
   cursor: nesw-resize;
-  background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.3) 50%);
   border-radius: 0 0 0 8px;
-  transition: background 0.2s ease;
   z-index: 10;
 }
 
 .terminal-resize-handle:hover {
-  background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
 }
 </style>
