@@ -3519,6 +3519,16 @@ function handleGlobalKeydown(event) {
 // 移动端历史管理变量
 let historyStateCount = 0
 
+// 监听页面刷新/跳转，如果连接到gateway则提示用户
+const handleBeforeUnload = (e) => {
+  if (socket.value) {
+    // 有socket连接，提示用户
+    e.preventDefault()
+    e.returnValue = '' // Chrome需要returnValue
+    console.log('[app] Preventing page unload, socket is connected')
+  }
+}
+
 // 移动端：打开浮层时推送历史状态
 const pushOverlayState = () => {
   if (windowWidth.value <= 768) {
@@ -3589,6 +3599,10 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
   
+  // 添加beforeunload监听
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  console.log('[app] Beforeunload listener added')
+  
   // 移动端：监听返回键（popstate事件）
   const handlePopState = () => {
     console.log('[app] Back button pressed, historyStateCount:', historyStateCount)
@@ -3639,6 +3653,10 @@ onUnmounted(() => {
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
   console.log('[app] Resize listener removed')
+  
+  // 移除beforeunload监听
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  console.log('[app] Beforeunload listener removed')
   
   // 移除返回键监听
   window.removeEventListener('popstate', handlePopState)
