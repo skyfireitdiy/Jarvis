@@ -1,0 +1,12 @@
+{
+  "id": "20260315_183638_871552",
+  "type": "project_long_term",
+  "tags": [
+    "移动端优化",
+    "agent切换",
+    "用户体验"
+  ],
+  "content": "【移动端agent切换优化】\n需求：移动端切换agent后自动隐藏agent侧边栏，提升用户体验\n实现：在switchAgent函数结尾添加移动端检测逻辑\n代码位置：frontend/src/App.vue 第2082-2086行\n逻辑：\n- 检测windowWidth.value <= 768（移动端）\n- 自动设置showAgentSidebar.value = false\n- 添加调试日志输出\n效果：移动端切换agent后侧边栏自动关闭，用户直接看到agent内容，无需手动关闭侧边栏\n提交ID：9660ed7",
+  "created_at": "2026-03-15T18:36:38.871568",
+  "updated_at": "2026-03-15T18:36:38.871571"
+}
