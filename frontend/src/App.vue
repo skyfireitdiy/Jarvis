@@ -190,10 +190,18 @@
         <h2>创建 Agent</h2>
         <div class="form-group">
           <label>Agent 类型</label>
-          <select v-model="newAgentType" class="form-control">
-            <option value="agent">通用 Agent (agent)</option>
-            <option value="codeagent">代码 Agent (codeagent)</option>
-          </select>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" v-model="newAgentType" value="agent" />
+              <span class="radio-text">通用 Agent</span>
+              <span class="radio-desc">适用于日常任务和通用操作</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" v-model="newAgentType" value="codeagent" />
+              <span class="radio-text">代码 Agent</span>
+              <span class="radio-desc">专注于代码分析和开发任务</span>
+            </label>
+          </div>
         </div>
         <div class="form-group">
           <label>Agent 名称（可选）</label>
@@ -3105,6 +3113,85 @@ body::-webkit-scrollbar {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
+}
+
+/* 单选框组样式 */
+.create-agent-modal .radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-agent-modal .radio-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.create-agent-modal .radio-label:hover {
+  background: rgba(13, 17, 23, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.create-agent-modal .radio-label:has(input:checked) {
+  background: rgba(56, 139, 253, 0.12);
+  border-color: rgba(56, 139, 253, 0.4);
+  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.1), 0 2px 8px rgba(56, 139, 253, 0.15);
+}
+
+.create-agent-modal .radio-label input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(13, 17, 23, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  position: relative;
+}
+
+.create-agent-modal .radio-label input[type="radio"]:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.create-agent-modal .radio-label input[type="radio"]:checked {
+  border-color: #58a6ff;
+  background: rgba(56, 139, 253, 0.1);
+}
+
+.create-agent-modal .radio-label input[type="radio"]:checked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #58a6ff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.6);
+}
+
+.create-agent-modal .radio-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.create-agent-modal .radio-desc {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.4;
 }
 
 /* Session 恢复弹窗 */
