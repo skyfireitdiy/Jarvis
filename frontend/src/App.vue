@@ -267,6 +267,14 @@
             <button class="btn select-dir-btn" @click="openDirDialog">选择目录</button>
           </div>
         </div>
+        <div class="form-group">
+          <label>模型组</label>
+          <select v-model="newAgentModelGroup" class="form-control">
+            <option v-for="group in modelGroups" :key="group.name" :value="group.name">
+              {{ group.name }} ({{ group.smart_model }}, {{ group.normal_model }}, {{ group.cheap_model }})
+            </option>
+          </select>
+        </div>
         <div class="modal-actions">
           <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
           <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
@@ -608,6 +616,8 @@ const isInputDisabled = computed(() => {
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('')       // 新 Agent 名称（可选）
+const modelGroups = ref([])        // 模型组列表
+const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 default）
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
@@ -797,6 +807,8 @@ function connect() {
     localStorage.setItem('jarvis_backend_host', backendHost.value)
     localStorage.setItem('jarvis_backend_port', backendPort.value)
     console.log('[ws] Connection info saved:', backendHost.value, backendPort.value)
+    // 获取模型组列表
+    fetchModelGroups()
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
@@ -1407,6 +1419,41 @@ function cancelDirDialog() {
   selectedDir.value = null
 }
 
+// 获取模型组列表
+async function fetchModelGroups() {
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/model-groups`)
+    
+    if (!response.ok) {
+      console.error('[MODEL GROUP] 获取模型组列表失败:', response.status)
+      return
+    }
+    
+    const result = await response.json()
+    if (result.success && result.data) {
+      modelGroups.value = result.data
+      // 如果模型组列表不为空，优先使用配置的默认模型组
+      if (modelGroups.value.length > 0) {
+        const defaultGroup = result.default_llm_group || ''
+        const hasDefaultGroup = defaultGroup && modelGroups.value.some(g => g.name === defaultGroup)
+        const hasCurrentGroup = modelGroups.value.some(g => g.name === newAgentModelGroup.value)
+        
+        if (hasDefaultGroup) {
+          // 使用配置的默认模型组
+          newAgentModelGroup.value = defaultGroup
+        } else if (!hasCurrentGroup) {
+          // 如果没有默认模型组或默认模型组不在列表中，选择第一个
+          newAgentModelGroup.value = modelGroups.value[0].name
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[MODEL GROUP] 获取模型组列表出错:', error)
+  }
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
   
@@ -1419,7 +1466,8 @@ async function createAgent() {
       body: JSON.stringify({
         agent_type: newAgentType.value,
         working_dir: newAgentDir.value,
-        name: newAgentName.value || undefined
+        name: newAgentName.value || undefined,
+        llm_group: newAgentModelGroup.value
       })
     })
     
