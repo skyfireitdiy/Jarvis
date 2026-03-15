@@ -2115,11 +2115,6 @@ class Agent:
             # 只在第一次运行时设置原始任务目标，确保交互模式下后续输入不会覆盖原始目标
             if not self.original_user_input:
                 self.original_user_input = user_input
-                # 同时更新pin_content，确保原始任务目标被固定保存
-                # 这样在总结后也能保留原始任务目标
-                # 注意：pin_content 可能会被用户通过 <Pin> 标记追加内容，但原始任务目标不会被覆盖
-                if not self.pin_content:
-                    self.pin_content = user_input
 
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
@@ -2134,9 +2129,7 @@ class Agent:
                     "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
                 )
 
-                # 如果是非交互模式，确保pin_content被设置（已在上面统一设置）
-                if not self.pin_content:
-                    self.pin_content = user_input
+                # 非交互模式下不再自动设置pin_content
 
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
