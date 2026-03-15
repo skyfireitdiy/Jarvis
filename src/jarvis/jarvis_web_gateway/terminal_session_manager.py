@@ -10,6 +10,7 @@ import fcntl
 import os
 import pty
 import select
+import shutil
 import struct
 import subprocess
 import termios
@@ -171,6 +172,11 @@ class TerminalSessionManager:
             terminal_id = str(uuid.uuid4())[:8]
 
             try:
+                # 检查解释器是否存在
+                if not shutil.which(interpreter):
+                    print(f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to bash")
+                    interpreter = "bash"
+
                 # 创建PTY
                 master_fd, slave_fd = pty.openpty()
 
