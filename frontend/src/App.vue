@@ -5,8 +5,8 @@
       <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
-          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
           <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
+          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
         </div>
       </div>
       <div class="agent-list">
