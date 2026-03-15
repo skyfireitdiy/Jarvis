@@ -31,6 +31,7 @@ from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_web_gateway.agent_manager import AgentManager
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
+from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_utils.globals import set_interrupt
 
 
@@ -42,6 +43,9 @@ _status_update_callback: Optional[Callable[[str], None]] = None
 
 # 全局 SessionOutputRouter，用于推送状态更新
 _router: Optional[SessionOutputRouter] = None
+
+# 全局 TerminalSessionManager，用于独立终端会话管理
+_terminal_session_manager: Optional[TerminalSessionManager] = None
 
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
@@ -384,6 +388,46 @@ class WebSocketConnectionManager:
         if message_type == "manual_interrupt":
             set_interrupt(True)
             return
+        # 独立终端会话消息处理
+        if message_type == "terminal_create":
+            interpreter = payload.get("interpreter", "bash")
+            working_dir = payload.get("working_dir", ".")
+            if _terminal_session_manager:
+                terminal_id, error = _terminal_session_manager.create_session(
+                    interpreter=interpreter,
+                    working_dir=working_dir,
+                    stream_publisher=self._router,
+                    session_id=session_id,
+                )
+                if terminal_id:
+                    message = {"type": "terminal_created", "payload": {"terminal_id": terminal_id}}
+                    self._router.publish(message, session_id=session_id)
+            return
+        if message_type == "terminal_close":
+            terminal_id = payload.get("terminal_id")
+            if terminal_id and _terminal_session_manager:
+                _terminal_session_manager.close_session(terminal_id)
+                message = {"type": "terminal_closed", "payload": {"terminal_id": terminal_id}}
+                self._router.publish(message, session_id=session_id)
+            return
+        if message_type == "terminal_session_input":
+            terminal_id = payload.get("terminal_id")
+            data = payload.get("data", "")
+            if terminal_id and _terminal_session_manager:
+                _terminal_session_manager.write_input(terminal_id, data)
+            return
+        if message_type == "terminal_session_resize":
+            terminal_id = payload.get("terminal_id")
+            rows = payload.get("rows")
+            cols = payload.get("cols")
+            if terminal_id and _terminal_session_manager:
+                try:
+                    rows_int = int(rows)
+                    cols_int = int(cols)
+                except (TypeError, ValueError):
+                    return
+                _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
+            return
 
 
 def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
@@ -405,10 +449,12 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
+    terminal_session_manager = TerminalSessionManager(max_sessions=5)
 
     # 保存 router 到全局，用于状态更新时推送消息
-    global _router
+    global _router, _terminal_session_manager
     _router = router
+    _terminal_session_manager = terminal_session_manager
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     manager = WebSocketConnectionManager(
@@ -438,6 +484,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     async def _shutdown() -> None:
         # 清理所有 Agent
         await agent_manager.cleanup()
+        # 清理所有终端会话
+        terminal_session_manager.cleanup()
         set_current_gateway(None)
 
     @app.websocket("/ws")
@@ -816,6 +864,86 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    # HTTP API：创建终端会话
+    @app.post("/api/terminals")
+    async def create_terminal(request: Dict[str, Any]) -> Dict[str, Any]:
+        """创建新的终端会话。
+
+        Args:
+            request: {
+                "interpreter": "bash",  # 可选，默认bash
+                "working_dir": "."     # 可选，默认当前目录
+            }
+
+        Returns:
+            {"success": True, "data": {"terminal_id": "xxx"}}
+        """
+        try:
+            interpreter = request.get("interpreter", "bash")
+            working_dir = request.get("working_dir", ".")
+
+            terminal_id, error = terminal_session_manager.create_session(
+                interpreter=interpreter,
+                working_dir=working_dir,
+                stream_publisher=router,
+                session_id="default",
+            )
+
+            if terminal_id is None:
+                return {
+                    "success": False,
+                    "error": {"code": "CREATE_FAILED", "message": error or "创建终端失败"},
+                }
+
+            return {"success": True, "data": {"terminal_id": terminal_id}}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：列出所有终端会话
+    @app.get("/api/terminals")
+    async def list_terminals() -> Dict[str, Any]:
+        """列出所有活跃的终端会话。
+
+        Returns:
+            {"success": True, "data": [{"terminal_id": "xxx", ...}]}
+        """
+        try:
+            sessions = terminal_session_manager.list_sessions()
+            return {"success": True, "data": sessions}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：关闭终端会话
+    @app.delete("/api/terminals/{terminal_id}")
+    async def close_terminal(terminal_id: str) -> Dict[str, Any]:
+        """关闭指定的终端会话。
+
+        Args:
+            terminal_id: 终端ID
+
+        Returns:
+            {"success": True}
+        """
+        try:
+            success = terminal_session_manager.close_session(terminal_id)
+            if not success:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "终端不存在"},
+                }
+            return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     return app
 
 
@@ -857,7 +985,17 @@ def _extract_auth_from_headers(websocket: WebSocket) -> Optional[Dict[str, Any]]
 
 def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
     def _sender(message: Dict[str, Any]) -> None:
-        asyncio.run_coroutine_threadsafe(websocket.send_json(message), loop)
+        async def _send():
+            try:
+                print(f"[WebSocket Sender] Sending message: type={message.get('type')}, exec_id={message.get('payload', {}).get('execution_id')}")
+                await websocket.send_json(message)
+                print("[WebSocket Sender] Message sent successfully")
+            except Exception as e:
+                print(f"[WebSocket Sender] Error sending message: {e}")
+        try:
+            asyncio.run_coroutine_threadsafe(_send(), loop)
+        except Exception as e:
+            print(f"[WebSocket Sender] Error scheduling send: {e}")
 
     return _sender
 

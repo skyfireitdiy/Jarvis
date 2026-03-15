@@ -43,6 +43,9 @@
         <span class="agent-dir">{{ currentAgent.working_dir }}</span>
       </div>
       <div class="header-actions">
+        <button class="icon-btn" @click="showTerminalPanel = !showTerminalPanel" :disabled="!socket" title="终端面板">
+          💻
+        </button>
         <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
           👤 人工介入
         </button>
@@ -92,6 +95,47 @@
         </article>
       </div>
     </main>
+
+    <!-- 终端面板 -->
+    <aside v-show="showTerminalPanel" class="terminal-panel">
+      <div class="terminal-panel-header">
+        <h3>终端</h3>
+        <div class="terminal-panel-actions">
+          <button class="icon-btn" @click="createTerminal" :disabled="terminalSessions.length >= 5" title="新建终端">➕</button>
+          <button class="icon-btn" @click="showTerminalPanel = false" title="关闭面板">✕</button>
+        </div>
+      </div>
+      
+      <!-- 终端标签栏 -->
+      <div class="terminal-tabs" v-if="terminalSessions.length > 0">
+        <div 
+          v-for="session in terminalSessions" 
+          :key="session.terminal_id"
+          class="terminal-tab"
+          :class="{ active: activeTerminalId === session.terminal_id }"
+          @click="switchTerminal(session.terminal_id)"
+        >
+          <span class="terminal-tab-title">{{ session.interpreter }}</span>
+          <button class="terminal-tab-close" @click.stop="closeTerminal(session.terminal_id)">✕</button>
+        </div>
+      </div>
+      
+      <!-- 终端内容区域 -->
+      <div class="terminal-content">
+        <div v-if="terminalSessions.length === 0" class="terminal-empty">
+          暂无终端，点击 + 创建
+        </div>
+        <div 
+          v-else 
+          v-for="session in terminalSessions" 
+          :key="session.terminal_id"
+          v-show="activeTerminalId === session.terminal_id"
+          class="terminal-host-wrapper"
+        >
+          <div :ref="el => setTerminalHostRef(session.terminal_id, el)" class="terminal-host"></div>
+        </div>
+      </div>
+    </aside>
 
     <!-- 底部输入区 -->
     <footer class="input-area">
@@ -480,6 +524,7 @@ const connectErrorMessage = ref('')  // 连接错误信息
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
+const showTerminalPanel = ref(false)  // 终端面板
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showSessionDialog = ref(false)   // Session 选择对话框
 const availableSessions = ref([])         // 可恢复的 session 列表
@@ -515,6 +560,11 @@ const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || [])
 const outputList = ref(null)
 const terminalHosts = ref(new Map())
 const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
+
+// 独立终端会话
+const terminalSessions = ref([]) // [{ terminal_id, interpreter, working_dir, terminal, hostEl, fitAddon }]
+const activeTerminalId = ref(null) // 当前激活的终端ID
+const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
 
 // 输入控制
 const inputText = ref('')
@@ -1767,6 +1817,9 @@ function handleMessage(message, agentId = null) {
   if (!message || typeof message !== 'object') return
   const { type, payload } = message
   
+  // 调试：记录所有收到的消息类型
+  console.log(`[ws] Received message type: ${type}`, {execution_id: payload?.execution_id})
+  
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
   if (type === 'ready') {
@@ -1944,6 +1997,44 @@ function handleMessage(message, agentId = null) {
       })
     } else {
       console.log('[ws] output item already exists for execution_id:', executionId)
+    }
+  } else if (type === 'terminal_created') {
+    // 独立终端创建成功
+    console.log('[ws] terminal_created', payload)
+    const terminalId = payload?.terminal_id
+    if (terminalId) {
+      terminalSessions.value.push({
+        terminal_id: terminalId,
+        interpreter: 'bash',
+        working_dir: '.',
+        terminal: null,
+        hostEl: null,
+        fitAddon: null,
+        history: []  // 保存历史输出，用于面板隐藏后再显示时恢复
+      })
+      if (!activeTerminalId.value) {
+        activeTerminalId.value = terminalId
+      }
+      // 初始化终端
+      nextTick(() => {
+        const hostEl = independentTerminalHosts.value.get(terminalId)
+        if (hostEl) {
+          initIndependentTerminal(terminalId, hostEl)
+        }
+      })
+    }
+  } else if (type === 'terminal_closed') {
+    // 独立终端关闭
+    console.log('[ws] terminal_closed', payload)
+    const terminalId = payload?.terminal_id
+    if (terminalId) {
+      // 检查终端是否还存在，避免重复关闭导致无限循环
+      const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+      if (session) {
+        closeTerminal(terminalId)
+      } else {
+        console.log(`[ws] terminal ${terminalId} already closed, ignoring`)
+      }
     }
   } else if (type === 'error') {
     console.warn('[ws] error payload', payload)
@@ -2156,6 +2247,54 @@ function appendExecution(payload) {
   const eventType = payload?.event_type
   
   console.log(`[terminal DEBUG] appendExecution: executionId=${executionId}, eventType=${eventType}, hasData=${!!payload?.data}, encoded=${payload?.encoded}`)
+  
+  // 检查是否是独立终端的输出（格式：terminal_{terminal_id}）
+  if (executionId.startsWith('terminal_')) {
+    const terminalId = executionId.replace('terminal_', '')
+    const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+    
+    // 检查会话是否存在
+    if (!session) {
+      console.warn(`[independent-terminal] No session found for ${terminalId}`)
+      return
+    }
+    
+    // 解码数据
+    let data = payload?.data || ''
+    if (payload?.encoded && data) {
+      try {
+        const binaryString = atob(data)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        const decoder = new TextDecoder('utf-8')
+        data = decoder.decode(bytes)
+      } catch (error) {
+        console.error('[independent-terminal] Failed to decode base64 data:', error)
+        return
+      }
+    }
+    
+    // 如果终端已初始化，直接写入
+    if (session.terminal) {
+      try {
+        session.terminal.write(data)
+        // 保存历史输出
+        session.history.push({ type: eventType, data: data })
+      } catch (error) {
+        console.error('[independent-terminal] Failed to write to terminal:', error)
+      }
+    } else {
+      // 终端尚未初始化，将输出暂存到缓冲区
+      console.log(`[independent-terminal] Terminal not ready, buffering output for ${terminalId}`)
+      if (!session.pending_output) {
+        session.pending_output = []
+      }
+      session.pending_output.push(data)
+    }
+    return
+  }
   
   // 处理 base64 编码的数据
   let data = payload?.data || ''
@@ -2658,6 +2797,227 @@ function setTerminalRef(executionId, el) {
       termInfo.hostEl = null
     }
   }
+}
+
+// 独立终端相关函数
+function setTerminalHostRef(terminalId, el) {
+  const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+  if (el) {
+    console.log(`[independent-terminal] Setting ref for terminal ${terminalId}`)
+    independentTerminalHosts.value.set(terminalId, el)
+    if (session) {
+      session.hostEl = el
+    }
+  } else {
+    independentTerminalHosts.value.delete(terminalId)
+    if (session) {
+      session.hostEl = null
+    }
+  }
+}
+
+function initIndependentTerminal(terminalId, el) {
+  const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+  if (!session) {
+    console.warn(`[independent-terminal] Session not found for ${terminalId}`)
+    return
+  }
+  
+  // 如果 terminal 实例已存在（面板隐藏后又显示），重新打开并恢复历史输出
+  if (session.terminal) {
+    console.log(`[independent-terminal] Reopening terminal ${terminalId} with ${session.history.length} history entries`)
+    try {
+      session.terminal.open(el)
+      session.hostEl = el
+      // 恢复 ResizeObserver
+      if (typeof ResizeObserver !== 'undefined') {
+        const resizeObserver = new ResizeObserver(() => {
+          if (session.fitAddon && session.terminal) {
+            session.fitAddon.fit()
+            sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
+          }
+        })
+        resizeObserver.observe(el)
+      }
+      // 恢复 FitAddon
+      session.fitAddon.fit()
+      // 恢复历史输出
+      session.history.forEach(item => {
+        if (session.terminal) {
+          session.terminal.write(item.data)
+        }
+      })
+      console.log(`[independent-terminal] Terminal ${terminalId} reopened successfully`)
+    } catch (error) {
+      console.error(`[independent-terminal] Failed to reopen terminal ${terminalId}:`, error)
+    }
+    return
+  }
+  
+  console.log(`[independent-terminal] Initializing terminal ${terminalId}`)
+  
+  // 创建终端实例
+  session.terminal = new Terminal({
+    theme: {
+      background: '#0b1220',
+    },
+    fontSize: 12,
+  })
+  session.terminal.open(el)
+  
+  // 创建并加载 FitAddon
+  session.fitAddon = new FitAddon()
+  session.terminal.loadAddon(session.fitAddon)
+  
+  // 使用 FitAddon 适配终端尺寸
+  session.fitAddon.fit()
+  console.log(`[independent-terminal] FitAddon fit: cols=${session.terminal.cols}, rows=${session.terminal.rows}`)
+  
+  // 设置 ResizeObserver 监听尺寸变化
+  if (typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(() => {
+      if (session.fitAddon && session.terminal) {
+        session.fitAddon.fit()
+        // 发送 resize 消息到后端
+        sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
+      }
+    })
+    resizeObserver.observe(el)
+  }
+  
+  // 监听用户输入
+  session.terminal.onData(data => {
+    sendTerminalInput(terminalId, data)
+  })
+  
+  // 初始化后发送 resize
+  setTimeout(() => {
+    if (session.fitAddon && session.terminal) {
+      session.fitAddon.fit()
+      sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
+      session.terminal.focus()
+      
+      // 写入缓冲的输出
+      if (session.pending_output && session.pending_output.length > 0) {
+        console.log(`[independent-terminal] Writing ${session.pending_output.length} buffered outputs to terminal ${terminalId}`)
+        try {
+          for (const bufferedData of session.pending_output) {
+            session.terminal.write(bufferedData)
+          }
+          console.log(`[independent-terminal] Successfully wrote buffered outputs`)
+        } catch (error) {
+          console.error('[independent-terminal] Failed to write buffered outputs:', error)
+        }
+        // 清空缓冲区
+        session.pending_output = []
+      }
+    }
+  }, 300)
+}
+
+function createTerminal() {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+  
+  console.log('[independent-terminal] Creating new terminal')
+  const message = {
+    type: 'terminal_create',
+    payload: {
+      interpreter: 'bash',
+      working_dir: '.',
+    },
+  }
+  socket.value.send(JSON.stringify(message))
+}
+
+function closeTerminal(terminalId) {
+  console.log(`[independent-terminal] Closing terminal ${terminalId}`)
+  
+  // 清理终端实例
+  const sessionIndex = terminalSessions.value.findIndex(t => t.terminal_id === terminalId)
+  if (sessionIndex !== -1) {
+    const session = terminalSessions.value[sessionIndex]
+    if (session.terminal) {
+      try {
+        session.terminal.dispose()
+      } catch (error) {
+        console.warn('[independent-terminal] Failed to dispose terminal', error)
+      }
+    }
+    // 从数组中移除
+    terminalSessions.value.splice(sessionIndex, 1)
+  }
+  
+  // 如果关闭的是当前激活的终端，切换到另一个
+  if (activeTerminalId.value === terminalId) {
+    activeTerminalId.value = terminalSessions.value.length > 0 ? terminalSessions.value[0].terminal_id : null
+  }
+  
+  // 发送关闭消息到后端
+  if (socket.value) {
+    const message = {
+      type: 'terminal_close',
+      payload: {
+        terminal_id: terminalId,
+      },
+    }
+    socket.value.send(JSON.stringify(message))
+  }
+  
+  // 清理 ref
+  independentTerminalHosts.value.delete(terminalId)
+}
+
+function switchTerminal(terminalId) {
+  console.log(`[independent-terminal] Switching to terminal ${terminalId}`)
+  activeTerminalId.value = terminalId
+  
+  // 聚焦到选中的终端
+  nextTick(() => {
+    const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+    if (session && session.terminal) {
+      try {
+        session.terminal.focus()
+      } catch (error) {
+        console.warn('[independent-terminal] Failed to focus terminal', error)
+      }
+    }
+  })
+}
+
+function sendTerminalInput(terminalId, data) {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+  
+  const message = {
+    type: 'terminal_session_input',
+    payload: {
+      terminal_id: terminalId,
+      data,
+    },
+  }
+  socket.value.send(JSON.stringify(message))
+}
+
+function sendTerminalResize(terminalId, rows, cols) {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+  
+  const message = {
+    type: 'terminal_session_resize',
+    payload: {
+      terminal_id: terminalId,
+      rows,
+      cols,
+    },
+  }
+  socket.value.send(JSON.stringify(message))
 }
 
 onMounted(() => {
@@ -4646,5 +5006,125 @@ body::-webkit-scrollbar {
   margin-bottom: 16px;
   font-size: 14px;
   text-align: center;
+}
+
+/* 终端面板 */
+.terminal-panel {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  width: 800px;
+  height: 500px;
+  background: rgba(13, 17, 23, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
+
+.terminal-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(22, 27, 34, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px 8px 0 0;
+}
+
+.terminal-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.terminal-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(48, 54, 61, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.terminal-tab:hover {
+  background: rgba(56, 139, 253, 0.1);
+  color: #58a6ff;
+}
+
+.terminal-tab.active {
+  background: rgba(56, 139, 253, 0.2);
+  color: #58a6ff;
+  border-color: rgba(56, 139, 253, 0.3);
+}
+
+.terminal-tab-title {
+  font-weight: 500;
+}
+
+.terminal-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.terminal-tab-close:hover {
+  background: rgba(248, 81, 73, 0.4);
+}
+
+.terminal-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8b949e;
+  font-size: 14px;
+}
+
+.terminal-host-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
+
+.terminal-host {
+  width: 100%;
+  height: 100%;
 }
 </style>
