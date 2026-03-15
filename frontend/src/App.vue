@@ -16,9 +16,9 @@
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
-            <span class="agent-port">:{{ agent.port }}</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir }}</div>
+          <button class="icon-btn copy-btn" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
           <button class="icon-btn stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
         </div>
         <div v-if="agentList.length === 0" class="agent-empty">
@@ -39,7 +39,6 @@
       <div class="current-agent-info" v-if="currentAgent">
         <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
         <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
-        <span class="agent-port">:{{ currentAgent.port }}</span>
         <span class="agent-dir">{{ currentAgent.working_dir }}</span>
       </div>
       <div class="header-actions">
@@ -1648,6 +1647,50 @@ async function fetchAgentList() {
 }
 
 // 停止 Agent
+// 复制 Agent
+async function copyAgent(agent) {
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    const response = await fetch(`http://${host}:${port}/api/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent_type: agent.agent_type,
+        working_dir: agent.working_dir,
+        name: agent.name || undefined
+      })
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`复制失败: ${error.error?.message || error.detail || '未知错误'}`)
+      return
+    }
+    
+    const result = await response.json()
+    console.log('[AGENT] Copied:', result)
+    
+    // 后端返回格式: { success: true, data: agent }
+    if (result.success && result.data) {
+      const newAgent = result.data
+      
+      // 添加到列表开头
+      agentList.value.unshift(newAgent)
+      
+      // 刷新列表
+      await fetchAgentList()
+      
+      console.log(`[AGENT] Successfully copied agent ${agent.agent_id}`)
+    } else {
+      alert('复制失败：返回数据格式错误')
+    }
+  } catch (error) {
+    console.error('[AGENT] Copy failed:', error)
+    alert(`复制失败: ${error.message}`)
+  }
+}
+
 // 删除 Agent
 async function deleteAgent(agentId) {
   showConfirm(
@@ -3476,7 +3519,7 @@ body::-webkit-scrollbar {
 
 /* Agent 浮动窗口 */
 .agent-sidebar {
-  width: 280px;
+  width: 320px;
   background: rgba(22, 27, 34, 0.95);
   border-right: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
@@ -3611,6 +3654,25 @@ body::-webkit-scrollbar {
   color: #8b949e;
   word-break: break-all;
   line-height: 1.4;
+}
+
+.agent-item .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 50px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: rgba(56, 139, 246, 0.2);
+  color: #388bfd;
+  border: 0.5px solid rgba(56, 139, 246, 0.3);
+}
+
+.agent-item:hover .copy-btn {
+  opacity: 1;
+}
+
+.agent-item .copy-btn:hover {
+  background: rgba(56, 139, 246, 0.3);
 }
 
 .agent-item .stop-btn {
