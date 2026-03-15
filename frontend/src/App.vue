@@ -547,6 +547,7 @@ function showConfirm(message, confirmCallback, cancelCallback) {
 const showCompletions = ref(false) // 是否显示补全列表
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
+const completionSearchInput = ref(null) // 补全搜索输入框引用
 
 // 流式消息跟踪
 const streamingMessage = ref(null) // 当前流式消息
@@ -1314,11 +1315,9 @@ async function openCompletions() {
   }
   
   // 聚焦搜索框
-  setTimeout(() => {
-    if (window.completionSearchInput) {
-      window.completionSearchInput.focus()
-    }
-  }, 100)
+  nextTick(() => {
+    completionSearchInput.value?.focus()
+  })
 }
 
 // 过滤补全列表
