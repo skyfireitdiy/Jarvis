@@ -162,14 +162,16 @@
             v-model="completionSearch" 
             placeholder="搜索补全..." 
             ref="completionSearchInput"
+            @keydown="handleCompletionKeydown"
           />
         </div>
-        <div class="completions-list">
+        <div class="completions-list" ref="completionsListRef">
           <div 
             v-for="(item, index) in filteredCompletions" 
             :key="index" 
+            :ref="el => { if (el) completionItemsRef[index] = el }"
             class="completion-item"
-            :class="`completion-${item.type}`"
+            :class="[`completion-${item.type}`, { 'selected': selectedIndex === index }]"
             @click="insertCompletion(item)"
           >
             <div class="completion-value">{{ item.display }}</div>
@@ -355,7 +357,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -547,7 +549,15 @@ function showConfirm(message, confirmCallback, cancelCallback) {
 const showCompletions = ref(false) // 是否显示补全列表
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
+
+// 监听搜索输入变化，重置选中状态
+watch(completionSearch, () => {
+  selectedIndex.value = -1
+})
 const completionSearchInput = ref(null) // 补全搜索输入框引用
+const completionsListRef = ref(null) // 补全列表容器引用
+const completionItemsRef = ref([]) // 补全条目元素引用数组
+const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示未选中
 
 // 流式消息跟踪
 const streamingMessage = ref(null) // 当前流式消息
@@ -1286,6 +1296,7 @@ async function openCompletions() {
   }
   
   completionSearch.value = ''
+  selectedIndex.value = -1
   showCompletions.value = true
   
   // 获取补全列表
@@ -1333,6 +1344,82 @@ const filteredCompletions = computed(() => {
   )
 })
 
+// 处理补全对话框的键盘事件
+function handleCompletionKeydown(event) {
+  const maxIndex = filteredCompletions.value.length - 1
+  
+  if (event.key === 'Escape') {
+    // ESC 键关闭对话框
+    showCompletions.value = false
+    selectedIndex.value = -1
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'ArrowDown') {
+    // 向下键：选择下一个条目
+    if (selectedIndex.value < maxIndex) {
+      selectedIndex.value++
+    } else if (selectedIndex.value === -1) {
+      selectedIndex.value = 0
+    }
+    scrollToSelected()
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'ArrowUp') {
+    // 向上键：选择上一个条目
+    if (selectedIndex.value > 0) {
+      selectedIndex.value--
+    } else if (selectedIndex.value === -1) {
+      selectedIndex.value = maxIndex
+    } else {
+      selectedIndex.value = -1
+    }
+    scrollToSelected()
+    event.preventDefault()
+    return
+  }
+  
+  if (event.key === 'Enter') {
+    // 回车键：如果选中了条目，则插入
+    if (selectedIndex.value >= 0 && selectedIndex.value <= maxIndex) {
+      insertCompletion(filteredCompletions.value[selectedIndex.value])
+      event.preventDefault()
+    }
+    return
+  }
+}
+
+// 滚动到选中的条目
+function scrollToSelected() {
+  nextTick(() => {
+    const selectedItem = completionItemsRef.value[selectedIndex.value]
+    const listContainer = completionsListRef.value
+    
+    if (selectedItem && listContainer) {
+      const containerRect = listContainer.getBoundingClientRect()
+      const itemRect = selectedItem.getBoundingClientRect()
+      
+      // 计算相对位置（考虑到可能的滚动偏移）
+      const itemTop = selectedItem.offsetTop
+      const itemBottom = itemTop + selectedItem.offsetHeight
+      const containerScrollTop = listContainer.scrollTop
+      const containerBottom = containerScrollTop + containerRect.height
+      
+      // 如果选中条目在可视区域上方，滚动到显示它
+      if (itemTop < containerScrollTop) {
+        listContainer.scrollTop = itemTop
+      }
+      // 如果选中条目在可视区域下方，滚动到显示它
+      else if (itemBottom > containerBottom) {
+        listContainer.scrollTop = itemBottom - containerRect.height
+      }
+    }
+  })
+}
+
 // 插入选中的补全
 function insertCompletion(item) {
   const textarea = document.querySelector('.input-wrapper textarea')
@@ -1355,6 +1442,7 @@ function insertCompletion(item) {
   
   // 关闭弹窗
   showCompletions.value = false
+  selectedIndex.value = -1
 }
 
 // 获取 Agent 列表
@@ -4270,6 +4358,10 @@ body::-webkit-scrollbar {
 
 .completion-item:hover {
   background: rgba(88, 166, 255, 0.1);
+}
+
+.completion-item.selected {
+  background: rgba(88, 166, 255, 0.25);
 }
 
 .completion-value {
