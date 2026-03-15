@@ -67,8 +67,8 @@
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
-          <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
-            👤 人工介入
+          <button class="icon-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
+            👤
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙️
