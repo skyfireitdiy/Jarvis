@@ -35,6 +35,15 @@ from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegis
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_utils.globals import set_interrupt
 
+# 导入 agent 状态管理器（用于处理 get_status 消息）
+try:
+    from jarvis.jarvis_agent.jarvis import get_agent_status_manager
+except ImportError:
+    # 如果 jarvis_agent 不可用，使用 None
+    get_agent_status_manager = None  # type: ignore
+
+
+
 
 # 全局 AgentManager，用于状态变更回调
 _global_agent_manager: Optional[AgentManager] = None
@@ -388,6 +397,20 @@ class WebSocketConnectionManager:
             return
         if message_type == "manual_interrupt":
             set_interrupt(True)
+            return
+        if message_type == "get_status":
+            # 处理前端主动请求状态的请求
+            if get_agent_status_manager is not None:
+                try:
+                    status_manager = get_agent_status_manager()
+                    current_status = status_manager.get_status()
+                    # 返回 status_update 消息
+                    status_message = {"type": "status_update", "payload": {"execution_status": current_status}}
+                    self._router.publish(status_message, session_id=session_id)
+                    print(f"[GET_STATUS] Sent agent status: {current_status}")
+                except Exception as e:
+                    # 获取状态失败
+                    print(f"[GET_STATUS] Failed to get status: {e}")
             return
         # 独立终端会话消息处理
         if message_type == "terminal_create":
