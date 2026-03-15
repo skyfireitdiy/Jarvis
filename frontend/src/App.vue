@@ -1794,6 +1794,9 @@ async function copyAgent(agent) {
       // 添加到列表开头
       agentList.value.unshift(newAgent)
       
+      // 立即切换到新复制的 agent
+      await switchAgent(newAgent)
+      
       // 刷新列表
       await fetchAgentList()
       
