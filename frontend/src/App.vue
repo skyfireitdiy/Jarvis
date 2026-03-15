@@ -18,8 +18,11 @@
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir }}</div>
-          <button class="icon-btn copy-btn" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
-          <button class="icon-btn stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
+          <div class="agent-actions">
+            <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
+            <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
+            <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
+          </div>
         </div>
         <div v-if="agentList.length === 0" class="agent-empty">
           暂无 Agent，点击 + 创建
@@ -284,6 +287,28 @@
         <div class="modal-actions">
           <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
           <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 重命名 Agent 弹窗 -->
+    <div class="modal-overlay" v-if="showRenameAgentModal">
+      <div class="modal create-agent-modal">
+        <h2>重命名 Agent</h2>
+        <div class="form-group">
+          <label>Agent 名称（可选）</label>
+          <input 
+            v-model="renameAgentName" 
+            type="text" 
+            class="form-control" 
+            placeholder="留空则使用默认名称"
+            ref="renameInput"
+            @keydown.enter="confirmRename"
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" @click="showRenameAgentModal = false">取消</button>
+          <button class="btn primary" @click="confirmRename">确认</button>
         </div>
       </div>
     </div>
@@ -557,6 +582,9 @@ const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
+const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
+const renamingAgent = ref(null)          // 正在重命名的 Agent
+const renameAgentName = ref('')           // 重命名的新名称
 const showSessionDialog = ref(false)   // Session 选择对话框
 const availableSessions = ref([])         // 可恢复的 session 列表
 const selectedSession = ref(null)         // 选中的 session
@@ -567,6 +595,7 @@ const selectedDir = ref(null)              // 选中的目录
 const dirSearchText = ref('')              // 目录搜索文本
 const dirSearchInput = ref(null)           // 目录搜索输入框引用
 const selectedDirIndex = ref(-1)           // 当前选中的目录索引，-1 表示未选中
+const renameInput = ref(null)               // 重命名输入框引用
 
 // 过滤后的目录列表（支持模糊搜索）
 const filteredDirList = computed(() => {
@@ -1775,6 +1804,59 @@ async function copyAgent(agent) {
   } catch (error) {
     console.error('[AGENT] Copy failed:', error)
     alert(`复制失败: ${error.message}`)
+  }
+}
+
+// 重命名 Agent
+function renameAgent(agent) {
+  renamingAgent.value = agent
+  renameAgentName.value = agent.name || ''
+  showRenameAgentModal.value = true
+  
+  // 自动聚焦到输入框
+  nextTick(() => {
+    if (renameInput.value) {
+      renameInput.value.focus()
+      // 选中所有文本
+      renameInput.value.select()
+    }
+  })
+}
+
+// 确认重命名
+async function confirmRename() {
+  const agent = renamingAgent.value
+  if (!agent) return
+  
+  const newName = renameAgentName.value.trim()
+  
+  try {
+    const host = backendHost.value || window.location.hostname || '127.0.0.1'
+    const port = backendPort.value || '8000'
+    
+    const body = newName === '' 
+      ? { name: null } 
+      : { name: newName }
+    
+    const response = await fetch(`http://${host}:${port}/api/agents/${agent.agent_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`重命名失败: ${error.error?.message || error.detail || '未知错误'}`)
+      return
+    }
+    
+    await fetchAgentList()
+    console.log(`[AGENT] Successfully renamed agent ${agent.agent_id}`)
+    showToast('重命名成功', 'success')
+    showRenameAgentModal.value = false
+  } catch (error) {
+    console.error('[AGENT] Rename failed:', error)
+    alert(`重命名失败: ${error.message}`)
   }
 }
 
@@ -3780,40 +3862,38 @@ body::-webkit-scrollbar {
   line-height: 1.4;
 }
 
-.agent-item .copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 50px;
-  opacity: 0;
-  background: rgba(56, 139, 246, 0.2);
-  color: #388bfd;
-  border: 0.5px solid rgba(56, 139, 246, 0.3);
+.agent-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  justify-content: flex-end;
 }
 
-.agent-item:hover .copy-btn {
-  opacity: 1;
+.icon-btn-small {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: #8b949e;
+  transition: all 0.2s ease;
 }
 
-.agent-item .copy-btn:hover {
-  background: rgba(56, 139, 246, 0.3);
+.icon-btn-small:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  transform: translateY(-1px);
 }
 
-.agent-item .stop-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
+.icon-btn-small:active {
+  transform: translateY(0);
+}
+
+.agent-actions .icon-btn-small.stop-btn:hover {
   background: rgba(248, 81, 73, 0.2);
   color: #f85149;
-  border: 0.5px solid rgba(248, 81, 73, 0.3);
-}
-
-.agent-item:hover .stop-btn {
-  opacity: 1;
-}
-
-.agent-item .stop-btn:hover {
-  background: rgba(248, 81, 73, 0.3);
+  border-color: rgba(248, 81, 73, 0.3);
 }
 
 .agent-empty {

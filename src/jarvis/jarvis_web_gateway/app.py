@@ -517,6 +517,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     async def _startup() -> None:
         # 初始化环境并加载配置文件
         from jarvis.jarvis_utils.utils import init_env
+
         init_env(welcome_str="", config_file=None)
         # 为运行中的 Agent 启动监控任务
         await agent_manager.start_monitoring_for_running_agents()
@@ -616,7 +617,11 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             default_llm_group = config.get("llm_group", "")
 
             if not isinstance(llm_groups, dict) or not llm_groups:
-                return {"success": True, "data": [], "default_llm_group": default_llm_group}
+                return {
+                    "success": True,
+                    "data": [],
+                    "default_llm_group": default_llm_group,
+                }
 
             # 转换格式: llm_groups 和 llms -> list of dict
             data = []
@@ -659,7 +664,11 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     }
                 )
 
-            return {"success": True, "data": data, "default_llm_group": default_llm_group}
+            return {
+                "success": True,
+                "data": data,
+                "default_llm_group": default_llm_group,
+            }
 
             return {"success": True, "data": data}
         except Exception as e:
@@ -674,6 +683,35 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         """停止 Agent。"""
         try:
             result = agent_manager.stop_agent(agent_id)
+            return {"success": True, "data": result}
+        except KeyError as e:
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：更新 Agent（重命名）
+    @app.patch("/api/agents/{agent_id}")
+    async def patch_agent(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+        """更新 Agent 信息（目前只支持重命名）。"""
+        try:
+            name = request.get("name")
+
+            if name is not None and not isinstance(name, str):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "name must be a string or null",
+                    },
+                }
+
+            result = agent_manager.rename_agent(agent_id, name)
             return {"success": True, "data": result}
         except KeyError as e:
             return {
