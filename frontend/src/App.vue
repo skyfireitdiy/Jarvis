@@ -5,6 +5,7 @@
       <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
+          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
           <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
         </div>
       </div>
@@ -3419,6 +3420,21 @@ function sendTerminalResize(terminalId, rows, cols) {
 
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
+  // Ctrl + A 打开/隐藏 Agent 侧边栏
+  if (event.ctrlKey && event.key === 'a') {
+    event.preventDefault()
+    
+    // 如果在输入框中，不触发快捷键
+    const tagName = event.target.tagName.toLowerCase()
+    if (tagName === 'textarea' || tagName === 'input') {
+      return
+    }
+    
+    // 切换 Agent 侧边栏显示状态
+    showAgentSidebar.value = !showAgentSidebar.value
+    console.log('[app] Toggle agent sidebar:', showAgentSidebar.value)
+  }
+  
   // Ctrl + ` 打开/隐藏终端面板
   if (event.ctrlKey && event.key === '`') {
     event.preventDefault()
