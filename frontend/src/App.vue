@@ -5535,6 +5535,8 @@ body::-webkit-scrollbar {
   position: fixed;
   top: 60px;
   right: 20px;
+  width: 800px;
+  height: 500px;
   background: rgba(13, 17, 23, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
