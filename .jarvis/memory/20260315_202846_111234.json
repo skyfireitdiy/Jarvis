@@ -1,0 +1,13 @@
+{
+  "id": "20260315_202846_111234",
+  "type": "project_long_term",
+  "tags": [
+    "移动端适配",
+    "返回键",
+    "history管理",
+    "bug修复"
+  ],
+  "content": "【移动端返回键功能已修复】\n\n问题原因：\n- toggleAgentSidebar、toggleTerminalPanel、toggleMobileMenu 等函数定义在 onMounted 内部\n- 模板无法访问这些函数，导致按钮点击无反应\n\n解决方案：\n- 将函数从 onMounted 内部移到外部（第3562-3595行）\n- 保持 historyStateCount 变量在 onMounted 外部定义\n- handlePopState 函数仍在 onMounted 内部，使用外部 historyStateCount\n\n修复位置：\n- 删除：onMounted 内部的函数定义（第3610-3643行）\n- 新增：onMounted 之前的函数定义（第3562-3595行）\n\n验证状态：✅ 编译通过，函数现在可以被模板正常访问\n提交记录：055f743（删除onMounted内函数）、5254274（在外部添加函数）",
+  "created_at": "2026-03-15T20:28:46.111258",
+  "updated_at": "2026-03-15T20:28:46.111262"
+}

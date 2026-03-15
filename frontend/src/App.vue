@@ -35,13 +35,24 @@
     <div class="main-content-wrapper">
       <!-- 顶部栏 -->
       <header class="app-header">
-        <!-- 移动端菜单按钮 -->
-        <button class="mobile-menu-btn" @click="showMobileMenu = !showMobileMenu">
-          ☰
-        </button>
+        <!-- 移动端快捷按钮 -->
+        <div class="mobile-header-actions">
+          <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent列表">
+            📋
+          </button>
+          <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
+            💻
+          </button>
+          <button class="icon-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
+            👤
+          </button>
+          <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
+            ⚙️
+          </button>
+        </div>
         
         <div class="header-title">
-          <button class="icon-btn desktop-only" @click="showAgentSidebar = !showAgentSidebar" title="切换 Agent 侧边栏">
+          <button class="icon-btn desktop-only" @click="toggleAgentSidebar()" title="切换 Agent 侧边栏">
             📋
           </button>
         </div>
@@ -53,13 +64,13 @@
         </div>
         
         <div class="header-actions desktop-only">
-          <button class="icon-btn" @click="showTerminalPanel = !showTerminalPanel" :disabled="!socket" title="终端面板">
+          <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
           <button class="manual-interrupt-btn" v-if="!showInput" @click="sendManualInterrupt" :disabled="!socket" title="人工介入 (中断当前操作)">
             👤 人工介入
           </button>
-          <button class="icon-btn" @click="showSettingsModal = true" :disabled="!socket">
+          <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙️
           </button>
           <div class="status">
@@ -68,48 +79,6 @@
           </div>
         </div>
       </header>
-      
-      <!-- 移动端菜单 -->
-      <div class="mobile-menu-overlay" v-if="showMobileMenu" @click="showMobileMenu = false"></div>
-      <div class="mobile-menu" :class="{ active: showMobileMenu }">
-        <div class="mobile-menu-header">
-          <h3>菜单</h3>
-          <button class="close-btn" @click="showMobileMenu = false">✕</button>
-        </div>
-        
-        <div class="mobile-menu-content">
-          <!-- Agent 侧边栏切换 -->
-          <button class="mobile-menu-item" @click="showAgentSidebar = !showAgentSidebar; showMobileMenu = false">
-            <span class="menu-icon">📋</span>
-            <span class="menu-text">Agent 侧边栏</span>
-          </button>
-          
-          <!-- 终端面板 -->
-          <button class="mobile-menu-item" @click="showTerminalPanel = !showTerminalPanel; showMobileMenu = false" :disabled="!socket">
-            <span class="menu-icon">💻</span>
-            <span class="menu-text">终端面板</span>
-          </button>
-          
-          <!-- 设置 -->
-          <button class="mobile-menu-item" @click="showSettingsModal = true; showMobileMenu = false" :disabled="!socket">
-            <span class="menu-icon">⚙️</span>
-            <span class="menu-text">设置</span>
-          </button>
-          
-          <!-- 人工介入 -->
-          <button class="mobile-menu-item mobile-menu-interrupt" v-if="!showInput" @click="sendManualInterrupt; showMobileMenu = false" :disabled="!socket">
-            <span class="menu-icon">👤</span>
-            <span class="menu-text">人工介入</span>
-          </button>
-          
-          <!-- Agent 信息 -->
-          <div class="mobile-menu-agent" v-if="currentAgent">
-            <div class="menu-agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</div>
-            <div class="menu-agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</div>
-            <div class="menu-agent-dir">{{ currentAgent.working_dir }}</div>
-          </div>
-        </div>
-      </div>
 
     <!-- 消息列表 -->
     <main class="chat-container">
@@ -3511,6 +3480,70 @@ function handleGlobalKeydown(event) {
       console.log('[app] Toggle terminal panel:', showTerminalPanel.value)
     }
   }
+  
+  // ESC 键关闭所有对话框
+  if (event.key === 'Escape') {
+    // 如果对话框打开，关闭对话框
+    if (showSettingsModal.value) {
+      showSettingsModal.value = false
+      console.log('[app] Close settings modal')
+    } else if (showCreateAgentModal.value) {
+      showCreateAgentModal.value = false
+      console.log('[app] Close create agent modal')
+    } else if (showSessionDialog.value) {
+      cancelSessionDialog()
+      console.log('[app] Close session dialog')
+    } else if (showDirDialog.value) {
+      cancelDirDialog()
+      console.log('[app] Close dir dialog')
+    }
+    
+    // ESC 键也关闭移动端菜单
+    if (showMobileMenu.value) {
+      showMobileMenu.value = false
+      console.log('[app] Close mobile menu')
+    }
+    
+    // ESC 键也关闭Agent侧边栏和终端面板（移动端）
+    if (showAgentSidebar.value && windowWidth.value <= 768) {
+      showAgentSidebar.value = false
+      console.log('[app] Close agent sidebar (mobile)')
+    }
+    if (showTerminalPanel.value && windowWidth.value <= 768) {
+      showTerminalPanel.value = false
+      console.log('[app] Close terminal panel (mobile)')
+    }
+  }
+}
+
+// 移动端历史管理变量
+let historyStateCount = 0
+
+// 移动端：打开浮层时推送历史状态
+const pushOverlayState = () => {
+  if (windowWidth.value <= 768) {
+    history.pushState({ overlay: true }, '', '')
+    historyStateCount++
+    console.log('[app] Push history state, count:', historyStateCount)
+  }
+}
+
+// 打开/关闭Agent侧边栏（移动端处理history）
+const toggleAgentSidebar = () => {
+  const newState = !showAgentSidebar.value
+  showAgentSidebar.value = newState
+  if (newState && windowWidth.value <= 768) {
+    pushOverlayState()
+  }
+}
+
+// 打开/关闭终端面板（移动端处理history）
+const toggleTerminalPanel = () => {
+  const newState = !showTerminalPanel.value
+  showTerminalPanel.value = newState
+  if (newState && windowWidth.value <= 768) {
+    pushOverlayState()
+  }
 }
 
 onMounted(() => {
@@ -3555,6 +3588,50 @@ onMounted(() => {
   }
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
+  
+  // 移动端历史管理
+  let historyStateCount = 0
+  
+  // 移动端：监听返回键（popstate事件）
+  const handlePopState = () => {
+    console.log('[app] Back button pressed, historyStateCount:', historyStateCount)
+    
+    if (historyStateCount > 0) {
+      // 有推送的历史状态，只是关闭浮层，不做真正的后退
+      historyStateCount--
+      
+      // 关闭所有打开的浮层
+      if (showSettingsModal.value) {
+        showSettingsModal.value = false
+        console.log('[app] Close settings modal via back button')
+      } else if (showCreateAgentModal.value) {
+        showCreateAgentModal.value = false
+        console.log('[app] Close create agent modal via back button')
+      } else if (showSessionDialog.value) {
+        cancelSessionDialog()
+        console.log('[app] Close session dialog via back button')
+      } else if (showDirDialog.value) {
+        cancelDirDialog()
+        console.log('[app] Close dir dialog via back button')
+      } else if (showAgentSidebar.value && windowWidth.value <= 768) {
+        showAgentSidebar.value = false
+        console.log('[app] Close agent sidebar via back button')
+      } else if (showTerminalPanel.value && windowWidth.value <= 768) {
+        showTerminalPanel.value = false
+        console.log('[app] Close terminal panel via back button')
+      } else if (showMobileMenu.value) {
+        showMobileMenu.value = false
+        console.log('[app] Close mobile menu via back button')
+      } else {
+        console.log('[app] No overlay to close')
+      }
+    } else {
+      // 没有推送的历史状态，允许默认后退行为
+      console.log('[app] No pushed history, allow default back')
+    }
+  }
+  window.addEventListener('popstate', handlePopState)
+  console.log('[app] Popstate listener added')
 })
 
 onUnmounted(() => {
@@ -3565,6 +3642,10 @@ onUnmounted(() => {
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
   console.log('[app] Resize listener removed')
+  
+  // 移除返回键监听
+  window.removeEventListener('popstate', handlePopState)
+  console.log('[app] Popstate listener removed')
 })
 </script>
 
@@ -3668,153 +3749,14 @@ body::-webkit-scrollbar {
   flex-shrink: 0;
 }
 
-/* 移动端菜单按钮 */
-.mobile-menu-btn {
+.mobile-header-actions {
   display: none;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 8px 12px;
-  color: #e6edf3;
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.mobile-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  gap: 8px;
 }
 
 /* 桌面端显示，移动端隐藏 */
 .desktop-only {
   display: flex;
-}
-
-/* 移动端菜单遮罩层 */
-.mobile-menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 998;
-  display: none;
-}
-
-/* 移动端菜单 */
-.mobile-menu {
-  position: fixed;
-  top: 0;
-  right: -320px;
-  width: 320px;
-  height: 100%;
-  background: rgba(22, 27, 34, 0.98);
-  z-index: 999;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
-  transition: right 0.3s ease;
-  display: none;
-}
-
-.mobile-menu.active {
-  right: 0;
-}
-
-.mobile-menu-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
-}
-
-.mobile-menu-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #e6edf3;
-}
-
-.mobile-menu-content {
-  padding: 12px;
-  overflow-y: auto;
-}
-
-/* 移动端菜单项 */
-.mobile-menu-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  color: #e6edf3;
-  font-size: 14px;
-  cursor: pointer;
-  margin-bottom: 8px;
-  text-align: left;
-}
-
-.mobile-menu-item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.mobile-menu-item:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.mobile-menu-item.mobile-menu-interrupt {
-  background: rgba(240, 136, 62, 0.1);
-  border-color: rgba(240, 136, 62, 0.3);
-  color: #f0883e;
-}
-
-.mobile-menu-item.mobile-menu-interrupt:hover:not(:disabled) {
-  background: rgba(240, 136, 62, 0.2);
-}
-
-.menu-icon {
-  font-size: 20px;
-}
-
-.menu-text {
-  flex: 1;
-  font-weight: 500;
-}
-
-/* 移动端菜单 Agent 信息 */
-.mobile-menu-agent {
-  padding: 14px 16px;
-  background: rgba(35, 134, 54, 0.1);
-  border: 1px solid rgba(56, 139, 253, 0.2);
-  border-radius: 8px;
-}
-
-.menu-agent-type {
-  font-size: 16px;
-  font-weight: 600;
-  color: #e6edf3;
-  margin-bottom: 4px;
-}
-
-.menu-agent-status {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-bottom: 6px;
-}
-
-.menu-agent-dir {
-  font-size: 11px;
-  color: #8b949e;
-  word-break: break-all;
-  line-height: 1.4;
 }
 
 .header-title h1 {
@@ -5841,18 +5783,22 @@ body::-webkit-scrollbar {
 
 /* 移动端适配 (< 768px) */
 @media (max-width: 768px) {
-  /* ========== 移动端菜单优化 ========== */
-  .mobile-menu-btn {
-    display: block;
-  }
-  
   .desktop-only {
     display: none !important;
   }
   
-  .mobile-menu,
-  .mobile-menu-overlay {
-    display: block;
+  .mobile-header-actions {
+    display: flex !important;
+  }
+  
+  .mobile-header-actions .icon-btn {
+    padding: 12px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  
+  .header-actions {
+    display: none !important;
   }
   
   /* ========== 终端面板优化 ========== */

@@ -1,0 +1,13 @@
+{
+  "id": "20260315_202718_345241",
+  "type": "project_long_term",
+  "tags": [
+    "移动端适配",
+    "返回键",
+    "history管理",
+    "popstate"
+  ],
+  "content": "【移动端返回键监听功能已完成】\n\n实现方案：\n1. 使用history.pushState()在打开浮层时推送历史状态\n2. 使用popstate事件监听返回键\n3. 通过historyStateCount变量跟踪推送的历史状态数量\n\n涉及的浮层：\n- 设置面板（showSettingsModal）\n- Agent侧边栏（showAgentSidebar）\n- 终端面板（showTerminalPanel）\n- 移动端菜单（showMobileMenu）\n\n新增函数：\n- pushOverlayState(): 移动端打开浮层时推送历史状态\n- toggleAgentSidebar(): 打开/关闭Agent侧边栏（移动端打开时推送history）\n- toggleTerminalPanel(): 打开/关闭终端面板（移动端打开时推送history）\n- toggleMobileMenu(): 打开/关闭移动端菜单（打开时推送history）\n\n修改文件：frontend/src/App.vue\n提交记录：404ee73, 9d16742, 63d855d, 8b8c75b, a64bdbe, 4fa3735, afc229d, 3c67d08, fdd2df1, 2f67290, 54231c5, 86385c7, f47de93, 6ef963b, 3c84919\n\n验证状态：✅ 编译通过，待实际浏览器测试验证",
+  "created_at": "2026-03-15T20:27:18.345258",
+  "updated_at": "2026-03-15T20:27:18.345260"
+}
