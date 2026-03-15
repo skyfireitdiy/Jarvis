@@ -97,7 +97,11 @@
     </main>
 
     <!-- 终端面板 -->
-    <aside v-show="showTerminalPanel" class="terminal-panel">
+    <aside 
+      v-show="showTerminalPanel" 
+      class="terminal-panel"
+      :style="{ width: terminalPanelSize.width + 'px', height: terminalPanelSize.height + 'px' }"
+    >
       <div class="terminal-panel-header">
         <h3>终端</h3>
         <div class="terminal-panel-actions">
@@ -135,6 +139,12 @@
           <div :ref="el => setTerminalHostRef(session.terminal_id, el)" class="terminal-host"></div>
         </div>
       </div>
+      
+      <!-- 调整大小手柄 -->
+      <div 
+        class="terminal-resize-handle"
+        @mousedown="startResizeTerminal"
+      ></div>
     </aside>
 
     <!-- 底部输入区 -->
@@ -2010,6 +2020,7 @@ function handleMessage(message, agentId = null) {
         terminal: null,
         hostEl: null,
         fitAddon: null,
+        resizeObserver: null,  // ResizeObserver 实例
         history: []  // 保存历史输出，用于面板隐藏后再显示时恢复
       })
       if (!activeTerminalId.value) {
@@ -2829,25 +2840,37 @@ function initIndependentTerminal(terminalId, el) {
     try {
       session.terminal.open(el)
       session.hostEl = el
-      // 恢复 ResizeObserver
-      if (typeof ResizeObserver !== 'undefined') {
-        const resizeObserver = new ResizeObserver(() => {
-          if (session.fitAddon && session.terminal) {
-            session.fitAddon.fit()
-            sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
+      
+      // 等待 DOM 更新后再恢复内容
+      nextTick(() => {
+        // 先 fit 一次，确保终端大小正确
+        session.fitAddon.fit()
+        console.log(`[independent-terminal] Terminal size before reset: ${session.terminal.cols} cols x ${session.terminal.rows} rows`)
+        // 清空终端，避免历史输出重复显示
+        session.terminal.reset()
+        // reset 后需要再次 fit，确保终端大小适应容器
+        session.fitAddon.fit()
+        console.log(`[independent-terminal] Terminal size after reset: ${session.terminal.cols} cols x ${session.terminal.rows} rows`)
+        // 恢复 ResizeObserver
+        if (typeof ResizeObserver !== 'undefined') {
+          const resizeObserver = new ResizeObserver(() => {
+            if (session.fitAddon && session.terminal) {
+              session.fitAddon.fit()
+              sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
+            }
+          })
+          resizeObserver.observe(el)
+        }
+        // 恢复历史输出
+        console.log(`[independent-terminal] Restoring ${session.history.length} history entries`)
+        session.history.forEach((item, index) => {
+          if (session.terminal) {
+            console.log(`[independent-terminal] History [${index}]: ${JSON.stringify(item.data.substring(0, 50))}...`)
+            session.terminal.write(item.data)
           }
         })
-        resizeObserver.observe(el)
-      }
-      // 恢复 FitAddon
-      session.fitAddon.fit()
-      // 恢复历史输出
-      session.history.forEach(item => {
-        if (session.terminal) {
-          session.terminal.write(item.data)
-        }
+        console.log(`[independent-terminal] Terminal ${terminalId} reopened successfully`)
       })
-      console.log(`[independent-terminal] Terminal ${terminalId} reopened successfully`)
     } catch (error) {
       console.error(`[independent-terminal] Failed to reopen terminal ${terminalId}:`, error)
     }
@@ -2883,6 +2906,7 @@ function initIndependentTerminal(terminalId, el) {
       }
     })
     resizeObserver.observe(el)
+    session.resizeObserver = resizeObserver
   }
   
   // 监听用户输入
@@ -2968,6 +2992,108 @@ function closeTerminal(terminalId) {
   
   // 清理 ref
   independentTerminalHosts.value.delete(terminalId)
+}
+
+// 终端面板大小调整
+const terminalPanelSize = ref({
+  width: 800,
+  height: 500,
+})
+
+// 监听面板显示状态
+watch(showTerminalPanel, (newValue, oldValue) => {
+  if (!newValue && oldValue) {
+    // 面板隐藏时，禁用所有终端的 ResizeObserver
+    console.log('[independent-terminal] Panel hiding, disabling ResizeObserver for all terminals')
+    terminalSessions.value.forEach(session => {
+      if (session.resizeObserver) {
+        session.resizeObserver.disconnect()
+      }
+    })
+  } else if (newValue && !oldValue) {
+    // 面板显示时，只启用当前活跃终端的 ResizeObserver
+    console.log('[independent-terminal] Panel showing, enabling ResizeObserver for active terminal')
+    nextTick(() => {
+      const activeSession = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
+      if (activeSession && activeSession.resizeObserver && activeSession.hostEl) {
+        activeSession.resizeObserver.observe(activeSession.hostEl)
+        if (activeSession.fitAddon && activeSession.terminal) {
+          activeSession.fitAddon.fit()
+          sendTerminalResize(activeSession.terminal_id, activeSession.terminal.rows, activeSession.terminal.cols)
+        }
+      }
+    })
+  }
+})
+
+// 监听终端切换
+watch(activeTerminalId, (newId, oldId) => {
+  if (newId !== oldId) {
+    // 切换终端标签
+    console.log(`[independent-terminal] Switching terminal: ${oldId} -> ${newId}`)
+    
+    // 禁用旧终端的 ResizeObserver
+    const oldSession = terminalSessions.value.find(s => s.terminal_id === oldId)
+    if (oldSession && oldSession.resizeObserver) {
+      oldSession.resizeObserver.disconnect()
+      console.log(`[independent-terminal] Disabled ResizeObserver for terminal ${oldId}`)
+    }
+    
+    // 启用新终端的 ResizeObserver
+    const newSession = terminalSessions.value.find(s => s.terminal_id === newId)
+    if (newSession && newSession.resizeObserver && newSession.hostEl) {
+      nextTick(() => {
+        newSession.resizeObserver.observe(newSession.hostEl)
+        if (newSession.fitAddon && newSession.terminal) {
+          newSession.fitAddon.fit()
+          sendTerminalResize(newSession.terminal_id, newSession.terminal.rows, newSession.terminal.cols)
+        }
+        console.log(`[independent-terminal] Enabled ResizeObserver for terminal ${newId}: ${newSession.terminal.cols} cols x ${newSession.terminal.rows} rows`)
+      })
+    }
+  }
+})
+
+let isResizing = false
+let resizeStartX = 0
+let resizeStartY = 0
+let resizeStartWidth = 0
+let resizeStartHeight = 0
+
+function startResizeTerminal(event) {
+  isResizing = true
+  resizeStartX = event.clientX
+  resizeStartY = event.clientY
+  resizeStartWidth = terminalPanelSize.value.width
+  resizeStartHeight = terminalPanelSize.value.height
+  
+  document.addEventListener('mousemove', onResizeTerminal)
+  document.addEventListener('mouseup', stopResizeTerminal)
+  event.preventDefault()
+}
+
+function onResizeTerminal(event) {
+  if (!isResizing) return
+  
+  const deltaX = event.clientX - resizeStartX
+  const deltaY = event.clientY - resizeStartY
+  
+  // 计算新尺寸（固定右侧的面板）
+  // 手柄向左拖（deltaX < 0）：面板变宽
+  // 手柄向右拖（deltaX > 0）：面板变窄
+  // 手柄向下拖（deltaY > 0）：面板变高
+  // 手柄向上拖（deltaY < 0）：面板变矮
+  const newWidth = Math.max(400, resizeStartWidth - deltaX)  // 最小宽度 400
+  const newHeight = Math.max(300, resizeStartHeight + deltaY)  // 最小高度 300
+  
+  terminalPanelSize.value.width = newWidth
+  terminalPanelSize.value.height = newHeight
+}
+
+function stopResizeTerminal() {
+  isResizing = false
+  document.removeEventListener('mousemove', onResizeTerminal)
+  document.removeEventListener('mouseup', stopResizeTerminal)
 }
 
 function switchTerminal(terminalId) {
@@ -5013,8 +5139,6 @@ body::-webkit-scrollbar {
   position: fixed;
   top: 60px;
   right: 20px;
-  width: 800px;
-  height: 500px;
   background: rgba(13, 17, 23, 0.95);
   backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -5126,5 +5250,23 @@ body::-webkit-scrollbar {
 .terminal-host {
   width: 100%;
   height: 100%;
+}
+
+/* 终端调整大小手柄 */
+.terminal-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nesw-resize;
+  background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.3) 50%);
+  border-radius: 0 0 0 8px;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.terminal-resize-handle:hover {
+  background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
 }
 </style>
