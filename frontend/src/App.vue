@@ -2079,6 +2079,12 @@ async function switchAgent(agent) {
     // 用户可以看到错误并手动重试
     // 即使连接失败，状态已通过 HTTP 查询
   }
+  
+  // 移动端：切换agent后自动隐藏侧边栏
+  if (windowWidth.value <= 768) {
+    showAgentSidebar.value = false
+    console.log('[AGENT] Mobile mode: auto hide sidebar after switching agent')
+  }
 }
 
 // 定时刷新 Agent 列表
