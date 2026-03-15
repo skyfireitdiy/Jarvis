@@ -2019,8 +2019,8 @@ function handleMessage(message, agentId = null) {
     if (terminalId) {
       terminalSessions.value.push({
         terminal_id: terminalId,
-        interpreter: 'bash',
-        working_dir: '.',
+        interpreter: payload?.interpreter || 'bash',
+        working_dir: payload?.working_dir || '.',
         terminal: null,
         hostEl: null,
         fitAddon: null,
@@ -2884,11 +2884,15 @@ function initIndependentTerminal(terminalId, el) {
   console.log(`[independent-terminal] Initializing terminal ${terminalId}`)
   
   // 创建终端实例
+  // 注意：这里不调用 fitAddon.fit()，因为初始时元素可能不可见（v-show）
+  // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
       background: '#0b1220',
     },
     fontSize: 12,
+    cols: 80,
+    rows: 24,
   })
   session.terminal.open(el)
   
@@ -2896,9 +2900,13 @@ function initIndependentTerminal(terminalId, el) {
   session.fitAddon = new FitAddon()
   session.terminal.loadAddon(session.fitAddon)
   
-  // 使用 FitAddon 适配终端尺寸
-  session.fitAddon.fit()
-  console.log(`[independent-terminal] FitAddon fit: cols=${session.terminal.cols}, rows=${session.terminal.rows}`)
+  // 使用 FitAddon 适配终端尺寸（仅当元素可见时）
+  if (el.offsetParent !== null) {
+    session.fitAddon.fit()
+    console.log(`[independent-terminal] FitAddon fit: cols=${session.terminal.cols}, rows=${session.terminal.rows}`)
+  } else {
+    console.log(`[independent-terminal] Element is hidden, skipping fit`)
+  }
   
   // 设置 ResizeObserver 监听尺寸变化
   if (typeof ResizeObserver !== 'undefined') {
@@ -2952,10 +2960,7 @@ function createTerminal() {
   console.log('[independent-terminal] Creating new terminal')
   const message = {
     type: 'terminal_create',
-    payload: {
-      interpreter: 'bash',
-      working_dir: '.',
-    },
+    payload: {},
   }
   socket.value.send(JSON.stringify(message))
 }

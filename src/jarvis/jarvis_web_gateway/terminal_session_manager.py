@@ -183,8 +183,18 @@ class TerminalSessionManager:
                 if interpreter in ("python", "python2", "python3"):
                     env["PYTHONIOENCODING"] = "utf-8"
 
+                # 构建命令
+                # 注意：fish shell 在 PTY 环境中无法正常运行（即使使用 -i 参数）
+                # 所以对于 fish shell，fallback 到 bash
+                cmd = [interpreter]
+                actual_interpreter = interpreter
+                if interpreter.endswith('fish'):
+                    print("[TerminalSessionManager] Fish shell detected, falling back to bash")
+                    cmd = ['bash']
+                    actual_interpreter = 'bash'
+
                 proc = subprocess.Popen(
-                    [interpreter],
+                    cmd,
                     stdin=slave_fd,
                     stdout=slave_fd,
                     stderr=slave_fd,
@@ -199,7 +209,7 @@ class TerminalSessionManager:
                 # 创建会话对象
                 session = TerminalSession(
                     terminal_id=terminal_id,
-                    interpreter=interpreter,
+                    interpreter=actual_interpreter,
                     working_dir=working_dir,
                     master_fd=master_fd,
                     proc=proc,
@@ -251,6 +261,7 @@ class TerminalSessionManager:
 
                 output_count += 1
                 print(f"[TerminalSessionManager] Read chunk {output_count} ({len(data)} bytes) from terminal {session.terminal_id}")
+                print(f"[TerminalSessionManager] Data preview: {data[:100]!r}")
                 # 发布输出
                 session._publish_output(data)
 
@@ -261,6 +272,11 @@ class TerminalSessionManager:
                 print(f"[TerminalSessionManager] Exception on terminal {session.terminal_id}: {e}")
                 break
         print(f"[TerminalSessionManager] Output reader stopped for terminal {session.terminal_id}")
+
+        # 检查进程退出状态
+        if session.proc is not None:
+            return_code = session.proc.poll()
+            print(f"[TerminalSessionManager] Process exit code: {return_code}")
 
         # 进程结束，清理会话
         self.close_session(session.terminal_id)

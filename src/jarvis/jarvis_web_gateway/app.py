@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from typing import Any
 from typing import Callable
@@ -390,7 +391,7 @@ class WebSocketConnectionManager:
             return
         # 独立终端会话消息处理
         if message_type == "terminal_create":
-            interpreter = payload.get("interpreter", "bash")
+            interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
             working_dir = payload.get("working_dir", ".")
             if _terminal_session_manager:
                 terminal_id, error = _terminal_session_manager.create_session(
@@ -400,7 +401,14 @@ class WebSocketConnectionManager:
                     session_id=session_id,
                 )
                 if terminal_id:
-                    message = {"type": "terminal_created", "payload": {"terminal_id": terminal_id}}
+                    message = {
+                        "type": "terminal_created",
+                        "payload": {
+                            "terminal_id": terminal_id,
+                            "interpreter": interpreter,
+                            "working_dir": working_dir,
+                        },
+                    }
                     self._router.publish(message, session_id=session_id)
             return
         if message_type == "terminal_close":
@@ -879,7 +887,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             {"success": True, "data": {"terminal_id": "xxx"}}
         """
         try:
-            interpreter = request.get("interpreter", "bash")
+            interpreter = request.get("interpreter") or os.environ.get("SHELL", "bash")
             working_dir = request.get("working_dir", ".")
 
             terminal_id, error = terminal_session_manager.create_session(
