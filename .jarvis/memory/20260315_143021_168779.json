@@ -1,0 +1,13 @@
+{
+  "id": "20260315_143021_168779",
+  "type": "project_long_term",
+  "tags": [
+    "Gateway",
+    "配置加载",
+    "API",
+    "模型组"
+  ],
+  "content": "Gateway配置加载问题已解决：\n\n问题根因：\n1. Gateway通过uvicorn jarvis.jarvis_web_gateway.app:create_app启动，调用create_app()而非run()，run()中的init_env()不执行\n2. 直接导入GLOBAL_CONFIG_DATA获取旧引用，set_global_config_data()使用global重新赋值不影响模块级变量\n\n解决方案：\n1. 在create_app()的_startup()函数中调用init_env()加载配置\n2. 修改get_model_groups()使用get_global_config_data()函数获取最新配置\n\n验证结果：\n- API GET /api/model-groups成功返回7个模型组配置\n- 配置文件~/.jarvis/config.yaml正确加载\n- 初始化流程正常工作\n\n关键文件：\n- src/jarvis/jarvis_web_gateway/app.py（第516-522行，606-607行）\n- src/jarvis/jarvis_utils/utils.py（init_env函数）\n- ~/.jarvis/config.yaml（配置文件）",
+  "created_at": "2026-03-15T14:30:21.168811",
+  "updated_at": "2026-03-15T14:30:21.168816"
+}

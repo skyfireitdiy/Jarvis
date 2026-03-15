@@ -42,7 +42,8 @@ except ImportError:
     # 如果 jarvis_agent 不可用，使用 None
     get_agent_status_manager = None  # type: ignore
 
-
+# 导入配置相关函数
+from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA, get_global_config_data
 
 
 # 全局 AgentManager，用于状态变更回调
@@ -405,7 +406,10 @@ class WebSocketConnectionManager:
                     status_manager = get_agent_status_manager()
                     current_status = status_manager.get_status()
                     # 返回 status_update 消息
-                    status_message = {"type": "status_update", "payload": {"execution_status": current_status}}
+                    status_message = {
+                        "type": "status_update",
+                        "payload": {"execution_status": current_status},
+                    }
                     self._router.publish(status_message, session_id=session_id)
                     print(f"[GET_STATUS] Sent agent status: {current_status}")
                 except Exception as e:
@@ -438,7 +442,10 @@ class WebSocketConnectionManager:
             terminal_id = payload.get("terminal_id")
             if terminal_id and _terminal_session_manager:
                 _terminal_session_manager.close_session(terminal_id)
-                message = {"type": "terminal_closed", "payload": {"terminal_id": terminal_id}}
+                message = {
+                    "type": "terminal_closed",
+                    "payload": {"terminal_id": terminal_id},
+                }
                 self._router.publish(message, session_id=session_id)
             return
         if message_type == "terminal_session_input":
@@ -508,6 +515,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
+        # 初始化环境并加载配置文件
+        from jarvis.jarvis_utils.utils import init_env
+        init_env(welcome_str="", config_file=None)
         # 为运行中的 Agent 启动监控任务
         await agent_manager.start_monitoring_for_running_agents()
 
@@ -589,6 +599,69 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         try:
             agents = agent_manager.get_agent_list()
             return {"success": True, "data": agents}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：获取模型组列表
+    @app.get("/api/model-groups")
+    async def get_model_groups() -> Dict[str, Any]:
+        """获取模型组列表。"""
+        try:
+            config = get_global_config_data()
+            llm_groups = config.get("llm_groups", {})
+            llms = config.get("llms", {})
+            default_llm_group = config.get("llm_group", "")
+
+            if not isinstance(llm_groups, dict) or not llm_groups:
+                return {"success": True, "data": [], "default_llm_group": default_llm_group}
+
+            # 转换格式: llm_groups 和 llms -> list of dict
+            data = []
+            for group_name, group_config in llm_groups.items():
+                if not isinstance(group_config, dict):
+                    continue
+
+                # 获取各平台的模型配置
+                smart_llm_ref = group_config.get("smart_llm", "")
+                normal_llm_ref = group_config.get("normal_llm", "")
+                cheap_llm_ref = group_config.get("cheap_llm", "")
+
+                # 从 llms 中获取实际模型名称
+                smart_model = "-"
+                normal_model = "-"
+                cheap_model = "-"
+
+                if isinstance(llms, dict):
+                    if smart_llm_ref and smart_llm_ref in llms:
+                        smart_config = llms[smart_llm_ref]
+                        if isinstance(smart_config, dict):
+                            smart_model = smart_config.get("model", smart_llm_ref)
+
+                    if normal_llm_ref and normal_llm_ref in llms:
+                        normal_config = llms[normal_llm_ref]
+                        if isinstance(normal_config, dict):
+                            normal_model = normal_config.get("model", normal_llm_ref)
+
+                    if cheap_llm_ref and cheap_llm_ref in llms:
+                        cheap_config = llms[cheap_llm_ref]
+                        if isinstance(cheap_config, dict):
+                            cheap_model = cheap_config.get("model", cheap_llm_ref)
+
+                data.append(
+                    {
+                        "name": group_name,
+                        "smart_model": smart_model,
+                        "normal_model": normal_model,
+                        "cheap_model": cheap_model,
+                    }
+                )
+
+            return {"success": True, "data": data, "default_llm_group": default_llm_group}
+
+            return {"success": True, "data": data}
         except Exception as e:
             return {
                 "success": False,
@@ -923,7 +996,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             if terminal_id is None:
                 return {
                     "success": False,
-                    "error": {"code": "CREATE_FAILED", "message": error or "创建终端失败"},
+                    "error": {
+                        "code": "CREATE_FAILED",
+                        "message": error or "创建终端失败",
+                    },
                 }
 
             return {"success": True, "data": {"terminal_id": terminal_id}}
@@ -985,7 +1061,10 @@ def run(
 
     import uvicorn
 
-    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+    from jarvis.jarvis_utils.utils import init_env
+
+    # 初始化环境并加载配置文件
+    init_env(welcome_str="", config_file=None)
 
     # 如果提供了密码参数，更新 gateway_auth 配置
     if password:
@@ -996,7 +1075,6 @@ def run(
         GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
     uvicorn.run(create_app(), host=host, port=port)
-
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
@@ -1018,11 +1096,14 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
     def _sender(message: Dict[str, Any]) -> None:
         async def _send():
             try:
-                print(f"[WebSocket Sender] Sending message: type={message.get('type')}, exec_id={message.get('payload', {}).get('execution_id')}")
+                print(
+                    f"[WebSocket Sender] Sending message: type={message.get('type')}, exec_id={message.get('payload', {}).get('execution_id')}"
+                )
                 await websocket.send_json(message)
                 print("[WebSocket Sender] Message sent successfully")
             except Exception as e:
                 print(f"[WebSocket Sender] Error sending message: {e}")
+
         try:
             asyncio.run_coroutine_threadsafe(_send(), loop)
         except Exception as e:
