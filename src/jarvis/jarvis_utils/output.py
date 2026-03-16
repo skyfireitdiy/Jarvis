@@ -1330,6 +1330,16 @@ class PrettyOutput:
                     )
                 )
 
+                # 发送第一个chunk（避免第一个chunk丢失）
+                if first_chunk:
+                    emit_output(
+                        OutputEvent(
+                            text=first_chunk,
+                            output_type=OutputType.STREAM_CHUNK,
+                            timestamp=False,
+                        )
+                    )
+
             buffer = ""
             last_update_time = time.time()
             update_interval = 1
