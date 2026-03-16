@@ -333,6 +333,7 @@ def _run_alignment_analysis(
         non_interactive=non_interactive,
         system_prompt=system_prompt,
         summary_prompt=summary_prompt,
+        model_type="smart",
     )
 
     # 构建分析任务
@@ -603,6 +604,7 @@ def _run_optimization(
         need_summary=False,
         non_interactive=non_interactive,
         append_tools="read_symbols",  # 添加 read_symbols 工具用于读取 C 符号信息
+        model_type="smart",
     )
 
     optimization_task = f"""
