@@ -185,6 +185,7 @@ def execute_llm_plan(
                     non_interactive=non_interactive,
                     enable_task_list_manager=False,
                     disable_review=True,
+                    enable_auto_rule_select=False,
                 )
                 # 验证 agent 内部的模型配置
                 if hasattr(agent, "model") and agent.model:
@@ -269,6 +270,7 @@ def execute_llm_plan(
                         non_interactive=non_interactive,
                         enable_task_list_manager=False,
                         disable_review=True,
+                        enable_auto_rule_select=False,
                     )
                     repair_agent.run(
                         repair_prompt,
