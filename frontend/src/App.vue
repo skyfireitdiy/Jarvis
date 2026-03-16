@@ -923,7 +923,7 @@ function loadHistoryMessages(prepend = false) {
     }
     // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
     const processedMessages = historyMessages.map(msg => {
-        const html = msg.lang === 'markdown' ? marked.parse(msg.text || '') : escapeHtml(msg.text || '')
+        const html = renderMessageHtml(msg)
         return {
           ...msg,
           html,
@@ -2531,25 +2531,29 @@ function renderSideBySideDiff(diffData) {
   return html
 }
 
-function appendOutput(payload, agentId = null) {
-  let html
+// 统一的消息HTML渲染函数（用于新消息和历史消息）
+function renderMessageHtml(payload) {
   if (payload?.lang === 'markdown') {
-    html = marked.parse(payload.text || '')
+    return marked.parse(payload.text || '')
   } else if (payload?.lang === 'diff') {
     // 将 diff 包装在 markdown 代码块中，以便语法高亮
-    html = marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
+    return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
   } else if (payload?.lang === 'json' && payload?.context?.diff_type === 'side_by_side') {
     // 解析 side by side diff 数据
     try {
       const diffData = JSON.parse(payload.text || '{}')
-      html = renderSideBySideDiff(diffData)
+      return renderSideBySideDiff(diffData)
     } catch (e) {
       console.error('[DIFF] Failed to parse side by side diff:', e)
-      html = escapeHtml(payload.text || '')
+      return escapeHtml(payload.text || '')
     }
   } else {
-    html = escapeHtml(payload.text || '')
+    return escapeHtml(payload.text || '')
   }
+}
+
+function appendOutput(payload, agentId = null) {
+  const html = renderMessageHtml(payload)
   
   // 生成真实时间戳
   const showTimestamp = payload?.timestamp !== false
