@@ -388,6 +388,16 @@ class task_list_manager:
         if llm_group is None:
             llm_group = get_llm_group()
 
+        # 判断是否需要使用 smart 模型（CodeAgent 任务使用 smart 模型）
+        model_type = "normal"
+        try:
+            from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+            if parent_agent is not None and isinstance(parent_agent, CodeAgent):
+                model_type = "smart"
+        except ImportError:
+            pass
+
         verification_agent = Agent(
             system_prompt=verification_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
@@ -404,6 +414,7 @@ class task_list_manager:
             non_interactive=True,
             use_methodology=True,
             use_analysis=True,
+            model_type=model_type,
         )
 
         return verification_agent
