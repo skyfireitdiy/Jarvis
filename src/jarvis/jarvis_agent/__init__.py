@@ -470,6 +470,7 @@ class Agent:
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
         enable_auto_rule_select: bool = True,
+        model_type: str = "normal",
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
@@ -493,6 +494,7 @@ class Agent:
             rule_names: 规则名称列表（逗号分隔），用于加载指定的规则
             optimize_system_prompt: 如果为True，将在第一次run()时使用用户输入来优化系统提示词
             enable_auto_rule_select: 是否启用自动规则选择（默认True）
+            model_type: 模型类型，可选 "normal"、"smart"、"cheap"（默认 "normal"）
         """
         # 基础属性初始化
         self._init_base_attributes(
@@ -512,6 +514,9 @@ class Agent:
             in_multi_agent,
             allow_savesession,
         )
+
+        # 模型类型配置
+        self._model_type = model_type
 
         # 核心组件初始化
         self._init_model()
@@ -799,11 +804,16 @@ class Agent:
         self._setup_system_prompt()
 
     def _init_model(self) -> None:
-        """初始化模型平台（统一使用 normal 平台/模型）"""
+        """初始化模型平台，根据 model_type 选择对应的平台（normal/smart/cheap）"""
 
-        # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
-        # get_normal_platform 内部会处理配置获取和平台创建
-        self.model = PlatformRegistry().get_normal_platform()
+        registry = PlatformRegistry()
+        model_type = getattr(self, "_model_type", "normal")
+        if model_type == "smart":
+            self.model = registry.get_smart_platform()
+        elif model_type == "cheap":
+            self.model = registry.get_cheap_platform()
+        else:
+            self.model = registry.get_normal_platform()
 
         self.model.set_suppress_output(False)
 

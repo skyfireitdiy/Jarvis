@@ -25,6 +25,7 @@ def create_agent(
     use_analysis: bool = False,
     need_summary: bool = False,
     rule_names: Optional[str] = None,
+    model_type: str = "normal",
     **kwargs: Any,
 ) -> AgentType:
     """
@@ -38,6 +39,7 @@ def create_agent(
         use_analysis: 是否使用代码分析
         need_summary: 是否需要总结
         rule_names: 规则名称
+        model_type: 模型类型，可选 "normal"、"smart"、"cheap"（默认 "normal"）
         **kwargs: 其他参数
 
     返回:
@@ -63,6 +65,7 @@ def create_agent(
         need_summary=need_summary,
         rule_names=rule_names,
         enable_auto_rule_select=False,
+        model_type=model_type,
         **kwargs,
     )
 
