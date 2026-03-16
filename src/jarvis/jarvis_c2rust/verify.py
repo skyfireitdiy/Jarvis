@@ -334,6 +334,7 @@ def _run_alignment_analysis(
         system_prompt=system_prompt,
         summary_prompt=summary_prompt,
         model_type="smart",
+        enable_auto_rule_select=False,
     )
 
     # 构建分析任务
