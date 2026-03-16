@@ -54,7 +54,7 @@ def create_llm_model(
         # 使用全局 PlatformRegistry 实例，确保平台已正确加载
         # get_smart_platform 内部会调用 get_llm_config("smart", ...)，现在 get_llm_config 已经处理了回退逻辑
         registry = PlatformRegistry.get_global_platform_registry()
-        model = registry.get_smart_platform(llm_group)
+        model = registry.get_smart_platform()
 
         # 确保模型没有控制台输出（与 code_agent.py 保持一致）
         try:
