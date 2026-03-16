@@ -373,7 +373,8 @@ def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
 
     result: Dict[str, List[str]] = {}
     for entry in data:
-        file_path = Path(entry.get("file", "")).resolve()
+        directory = Path(entry.get("directory", ""))
+        file_path = (directory / entry.get("file", "")).resolve()
         if not file_path:
             continue
         if "arguments" in entry and isinstance(entry["arguments"], list):
