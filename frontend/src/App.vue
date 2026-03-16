@@ -1992,6 +1992,8 @@ async function confirmRename() {
 
 // 删除 Agent
 async function deleteAgent(agentId) {
+  // 隐藏 agent 侧边栏，避免遮挡确认对话框（移动端）
+  showAgentSidebar.value = false
   showConfirm(
     '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
     async () => {
