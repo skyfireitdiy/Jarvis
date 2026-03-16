@@ -323,6 +323,7 @@ class PlanningManager:
                     non_interactive=self.non_interactive,
                     use_methodology=False,
                     use_analysis=False,
+                    enable_auto_rule_select=False,
                 )
                 # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
                 agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)

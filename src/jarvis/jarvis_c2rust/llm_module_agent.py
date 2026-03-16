@@ -190,6 +190,7 @@ class LLMRustCratePlannerAgent:
                     non_interactive=True,  # 非交互
                     use_methodology=False,
                     use_analysis=False,
+                    enable_auto_rule_select=False,
                 )
 
             # 进入主循环：第一轮仅输出 {ot('!!!COMPLETE!!!')} 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 JSON）
