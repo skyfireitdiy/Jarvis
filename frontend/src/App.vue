@@ -576,7 +576,7 @@ function getLanguageFromFilename(filename) {
 
 // 认证和连接配置
 const auth = ref({ password: '' })
-const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
+const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || import.meta.env.VITE_GATEWAY_URL || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)

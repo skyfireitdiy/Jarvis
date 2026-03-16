@@ -5,6 +5,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
+# 优先尝试激活虚拟环境
+if [ -f "$PROJECT_ROOT/venv/bin/activate" ]; then
+    echo "🐍 激活虚拟环境..."
+    source "$PROJECT_ROOT/venv/bin/activate"
+elif [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+    echo "🐍 激活虚拟环境..."
+    source "$PROJECT_ROOT/.venv/bin/activate"
+fi
+
 echo "🚀 启动 Jarvis 网关和前端..."
 echo "📁 项目根目录: $PROJECT_ROOT"
 
@@ -50,6 +59,10 @@ sleep 5
 # 启动前端（开发模式）
 echo "🎨 启动前端服务..."
 cd "$PROJECT_ROOT/frontend"
+
+# 注入网关地址环境变量供前端使用
+export VITE_GATEWAY_URL="$GATEWAY_HOST:$GATEWAY_PORT"
+
 npm run dev -- --host $FRONTEND_HOST --port $FRONTEND_PORT &
 FRONTEND_PID=$!
 
