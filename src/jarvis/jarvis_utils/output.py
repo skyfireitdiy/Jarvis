@@ -147,6 +147,8 @@ class OutputType(Enum):
     STREAM_START = "STREAM_START"
     STREAM_CHUNK = "STREAM_CHUNK"
     STREAM_END = "STREAM_END"
+    # Diff 可视化类型
+    DIFF = "DIFF"
 
 
 # 输出类型图标映射（统一的图标定义）
@@ -176,6 +178,7 @@ OUTPUT_ICONS = {
     OutputType.STREAM_START: "⏳",
     OutputType.STREAM_CHUNK: "▶️",
     OutputType.STREAM_END: "✅",
+    OutputType.DIFF: "🔄",
 }
 
 
@@ -207,6 +210,7 @@ EMOJI_TO_OUTPUT_TYPE = {
     "🎬": OutputType.STREAM_START,
     "▶️": OutputType.STREAM_CHUNK,
     "🏁": OutputType.STREAM_END,
+    "🔄": OutputType.DIFF,
 }
 
 
@@ -358,6 +362,11 @@ class ConsoleOutputSink(OutputSink):
             frame=True,
             meta={"icon": OUTPUT_ICONS[OutputType.SMART_MODEL]},
         ),
+        OutputType.DIFF: RichStyle(
+            color="cyan",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.DIFF]},
+        ),
     }
 
     # 文字颜色映射
@@ -384,6 +393,7 @@ class ConsoleOutputSink(OutputSink):
         OutputType.CHEAP_MODEL: "grey58",
         OutputType.NORMAL_MODEL: "bright_blue",
         OutputType.SMART_MODEL: "bright_magenta",
+        OutputType.DIFF: "cyan",
     }
 
     @staticmethod

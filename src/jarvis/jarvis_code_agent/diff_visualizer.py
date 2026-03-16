@@ -890,6 +890,7 @@ class DiffVisualizer:
         try:
             import json
             from jarvis.jarvis_utils.output import OutputEvent
+            from jarvis.jarvis_utils.output import OutputType
 
             # 构造 side by side 数据结构
             side_by_side_data = {
@@ -906,8 +907,7 @@ class DiffVisualizer:
             emit_output(
                 OutputEvent(
                     text=diff_text,
-                    output_type=OutputType.CODE,
-                    lang="json",  # 使用 json lang，前端会特殊处理
+                    output_type=OutputType.DIFF,  # 使用专门的 DIFF 类型
                     timestamp=True,
                     context={
                         "file_path": file_path,

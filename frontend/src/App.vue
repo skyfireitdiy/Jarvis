@@ -2535,13 +2535,22 @@ function renderSideBySideDiff(diffData) {
 
 // 统一的消息HTML渲染函数（用于新消息和历史消息）
 function renderMessageHtml(payload) {
-  if (payload?.lang === 'markdown') {
+  if (payload?.output_type === 'DIFF' && payload?.context?.diff_type === 'side_by_side') {
+    // 专门的 DIFF 类型：解析 side by side diff 数据
+    try {
+      const diffData = JSON.parse(payload.text || '{}')
+      return renderSideBySideDiff(diffData)
+    } catch (e) {
+      console.error('[DIFF] Failed to parse side by side diff:', e)
+      return escapeHtml(payload.text || '')
+    }
+  } else if (payload?.lang === 'markdown') {
     return marked.parse(payload.text || '')
   } else if (payload?.lang === 'diff') {
     // 将 diff 包装在 markdown 代码块中，以便语法高亮
     return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
   } else if (payload?.lang === 'json' && payload?.context?.diff_type === 'side_by_side') {
-    // 解析 side by side diff 数据
+    // 兼容旧版本：解析 side by side diff 数据
     try {
       const diffData = JSON.parse(payload.text || '{}')
       return renderSideBySideDiff(diffData)
