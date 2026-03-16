@@ -107,7 +107,7 @@
           <!-- 终端内容（历史记录） -->
           <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content">{{ item.terminal_content }}</pre>
+            <pre class="terminal-history-content" :style="getTerminalStyle(item.terminal_content)">{{ item.terminal_content }}</pre>
           </div>
         </article>
         <!-- 确认对话框 -->
@@ -504,6 +504,28 @@ marked.setOptions({
     return hljs.highlightAuto(code).value
   }
 })
+
+// 计算终端历史显示样式（高度自适应）
+function getTerminalStyle(terminalContent) {
+  if (!terminalContent) return {}
+  
+  const lineCount = terminalContent.split('\n').length
+  const fontSize = 14
+  const lineHeight = 1.4
+  const maxLines = 30
+  
+  const baseStyle = {
+    fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
+    fontSize: `${fontSize}px`,
+    lineHeight: lineHeight
+  }
+  
+  if (lineCount <= maxLines) {
+    return { ...baseStyle, maxHeight: 'none' }
+  } else {
+    return { ...baseStyle, maxHeight: `${maxLines * fontSize * lineHeight}px` }
+  }
+}
 
 // 拖拽相关函数
 function startDragSidebar(event) {
@@ -4854,9 +4876,7 @@ body::-webkit-scrollbar {
   margin: 0;
   overflow: auto;
   color: #c9d1d9;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  /* 字体由动态样式控制 */
   white-space: pre-wrap;
   word-break: break-all;
 }
