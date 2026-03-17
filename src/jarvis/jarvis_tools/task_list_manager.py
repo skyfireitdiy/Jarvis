@@ -907,6 +907,7 @@ class task_list_manager:
                                 text=table_md,
                                 output_type=OutputType.INFO,
                                 timestamp=True,
+                                lang="markdown",  # 标记为 Markdown 格式，前端将渲染表格
                                 context={
                                     "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
                                     "task_list_id": tlist_id,

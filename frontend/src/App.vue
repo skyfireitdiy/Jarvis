@@ -5006,6 +5006,30 @@ body::-webkit-scrollbar {
   margin: 8px 0;
 }
 
+/* 表格样式 - 排除 diff-table */
+.message-body.markdown-content :deep(table:not(.diff-table)) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.message-body.markdown-content :deep(table:not(.diff-table) th),
+.message-body.markdown-content :deep(table:not(.diff-table) td) {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.message-body.markdown-content :deep(table:not(.diff-table) th) {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.message-body.markdown-content :deep(table:not(.diff-table) tr:nth-child(even)) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 /* 终端 */
 .terminal-wrapper {
   margin-top: 14px;
