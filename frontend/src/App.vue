@@ -3876,7 +3876,7 @@ body::-webkit-scrollbar {
 .diff-side-by-side {
   background: #1a1f2e;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
   margin: 8px 0;
   width: 100%;
 }
@@ -5049,11 +5049,11 @@ body::-webkit-scrollbar {
   background: #0a0d12;
   padding: 16px;
   margin: 0;
-  overflow: auto;
+  overflow-x: auto;
   color: #c9d1d9;
   /* 字体由父容器的动态样式控制 */
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  /* 移除 word-break: break-all，让长行可以横向滚动 */
   /* 移除 flex: 1，高度由父容器控制 */
   /* 继承父容器的字体设置 */
   font-family: inherit;
