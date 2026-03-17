@@ -180,7 +180,7 @@
       <!-- 输入框 -->
       <div class="input-wrapper">
         <!-- Agent 运行中进度指示器 -->
-        <div class="agent-thinking-indicator" v-if="agentStatuses.get(currentAgentId)?.execution_status === 'running' && !showInput">
+        <div class="agent-thinking-indicator" v-if="currentAgent?.status === 'running' && agentStatuses.get(currentAgentId)?.execution_status === 'running' && !showInput">
           <div class="thinking-spinner"></div>
           <span class="thinking-text">Agent 正在思考...</span>
         </div>
