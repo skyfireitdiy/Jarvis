@@ -1698,10 +1698,65 @@ def get_loc_stats() -> str:
         return ""
 
 
+def is_uv_tool_installed_jarvis() -> bool:
+    """检测当前 Jarvis 是否通过 uv 安装（uv tool install 或 uv pip install）。
+
+    Returns:
+        bool: 如果是通过 uv 安装返回 True，否则返回 False
+    """
+    # 检查当前 Python 解释器路径
+    # uv tool 安装的路径特征：
+    # - Linux/macOS: ~/.local/share/uv/tools/
+    # - Windows: %LOCALAPPDATA%\uv\uv\tools\
+    exec_path = Path(sys.executable).resolve()
+    exec_path_str = str(exec_path).lower()
+    
+    # 检查路径中是否包含 uv/tools/（uv tool install）
+    if "uv/tools" in exec_path_str:
+        return True
+    
+    # 检查是否为 uv pip install
+    # 方法：尝试运行 uv pip show jarvis-ai-assistant
+    try:
+        result = subprocess.run(
+            ["uv", "pip", "show", "jarvis-ai-assistant"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # 如果命令成功且输出包含包名，说明是通过 uv pip 安装的
+        if result.returncode == 0 and "jarvis-ai-assistant" in result.stdout:
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        # uv 命令不可用或执行失败
+        pass
+    
+    return False
+
+
 def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
     """对指定的git仓库执行git pull操作，并根据commit hash判断是否有更新。"""
     git_dir = repo_path / ".git"
     if not git_dir.is_dir():
+        return
+
+    # 只为 uv 安装的用户自动升级（uv tool install 或 uv pip install）
+    if not is_uv_tool_installed_jarvis():
+        PrettyOutput.auto_print(
+            f"ℹ️ 检测到您不是通过 uv 安装的 Jarvis，跳过自动更新 '{repo_path.name}'。"
+        )
+        PrettyOutput.auto_print(
+            "   如需使用自动更新功能，请使用以下任一命令重新安装："
+        )
+        PrettyOutput.auto_print(
+            "   uv tool install git+https://github.com/skyfireitdiy/Jarvis.git"
+        )
+        PrettyOutput.auto_print(
+            "   或"
+        )
+        PrettyOutput.auto_print(
+            "   uv pip install git+https://github.com/skyfireitdiy/Jarvis.git"
+        )
         return
 
     try:
@@ -1768,6 +1823,10 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
         repo_dirs (List[str]): 需要检查的git仓库目录列表。
         repo_type (str): 仓库的类型名称，例如 "工具" 或 "方法论"，用于日志输出。
     """
+    # 只为 uv tool 安装的用户自动升级
+    if not is_uv_tool_installed_jarvis():
+        return
+
     data_dir = Path(str(get_data_dir()))
     last_check_file = data_dir / f"{repo_type}_updates_last_check.txt"
     should_check_for_updates = True

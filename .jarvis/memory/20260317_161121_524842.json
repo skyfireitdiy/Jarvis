@@ -1,0 +1,12 @@
+{
+  "id": "20260317_161121_524842",
+  "type": "project_long_term",
+  "tags": [
+    "自动升级",
+    "uv检测",
+    "jarvis配置"
+  ],
+  "content": "Jarvis 自动升级功能已更新为同时支持 uv tool install 和 uv pip install。\n\n检测逻辑：\n1. uv tool install: 检查 Python 解释器路径是否包含 uv/tools/\n2. uv pip install: 运行 uv pip show jarvis-ai-assistant 命令检测\n\n不支持的安装方式：\n- 直接使用 pip 安装（不通过 uv）\n\n修改文件：src/jarvis/jarvis_utils/utils.py\n修改函数：is_uv_tool_installed_jarvis(), _pull_git_repo()",
+  "created_at": "2026-03-17T16:11:21.524872",
+  "updated_at": "2026-03-17T16:11:21.524875"
+}
