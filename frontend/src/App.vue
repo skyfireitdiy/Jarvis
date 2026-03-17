@@ -116,12 +116,12 @@
             <p class="confirm-message">{{ confirmDialog.message }}</p>
             <div class="confirm-actions">
               <template v-if="confirmDialog.defaultConfirm">
-                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
-                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+                <button class="confirm-btn" @click="confirmDialog.cancelCallback">取消</button>
+                <button class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
               </template>
               <template v-else>
-                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
-                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+                <button class="confirm-btn" @click="confirmDialog.confirmCallback">确认</button>
+                <button class="confirm-btn default" @click="confirmDialog.cancelCallback">取消</button>
               </template>
             </div>
           </div>
@@ -5108,12 +5108,13 @@ body::-webkit-scrollbar {
   transform: translateY(-1px);
 }
 
-.confirm-btn.confirm {
+.confirm-btn.default {
   background: #238636;
   border-color: rgba(255, 255, 255, 0.2);
+  font-weight: 700;
 }
 
-.confirm-btn.confirm:hover {
+.confirm-btn.default:hover {
   background: #2ea043;
   border-color: rgba(255, 255, 255, 0.25);
 }
