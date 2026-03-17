@@ -2509,9 +2509,16 @@ function renderSideBySideDiff(diffData) {
       let oldContent = ''
       if (old_line) {
         const leadingSpaces = old_line.match(/^(\s*)/)[0]
-        const highlighted = hljs.highlight(old_line, { language }).value
-        // 在高亮结果前添加显式的 &nbsp; 来保留缩进
-        oldContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+        let highlighted
+        try {
+          highlighted = hljs.highlight(old_line, { language }).value
+          // 在高亮结果前添加显式的 &nbsp; 来保留缩进
+          oldContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+        } catch (e) {
+          // 如果语法高亮不支持该语言，降级为纯文本显示
+          console.warn('[highlight.js] Language not supported:', language, e)
+          oldContent = '&nbsp;'.repeat(leadingSpaces.length) + escapeHtml(old_line)
+        }
       }
       
       // 对于 replace 和 delete，添加删除背景色到 td
@@ -2531,9 +2538,16 @@ function renderSideBySideDiff(diffData) {
       let newContent = ''
       if (new_line) {
         const leadingSpaces = new_line.match(/^(\s*)/)[0]
-        const highlighted = hljs.highlight(new_line, { language }).value
-        // 在高亮结果前添加显式的 &nbsp; 来保留缩进
-        newContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+        let highlighted
+        try {
+          highlighted = hljs.highlight(new_line, { language }).value
+          // 在高亮结果前添加显式的 &nbsp; 来保留缩进
+          newContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
+        } catch (e) {
+          // 如果语法高亮不支持该语言，降级为纯文本显示
+          console.warn('[highlight.js] Language not supported:', language, e)
+          newContent = '&nbsp;'.repeat(leadingSpaces.length) + escapeHtml(new_line)
+        }
       }
       
       // 对于 replace 和 insert，添加新增背景色到 td
@@ -2572,17 +2586,6 @@ function renderMessageHtml(payload) {
   } else if (payload?.lang === 'diff') {
     // 将 diff 包装在 markdown 代码块中，以便语法高亮
     return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
-  } else if (payload?.lang === 'json') {
-    // 兼容旧版本：解析 side by side diff 数据
-    try {
-      const diffData = JSON.parse(payload.text || '{}')
-      if (diffData.diff_type === 'side_by_side') {
-        return renderSideBySideDiff(diffData)
-      }
-    } catch (e) {
-      console.error('[DIFF] Failed to parse side by side diff:', e)
-      return escapeHtml(payload.text || '')
-    }
   } else {
     return escapeHtml(payload.text || '')
   }
