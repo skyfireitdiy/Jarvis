@@ -105,9 +105,9 @@
             <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history">
+          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content" :style="getTerminalStyle(item.terminal_content)">{{ item.terminal_content }}</pre>
+            <pre class="terminal-history-content">{{ item.terminal_content }}</pre>
           </div>
         </article>
         <!-- 确认对话框 -->
@@ -523,9 +523,11 @@ function getTerminalStyle(terminalContent) {
   if (!terminalContent) return {}
   
   const lineCount = terminalContent.split('\n').length
-  const fontSize = 14
+  const fontSize = 12
   const lineHeight = 1.4
   const maxLines = 30
+  const headerHeight = 41 // header的高度
+  const contentPadding = 32 // content的padding
   
   const baseStyle = {
     fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
@@ -533,10 +535,16 @@ function getTerminalStyle(terminalContent) {
     lineHeight: lineHeight
   }
   
+  const contentHeight = lineCount * fontSize * lineHeight
+  const totalHeight = contentHeight + headerHeight + contentPadding
+  
   if (lineCount <= maxLines) {
-    return { ...baseStyle, maxHeight: 'none' }
+    // 行数少时，计算实际高度：内容高度 + header高度 + padding
+    return { ...baseStyle, height: `${totalHeight}px` }
   } else {
-    return { ...baseStyle, maxHeight: `${maxLines * fontSize * lineHeight}px` }
+    // 行数多时，使用最大高度
+    const maxHeight = maxLines * fontSize * lineHeight + headerHeight + contentPadding
+    return { ...baseStyle, height: `${maxHeight}px` }
   }
 }
 
@@ -5041,10 +5049,10 @@ body::-webkit-scrollbar {
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   overflow: hidden;
-  max-height: 600px;
   display: flex;
   flex-direction: column;
   background: rgba(13, 17, 23, 0.6);
+  /* max-height 由动态样式控制 */
 }
 
 .terminal-history-header {
@@ -5062,9 +5070,14 @@ body::-webkit-scrollbar {
   margin: 0;
   overflow: auto;
   color: #c9d1d9;
-  /* 字体由动态样式控制 */
+  /* 字体由父容器的动态样式控制 */
   white-space: pre-wrap;
   word-break: break-all;
+  /* 移除 flex: 1，高度由父容器控制 */
+  /* 继承父容器的字体设置 */
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 /* 确认对话框 */
