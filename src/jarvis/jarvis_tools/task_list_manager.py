@@ -7,7 +7,12 @@ import json
 import re
 
 
-from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.output import (
+    PrettyOutput,
+    emit_output,
+    OutputEvent,
+    OutputType,
+)
 
 # -*- coding: utf-8 -*-
 from typing import Dict, List, Optional, Any
@@ -658,23 +663,94 @@ class task_list_manager:
 
                 if is_passed:
                     PrettyOutput.auto_print(f"✅ 任务 [{task.task_name}] 验证通过")
+                    # 发送到前端
+                    try:
+                        emit_output(
+                            OutputEvent(
+                                text=f"✅ 任务 [{task.task_name}] 验证通过",
+                                output_type=OutputType.INFO,
+                                timestamp=True,
+                                context={
+                                    "_gateway_skip": True,
+                                    "task_id": task.task_id,
+                                    "task_name": task.task_name,
+                                    "status": "verified",
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
                     return True, verification_result_str
                 else:
                     # 直接使用完整的验证结果作为失败原因
                     PrettyOutput.auto_print(
                         f"❌ 任务 [{task.task_name}] 验证未通过：{verification_result_str[:200]}..."
                     )
+                    # 发送到前端
+                    try:
+                        emit_output(
+                            OutputEvent(
+                                text=f"❌ 任务 [{task.task_name}] 验证未通过",
+                                output_type=OutputType.WARNING,
+                                timestamp=True,
+                                context={
+                                    "_gateway_skip": True,
+                                    "task_id": task.task_id,
+                                    "task_name": task.task_name,
+                                    "status": "verification_failed",
+                                    "verification_result": verification_result_str[
+                                        :500
+                                    ],
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
                     return False, verification_result_str
             else:
                 PrettyOutput.auto_print(
                     f"⚠️ 任务 [{task.task_name}] 验证无结果，默认认为未完成"
                 )
+                # 发送到前端
+                try:
+                    emit_output(
+                        OutputEvent(
+                            text=f"⚠️ 任务 [{task.task_name}] 验证无结果，默认认为未完成",
+                            output_type=OutputType.WARNING,
+                            timestamp=True,
+                            context={
+                                "_gateway_skip": True,
+                                "task_id": task.task_id,
+                                "task_name": task.task_name,
+                                "status": "verification_no_result",
+                            },
+                        )
+                    )
+                except Exception:
+                    pass
                 return False, "验证无结果"
 
         except Exception as e:
             PrettyOutput.auto_print(
                 f"⚠️ 验证任务 [{task.task_name}] 时发生异常: {str(e)}"
             )
+            # 发送到前端
+            try:
+                emit_output(
+                    OutputEvent(
+                        text=f"⚠️ 验证任务 [{task.task_name}] 时发生异常: {str(e)}",
+                        output_type=OutputType.WARNING,
+                        timestamp=True,
+                        context={
+                            "_gateway_skip": True,
+                            "task_id": task.task_id,
+                            "task_name": task.task_name,
+                            "status": "verification_error",
+                        },
+                    )
+                )
+            except Exception:
+                pass
             return False, f"验证异常: {str(e)}"
 
     def _extract_task_number(self, task_id: str) -> int:
@@ -794,6 +870,53 @@ class task_list_manager:
                     )
                     console.print(f"[dim]{stats_text}[/dim]")
                     console.print()  # 空行
+
+                    # 发送到前端
+                    try:
+                        # 构建任务列表的 Markdown 表格
+                        table_md_lines = [f"## 任务列表状态: {tlist_id}\n"]
+                        table_md_lines.append(
+                            "| 任务ID | 任务名称 | 状态 | Agent类型 | 依赖 |"
+                        )
+                        table_md_lines.append(
+                            "|-------|---------|------|----------|-----|"
+                        )
+
+                        for task in sorted_tasks:
+                            status_text = task.status.value
+                            task_name = (
+                                task.task_name[:28] + "..."
+                                if len(task.task_name) > 30
+                                else task.task_name
+                            )
+                            deps_text = ", ".join(task.dependencies[:3])
+                            if len(task.dependencies) > 3:
+                                deps_text += f" (+{len(task.dependencies) - 3})"
+                            if not task.dependencies:
+                                deps_text = "-"
+
+                            table_md_lines.append(
+                                f"| {task.task_id} | {task_name} | {status_text} | {task.agent_type.value} | {deps_text} |"
+                            )
+
+                        table_md_lines.append(f"\n**统计信息:** {stats_text}")
+                        table_md = "\n".join(table_md_lines)
+
+                        emit_output(
+                            OutputEvent(
+                                text=table_md,
+                                output_type=OutputType.INFO,
+                                timestamp=True,
+                                context={
+                                    "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
+                                    "task_list_id": tlist_id,
+                                    "summary": summary,
+                                },
+                            )
+                        )
+                    except Exception:
+                        # 忽略输出错误，不影响控制台显示
+                        pass
 
         except Exception as e:
             # 打印详细错误信息，帮助调试
@@ -1265,6 +1388,26 @@ class task_list_manager:
                 "task_list_id": task_list_id,
                 "message": f"成功批量添加 {len(task_ids)} 个任务",
             }
+
+            # 发送到前端
+            try:
+                emit_output(
+                    OutputEvent(
+                        text=f"✅ 成功批量添加 {len(task_ids)} 个任务到任务列表: {task_list_id}",
+                        output_type=OutputType.INFO,
+                        timestamp=True,
+                        context={
+                            "_gateway_skip": True,
+                            "task_list_id": task_list_id,
+                            "task_ids": task_ids,
+                            "task_count": len(task_ids),
+                        },
+                    )
+                )
+            except Exception:
+                # 忽略输出错误，不影响返回结果
+                pass
+
             return {
                 "success": True,
                 "stdout": json.dumps(result, ensure_ascii=False, indent=2),
@@ -1546,6 +1689,27 @@ class task_list_manager:
                 "stderr": f"更新任务状态失败: {update_msg}",
             }
 
+        # 发送到前端：任务开始执行
+        try:
+            emit_output(
+                OutputEvent(
+                    text=f"🚀 开始执行任务: [{task.task_name}] ({task_id})",
+                    output_type=OutputType.INFO,
+                    timestamp=True,
+                    context={
+                        "_gateway_skip": True,
+                        "task_list_id": task_list_id,
+                        "task_id": task_id,
+                        "task_name": task.task_name,
+                        "agent_type": task.agent_type.value,
+                        "status": "running",
+                    },
+                )
+            )
+        except Exception:
+            # 忽略输出错误，不影响任务执行
+            pass
+
         # 对于 main 类型的任务，初始化模型调用次数并订阅事件
         if task.agent_type.value == "main":
             try:
@@ -1673,6 +1837,23 @@ class task_list_manager:
                         PrettyOutput.auto_print(
                             f"🔄 执行任务 [{task.task_name}] (第 {iteration} 次迭代)..."
                         )
+                        # 发送到前端
+                        try:
+                            emit_output(
+                                OutputEvent(
+                                    text=f"🔄 执行任务 [{task.task_name}] (第 {iteration} 次迭代)...",
+                                    output_type=OutputType.INFO,
+                                    timestamp=True,
+                                    context={
+                                        "_gateway_skip": True,
+                                        "task_id": task_id,
+                                        "task_name": task.task_name,
+                                        "iteration": iteration,
+                                    },
+                                )
+                            )
+                        except Exception:
+                            pass
 
                         if is_code_task:
                             # 代码相关任务：使用 sub_code_agent 工具
@@ -1836,6 +2017,23 @@ class task_list_manager:
                             PrettyOutput.auto_print(
                                 f"⏭️ 用户选择跳过验证，任务 [{task.task_name}] 直接标记为完成"
                             )
+                            # 发送到前端
+                            try:
+                                emit_output(
+                                    OutputEvent(
+                                        text=f"⏭️ 用户选择跳过验证，任务 [{task.task_name}] 直接标记为完成",
+                                        output_type=OutputType.INFO,
+                                        timestamp=True,
+                                        context={
+                                            "_gateway_skip": True,
+                                            "task_id": task_id,
+                                            "task_name": task.task_name,
+                                            "status": "verification_skipped",
+                                        },
+                                    )
+                                )
+                            except Exception:
+                                pass
 
                         # 记录验证结果
                         all_verification_results.append(verification_result)
@@ -1920,6 +2118,24 @@ class task_list_manager:
                         is_main_agent=is_main_agent,
                         actual_output=processed_result,
                     )
+                    # 发送到前端
+                    try:
+                        emit_output(
+                            OutputEvent(
+                                text=f"✅ 任务 [{task.task_name}] 执行完成",
+                                output_type=OutputType.INFO,
+                                timestamp=True,
+                                context={
+                                    "_gateway_skip": True,
+                                    "task_id": task_id,
+                                    "task_name": task.task_name,
+                                    "status": "completed",
+                                    "iteration": iteration,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
                 else:
                     # 验证未通过，标记为 failed，并返回详细的验证结果
                     task_list_manager.update_task_status(
@@ -1930,6 +2146,25 @@ class task_list_manager:
                         is_main_agent=is_main_agent,
                         actual_output=processed_result,
                     )
+
+                    # 发送到前端
+                    try:
+                        emit_output(
+                            OutputEvent(
+                                text=f"❌ 任务 [{task.task_name}] 执行失败",
+                                output_type=OutputType.ERROR,
+                                timestamp=True,
+                                context={
+                                    "_gateway_skip": True,
+                                    "task_id": task_id,
+                                    "task_name": task.task_name,
+                                    "status": "failed",
+                                    "iteration": iteration,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
 
                     # 获取最后一次验证结果
                     last_verification = (
@@ -2275,6 +2510,32 @@ class task_list_manager:
                         "stdout": "",
                         "stderr": f"更新任务状态失败: {status_msg}",
                     }
+
+                # 发送到前端：任务状态更新
+                try:
+                    status_emoji = {
+                        "pending": "⏳",
+                        "running": "🔄",
+                        "completed": "✅",
+                        "failed": "❌",
+                        "abandoned": "🚫",
+                    }.get(status, "📋")
+
+                    emit_output(
+                        OutputEvent(
+                            text=f"{status_emoji} 任务 [{task.task_name}] 状态更新为: {status}",
+                            output_type=OutputType.INFO,
+                            timestamp=True,
+                            context={
+                                "_gateway_skip": True,
+                                "task_id": task_id,
+                                "task_name": task.task_name,
+                                "status": status,
+                            },
+                        )
+                    )
+                except Exception:
+                    pass
 
                 # 任务状态更新成功后，清理事件订阅（对于 main 类型的任务）
                 if task.agent_type.value == "main":
