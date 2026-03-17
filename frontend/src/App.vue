@@ -2465,6 +2465,14 @@ function handleMessage(message, agentId = null) {
     if (payload?.execution_status) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
       console.log('[ws] Agent execution status updated:', payload.execution_status)
+      // 当 Agent 开始思考时，自动滚动到底部
+      if (payload.execution_status === 'running') {
+        nextTick(() => {
+          if (outputList.value) {
+            outputList.value.scrollTop = outputList.value.scrollHeight
+          }
+        })
+      }
     }
   }
 }
