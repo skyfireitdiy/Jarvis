@@ -58,12 +58,13 @@ _current_execution_status: str = "running"
 
 def get_current_execution_status() -> str:
     """获取当前执行状态。
-    
+
     Returns:
         str: 当前执行状态（running/waiting_multi/waiting_single）
     """
     global _current_execution_status
     return _current_execution_status
+
 
 # 全局 SessionOutputRouter，用于推送状态更新
 _router: Optional[SessionOutputRouter] = None
@@ -332,6 +333,15 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
+        # 发送缓存的消息
+        cached_messages = self._router.get_and_clear_cache()
+        if cached_messages:
+            print(f"[CACHE] Sending {len(cached_messages)} cached messages to client")
+            for msg in cached_messages:
+                try:
+                    await websocket.send_json(msg)
+                except Exception as e:
+                    print(f"[CACHE] Failed to send cached message: {e}")
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         print(
