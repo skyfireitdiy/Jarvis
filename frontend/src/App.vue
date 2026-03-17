@@ -115,8 +115,14 @@
           <div class="confirm-box">
             <p class="confirm-message">{{ confirmDialog.message }}</p>
             <div class="confirm-actions">
-              <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
-              <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+              <template v-if="confirmDialog.defaultConfirm">
+                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+              </template>
+              <template v-else>
+                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+              </template>
             </div>
           </div>
         </article>
@@ -2357,7 +2363,8 @@ function handleMessage(message, agentId = null) {
       },
       () => {
         sendConfirmResult(false)
-      }
+      },
+      payload.default !== undefined ? payload.default : true
     )
   } else if (type === 'execution') {
     console.log('[ws] execution event received:', {
