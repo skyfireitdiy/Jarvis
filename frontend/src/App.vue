@@ -186,7 +186,7 @@
       <!-- 输入框 -->
       <div class="input-wrapper">
         <!-- Agent 运行中进度指示器 -->
-        <div class="agent-thinking-indicator" v-if="currentAgent?.status === 'running' && agentStatuses.get(currentAgentId)?.execution_status === 'running' && !showInput">
+        <div class="agent-thinking-indicator" v-if="currentAgent?.status === 'running' && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'running'">
           <div class="thinking-spinner"></div>
           <span class="thinking-text">Agent 正在思考...</span>
         </div>
@@ -199,7 +199,7 @@
         ></textarea>
         
         <!-- 缓冲区指示器 -->
-        <div class="buffer-indicator" v-if="hasBufferedInput && !showInput" @click="sendBufferedInput">
+        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="sendBufferedInput">
           <span class="buffer-icon">📝</span>
           <span class="buffer-text">缓冲区有内容，点击发送</span>
         </div>
@@ -207,7 +207,7 @@
         <!-- 操作按钮 -->
         <div class="input-actions">
           <button 
-            v-if="hasBufferedInput && !showInput" 
+            v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" 
             class="action-btn clear-buffer-btn" 
             @click="clearBuffer"
             :disabled="isInputDisabled"
@@ -234,9 +234,9 @@
           <button 
             class="send-btn" 
             @click="submitInput" 
-            :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || showInput))"
+            :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'waiting_multi'))"
           >
-            {{ hasBufferedInput && !showInput ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
+            {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
           </button>
         </div>
       </div>
@@ -757,7 +757,6 @@ const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
 const inputText = ref('')
 const inputMode = ref('single')
 const inputTip = ref('')
-const showInput = ref(false) // 是否显示输入框
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
@@ -2082,7 +2081,6 @@ async function switchAgent(agent) {
   console.log('[AGENT] Switching to:', agent)
   
   // 清空输入状态
-  showInput.value = false
   lastInputRequest.value = null
   inputText.value = ''
   inputTip.value = ''
@@ -2214,7 +2212,6 @@ function handleMessage(message, agentId = null) {
       inputTip.value = lastInputRequest.value.tip || ''
       inputMode.value = lastInputRequest.value.mode || 'multi'
       inputText.value = lastInputRequest.value.preset || ''
-      showInput.value = true
       nextTick(() => {
         const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
         inputEl?.focus()
@@ -2336,7 +2333,6 @@ function handleMessage(message, agentId = null) {
       console.log('[INPUT_REQUEST] Before show - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'shouldScroll:', shouldScrollAfterInputShow)
     }
     
-    showInput.value = true // 显示输入框
     nextTick(() => {
       // 聚焦到输入框
       const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
