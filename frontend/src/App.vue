@@ -173,8 +173,9 @@
         </div>
       </div>
       
-      <!-- 调整大小手柄 -->
+      <!-- 调整大小手柄（仅在PC端显示） -->
       <div 
+        v-show="windowWidth.value > 768"
         class="terminal-resize-handle"
         @mousedown="startResizeTerminal"
       ></div>
