@@ -199,9 +199,9 @@
         ></textarea>
         
         <!-- 缓冲区指示器 -->
-        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="sendBufferedInput">
+        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = !showBufferPanel">
           <span class="buffer-icon">📝</span>
-          <span class="buffer-text">缓冲区有内容，点击发送</span>
+          <span class="buffer-text">{{ showBufferPanel ? '收起缓存' : '缓冲区有内容，点击管理' }}</span>
         </div>
         
         <!-- 操作按钮 -->
@@ -238,6 +238,53 @@
           >
             {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
           </button>
+        </div>
+      </div>
+      
+      <!-- 缓存管理面板 -->
+      <div class="buffer-panel" v-if="hasBufferedInput && showBufferPanel">
+        <div class="buffer-panel-header">
+          <span class="buffer-panel-title">📝 输入缓存</span>
+          <div class="buffer-panel-actions">
+            <button 
+              class="buffer-panel-btn"
+              @click="loadBufferToInput"
+              title="加载到输入框"
+            >
+              ↙ 加载
+            </button>
+            <button 
+              class="buffer-panel-btn"
+              @click="clearBuffer"
+              title="清空缓存"
+            >
+              🗑️ 清空
+            </button>
+            <button 
+              class="buffer-panel-btn close-btn"
+              @click="showBufferPanel = false"
+              title="关闭面板"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div class="buffer-panel-content">
+          <textarea 
+            v-model="bufferEditText"
+            class="buffer-edit-textarea"
+            placeholder="缓存内容..."
+            @keydown.ctrl.enter="saveBufferEdit"
+          ></textarea>
+          <div class="buffer-panel-footer">
+            <button 
+              class="buffer-save-btn"
+              @click="saveBufferEdit"
+              :disabled="!bufferEditText.trim()"
+            >
+              保存修改 (Ctrl+Enter)
+            </button>
+          </div>
         </div>
       </div>
     </footer>
@@ -723,6 +770,8 @@ const renameAgentName = ref('')           // 重命名的新名称
 const showSessionDialog = ref(false)   // Session 选择对话框
 const availableSessions = ref([])         // 可恢复的 session 列表
 const selectedSession = ref(null)         // 选中的 session
+const showBufferPanel = ref(false)        // 缓存管理面板显示状态
+const bufferEditText = ref('')            // 缓存编辑文本
 const showDirDialog = ref(false)           // 目录选择对话框
 const currentDirPath = ref('')             // 当前浏览的目录路径
 const dirList = ref([])                    // 目录列表
@@ -795,6 +844,16 @@ function showToast(message, type = 'success') {
 const hasBufferedInput = computed(() => {
   const agentId = currentAgentId.value
   return agentId ? inputBuffers.value.has(agentId) : false
+})
+
+// 监听缓存面板打开，自动加载缓存内容
+watch(showBufferPanel, (newVal) => {
+  if (newVal && hasBufferedInput.value) {
+    const agentId = currentAgentId.value
+    if (agentId && inputBuffers.value.has(agentId)) {
+      bufferEditText.value = inputBuffers.value.get(agentId)
+    }
+  }
 })
 
 // Agent 管理
@@ -3050,6 +3109,35 @@ function clearBuffer() {
     output_type: 'system',
     agent_name: 'system',
     text: '🗑️ 缓冲区已清空',
+    lang: 'text',
+  })
+}
+
+function loadBufferToInput() {
+  const agentId = currentAgentId.value
+  if (!agentId || !inputBuffers.value.has(agentId)) {
+    return
+  }
+  const bufferedText = inputBuffers.value.get(agentId)
+  inputText.value = bufferedText
+  showBufferPanel.value = false
+  // 聚焦到输入框
+  setTimeout(() => {
+    const textarea = document.querySelector('.input-wrapper textarea')
+    textarea?.focus()
+  }, 100)
+}
+
+function saveBufferEdit() {
+  const agentId = currentAgentId.value
+  if (!agentId || !bufferEditText.value.trim()) {
+    return
+  }
+  inputBuffers.value.set(agentId, bufferEditText.value.trim())
+  appendOutput({
+    output_type: 'system',
+    agent_name: 'system',
+    text: '✅ 缓存已更新',
     lang: 'text',
   })
 }
@@ -5344,6 +5432,170 @@ body::-webkit-scrollbar {
   font-size: 13px;
   color: #3fb950;
   font-weight: 500;
+}
+
+/* 缓存管理面板 */
+.buffer-panel {
+  margin-top: 8px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.buffer-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(35, 134, 54, 0.1);
+  border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+}
+
+.buffer-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3fb950;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.buffer-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.buffer-panel-btn {
+  padding: 6px 12px;
+  background: rgba(48, 54, 61, 0.8);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 6px;
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.buffer-panel-btn:hover {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: rgba(56, 139, 253, 0.5);
+  color: #58a6ff;
+}
+
+.buffer-panel-btn.close-btn:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: rgba(248, 81, 73, 0.5);
+  color: #f85149;
+}
+
+.buffer-panel-content {
+  padding: 0;
+}
+
+.buffer-edit-textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 300px;
+  background: rgba(13, 17, 23, 0.8);
+  border: none;
+  padding: 14px 16px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.buffer-edit-textarea::placeholder {
+  color: #8b949e;
+}
+
+.buffer-panel-footer {
+  padding: 12px 16px;
+  background: rgba(13, 17, 23, 0.6);
+  border-top: 1px solid rgba(48, 54, 61, 0.6);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.buffer-save-btn {
+  padding: 8px 16px;
+  background: rgba(56, 139, 253, 0.15);
+  border: 1px solid rgba(56, 139, 253, 0.5);
+  border-radius: 6px;
+  color: #58a6ff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.buffer-save-btn:hover:not(:disabled) {
+  background: rgba(56, 139, 253, 0.25);
+  border-color: rgba(56, 139, 253, 0.8);
+  transform: translateY(-1px);
+}
+
+.buffer-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .buffer-panel {
+    margin-top: 6px;
+    border-radius: 10px;
+  }
+  
+  .buffer-panel-header {
+    padding: 10px 12px;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .buffer-panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .buffer-panel-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    flex: 1;
+    text-align: center;
+  }
+  
+  .buffer-edit-textarea {
+    min-height: 100px;
+    font-size: 14px;
+  }
+  
+  .buffer-panel-footer {
+    padding: 10px 12px;
+  }
+  
+  .buffer-save-btn {
+    width: 100%;
+    padding: 10px 16px;
+  }
 }
 
 /* 操作按钮 */
