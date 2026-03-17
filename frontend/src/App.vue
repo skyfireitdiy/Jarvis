@@ -115,14 +115,8 @@
           <div class="confirm-box">
             <p class="confirm-message">{{ confirmDialog.message }}</p>
             <div class="confirm-actions">
-              <template v-if="confirmDialog.defaultConfirm">
-                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
-                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
-              </template>
-              <template v-else>
-                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
-                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
-              </template>
+              <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+              <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
             </div>
           </div>
         </article>
