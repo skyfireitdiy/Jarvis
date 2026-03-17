@@ -2267,25 +2267,6 @@ function handleMessage(message, agentId = null) {
     } else if (outputType === 'STREAM_END') {
       console.log('[STREAM] End event:', payload)
       if (streamingMessage.value) {
-        // 保存流式消息到历史记录（在删除之前）
-        try {
-          const messageToSave = {
-            agent_id: targetAgentId,
-            output_type: 'text', // 保存为普通文本消息
-            text: streamingMessage.value.text,
-            lang: streamingMessage.value.lang,
-            agent_name: streamingMessage.value.agent_name,
-            model_name: streamingMessage.value.model_name,
-            non_interactive: false,
-            timestamp: streamingMessage.value.timestamp,
-            context: streamingMessage.value.context || {},
-          }
-          console.log(`🚨 [STREAM] Saving streaming message to history: text_length=${messageToSave.text.length}, agent_id=${targetAgentId}`)
-          historyStorage.saveMessage(messageToSave)
-        } catch (error) {
-          console.warn('[STREAM] Failed to save streaming message to history:', error)
-        }
-        
         // 从 outputs 数组中删除流式消息
         const currentOutputs = allOutputs.value.get(targetAgentId) || []
         const index = currentOutputs.indexOf(streamingMessage.value)
