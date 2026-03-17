@@ -115,8 +115,14 @@
           <div class="confirm-box">
             <p class="confirm-message">{{ confirmDialog.message }}</p>
             <div class="confirm-actions">
-              <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
-              <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+              <template v-if="confirmDialog.defaultConfirm">
+                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+              </template>
+              <template v-else>
+                <button class="confirm-btn confirm" @click="confirmDialog.confirmCallback">确认</button>
+                <button class="confirm-btn cancel" @click="confirmDialog.cancelCallback">取消</button>
+              </template>
             </div>
           </div>
         </article>
@@ -811,13 +817,14 @@ watch(newAgentType, (newType) => {
 }, { immediate: true })
 
 // 确认对话框
-const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback }
+const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback, defaultConfirm }
 
 // 显示确认对话框（自动滚动到底部）
-function showConfirm(message, confirmCallback, cancelCallback) {
+function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = true) {
   // 先设置 confirmDialog，让对话框显示
   confirmDialog.value = {
     message,
+    defaultConfirm,
     confirmCallback: () => {
       confirmCallback()
       confirmDialog.value = null
