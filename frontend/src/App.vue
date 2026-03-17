@@ -2239,7 +2239,8 @@ function handleMessage(message, agentId = null) {
       // 追加到当前流式消息
       if (streamingMessage.value) {
         streamingMessage.value.text += payload.text || ''
-        streamingMessage.value.html = marked.parse(streamingMessage.value.text || '')
+        // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
+        streamingMessage.value.html = renderMessageHtml(streamingMessage.value)
         // 自动滚动到底部
         nextTick(() => {
           if (outputList.value) {
