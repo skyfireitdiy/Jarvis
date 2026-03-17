@@ -2054,6 +2054,13 @@ async function deleteAgent(agentId) {
 // 切换当前工作的 Agent
 async function switchAgent(agent) {
   console.log('[AGENT] switchAgent called with:', agent)
+  
+  // 移动端：切换agent后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
+  if (windowWidth.value <= 768) {
+    console.log('[AGENT] Mobile mode: hiding sidebar')
+    showAgentSidebar.value = false
+  }
+  
   if (agent.agent_id === currentAgentId.value) {
     console.log('[AGENT] Already on this agent, checking connection...')
     // 检查 WebSocket 连接是否存在
@@ -2103,8 +2110,10 @@ async function switchAgent(agent) {
     await fetchAgentStatus(agent)
     
     // 如果 Agent 已停止（已完成），不尝试连接 WebSocket
+    console.log('[AGENT DEBUG] Checking agent.status:', agent.status)
     if (agent.status === 'stopped') {
       console.log('[AGENT] Agent is stopped (completed), skipping WebSocket connection')
+      console.log('[AGENT DEBUG] windowWidth.value:', windowWidth.value, ', 768 threshold:', windowWidth.value <= 768)
       // 直接加载历史消息
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
@@ -2160,12 +2169,6 @@ async function switchAgent(agent) {
     // 连接失败，不加载历史消息，但保持当前状态
     // 用户可以看到错误并手动重试
     // 即使连接失败，状态已通过 HTTP 查询
-  }
-  
-  // 移动端：切换agent后自动隐藏侧边栏
-  if (windowWidth.value <= 768) {
-    showAgentSidebar.value = false
-    console.log('[AGENT] Mobile mode: auto hide sidebar after switching agent')
   }
 }
 
