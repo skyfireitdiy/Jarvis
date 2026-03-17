@@ -41,11 +41,14 @@ class SessionOutputRouter(OutputMessagePublisher):
     - session_id 为 None 时执行广播；
     - session_id 有值时仅路由到目标会话订阅者；
     - 订阅者使用回调抽象，后续可由真正的 WebSocket 连接对象适配。
+    - 支持消息缓存机制，当没有订阅者时缓存消息，待连接后发送。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_cache_size: int = 100) -> None:
         self._lock = threading.RLock()
         self._subscribers: Dict[str, Dict[str, Callable[[Dict[str, Any]], None]]] = {}
+        self._message_cache: list[Dict[str, Any]] = []
+        self._max_cache_size = max_cache_size
 
     def register(
         self,
@@ -76,7 +79,15 @@ class SessionOutputRouter(OutputMessagePublisher):
             for route_key in self._resolve_route_keys(session_id):
                 callbacks.update(self._subscribers.get(route_key, {}))
 
-        print(f"[SessionOutputRouter] Publishing message: type={message.get('type')}, session_id={session_id}, subscribers={len(callbacks)}")
+        print(
+            f"[SessionOutputRouter] Publishing message: type={message.get('type')}, session_id={session_id}, subscribers={len(callbacks)}"
+        )
+
+        # 如果没有订阅者，缓存消息
+        if not callbacks:
+            self._cache_message(message)
+            return
+
         for sender in callbacks.values():
             try:
                 sender(dict(message))
@@ -93,6 +104,49 @@ class SessionOutputRouter(OutputMessagePublisher):
         """检查是否有活跃的订阅者连接。"""
         with self._lock:
             return bool(self._subscribers)
+
+    def _cache_message(self, message: Dict[str, Any]) -> None:
+        """缓存消息到内存中。
+
+        使用 FIFO 策略，超过缓存大小时删除最旧的消息。
+
+        Args:
+            message: 要缓存的消息
+        """
+        with self._lock:
+            self._message_cache.append(message)
+            # 如果超过缓存大小限制，删除最旧的消息
+            if len(self._message_cache) > self._max_cache_size:
+                removed = self._message_cache.pop(0)
+                print(
+                    f"[SessionOutputRouter] Cache full, removed oldest message: type={removed.get('type')}"
+                )
+        print(
+            f"[SessionOutputRouter] Message cached: type={message.get('type')}, cache_size={len(self._message_cache)}"
+        )
+
+    def get_and_clear_cache(self) -> list[Dict[str, Any]]:
+        """获取并清空所有缓存的消息。
+
+        Returns:
+            缓存的消息列表（按发送顺序）
+        """
+        with self._lock:
+            cached_messages = list(self._message_cache)
+            self._message_cache.clear()
+            print(
+                f"[SessionOutputRouter] Cleared cache: {len(cached_messages)} messages"
+            )
+            return cached_messages
+
+    def get_cache_size(self) -> int:
+        """获取当前缓存大小。
+
+        Returns:
+            当前缓存的消息数量
+        """
+        with self._lock:
+            return len(self._message_cache)
 
 
 def serialize_output_event(
