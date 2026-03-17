@@ -2506,8 +2506,7 @@ function renderSideBySideDiff(diffData) {
     
     // 旧代码列
     if (type === 'equal' || type === 'delete' || type === 'replace') {
-      const oldNumClass = (type === 'replace' || type === 'delete') ? 'diff-deleted' : ''
-      html += `<td class="diff-line-num diff-old-num ${oldNumClass}">${escapeHtml(String(old_line_num || ''))}</td>`
+      html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
       
       // 统计并保留缩进
       let oldContent = ''
@@ -2535,8 +2534,7 @@ function renderSideBySideDiff(diffData) {
     
     // 新代码列
     if (type === 'equal' || type === 'insert' || type === 'replace') {
-      const newNumClass = (type === 'replace' || type === 'insert') ? 'diff-added' : ''
-      html += `<td class="diff-line-num diff-new-num ${newNumClass}">${escapeHtml(String(new_line_num || ''))}</td>`
+      html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
       
       // 统计并保留缩进
       let newContent = ''
@@ -3880,6 +3878,144 @@ body {
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
   display: none;
+}
+
+/* Side by side Diff 样式 */
+.diff-side-by-side {
+  background: #1a1f2e;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+  width: 100%;
+}
+
+.diff-header {
+  background: rgba(56, 139, 253, 0.1);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-file-path {
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.diff-stats {
+  color: #8b949e;
+  font-size: 12px;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+}
+
+.diff-additions {
+  color: #3fb950;
+  font-weight: 600;
+}
+
+.diff-deletions {
+  color: #f85149;
+  font-weight: 600;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.diff-row {
+}
+
+.diff-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diff-row-equal {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-row-delete {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-row-insert {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-line-num {
+  color: #8b949e;
+  padding: 2px 6px;
+  text-align: right;
+  width: 50px;
+  user-select: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  vertical-align: top;
+}
+
+.diff-content {
+  padding: 2px 6px;
+  white-space: pre;
+  word-break: break-all;
+  width: 50%;
+  vertical-align: top;
+}
+
+.diff-content code {
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  background: transparent;
+  padding: 0;
+  white-space: pre;
+}
+
+.diff-deleted {
+  background: rgba(248, 81, 73, 0.7);
+  color: #fff;
+}
+
+.diff-deleted code {
+  background: inherit;
+}
+
+.diff-added {
+  background: rgba(63, 185, 80, 0.7);
+  color: #fff;
+}
+
+.diff-added code {
+  background: inherit;
+}
+
+.diff-error {
+  color: #f85149;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+/* 移动端 Diff 适配 */
+@media (max-width: 768px) {
+  .diff-header {
+    padding: 6px 10px;
+  }
+  
+  .diff-file-path {
+    font-size: 13px;
+  }
+  
+  .diff-content {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  
+  .diff-line-num {
+    width: 40px;
+    font-size: 10px;
+  }
 }
 </style>
 
@@ -5472,114 +5608,7 @@ body::-webkit-scrollbar {
   transform: translateY(-1px);
 }
 
-/* Side by side Diff 样式 */
-.diff-side-by-side {
-  background: #1a1f2e;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 8px 0;
-  width: 100%;
-}
 
-.diff-header {
-  background: rgba(56, 139, 253, 0.1);
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.diff-file-path {
-  color: #e6edf3;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.diff-stats {
-  color: #8b949e;
-  font-size: 12px;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-}
-
-.diff-additions {
-  color: #3fb950;
-  font-weight: 600;
-}
-
-.diff-deletions {
-  color: #f85149;
-  font-weight: 600;
-}
-
-.diff-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
-}
-
-.diff-row {
-}
-
-.diff-row:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.diff-row-equal {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-row-delete {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-row-insert {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-line-num {
-  color: #8b949e;
-  padding: 2px 6px;
-  text-align: right;
-  width: 50px;
-  user-select: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  vertical-align: top;
-}
-
-.diff-content {
-  padding: 2px 6px;
-  white-space: pre;
-  word-break: break-all;
-  width: 50%;
-  vertical-align: top;
-}
-
-.diff-content code {
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.2;
-  background: transparent;
-  padding: 0;
-  white-space: pre;
-}
-
-.diff-deleted {
-  background: rgba(248, 81, 73, 0.7);
-  color: #fff;
-}
-
-.diff-added {
-  background: rgba(63, 185, 80, 0.7);
-  color: #fff;
-}
-
-.diff-error {
-  color: #f85149;
-  padding: 8px 12px;
-  font-weight: 600;
-}
 
 /* 移动端适配 */
 @media (max-width: 768px) {
@@ -6206,22 +6235,6 @@ body::-webkit-scrollbar {
   }
   
   /* ========== Diff 优化 ========== */
-  .diff-header {
-    padding: 6px 10px;
-  }
-  
-  .diff-file-path {
-    font-size: 13px;
-  }
-  
-  .diff-content {
-    font-size: 11px;
-    padding: 2px 4px;
-  }
-  
-  .diff-line-num {
-    width: 40px;
-    font-size: 10px;
-  }
+  /* 已移到全局样式中，因v-html插入的内容无法使用scoped样式 */
 }
 </style>
