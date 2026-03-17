@@ -185,6 +185,12 @@
     <footer class="input-area">
       <!-- 输入框 -->
       <div class="input-wrapper">
+        <!-- Agent 运行中进度指示器 -->
+        <div class="agent-thinking-indicator" v-if="agentStatuses.get(currentAgentId)?.execution_status === 'running' && !showInput">
+          <div class="thinking-spinner"></div>
+          <span class="thinking-text">Agent 正在思考...</span>
+        </div>
+        
         <textarea 
           v-model="inputText" 
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
@@ -5098,6 +5104,53 @@ body::-webkit-scrollbar {
 }
 
 /* 缓冲区指示器 */
+/* Agent 运行中进度指示器 */
+.agent-thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  margin: 8px 0;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.thinking-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.thinking-text {
+  font-size: 14px;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .buffer-indicator {
   display: flex;
   align-items: center;
