@@ -1490,10 +1490,12 @@ async function openDirDialog() {
   selectedDir.value = newAgentDir.value || '~'
   dirSearchText.value = '' // 清空搜索
   await fetchDirectories(selectedDir.value)
-  // 自动聚焦到搜索框
-  nextTick(() => {
-    dirSearchInput.value?.focus()
-  })
+  // PC端自动聚焦到搜索框，移动端不聚焦
+  if (windowWidth.value > 768) {
+    nextTick(() => {
+      dirSearchInput.value?.focus()
+    })
+  }
 }
 
 async function fetchDirectories(path = '') {
@@ -1752,10 +1754,12 @@ async function openCompletions() {
     alert(`获取补全列表失败: ${error.message}`)
   }
   
-  // 聚焦搜索框
-  nextTick(() => {
-    completionSearchInput.value?.focus()
-  })
+  // PC端聚焦搜索框，移动端不聚焦
+  if (windowWidth.value > 768) {
+    nextTick(() => {
+      completionSearchInput.value?.focus()
+    })
+  }
 }
 
 // 过滤补全列表
