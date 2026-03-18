@@ -38,6 +38,10 @@ def get_yes_no(*args, **kwargs):
     return user_confirm(*args, **kwargs)
 
 
+# 防止 init_env 重复调用的全局标志
+_init_env_called = False
+
+
 def decode_output(data: bytes) -> str:
     """解码命令输出，自动尝试 UTF-8 和 GBK 编码
 
@@ -825,6 +829,17 @@ def init_env(
         llm_group: 模型组覆盖参数，用于显示用户指定的模型组
         auto_upgrade: 是否自动检查并升级Jarvis，默认为True
     """
+    global _init_env_called
+
+    # 防止重复调用
+    if _init_env_called:
+        return
+
+    try:
+        _init_env_called = True
+    except Exception:
+        # 如果设置失败（理论上不可能），继续执行
+        pass
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
         if os.environ.get("terminal") == "1":
@@ -1710,11 +1725,11 @@ def is_uv_tool_installed_jarvis() -> bool:
     # - Windows: %LOCALAPPDATA%\uv\uv\tools\
     exec_path = Path(sys.executable).resolve()
     exec_path_str = str(exec_path).lower()
-    
+
     # 检查路径中是否包含 uv/tools/（uv tool install）
     if "uv/tools" in exec_path_str:
         return True
-    
+
     # 检查是否为 uv pip install
     # 方法：尝试运行 uv pip show jarvis-ai-assistant
     try:
@@ -1727,10 +1742,14 @@ def is_uv_tool_installed_jarvis() -> bool:
         # 如果命令成功且输出包含包名，说明是通过 uv pip 安装的
         if result.returncode == 0 and "jarvis-ai-assistant" in result.stdout:
             return True
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+    except (
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+    ):
         # uv 命令不可用或执行失败
         pass
-    
+
     return False
 
 
@@ -1745,15 +1764,11 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
         PrettyOutput.auto_print(
             f"ℹ️ 检测到您不是通过 uv 安装的 Jarvis，跳过自动更新 '{repo_path.name}'。"
         )
-        PrettyOutput.auto_print(
-            "   如需使用自动更新功能，请使用以下任一命令重新安装："
-        )
+        PrettyOutput.auto_print("   如需使用自动更新功能，请使用以下任一命令重新安装：")
         PrettyOutput.auto_print(
             "   uv tool install git+https://github.com/skyfireitdiy/Jarvis.git"
         )
-        PrettyOutput.auto_print(
-            "   或"
-        )
+        PrettyOutput.auto_print("   或")
         PrettyOutput.auto_print(
             "   uv pip install git+https://github.com/skyfireitdiy/Jarvis.git"
         )

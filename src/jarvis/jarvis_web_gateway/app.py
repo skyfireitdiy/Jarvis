@@ -539,10 +539,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
-        # 初始化环境并加载配置文件
-        from jarvis.jarvis_utils.utils import init_env
-
-        init_env(welcome_str="", config_file=None)
+        # 初始化环境并加载配置文件（已在 run() 函数中调用，此处避免重复）
+        # from jarvis.jarvis_utils.utils import init_env
+        # init_env(welcome_str="", config_file=None)
         # 为运行中的 Agent 启动监控任务
         await agent_manager.start_monitoring_for_running_agents()
 
