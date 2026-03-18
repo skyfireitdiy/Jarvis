@@ -1699,7 +1699,6 @@ def cli(
                         not non_interactive
                         and not restore_session
                         and not is_auto_resume_session()
-                        and not web_gateway
                     ):
                         try:
                             current_commit = get_latest_commit_hash()
@@ -1735,10 +1734,9 @@ def cli(
                             PrettyOutput.auto_print(f"⚠️  检测历史会话失败: {e}")
 
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
-                    # Web Gateway 模式下跳过自动恢复，由前端通过 WebSocket 控制
                     if (
                         restore_session or is_auto_resume_session()
-                    ) and not web_gateway:
+                    ):
                         if agent.restore_session():
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
