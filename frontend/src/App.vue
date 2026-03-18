@@ -2395,7 +2395,7 @@ function handleMessage(message, agentId = null) {
     lastInputRequest.value = payload
     inputTip.value = payload.tip || ''
     inputMode.value = payload.mode || 'multi'  // 默认多行
-    inputText.value = payload.preset || ''
+    inputText.value = payload.preset || inputText.value
     
     // 检查是否在底部（用于判断是否需要在显示输入框后滚动）
     const SCROLL_THRESHOLD = 50 // 50px 的容差
