@@ -502,6 +502,22 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         FastAPI 应用实例
     """
 
+    # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
+    from jarvis.jarvis_utils.utils import init_env
+
+    init_env(welcome_str="", config_file=None)
+
+    # 从环境变量读取 Gateway 密码（优先级高于配置文件）
+    import os
+
+    gateway_password = os.environ.get("JARVIS_GATEWAY_PASSWORD")
+    if gateway_password:
+        if "gateway_auth" not in GLOBAL_CONFIG_DATA:
+            GLOBAL_CONFIG_DATA["gateway_auth"] = {}
+        GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
+        GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
+        GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
+
     # 创建 AgentManager，并设置状态变更回调
     agent_manager = AgentManager(on_status_change=_on_agent_status_change)
     # 保存 agent_manager 到全局，以便回调访问
