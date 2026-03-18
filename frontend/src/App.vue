@@ -3172,9 +3172,18 @@ function submitInput() {
     return
   }
   
-  const userInput = inputText.value.trim()
-  if (!userInput) {
-    return
+  // 单行输入模式：允许发送空字符串
+  // 多行输入模式：不允许发送空字符串
+  let userInput
+  if (inputMode.value === 'single') {
+    // 单行输入：不trim，允许空字符串
+    userInput = inputText.value
+  } else {
+    // 多行输入：trim并检查空值
+    userInput = inputText.value.trim()
+    if (!userInput) {
+      return
+    }
   }
   
   // 获取当前运行状态
