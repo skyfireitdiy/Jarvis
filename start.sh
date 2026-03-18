@@ -38,7 +38,7 @@ FRONTEND_PORT="${JARVIS_FRONTEND_PORT:-5173}"
 # 启动网关（后台运行）
 echo "📡 启动网关服务..."
 cd "$PROJECT_ROOT"
-python -m uvicorn jarvis.jarvis_web_gateway.app:create_app --host $GATEWAY_HOST --port $GATEWAY_PORT $GATEWAY_PASSWORD &
+jwg --host $GATEWAY_HOST --port $GATEWAY_PORT $GATEWAY_PASSWORD &
 GATEWAY_PID=$!
 
 echo "✅ 网关已启动 (PID: $GATEWAY_PID)"
