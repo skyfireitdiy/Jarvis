@@ -492,11 +492,6 @@
             清除历史记录
           </button>
         </div>
-        <div class="form-group">
-          <button class="warning-btn" @click="confirmRestartGateway">
-            重启网关
-          </button>
-        </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
           <button class="primary-btn" @click="reconnect">重新连接</button>
@@ -3381,30 +3376,6 @@ function confirmClearHistory() {
       }
       // 无论清除是否成功，都关闭设置弹窗
       showSettingsModal.value = false
-    }
-  )
-}
-
-function confirmRestartGateway() {
-  // 先关闭设置弹窗
-  showSettingsModal.value = false
-  
-  showConfirm(
-    '确定要重启网关吗？这将断开连接并关闭所有 agent，然后重新加载代码。',
-    () => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        // 发送重启命令
-        socket.send(JSON.stringify({
-          type: 'restart_gateway'
-        }))
-        
-        // 显示重启提示
-        addSystemMessage('网关正在重启，请稍候...')
-        
-        // 关闭 WebSocket 连接
-        socket.close()
-        socket.value = null
-      }
     }
   )
 }
