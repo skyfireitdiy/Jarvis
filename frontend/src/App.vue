@@ -3032,6 +3032,13 @@ function isCursorAtLastLine(textarea) {
 
 // 处理 textarea 的键盘事件
 function handleTextareaKeydown(event) {
+  // @ 键：打开补全列表
+  if (event.key === '@') {
+    event.preventDefault()
+    openCompletions()
+    return
+  }
+  
   // Ctrl+Enter 提交输入
   if (event.ctrlKey && event.key === 'Enter') {
     event.preventDefault()
