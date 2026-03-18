@@ -83,10 +83,8 @@ class AgentStateManager:
 
     def set_status(self, status: AgentStatus) -> None:
         """设置当前状态。"""
-        import sys
 
         with self._lock:
-            old_status = self._status
             self._status = status
 
     def set_running(self) -> None:
@@ -1112,21 +1110,6 @@ def run_cli(
         llm_group=llm_group,
     )
 
-    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
-    try:
-        if llm_group:
-            set_config("llm_group", str(llm_group))
-        if tool_group:
-            set_config("tool_group", str(tool_group))
-        if disable_methodology_analysis:
-            set_config("use_methodology", False)
-            set_config("use_analysis", False)
-        if restore_session:
-            set_config("restore_session", True)
-    except Exception:
-        # 静默忽略同步异常，不影响主流程
-        pass
-
     if web_gateway:
         try:
             import threading
@@ -1264,6 +1247,21 @@ def run_cli(
             except Exception:
                 pass
             PrettyOutput.auto_print(f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}")
+
+    # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
+    try:
+        if llm_group:
+            set_config("llm_group", str(llm_group))
+        if tool_group:
+            set_config("tool_group", str(tool_group))
+        if disable_methodology_analysis:
+            set_config("use_methodology", False)
+            set_config("use_analysis", False)
+        if restore_session:
+            set_config("restore_session", True)
+    except Exception:
+        # 静默忽略同步异常，不影响主流程
+        pass
 
     # 运行主流程
     try:
