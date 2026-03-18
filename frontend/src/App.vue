@@ -3182,11 +3182,12 @@ function submitInput() {
   const executionStatus = statusData?.execution_status || 'running'
   
   // 判断是发送到缓冲区还是直接发送
-  // 只有当运行状态是 waiting_multi（等待多行输入）时，才直接发送
-  // 其他情况（running、waiting_single）都保存到缓冲区
-  if (executionStatus === 'waiting_multi') {
-    // 后端正在等待多行输入，直接发送
-    console.log('[SUBMIT] Sending input directly to backend (execution_status: waiting_multi)')
+  // 单行输入模式：直接发送（后端正在等待）
+  // 多行输入模式：只有当运行状态是 waiting_multi 时，才直接发送
+  // 其他情况（running）保存到缓冲区
+  if (inputMode.value === 'single' || executionStatus === 'waiting_multi') {
+    // 后端正在等待输入，直接发送
+    console.log('[SUBMIT] Sending input directly to backend (inputMode:', inputMode.value, ', execution_status:', executionStatus, ')')
     sendInputDirectly(userInput)
   } else {
     // 后端没有等待输入，保存到缓冲区
