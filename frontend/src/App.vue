@@ -294,7 +294,7 @@
       <div class="modal completions-modal">
         <div class="modal-header">
           <h3>插入补全</h3>
-          <button class="icon-btn" @click="showCompletions = false">✕</button>
+          <button class="icon-btn" @click="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1">✕</button>
         </div>
         <div class="completions-search">
           <input 
@@ -924,6 +924,7 @@ function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = 
 
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
+const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位置
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 
@@ -1856,9 +1857,11 @@ function handleCompletionKeydown(event) {
   const maxIndex = filteredCompletions.value.length - 1
   
   if (event.key === 'Escape') {
-    // ESC 键关闭对话框
+    // ESC 键关闭对话框，插入 @ 符号
+    insertAtPosition('@', completionCursorPos.value)
     showCompletions.value = false
     selectedIndex.value = -1
+    completionCursorPos.value = -1
     event.preventDefault()
     return
   }
@@ -1927,6 +1930,23 @@ function scrollToSelected() {
   })
 }
 
+// 在指定位置插入文本
+function insertAtPosition(text, position) {
+  const textarea = document.querySelector('.input-wrapper textarea')
+  if (!textarea || position === -1) return
+  
+  const currentText = textarea.value
+  // 在指定位置插入文本
+  const newText = currentText.substring(0, position) + text + currentText.substring(position)
+  inputText.value = newText
+  
+  // 更新 textarea 并设置光标位置
+  textarea.value = newText
+  const newCursorPos = position + text.length
+  textarea.setSelectionRange(newCursorPos, newCursorPos)
+  textarea.focus()
+}
+
 // 插入选中的补全
 function insertCompletion(item) {
   const textarea = document.querySelector('.input-wrapper textarea')
@@ -1950,6 +1970,7 @@ function insertCompletion(item) {
   // 关闭弹窗
   showCompletions.value = false
   selectedIndex.value = -1
+  completionCursorPos.value = -1
 }
 
 // 获取 Agent 列表
@@ -3035,6 +3056,7 @@ function handleTextareaKeydown(event) {
   // @ 键：打开补全列表
   if (event.key === '@') {
     event.preventDefault()
+    completionCursorPos.value = event.target.selectionStart
     openCompletions()
     return
   }
