@@ -416,6 +416,38 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
+    # 检查是否在 Gateway 模式下
+    gateway = None
+    GatewayInputRequest = None
+    try:
+        from jarvis.jarvis_gateway.events import (
+            GatewayInputRequest as _GatewayInputRequest,
+        )
+        from jarvis.jarvis_gateway.manager import get_current_gateway
+
+        gateway = get_current_gateway()
+        GatewayInputRequest = _GatewayInputRequest
+    except Exception:
+        gateway = None
+
+    if gateway is not None and GatewayInputRequest is not None:
+        # Gateway 模式：发送输入请求到前端
+        try:
+            request = GatewayInputRequest(
+                tip=tip,
+                mode="single",
+                preset=default,
+            )
+            result = gateway.request_input(request)
+            return result.text if result is not None else default
+        except InputProviderTimeoutError:
+            PrettyOutput.auto_print("⚠️ 输入等待超时，已使用默认值")
+            return default
+        except InputProviderDisconnectedError:
+            PrettyOutput.auto_print("⚠️ 远端输入连接已断开，已使用默认值")
+            return default
+
+    # 非 Gateway 模式：使用命令行输入
     history_dir = get_data_dir()
     session: PromptSession[Any] = PromptSession(
         history=FileHistory(os.path.join(history_dir, "single_line_input_history"))
@@ -1007,10 +1039,7 @@ def user_confirm(tip: str, default: bool = True) -> bool:
         if gateway is not None and GatewayConfirmRequest is not None:
             # Gateway 模式：发送确认请求到前端
             try:
-                request = GatewayConfirmRequest(
-                    message=message,
-                    default=default
-                )
+                request = GatewayConfirmRequest(message=message, default=default)
                 result = gateway.request_confirm(request)
                 return result.confirmed if result is not None else default
             except InputProviderTimeoutError:
