@@ -3094,6 +3094,21 @@ function handleTextareaKeydown(event) {
     return
   }
   
+  // Ctrl+C 在等待多行输入且输入框为空时，触发完成功能
+  if (event.ctrlKey && event.key === 'c') {
+    const userInput = inputText.value.trim()
+    const agentId = currentAgentId.value
+    const statusData = agentStatuses.value.get(agentId)
+    const executionStatus = statusData?.execution_status || 'running'
+    
+    // 只有在等待多行输入且输入框为空时才触发
+    if (executionStatus === 'waiting_multi' && !userInput) {
+      event.preventDefault()
+      submitCompletion()
+      return
+    }
+  }
+  
   // 向上箭头：检查是否在第一行，是才触发历史
   if (event.key === 'ArrowUp') {
     const textarea = event.target
@@ -3167,23 +3182,31 @@ function submitCompletion() {
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
   
-  // 发送 Ctrl+C 信号作为完成信号（与 CLI 模式按 Ctrl+C 行为一致）
-  // 注意：完成信号只针对多行输入，单行输入（如确认对话框）不使用完成按钮
-  if (executionStatus === 'waiting_multi') {
-    // 后端正在等待多行输入，直接发送 Ctrl+C 信号
-    console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend (execution_status: waiting_multi)')
-    sendInputDirectly('__CTRL_C_PRESSED__')
-  } else {
-    // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
-    console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
-    inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
-    appendOutput({
-      output_type: 'system',
-      agent_name: 'system',
-      text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
-      lang: 'text',
-    })
-  }
+  // 添加确认对话框，防止误触
+  showConfirm(
+    '确定要发送完成信号吗？',
+    () => {
+      // 用户确认，发送 Ctrl+C 信号作为完成信号（与 CLI 模式按 Ctrl+C 行为一致）
+      // 注意：完成信号只针对多行输入，单行输入（如确认对话框）不使用完成按钮
+      if (executionStatus === 'waiting_multi') {
+        // 后端正在等待多行输入，直接发送 Ctrl+C 信号
+        console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend (execution_status: waiting_multi)')
+        sendInputDirectly('__CTRL_C_PRESSED__')
+      } else {
+        // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
+        console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
+        inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
+        appendOutput({
+          output_type: 'system',
+          agent_name: 'system',
+          text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
+          lang: 'text',
+        })
+      }
+    },
+    null, // 取消回调，不需要特殊处理
+    true  // defaultConfirm=true，默认选择"是"
+  )
 }
 
 function sendInputDirectly(text) {
