@@ -190,12 +190,26 @@
           <span class="thinking-text">Agent 正在思考...</span>
         </div>
         
+        <!-- 多行输入框 -->
         <textarea 
+          v-if="inputMode === 'multi'"
           v-model="inputText" 
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
           :disabled="isInputDisabled"
           @keydown="handleTextareaKeydown"
+          ref="multilineInput"
         ></textarea>
+        
+        <!-- 单行输入框 -->
+        <input 
+          v-else
+          v-model="inputText" 
+          type="text"
+          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
+          :disabled="isInputDisabled"
+          @keydown="handleSinglelineKeydown"
+          ref="singlelineInput"
+        />
         
         <!-- 缓冲区指示器 -->
         <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = !showBufferPanel">
@@ -813,6 +827,8 @@ const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
 const inputText = ref('')
 const inputMode = ref('single')
 const inputTip = ref('')
+const multilineInput = ref(null)
+const singlelineInput = ref(null)
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
@@ -2441,8 +2457,11 @@ function handleMessage(message, agentId = null) {
     
     nextTick(() => {
       // 聚焦到输入框
-      const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
-      inputEl?.focus()
+      if (inputMode.value === 'multi') {
+        multilineInput.value?.focus()
+      } else {
+        singlelineInput.value?.focus()
+      }
       
       // 输入框显示后，如果之前在底部，就滚动到底部
       if (shouldScrollAfterInputShow && outputList.value) {
@@ -3072,6 +3091,18 @@ function isCursorAtFirstLine(textarea) {
   const cursorPosition = textarea.selectionStart
   const textBeforeCursor = textarea.value.substring(0, cursorPosition)
   return !textBeforeCursor.includes('\n')
+}
+
+// 处理单行输入框的键盘事件
+function handleSinglelineKeydown(event) {
+  // Enter 键提交输入
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    submitInput()
+    // 提交后自动切换回多行输入模式
+    inputMode.value = 'multi'
+    return
+  }
 }
 
 // 检查光标是否在最后一行
