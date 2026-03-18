@@ -133,7 +133,7 @@
     <aside 
       v-show="showTerminalPanel" 
       class="terminal-panel"
-      :style="windowWidth.value > 768 ? { width: terminalPanelSize.width + 'px', height: terminalPanelSize.height + 'px' } : {}"
+      :style="terminalPanelStyle"
     >
       <div class="terminal-panel-header">
         <h3>终端</h3>
@@ -173,9 +173,8 @@
         </div>
       </div>
       
-      <!-- 调整大小手柄（仅在PC端显示） -->
+      <!-- 调整大小手柄 -->
       <div 
-        v-show="windowWidth.value > 768"
         class="terminal-resize-handle"
         @mousedown="startResizeTerminal"
       ></div>
@@ -3537,6 +3536,14 @@ const terminalPanelSize = ref({
   height: 500,
 })
 
+// 终端面板动态样式
+const terminalPanelStyle = computed(() => {
+  return {
+    '--terminal-width': (windowWidth.value > 768 ? terminalPanelSize.value.width : Math.min(terminalPanelSize.value.width, windowWidth.value - 40)) + 'px',
+    '--terminal-height': terminalPanelSize.value.height + 'px',
+  }
+})
+
 // 监听面板显示状态
 watch(showTerminalPanel, (newValue, oldValue) => {
   if (!newValue && oldValue) {
@@ -6056,14 +6063,15 @@ body::-webkit-scrollbar {
   position: fixed;
   top: 60px;
   right: 20px;
-  width: 800px;
-  height: 500px;
+  width: var(--terminal-width, 800px) !important;
+  height: var(--terminal-height, 500px) !important;
   background: rgba(13, 17, 23, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   z-index: 1000;
+  overflow: visible !important;
 }
 
 .terminal-panel-header {
@@ -6146,6 +6154,7 @@ body::-webkit-scrollbar {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .copy-message-btn {
@@ -6244,14 +6253,17 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: calc(100% - 30px);
   color: #8b949e;
   font-size: 14px;
+  margin-bottom: 30px;
 }
 
 .terminal-host-wrapper {
   flex: 1;
   overflow: hidden;
+  margin-bottom: 30px;
+  min-height: 0;
 }
 
 .terminal-host {
@@ -6261,17 +6273,35 @@ body::-webkit-scrollbar {
 
 /* 终端调整大小手柄 */
 .terminal-resize-handle {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 20px;
-  height: 20px;
-  cursor: nesw-resize;
-  border-radius: 0 0 0 8px;
-  z-index: 10;
+  position: absolute !important;
+  bottom: 8px;
+  left: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  cursor: nesw-resize !important;
+  z-index: 2147483647 !important;
+  background: rgba(139, 156, 174, 0.4);
+  transition: all 0.2s ease;
+  pointer-events: auto !important;
+  user-select: none !important;
 }
 
 .terminal-resize-handle:hover {
+  background: rgba(56, 139, 253, 0.7);
+  transform: scale(1.2);
+}
+
+.terminal-resize-handle:active {
+  background: rgba(56, 139, 253, 1);
+  transform: scale(1.1);
+}
+
+/* 移动端隐藏调整大小手柄 */
+@media (max-width: 768px) {
+  .terminal-resize-handle {
+    display: none !important;
+  }
 }
 
 /* ==================== 响应式适配（方案一：渐进式） ==================== */
