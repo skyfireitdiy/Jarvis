@@ -194,7 +194,7 @@
           v-model="inputText" 
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
           :disabled="isInputDisabled"
-          @keydown.ctrl.enter="submitInput"
+          @keydown="handleTextareaKeydown"
         ></textarea>
         
         <!-- 缓冲区指示器 -->
@@ -815,6 +815,11 @@ const inputMode = ref('single')
 const inputTip = ref('')
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
+
+// 历史输入记录
+const inputHistory = ref([]) // 历史输入记录数组
+const historyIndex = ref(-1) // 当前浏览的历史记录索引（-1 表示未浏览历史）
+const currentTempInput = ref('') // 用户正在编辑的临时内容
 
 // Toast 提示
 const toast = ref({
@@ -2958,6 +2963,103 @@ function appendExecution(payload) {
   }
 }
 
+// ============ 历史输入记录管理 ============
+
+// 保存输入到历史记录
+function saveToHistory(text) {
+  if (!text || !text.trim()) return
+  
+  // 避免保存重复的历史记录
+  const lastHistory = inputHistory.value[0]
+  if (lastHistory && lastHistory.trim() === text.trim()) {
+    return
+  }
+  
+  // 将新输入添加到历史记录开头
+  inputHistory.value.unshift(text)
+  
+  // 限制历史记录数量（最多保存100条）
+  if (inputHistory.value.length > 100) {
+    inputHistory.value.pop()
+  }
+  
+  // 重置历史浏览状态
+  historyIndex.value = -1
+  currentTempInput.value = ''
+}
+
+// 翻阅历史记录
+function navigateHistory(direction) {
+  // direction: 'up' 或 'down'
+  
+  if (direction === 'up') {
+    // 向上翻阅：加载更早的历史记录
+    if (historyIndex.value < inputHistory.value.length - 1) {
+      // 第一次翻阅时，保存当前正在编辑的内容
+      if (historyIndex.value === -1) {
+        currentTempInput.value = inputText.value
+      }
+      historyIndex.value++
+      inputText.value = inputHistory.value[historyIndex.value]
+    }
+  } else if (direction === 'down') {
+    // 向下翻阅：加载更新的历史记录
+    if (historyIndex.value > -1) {
+      historyIndex.value--
+      if (historyIndex.value === -1) {
+        // 回到最新状态，恢复临时编辑的内容
+        inputText.value = currentTempInput.value
+      } else {
+        inputText.value = inputHistory.value[historyIndex.value]
+      }
+    }
+  }
+}
+
+// 检查光标是否在第一行
+function isCursorAtFirstLine(textarea) {
+  const cursorPosition = textarea.selectionStart
+  const textBeforeCursor = textarea.value.substring(0, cursorPosition)
+  return !textBeforeCursor.includes('\n')
+}
+
+// 检查光标是否在最后一行
+function isCursorAtLastLine(textarea) {
+  const cursorPosition = textarea.selectionEnd
+  const textAfterCursor = textarea.value.substring(cursorPosition)
+  return !textAfterCursor.includes('\n')
+}
+
+// 处理 textarea 的键盘事件
+function handleTextareaKeydown(event) {
+  // Ctrl+Enter 提交输入
+  if (event.ctrlKey && event.key === 'Enter') {
+    event.preventDefault()
+    submitInput()
+    return
+  }
+  
+  // 向上箭头：检查是否在第一行，是才触发历史
+  if (event.key === 'ArrowUp') {
+    const textarea = event.target
+    if (isCursorAtFirstLine(textarea)) {
+      event.preventDefault()
+      navigateHistory('up')
+    }
+    return
+  }
+  
+  // 向下箭头：检查是否在最后一行，是才触发历史
+  if (event.key === 'ArrowDown') {
+    const textarea = event.target
+    if (isCursorAtLastLine(textarea)) {
+      event.preventDefault()
+      navigateHistory('down')
+    }
+    return
+  }
+}
+
 function submitInput() {
   const agentId = currentAgentId.value
   if (!agentId) {
@@ -2992,6 +3094,9 @@ function submitInput() {
       lang: 'text',
     })
   }
+  
+  // 保存到历史记录
+  saveToHistory(userInput)
   
   inputText.value = ''
 }
