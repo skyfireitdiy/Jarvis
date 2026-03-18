@@ -117,10 +117,10 @@
             <div class="confirm-actions">
               <template v-if="confirmDialog.defaultConfirm">
                 <button class="confirm-btn" @click="confirmDialog.cancelCallback">取消</button>
-                <button class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
+                <button ref="confirmDefaultBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
               </template>
               <template v-else>
-                <button class="confirm-btn" @click="confirmDialog.confirmCallback">确认</button>
+                <button ref="confirmDefaultBtn" class="confirm-btn" @click="confirmDialog.confirmCallback">确认</button>
                 <button class="confirm-btn default" @click="confirmDialog.cancelCallback">取消</button>
               </template>
             </div>
@@ -895,6 +895,7 @@ watch(newAgentType, (newType) => {
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback, defaultConfirm }
+const confirmDefaultBtn = ref(null) // 确认对话框默认按钮引用
 
 // 显示确认对话框（自动滚动到底部）
 function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = true) {
@@ -919,8 +920,28 @@ function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = 
     if (outputList.value) {
       outputList.value.scrollTop = outputList.value.scrollHeight
     }
+    // 聚焦默认按钮
+    if (confirmDefaultBtn.value) {
+      confirmDefaultBtn.value.focus()
+    }
   })
 }
+
+// 处理确认对话框的键盘事件
+function handleConfirmKeydown(event) {
+  if (event.key === 'Enter' && confirmDialog.value) {
+    confirmDialog.value.confirmCallback()
+  }
+}
+
+// 监听确认对话框的显示状态，动态添加/移除键盘事件监听
+watch(confirmDialog, (newVal) => {
+  if (newVal) {
+    document.addEventListener('keydown', handleConfirmKeydown)
+  } else {
+    document.removeEventListener('keydown', handleConfirmKeydown)
+  }
+})
 
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
