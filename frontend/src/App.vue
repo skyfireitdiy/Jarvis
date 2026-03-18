@@ -116,12 +116,12 @@
             <p class="confirm-message">{{ confirmDialog.message }}</p>
             <div class="confirm-actions">
               <template v-if="confirmDialog.defaultConfirm">
-                <button class="confirm-btn" @click="confirmDialog.cancelCallback">取消</button>
-                <button ref="confirmDefaultBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
+                <button ref="confirmCancelBtn" class="confirm-btn" @click="confirmDialog.cancelCallback">取消</button>
+                <button ref="confirmConfirmBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
               </template>
               <template v-else>
-                <button ref="confirmDefaultBtn" class="confirm-btn" @click="confirmDialog.confirmCallback">确认</button>
-                <button class="confirm-btn default" @click="confirmDialog.cancelCallback">取消</button>
+                <button ref="confirmCancelBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
+                <button ref="confirmConfirmBtn" @click="confirmDialog.cancelCallback">取消</button>
               </template>
             </div>
           </div>
@@ -900,7 +900,8 @@ watch(newAgentType, (newType) => {
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback, defaultConfirm }
-const confirmDefaultBtn = ref(null) // 确认对话框默认按钮引用
+const confirmConfirmBtn = ref(null) // 确认按钮引用
+const confirmCancelBtn = ref(null) // 取消按钮引用
 
 // 显示确认对话框（自动滚动到底部）
 function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = true) {
@@ -925,9 +926,11 @@ function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = 
     if (outputList.value) {
       outputList.value.scrollTop = outputList.value.scrollHeight
     }
-    // 聚焦默认按钮
-    if (confirmDefaultBtn.value) {
-      confirmDefaultBtn.value.focus()
+    // 根据 defaultConfirm 聚焦默认按钮
+    if (defaultConfirm && confirmConfirmBtn.value) {
+      confirmConfirmBtn.value.focus()
+    } else if (!defaultConfirm && confirmCancelBtn.value) {
+      confirmCancelBtn.value.focus()
     }
   })
 }
@@ -935,7 +938,13 @@ function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = 
 // 处理确认对话框的键盘事件
 function handleConfirmKeydown(event) {
   if (event.key === 'Enter' && confirmDialog.value) {
-    confirmDialog.value.confirmCallback()
+    const activeElement = document.activeElement
+    // 根据当前焦点元素决定调用哪个回调
+    if (activeElement === confirmConfirmBtn.value) {
+      confirmDialog.value.confirmCallback()
+    } else if (activeElement === confirmCancelBtn.value) {
+      confirmDialog.value.cancelCallback()
+    }
   }
 }
 
