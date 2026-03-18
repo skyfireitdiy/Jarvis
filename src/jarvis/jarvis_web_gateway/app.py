@@ -440,6 +440,21 @@ class WebSocketConnectionManager:
                     # 获取状态失败
                     print(f"[GET_STATUS] Failed to get status: {e}")
             return
+        if message_type == "restart_gateway":
+            # 处理重启网关请求
+            import threading
+            
+            def _restart_after_delay():
+                """延迟重启，确保消息已发送"""
+                import time
+                time.sleep(1)  # 等待 1 秒，确保响应已发送
+                _restart_gateway()
+            
+            # 在新线程中执行重启，避免阻塞消息处理
+            restart_thread = threading.Thread(target=_restart_after_delay, daemon=True)
+            restart_thread.start()
+            print("[RESTART] Restart gateway requested, will restart in 1 second")
+            return
         # 独立终端会话消息处理
         if message_type == "terminal_create":
             interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
@@ -1131,6 +1146,63 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     return app
 
 
+def _restart_gateway() -> None:
+    """重启网关进程。
+    
+    该函数会：
+    1. 关闭所有 agent 和终端会话
+    2. 断开 WebSocket 连接
+    3. 使用相同参数重新启动进程
+    """
+    import sys
+    import os
+    
+    print("[RESTART] Starting gateway restart...")
+    
+    # 1. 关闭所有 agent
+    global _global_agent_manager
+    if _global_agent_manager:
+        print("[RESTART] Shutting down agent manager...")
+        try:
+            _global_agent_manager.shutdown()
+        except Exception as e:
+            print(f"[RESTART] Error shutting down agent manager: {e}")
+    
+    # 2. 关闭终端会话
+    global _terminal_session_manager
+    if _terminal_session_manager:
+        print("[RESTART] Shutting down terminal sessions...")
+        try:
+            _terminal_session_manager.shutdown()
+        except Exception as e:
+            print(f"[RESTART] Error shutting down terminal sessions: {e}")
+    
+    # 3. 获取当前配置
+    host = GLOBAL_CONFIG_DATA.get("gateway_auth", {}).get("host", "127.0.0.1")
+    port = GLOBAL_CONFIG_DATA.get("gateway_auth", {}).get("port", 8000)
+    password = GLOBAL_CONFIG_DATA.get("gateway_auth", {}).get("password")
+    
+    # 4. 构建启动参数
+    args = [
+        sys.executable,
+        "-m", "jarvis.jarvis_web_gateway.cli",
+        "serve",
+        "--host", str(host),
+        "--port", str(port),
+    ]
+    if password:
+        args.extend(["--gateway-password", password])
+    
+    print(f"[RESTART] Executing: {' '.join(args)}")
+    
+    # 5. 使用 execvp 替换当前进程
+    try:
+        os.execvp(sys.executable, args)
+    except Exception as e:
+        print(f"[RESTART] Failed to restart: {e}")
+        sys.exit(1)
+
+
 def run(
     host: str = "127.0.0.1", port: int = 8000, password: Optional[str] = None
 ) -> None:
@@ -1143,10 +1215,14 @@ def run(
     # 初始化环境并加载配置文件
     init_env(welcome_str="", config_file=None)
 
+    # 保存启动参数到配置，用于重启
+    if "gateway_auth" not in GLOBAL_CONFIG_DATA:
+        GLOBAL_CONFIG_DATA["gateway_auth"] = {}
+    GLOBAL_CONFIG_DATA["gateway_auth"]["host"] = host
+    GLOBAL_CONFIG_DATA["gateway_auth"]["port"] = port
+
     # 如果提供了密码参数，更新 gateway_auth 配置
     if password:
-        if "gateway_auth" not in GLOBAL_CONFIG_DATA:
-            GLOBAL_CONFIG_DATA["gateway_auth"] = {}
         GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = password
         GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
         GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
