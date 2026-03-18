@@ -23,10 +23,10 @@ if (-not $npmCmd) {
 }
 
 # 检查是否设置了网关密码环境变量
-$gatewayPasswordArgs = ""
+$gatewayPasswordArgs = @()
 if ($env:JARVIS_GATEWAY_PASSWORD) {
     Write-Host "🔐 检测到网关密码环境变量"
-    $gatewayPasswordArgs = "--gateway-password $env:JARVIS_GATEWAY_PASSWORD"
+    $gatewayPasswordArgs = @("--gateway-password", $env:JARVIS_GATEWAY_PASSWORD)
 }
 
 # 检查网关 host 和 port 环境变量
@@ -39,7 +39,8 @@ $frontendPort = if ($env:JARVIS_FRONTEND_PORT) { $env:JARVIS_FRONTEND_PORT } els
 
 # 启动网关（后台运行）
 Write-Host "📡 启动网关服务..."
-$gatewayProcess = Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","jarvis.jarvis_web_gateway.app:create_app","--host","$gatewayHost","--port","$gatewayPort","$gatewayPasswordArgs" -PassThru -WindowStyle Hidden
+$gatewayArgs = @("--host", $gatewayHost, "--port", $gatewayPort) + $gatewayPasswordArgs
+$gatewayProcess = Start-Process -FilePath "jwg" -ArgumentList $gatewayArgs -PassThru -WindowStyle Hidden
 
 Write-Host "✅ 网关已启动 (PID: $($gatewayProcess.Id))"
 
