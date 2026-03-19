@@ -544,7 +544,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
         layout=layout,
         key_bindings=bindings,
         style=style,
-        mouse_support=True,
+        mouse_support=False,
         full_screen=True,
     )
 
