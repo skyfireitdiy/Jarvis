@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import pathlib
 import uuid
 from typing import Any
 from typing import Callable
@@ -77,6 +78,9 @@ _router: Optional[SessionOutputRouter] = None
 
 # 全局 TerminalSessionManager，用于独立终端会话管理
 _terminal_session_manager: Optional[TerminalSessionManager] = None
+
+MAX_FILE_SIZE_BYTES = 1024 * 1024
+BINARY_FILE_SAMPLE_SIZE = 4096
 
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
@@ -1118,6 +1122,193 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     )
 
             return {"success": True, "data": search_results}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/file-content")
+    async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+        """读取指定绝对路径文件的内容。"""
+        try:
+            file_path = str(request.get("path", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path is required",
+                    },
+                }
+
+            target_path = pathlib.Path(file_path)
+            if not target_path.is_absolute():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path must be absolute",
+                    },
+                }
+
+            target_path = target_path.resolve()
+
+            if not target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Path does not exist: {file_path}",
+                    },
+                }
+
+            if not target_path.is_file():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_A_FILE",
+                        "message": f"Path is not a file: {file_path}",
+                    },
+                }
+
+            if target_path.stat().st_size > MAX_FILE_SIZE_BYTES:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FILE_TOO_LARGE",
+                        "message": "File size exceeds 1MB limit",
+                    },
+                }
+
+            with open(target_path, "rb") as binary_file:
+                file_header = binary_file.read(BINARY_FILE_SAMPLE_SIZE)
+
+            if b"\x00" in file_header:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "BINARY_FILE_NOT_SUPPORTED",
+                        "message": "Binary file is not supported",
+                    },
+                }
+
+            try:
+                with open(target_path, "r", encoding="utf-8") as file:
+                    file_content = file.read()
+            except UnicodeDecodeError:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "BINARY_FILE_NOT_SUPPORTED",
+                        "message": "Binary file is not supported",
+                    },
+                }
+
+            return {
+                "success": True,
+                "data": {
+                    "path": str(target_path),
+                    "content": file_content,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/file-write")
+    async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+        """写入指定绝对路径文本文件的内容。"""
+        try:
+            file_path = str(request.get("path", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path is required",
+                    },
+                }
+
+            target_path = pathlib.Path(file_path)
+            if not target_path.is_absolute():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path must be absolute",
+                    },
+                }
+
+            file_content = request.get("content")
+            if not isinstance(file_content, str):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_CONTENT",
+                        "message": "Content must be a string",
+                    },
+                }
+
+            encoded_content = file_content.encode("utf-8")
+            if len(encoded_content) > MAX_FILE_SIZE_BYTES:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FILE_TOO_LARGE",
+                        "message": "File size exceeds 1MB limit",
+                    },
+                }
+
+            target_path = target_path.resolve(strict=False)
+            parent_directory = target_path.parent
+
+            if not parent_directory.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_DIRECTORY_NOT_FOUND",
+                        "message": f"Parent directory does not exist: {parent_directory}",
+                    },
+                }
+
+            if not parent_directory.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_NOT_A_DIRECTORY",
+                        "message": f"Parent path is not a directory: {parent_directory}",
+                    },
+                }
+
+            with open(target_path, "w", encoding="utf-8") as file:
+                bytes_written = file.write(file_content)
+
+            return {
+                "success": True,
+                "data": {
+                    "path": str(target_path),
+                    "bytes_written": len(encoded_content),
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied",
+                },
+            }
         except Exception as e:
             return {
                 "success": False,
