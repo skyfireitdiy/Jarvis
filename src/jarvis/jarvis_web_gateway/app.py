@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import uuid
 from typing import Any
@@ -15,8 +16,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
-from fastapi import FastAPI
-from fastapi import WebSocket
+from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,6 +31,12 @@ from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_web_gateway.agent_manager import AgentManager
+from jarvis.jarvis_web_gateway.agent_proxy_manager import (
+    AgentProxyManager,
+    AgentNotFoundError,
+    AgentNotRunningError,
+    ProxyConnectionError,
+)
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_utils.globals import set_interrupt
@@ -524,6 +530,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     global _global_agent_manager
     _global_agent_manager = agent_manager
 
+    # 创建 AgentProxyManager
+    agent_proxy_manager = AgentProxyManager(agent_manager)
+
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
@@ -565,6 +574,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     async def _shutdown() -> None:
         # 清理所有 Agent
         await agent_manager.cleanup()
+        # 清理代理管理器
+        await agent_proxy_manager.cleanup()
         # 清理所有终端会话
         terminal_session_manager.cleanup()
         set_current_gateway(None)
@@ -572,6 +583,83 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
         await manager.handle(websocket)
+
+    # WebSocket 代理：代理到 Agent WebSocket
+    @app.websocket("/api/agent/{agent_id}/ws")
+    async def agent_websocket_proxy(agent_id: str, websocket: WebSocket) -> None:
+        """代理 WebSocket 连接到指定 Agent。
+
+        Args:
+            agent_id: Agent ID
+            websocket: 客户端 WebSocket 连接
+        """
+        await websocket.accept()
+        logger = logging.getLogger(__name__)
+        logger.info(f"[WS PROXY] New WebSocket connection for agent {agent_id}")
+
+        try:
+            await agent_proxy_manager.proxy_websocket(websocket, agent_id)
+        except AgentNotFoundError:
+            logger.error(f"[WS PROXY] Agent not found: {agent_id}")
+            await websocket.close(code=4000, reason="Agent not found")
+        except AgentNotRunningError as e:
+            logger.error(f"[WS PROXY] Agent not running: {e}")
+            await websocket.close(code=4001, reason="Agent not running")
+        except ProxyConnectionError as e:
+            logger.error(f"[WS PROXY] Proxy connection error: {e}")
+            await websocket.close(code=4002, reason="Proxy connection failed")
+        except Exception as e:
+            logger.error(f"[WS PROXY] Unexpected error: {e}")
+            await websocket.close(code=4999, reason="Internal error")
+        finally:
+            logger.info(f"[WS PROXY] WebSocket connection closed for agent {agent_id}")
+
+    # HTTP 代理：代理到 Agent HTTP API
+    @app.api_route("/api/agent/{agent_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+    async def agent_http_proxy(agent_id: str, path: str, request: Request) -> Response:
+        """代理 HTTP 请求到指定 Agent。
+
+        Args:
+            agent_id: Agent ID
+            path: 目标路径
+            request: FastAPI Request 对象
+
+        Returns:
+            代理的 HTTP 响应
+        """
+        logger = logging.getLogger(__name__)
+        logger.info(f"[HTTP PROXY] {request.method} /api/agent/{agent_id}/{path}")
+
+        try:
+            return await agent_proxy_manager.proxy_http_request(request, agent_id, path)
+        except AgentNotFoundError:
+            logger.error(f"[HTTP PROXY] Agent not found: {agent_id}")
+            return Response(
+                content='{"error": "Agent not found"}',
+                status_code=404,
+                media_type="application/json",
+            )
+        except AgentNotRunningError as e:
+            logger.error(f"[HTTP PROXY] Agent not running: {e}")
+            return Response(
+                content='{"error": "Agent not running"}',
+                status_code=503,
+                media_type="application/json",
+            )
+        except ProxyConnectionError as e:
+            logger.error(f"[HTTP PROXY] Proxy connection error: {e}")
+            return Response(
+                content='{"error": "Proxy connection failed"}',
+                status_code=502,
+                media_type="application/json",
+            )
+        except Exception as e:
+            logger.error(f"[HTTP PROXY] Unexpected error: {e}")
+            return Response(
+                content='{"error": "Internal error"}',
+                status_code=500,
+                media_type="application/json",
+            )
 
     # HTTP API：创建 Agent
     @app.post("/api/agents")

@@ -1,0 +1,12 @@
+{
+  "id": "20260319_092821_860618",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_decision",
+    "agent_gateway_proxy",
+    "reverse_proxy"
+  ],
+  "content": "架构决策：Web网关反向代理Agent流量\n\n背景：\n- 当前架构：前端直连Agent随机端口(10000-65535)\n- 问题：云环境下无法预先开放防火墙端口\n\n决策：\n- 在WebGateway添加/api/agent/{agent_id}接口\n- 实现HTTP和WebSocket反向代理到Agent端口\n- Agent继续使用随机端口，但对前端透明\n\n影响范围：\n1. src/jarvis/jarvis_web_gateway/app.py - 添加代理路由\n2. src/jarvis/jarvis_web_gateway/agent_manager.py - 无需修改\n3. frontend/src/App.vue - 修改连接URL为代理路径\n\n优点：\n- 统一通过Web网关端口，防火墙配置简单\n- Agent随机端口对外不可见，安全性提升\n- 符合云原生部署要求",
+  "created_at": "2026-03-19T09:28:21.860659",
+  "updated_at": "2026-03-19T09:28:21.860664"
+}
