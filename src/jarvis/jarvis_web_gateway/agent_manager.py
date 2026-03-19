@@ -400,7 +400,6 @@ class AgentManager:
 
         # 添加参数
         cmd = base_cmd.copy()
-        cmd.extend(["--web-gateway-host", "0.0.0.0"])  # 允许来自任何 IP 的连接
         cmd.extend(["--web-gateway-port", str(port)])
         cmd.append("--web-gateway")  # 启动为 WebSocket Gateway 模式
 

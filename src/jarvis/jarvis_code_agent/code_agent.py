@@ -1393,11 +1393,7 @@ def cli(
         "--web-gateway",
         help="启用 Web Gateway 服务（WebSocket 输入输出）",
     ),
-    web_gateway_host: str = typer.Option(
-        "127.0.0.1",
-        "--web-gateway-host",
-        help="Web Gateway 监听地址",
-    ),
+
     web_gateway_port: int = typer.Option(
         8000,
         "--web-gateway-port",
@@ -1526,7 +1522,7 @@ def cli(
 
             config = uvicorn.Config(
                 create_app(custom_app=custom_app),
-                host=web_gateway_host,
+                host="127.0.0.1",
                 port=web_gateway_port,
                 log_level="info",
             )
@@ -1534,7 +1530,7 @@ def cli(
             thread = threading.Thread(target=web_gateway_server.run, daemon=True)
             thread.start()
             PrettyOutput.auto_print(
-                f"🌐 Web Gateway 已启动: ws://{web_gateway_host}:{web_gateway_port}/ws"
+                f"🌐 Web Gateway 已启动: ws://127.0.0.1:{web_gateway_port}/ws"
             )
         except Exception as web_gateway_err:
             try:
