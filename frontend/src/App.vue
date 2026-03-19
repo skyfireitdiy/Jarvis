@@ -239,7 +239,7 @@
         </div>
         <div class="editor-panel-actions">
           <button class="icon-btn" @click.stop="saveActiveEditorTab" :disabled="!activeEditorTab || activeEditorTab.loading" title="保存文件">💾</button>
-          <button class="icon-btn" @click="showEditorPanel = false" title="关闭编辑器">✕</button>
+          <button class="icon-btn" @click="closeEditorPanel" title="关闭编辑器">✕</button>
         </div>
       </div>
       <div class="editor-tabs" v-if="editorTabs.length > 0">
@@ -886,13 +886,47 @@ const showMobileMenu = ref(false)     // 移动端菜单
 
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
+const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
 const editorResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
-const editorPanelRect = ref({
-  top: 88,
-  left: Math.max(window.innerWidth - 444, 16),
-  width: 420,
-  height: 520,
-})
+
+function getDefaultEditorPanelRect() {
+  return {
+    top: 88,
+    left: Math.max(window.innerWidth - 824, 16),
+    width: 800,
+    height: 600,
+  }
+}
+
+function loadEditorPanelRect() {
+  const defaultEditorPanelRect = getDefaultEditorPanelRect()
+  const savedValue = localStorage.getItem(EDITOR_PANEL_STORAGE_KEY)
+  if (!savedValue) {
+    return defaultEditorPanelRect
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (
+      typeof parsedValue.top !== 'number' ||
+      typeof parsedValue.left !== 'number' ||
+      typeof parsedValue.width !== 'number' ||
+      typeof parsedValue.height !== 'number'
+    ) {
+      return defaultEditorPanelRect
+    }
+
+    return parsedValue
+  } catch {
+    return defaultEditorPanelRect
+  }
+}
+
+function saveEditorPanelRect() {
+  localStorage.setItem(EDITOR_PANEL_STORAGE_KEY, JSON.stringify(editorPanelRect.value))
+}
+
+const editorPanelRect = ref(loadEditorPanelRect())
 const editorPanelInteraction = ref({
   active: false,
   mode: null,
@@ -1112,6 +1146,7 @@ function stopEditorPanelInteraction() {
 
   document.removeEventListener('mousemove', onEditorPanelPointerMove)
   document.removeEventListener('mouseup', stopEditorPanelInteraction)
+  saveEditorPanelRect()
 }
 
 function getEditorTabByPath(path) {
@@ -1265,6 +1300,30 @@ async function saveEditorTab(path) {
 async function saveActiveEditorTab() {
   if (!activeEditorTab.value) return
   await saveEditorTab(activeEditorTab.value.path)
+}
+
+function hasDirtyEditorTabs() {
+  return editorTabs.value.some(tab => tab.isDirty)
+}
+
+function confirmCloseEditorPanel() {
+  return new Promise((resolve) => {
+    showConfirm(
+      '存在未保存标签，确定关闭编辑器吗？',
+      () => resolve(true),
+      () => resolve(false),
+      false
+    )
+  })
+}
+
+async function closeEditorPanel() {
+  if (hasDirtyEditorTabs()) {
+    const confirmed = await confirmCloseEditorPanel()
+    if (!confirmed) return
+  }
+
+  showEditorPanel.value = false
 }
 
 function confirmCloseDirtyEditorTab(path) {
@@ -4686,6 +4745,28 @@ function sendTerminalResize(terminalId, rows, cols) {
 
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
+  const isModifierPressed = event.ctrlKey || event.metaKey
+
+  // Ctrl/Cmd + S 保存当前编辑器标签
+  if (isModifierPressed && event.key === 's') {
+    if (showEditorPanel.value && activeEditorTab.value && !activeEditorTab.value.loading) {
+      event.preventDefault()
+      saveActiveEditorTab()
+    }
+    return
+  }
+
+  // Ctrl/Cmd + E 打开/隐藏编辑器面板
+  if (isModifierPressed && event.key === 'e') {
+    event.preventDefault()
+    if (showEditorPanel.value) {
+      closeEditorPanel()
+    } else {
+      showEditorPanel.value = true
+    }
+    return
+  }
+
   // Ctrl + A 打开/隐藏 Agent 侧边栏
   if (event.ctrlKey && event.key === 'a') {
     // 如果在输入框中，不触发快捷键（允许默认的全选行为）
@@ -4848,6 +4929,7 @@ onMounted(() => {
   const handleResize = () => {
     windowWidth.value = window.innerWidth
     ensureEditorPanelInViewport()
+    saveEditorPanelRect()
     layoutMonacoEditor()
   }
   window.addEventListener('resize', handleResize)
