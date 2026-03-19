@@ -1306,7 +1306,8 @@ async function closeEditorTab(path) {
     } else {
       activeEditorTabPath.value = null
       if (monacoEditor) {
-        monacoEditor.setModel(null)
+        monacoEditor.dispose()
+        monacoEditor = null
       }
     }
   }
