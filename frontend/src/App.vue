@@ -18,12 +18,7 @@
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
           </div>
-          <div class="agent-dir">{{ agent.working_dir }}</div>
-          
-          <!-- 文件树切换按钮 -->
-          <button class="file-tree-toggle" @click.stop="toggleFileTree(agent.agent_id)" title="切换文件树">
-            {{ showFileTree.get(agent.agent_id) ? '▼ 文件树' : '▶ 文件树' }}
-          </button>
+          <div class="agent-dir" @click.stop="toggleFileTree(agent.agent_id, agent.working_dir)">{{ agent.working_dir }}（点击浏览）</div>
           
           <!-- 文件树容器 -->
           <div v-if="showFileTree.get(agent.agent_id)" class="file-tree-container">
@@ -31,36 +26,30 @@
               <button @click.stop="initFileTree(agent.agent_id, agent.working_dir)">加载文件树</button>
             </div>
             <div v-else class="file-tree">
-              <div v-for="node in fileTreeState.get(agent.agent_id)" :key="node.path" class="tree-node">
-                <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, node)">
-                  <span v-if="node.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: node.expanded }">▶</span>
+              <div
+                v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
+                :key="visibleNode.node.path"
+                class="tree-node"
+              >
+                <div
+                  class="tree-node-content"
+                  :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                  @click.stop="toggleNodeExpand(agent.agent_id, visibleNode.node)"
+                >
+                  <span
+                    v-if="visibleNode.node.type === 'directory'"
+                    class="tree-node-icon expand-arrow"
+                    :class="{ expanded: visibleNode.node.expanded }"
+                  >▶</span>
                   <span v-else class="tree-node-icon"></span>
-                  <span class="tree-node-icon" :class="node.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ node.type === 'directory' ? '📁' : '📄' }}</span>
-                  <span class="tree-node-text" :class="node.type === 'directory' ? 'directory' : 'file'">{{ node.name }}</span>
-                </div>
-                <!-- 递归显示子节点 -->
-                <div v-if="node.expanded && node.children && node.children.length > 0" class="tree-children">
-                  <template v-for="child in node.children" :key="child.path">
-                    <div class="tree-node">
-                      <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, child)">
-                        <span v-if="child.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: child.expanded }">▶</span>
-                        <span v-else class="tree-node-icon"></span>
-                        <span class="tree-node-icon" :class="child.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ child.type === 'directory' ? '📁' : '📄' }}</span>
-                        <span class="tree-node-text" :class="child.type === 'directory' ? 'directory' : 'file'">{{ child.name }}</span>
-                      </div>
-                      <!-- 递归显示更深层的子节点（两层示例） -->
-                      <div v-if="child.expanded && child.children && child.children.length > 0" class="tree-children">
-                        <div v-for="grandchild in child.children" :key="grandchild.path" class="tree-node">
-                          <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, grandchild)">
-                            <span v-if="grandchild.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: grandchild.expanded }">▶</span>
-                            <span v-else class="tree-node-icon"></span>
-                            <span class="tree-node-icon" :class="grandchild.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ grandchild.type === 'directory' ? '📁' : '📄' }}</span>
-                            <span class="tree-node-text" :class="grandchild.type === 'directory' ? 'directory' : 'file'">{{ grandchild.name }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </template>
+                  <span
+                    class="tree-node-icon"
+                    :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                  >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                  <span
+                    class="tree-node-text"
+                    :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                  >{{ visibleNode.node.name }}</span>
                 </div>
               </div>
             </div>
@@ -2394,10 +2383,38 @@ async function initFileTree(agentId, rootPath) {
   fileTreeState.value.set(agentId, [rootNode])
 }
 
+function flattenVisibleFileTreeNodes(nodes, depth = 0) {
+  const visibleNodes = []
+
+  for (const node of nodes) {
+    visibleNodes.push({ node, depth })
+
+    if (node.expanded && node.children && node.children.length > 0) {
+      visibleNodes.push(...flattenVisibleFileTreeNodes(node.children, depth + 1))
+    }
+  }
+
+  return visibleNodes
+}
+
+function getVisibleFileTreeNodes(agentId) {
+  const treeNodes = fileTreeState.value.get(agentId) || []
+  return flattenVisibleFileTreeNodes(treeNodes)
+}
+
 // 切换显示/隐藏文件树
-function toggleFileTree(agentId) {
+async function toggleFileTree(agentId, rootPath) {
   const currentShow = showFileTree.value.get(agentId) || false
-  showFileTree.value.set(agentId, !currentShow)
+  const nextShow = !currentShow
+
+  showFileTree.value.set(agentId, nextShow)
+
+  const treeNodes = fileTreeState.value.get(agentId) || []
+  const hasLoadedFileTree = treeNodes.length > 0
+
+  if (nextShow && !hasLoadedFileTree && rootPath) {
+    await initFileTree(agentId, rootPath)
+  }
 }
 
 // 递归查找节点
