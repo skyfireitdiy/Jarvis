@@ -615,7 +615,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             logger.info(f"[WS PROXY] WebSocket connection closed for agent {agent_id}")
 
     # HTTP 代理：代理到 Agent HTTP API
-    @app.api_route("/api/agent/{agent_id}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+    @app.api_route(
+        "/api/agent/{agent_id}/{path:path}",
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    )
     async def agent_http_proxy(agent_id: str, path: str, request: Request) -> Response:
         """代理 HTTP 请求到指定 Agent。
 
@@ -1032,6 +1035,89 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 print(f"[COMPLETIONS] Failed to load rules: {e}")
 
             return {"success": True, "data": all_completions}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.get("/api/completions/{agent_id}/search")
+    async def search_completions(agent_id: str, query: str = "") -> Dict[str, Any]:
+        """搜索文件补全项。
+
+        Args:
+            agent_id: Agent ID
+            query: 搜索关键词
+
+        Returns:
+            {
+                "success": True,
+                "data": [
+                    {
+                        "type": "file",
+                        "value": "path/to/file",
+                        "display": "path/to/file",
+                        "description": "File"
+                    },
+                    ...
+                ]
+            }
+        """
+        try:
+            import subprocess
+            from fuzzywuzzy import process
+            from jarvis.jarvis_utils.utils import decode_output
+            import os
+
+            # 获取 Agent 的工作目录
+            agent = agent_manager.get_agent(agent_id)
+            if not agent:
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
+            working_dir = agent.working_dir
+            os.chdir(working_dir)
+
+            # 获取 git 文件列表
+            result = subprocess.run(
+                ["git", "ls-files"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+            )
+            files = []
+            if result.returncode == 0:
+                files = [
+                    line
+                    for line in decode_output(result.stdout).splitlines()
+                    if line.strip()
+                ]
+
+            # 模糊搜索
+            search_results = []
+            if query and files:
+                scored_items = process.extract(
+                    query,
+                    files,
+                    limit=30,
+                )
+                scored_items = [
+                    (item[0], item[1])
+                    for item in scored_items
+                    if item[1] > 10  # 最小分数阈值
+                ]
+                for path, score in scored_items:
+                    search_results.append(
+                        {
+                            "type": "file",
+                            "value": path,
+                            "display": f"{path} ({score}%)" if score < 100 else path,
+                            "description": "File",
+                        }
+                    )
+
+            return {"success": True, "data": search_results}
         except Exception as e:
             return {
                 "success": False,
