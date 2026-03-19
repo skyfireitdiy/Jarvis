@@ -79,6 +79,9 @@
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
+          <button class="icon-btn" @click="showEditorPanel = !showEditorPanel" :disabled="!socket" title="编辑器">
+            📝
+          </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
             👤
           </button>
@@ -102,6 +105,9 @@
         <div class="header-actions desktop-only">
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
+          </button>
+          <button class="icon-btn" @click="showEditorPanel = !showEditorPanel" :disabled="!socket" title="编辑器">
+            📝
           </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
             👤
@@ -213,6 +219,37 @@
       <div 
         class="terminal-resize-handle"
         @mousedown="startResizeTerminal"
+      ></div>
+    </aside>
+
+    <!-- 浮动编辑器面板 -->
+    <aside
+      v-show="showEditorPanel"
+      class="editor-panel"
+      :class="{ 'editor-panel-dragging': editorPanelInteraction.active }"
+      :style="editorPanelStyle"
+    >
+      <div
+        class="editor-panel-header"
+        @mousedown="startEditorPanelMove"
+      >
+        <h3>编辑器</h3>
+        <div class="editor-panel-actions">
+          <button class="icon-btn" @click="showEditorPanel = false" title="关闭编辑器">✕</button>
+        </div>
+      </div>
+      <div class="editor-panel-content">
+        <div class="editor-placeholder">
+          <div class="editor-placeholder-icon">📝</div>
+          <div class="editor-placeholder-title">编辑器窗口已准备就绪</div>
+          <div class="editor-placeholder-text">当前为占位实现，后续可在此接入代码编辑器。</div>
+        </div>
+      </div>
+      <div
+        v-for="direction in editorResizeDirections"
+        :key="direction"
+        :class="['editor-resize-handle', `editor-resize-${direction}`]"
+        @mousedown="startEditorPanelResize($event, direction)"
       ></div>
     </aside>
 
@@ -819,7 +856,29 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
+const showEditorPanel = ref(false)    // 编辑器浮动面板
 const showMobileMenu = ref(false)     // 移动端菜单
+
+const EDITOR_PANEL_MIN_WIDTH = 360
+const EDITOR_PANEL_MIN_HEIGHT = 260
+const editorResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+const editorPanelRect = ref({
+  top: 88,
+  left: Math.max(window.innerWidth - 444, 16),
+  width: 420,
+  height: 520,
+})
+const editorPanelInteraction = ref({
+  active: false,
+  mode: null,
+  direction: null,
+  startX: 0,
+  startY: 0,
+  startTop: 0,
+  startLeft: 0,
+  startWidth: 0,
+  startHeight: 0,
+})
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -861,6 +920,165 @@ const filteredDirList = computed(() => {
 const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
 const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
 const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
+
+const editorPanelStyle = computed(() => ({
+  top: `${editorPanelRect.value.top}px`,
+  left: `${editorPanelRect.value.left}px`,
+  width: `${editorPanelRect.value.width}px`,
+  height: `${editorPanelRect.value.height}px`,
+}))
+
+function clamp(value, min, max) {
+  if (max < min) return min
+  return Math.min(Math.max(value, min), max)
+}
+
+function getEditorPanelBounds() {
+  return {
+    minTop: 0,
+    minLeft: 0,
+    maxLeft: Math.max(window.innerWidth - editorPanelRect.value.width, 0),
+    maxTop: Math.max(window.innerHeight - editorPanelRect.value.height, 0),
+    maxWidth: window.innerWidth,
+    maxHeight: window.innerHeight,
+  }
+}
+
+function ensureEditorPanelInViewport() {
+  const maxWidth = Math.max(window.innerWidth, EDITOR_PANEL_MIN_WIDTH)
+  const maxHeight = Math.max(window.innerHeight, EDITOR_PANEL_MIN_HEIGHT)
+
+  editorPanelRect.value.width = clamp(editorPanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
+  editorPanelRect.value.height = clamp(editorPanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
+
+  editorPanelRect.value.left = clamp(
+    editorPanelRect.value.left,
+    0,
+    Math.max(window.innerWidth - editorPanelRect.value.width, 0)
+  )
+  editorPanelRect.value.top = clamp(
+    editorPanelRect.value.top,
+    0,
+    Math.max(window.innerHeight - editorPanelRect.value.height, 0)
+  )
+}
+
+function startEditorPanelMove(event) {
+  if (windowWidth.value <= 768) return
+  if (event.target.closest('.editor-panel-actions')) return
+
+  editorPanelInteraction.value = {
+    active: true,
+    mode: 'move',
+    direction: null,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: editorPanelRect.value.top,
+    startLeft: editorPanelRect.value.left,
+    startWidth: editorPanelRect.value.width,
+    startHeight: editorPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onEditorPanelPointerMove)
+  document.addEventListener('mouseup', stopEditorPanelInteraction)
+  event.preventDefault()
+}
+
+function startEditorPanelResize(event, direction) {
+  if (windowWidth.value <= 768) return
+
+  editorPanelInteraction.value = {
+    active: true,
+    mode: 'resize',
+    direction,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: editorPanelRect.value.top,
+    startLeft: editorPanelRect.value.left,
+    startWidth: editorPanelRect.value.width,
+    startHeight: editorPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onEditorPanelPointerMove)
+  document.addEventListener('mouseup', stopEditorPanelInteraction)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onEditorPanelPointerMove(event) {
+  if (!editorPanelInteraction.value.active) return
+
+  const deltaX = event.clientX - editorPanelInteraction.value.startX
+  const deltaY = event.clientY - editorPanelInteraction.value.startY
+
+  if (editorPanelInteraction.value.mode === 'move') {
+    const bounds = getEditorPanelBounds()
+    editorPanelRect.value.left = clamp(editorPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    editorPanelRect.value.top = clamp(editorPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+    return
+  }
+
+  const direction = editorPanelInteraction.value.direction || ''
+  const startLeft = editorPanelInteraction.value.startLeft
+  const startTop = editorPanelInteraction.value.startTop
+  const startWidth = editorPanelInteraction.value.startWidth
+  const startHeight = editorPanelInteraction.value.startHeight
+
+  let nextLeft = startLeft
+  let nextTop = startTop
+  let nextWidth = startWidth
+  let nextHeight = startHeight
+
+  if (direction.includes('e')) {
+    nextWidth = clamp(startWidth + deltaX, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, EDITOR_PANEL_MIN_WIDTH))
+  }
+
+  if (direction.includes('s')) {
+    nextHeight = clamp(startHeight + deltaY, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, EDITOR_PANEL_MIN_HEIGHT))
+  }
+
+  if (direction.includes('w')) {
+    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - EDITOR_PANEL_MIN_WIDTH)
+    nextLeft = desiredLeft
+    nextWidth = startWidth - (desiredLeft - startLeft)
+  }
+
+  if (direction.includes('n')) {
+    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - EDITOR_PANEL_MIN_HEIGHT)
+    nextTop = desiredTop
+    nextHeight = startHeight - (desiredTop - startTop)
+  }
+
+  if (nextLeft + nextWidth > window.innerWidth) {
+    nextWidth = Math.max(EDITOR_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
+  }
+
+  if (nextTop + nextHeight > window.innerHeight) {
+    nextHeight = Math.max(EDITOR_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
+  }
+
+  editorPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  editorPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  editorPanelRect.value.width = clamp(nextWidth, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - editorPanelRect.value.left, EDITOR_PANEL_MIN_WIDTH))
+  editorPanelRect.value.height = clamp(nextHeight, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - editorPanelRect.value.top, EDITOR_PANEL_MIN_HEIGHT))
+}
+
+function stopEditorPanelInteraction() {
+  editorPanelInteraction.value = {
+    active: false,
+    mode: null,
+    direction: null,
+    startX: 0,
+    startY: 0,
+    startTop: 0,
+    startLeft: 0,
+    startWidth: 0,
+    startHeight: 0,
+  }
+
+  document.removeEventListener('mousemove', onEditorPanelPointerMove)
+  document.removeEventListener('mouseup', stopEditorPanelInteraction)
+}
 
 // 消息和终端
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
@@ -4327,6 +4545,14 @@ const toggleTerminalPanel = () => {
   }
 }
 
+watch(showEditorPanel, (visible) => {
+  if (visible) {
+    ensureEditorPanelInViewport()
+  } else {
+    stopEditorPanelInteraction()
+  }
+})
+
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
@@ -4366,6 +4592,7 @@ onMounted(() => {
   // 监听窗口resize事件
   const handleResize = () => {
     windowWidth.value = window.innerWidth
+    ensureEditorPanelInViewport()
   }
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
@@ -4417,6 +4644,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopEditorPanelInteraction()
+
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown)
   console.log('[app] Global keyboard listener removed')
@@ -4696,6 +4925,148 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.editor-panel {
+  position: fixed;
+  background: rgba(22, 27, 34, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.editor-panel-dragging {
+  transition: none;
+}
+
+.editor-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 17, 23, 0.9);
+  cursor: move;
+}
+
+.editor-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-panel-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  user-select: text;
+}
+
+.editor-placeholder {
+  text-align: center;
+  color: #8b949e;
+  max-width: 280px;
+}
+
+.editor-placeholder-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.editor-placeholder-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 8px;
+}
+
+.editor-placeholder-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editor-resize-handle {
+  position: absolute;
+  z-index: 2;
+}
+
+.editor-resize-n,
+.editor-resize-s {
+  left: 10px;
+  right: 10px;
+  height: 10px;
+}
+
+.editor-resize-e,
+.editor-resize-w {
+  top: 10px;
+  bottom: 10px;
+  width: 10px;
+}
+
+.editor-resize-n {
+  top: -5px;
+  cursor: n-resize;
+}
+
+.editor-resize-s {
+  bottom: -5px;
+  cursor: s-resize;
+}
+
+.editor-resize-e {
+  right: -5px;
+  cursor: e-resize;
+}
+
+.editor-resize-w {
+  left: -5px;
+  cursor: w-resize;
+}
+
+.editor-resize-ne,
+.editor-resize-nw,
+.editor-resize-se,
+.editor-resize-sw {
+  width: 14px;
+  height: 14px;
+}
+
+.editor-resize-ne {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+
+.editor-resize-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+
+.editor-resize-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: se-resize;
+}
+
+.editor-resize-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: sw-resize;
 }
 
 /* 当前 Agent 信息 */
