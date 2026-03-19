@@ -98,6 +98,13 @@ class OpenAIModel(BasePlatform):
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 解析 openai_extra_headers 失败: {e}")
 
+        # 默认添加浏览器 User-Agent，避免被某些 API 网关拦截
+        if "User-Agent" not in self.extra_headers:
+            self.extra_headers["User-Agent"] = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+
         # Optional: Set reasoning effort for o1 series models via llm_config or environment variable
         # Expected format: openai_reasoning_effort="low" or "medium" or "high" or "xhigh"
         reasoning_effort_value = llm_config.get("openai_reasoning_effort")
