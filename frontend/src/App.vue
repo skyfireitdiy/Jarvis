@@ -6814,6 +6814,9 @@ body::-webkit-scrollbar {
 
 .terminal-history {
   margin-top: 14px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   overflow: hidden;
@@ -6834,6 +6837,9 @@ body::-webkit-scrollbar {
 
 .terminal-history-content {
   background: #0a0d12;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 16px;
   margin: 0;
   overflow-x: auto;
