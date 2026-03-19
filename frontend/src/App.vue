@@ -19,6 +19,53 @@
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir }}</div>
+          
+          <!-- 文件树切换按钮 -->
+          <button class="file-tree-toggle" @click.stop="toggleFileTree(agent.agent_id)" title="切换文件树">
+            {{ showFileTree.get(agent.agent_id) ? '▼ 文件树' : '▶ 文件树' }}
+          </button>
+          
+          <!-- 文件树容器 -->
+          <div v-if="showFileTree.get(agent.agent_id)" class="file-tree-container">
+            <div v-if="!fileTreeState.get(agent.agent_id) || fileTreeState.get(agent.agent_id).length === 0" class="file-tree-empty">
+              <button @click.stop="initFileTree(agent.agent_id, agent.working_dir)">加载文件树</button>
+            </div>
+            <div v-else class="file-tree">
+              <div v-for="node in fileTreeState.get(agent.agent_id)" :key="node.path" class="tree-node">
+                <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, node)">
+                  <span v-if="node.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: node.expanded }">▶</span>
+                  <span v-else class="tree-node-icon"></span>
+                  <span class="tree-node-icon" :class="node.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ node.type === 'directory' ? '📁' : '📄' }}</span>
+                  <span class="tree-node-text" :class="node.type === 'directory' ? 'directory' : 'file'">{{ node.name }}</span>
+                </div>
+                <!-- 递归显示子节点 -->
+                <div v-if="node.expanded && node.children && node.children.length > 0" class="tree-children">
+                  <template v-for="child in node.children" :key="child.path">
+                    <div class="tree-node">
+                      <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, child)">
+                        <span v-if="child.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: child.expanded }">▶</span>
+                        <span v-else class="tree-node-icon"></span>
+                        <span class="tree-node-icon" :class="child.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ child.type === 'directory' ? '📁' : '📄' }}</span>
+                        <span class="tree-node-text" :class="child.type === 'directory' ? 'directory' : 'file'">{{ child.name }}</span>
+                      </div>
+                      <!-- 递归显示更深层的子节点（两层示例） -->
+                      <div v-if="child.expanded && child.children && child.children.length > 0" class="tree-children">
+                        <div v-for="grandchild in child.children" :key="grandchild.path" class="tree-node">
+                          <div class="tree-node-content" @click.stop="toggleNodeExpand(agent.agent_id, grandchild)">
+                            <span v-if="grandchild.type === 'directory'" class="tree-node-icon expand-arrow" :class="{ expanded: grandchild.expanded }">▶</span>
+                            <span v-else class="tree-node-icon"></span>
+                            <span class="tree-node-icon" :class="grandchild.type === 'directory' ? 'folder-icon' : 'file-icon'">{{ grandchild.type === 'directory' ? '📁' : '📄' }}</span>
+                            <span class="tree-node-text" :class="grandchild.type === 'directory' ? 'directory' : 'file'">{{ grandchild.name }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="agent-actions">
             <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
@@ -802,6 +849,12 @@ const dirSearchText = ref('')              // 目录搜索文本
 const dirSearchInput = ref(null)           // 目录搜索输入框引用
 const selectedDirIndex = ref(-1)           // 当前选中的目录索引，-1 表示未选中
 const renameInput = ref(null)               // 重命名输入框引用
+
+// 文件树状态管理
+const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
+const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：agent_id -> Set(expandedPaths)
+const fileTreeLoading = ref(new Map())      // 每个 Agent 的加载状态：agent_id -> Set(loadingPaths)
+const showFileTree = ref(new Map())         // 每个 Agent 是否显示文件树：agent_id -> boolean
 
 // 过滤后的目录列表（支持模糊搜索）
 const filteredDirList = computed(() => {
@@ -2231,6 +2284,12 @@ async function deleteAgent(agentId) {
         // 清除该 Agent 的历史记录
         historyStorage.clearHistoryForAgent(agentId)
         
+        // 清除该 Agent 的文件树状态
+        fileTreeState.value.delete(agentId)
+        fileTreeExpanded.value.delete(agentId)
+        fileTreeLoading.value.delete(agentId)
+        showFileTree.value.delete(agentId)
+        
         // 如果是当前 Agent，清空当前 Agent ID
         if (currentAgentId.value === agentId) {
           currentAgentId.value = null
@@ -2248,6 +2307,120 @@ async function deleteAgent(agentId) {
       }
     }
   )
+}
+
+// 初始化 Agent 的文件树状态
+function initFileTreeState(agentId) {
+  if (!fileTreeState.value.has(agentId)) {
+    fileTreeState.value.set(agentId, [])
+    fileTreeExpanded.value.set(agentId, new Set())
+    fileTreeLoading.value.set(agentId, new Set())
+    showFileTree.value.set(agentId, false) // 默认不显示文件树
+  }
+}
+
+// 加载文件树节点的子目录
+async function loadFileTreeNode(agentId, node) {
+  const loadingSet = fileTreeLoading.value.get(agentId)
+  if (!loadingSet) return
+  
+  // 标记为加载中
+  loadingSet.add(node.path)
+  
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(node.path)}`)
+    
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('[FILETREE] 加载目录失败:', error)
+      return
+    }
+    
+    const result = await response.json()
+    if (result.success && result.data) {
+      // 转换为树节点格式
+      const children = (result.data.directories || []).map(dir => ({
+        name: dir.name,
+        path: dir.path,
+        type: 'directory',
+        expanded: false,
+        loaded: false,
+        children: []
+      }))
+      
+      // 更新节点的子节点
+      node.children = children
+      node.loaded = true
+    }
+  } catch (error) {
+    console.error('[FILETREE] 加载目录出错:', error)
+  } finally {
+    // 移除加载状态
+    loadingSet.delete(node.path)
+  }
+}
+
+// 初始化文件树（加载根目录）
+async function initFileTree(agentId, rootPath) {
+  initFileTreeState(agentId)
+  
+  // 创建根节点
+  const rootNode = {
+    name: rootPath.split('/').pop() || rootPath,
+    path: rootPath,
+    type: 'directory',
+    expanded: false,
+    loaded: false,
+    children: []
+  }
+  
+  // 加载根目录的内容
+  await loadFileTreeNode(agentId, rootNode)
+  
+  // 保存到状态
+  fileTreeState.value.set(agentId, [rootNode])
+}
+
+// 切换显示/隐藏文件树
+function toggleFileTree(agentId) {
+  const currentShow = showFileTree.value.get(agentId) || false
+  showFileTree.value.set(agentId, !currentShow)
+}
+
+// 递归查找节点
+function findNode(nodes, path) {
+  for (const node of nodes) {
+    if (node.path === path) {
+      return node
+    }
+    if (node.children && node.children.length > 0) {
+      const found = findNode(node.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// 切换节点展开/收缩
+async function toggleNodeExpand(agentId, node) {
+  const expandedSet = fileTreeExpanded.value.get(agentId)
+  if (!expandedSet) return
+  
+  if (node.expanded) {
+    // 收缩
+    node.expanded = false
+    expandedSet.delete(node.path)
+  } else {
+    // 展开
+    node.expanded = true
+    expandedSet.add(node.path)
+    
+    // 如果未加载过子节点，则加载
+    if (!node.loaded) {
+      await loadFileTreeNode(agentId, node)
+    }
+  }
 }
 
 // 切换当前工作的 Agent
@@ -4814,6 +4987,172 @@ body::-webkit-scrollbar {
   color: #8b949e;
   padding: 40px 20px;
   font-size: 13px;
+}
+
+/* 文件树容器 */
+.file-tree-container {
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.file-tree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.file-tree-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.file-tree-toggle {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-tree-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+}
+
+.tree-node {
+  margin: 2px 0;
+}
+
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.tree-node-content:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tree-node-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  color: #6e7681;
+  transition: transform 0.2s ease;
+  font-size: 12px;
+}
+
+.tree-node-icon.expand-arrow {
+  margin-right: 4px;
+  color: #8b949e;
+}
+
+.tree-node-icon.expand-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-node-icon.folder-icon {
+  color: #58a6ff;
+}
+
+.tree-node-icon.file-icon {
+  color: #8b949e;
+}
+
+.tree-node-text {
+  font-size: 13px;
+  color: #e6edf3;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-node-text.directory {
+  color: #58a6ff;
+  font-weight: 500;
+}
+
+.tree-node-text.file {
+  color: #c9d1d9;
+}
+
+.tree-children {
+  margin-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 4px;
+}
+
+.tree-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.tree-loading-icon {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(139, 148, 158, 0.3);
+  border-top-color: #8b949e;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tree-empty {
+  padding: 12px;
+  text-align: center;
+  color: #6e7681;
+  font-size: 12px;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .file-tree-container {
+    padding: 6px;
+  }
+  .file-tree-title {
+    font-size: 11px;
+  }
+  .tree-node-content {
+    padding: 5px 6px;
+  }
+  .tree-node-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 11px;
+  }
+  .tree-node-text {
+    font-size: 12px;
+  }
+  .tree-children {
+    margin-left: 12px;
+  }
 }
 
 /* 创建 Agent 弹窗 */
