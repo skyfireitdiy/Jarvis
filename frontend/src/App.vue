@@ -175,9 +175,10 @@
     <aside 
       v-show="showTerminalPanel" 
       class="terminal-panel"
+      :class="{ 'terminal-panel-dragging': terminalPanelInteraction.active }"
       :style="terminalPanelStyle"
     >
-      <div class="terminal-panel-header">
+      <div class="terminal-panel-header" @mousedown="startTerminalPanelMove">
         <h3>终端</h3>
         <div class="terminal-panel-actions">
           <button class="icon-btn" @click="createTerminal" :disabled="terminalSessions.length >= 5" title="新建终端">➕</button>
@@ -214,11 +215,11 @@
           <div :ref="el => setTerminalHostRef(session.terminal_id, el)" class="terminal-host"></div>
         </div>
       </div>
-      
-      <!-- 调整大小手柄 -->
-      <div 
-        class="terminal-resize-handle"
-        @mousedown="startResizeTerminal"
+      <div
+        v-for="direction in terminalResizeDirections"
+        :key="direction"
+        :class="['terminal-resize-handle', `terminal-resize-${direction}`]"
+        @mousedown="startTerminalPanelResize($event, direction)"
       ></div>
     </aside>
 
@@ -4583,24 +4584,217 @@ function closeTerminal(terminalId) {
   independentTerminalHosts.value.delete(terminalId)
 }
 
-// 终端面板大小调整
-const terminalPanelSize = ref({
-  width: 800,
-  height: 500,
+const TERMINAL_PANEL_MIN_WIDTH = 400
+const TERMINAL_PANEL_MIN_HEIGHT = 300
+const TERMINAL_PANEL_STORAGE_KEY = 'jarvis_terminal_panel_rect'
+const terminalResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+
+function getDefaultTerminalPanelRect() {
+  return {
+    top: 88,
+    left: Math.max(window.innerWidth - 824, 16),
+    width: 800,
+    height: 500,
+  }
+}
+
+function loadTerminalPanelRect() {
+  const defaultTerminalPanelRect = getDefaultTerminalPanelRect()
+  const savedValue = localStorage.getItem(TERMINAL_PANEL_STORAGE_KEY)
+  if (!savedValue) {
+    return defaultTerminalPanelRect
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (
+      typeof parsedValue.top !== 'number' ||
+      typeof parsedValue.left !== 'number' ||
+      typeof parsedValue.width !== 'number' ||
+      typeof parsedValue.height !== 'number'
+    ) {
+      return defaultTerminalPanelRect
+    }
+
+    return parsedValue
+  } catch {
+    return defaultTerminalPanelRect
+  }
+}
+
+function saveTerminalPanelRect() {
+  localStorage.setItem(TERMINAL_PANEL_STORAGE_KEY, JSON.stringify(terminalPanelRect.value))
+}
+
+const terminalPanelRect = ref(loadTerminalPanelRect())
+const terminalPanelInteraction = ref({
+  active: false,
+  mode: null,
+  direction: null,
+  startX: 0,
+  startY: 0,
+  startTop: 0,
+  startLeft: 0,
+  startWidth: 0,
+  startHeight: 0,
 })
 
-// 终端面板动态样式
-const terminalPanelStyle = computed(() => {
+const terminalPanelStyle = computed(() => ({
+  top: `${terminalPanelRect.value.top}px`,
+  left: `${terminalPanelRect.value.left}px`,
+  width: `${terminalPanelRect.value.width}px`,
+  height: `${terminalPanelRect.value.height}px`,
+}))
+
+function getTerminalPanelBounds() {
   return {
-    '--terminal-width': (windowWidth.value > 768 ? terminalPanelSize.value.width : Math.min(terminalPanelSize.value.width, windowWidth.value - 40)) + 'px',
-    '--terminal-height': terminalPanelSize.value.height + 'px',
+    minTop: 0,
+    minLeft: 0,
+    maxLeft: Math.max(window.innerWidth - terminalPanelRect.value.width, 0),
+    maxTop: Math.max(window.innerHeight - terminalPanelRect.value.height, 0),
   }
-})
+}
+
+function ensureTerminalPanelInViewport() {
+  const maxWidth = Math.max(window.innerWidth, TERMINAL_PANEL_MIN_WIDTH)
+  const maxHeight = Math.max(window.innerHeight, TERMINAL_PANEL_MIN_HEIGHT)
+
+  terminalPanelRect.value.width = clamp(terminalPanelRect.value.width, TERMINAL_PANEL_MIN_WIDTH, maxWidth)
+  terminalPanelRect.value.height = clamp(terminalPanelRect.value.height, TERMINAL_PANEL_MIN_HEIGHT, maxHeight)
+  terminalPanelRect.value.left = clamp(
+    terminalPanelRect.value.left,
+    0,
+    Math.max(window.innerWidth - terminalPanelRect.value.width, 0)
+  )
+  terminalPanelRect.value.top = clamp(
+    terminalPanelRect.value.top,
+    0,
+    Math.max(window.innerHeight - terminalPanelRect.value.height, 0)
+  )
+}
+
+function startTerminalPanelMove(event) {
+  if (windowWidth.value <= 768) return
+  if (event.target.closest('.terminal-panel-actions')) return
+
+  terminalPanelInteraction.value = {
+    active: true,
+    mode: 'move',
+    direction: null,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: terminalPanelRect.value.top,
+    startLeft: terminalPanelRect.value.left,
+    startWidth: terminalPanelRect.value.width,
+    startHeight: terminalPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onTerminalPanelPointerMove)
+  document.addEventListener('mouseup', stopTerminalPanelInteraction)
+  event.preventDefault()
+}
+
+function startTerminalPanelResize(event, direction) {
+  if (windowWidth.value <= 768) return
+
+  terminalPanelInteraction.value = {
+    active: true,
+    mode: 'resize',
+    direction,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: terminalPanelRect.value.top,
+    startLeft: terminalPanelRect.value.left,
+    startWidth: terminalPanelRect.value.width,
+    startHeight: terminalPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onTerminalPanelPointerMove)
+  document.addEventListener('mouseup', stopTerminalPanelInteraction)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onTerminalPanelPointerMove(event) {
+  if (!terminalPanelInteraction.value.active) return
+
+  const deltaX = event.clientX - terminalPanelInteraction.value.startX
+  const deltaY = event.clientY - terminalPanelInteraction.value.startY
+
+  if (terminalPanelInteraction.value.mode === 'move') {
+    const bounds = getTerminalPanelBounds()
+    terminalPanelRect.value.left = clamp(terminalPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    terminalPanelRect.value.top = clamp(terminalPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+    return
+  }
+
+  const direction = terminalPanelInteraction.value.direction || ''
+  const startLeft = terminalPanelInteraction.value.startLeft
+  const startTop = terminalPanelInteraction.value.startTop
+  const startWidth = terminalPanelInteraction.value.startWidth
+  const startHeight = terminalPanelInteraction.value.startHeight
+
+  let nextLeft = startLeft
+  let nextTop = startTop
+  let nextWidth = startWidth
+  let nextHeight = startHeight
+
+  if (direction.includes('e')) {
+    nextWidth = clamp(startWidth + deltaX, TERMINAL_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, TERMINAL_PANEL_MIN_WIDTH))
+  }
+
+  if (direction.includes('s')) {
+    nextHeight = clamp(startHeight + deltaY, TERMINAL_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, TERMINAL_PANEL_MIN_HEIGHT))
+  }
+
+  if (direction.includes('w')) {
+    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - TERMINAL_PANEL_MIN_WIDTH)
+    nextLeft = desiredLeft
+    nextWidth = startWidth - (desiredLeft - startLeft)
+  }
+
+  if (direction.includes('n')) {
+    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - TERMINAL_PANEL_MIN_HEIGHT)
+    nextTop = desiredTop
+    nextHeight = startHeight - (desiredTop - startTop)
+  }
+
+  if (nextLeft + nextWidth > window.innerWidth) {
+    nextWidth = Math.max(TERMINAL_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
+  }
+
+  if (nextTop + nextHeight > window.innerHeight) {
+    nextHeight = Math.max(TERMINAL_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
+  }
+
+  terminalPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  terminalPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  terminalPanelRect.value.width = clamp(nextWidth, TERMINAL_PANEL_MIN_WIDTH, Math.max(window.innerWidth - terminalPanelRect.value.left, TERMINAL_PANEL_MIN_WIDTH))
+  terminalPanelRect.value.height = clamp(nextHeight, TERMINAL_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - terminalPanelRect.value.top, TERMINAL_PANEL_MIN_HEIGHT))
+}
+
+function stopTerminalPanelInteraction() {
+  terminalPanelInteraction.value = {
+    active: false,
+    mode: null,
+    direction: null,
+    startX: 0,
+    startY: 0,
+    startTop: 0,
+    startLeft: 0,
+    startWidth: 0,
+    startHeight: 0,
+  }
+
+  document.removeEventListener('mousemove', onTerminalPanelPointerMove)
+  document.removeEventListener('mouseup', stopTerminalPanelInteraction)
+  saveTerminalPanelRect()
+}
 
 // 监听面板显示状态
 watch(showTerminalPanel, (newValue, oldValue) => {
   if (!newValue && oldValue) {
-    // 面板隐藏时，禁用所有终端的 ResizeObserver
+    stopTerminalPanelInteraction()
     console.log('[independent-terminal] Panel hiding, disabling ResizeObserver for all terminals')
     terminalSessions.value.forEach(session => {
       if (session.resizeObserver) {
@@ -4608,7 +4802,8 @@ watch(showTerminalPanel, (newValue, oldValue) => {
       }
     })
   } else if (newValue && !oldValue) {
-    // 面板显示时，只启用当前活跃终端的 ResizeObserver
+    ensureTerminalPanelInViewport()
+    saveTerminalPanelRect()
     console.log('[independent-terminal] Panel showing, enabling ResizeObserver for active terminal')
     nextTick(() => {
       const activeSession = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
@@ -4651,47 +4846,6 @@ watch(activeTerminalId, (newId, oldId) => {
   }
 })
 
-let isResizing = false
-let resizeStartX = 0
-let resizeStartY = 0
-let resizeStartWidth = 0
-let resizeStartHeight = 0
-
-function startResizeTerminal(event) {
-  isResizing = true
-  resizeStartX = event.clientX
-  resizeStartY = event.clientY
-  resizeStartWidth = terminalPanelSize.value.width
-  resizeStartHeight = terminalPanelSize.value.height
-  
-  document.addEventListener('mousemove', onResizeTerminal)
-  document.addEventListener('mouseup', stopResizeTerminal)
-  event.preventDefault()
-}
-
-function onResizeTerminal(event) {
-  if (!isResizing) return
-  
-  const deltaX = event.clientX - resizeStartX
-  const deltaY = event.clientY - resizeStartY
-  
-  // 计算新尺寸（固定右侧的面板）
-  // 手柄向左拖（deltaX < 0）：面板变宽
-  // 手柄向右拖（deltaX > 0）：面板变窄
-  // 手柄向下拖（deltaY > 0）：面板变高
-  // 手柄向上拖（deltaY < 0）：面板变矮
-  const newWidth = Math.max(400, resizeStartWidth - deltaX)  // 最小宽度 400
-  const newHeight = Math.max(300, resizeStartHeight + deltaY)  // 最小高度 300
-  
-  terminalPanelSize.value.width = newWidth
-  terminalPanelSize.value.height = newHeight
-}
-
-function stopResizeTerminal() {
-  isResizing = false
-  document.removeEventListener('mousemove', onResizeTerminal)
-  document.removeEventListener('mouseup', stopResizeTerminal)
-}
 
 function switchTerminal(terminalId) {
   console.log(`[independent-terminal] Switching to terminal ${terminalId}`)
@@ -4929,8 +5083,16 @@ onMounted(() => {
   const handleResize = () => {
     windowWidth.value = window.innerWidth
     ensureEditorPanelInViewport()
+    ensureTerminalPanelInViewport()
     saveEditorPanelRect()
+    saveTerminalPanelRect()
     layoutMonacoEditor()
+
+    const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
+    if (activeSession && activeSession.fitAddon && activeSession.terminal) {
+      activeSession.fitAddon.fit()
+      sendTerminalResize(activeSession.terminal_id, activeSession.terminal.rows, activeSession.terminal.cols)
+    }
   }
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
@@ -7567,17 +7729,17 @@ body::-webkit-scrollbar {
 /* 终端面板 */
 .terminal-panel {
   position: fixed;
-  top: 60px;
-  right: 20px;
-  width: var(--terminal-width, 800px) !important;
-  height: var(--terminal-height, 500px) !important;
   background: rgba(13, 17, 23, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   z-index: 1000;
-  overflow: visible !important;
+  overflow: hidden;
+}
+
+.terminal-panel-dragging {
+  user-select: none;
 }
 
 .terminal-panel-header {
@@ -7588,6 +7750,7 @@ body::-webkit-scrollbar {
   background: rgba(22, 27, 34, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px 8px 0 0;
+  cursor: move;
 }
 
 .terminal-panel-header h3 {
@@ -7779,28 +7942,74 @@ body::-webkit-scrollbar {
 
 /* 终端调整大小手柄 */
 .terminal-resize-handle {
-  position: absolute !important;
-  bottom: 8px;
+  position: absolute;
+  z-index: 2;
+}
+
+.terminal-resize-n,
+.terminal-resize-s {
   left: 8px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  cursor: nesw-resize !important;
-  z-index: 2147483647 !important;
-  background: rgba(139, 156, 174, 0.4);
-  transition: all 0.2s ease;
-  pointer-events: auto !important;
-  user-select: none !important;
+  right: 8px;
+  height: 8px;
 }
 
-.terminal-resize-handle:hover {
-  background: rgba(56, 139, 253, 0.7);
-  transform: scale(1.2);
+.terminal-resize-n {
+  top: -4px;
+  cursor: ns-resize;
 }
 
-.terminal-resize-handle:active {
-  background: rgba(56, 139, 253, 1);
-  transform: scale(1.1);
+.terminal-resize-s {
+  bottom: -4px;
+  cursor: ns-resize;
+}
+
+.terminal-resize-e,
+.terminal-resize-w {
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+}
+
+.terminal-resize-e {
+  right: -4px;
+  cursor: ew-resize;
+}
+
+.terminal-resize-w {
+  left: -4px;
+  cursor: ew-resize;
+}
+
+.terminal-resize-ne,
+.terminal-resize-nw,
+.terminal-resize-se,
+.terminal-resize-sw {
+  width: 12px;
+  height: 12px;
+}
+
+.terminal-resize-ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.terminal-resize-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.terminal-resize-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.terminal-resize-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
 }
 
 /* 移动端隐藏调整大小手柄 */
