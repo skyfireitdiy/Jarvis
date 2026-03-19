@@ -231,7 +231,7 @@
           <button 
             class="complete-btn" 
             @click="submitCompletion" 
-            :disabled="isInputDisabled"
+            :disabled="isWaitingMultiDisabled"
             title="完成（发送空消息）"
           >
             完成
@@ -239,7 +239,7 @@
           <button 
             class="action-btn completion-btn" 
             @click="openCompletions" 
-            :disabled="isInputDisabled"
+            :disabled="isWaitingMultiDisabled"
             title="插入补全 (@)"
           >
             @
@@ -902,6 +902,21 @@ const isInputDisabled = computed(() => {
     return true // agent 状态不是 running
   }
   return false
+})
+
+// 判断完成和补全按钮是否应该禁用（只在等待多行输入时使能）
+const isWaitingMultiDisabled = computed(() => {
+  console.log('[DEBUG isWaitingMultiDisabled]', {
+    currentAgentId: currentAgentId.value,
+    executionStatus: agentStatuses.value.get(currentAgentId.value)?.execution_status,
+    agentStatusesKeys: [...agentStatuses.value.keys()],
+    agentStatusesValues: [...agentStatuses.value.entries()]
+  })
+  if (!currentAgentId.value) {
+    return true // 没有激活的 agent
+  }
+  const executionStatus = agentStatuses.value.get(currentAgentId.value)?.execution_status
+  return executionStatus !== 'waiting_multi' // 只有在等待多行输入时才使能
 })
 const newAgentType = ref('agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
@@ -2237,6 +2252,8 @@ async function switchAgent(agent) {
   }
   
   console.log('[AGENT] Switching to:', agent)
+  console.log('[AGENT] Current sockets before switch:', [...sockets.value.keys()])
+  console.log('[AGENT] Current agent statuses:', [...agentStatuses.value.keys()])
   
   // 清空输入状态
   lastInputRequest.value = null
@@ -2309,6 +2326,7 @@ async function switchAgent(agent) {
     }
     
     console.log(`[AGENT] Stable connection established after ${retryCount} retries`)
+    console.log('[AGENT] Current sockets after connection:', [...sockets.value.keys()])
     
     // 最终检查WebSocket是否真正连接成功
     const ws = sockets.value.get(agent.agent_id)
@@ -2461,6 +2479,13 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
     const agentId = currentAgentId.value
+    
+    // 根据 mode 设置 agentStatuses
+    if (agentId && payload.mode) {
+      const statusKey = payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single'
+      agentStatuses.value.set(agentId, {execution_status: statusKey})
+      console.log('[ws] Set agentStatuses based on input_request mode:', statusKey, 'for agent:', agentId)
+    }
     
     // 检查缓冲区是否有内容
     if (agentId && inputBuffers.value.has(agentId)) {
@@ -2631,10 +2656,11 @@ function handleMessage(message, agentId = null) {
     })
   } else if (type === 'status_update') {
     console.log('[ws] status_update payload', payload)
+    console.log('[ws] status_update targetAgentId:', targetAgentId, 'currentAgentId:', currentAgentId.value)
     // 更新 Agent 执行状态
     if (payload?.execution_status) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
-      console.log('[ws] Agent execution status updated:', payload.execution_status)
+      console.log('[ws] Agent execution status updated:', payload.execution_status, 'for agent:', targetAgentId)
       // 当 Agent 开始思考时，自动滚动到底部
       if (payload.execution_status === 'running') {
         nextTick(() => {
