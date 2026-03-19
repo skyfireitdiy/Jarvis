@@ -5238,6 +5238,8 @@ body::-webkit-scrollbar {
   overflow-x: auto;
   margin: 8px 0;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .diff-header {
@@ -5274,6 +5276,7 @@ body::-webkit-scrollbar {
 .diff-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
   font-size: 12px;
 }
@@ -5309,10 +5312,13 @@ body::-webkit-scrollbar {
 
 .diff-content {
   padding: 2px 6px;
-  white-space: pre;
-  word-break: break-all;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   width: 50%;
+  max-width: 50%;
   vertical-align: top;
+  box-sizing: border-box;
 }
 
 .diff-content code {
@@ -5321,7 +5327,9 @@ body::-webkit-scrollbar {
   line-height: 1.2;
   background: transparent;
   padding: 0;
-  white-space: pre;
+  white-space: inherit;
+  word-break: inherit;
+  overflow-wrap: inherit;
 }
 
 .diff-deleted {
