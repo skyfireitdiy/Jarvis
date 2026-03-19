@@ -620,6 +620,9 @@ def switch_model_group(agent: Any) -> bool:
         return False
 
     # 显示模型组列表
+    # 使用 io.StringIO 捕获表格输出，以便通过 PrettyOutput.auto_print() 发送到前端
+    string_io = io.StringIO()
+    console_plain = Console(file=string_io, force_terminal=False, no_color=True, legacy_windows=False, width=100)
     table = Table(
         title="📋 可用模型组",
         show_header=True,
@@ -637,7 +640,21 @@ def switch_model_group(agent: Any) -> bool:
     ):
         table.add_row(str(idx), group_name, smart_model, normal_model, cheap_model)
 
-    Console().print(table)
+    # 检测是否存在 Gateway
+    try:
+        from jarvis.jarvis_gateway.manager import get_current_gateway
+        has_gateway = get_current_gateway() is not None
+    except Exception:
+        has_gateway = False
+
+    if has_gateway:
+        # Gateway 模式：捕获纯文本输出到前端
+        console_plain.print(table)
+        table_text = string_io.getvalue()
+        PrettyOutput.auto_print(table_text, timestamp=False)
+    else:
+        # CLI 模式：直接打印到终端（保留样式）
+        Console().print(table)
 
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
