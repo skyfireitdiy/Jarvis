@@ -1180,22 +1180,23 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             if target_path.parent != target_path:  # 不是根目录
                 parent_path = str(target_path.parent)
 
-            # 获取子目录列表
-            directories = []
+            # 获取子目录和文件列表
+            items = []
             try:
                 for entry in target_path.iterdir():
-                    # 只返回目录
-                    if entry.is_dir():
-                        # 过滤隐藏文件（以 . 开头）
-                        if not entry.name.startswith("."):
-                            directories.append(
-                                {
-                                    "name": entry.name,
-                                    "path": str(entry),
-                                }
-                            )
-                # 按名称排序
-                directories.sort(key=lambda x: x["name"])
+                    # 过滤隐藏文件（以 . 开头）
+                    if not entry.name.startswith("."):
+                        # 判断是目录还是文件
+                        entry_type = "directory" if entry.is_dir() else "file"
+                        items.append(
+                            {
+                                "name": entry.name,
+                                "path": str(entry),
+                                "type": entry_type,
+                            }
+                        )
+                # 按名称排序，目录在前，文件在后
+                items.sort(key=lambda x: (x["type"] != "directory", x["name"]))
             except PermissionError:
                 # 忽略权限错误，返回空列表
                 pass
@@ -1205,7 +1206,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "data": {
                     "current_path": str(target_path),
                     "parent_path": parent_path,
-                    "directories": directories,
+                    "items": items,
                 },
             }
         except PermissionError:
