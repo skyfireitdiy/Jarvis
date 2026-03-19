@@ -34,7 +34,7 @@
                 <div
                   class="tree-node-content"
                   :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                  @click.stop="toggleNodeExpand(agent.agent_id, visibleNode.node)"
+                  @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                 >
                   <span
                     v-if="visibleNode.node.type === 'directory'"
@@ -233,17 +233,41 @@
         class="editor-panel-header"
         @mousedown="startEditorPanelMove"
       >
-        <h3>编辑器</h3>
+        <div class="editor-panel-title-group">
+          <h3>编辑器</h3>
+          <span v-if="activeEditorTab" class="editor-panel-subtitle">{{ activeEditorTab.path }}</span>
+        </div>
         <div class="editor-panel-actions">
+          <button class="icon-btn" @click.stop="saveActiveEditorTab" :disabled="!activeEditorTab || activeEditorTab.loading" title="保存文件">💾</button>
           <button class="icon-btn" @click="showEditorPanel = false" title="关闭编辑器">✕</button>
         </div>
       </div>
-      <div class="editor-panel-content">
-        <div class="editor-placeholder">
-          <div class="editor-placeholder-icon">📝</div>
-          <div class="editor-placeholder-title">编辑器窗口已准备就绪</div>
-          <div class="editor-placeholder-text">当前为占位实现，后续可在此接入代码编辑器。</div>
+      <div class="editor-tabs" v-if="editorTabs.length > 0">
+        <div
+          v-for="tab in editorTabs"
+          :key="tab.path"
+          class="editor-tab"
+          :class="{ active: activeEditorTabPath === tab.path }"
+          @click="activateEditorTab(tab.path)"
+        >
+          <span class="editor-tab-name">{{ tab.name }}</span>
+          <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
+          <button class="editor-tab-close" @click.stop="closeEditorTab(tab.path)">✕</button>
         </div>
+      </div>
+      <div class="editor-panel-toolbar">
+        <span class="editor-toolbar-status" v-if="activeEditorTab?.loading">加载中...</span>
+        <span class="editor-toolbar-status error" v-else-if="activeEditorTab?.error">{{ activeEditorTab.error }}</span>
+        <span class="editor-toolbar-status" v-else-if="activeEditorTab">{{ activeEditorTab.isDirty ? '未保存修改' : '已保存' }}</span>
+        <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
+      </div>
+      <div class="editor-panel-content editor-panel-content-main">
+        <div v-if="editorTabs.length === 0" class="editor-placeholder">
+          <div class="editor-placeholder-icon">📝</div>
+          <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
+          <div class="editor-placeholder-text">支持 Monaco 语法高亮、代码折叠、多标签切换与保存。</div>
+        </div>
+        <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
       </div>
       <div
         v-for="direction in editorResizeDirections"
@@ -629,6 +653,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import * as monaco from 'monaco-editor'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -879,6 +904,11 @@ const editorPanelInteraction = ref({
   startWidth: 0,
   startHeight: 0,
 })
+const editorContainerRef = ref(null)
+const editorTabs = ref([])
+const activeEditorTabPath = ref(null)
+const editorModels = new Map()
+let monacoEditor = null
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -927,6 +957,10 @@ const editorPanelStyle = computed(() => ({
   width: `${editorPanelRect.value.width}px`,
   height: `${editorPanelRect.value.height}px`,
 }))
+
+const activeEditorTab = computed(() => {
+  return editorTabs.value.find(tab => tab.path === activeEditorTabPath.value) || null
+})
 
 function clamp(value, min, max) {
   if (max < min) return min
@@ -1078,6 +1112,213 @@ function stopEditorPanelInteraction() {
 
   document.removeEventListener('mousemove', onEditorPanelPointerMove)
   document.removeEventListener('mouseup', stopEditorPanelInteraction)
+}
+
+function getEditorTabByPath(path) {
+  return editorTabs.value.find(tab => tab.path === path) || null
+}
+
+function syncEditorTabDirtyState(path, value) {
+  const tab = getEditorTabByPath(path)
+  if (tab) {
+    tab.isDirty = value
+  }
+}
+
+function ensureMonacoEditor() {
+  if (monacoEditor || !editorContainerRef.value) return
+
+  monacoEditor = monaco.editor.create(editorContainerRef.value, {
+    value: '',
+    language: 'plaintext',
+    theme: 'vs-dark',
+    automaticLayout: true,
+    minimap: { enabled: false },
+    folding: true,
+    scrollBeyondLastLine: false,
+    fontSize: 13,
+    tabSize: 2,
+    wordWrap: 'off',
+    renderWhitespace: 'selection',
+  })
+
+  monacoEditor.onDidChangeModel(() => {
+    const model = monacoEditor.getModel()
+    if (!model) return
+    const path = model.uri.path
+    const tab = getEditorTabByPath(path)
+    if (!tab) return
+    tab.content = model.getValue()
+    tab.isDirty = tab.content !== tab.originalContent
+  })
+}
+
+function layoutMonacoEditor() {
+  if (monacoEditor) {
+    monacoEditor.layout()
+  }
+}
+
+function activateEditorTab(path) {
+  activeEditorTabPath.value = path
+  const model = editorModels.get(path)
+  if (monacoEditor && model) {
+    monacoEditor.setModel(model)
+    monaco.editor.setModelLanguage(model, getLanguageFromFilename(path))
+    nextTick(() => {
+      layoutMonacoEditor()
+      monacoEditor.focus()
+    })
+  }
+}
+
+async function fetchFileContent(path) {
+  const { host, port } = getGatewayAddress()
+  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-content`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  })
+
+  const result = await response.json()
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || '读取文件失败')
+  }
+  return result.data.content || ''
+}
+
+async function openEditorFile(path) {
+  if (!path) return
+
+  showEditorPanel.value = true
+
+  const existingTab = getEditorTabByPath(path)
+  if (existingTab) {
+    activateEditorTab(path)
+    return
+  }
+
+  const tab = {
+    path,
+    name: path.split('/').pop() || path,
+    content: '',
+    originalContent: '',
+    language: getLanguageFromFilename(path),
+    isDirty: false,
+    loading: true,
+    error: '',
+  }
+  editorTabs.value.push(tab)
+  activeEditorTabPath.value = path
+
+  try {
+    const content = await fetchFileContent(path)
+    tab.content = content
+    tab.originalContent = content
+    tab.loading = false
+
+    let model = editorModels.get(path)
+    if (!model) {
+      model = monaco.editor.createModel(content, tab.language, monaco.Uri.file(path))
+      editorModels.set(path, model)
+    }
+    model.setValue(content)
+
+    await nextTick()
+    ensureMonacoEditor()
+    activateEditorTab(path)
+  } catch (error) {
+    tab.loading = false
+    tab.error = error.message || '读取文件失败'
+  }
+}
+
+async function saveEditorTab(path) {
+  const tab = getEditorTabByPath(path)
+  if (!tab) return
+
+  const model = editorModels.get(path)
+  const content = model ? model.getValue() : tab.content
+
+  const { host, port } = getGatewayAddress()
+  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-write`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content })
+  })
+  const result = await response.json()
+
+  if (!response.ok || !result.success) {
+    const message = result.error?.message || '保存文件失败'
+    tab.error = message
+    showToast(message, 'error')
+    return
+  }
+
+  tab.originalContent = content
+  tab.content = content
+  tab.isDirty = false
+  tab.error = ''
+  showToast('文件已保存', 'success')
+}
+
+async function saveActiveEditorTab() {
+  if (!activeEditorTab.value) return
+  await saveEditorTab(activeEditorTab.value.path)
+}
+
+function confirmCloseDirtyEditorTab(path) {
+  return new Promise((resolve) => {
+    showConfirm(
+      '该标签存在未保存修改，确定关闭吗？',
+      () => resolve(true),
+      () => resolve(false),
+      false
+    )
+  })
+}
+
+async function closeEditorTab(path) {
+  const tab = getEditorTabByPath(path)
+  if (!tab) return
+
+  if (tab.isDirty) {
+    const confirmed = await confirmCloseDirtyEditorTab(path)
+    if (!confirmed) return
+  }
+
+  const index = editorTabs.value.findIndex(item => item.path === path)
+  if (index === -1) return
+
+  const wasActive = activeEditorTabPath.value === path
+  editorTabs.value.splice(index, 1)
+
+  const model = editorModels.get(path)
+  if (model) {
+    model.dispose()
+    editorModels.delete(path)
+  }
+
+  if (wasActive) {
+    const nextTab = editorTabs.value[index] || editorTabs.value[index - 1] || null
+    if (nextTab) {
+      activateEditorTab(nextTab.path)
+    } else {
+      activeEditorTabPath.value = null
+      if (monacoEditor) {
+        monacoEditor.setModel(null)
+      }
+    }
+  }
+}
+
+async function handleFileTreeNodeClick(agentId, node) {
+  if (node.type === 'directory') {
+    await toggleNodeExpand(agentId, node)
+    return
+  }
+
+  await openEditorFile(node.path)
 }
 
 // 消息和终端
@@ -4545,12 +4786,25 @@ const toggleTerminalPanel = () => {
   }
 }
 
-watch(showEditorPanel, (visible) => {
+watch(showEditorPanel, async (visible) => {
   if (visible) {
     ensureEditorPanelInViewport()
+    await nextTick()
+    ensureMonacoEditor()
+    if (activeEditorTabPath.value) {
+      activateEditorTab(activeEditorTabPath.value)
+    }
+    nextTick(() => layoutMonacoEditor())
   } else {
     stopEditorPanelInteraction()
   }
+})
+
+watch(activeEditorTabPath, async (path) => {
+  if (!path) return
+  await nextTick()
+  ensureMonacoEditor()
+  activateEditorTab(path)
 })
 
 onMounted(() => {
@@ -4593,6 +4847,7 @@ onMounted(() => {
   const handleResize = () => {
     windowWidth.value = window.innerWidth
     ensureEditorPanelInViewport()
+    layoutMonacoEditor()
   }
   window.addEventListener('resize', handleResize)
   console.log('[app] Resize listener added')
@@ -4645,6 +4900,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopEditorPanelInteraction()
+
+  if (monacoEditor) {
+    monacoEditor.dispose()
+    monacoEditor = null
+  }
+  editorModels.forEach(model => model.dispose())
+  editorModels.clear()
 
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown)
@@ -4952,6 +5214,14 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(13, 17, 23, 0.9);
   cursor: move;
+  gap: 12px;
+}
+
+.editor-panel-title-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .editor-panel-header h3 {
@@ -4960,10 +5230,86 @@ body::-webkit-scrollbar {
   font-weight: 600;
 }
 
+.editor-panel-subtitle {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
 .editor-panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px 8px 0;
+  background: rgba(13, 17, 23, 0.92);
+  overflow-x: auto;
+}
+
+.editor-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: rgba(110, 118, 129, 0.16);
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.editor-tab.active {
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+.editor-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tab-dirty {
+  color: #f2cc60;
+  font-size: 10px;
+}
+
+.editor-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.editor-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(22, 27, 34, 0.98);
+}
+
+.editor-toolbar-status {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.editor-toolbar-status.error {
+  color: #f85149;
 }
 
 .editor-panel-content {
@@ -4975,10 +5321,22 @@ body::-webkit-scrollbar {
   user-select: text;
 }
 
+.editor-panel-content-main {
+  padding: 0;
+  min-height: 0;
+  background: #0d1117;
+}
+
+.editor-monaco-container {
+  width: 100%;
+  height: 100%;
+}
+
 .editor-placeholder {
   text-align: center;
   color: #8b949e;
   max-width: 280px;
+  padding: 24px;
 }
 
 .editor-placeholder-icon {
