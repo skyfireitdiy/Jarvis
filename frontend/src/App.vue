@@ -997,10 +997,35 @@ const showCompletions = ref(false) // 是否显示补全列表
 const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位置
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
+const fileCompletions = ref([]) // 文件补全搜索结果
 
-// 监听搜索输入变化，重置选中状态
-watch(completionSearch, () => {
+// 监听搜索输入变化，触发文件搜索
+watch(completionSearch, async (newSearch) => {
   selectedIndex.value = -1
+  
+  // 如果有搜索内容，加载文件补全
+  if (newSearch.trim()) {
+    try {
+      const { host, port } = getGatewayAddress()
+      const response = await fetch(
+        `${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}/search?query=${encodeURIComponent(newSearch)}`
+      )
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success && result.data) {
+        fileCompletions.value = result.data
+        console.log('[FILE COMPLETIONS] Loaded', result.data.length, 'files')
+      } else {
+        fileCompletions.value = []
+      }
+    } catch (error) {
+      console.error('[FILE COMPLETIONS] Fetch failed:', error)
+      fileCompletions.value = []
+    }
+  } else {
+    fileCompletions.value = []
+  }
 })
 const completionSearchInput = ref(null) // 补全搜索输入框引用
 const completionsListRef = ref(null) // 补全列表容器引用
@@ -1920,10 +1945,18 @@ const filteredCompletions = computed(() => {
   }
   
   const search = completionSearch.value.toLowerCase()
-  return completions.value.filter(item => 
+  // 过滤原始补全项
+  const filteredOriginal = completions.value.filter(item => 
     item.display.toLowerCase().includes(search) || 
     item.description.toLowerCase().includes(search)
   )
+  
+  // 合并文件补全结果（如果有搜索内容）
+  if (fileCompletions.value.length > 0) {
+    return [...filteredOriginal, ...fileCompletions.value]
+  }
+  
+  return filteredOriginal
 })
 
 // 处理补全对话框的键盘事件
