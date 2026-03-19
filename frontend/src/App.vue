@@ -1742,7 +1742,8 @@ async function fetchDirectories(path = '') {
     const result = await response.json()
     if (result.success && result.data) {
       currentDirPath.value = result.data.current_path
-      dirList.value = result.data.directories || []
+      // 只显示目录，过滤掉文件（工作目录选择不需要显示文件）
+      dirList.value = (result.data.items || []).filter(item => item.type === 'directory')
     }
   } catch (error) {
     console.error('[DIR] 获取目录列表出错:', error)
@@ -2340,14 +2341,25 @@ async function loadFileTreeNode(agentId, node) {
     const result = await response.json()
     if (result.success && result.data) {
       // 转换为树节点格式
-      const children = (result.data.directories || []).map(dir => ({
-        name: dir.name,
-        path: dir.path,
-        type: 'directory',
-        expanded: false,
-        loaded: false,
-        children: []
-      }))
+      const children = (result.data.items || []).map(item => {
+        // 文件节点不需要 children 和 loaded 字段
+        if (item.type === 'file') {
+          return {
+            name: item.name,
+            path: item.path,
+            type: 'file'
+          }
+        }
+        // 目录节点需要 children 和 loaded 字段
+        return {
+          name: item.name,
+          path: item.path,
+          type: 'directory',
+          expanded: false,
+          loaded: false,
+          children: []
+        }
+      })
       
       // 更新节点的子节点
       node.children = children
