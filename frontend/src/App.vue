@@ -834,7 +834,7 @@ const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
 
 // 输入控制
 const inputText = ref('')
-const inputMode = ref('single')
+const inputMode = ref('multi')
 const inputTip = ref('')
 const multilineInput = ref(null)
 const singlelineInput = ref(null)
