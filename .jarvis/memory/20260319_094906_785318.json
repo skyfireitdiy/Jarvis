@@ -1,0 +1,15 @@
+{
+  "id": "20260319_094906_785318",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_decision",
+    "agent_gateway_proxy",
+    "web_gateway",
+    "frontend",
+    "completed",
+    "final_summary"
+  ],
+  "content": "Web网关Agent反向代理架构升级 - 项目完成总结\n\n## 项目目标\n解决云环境下Agent随机端口无法通过防火墙的问题\n\n## 架构变更\n**原架构**：前端 → 直连Agent随机端口(10000-65535)\n**新架构**：前端 → Web网关代理 → Agent随机端口\n\n## 实现内容\n\n### 后端实现（3个文件）\n1. **agent_proxy_manager.py**（新增）\n   - AgentProxyManager类：管理Agent代理连接\n   - get_agent_port()：获取Agent端口\n   - proxy_http_request()：HTTP请求转发（使用httpx）\n   - proxy_websocket()：WebSocket双向转发（使用websockets）\n   - 异常处理：AgentNotFoundError、AgentNotRunningError、ProxyConnectionError\n\n2. **app.py**（修改）\n   - WebSocket代理路由：/api/agent/{agent_id}/ws\n   - HTTP代理路由：/api/agent/{agent_id}/{path:path}\n   - 支持所有HTTP方法：GET/POST/PUT/DELETE/PATCH\n   - 完整的错误处理和日志记录\n\n### 前端修改（1个文件）\n3. **App.vue**（修改）\n   - 新增buildAgentWebSocketUrl(host, agentId)函数\n   - 修改connectToAgent使用代理路径\n   - 修改fetchAgentStatus使用代理路径\n   - 移除所有agent.port直接引用\n\n### 测试文件（1个文件）\n4. **test_agent_proxy.py**（新增）\n   - 单元测试：测试代理管理器功能\n   - 性能测试：验证响应时间<5秒\n   - 代码质量检查：验证模块导入和功能完整性\n\n## 技术栈\n- FastAPI（Web框架）\n- httpx（HTTP客户端）\n- websockets（WebSocket库）\n- asyncio（异步编程）\n\n## 优点\n1. 统一通过Web网关端口，防火墙配置简单\n2. Agent随机端口对外不可见，安全性提升\n3. 符合云原生部署要求\n4. 保持向后兼容，不影响现有功能\n\n## 测试结果\n✅ 代码质量检查通过（ruff静态检查）\n✅ 性能测试通过（模块导入时间<1秒）\n✅ 基本功能测试通过\n\n## Git Commits\n- 2cbb3c8: 新增buildAgentWebSocketUrl函数\n- 8071eee: 修改connectToAgent使用代理\n- ab85bce: 修改fetchAgentStatus使用代理\n- 323e06d: 创建测试文件\n- 963fecc: 修复静态检查问题\n- 93d1998: 修复异常类名\n\n## 部署建议\n1. 启动Web网关时无需开放额外的Agent端口\n2. 只需开放Web网关的HTTP/HTTPS端口\n3. 代理层会自动处理与Agent的连接管理\n4. 支持多Agent并发访问\n\n## 后续优化建议\n1. 添加连接池管理，优化性能\n2. 添加监控指标（连接数、延迟等）\n3. 添加负载均衡支持\n4. 完善端到端测试套件",
+  "created_at": "2026-03-19T09:49:06.785342",
+  "updated_at": "2026-03-19T09:49:06.785346"
+}

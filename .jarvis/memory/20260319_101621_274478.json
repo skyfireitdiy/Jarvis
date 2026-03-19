@@ -1,0 +1,12 @@
+{
+  "id": "20260319_101621_274478",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "agent_connection",
+    "frontend"
+  ],
+  "content": "创建Agent后自动连接失败问题修复\n\n问题：创建Agent后WebSocket连接验证通过，但随后被后端关闭，导致无法使用\n\n原因分析：\n1. Agent启动需要时间\n2. WebSocket初始连接成功，验证通过（readyState === OPEN）\n3. 但Agent还未完全启动，WebSocket被后端关闭\n4. 没有收到ready和input_request消息\n5. 前端认为连接成功，不会重连\n6. 用户需要手动点击才会重连\n\n解决方案：\n- 在连接验证后，等待500ms检查连接是否仍然有效\n- 如果连接已断开，自动重新连接\n\nGit Commit:\n- 49bb5fb: 添加连接稳定性检查和自动重连\n\n效果：创建Agent后能自动等待Agent启动完成，无需手动点击",
+  "created_at": "2026-03-19T10:16:21.274512",
+  "updated_at": "2026-03-19T10:16:21.274516"
+}

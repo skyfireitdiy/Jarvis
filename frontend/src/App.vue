@@ -740,11 +740,20 @@ function parseGatewayAddress(address) {
   }
 }
 
-// 构建 WebSocket URL
+// 构建 WebSocket URL（用于网关连接）
 function buildWebSocketUrl(host, port, protocol = null) {
   // 如果没有指定协议，根据当前页面自动检测
   const wsProtocol = protocol || getWebSocketProtocol()
   return `${wsProtocol}://${host}:${port}/ws`
+}
+
+// 构建 Agent WebSocket URL（通过网关代理）
+function buildAgentWebSocketUrl(host, agentId, protocol = null, port = null) {
+  // 如果没有指定协议，根据当前页面自动检测
+  const wsProtocol = protocol || getWebSocketProtocol()
+  // 通过网关代理路径连接：/api/agent/{agentId}/ws
+  const portStr = port ? `:${port}` : ''
+  return `${wsProtocol}://${host}${portStr}/api/agent/${agentId}/ws`
 }
 
 // 构建 HTTP URL
@@ -1227,9 +1236,9 @@ function sendMessageToAgent(message) {
 // 连接到指定的 Agent（建立独立的 WebSocket 连接）
 async function connectToAgent(agent, retryCount = 0) {
   const agentId = agent.agent_id
-  const maxRetries = 3
-  const retryDelay = 1000 // 1秒重试间隔
-  const connectionTimeout = 5000 // 5秒连接超时
+  const maxRetries = 12  // 最多重试12次
+  const retryDelay = 2000 // 2秒重试间隔
+  const connectionTimeout = 10000 // 10秒连接超时（适应Agent启动时间）
   
   // 检查是否已有连接
   if (sockets.value.has(agentId)) {
@@ -1276,9 +1285,9 @@ async function connectToAgent(agent, retryCount = 0) {
   
   console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
   
-  const { host } = getGatewayAddress()
-  const agentPort = agent.port
-  const url = buildWebSocketUrl(host, agentPort)
+  const { host, port } = getGatewayAddress()
+  // 通过网关代理连接：/api/agent/{agentId}/ws
+  const url = buildAgentWebSocketUrl(host, agentId, null, port)
   
   connecting.value = true
   
@@ -1375,6 +1384,9 @@ async function connectToAgent(agent, retryCount = 0) {
           ws.send(JSON.stringify({ type: 'auth', payload }))
           console.log(`[AGENT ${agentId}] auth sent`, payload)
         }
+        
+        // 标记连接已完成（在onclose中用于判断是否需要重试）
+        ws._connectionCompleted = true
         
         // 连接成功，resolve Promise
         resolve(ws)
@@ -1537,17 +1549,17 @@ function getStatusClass(agent) {
   return statusData.execution_status || 'running'
 }
 
-// 查询 Agent 状态
+// 查询 Agent 状态（通过网关代理）
 async function fetchAgentStatus(agent) {
-  if (!agent || !agent.port) {
+  if (!agent || !agent.agent_id) {
     console.warn('[AGENT STATUS] Invalid agent:', agent)
     return 'running' // 默认返回 running
   }
   
   try {
-    const { host } = getGatewayAddress()
-    const port = agent.port
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/status`)
+    const { host, port } = getGatewayAddress()
+    // 通过网关代理查询状态：/api/agent/{agentId}/status
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agent/${agent.agent_id}/status`)
     
     if (!response.ok) {
       console.warn(`[AGENT STATUS] Failed to fetch status for agent ${agent.agent_id}:`, response.status)
@@ -1577,7 +1589,8 @@ async function restoreSession(sessionFile) {
   }
 
   try {
-    const response = await fetch(`${apiBase.value}/api/agents/${currentAgentId.value}/sessions`, {
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${currentAgentId.value}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_file: sessionFile })
@@ -2263,12 +2276,43 @@ async function switchAgent(agent) {
       return
     }
     
-    await connectToAgent(agent)
+    // 等待连接稳定（Agent启动需要时间，持续重试直到成功）
+    let stableConnection = false
+    let retryCount = 0
+    // 移除重试次数限制，等待Agent完全启动
     
-    // 验证连接是否真的成功
+    while (!stableConnection) {
+      await connectToAgent(agent)
+      
+      // 验证连接是否真的成功，并等待一小段时间确保连接稳定
+      const ws = sockets.value.get(agent.agent_id)
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // 等待2000ms，确保连接稳定（Agent启动需要更长时间）
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // 再次检查连接是否仍然有效
+        if (ws.readyState === WebSocket.OPEN) {
+          console.log('[AGENT] Connection verified successfully')
+          stableConnection = true
+        } else {
+          retryCount++
+          console.warn(`[AGENT] Connection closed after ${retryCount} tries, retrying...`)
+          // 等待2秒后继续重试
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      } else {
+        retryCount++
+        console.warn(`[AGENT] Connection failed after ${retryCount} tries, retrying...`)
+        // 等待2秒后继续重试
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+    }
+    
+    console.log(`[AGENT] Stable connection established after ${retryCount} retries`)
+    
+    // 最终检查WebSocket是否真正连接成功
     const ws = sockets.value.get(agent.agent_id)
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log('[AGENT] Connection verified successfully')
       // 连接成功后再次查询状态，确保同步
       console.log('[AGENT] Fetching status after connection...')
       await fetchAgentStatus(agent)
@@ -2278,7 +2322,8 @@ async function switchAgent(agent) {
       if (currentOutputs.length === 0) {
         console.log('[AGENT] New agent, checking for recoverable sessions...')
         try {
-          const sessionsResponse = await fetch(`${apiBase.value}/api/agents/${agent.agent_id}/sessions`)
+          const { host, port } = getGatewayAddress()
+          const sessionsResponse = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`)
           const sessionsData = await sessionsResponse.json()
           if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
             console.log('[AGENT] Found recoverable sessions:', sessionsData.data)

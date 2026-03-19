@@ -1,0 +1,14 @@
+{
+  "id": "20260319_094610_885751",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_decision",
+    "agent_gateway_proxy",
+    "web_gateway",
+    "frontend",
+    "completed"
+  ],
+  "content": "Web网关Agent反向代理架构升级已完成\n\n架构变更：\n- 原架构：前端直连Agent的随机端口(10000-65535)\n- 新架构：前端统一通过Web网关代理访问Agent\n\n后端实现：\n1. 新增AgentProxyManager模块(src/jarvis/jarvis_web_gateway/agent_proxy_manager.py)\n2. 添加WebSocket代理路由：/api/agent/{agent_id}/ws\n3. 添加HTTP代理路由：/api/agent/{agent_id}/{path:path}\n\n前端修改：\n1. 新增buildAgentWebSocketUrl(host, agentId)函数，构建代理URL\n2. 修改connectToAgent函数，使用代理路径连接\n3. 修改fetchAgentStatus函数，HTTP请求改为通过代理\n4. 移除所有agent.port直接引用\n\n优点：\n- 统一通过Web网关端口，防火墙配置简单\n- Agent随机端口对外不可见，安全性提升\n- 符合云原生部署要求\n\nGit commits:\n- 2cbb3c8: 新增buildAgentWebSocketUrl函数\n- 8071eee: 修改connectToAgent使用代理\n- ab85bce: 修改fetchAgentStatus使用代理",
+  "created_at": "2026-03-19T09:46:10.885795",
+  "updated_at": "2026-03-19T09:46:10.885799"
+}

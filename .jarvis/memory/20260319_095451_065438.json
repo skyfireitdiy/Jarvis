@@ -1,0 +1,12 @@
+{
+  "id": "20260319_095451_065438",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "agent_proxy",
+    "frontend"
+  ],
+  "content": "Web网关Agent反向代理前端Bug修复完成\n\n修复内容：\n1. Bug1: URL缺少端口号\n   - buildAgentWebSocketUrl添加port参数\n   - connectToAgent传入port参数\n   - fetchAgentStatus添加port参数\n\n2. Bug2: apiBase未定义\n   - switchAgent函数第2289行：改为使用getGatewayAddress()\n   - restoreSession函数第1589行：改为使用getGatewayAddress()\n\n验证结果：\n- rg 'apiBase' 无匹配项\n- rg 'agent.port' 无匹配项\n\nGit Commits:\n- 1eac969: 修复switchAgent中apiBase未定义\n- 726d7a1: 修复restoreSession中apiBase未定义\n\n前端连接架构已完全切换到代理模式，所有直接访问Agent端口的代码已移除",
+  "created_at": "2026-03-19T09:54:51.065462",
+  "updated_at": "2026-03-19T09:54:51.065467"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260319_100317_522456",
+  "type": "project_long_term",
+  "tags": [
+    "agent_connection",
+    "retry_strategy",
+    "frontend"
+  ],
+  "content": "前端Agent连接重连策略优化\n\n问题：Agent启动需要较长时间，前端连接失败\n- 错误信息: [Errno 111] Connection refused\n- 原因: Agent启动需要时间，前端超时太快\n\n优化前：\n- maxRetries = 3（重试3次）\n- retryDelay = 1000ms（间隔1秒）\n- connectionTimeout = 5000ms（超时5秒）\n- 最大等待时间: ~20秒\n\n优化后：\n- maxRetries = 12（重试12次）\n- retryDelay = 2000ms（间隔2秒）\n- connectionTimeout = 10000ms（超时10秒）\n- 最大等待时间: ~142秒（适应Agent启动时间）\n\nGit Commit:\n- 909598d: 调整重连策略参数\n\n效果：前端现在能自动等待Agent启动完成，避免连接失败",
+  "created_at": "2026-03-19T10:03:17.522505",
+  "updated_at": "2026-03-19T10:03:17.522510"
+}
