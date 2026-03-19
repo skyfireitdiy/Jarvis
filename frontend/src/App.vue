@@ -6646,9 +6646,10 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: stretch;
   text-align: left;
   position: relative;
+  min-width: 0;
 }
 
 .message-content .message-meta-left {
@@ -6824,6 +6825,7 @@ body::-webkit-scrollbar {
   margin-top: 14px;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
@@ -6845,12 +6847,15 @@ body::-webkit-scrollbar {
 
 .terminal-history-content {
   background: #0a0d12;
+  display: block;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   padding: 16px;
   margin: 0;
   overflow-x: auto;
+  overflow-y: auto;
   color: #c9d1d9;
   /* 字体由父容器的动态样式控制 */
   white-space: pre;
