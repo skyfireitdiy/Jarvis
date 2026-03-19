@@ -403,6 +403,10 @@ class AgentManager:
         cmd.extend(["--web-gateway-port", str(port)])
         cmd.append("--web-gateway")  # 启动为 WebSocket Gateway 模式
 
+        # 添加 LLM 模型组参数
+        if llm_group and llm_group != "default":
+            cmd.extend(["-g", llm_group])
+
         if config_file:
             cmd.extend(["--config-file", config_file])
 
