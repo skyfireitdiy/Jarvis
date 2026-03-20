@@ -52,14 +52,10 @@ Start-Sleep -Seconds 5
 Write-Host "🎨 启动前端服务..."
 Set-Location "$ProjectRoot\frontend"
 
-# 检查并安装前端依赖
-if (-not (Test-Path "node_modules")) {
-    Write-Host "📦 首次启动，安装前端依赖..."
-    npm install
-    Write-Host "✅ 前端依赖安装完成"
-} else {
-    Write-Host "✅ 前端依赖已存在，跳过安装"
-}
+# 安装前端依赖
+Write-Host "📦 安装前端依赖..."
+npm install
+Write-Host "✅ 前端依赖安装完成"
 
 $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run","dev","--","--host","$frontendHost","--port","$frontendPort" -PassThru
 
