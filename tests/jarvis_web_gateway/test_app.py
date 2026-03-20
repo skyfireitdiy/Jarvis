@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_web_gateway app API tests."""
 
+import os
 from fastapi.testclient import TestClient
 
 from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
@@ -8,6 +9,8 @@ from jarvis.jarvis_web_gateway.app import create_app
 
 
 def create_test_client() -> TestClient:
+    # 在测试环境中跳过交互式配置
+    os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
     app = create_app()
     return TestClient(app)
 
@@ -143,7 +146,10 @@ def test_post_file_write_rejects_large_content(tmp_path):
 
     response = client.post(
         "/api/file-write",
-        json={"path": str(test_file.resolve()), "content": "a" * (MAX_FILE_SIZE_BYTES + 1)},
+        json={
+            "path": str(test_file.resolve()),
+            "content": "a" * (MAX_FILE_SIZE_BYTES + 1),
+        },
     )
 
     assert response.status_code == 200

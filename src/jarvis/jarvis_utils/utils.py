@@ -1046,7 +1046,17 @@ def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导
 
     直接调用 quick_config 模块进行快速配置。
+    如果设置了环境变量 JARVIS_SKIP_INTERACTIVE_CONFIG，则跳过交互式配置。
     """
+    import os
+
+    # 检查是否跳过交互式配置（用于 CI/测试环境）
+    if os.environ.get("JARVIS_SKIP_INTERACTIVE_CONFIG"):
+        PrettyOutput.auto_print(
+            "ℹ️ 已跳过交互式配置（JARVIS_SKIP_INTERACTIVE_CONFIG 已设置）"
+        )
+        return
+
     PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！正在启动快速配置程序...")
 
     try:
