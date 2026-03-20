@@ -1488,6 +1488,10 @@ const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
 })
 
+function isCurrentAgent(agentId) {
+  return agentId === currentAgentId.value
+}
+
 // 判断输入框是否应该禁用（没有激活的 agent 或 agent 状态不是 running）
 const isInputDisabled = computed(() => {
   if (!currentAgentId.value) {
@@ -3254,9 +3258,9 @@ function handleMessage(message, agentId = null) {
         streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
         streamingMessage.html = renderMessageHtml(streamingMessage)
-        // 自动滚动到底部
+        // 仅当前 Agent 的流式消息触发滚动
         nextTick(() => {
-          if (outputList.value) {
+          if (isCurrentAgent(targetAgentId) && outputList.value) {
             outputList.value.scrollTop = outputList.value.scrollHeight
           }
         })
@@ -3341,8 +3345,8 @@ function handleMessage(message, agentId = null) {
         singlelineInput.value?.focus()
       }
       
-      // 输入框显示后，如果之前在底部，就滚动到底部
-      if (shouldScrollAfterInputShow && outputList.value) {
+      // 输入框显示后，如果之前在底部且请求属于当前 Agent，就滚动到底部
+      if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value) {
         requestAnimationFrame(() => {
           const scrollHeight = outputList.value.scrollHeight
           const scrollTop = outputList.value.scrollTop
@@ -3470,8 +3474,8 @@ function handleMessage(message, agentId = null) {
     if (payload?.execution_status) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
       console.log('[ws] Agent execution status updated:', payload.execution_status, 'for agent:', targetAgentId)
-      // 当 Agent 开始思考时，自动滚动到底部
-      if (payload.execution_status === 'running') {
+      // 当当前 Agent 开始思考时，自动滚动到底部
+      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId)) {
         nextTick(() => {
           if (outputList.value) {
             outputList.value.scrollTop = outputList.value.scrollHeight
@@ -3623,11 +3627,10 @@ function appendOutput(payload, agentId = null) {
   console.log('[DEBUG] agent_name:', outputItem.agent_name)
   console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
   
-  // 只要 append 就自动滚动到底部，不需要判断位置
-  const shouldAutoScroll = true
-  
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
+  // 仅当前 Agent 的消息自动滚动到底部
+  const shouldAutoScroll = isCurrentAgent(targetAgentId)
   
   // 添加到目标 Agent 的消息列表
   const currentOutputs = allOutputs.value.get(targetAgentId) || []
@@ -3664,12 +3667,12 @@ function appendOutput(payload, agentId = null) {
     // 不影响正常显示，静默失败
   }
   
-  // DOM更新后，自动滚动到底部
+  // DOM更新后，仅当前 Agent 的消息自动滚动到底部
   // 使用双 nextTick + requestAnimationFrame 确保布局完全计算后再滚动
   nextTick(() => {
     nextTick(() => {
       requestAnimationFrame(() => {
-        if (outputList.value) {
+        if (shouldAutoScroll && outputList.value) {
           const scrollHeight = outputList.value.scrollHeight
           outputList.value.scrollTop = scrollHeight
           console.log('[SCROLL] Auto-scrolled to bottom')
