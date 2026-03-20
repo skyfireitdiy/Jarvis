@@ -2681,7 +2681,8 @@ async function copyAgent(agent) {
       body: JSON.stringify({
         agent_type: agent.agent_type,
         working_dir: agent.working_dir,
-        name: agent.name || undefined
+        name: agent.name || undefined,
+        llm_group: agent.llm_group || 'default'
       })
     })
     
