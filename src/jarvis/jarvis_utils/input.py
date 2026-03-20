@@ -455,6 +455,9 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
+    if _is_non_interactive_for_current_agent():
+        return default
+
     # 检查是否在 Gateway 模式下
     gateway = None
     GatewayInputRequest = None
