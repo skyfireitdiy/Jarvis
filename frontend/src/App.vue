@@ -3955,6 +3955,14 @@ function handleTextareaKeydown(event) {
     return
   }
   
+  // Ctrl+T 触发终端命令执行
+  if (event.ctrlKey && event.key === 't') {
+    event.preventDefault()
+    inputText.value = '__CTRL_T_PRESSED__'
+    submitInput()
+    return
+  }
+  
   // Ctrl+C 在等待多行输入且输入框为空时，触发完成功能
   if (event.ctrlKey && event.key === 'c') {
     const userInput = inputText.value.trim()

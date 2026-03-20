@@ -74,6 +74,45 @@ FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Sentinel value to indicate that Ctrl+C was pressed
 CTRL_C_SENTINEL = "__CTRL_C_PRESSED__"
+# Sentinel value to indicate that Ctrl+T was pressed
+CTRL_T_SENTINEL = "__CTRL_T_PRESSED__"
+
+
+def _gen_shell_cmd_for_terminal() -> str:
+    """Generate shell command for terminal execution.
+
+    This function generates appropriate shell commands based on the operating system.
+    It's used both for Ctrl+T in CLI mode and for the Web frontend.
+
+    Returns:
+        Shell command string with appropriate interpreter.
+    """
+    try:
+        if _os.name == "nt":
+            # Prefer PowerShell if available, otherwise fallback to cmd
+            for name in ("pwsh", "powershell", "cmd"):
+                if name == "cmd" or _shutil.which(name):
+                    if name == "cmd":
+                        # Keep session open with /K and set env for spawned shell
+                        return "!cmd /K set terminal=1"
+                    else:
+                        # PowerShell or pwsh: set env then remain in session
+                        return f"!{name} -NoExit -Command \"$env:terminal='1'\""
+        else:
+            shell_path = os.environ.get("SHELL", "")
+            if shell_path:
+                base = os.path.basename(shell_path)
+                if base:
+                    return f"!env terminal=1 {base}"
+            for name in ("fish", "zsh", "bash", "sh"):
+                if _shutil.which(name):
+                    return f"!env terminal=1 {name}"
+            return "!env terminal=1 bash"
+    except Exception:
+        return "!env terminal=1 bash"
+    # Fallback for all cases
+    return "!env terminal=1 bash"
+
 
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
@@ -1213,7 +1252,7 @@ def _get_multiline_input_internal(
             return "!env terminal=1 bash"
 
         # Append a special marker to indicate no-confirm execution in shell_input_handler
-        event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
+        event.app.exit(result=_gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM")
 
     @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event: KeyPressEvent) -> None:
@@ -1517,6 +1556,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             if user_input == CTRL_C_SENTINEL:
                 # Ctrl+C pressed, allow exit and return empty string
                 return ""
+            elif user_input == CTRL_T_SENTINEL:
+                # Ctrl+T pressed, generate shell command for terminal
+                return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM"
             elif not user_input:
                 # Empty submission, require user to input something
                 continue
