@@ -5,7 +5,7 @@
       <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
-          <button class="icon-btn" @click="showCreateAgentModal = true" title="创建新 Agent">➕</button>
+          <button class="icon-btn" @click="openCreateAgentModal" title="创建新 Agent">➕</button>
           <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
         </div>
       </div>
@@ -17,6 +17,7 @@
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
+            <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
           </div>
           <div class="agent-dir" @click.stop="toggleFileTree(agent.agent_id, agent.working_dir)">{{ agent.working_dir }}（点击浏览）</div>
           
@@ -2396,6 +2397,13 @@ async function confirmDirectory() {
 function cancelDirDialog() {
   showDirDialog.value = false
   selectedDir.value = null
+}
+
+// 打开创建 Agent 弹窗
+async function openCreateAgentModal() {
+  // 先刷新模型组列表，确保获取最新的配置
+  await fetchModelGroups()
+  showCreateAgentModal.value = true
 }
 
 // 获取模型组列表
@@ -6009,6 +6017,14 @@ body::-webkit-scrollbar {
 .agent-status.stopped {
   background: rgba(248, 81, 73, 0.2);
   color: #f85149;
+}
+
+.agent-llm-group {
+  font-size: 11px;
+  color: #666;
+  background: rgba(108, 117, 125, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .agent-port {
