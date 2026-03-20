@@ -21,7 +21,7 @@
           <div class="agent-dir" @click.stop="toggleFileTree(agent.agent_id, agent.working_dir)">{{ agent.working_dir }}（点击浏览）</div>
           
           <!-- 文件树容器 -->
-          <div v-if="showFileTree.get(agent.agent_id)" class="file-tree-container">
+          <div v-if="getShowFileTree(agent.agent_id)" class="file-tree-container">
             <div v-if="!fileTreeState.get(agent.agent_id) || fileTreeState.get(agent.agent_id).length === 0" class="file-tree-empty">
               <button @click.stop="initFileTree(agent.agent_id, agent.working_dir)">加载文件树</button>
             </div>
@@ -2825,7 +2825,8 @@ function initFileTreeState(agentId) {
     fileTreeState.value.set(agentId, [])
     fileTreeExpanded.value.set(agentId, new Set())
     fileTreeLoading.value.set(agentId, new Set())
-    showFileTree.value.set(agentId, false) // 默认不显示文件树
+    // 不再在此处设置 showFileTree，由 toggleFileTree 控制显示状态
+    // showFileTree.value.set(agentId, false) // 默认不显示文件树
   }
 }
 
@@ -2920,6 +2921,13 @@ function flattenVisibleFileTreeNodes(nodes, depth = 0) {
 function getVisibleFileTreeNodes(agentId) {
   const treeNodes = fileTreeState.value.get(agentId) || []
   return flattenVisibleFileTreeNodes(treeNodes)
+}
+
+// 获取文件树显示状态（可追踪响应式）
+function getShowFileTree(agentId) {
+  // 通过访问 showFileTree.value 确保依赖被追踪
+  const map = showFileTree.value
+  return map.get(agentId) || false
 }
 
 // 切换显示/隐藏文件树
