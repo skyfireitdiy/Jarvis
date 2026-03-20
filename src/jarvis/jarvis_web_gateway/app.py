@@ -1128,47 +1128,52 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    def _validate_absolute_file_path(file_path: str) -> pathlib.Path:
+        if not file_path:
+            raise ValueError("Path is required")
+
+        target_path = pathlib.Path(file_path)
+        if not target_path.is_absolute():
+            raise ValueError("Path must be absolute")
+
+        target_path = target_path.resolve()
+        if not target_path.exists():
+            raise FileNotFoundError(f"Path does not exist: {file_path}")
+
+        if not target_path.is_file():
+            raise IsADirectoryError(f"Path is not a file: {file_path}")
+
+        return target_path
+
     @app.post("/api/file-content")
     async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
         """读取指定绝对路径文件的内容。"""
         try:
             file_path = str(request.get("path", "")).strip()
-            if not file_path:
+            try:
+                target_path = _validate_absolute_file_path(file_path)
+            except ValueError as exc:
                 return {
                     "success": False,
                     "error": {
                         "code": "INVALID_PATH",
-                        "message": "Path is required",
+                        "message": str(exc),
                     },
                 }
-
-            target_path = pathlib.Path(file_path)
-            if not target_path.is_absolute():
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "INVALID_PATH",
-                        "message": "Path must be absolute",
-                    },
-                }
-
-            target_path = target_path.resolve()
-
-            if not target_path.exists():
+            except FileNotFoundError as exc:
                 return {
                     "success": False,
                     "error": {
                         "code": "NOT_FOUND",
-                        "message": f"Path does not exist: {file_path}",
+                        "message": str(exc),
                     },
                 }
-
-            if not target_path.is_file():
+            except IsADirectoryError as exc:
                 return {
                     "success": False,
                     "error": {
                         "code": "NOT_A_FILE",
-                        "message": f"Path is not a file: {file_path}",
+                        "message": str(exc),
                     },
                 }
 
@@ -1210,6 +1215,61 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "data": {
                     "path": str(target_path),
                     "content": file_content,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/file-stat")
+    async def get_file_stat(request: Dict[str, Any]) -> Dict[str, Any]:
+        """读取指定绝对路径文件的元信息。"""
+        try:
+            file_path = str(request.get("path", "")).strip()
+            try:
+                target_path = _validate_absolute_file_path(file_path)
+            except ValueError as exc:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": str(exc),
+                    },
+                }
+            except FileNotFoundError as exc:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": str(exc),
+                    },
+                }
+            except IsADirectoryError as exc:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_A_FILE",
+                        "message": str(exc),
+                    },
+                }
+
+            file_stat = target_path.stat()
+            return {
+                "success": True,
+                "data": {
+                    "path": str(target_path),
+                    "mtime_ns": file_stat.st_mtime_ns,
+                    "size": file_stat.st_size,
                 },
             }
         except PermissionError:
