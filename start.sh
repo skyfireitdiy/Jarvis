@@ -51,14 +51,10 @@ sleep 5
 echo "🎨 启动前端服务..."
 cd "$PROJECT_ROOT/frontend"
 
-# 检查并安装前端依赖
-if [ ! -d "node_modules" ]; then
-    echo "📦 首次启动，安装前端依赖..."
-    npm install
-    echo "✅ 前端依赖安装完成"
-else
-    echo "✅ 前端依赖已存在，跳过安装"
-fi
+# 安装前端依赖
+echo "📦 安装前端依赖..."
+npm install
+echo "✅ 前端依赖安装完成"
 
 npm run dev -- --host $FRONTEND_HOST --port $FRONTEND_PORT &
 FRONTEND_PID=$!
