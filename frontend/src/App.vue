@@ -1404,9 +1404,39 @@ const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
 // 历史输入记录
+const INPUT_HISTORY_STORAGE_KEY = 'jarvis_input_history'
+const MAX_INPUT_HISTORY_COUNT = 100
+
 const inputHistory = ref([]) // 历史输入记录数组
 const historyIndex = ref(-1) // 当前浏览的历史记录索引（-1 表示未浏览历史）
 const currentTempInput = ref('') // 用户正在编辑的临时内容
+
+function loadInputHistory() {
+  const savedValue = localStorage.getItem(INPUT_HISTORY_STORAGE_KEY)
+  if (!savedValue) {
+    return []
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (!Array.isArray(parsedValue)) {
+      return []
+    }
+
+    return parsedValue
+      .filter(historyItem => typeof historyItem === 'string' && historyItem.trim())
+      .slice(0, MAX_INPUT_HISTORY_COUNT)
+  } catch {
+    return []
+  }
+}
+
+function saveInputHistory() {
+  localStorage.setItem(
+    INPUT_HISTORY_STORAGE_KEY,
+    JSON.stringify(inputHistory.value.slice(0, MAX_INPUT_HISTORY_COUNT))
+  )
+}
 
 // Toast 提示
 const toast = ref({
@@ -3883,10 +3913,12 @@ function saveToHistory(text) {
   // 将新输入添加到历史记录开头
   inputHistory.value.unshift(text)
   
-  // 限制历史记录数量（最多保存100条）
-  if (inputHistory.value.length > 100) {
+  // 限制历史记录数量
+  if (inputHistory.value.length > MAX_INPUT_HISTORY_COUNT) {
     inputHistory.value.pop()
   }
+
+  saveInputHistory()
   
   // 重置历史浏览状态
   historyIndex.value = -1
@@ -5077,6 +5109,8 @@ watch(activeEditorTabPath, async (path) => {
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
+
+  inputHistory.value = loadInputHistory()
   
   // 启动 Agent 列表刷新
   startAgentListRefresh()
