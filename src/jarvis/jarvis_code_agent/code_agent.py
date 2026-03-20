@@ -27,6 +27,7 @@ from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.code_agent_prompts import (
     classify_user_request,
     get_system_prompt,
@@ -364,19 +365,32 @@ class CodeAgent(Agent):
             self.prefix = prefix
             self.suffix = suffix
 
-            # 优先处理内置命令（如 <ListRule>）
-            # 如果是内置命令且已被处理，则直接返回，不进入需求分类流程
+            # 优先处理输入处理器（如内置命令、shell 快捷输入）
+            # 如果当前输入已被处理，则继续等待用户输入，不进入需求分类流程
             processed_input = ""
             while True:
                 processed_input, is_handled = builtin_input_handler(user_input, self)
                 if is_handled:
-                    # 内置命令已处理完成，直接返回
+                    # 内置命令已处理完成，继续等待用户输入
                     user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
                     if not user_input:
                         # 用户取消输入，不保存会话
                         _should_save_session = False
                         return None
                     continue
+
+                processed_input, is_handled = shell_input_handler(user_input, self)
+                if is_handled:
+                    # Shell 输入已处理完成，继续等待用户输入
+                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
+                    if not user_input:
+                        # 用户取消输入，不保存会话
+                        _should_save_session = False
+                        return None
+                    continue
+
+                if processed_input:
+                    user_input = processed_input
                 break
 
             # 需求分类：仅在首次运行时执行（未恢复会话）
@@ -1393,7 +1407,6 @@ def cli(
         "--web-gateway",
         help="启用 Web Gateway 服务（WebSocket 输入输出）",
     ),
-
     web_gateway_port: int = typer.Option(
         8000,
         "--web-gateway-port",
@@ -1495,6 +1508,7 @@ def cli(
             # 如果提供了密码参数，更新 gateway_auth 配置
             if gateway_password:
                 from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
                 if "gateway_auth" not in GLOBAL_CONFIG_DATA:
                     GLOBAL_CONFIG_DATA["gateway_auth"] = {}
                 GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
@@ -1510,7 +1524,7 @@ def cli(
             @custom_app.get("/status")
             async def get_status() -> dict:
                 """获取 Agent 运行状态。
-                
+
                 返回状态说明：
                 - execution_status: 任务执行状态（running/waiting_multi/waiting_single）
                 - status: 进程状态（永远返回 running，因为进程还在运行）
@@ -1730,9 +1744,7 @@ def cli(
                             PrettyOutput.auto_print(f"⚠️  检测历史会话失败: {e}")
 
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
-                    if (
-                        restore_session or is_auto_resume_session()
-                    ):
+                    if restore_session or is_auto_resume_session():
                         if agent.restore_session():
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
