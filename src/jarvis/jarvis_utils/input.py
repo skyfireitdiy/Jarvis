@@ -74,15 +74,15 @@ FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Sentinel value to indicate that Ctrl+C was pressed
 CTRL_C_SENTINEL = "__CTRL_C_PRESSED__"
-# Sentinel value to indicate that Ctrl+T was pressed
-CTRL_T_SENTINEL = "__CTRL_T_PRESSED__"
+# Sentinel value to indicate that Alt+T was pressed
+CTRL_T_SENTINEL = "__ALT_T_PRESSED__"
 
 
 def _gen_shell_cmd_for_terminal() -> str:
     """Generate shell command for terminal execution.
 
     This function generates appropriate shell commands based on the operating system.
-    It's used both for Ctrl+T in CLI mode and for the Web frontend.
+    It's used both for Alt+T in CLI mode and for the Web frontend.
 
     Returns:
         Shell command string with appropriate interpreter.
@@ -1216,43 +1216,24 @@ def _get_multiline_input_internal(
         """Handle Ctrl+X by exiting the prompt and requesting program exit."""
         event.app.exit(result=CTRL_X_SENTINEL)
 
-    @bindings.add("c-t", eager=True)
-    def _(event: KeyPressEvent) -> None:
-        """Return a shell command like '!bash' for upper input_handler to execute.
+    def _handle_shell_cmd(event: KeyPressEvent) -> None:
+        """Handle shell command trigger (called by Ctrl+T and Alt+T).
 
         This binding works globally (without focus filter) so it can be triggered
         even when LLM is outputting or after interrupting output with Ctrl+C.
         """
-
-        def _gen_shell_cmd() -> str:
-            try:
-                if _os.name == "nt":
-                    # Prefer PowerShell if available, otherwise fallback to cmd
-                    for name in ("pwsh", "powershell", "cmd"):
-                        if name == "cmd" or _shutil.which(name):
-                            if name == "cmd":
-                                # Keep session open with /K and set env for the spawned shell
-                                return "!cmd /K set terminal=1"
-                            else:
-                                # PowerShell or pwsh: set env then remain in session
-                                return f"!{name} -NoExit -Command \"$env:terminal='1'\""
-                else:
-                    shell_path = os.environ.get("SHELL", "")
-                    if shell_path:
-                        base = os.path.basename(shell_path)
-                        if base:
-                            return f"!env terminal=1 {base}"
-                    for name in ("fish", "zsh", "bash", "sh"):
-                        if _shutil.which(name):
-                            return f"!env terminal=1 {name}"
-                    return "!env terminal=1 bash"
-            except Exception:
-                return "!env terminal=1 bash"
-            # Fallback for all cases
-            return "!env terminal=1 bash"
-
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM")
+
+    @bindings.add("c-t", eager=True)
+    def _(event: KeyPressEvent) -> None:
+        """Handle Ctrl+T to trigger shell command (CLI mode)."""
+        _handle_shell_cmd(event)
+
+    @bindings.add("escape", "t", eager=True)
+    def _(event: KeyPressEvent) -> None:
+        """Handle Alt+T to trigger shell command (CLI/Web mode)."""
+        _handle_shell_cmd(event)
 
     @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event: KeyPressEvent) -> None:
@@ -1351,7 +1332,7 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "Ctrl+O"),
                 ("class:bt.label", " 复制历史信息 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+T"),
+                ("class:bt.key", "Alt+T"),
                 ("class:bt.label", " 终端(!SHELL) "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+X"),
@@ -1557,7 +1538,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 # Ctrl+C pressed, allow exit and return empty string
                 return ""
             elif user_input == CTRL_T_SENTINEL:
-                # Ctrl+T pressed, generate shell command for terminal
+                # Alt+T pressed, generate shell command for terminal
                 return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM"
             elif not user_input:
                 # Empty submission, require user to input something

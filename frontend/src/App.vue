@@ -3963,10 +3963,13 @@ function handleTextareaKeydown(event) {
     return
   }
   
-  // Ctrl+T 触发终端命令执行
-  if (event.ctrlKey && event.key === 't') {
+  // Alt+T 触发终端命令执行
+  // 使用 event.code 而不是 event.key 来避免大小写问题
+  // event.code 在按键位置相同的情况下返回相同的值，不受大小写影响
+  if (event.altKey && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
     event.preventDefault()
-    inputText.value = '__CTRL_T_PRESSED__'
+    event.stopPropagation() // 阻止事件冒泡
+    inputText.value = '__ALT_T_PRESSED__'
     submitInput()
     return
   }
@@ -4962,6 +4965,17 @@ function handleGlobalKeydown(event) {
       console.log('[app] Toggle terminal panel:', showTerminalPanel.value)
     }
   }
+
+  // Alt + T 在 textarea 中切换代码编辑器
+  if (event.altKey && event.key === 't') {
+    const tagName = event.target.tagName.toLowerCase()
+    if (tagName === 'textarea') {
+      event.preventDefault()
+      event.stopPropagation()
+      // 手动调用 textarea 的 keydown 处理
+      handleTextareaKeydown(event)
+    }
+  }
   
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
@@ -5091,9 +5105,9 @@ onMounted(() => {
     console.log('[HISTORY] Scroll listener added')
   }
   
-  // 添加全局键盘事件监听
-  document.addEventListener('keydown', handleGlobalKeydown)
-  console.log('[app] Global keyboard listener added')
+  // 添加全局键盘事件监听（在捕获阶段处理 Ctrl+T 等快捷键）
+  document.addEventListener('keydown', handleGlobalKeydown, { capture: true })
+  console.log('[app] Global keyboard listener added (capture mode)')
   
   // 监听窗口resize事件
   const handleResize = () => {
@@ -5170,7 +5184,7 @@ onUnmounted(() => {
   editorModels.clear()
 
   // 移除全局键盘事件监听
-  document.removeEventListener('keydown', handleGlobalKeydown)
+  document.removeEventListener('keydown', handleGlobalKeydown, { capture: true })
   console.log('[app] Global keyboard listener removed')
   
   // 移除窗口resize监听
