@@ -69,8 +69,8 @@ class AgentManager:
 
     # Agent 入口文件路径
     AGENT_ENTRY_POINTS = {
-        "agent": "python -m jarvis.jarvis_agent.jarvis",
-        "codeagent": "python -m jarvis.jarvis_code_agent.code_agent",
+        "agent": "jvs",
+        "codeagent": "jca",
     }
 
     # 随机端口范围
