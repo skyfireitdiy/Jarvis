@@ -185,6 +185,7 @@ class AgentManager:
             working_dir=working_dir,
             process=process,
             name=name,
+            llm_group=llm_group,
         )
 
         # 保存到内存
