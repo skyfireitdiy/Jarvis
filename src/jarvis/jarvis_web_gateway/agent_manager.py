@@ -35,6 +35,7 @@ class AgentInfo:
         working_dir: str,
         process: Optional[subprocess.Popen],
         name: Optional[str] = None,
+        llm_group: str = "default",
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -43,6 +44,7 @@ class AgentInfo:
         self.port = port
         self.working_dir = working_dir
         self.process = process
+        self.llm_group = llm_group
         self.status = "running"
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
@@ -57,6 +59,7 @@ class AgentInfo:
             "port": self.port,
             "status": self.status,
             "working_dir": self.working_dir,
+            "llm_group": self.llm_group,
             "created_at": self.created_at,
         }
 
@@ -549,6 +552,9 @@ class AgentManager:
                         working_dir=agent_data["working_dir"],
                         process=None,  # 进程对象无法恢复，设为 None
                         name=agent_data.get("name"),
+                        llm_group=agent_data.get(
+                            "llm_group", "default"
+                        ),  # 向后兼容，旧数据使用默认值
                     )
 
                     # 检查进程是否还在运行
