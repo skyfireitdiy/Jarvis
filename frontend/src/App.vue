@@ -1402,6 +1402,8 @@ const inputTip = ref('')
 const multilineInput = ref(null)
 const singlelineInput = ref(null)
 const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
+const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent
+const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
 // 历史输入记录
@@ -1626,7 +1628,7 @@ const completionItemsRef = ref([]) // 补全条目元素引用数组
 const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示未选中
 
 // 流式消息跟踪
-const streamingMessage = ref(null) // 当前流式消息
+const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消息
 
 // 执行状态
 const isExecuting = ref(false)
@@ -3229,9 +3231,9 @@ function handleMessage(message, agentId = null) {
     // 处理流式输出
     if (outputType === 'STREAM_START') {
       console.log('[STREAM] Start event:', payload)
-      // 创建新的流式消息
+      // 创建当前 Agent 的流式消息
       const currentOutputs = allOutputs.value.get(targetAgentId) || []
-      streamingMessage.value = {
+      const streamingMessage = {
         output_type: 'STREAM',
         text: '',
         lang: 'markdown',
@@ -3241,15 +3243,17 @@ function handleMessage(message, agentId = null) {
         context: payload?.context || {},
         isStreaming: true
       }
-      currentOutputs.push(streamingMessage.value)
-      console.log('[STREAM] Created streaming message, total:', currentOutputs.length)
+      streamingMessages.value.set(targetAgentId, streamingMessage)
+      currentOutputs.push(streamingMessage)
+      console.log('[STREAM] Created streaming message, total:', currentOutputs.length, 'agent:', targetAgentId)
     } else if (outputType === 'STREAM_CHUNK') {
       console.log('[STREAM] Chunk event:', payload)
-      // 追加到当前流式消息
-      if (streamingMessage.value) {
-        streamingMessage.value.text += payload.text || ''
+      // 追加到当前 Agent 的流式消息
+      const streamingMessage = streamingMessages.value.get(targetAgentId)
+      if (streamingMessage) {
+        streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
-        streamingMessage.value.html = renderMessageHtml(streamingMessage.value)
+        streamingMessage.html = renderMessageHtml(streamingMessage)
         // 自动滚动到底部
         nextTick(() => {
           if (outputList.value) {
@@ -3257,22 +3261,23 @@ function handleMessage(message, agentId = null) {
           }
         })
       } else {
-        console.warn('[STREAM] Received chunk but no streaming message found')
+        console.warn('[STREAM] Received chunk but no streaming message found for agent:', targetAgentId)
       }
     } else if (outputType === 'STREAM_END') {
       console.log('[STREAM] End event:', payload)
-      if (streamingMessage.value) {
-        // 从 outputs 数组中删除流式消息
+      const streamingMessage = streamingMessages.value.get(targetAgentId)
+      if (streamingMessage) {
+        // 从当前 Agent 的 outputs 数组中删除流式消息
         const currentOutputs = allOutputs.value.get(targetAgentId) || []
-        const index = currentOutputs.indexOf(streamingMessage.value)
+        const index = currentOutputs.indexOf(streamingMessage)
         if (index !== -1) {
           currentOutputs.splice(index, 1)
-          console.log('[STREAM] Removed streaming message from outputs')
+          console.log('[STREAM] Removed streaming message from outputs for agent:', targetAgentId)
         }
-        // 清除当前流式消息引用
-        streamingMessage.value = null
+        // 清除当前 Agent 的流式消息引用
+        streamingMessages.value.delete(targetAgentId)
       } else {
-        console.warn('[STREAM] Received end but no streaming message found')
+        console.warn('[STREAM] Received end but no streaming message found for agent:', targetAgentId)
       }
     } else {
       // 普通输出
@@ -3280,31 +3285,32 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'input_request') {
     console.log('[ws] input_request', payload)
-    const agentId = currentAgentId.value
+    const requestAgentId = targetAgentId
+    pendingInputAgentId.value = requestAgentId
     
     // 根据 mode 设置 agentStatuses
-    if (agentId && payload.mode) {
+    if (requestAgentId && payload.mode) {
       const statusKey = payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single'
-      agentStatuses.value.set(agentId, {execution_status: statusKey})
-      console.log('[ws] Set agentStatuses based on input_request mode:', statusKey, 'for agent:', agentId)
+      agentStatuses.value.set(requestAgentId, {execution_status: statusKey})
+      console.log('[ws] Set agentStatuses based on input_request mode:', statusKey, 'for agent:', requestAgentId)
     }
     
     // 检查缓冲区是否有内容
-    if (agentId && inputBuffers.value.has(agentId)) {
+    if (requestAgentId && inputBuffers.value.has(requestAgentId)) {
       // 完成信号 (__CTRL_C_PRESSED__) 只发送给多行输入
-      const bufferedText = inputBuffers.value.get(agentId)
+      const bufferedText = inputBuffers.value.get(requestAgentId)
       const isCompletionSignal = bufferedText === '__CTRL_C_PRESSED__'
       const isMultiLineRequest = payload.mode === 'multi'
       
       if (isCompletionSignal && !isMultiLineRequest) {
         // 完成信号不能发送给单行输入（如确认对话框），清空缓冲区
         console.log('[INPUT_REQUEST] Completion signal in buffer but request is single-line, discarding')
-        inputBuffers.value.delete(agentId)
+        inputBuffers.value.delete(requestAgentId)
       } else {
         // 普通输入或匹配的多行输入，发送缓冲区内容
         console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
-        inputBuffers.value.delete(agentId)
-        sendInputResult(bufferedText, payload.request_id)
+        inputBuffers.value.delete(requestAgentId)
+        sendInputResult(bufferedText, payload.request_id, requestAgentId)
       }
       return
     }
@@ -3349,13 +3355,14 @@ function handleMessage(message, agentId = null) {
     })
   } else if (type === 'confirm') {
     console.log('[ws] confirm', payload)
+    pendingConfirmAgentId.value = targetAgentId
     showConfirm(
       payload.message || '请确认',
       () => {
-        sendConfirmResult(true)
+        sendConfirmResult(true, targetAgentId)
       },
       () => {
-        sendConfirmResult(false)
+        sendConfirmResult(false, targetAgentId)
       },
       payload.default !== undefined ? payload.default : true
     )
@@ -4172,8 +4179,8 @@ function sendInputDirectly(text) {
   lastInputRequest.value = null // 清空保存的输入请求
 }
 
-function sendInputResult(text, requestId) {
-  const agentId = currentAgentId.value
+function sendInputResult(text, requestId, agentId = null) {
+  const targetAgentId = agentId || pendingInputAgentId.value || currentAgentId.value
   
   // 先将用户输入回显到聊天窗口
   console.log('[DEBUG] Buffered input payload:', {
@@ -4181,13 +4188,14 @@ function sendInputResult(text, requestId) {
     agent_name: 'user',
     text: text,
     lang: 'text',
+    agent_id: targetAgentId,
   })
   appendOutput({
     output_type: 'user_input',
     agent_name: 'user',
     text: text,
     lang: 'text',
-  })
+  }, targetAgentId)
   
   const message = {
     type: 'input_result',
@@ -4196,8 +4204,16 @@ function sendInputResult(text, requestId) {
       request_id: requestId,
     },
   }
-  console.log('[ws] send input_result (from buffer)', message)
-  sendMessageToAgent(message)
+  console.log('[ws] send input_result (from buffer)', message, 'agent:', targetAgentId)
+  if (targetAgentId) {
+    const ws = sockets.value.get(targetAgentId)
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message))
+    } else {
+      console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
+    }
+  }
+  pendingInputAgentId.value = null
 }
 
 function sendBufferedInput() {
@@ -4255,15 +4271,24 @@ function saveBufferEdit() {
   })
 }
 
-function sendConfirmResult(confirmed) {
+function sendConfirmResult(confirmed, agentId = null) {
+  const targetAgentId = agentId || pendingConfirmAgentId.value || currentAgentId.value
   const message = {
     type: 'confirm_result',
     payload: {
       confirmed,
     },
   }
-  console.log('[ws] send confirm_result', message)
-  sendMessageToAgent(message)
+  console.log('[ws] send confirm_result', message, 'agent:', targetAgentId)
+  if (targetAgentId) {
+    const ws = sockets.value.get(targetAgentId)
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message))
+    } else {
+      console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
+    }
+  }
+  pendingConfirmAgentId.value = null
 }
 
 function sendInterrupt() {
