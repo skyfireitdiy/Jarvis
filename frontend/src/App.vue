@@ -945,6 +945,8 @@ const editorTabs = ref([])
 const activeEditorTabPath = ref(null)
 const editorModels = new Map()
 let monacoEditor = null
+let editorFileHeartbeatTimer = null
+const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -1162,6 +1164,19 @@ function syncEditorTabDirtyState(path, value) {
   }
 }
 
+function updateEditorTabFileStat(tab, fileStat = {}) {
+  if (!tab) return
+  tab.mtimeNs = fileStat.mtime_ns ?? null
+  tab.fileSize = fileStat.size ?? null
+}
+
+function markEditorTabExternalModified(path, value) {
+  const tab = getEditorTabByPath(path)
+  if (tab) {
+    tab.externalModified = value
+  }
+}
+
 function ensureMonacoEditor() {
   if (monacoEditor || !editorContainerRef.value) return
 
@@ -1224,6 +1239,103 @@ async function fetchFileContent(path) {
   return result.data.content || ''
 }
 
+async function fetchFileStat(path) {
+  const { host, port } = getGatewayAddress()
+  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-stat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  })
+
+  const result = await response.json()
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || '读取文件状态失败')
+  }
+  return result.data
+}
+
+async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
+  const tab = getEditorTabByPath(path)
+  if (!tab) return
+
+  const [content, fileStat] = await Promise.all([
+    fetchFileContent(path),
+    fetchFileStat(path),
+  ])
+
+  tab.content = content
+  tab.originalContent = content
+  tab.isDirty = false
+  tab.error = ''
+  tab.externalModified = false
+  updateEditorTabFileStat(tab, fileStat)
+
+  const model = editorModels.get(path)
+  if (model && model.getValue() !== content) {
+    model.setValue(content)
+  }
+
+  if (showAutoRefreshToast) {
+    showToast('检测到文件已更新，已自动刷新', 'info')
+  }
+}
+
+async function checkActiveEditorFileHeartbeat() {
+  if (!showEditorPanel.value) return
+
+  const tab = activeEditorTab.value
+  if (!tab || tab.loading || !tab.path) return
+
+  try {
+    const remoteFileStat = await fetchFileStat(tab.path)
+    const remoteMtimeNs = remoteFileStat.mtime_ns ?? null
+    const remoteFileSize = remoteFileStat.size ?? null
+    const localMtimeNs = tab.mtimeNs ?? null
+    const localFileSize = tab.fileSize ?? null
+    const hasRemoteChange =
+      remoteMtimeNs !== localMtimeNs || remoteFileSize !== localFileSize
+
+    if (!hasRemoteChange) {
+      if (!tab.isDirty && tab.externalModified) {
+        tab.externalModified = false
+      }
+      return
+    }
+
+    if (tab.isDirty) {
+      if (!tab.externalModified) {
+        tab.externalModified = true
+        tab.error = '文件已被外部修改，请先处理冲突后再保存'
+        showToast('检测到文件外部变更，当前标签有未保存修改', 'error')
+      }
+      return
+    }
+
+    await refreshEditorTabFromRemote(tab.path, true)
+  } catch (error) {
+    console.error('[EDITOR] File heartbeat check failed:', error)
+  }
+}
+
+function stopEditorFileHeartbeat() {
+  if (editorFileHeartbeatTimer) {
+    clearInterval(editorFileHeartbeatTimer)
+    editorFileHeartbeatTimer = null
+  }
+}
+
+function startEditorFileHeartbeat() {
+  stopEditorFileHeartbeat()
+
+  if (!showEditorPanel.value || !activeEditorTab.value) {
+    return
+  }
+
+  editorFileHeartbeatTimer = setInterval(() => {
+    checkActiveEditorFileHeartbeat()
+  }, EDITOR_FILE_HEARTBEAT_INTERVAL)
+}
+
 async function openEditorFile(path) {
   if (!path) return
 
@@ -1244,14 +1356,22 @@ async function openEditorFile(path) {
     isDirty: false,
     loading: true,
     error: '',
+    externalModified: false,
+    mtimeNs: null,
+    fileSize: null,
   }
   editorTabs.value.push(tab)
   activeEditorTabPath.value = path
 
   try {
-    const content = await fetchFileContent(path)
+    const [content, fileStat] = await Promise.all([
+      fetchFileContent(path),
+      fetchFileStat(path),
+    ])
     tab.content = content
     tab.originalContent = content
+    tab.externalModified = false
+    updateEditorTabFileStat(tab, fileStat)
     tab.loading = false
 
     let model = editorModels.get(path)
@@ -1296,6 +1416,15 @@ async function saveEditorTab(path) {
   tab.content = content
   tab.isDirty = false
   tab.error = ''
+  tab.externalModified = false
+
+  try {
+    const fileStat = await fetchFileStat(path)
+    updateEditorTabFileStat(tab, fileStat)
+  } catch (error) {
+    console.error('[EDITOR] Failed to refresh file stat after save:', error)
+  }
+
   showToast('文件已保存', 'success')
 }
 
@@ -4880,6 +5009,19 @@ function stopTerminalPanelInteraction() {
 }
 
 // 监听面板显示状态
+watch(showEditorPanel, (visible) => {
+  if (visible) {
+    startEditorFileHeartbeat()
+    return
+  }
+
+  stopEditorFileHeartbeat()
+})
+
+watch(activeEditorTabPath, () => {
+  startEditorFileHeartbeat()
+})
+
 watch(showTerminalPanel, (newValue, oldValue) => {
   if (!newValue && oldValue) {
     stopTerminalPanelInteraction()
@@ -5246,6 +5388,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopEditorPanelInteraction()
+  stopEditorFileHeartbeat()
 
   if (monacoEditor) {
     monacoEditor.dispose()
