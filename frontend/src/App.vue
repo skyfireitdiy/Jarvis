@@ -7730,13 +7730,25 @@ body::-webkit-scrollbar {
   max-width: 420px;
 }
 
-.connect-modal h2,
-.settings-modal h2 {
+.connect-modal h2 {
   margin: 0 0 24px 0;
   font-size: 21px;
   font-weight: 600;
   color: #e6edf3;
   letter-spacing: -0.02em;
+}
+
+/* Settings Modal - 更宽的布局以容纳更多配置项 */
+.settings-modal {
+  max-width: 640px;
+}
+
+.settings-modal h2 {
+  margin: 0 0 24px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.03em;
 }
 
 .form-group {
