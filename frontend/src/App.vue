@@ -575,7 +575,7 @@
     <div class="modal-overlay" v-if="showSettingsModal">
       <div class="modal settings-modal">
         <div class="modal-header">
-          <h2>连接设置</h2>
+          <h2>设置</h2>
           <button class="close-btn" @click="showSettingsModal = false">×</button>
         </div>
         <div class="form-group">
