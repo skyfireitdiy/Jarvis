@@ -262,6 +262,17 @@
         <span class="editor-toolbar-status error" v-else-if="activeEditorTab?.error">{{ activeEditorTab.error }}</span>
         <span class="editor-toolbar-status" v-else-if="activeEditorTab">{{ activeEditorTab.isDirty ? '未保存修改' : '已保存' }}</span>
         <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
+        <div class="editor-toolbar-spacer"></div>
+        <button
+          v-if="editorTabs.length > 0"
+          class="editor-edit-toggle"
+          :class="{ 'editable': isEditorEditable }"
+          @click="toggleEditorEditable"
+          :title="isEditorEditable ? '切换到只读模式' : '切换到编辑模式'"
+        >
+          <span class="editor-edit-toggle-icon">{{ isEditorEditable ? '🔓' : '🔒' }}</span>
+          <span class="editor-edit-toggle-text">{{ isEditorEditable ? '可编辑' : '只读' }}</span>
+        </button>
       </div>
       <div class="editor-panel-content editor-panel-content-main">
         <div v-if="editorTabs.length === 0" class="editor-placeholder">
@@ -1010,6 +1021,7 @@ const activeEditorTabPath = ref(null)
 const editorModels = new Map()
 let monacoEditor = null
 let editorFileHeartbeatTimer = null
+const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
@@ -1256,6 +1268,7 @@ function ensureMonacoEditor() {
     tabSize: 2,
     wordWrap: 'off',
     renderWhitespace: 'selection',
+    readOnly: !isEditorEditable.value,
   })
 
   monacoEditor.onDidChangeModel(() => {
@@ -1492,6 +1505,13 @@ async function saveEditorTab(path) {
 async function saveActiveEditorTab() {
   if (!activeEditorTab.value) return
   await saveEditorTab(activeEditorTab.value.path)
+}
+
+function toggleEditorEditable() {
+  isEditorEditable.value = !isEditorEditable.value
+  if (monacoEditor) {
+    monacoEditor.updateOptions({ readOnly: !isEditorEditable.value })
+  }
 }
 
 function hasDirtyEditorTabs() {
@@ -5896,6 +5916,52 @@ body::-webkit-scrollbar {
 
 .editor-toolbar-status.error {
   color: #f85149;
+}
+
+.editor-toolbar-spacer {
+  flex: 1;
+}
+
+.editor-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  background: rgba(110, 118, 129, 0.2);
+  color: #8b949e;
+  backdrop-filter: blur(20px);
+}
+
+.editor-edit-toggle:hover {
+  background: rgba(110, 118, 129, 0.3);
+}
+
+.editor-edit-toggle:active {
+  transform: scale(0.96);
+}
+
+.editor-edit-toggle.editable {
+  background: rgba(35, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.editor-edit-toggle.editable:hover {
+  background: rgba(35, 197, 94, 0.3);
+}
+
+.editor-edit-toggle-icon {
+  font-size: 12px;
+}
+
+.editor-edit-toggle-text {
+  font-size: 11px;
+  letter-spacing: 0.02em;
 }
 
 .editor-panel-content {
