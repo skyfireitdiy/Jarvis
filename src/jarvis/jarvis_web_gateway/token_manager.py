@@ -12,11 +12,6 @@ import uuid
 from typing import Optional
 
 
-# 全局 Token
-# 在 Web Gateway 启动时生成一次
-_gateway_token: Optional[str] = None
-
-
 def generate_gateway_token() -> str:
     """生成 Gateway Token。
 
@@ -26,25 +21,6 @@ def generate_gateway_token() -> str:
         Token 字符串
     """
     return str(uuid.uuid4())
-
-
-def set_gateway_token(token: str) -> None:
-    """设置 Gateway Token。
-
-    Args:
-        token: Token 字符串
-    """
-    global _gateway_token
-    _gateway_token = token
-
-
-def get_gateway_token() -> Optional[str]:
-    """获取 Gateway Token。
-
-    Returns:
-        Token 字符串，如果未设置则返回 None
-    """
-    return _gateway_token
 
 
 def validate_gateway_token(token: Optional[str]) -> bool:
@@ -59,8 +35,12 @@ def validate_gateway_token(token: Optional[str]) -> bool:
     if not token:
         return False
 
+    print(f"token: {token}")
+
     # 统一从环境变量读取 Token（Web Gateway 和 Agent Gateway 共用）
     expected_token = os.environ.get("JARVIS_AUTH_TOKEN")
+
+    print(f"expected_token: {expected_token}")
 
     if not expected_token:
         return False
