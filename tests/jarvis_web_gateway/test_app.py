@@ -8,11 +8,22 @@ from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
 from jarvis.jarvis_web_gateway.app import create_app
 
 
+# 测试用的认证 Token
+TEST_AUTH_TOKEN = "test-token-for-unit-tests"
+
+
 def create_test_client() -> TestClient:
     # 在测试环境中跳过交互式配置
     os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
+    # 设置认证 Token 环境变量
+    os.environ["JARVIS_AUTH_TOKEN"] = TEST_AUTH_TOKEN
     app = create_app()
     return TestClient(app)
+
+
+def get_auth_headers():
+    """获取认证 Header"""
+    return {"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
 
 
 def test_post_file_content_success(tmp_path):
