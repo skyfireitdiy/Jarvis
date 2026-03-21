@@ -71,6 +71,21 @@ class SessionOutputRouter(OutputMessagePublisher):
             if not subscribers:
                 self._subscribers.pop(route_key, None)
 
+    def unregister_all_session(self, session_id: Optional[str] = None) -> None:
+        """断开指定 session 的所有连接。
+
+        Args:
+            session_id: 会话 ID，如果为 None 则断开所有会话
+        """
+        route_key = session_id or "*"
+        with self._lock:
+            if session_id is None:
+                # 断开所有连接
+                self._subscribers.clear()
+            else:
+                # 断开指定 session 的所有连接
+                self._subscribers.pop(route_key, None)
+
     def publish(
         self, message: Dict[str, Any], session_id: Optional[str] = None
     ) -> None:
