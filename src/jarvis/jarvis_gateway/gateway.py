@@ -61,6 +61,45 @@ class BaseGateway(IGateway):
     """基础网关实现，便于扩展自定义交互方式。"""
 
     def _check_auth(self, auth: Optional[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
+        """检查认证信息。
+
+        Args:
+            auth: 认证信息字典，应包含 token 字段
+
+        Returns:
+            (是否认证成功, 错误信息) 元组
+        """
+        # 导入 token 管理模块
+        try:
+            from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
+        except ImportError:
+            # 如果不可用（如 CLI Gateway），则回退到旧的密码认证
+            return self._check_auth_fallback(auth)
+
+        # 检查 Token
+        if not auth:
+            return False, "token missing"
+
+        token = auth.get("token")
+        if not token:
+            return False, "token missing"
+
+        if validate_gateway_token(token):
+            return True, None
+
+        return False, "invalid token"
+
+    def _check_auth_fallback(
+        self, auth: Optional[Dict[str, Any]]
+    ) -> Tuple[bool, Optional[str]]:
+        """回退的密码认证方法（用于 CLI Gateway）。
+
+        Args:
+            auth: 认证信息字典，应包含 password 字段
+
+        Returns:
+            (是否认证成功, 错误信息) 元组
+        """
         from jarvis.jarvis_utils.config import get_gateway_auth_config
 
         config = get_gateway_auth_config()

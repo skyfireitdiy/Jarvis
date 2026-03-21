@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -24,21 +25,25 @@ logger = logging.getLogger(__name__)
 # 代理相关异常
 class AgentProxyError(Exception):
     """代理异常基类。"""
+
     pass
 
 
 class AgentNotFoundError(AgentProxyError):
     """Agent 不存在。"""
+
     pass
 
 
 class AgentNotRunningError(AgentProxyError):
     """Agent 未运行。"""
+
     pass
 
 
 class ProxyConnectionError(AgentProxyError):
     """代理连接失败。"""
+
     pass
 
 
@@ -61,13 +66,13 @@ class AgentProxyManager:
         self._agent_manager = agent_manager
         self._http_timeout = http_timeout
         self._ws_timeout = ws_timeout
-        
+
         # 创建 httpx 异步客户端（带连接池）
         self._http_client = httpx.AsyncClient(
             timeout=http_timeout,
             follow_redirects=True,
         )
-        
+
         logger.info("[PROXY MANAGER] AgentProxyManager initialized")
 
     async def get_agent_port(self, agent_id: str) -> int:
@@ -132,7 +137,9 @@ class AgentProxyManager:
         # 准备请求头（过滤掉 Host 等需要重写的头）
         headers = dict(request.headers)
         headers.pop("host", None)
-        headers["X-Forwarded-For"] = request.client.host if request.client else "unknown"
+        headers["X-Forwarded-For"] = (
+            request.client.host if request.client else "unknown"
+        )
         headers["X-Forwarded-Proto"] = request.url.scheme
 
         # 读取请求体
@@ -224,6 +231,18 @@ class AgentProxyManager:
         logger.info(f"[PROXY MANAGER] WebSocket connected to agent {agent_id}")
 
         try:
+            # 发送认证消息给 Agent Gateway
+            # Agent Gateway 要求首条消息必须是认证消息
+            import os
+
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if auth_token:
+                auth_message = json.dumps(
+                    {"type": "auth", "payload": {"token": auth_token}}
+                )
+                await agent_ws.send(auth_message)
+                logger.info(f"[PROXY MANAGER] Sent auth message to agent {agent_id}")
+
             # 创建双向转发任务
             client_to_agent_task = asyncio.create_task(
                 self._forward_messages(client_ws, agent_ws, "client->agent")
@@ -258,7 +277,7 @@ class AgentProxyManager:
         finally:
             # 清理连接
             try:
-                if 'agent_ws' in locals():
+                if "agent_ws" in locals():
                     await agent_ws.close()
             except Exception as e:
                 logger.warning(f"[PROXY MANAGER] Failed to close agent WebSocket: {e}")
@@ -283,7 +302,9 @@ class AgentProxyManager:
                 # FastAPI WebSocket
                 while True:
                     data = await source_ws.receive_text()
-                    logger.debug(f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes")
+                    logger.debug(
+                        f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
+                    )
                     if isinstance(target_ws, WebSocket):
                         await target_ws.send_text(data)
                     else:
@@ -292,7 +313,9 @@ class AgentProxyManager:
                 # websockets WebSocket
                 async for message in source_ws:
                     data = message if isinstance(message, str) else message.decode()
-                    logger.debug(f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes")
+                    logger.debug(
+                        f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
+                    )
                     if isinstance(target_ws, WebSocket):
                         await target_ws.send_text(data)
                     else:
