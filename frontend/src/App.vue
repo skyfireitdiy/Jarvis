@@ -8615,5 +8615,121 @@ body::-webkit-scrollbar {
   
   /* ========== Diff 优化 ========== */
   /* 已移到全局样式中，因v-html插入的内容无法使用scoped样式 */
+
+  /* ========== Toggle Switch 样式 ========== */
+  .toggle-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 4px 0;
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 30px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .toggle-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(28, 28, 30, 0.6);
+    backdrop-filter: blur(40px) saturate(150%);
+    -webkit-backdrop-filter: blur(40px) saturate(150%);
+    border: 1px solid rgba(0, 0, 0, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* 外描边效果 */
+    outline: 1px solid rgba(113, 113, 122, 0.4);
+    outline-offset: -1px;
+  }
+
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 24px;
+    width: 24px;
+    left: 3px;
+    bottom: 3px;
+    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .toggle-input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+    border-color: rgba(0, 122, 255, 0.6);
+    box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    outline-color: rgba(0, 122, 255, 0.5);
+  }
+
+  .toggle-input:checked + .toggle-slider:before {
+    transform: translateX(22px);
+    background-color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-color: rgba(0, 122, 255, 0.3);
+  }
+
+  /* Hover 状态 */
+  .toggle-switch:hover .toggle-slider {
+    backdrop-filter: blur(60px) saturate(180%);
+    -webkit-backdrop-filter: blur(60px) saturate(180%);
+  }
+
+  .toggle-switch:hover .toggle-slider:before {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Active 状态 - 物理回弹反馈 */
+  .toggle-switch:active .toggle-slider {
+    transform: scale(0.95);
+  }
+
+  .toggle-switch:active .toggle-slider:before {
+    transform: translateX(22px) scale(0.95);
+  }
+
+  /* 禁用状态 */
+  .toggle-input:disabled + .toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .toggle-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .toggle-label-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e6edf3;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+  }
+
+  /* ========== Toggle Switch 样式结束 ========== */
 }
 </style>
