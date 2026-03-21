@@ -1780,7 +1780,7 @@ watch(completionSearch, async (newSearch) => {
   if (newSearch.trim()) {
     try {
       const { host, port } = getGatewayAddress()
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}/search?query=${encodeURIComponent(newSearch)}`
       )
       
