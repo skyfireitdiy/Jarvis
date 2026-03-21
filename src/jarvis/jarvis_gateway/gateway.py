@@ -94,6 +94,8 @@ class BaseGateway(IGateway):
     ) -> Tuple[bool, Optional[str]]:
         """回退的密码认证方法（用于 CLI Gateway）。
 
+        只要在配置中设置了 password，就启用认证。
+
         Args:
             auth: 认证信息字典，应包含 password 字段
 
@@ -103,23 +105,28 @@ class BaseGateway(IGateway):
         from jarvis.jarvis_utils.config import get_gateway_auth_config
 
         config = get_gateway_auth_config()
-        if not config:
-            return True, None
-        if not bool(config.get("enable", False)):
-            return True, None
-        allow_unset = bool(config.get("allow_unset", True))
-        expected_password = config.get("password")
-        if not expected_password:
-            if allow_unset:
+
+        # 获取配置的密码（可以从配置文件或命令行参数传入）
+        expected_password = config.get("password") if config else None
+
+        # 情况1：配置中有密码 -> 启用认证
+        if expected_password:
+            if not auth:
+                return False, "gateway auth missing"
+
+            password = auth.get("password")
+            if password == expected_password:
                 return True, None
-            return False, "gateway auth required"
-        if not auth:
-            return False, "gateway auth missing"
-        password = auth.get("password")
-        password_match = bool(expected_password) and password == expected_password
-        if password_match:
-            return True, None
-        return False, "gateway auth failed"
+
+            return False, "gateway auth failed"
+
+        # 情况2：配置中没有密码 -> 不启用认证
+        # - 用户没传密码 -> 允许访问
+        # - 用户传了密码 -> 拒绝（因为配置中没有可校验的密码）
+        if not auth or not auth.get("password"):
+            return True, None  # 没传密码，允许访问
+
+        return False, "gateway auth not configured"
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         del event
