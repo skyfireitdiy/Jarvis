@@ -31,7 +31,11 @@ def test_post_file_content_success(tmp_path):
     test_file.write_text("hello jarvis", encoding="utf-8")
     client = create_test_client()
 
-    response = client.post("/api/file-content", json={"path": str(test_file.resolve())})
+    response = client.post(
+        "/api/file-content",
+        json={"path": str(test_file.resolve())},
+        headers=get_auth_headers()
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -45,7 +49,11 @@ def test_post_file_content_rejects_relative_path(tmp_path):
     test_file.write_text("hello jarvis", encoding="utf-8")
     client = create_test_client()
 
-    response = client.post("/api/file-content", json={"path": test_file.name})
+    response = client.post(
+        "/api/file-content",
+        json={"path": test_file.name},
+        headers=get_auth_headers()
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -56,7 +64,11 @@ def test_post_file_content_rejects_relative_path(tmp_path):
 def test_post_file_content_rejects_directory(tmp_path):
     client = create_test_client()
 
-    response = client.post("/api/file-content", json={"path": str(tmp_path.resolve())})
+    response = client.post(
+        "/api/file-content",
+        json={"path": str(tmp_path.resolve())},
+        headers=get_auth_headers()
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -69,7 +81,11 @@ def test_post_file_content_rejects_large_file(tmp_path):
     test_file.write_text("a" * (MAX_FILE_SIZE_BYTES + 1), encoding="utf-8")
     client = create_test_client()
 
-    response = client.post("/api/file-content", json={"path": str(test_file.resolve())})
+    response = client.post(
+        "/api/file-content",
+        json={"path": str(test_file.resolve())},
+        headers=get_auth_headers()
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -82,7 +98,11 @@ def test_post_file_content_rejects_binary_file(tmp_path):
     test_file.write_bytes(b"\x00\x01\x02jarvis")
     client = create_test_client()
 
-    response = client.post("/api/file-content", json={"path": str(test_file.resolve())})
+    response = client.post(
+        "/api/file-content",
+        json={"path": str(test_file.resolve())},
+        headers=get_auth_headers()
+    )
 
     assert response.status_code == 200
     payload = response.json()
