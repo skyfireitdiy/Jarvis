@@ -787,7 +787,7 @@ function getLanguageFromFilename(filename) {
 // 认证和连接配置
 const auth = ref({ 
   password: '',
-  token: localStorage.getItem('jarvis_auth_token') || '' 
+  token: ''
 })
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
@@ -811,10 +811,13 @@ async function loginWithPassword(password) {
       throw new Error(result.error?.message || '登录失败')
     }
     
-    // 保存 Token
+    // 保存 Token（仅在内存中保存，页面刷新后会失效，需要重新登录）
     auth.value.token = result.data.token
-    localStorage.setItem('jarvis_auth_token', result.data.token)
-    console.log('[AUTH] Login successful, token saved')
+    
+    // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
+    auth.value.password = ''
+    
+    console.log('[AUTH] Login successful, token saved, password cleared')
     return true
   } catch (error) {
     console.error('[AUTH] Login failed:', error)
@@ -2005,8 +2008,7 @@ async function connect() {
     }
     const payload = {}
     if (auth.value.token) payload.token = auth.value.token
-    if (auth.value.password) payload.password = auth.value.password
-    // 始终发送 auth 消息，即使没有密码
+    // 始终发送 auth 消息，即使没有 password
     // 这样后端可以立即检测到认证失败，而不需要等待超时
     ws.send(JSON.stringify({ type: 'auth', payload }))
     console.log('[ws] auth sent', payload)
@@ -2234,7 +2236,6 @@ async function connectToAgent(agent, retryCount = 0) {
         // 发送认证
         const payload = {}
         if (auth.value.token) payload.token = auth.value.token
-        if (auth.value.password) payload.password = auth.value.password
         if (Object.keys(payload).length > 0) {
           ws.send(JSON.stringify({ type: 'auth', payload }))
           console.log(`[AGENT ${agentId}] auth sent`, payload)
