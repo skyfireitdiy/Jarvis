@@ -117,6 +117,7 @@ def test_post_file_write_success(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(test_file.resolve()), "content": "hello write"},
+        headers=get_auth_headers()
     )
 
     assert response.status_code == 200
@@ -133,6 +134,7 @@ def test_post_file_write_rejects_relative_path(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": "relative.txt", "content": "hello"},
+        headers=get_auth_headers()
     )
 
     assert response.status_code == 200
@@ -148,6 +150,7 @@ def test_post_file_write_rejects_missing_parent_directory(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(missing_file.resolve(strict=False)), "content": "hello"},
+        headers=get_auth_headers()
     )
 
     assert response.status_code == 200
@@ -163,6 +166,7 @@ def test_post_file_write_rejects_non_string_content(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(test_file.resolve()), "content": 123},
+        headers=get_auth_headers()
     )
 
     assert response.status_code == 200
@@ -181,6 +185,7 @@ def test_post_file_write_rejects_large_content(tmp_path):
             "path": str(test_file.resolve()),
             "content": "a" * (MAX_FILE_SIZE_BYTES + 1),
         },
+        headers=get_auth_headers()
     )
 
     assert response.status_code == 200
