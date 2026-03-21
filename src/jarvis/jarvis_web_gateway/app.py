@@ -40,7 +40,6 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
 )
 from jarvis.jarvis_web_gateway.token_manager import (
     generate_gateway_token,
-    set_gateway_token,
 )
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
@@ -517,8 +516,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     """
 
     # 生成并设置 Gateway Token（启动时生成一次，永久使用）
-    gateway_token = generate_gateway_token()
-    set_gateway_token(gateway_token)
+    gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", generate_gateway_token())
     # 统一设置到环境变量，供子进程（Agent）使用
     os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
     print(f"[GATEWAY] Generated token: {gateway_token}")
