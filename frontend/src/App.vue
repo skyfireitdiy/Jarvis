@@ -586,6 +586,13 @@
           <label>网关地址</label>
           <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
         </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="connectionLockEnabled" @change="saveConnectionLockSetting" />
+            <span class="checkbox-label-text">锁定连接（拒绝新连接）</span>
+          </label>
+          <div class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</div>
+        </div>
         
         <!-- 历史消息管理 -->
         <div class="form-group">
@@ -787,6 +794,7 @@ const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
 const connectErrorMessage = ref('')  // 连接错误信息
+const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 
 // 登录函数：使用密码获取 Token
 async function loginWithPassword(password) {
@@ -1931,6 +1939,24 @@ function loadHistoryMessages(prepend = false) {
   }
 }
 
+// 保存连接锁定设置
+function saveConnectionLockSetting() {
+  localStorage.setItem('connection_lock_enabled', connectionLockEnabled.value)
+  console.log('[SETTINGS] Connection lock setting saved:', connectionLockEnabled.value)
+  // 如果已连接，发送设置更新消息
+  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
+    try {
+      socket.value.send(JSON.stringify({
+        type: 'connection_lock',
+        payload: { enabled: connectionLockEnabled.value }
+      }))
+      console.log('[SETTINGS] Connection lock setting sent to server')
+    } catch (error) {
+      console.error('[SETTINGS] Failed to send connection lock setting:', error)
+    }
+  }
+}
+
 // 连接到 Gateway
 async function connect() {
   // 清空之前的错误信息
@@ -1984,6 +2010,12 @@ async function connect() {
     // 这样后端可以立即检测到认证失败，而不需要等待超时
     ws.send(JSON.stringify({ type: 'auth', payload }))
     console.log('[ws] auth sent', payload)
+    // 发送连接锁定设置
+    ws.send(JSON.stringify({
+      type: 'connection_lock',
+      payload: { enabled: connectionLockEnabled.value }
+    }))
+    console.log('[ws] connection_lock sent', connectionLockEnabled.value)
   }
   ws.onmessage = (event) => {
     let message = null

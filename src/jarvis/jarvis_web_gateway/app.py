@@ -311,6 +311,9 @@ class WebSocketConnectionManager:
         self._terminal_input_registry = terminal_input_registry
         self._gateway = gateway
         self._auth_store = auth_store
+        self._connection_lock_enabled = (
+            False  # 连接锁定模式：True=拒绝新连接，False=允许新连接替换旧连接
+        )
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -328,13 +331,23 @@ class WebSocketConnectionManager:
             await websocket.close()
             return
 
-        # 检查是否已有活跃连接，如果有则拒绝新连接（在认证后、注册前检查）
+        # 检查是否已有活跃连接
         if self._router.has_active_subscribers():
-            await _send_error(
-                websocket, "CONNECTION_REJECTED", "Already have an active connection"
-            )
-            await websocket.close()
-            return
+            if self._connection_lock_enabled:
+                # 锁定模式：拒绝新连接
+                await _send_error(
+                    websocket,
+                    "CONNECTION_REJECTED",
+                    "Already have an active connection (connection lock enabled)",
+                )
+                await websocket.close()
+                return
+            else:
+                # 非锁定模式：断开旧连接，允许新连接
+                print(
+                    f"[WS CONNECTION] New connection replacing old one (connection lock disabled)"
+                )
+                self._router.unregister_all_session(session_id=session_id)
 
         self._auth_store[session_id] = auth_payload
         self._router.register(
@@ -402,6 +415,13 @@ class WebSocketConnectionManager:
             if not authorized:
                 return
             self._auth_store[session_id] = auth_payload
+            return
+        if message_type == "connection_lock":
+            enabled = payload.get("enabled", False)
+            self._connection_lock_enabled = enabled
+            print(
+                f"[WS CONNECTION LOCK] Connection lock {'enabled' if enabled else 'disabled'}"
+            )
             return
         if message_type == "input_result":
             text = payload.get("text", "")
