@@ -53,7 +53,11 @@ except ImportError:
     get_agent_status_manager = None  # type: ignore
 
 # 导入配置相关函数
-from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA, get_global_config_data
+from jarvis.jarvis_utils.config import (
+    GLOBAL_CONFIG_DATA,
+    get_global_config_data,
+    get_gateway_auth_config,
+)
 
 
 # 全局 AgentManager，用于状态变更回调
@@ -546,15 +550,6 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
     init_env(welcome_str="", config_file=None)
 
-    # 从环境变量读取 Gateway 密码（优先级高于配置文件）
-    gateway_password = os.environ.get("JARVIS_GATEWAY_PASSWORD")
-    if gateway_password:
-        if "gateway_auth" not in GLOBAL_CONFIG_DATA:
-            GLOBAL_CONFIG_DATA["gateway_auth"] = {}
-        GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
-        GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
-        GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
-
     # 创建 AgentManager，并设置状态变更回调
     agent_manager = AgentManager(on_status_change=_on_agent_status_change)
     # 保存 agent_manager 到全局，以便回调访问
@@ -658,11 +653,18 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     @app.post("/api/auth/login")
     async def login(request: Dict[str, Any]) -> Dict[str, Any]:
         """登录接口，验证密码并返回 Token。"""
-        try:
-            from jarvis.jarvis_utils.config import get_gateway_auth_config
+        import logging
 
+        logger = logging.getLogger(__name__)
+
+        try:
             password = request.get("password")
+            logger.info(
+                f"[AUTH] Login attempt with password length: {len(password) if password else 0}"
+            )
+
             if not password:
+                logger.warning(f"[AUTH] Login failed: password is empty")
                 return {
                     "success": False,
                     "error": {
@@ -671,21 +673,38 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     },
                 }
 
-            # 验证密码（如果配置了的话）
+            # 验证密码（get_gateway_auth_config 已集成环境变量优先逻辑）
             config = get_gateway_auth_config()
-            if config and bool(config.get("enable", False)):
-                expected_password = config.get("password")
-                if expected_password and password != expected_password:
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "AUTH_FAILED",
-                            "message": "Invalid password",
-                        },
-                    }
+            expected_password = config.get("password") if config else None
+
+            # 判断密码来源：检查环境变量和配置文件
+            password_source = (
+                "环境变量"
+                if os.environ.get("JARVIS_GATEWAY_PASSWORD")
+                else "配置文件"
+                if expected_password
+                else "未设置"
+            )
+            logger.info(
+                f"[AUTH] Password source: {password_source}, set: {'yes (length: ' + str(len(expected_password)) + ')' if expected_password else 'no'}"
+            )
+
+            # 如果设置了密码，进行验证
+            if expected_password and password != expected_password:
+                logger.warning(f"[AUTH] Login failed: password mismatch")
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "AUTH_FAILED",
+                        "message": "Invalid password",
+                    },
+                }
+            logger.info(f"[AUTH] Password verification passed")
             # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
             token = os.environ.get("JARVIS_AUTH_TOKEN")
+
             if not token:
+                logger.error(f"[AUTH] Login failed: Token not generated")
                 return {
                     "success": False,
                     "error": {
@@ -693,6 +712,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                         "message": "Token not generated",
                     },
                 }
+            logger.info(f"[AUTH] Login successful")
             return {
                 "success": True,
                 "data": {
@@ -701,6 +721,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 },
             }
         except Exception as e:
+            print(f"[AUTH DEBUG] 登录过程发生异常: {type(e).__name__}: {e}")
+            logger.error(f"[AUTH] Login failed with exception: {type(e).__name__}: {e}")
             return {
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},

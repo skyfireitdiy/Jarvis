@@ -970,13 +970,28 @@ def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。
 
+    环境变量优先级高于配置文件：
+    - 如果设置了环境变量 JARVIS_GATEWAY_PASSWORD，则使用环境变量中的密码
+    - 如果环境变量未设置，则使用配置文件中的 gateway_auth 配置
+
     返回:
-        Dict[str, Any]: Gateway 认证配置字典，未配置返回空字典
+        Dict[str, Any]: Gateway 认证配置字典，包含 enable, password, allow_unset 等字段
     """
-    value = GLOBAL_CONFIG_DATA.get("gateway_auth", {})
-    if isinstance(value, dict):
-        return dict(value)
-    return {}
+    # 先从配置文件读取
+    config = GLOBAL_CONFIG_DATA.get("gateway_auth", {})
+    if not isinstance(config, dict):
+        config = {}
+
+    result = dict(config)
+
+    # 环境变量优先：如果设置了 JARVIS_GATEWAY_PASSWORD，覆盖配置文件中的密码
+    env_password = os.environ.get("JARVIS_GATEWAY_PASSWORD")
+    if env_password:
+        result["password"] = env_password
+        result["enable"] = True
+        result["allow_unset"] = False
+
+    return result
 
 
 # ==============================================================================
