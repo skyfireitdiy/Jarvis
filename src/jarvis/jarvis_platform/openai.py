@@ -100,10 +100,14 @@ class OpenAIModel(BasePlatform):
 
         # 默认添加浏览器 User-Agent，避免被某些 API 网关拦截
         if "User-Agent" not in self.extra_headers:
-            self.extra_headers["User-Agent"] = (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
+            # 检测是否为 Kimi API，如果是则使用特定的 User-Agent
+            if self.base_url and "https://api.kimi.com" in self.base_url:
+                self.extra_headers["User-Agent"] = "KimiCLI/1.6"
+            else:
+                self.extra_headers["User-Agent"] = (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
 
         # Optional: Set reasoning effort for o1 series models via llm_config or environment variable
         # Expected format: openai_reasoning_effort="low" or "medium" or "high" or "xhigh"
