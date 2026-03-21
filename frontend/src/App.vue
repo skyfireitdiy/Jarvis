@@ -778,12 +778,60 @@ function getLanguageFromFilename(filename) {
 }
 
 // 认证和连接配置
-const auth = ref({ password: '' })
+const auth = ref({ 
+  password: '',
+  token: localStorage.getItem('jarvis_auth_token') || '' 
+})
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
 const connectErrorMessage = ref('')  // 连接错误信息
+
+// 登录函数：使用密码获取 Token
+async function loginWithPassword(password) {
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    })
+    
+    const result = await response.json()
+    if (!response.ok || !result.success || !result.data?.token) {
+      throw new Error(result.error?.message || '登录失败')
+    }
+    
+    // 保存 Token
+    auth.value.token = result.data.token
+    localStorage.setItem('jarvis_auth_token', result.data.token)
+    console.log('[AUTH] Login successful, token saved')
+    return true
+  } catch (error) {
+    console.error('[AUTH] Login failed:', error)
+    throw error
+  }
+}
+
+// 通用的带认证的 fetch 函数
+async function fetchWithAuth(url, options = {}) {
+  // 复制 options 避免修改原始对象
+  const fetchOptions = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Content-Type': 'Content-Type' in (options.headers || {}) ? options.headers['Content-Type'] : 'application/json'
+    }
+  }
+  
+  // 如果有 Token，添加到 Authorization Header
+  if (auth.value.token) {
+    fetchOptions.headers['Authorization'] = `Bearer ${auth.value.token}`
+  }
+  
+  return fetch(url, fetchOptions)
+}
 
 // URL 解析辅助函数：支持 HTTPS 协议和域名
 
@@ -1226,9 +1274,8 @@ function activateEditorTab(path) {
 
 async function fetchFileContent(path) {
   const { host, port } = getGatewayAddress()
-  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-content`, {
+  const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-content`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path })
   })
 
@@ -1241,9 +1288,8 @@ async function fetchFileContent(path) {
 
 async function fetchFileStat(path) {
   const { host, port } = getGatewayAddress()
-  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-stat`, {
+  const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-stat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path })
   })
 
@@ -1398,9 +1444,8 @@ async function saveEditorTab(path) {
   const content = model ? model.getValue() : tab.content
 
   const { host, port } = getGatewayAddress()
-  const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/file-write`, {
+  const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-write`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, content })
   })
   const result = await response.json()
@@ -1887,7 +1932,7 @@ function loadHistoryMessages(prepend = false) {
 }
 
 // 连接到 Gateway
-function connect() {
+async function connect() {
   // 清空之前的错误信息
   connectErrorMessage.value = ''
   if (socket.value) return
@@ -1897,6 +1942,16 @@ function connect() {
   if (!parsed) {
     connectErrorMessage.value = '无效的网关地址格式'
     return
+  }
+  
+  // 如果用户输入了密码，先登录获取 Token
+  if (auth.value.password) {
+    try {
+      await loginWithPassword(auth.value.password)
+    } catch (error) {
+      connectErrorMessage.value = error.message || '登录失败'
+      return
+    }
   }
   
   const host = parsed.host || window.location.hostname || '127.0.0.1'
@@ -2327,7 +2382,7 @@ async function fetchAgentStatus(agent) {
   try {
     const { host, port } = getGatewayAddress()
     // 通过网关代理查询状态：/api/agent/{agentId}/status
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agent/${agent.agent_id}/status`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agent/${agent.agent_id}/status`)
     
     if (!response.ok) {
       console.warn(`[AGENT STATUS] Failed to fetch status for agent ${agent.agent_id}:`, response.status)
@@ -2358,9 +2413,8 @@ async function restoreSession(sessionFile) {
 
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${currentAgentId.value}/sessions`, {
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${currentAgentId.value}/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_file: sessionFile })
     })
 
@@ -2405,7 +2459,7 @@ async function openDirDialog() {
 async function fetchDirectories(path = '') {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
     
     if (!response.ok) {
       const error = await response.json()
@@ -2545,7 +2599,7 @@ async function openCreateAgentModal() {
 async function fetchModelGroups() {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/model-groups`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/model-groups`)
     
     if (!response.ok) {
       console.error('[MODEL GROUP] 获取模型组列表失败:', response.status)
@@ -2580,9 +2634,8 @@ async function createAgent() {
   
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         agent_type: newAgentType.value,
         working_dir: newAgentDir.value,
@@ -2644,7 +2697,7 @@ async function openCompletions() {
   // 获取补全列表
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
     
     const result = await response.json()
     console.log('[COMPLETIONS] API response:', result)
@@ -2820,7 +2873,7 @@ function insertCompletion(item) {
 async function fetchAgentList() {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`)
     
     if (!response.ok) return
     
@@ -2848,9 +2901,8 @@ async function fetchAgentList() {
 async function copyAgent(agent) {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         agent_type: agent.agent_type,
         working_dir: agent.working_dir,
@@ -2921,9 +2973,8 @@ async function confirmRename() {
       ? { name: null } 
       : { name: newName }
     
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}`, {
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
     
@@ -2952,7 +3003,7 @@ async function deleteAgent(agentId) {
     async () => {
       try {
         const { host, port } = getGatewayAddress()
-        const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
+        const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
           method: 'DELETE'
         })
         
@@ -3014,7 +3065,7 @@ async function loadFileTreeNode(agentId, node) {
   
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(node.path)}`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(node.path)}`)
     
     if (!response.ok) {
       const error = await response.json()
@@ -3278,7 +3329,7 @@ async function switchAgent(agent) {
         console.log('[AGENT] New agent, checking for recoverable sessions...')
         try {
           const { host, port } = getGatewayAddress()
-          const sessionsResponse = await fetch(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`)
+          const sessionsResponse = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`)
           const sessionsData = await sessionsResponse.json()
           if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
             console.log('[AGENT] Found recoverable sessions:', sessionsData.data)

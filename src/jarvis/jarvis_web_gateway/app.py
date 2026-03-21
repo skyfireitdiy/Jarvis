@@ -17,7 +17,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
-from fastapi import FastAPI, Request, Response, WebSocket
+from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -37,6 +37,10 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
     AgentNotFoundError,
     AgentNotRunningError,
     ProxyConnectionError,
+)
+from jarvis.jarvis_web_gateway.token_manager import (
+    generate_gateway_token,
+    set_gateway_token,
 )
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
@@ -512,14 +516,19 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         FastAPI 应用实例
     """
 
+    # 生成并设置 Gateway Token（启动时生成一次，永久使用）
+    gateway_token = generate_gateway_token()
+    set_gateway_token(gateway_token)
+    # 统一设置到环境变量，供子进程（Agent）使用
+    os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
+    print(f"[GATEWAY] Generated token: {gateway_token}")
+
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
 
     init_env(welcome_str="", config_file=None)
 
     # 从环境变量读取 Gateway 密码（优先级高于配置文件）
-    import os
-
     gateway_password = os.environ.get("JARVIS_GATEWAY_PASSWORD")
     if gateway_password:
         if "gateway_auth" not in GLOBAL_CONFIG_DATA:
@@ -566,6 +575,49 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # HTTP 认证依赖
+    def verify_token(request: Request) -> None:
+        """验证 HTTP 请求的 Token。
+
+        Args:
+            request: FastAPI Request 对象
+
+        Raises:
+            HTTPException: Token 无效时抛出 401 错误
+        """
+        from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
+        from fastapi import HTTPException
+
+        # 从 Authorization Header 提取 Token
+        authorization = request.headers.get("Authorization")
+        if not authorization:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "code": "MISSING_TOKEN",
+                    "message": "Authorization header is required",
+                },
+            )
+
+        parts = authorization.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "code": "INVALID_TOKEN_FORMAT",
+                    "message": "Authorization header must be 'Bearer <token>'",
+                },
+            )
+
+        token = parts[1]
+
+        # 验证 Token
+        if not validate_gateway_token(token):
+            raise HTTPException(
+                status_code=401,
+                detail={"code": "INVALID_TOKEN", "message": "Invalid or expired token"},
+            )
+
     @app.on_event("startup")
     async def _startup() -> None:
         # 初始化环境并加载配置文件（已在 run() 函数中调用，此处避免重复）
@@ -583,6 +635,58 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         # 清理所有终端会话
         terminal_session_manager.cleanup()
         set_current_gateway(None)
+
+    # HTTP API：登录接口
+    @app.post("/api/auth/login")
+    async def login(request: Dict[str, Any]) -> Dict[str, Any]:
+        """登录接口，验证密码并返回 Token。"""
+        try:
+            from jarvis.jarvis_utils.config import get_gateway_auth_config
+
+            password = request.get("password")
+            if not password:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "MISSING_PASSWORD",
+                        "message": "password is required",
+                    },
+                }
+
+            # 验证密码（如果配置了的话）
+            config = get_gateway_auth_config()
+            if config and bool(config.get("enable", False)):
+                expected_password = config.get("password")
+                if expected_password and password != expected_password:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "AUTH_FAILED",
+                            "message": "Invalid password",
+                        },
+                    }
+            # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
+            token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if not token:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": "Token not generated",
+                    },
+                }
+            return {
+                "success": True,
+                "data": {
+                    "token": token,
+                    "note": "Token is valid until Web Gateway restarts",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
@@ -668,8 +772,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 media_type="application/json",
             )
 
-    # HTTP API：创建 Agent
-    @app.post("/api/agents")
+    # HTTP API：创建 Agent（需要认证）
+    @app.post("/api/agents", dependencies=[Depends(verify_token)])
     async def create_agent(request: Dict[str, Any]) -> Dict[str, Any]:
         """创建 Agent。"""
         try:
@@ -699,7 +803,11 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     },
                 }
 
+            # 从环境变量获取当前 Token 并传递给 Agent
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+
             agent_info = agent_manager.create_agent(
+                auth_token=auth_token,
                 agent_type=agent_type,
                 working_dir=working_dir,
                 name=name,
@@ -728,7 +836,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：获取 Agent 列表
-    @app.get("/api/agents")
+    @app.get("/api/agents", dependencies=[Depends(verify_token)])
     async def get_agents() -> Dict[str, Any]:
         """获取 Agent 列表。"""
         try:
@@ -741,7 +849,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：获取模型组列表
-    @app.get("/api/model-groups")
+    @app.get("/api/model-groups", dependencies=[Depends(verify_token)])
     async def get_model_groups() -> Dict[str, Any]:
         """获取模型组列表。"""
         try:
@@ -812,7 +920,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：停止 Agent
-    @app.delete("/api/agents/{agent_id}/stop")
+    @app.delete("/api/agents/{agent_id}/stop", dependencies=[Depends(verify_token)])
     async def stop_agent(agent_id: str) -> Dict[str, Any]:
         """停止 Agent。"""
         try:
@@ -830,7 +938,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：更新 Agent（重命名）
-    @app.patch("/api/agents/{agent_id}")
+    @app.patch("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
     async def patch_agent(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
         """更新 Agent 信息（目前只支持重命名）。"""
         try:
@@ -859,7 +967,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：删除 Agent
-    @app.delete("/api/agents/{agent_id}")
+    @app.delete("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
     async def delete_agent(agent_id: str) -> Dict[str, Any]:
         """删除 Agent。"""
         try:
@@ -877,7 +985,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：获取可恢复的 session 列表
-    @app.get("/api/agents/{agent_id}/sessions")
+    @app.get("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
     async def list_agent_sessions(agent_id: str) -> Dict[str, Any]:
         """获取可恢复的 session 列表。"""
         try:
@@ -908,7 +1016,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：恢复指定的 session
-    @app.post("/api/agents/{agent_id}/sessions")
+    @app.post("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
     async def restore_agent_session(
         agent_id: str, request: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -941,7 +1049,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：获取补全列表
-    @app.get("/api/completions/{agent_id}")
+    @app.get("/api/completions/{agent_id}", dependencies=[Depends(verify_token)])
     async def get_completions(agent_id: str) -> Dict[str, Any]:
         """获取所有可用补全项（不包括文件）。"""
         try:
@@ -1045,7 +1153,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.get("/api/completions/{agent_id}/search")
+    @app.get("/api/completions/{agent_id}/search", dependencies=[Depends(verify_token)])
     async def search_completions(agent_id: str, query: str = "") -> Dict[str, Any]:
         """搜索文件补全项。
 
@@ -1145,7 +1253,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
         return target_path
 
-    @app.post("/api/file-content")
+    @app.post("/api/file-content", dependencies=[Depends(verify_token)])
     async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
         """读取指定绝对路径文件的内容。"""
         try:
@@ -1231,7 +1339,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/file-stat")
+    @app.post("/api/file-stat", dependencies=[Depends(verify_token)])
     async def get_file_stat(request: Dict[str, Any]) -> Dict[str, Any]:
         """读取指定绝对路径文件的元信息。"""
         try:
@@ -1286,7 +1394,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/file-write")
+    @app.post("/api/file-write", dependencies=[Depends(verify_token)])
     async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
         """写入指定绝对路径文本文件的内容。"""
         try:
@@ -1352,7 +1460,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 }
 
             with open(target_path, "w", encoding="utf-8") as file:
-                bytes_written = file.write(file_content)
+                file.write(file_content)
 
             return {
                 "success": True,
@@ -1375,7 +1483,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.get("/api/directories")
+    @app.get("/api/directories", dependencies=[Depends(verify_token)])
     async def list_directories(path: str = "") -> Dict[str, Any]:
         """获取指定路径下的目录列表。
 
@@ -1472,7 +1580,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：创建终端会话
-    @app.post("/api/terminals")
+    @app.post("/api/terminals", dependencies=[Depends(verify_token)])
     async def create_terminal(request: Dict[str, Any]) -> Dict[str, Any]:
         """创建新的终端会话。
 
@@ -1513,7 +1621,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：列出所有终端会话
-    @app.get("/api/terminals")
+    @app.get("/api/terminals", dependencies=[Depends(verify_token)])
     async def list_terminals() -> Dict[str, Any]:
         """列出所有活跃的终端会话。
 
@@ -1530,7 +1638,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             }
 
     # HTTP API：关闭终端会话
-    @app.delete("/api/terminals/{terminal_id}")
+    @app.delete("/api/terminals/{terminal_id}", dependencies=[Depends(verify_token)])
     async def close_terminal(terminal_id: str) -> Dict[str, Any]:
         """关闭指定的终端会话。
 
@@ -1581,18 +1689,44 @@ def run(
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
+    """规范化 WebSocket 认证消息的负载。
+
+    Args:
+        payload: 认证消息的 payload
+
+    Returns:
+        规范化后的认证负载，包含 token
+    """
     if not isinstance(payload, dict):
         return None
     return {
-        "password": payload.get("password"),
+        "token": payload.get("token"),
     }
 
 
 def _extract_auth_from_headers(websocket: WebSocket) -> Optional[Dict[str, Any]]:
-    password = websocket.headers.get("x-jarvis-password")
-    if not password:
-        return None
-    return {"password": password}
+    """从 WebSocket HTTP Header 提取认证信息。
+
+    Args:
+        websocket: WebSocket 连接对象
+
+    Returns:
+        认证负载，包含 token（如果存在）
+    """
+    # 支持两种方式：
+    # 1. x-jarvis-token Header（旧格式，保持兼容）
+    token = websocket.headers.get("x-jarvis-token")
+    if token:
+        return {"token": token}
+
+    # 2. Authorization: Bearer <token> Header（新格式）
+    authorization = websocket.headers.get("Authorization")
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return {"token": parts[1]}
+
+    return None
 
 
 def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
@@ -1618,15 +1752,38 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
 async def _await_auth_message(
     websocket: WebSocket, gateway: WebGateway
 ) -> Tuple[Optional[Dict[str, Any]], bool, Optional[str]]:
+    """等待 WebSocket 的第一条认证消息。
+
+    Args:
+        websocket: WebSocket 连接对象
+        gateway: WebGateway 实例
+
+    Returns:
+        (认证负载, 是否认证成功, 错误原因)
+    """
     try:
         message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
     except Exception:
-        return None, False, "gateway auth missing"
+        return (
+            None,
+            False,
+            "Authentication required. First message must be an auth message with type 'auth' and payload containing 'token'.",
+        )
+
     if not isinstance(message, dict) or message.get("type") != "auth":
-        return None, False, "gateway auth missing"
+        return (
+            None,
+            False,
+            "Authentication required. First message must be an auth message with type 'auth' and payload containing 'token'.",
+        )
+
     payload = _normalize_auth_payload(message.get("payload") or {})
     authorized, reason = gateway._check_auth(payload)
-    return payload, authorized, reason
+
+    if not authorized:
+        return payload, False, reason or "Invalid token"
+
+    return payload, True, "Authorized"
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:

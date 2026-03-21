@@ -868,7 +868,6 @@ def run_cli(
         "--web-gateway",
         help="启用 Web Gateway 服务（WebSocket 输入输出）",
     ),
-
     web_gateway_port: int = typer.Option(
         8000,
         "--web-gateway-port",
@@ -1115,14 +1114,21 @@ def run_cli(
             from jarvis.jarvis_web_gateway.app import create_app
             from jarvis.jarvis_web_gateway.app import set_status_update_callback
 
-            # 如果提供了密码参数，更新 gateway_auth 配置
-            if gateway_password:
+            # 检测认证方式：Token 认证（新）或密码认证（旧）
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if auth_token:
+                # Token 认证：validate_gateway_token() 会直接从环境变量读取
+                print("[AGENT] Using JARVIS_AUTH_TOKEN for authentication")
+            elif gateway_password:
+                # 旧密码认证（兼容模式）
                 from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
                 if "gateway_auth" not in GLOBAL_CONFIG_DATA:
                     GLOBAL_CONFIG_DATA["gateway_auth"] = {}
                 GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
                 GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
                 GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
+                print("[AGENT] Using gateway_password for authentication (legacy mode)")
 
             # 获取状态管理器并注册状态更新回调
             status_manager = get_agent_status_manager()
@@ -1225,9 +1231,7 @@ def run_cli(
             web_gateway_server = uvicorn.Server(config)
             thread = threading.Thread(target=web_gateway_server.run, daemon=False)
             thread.start()
-            print(
-                f"🌐 Web Gateway 已启动: ws://127.0.0.1:{web_gateway_port}/ws"
-            )
+            print(f"🌐 Web Gateway 已启动: ws://127.0.0.1:{web_gateway_port}/ws")
             # 验证 gateway 是否设置成功
             try:
                 from jarvis.jarvis_gateway.manager import get_current_gateway

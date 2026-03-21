@@ -103,6 +103,7 @@ class AgentManager:
         config_file: Optional[str] = None,
         task: Optional[str] = None,
         additional_args: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -115,6 +116,7 @@ class AgentManager:
             config_file: 配置文件路径
             task: 任务描述（仅对 codeagent 有效）
             additional_args: 额外参数
+            auth_token: 认证 Token，将通过环境变量传递给 Agent
 
         Returns:
             Agent 信息字典
@@ -156,6 +158,12 @@ class AgentManager:
             additional_args=additional_args,
         )
 
+        # 准备环境变量（包含认证 Token）
+        env = os.environ.copy()
+        if auth_token:
+            env["JARVIS_AUTH_TOKEN"] = auth_token
+            print(f"[AGENT MANAGER] Setting JARVIS_AUTH_TOKEN environment variable")
+
         # 打印启动信息
         print("[AGENT MANAGER] Creating agent:")
         print(f"  Agent ID: {agent_id}")
@@ -170,6 +178,7 @@ class AgentManager:
             process = subprocess.Popen(
                 cmd,
                 cwd=working_dir,
+                env=env,
             )
             print(f"[AGENT MANAGER] Process started with PID: {process.pid}")
         except Exception as e:

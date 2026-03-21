@@ -1505,8 +1505,13 @@ def cli(
 
             from jarvis.jarvis_web_gateway.app import create_app
 
-            # 如果提供了密码参数，更新 gateway_auth 配置
-            if gateway_password:
+            # 检测认证方式：Token 认证（新）或密码认证（旧）
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if auth_token:
+                # Token 认证：validate_gateway_token() 会直接从环境变量读取
+                print("[CODE AGENT] Using JARVIS_AUTH_TOKEN for authentication")
+            elif gateway_password:
+                # 旧密码认证（兼容模式）
                 from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
                 if "gateway_auth" not in GLOBAL_CONFIG_DATA:
@@ -1514,6 +1519,9 @@ def cli(
                 GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
                 GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
                 GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
+                print(
+                    "[CODE AGENT] Using gateway_password for authentication (legacy mode)"
+                )
 
             # 创建自定义 FastAPI app，添加状态查询接口
             from fastapi import FastAPI
