@@ -587,11 +587,16 @@
           <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
         </div>
         <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="connectionLockEnabled" @change="saveConnectionLockSetting" />
-            <span class="checkbox-label-text">锁定连接（拒绝新连接）</span>
-          </label>
-          <div class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</div>
+          <div class="toggle-wrapper">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="connectionLockEnabled" @change="saveConnectionLockSetting" class="toggle-input" />
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="toggle-info">
+              <div class="toggle-label-text">锁定连接（拒绝新连接）</div>
+              <div class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</div>
+            </div>
+          </div>
         </div>
         
         <!-- 历史消息管理 -->
