@@ -8742,6 +8742,15 @@ body::-webkit-scrollbar {
     line-height: 1.4;
   }
 
+  .form-help {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(139, 148, 158, 0.85);
+    letter-spacing: 0.01em;
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+
   /* ========== Toggle Switch 样式结束 ========== */
 }
 </style>
