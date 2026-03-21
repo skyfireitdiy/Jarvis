@@ -178,11 +178,15 @@
       class="terminal-panel"
       :class="{ 'terminal-panel-dragging': terminalPanelInteraction.active }"
       :style="terminalPanelStyle"
+      @mousedown="focusWindow('terminal')"
     >
       <div class="terminal-panel-header" @mousedown="startTerminalPanelMove">
         <h3>终端</h3>
         <div class="terminal-panel-actions">
           <button class="icon-btn" @click="createTerminal" :disabled="terminalSessions.length >= 5" title="新建终端">➕</button>
+          <button class="icon-btn maximize-btn" @click="toggleTerminalMaximize" :title="isTerminalMaximized ? '还原' : '最大化'">
+            {{ isTerminalMaximized ? '🗗' : '🗖' }}
+          </button>
           <button class="icon-btn" @click="showTerminalPanel = false" title="关闭面板">✕</button>
         </div>
       </div>
@@ -230,6 +234,7 @@
       class="editor-panel"
       :class="{ 'editor-panel-dragging': editorPanelInteraction.active }"
       :style="editorPanelStyle"
+      @mousedown="focusWindow('editor')"
     >
       <div
         class="editor-panel-header"
@@ -241,6 +246,9 @@
         </div>
         <div class="editor-panel-actions">
           <button class="icon-btn" @click.stop="saveActiveEditorTab" :disabled="!activeEditorTab || activeEditorTab.loading" title="保存文件">💾</button>
+          <button class="icon-btn maximize-btn" @click="toggleEditorMaximize" :title="isEditorMaximized ? '还原' : '最大化'">
+            {{ isEditorMaximized ? '🗗' : '🗖' }}
+          </button>
           <button class="icon-btn" @click="closeEditorPanel" title="关闭编辑器">✕</button>
         </div>
       </div>
@@ -960,11 +968,22 @@ const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
 const showMobileMenu = ref(false)     // 移动端菜单
+const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
+
+// 窗口z-index常量
+const BASE_Z_INDEX = 1000
+const ACTIVE_Z_INDEX = 1100
 
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
 const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
 const editorResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+
+// 窗口最大化状态
+const isEditorMaximized = ref(false)
+const isTerminalMaximized = ref(false)
+const editorPanelRectBeforeMaximize = ref(null)
+const terminalPanelRectBeforeMaximize = ref(null)
 
 function getDefaultEditorPanelRect() {
   return {
@@ -1070,6 +1089,7 @@ const editorPanelStyle = computed(() => ({
   left: `${editorPanelRect.value.left}px`,
   width: `${editorPanelRect.value.width}px`,
   height: `${editorPanelRect.value.height}px`,
+  zIndex: activeWindow.value === 'editor' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
 }))
 
 const activeEditorTab = computed(() => {
@@ -1081,39 +1101,95 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
+// 设置焦点窗口
+function focusWindow(windowType) {
+  activeWindow.value = windowType
+}
+
+// 编辑器窗口最大化/还原
+function toggleEditorMaximize() {
+  if (isEditorMaximized.value) {
+    // 还原
+    if (editorPanelRectBeforeMaximize.value) {
+      editorPanelRect.value = { ...editorPanelRectBeforeMaximize.value }
+    }
+    isEditorMaximized.value = false
+  } else {
+    // 最大化
+    editorPanelRectBeforeMaximize.value = { ...editorPanelRect.value }
+    editorPanelRect.value = {
+      top: 0,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
+    isEditorMaximized.value = true
+  }
+  nextTick(() => {
+    layoutMonacoEditor()
+  })
+}
+
+// 终端窗口最大化/还原
+function toggleTerminalMaximize() {
+  if (isTerminalMaximized.value) {
+    // 还原
+    if (terminalPanelRectBeforeMaximize.value) {
+      terminalPanelRect.value = { ...terminalPanelRectBeforeMaximize.value }
+    }
+    isTerminalMaximized.value = false
+  } else {
+    // 最大化
+    terminalPanelRectBeforeMaximize.value = { ...terminalPanelRect.value }
+    terminalPanelRect.value = {
+      top: 0,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
+    isTerminalMaximized.value = true
+  }
+}
+
 function getEditorPanelBounds() {
+  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
   return {
-    minTop: 0,
-    minLeft: 0,
-    maxLeft: Math.max(window.innerWidth - editorPanelRect.value.width, 0),
-    maxTop: Math.max(window.innerHeight - editorPanelRect.value.height, 0),
+    minTop: KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出，但保留底部100px
+    minLeft: KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出，但保留右侧100px
+    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
+    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
     maxWidth: window.innerWidth,
     maxHeight: window.innerHeight,
   }
 }
 
 function ensureEditorPanelInViewport() {
+  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
   const maxWidth = Math.max(window.innerWidth, EDITOR_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, EDITOR_PANEL_MIN_HEIGHT)
 
   editorPanelRect.value.width = clamp(editorPanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
   editorPanelRect.value.height = clamp(editorPanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
 
+  // 允许部分拖出屏幕，但保留至少100px可见区域
   editorPanelRect.value.left = clamp(
     editorPanelRect.value.left,
-    0,
-    Math.max(window.innerWidth - editorPanelRect.value.width, 0)
+    KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出
+    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
   )
   editorPanelRect.value.top = clamp(
     editorPanelRect.value.top,
-    0,
-    Math.max(window.innerHeight - editorPanelRect.value.height, 0)
+    KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出
+    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
   )
 }
 
 function startEditorPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.editor-panel-actions')) return
+
+  // 拖拽时立即激活编辑器窗口
+  focusWindow('editor')
 
   editorPanelInteraction.value = {
     active: true,
@@ -4970,38 +5046,46 @@ const terminalPanelStyle = computed(() => ({
   left: `${terminalPanelRect.value.left}px`,
   width: `${terminalPanelRect.value.width}px`,
   height: `${terminalPanelRect.value.height}px`,
+  zIndex: activeWindow.value === 'terminal' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
 }))
 
 function getTerminalPanelBounds() {
+  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
   return {
-    minTop: 0,
-    minLeft: 0,
-    maxLeft: Math.max(window.innerWidth - terminalPanelRect.value.width, 0),
-    maxTop: Math.max(window.innerHeight - terminalPanelRect.value.height, 0),
+    minTop: KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出，但保留底部100px
+    minLeft: KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出，但保留右侧100px
+    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
+    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
   }
 }
 
 function ensureTerminalPanelInViewport() {
+  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
   const maxWidth = Math.max(window.innerWidth, TERMINAL_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, TERMINAL_PANEL_MIN_HEIGHT)
 
   terminalPanelRect.value.width = clamp(terminalPanelRect.value.width, TERMINAL_PANEL_MIN_WIDTH, maxWidth)
   terminalPanelRect.value.height = clamp(terminalPanelRect.value.height, TERMINAL_PANEL_MIN_HEIGHT, maxHeight)
+
+  // 允许部分拖出屏幕，但保留至少100px可见区域
   terminalPanelRect.value.left = clamp(
     terminalPanelRect.value.left,
-    0,
-    Math.max(window.innerWidth - terminalPanelRect.value.width, 0)
+    KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出
+    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
   )
   terminalPanelRect.value.top = clamp(
     terminalPanelRect.value.top,
-    0,
-    Math.max(window.innerHeight - terminalPanelRect.value.height, 0)
+    KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出
+    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
   )
 }
 
 function startTerminalPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.terminal-panel-actions')) return
+
+  // 拖拽时立即激活终端窗口
+  focusWindow('terminal')
 
   terminalPanelInteraction.value = {
     active: true,
@@ -5801,7 +5885,6 @@ body::-webkit-scrollbar {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  z-index: 1300;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5816,11 +5899,12 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 8px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(13, 17, 23, 0.9);
   cursor: move;
-  gap: 12px;
+  gap: 10px;
+  min-height: 36px;
 }
 
 .editor-panel-title-group {
@@ -6141,8 +6225,14 @@ body::-webkit-scrollbar {
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 0;
   color: #8b949e;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -8174,7 +8264,6 @@ body::-webkit-scrollbar {
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  z-index: 1000;
   overflow: hidden;
 }
 
@@ -8186,11 +8275,12 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: rgba(22, 27, 34, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px 8px 0 0;
   cursor: move;
+  min-height: 36px;
 }
 
 .terminal-panel-header h3 {
