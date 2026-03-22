@@ -11,6 +11,7 @@ from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
 from jarvis.jarvis_web_gateway.app import WebGateway
 from jarvis.jarvis_web_gateway.app import create_app
+from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 
 
 # 测试用的认证 Token
@@ -255,3 +256,14 @@ def test_web_gateway_emit_output_promotes_agent_id_to_payload():
     assert message["type"] == "output"
     assert message["payload"]["agent_id"] == "agent-123"
     assert message["payload"]["context"]["agent_id"] == "agent-123"
+
+
+def test_create_app_attaches_timer_manager_to_app_state():
+    app = create_app()
+    timer_manager = app.state.timer_manager
+
+    try:
+        assert isinstance(timer_manager, TimerManager)
+        assert timer_manager.is_shutdown() is False
+    finally:
+        timer_manager.shutdown()
