@@ -1,0 +1,8 @@
+{
+  "id": "20260322_203615_490043",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "用户手册", "源码依据", "功能清单", "关键文件"],
+  "content": "Jarvis 项目中 /home/skyfire/code/Jarvis/功能清单_分类版.md 的 CodeAgent 分类实际包含 40 个功能点，范围为第41行标题“## CodeAgent”到第82行最后一个功能项，下一分类从第84行开始。后续所有 CodeAgent 用户手册覆盖率核对必须以 40 项为基线，而非前序任务摘要中误记的 39 项。",
+  "created_at": "2026-03-22T20:36:15.490058",
+  "updated_at": "2026-03-22T20:36:15.490061"
+}

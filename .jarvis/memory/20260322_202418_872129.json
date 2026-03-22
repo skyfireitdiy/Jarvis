@@ -1,0 +1,8 @@
+{
+  "id": "20260322_202418_872129",
+  "type": "project_long_term",
+  "tags": ["用户手册", "通用Agent", "源码依据", "关键文件"],
+  "content": "Jarvis 项目“通用 Agent”分类源码依据已完成闭环梳理。功能清单文件 /home/skyfire/code/Jarvis/功能清单_分类版.md 中“通用 Agent”位于第3-39行，共37个功能点，已实现 37/37 源码映射，无遗漏。后续编写 docs/用户手册/01_通用_agent 时应优先读取的关键文件按优先级为：1) src/jarvis/jarvis_agent/__init__.py；2) src/jarvis/jarvis_agent/main.py；3) src/jarvis/jarvis_agent/builtin_input_handler.py；4) src/jarvis/jarvis_agent/session_manager.py；5) src/jarvis/jarvis_agent/rules_manager.py；6) src/jarvis/jarvis_agent/run_loop.py；7) src/jarvis/jarvis_agent/memory_manager.py；8) src/jarvis/jarvis_agent/task_manager.py；9) src/jarvis/jarvis_agent/agent_manager.py；10) src/jarvis/jarvis_agent/file_methodology_manager.py；11) src/jarvis/jarvis_agent/tool_executor.py；12) src/jarvis/jarvis_agent/shell_input_handler.py；13) src/jarvis/jarvis_agent/file_context_handler.py；14) src/jarvis/jarvis_agent/user_interaction.py；15) src/jarvis/jarvis_agent/jvsd_cli.py。",
+  "created_at": "2026-03-22T20:24:18.872143",
+  "updated_at": "2026-03-22T20:24:18.872146"
+}
