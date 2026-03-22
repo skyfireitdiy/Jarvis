@@ -10,7 +10,9 @@ import asyncio
 import logging
 import os
 import pathlib
+import subprocess
 import uuid
+from datetime import datetime
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -655,6 +657,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         # 初始化环境并加载配置文件（已在 run() 函数中调用，此处避免重复）
         # from jarvis.jarvis_utils.utils import init_env
         # init_env(welcome_str="", config_file=None)
+        agent_manager.set_event_loop(asyncio.get_running_loop())
         # 为运行中的 Agent 启动监控任务
         await agent_manager.start_monitoring_for_running_agents()
 
@@ -1314,6 +1317,260 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             raise IsADirectoryError(f"Path is not a file: {file_path}")
 
         return target_path
+
+    def _parse_timer_schedule(request: Dict[str, Any]) -> Dict[str, Any]:
+        schedule = request.get("schedule")
+        if not isinstance(schedule, dict):
+            raise ValueError("schedule must be an object")
+
+        run_at = schedule.get("run_at")
+        delay_seconds = schedule.get("delay_seconds")
+        interval_seconds = schedule.get("interval_seconds")
+        provided_fields = [
+            value is not None for value in [run_at, delay_seconds, interval_seconds]
+        ]
+        if sum(provided_fields) != 1:
+            raise ValueError(
+                "Exactly one of schedule.run_at, schedule.delay_seconds, schedule.interval_seconds is required"
+            )
+
+        if run_at is not None:
+            if not isinstance(run_at, str) or not run_at.strip():
+                raise ValueError(
+                    "schedule.run_at must be a non-empty ISO datetime string"
+                )
+            parsed_run_at = datetime.fromisoformat(run_at)
+            return {"schedule_type": "run_at", "run_at": parsed_run_at}
+
+        if delay_seconds is not None:
+            if not isinstance(delay_seconds, (int, float)):
+                raise ValueError("schedule.delay_seconds must be a number")
+            if delay_seconds < 0:
+                raise ValueError("schedule.delay_seconds must be >= 0")
+            return {"schedule_type": "delay", "delay_seconds": float(delay_seconds)}
+
+        if not isinstance(interval_seconds, (int, float)):
+            raise ValueError("schedule.interval_seconds must be a number")
+        if interval_seconds <= 0:
+            raise ValueError("schedule.interval_seconds must be > 0")
+        return {
+            "schedule_type": "interval",
+            "interval_seconds": float(interval_seconds),
+        }
+
+    def _build_create_agent_callback(action_params: Dict[str, Any]):
+        agent_type = action_params.get("agent_type")
+        working_dir = action_params.get("working_dir")
+        name = action_params.get("name")
+        llm_group = action_params.get("llm_group", "default")
+        tool_group = action_params.get("tool_group", "default")
+        config_file = action_params.get("config_file")
+        task = action_params.get("task")
+        additional_args = action_params.get("additional_args")
+        worktree = bool(action_params.get("worktree", False))
+
+        if not agent_type:
+            raise ValueError("action.params.agent_type is required")
+        if not working_dir:
+            raise ValueError("action.params.working_dir is required")
+
+        metadata = {
+            "type": "create_agent",
+            "params": {
+                "agent_type": agent_type,
+                "working_dir": working_dir,
+                "name": name,
+                "llm_group": llm_group,
+                "tool_group": tool_group,
+                "config_file": config_file,
+                "task": task,
+                "additional_args": additional_args,
+                "worktree": worktree,
+            },
+        }
+
+        def _create_agent_callback() -> None:
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            agent_manager.create_agent_threadsafe(
+                auth_token=auth_token,
+                agent_type=agent_type,
+                working_dir=working_dir,
+                name=name,
+                llm_group=llm_group,
+                tool_group=tool_group,
+                config_file=config_file,
+                task=task,
+                additional_args=additional_args,
+                worktree=worktree,
+            )
+
+        return _create_agent_callback, metadata
+
+    def _build_shell_command_callback(action_params: Dict[str, Any]):
+        command = action_params.get("command")
+        working_dir = action_params.get("working_dir")
+        interpreter = action_params.get("interpreter") or os.environ.get(
+            "SHELL", "bash"
+        )
+
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("action.params.command must be a non-empty string")
+        if not isinstance(working_dir, str) or not working_dir.strip():
+            raise ValueError("action.params.working_dir must be a non-empty string")
+
+        working_path = pathlib.Path(working_dir).expanduser().resolve()
+        if not working_path.exists():
+            raise ValueError(f"Working directory not found: {working_dir}")
+        if not working_path.is_dir():
+            raise ValueError(f"Working directory is not a directory: {working_dir}")
+        if not isinstance(interpreter, str) or not interpreter.strip():
+            raise ValueError("action.params.interpreter must be a non-empty string")
+
+        metadata = {
+            "type": "run_shell_command",
+            "params": {
+                "command": command,
+                "working_dir": str(working_path),
+                "interpreter": interpreter,
+            },
+        }
+
+        def _run_shell_command_callback() -> None:
+            subprocess.run(
+                [interpreter, "-lc", command],
+                cwd=str(working_path),
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+            )
+
+        return _run_shell_command_callback, metadata
+
+    def _build_timer_action(request: Dict[str, Any]):
+        action = request.get("action")
+        if not isinstance(action, dict):
+            raise ValueError("action must be an object")
+
+        action_type = action.get("type")
+        action_params = action.get("params")
+        if not isinstance(action_type, str) or not action_type.strip():
+            raise ValueError("action.type is required")
+        if not isinstance(action_params, dict):
+            raise ValueError("action.params must be an object")
+
+        if action_type == "create_agent":
+            return _build_create_agent_callback(action_params)
+        if action_type == "run_shell_command":
+            return _build_shell_command_callback(action_params)
+        raise ValueError("action.type must be one of create_agent or run_shell_command")
+
+    def _schedule_timer_task(request: Dict[str, Any]) -> Dict[str, Any]:
+        schedule_info = _parse_timer_schedule(request)
+        callback, action_metadata = _build_timer_action(request)
+        timer_metadata = {
+            "action": action_metadata,
+            "schedule": {
+                "type": schedule_info["schedule_type"],
+            },
+        }
+
+        if schedule_info["schedule_type"] == "run_at":
+            run_at = schedule_info["run_at"]
+            timer_metadata["schedule"]["run_at"] = run_at.isoformat()
+            timer_id = timer_manager.schedule_at(
+                run_at=run_at,
+                callback=callback,
+                metadata=timer_metadata,
+            )
+        elif schedule_info["schedule_type"] == "delay":
+            delay_seconds = schedule_info["delay_seconds"]
+            timer_metadata["schedule"]["delay_seconds"] = delay_seconds
+            timer_id = timer_manager.schedule_after(
+                delay_seconds=delay_seconds,
+                callback=callback,
+                metadata=timer_metadata,
+            )
+        else:
+            interval_seconds = schedule_info["interval_seconds"]
+            timer_metadata["schedule"]["interval_seconds"] = interval_seconds
+            timer_id = timer_manager.schedule_every(
+                interval_seconds=interval_seconds,
+                callback=callback,
+                metadata=timer_metadata,
+            )
+
+        timer_info = timer_manager.get_task(timer_id)
+        if timer_info is None:
+            raise RuntimeError("Failed to load timer after scheduling")
+        return timer_info
+
+    @app.post("/api/timers", dependencies=[Depends(verify_token)])
+    async def create_timer(request: Dict[str, Any]) -> Dict[str, Any]:
+        """创建定时器。"""
+        try:
+            timer_info = _schedule_timer_task(request)
+            return {"success": True, "data": timer_info}
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": {"code": "INVALID_ARGUMENT", "message": str(e)},
+            }
+        except RuntimeError as e:
+            return {
+                "success": False,
+                "error": {"code": "CREATE_FAILED", "message": str(e)},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.get("/api/timers", dependencies=[Depends(verify_token)])
+    async def list_timers() -> Dict[str, Any]:
+        """查询所有定时器。"""
+        try:
+            return {"success": True, "data": timer_manager.list_tasks()}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.get("/api/timers/{timer_id}", dependencies=[Depends(verify_token)])
+    async def get_timer(timer_id: str) -> Dict[str, Any]:
+        """查询单个定时器。"""
+        try:
+            timer_info = timer_manager.get_task(timer_id)
+            if timer_info is None:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Timer not found"},
+                }
+            return {"success": True, "data": timer_info}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.delete("/api/timers/{timer_id}", dependencies=[Depends(verify_token)])
+    async def delete_timer(timer_id: str) -> Dict[str, Any]:
+        """删除指定定时器。"""
+        try:
+            success = timer_manager.cancel(timer_id)
+            if not success:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Timer not found"},
+                }
+            return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     @app.post("/api/file-content", dependencies=[Depends(verify_token)])
     async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
