@@ -321,12 +321,46 @@ class WebSocketConnectionManager:
         self._connection_lock_enabled = (
             False  # 连接锁定模式：True=拒绝新连接，False=允许新连接替换旧连接
         )
+        self._active_connections: Dict[str, tuple[str, WebSocket]] = {}
+        self._connection_state_lock = asyncio.Lock()
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept()
         session_id = "default"  # 固定使用 default session，简化重连逻辑
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
+
+        async with self._connection_state_lock:
+            existing_connection = self._active_connections.get(session_id)
+            if existing_connection:
+                if self._connection_lock_enabled:
+                    await _send_error(
+                        websocket,
+                        "CONNECTION_REJECTED",
+                        "Already have an active connection (connection lock enabled)",
+                    )
+                    await websocket.close()
+                    return
+                old_connection_id, old_websocket = existing_connection
+                print(
+                    "[WS CONNECTION] New connection replacing old one (connection lock disabled)"
+                )
+                try:
+                    await _send_error(
+                        old_websocket,
+                        "CONNECTION_REPLACED",
+                        "Connection replaced by a new login",
+                    )
+                except Exception:
+                    pass
+                try:
+                    await old_websocket.close()
+                except Exception:
+                    pass
+                self._router.unregister(old_connection_id, session_id=session_id)
+                self._active_connections.pop(session_id, None)
+                self._auth_store.pop(session_id, None)
+
         auth_payload = _extract_auth_from_headers(websocket)
         authorized, reason = self._gateway._check_auth(auth_payload)
         if not authorized:
@@ -338,30 +372,14 @@ class WebSocketConnectionManager:
             await websocket.close()
             return
 
-        # 检查是否已有活跃连接
-        if self._router.has_active_subscribers():
-            if self._connection_lock_enabled:
-                # 锁定模式：拒绝新连接
-                await _send_error(
-                    websocket,
-                    "CONNECTION_REJECTED",
-                    "Already have an active connection (connection lock enabled)",
-                )
-                await websocket.close()
-                return
-            else:
-                # 非锁定模式：断开旧连接，允许新连接
-                print(
-                    f"[WS CONNECTION] New connection replacing old one (connection lock disabled)"
-                )
-                self._router.unregister_all_session(session_id=session_id)
-
         self._auth_store[session_id] = auth_payload
         self._router.register(
             connection_id,
             _build_sender(websocket, loop),
             session_id=session_id,
         )
+        async with self._connection_state_lock:
+            self._active_connections[session_id] = (connection_id, websocket)
         self._input_registry.register_provider(session_id)
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
@@ -411,7 +429,11 @@ class WebSocketConnectionManager:
             self._router.unregister(connection_id, session_id=session_id)
             self._input_registry.unregister_provider(session_id)
             self._input_registry.disconnect_confirm_session(session_id)
-            self._auth_store.pop(session_id, None)
+            async with self._connection_state_lock:
+                active_connection = self._active_connections.get(session_id)
+                if active_connection and active_connection[0] == connection_id:
+                    self._active_connections.pop(session_id, None)
+                    self._auth_store.pop(session_id, None)
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
         if not isinstance(message, dict):
