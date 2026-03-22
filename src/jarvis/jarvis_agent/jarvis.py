@@ -278,6 +278,83 @@ def handle_interactive_config_option(
         return True
 
 
+def handle_quick_config_option(quick_config: bool) -> bool:
+    """处理快速配置选项，返回是否已处理并需提前结束。
+
+    启动快速配置向导：快速配置 LLM 平台信息。
+    """
+    if not quick_config:
+        return False
+    qc.quick_config()
+    return True
+
+
+def handle_check_mode(
+    check: bool,
+    check_lint: bool,
+    check_build: bool,
+    check_tool_name: Optional[str],
+    check_json: bool,
+) -> bool:
+    """处理工具检查模式，返回是否已处理并需提前结束。
+
+    执行工具检查（原 jck 命令功能）。
+    """
+    # 任何一个 check 相关参数都会触发检查
+    is_check_mode = check or check_lint or check_build or check_tool_name is not None
+
+    if not is_check_mode:
+        return False
+
+    # 检查选项互斥性
+    check_flags = [check_lint, check_build]
+    active_flags = sum(check_flags)
+    if active_flags > 1:
+        PrettyOutput.auto_print(
+            "❌ 错误：--check-lint 和 --check-build 选项不能同时使用"
+        )
+        raise typer.Exit(code=1)
+
+    # 确定检查类型
+    do_check_lint = check_lint
+    do_check_build = check_build
+
+    # 执行工具检查
+    checker = ToolChecker()
+    results, summary = _perform_check(
+        checker, check_tool_name, do_check_lint, do_check_build
+    )
+
+    if check_json:
+        # JSON格式输出
+        output = {
+            "summary": summary,
+            "results": results,
+        }
+        PrettyOutput.auto_print(
+            "📝 " + json.dumps(output, ensure_ascii=False, indent=2),
+            lang="json",
+        )
+    else:
+        # 友好的文本输出
+        # 如果有未安装工具，询问是否自动安装
+        if summary["missing"] > 0:
+            _install_missing_tools(results)
+            # 重新检查工具状态
+            results, summary = _perform_check(
+                checker, check_tool_name, do_check_lint, do_check_build
+            )
+
+        # 输出最终结果
+        _print_results(results, summary)
+
+    # 如果有工具未安装，返回非零退出码
+    if summary["missing"] > 0:
+        raise typer.Exit(code=1)
+
+    return True
+
+
 def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
     """处理数据备份选项，返回是否已处理并需提前结束。"""
     if backup_dir_path is None:
@@ -886,60 +963,11 @@ def run_cli(
     web_gateway_server = None
 
     # 处理 --quick-config 参数：启动快速配置向导
-    if quick_config:
-        qc.quick_config()
+    if handle_quick_config_option(quick_config):
         return
 
     # 处理工具检查参数（原 jck 命令功能）
-    # 任何一个 check 相关参数都会触发检查
-    is_check_mode = check or check_lint or check_build or check_tool_name is not None
-
-    if is_check_mode:
-        # 检查选项互斥性
-        check_flags = [check_lint, check_build]
-        active_flags = sum(check_flags)
-        if active_flags > 1:
-            PrettyOutput.auto_print(
-                "❌ 错误：--check-lint 和 --check-build 选项不能同时使用"
-            )
-            raise typer.Exit(code=1)
-
-        # 确定检查类型
-        do_check_lint = check_lint
-        do_check_build = check_build
-
-        # 执行工具检查
-        checker = ToolChecker()
-        results, summary = _perform_check(
-            checker, check_tool_name, do_check_lint, do_check_build
-        )
-
-        if check_json:
-            # JSON格式输出
-            output = {
-                "summary": summary,
-                "results": results,
-            }
-            PrettyOutput.auto_print(
-                "📝 " + json.dumps(output, ensure_ascii=False, indent=2),
-                lang="json",
-            )
-        else:
-            # 友好的文本输出
-            # 如果有未安装工具，询问是否自动安装
-            if summary["missing"] > 0:
-                _install_missing_tools(results)
-                # 重新检查工具状态
-                results, summary = _perform_check(
-                    checker, check_tool_name, do_check_lint, do_check_build
-                )
-
-            # 输出最终结果
-            _print_results(results, summary)
-
-        # 如果有工具未安装，返回非零退出码
-        if summary["missing"] > 0:
-            raise typer.Exit(code=1)
+    if handle_check_mode(check, check_lint, check_build, check_tool_name, check_json):
         return
 
     # 处理任务内容：优先从文件读取
