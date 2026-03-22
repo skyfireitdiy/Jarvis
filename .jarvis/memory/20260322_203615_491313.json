@@ -1,0 +1,8 @@
+{
+  "id": "20260322_203615_491313",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "源码依据", "关键文件", "用户手册"],
+  "content": "CodeAgent 用户手册写作的一级源码依据文件为：src/jarvis/jarvis_code_agent/code_agent.py、worktree_manager.py、code_agent_git.py、code_agent_build.py、code_agent_lint.py；二级依据文件为：code_agent_diff.py、code_agent_impact.py、code_agent_postprocess.py、after_change.py、jcad_cli.py。大多数 CodeAgent 用户可见能力以 code_agent.py 为主入口依据。",
+  "created_at": "2026-03-22T20:36:15.491325",
+  "updated_at": "2026-03-22T20:36:15.491327"
+}

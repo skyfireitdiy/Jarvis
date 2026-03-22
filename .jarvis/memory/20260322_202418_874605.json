@@ -1,0 +1,8 @@
+{
+  "id": "20260322_202418_874605",
+  "type": "project_long_term",
+  "tags": ["源码分析", "通用Agent", "共享依据", "用户手册"],
+  "content": "通用 Agent 功能点源码共享依据分组：A. 启动/CLI 类功能主要共享 main.py、agent_manager.py、__init__.py；B. 内置标记与运行中控制主要共享 builtin_input_handler.py、__init__.py、run_loop.py；C. 会话管理主要共享 session_manager.py、builtin_input_handler.py、__init__.py；D. 规则系统主要共享 rules_manager.py、builtin_input_handler.py、__init__.py；E. 记忆与方法论主要共享 memory_manager.py、file_methodology_manager.py、__init__.py。后续写文档时可按这些共享组复用同一批源码依据，减少重复取证。",
+  "created_at": "2026-03-22T20:24:18.874614",
+  "updated_at": "2026-03-22T20:24:18.874616"
+}
