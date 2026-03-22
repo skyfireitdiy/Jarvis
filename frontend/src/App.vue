@@ -1183,13 +1183,25 @@ const agentSidebarStyle = computed(() => {
   return { width: `${agentSidebarWidth.value}px` }
 })
 
-const editorPanelStyle = computed(() => ({
-  top: `${editorPanelRect.value.top}px`,
-  left: `${editorPanelRect.value.left}px`,
-  width: `${editorPanelRect.value.width}px`,
-  height: `${editorPanelRect.value.height}px`,
-  zIndex: activeWindow.value === 'editor' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
-}))
+const editorPanelStyle = computed(() => {
+  if (windowWidth.value <= 768) {
+    return {
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: 'var(--app-height, 100vh)',
+      zIndex: 2000,
+    }
+  }
+
+  return {
+    top: `${editorPanelRect.value.top}px`,
+    left: `${editorPanelRect.value.left}px`,
+    width: `${editorPanelRect.value.width}px`,
+    height: `${editorPanelRect.value.height}px`,
+    zIndex: activeWindow.value === 'editor' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+  }
+})
 
 const activeEditorTab = computed(() => {
   return editorTabs.value.find(tab => tab.path === activeEditorTabPath.value) || null
@@ -9052,6 +9064,41 @@ body::-webkit-scrollbar {
     display: none !important;
   }
   
+  .editor-panel {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: var(--app-height, 100vh) !important;
+    border-radius: 0 !important;
+    border: none !important;
+    z-index: 2000 !important;
+  }
+
+  .editor-panel-header {
+    cursor: default;
+    padding: 10px 12px;
+  }
+
+  .editor-panel-subtitle {
+    max-width: none;
+  }
+
+  .editor-panel-toolbar {
+    padding: 0 10px;
+  }
+
+  .editor-panel-content,
+  .editor-panel-content-main {
+    min-height: 0;
+  }
+
+  .editor-resize-handle {
+    display: none !important;
+  }
+
   /* ========== 终端面板优化 ========== */
   .terminal-panel {
     position: fixed !important;
