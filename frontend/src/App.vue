@@ -2628,6 +2628,23 @@ async function fetchAgentStatus(agent) {
     
     // 更新状态映射（存储对象格式）
     agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus})
+
+    // 当前 Agent 连接后根据 execution_status 恢复输入 UI
+    if (agent.agent_id === currentAgentId.value) {
+      if (executionStatus === 'waiting_single') {
+        inputMode.value = 'single'
+        nextTick(() => {
+          singlelineInput.value?.focus()
+        })
+      } else if (executionStatus === 'waiting_multi') {
+        inputMode.value = 'multi'
+        nextTick(() => {
+          multilineInput.value?.focus()
+        })
+      } else {
+        inputMode.value = 'multi'
+      }
+    }
     
     console.log(`[AGENT STATUS] Agent ${agent.agent_id} execution_status:`, executionStatus)
     return executionStatus
@@ -3480,6 +3497,7 @@ async function switchAgent(agent) {
   lastInputRequest.value = null
   inputText.value = ''
   inputTip.value = ''
+  inputMode.value = 'multi'
   
   // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
