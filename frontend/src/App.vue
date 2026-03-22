@@ -1095,6 +1095,14 @@ const selectedSession = ref(null)         // 选中的 session
 const showBufferPanel = ref(false)        // 缓存管理面板显示状态
 const bufferEditText = ref('')            // 缓存编辑文本
 const showDirDialog = ref(false)           // 目录选择对话框
+let handleResize = null
+let handlePopState = null
+let visualViewportResizeHandler = null
+
+function updateViewportHeight() {
+  const viewportHeight = window.visualViewport?.height || window.innerHeight
+  document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`)
+}
 const currentDirPath = ref('')             // 当前浏览的目录路径
 const dirList = ref([])                    // 目录列表
 const selectedDir = ref(null)              // 选中的目录
@@ -5600,6 +5608,12 @@ onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
 
+  updateViewportHeight()
+  visualViewportResizeHandler = () => {
+    updateViewportHeight()
+  }
+  window.visualViewport?.addEventListener('resize', visualViewportResizeHandler)
+
   inputHistory.value = loadInputHistory()
   
   // 启动 Agent 列表刷新
@@ -5635,8 +5649,9 @@ onMounted(() => {
   console.log('[app] Global keyboard listener added (capture mode)')
   
   // 监听窗口resize事件
-  const handleResize = () => {
+  handleResize = () => {
     windowWidth.value = window.innerWidth
+    updateViewportHeight()
     ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
@@ -5659,7 +5674,7 @@ onMounted(() => {
   console.log('[app] Beforeunload listener added')
   
   // 移动端：监听返回键（popstate事件）
-  const handlePopState = () => {
+  handlePopState = () => {
     console.log('[app] Back button pressed, historyStateCount:', historyStateCount)
     
     if (historyStateCount > 0) {
@@ -5704,6 +5719,7 @@ onUnmounted(() => {
   stopAgentSidebarResize()
   stopEditorPanelInteraction()
   stopEditorFileHeartbeat()
+  window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
   if (monacoEditor) {
     monacoEditor.dispose()
@@ -5741,7 +5757,9 @@ onUnmounted(() => {
 html,
 body {
   width: 100vw;
-  height: 100vh;
+  height: var(--app-height, 100vh);
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -5751,7 +5769,9 @@ body {
 
 #app {
   width: 100vw;
-  height: 100vh;
+  height: var(--app-height, 100vh);
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
 }
@@ -5944,7 +5964,9 @@ body::-webkit-scrollbar {
 .app {
   display: flex;
   flex-direction: row; /* 改为左右布局 */
-  height: 100vh;
+  height: var(--app-height, 100vh);
+  min-height: 100vh;
+  min-height: 100dvh;
   width: 100vw;
   margin: 0;
   padding: 0;
