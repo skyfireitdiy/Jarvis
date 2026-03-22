@@ -43,6 +43,7 @@ from jarvis.jarvis_web_gateway.token_manager import (
 )
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
+from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_utils.globals import set_interrupt
 
 # 导入 agent 状态管理器（用于处理 get_status 消息）
@@ -579,6 +580,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
     terminal_session_manager = TerminalSessionManager(max_sessions=5)
+    timer_manager = TimerManager()
 
     # 保存 router 到全局，用于状态更新时推送消息
     global _router, _terminal_session_manager
@@ -594,6 +596,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
     # 使用自定义 app 或创建新 app
     app = custom_app if custom_app is not None else FastAPI()
+    app.state.timer_manager = timer_manager
 
     # 添加 CORS 中间件，允许前端跨域访问
     app.add_middleware(
@@ -663,6 +666,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         await agent_proxy_manager.cleanup()
         # 清理所有终端会话
         terminal_session_manager.cleanup()
+        timer_manager.shutdown()
         set_current_gateway(None)
 
     # HTTP API：登录接口
