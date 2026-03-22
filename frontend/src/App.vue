@@ -7113,6 +7113,8 @@ body::-webkit-scrollbar {
 .create-agent-modal {
   max-width: 400px;
   width: 90%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 .create-agent-modal h2 {
@@ -9027,6 +9029,11 @@ body::-webkit-scrollbar {
 
 /* 移动端适配 (< 768px) */
 @media (max-width: 768px) {
+  .create-agent-modal {
+    max-height: calc(100vh - 32px);
+    -webkit-overflow-scrolling: touch;
+  }
+
   .desktop-only {
     display: none !important;
   }
