@@ -4697,6 +4697,22 @@ function handleTextareaKeydown(event) {
   }
 }
 
+function updateInputBuffer(agentId, nextValue) {
+  inputBuffers.value.set(agentId, nextValue)
+  if (currentAgentId.value === agentId) {
+    bufferEditText.value = nextValue
+  }
+}
+
+function appendToInputBuffer(agentId, text) {
+  const existingText = inputBuffers.value.get(agentId) || ''
+  const nextValue = existingText
+    ? `${existingText}\n${text}`
+    : text
+
+  updateInputBuffer(agentId, nextValue)
+}
+
 function submitInput() {
   const agentId = currentAgentId.value
   if (!agentId) {
@@ -4733,11 +4749,11 @@ function submitInput() {
   } else {
     // 后端没有等待输入，保存到缓冲区
     console.log('[SUBMIT] Saving input to buffer (execution_status:', executionStatus, ')')
-    inputBuffers.value.set(agentId, userInput)
+    appendToInputBuffer(agentId, userInput)
     appendOutput({
       output_type: 'system',
       agent_name: 'system',
-      text: '✓ 输入已保存到缓冲区，等待后端请求',
+      text: '✓ 输入已追加到缓冲区，等待后端请求',
       lang: 'text',
     })
   }
@@ -4772,7 +4788,7 @@ function submitCompletion() {
       } else {
         // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
         console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
-        inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
+        updateInputBuffer(agentId, '__CTRL_C_PRESSED__')
         appendOutput({
           output_type: 'system',
           agent_name: 'system',
@@ -4901,7 +4917,7 @@ function saveBufferEdit() {
   if (!agentId || !bufferEditText.value.trim()) {
     return
   }
-  inputBuffers.value.set(agentId, bufferEditText.value.trim())
+  updateInputBuffer(agentId, bufferEditText.value.trim())
   appendOutput({
     output_type: 'system',
     agent_name: 'system',
