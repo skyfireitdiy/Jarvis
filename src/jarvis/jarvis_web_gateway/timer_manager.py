@@ -10,6 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -29,12 +30,24 @@ class TimerTask:
     callback: TimerCallback
     run_at: float
     interval_seconds: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
     cancelled: bool = False
 
     @property
     def is_recurring(self) -> bool:
         """是否为循环任务。"""
         return self.interval_seconds is not None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为可序列化的任务信息。"""
+        return {
+            "task_id": self.task_id,
+            "run_at": datetime.fromtimestamp(self.run_at).isoformat(),
+            "interval_seconds": self.interval_seconds,
+            "is_recurring": self.is_recurring,
+            "cancelled": self.cancelled,
+            "metadata": dict(self.metadata or {}),
+        }
 
 
 @dataclass(order=True)
@@ -69,17 +82,40 @@ class TimerManager:
         )
         self._worker.start()
 
-    def schedule_at(self, run_at: datetime, callback: TimerCallback) -> str:
+    def schedule_at(
+        self,
+        run_at: datetime,
+        callback: TimerCallback,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """注册绝对时间一次任务。"""
-        return self._schedule_task(run_at=run_at.timestamp(), callback=callback)
+        return self._schedule_task(
+            run_at=run_at.timestamp(),
+            callback=callback,
+            metadata=metadata,
+        )
 
-    def schedule_after(self, delay_seconds: float, callback: TimerCallback) -> str:
+    def schedule_after(
+        self,
+        delay_seconds: float,
+        callback: TimerCallback,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """注册相对延迟一次任务。"""
         if delay_seconds < 0:
             raise ValueError("delay_seconds must be >= 0")
-        return self._schedule_task(run_at=time.time() + delay_seconds, callback=callback)
+        return self._schedule_task(
+            run_at=time.time() + delay_seconds,
+            callback=callback,
+            metadata=metadata,
+        )
 
-    def schedule_every(self, interval_seconds: float, callback: TimerCallback) -> str:
+    def schedule_every(
+        self,
+        interval_seconds: float,
+        callback: TimerCallback,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """注册循环定时任务。"""
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be > 0")
@@ -87,6 +123,7 @@ class TimerManager:
             run_at=time.time() + interval_seconds,
             callback=callback,
             interval_seconds=interval_seconds,
+            metadata=metadata,
         )
 
     def cancel(self, task_id: str) -> bool:
@@ -99,6 +136,23 @@ class TimerManager:
             self._tasks.pop(task_id, None)
             self._condition.notify_all()
             return True
+
+    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """获取单个任务的可序列化信息。"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return None
+            return task.to_dict()
+
+    def list_tasks(self) -> List[Dict[str, Any]]:
+        """列出所有未取消的任务。"""
+        with self._lock:
+            tasks = [
+                task.to_dict() for task in self._tasks.values() if not task.cancelled
+            ]
+        tasks.sort(key=lambda task_info: task_info["run_at"])
+        return tasks
 
     def shutdown(self) -> None:
         """关闭定时器管理器并停止后续调度。"""
@@ -123,6 +177,7 @@ class TimerManager:
         run_at: float,
         callback: TimerCallback,
         interval_seconds: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         with self._condition:
             if self._shutdown:
@@ -134,6 +189,7 @@ class TimerManager:
                 callback=callback,
                 run_at=run_at,
                 interval_seconds=interval_seconds,
+                metadata=metadata,
             )
             self._tasks[task_id] = timer_task
             heapq.heappush(

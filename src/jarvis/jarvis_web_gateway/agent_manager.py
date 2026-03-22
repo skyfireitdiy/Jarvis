@@ -92,9 +92,14 @@ class AgentManager:
         """
         self._agents: Dict[str, AgentInfo] = {}
         self._on_status_change = on_status_change
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # 加载已保存的 Agent 列表
         self._load_agents()
+
+    def set_event_loop(self, event_loop: asyncio.AbstractEventLoop) -> None:
+        """绑定用于监控任务的主事件循环。"""
+        self._event_loop = event_loop
 
     def create_agent(
         self,
@@ -212,10 +217,98 @@ class AgentManager:
         self._save_agents()
 
         # 启动监控任务
-        agent_info._monitor_task = asyncio.create_task(self._monitor_agent(agent_id))
+        monitor_loop = self._event_loop
+        if monitor_loop is None:
+            monitor_loop = asyncio.get_running_loop()
+
+        if not monitor_loop.is_running():
+            raise RuntimeError("AgentManager event loop is not running")
+
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if monitor_loop is current_loop:
+            agent_info._monitor_task = monitor_loop.create_task(
+                self._monitor_agent(agent_id)
+            )
+        else:
+            monitor_loop.call_soon_threadsafe(
+                self._attach_monitor_task,
+                agent_id,
+            )
 
         # 返回信息
         return agent_info.to_dict()
+
+    def _attach_monitor_task(self, agent_id: str) -> None:
+        """在已绑定的事件循环中附加监控任务。"""
+        agent_info = self._agents.get(agent_id)
+        if agent_info is None:
+            return
+        agent_info._monitor_task = asyncio.create_task(self._monitor_agent(agent_id))
+
+    def create_agent_threadsafe(
+        self,
+        agent_type: str,
+        working_dir: str,
+        name: Optional[str] = None,
+        llm_group: str = "default",
+        tool_group: str = "default",
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,
+        worktree: bool = False,
+    ) -> Dict[str, Any]:
+        """在线程环境中安全地创建 Agent。"""
+        if self._event_loop is None:
+            raise RuntimeError("AgentManager event loop is not set")
+
+        future = asyncio.run_coroutine_threadsafe(
+            self._create_agent_async(
+                agent_type=agent_type,
+                working_dir=working_dir,
+                name=name,
+                llm_group=llm_group,
+                tool_group=tool_group,
+                config_file=config_file,
+                task=task,
+                additional_args=additional_args,
+                auth_token=auth_token,
+                worktree=worktree,
+            ),
+            self._event_loop,
+        )
+        return future.result()
+
+    async def _create_agent_async(
+        self,
+        agent_type: str,
+        working_dir: str,
+        name: Optional[str] = None,
+        llm_group: str = "default",
+        tool_group: str = "default",
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,
+        worktree: bool = False,
+    ) -> Dict[str, Any]:
+        """在事件循环上下文中创建 Agent。"""
+        return self.create_agent(
+            agent_type=agent_type,
+            working_dir=working_dir,
+            name=name,
+            llm_group=llm_group,
+            tool_group=tool_group,
+            config_file=config_file,
+            task=task,
+            additional_args=additional_args,
+            auth_token=auth_token,
+            worktree=worktree,
+        )
 
     def stop_agent(self, agent_id: str) -> Dict[str, Any]:
         """停止 Agent。
