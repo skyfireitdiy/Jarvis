@@ -252,7 +252,7 @@ llms:
 
 ## 📖 Jarvis Book <a id="jarvis-book"></a>
 
-[项目介绍](docs/jarvis_book/1.项目介绍.md) · [快速开始](docs/jarvis_book/2.快速开始.md) · [核心概念与架构](docs/jarvis_book/3.核心概念与架构.md) · [使用指南](docs/jarvis_book/4.使用指南.md) · [功能扩展](docs/jarvis_book/5.功能扩展.md) · [高级主题](docs/jarvis_book/6.高级主题.md) · [参与贡献](docs/jarvis_book/7.参与贡献.md) · [常见问题](docs/jarvis_book/8.常见问题.md) · [用户手册](docs/jarvis_book/9.用户手册.md)
+[项目介绍](docs/jarvis_book/1.项目介绍.md) · [快速开始](docs/jarvis_book/2.快速开始.md) · [核心概念与架构](docs/jarvis_book/3.核心概念与架构.md) · [使用指南](docs/jarvis_book/4.使用指南.md) · [功能扩展](docs/jarvis_book/5.功能扩展.md) · [高级主题](docs/jarvis_book/6.高级主题.md) · [参与贡献](docs/jarvis_book/7.参与贡献.md) · [常见问题](docs/jarvis_book/8.常见问题.md)
 
 ---
 
