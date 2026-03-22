@@ -252,8 +252,7 @@ def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
 
     PrettyOutput.auto_print(f"📝 添加 LLM 配置: {name}")
 
-    # 交互式输入
-    platform = get_single_line_input("平台名称 (openai/claude/other): ").strip()
+    platform = get_single_line_input("平台名称 (openai/claude/other): ").strip().lower()
     if not platform:
         PrettyOutput.auto_print("❌ 平台名称不能为空")
         raise typer.Exit(code=1)
@@ -270,27 +269,39 @@ def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
         PrettyOutput.auto_print("❌ 无效的token数，使用默认值 128000")
         max_tokens = 128000
 
-    # 创建配置
+    base_url = get_single_line_input("API基础URL: ").strip()
+    if not base_url:
+        PrettyOutput.auto_print("❌ API基础URL不能为空")
+        raise typer.Exit(code=1)
+
+    api_key = get_single_line_input("API密钥: ").strip()
+    if not api_key:
+        PrettyOutput.auto_print("❌ API密钥不能为空")
+        raise typer.Exit(code=1)
+
+    if platform == "openai":
+        llm_config_dict = {
+            "openai_api_key": api_key,
+            "openai_api_base": base_url,
+        }
+    elif platform == "claude":
+        llm_config_dict = {
+            "anthropic_api_key": api_key,
+            "anthropic_base_url": base_url,
+        }
+    else:
+        llm_config_dict = {
+            f"{platform}_api_key": api_key,
+            f"{platform}_base_url": base_url,
+        }
+
     llm_config: Dict[str, Any] = {
         "platform": platform,
         "model": model,
         "max_input_token_count": max_tokens,
+        "llm_config": llm_config_dict,
     }
 
-    # 询问是否添加额外配置
-    from jarvis.jarvis_utils.input import user_confirm
-
-    if user_confirm("是否添加额外配置 (如 API key)?", default=False):
-        PrettyOutput.auto_print("ℹ️ 输入配置键和值 (留空结束)")
-        llm_config["llm_config"] = {}
-        while True:
-            key = get_single_line_input("配置键: ").strip()
-            if not key:
-                break
-            value = get_single_line_input(f"配置值 ({key}): ").strip()
-            llm_config["llm_config"][key] = value
-
-    # 保存配置
     config["llms"][name] = llm_config
     if _save_config(config):
         PrettyOutput.auto_print(f"✅ 已添加 LLM 配置: {name}")
