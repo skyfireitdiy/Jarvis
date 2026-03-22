@@ -15,6 +15,47 @@ if TYPE_CHECKING:
     from jarvis.jarvis_agent import Agent
 
 
+TERMINAL_SCREEN_COLUMNS = 300
+TERMINAL_SCREEN_LINES = 100000
+
+
+def _normalize_terminal_output(output_text: str) -> str:
+    """将终端输出归一化为用户最终可见的文本。"""
+    if not output_text:
+        return output_text
+
+    try:
+        import pyte
+
+        screen = pyte.Screen(TERMINAL_SCREEN_COLUMNS, TERMINAL_SCREEN_LINES)
+        stream = pyte.Stream(screen)
+        stream.feed(output_text)
+
+        visible_lines: List[str] = []
+        for row_index in range(screen.lines):
+            row = screen.buffer[row_index]
+            rendered_line = "".join(char.data for char in row.values()).rstrip()
+            if rendered_line:
+                visible_lines.append(rendered_line)
+
+        normalized_output = "\n".join(visible_lines).strip()
+        return normalized_output or output_text.strip()
+    except Exception:
+        return output_text.strip()
+
+
+def _normalize_tool_result(tool_result: Any) -> Any:
+    """清理工具结果中的终端控制输出，优先保持现有返回协议不变。"""
+    if not isinstance(tool_result, tuple) or len(tool_result) != 2:
+        return tool_result
+
+    should_return, payload = tool_result
+    if isinstance(payload, str):
+        return should_return, _normalize_terminal_output(payload)
+
+    return tool_result
+
+
 def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     """
     Parses the model's response, identifies the appropriate tool, and executes it.
@@ -75,7 +116,7 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     ):
         try:
             result = tool_to_execute.handle(response, agent)
-            return result
+            return _normalize_tool_result(result)
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 工具执行失败: {str(e)}")
             return False, str(e)
