@@ -2109,10 +2109,10 @@ async function connect() {
     }
     const payload = {}
     if (auth.value.token) payload.token = auth.value.token
-    // 始终发送 auth 消息，即使没有 password
-    // 这样后端可以立即检测到认证失败，而不需要等待超时
-    ws.send(JSON.stringify({ type: 'auth', payload }))
-    console.log('[ws] auth sent', payload)
+    if (Object.keys(payload).length > 0) {
+      ws.send(JSON.stringify({ type: 'auth', payload }))
+      console.log('[ws] auth sent', payload)
+    }
     // 发送连接锁定设置
     ws.send(JSON.stringify({
       type: 'connection_lock',
@@ -3927,6 +3927,7 @@ function appendOutput(payload, agentId = null) {
   const context = payload?.context || {}
   const agentName = payload?.agent_name || context.agent_name || context.agent || ''
   const nonInteractive = payload?.non_interactive !== undefined ? payload?.non_interactive : (context.non_interactive || false)
+  const resolvedAgentId = agentId || payload?.agent_id || context.agent_id || currentAgentId.value
   
   const outputItem = {
     ...payload,
@@ -3934,6 +3935,7 @@ function appendOutput(payload, agentId = null) {
     timestamp: now,
     agent_name: agentName,
     non_interactive: nonInteractive,
+    agent_id: resolvedAgentId,
   }
   
   console.log('[DEBUG] appendOutput outputItem:', outputItem)
@@ -3941,8 +3943,8 @@ function appendOutput(payload, agentId = null) {
   console.log('[DEBUG] agent_name:', outputItem.agent_name)
   console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
   
-  // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
-  const targetAgentId = agentId || currentAgentId.value
+  // 确定目标 Agent ID：优先使用传入参数，其次使用消息自带 agent_id，最后回退到当前 Agent
+  const targetAgentId = resolvedAgentId
   // 仅当前 Agent 的消息自动滚动到底部
   const shouldAutoScroll = isCurrentAgent(targetAgentId)
   

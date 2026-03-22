@@ -308,3 +308,15 @@ class TestWebApp:
         with open(output_file, "r", encoding="utf-8") as f:
             loaded_config = yaml.safe_load(f)
         assert loaded_config == config_data
+
+    def test_get_root_endpoint_login_password_is_optional(
+        self, sample_schema_file, tmp_path
+    ):
+        """测试前端登录界面将密码标记为可选"""
+        output_file = tmp_path / "config.json"
+        app = create_app(sample_schema_file, output_file)
+        client = TestClient(app)
+
+        response = client.get("/")
+        assert response.status_code == 200
+        assert 'placeholder="可选"' in response.text
