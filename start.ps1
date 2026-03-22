@@ -48,8 +48,8 @@ Write-Host "✅ 网关已启动 (PID: $($gatewayProcess.Id))"
 Write-Host "⏳ 等待网关服务就绪..."
 Start-Sleep -Seconds 5
 
-# 启动前端（开发模式）
-Write-Host "🎨 启动前端服务..."
+# 启动前端（发布模式）
+Write-Host "🎨 启动前端发布服务..."
 Set-Location "$ProjectRoot\frontend"
 
 # 安装前端依赖
@@ -57,9 +57,14 @@ Write-Host "📦 安装前端依赖..."
 npm install
 Write-Host "✅ 前端依赖安装完成"
 
-$frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run","dev","--","--host","$frontendHost","--port","$frontendPort" -PassThru
+# 构建前端发布产物
+Write-Host "🏗️ 构建前端发布版本..."
+npm run build
+Write-Host "✅ 前端发布版本构建完成"
 
-Write-Host "✅ 前端已启动 (PID: $($frontendProcess.Id))"
+$frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run","preview","--","--host","$frontendHost","--port","$frontendPort" -PassThru
+
+Write-Host "✅ 前端发布服务已启动 (PID: $($frontendProcess.Id))"
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "✨ Jarvis 服务已全部启动！" -ForegroundColor Green
