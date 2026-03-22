@@ -582,7 +582,14 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
     terminal_session_manager = TerminalSessionManager(max_sessions=5)
-    timer_manager = TimerManager()
+
+    def _build_callback_from_metadata(metadata: Dict[str, Any]):
+        action_metadata = metadata.get("action")
+        if not isinstance(action_metadata, dict):
+            raise ValueError("Persisted timer metadata.action must be an object")
+        return _build_timer_action({"action": action_metadata})[0]
+
+    timer_manager = TimerManager(task_factory=_build_callback_from_metadata)
 
     # 保存 router 到全局，用于状态更新时推送消息
     global _router, _terminal_session_manager
@@ -1464,6 +1471,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         if action_type == "run_shell_command":
             return _build_shell_command_callback(action_params)
         raise ValueError("action.type must be one of create_agent or run_shell_command")
+
+    timer_manager.load_persisted_tasks()
 
     def _schedule_timer_task(request: Dict[str, Any]) -> Dict[str, Any]:
         schedule_info = _parse_timer_schedule(request)
