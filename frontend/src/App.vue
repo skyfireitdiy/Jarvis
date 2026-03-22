@@ -9,6 +9,7 @@
       <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
+          <button class="icon-btn" :class="{ active: isBatchMode }" @click="toggleBatchMode" title="批量选择模式">☑</button>
           <button class="icon-btn" @click="openCreateAgentModal" title="创建新 Agent">➕</button>
           <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
         </div>
@@ -16,8 +17,11 @@
       <div class="agent-list">
         <div v-for="agent in agentList" :key="agent.agent_id" 
              class="agent-item" 
-             :class="{ active: currentAgentId === agent.agent_id }"
-             @click="switchAgent(agent)">
+             :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
+             @click="handleAgentItemClick(agent, $event)">
+          <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
+            <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
+          </div>
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
@@ -64,6 +68,26 @@
             <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
             <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
+          </div>
+        </div>
+        <!-- 批量操作按钮栏 -->
+        <div v-if="isBatchMode && agentList.length > 0" class="batch-actions-bar">
+          <div class="batch-actions-info">
+            已选 {{ selectedAgents.size }} 个
+          </div>
+          <div class="batch-actions-buttons">
+            <button class="icon-btn-small" @click="toggleSelectAll" :title="isAllSelected ? '取消全选' : '全选'">
+              {{ isAllSelected ? '⬜' : '☑' }}
+            </button>
+            <button class="icon-btn-small" @click="batchCopyAgents" title="批量复制">
+              📋
+            </button>
+            <button class="icon-btn-small stop-btn" @click="batchDeleteAgents" title="批量删除">
+              🗑️
+            </button>
+            <button class="icon-btn-small" @click="toggleBatchMode" title="退出批量模式">
+              ✕
+            </button>
           </div>
         </div>
         <div v-if="agentList.length === 0" class="agent-empty">
@@ -1881,6 +1905,66 @@ const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
 })
 
+// Agent 批量选择管理
+const selectedAgents = ref(new Set()) // 选中的 Agent ID 集合
+const isBatchMode = ref(false)        // 是否处于批量选择模式
+
+// 切换批量选择模式
+function toggleBatchMode() {
+  isBatchMode.value = !isBatchMode.value
+  if (!isBatchMode.value) {
+    // 退出批量模式时清空选中状态
+    selectedAgents.value.clear()
+  }
+}
+
+// 处理 Agent item 点击事件
+function handleAgentItemClick(agent, event) {
+  if (isBatchMode.value) {
+    // 多选模式下，点击整个 item 只切换选择状态，不切换 agent
+    toggleSelectAgent(agent.agent_id)
+  } else {
+    // 正常模式下，切换 agent
+    switchAgent(agent)
+  }
+}
+
+// 切换单个 Agent 的选中状态
+function toggleSelectAgent(agentId) {
+  if (selectedAgents.value.has(agentId)) {
+    selectedAgents.value.delete(agentId)
+  } else {
+    selectedAgents.value.add(agentId)
+  }
+  // 触发响应式更新
+  selectedAgents.value = new Set(selectedAgents.value)
+}
+
+// 判断 Agent 是否被选中
+function isAgentSelected(agentId) {
+  return selectedAgents.value.has(agentId)
+}
+
+// 判断是否全选
+const isAllSelected = computed(() => {
+  return agentList.value.length > 0 && agentList.value.every(agent => selectedAgents.value.has(agent.agent_id))
+})
+
+// 切换全选/取消全选
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    // 取消全选
+    selectedAgents.value.clear()
+  } else {
+    // 全选
+    agentList.value.forEach(agent => {
+      selectedAgents.value.add(agent.agent_id)
+    })
+  }
+  // 触发响应式更新
+  selectedAgents.value = new Set(selectedAgents.value)
+}
+
 function isCurrentAgent(agentId) {
   return agentId === currentAgentId.value
 }
@@ -3201,6 +3285,54 @@ async function copyAgent(agent) {
   }
 }
 
+// 批量复制 Agent
+async function batchCopyAgents() {
+  const selectedIds = Array.from(selectedAgents.value)
+  if (selectedIds.length === 0) {
+    showToast('请先选择要复制的 Agent', 'warning')
+    return
+  }
+  const selectedAgentList = agentList.value.filter(agent => selectedAgents.value.has(agent.agent_id))
+  try {
+    let successCount = 0
+    let failCount = 0
+    for (const agent of selectedAgentList) {
+      try {
+        const { host, port } = getGatewayAddress()
+        const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
+          method: 'POST',
+          body: JSON.stringify({
+            agent_type: agent.agent_type,
+            working_dir: agent.working_dir,
+            name: agent.name ? `${agent.name}_copy` : undefined,
+            llm_group: agent.llm_group || 'default'
+          })
+        })
+        if (response.ok) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch (error) {
+        console.error(`[AGENT] Failed to copy agent ${agent.agent_id}:`, error)
+        failCount++
+      }
+    }
+    await fetchAgentList()
+    selectedAgents.value.clear()
+    selectedAgents.value = new Set()
+    isBatchMode.value = false
+    if (failCount === 0) {
+      showToast(`成功复制 ${successCount} 个 Agent`, 'success')
+    } else {
+      showToast(`复制完成：成功 ${successCount} 个，失败 ${failCount} 个`, 'warning')
+    }
+  } catch (error) {
+    console.error('[AGENT] Batch copy failed:', error)
+    showToast('批量复制失败', 'error')
+  }
+}
+
 // 重命名 Agent
 function renameAgent(agent) {
   renamingAgent.value = agent
@@ -3297,6 +3429,72 @@ async function deleteAgent(agentId) {
       } catch (error) {
         console.error('[AGENT] Delete failed:', error)
         alert(`删除失败: ${error.message}`)
+      }
+    }
+  )
+}
+
+// 批量删除 Agent
+async function batchDeleteAgents() {
+  const selectedIds = Array.from(selectedAgents.value)
+  if (selectedIds.length === 0) {
+    showToast('请先选择要删除的 Agent', 'warning')
+    return
+  }
+  // 隐藏 agent 侧边栏，避免遮挡确认对话框（仅移动端）
+  if (windowWidth.value <= 768) showAgentSidebar.value = false
+  showConfirm(
+    `确认删除选中的 ${selectedIds.length} 个 Agent？删除后将无法恢复，且会清除所有历史记录。`,
+    async () => {
+      try {
+        let successCount = 0
+        let failCount = 0
+        for (const agentId of selectedIds) {
+          try {
+            const { host, port } = getGatewayAddress()
+            const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
+              method: 'DELETE'
+            })
+            const result = await response.json()
+            if (response.ok && result.success) {
+              successCount++
+              // 清除该 Agent 的历史记录
+              historyStorage.clearHistoryForAgent(agentId)
+              // 清除该 Agent 的文件树状态
+              fileTreeState.value.delete(agentId)
+              fileTreeExpanded.value.delete(agentId)
+              fileTreeLoading.value.delete(agentId)
+              showFileTree.value.delete(agentId)
+              // 如果是当前 Agent，清空当前 Agent ID
+              if (currentAgentId.value === agentId) {
+                currentAgentId.value = null
+                outputs.value = []
+                historyOffset.value = 0
+                hasMoreHistory.value = true
+              }
+            } else {
+              failCount++
+            }
+          } catch (error) {
+            console.error(`[AGENT] Failed to delete agent ${agentId}:`, error)
+            failCount++
+          }
+        }
+        // 刷新列表
+        await fetchAgentList()
+        // 清空选中状态并退出批量模式
+        selectedAgents.value.clear()
+        selectedAgents.value = new Set()
+        isBatchMode.value = false
+        // 显示结果提示
+        if (failCount === 0) {
+          showToast(`成功删除 ${successCount} 个 Agent`, 'success')
+        } else {
+          showToast(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`, 'warning')
+        }
+      } catch (error) {
+        console.error('[AGENT] Batch delete failed:', error)
+        showToast('批量删除失败', 'error')
       }
     }
   )
@@ -6546,6 +6744,44 @@ body::-webkit-scrollbar {
   border-color: rgba(56, 139, 253, 0.4);
 }
 
+.agent-item.selected {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.agent-checkbox {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.agent-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #58a6ff;
+}
+
+.batch-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(22, 27, 34, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+}
+
+.batch-actions-info {
+  font-size: 13px;
+  color: #8b949e;
+}
+
+.batch-actions-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .agent-item .agent-status {
   font-size: 11px;
   padding: 2px 6px;
@@ -8813,6 +9049,25 @@ body::-webkit-scrollbar {
   
   .agent-item {
     padding: 10px;
+  }
+  .agent-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .batch-actions-bar {
+    padding: 10px 12px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .batch-actions-info {
+    font-size: 12px;
+  }
+
+  .batch-actions-buttons {
+    width: 100%;
+    justify-content: flex-end;
   }
   
   /* ========== 顶部栏优化 ========== */
