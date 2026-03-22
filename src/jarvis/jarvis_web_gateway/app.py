@@ -384,17 +384,6 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
-        # 发送当前 session 缓存的消息
-        cached_messages = self._router.get_and_clear_cache(session_id)
-        if cached_messages:
-            print(
-                f"[CACHE] Sending {len(cached_messages)} cached messages to client for session={session_id}"
-            )
-            for msg in cached_messages:
-                try:
-                    await websocket.send_json(msg)
-                except Exception as e:
-                    print(f"[CACHE] Failed to send cached message: {e}")
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         print(
