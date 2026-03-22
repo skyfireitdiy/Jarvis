@@ -6309,7 +6309,7 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  padding: 8px 8px 0;
+  padding: 4px 4px 0;
   background: rgba(13, 17, 23, 0.92);
   overflow-x: auto;
 }
@@ -6317,16 +6317,18 @@ body::-webkit-scrollbar {
 .editor-tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   max-width: 220px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: none;
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
   background: rgba(110, 118, 129, 0.16);
   color: #8b949e;
   cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .editor-tab.active {
@@ -6350,6 +6352,9 @@ body::-webkit-scrollbar {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
 }
 
 .editor-panel-toolbar {
