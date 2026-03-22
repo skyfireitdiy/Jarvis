@@ -1,7 +1,11 @@
 <template>
   <div class="app">
     <!-- Agent 侧边栏 -->
-    <aside class="agent-sidebar" :class="{ collapsed: !showAgentSidebar }">
+    <aside
+      class="agent-sidebar"
+      :class="{ collapsed: !showAgentSidebar, 'agent-sidebar-resizing': agentSidebarResizeState.active }"
+      :style="agentSidebarStyle"
+    >
       <div class="agent-sidebar-header">
         <h3>Agent 列表</h3>
         <div class="sidebar-header-actions">
@@ -66,6 +70,11 @@
           暂无 Agent，点击 + 创建
         </div>
       </div>
+      <div
+        v-if="showAgentSidebar && windowWidth > 768"
+        class="agent-sidebar-resize-handle"
+        @mousedown="startAgentSidebarResize"
+      ></div>
     </aside>
 
     <!-- 主内容区 -->
@@ -974,6 +983,39 @@ const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'edito
 const BASE_Z_INDEX = 1000
 const ACTIVE_Z_INDEX = 1100
 
+const AGENT_SIDEBAR_DEFAULT_WIDTH = 320
+const AGENT_SIDEBAR_MIN_WIDTH = 240
+const AGENT_SIDEBAR_MAX_WIDTH = 560
+const AGENT_SIDEBAR_STORAGE_KEY = 'jarvis_agent_sidebar_width'
+
+function normalizeAgentSidebarWidth(width) {
+  return clamp(width, AGENT_SIDEBAR_MIN_WIDTH, AGENT_SIDEBAR_MAX_WIDTH)
+}
+
+function loadAgentSidebarWidth() {
+  const savedValue = localStorage.getItem(AGENT_SIDEBAR_STORAGE_KEY)
+  if (!savedValue) {
+    return AGENT_SIDEBAR_DEFAULT_WIDTH
+  }
+
+  const parsedWidth = Number(savedValue)
+  if (!Number.isFinite(parsedWidth)) {
+    return AGENT_SIDEBAR_DEFAULT_WIDTH
+  }
+
+  return normalizeAgentSidebarWidth(parsedWidth)
+}
+
+function saveAgentSidebarWidth() {
+  localStorage.setItem(AGENT_SIDEBAR_STORAGE_KEY, String(agentSidebarWidth.value))
+}
+
+const agentSidebarWidth = ref(loadAgentSidebarWidth())
+const agentSidebarResizeState = ref({
+  active: false,
+  startX: 0,
+  startWidth: AGENT_SIDEBAR_DEFAULT_WIDTH,
+})
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
 const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
@@ -1084,6 +1126,18 @@ const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
 const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
 const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
 
+const agentSidebarStyle = computed(() => {
+  if (!showAgentSidebar.value) {
+    return {}
+  }
+
+  if (windowWidth.value <= 768) {
+    return { width: '100vw' }
+  }
+
+  return { width: `${agentSidebarWidth.value}px` }
+})
+
 const editorPanelStyle = computed(() => ({
   top: `${editorPanelRect.value.top}px`,
   left: `${editorPanelRect.value.left}px`,
@@ -1099,6 +1153,51 @@ const activeEditorTab = computed(() => {
 function clamp(value, min, max) {
   if (max < min) return min
   return Math.min(Math.max(value, min), max)
+}
+
+function ensureAgentSidebarWidthInBounds() {
+  agentSidebarWidth.value = normalizeAgentSidebarWidth(agentSidebarWidth.value)
+}
+
+function startAgentSidebarResize(event) {
+  if (windowWidth.value <= 768 || !showAgentSidebar.value) return
+
+  agentSidebarResizeState.value = {
+    active: true,
+    startX: event.clientX,
+    startWidth: agentSidebarWidth.value,
+  }
+
+  document.addEventListener('mousemove', onAgentSidebarResize)
+  document.addEventListener('mouseup', stopAgentSidebarResize)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onAgentSidebarResize(event) {
+  if (!agentSidebarResizeState.value.active) return
+
+  const deltaX = event.clientX - agentSidebarResizeState.value.startX
+  const nextWidth = agentSidebarResizeState.value.startWidth + deltaX
+  agentSidebarWidth.value = normalizeAgentSidebarWidth(nextWidth)
+}
+
+function stopAgentSidebarResize() {
+  if (!agentSidebarResizeState.value.active) {
+    document.removeEventListener('mousemove', onAgentSidebarResize)
+    document.removeEventListener('mouseup', stopAgentSidebarResize)
+    return
+  }
+
+  agentSidebarResizeState.value = {
+    active: false,
+    startX: 0,
+    startWidth: agentSidebarWidth.value,
+  }
+
+  document.removeEventListener('mousemove', onAgentSidebarResize)
+  document.removeEventListener('mouseup', stopAgentSidebarResize)
+  saveAgentSidebarWidth()
 }
 
 // 设置焦点窗口
@@ -5520,8 +5619,10 @@ onMounted(() => {
   // 监听窗口resize事件
   const handleResize = () => {
     windowWidth.value = window.innerWidth
+    ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
+    saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
     layoutMonacoEditor()
@@ -5582,6 +5683,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopAgentSidebarResize()
   stopEditorPanelInteraction()
   stopEditorFileHeartbeat()
 
@@ -6316,7 +6418,9 @@ body::-webkit-scrollbar {
 
 /* Agent 浮动窗口 */
 .agent-sidebar {
+  position: relative;
   width: 320px;
+  min-width: 0;
   background: rgba(22, 27, 34, 0.95);
   border-right: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
@@ -6329,6 +6433,37 @@ body::-webkit-scrollbar {
   width: 0;
   border-right: none;
   overflow: hidden;
+}
+
+.agent-sidebar-resizing {
+  user-select: none;
+}
+
+.agent-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 5;
+}
+
+.agent-sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.agent-sidebar-resize-handle:hover::after,
+.agent-sidebar-resizing .agent-sidebar-resize-handle::after {
+  background: rgba(88, 166, 255, 0.6);
 }
 
 .agent-sidebar-header {
