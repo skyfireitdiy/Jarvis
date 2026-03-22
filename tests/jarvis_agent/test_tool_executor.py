@@ -165,3 +165,29 @@ class TestToolExecutor:
         handler2.handle.assert_called_once()
         handler1.handle.assert_not_called()
         handler3.handle.assert_not_called()
+
+    def test_handler_output_keeps_only_final_visible_progress_state(
+        self, mock_agent, mock_handler
+    ):
+        """测试终端进度输出只保留最终可见状态。"""
+        mock_agent.output_handler = [mock_handler]
+        mock_handler.handle.return_value = (
+            True,
+            "Downloading 10%\rDownloading 60%\rDownloading 100%\nDone\n",
+        )
+
+        result = execute_tool_call("test command", mock_agent)
+
+        assert result == (True, "Downloading 100%\nDone")
+
+    def test_handler_output_strips_ansi_sequences(self, mock_agent, mock_handler):
+        """测试 ANSI 控制字符不会出现在最终输出中。"""
+        mock_agent.output_handler = [mock_handler]
+        mock_handler.handle.return_value = (
+            True,
+            "\x1b[32mSuccess\x1b[0m\n\x1b[31mWarning\x1b[0m",
+        )
+
+        result = execute_tool_call("test command", mock_agent)
+
+        assert result == (True, "Success\nWarning")
