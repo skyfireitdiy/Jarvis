@@ -5687,7 +5687,7 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + E 打开/隐藏编辑器面板
-  if (isModifierPressed && event.key === 'e') {
+  if (isModifierPressed && event.code === 'KeyE') {
     event.preventDefault()
     if (showEditorPanel.value) {
       closeEditorPanel()
