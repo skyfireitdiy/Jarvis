@@ -4,22 +4,27 @@
 from __future__ import annotations
 
 import heapq
+import json
 import logging
 import threading
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
 
+from jarvis.jarvis_utils.config import get_data_dir
+
 
 logger = logging.getLogger(__name__)
 
 TimerCallback = Callable[[], None]
+TaskFactory = Callable[[Dict[str, Any]], TimerCallback]
 
 
 @dataclass
@@ -68,13 +73,16 @@ class TimerManager:
     - 固定间隔循环任务
     """
 
-    def __init__(self) -> None:
+    PERSISTENCE_FILE = Path(get_data_dir()) / "gateway" / ".jarvis_timers.json"
+
+    def __init__(self, task_factory: Optional[TaskFactory] = None) -> None:
         self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
         self._tasks: Dict[str, TimerTask] = {}
         self._queue: List[ScheduledTask] = []
         self._sequence = 0
         self._shutdown = False
+        self._task_factory = task_factory
         self._worker = threading.Thread(
             target=self._run_loop,
             daemon=True,
@@ -134,6 +142,7 @@ class TimerManager:
                 return False
             task.cancelled = True
             self._tasks.pop(task_id, None)
+            self._persist_tasks_locked()
             self._condition.notify_all()
             return True
 
@@ -160,8 +169,6 @@ class TimerManager:
             if self._shutdown:
                 return
             self._shutdown = True
-            self._tasks.clear()
-            self._queue.clear()
             self._condition.notify_all()
 
         if self._worker.is_alive():
@@ -172,18 +179,46 @@ class TimerManager:
         with self._lock:
             return self._shutdown
 
+    def load_persisted_tasks(self) -> None:
+        """显式加载已持久化的定时任务。"""
+        self._load_tasks()
+
+    def restore_task(self, task_data: Dict[str, Any]) -> str:
+        """从持久化数据恢复单个任务。"""
+        if self._task_factory is None:
+            raise RuntimeError("Timer task factory is not configured")
+
+        task_id = task_data["task_id"]
+        run_at_raw = task_data["run_at"]
+        interval_seconds = task_data.get("interval_seconds")
+        metadata = task_data.get("metadata") or {}
+
+        callback = self._task_factory(metadata)
+        run_at_dt = datetime.fromisoformat(run_at_raw)
+        run_at_ts = max(run_at_dt.timestamp(), time.time())
+        return self._schedule_task(
+            run_at=run_at_ts,
+            callback=callback,
+            interval_seconds=interval_seconds,
+            metadata=metadata,
+            task_id=task_id,
+            persist=False,
+        )
+
     def _schedule_task(
         self,
         run_at: float,
         callback: TimerCallback,
         interval_seconds: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        task_id: Optional[str] = None,
+        persist: bool = True,
     ) -> str:
         with self._condition:
             if self._shutdown:
                 raise RuntimeError("TimerManager is shut down")
 
-            task_id = str(uuid.uuid4())
+            task_id = task_id or str(uuid.uuid4())
             timer_task = TimerTask(
                 task_id=task_id,
                 callback=callback,
@@ -200,6 +235,8 @@ class TimerManager:
                     task_id=task_id,
                 ),
             )
+            if persist:
+                self._persist_tasks_locked()
             self._condition.notify_all()
             return task_id
 
@@ -251,11 +288,13 @@ class TimerManager:
         if not timer_task.is_recurring:
             with self._condition:
                 self._tasks.pop(timer_task.task_id, None)
+                self._persist_tasks_locked()
             return
 
         with self._condition:
             if self._shutdown or timer_task.cancelled:
                 self._tasks.pop(timer_task.task_id, None)
+                self._persist_tasks_locked()
                 return
 
             assert timer_task.interval_seconds is not None
@@ -268,4 +307,51 @@ class TimerManager:
                     task_id=timer_task.task_id,
                 ),
             )
+            self._persist_tasks_locked()
             self._condition.notify_all()
+
+    def _load_tasks(self) -> None:
+        """从文件加载已保存的定时任务。"""
+        if self._task_factory is None:
+            return
+        if not self.PERSISTENCE_FILE.exists():
+            return
+
+        try:
+            with open(self.PERSISTENCE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if not isinstance(data, list):
+                logger.warning("Invalid timer persistence file format")
+                return
+
+            restored = False
+            for task_data in data:
+                if not isinstance(task_data, dict):
+                    continue
+                try:
+                    self.restore_task(task_data)
+                    restored = True
+                except Exception:
+                    logger.exception(
+                        "Failed to restore timer task: %s",
+                        task_data.get("task_id"),
+                    )
+
+            if restored:
+                with self._condition:
+                    self._persist_tasks_locked()
+        except Exception:
+            logger.exception("Failed to load timer persistence file")
+
+    def _persist_tasks_locked(self) -> None:
+        """将当前任务集合写入持久化文件。调用方需持有锁。"""
+        try:
+            self.PERSISTENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            data = [
+                task.to_dict() for task in self._tasks.values() if not task.cancelled
+            ]
+            with open(self.PERSISTENCE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            logger.exception("Failed to persist timer tasks")
