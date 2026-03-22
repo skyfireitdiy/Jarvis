@@ -217,7 +217,7 @@
       <div class="terminal-panel-header" @mousedown="startTerminalPanelMove">
         <h3>终端</h3>
         <div class="terminal-panel-actions">
-          <button class="icon-btn" @click="createTerminal" :disabled="terminalSessions.length >= 5" title="新建终端">➕</button>
+          <button class="icon-btn" @click="createTerminal" :disabled="!socket" title="新建终端">➕</button>
           <button class="icon-btn maximize-btn" @click="toggleTerminalMaximize" :title="isTerminalMaximized ? '还原' : '最大化'">
             {{ isTerminalMaximized ? '🗗' : '🗖' }}
           </button>
