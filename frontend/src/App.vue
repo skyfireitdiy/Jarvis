@@ -68,7 +68,7 @@
           <div class="agent-actions">
             <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
-            <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">✕</button>
+            <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
           </div>
         </div>
         <!-- 批量操作按钮栏 -->
