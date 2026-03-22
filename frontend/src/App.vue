@@ -4469,21 +4469,10 @@ function appendExecution(payload) {
     
     // 保存终端内容到消息列表
     if (termInfo.terminal) {
-      termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
+      const terminalContent = getTerminalBufferContent(termInfo.terminal, true)
       
       // 获取终端内容并保存
       try {
-        const buffer = termInfo.terminal.buffer.active
-        const lines = []
-        for (let i = 0; i < buffer.length; i++) {
-          const line = buffer.getLine(i)
-          if (line) {
-            const lineText = line.translateToString(true)
-            lines.push(lineText)
-          }
-        }
-        const terminalContent = lines.join('\n')
-        
         console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
         
         // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
@@ -4988,6 +4977,22 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+function getTerminalBufferContent(terminal, trimTrailingWhitespace = false) {
+  const buffer = terminal?.buffer?.active
+  if (!buffer) return ''
+
+  const lines = []
+  for (let i = 0; i < buffer.length; i++) {
+    const line = buffer.getLine(i)
+    if (line) {
+      lines.push(line.translateToString(true))
+    }
+  }
+
+  const content = lines.join('\n')
+  return trimTrailingWhitespace ? content.replace(/\s+$/, '') : content
+}
+
 function syncTerminalSize(executionId, termInfo) {
   console.log(`[terminal] syncTerminalSize called for execution ${executionId}`)
   if (!termInfo) {
@@ -5112,9 +5117,8 @@ function setTerminalRef(executionId, el) {
         termInfo.pendingChunks = []
       }
       if (termInfo.ended) {
-        termInfo.terminal.writeln('\r\n[status] Execution completed - terminal is now read-only')
+        getTerminalBufferContent(termInfo.terminal, true)
       }
-      termInfo.terminal.writeln(`\r\n[Terminal ${executionId}] Ready.\r\n`)
     } else if (termInfo) {
       syncTerminalSize(executionId, termInfo)
     }
