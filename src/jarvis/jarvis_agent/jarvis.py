@@ -1281,9 +1281,10 @@ def run_cli(
         output_content = ""
         exit_code = 0
         error_message = ""
+        agent = None
 
         try:
-            # 初始化agent并运行任务，捕获输出
+            # 初始化 agent 并运行任务，捕获输出
             agent = agent_manager.initialize()
 
             # 优先处理命令行直接传入的任务
@@ -1364,6 +1365,12 @@ def run_cli(
             error_message = str(exec_err)
             raise
         finally:
+            if agent is not None:
+                try:
+                    agent.save_session()
+                except Exception:
+                    pass
+
             if web_gateway_server is not None:
                 try:
                     # 设置退出标志，让 uvicorn 服务器优雅关闭
