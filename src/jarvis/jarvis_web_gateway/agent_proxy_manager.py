@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import defaultdict
 from typing import Any
 
 import httpx
@@ -72,6 +73,9 @@ class AgentProxyManager:
             timeout=http_timeout,
             follow_redirects=True,
         )
+        self._agent_message_cache: dict[str, list[str]] = defaultdict(list)
+        self._agent_cache_limit = 200
+        self._agent_cache_lock = asyncio.Lock()
 
         logger.info("[PROXY MANAGER] AgentProxyManager initialized")
 
@@ -243,12 +247,14 @@ class AgentProxyManager:
                 await agent_ws.send(auth_message)
                 logger.info(f"[PROXY MANAGER] Sent auth message to agent {agent_id}")
 
+            await self._flush_cached_messages(client_ws, agent_id)
+
             # 创建双向转发任务
             client_to_agent_task = asyncio.create_task(
-                self._forward_messages(client_ws, agent_ws, "client->agent")
+                self._forward_messages(client_ws, agent_ws, "client->agent", agent_id)
             )
             agent_to_client_task = asyncio.create_task(
-                self._forward_messages(agent_ws, client_ws, "agent->client")
+                self._forward_messages(agent_ws, client_ws, "agent->client", agent_id)
             )
 
             # 等待任一任务完成（连接断开）
@@ -289,6 +295,7 @@ class AgentProxyManager:
         source_ws: Any,
         target_ws: Any,
         direction: str,
+        agent_id: str,
     ) -> None:
         """转发 WebSocket 消息。
 
@@ -316,16 +323,53 @@ class AgentProxyManager:
                     logger.debug(
                         f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
                     )
-                    if isinstance(target_ws, WebSocket):
-                        await target_ws.send_text(data)
-                    else:
-                        await target_ws.send(data)
+                    try:
+                        if isinstance(target_ws, WebSocket):
+                            await target_ws.send_text(data)
+                        else:
+                            await target_ws.send(data)
+                    except Exception:
+                        if direction == "agent->client":
+                            await self._cache_agent_message(agent_id, data)
+                        raise
 
         except WebSocketDisconnect:
             logger.debug(f"[PROXY MANAGER] {direction}: WebSocket disconnected")
         except Exception as e:
             logger.debug(f"[PROXY MANAGER] {direction}: Forward error: {e}")
             raise
+
+    async def _cache_agent_message(self, agent_id: str, message: str) -> None:
+        async with self._agent_cache_lock:
+            cache_bucket = self._agent_message_cache[agent_id]
+            cache_bucket.append(message)
+            if len(cache_bucket) > self._agent_cache_limit:
+                cache_bucket.pop(0)
+            logger.info(
+                "[PROXY MANAGER] Cached agent message for %s, cache_size=%d",
+                agent_id,
+                len(cache_bucket),
+            )
+
+    async def _flush_cached_messages(self, client_ws: WebSocket, agent_id: str) -> None:
+        async with self._agent_cache_lock:
+            cached_messages = list(self._agent_message_cache.get(agent_id, []))
+            self._agent_message_cache.pop(agent_id, None)
+
+        if not cached_messages:
+            return
+
+        logger.info(
+            "[PROXY MANAGER] Flushing %d cached messages to agent client %s",
+            len(cached_messages),
+            agent_id,
+        )
+        for message in cached_messages:
+            try:
+                await client_ws.send_text(message)
+            except Exception:
+                await self._cache_agent_message(agent_id, message)
+                raise
 
     async def cleanup(self) -> None:
         """清理资源。"""
