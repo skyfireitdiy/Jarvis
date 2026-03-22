@@ -36,6 +36,7 @@ class AgentInfo:
         process: Optional[subprocess.Popen],
         name: Optional[str] = None,
         llm_group: str = "default",
+        worktree: bool = False,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -45,6 +46,7 @@ class AgentInfo:
         self.working_dir = working_dir
         self.process = process
         self.llm_group = llm_group
+        self.worktree = worktree
         self.status = "running"
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
@@ -60,6 +62,7 @@ class AgentInfo:
             "status": self.status,
             "working_dir": self.working_dir,
             "llm_group": self.llm_group,
+            "worktree": self.worktree,
             "created_at": self.created_at,
         }
 
@@ -104,6 +107,7 @@ class AgentManager:
         task: Optional[str] = None,
         additional_args: Optional[Dict[str, Any]] = None,
         auth_token: Optional[str] = None,
+        worktree: bool = False,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -117,6 +121,7 @@ class AgentManager:
             task: 任务描述（仅对 codeagent 有效）
             additional_args: 额外参数
             auth_token: 认证 Token，将通过环境变量传递给 Agent
+            worktree: 是否为 codeagent 启用 git worktree 模式
 
         Returns:
             Agent 信息字典
@@ -156,6 +161,7 @@ class AgentManager:
             config_file=config_file,
             task=task,
             additional_args=additional_args,
+            worktree=worktree,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -195,6 +201,7 @@ class AgentManager:
             process=process,
             name=name,
             llm_group=llm_group,
+            worktree=worktree,
         )
 
         # 保存到内存
@@ -393,6 +400,7 @@ class AgentManager:
         config_file: Optional[str],
         task: Optional[str],
         additional_args: Optional[Dict[str, Any]],
+        worktree: bool = False,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -404,6 +412,7 @@ class AgentManager:
             config_file: 配置文件路径
             task: 任务描述
             additional_args: 额外参数
+            worktree: 是否为 codeagent 启用 git worktree 模式
 
         Returns:
             命令列表
@@ -425,6 +434,9 @@ class AgentManager:
 
         if task:
             cmd.extend(["--task", task])
+
+        if agent_type == "codeagent" and worktree:
+            cmd.append("-w")
 
         # 添加额外参数
         if additional_args:
@@ -565,6 +577,7 @@ class AgentManager:
                         llm_group=agent_data.get(
                             "llm_group", "default"
                         ),  # 向后兼容，旧数据使用默认值
+                        worktree=agent_data.get("worktree", False),
                     )
 
                     # 检查进程是否还在运行
