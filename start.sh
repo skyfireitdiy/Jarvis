@@ -47,8 +47,8 @@ echo "✅ 网关已启动 (PID: $GATEWAY_PID)"
 echo "⏳ 等待网关服务就绪..."
 sleep 5
 
-# 启动前端（开发模式）
-echo "🎨 启动前端服务..."
+# 启动前端（发布模式）
+echo "🎨 启动前端发布服务..."
 cd "$PROJECT_ROOT/frontend"
 
 # 安装前端依赖
@@ -56,10 +56,15 @@ echo "📦 安装前端依赖..."
 npm install
 echo "✅ 前端依赖安装完成"
 
-npm run dev -- --host $FRONTEND_HOST --port $FRONTEND_PORT &
+# 构建前端发布产物
+echo "🏗️ 构建前端发布版本..."
+npm run build
+echo "✅ 前端发布版本构建完成"
+
+npm run preview -- --host $FRONTEND_HOST --port $FRONTEND_PORT &
 FRONTEND_PID=$!
 
-echo "✅ 前端已启动 (PID: $FRONTEND_PID)"
+echo "✅ 前端发布服务已启动 (PID: $FRONTEND_PID)"
 echo ""
 echo "========================================="
 echo "✨ Jarvis 服务已全部启动！"
