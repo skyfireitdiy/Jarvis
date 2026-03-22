@@ -841,6 +841,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             config_file = request.get("config_file")
             task = request.get("task")
             additional_args = request.get("additional_args")
+            worktree = bool(request.get("worktree", False))
 
             if not agent_type:
                 return {
@@ -872,6 +873,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 config_file=config_file,
                 task=task,
                 additional_args=additional_args,
+                worktree=worktree,
             )
 
             return {"success": True, "data": agent_info}
