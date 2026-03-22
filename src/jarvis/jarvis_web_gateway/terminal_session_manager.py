@@ -109,14 +109,17 @@ class TerminalSession:
     def _publish_output(self, data: bytes) -> None:
         """发布终端输出到WebSocket。"""
         if self.stream_publisher is None:
-            print(f"[TerminalSession {self.terminal_id}] No stream publisher, skipping output")
+            print(
+                f"[TerminalSession {self.terminal_id}] No stream publisher, skipping output"
+            )
             return
 
         try:
             # base64 编码数据，使其可序列化为 JSON
             import base64
-            encoded_data = base64.b64encode(data).decode('utf-8')
-            
+
+            encoded_data = base64.b64encode(data).decode("utf-8")
+
             # 构建符合前端期望的 WebSocket 消息格式
             # 直接发送 {type: "execution", payload: {...}} 格式
             payload = {
@@ -126,11 +129,10 @@ class TerminalSession:
                 "sequence": self.next_sequence(),
                 "execution_id": f"terminal_{self.terminal_id}",
             }
-            message = {
-                "type": "execution",
-                "payload": payload
-            }
-            print(f"[TerminalSession {self.terminal_id}] Publishing output: type={message['type']}, exec_id={payload['execution_id']}, data_len={len(data)}")
+            message = {"type": "execution", "payload": payload}
+            print(
+                f"[TerminalSession {self.terminal_id}] Publishing output: type={message['type']}, exec_id={payload['execution_id']}, data_len={len(data)}"
+            )
             # 直接通过 router 发送消息
             self.stream_publisher.publish(message, session_id=self.session_id)
         except Exception as e:
@@ -140,7 +142,7 @@ class TerminalSession:
 class TerminalSessionManager:
     """独立终端会话管理器。"""
 
-    def __init__(self, max_sessions: int = 5):
+    def __init__(self, max_sessions: Optional[int] = None):
         self._max_sessions = max_sessions
         self._lock = threading.RLock()
         self._sessions: Dict[str, TerminalSession] = {}
@@ -166,7 +168,10 @@ class TerminalSessionManager:
         """
         with self._lock:
             # 检查会话数量限制
-            if len(self._sessions) >= self._max_sessions:
+            if (
+                self._max_sessions is not None
+                and len(self._sessions) >= self._max_sessions
+            ):
                 return None, f"已达到最大终端数量限制（{self._max_sessions}）"
 
             # 生成terminal_id
@@ -175,7 +180,9 @@ class TerminalSessionManager:
             try:
                 # 检查解释器是否存在
                 if not shutil.which(interpreter):
-                    print(f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to bash")
+                    print(
+                        f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to bash"
+                    )
                     interpreter = "bash"
 
                 # 创建PTY
@@ -193,9 +200,11 @@ class TerminalSessionManager:
                 # 构建命令
                 # fish 在 PTY 环境中无法直接启动，但可以通过 bash -c exec fish 启动
                 # 这样 fish 会继承正确的进程组设置
-                if interpreter.endswith('fish'):
-                    print("[TerminalSessionManager] Fish shell detected, using bash -c exec fish")
-                    cmd = ['bash', '-c', f'exec {interpreter} -i']
+                if interpreter.endswith("fish"):
+                    print(
+                        "[TerminalSessionManager] Fish shell detected, using bash -c exec fish"
+                    )
+                    cmd = ["bash", "-c", f"exec {interpreter} -i"]
                     actual_interpreter = interpreter
                 else:
                     cmd = [interpreter]
@@ -252,7 +261,9 @@ class TerminalSessionManager:
 
     def _read_output(self, session: TerminalSession) -> None:
         """读取终端输出的线程函数。"""
-        print(f"[TerminalSessionManager] Starting output reader for terminal {session.terminal_id}")
+        print(
+            f"[TerminalSessionManager] Starting output reader for terminal {session.terminal_id}"
+        )
         output_count = 0
         while not session.is_closed():
             try:
@@ -264,22 +275,32 @@ class TerminalSessionManager:
                 # 读取数据
                 data = os.read(session.master_fd, 4096)
                 if not data:
-                    print(f"[TerminalSessionManager] EOF on terminal {session.terminal_id}")
+                    print(
+                        f"[TerminalSessionManager] EOF on terminal {session.terminal_id}"
+                    )
                     break
 
                 output_count += 1
-                print(f"[TerminalSessionManager] Read chunk {output_count} ({len(data)} bytes) from terminal {session.terminal_id}")
+                print(
+                    f"[TerminalSessionManager] Read chunk {output_count} ({len(data)} bytes) from terminal {session.terminal_id}"
+                )
                 print(f"[TerminalSessionManager] Data preview: {data[:100]!r}")
                 # 发布输出
                 session._publish_output(data)
 
             except OSError as e:
-                print(f"[TerminalSessionManager] OSError on terminal {session.terminal_id}: {e}")
+                print(
+                    f"[TerminalSessionManager] OSError on terminal {session.terminal_id}: {e}"
+                )
                 break
             except Exception as e:
-                print(f"[TerminalSessionManager] Exception on terminal {session.terminal_id}: {e}")
+                print(
+                    f"[TerminalSessionManager] Exception on terminal {session.terminal_id}: {e}"
+                )
                 break
-        print(f"[TerminalSessionManager] Output reader stopped for terminal {session.terminal_id}")
+        print(
+            f"[TerminalSessionManager] Output reader stopped for terminal {session.terminal_id}"
+        )
 
         # 检查进程退出状态
         if session.proc is not None:
@@ -346,7 +367,7 @@ class TerminalSessionManager:
 
             # 标记为正在关闭
             self._closing_sessions.add(terminal_id)
-            
+
             # 发送 terminal_closed 消息通知前端
             if session.stream_publisher is not None:
                 try:
@@ -356,13 +377,19 @@ class TerminalSessionManager:
                             "terminal_id": terminal_id,
                         },
                     }
-                    print(f"[TerminalSessionManager] Sending terminal_closed for {terminal_id}")
-                    session.stream_publisher.publish(message, session_id=session.session_id)
+                    print(
+                        f"[TerminalSessionManager] Sending terminal_closed for {terminal_id}"
+                    )
+                    session.stream_publisher.publish(
+                        message, session_id=session.session_id
+                    )
                 except Exception as e:
-                    print(f"[TerminalSessionManager] Failed to send terminal_closed: {e}")
-            
+                    print(
+                        f"[TerminalSessionManager] Failed to send terminal_closed: {e}"
+                    )
+
             session.close()
-            
+
             # 从关闭集合中移除
             self._closing_sessions.discard(terminal_id)
             return True
