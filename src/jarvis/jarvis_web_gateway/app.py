@@ -165,6 +165,7 @@ class WebGateway(BaseGateway):
         authorized, _ = self._check_auth(auth_payload)
         if not authorized:
             return
+        context = dict(event.context) if event.context else {}
         payload = {
             "text": event.text,
             "output_type": event.output_type,
@@ -172,8 +173,10 @@ class WebGateway(BaseGateway):
             "lang": event.lang,
             "traceback": event.traceback,
             "section": event.section,
-            "context": dict(event.context) if event.context else {},
+            "context": context,
         }
+        if context.get("agent_id"):
+            payload["agent_id"] = context["agent_id"]
         message = {"type": "output", "payload": payload}
         self._router.publish(message, session_id=session_id)
 
@@ -363,10 +366,12 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
-        # 发送缓存的消息
-        cached_messages = self._router.get_and_clear_cache()
+        # 发送当前 session 缓存的消息
+        cached_messages = self._router.get_and_clear_cache(session_id)
         if cached_messages:
-            print(f"[CACHE] Sending {len(cached_messages)} cached messages to client")
+            print(
+                f"[CACHE] Sending {len(cached_messages)} cached messages to client for session={session_id}"
+            )
             for msg in cached_messages:
                 try:
                     await websocket.send_json(msg)

@@ -2,9 +2,14 @@
 """jarvis_web_gateway app API tests."""
 
 import os
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
+from jarvis.jarvis_gateway.events import GatewayOutputEvent
+from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
+from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
+from jarvis.jarvis_web_gateway.app import WebGateway
 from jarvis.jarvis_web_gateway.app import create_app
 
 
@@ -34,7 +39,7 @@ def test_post_file_content_success(tmp_path):
     response = client.post(
         "/api/file-content",
         json={"path": str(test_file.resolve())},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -50,9 +55,7 @@ def test_post_file_content_rejects_relative_path(tmp_path):
     client = create_test_client()
 
     response = client.post(
-        "/api/file-content",
-        json={"path": test_file.name},
-        headers=get_auth_headers()
+        "/api/file-content", json={"path": test_file.name}, headers=get_auth_headers()
     )
 
     assert response.status_code == 200
@@ -67,7 +70,7 @@ def test_post_file_content_rejects_directory(tmp_path):
     response = client.post(
         "/api/file-content",
         json={"path": str(tmp_path.resolve())},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -84,7 +87,7 @@ def test_post_file_content_rejects_large_file(tmp_path):
     response = client.post(
         "/api/file-content",
         json={"path": str(test_file.resolve())},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -101,7 +104,7 @@ def test_post_file_content_rejects_binary_file(tmp_path):
     response = client.post(
         "/api/file-content",
         json={"path": str(test_file.resolve())},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -117,7 +120,7 @@ def test_post_file_write_success(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(test_file.resolve()), "content": "hello write"},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -134,7 +137,7 @@ def test_post_file_write_rejects_relative_path(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": "relative.txt", "content": "hello"},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -150,7 +153,7 @@ def test_post_file_write_rejects_missing_parent_directory(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(missing_file.resolve(strict=False)), "content": "hello"},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -166,7 +169,7 @@ def test_post_file_write_rejects_non_string_content(tmp_path):
     response = client.post(
         "/api/file-write",
         json={"path": str(test_file.resolve()), "content": 123},
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
@@ -185,10 +188,70 @@ def test_post_file_write_rejects_large_content(tmp_path):
             "path": str(test_file.resolve()),
             "content": "a" * (MAX_FILE_SIZE_BYTES + 1),
         },
-        headers=get_auth_headers()
+        headers=get_auth_headers(),
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is False
     assert payload["error"]["code"] == "FILE_TOO_LARGE"
+
+
+def test_session_output_router_keeps_cache_isolated_per_session():
+    """断线缓存应按 session 隔离，不能被其他 session 取走"""
+    router = SessionOutputRouter()
+
+    session_a_message = {"type": "output", "payload": {"text": "from-a"}}
+    session_b_message = {"type": "output", "payload": {"text": "from-b"}}
+
+    router.publish(session_a_message, session_id="session-a")
+    router.publish(session_b_message, session_id="session-b")
+
+    cached_messages_a = router.get_and_clear_cache("session-a")
+    assert cached_messages_a == [session_a_message]
+
+    cached_messages_b = router.get_and_clear_cache("session-b")
+    assert cached_messages_b == [session_b_message]
+
+
+def test_session_output_router_clears_only_requested_session_cache():
+    """回放某个 session 缓存后，不应清空其他 session 的缓存"""
+    router = SessionOutputRouter()
+
+    session_a_message = {"type": "output", "payload": {"text": "from-a"}}
+    session_b_message = {"type": "output", "payload": {"text": "from-b"}}
+
+    router.publish(session_a_message, session_id="session-a")
+    router.publish(session_b_message, session_id="session-b")
+
+    assert router.get_and_clear_cache("session-a") == [session_a_message]
+    assert router.get_and_clear_cache("session-a") == []
+    assert router.get_and_clear_cache("session-b") == [session_b_message]
+
+
+def test_web_gateway_emit_output_promotes_agent_id_to_payload():
+    """主连接 output 消息应在 payload 顶层携带 agent_id，便于前端准确归属"""
+    router = SessionOutputRouter()
+    input_registry = Mock()
+    terminal_input_registry = Mock()
+    auth_store = {"default": {"token": "test-token"}}
+    gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
+    gateway._check_auth = Mock(return_value=(True, None))
+
+    sender = Mock()
+    router.register("conn-1", sender, session_id="default")
+
+    event = GatewayOutputEvent(
+        output_type=OutputType.INFO,
+        text="hello",
+        timestamp="12:00:00",
+        context={"agent_id": "agent-123", "agent_name": "Agent 123"},
+    )
+
+    gateway.emit_output(event)
+
+    sender.assert_called_once()
+    message = sender.call_args[0][0]
+    assert message["type"] == "output"
+    assert message["payload"]["agent_id"] == "agent-123"
+    assert message["payload"]["context"]["agent_id"] == "agent-123"
