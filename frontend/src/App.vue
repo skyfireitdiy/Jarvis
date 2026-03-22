@@ -2051,7 +2051,7 @@ const hasMoreHistory = ref(true)
  * 加载历史消息
  * @param {boolean} prepend - 是否插入到消息列表开头
  */
-function loadHistoryMessages(prepend = false) {
+async function loadHistoryMessages(prepend = false) {
   // 没有激活的 agent 时，不加载历史记录
   if (!currentAgentId.value) {
     console.log('[HISTORY] No active agent, skip loading history')
@@ -3517,29 +3517,23 @@ async function switchAgent(agent) {
   
   // 清空当前 Agent 的消息列表
   allOutputs.value.set(agent.agent_id, [])
-  
+
+  // 先加载历史消息，再连接 Agent
+  console.log('[AGENT] Loading history before connecting...')
+  await loadHistoryMessages(false)
+
   // 连接到目标 Agent（等待连接真正建立）
   try {
     // 切换后立即查询一次状态（即使 WebSocket 未连接）
     console.log('[AGENT] Fetching status after switch...')
     await fetchAgentStatus(agent)
-    
     // 如果 Agent 已停止（已完成），不尝试连接 WebSocket
     console.log('[AGENT DEBUG] Checking agent.status:', agent.status)
     if (agent.status === 'stopped') {
       console.log('[AGENT] Agent is stopped (completed), skipping WebSocket connection')
       console.log('[AGENT DEBUG] windowWidth.value:', windowWidth.value, ', 768 threshold:', windowWidth.value <= 768)
-      // 直接加载历史消息
-      const currentOutputs = allOutputs.value.get(agent.agent_id) || []
-      if (currentOutputs.length === 0) {
-        console.log('[AGENT] Loading history messages...')
-        loadHistoryMessages(false)
-      } else {
-        console.log('[AGENT] Messages already exist, skip loading history')
-      }
       return
     }
-    
     // 等待连接稳定（Agent启动需要时间，持续重试直到成功）
     let stableConnection = false
     let retryCount = 0
@@ -3582,10 +3576,10 @@ async function switchAgent(agent) {
       console.log('[AGENT] Fetching status after connection...')
       await fetchAgentStatus(agent)
       
-      // 检测可恢复的 session（仅新创建的 Agent）
+      // 若历史为空，则检测可恢复的 session（通常是新创建的 Agent）
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
-        console.log('[AGENT] New agent, checking for recoverable sessions...')
+        console.log('[AGENT] No history found, checking for recoverable sessions...')
         try {
           const { host, port } = getGatewayAddress()
           const sessionsResponse = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`)
@@ -3597,15 +3591,12 @@ async function switchAgent(agent) {
             showSessionDialog.value = true
           } else {
             console.log('[AGENT] No recoverable sessions found')
-            loadHistoryMessages(false)
           }
         } catch (error) {
           console.error('[AGENT] Failed to fetch sessions:', error)
-          // 加载历史消息（即使在获取 session 列表失败时）
-          loadHistoryMessages(false)
         }
       } else {
-        console.log('[AGENT] Agent has existing messages, skipping session detection')
+        console.log('[AGENT] History already loaded, skipping session detection')
       }
     } else {
       console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
