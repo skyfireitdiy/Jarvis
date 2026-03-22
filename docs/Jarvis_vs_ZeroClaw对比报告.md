@@ -8,6 +8,30 @@
   - Jarvis: README.md、功能清单\_分类版.md、源代码
   - ZeroClaw: ZeroClaw分析.md (851行深度研究报告)
 
+## 执行摘要
+
+### 一句话概括
+
+- **Jarvis**：更偏向面向开发者的代码工程 Agent 工作台。
+- **ZeroClaw**：更偏向通用 Agent 的轻量级运行时底座。
+
+### 核心结论
+
+1. 两者都属于 AI Agent 相关项目，但**关注重心并不相同**。
+2. Jarvis 的核心价值在于**代码开发闭环**，包括 CodeAgent、规则系统、方法论、Git/构建/Lint/影响分析以及专项能力集成。
+3. ZeroClaw 的核心价值在于**运行时基础设施**，包括 Provider/Channel/Runtime/Memory/Security/Gateway 等可插拔子系统，以及极致轻量化特性。
+4. 从汇报角度看，二者更适合理解为**不同层次、不同侧重的开源项目**，而不是简单的同构替代品。
+
+### 高层概览对比表
+
+| 维度         | Jarvis                                  | ZeroClaw                                         |
+| ------------ | --------------------------------------- | ------------------------------------------------ |
+| 项目角色     | 代码工程 Agent 平台                     | 通用 Agent Runtime                               |
+| 核心关注点   | 开发流程闭环、规则与经验复用            | 运行时抽象、多渠道接入、轻量部署                 |
+| 代表性能力   | CodeAgent、规则系统、方法论、专项工具链 | Provider/Channel/Tool/Memory/Runtime、安全与网关 |
+| 更突出的优势 | 工程化、可操作性、开发者体验            | 模块化、可移植性、性能与资源效率                 |
+| 更明显的边界 | 通用运行时抽象较弱，多渠道能力有限      | 代码工程闭环较弱，研发工作流封装不足             |
+
 ---
 
 ## 1. 竞品识别和概览
@@ -275,7 +299,7 @@ cargo install zeroclaw
 
 #### 6.2.1 代码开发场景
 
-**推荐选择：Jarvis**
+##### 推荐选择：Jarvis
 
 - CodeAgent专门针对代码开发优化
 - 深度Git集成，提交自动化
@@ -286,7 +310,7 @@ cargo install zeroclaw
 
 #### 6.2.2 边缘计算场景
 
-**推荐选择：ZeroClaw**
+##### 推荐选择：ZeroClaw
 
 - <5MB内存，可在ESP32运行
 - <10ms启动，适合按需运行
@@ -296,7 +320,7 @@ cargo install zeroclaw
 
 #### 6.2.3 企业内部工具开发
 
-**推荐选择：Jarvis**
+##### 推荐选择：Jarvis
 
 - 规则系统，规范可复用
 - 方法论沉淀，避免重复踩坑
@@ -306,7 +330,7 @@ cargo install zeroclaw
 
 #### 6.2.4 多渠道消息机器人
 
-**推荐选择：ZeroClaw**
+##### 推荐选择：ZeroClaw
 
 - 70+通信渠道支持
 - 轻量级，低资源消耗
@@ -369,7 +393,58 @@ cargo install zeroclaw
 - 可组合性强，灵活扩展
 - 编译期类型检查，安全可靠
 
-### 7.4 架构优缺点对比
+### 7.4 核心模块映射分析
+
+基于 `docs/ZeroClaw分析.md`、`功能清单_分类版.md` 以及双方源码的概读，可以把两者的差异理解为：**ZeroClaw 更像“通用 Agent 运行时底座”，Jarvis 更像“面向代码工程的 Agent 工作台与能力套件”**。因此，两边并不是简单的一一对应关系，更准确的表达应当是“直接对应 / 功能类似 / 无明显对应”。
+
+#### 7.4.1 Jarvis 核心模块在 ZeroClaw 中的对应情况
+
+| Jarvis 核心模块                                                     | ZeroClaw 中是否有对应/类似模块                                 | 判断       | 说明                                                                                                                                            |
+| ------------------------------------------------------------------- | -------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jarvis_agent`（通用 Agent 主循环、会话、任务、工具调度）           | `agent` + `runtime`                                            | 功能类似   | 两者都承担 Agent 主循环与执行编排职责；但 ZeroClaw 更强调运行时抽象，Jarvis 更强调任务执行流程、交互模式和上下文管理。                          |
+| `jarvis_code_agent`（代码分析/修改/Git/构建/Lint/影响分析）         | 无明显完整对应，部分能力散落于 `tools`、`runtime`、`providers` | 无明显对应 | 这是 Jarvis 最核心的差异化能力。ZeroClaw 有工具系统和运行时，但没有看到像 CodeAgent 这样围绕代码工程闭环封装的专用层。                          |
+| `rules_manager`（规则加载、激活、索引、中心仓库）                   | `skills` / `skillforge` / `plugins` 可类比，但不等价           | 功能类似   | ZeroClaw 有技能、插件和可插拔扩展，但 Jarvis 的“规则即知识约束”体系更强，且直接参与 Agent 提示词构造。                                          |
+| `file_methodology_manager` + `jarvis_methodology`（历史方法论复用） | 无明显对应                                                     | 无明显对应 | Jarvis 把“过往经验沉淀”为方法论并参与当前任务执行，这在 ZeroClaw 中没有看到清晰等价模块。                                                       |
+| `jarvis_tools`（工具注册、调用协议、多工具调度）                    | `tools`                                                        | 直接对应   | 两者都有明确的工具抽象与注册/执行机制；ZeroClaw 基于 Rust Trait，Jarvis 基于 Python 注册中心与工具调用协议。                                    |
+| `jarvis_platform` / `jarvis_platform_manager`（模型平台配置与切换） | `providers` + `auth`                                           | 功能类似   | 两者都支持多模型接入与切换；ZeroClaw 把重点放在 Provider 工厂、路由、回退链路，Jarvis 更偏向配置管理与多模型组运营。                            |
+| `jarvis_mcp`（MCP 客户端接入外部工具）                              | `tools/mcp_*`                                                  | 直接对应   | 两者都支持通过 MCP 扩展外部工具能力；ZeroClaw 将其视为工具子系统的一部分，Jarvis 将其拆成独立模块并接入工具注册表。                             |
+| `jarvis_web_gateway` + `jarvis_gateway`                             | `gateway`                                                      | 直接对应   | 两边都有 Web/Gateway 层，负责把 Agent 能力暴露给 WebSocket/HTTP 等交互端；ZeroClaw 更偏“统一接入网关”，Jarvis 更偏“Web 前端 + Agent 会话桥接”。 |
+| `jarvis_memory_organizer` + Agent MemoryManager                     | `memory`                                                       | 功能类似   | 两者都具备记忆存储与检索能力；ZeroClaw 的记忆后端和搜索机制更像运行时基础设施，Jarvis 更强调任务后整理、长期记忆复用和轻量知识沉淀。            |
+| `jarvis_sec`（安全扫描专项能力）                                    | `security`                                                     | 功能类似   | 都有安全相关能力，但侧重点不同：ZeroClaw 是运行时安全、沙箱与策略控制；Jarvis 的 `jsec` 更像面向代码仓的安全分析工具链。                        |
+| `jarvis_c2rust`（C→Rust迁移流水线）                                 | 无明显对应                                                     | 无明显对应 | 这是 Jarvis 的专项工程化能力，ZeroClaw 当前没有看到等价的独立迁移流水线。                                                                       |
+| `jarvis_smart_shell` / Git 辅助模块                                 | `tools/shell`、部分 `git_operations`                           | 功能类似   | ZeroClaw 支持 shell / git 类工具，但 Jarvis 在 Shell 智能化、Git 工作流、提交与回退流程上更面向开发者日常使用。                                 |
+
+#### 7.4.2 ZeroClaw 核心模块在 Jarvis 中的对应情况
+
+| ZeroClaw 核心模块                                            | Jarvis 中是否有对应/类似模块                                      | 判断           | 说明                                                                                                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `providers`（多模型 Provider 工厂、路由、回退）              | `jarvis_platform` / `jarvis_platform_manager`                     | 功能类似       | Jarvis 也支持多模型平台和模型组，但抽象层次更偏平台配置；ZeroClaw 的 Provider 子系统更底层、更运行时化。      |
+| `channels`（多通信渠道，如 Slack/Telegram/Discord/Email 等） | `jarvis_web_gateway` / `jarvis_gateway`，其余渠道无明显对应       | 部分对应       | Jarvis 具备 Web 网关与交互桥接，但没有看到 ZeroClaw 那种大规模多渠道连接器矩阵。                              |
+| `tools`                                                      | `jarvis_tools`                                                    | 直接对应       | 这是双方最容易对齐的模块。                                                                                    |
+| `memory`（多后端、向量/缓存/知识图谱/SQLite 等）             | Agent MemoryManager + `jarvis_memory_organizer`                   | 功能类似       | Jarvis 有记忆体系，但 ZeroClaw 在记忆后端、嵌入、缓存、知识图谱等基础设施层面更完整。                         |
+| `runtime`（native/docker 等执行运行时）                      | `jarvis_agent` / `jarvis_code_agent` 内部执行流程，辅以工具执行器 | 功能类似       | Jarvis 有执行能力，但没有像 ZeroClaw 那样明确抽象成独立 runtime 子系统。                                      |
+| `observability`（日志、OTel、Prometheus、runtime trace）     | 无明显独立等价模块                                                | 无明显对应     | Jarvis 有事件与输出桥接，但缺少一个像 ZeroClaw 那样独立成体系的可观测性子系统。                               |
+| `security`（策略、沙箱、配对、秘密管理、Prompt Guard）       | `jarvis_sec` + 配置/工具确认机制                                  | 功能类似       | Jarvis 的安全更多体现在“安全分析”和“执行确认”，而 ZeroClaw 的安全是底层运行时控制面。                         |
+| `approval` / `pairing` / `auth`                              | 网关认证、工具确认、平台认证                                      | 功能类似       | Jarvis 也有确认与认证，但更分散；ZeroClaw 把这些能力更系统地纳入运行时与网关安全链路。                        |
+| `plugins` / `skills` / `skillforge`                          | 规则系统、工具扩展、MCP 扩展                                      | 功能类似       | 两者都能扩展能力，但 Jarvis 倾向“规则 + 工具 + 方法论”组合扩展，ZeroClaw 倾向“插件/技能/Tool Trait”统一扩展。 |
+| `gateway`                                                    | `jarvis_web_gateway` + `jarvis_gateway`                           | 直接对应       | 都承担外部访问入口与会话桥接职责。                                                                            |
+| `hardware` / `peripherals` / `robot-kit`                     | 无明显对应                                                        | 无明显对应     | ZeroClaw 已明显向硬件控制、边缘设备、机器人外设延伸，这不是 Jarvis 的目标方向。                               |
+| `cron` / `heartbeat` / `daemon`                              | 无明显独立对应，部分可借助工具或任务机制实现                      | 无明显对应     | Jarvis 有任务与自动化能力，但没有读到独立、系统化的后台调度/守护进程子系统。                                  |
+| `rag` / `knowledge_graph` / `verifiable_intent`              | 仅有局部能力接近，暂无完整对等模块                                | 无明显完整对应 | Jarvis 可借助规则、记忆、工具做增强，但没有看到 ZeroClaw 这类被单独产品化的运行时子系统。                     |
+
+#### 7.4.3 汇报时可直接使用的结论
+
+- **Jarvis 的强项不在“通用运行时底座”，而在“面向代码工程的上层工作流封装”**：CodeAgent、规则系统、方法论、Git/构建/Lint/影响分析、C2Rust/JSec 等都属于 ZeroClaw 当前没有完整对位的能力。
+- **ZeroClaw 的强项不在“代码工程闭环”，而在“运行时基础设施的通用性与模块化”**：Provider/Channel/Runtime/Memory/Security/Gateway/Observability 等底座化能力更清晰，且更适合做跨渠道、跨设备、跨运行环境的 Agent 运行时。
+- **如果向领导汇报，最准确的定位不是“谁替代谁”，而是“二者站位不同”**：
+  - Jarvis：更像 **开发者工作台 / 代码工程 Agent 平台**
+  - ZeroClaw：更像 **通用 Agent Runtime / 多渠道多环境接入底座**
+- **两者真正重叠的部分主要是**：模型接入、工具系统、记忆、网关、部分安全与扩展能力。
+- **两者真正拉开差距的部分主要是**：
+  - Jarvis 独有优势：规则、方法论、代码工程闭环、专项工程能力
+  - ZeroClaw 独有优势：多渠道连接、运行时抽象、可观测性、安全底座、硬件/边缘扩展
+
+### 7.5 架构优缺点对比
 
 **Jarvis架构优点**：
 
@@ -509,49 +584,60 @@ cargo install zeroclaw
 
 ### 10.1 核心结论
 
-**Jarvis和ZeroClaw是两个定位不同的AI Agent框架**：
+**Jarvis 和 ZeroClaw 分别代表了两种不同的 AI Agent 产品化方向**：
 
-- Jarvis专注于代码开发、规则驱动、人机协作
-- ZeroClaw专注于高性能、低资源、通用Agent运行时
+- **Jarvis** 更强调“把 Agent 能力落到开发流程里”，重点是代码分析、修改、审查、提交、规范复用和经验沉淀。
+- **ZeroClaw** 更强调“把 Agent 能力做成可移植的运行时底座”，重点是运行时抽象、多渠道接入、轻量部署、安全控制和跨环境运行。
 
-**两者各有优势，不存在绝对的优劣**：
+### 10.2 核心设计亮点
 
-- Jarvis适合代码开发场景，功能丰富，易用性高
-- ZeroClaw适合边缘计算场景，性能极致，轻量级
+**Jarvis 的设计亮点**：
 
-### 10.2 选择建议
+- 以 `Agent -> CodeAgent -> 专项能力` 形成清晰的工程化分层
+- 规则系统直接参与执行流程，而不仅仅是静态文档
+- 方法论机制把历史经验转化为可复用的执行知识
+- 与 Git、构建、Lint、影响分析等研发环节形成闭环
+- 在通用 Agent 基础上发展出 `jsec`、`jc2r` 等专项能力
 
-**选择Jarvis如果**：
+**ZeroClaw 的设计亮点**：
 
-- 主要场景是代码开发、重构、安全分析
-- 需要规则系统和方法论沉淀
-- 需要Git深度集成
-- 优先考虑易用性和快速上手
+- 基于 Trait 的 Provider / Channel / Tool / Memory / Runtime 抽象清晰
+- 运行时底座化程度高，组件替换边界明确
+- 多渠道接入能力突出，适合消息平台和多入口 Agent 场景
+- 安全能力更系统，包含策略、沙箱、认证、网关控制等多个层次
+- 轻量、低资源占用，适合边缘设备和长期运行环境
 
-**选择ZeroClaw如果**：
+### 10.3 适用场景与边界
 
-- 主要场景是边缘计算、Serverless
-- 追求极致性能和低资源占用
-- 需要70+通信渠道支持
-- 优先考虑安全性和稳定性
+**Jarvis 更容易发挥优势的场景**：
 
-### 10.3 未来展望
+- 代码开发、重构、审查与修复
+- 研发流程自动化与半自动化协作
+- 需要规则沉淀、经验复用、规范执行的场景
+- 需要专项工程能力（如 C→Rust、安全分析）的场景
 
-**Jarvis发展方向**：
+**ZeroClaw 更容易发挥优势的场景**：
 
-- 继续强化代码开发能力
-- 扩展规则生态和方法论库
-- 提升Web界面体验
-- 集成更多AI模型
+- 需要多渠道接入的通用 Agent 系统
+- 对启动速度、资源占用、运行时可移植性要求较高的场景
+- 边缘计算、长期运行、低资源部署场景
+- 需要更完整运行时安全与网关能力的场景
 
-**ZeroClaw发展方向**：
+**两者的边界也比较清晰**：
 
-- 持续优化性能
-- 扩展Trait生态系统
-- 增加更多通信渠道
-- 完善文档和示例
+- Jarvis 的重点不是构建一个极致轻量的通用 Runtime，也不是覆盖海量消息渠道。
+- ZeroClaw 的重点不是围绕代码工程构建完整开发闭环，也不是把规则/方法论沉淀作为核心能力。
 
-### 10.4 致谢
+### 10.4 汇报结论摘要
+
+如果只用几句话概括本次研究，可以总结为：
+
+1. **Jarvis 更像“开发者工作台”，ZeroClaw 更像“Agent 运行时底座”。**
+2. **Jarvis 的优势来自工程闭环，ZeroClaw 的优势来自底座抽象。**
+3. **两者有交集，但真正突出的部分并不相同。**
+4. **因此，对它们的理解不应停留在“功能多少”的比较，而应回到“设计目标和使用场景”的差异。**
+
+### 10.5 致谢
 
 本报告基于Jarvis和ZeroClaw的公开资料分析完成，感谢两个项目的贡献者。
 
@@ -577,7 +663,7 @@ cargo install zeroclaw
 
 ---
 
-**报告结束**
+## 报告结束
 
 ## 快速选型指南
 
