@@ -5,13 +5,13 @@
 
 import hashlib
 import os
-import shlex
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from rich.status import Status
 from jarvis.jarvis_utils.globals import console
 
 # -*- coding: utf-8 -*-
+import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -39,7 +39,6 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_tools.execute_script import ScriptTool
 from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
@@ -68,22 +67,6 @@ from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
 
 app = typer.Typer(help="Jarvis 代码助手")
-
-
-def _quote_shell_argument(argument: str) -> str:
-    """按当前平台转义 shell 参数。"""
-    if os.name == "nt":
-        return f"'{argument.replace("'", "''")}'"
-    return shlex.quote(argument)
-
-
-def _execute_shell_command(command: str) -> Dict[str, Any]:
-    """通过 execute_script 工具执行 shell 命令。"""
-    return ScriptTool().execute(
-        {
-            "script_content": command,
-        }
-    )
 
 
 class CodeAgent(Agent):
@@ -722,20 +705,23 @@ git reset --hard {start_commit}
                     commit_info = ""
                     if end_hash:
                         try:
-                            safe_end_hash = _quote_shell_argument(end_hash)
-                            command_result = _execute_shell_command(
-                                f"git log -1 --pretty=format:%H|%s {safe_end_hash}"
+                            result = subprocess.run(
+                                ["git", "log", "-1", "--pretty=format:%H|%s", end_hash],
+                                capture_output=True,
+                                text=True,
+                                encoding="utf-8",
+                                errors="replace",
+                                check=False,
                             )
-                            command_stdout = str(command_result.get("stdout", ""))
                             if (
-                                command_result.get("success")
-                                and command_stdout
-                                and "|" in command_stdout
+                                result.returncode == 0
+                                and result.stdout
+                                and "|" in result.stdout
                             ):
                                 (
                                     commit_hash,
                                     commit_message,
-                                ) = command_stdout.strip().split("|", 1)
+                                ) = result.stdout.strip().split("|", 1)
                                 commit_short_hash = (
                                     commit_hash[:7]
                                     if len(commit_hash) >= 7
@@ -1593,10 +1579,13 @@ def cli(
         pass
 
     try:
-        git_check_result = _execute_shell_command("git rev-parse --git-dir")
-        if not git_check_result.get("success"):
-            raise RuntimeError("git repository not found")
-    except Exception:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
         curr_dir_path = os.getcwd()
         PrettyOutput.auto_print(f"⚠️ 警告：当前目录 '{curr_dir_path}' 不是一个git仓库。")
         init_git = (
@@ -1608,11 +1597,14 @@ def cli(
         )
         if init_git:
             try:
-                git_init_result = _execute_shell_command("git init")
-                if not git_init_result.get("success"):
-                    raise RuntimeError(
-                        str(git_init_result.get("stderr", "git init failed"))
-                    )
+                subprocess.run(
+                    ["git", "init"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
                 PrettyOutput.auto_print("✅ 已成功初始化git仓库。")
 
                 # 初始化 .gitignore 文件，包含所有语言的默认忽略规则
@@ -1625,7 +1617,7 @@ def cli(
                 with open(gitignore_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(default_templates + "\n")
                 PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加各语言默认忽略规则")
-            except Exception as e:
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 PrettyOutput.auto_print(f"❌ 初始化git仓库失败: {e}")
                 sys.exit(1)
         else:
