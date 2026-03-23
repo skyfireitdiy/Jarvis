@@ -6210,6 +6210,8 @@ body::-webkit-scrollbar {
   width: 100vw;
   margin: 0;
   padding: 0;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
   background: #0d1117;
   color: #e6edf3;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
@@ -6233,6 +6235,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 14px 20px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
   background: rgba(22, 27, 34, 0.85);
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
@@ -7541,6 +7544,8 @@ body::-webkit-scrollbar {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 24px 20px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -7882,6 +7887,7 @@ body::-webkit-scrollbar {
 .input-area {
   background: rgba(22, 27, 34, 0.9);
   border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   flex-shrink: 0;
 }
 
@@ -8559,6 +8565,9 @@ body::-webkit-scrollbar {
   
   .app-header {
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
   .header-title h1 {
     font-size: 16px;
@@ -8566,6 +8575,9 @@ body::-webkit-scrollbar {
   
   .messages {
     padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
   
   .message {
@@ -8593,7 +8605,14 @@ body::-webkit-scrollbar {
   .send-btn {
     width: 100%;
   }
+
+  .input-area {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
+
 
 /* 补全按钮 */
 .completion-btn {
