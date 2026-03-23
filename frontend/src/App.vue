@@ -8914,16 +8914,13 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: calc(100% - 30px);
   color: #8b949e;
   font-size: 14px;
-  margin-bottom: 30px;
 }
 
 .terminal-host-wrapper {
   flex: 1;
   overflow: hidden;
-  margin-bottom: 30px;
   min-height: 0;
 }
 
