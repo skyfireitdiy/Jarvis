@@ -7127,7 +7127,7 @@ body::-webkit-scrollbar {
 .create-agent-modal {
   max-width: 400px;
   width: 90%;
-  max-height: calc(100vh - 40px);
+  max-height: calc(var(--app-height, 100vh) - 40px);
   overflow-y: auto;
 }
 
