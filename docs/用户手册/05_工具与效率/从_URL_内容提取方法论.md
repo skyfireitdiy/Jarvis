@@ -7,7 +7,7 @@
 ## 操作步骤
 
 1. 准备你要提取的方法论来源 URL。
-2. 在终端中运行从 URL 提取方法论的命令，并传入该 URL。
+2. 在终端中运行从 URL 提取方法论的命令，例如：`jm extract-url "https://example.com/article" --scope global`。
 3. 选择保存作用域：
 
    - global

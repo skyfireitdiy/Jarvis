@@ -6,7 +6,7 @@
 
 ## 操作步骤
 
-1. 在终端中运行 JSS 的卸载命令。
+1. 在终端中运行 JSS 的卸载命令，例如：`jss uninstall --shell bash`。
 2. 指定你要卸载的 shell 类型：
 
    - fish
