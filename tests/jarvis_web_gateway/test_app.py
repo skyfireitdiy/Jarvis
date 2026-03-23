@@ -207,36 +207,43 @@ def test_post_file_write_rejects_large_content(tmp_path):
     assert payload["error"]["code"] == "FILE_TOO_LARGE"
 
 
-def test_session_output_router_keeps_cache_isolated_per_session():
-    """断线缓存应按 session 隔离，不能被其他 session 取走"""
+def test_session_output_router_drops_messages_without_subscribers():
+    """无订阅者时，router 不应缓存或延迟回放消息"""
     router = SessionOutputRouter()
 
     session_a_message = {"type": "output", "payload": {"text": "from-a"}}
     session_b_message = {"type": "output", "payload": {"text": "from-b"}}
 
+    sender_a = Mock()
+    sender_b = Mock()
+
     router.publish(session_a_message, session_id="session-a")
     router.publish(session_b_message, session_id="session-b")
 
-    cached_messages_a = router.get_and_clear_cache("session-a")
-    assert cached_messages_a == [session_a_message]
+    router.register("conn-a", sender_a, session_id="session-a")
+    router.register("conn-b", sender_b, session_id="session-b")
 
-    cached_messages_b = router.get_and_clear_cache("session-b")
-    assert cached_messages_b == [session_b_message]
+    sender_a.assert_not_called()
+    sender_b.assert_not_called()
 
 
-def test_session_output_router_clears_only_requested_session_cache():
-    """回放某个 session 缓存后，不应清空其他 session 的缓存"""
+def test_session_output_router_routes_only_to_registered_session():
+    """已注册订阅者时，消息只发送给对应 session 的 sender"""
     router = SessionOutputRouter()
 
     session_a_message = {"type": "output", "payload": {"text": "from-a"}}
     session_b_message = {"type": "output", "payload": {"text": "from-b"}}
 
+    sender_a = Mock()
+    sender_b = Mock()
+    router.register("conn-a", sender_a, session_id="session-a")
+    router.register("conn-b", sender_b, session_id="session-b")
+
     router.publish(session_a_message, session_id="session-a")
     router.publish(session_b_message, session_id="session-b")
 
-    assert router.get_and_clear_cache("session-a") == [session_a_message]
-    assert router.get_and_clear_cache("session-a") == []
-    assert router.get_and_clear_cache("session-b") == [session_b_message]
+    sender_a.assert_called_once_with(session_a_message)
+    sender_b.assert_called_once_with(session_b_message)
 
 
 def test_web_gateway_emit_output_promotes_agent_id_to_payload():

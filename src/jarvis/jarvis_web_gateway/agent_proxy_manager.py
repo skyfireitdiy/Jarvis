@@ -364,11 +364,22 @@ class AgentProxyManager:
             len(cached_messages),
             agent_id,
         )
-        for message in cached_messages:
+        for index, message in enumerate(cached_messages):
             try:
                 await client_ws.send_text(message)
             except Exception:
-                await self._cache_agent_message(agent_id, message)
+                remaining_messages = cached_messages[index:]
+                async with self._agent_cache_lock:
+                    cache_bucket = self._agent_message_cache[agent_id]
+                    for pending_message in remaining_messages:
+                        cache_bucket.append(pending_message)
+                    while len(cache_bucket) > self._agent_cache_limit:
+                        cache_bucket.pop(0)
+                logger.warning(
+                    "[PROXY MANAGER] Failed while flushing cached messages for %s, restored %d messages",
+                    agent_id,
+                    len(remaining_messages),
+                )
                 raise
 
     async def cleanup(self) -> None:
