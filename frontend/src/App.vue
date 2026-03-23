@@ -3267,19 +3267,24 @@ async function fetchAgentList() {
   }
 }
 
-// 停止 Agent
+// 构造复制 Agent 的请求参数
+function buildCopiedAgentPayload(agent, copiedName) {
+  return {
+    agent_type: agent.agent_type,
+    working_dir: agent.working_dir,
+    name: copiedName,
+    llm_group: agent.llm_group || 'default',
+    worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false
+  }
+}
+
 // 复制 Agent
 async function copyAgent(agent) {
   try {
     const { host, port } = getGatewayAddress()
     const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
       method: 'POST',
-      body: JSON.stringify({
-        agent_type: agent.agent_type,
-        working_dir: agent.working_dir,
-        name: agent.name || undefined,
-        llm_group: agent.llm_group || 'default'
-      })
+      body: JSON.stringify(buildCopiedAgentPayload(agent, agent.name || undefined))
     })
     
     if (!response.ok) {
@@ -3330,12 +3335,9 @@ async function batchCopyAgents() {
         const { host, port } = getGatewayAddress()
         const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
           method: 'POST',
-          body: JSON.stringify({
-            agent_type: agent.agent_type,
-            working_dir: agent.working_dir,
-            name: agent.name ? `${agent.name}_copy` : undefined,
-            llm_group: agent.llm_group || 'default'
-          })
+          body: JSON.stringify(
+            buildCopiedAgentPayload(agent, agent.name ? `${agent.name}_copy` : undefined)
+          )
         })
         if (response.ok) {
           successCount++
