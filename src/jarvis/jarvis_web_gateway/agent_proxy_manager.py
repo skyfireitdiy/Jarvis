@@ -257,22 +257,27 @@ class AgentProxyManager:
                 self._forward_messages(agent_ws, client_ws, "agent->client", agent_id)
             )
 
-            # 等待任一任务完成（连接断开）
-            done, pending = await asyncio.wait(
-                [client_to_agent_task, agent_to_client_task],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            # 优先等待 client->agent 结束；client 断开后，允许 agent->client 继续运行，
+            # 以便继续消费 agent 消息并在无法发送给 client 时写入缓存。
+            await client_to_agent_task
 
-            # 取消未完成的任务
-            for task in pending:
-                task.cancel()
+            try:
+                await asyncio.wait_for(agent_to_client_task, timeout=self._ws_timeout)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "[PROXY MANAGER] Timed out waiting for agent->client forward task after client disconnect: %s",
+                    agent_id,
+                )
+                agent_to_client_task.cancel()
                 try:
-                    await task
+                    await agent_to_client_task
                 except asyncio.CancelledError:
                     pass
 
-            # 检查是否有异常
-            for task in done:
+            # 检查转发任务是否有异常
+            for task in (client_to_agent_task, agent_to_client_task):
+                if task.cancelled():
+                    continue
                 if task.exception():
                     logger.error(
                         f"[PROXY MANAGER] WebSocket forward task error: {task.exception()}"
@@ -324,18 +329,19 @@ class AgentProxyManager:
                         f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
                     )
                     try:
-                        print("send message")
                         if isinstance(target_ws, WebSocket):
                             await target_ws.send_text(data)
                         else:
                             await target_ws.send(data)
-                        print("send message ok")
-                    except Exception:
+                    except Exception as e:
                         if direction == "agent->client":
-                            print("cache a message")
+                            logger.info(
+                                "[PROXY MANAGER] Client unavailable while forwarding agent message, caching it for %s: %s",
+                                agent_id,
+                                e,
+                            )
                             await self._cache_agent_message(agent_id, data)
-                        else:
-                            print("not a agent -> client message")
+                            return
                         raise
 
         except WebSocketDisconnect:
