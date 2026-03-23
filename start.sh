@@ -57,7 +57,7 @@ npm install
 echo "✅ 前端依赖安装完成"
 
 # 构建前端发布产物
-echo "🏗️ 构建前端发布版本..."
+echo "🏗️ 构建前端发布产物..."
 npm run build
 echo "✅ 前端发布版本构建完成"
 
