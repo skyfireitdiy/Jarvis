@@ -1,85 +1,85 @@
 #!/usr/bin/env pwsh
-# Windows PowerShell 启动脚本
+# Windows PowerShell startup script
 
-# 获取脚本所在目录作为项目根目录
+# Get the script directory as the project root
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = $ScriptDir
 
-Write-Host "🚀 启动 Jarvis 网关和前端..."
-Write-Host "📁 项目根目录: $ProjectRoot"
+Write-Host "Starting Jarvis gateway and frontend..."
+Write-Host "Project root: $ProjectRoot"
 
-# 检查 Python 环境
+# Check Python environment
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
 if (-not $pythonCmd) {
-    Write-Host "❌ 错误: 未找到 Python 环境" -ForegroundColor Red
+    Write-Host "Error: Python was not found" -ForegroundColor Red
     exit 1
 }
 
-# 检查 npm 环境
+# Check npm environment
 $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
 if (-not $npmCmd) {
-    Write-Host "❌ 错误: 未找到 npm 环境" -ForegroundColor Red
+    Write-Host "Error: npm was not found" -ForegroundColor Red
     exit 1
 }
 
-# 检查是否设置了网关密码环境变量
+# Check whether the gateway password environment variable is set
 $gatewayPasswordArgs = @()
 if ($env:JARVIS_GATEWAY_PASSWORD) {
-    Write-Host "🔐 检测到网关密码环境变量"
+    Write-Host "Detected gateway password environment variable"
     $gatewayPasswordArgs = @("--gateway-password", $env:JARVIS_GATEWAY_PASSWORD)
 }
 
-# 检查网关 host 和 port 环境变量
+# Check gateway host and port environment variables
 $gatewayHost = if ($env:JARVIS_GATEWAY_HOST) { $env:JARVIS_GATEWAY_HOST } else { "127.0.0.1" }
 $gatewayPort = if ($env:JARVIS_GATEWAY_PORT) { $env:JARVIS_GATEWAY_PORT } else { "8000" }
 
-# 检查前端 host 和 port 环境变量
+# Check frontend host and port environment variables
 $frontendHost = if ($env:JARVIS_FRONTEND_HOST) { $env:JARVIS_FRONTEND_HOST } else { "127.0.0.1" }
 $frontendPort = if ($env:JARVIS_FRONTEND_PORT) { $env:JARVIS_FRONTEND_PORT } else { "5173" }
 
-# 启动网关（后台运行）
-Write-Host "📡 启动网关服务..."
+# Start gateway in the background
+Write-Host "Starting gateway service..."
 $gatewayArgs = @("--host", $gatewayHost, "--port", $gatewayPort) + $gatewayPasswordArgs
 $gatewayProcess = Start-Process -FilePath "jwg" -ArgumentList $gatewayArgs -PassThru -WindowStyle Hidden
 
-Write-Host "✅ 网关已启动 (PID: $($gatewayProcess.Id))"
+Write-Host "Gateway started (PID: $($gatewayProcess.Id))"
 
-# 等待网关启动
-Write-Host "⏳ 等待网关服务就绪..."
+# Wait for the gateway to start
+Write-Host "Waiting for gateway service to become ready..."
 Start-Sleep -Seconds 5
 
-# 启动前端（发布模式）
-Write-Host "🎨 启动前端发布服务..."
+# Start frontend in preview mode
+Write-Host "Starting frontend preview service..."
 Set-Location "$ProjectRoot\frontend"
 
-# 安装前端依赖
-Write-Host "📦 安装前端依赖..."
+# Install frontend dependencies
+Write-Host "Installing frontend dependencies..."
 npm install
-Write-Host "✅ 前端依赖安装完成"
+Write-Host "Frontend dependencies installed"
 
-# 构建前端发布产物
-Write-Host "🏗️ 构建前端发布版本..."
+# Build frontend production bundle
+Write-Host "Building frontend production bundle..."
 npm run build
-Write-Host "✅ 前端发布版本构建完成"
+Write-Host "Frontend production build completed"
 
 $frontendProcess = Start-Process -FilePath "npm" -ArgumentList "run","preview","--","--host","$frontendHost","--port","$frontendPort" -PassThru
 
-Write-Host "✅ 前端发布服务已启动 (PID: $($frontendProcess.Id))"
+Write-Host "Frontend preview service started (PID: $($frontendProcess.Id))"
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "✨ Jarvis 服务已全部启动！" -ForegroundColor Green
+Write-Host "Jarvis services are fully started" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "📡 网关地址: http://$gatewayHost:$gatewayPort"
-Write-Host "🎨 前端地址: http://$frontendHost:$frontendPort"
+Write-Host "Gateway URL: http://$gatewayHost:$gatewayPort"
+Write-Host "Frontend URL: http://$frontendHost:$frontendPort"
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "💡 提示: 按 Ctrl+C 停止所有服务"
+Write-Host "Tip: Press Ctrl+C to stop all services"
 Write-Host ""
 
-# 捕获退出信号，清理后台进程
+# Capture exit signal and clean up background processes
 $cleanup = {
     Write-Host ""
-    Write-Host "🛑 正在停止服务..."
+    Write-Host "Stopping services..."
     if ($gatewayProcess -and !$gatewayProcess.HasExited) {
         Stop-Process -Id $gatewayProcess.Id -Force -ErrorAction SilentlyContinue
     }
@@ -89,11 +89,11 @@ $cleanup = {
     exit 0
 }
 
-# 注册 Ctrl+C 处理
+# Register Ctrl+C handling
 [Console]::TreatControlCAsInput = $false
 $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action $cleanup
 
-# 等待进程结束
+# Wait for processes to exit
 try {
     while (!$frontendProcess.HasExited -and !$gatewayProcess.HasExited) {
         Start-Sleep -Milliseconds 100
