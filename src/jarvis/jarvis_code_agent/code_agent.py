@@ -1783,18 +1783,6 @@ def cli(
                 error_message = str(exec_err)
                 raise
         finally:
-            if web_gateway_server is not None:
-                try:
-                    web_gateway_server.should_exit = True
-                except Exception:
-                    pass
-                try:
-                    from jarvis.jarvis_gateway.manager import set_current_gateway
-
-                    set_current_gateway(None)
-                except Exception:
-                    pass
-
             # 如果是tmux并行任务，写入状态文件
             if status_file_path:
                 import json
@@ -1850,6 +1838,18 @@ def cli(
                 _handle_worktree_merge(
                     worktree_manager, original_branch, non_interactive
                 )
+
+            if web_gateway_server is not None:
+                try:
+                    web_gateway_server.should_exit = True
+                except Exception:
+                    pass
+                try:
+                    from jarvis.jarvis_gateway.manager import set_current_gateway
+
+                    set_current_gateway(None)
+                except Exception:
+                    pass
 
     except typer.Exit:
         raise
