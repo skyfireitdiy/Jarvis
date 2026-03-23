@@ -213,10 +213,10 @@ class TaskAnalyzer:
         except Exception:
             pass
 
-        # 交互模式：询问用户是否执行任务分析（默认True）
+        # 任务完成后统一默认启用任务分析（默认True），不再区分场景
         if not self.agent.confirm_callback(
             "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？",
-            True if self.agent.non_interactive else False,
+            True,
         ):
             self._analysis_done = True
             return
