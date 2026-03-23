@@ -257,22 +257,27 @@ class AgentProxyManager:
                 self._forward_messages(agent_ws, client_ws, "agent->client", agent_id)
             )
 
-            # 优先等待 client->agent 结束；client 断开后，允许 agent->client 继续运行，
-            # 以便继续消费 agent 消息并在无法发送给 client 时写入缓存。
+            # 优先等待 client->agent 结束；client 断开后，不再依赖向 client 发送失败来触发缓存，
+            # 而是显式切换到继续消费 agent 消息并缓存的模式。
             await client_to_agent_task
 
-            try:
-                await asyncio.wait_for(agent_to_client_task, timeout=self._ws_timeout)
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "[PROXY MANAGER] Timed out waiting for agent->client forward task after client disconnect: %s",
-                    agent_id,
-                )
+            if not agent_to_client_task.done():
                 agent_to_client_task.cancel()
                 try:
                     await agent_to_client_task
                 except asyncio.CancelledError:
                     pass
+
+                try:
+                    await asyncio.wait_for(
+                        self._cache_messages_from_agent(agent_ws, agent_id),
+                        timeout=self._ws_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "[PROXY MANAGER] Timed out while caching agent messages after client disconnect: %s",
+                        agent_id,
+                    )
 
             # 检查转发任务是否有异常
             for task in (client_to_agent_task, agent_to_client_task):
@@ -360,6 +365,22 @@ class AgentProxyManager:
                 "[PROXY MANAGER] Cached agent message for %s, cache_size=%d",
                 agent_id,
                 len(cache_bucket),
+            )
+
+    async def _cache_messages_from_agent(self, agent_ws: Any, agent_id: str) -> None:
+        """在 client 断开后继续消费 agent 消息并写入缓存。"""
+        try:
+            async for message in agent_ws:
+                data = message if isinstance(message, str) else message.decode()
+                logger.info(
+                    "[PROXY MANAGER] Caching agent message after client disconnect for %s: %d bytes",
+                    agent_id,
+                    len(data),
+                )
+                await self._cache_agent_message(agent_id, data)
+        except Exception as e:
+            logger.debug(
+                f"[PROXY MANAGER] Stop caching agent messages for {agent_id}: {e}"
             )
 
     async def _flush_cached_messages(self, client_ws: WebSocket, agent_id: str) -> None:
