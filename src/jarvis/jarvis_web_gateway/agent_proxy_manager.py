@@ -324,13 +324,18 @@ class AgentProxyManager:
                         f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
                     )
                     try:
+                        print("send message")
                         if isinstance(target_ws, WebSocket):
                             await target_ws.send_text(data)
                         else:
                             await target_ws.send(data)
+                        print("send message ok")
                     except Exception:
                         if direction == "agent->client":
+                            print("cache a message")
                             await self._cache_agent_message(agent_id, data)
+                        else:
+                            print("not a agent -> client message")
                         raise
 
         except WebSocketDisconnect:

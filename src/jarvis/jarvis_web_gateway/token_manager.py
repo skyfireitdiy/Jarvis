@@ -35,12 +35,8 @@ def validate_gateway_token(token: Optional[str]) -> bool:
     if not token:
         return False
 
-    print(f"token: {token}")
-
     # 统一从环境变量读取 Token（Web Gateway 和 Agent Gateway 共用）
     expected_token = os.environ.get("JARVIS_AUTH_TOKEN")
-
-    print(f"expected_token: {expected_token}")
 
     if not expected_token:
         return False
