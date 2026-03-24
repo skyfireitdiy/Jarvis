@@ -364,9 +364,9 @@
         />
         
         <!-- 缓冲区指示器 -->
-        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = !showBufferPanel">
+        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = true">
           <span class="buffer-icon">📝</span>
-          <span class="buffer-text">{{ showBufferPanel ? '收起缓存' : '缓冲区有内容，点击管理' }}</span>
+          <span class="buffer-text">缓冲区有内容，点击管理</span>
         </div>
         
         <!-- 操作按钮 -->
@@ -406,26 +406,30 @@
         </div>
       </div>
       
-      <!-- 缓存管理面板 -->
-      <div class="buffer-panel" v-if="hasBufferedInput && showBufferPanel">
+    </footer>
+    </div> <!-- 结束 main-content-wrapper -->
+
+    <!-- 缓存管理弹窗 -->
+    <div class="modal-overlay" v-if="hasBufferedInput && showBufferPanel" @click.self="showBufferPanel = false">
+      <div class="modal buffer-modal">
         <div class="buffer-panel-header">
           <span class="buffer-panel-title">📝 输入缓存</span>
           <div class="buffer-panel-actions">
-            <button 
+            <button
               class="buffer-panel-btn"
               @click="loadBufferToInput"
               title="加载到输入框"
             >
               ↙ 加载
             </button>
-            <button 
+            <button
               class="buffer-panel-btn"
               @click="clearBuffer"
               title="清空缓存"
             >
-              🗑️ 清空
+              🗑
             </button>
-            <button 
+            <button
               class="buffer-panel-btn close-btn"
               @click="showBufferPanel = false"
               title="关闭面板"
@@ -435,14 +439,14 @@
           </div>
         </div>
         <div class="buffer-panel-content">
-          <textarea 
+          <textarea
             v-model="bufferEditText"
             class="buffer-edit-textarea"
             placeholder="缓存内容..."
             @keydown.ctrl.enter="saveBufferEdit"
           ></textarea>
           <div class="buffer-panel-footer">
-            <button 
+            <button
               class="buffer-save-btn"
               @click="saveBufferEdit"
               :disabled="!bufferEditText.trim()"
@@ -452,8 +456,7 @@
           </div>
         </div>
       </div>
-    </footer>
-    </div> <!-- 结束 main-content-wrapper -->
+    </div>
 
     <!-- 补全列表弹窗 -->
     <div class="modal-overlay" v-if="showCompletions">
@@ -8094,13 +8097,11 @@ body::-webkit-scrollbar {
 }
 
 /* 缓存管理面板 */
-.buffer-panel {
-  margin-top: 8px;
-  background: rgba(22, 27, 34, 0.95);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-  border-radius: 12px;
+.buffer-modal {
+  max-width: min(720px, 100%);
+  padding: 0;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   animation: slideDown 0.2s ease-out;
 }
 
@@ -8164,12 +8165,14 @@ body::-webkit-scrollbar {
 
 .buffer-panel-content {
   padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .buffer-edit-textarea {
   width: 100%;
-  min-height: 120px;
-  max-height: 300px;
+  min-height: 220px;
+  max-height: min(60vh, 520px);
   background: rgba(13, 17, 23, 0.8);
   border: none;
   padding: 14px 16px;
@@ -8223,6 +8226,13 @@ body::-webkit-scrollbar {
     border-radius: 10px;
   }
   
+  .buffer-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(80vh, 100%);
+    border-radius: 12px;
+  }
+
   .buffer-panel-header {
     padding: 10px 12px;
     flex-direction: column;
@@ -8243,7 +8253,8 @@ body::-webkit-scrollbar {
   }
   
   .buffer-edit-textarea {
-    min-height: 100px;
+    min-height: 180px;
+    max-height: min(55vh, 420px);
     font-size: 14px;
   }
   
