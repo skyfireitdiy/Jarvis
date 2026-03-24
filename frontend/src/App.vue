@@ -364,9 +364,9 @@
         />
         
         <!-- 缓冲区指示器 -->
-        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = !showBufferPanel">
+        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = true">
           <span class="buffer-icon">📝</span>
-          <span class="buffer-text">{{ showBufferPanel ? '收起缓存' : '缓冲区有内容，点击管理' }}</span>
+          <span class="buffer-text">缓冲区有内容，点击管理</span>
         </div>
         
         <!-- 操作按钮 -->
