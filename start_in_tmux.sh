@@ -41,7 +41,7 @@ run_jarvis_services() {
     sleep 5
 
     echo "🎨 启动前端发布服务..."
-    cd "$PROJECT_ROOT/frontend"
+    cd "$PROJECT_ROOT/src/jarvis/jarvis_service/frontend"
 
     echo "📦 安装前端依赖..."
     npm install

@@ -22,7 +22,8 @@ DEFAULT_FRONTEND_PORT = 5173
 GATEWAY_READY_WAIT_SECONDS = 5
 PROCESS_TERMINATE_TIMEOUT_SECONDS = 10
 ROOT_MARKER_FILES = ("pyproject.toml",)
-ROOT_MARKER_DIRECTORIES = ("frontend", "src/jarvis")
+ROOT_MARKER_DIRECTORIES = ("src/jarvis",)
+FRONTEND_RELATIVE_PATH = Path("src/jarvis/jarvis_service/frontend")
 
 app = typer.Typer(help="Jarvis Service 服务")
 
@@ -246,7 +247,7 @@ def is_project_root(candidate_root: Path) -> bool:
 def build_service_config() -> ServiceConfig:
     """根据环境变量构建服务配置。"""
     project_root = resolve_project_root()
-    frontend_root = project_root / "frontend"
+    frontend_root = project_root / FRONTEND_RELATIVE_PATH
     return ServiceConfig(
         project_root=project_root,
         frontend_root=frontend_root,

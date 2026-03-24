@@ -2,9 +2,10 @@ include README.md
 include LICENSE
 include pyproject.toml
 recursive-include src/jarvis *
-recursive-include frontend **
 recursive-include builtin **
 recursive-include docs **
+prune src/jarvis/jarvis_service/frontend/node_modules
+prune src/jarvis/jarvis_service/frontend/dist
 exclude __pycache__
 exclude .venv
 exclude *.pyc

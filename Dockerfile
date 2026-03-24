@@ -163,7 +163,7 @@ RUN pip install \
     && rm -rf /root/.cache/pip 2>/dev/null || true
 
 # 安装前端依赖
-WORKDIR /app/frontend
+WORKDIR /app/src/jarvis/jarvis_service/frontend
 RUN npm install \
     && echo "✅ 前端依赖安装完成" \
     && rm -rf /root/.npm
