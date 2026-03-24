@@ -16,34 +16,8 @@ definition:
 
 # Theme configuration
 theme:
-  name: material
+  name: dracula
   language: zh
-  palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: 切换到深色模式
-    - scheme: slate
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-4
-        name: 切换到浅色模式
-  features:
-    - navigation.instant
-    - navigation.tracking
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.indexes
-    - search.suggest
-    - search.highlight
-    - content.code.copy
-    - content.tabs.link
-  icon:
-    repo: fontawesome/brands/github
 
 # Plugins
 plugins:
