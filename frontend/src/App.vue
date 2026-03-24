@@ -899,7 +899,15 @@ async function loginWithPassword(password) {
 }
 
 // 通用的带认证的 fetch 函数
+function hasAuthToken() {
+  return Boolean(auth.value.token)
+}
+
 async function fetchWithAuth(url, options = {}) {
+  if (!hasAuthToken()) {
+    throw new Error('尚未登录，已阻止向后端发送请求')
+  }
+
   // 复制 options 避免修改原始对象
   const fetchOptions = {
     ...options,
@@ -2305,6 +2313,11 @@ async function connect() {
     }
   }
   
+  if (!hasAuthToken()) {
+    connectErrorMessage.value = '请先登录获取 Token'
+    return
+  }
+  
   const host = parsed.host || window.location.hostname || '127.0.0.1'
   const port = parsed.port || '8000'
   const url = buildWebSocketUrl(host, port, parsed.protocol)
@@ -2319,6 +2332,7 @@ async function connect() {
     // 保存连接信息到 localStorage
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     console.log('[ws] Connection info saved:', gatewayUrl.value)
+    startAgentListRefresh()
     // 获取模型组列表
     fetchModelGroups()
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
@@ -5859,8 +5873,10 @@ onMounted(() => {
 
   inputHistory.value = loadInputHistory()
   
-  // 启动 Agent 列表刷新
-  startAgentListRefresh()
+  // 已登录时才启动 Agent 列表刷新，避免未获取 token 前向后端发送请求
+  if (hasAuthToken()) {
+    startAgentListRefresh()
+  }
   
   // 添加滚动事件监听，实现滚动到顶部时加载更多历史
   let scrollDebounceTimer = null
