@@ -40,7 +40,27 @@ def _load_rules_from_directory(directory: Path, base_dir: Path) -> None:
 
         try:
             with open(rule_file, "r", encoding="utf-8") as f:
-                rule_content = f.read().strip()
+                rule_content = f.read()
+
+                # 去除 YAML Front Matter 头部，与文件型规则保持一致
+                if rule_content.startswith("---"):
+                    lines = rule_content.split("\n")
+                    found_first = False
+                    found_second = False
+                    new_lines = []
+                    for line in lines:
+                        if not found_second:
+                            if line.strip() == "---":
+                                if not found_first:
+                                    found_first = True
+                                else:
+                                    found_second = True
+                            continue
+                        new_lines.append(line)
+                    rule_content = "\n".join(new_lines).strip()
+                else:
+                    rule_content = rule_content.strip()
+
                 # 使用通用的渲染函数
                 rendered_content = render_rule_template(
                     rule_content, rule_file.parent.as_posix()
