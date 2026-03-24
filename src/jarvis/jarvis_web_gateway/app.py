@@ -1321,7 +1321,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 scored_items = process.extract(
                     query,
                     files,
-                    limit=30,
+                    limit=50,
                 )
                 scored_items = [
                     (item[0], item[1])
