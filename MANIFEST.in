@@ -1,7 +1,8 @@
 include README.md
 include LICENSE
 include pyproject.toml
-recursive-include src/jarvis * 
+recursive-include src/jarvis *
+recursive-include frontend **
 recursive-include builtin **
 recursive-include docs **
 exclude __pycache__
