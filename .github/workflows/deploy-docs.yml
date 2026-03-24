@@ -38,8 +38,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -U pip
-          pip install mkdocs
-          pip install mkdocs-dracula-theme
+          pip install mkdocs-material
           pip install mkdocs-git-revision-date-localized-plugin
           pip install pymdown-extensions
 
