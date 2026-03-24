@@ -659,6 +659,15 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 detail={"code": "INVALID_TOKEN", "message": "Invalid or expired token"},
             )
 
+    def verify_agent_proxy_access(request: Request) -> None:
+        """验证 Agent HTTP 代理访问权限。
+
+        已登录会话或 Bearer Token 任一通过即可。
+        """
+        if manager._auth_store.get("default") is not None:
+            return
+        verify_token(request)
+
     @app.on_event("startup")
     async def _startup() -> None:
         # 初始化环境并加载配置文件（已在 run() 函数中调用，此处避免重复）
@@ -789,7 +798,11 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         logger.info(f"[WS PROXY] New WebSocket connection for agent {agent_id}")
 
         auth_payload = _extract_auth_from_headers(websocket)
-        authorized, reason = gateway._check_auth(auth_payload)
+        if auth_payload is not None:
+            authorized, reason = gateway._check_auth(auth_payload)
+        else:
+            authorized = manager._auth_store.get("default") is not None
+            reason = "Authentication required"
         if not authorized:
             await websocket.accept()
             await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
@@ -819,7 +832,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     @app.api_route(
         "/api/agent/{agent_id}/{path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-        dependencies=[Depends(verify_token)],
+        dependencies=[Depends(verify_agent_proxy_access)],
     )
     async def agent_http_proxy(agent_id: str, path: str, request: Request) -> Response:
         """代理 HTTP 请求到指定 Agent。
