@@ -729,6 +729,20 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                         "message": "Invalid password",
                     },
                 }
+
+            has_authorized_connection = manager._auth_store.get("default") is not None
+            if manager._connection_lock_enabled and has_authorized_connection:
+                logger.warning(
+                    "[AUTH] Login rejected: connection lock enabled and an authorized connection already exists"
+                )
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "CONNECTION_LOCKED",
+                        "message": "An authenticated connection already exists",
+                    },
+                }
+
             logger.info(f"[AUTH] Password verification passed")
             # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
             token = os.environ.get("JARVIS_AUTH_TOKEN")
@@ -771,9 +785,18 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             agent_id: Agent ID
             websocket: 客户端 WebSocket 连接
         """
-        await websocket.accept()
         logger = logging.getLogger(__name__)
         logger.info(f"[WS PROXY] New WebSocket connection for agent {agent_id}")
+
+        auth_payload = _extract_auth_from_headers(websocket)
+        authorized, reason = gateway._check_auth(auth_payload)
+        if not authorized:
+            await websocket.accept()
+            await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
+            await websocket.close(code=4401, reason="Unauthorized")
+            return
+
+        await websocket.accept()
 
         try:
             await agent_proxy_manager.proxy_websocket(websocket, agent_id)
@@ -796,6 +819,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     @app.api_route(
         "/api/agent/{agent_id}/{path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        dependencies=[Depends(verify_token)],
     )
     async def agent_http_proxy(agent_id: str, path: str, request: Request) -> Response:
         """代理 HTTP 请求到指定 Agent。
