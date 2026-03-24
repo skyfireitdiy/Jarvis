@@ -196,6 +196,8 @@ setup(
             "jw=jarvis.jarvis_windows.cli:app",
             "jarvis-web-gateway=jarvis.jarvis_web_gateway.cli:app",
             "jwg=jarvis.jarvis_web_gateway.cli:app",
+            "jarvis-service=jarvis.jarvis_service.cli:main",
+            "jservice=jarvis.jarvis_service.cli:main",
         ],
     },
     python_requires="==3.12.*",
