@@ -292,6 +292,9 @@ def acquire_single_instance_lock() -> None:
         lock_handle.close()
         PrettyOutput.auto_print("❌ 当前用户已有 jarvis-service 实例正在运行")
         raise typer.Exit(code=1)
+    service_pid = os.getpid()
+    lock_handle.write(f"{service_pid}\n")
+    lock_handle.flush()
     SINGLE_INSTANCE_LOCK_HANDLE = lock_handle
     atexit.register(release_single_instance_lock)
 
