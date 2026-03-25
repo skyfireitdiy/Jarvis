@@ -812,7 +812,7 @@
           </button>
         </div>
         <div class="form-group">
-          <button class="ghost-btn" @click="restartGateway" :disabled="isRestartingGateway">
+          <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
             {{ isRestartingGateway ? '重启中...' : '重启服务' }}
           </button>
         </div>
@@ -2768,6 +2768,21 @@ function disconnect() {
   if (socket.value) {
     socket.value.close()
   }
+}
+
+function confirmRestartGateway() {
+  if (isRestartingGateway.value) {
+    return
+  }
+
+  showConfirm(
+    '确认重启服务吗？这将短暂中断当前连接。',
+    () => {
+      restartGateway()
+    },
+    () => {},
+    false
+  )
 }
 
 async function restartGateway() {
