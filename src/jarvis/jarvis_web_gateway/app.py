@@ -46,6 +46,7 @@ from jarvis.jarvis_web_gateway.token_manager import (
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
+from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt
 
 # 导入 agent 状态管理器（用于处理 get_status 消息）
@@ -878,6 +879,61 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 status_code=500,
                 media_type="application/json",
             )
+
+    @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
+    async def restart_service() -> Dict[str, Any]:
+        """请求 jarvis-service 通过 SIGUSR1 重启服务。"""
+        try:
+            lock_file_path = get_single_instance_lock_path()
+            if not lock_file_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "UNSUPPORTED",
+                        "message": "当前环境不支持重启：未检测到 jarvis-service 锁文件",
+                    },
+                }
+
+            service_pid_text = lock_file_path.read_text(encoding="utf-8").strip()
+            if not service_pid_text:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "UNSUPPORTED",
+                        "message": "当前环境不支持重启：未检测到 service PID",
+                    },
+                }
+
+            service_pid = int(service_pid_text)
+            os.kill(service_pid, signal.SIGUSR1)
+            return {
+                "success": True,
+                "data": {
+                    "pid": service_pid,
+                    "message": "已请求 jarvis-service 重启服务",
+                },
+            }
+        except (ValueError, ProcessLookupError):
+            return {
+                "success": False,
+                "error": {
+                    "code": "UNSUPPORTED",
+                    "message": "当前环境不支持重启：未通过 jarvis-service 启动",
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {
+                    "code": "PERMISSION_DENIED",
+                    "message": "无权限向 jarvis-service 发送重启信号",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：创建 Agent（需要认证）
     @app.post("/api/agents", dependencies=[Depends(verify_token)])
