@@ -305,29 +305,12 @@
         <span class="editor-toolbar-status" v-else-if="activeEditorTab">{{ activeEditorTab.isDirty ? '未保存修改' : '已保存' }}</span>
         <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
         <div class="editor-toolbar-spacer"></div>
-        <div class="editor-global-search">
-          <input
-            v-model="globalSearchQuery"
-            class="editor-global-search-input"
-            type="text"
-            placeholder="全局搜索文件内容..."
-            :disabled="globalSearchLoading || !currentAgentId"
-            @keydown.enter.prevent="runGlobalSearch"
-          >
-          <input
-            v-model="globalSearchFileGlob"
-            class="editor-global-search-input editor-global-search-glob-input"
-            type="text"
-            placeholder="文件过滤，如 *.py,!tests/**"
-            :disabled="globalSearchLoading || !currentAgentId"
-            @keydown.enter.prevent="runGlobalSearch"
-          >
-          <label class="editor-global-search-toggle">
-            <input v-model="globalSearchCaseSensitive" type="checkbox">
-            <span>区分大小写</span>
-          </label>
-          <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
-        </div>
+        <button
+          class="icon-btn"
+          @click="toggleEditorSearchSidebar"
+          :class="{ active: editorSidebarView === 'search' && showEditorSidebar }"
+          title="搜索侧边栏"
+        >🔍</button>
         <button
           v-if="editorTabs.length > 0"
           class="editor-edit-toggle"
@@ -339,41 +322,95 @@
           <span class="editor-edit-toggle-text">{{ isEditorEditable ? '可编辑' : '只读' }}</span>
         </button>
       </div>
-      <div v-if="globalSearchVisible" class="editor-global-search-results">
-        <div class="editor-global-search-summary">
-          <span v-if="globalSearchLoading">搜索中...</span>
-          <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
-          <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
-          <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
-        </div>
-        <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
-          未找到匹配结果
-        </div>
-        <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
-          <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
-            {{ result.file_path }}
-            <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
-          </div>
+      <div class="editor-workspace">
+        <div class="editor-activity-bar">
           <button
-            v-for="match in result.matches"
-            :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
-            class="editor-global-search-match"
-            @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
-          >
-            <span class="editor-global-search-line">{{ match.line_number }}</span>
-            <span class="editor-global-search-text">
-              {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
-            </span>
-          </button>
+            class="editor-activity-button"
+            :class="{ active: !showEditorSidebar || editorSidebarView === 'editor' }"
+            @click="setEditorSidebarView('editor')"
+            title="编辑器"
+          >📝</button>
+          <button
+            class="editor-activity-button"
+            :class="{ active: showEditorSidebar && editorSidebarView === 'search' }"
+            @click="setEditorSidebarView('search')"
+            title="全局搜索"
+          >🔎</button>
         </div>
-      </div>
-      <div class="editor-panel-content editor-panel-content-main">
-        <div v-if="editorTabs.length === 0" class="editor-placeholder">
-          <div class="editor-placeholder-icon">📝</div>
-          <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
-          <div class="editor-placeholder-text">支持 Monaco 语法高亮、代码折叠、多标签切换与保存。</div>
+        <aside v-if="showEditorSidebar" class="editor-sidebar">
+          <div class="editor-sidebar-header">
+            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '编辑器' }}</span>
+            <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+          </div>
+          <div v-if="editorSidebarView === 'search'" class="editor-sidebar-content">
+            <div class="editor-global-search-panel">
+              <input
+                v-model="globalSearchQuery"
+                class="editor-global-search-input"
+                type="text"
+                placeholder="全局搜索文件内容..."
+                :disabled="globalSearchLoading || !currentAgentId"
+                @keydown.enter.prevent="runGlobalSearch"
+              >
+              <input
+                v-model="globalSearchFileGlob"
+                class="editor-global-search-input editor-global-search-glob-input"
+                type="text"
+                placeholder="文件过滤，如 *.py,!tests/**"
+                :disabled="globalSearchLoading || !currentAgentId"
+                @keydown.enter.prevent="runGlobalSearch"
+              >
+              <label class="editor-global-search-toggle">
+                <input v-model="globalSearchCaseSensitive" type="checkbox">
+                <span>区分大小写</span>
+              </label>
+              <div class="editor-global-search-actions">
+                <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+                <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+              </div>
+            </div>
+            <div class="editor-global-search-results">
+              <div class="editor-global-search-summary">
+                <span v-if="globalSearchLoading">搜索中...</span>
+                <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
+                <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
+                <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
+              </div>
+              <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                未找到匹配结果
+              </div>
+              <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
+                <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                  {{ result.file_path }}
+                  <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                </div>
+                <button
+                  v-for="match in result.matches"
+                  :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
+                  class="editor-global-search-match"
+                  @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                >
+                  <span class="editor-global-search-line">{{ match.line_number }}</span>
+                  <span class="editor-global-search-text">
+                    {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="editor-sidebar-content editor-sidebar-placeholder">
+            <div class="editor-sidebar-placeholder-icon">📝</div>
+            <div class="editor-sidebar-placeholder-text">当前为编辑视图，点击活动栏中的搜索按钮可打开全局搜索。</div>
+          </div>
+        </aside>
+        <div class="editor-panel-content editor-panel-content-main">
+          <div v-if="editorTabs.length === 0" class="editor-placeholder">
+            <div class="editor-placeholder-icon">📝</div>
+            <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
+            <div class="editor-placeholder-text">支持 Monaco 语法高亮、代码折叠、多标签切换与保存。</div>
+          </div>
+          <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
         </div>
-        <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
       </div>
       <div
         v-for="direction in editorResizeDirections"
@@ -1198,7 +1235,8 @@ const globalSearchResults = ref([])
 const globalSearchTotalFiles = ref(0)
 const globalSearchTotalMatches = ref(0)
 const globalSearchExecuted = ref(false)
-const globalSearchVisible = computed(() => globalSearchLoading.value || globalSearchExecuted.value || !!globalSearchError.value)
+const showEditorSidebar = ref(false)
+const editorSidebarView = ref('editor')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -1631,6 +1669,40 @@ async function fetchGlobalSearchResults(agentId, payload) {
   return result.data
 }
 
+function setEditorSidebarView(view) {
+  editorSidebarView.value = view
+  showEditorSidebar.value = true
+  nextTick(() => {
+    layoutMonacoEditor()
+  })
+}
+
+function toggleEditorSearchSidebar() {
+  if (showEditorSidebar.value && editorSidebarView.value === 'search') {
+    closeEditorSidebar()
+    return
+  }
+  setEditorSidebarView('search')
+}
+
+function closeEditorSidebar() {
+  showEditorSidebar.value = false
+  nextTick(() => {
+    layoutMonacoEditor()
+  })
+}
+
+function clearGlobalSearch() {
+  globalSearchQuery.value = ''
+  globalSearchFileGlob.value = ''
+  globalSearchCaseSensitive.value = false
+  globalSearchError.value = ''
+  globalSearchResults.value = []
+  globalSearchTotalFiles.value = 0
+  globalSearchTotalMatches.value = 0
+  globalSearchExecuted.value = false
+}
+
 async function runGlobalSearch() {
   if (!currentAgentId.value) {
     showToast('请先选择 Agent', 'error')
@@ -1642,9 +1714,11 @@ async function runGlobalSearch() {
     globalSearchError.value = '请输入搜索关键词'
     globalSearchExecuted.value = false
     globalSearchResults.value = []
+    setEditorSidebarView('search')
     return
   }
 
+  setEditorSidebarView('search')
   globalSearchLoading.value = true
   globalSearchError.value = ''
   globalSearchExecuted.value = false
@@ -6672,6 +6746,7 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   min-height: 34px;
   padding: 0 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -6734,6 +6809,211 @@ body::-webkit-scrollbar {
   letter-spacing: 0.02em;
 }
 
+.editor-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #0d1117;
+}
+
+.editor-activity-bar {
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(1, 4, 9, 0.96);
+}
+
+.editor-activity-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.editor-activity-button:hover,
+.editor-activity-button.active {
+  color: #e6edf3;
+  background: rgba(56, 139, 253, 0.18);
+  border-color: rgba(56, 139, 253, 0.32);
+}
+
+.editor-sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 17, 23, 0.98);
+}
+
+.editor-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.editor-sidebar-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-sidebar-placeholder {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px;
+  color: #8b949e;
+}
+
+.editor-sidebar-placeholder-icon {
+  font-size: 22px;
+}
+
+.editor-sidebar-placeholder-text {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.editor-global-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-global-search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(139, 148, 158, 0.35);
+  border-radius: 6px;
+  background: rgba(22, 27, 34, 0.9);
+  color: #e6edf3;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.editor-global-search-input:focus {
+  outline: none;
+  border-color: rgba(56, 139, 253, 0.72);
+}
+
+.editor-global-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #c9d1d9;
+}
+
+.editor-global-search-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.editor-global-search-btn {
+  min-width: 34px;
+}
+
+.editor-global-search-results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.editor-global-search-summary {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.editor-global-search-empty {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.editor-global-search-file-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.editor-global-search-file-path {
+  font-size: 12px;
+  font-weight: 600;
+  color: #79c0ff;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.editor-global-search-file-count {
+  margin-left: 4px;
+  color: #8b949e;
+}
+
+.editor-global-search-match {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(22, 27, 34, 0.85);
+  color: #c9d1d9;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor-global-search-match:hover {
+  border-color: rgba(56, 139, 253, 0.3);
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.editor-global-search-line {
+  flex: 0 0 auto;
+  min-width: 32px;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.editor-global-search-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.editor-global-search-text mark {
+  background: rgba(242, 204, 96, 0.32);
+  color: #f2cc60;
+}
+
 .editor-panel-content {
   flex: 1;
   display: flex;
@@ -6744,7 +7024,9 @@ body::-webkit-scrollbar {
 }
 
 .editor-panel-content-main {
+  flex: 1;
   padding: 0;
+  min-width: 0;
   min-height: 0;
   background: #0d1117;
 }
