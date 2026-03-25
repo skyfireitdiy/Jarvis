@@ -326,10 +326,10 @@
         <div class="editor-activity-bar">
           <button
             class="editor-activity-button"
-            :class="{ active: !showEditorSidebar || editorSidebarView === 'editor' }"
-            @click="setEditorSidebarView('editor')"
-            title="编辑器"
-          >📝</button>
+            :class="{ active: showEditorSidebar && editorSidebarView === 'files' }"
+            @click="setEditorSidebarView('files')"
+            title="目录树"
+          >📁</button>
           <button
             class="editor-activity-button"
             :class="{ active: showEditorSidebar && editorSidebarView === 'search' }"
@@ -339,10 +339,52 @@
         </div>
         <aside v-if="showEditorSidebar" class="editor-sidebar">
           <div class="editor-sidebar-header">
-            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '编辑器' }}</span>
+            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
             <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
           </div>
-          <div v-if="editorSidebarView === 'search'" class="editor-sidebar-content">
+          <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
+            <div v-if="currentAgent" class="editor-file-tree-panel">
+              <div class="editor-file-tree-root" @click.stop="ensureEditorSidebarFileTree(currentAgent)">
+                {{ currentAgent.working_dir }}
+              </div>
+              <div v-if="!hasEditorSidebarFileTree" class="editor-file-tree-empty">
+                点击上方目录加载文件树
+              </div>
+              <div v-else class="editor-file-tree-list">
+                <div
+                  v-for="visibleNode in getVisibleFileTreeNodes(currentAgent.agent_id)"
+                  :key="visibleNode.node.path"
+                  class="tree-node editor-tree-node"
+                >
+                  <div
+                    class="tree-node-content"
+                    :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                    @click.stop="handleFileTreeNodeClick(currentAgent.agent_id, visibleNode.node)"
+                  >
+                    <span
+                      v-if="visibleNode.node.type === 'directory'"
+                      class="tree-node-icon expand-arrow"
+                      :class="{ expanded: visibleNode.node.expanded }"
+                    >▶</span>
+                    <span v-else class="tree-node-icon"></span>
+                    <span
+                      class="tree-node-icon"
+                      :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                    >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                    <span
+                      class="tree-node-text"
+                      :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                    >{{ visibleNode.node.name }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="editor-sidebar-content editor-sidebar-placeholder">
+              <div class="editor-sidebar-placeholder-icon">📁</div>
+              <div class="editor-sidebar-placeholder-text">请先选择一个 Agent 以查看工作目录树。</div>
+            </div>
+          </div>
+          <div v-else class="editor-sidebar-content">
             <div class="editor-global-search-panel">
               <input
                 v-model="globalSearchQuery"
@@ -397,10 +439,6 @@
                 </button>
               </div>
             </div>
-          </div>
-          <div v-else class="editor-sidebar-content editor-sidebar-placeholder">
-            <div class="editor-sidebar-placeholder-icon">📝</div>
-            <div class="editor-sidebar-placeholder-text">当前为编辑视图，点击活动栏中的搜索按钮可打开全局搜索。</div>
           </div>
         </aside>
         <div class="editor-panel-content editor-panel-content-main">
@@ -1236,7 +1274,7 @@ const globalSearchTotalFiles = ref(0)
 const globalSearchTotalMatches = ref(0)
 const globalSearchExecuted = ref(false)
 const showEditorSidebar = ref(true)
-const editorSidebarView = ref('search')
+const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -1669,9 +1707,30 @@ async function fetchGlobalSearchResults(agentId, payload) {
   return result.data
 }
 
+const hasEditorSidebarFileTree = computed(() => {
+  const agentId = currentAgentId.value
+  if (!agentId) return false
+  return getVisibleFileTreeNodes(agentId).length > 0
+})
+
+async function ensureEditorSidebarFileTree(agent = currentAgent.value) {
+  if (!agent?.agent_id || !agent.working_dir) return
+  const treeNodes = fileTreeState.value.get(agent.agent_id) || []
+  if (treeNodes.length === 0) {
+    await initFileTree(agent.agent_id, agent.working_dir)
+  }
+}
+
 function setEditorSidebarView(view) {
   editorSidebarView.value = view
   showEditorSidebar.value = true
+  if (view === 'files') {
+    nextTick(() => {
+      ensureEditorSidebarFileTree()
+      layoutMonacoEditor()
+    })
+    return
+  }
   nextTick(() => {
     layoutMonacoEditor()
   })
