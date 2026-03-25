@@ -314,6 +314,14 @@
             :disabled="globalSearchLoading || !currentAgentId"
             @keydown.enter.prevent="runGlobalSearch"
           >
+          <input
+            v-model="globalSearchFileGlob"
+            class="editor-global-search-input editor-global-search-glob-input"
+            type="text"
+            placeholder="文件过滤，如 *.py,!tests/**"
+            :disabled="globalSearchLoading || !currentAgentId"
+            @keydown.enter.prevent="runGlobalSearch"
+          >
           <label class="editor-global-search-toggle">
             <input v-model="globalSearchCaseSensitive" type="checkbox">
             <span>区分大小写</span>
@@ -1182,6 +1190,7 @@ let editorFileHeartbeatTimer = null
 const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const globalSearchQuery = ref('')
+const globalSearchFileGlob = ref('')
 const globalSearchCaseSensitive = ref(false)
 const globalSearchLoading = ref(false)
 const globalSearchError = ref('')
@@ -1645,6 +1654,7 @@ async function runGlobalSearch() {
       query,
       case_sensitive: globalSearchCaseSensitive.value,
       max_results: 100,
+      file_glob: globalSearchFileGlob.value.trim(),
     })
     globalSearchResults.value = Array.isArray(data.results) ? data.results : []
     globalSearchTotalFiles.value = Number(data.total_files || 0)
