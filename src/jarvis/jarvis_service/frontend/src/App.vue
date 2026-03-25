@@ -305,6 +305,21 @@
         <span class="editor-toolbar-status" v-else-if="activeEditorTab">{{ activeEditorTab.isDirty ? '未保存修改' : '已保存' }}</span>
         <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
         <div class="editor-toolbar-spacer"></div>
+        <div class="editor-global-search">
+          <input
+            v-model="globalSearchQuery"
+            class="editor-global-search-input"
+            type="text"
+            placeholder="全局搜索文件内容..."
+            :disabled="globalSearchLoading || !currentAgentId"
+            @keydown.enter.prevent="runGlobalSearch"
+          >
+          <label class="editor-global-search-toggle">
+            <input v-model="globalSearchCaseSensitive" type="checkbox">
+            <span>区分大小写</span>
+          </label>
+          <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+        </div>
         <button
           v-if="editorTabs.length > 0"
           class="editor-edit-toggle"
@@ -315,6 +330,34 @@
           <span class="editor-edit-toggle-icon">{{ isEditorEditable ? '🔓' : '🔒' }}</span>
           <span class="editor-edit-toggle-text">{{ isEditorEditable ? '可编辑' : '只读' }}</span>
         </button>
+      </div>
+      <div v-if="globalSearchVisible" class="editor-global-search-results">
+        <div class="editor-global-search-summary">
+          <span v-if="globalSearchLoading">搜索中...</span>
+          <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
+          <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
+          <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
+        </div>
+        <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+          未找到匹配结果
+        </div>
+        <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
+          <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+            {{ result.file_path }}
+            <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+          </div>
+          <button
+            v-for="match in result.matches"
+            :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
+            class="editor-global-search-match"
+            @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+          >
+            <span class="editor-global-search-line">{{ match.line_number }}</span>
+            <span class="editor-global-search-text">
+              {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
+            </span>
+          </button>
+        </div>
       </div>
       <div class="editor-panel-content editor-panel-content-main">
         <div v-if="editorTabs.length === 0" class="editor-placeholder">
@@ -1138,6 +1181,15 @@ let monacoEditor = null
 let editorFileHeartbeatTimer = null
 const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
+const globalSearchQuery = ref('')
+const globalSearchCaseSensitive = ref(false)
+const globalSearchLoading = ref(false)
+const globalSearchError = ref('')
+const globalSearchResults = ref([])
+const globalSearchTotalFiles = ref(0)
+const globalSearchTotalMatches = ref(0)
+const globalSearchExecuted = ref(false)
+const globalSearchVisible = computed(() => globalSearchLoading.value || globalSearchExecuted.value || !!globalSearchError.value)
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
@@ -1548,6 +1600,89 @@ function activateEditorTab(path) {
       monacoEditor.focus()
     })
   }
+}
+
+function resolveAgentRelativePath(relativePath) {
+  if (!relativePath) return ''
+  const workingDir = currentAgent.value?.working_dir || ''
+  if (!workingDir) return relativePath
+  return `${workingDir.replace(/\/$/, '')}/${String(relativePath).replace(/^\//, '')}`
+}
+
+async function fetchGlobalSearchResults(agentId, payload) {
+  const { host, port } = getGatewayAddress()
+  const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/global-search/${agentId}`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || '全局搜索失败')
+  }
+  return result.data
+}
+
+async function runGlobalSearch() {
+  if (!currentAgentId.value) {
+    showToast('请先选择 Agent', 'error')
+    return
+  }
+
+  const query = globalSearchQuery.value.trim()
+  if (!query) {
+    globalSearchError.value = '请输入搜索关键词'
+    globalSearchExecuted.value = false
+    globalSearchResults.value = []
+    return
+  }
+
+  globalSearchLoading.value = true
+  globalSearchError.value = ''
+  globalSearchExecuted.value = false
+
+  try {
+    const data = await fetchGlobalSearchResults(currentAgentId.value, {
+      query,
+      case_sensitive: globalSearchCaseSensitive.value,
+      max_results: 100,
+    })
+    globalSearchResults.value = Array.isArray(data.results) ? data.results : []
+    globalSearchTotalFiles.value = Number(data.total_files || 0)
+    globalSearchTotalMatches.value = Number(data.total_matches || 0)
+    globalSearchExecuted.value = true
+  } catch (error) {
+    globalSearchError.value = error.message || '全局搜索失败'
+    globalSearchResults.value = []
+    globalSearchTotalFiles.value = 0
+    globalSearchTotalMatches.value = 0
+    globalSearchExecuted.value = true
+    showToast(globalSearchError.value, 'error')
+  } finally {
+    globalSearchLoading.value = false
+  }
+}
+
+async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
+  const absolutePath = resolveAgentRelativePath(filePath)
+  await openEditorFile(absolutePath)
+  await nextTick()
+  const model = editorModels.get(absolutePath)
+  if (!monacoEditor || !model) {
+    return
+  }
+
+  monacoEditor.setModel(model)
+  const column = Number(matchStart || 0) + 1
+  const endColumn = Math.max(column, Number(matchEnd || matchStart || 0) + 1)
+  monacoEditor.revealLineInCenter(Number(lineNumber || 1))
+  monacoEditor.setPosition({ lineNumber: Number(lineNumber || 1), column })
+  monacoEditor.setSelection({
+    startLineNumber: Number(lineNumber || 1),
+    startColumn: column,
+    endLineNumber: Number(lineNumber || 1),
+    endColumn,
+  })
+  monacoEditor.focus()
 }
 
 async function fetchFileContent(path) {
