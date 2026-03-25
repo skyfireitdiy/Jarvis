@@ -9,6 +9,7 @@
 """
 
 import base64
+import json
 import os
 import sys
 import threading
@@ -116,6 +117,51 @@ def _gen_shell_cmd_for_terminal() -> str:
 
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
+
+# Completion usage stats file
+COMPLETION_STATS_FILE = os.path.join(get_data_dir(), "completion_usage_stats.json")
+
+
+def _load_completion_usage_stats() -> Dict[str, int]:
+    """Load completion usage stats from JSON file."""
+    try:
+        if not os.path.exists(COMPLETION_STATS_FILE):
+            return {}
+        with open(COMPLETION_STATS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                return {}
+            # Filter out invalid entries
+            return {
+                k: v
+                for k, v in data.items()
+                if isinstance(k, str) and isinstance(v, int) and v > 0
+            }
+    except Exception:
+        return {}
+
+
+def _save_completion_usage_stats(stats: Dict[str, int]) -> None:
+    """Save completion usage stats to JSON file."""
+    try:
+        os.makedirs(os.path.dirname(COMPLETION_STATS_FILE), exist_ok=True)
+        with open(COMPLETION_STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(stats, f, indent=2, ensure_ascii=False)
+    except Exception:
+        # Non-critical: ignore save failures
+        pass
+
+
+def _update_completion_usage(file_path: str) -> None:
+    """Update usage count for a file path."""
+    try:
+        stats = _load_completion_usage_stats()
+        stats[file_path] = stats.get(file_path, 0) + 1
+        _save_completion_usage_stats(stats)
+    except Exception:
+        # Non-critical: ignore update failures
+        pass
+
 
 # 内置命令标记列表（用于自动补全和 fzf）
 BUILTIN_COMMANDS = [
@@ -613,6 +659,8 @@ class FileCompleter(Completer):
         self._max_walk_files = 10000
         # Cache for rules to avoid repeated loading
         self._rules_cache: Optional[List[Tuple[str, str]]] = None
+        # Load completion usage stats
+        self._usage_stats: Dict[str, int] = _load_completion_usage_stats()
 
     def _get_all_rule_completions(self) -> List[str]:
         """获取所有规则补全项的统一接口
@@ -816,14 +864,26 @@ class FileCompleter(Completer):
                     [item[0] for item in all_completions],
                     limit=self.max_suggestions,
                 )
-                scored_items = [
-                    (item[0], item[1])
-                    for item in scored_items
-                    if item[1] > self.min_score
-                ]
+                # Adjust scores based on usage stats
+                scored_items_with_usage: List[Tuple[str, int, int]] = []
+                for item_path, score in scored_items:
+                    usage_count = self._usage_stats.get(item_path, 0)
+                    # Add usage count as weight (usage_count * 5 to balance with fuzzy score)
+                    final_score = score + (usage_count * 5)
+                    scored_items_with_usage.append((item_path, final_score, score))
+
+                # Sort by final score and filter by minimum score
+                scored_items_with_usage.sort(key=lambda x: x[1], reverse=True)
+                # Filter by minimum score and limit to max_suggestions
+                filtered_items: List[Tuple[str, int, int]] = [
+                    item for item in scored_items_with_usage if item[2] > self.min_score
+                ][: self.max_suggestions]
+
                 completion_map = {item[0]: item[1] for item in all_completions}
-                for t, score in scored_items:
-                    display_text = f"{t} ({score}%)" if score < 100 else t
+                for t, final_score, original_score in filtered_items:
+                    display_text = (
+                        f"{t} ({original_score}%)" if original_score < 100 else t
+                    )
                     yield Completion(
                         text=f"'{t}'",
                         start_position=-replace_length,
@@ -1196,6 +1256,13 @@ def _get_multiline_input_internal(
             completion = event.current_buffer.complete_state.current_completion
             if completion:
                 event.current_buffer.apply_completion(completion)
+                # Track completion usage when user selects an item
+                if hasattr(completion, "text") and completion.text:
+                    # Extract item from completion text (remove quotes)
+                    item = completion.text.strip("'\"")
+                    # Track all completions (files, commands, etc.)
+                    if item:
+                        _update_completion_usage(item)
             else:
                 event.current_buffer.insert_text("\n")
         else:
