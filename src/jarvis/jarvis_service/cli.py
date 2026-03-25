@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Jarvis service CLI。"""
 
+import atexit
 import os
 import shutil
 import signal
@@ -13,6 +14,7 @@ from typing import Optional
 
 import typer
 
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
 
 DEFAULT_GATEWAY_HOST = "127.0.0.1"
@@ -26,6 +28,7 @@ ROOT_MARKER_DIRECTORIES = ("src/jarvis",)
 FRONTEND_RELATIVE_PATH = Path("src/jarvis/jarvis_service/frontend")
 
 app = typer.Typer(help="Jarvis Service 服务")
+SINGLE_INSTANCE_LOCK_HANDLE: Optional[object] = None
 
 
 class LoopAction(Enum):
@@ -207,9 +210,7 @@ class ServiceController:
             process.kill()
             process.wait()
 
-    def _print_service_summary(
-        self, gateway_pid: int, frontend_pid: int
-    ) -> None:
+    def _print_service_summary(self, gateway_pid: int, frontend_pid: int) -> None:
         """打印启动结果摘要。"""
         PrettyOutput.auto_print(
             f"ℹ️ 网关地址: http://{self._config.gateway_host}:{self._config.gateway_port}"
@@ -237,7 +238,9 @@ def resolve_project_root() -> Path:
 
 def is_project_root(candidate_root: Path) -> bool:
     """判断目录是否为 Jarvis 项目根目录。"""
-    has_marker_files = all((candidate_root / marker).exists() for marker in ROOT_MARKER_FILES)
+    has_marker_files = all(
+        (candidate_root / marker).exists() for marker in ROOT_MARKER_FILES
+    )
     has_marker_directories = all(
         (candidate_root / marker).exists() for marker in ROOT_MARKER_DIRECTORIES
     )
@@ -254,13 +257,48 @@ def build_service_config() -> ServiceConfig:
         gateway_host=os.getenv("JARVIS_GATEWAY_HOST", DEFAULT_GATEWAY_HOST),
         gateway_port=int(os.getenv("JARVIS_GATEWAY_PORT", str(DEFAULT_GATEWAY_PORT))),
         frontend_host=os.getenv("JARVIS_FRONTEND_HOST", DEFAULT_FRONTEND_HOST),
-        frontend_port=int(os.getenv("JARVIS_FRONTEND_PORT", str(DEFAULT_FRONTEND_PORT))),
+        frontend_port=int(
+            os.getenv("JARVIS_FRONTEND_PORT", str(DEFAULT_FRONTEND_PORT))
+        ),
         gateway_password=os.getenv("JARVIS_GATEWAY_PASSWORD") or None,
     )
 
 
+def get_single_instance_lock_path() -> Path:
+    """返回当前用户的服务实例锁文件路径。"""
+    return Path(get_data_dir()) / f"jarvis-service-{os.getuid()}.lock"
+
+
+def release_single_instance_lock() -> None:
+    """释放当前用户的服务实例锁。"""
+    global SINGLE_INSTANCE_LOCK_HANDLE
+    if SINGLE_INSTANCE_LOCK_HANDLE is None:
+        return
+    SINGLE_INSTANCE_LOCK_HANDLE.close()
+    SINGLE_INSTANCE_LOCK_HANDLE = None
+
+
+def acquire_single_instance_lock() -> None:
+    """获取当前用户的服务实例锁，若失败则退出。"""
+    global SINGLE_INSTANCE_LOCK_HANDLE
+    lock_file_path = get_single_instance_lock_path()
+    lock_file_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_handle = open(lock_file_path, "w", encoding="utf-8")
+    try:
+        import fcntl
+
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock_handle.close()
+        PrettyOutput.auto_print("❌ 当前用户已有 jarvis-service 实例正在运行")
+        raise typer.Exit(code=1)
+    SINGLE_INSTANCE_LOCK_HANDLE = lock_handle
+    atexit.register(release_single_instance_lock)
+
+
 def run_service() -> None:
     """启动 Jarvis 服务循环。"""
+    acquire_single_instance_lock()
     config = build_service_config()
     controller = ServiceController(config)
     signal.signal(signal.SIGINT, controller.request_exit)
