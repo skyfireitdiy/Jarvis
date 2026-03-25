@@ -685,6 +685,11 @@
             清除历史记录
           </button>
         </div>
+        <div class="form-group">
+          <button class="ghost-btn" @click="restartGateway" :disabled="isRestartingGateway">
+            {{ isRestartingGateway ? '重启中...' : '重启服务' }}
+          </button>
+        </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
           <button class="primary-btn" @click="reconnect">重新连接</button>
@@ -868,6 +873,7 @@ const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
 const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
+const isRestartingGateway = ref(false)
 
 // 登录函数：使用密码获取 Token
 async function loginWithPassword(password) {
@@ -2387,6 +2393,32 @@ async function connect() {
 function disconnect() {
   if (socket.value) {
     socket.value.close()
+  }
+}
+
+async function restartGateway() {
+  if (isRestartingGateway.value) {
+    return
+  }
+
+  try {
+    isRestartingGateway.value = true
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/service/restart`, {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || '重启服务失败')
+    }
+
+    showToast(result.data?.message || '已请求服务重启', 'success')
+  } catch (error) {
+    console.error('[SETTINGS] Failed to restart gateway:', error)
+    showToast(error.message || '重启服务失败', 'error')
+  } finally {
+    isRestartingGateway.value = false
   }
 }
 
