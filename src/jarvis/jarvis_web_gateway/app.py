@@ -93,6 +93,11 @@ _terminal_session_manager: Optional[TerminalSessionManager] = None
 
 MAX_FILE_SIZE_BYTES = 1024 * 1024
 BINARY_FILE_SAMPLE_SIZE = 4096
+GLOBAL_SEARCH_MAX_QUERY_LENGTH = 200
+GLOBAL_SEARCH_DEFAULT_MAX_RESULTS = 100
+GLOBAL_SEARCH_MAX_RESULTS_LIMIT = 500
+GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS = 30
+GLOBAL_SEARCH_MAX_LINE_LENGTH = 2000
 
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
@@ -1396,6 +1401,186 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     )
 
             return {"success": True, "data": search_results}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/global-search/{agent_id}", dependencies=[Depends(verify_token)])
+    async def global_search(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+        """在 Agent 工作目录内执行全局文件内容搜索。"""
+        try:
+            agent = agent_manager.get_agent(agent_id)
+            if not agent:
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
+
+            raw_query = request.get("query", "")
+            query = str(raw_query).strip() if raw_query is not None else ""
+            if not query:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_QUERY", "message": "query is required"},
+                }
+            if len(query) > GLOBAL_SEARCH_MAX_QUERY_LENGTH:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"query length must be <= {GLOBAL_SEARCH_MAX_QUERY_LENGTH}",
+                    },
+                }
+
+            case_sensitive = bool(request.get("case_sensitive", False))
+            raw_max_results = request.get("max_results", GLOBAL_SEARCH_DEFAULT_MAX_RESULTS)
+            try:
+                max_results = int(raw_max_results)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": "max_results must be an integer",
+                    },
+                }
+            if max_results < 1 or max_results > GLOBAL_SEARCH_MAX_RESULTS_LIMIT:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"max_results must be between 1 and {GLOBAL_SEARCH_MAX_RESULTS_LIMIT}",
+                    },
+                }
+
+            working_dir = pathlib.Path(agent.working_dir).resolve()
+            if not working_dir.exists() or not working_dir.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "WORKING_DIR_NOT_FOUND",
+                        "message": f"Working directory not found: {working_dir}",
+                    },
+                }
+
+            rg_command = [
+                "rg",
+                "--line-number",
+                "--column",
+                "--no-heading",
+                "--color",
+                "never",
+                "--hidden",
+                "--glob",
+                "!.git",
+                "--glob",
+                "!node_modules",
+                "--glob",
+                "!__pycache__",
+                "--glob",
+                "!.venv",
+                "--glob",
+                "!venv",
+                "--glob",
+                "!dist",
+                "--glob",
+                "!build",
+                "--max-count",
+                str(max_results),
+            ]
+            if not case_sensitive:
+                rg_command.append("--ignore-case")
+            rg_command.extend([query, str(working_dir)])
+
+            try:
+                result = subprocess.run(
+                    rg_command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS,
+                    cwd=str(working_dir),
+                )
+            except FileNotFoundError:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_FAILED",
+                        "message": "ripgrep (rg) is not available",
+                    },
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_TIMEOUT",
+                        "message": f"Search timed out after {GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS} seconds",
+                    },
+                }
+
+            if result.returncode not in (0, 1):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_FAILED",
+                        "message": result.stderr.strip() or "Search command failed",
+                    },
+                }
+
+            results_by_file: Dict[str, list[Dict[str, Any]]] = {}
+            total_matches = 0
+            for line in result.stdout.splitlines():
+                if total_matches >= max_results:
+                    break
+                parts = line.split(":", 3)
+                if len(parts) != 4:
+                    continue
+                file_path_str, line_number_str, column_str, line_content = parts
+                try:
+                    absolute_path = pathlib.Path(file_path_str).resolve()
+                    relative_path = absolute_path.relative_to(working_dir)
+                    line_number = int(line_number_str)
+                    column = int(column_str)
+                except (ValueError, OSError):
+                    continue
+
+                if len(line_content) > GLOBAL_SEARCH_MAX_LINE_LENGTH:
+                    line_content = line_content[:GLOBAL_SEARCH_MAX_LINE_LENGTH] + "..."
+
+                match_start = max(column - 1, 0)
+                match_end = min(match_start + len(query), len(line_content))
+                file_key = str(relative_path)
+                results_by_file.setdefault(file_key, []).append(
+                    {
+                        "line_number": line_number,
+                        "line_content": line_content,
+                        "match_start": match_start,
+                        "match_end": match_end,
+                    }
+                )
+                total_matches += 1
+
+            structured_results = [
+                {
+                    "file_path": file_path,
+                    "matches": matches,
+                }
+                for file_path, matches in results_by_file.items()
+            ]
+
+            return {
+                "success": True,
+                "data": {
+                    "query": query,
+                    "total_files": len(structured_results),
+                    "total_matches": total_matches,
+                    "results": structured_results,
+                },
+            }
         except Exception as e:
             return {
                 "success": False,
