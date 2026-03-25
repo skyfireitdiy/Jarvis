@@ -10,6 +10,7 @@ import asyncio
 import logging
 import os
 import pathlib
+import signal
 import subprocess
 import uuid
 from datetime import datetime
