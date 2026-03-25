@@ -98,6 +98,7 @@ GLOBAL_SEARCH_DEFAULT_MAX_RESULTS = 100
 GLOBAL_SEARCH_MAX_RESULTS_LIMIT = 500
 GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS = 30
 GLOBAL_SEARCH_MAX_LINE_LENGTH = 2000
+GLOBAL_SEARCH_MAX_GLOB_LENGTH = 500
 
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
@@ -1435,7 +1436,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 }
 
             case_sensitive = bool(request.get("case_sensitive", False))
-            raw_max_results = request.get("max_results", GLOBAL_SEARCH_DEFAULT_MAX_RESULTS)
+            raw_max_results = request.get(
+                "max_results", GLOBAL_SEARCH_DEFAULT_MAX_RESULTS
+            )
             try:
                 max_results = int(raw_max_results)
             except (TypeError, ValueError):
@@ -1454,6 +1457,22 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                         "message": f"max_results must be between 1 and {GLOBAL_SEARCH_MAX_RESULTS_LIMIT}",
                     },
                 }
+
+            raw_file_glob = request.get("file_glob", "")
+            file_glob = str(raw_file_glob).strip() if raw_file_glob is not None else ""
+            if len(file_glob) > GLOBAL_SEARCH_MAX_GLOB_LENGTH:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"file_glob length must be <= {GLOBAL_SEARCH_MAX_GLOB_LENGTH}",
+                    },
+                }
+            file_glob_patterns = [
+                item.strip()
+                for item in file_glob.split(",")
+                if isinstance(item, str) and item.strip()
+            ]
 
             working_dir = pathlib.Path(agent.working_dir).resolve()
             if not working_dir.exists() or not working_dir.is_dir():
@@ -1492,6 +1511,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             ]
             if not case_sensitive:
                 rg_command.append("--ignore-case")
+            for glob_pattern in file_glob_patterns:
+                rg_command.extend(["--glob", glob_pattern])
             rg_command.extend([query, str(working_dir)])
 
             try:
@@ -1576,6 +1597,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 "success": True,
                 "data": {
                     "query": query,
+                    "file_glob": file_glob,
                     "total_files": len(structured_results),
                     "total_matches": total_matches,
                     "results": structured_results,

@@ -26,9 +26,10 @@ POST /api/global-search/{agent_id}
 **请求参数**：
 ```json
 {
-  "query": "string",      // 搜索关键词
+  "query": "string",       // 搜索关键词
   "case_sensitive": false, // 是否区分大小写（默认 false）
-  "max_results": 100      // 最大结果数量（默认 100）
+  "max_results": 100,      // 最大结果数量（默认 100）
+  "file_glob": "*.py,!tests/**" // 文件过滤 glob，逗号分隔，支持 ! 排除
 }
 ```
 
@@ -84,6 +85,12 @@ POST /api/global-search/{agent_id}
   - 匹配行号
   - 匹配行内容（高亮关键词）
 
+**文件过滤输入框**：
+- 类型：文本输入
+- 用途：限制搜索参与匹配的文件路径
+- 语法：glob 通配符，多个规则以逗号分隔，支持 `!` 前缀排除
+- 示例：`*.py`、`src/**/*.ts`、`*.py,!tests/**`
+
 ## 输入输出说明
 
 ### 输入参数
@@ -102,6 +109,15 @@ POST /api/global-search/{agent_id}
 - 类型：integer
 - 默认值：100
 - 约束：1-500 之间的整数
+
+**file_glob（文件过滤规则）**：
+- 类型：string
+- 默认值：空字符串（不过滤）
+- 约束：可选，最大长度 500 字符
+- 语法：glob 通配符，多个规则使用逗号分隔
+- 包含规则示例：`*.py`、`src/**/*.vue`
+- 排除规则示例：`!tests/**`、`!node_modules/**`
+- 组合示例：`*.py,!tests/**`
 
 ### 输出说明
 
@@ -130,10 +146,11 @@ POST /api/global-search/{agent_id}
 ### 正常情况处理
 
 1. **用户发起搜索**：
-   - 用户在搜索框输入关键词并按回车或点击搜索按钮
+   - 用户在搜索框输入关键词，并可选输入文件过滤 glob
+   - 用户按回车或点击搜索按钮
    - 前端发送 POST 请求到 `/api/global-search/{agent_id}`
-   - 后端在 Agent 工作目录下遍历文件
-   - 对每个文本文件内容进行关键词匹配
+   - 后端在 Agent 工作目录下结合 `file_glob` 过滤文件范围
+   - 对过滤后的文本文件内容进行关键词匹配
    - 返回匹配结果列表
    - 前端展示搜索结果
 
@@ -159,7 +176,15 @@ POST /api/global-search/{agent_id}
    - 显示"未找到匹配结果"提示
    - 保持搜索框可继续输入
 
-4. **工作目录为空**：
+4. **glob 规则为空**：
+   - 不做额外文件过滤
+   - 搜索行为与当前实现一致
+
+5. **glob 规则存在但未命中任何文件**：
+   - 返回空结果列表
+   - total_files: 0, total_matches: 0
+
+6. **工作目录为空**：
    - 返回空结果列表
    - total_files: 0, total_matches: 0
 
@@ -184,6 +209,11 @@ POST /api/global-search/{agent_id}
 5. **二进制文件**：
    - 自动检测并跳过二进制文件
    - 不搜索 .png, .jpg, .pdf, .exe 等文件
+
+6. **glob 语法输入异常**：
+   - 对空片段进行忽略
+   - 对非空 glob 片段按原样传递给搜索命令
+   - 若搜索命令执行失败，返回 SEARCH_FAILED
 
 ## 性能要求
 
@@ -213,6 +243,8 @@ POST /api/global-search/{agent_id}
    - [ ] 支持取消正在进行的搜索
    - [ ] 支持快捷键触发搜索（Ctrl/Cmd + Shift + F）
    - [ ] 支持区分大小写选项
+   - [ ] 支持输入文件过滤 glob
+   - [ ] 支持 `!` 前缀排除 glob
 
 4. **边界情况**：
    - [ ] 空搜索词不触发搜索
