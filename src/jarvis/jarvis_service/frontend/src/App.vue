@@ -1868,10 +1868,105 @@ const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: ag
 // 历史输入记录
 const INPUT_HISTORY_STORAGE_KEY = 'jarvis_input_history'
 const MAX_INPUT_HISTORY_COUNT = 100
+const COMPLETION_USAGE_STORAGE_KEY = 'jarvis_completion_usage_stats'
 
 const inputHistory = ref([]) // 历史输入记录数组
 const historyIndex = ref(-1) // 当前浏览的历史记录索引（-1 表示未浏览历史）
 const currentTempInput = ref('') // 用户正在编辑的临时内容
+
+function loadCompletionUsageStats() {
+  const savedValue = localStorage.getItem(COMPLETION_USAGE_STORAGE_KEY)
+  if (!savedValue) {
+    return {}
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+      return {}
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsedValue).filter(([, count]) => Number.isInteger(count) && count > 0)
+    )
+  } catch {
+    return {}
+  }
+}
+
+function saveCompletionUsageStats(completionUsageStats) {
+  localStorage.setItem(COMPLETION_USAGE_STORAGE_KEY, JSON.stringify(completionUsageStats))
+}
+
+function getCompletionUsageKey(item) {
+  if (!item || item.type !== 'file' || typeof item.value !== 'string') {
+    return ''
+  }
+
+  return item.value
+}
+
+function getCompletionUsageCount(item) {
+  const completionUsageKey = getCompletionUsageKey(item)
+  if (!completionUsageKey) {
+    return 0
+  }
+
+  return completionUsageStats.value[completionUsageKey] || 0
+}
+
+function getCompletionRecommendationScore(item, originalIndex = 0) {
+  if (!item || typeof item !== 'object') {
+    return -originalIndex
+  }
+
+  const scoreMatch = typeof item.display === 'string'
+    ? item.display.match(/\((\d+)%\)$/)
+    : null
+
+  if (scoreMatch) {
+    return Number(scoreMatch[1])
+  }
+
+  return -originalIndex
+}
+
+function sortCompletionItems(items = []) {
+  return items
+    .map((item, index) => ({
+      item,
+      usageCount: getCompletionUsageCount(item),
+      recommendationScore: getCompletionRecommendationScore(item, index),
+      originalIndex: index,
+    }))
+    .sort((leftItem, rightItem) => {
+      if (rightItem.usageCount !== leftItem.usageCount) {
+        return rightItem.usageCount - leftItem.usageCount
+      }
+
+      if (rightItem.recommendationScore !== leftItem.recommendationScore) {
+        return rightItem.recommendationScore - leftItem.recommendationScore
+      }
+
+      return leftItem.originalIndex - rightItem.originalIndex
+    })
+    .map(({ item }) => item)
+}
+
+function recordCompletionSelection(item) {
+  const completionUsageKey = getCompletionUsageKey(item)
+  if (!completionUsageKey) {
+    return
+  }
+
+  const nextCompletionUsageStats = {
+    ...completionUsageStats.value,
+    [completionUsageKey]: (completionUsageStats.value[completionUsageKey] || 0) + 1,
+  }
+
+  completionUsageStats.value = nextCompletionUsageStats
+  saveCompletionUsageStats(nextCompletionUsageStats)
+}
 
 function loadInputHistory() {
   const savedValue = localStorage.getItem(INPUT_HISTORY_STORAGE_KEY)
@@ -2118,6 +2213,7 @@ const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位�
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 const fileCompletions = ref([]) // 文件补全搜索结果
+const completionUsageStats = ref(loadCompletionUsageStats()) // 补全项本地使用统计
 
 // 监听搜索输入变化，触发文件搜索
 watch(completionSearch, async (newSearch) => {
@@ -2134,7 +2230,7 @@ watch(completionSearch, async (newSearch) => {
       const result = await response.json()
       
       if (response.ok && result.success && result.data) {
-        fileCompletions.value = result.data
+        fileCompletions.value = sortCompletionItems(result.data)
         console.log('[FILE COMPLETIONS] Loaded', result.data.length, 'files')
       } else {
         fileCompletions.value = []
@@ -3128,7 +3224,7 @@ async function openCompletions() {
     }
     
     if (result.success && result.data) {
-      completions.value = result.data
+      completions.value = sortCompletionItems(result.data)
       console.log('[COMPLETIONS] Loaded', result.data.length, 'completions')
     } else {
       console.error('[COMPLETIONS] Invalid format:', result)
@@ -3150,7 +3246,7 @@ async function openCompletions() {
 // 过滤补全列表
 const filteredCompletions = computed(() => {
   if (!completionSearch.value) {
-    return completions.value
+    return sortCompletionItems(completions.value)
   }
   
   const search = completionSearch.value.toLowerCase()
@@ -3162,10 +3258,10 @@ const filteredCompletions = computed(() => {
   
   // 合并文件补全结果（如果有搜索内容）
   if (fileCompletions.value.length > 0) {
-    return [...filteredOriginal, ...fileCompletions.value]
+    return sortCompletionItems([...filteredOriginal, ...fileCompletions.value])
   }
   
-  return filteredOriginal
+  return sortCompletionItems(filteredOriginal)
 })
 
 // 处理补全对话框的键盘事件
@@ -3271,6 +3367,8 @@ function insertCompletion(item) {
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
   const text = textarea.value
+
+  recordCompletionSelection(item)
   
   // 在光标位置插入补全（添加单引号包裹）
   const valueToInsert = `'${item.value}'`
