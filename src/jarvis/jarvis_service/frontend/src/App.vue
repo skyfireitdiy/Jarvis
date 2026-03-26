@@ -28,43 +28,6 @@
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
             <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
           </div>
-          <div class="agent-dir" @click.stop="toggleFileTree(agent.agent_id, agent.working_dir)">{{ agent.working_dir }}（点击浏览）</div>
-          
-          <!-- 文件树容器 -->
-          <div v-if="getShowFileTree(agent.agent_id)" class="file-tree-container">
-            <div v-if="!fileTreeState.get(agent.agent_id) || fileTreeState.get(agent.agent_id).length === 0" class="file-tree-empty">
-              <button @click.stop="initFileTree(agent.agent_id, agent.working_dir)">加载文件树</button>
-            </div>
-            <div v-else class="file-tree">
-              <div
-                v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
-                :key="visibleNode.node.path"
-                class="tree-node"
-              >
-                <div
-                  class="tree-node-content"
-                  :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                  @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
-                >
-                  <span
-                    v-if="visibleNode.node.type === 'directory'"
-                    class="tree-node-icon expand-arrow"
-                    :class="{ expanded: visibleNode.node.expanded }"
-                  >▶</span>
-                  <span v-else class="tree-node-icon"></span>
-                  <span
-                    class="tree-node-icon"
-                    :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
-                  >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
-                  <span
-                    class="tree-node-text"
-                    :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
-                  >{{ visibleNode.node.name }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
           <div class="agent-actions">
             <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
@@ -1306,7 +1269,6 @@ const renameInput = ref(null)               // 重命名输入框引用
 const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
 const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：agent_id -> Set(expandedPaths)
 const fileTreeLoading = ref(new Map())      // 每个 Agent 的加载状态：agent_id -> Set(loadingPaths)
-const showFileTree = ref(new Map())         // 每个 Agent 是否显示文件树：agent_id -> boolean
 
 // 过滤后的目录列表（支持模糊搜索）
 const filteredDirList = computed(() => {
@@ -3887,7 +3849,6 @@ async function deleteAgent(agentId) {
         fileTreeState.value.delete(agentId)
         fileTreeExpanded.value.delete(agentId)
         fileTreeLoading.value.delete(agentId)
-        showFileTree.value.delete(agentId)
         
         // 如果是当前 Agent，清空当前 Agent ID
         if (currentAgentId.value === agentId) {
@@ -3938,7 +3899,6 @@ async function batchDeleteAgents() {
               fileTreeState.value.delete(agentId)
               fileTreeExpanded.value.delete(agentId)
               fileTreeLoading.value.delete(agentId)
-              showFileTree.value.delete(agentId)
               // 如果是当前 Agent，清空当前 Agent ID
               if (currentAgentId.value === agentId) {
                 currentAgentId.value = null
@@ -3980,8 +3940,6 @@ function initFileTreeState(agentId) {
     fileTreeState.value.set(agentId, [])
     fileTreeExpanded.value.set(agentId, new Set())
     fileTreeLoading.value.set(agentId, new Set())
-    // 不再在此处设置 showFileTree，由 toggleFileTree 控制显示状态
-    // showFileTree.value.set(agentId, false) // 默认不显示文件树
   }
 }
 
@@ -4076,28 +4034,6 @@ function flattenVisibleFileTreeNodes(nodes, depth = 0) {
 function getVisibleFileTreeNodes(agentId) {
   const treeNodes = fileTreeState.value.get(agentId) || []
   return flattenVisibleFileTreeNodes(treeNodes)
-}
-
-// 获取文件树显示状态（可追踪响应式）
-function getShowFileTree(agentId) {
-  // 通过访问 showFileTree.value 确保依赖被追踪
-  const map = showFileTree.value
-  return map.get(agentId) || false
-}
-
-// 切换显示/隐藏文件树
-async function toggleFileTree(agentId, rootPath) {
-  const currentShow = showFileTree.value.get(agentId) || false
-  const nextShow = !currentShow
-
-  showFileTree.value.set(agentId, nextShow)
-
-  const treeNodes = fileTreeState.value.get(agentId) || []
-  const hasLoadedFileTree = treeNodes.length > 0
-
-  if (nextShow && !hasLoadedFileTree && rootPath) {
-    await initFileTree(agentId, rootPath)
-  }
 }
 
 // 递归查找节点
@@ -7627,46 +7563,6 @@ body::-webkit-scrollbar {
   font-size: 13px;
 }
 
-/* 文件树容器 */
-.file-tree-container {
-  margin-top: 10px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  border: 0.5px solid rgba(255, 255, 255, 0.06);
-}
-
-.file-tree-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
-}
-
-.file-tree-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #8b949e;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.file-tree-toggle {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.file-tree-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
-}
-
 .tree-node {
   margin: 2px 0;
 }
@@ -7771,12 +7667,6 @@ body::-webkit-scrollbar {
 }
 
 @media (max-width: 768px) {
-  .file-tree-container {
-    padding: 6px;
-  }
-  .file-tree-title {
-    font-size: 11px;
-  }
   .tree-node-content {
     padding: 5px 6px;
   }
