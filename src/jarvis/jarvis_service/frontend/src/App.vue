@@ -6954,6 +6954,19 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
+.editor-file-tree-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-file-tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 .editor-sidebar-placeholder {
   align-items: center;
   justify-content: center;
