@@ -270,12 +270,6 @@
         <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
         <div class="editor-toolbar-spacer"></div>
         <button
-          class="icon-btn"
-          @click="toggleEditorSearchSidebar"
-          :class="{ active: editorSidebarView === 'search' && showEditorSidebar }"
-          title="搜索侧边栏"
-        >🔍</button>
-        <button
           v-if="editorTabs.length > 0"
           class="editor-edit-toggle"
           :class="{ 'editable': isEditorEditable }"
@@ -312,7 +306,7 @@
                 {{ currentAgent.working_dir }}
               </div>
               <div v-if="!hasEditorSidebarFileTree" class="editor-file-tree-empty">
-                点击上方目录加载文件树
+                当前工作目录下暂无可显示内容
               </div>
               <div v-else class="editor-file-tree-list">
                 <div
@@ -2003,6 +1997,16 @@ function toggleEditorEditable() {
     monacoEditor.updateOptions({ readOnly: !isEditorEditable.value })
   }
 }
+
+watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
+  if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {
+    return
+  }
+
+  nextTick(() => {
+    ensureEditorSidebarFileTree()
+  })
+})
 
 function hasDirtyEditorTabs() {
   return editorTabs.value.some(tab => tab.isDirty)
@@ -6844,6 +6848,11 @@ body::-webkit-scrollbar {
 .editor-activity-button {
   width: 32px;
   height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
