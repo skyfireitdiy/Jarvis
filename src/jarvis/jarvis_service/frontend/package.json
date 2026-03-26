@@ -1,0 +1,23 @@
+{
+  "name": "jarvis-web-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "highlight.js": "^11.9.0",
+    "marked": "^11.1.1",
+    "monaco-editor": "^0.55.1",
+    "vue": "^3.4.21",
+    "xterm": "^5.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.10"
+  }
+}
