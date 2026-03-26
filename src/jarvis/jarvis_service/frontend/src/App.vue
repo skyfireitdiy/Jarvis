@@ -28,6 +28,7 @@
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
             <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
           </div>
+          <div class="agent-dir" v-if="agent.working_dir">{{ agent.working_dir }}</div>
           <div class="agent-actions">
             <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
