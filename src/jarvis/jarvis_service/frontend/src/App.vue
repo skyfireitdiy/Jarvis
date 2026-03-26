@@ -3545,10 +3545,12 @@ const filteredCompletions = computed(() => {
   
   const search = completionSearch.value.toLowerCase()
   // 过滤原始补全项
-  const filteredOriginal = completions.value.filter(item => 
-    item.display.toLowerCase().includes(search) || 
-    item.description.toLowerCase().includes(search)
-  )
+  const filteredOriginal = completions.value.filter(item => {
+    const displayText = String(item.display || '').toLowerCase()
+    const descriptionText = String(item.description || '').toLowerCase()
+    const valueText = String(item.value || '').toLowerCase()
+    return displayText.includes(search) || descriptionText.includes(search) || valueText.includes(search)
+  })
   
   // 合并文件补全结果（如果有搜索内容）
   if (fileCompletions.value.length > 0) {
