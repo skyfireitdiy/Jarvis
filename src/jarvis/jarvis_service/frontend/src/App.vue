@@ -7105,9 +7105,9 @@ body::-webkit-scrollbar {
 .editor-panel-content {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   user-select: text;
 }
 
@@ -7125,6 +7125,7 @@ body::-webkit-scrollbar {
 }
 
 .editor-placeholder {
+  margin: auto;
   text-align: center;
   color: #8b949e;
   max-width: 280px;
