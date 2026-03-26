@@ -360,17 +360,19 @@
                 :disabled="globalSearchLoading || !currentAgentId"
                 @keydown.enter.prevent="runGlobalSearch"
               >
-              <label class="editor-global-search-toggle">
-                <input v-model="globalSearchCaseSensitive" type="checkbox">
-                <span>区分大小写</span>
-              </label>
-              <label class="editor-global-search-toggle">
-                <input v-model="globalSearchWholeWord" type="checkbox">
-                <span>全词匹配</span>
-              </label>
-              <div class="editor-global-search-actions">
-                <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
-                <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+              <div class="editor-global-search-toolbar">
+                <label class="editor-global-search-toggle">
+                  <input v-model="globalSearchCaseSensitive" type="checkbox">
+                  <span>区分大小写</span>
+                </label>
+                <label class="editor-global-search-toggle">
+                  <input v-model="globalSearchWholeWord" type="checkbox">
+                  <span>全词匹配</span>
+                </label>
+                <div class="editor-global-search-actions">
+                  <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+                  <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+                </div>
               </div>
             </div>
             <div class="editor-global-search-results">
@@ -2095,6 +2097,7 @@ const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObs
 const terminalSessions = ref([]) // [{ terminal_id, interpreter, working_dir, terminal, hostEl, fitAddon }]
 const activeTerminalId = ref(null) // 当前激活的终端ID
 const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
+const isCreatingTerminalSession = ref(false)
 
 // 输入控制
 const inputText = ref('')
@@ -4462,6 +4465,7 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'terminal_created') {
     // 独立终端创建成功
     console.log('[ws] terminal_created', payload)
+    isCreatingTerminalSession.value = false
     const terminalId = payload?.terminal_id
     if (terminalId) {
       terminalSessions.value.push({
@@ -5990,6 +5994,9 @@ watch(showTerminalPanel, (newValue, oldValue) => {
   } else if (newValue && !oldValue) {
     ensureTerminalPanelInViewport()
     saveTerminalPanelRect()
+    if (terminalSessions.value.length === 0 && !isCreatingTerminalSession.value) {
+      createTerminal()
+    }
     console.log('[independent-terminal] Panel showing, enabling ResizeObserver for active terminal')
     nextTick(() => {
       const activeSession = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
@@ -6969,6 +6976,13 @@ body::-webkit-scrollbar {
   border-color: rgba(56, 139, 253, 0.72);
 }
 
+.editor-global-search-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .editor-global-search-toggle {
   display: inline-flex;
   align-items: center;
@@ -6983,7 +6997,10 @@ body::-webkit-scrollbar {
 }
 
 .editor-global-search-btn {
-  min-width: 34px;
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
 }
 
 .editor-global-search-results {
