@@ -2775,6 +2775,7 @@ function confirmRestartGateway() {
     return
   }
 
+  showSettingsModal.value = false
   showConfirm(
     '确认重启服务吗？这将短暂中断当前连接。',
     () => {
