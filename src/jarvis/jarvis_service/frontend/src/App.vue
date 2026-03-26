@@ -364,6 +364,10 @@
                 <input v-model="globalSearchCaseSensitive" type="checkbox">
                 <span>区分大小写</span>
               </label>
+              <label class="editor-global-search-toggle">
+                <input v-model="globalSearchWholeWord" type="checkbox">
+                <span>全词匹配</span>
+              </label>
               <div class="editor-global-search-actions">
                 <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
                 <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
@@ -1225,6 +1229,7 @@ const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const globalSearchQuery = ref('')
 const globalSearchFileGlob = ref('')
 const globalSearchCaseSensitive = ref(false)
+const globalSearchWholeWord = ref(false)
 const globalSearchLoading = ref(false)
 const globalSearchError = ref('')
 const globalSearchResults = ref([])
@@ -1712,6 +1717,7 @@ function clearGlobalSearch() {
   globalSearchQuery.value = ''
   globalSearchFileGlob.value = ''
   globalSearchCaseSensitive.value = false
+  globalSearchWholeWord.value = false
   globalSearchError.value = ''
   globalSearchResults.value = []
   globalSearchTotalFiles.value = 0
@@ -1743,6 +1749,7 @@ async function runGlobalSearch() {
     const data = await fetchGlobalSearchResults(currentAgentId.value, {
       query,
       case_sensitive: globalSearchCaseSensitive.value,
+      whole_word: globalSearchWholeWord.value,
       max_results: 100,
       file_glob: globalSearchFileGlob.value.trim(),
     })
