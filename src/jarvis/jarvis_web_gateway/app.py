@@ -1575,7 +1575,27 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 if len(line_content) > GLOBAL_SEARCH_MAX_LINE_LENGTH:
                     line_content = line_content[:GLOBAL_SEARCH_MAX_LINE_LENGTH] + "..."
 
-                match_start = max(column - 1, 0)
+                expected_match_start = max(column - 1, 0)
+                search_line_content = (
+                    line_content if case_sensitive else line_content.lower()
+                )
+                search_query = query if case_sensitive else query.lower()
+                match_start = expected_match_start
+                nearest_match_start = search_line_content.find(search_query)
+                if nearest_match_start != -1:
+                    search_from = 0
+                    while True:
+                        candidate_match_start = search_line_content.find(
+                            search_query, search_from
+                        )
+                        if candidate_match_start == -1:
+                            break
+                        if abs(candidate_match_start - expected_match_start) < abs(
+                            nearest_match_start - expected_match_start
+                        ):
+                            nearest_match_start = candidate_match_start
+                        search_from = candidate_match_start + 1
+                    match_start = nearest_match_start
                 match_end = min(match_start + len(query), len(line_content))
                 file_key = str(relative_path)
                 results_by_file.setdefault(file_key, []).append(
