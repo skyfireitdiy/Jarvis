@@ -1436,6 +1436,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 }
 
             case_sensitive = bool(request.get("case_sensitive", False))
+            whole_word = bool(request.get("whole_word", False))
             raw_max_results = request.get(
                 "max_results", GLOBAL_SEARCH_DEFAULT_MAX_RESULTS
             )
@@ -1511,6 +1512,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             ]
             if not case_sensitive:
                 rg_command.append("--ignore-case")
+            if whole_word:
+                rg_command.append("--word-regexp")
             for glob_pattern in file_glob_patterns:
                 rg_command.extend(["--glob", glob_pattern])
             rg_command.extend([query, str(working_dir)])
