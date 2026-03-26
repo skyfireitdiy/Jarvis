@@ -2144,11 +2144,20 @@ function saveCompletionUsageStats(completionUsageStats) {
 }
 
 function getCompletionUsageKey(item) {
-  if (!item || item.type !== 'file' || typeof item.value !== 'string') {
+  if (!item || typeof item.value !== 'string') {
     return ''
   }
 
-  return item.value
+  const normalizedValue = item.value.trim()
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const normalizedType = typeof item.type === 'string' && item.type.trim()
+    ? item.type.trim()
+    : 'unknown'
+
+  return `${normalizedType}:${normalizedValue}`
 }
 
 function getCompletionUsageCount(item) {
