@@ -507,7 +507,10 @@ class WebSocketConnectionManager:
         # 独立终端会话消息处理
         if message_type == "terminal_create":
             interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
-            working_dir = payload.get("working_dir", ".")
+            raw_working_dir = payload.get("working_dir")
+            working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
+            if not working_dir:
+                working_dir = str(pathlib.Path.home())
             if _terminal_session_manager:
                 terminal_id, error = _terminal_session_manager.create_session(
                     interpreter=interpreter,
@@ -2247,7 +2250,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         """
         try:
             interpreter = request.get("interpreter") or os.environ.get("SHELL", "bash")
-            working_dir = request.get("working_dir", ".")
+            raw_working_dir = request.get("working_dir")
+            working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
+            if not working_dir:
+                working_dir = str(pathlib.Path.home())
 
             terminal_id, error = terminal_session_manager.create_session(
                 interpreter=interpreter,
