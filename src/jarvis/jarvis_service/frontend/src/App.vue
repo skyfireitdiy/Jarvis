@@ -5699,9 +5699,14 @@ function createTerminal() {
   }
   
   console.log('[independent-terminal] Creating new terminal')
+  const payload = {}
+  const currentWorkingDir = currentAgent.value?.working_dir?.trim()
+  if (currentWorkingDir) {
+    payload.working_dir = currentWorkingDir
+  }
   const message = {
     type: 'terminal_create',
-    payload: {},
+    payload,
   }
   socket.value.send(JSON.stringify(message))
 }
