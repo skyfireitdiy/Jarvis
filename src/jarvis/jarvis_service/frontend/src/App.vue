@@ -1998,16 +1998,6 @@ function toggleEditorEditable() {
   }
 }
 
-watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
-  if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {
-    return
-  }
-
-  nextTick(() => {
-    ensureEditorSidebarFileTree()
-  })
-})
-
 function hasDirtyEditorTabs() {
   return editorTabs.value.some(tab => tab.isDirty)
 }
@@ -2285,6 +2275,16 @@ const currentAgentId = ref(null) // 当前连接的 Agent ID
 const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
 const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
+})
+
+watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
+  if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {
+    return
+  }
+
+  nextTick(() => {
+    ensureEditorSidebarFileTree()
+  })
 })
 
 // Agent 批量选择管理
