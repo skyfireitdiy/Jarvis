@@ -852,10 +852,26 @@ function isPlantUmlLanguage(language) {
   return String(language || '').trim().toLowerCase() === PLANTUML_BLOCK_LANGUAGE
 }
 
+/**
+ * 检查 PlantUML 代码是否完整（包含 @startuml 和 @enduml 标记）
+ * @param {string} source - PlantUML 源码
+ * @returns {boolean} - 返回 true 表示完整
+ */
+function isPlantUmlComplete(source) {
+  const trimmedSource = String(source || '').trim()
+  const lowerSource = trimmedSource.toLowerCase()
+  return lowerSource.includes('@startuml') && lowerSource.includes('@enduml')
+}
+
 function renderPlantUmlBlock(plantUmlSource) {
   const trimmedSource = String(plantUmlSource || '').trim()
   if (!trimmedSource) {
     return '<pre><code class="language-plantuml"></code></pre>'
+  }
+
+  // 检查 PlantUML 代码是否完整，不完整时不请求远端渲染
+  if (!isPlantUmlComplete(trimmedSource)) {
+    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`
   }
 
   try {
