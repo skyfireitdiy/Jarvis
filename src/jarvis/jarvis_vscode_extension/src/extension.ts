@@ -3,8 +3,13 @@ import WebSocket, { RawData } from 'ws'
 
 interface AgentListItem {
   id: string
+  name?: string
   displayName: string
   statusText: string
+  agentType: 'agent' | 'codeagent'
+  workingDir: string
+  llmGroup: string
+  worktree: boolean
 }
 
 interface GatewayAddress {
@@ -66,8 +71,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private agentItems: AgentListItem[] = [
     {
       id: 'default-agent',
+      name: 'default-agent',
       displayName: 'default-agent',
-      statusText: '示例 Agent（MVP 占位）'
+      statusText: '示例 Agent（MVP 占位）',
+      agentType: 'agent',
+      workingDir: '~',
+      llmGroup: '',
+      worktree: false
     }
   ]
   private currentView: vscode.WebviewView | undefined
@@ -137,6 +147,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       if (message?.type === 'createAgent') {
         await this.createAgent(message)
+        return
+      }
+      if (message?.type === 'copyAgent') {
+        await this.copyAgent(message.agentId)
+        return
+      }
+      if (message?.type === 'deleteAgent') {
+        await this.deleteAgent(message.agentId)
       }
     })
   }
@@ -240,8 +258,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       .map((agentItem) => {
         return `
     <li data-agent-id="${agentItem.id}">
-      <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
-      <div class="agent-meta">${escapeHtml(agentItem.statusText)}</div>
+      <div class="agent-row">
+        <div>
+          <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
+          <div class="agent-meta">${escapeHtml(agentItem.statusText)}</div>
+        </div>
+        <div class="agent-actions">
+          <button class="icon-button" type="button" data-copy-agent-id="${agentItem.id}" title="复制 Agent">📋</button>
+          <button class="icon-button" type="button" data-delete-agent-id="${agentItem.id}" title="删除 Agent">🗑</button>
+        </div>
+      </div>
     </li>`
       })
       .join('')
@@ -262,8 +288,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     input, select { width: 100%; padding: 6px 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); box-sizing: border-box; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { border: 1px solid var(--vscode-panel-border); border-radius: 6px; margin-bottom: 8px; padding: 8px; cursor: pointer; }
+    .agent-row { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
     .agent-name { font-weight: 600; }
     .agent-meta { opacity: 0.8; font-size: 12px; margin-top: 4px; }
+    .agent-actions { display: flex; gap: 6px; }
+    .icon-button { padding: 4px 6px; min-width: auto; }
     .create-agent-panel { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
     .form-group { margin-bottom: 10px; }
     .form-group label { display: block; font-size: 12px; margin-bottom: 4px; opacity: 0.9; }
@@ -331,6 +360,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'cancelCreateAgent' });
       });
     }
+    document.querySelectorAll('[data-copy-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'copyAgent', agentId: item.getAttribute('data-copy-agent-id') });
+      });
+    });
+    document.querySelectorAll('[data-delete-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'deleteAgent', agentId: item.getAttribute('data-delete-agent-id') });
+      });
+    });
     document.querySelectorAll('[data-agent-id]').forEach((item) => {
       item.addEventListener('click', () => {
         vscode.postMessage({ type: 'openAgent', agentId: item.getAttribute('data-agent-id') });
@@ -545,8 +586,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
       this.agentItems = result.data.map((agent) => ({
         id: agent.agent_id,
+        name: agent.name,
         displayName: agent.name || agent.agent_id,
-        statusText: agent.status || agent.agent_type || 'unknown'
+        statusText: agent.status || agent.agent_type || 'unknown',
+        agentType: agent.agent_type === 'codeagent' ? 'codeagent' : 'agent',
+        workingDir: agent.working_dir || '',
+        llmGroup: agent.llm_group || '',
+        worktree: Boolean(agent.worktree)
       }))
 
       if (!this.panelState.selectedAgentId && this.agentItems.length > 0) {
@@ -733,6 +779,91 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.name = agentType === 'codeagent' ? '代码Agent' : '通用Agent'
     if (agentType !== 'codeagent') {
       this.createAgentFormState.useWorktree = false
+    }
+  }
+
+  private async copyAgent(agentId?: string): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage('请先连接并登录 Jarvis 网关')
+      return
+    }
+    const sourceAgent = this.agentItems.find((item) => item.id === agentId)
+    if (!sourceAgent) {
+      vscode.window.showErrorMessage('未找到要复制的 Agent')
+      return
+    }
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl)
+      const response = await fetch(buildHttpUrl(gatewayAddress, '/api/agents'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.panelState.token}`
+        },
+        body: JSON.stringify({
+          agent_type: sourceAgent.agentType,
+          working_dir: sourceAgent.workingDir,
+          name: sourceAgent.name || undefined,
+          llm_group: sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
+          worktree: sourceAgent.agentType === 'codeagent' ? sourceAgent.worktree : false
+        })
+      })
+      const result = (await response.json()) as CreateAgentResponse
+      if (!response.ok || !result.success || !result.data?.agent_id) {
+        throw new Error(result.error?.message || '复制 Agent 失败')
+      }
+      this.panelState.selectedAgentId = result.data.agent_id
+      await this.refreshAgents()
+      this.renderAgentListView()
+      this.postPanelMessage(`已复制 Agent：${result.data.name || result.data.agent_id}`, 'system')
+      await this.openChatPanel(result.data.agent_id)
+    } catch (error) {
+      vscode.window.showErrorMessage(getErrorMessage(error))
+    }
+  }
+
+  private async deleteAgent(agentId?: string): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage('请先连接并登录 Jarvis 网关')
+      return
+    }
+    if (!agentId) {
+      vscode.window.showErrorMessage('未找到要删除的 Agent')
+      return
+    }
+    const confirmed = await vscode.window.showWarningMessage(
+      '确认删除该 Agent？删除后将无法恢复。',
+      { modal: true },
+      '删除'
+    )
+    if (confirmed !== '删除') {
+      return
+    }
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl)
+      const response = await fetch(buildHttpUrl(gatewayAddress, `/api/agents/${agentId}`), {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.panelState.token}`
+        }
+      })
+      const result = (await response.json()) as DeleteAgentResponse
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || '删除 Agent 失败')
+      }
+      if (this.panelState.selectedAgentId === agentId) {
+        this.panelState.selectedAgentId = undefined
+      }
+      await this.refreshAgents()
+      this.renderAgentListView()
+      this.postPanelMessage(`已删除 Agent：${agentId}`, 'system')
+      if (this.currentPanel) {
+        this.currentPanel.title = this.getChatPanelTitle()
+        this.currentPanel.webview.html = this.getChatPanelHtml(this.panelState.selectedAgentId)
+        this.postPanelState()
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(getErrorMessage(error))
     }
   }
 
@@ -992,6 +1123,13 @@ interface CreateAgentResponse {
   }
 }
 
+interface DeleteAgentResponse {
+  success: boolean
+  error?: {
+    message?: string
+  }
+}
+
 interface AgentListResponse {
   success: boolean
   data?: Array<{
@@ -999,6 +1137,9 @@ interface AgentListResponse {
     name?: string
     status?: string
     agent_type?: string
+    working_dir?: string
+    llm_group?: string
+    worktree?: boolean
   }>
   error?: {
     message?: string
