@@ -69,11 +69,12 @@
 - 点击后展开创建表单
 - 表单至少包含以下字段：
   - `agent_type`
-  - `working_dir`
+  - `working_dir`（通过 VS Code 原生目录选择器选择）
   - `name`
   - `llm_group`
   - `worktree`（仅 `codeagent` 时生效）
 - 提供取消与创建按钮
+- 提供“选择目录”按钮以选择 `working_dir`
 - 创建成功后自动刷新左侧 Agent 列表
 - 创建成功后可自动选中新建 Agent
 
@@ -171,11 +172,12 @@
   - 首版至少支持：`agent`、`codeagent`
 - `working_dir: string`
   - 必填
+  - 通过 VS Code 原生目录选择器选择
   - 仅空白字符视为无效输入
 - `name?: string`
   - 可选
 - `llm_group: string`
-  - 可为空；若前端未能获取模型组，则允许使用默认值 `default`
+  - 应优先使用后端返回的真实默认模型组或用户当前选择值
 - `worktree: boolean`
   - 仅在 `agent_type=codeagent` 时有意义
 
@@ -227,6 +229,7 @@
 
 ### 5.3 创建 Agent 行为
 - 左侧边栏应提供创建 Agent 入口
+- `working_dir` 应通过 VS Code 原生目录选择器选择，而不是依赖手工输入
 - 用户提交表单前必须校验 `working_dir` 非空
 - 若用户未连接或未登录，不得发起创建请求
 - 创建成功后：
@@ -234,7 +237,7 @@
   2. 新建 Agent 应在列表中可见
   3. 扩展应自动选中新建 Agent，或至少在刷新后保持可立即点击进入
 - 创建失败时应显示明确错误信息
-- 首版不要求实现目录浏览器与高级参数配置
+- 首版不要求实现复杂目录浏览器与高级参数配置
 
 ### 5.4 聊天行为
 - 用户输入消息并发送后，消息应进入当前 Agent 对话上下文
