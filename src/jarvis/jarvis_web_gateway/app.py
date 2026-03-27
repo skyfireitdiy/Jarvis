@@ -739,8 +739,21 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 f"[AUTH] Password source: {password_source}, set: {'yes (length: ' + str(len(expected_password)) + ')' if expected_password else 'no'}"
             )
 
+            # 未配置密码时，不允许通过密码登录接口获取令牌
+            if not expected_password:
+                logger.warning(
+                    "[AUTH] Login failed: gateway password is not configured"
+                )
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "AUTH_NOT_CONFIGURED",
+                        "message": "gateway password is not configured",
+                    },
+                }
+
             # 如果设置了密码，进行验证
-            if expected_password and password != expected_password:
+            if password != expected_password:
                 logger.warning(f"[AUTH] Login failed: password mismatch")
                 return {
                     "success": False,

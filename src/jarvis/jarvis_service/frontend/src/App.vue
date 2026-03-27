@@ -2752,10 +2752,12 @@ async function connect() {
     return
   }
   
-  // 如果用户输入了密码，先登录获取 Token
-  if (auth.value.password) {
+  const password = String(auth.value.password || '').trim()
+
+  // 只有密码非空白时才发起登录请求
+  if (password) {
     try {
-      await loginWithPassword(auth.value.password)
+      await loginWithPassword(password)
     } catch (error) {
       connectErrorMessage.value = error.message || '登录失败'
       return
@@ -2763,7 +2765,7 @@ async function connect() {
   }
   
   if (!hasAuthToken()) {
-    connectErrorMessage.value = '请先登录获取 Token'
+    connectErrorMessage.value = '请输入密码后再连接'
     return
   }
   
