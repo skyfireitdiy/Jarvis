@@ -1165,6 +1165,7 @@ const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
 const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
 const editorResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+const PANEL_DRAG_ACTIVATION_DISTANCE = 4
 
 // 窗口最大化状态
 const isEditorMaximized = ref(false)
@@ -1463,11 +1464,10 @@ function startEditorPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.editor-panel-actions')) return
 
-  // 拖拽时立即激活编辑器窗口
   focusWindow('editor')
 
   editorPanelInteraction.value = {
-    active: true,
+    active: false,
     mode: 'move',
     direction: null,
     startX: event.clientX,
@@ -1480,7 +1480,6 @@ function startEditorPanelMove(event) {
 
   document.addEventListener('mousemove', onEditorPanelPointerMove)
   document.addEventListener('mouseup', stopEditorPanelInteraction)
-  event.preventDefault()
 }
 
 function startEditorPanelResize(event, direction) {
@@ -1505,10 +1504,23 @@ function startEditorPanelResize(event, direction) {
 }
 
 function onEditorPanelPointerMove(event) {
-  if (!editorPanelInteraction.value.active) return
-
   const deltaX = event.clientX - editorPanelInteraction.value.startX
   const deltaY = event.clientY - editorPanelInteraction.value.startY
+
+  if (editorPanelInteraction.value.mode === 'move' && !editorPanelInteraction.value.active) {
+    const dragDistance = Math.hypot(deltaX, deltaY)
+    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
+      return
+    }
+
+    editorPanelInteraction.value = {
+      ...editorPanelInteraction.value,
+      active: true,
+    }
+    event.preventDefault()
+  }
+
+  if (!editorPanelInteraction.value.active) return
 
   if (editorPanelInteraction.value.mode === 'move') {
     const bounds = getEditorPanelBounds()
@@ -5861,11 +5873,10 @@ function startTerminalPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.terminal-panel-actions')) return
 
-  // 拖拽时立即激活终端窗口
   focusWindow('terminal')
 
   terminalPanelInteraction.value = {
-    active: true,
+    active: false,
     mode: 'move',
     direction: null,
     startX: event.clientX,
@@ -5878,7 +5889,6 @@ function startTerminalPanelMove(event) {
 
   document.addEventListener('mousemove', onTerminalPanelPointerMove)
   document.addEventListener('mouseup', stopTerminalPanelInteraction)
-  event.preventDefault()
 }
 
 function startTerminalPanelResize(event, direction) {
@@ -5903,10 +5913,23 @@ function startTerminalPanelResize(event, direction) {
 }
 
 function onTerminalPanelPointerMove(event) {
-  if (!terminalPanelInteraction.value.active) return
-
   const deltaX = event.clientX - terminalPanelInteraction.value.startX
   const deltaY = event.clientY - terminalPanelInteraction.value.startY
+
+  if (terminalPanelInteraction.value.mode === 'move' && !terminalPanelInteraction.value.active) {
+    const dragDistance = Math.hypot(deltaX, deltaY)
+    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
+      return
+    }
+
+    terminalPanelInteraction.value = {
+      ...terminalPanelInteraction.value,
+      active: true,
+    }
+    event.preventDefault()
+  }
+
+  if (!terminalPanelInteraction.value.active) return
 
   if (terminalPanelInteraction.value.mode === 'move') {
     const bounds = getTerminalPanelBounds()
