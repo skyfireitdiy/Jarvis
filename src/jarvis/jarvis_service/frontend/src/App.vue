@@ -2754,18 +2754,15 @@ async function connect() {
   
   const password = String(auth.value.password || '').trim()
 
-  // 只有密码非空白时才发起登录请求
-  if (password) {
-    try {
-      await loginWithPassword(password)
-    } catch (error) {
-      connectErrorMessage.value = error.message || '登录失败'
-      return
-    }
+  try {
+    await loginWithPassword(password)
+  } catch (error) {
+    connectErrorMessage.value = error.message || '登录失败'
+    return
   }
   
   if (!hasAuthToken()) {
-    connectErrorMessage.value = '请输入密码后再连接'
+    connectErrorMessage.value = '登录失败，请重试'
     return
   }
   

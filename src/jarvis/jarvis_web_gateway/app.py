@@ -708,20 +708,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         logger = logging.getLogger(__name__)
 
         try:
-            password = request.get("password")
-            logger.info(
-                f"[AUTH] Login attempt with password length: {len(password) if password else 0}"
-            )
-
-            if not password:
-                logger.warning(f"[AUTH] Login failed: password is empty")
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "MISSING_PASSWORD",
-                        "message": "password is required",
-                    },
-                }
+            raw_password = request.get("password")
+            password = str(raw_password).strip() if raw_password is not None else ""
+            logger.info(f"[AUTH] Login attempt with password length: {len(password)}")
 
             # 验证密码（get_gateway_auth_config 已集成环境变量优先逻辑）
             config = get_gateway_auth_config()
@@ -739,29 +728,30 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 f"[AUTH] Password source: {password_source}, set: {'yes (length: ' + str(len(expected_password)) + ')' if expected_password else 'no'}"
             )
 
-            # 未配置密码时，不允许通过密码登录接口获取令牌
+            # 未配置密码时，允许直接登录获取令牌
             if not expected_password:
-                logger.warning(
-                    "[AUTH] Login failed: gateway password is not configured"
-                )
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "AUTH_NOT_CONFIGURED",
-                        "message": "gateway password is not configured",
-                    },
-                }
+                logger.info("[AUTH] Gateway password is not configured, login allowed")
+            else:
+                if not password:
+                    logger.warning(f"[AUTH] Login failed: password is empty")
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "MISSING_PASSWORD",
+                            "message": "password is required",
+                        },
+                    }
 
-            # 如果设置了密码，进行验证
-            if password != expected_password:
-                logger.warning(f"[AUTH] Login failed: password mismatch")
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "AUTH_FAILED",
-                        "message": "Invalid password",
-                    },
-                }
+                # 如果设置了密码，进行验证
+                if password != expected_password:
+                    logger.warning(f"[AUTH] Login failed: password mismatch")
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "AUTH_FAILED",
+                            "message": "Invalid password",
+                        },
+                    }
 
             has_authorized_connection = manager._auth_store.get("default") is not None
             if manager._connection_lock_enabled and has_authorized_connection:
