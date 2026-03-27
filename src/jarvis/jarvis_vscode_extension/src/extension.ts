@@ -126,6 +126,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         this.toggleCreateAgentForm()
         return
       }
+      if (message?.type === 'pickWorkingDirectory') {
+        await this.pickWorkingDirectory()
+        return
+      }
       if (message?.type === 'cancelCreateAgent') {
         this.resetCreateAgentForm()
         this.renderAgentListView()
@@ -211,7 +215,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="form-group">
       <label for="workingDir">工作目录</label>
-      <input id="workingDir" value="${escapeHtml(this.createAgentFormState.workingDir)}" placeholder="~/project" />
+      <div class="path-row">
+        <input id="workingDir" value="${escapeHtml(this.createAgentFormState.workingDir)}" placeholder="请选择工作目录" readonly />
+        <button id="pickWorkingDirButton" type="button" ${createButtonDisabled}>选择目录</button>
+      </div>
     </div>
     <div class="form-group">
       <label for="agentName">名称</label>
@@ -260,6 +267,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .create-agent-panel { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
     .form-group { margin-bottom: 10px; }
     .form-group label { display: block; font-size: 12px; margin-bottom: 4px; opacity: 0.9; }
+    .path-row { display: flex; gap: 8px; align-items: center; }
+    .path-row input { flex: 1; }
+    .path-row button { white-space: nowrap; }
     .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
     .checkbox-row input { width: auto; }
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -289,6 +299,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (toggleCreateAgentButton) {
       toggleCreateAgentButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'toggleCreateAgentForm' });
+      });
+    }
+    const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');
+    if (pickWorkingDirButton) {
+      pickWorkingDirButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'pickWorkingDirectory' });
       });
     }
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
@@ -682,6 +698,21 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private toggleCreateAgentForm(): void {
     this.createAgentFormState.isVisible = !this.createAgentFormState.isVisible
+    this.createAgentFormState.errorMessage = ''
+    this.renderAgentListView()
+  }
+
+  private async pickWorkingDirectory(): Promise<void> {
+    const selectedUris = await vscode.window.showOpenDialog({
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+      openLabel: '选择工作目录'
+    })
+    if (!selectedUris || selectedUris.length === 0) {
+      return
+    }
+    this.createAgentFormState.workingDir = selectedUris[0].fsPath
     this.createAgentFormState.errorMessage = ''
     this.renderAgentListView()
   }
