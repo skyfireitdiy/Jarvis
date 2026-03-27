@@ -178,7 +178,7 @@
       :style="terminalPanelStyle"
       @mousedown="focusWindow('terminal')"
     >
-      <div class="terminal-panel-header" @mousedown="startTerminalPanelMove">
+      <div class="terminal-panel-header" @mousedown="startTerminalPanelMove" @dblclick.stop="toggleTerminalMaximize">
         <h3>终端</h3>
         <div class="terminal-panel-actions">
           <button class="icon-btn" @click="createTerminal" :disabled="!socket" title="新建终端">➕</button>
@@ -237,6 +237,7 @@
       <div
         class="editor-panel-header"
         @mousedown="startEditorPanelMove"
+        @dblclick.stop="toggleEditorMaximize"
       >
         <div class="editor-panel-title-group">
           <h3>编辑器</h3>
