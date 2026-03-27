@@ -837,10 +837,64 @@ import 'highlight.js/styles/github-dark.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
+import plantumlEncoder from 'plantuml-encoder'
 import historyStorage from './historyStorage.js'
+
+const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
+const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
+
+function encodePlantUmlText(plantUmlSource) {
+  return plantumlEncoder.encode(String(plantUmlSource || '').trim())
+}
+
+function isPlantUmlLanguage(language) {
+  return String(language || '').trim().toLowerCase() === PLANTUML_BLOCK_LANGUAGE
+}
+
+function renderPlantUmlBlock(plantUmlSource) {
+  const trimmedSource = String(plantUmlSource || '').trim()
+  if (!trimmedSource) {
+    return '<pre><code class="language-plantuml"></code></pre>'
+  }
+
+  try {
+    const escapedSource = escapeHtml(trimmedSource)
+    const encodedSource = encodePlantUmlText(trimmedSource)
+    const plantUmlUrl = `${PLANTUML_SERVER_URL}${encodedSource}`
+
+    return [
+      '<div class="plantuml-block">',
+      '  <div class="plantuml-notice">',
+      '    当前前端使用 PlantUML 在线服务渲染，若图片加载失败可展开查看源码。',
+      '  </div>',
+      `  <a class="plantuml-link" href="${plantUmlUrl}" target="_blank" rel="noopener noreferrer">`,
+      `    <img class="plantuml-image" src="${plantUmlUrl}" alt="PlantUML diagram" loading="lazy" />`,
+      '  </a>',
+      '  <details class="plantuml-source">',
+      '    <summary>查看 PlantUML 源码</summary>',
+      `    <pre><code class="language-plantuml">${escapedSource}</code></pre>`,
+      '  </details>',
+      '</div>'
+    ].join('\n')
+  } catch (error) {
+    console.error('[PlantUML] Failed to render PlantUML block:', error)
+    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`
+  }
+}
+
+const markedRenderer = new marked.Renderer()
+const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer)
+
+markedRenderer.code = function(code, language, isEscaped) {
+  if (isPlantUmlLanguage(language)) {
+    return renderPlantUmlBlock(code)
+  }
+  return defaultCodeRenderer(code, language, isEscaped)
+}
 
 // 配置 marked 使用 highlight.js 进行语法高亮
 marked.setOptions({
+  renderer: markedRenderer,
   highlight: function(code, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
@@ -8345,6 +8399,47 @@ body::-webkit-scrollbar {
 
 .message-body.markdown-content :deep(p) {
   margin: 8px 0;
+}
+
+.message-body.markdown-content :deep(.plantuml-block) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgba(139, 148, 158, 0.25);
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.35);
+}
+
+.message-body.markdown-content :deep(.plantuml-notice) {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.message-body.markdown-content :deep(.plantuml-link) {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  color: #58a6ff;
+  text-decoration: none;
+}
+
+.message-body.markdown-content :deep(.plantuml-link:hover) {
+  text-decoration: underline;
+}
+
+.message-body.markdown-content :deep(.plantuml-image) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #ffffff;
+  border-radius: 6px;
+}
+
+.message-body.markdown-content :deep(.plantuml-source summary) {
+  cursor: pointer;
+  color: #8b949e;
 }
 
 /* 表格样式 - 排除 diff-table */
