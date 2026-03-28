@@ -170,3 +170,4 @@ goals
 site
 .jarvis/sessions
 
+src/jarvis/jarvis_vscode_extension/media/chatPanel.js

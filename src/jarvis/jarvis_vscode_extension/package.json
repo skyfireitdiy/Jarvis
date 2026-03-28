@@ -52,7 +52,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./tsconfig.json",
+    "build:webview": "esbuild ./src/webview/chatPanel.ts --bundle --format=iife --platform=browser --outfile=./media/chatPanel.js",
+    "build": "npm run build:webview && tsc -p ./tsconfig.json",
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
@@ -60,10 +61,12 @@
     "@types/vscode": "^1.82.0",
     "@types/ws": "^8.18.1",
     "@vscode/vsce": "^3.2.2",
+    "esbuild": "^0.25.12",
     "typescript": "^5.4.5"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
     "ws": "^8.18.0",
     "xterm": "^5.3.0"
   }
