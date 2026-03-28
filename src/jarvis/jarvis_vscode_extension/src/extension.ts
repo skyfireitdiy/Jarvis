@@ -307,6 +307,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </li>`;
       })
       .join("");
+    const connectionStatusClass = this.panelState.hasConnectionError
+      ? 'status-banner error'
+      : 'status-banner';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -339,6 +342,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .checkbox-row input { width: auto; }
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
     .form-error { color: var(--vscode-errorForeground); font-size: 12px; margin-bottom: 10px; }
+    .status-banner { margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; font-size: 12px; opacity: 0.9; }
+    .status-banner.error { color: var(--vscode-errorForeground); border-color: var(--vscode-errorForeground); }
   </style>
 </head>
 <body>
@@ -349,6 +354,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <button id="refreshButton">刷新</button>
     </div>
   </div>
+  <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
   ${createAgentFormMarkup}
   <ul>${agentListMarkup}
   </ul>
@@ -443,11 +449,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     button { width: 100%; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 4px; padding: 8px 12px; cursor: pointer; }
     .form-error { color: var(--vscode-errorForeground); font-size: 12px; margin-bottom: 10px; }
     .help-text { font-size: 12px; opacity: 0.8; margin-top: 10px; }
+    .status-text { font-size: 12px; margin-bottom: 10px; opacity: 0.85; }
+    .status-text.error { color: var(--vscode-errorForeground); }
   </style>
 </head>
 <body>
   <div class="login-panel">
     <div class="panel-title">连接到 Jarvis</div>
+    <div class="status-text ${this.panelState.hasConnectionError ? 'error' : ''}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
     ${loginErrorMarkup}
     <div class="form-group">
       <label for="gatewayUrl">网关地址</label>
@@ -687,7 +696,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async refreshAgents(): Promise<void> {
+  public async refreshAgents(): Promise<void> {
     if (!this.panelState.token) {
       this.appendPanelMessage("请先连接并登录 Jarvis 网关", "error");
       return;
@@ -1601,7 +1610,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("jarvis.refreshAgents", async () => {
-      await provider.openChatPanel();
+      await provider.refreshAgents();
     }),
   );
 }

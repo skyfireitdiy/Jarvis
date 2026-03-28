@@ -5,6 +5,10 @@
   "version": "0.0.1",
   "publisher": "jarvis",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skyfireitdiy/Jarvis.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -48,12 +52,14 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./tsconfig.json"
+    "build": "tsc -p ./tsconfig.json",
+    "package": "npx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.2.2",
     "typescript": "^5.4.5"
   },
   "dependencies": {
