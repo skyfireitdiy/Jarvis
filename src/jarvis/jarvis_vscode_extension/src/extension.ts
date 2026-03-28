@@ -525,8 +525,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private getChatPanelHtml(agentId?: string): string {
     const nonce = createNonce();
     const selectedAgentLabel = agentId ?? "未选择 Agent";
-    const xtermCssUri = this.currentPanel
-      ? this.currentPanel.webview.asWebviewUri(
+    const webview = this.currentPanel?.webview;
+    const xtermCssUri = webview
+      ? webview.asWebviewUri(
           vscode.Uri.joinPath(
             this.extensionUri,
             "node_modules",
@@ -536,34 +537,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           ),
         )
       : "";
-    const xtermJsUri = this.currentPanel
-      ? this.currentPanel.webview.asWebviewUri(
-          vscode.Uri.joinPath(
-            this.extensionUri,
-            "node_modules",
-            "xterm",
-            "lib",
-            "xterm.js",
-          ),
+    const chatPanelJsUri = webview
+      ? webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, "media", "chatPanel.js"),
         )
       : "";
-    const fitAddonJsUri = this.currentPanel
-      ? this.currentPanel.webview.asWebviewUri(
-          vscode.Uri.joinPath(
-            this.extensionUri,
-            "node_modules",
-            "@xterm",
-            "addon-fit",
-            "lib",
-            "addon-fit.js",
-          ),
-        )
-      : "";
+    const cspSource = webview?.cspSource || "";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${xtermCssUri}; script-src 'nonce-${nonce}' ${xtermJsUri} ${fitAddonJsUri};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src 'nonce-${nonce}' ${cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="${xtermCssUri}">
   <title>Jarvis Chat</title>
@@ -579,9 +563,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
     .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); padding-bottom: 12px; }
     .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
-    .execution-terminal { height: 220px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: #111; color: #ddd; overflow: auto; white-space: pre-wrap; font-family: monospace; padding: 10px; box-sizing: border-box; }
-    .execution-input-row { display: flex; gap: 8px; margin-top: 8px; }
-    .execution-input-row input { flex: 1; }
+    .execution-terminal { height: 220px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: #111; overflow: hidden; }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
@@ -616,206 +598,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
   </div>
-  <script nonce="${nonce}" src="${xtermJsUri}"></script>
-  <script nonce="${nonce}" src="${fitAddonJsUri}"></script>
-  <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
-    const messages = document.getElementById('messages');
-    const connectionStatus = document.getElementById('connectionStatus');
-    const selectedAgentLabel = document.getElementById('selectedAgentLabel');
-    const executionStatusHint = document.getElementById('executionStatusHint');
-    const inputTip = document.getElementById('inputTip');
-    const multiInputRow = document.getElementById('multiInputRow');
-    const singleInputRow = document.getElementById('singleInputRow');
-    const messageInput = document.getElementById('messageInput');
-    const singleMessageInput = document.getElementById('singleMessageInput');
-    const terminalRegistry = new Map();
-    const TerminalCtor = window.Terminal;
-    const FitAddonCtor = window.FitAddon && window.FitAddon.FitAddon;
-
-    function ensureTerminalEntry(executionId) {
-      if (!terminalRegistry.has(executionId)) {
-        terminalRegistry.set(executionId, {
-          terminal: null,
-          fitAddon: null,
-          host: null,
-          resizeObserver: null,
-          pendingChunks: [],
-          buffer: '',
-          finished: false,
-        });
-      }
-      return terminalRegistry.get(executionId);
-    }
-
-    function syncTerminalSize(executionId, entry) {
-      if (!entry || !entry.terminal || !entry.fitAddon) {
-        return;
-      }
-      const oldCols = entry.terminal.cols;
-      const oldRows = entry.terminal.rows;
-      entry.fitAddon.fit();
-      const newCols = entry.terminal.cols;
-      const newRows = entry.terminal.rows;
-      if (oldCols === newCols && oldRows === newRows) {
-        return;
-      }
-      vscode.postMessage({
-        type: 'terminalResize',
-        executionId,
-        cols: newCols,
-        rows: newRows,
-      });
-    }
-
-    function mountTerminal(executionId, host, item) {
-      const entry = ensureTerminalEntry(executionId);
-      entry.host = host;
-      entry.buffer = item.executionBuffer || entry.buffer || '';
-      entry.finished = Boolean(item.finished);
-
-      if (!TerminalCtor || !FitAddonCtor) {
-        host.textContent = entry.buffer;
-        return;
-      }
-
-      if (!entry.terminal) {
-        entry.terminal = new TerminalCtor({
-          theme: { background: '#111111' },
-          fontSize: 12,
-          convertEol: false,
-        });
-        entry.fitAddon = new FitAddonCtor();
-        entry.terminal.loadAddon(entry.fitAddon);
-        entry.terminal.open(host);
-        entry.terminal.onData((data) => {
-          if (entry.finished) {
-            return;
-          }
-          vscode.postMessage({
-            type: 'sendTerminalInput',
-            text: data,
-            executionId,
-          });
-        });
-        if (typeof ResizeObserver !== 'undefined') {
-          entry.resizeObserver = new ResizeObserver(() => {
-            syncTerminalSize(executionId, entry);
-          });
-          entry.resizeObserver.observe(host);
-        }
-      }
-
-      try {
-        entry.terminal.reset();
-      } catch (error) {
-      }
-      if (entry.buffer) {
-        entry.terminal.write(entry.buffer);
-      }
-      requestAnimationFrame(() => {
-        syncTerminalSize(executionId, entry);
-      });
-    }
-
-    function renderMessages(messageList) {
-      messages.innerHTML = '';
-      (messageList || []).forEach((item) => {
-        const node = document.createElement('div');
-        node.className = 'message ' + (item.variant || 'system');
-        if (item.variant === 'execution') {
-          const header = document.createElement('div');
-          header.className = 'message-header';
-          header.textContent = item.text || '执行中';
-          node.appendChild(header);
-
-          const terminalHost = document.createElement('div');
-          terminalHost.className = 'execution-terminal';
-          node.appendChild(terminalHost);
-
-          if (item.executionId) {
-            mountTerminal(item.executionId, terminalHost, item);
-          } else {
-            terminalHost.textContent = item.executionBuffer || '';
-          }
-
-          if (item.finished) {
-            const finishedNode = document.createElement('div');
-            finishedNode.className = 'execution-finished';
-            finishedNode.textContent = '执行已结束';
-            node.appendChild(finishedNode);
-          }
-        } else {
-          node.textContent = item.text || '';
-        }
-        messages.appendChild(node);
-      });
-      messages.scrollTop = messages.scrollHeight;
-    }
-
-    function syncInputMode(mode, tipText) {
-      const isSingle = mode === 'single';
-      singleInputRow.style.display = isSingle ? 'flex' : 'none';
-      multiInputRow.style.display = isSingle ? 'none' : 'block';
-      inputTip.textContent = tipText || (isSingle ? '当前为单行输入模式' : '当前为多行输入模式');
-    }
-
-    function sendCurrentInput(mode) {
-      const inputEl = mode === 'single' ? singleMessageInput : messageInput;
-      const text = inputEl ? inputEl.value : '';
-      vscode.postMessage({ type: 'sendMessage', text });
-      if (inputEl) {
-        inputEl.value = '';
-      }
-    }
-
-    document.getElementById('sendButton').addEventListener('click', () => {
-      const text = messageInput ? messageInput.value : '';
-      if (!text.trim()) {
-        return;
-      }
-      sendCurrentInput('multi');
-    });
-
-    document.getElementById('sendSingleButton').addEventListener('click', () => {
-      sendCurrentInput('single');
-    });
-
-    if (messageInput) {
-      messageInput.addEventListener('keydown', (event) => {
-        if (event.ctrlKey && event.key === 'Enter') {
-          event.preventDefault();
-          const text = messageInput.value;
-          if (!text.trim()) {
-            return;
-          }
-          sendCurrentInput('multi');
-        }
-      });
-    }
-
-    if (singleMessageInput) {
-      singleMessageInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          sendCurrentInput('single');
-        }
-      });
-    }
-
-    window.addEventListener('message', (event) => {
-      const data = event.data || {};
-      if (data.type === 'state') {
-        const payload = data.payload || {};
-        selectedAgentLabel.textContent = payload.selectedAgentId || '未选择 Agent';
-        connectionStatus.textContent = payload.statusText || '未连接';
-        connectionStatus.className = payload.isError ? 'status error' : 'status';
-        executionStatusHint.textContent = '执行状态：' + (payload.executionStatus || 'running');
-        syncInputMode(payload.inputMode || 'multi', payload.inputTip || '');
-        renderMessages(payload.messages || []);
-      }
-    });
-  </script>
+  <script nonce="${nonce}" src="${chatPanelJsUri}"></script>
 </body>
 </html>`;
   }
@@ -1038,7 +821,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         },
       }),
     );
-    this.appendPanelMessage(`终端输入：${inputText}`, "system", agentId);
   }
 
   private async sendTerminalResize(
@@ -1050,26 +832,26 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (!agentId) {
       return;
     }
-    const normalizedExecutionId = String(executionId || "").trim();
-    const normalizedCols = Number(cols || 0);
-    const normalizedRows = Number(rows || 0);
-    if (!normalizedExecutionId || normalizedCols <= 0 || normalizedRows <= 0) {
-      return;
-    }
     const agentSocket = this.agentSockets.get(agentId);
     if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
       return;
     }
-    agentSocket.send(
-      JSON.stringify({
-        type: "terminal_resize",
-        payload: {
-          execution_id: normalizedExecutionId,
-          cols: normalizedCols,
-          rows: normalizedRows,
-        },
-      }),
-    );
+    const agentState = this.getAgentState(agentId);
+    const targetExecutionId =
+      String(executionId || "").trim() || agentState.activeExecutionId;
+    const nextCols = Number(cols || 0);
+    const nextRows = Number(rows || 0);
+    if (!targetExecutionId || nextCols <= 0 || nextRows <= 0) {
+      return;
+    }
+    this.sendSocketMessage(agentSocket, {
+      type: "terminal_resize",
+      payload: {
+        execution_id: targetExecutionId,
+        cols: nextCols,
+        rows: nextRows,
+      },
+    });
   }
 
   private async loginWithPassword(password: string): Promise<string> {
@@ -1896,9 +1678,9 @@ interface ChatPanelMessage {
   password?: string;
   text?: string;
   executionId?: string;
+  confirmed?: boolean;
   cols?: number;
   rows?: number;
-  confirmed?: boolean;
 }
 
 interface ModelGroupsResponse {
