@@ -20,7 +20,10 @@ interface GatewayAddress {
 
 interface ChatMessageItem {
   text: string;
-  variant: "system" | "error" | "output" | "stream";
+  variant: "system" | "error" | "output" | "stream" | "execution";
+  executionId?: string;
+  executionBuffer?: string;
+  finished?: boolean;
 }
 
 interface AgentChatState {
@@ -33,6 +36,8 @@ interface AgentChatState {
   messages: ChatMessageItem[];
   pendingRequestId?: string;
   pendingStreamText: string;
+  activeExecutionId?: string;
+  executionBuffers: Record<string, string>;
 }
 
 interface ChatPanelState {
@@ -520,16 +525,51 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private getChatPanelHtml(agentId?: string): string {
     const nonce = createNonce();
     const selectedAgentLabel = agentId ?? "未选择 Agent";
+    const xtermCssUri = this.currentPanel
+      ? this.currentPanel.webview.asWebviewUri(
+          vscode.Uri.joinPath(
+            this.extensionUri,
+            "node_modules",
+            "xterm",
+            "css",
+            "xterm.css",
+          ),
+        )
+      : "";
+    const xtermJsUri = this.currentPanel
+      ? this.currentPanel.webview.asWebviewUri(
+          vscode.Uri.joinPath(
+            this.extensionUri,
+            "node_modules",
+            "xterm",
+            "lib",
+            "xterm.js",
+          ),
+        )
+      : "";
+    const fitAddonJsUri = this.currentPanel
+      ? this.currentPanel.webview.asWebviewUri(
+          vscode.Uri.joinPath(
+            this.extensionUri,
+            "node_modules",
+            "@xterm",
+            "addon-fit",
+            "lib",
+            "addon-fit.js",
+          ),
+        )
+      : "";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${xtermCssUri}; script-src 'nonce-${nonce}' ${xtermJsUri} ${fitAddonJsUri};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="${xtermCssUri}">
   <title>Jarvis Chat</title>
   <style>
     body { font-family: var(--vscode-font-family); padding: 0; margin: 0; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
-    .layout { display: grid; grid-template-rows: auto 1fr auto auto; height: 100vh; }
+    .layout { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
     .section { padding: 12px; border-bottom: 1px solid var(--vscode-panel-border); }
     .messages { overflow: auto; padding: 12px; }
     .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: var(--vscode-sideBar-background); white-space: pre-wrap; }
@@ -537,7 +577,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .message.error { border-left: 3px solid var(--vscode-errorForeground); }
     .message.output { border-left: 3px solid var(--vscode-testing-iconPassed); }
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
-    .terminal { height: 180px; margin: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px; background: #111; color: #ddd; font-family: monospace; white-space: pre-wrap; overflow: auto; }
+    .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); padding-bottom: 12px; }
+    .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
+    .execution-terminal { height: 220px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: #111; color: #ddd; overflow: auto; white-space: pre-wrap; font-family: monospace; padding: 10px; box-sizing: border-box; }
+    .execution-input-row { display: flex; gap: 8px; margin-top: 8px; }
+    .execution-input-row input { flex: 1; }
+    .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
     textarea { min-height: 84px; resize: vertical; }
@@ -555,7 +600,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <div class="status" id="connectionStatus">未连接</div>
       <div class="hint" id="executionStatusHint">执行状态：running</div>
       <div class="hint" id="inputTip">当前为多行输入模式</div>
-      <div class="hint">连接与 Agent 管理请在左侧边栏完成，此处聚焦聊天与终端。</div>
+      <div class="hint">连接与 Agent 管理请在左侧边栏完成，此处聚焦聊天与对话内执行输出。</div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="section">
@@ -570,14 +615,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
     </div>
-    <div>
-      <div class="terminal" id="terminalOutput">暂无终端输出</div>
-    </div>
   </div>
+  <script nonce="${nonce}" src="${xtermJsUri}"></script>
+  <script nonce="${nonce}" src="${fitAddonJsUri}"></script>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const messages = document.getElementById('messages');
-    const terminalOutput = document.getElementById('terminalOutput');
     const connectionStatus = document.getElementById('connectionStatus');
     const selectedAgentLabel = document.getElementById('selectedAgentLabel');
     const executionStatusHint = document.getElementById('executionStatusHint');
@@ -586,13 +629,125 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const singleInputRow = document.getElementById('singleInputRow');
     const messageInput = document.getElementById('messageInput');
     const singleMessageInput = document.getElementById('singleMessageInput');
+    const terminalRegistry = new Map();
+    const TerminalCtor = window.Terminal;
+    const FitAddonCtor = window.FitAddon && window.FitAddon.FitAddon;
+
+    function ensureTerminalEntry(executionId) {
+      if (!terminalRegistry.has(executionId)) {
+        terminalRegistry.set(executionId, {
+          terminal: null,
+          fitAddon: null,
+          host: null,
+          resizeObserver: null,
+          pendingChunks: [],
+          buffer: '',
+          finished: false,
+        });
+      }
+      return terminalRegistry.get(executionId);
+    }
+
+    function syncTerminalSize(executionId, entry) {
+      if (!entry || !entry.terminal || !entry.fitAddon) {
+        return;
+      }
+      const oldCols = entry.terminal.cols;
+      const oldRows = entry.terminal.rows;
+      entry.fitAddon.fit();
+      const newCols = entry.terminal.cols;
+      const newRows = entry.terminal.rows;
+      if (oldCols === newCols && oldRows === newRows) {
+        return;
+      }
+      vscode.postMessage({
+        type: 'terminalResize',
+        executionId,
+        cols: newCols,
+        rows: newRows,
+      });
+    }
+
+    function mountTerminal(executionId, host, item) {
+      const entry = ensureTerminalEntry(executionId);
+      entry.host = host;
+      entry.buffer = item.executionBuffer || entry.buffer || '';
+      entry.finished = Boolean(item.finished);
+
+      if (!TerminalCtor || !FitAddonCtor) {
+        host.textContent = entry.buffer;
+        return;
+      }
+
+      if (!entry.terminal) {
+        entry.terminal = new TerminalCtor({
+          theme: { background: '#111111' },
+          fontSize: 12,
+          convertEol: false,
+        });
+        entry.fitAddon = new FitAddonCtor();
+        entry.terminal.loadAddon(entry.fitAddon);
+        entry.terminal.open(host);
+        entry.terminal.onData((data) => {
+          if (entry.finished) {
+            return;
+          }
+          vscode.postMessage({
+            type: 'sendTerminalInput',
+            text: data,
+            executionId,
+          });
+        });
+        if (typeof ResizeObserver !== 'undefined') {
+          entry.resizeObserver = new ResizeObserver(() => {
+            syncTerminalSize(executionId, entry);
+          });
+          entry.resizeObserver.observe(host);
+        }
+      }
+
+      try {
+        entry.terminal.reset();
+      } catch (error) {
+      }
+      if (entry.buffer) {
+        entry.terminal.write(entry.buffer);
+      }
+      requestAnimationFrame(() => {
+        syncTerminalSize(executionId, entry);
+      });
+    }
 
     function renderMessages(messageList) {
       messages.innerHTML = '';
       (messageList || []).forEach((item) => {
         const node = document.createElement('div');
         node.className = 'message ' + (item.variant || 'system');
-        node.textContent = item.text || '';
+        if (item.variant === 'execution') {
+          const header = document.createElement('div');
+          header.className = 'message-header';
+          header.textContent = item.text || '执行中';
+          node.appendChild(header);
+
+          const terminalHost = document.createElement('div');
+          terminalHost.className = 'execution-terminal';
+          node.appendChild(terminalHost);
+
+          if (item.executionId) {
+            mountTerminal(item.executionId, terminalHost, item);
+          } else {
+            terminalHost.textContent = item.executionBuffer || '';
+          }
+
+          if (item.finished) {
+            const finishedNode = document.createElement('div');
+            finishedNode.className = 'execution-finished';
+            finishedNode.textContent = '执行已结束';
+            node.appendChild(finishedNode);
+          }
+        } else {
+          node.textContent = item.text || '';
+        }
         messages.appendChild(node);
       });
       messages.scrollTop = messages.scrollHeight;
@@ -656,12 +811,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         connectionStatus.textContent = payload.statusText || '未连接';
         connectionStatus.className = payload.isError ? 'status error' : 'status';
         executionStatusHint.textContent = '执行状态：' + (payload.executionStatus || 'running');
-        terminalOutput.textContent = payload.terminalOutput || '暂无终端输出';
         syncInputMode(payload.inputMode || 'multi', payload.inputTip || '');
         renderMessages(payload.messages || []);
-      }
-      if (data.type === 'terminalOutput') {
-        terminalOutput.textContent = data.payload || '暂无终端输出';
       }
     });
   </script>
@@ -674,6 +825,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     if (message.type === "sendMessage") {
       await this.sendAgentMessage(message.text ?? "");
+      return;
+    }
+    if (message.type === "sendTerminalInput") {
+      await this.sendTerminalInput(message.text ?? "", message.executionId);
+      return;
+    }
+    if (message.type === "terminalResize") {
+      await this.sendTerminalResize(
+        message.executionId,
+        message.cols,
+        message.rows,
+      );
       return;
     }
     if (message.type === "confirmResult") {
@@ -815,7 +978,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.appendPanelMessage(`我：${messageText}`, "system");
+    this.appendPanelMessage(`我：${messageText}`, "system", agentId);
     agentSocket.send(
       JSON.stringify({
         type: "input_result",
@@ -831,6 +994,82 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.executionStatus = "running";
     this.syncSelectedAgentState();
     this.postPanelState();
+  }
+
+  private async sendTerminalInput(
+    text: string,
+    executionId?: string,
+  ): Promise<void> {
+    const agentId = this.panelState.selectedAgentId;
+    const inputText = String(text ?? "");
+    if (!agentId) {
+      this.appendPanelMessage("请先在左侧选择 Agent", "error");
+      return;
+    }
+    if (!inputText) {
+      return;
+    }
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      this.appendPanelMessage(
+        "当前 Agent WebSocket 未连接，无法发送终端输入",
+        "error",
+        agentId,
+      );
+      return;
+    }
+    const agentState = this.getAgentState(agentId);
+    const targetExecutionId =
+      String(executionId || "").trim() || agentState.activeExecutionId;
+    if (!targetExecutionId) {
+      this.appendPanelMessage(
+        "当前没有可交互的执行会话，无法发送终端输入",
+        "error",
+        agentId,
+      );
+      return;
+    }
+    agentSocket.send(
+      JSON.stringify({
+        type: "terminal_input",
+        payload: {
+          execution_id: targetExecutionId,
+          data: inputText,
+        },
+      }),
+    );
+    this.appendPanelMessage(`终端输入：${inputText}`, "system", agentId);
+  }
+
+  private async sendTerminalResize(
+    executionId?: string,
+    cols?: number,
+    rows?: number,
+  ): Promise<void> {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      return;
+    }
+    const normalizedExecutionId = String(executionId || "").trim();
+    const normalizedCols = Number(cols || 0);
+    const normalizedRows = Number(rows || 0);
+    if (!normalizedExecutionId || normalizedCols <= 0 || normalizedRows <= 0) {
+      return;
+    }
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    agentSocket.send(
+      JSON.stringify({
+        type: "terminal_resize",
+        payload: {
+          execution_id: normalizedExecutionId,
+          cols: normalizedCols,
+          rows: normalizedRows,
+        },
+      }),
+    );
   }
 
   private async loginWithPassword(password: string): Promise<string> {
@@ -1446,24 +1685,41 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ): void {
     const executionId = String(payload?.execution_id || "default");
     const executionChunk = decodeExecutionChunk(payload);
-    if (executionChunk) {
-      this.withAgentState(agentId, (state) => {
-        state.terminalOutput = appendTerminalChunk(
-          state.terminalOutput,
+    const messageType = String(payload?.message_type || "");
+
+    this.withAgentState(agentId, (state) => {
+      if (messageType === "tool_stream_start") {
+        state.executionStatus = "running";
+        state.activeExecutionId = executionId;
+        this.upsertExecutionMessage(state, executionId, {
+          text: `执行中：${executionId}`,
+          finished: false,
+        });
+      }
+
+      if (executionChunk) {
+        const nextBuffer = appendTerminalChunk(
+          state.executionBuffers[executionId] || "",
           executionChunk,
         );
-      });
-    }
-    const messageType = String(payload?.message_type || "");
-    if (messageType === "tool_stream_start") {
-      this.withAgentState(agentId, (state) => {
-        state.executionStatus = "running";
-      });
-      this.appendPanelMessage(`执行开始：${executionId}`, "system", agentId);
-    }
-    if (messageType === "tool_stream_end") {
-      this.appendPanelMessage(`执行结束：${executionId}`, "system", agentId);
-    }
+        state.executionBuffers[executionId] = nextBuffer;
+        this.upsertExecutionMessage(state, executionId, {
+          text: `执行中：${executionId}`,
+          executionBuffer: nextBuffer,
+        });
+      }
+
+      if (messageType === "tool_stream_end") {
+        if (state.activeExecutionId === executionId) {
+          state.activeExecutionId = undefined;
+        }
+        this.upsertExecutionMessage(state, executionId, {
+          text: `执行完成：${executionId}`,
+          finished: true,
+        });
+      }
+    });
+
     this.postPanelState();
   }
 
@@ -1501,6 +1757,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       messages: [],
       pendingRequestId: undefined,
       pendingStreamText: "",
+      activeExecutionId: undefined,
+      executionBuffers: {},
     };
   }
 
@@ -1558,6 +1816,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (!agentId) {
       return;
     }
+    const currentState = this.getAgentState(agentId);
     this.agentPanelStates.set(agentId, {
       terminalOutput: this.panelState.terminalOutput,
       connectionStatusText: this.panelState.connectionStatusText,
@@ -1568,6 +1827,34 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       messages: [...this.panelState.messages],
       pendingRequestId: this.panelState.pendingRequestId,
       pendingStreamText: this.panelState.pendingStreamText,
+      activeExecutionId: currentState.activeExecutionId,
+      executionBuffers: { ...currentState.executionBuffers },
+    });
+  }
+
+  private upsertExecutionMessage(
+    state: AgentChatState,
+    executionId: string,
+    patch: Partial<ChatMessageItem>,
+  ): void {
+    const index = state.messages.findIndex(
+      (item) => item.variant === "execution" && item.executionId === executionId,
+    );
+    if (index >= 0) {
+      state.messages[index] = {
+        ...state.messages[index],
+        ...patch,
+        variant: "execution",
+        executionId,
+      };
+      return;
+    }
+    state.messages.push({
+      text: String(patch.text || `执行中：${executionId}`),
+      variant: "execution",
+      executionId,
+      executionBuffer: patch.executionBuffer || "",
+      finished: Boolean(patch.finished),
     });
   }
 
@@ -1576,17 +1863,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     variant: "system" | "error" | "output" | "stream" = "system",
     agentId?: string,
   ): void {
-    const targetAgentId = agentId ?? this.panelState.selectedAgentId;
-    if (targetAgentId) {
-      const agentState = this.getAgentState(targetAgentId);
+    if (agentId) {
+      const agentState = this.getAgentState(agentId);
       agentState.messages.push({ text, variant });
-      if (this.panelState.selectedAgentId === targetAgentId) {
+      if (this.panelState.selectedAgentId === agentId) {
         this.panelState.messages = [...agentState.messages];
+        this.syncSelectedAgentState();
       }
     } else {
       this.panelState.messages.push({ text, variant });
     }
-    this.syncSelectedAgentState();
     this.postPanelState();
   }
 
@@ -1609,6 +1895,9 @@ interface ChatPanelMessage {
   gatewayUrl?: string;
   password?: string;
   text?: string;
+  executionId?: string;
+  cols?: number;
+  rows?: number;
   confirmed?: boolean;
 }
 
