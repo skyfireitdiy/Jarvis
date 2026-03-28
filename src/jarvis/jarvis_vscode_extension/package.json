@@ -10,7 +10,7 @@
     "url": "https://github.com/skyfireitdiy/Jarvis.git"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Other"
@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.82.0",
     "@types/ws": "^8.18.1",
     "@vscode/vsce": "^3.2.2",
     "typescript": "^5.4.5"
