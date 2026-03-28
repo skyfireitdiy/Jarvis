@@ -6,6 +6,7 @@ interface AgentListItem {
   name?: string;
   displayName: string;
   statusText: string;
+  statusClass: "running" | "waiting_multi" | "waiting_single" | "stopped";
   agentType: "agent" | "codeagent";
   workingDir: string;
   llmGroup: string;
@@ -22,13 +23,24 @@ interface ChatMessageItem {
   variant: "system" | "error" | "output" | "stream";
 }
 
+interface AgentChatState {
+  terminalOutput: string;
+  connectionStatusText: string;
+  hasConnectionError: boolean;
+  inputMode: "single" | "multi";
+  inputTip: string;
+  executionStatus: "running" | "waiting_single" | "waiting_multi";
+  messages: ChatMessageItem[];
+  pendingRequestId?: string;
+  pendingStreamText: string;
+}
+
 interface ChatPanelState {
   gatewayUrl: string;
   password: string;
   token: string;
   selectedAgentId?: string;
   gatewaySocket?: WebSocket;
-  agentSocket?: WebSocket;
   terminalOutput: string;
   connectionStatusText: string;
   hasConnectionError: boolean;
@@ -86,6 +98,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       name: "default-agent",
       displayName: "default-agent",
       statusText: "示例 Agent（MVP 占位）",
+      statusClass: "running",
       agentType: "agent",
       workingDir: "~",
       llmGroup: "",
@@ -99,7 +112,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     token: "",
     selectedAgentId: undefined,
     gatewaySocket: undefined,
-    agentSocket: undefined,
     terminalOutput: "暂无终端输出",
     connectionStatusText: "未连接",
     hasConnectionError: false,
@@ -111,6 +123,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     pendingRequestId: undefined,
     pendingStreamText: "",
   };
+  private readonly agentPanelStates = new Map<string, AgentChatState>();
+  private readonly agentSockets = new Map<string, WebSocket>();
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "agent",
@@ -183,6 +197,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   async openChatPanel(agentId?: string): Promise<void> {
     if (agentId) {
       this.panelState.selectedAgentId = agentId;
+      this.restoreSelectedAgentState();
     }
 
     if (!this.currentPanel) {
@@ -293,11 +308,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const agentListMarkup = this.agentItems
       .map((agentItem) => {
         return `
-    <li data-agent-id="${agentItem.id}">
+    <li data-agent-id="${agentItem.id}" class="agent-item ${agentItem.statusClass}">
       <div class="agent-row">
-        <div>
-          <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
-          <div class="agent-meta">${escapeHtml(agentItem.statusText)}</div>
+        <div class="agent-main">
+          <div class="agent-title-row">
+            <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
+            <div class="agent-status ${agentItem.statusClass}">${escapeHtml(agentItem.statusText)}</div>
+          </div>
+          <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
         <div class="agent-actions">
           <button class="icon-button" type="button" data-copy-agent-id="${agentItem.id}" title="复制 Agent">📋</button>
@@ -327,9 +345,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     input, select { width: 100%; padding: 6px 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); box-sizing: border-box; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { border: 1px solid var(--vscode-panel-border); border-radius: 6px; margin-bottom: 8px; padding: 8px; cursor: pointer; }
+    .agent-item.running { background: rgba(76, 175, 80, 0.12); }
+    .agent-item.waiting_multi { background: rgba(255, 193, 7, 0.12); }
+    .agent-item.waiting_single { background: rgba(255, 152, 0, 0.12); }
+    .agent-item.stopped { background: rgba(158, 158, 158, 0.12); }
     .agent-row { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+    .agent-main { min-width: 0; flex: 1; }
+    .agent-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .agent-name { font-weight: 600; }
-    .agent-meta { opacity: 0.8; font-size: 12px; margin-top: 4px; }
+    .agent-status { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; }
+    .agent-status.running { background: rgba(76, 175, 80, 0.18); color: #2e7d32; border-color: rgba(76, 175, 80, 0.28); }
+    .agent-status.waiting_multi { background: rgba(255, 193, 7, 0.18); color: #8a6d00; border-color: rgba(255, 193, 7, 0.28); }
+    .agent-status.waiting_single { background: rgba(255, 152, 0, 0.18); color: #a85d00; border-color: rgba(255, 152, 0, 0.28); }
+    .agent-status.stopped { background: rgba(158, 158, 158, 0.18); color: #666; border-color: rgba(158, 158, 158, 0.28); }
+    .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
     .agent-actions { display: flex; gap: 6px; }
     .icon-button { padding: 4px 6px; min-width: auto; }
     .create-agent-panel { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
@@ -648,7 +677,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (message.type === "confirmResult") {
-      await this.sendConfirmResult(Boolean(message.confirmed));
+      const agentId = this.panelState.selectedAgentId;
+      if (!agentId) {
+        this.appendPanelMessage("请先在左侧选择 Agent", "error");
+        return;
+      }
+      await this.sendConfirmResult(agentId, Boolean(message.confirmed));
     }
   }
 
@@ -712,20 +746,31 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         throw new Error(result.error?.message || "获取 Agent 列表失败");
       }
 
-      this.agentItems = result.data.map((agent) => ({
-        id: agent.agent_id,
-        name: agent.name,
-        displayName: agent.name || agent.agent_id,
-        statusText: agent.status || agent.agent_type || "unknown",
-        agentType: agent.agent_type === "codeagent" ? "codeagent" : "agent",
-        workingDir: agent.working_dir || "",
-        llmGroup: agent.llm_group || "",
-        worktree: Boolean(agent.worktree),
-      }));
+      this.agentItems = result.data
+        .slice()
+        .reverse()
+        .map((agent) => {
+          const statusClass =
+            agent.status === "stopped" ? "stopped" : "running";
+          const statusText =
+            statusClass === "stopped" ? "已完成" : "运行中";
+          return {
+            id: agent.agent_id,
+            name: agent.name,
+            displayName: agent.name || agent.agent_id,
+            statusText,
+            statusClass,
+            agentType: agent.agent_type === "codeagent" ? "codeagent" : "agent",
+            workingDir: agent.working_dir || "",
+            llmGroup: agent.llm_group || "",
+            worktree: Boolean(agent.worktree),
+          };
+        });
 
       if (!this.panelState.selectedAgentId && this.agentItems.length > 0) {
         this.panelState.selectedAgentId = this.agentItems[0].id;
       }
+      this.restoreSelectedAgentState();
 
       this.renderAgentListView();
       if (this.currentPanel) {
@@ -752,7 +797,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (this.panelState.inputMode !== "single" && !messageText) {
       return;
     }
-    if (!this.panelState.selectedAgentId) {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
       this.appendPanelMessage("请先在左侧选择 Agent", "error");
       return;
     }
@@ -760,10 +806,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.appendPanelMessage("请先连接 Jarvis 网关", "error");
       return;
     }
-    if (
-      !this.panelState.agentSocket ||
-      this.panelState.agentSocket.readyState !== WebSocket.OPEN
-    ) {
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
       this.appendPanelMessage(
         "当前 Agent WebSocket 未连接，无法发送消息",
         "error",
@@ -772,7 +816,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
 
     this.appendPanelMessage(`我：${messageText}`, "system");
-    this.panelState.agentSocket.send(
+    agentSocket.send(
       JSON.stringify({
         type: "input_result",
         payload: {
@@ -785,6 +829,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.inputTip = "";
     this.panelState.inputMode = "multi";
     this.panelState.executionStatus = "running";
+    this.syncSelectedAgentState();
     this.postPanelState();
   }
 
@@ -871,14 +916,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         messages: this.panelState.messages,
       },
     });
-  }
-
-  private appendPanelMessage(
-    text: string,
-    variant: "system" | "error" | "output" | "stream" = "system",
-  ): void {
-    this.panelState.messages.push({ text, variant });
-    this.postPanelState();
   }
 
   private renderAgentListView(): void {
@@ -1170,11 +1207,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private connectAgentSocket(): void {
-    if (!this.panelState.selectedAgentId || !this.panelState.token) {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId || !this.panelState.token) {
       return;
     }
 
-    const existingSocket = this.panelState.agentSocket;
+    const existingSocket = this.agentSockets.get(agentId);
     if (existingSocket && existingSocket.readyState === WebSocket.OPEN) {
       this.sendSocketMessage(existingSocket, {
         type: "get_status",
@@ -1182,13 +1220,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       });
       return;
     }
+    if (existingSocket && existingSocket.readyState === WebSocket.CONNECTING) {
+      return;
+    }
 
-    this.disposeSocket("agentSocket");
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-    const socketUrl = buildAgentWebSocketUrl(
-      gatewayAddress,
-      this.panelState.selectedAgentId,
-    );
+    const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId);
     const agentSocket = new WebSocket(socketUrl, {
       headers: {
         Authorization: `Bearer ${this.panelState.token}`,
@@ -1201,25 +1238,36 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         payload: { token: this.panelState.token },
       });
       this.sendSocketMessage(agentSocket, { type: "get_status", payload: {} });
-      this.appendPanelMessage(
-        `已连接 Agent：${this.panelState.selectedAgentId}`,
-        "system",
-      );
+      this.withAgentState(agentId, (state) => {
+        state.connectionStatusText = `已连接 Agent：${agentId}`;
+        state.hasConnectionError = false;
+      });
+      this.appendPanelMessage(`已连接 Agent：${agentId}`, "system", agentId);
     });
 
     agentSocket.on("message", (data: RawData) => {
-      this.handleAgentSocketMessage(data);
+      this.handleAgentSocketMessage(agentId, data);
     });
 
     agentSocket.on("error", () => {
-      this.appendPanelMessage("Agent WebSocket 连接异常", "error");
+      this.withAgentState(agentId, (state) => {
+        state.connectionStatusText = `Agent WebSocket 连接异常：${agentId}`;
+        state.hasConnectionError = true;
+      });
+      this.appendPanelMessage("Agent WebSocket 连接异常", "error", agentId);
     });
 
     agentSocket.on("close", () => {
-      this.appendPanelMessage("Agent WebSocket 已关闭", "system");
+      if (this.agentSockets.get(agentId) === agentSocket) {
+        this.agentSockets.delete(agentId);
+      }
+      this.withAgentState(agentId, (state) => {
+        state.connectionStatusText = `Agent WebSocket 已关闭：${agentId}`;
+      });
+      this.appendPanelMessage("Agent WebSocket 已关闭", "system", agentId);
     });
 
-    this.panelState.agentSocket = agentSocket;
+    this.agentSockets.set(agentId, agentSocket);
   }
 
   private handleGatewaySocketMessage(rawData: RawData): void {
@@ -1233,52 +1281,66 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (parsedMessage.type === "status_update") {
-      this.updateExecutionStatus(parsedMessage.payload?.execution_status);
-      this.panelState.connectionStatusText = `状态：${this.panelState.executionStatus}`;
-      this.panelState.hasConnectionError = false;
+      const agentId = this.panelState.selectedAgentId;
+      if (agentId) {
+        this.withAgentState(agentId, (state) => {
+          this.updateExecutionStatus(state, parsedMessage.payload?.execution_status);
+          state.connectionStatusText = `状态：${state.executionStatus}`;
+          state.hasConnectionError = false;
+        });
+      } else {
+        this.panelState.connectionStatusText = "状态：running";
+        this.panelState.hasConnectionError = false;
+      }
       this.postPanelState();
       return;
     }
     if (parsedMessage.type === "execution") {
-      this.handleExecutionPayload(parsedMessage.payload);
+      const agentId = this.panelState.selectedAgentId;
+      if (agentId) {
+        this.handleExecutionPayload(agentId, parsedMessage.payload);
+      }
     }
   }
 
-  private handleAgentSocketMessage(rawData: RawData): void {
+  private handleAgentSocketMessage(agentId: string, rawData: RawData): void {
     const parsedMessage = parseSocketMessage(rawData);
     if (!parsedMessage) {
       return;
     }
 
     if (parsedMessage.type === "output") {
-      this.handleOutputPayload(parsedMessage.payload);
+      this.handleOutputPayload(agentId, parsedMessage.payload);
       return;
     }
 
     if (parsedMessage.type === "input_request") {
-      this.panelState.pendingRequestId =
-        typeof parsedMessage.payload?.request_id === "string"
-          ? parsedMessage.payload.request_id
-          : undefined;
-      const mode =
-        parsedMessage.payload?.mode === "single" ? "single" : "multi";
-      this.panelState.inputMode = mode;
-      this.panelState.executionStatus =
-        mode === "single" ? "waiting_single" : "waiting_multi";
-      this.panelState.inputTip = String(
-        parsedMessage.payload?.tip || "Agent 请求输入",
-      );
-      this.appendPanelMessage(this.panelState.inputTip, "system");
+      this.withAgentState(agentId, (state) => {
+        state.pendingRequestId =
+          typeof parsedMessage.payload?.request_id === "string"
+            ? parsedMessage.payload.request_id
+            : undefined;
+        const mode =
+          parsedMessage.payload?.mode === "single" ? "single" : "multi";
+        state.inputMode = mode;
+        state.executionStatus =
+          mode === "single" ? "waiting_single" : "waiting_multi";
+        state.inputTip = String(parsedMessage.payload?.tip || "Agent 请求输入");
+      });
+      const agentState = this.getAgentState(agentId);
+      this.appendPanelMessage(agentState.inputTip, "system", agentId);
       return;
     }
 
     if (parsedMessage.type === "confirm") {
-      void this.handleConfirmRequest(parsedMessage.payload);
+      void this.handleConfirmRequest(agentId, parsedMessage.payload);
       return;
     }
 
     if (parsedMessage.type === "status_update") {
-      this.updateExecutionStatus(parsedMessage.payload?.execution_status);
+      this.withAgentState(agentId, (state) => {
+        this.updateExecutionStatus(state, parsedMessage.payload?.execution_status);
+      });
       this.postPanelState();
       return;
     }
@@ -1287,112 +1349,137 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.appendPanelMessage(
         String(parsedMessage.payload?.message || "未知错误"),
         "error",
+        agentId,
       );
       return;
     }
 
     if (parsedMessage.type === "execution") {
-      this.handleExecutionPayload(parsedMessage.payload);
+      this.handleExecutionPayload(agentId, parsedMessage.payload);
     }
   }
 
   private async handleConfirmRequest(
+    agentId: string,
     payload: Record<string, unknown> | undefined,
   ): Promise<void> {
-    this.panelState.pendingRequestId =
-      typeof payload?.request_id === "string" ? payload.request_id : undefined;
+    this.withAgentState(agentId, (state) => {
+      state.pendingRequestId =
+        typeof payload?.request_id === "string" ? payload.request_id : undefined;
+    });
     const message = String(payload?.message || "请确认");
     const confirmed = await vscode.window.showInformationMessage(
       message,
       { modal: true },
       "确认",
     );
-    await this.sendConfirmResult(confirmed === "确认");
+    await this.sendConfirmResult(agentId, confirmed === "确认");
   }
 
-  private async sendConfirmResult(confirmed: boolean): Promise<void> {
-    if (
-      !this.panelState.agentSocket ||
-      this.panelState.agentSocket.readyState !== WebSocket.OPEN
-    ) {
+  private async sendConfirmResult(
+    agentId: string,
+    confirmed: boolean,
+  ): Promise<void> {
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
       this.appendPanelMessage(
         "当前 Agent WebSocket 未连接，无法发送确认结果",
         "error",
+        agentId,
       );
       return;
     }
-    this.sendSocketMessage(this.panelState.agentSocket, {
+    const agentState = this.getAgentState(agentId);
+    this.sendSocketMessage(agentSocket, {
       type: "confirm_result",
       payload: {
         confirmed,
-        request_id: this.panelState.pendingRequestId,
+        request_id: agentState.pendingRequestId,
       },
     });
-    this.panelState.pendingRequestId = undefined;
-    this.panelState.inputTip = "";
-    this.panelState.executionStatus = "running";
+    this.withAgentState(agentId, (state) => {
+      state.pendingRequestId = undefined;
+      state.inputTip = "";
+      state.executionStatus = "running";
+    });
     this.postPanelState();
   }
 
   private handleOutputPayload(
+    agentId: string,
     payload: Record<string, unknown> | undefined,
   ): void {
     const outputType = String(payload?.output_type || "");
     if (outputType === "STREAM_START") {
-      this.panelState.pendingStreamText = "";
+      this.withAgentState(agentId, (state) => {
+        state.pendingStreamText = "";
+      });
       this.postPanelState();
       return;
     }
     if (outputType === "STREAM_CHUNK") {
-      this.panelState.pendingStreamText += String(payload?.text || "");
+      this.withAgentState(agentId, (state) => {
+        state.pendingStreamText += String(payload?.text || "");
+      });
       this.postPanelState();
       return;
     }
     if (outputType === "STREAM_END") {
-      if (this.panelState.pendingStreamText) {
-        this.appendPanelMessage(this.panelState.pendingStreamText, "stream");
-        this.panelState.pendingStreamText = "";
+      const agentState = this.getAgentState(agentId);
+      if (agentState.pendingStreamText) {
+        this.appendPanelMessage(agentState.pendingStreamText, "stream", agentId);
+        this.withAgentState(agentId, (state) => {
+          state.pendingStreamText = "";
+        });
       }
       return;
     }
     const outputText = String(payload?.text || "");
     if (outputText) {
-      this.appendPanelMessage(outputText, "output");
+      this.appendPanelMessage(outputText, "output", agentId);
     }
   }
 
   private handleExecutionPayload(
+    agentId: string,
     payload: Record<string, unknown> | undefined,
   ): void {
     const executionId = String(payload?.execution_id || "default");
     const executionChunk = decodeExecutionChunk(payload);
     if (executionChunk) {
-      this.panelState.terminalOutput = appendTerminalChunk(
-        this.panelState.terminalOutput,
-        executionChunk,
-      );
+      this.withAgentState(agentId, (state) => {
+        state.terminalOutput = appendTerminalChunk(
+          state.terminalOutput,
+          executionChunk,
+        );
+      });
     }
     const messageType = String(payload?.message_type || "");
     if (messageType === "tool_stream_start") {
-      this.appendPanelMessage(`执行开始：${executionId}`, "system");
-      this.panelState.executionStatus = "running";
+      this.withAgentState(agentId, (state) => {
+        state.executionStatus = "running";
+      });
+      this.appendPanelMessage(`执行开始：${executionId}`, "system", agentId);
     }
     if (messageType === "tool_stream_end") {
-      this.appendPanelMessage(`执行结束：${executionId}`, "system");
+      this.appendPanelMessage(`执行结束：${executionId}`, "system", agentId);
     }
     this.postPanelState();
   }
 
-  private updateExecutionStatus(status: unknown): void {
+  private updateExecutionStatus(
+    state: AgentChatState,
+    status: unknown,
+  ): void {
     const normalizedStatus = String(status || "running");
     if (
       normalizedStatus === "waiting_single" ||
       normalizedStatus === "waiting_multi" ||
       normalizedStatus === "running"
     ) {
-      this.panelState.executionStatus = normalizedStatus;
+      state.executionStatus = normalizedStatus;
     } else {
-      this.panelState.executionStatus = "running";
+      state.executionStatus = "running";
     }
   }
 
@@ -1403,7 +1490,107 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     socket.send(JSON.stringify(payload));
   }
 
-  private disposeSocket(socketKey: "gatewaySocket" | "agentSocket"): void {
+  private createDefaultAgentState(): AgentChatState {
+    return {
+      terminalOutput: "暂无终端输出",
+      connectionStatusText: "未连接",
+      hasConnectionError: false,
+      inputMode: "multi",
+      inputTip: "",
+      executionStatus: "running",
+      messages: [],
+      pendingRequestId: undefined,
+      pendingStreamText: "",
+    };
+  }
+
+  private getAgentState(agentId: string): AgentChatState {
+    const existingState = this.agentPanelStates.get(agentId);
+    if (existingState) {
+      return existingState;
+    }
+    const nextState = this.createDefaultAgentState();
+    this.agentPanelStates.set(agentId, nextState);
+    return nextState;
+  }
+
+  private withAgentState(
+    agentId: string,
+    updater: (state: AgentChatState) => void,
+  ): void {
+    const state = this.getAgentState(agentId);
+    updater(state);
+    if (this.panelState.selectedAgentId === agentId) {
+      this.restoreSelectedAgentState();
+    }
+  }
+
+  private restoreSelectedAgentState(): void {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      this.panelState.messages = [];
+      this.panelState.terminalOutput = "暂无终端输出";
+      this.panelState.inputMode = "multi";
+      this.panelState.inputTip = "";
+      this.panelState.executionStatus = "running";
+      this.panelState.pendingRequestId = undefined;
+      this.panelState.pendingStreamText = "";
+      this.panelState.connectionStatusText = this.panelState.token
+        ? "已连接并加载 Agents"
+        : "未连接";
+      this.panelState.hasConnectionError = false;
+      return;
+    }
+    const agentState = this.getAgentState(agentId);
+    this.panelState.messages = [...agentState.messages];
+    this.panelState.terminalOutput = agentState.terminalOutput;
+    this.panelState.inputMode = agentState.inputMode;
+    this.panelState.inputTip = agentState.inputTip;
+    this.panelState.executionStatus = agentState.executionStatus;
+    this.panelState.pendingRequestId = agentState.pendingRequestId;
+    this.panelState.pendingStreamText = agentState.pendingStreamText;
+    this.panelState.connectionStatusText = agentState.connectionStatusText;
+    this.panelState.hasConnectionError = agentState.hasConnectionError;
+  }
+
+  private syncSelectedAgentState(): void {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      return;
+    }
+    this.agentPanelStates.set(agentId, {
+      terminalOutput: this.panelState.terminalOutput,
+      connectionStatusText: this.panelState.connectionStatusText,
+      hasConnectionError: this.panelState.hasConnectionError,
+      inputMode: this.panelState.inputMode,
+      inputTip: this.panelState.inputTip,
+      executionStatus: this.panelState.executionStatus,
+      messages: [...this.panelState.messages],
+      pendingRequestId: this.panelState.pendingRequestId,
+      pendingStreamText: this.panelState.pendingStreamText,
+    });
+  }
+
+  private appendPanelMessage(
+    text: string,
+    variant: "system" | "error" | "output" | "stream" = "system",
+    agentId?: string,
+  ): void {
+    const targetAgentId = agentId ?? this.panelState.selectedAgentId;
+    if (targetAgentId) {
+      const agentState = this.getAgentState(targetAgentId);
+      agentState.messages.push({ text, variant });
+      if (this.panelState.selectedAgentId === targetAgentId) {
+        this.panelState.messages = [...agentState.messages];
+      }
+    } else {
+      this.panelState.messages.push({ text, variant });
+    }
+    this.syncSelectedAgentState();
+    this.postPanelState();
+  }
+
+  private disposeSocket(socketKey: "gatewaySocket"): void {
     const socket = this.panelState[socketKey];
     if (!socket) {
       return;
