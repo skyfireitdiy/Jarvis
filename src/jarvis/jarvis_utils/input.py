@@ -176,6 +176,7 @@ BUILTIN_COMMANDS = [
     ("ListSessions", "列出所有会话"),
     ("ListRule", "列出所有规则"),
     ("Quiet", "无人值守模式"),
+    ("AutoComplete", "自动完成后转交用户"),
     ("FixToolCall", "修复工具调用"),
     ("SwitchModel", "切换模型组"),
 ]

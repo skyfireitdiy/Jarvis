@@ -622,6 +622,7 @@ class Agent:
         self.original_user_input: str = ""  # 记录原始用户输入
         self.recent_memories: List[str] = []  # 最近10条记忆内容
         self.MAX_RECENT_MEMORIES = 10  # 最大记忆数量
+        self.return_control_on_auto_complete = False  # 自动完成后将控制权交还用户
 
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
