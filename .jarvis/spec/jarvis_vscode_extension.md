@@ -26,6 +26,7 @@
 - 活动栏图标与 View Container
 - 左侧 Agent 列表视图
 - 左侧边栏中的 Agent 创建入口与最小创建表单
+- 左侧 Agent 列表中的最小管理操作（复制、删除）
 - 右侧聊天/终端 WebviewPanel
 - 网关地址配置与密码登录
 - 聊天消息展示与输入发送
@@ -36,7 +37,7 @@
 - 完整迁移 `App.vue` 的全部能力
 - Monaco 编辑器面板
 - 文件树与全局搜索
-- Agent 复制、删除、重命名
+- Agent 重命名
 - 会话恢复、多弹窗管理、复杂拖拽布局的完整还原
 
 ## 2. 界面结构定义
@@ -57,12 +58,14 @@
 **内容要求：**
 
 - 未登录时显示：
+  - 当前连接状态
   - 网关地址输入框
   - 密码输入框
   - 连接按钮
   - 连接失败错误提示（如有）
 - 登录成功后：
   - 隐藏登录表单
+  - 显示当前连接状态
   - 显示 Agent 基本列表
   - 每个 Agent 至少展示：
     - agent_id 或可读名称
@@ -392,6 +395,14 @@
 
 ## 8. 验收标准
 
+### 8.0 发布构建验收
+
+1. 仓库中存在发布构建脚本：`scripts/build_vscode_extension_release.sh`
+2. 发布构建脚本应在仓库根目录执行，并自动进入 `src/jarvis/jarvis_vscode_extension/`
+3. 发布构建脚本应先执行 TypeScript 编译，生成 `src/jarvis/jarvis_vscode_extension/dist/extension.js`
+4. 发布构建脚本应继续打包生成 `.vsix` 文件，产物位于 `src/jarvis/jarvis_vscode_extension/` 目录下
+5. 发布构建脚本应在依赖缺失时给出明确错误信息，并在成功后输出产物路径
+
 ### 8.1 功能验收
 
 1. 仓库中存在 Spec 文件：`.jarvis/spec/jarvis_vscode_extension.md`
@@ -437,3 +448,6 @@
 6. 验证消息发送与消息展示
 7. 触发执行输出，验证终端区内容展示
 8. 运行构建或类型检查，确认无基础错误
+9. 在仓库根目录执行 `bash scripts/build_vscode_extension_release.sh`
+10. 确认生成 `src/jarvis/jarvis_vscode_extension/dist/extension.js`
+11. 确认生成 `src/jarvis/jarvis_vscode_extension/*.vsix`
