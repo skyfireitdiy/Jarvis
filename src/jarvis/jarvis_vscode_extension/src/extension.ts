@@ -40,6 +40,16 @@ interface AgentChatState {
   executionBuffers: Record<string, string>;
 }
 
+interface ExecutionTerminalSession {
+  agentId: string;
+  executionId: string;
+  terminal: vscode.Terminal;
+  writeEmitter: vscode.EventEmitter<string>;
+  closeEmitter: vscode.EventEmitter<void>;
+  lastBuffer: string;
+  closed: boolean;
+}
+
 interface ChatPanelState {
   gatewayUrl: string;
   password: string;
@@ -130,6 +140,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   };
   private readonly agentPanelStates = new Map<string, AgentChatState>();
   private readonly agentSockets = new Map<string, WebSocket>();
+  private readonly executionTerminalSessions = new Map<
+    string,
+    ExecutionTerminalSession
+  >();
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "agent",
@@ -331,8 +345,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       })
       .join("");
     const connectionStatusClass = this.panelState.hasConnectionError
-      ? 'status-banner error'
-      : 'status-banner';
+      ? "status-banner error"
+      : "status-banner";
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -490,7 +504,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="login-panel">
     <div class="panel-title">连接到 Jarvis</div>
-    <div class="status-text ${this.panelState.hasConnectionError ? 'error' : ''}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
+    <div class="status-text ${this.panelState.hasConnectionError ? "error" : ""}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
     ${loginErrorMarkup}
     <div class="form-group">
       <label for="gatewayUrl">网关地址</label>
@@ -561,9 +575,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .message.error { border-left: 3px solid var(--vscode-errorForeground); }
     .message.output { border-left: 3px solid var(--vscode-testing-iconPassed); }
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
-    .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); padding-bottom: 12px; }
+    .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); }
     .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
-    .execution-terminal { height: 220px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: #111; overflow: hidden; }
+    .execution-hint { font-size: 12px; opacity: 0.82; }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
@@ -582,7 +596,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <div class="status" id="connectionStatus">未连接</div>
       <div class="hint" id="executionStatusHint">执行状态：running</div>
       <div class="hint" id="inputTip">当前为多行输入模式</div>
-      <div class="hint">连接与 Agent 管理请在左侧边栏完成，此处聚焦聊天与对话内执行输出。</div>
+      <div class="hint">连接与 Agent 管理请在左侧边栏完成；真实终端交互已迁移到 VS Code 原生 Terminal 面板。</div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="section">
@@ -698,8 +712,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         .map((agent) => {
           const statusClass =
             agent.status === "stopped" ? "stopped" : "running";
-          const statusText =
-            statusClass === "stopped" ? "已完成" : "运行中";
+          const statusText = statusClass === "stopped" ? "已完成" : "运行中";
           return {
             id: agent.agent_id,
             name: agent.name,
@@ -783,32 +796,24 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     text: string,
     executionId?: string,
   ): Promise<void> {
-    const agentId = this.panelState.selectedAgentId;
     const inputText = String(text ?? "");
-    if (!agentId) {
-      this.appendPanelMessage("请先在左侧选择 Agent", "error");
-      return;
-    }
     if (!inputText) {
       return;
     }
-    const agentSocket = this.agentSockets.get(agentId);
+    const resolvedSession = this.resolveExecutionSession(executionId);
+    if (!resolvedSession) {
+      this.appendPanelMessage(
+        "当前没有可交互的执行会话，无法发送终端输入",
+        "error",
+      );
+      return;
+    }
+    const agentSocket = this.agentSockets.get(resolvedSession.agentId);
     if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
       this.appendPanelMessage(
         "当前 Agent WebSocket 未连接，无法发送终端输入",
         "error",
-        agentId,
-      );
-      return;
-    }
-    const agentState = this.getAgentState(agentId);
-    const targetExecutionId =
-      String(executionId || "").trim() || agentState.activeExecutionId;
-    if (!targetExecutionId) {
-      this.appendPanelMessage(
-        "当前没有可交互的执行会话，无法发送终端输入",
-        "error",
-        agentId,
+        resolvedSession.agentId,
       );
       return;
     }
@@ -816,7 +821,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       JSON.stringify({
         type: "terminal_input",
         payload: {
-          execution_id: targetExecutionId,
+          execution_id: resolvedSession.executionId,
           data: inputText,
         },
       }),
@@ -828,26 +833,23 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     cols?: number,
     rows?: number,
   ): Promise<void> {
-    const agentId = this.panelState.selectedAgentId;
-    if (!agentId) {
+    const resolvedSession = this.resolveExecutionSession(executionId);
+    if (!resolvedSession) {
       return;
     }
-    const agentSocket = this.agentSockets.get(agentId);
+    const agentSocket = this.agentSockets.get(resolvedSession.agentId);
     if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
       return;
     }
-    const agentState = this.getAgentState(agentId);
-    const targetExecutionId =
-      String(executionId || "").trim() || agentState.activeExecutionId;
     const nextCols = Number(cols || 0);
     const nextRows = Number(rows || 0);
-    if (!targetExecutionId || nextCols <= 0 || nextRows <= 0) {
+    if (nextCols <= 0 || nextRows <= 0) {
       return;
     }
     this.sendSocketMessage(agentSocket, {
       type: "terminal_resize",
       payload: {
-        execution_id: targetExecutionId,
+        execution_id: resolvedSession.executionId,
         cols: nextCols,
         rows: nextRows,
       },
@@ -1305,7 +1307,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const agentId = this.panelState.selectedAgentId;
       if (agentId) {
         this.withAgentState(agentId, (state) => {
-          this.updateExecutionStatus(state, parsedMessage.payload?.execution_status);
+          this.updateExecutionStatus(
+            state,
+            parsedMessage.payload?.execution_status,
+          );
           state.connectionStatusText = `状态：${state.executionStatus}`;
           state.hasConnectionError = false;
         });
@@ -1360,7 +1365,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
     if (parsedMessage.type === "status_update") {
       this.withAgentState(agentId, (state) => {
-        this.updateExecutionStatus(state, parsedMessage.payload?.execution_status);
+        this.updateExecutionStatus(
+          state,
+          parsedMessage.payload?.execution_status,
+        );
       });
       this.postPanelState();
       return;
@@ -1386,7 +1394,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     this.withAgentState(agentId, (state) => {
       state.pendingRequestId =
-        typeof payload?.request_id === "string" ? payload.request_id : undefined;
+        typeof payload?.request_id === "string"
+          ? payload.request_id
+          : undefined;
     });
     const message = String(payload?.message || "请确认");
     const confirmed = await vscode.window.showInformationMessage(
@@ -1448,7 +1458,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (outputType === "STREAM_END") {
       const agentState = this.getAgentState(agentId);
       if (agentState.pendingStreamText) {
-        this.appendPanelMessage(agentState.pendingStreamText, "stream", agentId);
+        this.appendPanelMessage(
+          agentState.pendingStreamText,
+          "stream",
+          agentId,
+        );
         this.withAgentState(agentId, (state) => {
           state.pendingStreamText = "";
         });
@@ -1468,19 +1482,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const executionId = String(payload?.execution_id || "default");
     const executionChunk = decodeExecutionChunk(payload);
     const messageType = String(payload?.message_type || "");
+    let nextBuffer = "";
 
     this.withAgentState(agentId, (state) => {
       if (messageType === "tool_stream_start") {
         state.executionStatus = "running";
         state.activeExecutionId = executionId;
+        this.ensureExecutionTerminalSession(agentId, executionId);
         this.upsertExecutionMessage(state, executionId, {
           text: `执行中：${executionId}`,
+          executionBuffer: state.executionBuffers[executionId] || "",
           finished: false,
         });
       }
 
       if (executionChunk) {
-        const nextBuffer = appendTerminalChunk(
+        nextBuffer = appendTerminalChunk(
           state.executionBuffers[executionId] || "",
           executionChunk,
         );
@@ -1489,6 +1506,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           text: `执行中：${executionId}`,
           executionBuffer: nextBuffer,
         });
+      } else {
+        nextBuffer = state.executionBuffers[executionId] || "";
       }
 
       if (messageType === "tool_stream_end") {
@@ -1497,18 +1516,24 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         this.upsertExecutionMessage(state, executionId, {
           text: `执行完成：${executionId}`,
+          executionBuffer: nextBuffer,
           finished: true,
         });
       }
     });
 
+    const session = this.ensureExecutionTerminalSession(agentId, executionId);
+    if (executionChunk) {
+      this.writeExecutionTerminalChunk(session, executionChunk);
+    }
+    if (messageType === "tool_stream_end") {
+      this.closeExecutionTerminalSession(agentId, executionId);
+    }
+
     this.postPanelState();
   }
 
-  private updateExecutionStatus(
-    state: AgentChatState,
-    status: unknown,
-  ): void {
+  private updateExecutionStatus(state: AgentChatState, status: unknown): void {
     const normalizedStatus = String(status || "running");
     if (
       normalizedStatus === "waiting_single" ||
@@ -1614,13 +1639,162 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private getExecutionSessionKey(agentId: string, executionId: string): string {
+    return `${agentId}::${executionId}`;
+  }
+
+  private ensureExecutionTerminalSession(
+    agentId: string,
+    executionId: string,
+  ): ExecutionTerminalSession {
+    const sessionKey = this.getExecutionSessionKey(agentId, executionId);
+    const existingSession = this.executionTerminalSessions.get(sessionKey);
+    if (existingSession) {
+      return existingSession;
+    }
+    const writeEmitter = new vscode.EventEmitter<string>();
+    const closeEmitter = new vscode.EventEmitter<void>();
+    const pty: vscode.Pseudoterminal = {
+      onDidWrite: writeEmitter.event,
+      onDidClose: closeEmitter.event,
+      open: () => {
+        writeEmitter.fire(
+          `\u001b[1;32mJarvis execution started: ${executionId}\u001b[0m\r\n`,
+        );
+      },
+      close: () => {
+        this.disposeExecutionTerminalSession(agentId, executionId);
+      },
+      handleInput: (data: string) => {
+        void this.sendTerminalInput(data, executionId);
+      },
+      setDimensions: (dimensions: vscode.TerminalDimensions) => {
+        void this.sendTerminalResize(
+          executionId,
+          dimensions.columns,
+          dimensions.rows,
+        );
+      },
+    };
+    const terminal = vscode.window.createTerminal({
+      name: `Jarvis ${agentId} · ${executionId}`,
+      pty,
+      isTransient: true,
+    });
+    const session: ExecutionTerminalSession = {
+      agentId,
+      executionId,
+      terminal,
+      writeEmitter,
+      closeEmitter,
+      lastBuffer: "",
+      closed: false,
+    };
+    this.executionTerminalSessions.set(sessionKey, session);
+    terminal.show(true);
+    return session;
+  }
+
+  private writeExecutionTerminalChunk(
+    session: ExecutionTerminalSession,
+    chunk: string,
+  ): void {
+    if (session.closed) {
+      return;
+    }
+    const normalizedChunk = String(chunk || "");
+    if (!normalizedChunk) {
+      return;
+    }
+    session.writeEmitter.fire(normalizedChunk);
+    session.lastBuffer = `${session.lastBuffer}${normalizedChunk}`;
+  }
+
+  private closeExecutionTerminalSession(
+    agentId: string,
+    executionId: string,
+  ): void {
+    const session = this.executionTerminalSessions.get(
+      this.getExecutionSessionKey(agentId, executionId),
+    );
+    if (!session || session.closed) {
+      return;
+    }
+    session.closed = true;
+    session.writeEmitter.fire(
+      `\r\n\u001b[90m[Jarvis execution finished: ${executionId}]\u001b[0m\r\n`,
+    );
+    session.closeEmitter.fire();
+    setTimeout(() => {
+      try {
+        session.terminal.dispose();
+      } catch {
+        // ignore dispose error
+      }
+      this.disposeExecutionTerminalSession(agentId, executionId);
+    }, 0);
+  }
+
+  private disposeExecutionTerminalSession(
+    agentId: string,
+    executionId: string,
+  ): void {
+    const sessionKey = this.getExecutionSessionKey(agentId, executionId);
+    const session = this.executionTerminalSessions.get(sessionKey);
+    if (!session) {
+      return;
+    }
+    this.executionTerminalSessions.delete(sessionKey);
+    session.writeEmitter.dispose();
+    session.closeEmitter.dispose();
+  }
+
+  private resolveExecutionSession(
+    executionId?: string,
+  ): { agentId: string; executionId: string } | undefined {
+    const selectedAgentId = this.panelState.selectedAgentId;
+    const targetExecutionId = String(executionId || "").trim();
+    if (targetExecutionId) {
+      if (selectedAgentId) {
+        const selectedSession = this.executionTerminalSessions.get(
+          this.getExecutionSessionKey(selectedAgentId, targetExecutionId),
+        );
+        if (selectedSession && !selectedSession.closed) {
+          return {
+            agentId: selectedSession.agentId,
+            executionId: selectedSession.executionId,
+          };
+        }
+        return { agentId: selectedAgentId, executionId: targetExecutionId };
+      }
+      for (const session of this.executionTerminalSessions.values()) {
+        if (session.executionId === targetExecutionId && !session.closed) {
+          return { agentId: session.agentId, executionId: session.executionId };
+        }
+      }
+      return undefined;
+    }
+    if (!selectedAgentId) {
+      return undefined;
+    }
+    const agentState = this.getAgentState(selectedAgentId);
+    if (!agentState.activeExecutionId) {
+      return undefined;
+    }
+    return {
+      agentId: selectedAgentId,
+      executionId: agentState.activeExecutionId,
+    };
+  }
+
   private upsertExecutionMessage(
     state: AgentChatState,
     executionId: string,
     patch: Partial<ChatMessageItem>,
   ): void {
     const index = state.messages.findIndex(
-      (item) => item.variant === "execution" && item.executionId === executionId,
+      (item) =>
+        item.variant === "execution" && item.executionId === executionId,
     );
     if (index >= 0) {
       state.messages[index] = {

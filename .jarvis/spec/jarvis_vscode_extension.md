@@ -95,7 +95,7 @@
 
 ### 2.4 右侧聊天面板
 
-右侧区域使用 WebviewPanel 承载对话与终端。
+右侧区域使用 WebviewPanel 承载对话、状态与执行消息标识，不再承载真实 tty 终端交互。
 
 **内容要求：**
 
@@ -106,19 +106,22 @@
 - 显示聊天消息列表
 - 提供消息输入框与发送按钮
 - 提供单行/多行输入的最小适配能力
-- 显示终端区域
+- 在消息列表中显示 `execution` 执行标识与状态摘要
 - 不再作为主登录入口
 
 ### 2.5 终端区域
 
-终端区域采用前端渲染方案实现，可使用 `xterm`。
+真实终端交互必须采用 VS Code 原生 `Pseudoterminal` 实现，而不是在 Webview 中依赖前端渲染终端承担完整 tty 能力。
 
 **首版要求：**
 
-- 可以显示终端输出
-- 可以与聊天区同处右侧面板
-- 若后端协议允许，则支持基础输入
-- 若无法完成完整交互，至少应支持只读终端输出展示
+- 每个 `execution` 创建一个独立的 VS Code Terminal
+- Terminal 与 `execution_id` 一一对应，不复用历史 execution 的 terminal 会话
+- Terminal 必须支持完整 tty 输入、输出与 resize 映射
+- Terminal 启动后应展示该 execution 的终端输出
+- Terminal 结束后应自动退出/关闭，不要求保留为长期标签
+- 右侧聊天面板只负责展示执行消息标识、状态摘要与非终端类消息
+- 已知限制：在当前 VS Code `Pseudoterminal` + 远端完整 tty 流桥接模型下，输入字符可能出现显示层双回显（例如输入 `a` 显示为 `aa`），该问题当前视为显示限制而非功能错误
 
 ## 3. 接口定义
 
@@ -327,11 +330,15 @@
 
 ### 5.5 终端行为
 
-- 当收到执行类输出或终端输出时，右侧终端区域应显示当前 Agent 对应内容
-- 不同 Agent 的终端输出必须彼此隔离，切换 Agent 时不得残留其他 Agent 的终端内容
-- `execution` 消息应同时作为消息列表中的执行标识，且其 stdout/stderr/status 数据应进入终端区
-- 若终端会话结束，终端区域应保留历史输出或提供结束状态
-- 不要求首版完整复刻 Web 前端多终端标签行为
+- 当收到 `tool_stream_start` 或等价 execution 启动事件时，扩展必须为该 `execution_id` 创建一个独立的 VS Code 原生 Terminal
+- Terminal 会话必须与 `agentId + execution_id` 绑定，不同 Agent、不同 execution 间不得串用
+- 当收到执行类输出或终端输出时，扩展必须将数据写入对应 execution 的原生 Terminal
+- 右侧聊天面板中的 `execution` 消息仅作为执行标识与状态摘要，不承担真实 tty 交互
+- 用户在原生 Terminal 中的输入必须通过当前 execution 对应的桥接逻辑回传后端
+- Terminal resize 必须映射为对应 execution 的终端尺寸更新
+- 当收到 `tool_stream_end` 或等价 execution 结束事件时，对应 Terminal 应自动退出/关闭
+- 已知限制：若 VS Code `Pseudoterminal` 本地输入显示与远端 tty 回显同时生效，界面上可能出现字符重复显示；只要实际发送到后端的数据正确且 execution 行为不受影响，可暂按显示层已知限制处理
+- 不要求首版实现 execution terminal 复用、多标签管理或跨 execution 历史恢复
 
 ### 5.6 错误处理
 
@@ -395,7 +402,7 @@
 3. 尽量复用 `App.vue` 中已验证的连接逻辑与协议理解，但不得直接复制整个 1 万行文件
 4. 首版实现遵循 MVP 原则，只实现对话与终端必需能力
 5. 创建 Agent 能力必须优先复用现有 Web 前端与后端已验证的接口协议，不重复发明新协议
-6. 允许直接参考现有前端依赖策略，首版最小依赖包括 `xterm` 与 `@xterm/addon-fit`；如需构建脚本，优先使用独立最小 TypeScript 配置
+6. 允许保留 Webview 中的最小展示逻辑，但真实 tty 必须优先基于 VS Code `Pseudoterminal` 实现；如需构建脚本，优先使用独立最小 TypeScript 配置
 7. 不得破坏现有 Web 前端和 Python 后端主要功能
 8. 所有新增文件命名应清晰可维护
 
@@ -424,7 +431,7 @@
 11. 创建成功后新 Agent 在列表中可见，并可被自动选中或立即进入
 12. 右侧面板可以展示聊天消息
 13. 右侧面板可以发送消息到当前 Agent
-14. 右侧面板中存在终端区域，并可展示终端输出
+14. 当触发 execution 时，可创建对应的 VS Code 原生 Terminal，并展示终端输出
 
 ### 8.2 工程验收
 
@@ -442,7 +449,7 @@
 - 有右侧聊天面板
 - 可连接 Jarvis
 - 可进行基础对话
-- 可展示终端输出
+- 可创建并使用 execution 对应的原生 Terminal
 
 ## 9. 验证方法
 
@@ -452,7 +459,7 @@
 4. 选择 Agent，确认右侧打开聊天面板
 5. 输入网关地址与密码，执行连接
 6. 验证消息发送与消息展示
-7. 触发执行输出，验证终端区内容展示
+7. 触发 execution，验证创建对应的 VS Code 原生 Terminal，并检查终端输出、输入与 resize 映射
 8. 运行构建或类型检查，确认无基础错误
 9. 在仓库根目录执行 `bash scripts/build_vscode_extension_release.sh`
 10. 确认生成 `src/jarvis/jarvis_vscode_extension/dist/extension.js`
