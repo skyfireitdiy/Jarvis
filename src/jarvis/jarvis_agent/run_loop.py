@@ -289,6 +289,7 @@ class AgentRunLoop:
 
         # 导入状态管理器
         from jarvis.jarvis_agent.jarvis import get_agent_status_manager
+
         status_manager = get_agent_status_manager()
 
         while True:
@@ -688,6 +689,15 @@ class AgentRunLoop:
                             should_auto_complete = True
 
                     if should_auto_complete:
+                        if getattr(ag, "return_control_on_auto_complete", False):
+                            ag.return_control_on_auto_complete = False
+                            if ag.non_interactive:
+                                ag.set_non_interactive(False)
+                            ag.run_input_handlers_next_turn = True
+                            PrettyOutput.auto_print(
+                                "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
+                            )
+                            return current_response
                         # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
                         result = ag._complete_task(auto_completed=True)
                         # 若不需要summary，则将最后一条LLM输出作为返回值

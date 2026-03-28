@@ -350,6 +350,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             PrettyOutput.auto_print("🔇 已切换到无人值守模式（非交互模式）")
             modified_input = modified_input.replace("'<Quiet>'", "")
             continue
+        elif tag == "AutoComplete":
+            agent.set_non_interactive(True)
+            agent.return_control_on_auto_complete = True
+            PrettyOutput.auto_print(
+                "🤖 已切换到自动完成模式：LLM 完成后将恢复交互并把控制权交还给用户"
+            )
+            modified_input = modified_input.replace("'<AutoComplete>'", "")
+            continue
         elif tag == "FixToolCall":
             # 处理修复工具调用的命令
             if not agent._last_response_content:
