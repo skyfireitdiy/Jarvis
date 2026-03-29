@@ -173,6 +173,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   };
   private modelGroups: ModelGroupItem[] = [];
   private defaultLlmGroup = "";
+  private lastAgentItemsJson: string = "";
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -771,7 +772,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         throw new Error(result.error?.message || "获取 Agent 列表失败");
       }
 
-      this.agentItems = result.data
+      const newAgentItems: AgentListItem[] = result.data
         .slice()
         .reverse()
         .map((agent) => {
@@ -783,7 +784,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             name: agent.name,
             displayName: agent.name || agent.agent_id,
             statusText,
-            statusClass,
+            statusClass: statusClass as AgentListItem["statusClass"],
             agentType: agent.agent_type === "codeagent" ? "codeagent" : "agent",
             workingDir: agent.working_dir || "",
             llmGroup: agent.llm_group || "",
@@ -791,17 +792,27 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           };
         });
 
+      // 检查数据是否有变化，无变化则不重新渲染
+      const newAgentItemsJson = JSON.stringify(newAgentItems);
+      const hasChanged = this.lastAgentItemsJson !== newAgentItemsJson;
+
+      this.agentItems = newAgentItems;
+
       if (!this.panelState.selectedAgentId && this.agentItems.length > 0) {
         this.panelState.selectedAgentId = this.agentItems[0].id;
       }
       this.restoreSelectedAgentState();
 
-      this.renderAgentListView();
-      if (this.currentPanel) {
-        this.currentPanel.title = this.getChatPanelTitle();
-        this.currentPanel.webview.html = this.getChatPanelHtml(
-          this.panelState.selectedAgentId,
-        );
+      // 只有在数据变化时才重新渲染界面，避免抢占焦点
+      if (hasChanged) {
+        this.lastAgentItemsJson = newAgentItemsJson;
+        this.renderAgentListView();
+        if (this.currentPanel) {
+          this.currentPanel.title = this.getChatPanelTitle();
+          this.currentPanel.webview.html = this.getChatPanelHtml(
+            this.panelState.selectedAgentId,
+          );
+        }
       }
 
       this.panelState.connectionStatusText = "已连接并加载 Agents";
