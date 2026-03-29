@@ -179,6 +179,42 @@ function syncExecutionTerminalBuffer(
   entry.lastBuffer = nextBuffer;
 }
 
+function isNearBottom(container: HTMLDivElement, threshold = 24): boolean {
+  const distanceToBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight;
+  return distanceToBottom <= threshold;
+}
+
+function ensureMessageNode(item: ChatMessageItem, index: number): HTMLDivElement {
+  if (!messages) {
+    const fallbackNode = document.createElement("div");
+    fallbackNode.className = "message " + (item.variant || "system");
+    fallbackNode.innerHTML = renderMessageHtml(item);
+    return fallbackNode;
+  }
+
+  const existingNode = messages.children.item(index);
+  if (
+    existingNode instanceof HTMLDivElement &&
+    !existingNode.classList.contains("execution")
+  ) {
+    const nextClassName = "message " + (item.variant || "system");
+    const nextHtml = renderMessageHtml(item);
+    if (existingNode.className !== nextClassName) {
+      existingNode.className = nextClassName;
+    }
+    if (existingNode.innerHTML !== nextHtml) {
+      existingNode.innerHTML = nextHtml;
+    }
+    return existingNode;
+  }
+
+  const node = document.createElement("div");
+  node.className = "message " + (item.variant || "system");
+  node.innerHTML = renderMessageHtml(item);
+  return node;
+}
+
 function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
   const existing = executionTerminals.get(executionId);
   if (existing) {
@@ -219,7 +255,9 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
     terminal.focus();
   };
 
+  terminalHost.addEventListener("mousedown", focusTerminal);
   terminalHost.addEventListener("click", focusTerminal);
+  wrapper.addEventListener("mousedown", focusTerminal);
   wrapper.addEventListener("click", focusTerminal);
 
   terminal.onData((data: string) => {
@@ -295,16 +333,14 @@ function renderMessages(messageList: ChatMessageItem[], agentId: string): void {
   if (!messages) {
     return;
   }
+  const shouldAutoScroll = isNearBottom(messages);
   const nextNodes: HTMLDivElement[] = [];
-  (messageList || []).forEach((item) => {
+  (messageList || []).forEach((item, index) => {
     if (item.variant === "execution") {
       nextNodes.push(renderExecutionMessage(item, agentId));
       return;
     }
-    const node = document.createElement("div");
-    node.className = "message " + (item.variant || "system");
-    node.innerHTML = renderMessageHtml(item);
-    nextNodes.push(node);
+    nextNodes.push(ensureMessageNode(item, index));
   });
 
   nextNodes.forEach((node, index) => {
@@ -337,7 +373,9 @@ function renderMessages(messageList: ChatMessageItem[], agentId: string): void {
     messages.removeChild(lastChild);
   }
 
-  messages.scrollTop = messages.scrollHeight;
+  if (shouldAutoScroll) {
+    messages.scrollTop = messages.scrollHeight;
+  }
 }
 
 function syncInputMode(mode: "single" | "multi", tipText: string): void {
