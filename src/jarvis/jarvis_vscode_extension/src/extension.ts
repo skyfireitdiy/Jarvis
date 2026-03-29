@@ -43,9 +43,6 @@ interface AgentChatState {
 interface ExecutionTerminalSession {
   agentId: string;
   executionId: string;
-  terminal: vscode.Terminal;
-  writeEmitter: vscode.EventEmitter<string>;
-  closeEmitter: vscode.EventEmitter<void>;
   lastBuffer: string;
   closed: boolean;
 }
@@ -577,7 +574,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
     .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); }
     .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
-    .execution-hint { font-size: 12px; opacity: 0.82; }
+    .execution-hint { font-size: 12px; opacity: 0.82; margin-bottom: 8px; }
+    .execution-terminal { height: 240px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
@@ -596,7 +594,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <div class="status" id="connectionStatus">未连接</div>
       <div class="hint" id="executionStatusHint">执行状态：running</div>
       <div class="hint" id="inputTip">当前为多行输入模式</div>
-      <div class="hint">连接与 Agent 管理请在左侧边栏完成；真实终端交互已迁移到 VS Code 原生 Terminal 面板。</div>
+      <div class="hint">连接与 Agent 管理请在左侧边栏完成；执行终端将在当前 Chat Panel 中以内嵌终端显示。</div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="section">
@@ -1652,46 +1650,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (existingSession) {
       return existingSession;
     }
-    const writeEmitter = new vscode.EventEmitter<string>();
-    const closeEmitter = new vscode.EventEmitter<void>();
-    const pty: vscode.Pseudoterminal = {
-      onDidWrite: writeEmitter.event,
-      onDidClose: closeEmitter.event,
-      open: () => {
-        writeEmitter.fire(
-          `\u001b[1;32mJarvis execution started: ${executionId}\u001b[0m\r\n`,
-        );
-      },
-      close: () => {
-        this.disposeExecutionTerminalSession(agentId, executionId);
-      },
-      handleInput: (data: string) => {
-        void this.sendTerminalInput(data, executionId);
-      },
-      setDimensions: (dimensions: vscode.TerminalDimensions) => {
-        void this.sendTerminalResize(
-          executionId,
-          dimensions.columns,
-          dimensions.rows,
-        );
-      },
-    };
-    const terminal = vscode.window.createTerminal({
-      name: `Jarvis ${agentId} · ${executionId}`,
-      pty,
-      isTransient: true,
-    });
     const session: ExecutionTerminalSession = {
       agentId,
       executionId,
-      terminal,
-      writeEmitter,
-      closeEmitter,
       lastBuffer: "",
       closed: false,
     };
     this.executionTerminalSessions.set(sessionKey, session);
-    terminal.show(true);
     return session;
   }
 
@@ -1706,7 +1671,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (!normalizedChunk) {
       return;
     }
-    session.writeEmitter.fire(normalizedChunk);
     session.lastBuffer = `${session.lastBuffer}${normalizedChunk}`;
   }
 
@@ -1721,16 +1685,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     session.closed = true;
-    session.writeEmitter.fire(
-      `\r\n\u001b[90m[Jarvis execution finished: ${executionId}]\u001b[0m\r\n`,
-    );
-    session.closeEmitter.fire();
+    session.lastBuffer = `${session.lastBuffer}\r\n\u001b[90m[Jarvis execution finished: ${executionId}]\u001b[0m\r\n`;
     setTimeout(() => {
-      try {
-        session.terminal.dispose();
-      } catch {
-        // ignore dispose error
-      }
       this.disposeExecutionTerminalSession(agentId, executionId);
     }, 0);
   }
@@ -1745,8 +1701,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this.executionTerminalSessions.delete(sessionKey);
-    session.writeEmitter.dispose();
-    session.closeEmitter.dispose();
   }
 
   private resolveExecutionSession(

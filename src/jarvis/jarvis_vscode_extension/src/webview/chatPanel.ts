@@ -1,3 +1,6 @@
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+
 type ChatMessageItem = {
   text?: string;
   variant?: string;
@@ -52,34 +55,159 @@ const sendSingleButton = document.getElementById(
 ) as HTMLButtonElement | null;
 let currentSelectedAgentId = "";
 
-function renderExecutionMessage(
-  item: ChatMessageItem,
-  _agentId: string,
-): HTMLDivElement {
+type ExecutionTerminalEntry = {
+  wrapper: HTMLDivElement;
+  terminalHost: HTMLDivElement;
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  resizeObserver: ResizeObserver;
+  lastBuffer: string;
+};
+
+const executionTerminals = new Map<string, ExecutionTerminalEntry>();
+
+function sendTerminalResize(
+  executionId: string,
+  cols: number,
+  rows: number,
+): void {
+  if (!executionId || cols <= 0 || rows <= 0) {
+    return;
+  }
+  vscode.postMessage({ type: "terminalResize", executionId, cols, rows });
+}
+
+function syncExecutionTerminalBuffer(
+  entry: ExecutionTerminalEntry,
+  nextBuffer: string,
+): void {
+  if (entry.lastBuffer === nextBuffer) {
+    return;
+  }
+  if (!nextBuffer.startsWith(entry.lastBuffer)) {
+    entry.terminal.reset();
+    entry.terminal.write(nextBuffer);
+    entry.lastBuffer = nextBuffer;
+    return;
+  }
+  const appended = nextBuffer.slice(entry.lastBuffer.length);
+  if (appended) {
+    entry.terminal.write(appended);
+  }
+  entry.lastBuffer = nextBuffer;
+}
+
+function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
+  const existing = executionTerminals.get(executionId);
+  if (existing) {
+    return existing;
+  }
+
   const wrapper = document.createElement("div");
   wrapper.className = "message execution";
 
   const header = document.createElement("div");
   header.className = "message-header";
-  header.textContent = item.text || "执行中";
   wrapper.appendChild(header);
 
   const hint = document.createElement("div");
   hint.className = "execution-hint";
-  const executionId = String(item.executionId || "").trim();
-  hint.textContent = executionId
-    ? `真实终端已在 VS Code Terminal 面板中打开（execution: ${executionId}）`
-    : "真实终端已在 VS Code Terminal 面板中打开";
   wrapper.appendChild(hint);
 
+  const terminalHost = document.createElement("div");
+  terminalHost.className = "execution-terminal";
+  terminalHost.tabIndex = 0;
+  wrapper.appendChild(terminalHost);
+
+  const terminal = new Terminal({
+    convertEol: false,
+    cursorBlink: true,
+    fontFamily: "var(--vscode-editor-font-family)",
+    fontSize: 13,
+    theme: {
+      background: "#1e1e1e",
+    },
+  });
+  const fitAddon = new FitAddon();
+  terminal.loadAddon(fitAddon);
+  terminal.open(terminalHost);
+
+  const focusTerminal = () => {
+    terminalHost.focus();
+    terminal.focus();
+  };
+
+  terminalHost.addEventListener("click", focusTerminal);
+  wrapper.addEventListener("click", focusTerminal);
+
+  terminal.onData((data) => {
+    vscode.postMessage({ type: "sendTerminalInput", text: data, executionId });
+  });
+
+  const resizeObserver = new ResizeObserver(() => {
+    fitAddon.fit();
+    sendTerminalResize(executionId, terminal.cols, terminal.rows);
+  });
+  resizeObserver.observe(terminalHost);
+
+  requestAnimationFrame(() => {
+    fitAddon.fit();
+    sendTerminalResize(executionId, terminal.cols, terminal.rows);
+    focusTerminal();
+  });
+
+  const entry: ExecutionTerminalEntry = {
+    wrapper,
+    terminalHost,
+    terminal,
+    fitAddon,
+    resizeObserver,
+    lastBuffer: "",
+  };
+  executionTerminals.set(executionId, entry);
+  return entry;
+}
+
+function renderExecutionMessage(
+  item: ChatMessageItem,
+  _agentId: string,
+): HTMLDivElement {
+  const executionId = String(item.executionId || "").trim();
+  const entry = ensureExecutionTerminal(executionId || "default");
+  const header = entry.wrapper.querySelector(".message-header");
+  if (header instanceof HTMLDivElement) {
+    header.textContent = item.text || "执行中";
+  }
+  const hint = entry.wrapper.querySelector(".execution-hint");
+  if (hint instanceof HTMLDivElement) {
+    hint.textContent = executionId
+      ? `终端会话：${executionId}`
+      : "终端会话已建立";
+  }
+  syncExecutionTerminalBuffer(entry, String(item.executionBuffer || ""));
+
+  const existingFinished = entry.wrapper.querySelector(".execution-finished");
   if (item.finished) {
-    const finishedNode = document.createElement("div");
-    finishedNode.className = "execution-finished";
-    finishedNode.textContent = "执行已结束";
-    wrapper.appendChild(finishedNode);
+    if (!existingFinished) {
+      const finishedNode = document.createElement("div");
+      finishedNode.className = "execution-finished";
+      finishedNode.textContent = "执行已结束";
+      entry.wrapper.appendChild(finishedNode);
+    }
+  } else if (existingFinished) {
+    existingFinished.remove();
   }
 
-  return wrapper;
+  requestAnimationFrame(() => {
+    entry.fitAddon.fit();
+    sendTerminalResize(
+      executionId || "default",
+      entry.terminal.cols,
+      entry.terminal.rows,
+    );
+  });
+
+  return entry.wrapper;
 }
 
 function renderMessages(messageList: ChatMessageItem[], agentId: string): void {
