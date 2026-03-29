@@ -100,6 +100,13 @@ interface AgentListViewMessage {
   useWorktree?: boolean;
 }
 
+interface SavedConnectionInfo {
+  gatewayUrl?: string;
+  connectionLockEnabled?: boolean;
+}
+
+const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
+
 class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "jarvis.agentListView";
 
@@ -158,7 +165,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private modelGroups: ModelGroupItem[] = [];
   private defaultLlmGroup = "";
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly globalState: vscode.Memento,
+  ) {
+    this.restoreSavedConnectionInfo();
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.currentView = webviewView;
@@ -644,6 +656,29 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private restoreSavedConnectionInfo(): void {
+    const savedConnectionInfo = this.globalState.get<SavedConnectionInfo>(
+      SAVED_CONNECTION_INFO_KEY,
+    );
+    if (!savedConnectionInfo) {
+      return;
+    }
+    const savedGatewayUrl = String(savedConnectionInfo.gatewayUrl || "").trim();
+    if (savedGatewayUrl) {
+      this.panelState.gatewayUrl = savedGatewayUrl;
+    }
+    this.panelState.connectionLockEnabled = Boolean(
+      savedConnectionInfo.connectionLockEnabled,
+    );
+  }
+
+  private async saveConnectionInfo(): Promise<void> {
+    await this.globalState.update(SAVED_CONNECTION_INFO_KEY, {
+      gatewayUrl: this.panelState.gatewayUrl,
+      connectionLockEnabled: this.panelState.connectionLockEnabled,
+    } satisfies SavedConnectionInfo);
+  }
+
   private async connectToGateway(
     gatewayUrl: string,
     password: string,
@@ -670,6 +705,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.panelState.executionStatus = "running";
       this.panelState.pendingRequestId = undefined;
       this.panelState.pendingStreamText = "";
+      await this.saveConnectionInfo();
       await this.loadModelGroups();
       this.postPanelState();
       this.connectGatewaySocket();
@@ -1685,10 +1721,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     session.closed = true;
-    session.lastBuffer = `${session.lastBuffer}\r\n\u001b[90m[Jarvis execution finished: ${executionId}]\u001b[0m\r\n`;
-    setTimeout(() => {
-      this.disposeExecutionTerminalSession(agentId, executionId);
-    }, 0);
   }
 
   private disposeExecutionTerminalSession(
@@ -1979,7 +2011,10 @@ function escapeHtml(value: string): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new JarvisAgentListViewProvider(context.extensionUri);
+  const provider = new JarvisAgentListViewProvider(
+    context.extensionUri,
+    context.globalState,
+  );
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(

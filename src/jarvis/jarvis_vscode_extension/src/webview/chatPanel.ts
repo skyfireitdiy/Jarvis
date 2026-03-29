@@ -84,16 +84,14 @@ function syncExecutionTerminalBuffer(
   if (entry.lastBuffer === nextBuffer) {
     return;
   }
-  if (!nextBuffer.startsWith(entry.lastBuffer)) {
-    entry.terminal.reset();
-    entry.terminal.write(nextBuffer);
+  const appended = nextBuffer.startsWith(entry.lastBuffer)
+    ? nextBuffer.slice(entry.lastBuffer.length)
+    : nextBuffer;
+  if (!appended) {
     entry.lastBuffer = nextBuffer;
     return;
   }
-  const appended = nextBuffer.slice(entry.lastBuffer.length);
-  if (appended) {
-    entry.terminal.write(appended);
-  }
+  entry.terminal.write(appended);
   entry.lastBuffer = nextBuffer;
 }
 
@@ -140,7 +138,7 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
   terminalHost.addEventListener("click", focusTerminal);
   wrapper.addEventListener("click", focusTerminal);
 
-  terminal.onData((data) => {
+  terminal.onData((data: string) => {
     vscode.postMessage({ type: "sendTerminalInput", text: data, executionId });
   });
 
@@ -153,7 +151,6 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
   requestAnimationFrame(() => {
     fitAddon.fit();
     sendTerminalResize(executionId, terminal.cols, terminal.rows);
-    focusTerminal();
   });
 
   const entry: ExecutionTerminalEntry = {
