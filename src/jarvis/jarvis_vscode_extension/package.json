@@ -17,8 +17,7 @@
   ],
   "activationEvents": [
     "onView:jarvis.agentListView",
-    "onCommand:jarvis.openPanel",
-    "onCommand:jarvis.refreshAgents"
+    "onCommand:jarvis.openPanel"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -26,10 +25,6 @@
       {
         "command": "jarvis.openPanel",
         "title": "Jarvis: Open Panel"
-      },
-      {
-        "command": "jarvis.refreshAgents",
-        "title": "Jarvis: Refresh Agents"
       }
     ],
     "viewsContainers": {

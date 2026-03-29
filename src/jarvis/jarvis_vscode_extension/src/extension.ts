@@ -109,6 +109,7 @@ const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
 const AGENT_CONNECTION_MAX_RETRIES = 12;
 const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
 const AGENT_CONNECTION_TIMEOUT_MS = 10000;
+const AGENT_LIST_REFRESH_INTERVAL_MS = 3000;
 
 class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "jarvis.agentListView";
@@ -148,6 +149,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readonly agentPanelStates = new Map<string, AgentChatState>();
   private readonly agentSockets = new Map<string, WebSocket>();
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
+  private agentListRefreshTimer: NodeJS.Timeout | undefined;
   private readonly executionTerminalSessions = new Map<
     string,
     ExecutionTerminalSession
@@ -188,10 +190,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       async (message: AgentListViewMessage) => {
         if (message?.type === "openAgent") {
           await this.openChatPanel(message.agentId);
-          return;
-        }
-        if (message?.type === "refreshAgents") {
-          await this.refreshAgents();
           return;
         }
         if (message?.type === "connect") {
@@ -412,7 +410,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     <strong>Agents</strong>
     <div class="toolbar-actions">
       <button id="toggleCreateAgentButton" ${createButtonDisabled}>${createButtonLabel}</button>
-      <button id="refreshButton">刷新</button>
     </div>
   </div>
   <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
@@ -421,13 +418,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   </ul>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-    const refreshButton = document.getElementById('refreshButton');
     const toggleCreateAgentButton = document.getElementById('toggleCreateAgentButton');
-    if (refreshButton) {
-      refreshButton.addEventListener('click', () => {
-        vscode.postMessage({ type: 'refreshAgents' });
-      });
-    }
     if (toggleCreateAgentButton) {
       toggleCreateAgentButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'toggleCreateAgentForm' });
@@ -683,6 +674,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     } satisfies SavedConnectionInfo);
   }
 
+  private startAgentListRefresh(): void {
+    this.stopAgentListRefresh();
+    this.agentListRefreshTimer = setInterval(() => {
+      void this.refreshAgents();
+    }, AGENT_LIST_REFRESH_INTERVAL_MS);
+    void this.refreshAgents();
+  }
+
+  private stopAgentListRefresh(): void {
+    if (!this.agentListRefreshTimer) {
+      return;
+    }
+    clearInterval(this.agentListRefreshTimer);
+    this.agentListRefreshTimer = undefined;
+  }
+
   private async connectToGateway(
     gatewayUrl: string,
     password: string,
@@ -713,7 +720,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       await this.loadModelGroups();
       this.postPanelState();
       this.connectGatewaySocket();
-      await this.refreshAgents();
+      this.startAgentListRefresh();
       this.renderAgentListView();
       this.appendPanelMessage("登录成功", "system");
     } catch (error) {
@@ -730,6 +737,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   public async refreshAgents(): Promise<void> {
     if (!this.panelState.token) {
+      this.stopAgentListRefresh();
       this.appendPanelMessage("请先连接并登录 Jarvis 网关", "error");
       return;
     }
@@ -1937,6 +1945,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     this.panelState[socketKey] = undefined;
   }
+
+  public dispose(): void {
+    this.stopAgentListRefresh();
+    this.disposeSocket("gatewaySocket");
+  }
 }
 
 interface ChatPanelMessage {
@@ -2122,6 +2135,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.extensionUri,
     context.globalState,
   );
+  activeProvider = provider;
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -2136,14 +2150,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("jarvis.refreshAgents", async () => {
-      await provider.refreshAgents();
-    }),
-  );
 }
 
-export function deactivate(): void {}
+let activeProvider: JarvisAgentListViewProvider | undefined;
+
+export function deactivate(): void {
+  activeProvider?.dispose();
+}
 
 function createNonce(): string {
   const possible =
