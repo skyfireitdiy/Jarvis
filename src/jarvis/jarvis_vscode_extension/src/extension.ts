@@ -21,6 +21,8 @@ interface GatewayAddress {
 interface ChatMessageItem {
   text: string;
   variant: "system" | "error" | "output" | "stream" | "execution";
+  lang?: "markdown" | "diff" | "text";
+  streamId?: string;
   executionId?: string;
   executionBuffer?: string;
   finished?: boolean;
@@ -36,6 +38,7 @@ interface AgentChatState {
   messages: ChatMessageItem[];
   pendingRequestId?: string;
   pendingStreamText: string;
+  activeStreamingMessageId?: string;
   activeExecutionId?: string;
   executionBuffers: Record<string, string>;
 }
@@ -574,12 +577,28 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .layout { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
     .section { padding: 12px; border-bottom: 1px solid var(--vscode-panel-border); }
     .messages { overflow: auto; padding: 12px; }
-    .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: var(--vscode-sideBar-background); white-space: pre-wrap; }
+    .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: var(--vscode-sideBar-background); white-space: normal; overflow-wrap: anywhere; }
     .message.system { border-left: 3px solid var(--vscode-textLink-foreground); }
     .message.error { border-left: 3px solid var(--vscode-errorForeground); }
     .message.output { border-left: 3px solid var(--vscode-testing-iconPassed); }
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
     .message.execution { border-left: 3px solid var(--vscode-terminal-ansiGreen, var(--vscode-testing-iconPassed)); }
+    .message p { margin: 0 0 8px; }
+    .message p:last-child { margin-bottom: 0; }
+    .message ul, .message ol { margin: 0 0 8px 20px; padding: 0; }
+    .message li + li { margin-top: 4px; }
+    .message pre { margin: 8px 0; padding: 10px; border-radius: 6px; overflow: auto; background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06)); }
+    .message code { font-family: var(--vscode-editor-font-family); font-size: 12px; }
+    .message :not(pre) > code { padding: 2px 4px; border-radius: 4px; background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06)); }
+    .message blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--vscode-panel-border); opacity: 0.9; }
+    .message a { color: var(--vscode-textLink-foreground); }
+    .message table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+    .message th, .message td { border: 1px solid var(--vscode-panel-border); padding: 6px 8px; text-align: left; }
+    .message .plantuml-block { margin: 8px 0; padding: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
+    .message .plantuml-notice { margin-bottom: 8px; font-size: 12px; opacity: 0.8; }
+    .message .plantuml-link { display: inline-block; text-decoration: none; }
+    .message .plantuml-image { max-width: 100%; border-radius: 4px; background: #fff; }
+    .message .plantuml-source summary { cursor: pointer; margin-top: 8px; }
     .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
     .execution-hint { font-size: 12px; opacity: 0.82; margin-bottom: 8px; }
     .execution-terminal { height: 240px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
@@ -1307,7 +1326,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     agentId?: string,
     retryCount = 0,
   ): Promise<void> {
-    const targetAgentId = String(agentId || this.panelState.selectedAgentId || "").trim();
+    const targetAgentId = String(
+      agentId || this.panelState.selectedAgentId || "",
+    ).trim();
     if (!targetAgentId || !this.panelState.token) {
       return;
     }
@@ -1384,7 +1405,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           type: "auth",
           payload: { token: this.panelState.token },
         });
-        this.sendSocketMessage(agentSocket, { type: "get_status", payload: {} });
+        this.sendSocketMessage(agentSocket, {
+          type: "get_status",
+          payload: {},
+        });
         this.withAgentState(agentId, (state) => {
           state.connectionStatusText = `已连接 Agent：${agentId}`;
           state.hasConnectionError = false;
@@ -1429,7 +1453,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }).catch(async (error) => {
       this.withAgentState(agentId, (state) => {
         state.connectionStatusText = `等待 Agent 就绪：${agentId} (${retryCount + 1}/${AGENT_CONNECTION_MAX_RETRIES})`;
-        state.hasConnectionError = retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES;
+        state.hasConnectionError =
+          retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES;
       });
       if (retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES) {
         this.appendPanelMessage(getErrorMessage(error), "error", agentId);
@@ -1591,8 +1616,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ): void {
     const outputType = String(payload?.output_type || "");
     if (outputType === "STREAM_START") {
+      const streamId = `stream-${Date.now()}`;
       this.withAgentState(agentId, (state) => {
         state.pendingStreamText = "";
+        state.activeStreamingMessageId = streamId;
+        state.messages.push({
+          text: "",
+          variant: "stream",
+          lang: "markdown",
+          streamId,
+        });
       });
       this.postPanelState();
       return;
@@ -1600,27 +1633,42 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (outputType === "STREAM_CHUNK") {
       this.withAgentState(agentId, (state) => {
         state.pendingStreamText += String(payload?.text || "");
+        if (!state.activeStreamingMessageId) {
+          return;
+        }
+        const streamingMessage = state.messages.find(
+          (item) => item.streamId === state.activeStreamingMessageId,
+        );
+        if (streamingMessage) {
+          streamingMessage.text = state.pendingStreamText;
+          streamingMessage.lang = "markdown";
+        }
       });
       this.postPanelState();
       return;
     }
     if (outputType === "STREAM_END") {
-      const agentState = this.getAgentState(agentId);
-      if (agentState.pendingStreamText) {
-        this.appendPanelMessage(
-          agentState.pendingStreamText,
-          "stream",
-          agentId,
-        );
-        this.withAgentState(agentId, (state) => {
-          state.pendingStreamText = "";
-        });
-      }
+      this.withAgentState(agentId, (state) => {
+        if (state.activeStreamingMessageId) {
+          state.messages = state.messages.filter(
+            (item) => item.streamId !== state.activeStreamingMessageId,
+          );
+        }
+        state.pendingStreamText = "";
+        state.activeStreamingMessageId = undefined;
+      });
+      this.postPanelState();
       return;
     }
     const outputText = String(payload?.text || "");
     if (outputText) {
-      this.appendPanelMessage(outputText, "output", agentId);
+      const lang =
+        payload?.lang === "markdown"
+          ? "markdown"
+          : payload?.lang === "diff"
+            ? "diff"
+            : "text";
+      this.appendPanelMessage(outputText, "output", agentId, lang);
     }
   }
 
@@ -1713,6 +1761,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       messages: [],
       pendingRequestId: undefined,
       pendingStreamText: "",
+      activeStreamingMessageId: undefined,
       activeExecutionId: undefined,
       executionBuffers: {},
     };
@@ -1783,6 +1832,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       messages: [...this.panelState.messages],
       pendingRequestId: this.panelState.pendingRequestId,
       pendingStreamText: this.panelState.pendingStreamText,
+      activeStreamingMessageId: currentState.activeStreamingMessageId,
       activeExecutionId: currentState.activeExecutionId,
       executionBuffers: { ...currentState.executionBuffers },
     });
@@ -1919,16 +1969,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     text: string,
     variant: "system" | "error" | "output" | "stream" = "system",
     agentId?: string,
+    lang: "markdown" | "diff" | "text" = "text",
   ): void {
     if (agentId) {
       const agentState = this.getAgentState(agentId);
-      agentState.messages.push({ text, variant });
+      agentState.messages.push({ text, variant, lang });
       if (this.panelState.selectedAgentId === agentId) {
         this.panelState.messages = [...agentState.messages];
         this.syncSelectedAgentState();
       }
     } else {
-      this.panelState.messages.push({ text, variant });
+      this.panelState.messages.push({ text, variant, lang });
     }
     this.postPanelState();
   }
@@ -2149,7 +2200,6 @@ export function activate(context: vscode.ExtensionContext): void {
       await provider.openChatPanel();
     }),
   );
-
 }
 
 let activeProvider: JarvisAgentListViewProvider | undefined;
