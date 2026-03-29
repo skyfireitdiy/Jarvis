@@ -108,7 +108,19 @@ interface SavedConnectionInfo {
   connectionLockEnabled?: boolean;
 }
 
+interface PersistedChatMessageItem {
+  text: string;
+  variant: "system" | "error" | "output" | "execution";
+  lang?: "markdown" | "diff" | "text";
+  executionId?: string;
+  executionBuffer?: string;
+  finished?: boolean;
+}
+
 const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
+const AGENT_CHAT_HISTORY_KEY = "jarvis.agentChatHistory";
+const MAX_PERSISTED_MESSAGES_PER_AGENT = 100;
+const MAX_PERSISTED_EXECUTION_BUFFER_LENGTH = 50000;
 const AGENT_CONNECTION_MAX_RETRIES = 12;
 const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
 const AGENT_CONNECTION_TIMEOUT_MS = 10000;
@@ -694,6 +706,118 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     } satisfies SavedConnectionInfo);
   }
 
+  private getPersistedAgentChatHistory(): Record<
+    string,
+    PersistedChatMessageItem[]
+  > {
+    const savedHistory = this.globalState.get<
+      Record<string, PersistedChatMessageItem[]>
+    >(AGENT_CHAT_HISTORY_KEY);
+    if (!savedHistory || typeof savedHistory !== "object") {
+      return {};
+    }
+    return savedHistory;
+  }
+
+  private sanitizePersistedExecutionBuffer(
+    buffer: unknown,
+  ): string | undefined {
+    const text = String(buffer || "");
+    if (!text) {
+      return undefined;
+    }
+    if (text.length <= MAX_PERSISTED_EXECUTION_BUFFER_LENGTH) {
+      return text;
+    }
+    return text.slice(-MAX_PERSISTED_EXECUTION_BUFFER_LENGTH);
+  }
+
+  private toPersistedChatMessage(
+    message: ChatMessageItem,
+  ): PersistedChatMessageItem | undefined {
+    if (message.variant === "stream") {
+      return undefined;
+    }
+    return {
+      text: String(message.text || ""),
+      variant: message.variant,
+      lang: message.lang,
+      executionId: message.executionId,
+      executionBuffer: this.sanitizePersistedExecutionBuffer(
+        message.executionBuffer,
+      ),
+      finished:
+        message.variant === "execution" ? Boolean(message.finished) : undefined,
+    };
+  }
+
+  private async persistAgentHistory(agentId: string): Promise<void> {
+    const agentState = this.agentPanelStates.get(agentId);
+    if (!agentState) {
+      return;
+    }
+    const persistedMessages = agentState.messages
+      .map((message) => this.toPersistedChatMessage(message))
+      .filter(
+        (message): message is PersistedChatMessageItem => message !== undefined,
+      )
+      .slice(-MAX_PERSISTED_MESSAGES_PER_AGENT);
+    const allHistory = this.getPersistedAgentChatHistory();
+    allHistory[agentId] = persistedMessages;
+    await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
+  }
+
+  private loadPersistedAgentHistory(agentId: string): void {
+    const allHistory = this.getPersistedAgentChatHistory();
+    const persistedMessages = Array.isArray(allHistory[agentId])
+      ? allHistory[agentId]
+      : [];
+    if (persistedMessages.length === 0) {
+      return;
+    }
+    const state = this.agentPanelStates.get(agentId);
+    if (!state || state.messages.length > 0) {
+      return;
+    }
+    const restoredMessages: ChatMessageItem[] = persistedMessages.map(
+      (message) => ({
+        text: String(message.text || ""),
+        variant: message.variant,
+        lang: message.lang,
+        executionId: message.executionId,
+        executionBuffer: this.sanitizePersistedExecutionBuffer(
+          message.executionBuffer,
+        ),
+        finished:
+          message.variant === "execution"
+            ? Boolean(message.finished)
+            : undefined,
+      }),
+    );
+    state.messages = restoredMessages;
+    state.executionBuffers = {};
+    state.activeExecutionId = undefined;
+    state.activeStreamingMessageId = undefined;
+    for (const message of restoredMessages) {
+      if (message.variant === "execution" && message.executionId) {
+        state.executionBuffers[message.executionId] =
+          this.sanitizePersistedExecutionBuffer(message.executionBuffer) || "";
+        if (message.finished === false) {
+          state.activeExecutionId = message.executionId;
+        }
+      }
+    }
+  }
+
+  private async clearPersistedAgentHistory(agentId: string): Promise<void> {
+    const allHistory = this.getPersistedAgentChatHistory();
+    if (!(agentId in allHistory)) {
+      return;
+    }
+    delete allHistory[agentId];
+    await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
+  }
+
   private startAgentListRefresh(): void {
     this.stopAgentListRefresh();
     this.agentListRefreshTimer = setInterval(() => {
@@ -1161,6 +1285,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       if (this.panelState.selectedAgentId === agentId) {
         this.panelState.selectedAgentId = undefined;
       }
+      this.agentPanelStates.delete(agentId);
+      await this.clearPersistedAgentHistory(agentId);
       await this.refreshAgents();
       this.renderAgentListView();
       this.appendPanelMessage(`已删除 Agent：${agentId}`, "system");
@@ -1781,6 +1907,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const nextState = this.createDefaultAgentState();
     this.agentPanelStates.set(agentId, nextState);
+    this.loadPersistedAgentHistory(agentId);
     return nextState;
   }
 
@@ -1793,6 +1920,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (this.panelState.selectedAgentId === agentId) {
       this.restoreSelectedAgentState();
     }
+    void this.persistAgentHistory(agentId);
   }
 
   private restoreSelectedAgentState(): void {
@@ -1843,6 +1971,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       activeExecutionId: currentState.activeExecutionId,
       executionBuffers: { ...currentState.executionBuffers },
     });
+    void this.persistAgentHistory(agentId);
   }
 
   private getExecutionSessionKey(agentId: string, executionId: string): string {
@@ -1984,6 +2113,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       if (this.panelState.selectedAgentId === agentId) {
         this.panelState.messages = [...agentState.messages];
         this.syncSelectedAgentState();
+      } else {
+        void this.persistAgentHistory(agentId);
       }
     } else {
       this.panelState.messages.push({ text, variant, lang });
