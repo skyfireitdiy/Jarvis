@@ -1,9 +1,12 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { marked } from "marked";
+import plantumlEncoder from "plantuml-encoder";
 
 type ChatMessageItem = {
   text?: string;
   variant?: string;
+  lang?: string;
   executionId?: string;
   executionBuffer?: string;
   finished?: boolean;
@@ -65,6 +68,87 @@ type ExecutionTerminalEntry = {
 };
 
 const executionTerminals = new Map<string, ExecutionTerminalEntry>();
+const PLANTUML_SERVER_URL = "https://www.plantuml.com/plantuml/svg/";
+const PLANTUML_BLOCK_LANGUAGE = "plantuml";
+
+function escapeHtml(value: string): string {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function isPlantUmlLanguage(language: string | undefined): boolean {
+  return (
+    String(language || "")
+      .trim()
+      .toLowerCase() === PLANTUML_BLOCK_LANGUAGE
+  );
+}
+
+function isPlantUmlComplete(source: string): boolean {
+  const trimmedSource = String(source || "")
+    .trim()
+    .toLowerCase();
+  return (
+    trimmedSource.includes("@startuml") && trimmedSource.includes("@enduml")
+  );
+}
+
+function renderPlantUmlBlock(plantUmlSource: string): string {
+  const trimmedSource = String(plantUmlSource || "").trim();
+  if (!trimmedSource) {
+    return '<pre><code class="language-plantuml"></code></pre>';
+  }
+  if (!isPlantUmlComplete(trimmedSource)) {
+    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`;
+  }
+  try {
+    const escapedSource = escapeHtml(trimmedSource);
+    const encodedSource = plantumlEncoder.encode(trimmedSource);
+    const plantUmlUrl = `${PLANTUML_SERVER_URL}${encodedSource}`;
+    return [
+      '<div class="plantuml-block">',
+      '  <div class="plantuml-notice">',
+      "    当前前端使用 PlantUML 在线服务渲染，若图片加载失败可展开查看源码。",
+      "  </div>",
+      `  <a class="plantuml-link" href="${plantUmlUrl}" target="_blank" rel="noopener noreferrer">`,
+      `    <img class="plantuml-image" src="${plantUmlUrl}" alt="PlantUML diagram" loading="lazy" />`,
+      "  </a>",
+      '  <details class="plantuml-source">',
+      "    <summary>查看 PlantUML 源码</summary>",
+      `    <pre><code class="language-plantuml">${escapedSource}</code></pre>`,
+      "  </details>",
+      "</div>",
+    ].join("\n");
+  } catch (error) {
+    console.error("[PlantUML] Failed to render PlantUML block:", error);
+    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`;
+  }
+}
+
+const markedRenderer = new marked.Renderer();
+const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer);
+markedRenderer.code = (token: Parameters<typeof defaultCodeRenderer>[0]) => {
+  if (isPlantUmlLanguage(token.lang)) {
+    return renderPlantUmlBlock(token.text);
+  }
+  return defaultCodeRenderer(token);
+};
+marked.setOptions({ renderer: markedRenderer });
+
+function renderMessageHtml(item: ChatMessageItem): string {
+  const text = String(item.text || "");
+  if (item.lang === "markdown") {
+    return marked.parse(text) as string;
+  }
+  if (item.lang === "diff") {
+    return marked.parse(`\`\`\`diff\n${text}\n\`\`\``) as string;
+  }
+  return escapeHtml(text);
+}
 
 function sendTerminalResize(
   executionId: string,
@@ -219,7 +303,7 @@ function renderMessages(messageList: ChatMessageItem[], agentId: string): void {
     }
     const node = document.createElement("div");
     node.className = "message " + (item.variant || "system");
-    node.textContent = item.text || "";
+    node.innerHTML = renderMessageHtml(item);
     nextNodes.push(node);
   });
 
