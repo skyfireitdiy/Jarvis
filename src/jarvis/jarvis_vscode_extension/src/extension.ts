@@ -2147,6 +2147,10 @@ function decodeExecutionChunk(
   if (!payload) {
     return "";
   }
+  const messageType = String(payload.message_type || "");
+  if (messageType === "tool_input") {
+    return "";
+  }
   const chunkData = String(payload.data || "");
   if (!chunkData) {
     return "";

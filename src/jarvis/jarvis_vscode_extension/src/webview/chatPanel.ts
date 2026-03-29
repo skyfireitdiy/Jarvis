@@ -255,9 +255,7 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
     terminal.focus();
   };
 
-  terminalHost.addEventListener("mousedown", focusTerminal);
   terminalHost.addEventListener("click", focusTerminal);
-  wrapper.addEventListener("mousedown", focusTerminal);
   wrapper.addEventListener("click", focusTerminal);
 
   terminal.onData((data: string) => {
