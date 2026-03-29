@@ -803,15 +803,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       this.restoreSelectedAgentState();
 
-      // 只有在数据变化时才重新渲染界面，避免抢占焦点
+      // 只有在数据变化时才重新渲染左侧列表；右侧 Chat Panel 仅同步状态，避免重建 DOM 抢占焦点
       if (hasChanged) {
         this.lastAgentItemsJson = newAgentItemsJson;
         this.renderAgentListView();
         if (this.currentPanel) {
           this.currentPanel.title = this.getChatPanelTitle();
-          this.currentPanel.webview.html = this.getChatPanelHtml(
-            this.panelState.selectedAgentId,
-          );
+          this.postPanelState();
         }
       }
 
@@ -1424,7 +1422,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           state.connectionStatusText = `已连接 Agent：${agentId}`;
           state.hasConnectionError = false;
         });
-        this.appendPanelMessage(`已连接 Agent：${agentId}`, "system", agentId);
         resolve();
       });
 
@@ -1459,7 +1456,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         this.withAgentState(agentId, (state) => {
           state.connectionStatusText = `Agent WebSocket 已关闭：${agentId}`;
         });
-        this.appendPanelMessage("Agent WebSocket 已关闭", "system", agentId);
       });
     }).catch(async (error) => {
       this.withAgentState(agentId, (state) => {
