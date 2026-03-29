@@ -106,6 +106,9 @@ interface SavedConnectionInfo {
 }
 
 const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
+const AGENT_CONNECTION_MAX_RETRIES = 12;
+const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
+const AGENT_CONNECTION_TIMEOUT_MS = 10000;
 
 class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "jarvis.agentListView";
@@ -144,6 +147,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   };
   private readonly agentPanelStates = new Map<string, AgentChatState>();
   private readonly agentSockets = new Map<string, WebSocket>();
+  private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
   private readonly executionTerminalSessions = new Map<
     string,
     ExecutionTerminalSession
@@ -1208,6 +1212,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         "system",
       );
       await this.openChatPanel(result.data.agent_id);
+      void this.connectAgentSocket(result.data.agent_id);
     } catch (error) {
       this.createAgentFormState.isSubmitting = false;
       this.createAgentFormState.errorMessage = getErrorMessage(error);
@@ -1263,12 +1268,67 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.gatewaySocket = gatewaySocket;
   }
 
-  private connectAgentSocket(): void {
-    const agentId = this.panelState.selectedAgentId;
-    if (!agentId || !this.panelState.token) {
+  private async waitForSocketClose(socket: WebSocket): Promise<void> {
+    if (socket.readyState === WebSocket.CLOSED) {
       return;
     }
+    try {
+      socket.close();
+    } catch {
+      // ignore close error
+    }
+    await new Promise<void>((resolve) => {
+      if (socket.readyState === WebSocket.CLOSED) {
+        resolve();
+        return;
+      }
+      const checkInterval = setInterval(() => {
+        if (socket.readyState === WebSocket.CLOSED) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 50);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve();
+      }, 1000);
+    });
+  }
 
+  private async connectAgentSocket(
+    agentId?: string,
+    retryCount = 0,
+  ): Promise<void> {
+    const targetAgentId = String(agentId || this.panelState.selectedAgentId || "").trim();
+    if (!targetAgentId || !this.panelState.token) {
+      return;
+    }
+    if (retryCount === 0) {
+      const pendingAttempt = this.agentConnectionAttempts.get(targetAgentId);
+      if (pendingAttempt) {
+        return pendingAttempt;
+      }
+    }
+
+    const connectionPromise = this.connectAgentSocketWithRetry(
+      targetAgentId,
+      retryCount,
+    ).finally(() => {
+      if (retryCount === 0) {
+        this.agentConnectionAttempts.delete(targetAgentId);
+      }
+    });
+
+    if (retryCount === 0) {
+      this.agentConnectionAttempts.set(targetAgentId, connectionPromise);
+    }
+    return connectionPromise;
+  }
+
+  private async connectAgentSocketWithRetry(
+    agentId: string,
+    retryCount: number,
+  ): Promise<void> {
     const existingSocket = this.agentSockets.get(agentId);
     if (existingSocket && existingSocket.readyState === WebSocket.OPEN) {
       this.sendSocketMessage(existingSocket, {
@@ -1277,54 +1337,101 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       });
       return;
     }
-    if (existingSocket && existingSocket.readyState === WebSocket.CONNECTING) {
-      return;
+    if (existingSocket && existingSocket.readyState !== WebSocket.CLOSED) {
+      await this.waitForSocketClose(existingSocket);
+      this.agentSockets.delete(agentId);
     }
 
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId);
-    const agentSocket = new WebSocket(socketUrl, {
-      headers: {
-        Authorization: `Bearer ${this.panelState.token}`,
-      },
-    });
 
-    agentSocket.on("open", () => {
-      this.sendSocketMessage(agentSocket, {
-        type: "auth",
-        payload: { token: this.panelState.token },
+    await new Promise<void>((resolve, reject) => {
+      const agentSocket = new WebSocket(socketUrl, {
+        headers: {
+          Authorization: `Bearer ${this.panelState.token}`,
+        },
       });
-      this.sendSocketMessage(agentSocket, { type: "get_status", payload: {} });
+      let connectionHandled = false;
+      const timeoutId = setTimeout(() => {
+        if (connectionHandled) {
+          return;
+        }
+        connectionHandled = true;
+        try {
+          agentSocket.close();
+        } catch {
+          // ignore close error
+        }
+        reject(new Error(`Agent WebSocket 连接超时：${agentId}`));
+      }, AGENT_CONNECTION_TIMEOUT_MS);
+
+      agentSocket.on("open", () => {
+        if (connectionHandled) {
+          return;
+        }
+        connectionHandled = true;
+        clearTimeout(timeoutId);
+        this.agentSockets.set(agentId, agentSocket);
+        this.sendSocketMessage(agentSocket, {
+          type: "auth",
+          payload: { token: this.panelState.token },
+        });
+        this.sendSocketMessage(agentSocket, { type: "get_status", payload: {} });
+        this.withAgentState(agentId, (state) => {
+          state.connectionStatusText = `已连接 Agent：${agentId}`;
+          state.hasConnectionError = false;
+        });
+        this.appendPanelMessage(`已连接 Agent：${agentId}`, "system", agentId);
+        resolve();
+      });
+
+      agentSocket.on("message", (data: RawData) => {
+        this.handleAgentSocketMessage(agentId, data);
+      });
+
+      agentSocket.on("error", () => {
+        if (connectionHandled) {
+          return;
+        }
+        connectionHandled = true;
+        clearTimeout(timeoutId);
+        try {
+          agentSocket.close();
+        } catch {
+          // ignore close error
+        }
+        reject(new Error(`Agent WebSocket 连接异常：${agentId}`));
+      });
+
+      agentSocket.on("close", () => {
+        if (this.agentSockets.get(agentId) === agentSocket) {
+          this.agentSockets.delete(agentId);
+        }
+        if (!connectionHandled) {
+          connectionHandled = true;
+          clearTimeout(timeoutId);
+          reject(new Error(`Agent WebSocket 提前关闭：${agentId}`));
+          return;
+        }
+        this.withAgentState(agentId, (state) => {
+          state.connectionStatusText = `Agent WebSocket 已关闭：${agentId}`;
+        });
+        this.appendPanelMessage("Agent WebSocket 已关闭", "system", agentId);
+      });
+    }).catch(async (error) => {
       this.withAgentState(agentId, (state) => {
-        state.connectionStatusText = `已连接 Agent：${agentId}`;
-        state.hasConnectionError = false;
+        state.connectionStatusText = `等待 Agent 就绪：${agentId} (${retryCount + 1}/${AGENT_CONNECTION_MAX_RETRIES})`;
+        state.hasConnectionError = retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES;
       });
-      this.appendPanelMessage(`已连接 Agent：${agentId}`, "system", agentId);
-    });
-
-    agentSocket.on("message", (data: RawData) => {
-      this.handleAgentSocketMessage(agentId, data);
-    });
-
-    agentSocket.on("error", () => {
-      this.withAgentState(agentId, (state) => {
-        state.connectionStatusText = `Agent WebSocket 连接异常：${agentId}`;
-        state.hasConnectionError = true;
-      });
-      this.appendPanelMessage("Agent WebSocket 连接异常", "error", agentId);
-    });
-
-    agentSocket.on("close", () => {
-      if (this.agentSockets.get(agentId) === agentSocket) {
-        this.agentSockets.delete(agentId);
+      if (retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES) {
+        this.appendPanelMessage(getErrorMessage(error), "error", agentId);
+        throw error;
       }
-      this.withAgentState(agentId, (state) => {
-        state.connectionStatusText = `Agent WebSocket 已关闭：${agentId}`;
+      await new Promise((resolve) => {
+        setTimeout(resolve, AGENT_CONNECTION_RETRY_DELAY_MS);
       });
-      this.appendPanelMessage("Agent WebSocket 已关闭", "system", agentId);
+      await this.connectAgentSocketWithRetry(agentId, retryCount + 1);
     });
-
-    this.agentSockets.set(agentId, agentSocket);
   }
 
   private handleGatewaySocketMessage(rawData: RawData): void {
