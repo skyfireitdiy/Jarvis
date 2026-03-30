@@ -22,6 +22,13 @@ type StatePayload = {
   messages?: ChatMessageItem[];
 };
 
+type CompletionItem = {
+  value?: string;
+  display?: string;
+  description?: string;
+  type?: string;
+};
+
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
 };
@@ -68,8 +75,27 @@ const manualInterruptButton = document.getElementById(
 const runningIndicator = document.getElementById(
   "runningIndicator",
 ) as HTMLDivElement | null;
+const completionModalOverlay = document.getElementById(
+  "completionModalOverlay",
+) as HTMLDivElement | null;
+const closeCompletionModalButton = document.getElementById(
+  "closeCompletionModalButton",
+) as HTMLButtonElement | null;
+const completionSearchInput = document.getElementById(
+  "completionSearchInput",
+) as HTMLInputElement | null;
+const completionList = document.getElementById(
+  "completionList",
+) as HTMLDivElement | null;
+const completionStatus = document.getElementById(
+  "completionStatus",
+) as HTMLDivElement | null;
 let currentSelectedAgentId = "";
 let wasRunningIndicatorVisible = false;
+let completionCursorPos = -1;
+let baseCompletions: CompletionItem[] = [];
+let searchedCompletions: CompletionItem[] = [];
+let selectedCompletionIndex = -1;
 
 type ExecutionTerminalEntry = {
   wrapper: HTMLDivElement;
@@ -437,6 +463,125 @@ function insertTextAtCursor(textToInsert: string): void {
   inputElement.focus();
 }
 
+function getMergedCompletions(): CompletionItem[] {
+  const query = String(completionSearchInput?.value || "")
+    .trim()
+    .toLowerCase();
+  if (!query) {
+    return baseCompletions;
+  }
+  const filteredBaseCompletions = baseCompletions.filter((item) => {
+    const displayText = String(item.display || "").toLowerCase();
+    const descriptionText = String(item.description || "").toLowerCase();
+    const valueText = String(item.value || "").toLowerCase();
+    return (
+      displayText.includes(query) ||
+      descriptionText.includes(query) ||
+      valueText.includes(query)
+    );
+  });
+  return [...filteredBaseCompletions, ...searchedCompletions];
+}
+
+function renderCompletionList(): void {
+  if (!completionList) {
+    return;
+  }
+  const items = getMergedCompletions();
+  completionList.innerHTML = "";
+  if (items.length === 0) {
+    const emptyNode = document.createElement("div");
+    emptyNode.className = "completion-empty";
+    emptyNode.textContent = "没有找到匹配的补全";
+    completionList.appendChild(emptyNode);
+    return;
+  }
+  items.forEach((item, index) => {
+    const node = document.createElement("div");
+    node.className =
+      "completion-item" + (selectedCompletionIndex === index ? " selected" : "");
+    const typeClass = String(item.type || "").trim();
+    if (typeClass) {
+      node.classList.add(`completion-${typeClass}`);
+    }
+    const valueNode = document.createElement("div");
+    valueNode.className = "completion-value";
+    valueNode.textContent = String(item.display || item.value || "");
+    node.appendChild(valueNode);
+    const descNode = document.createElement("div");
+    descNode.className = "completion-desc";
+    descNode.textContent = String(item.description || "");
+    node.appendChild(descNode);
+    node.addEventListener("click", () => {
+      insertCompletionItem(item);
+    });
+    completionList.appendChild(node);
+  });
+}
+
+function setCompletionStatus(message: string, isError = false): void {
+  if (!completionStatus) {
+    return;
+  }
+  const text = String(message || "").trim();
+  completionStatus.textContent = text;
+  completionStatus.style.display = text ? "block" : "none";
+  completionStatus.className = isError
+    ? "completion-status error"
+    : "completion-status";
+}
+
+function openCompletionModal(): void {
+  const inputElement = getActiveInputElement();
+  completionCursorPos = inputElement?.selectionStart ?? inputElement?.value.length ?? -1;
+  selectedCompletionIndex = -1;
+  searchedCompletions = [];
+  setCompletionStatus("正在加载补全...");
+  renderCompletionList();
+  completionModalOverlay?.classList.add("visible");
+  vscode.postMessage({ type: "openCompletions" });
+}
+
+function closeCompletionModal(insertAtOnClose = false): void {
+  completionModalOverlay?.classList.remove("visible");
+  setCompletionStatus("");
+  selectedCompletionIndex = -1;
+  baseCompletions = [];
+  searchedCompletions = [];
+  const cursorPos = completionCursorPos;
+  completionCursorPos = -1;
+  if (insertAtOnClose && cursorPos >= 0) {
+    insertTextAtCursor("@");
+  }
+}
+
+function insertCompletionItem(item: CompletionItem): void {
+  const value = String(item.value || "").trim();
+  if (!value) {
+    return;
+  }
+  insertTextAtCursor(`'${value}'`);
+  closeCompletionModal(false);
+}
+
+function moveCompletionSelection(delta: number): void {
+  const items = getMergedCompletions();
+  if (items.length === 0) {
+    return;
+  }
+  if (selectedCompletionIndex < 0) {
+    selectedCompletionIndex = delta > 0 ? 0 : items.length - 1;
+  } else {
+    selectedCompletionIndex =
+      (selectedCompletionIndex + delta + items.length) % items.length;
+  }
+  renderCompletionList();
+  const selectedNode = completionList?.children.item(selectedCompletionIndex);
+  if (selectedNode instanceof HTMLDivElement) {
+    selectedNode.scrollIntoView({ block: "nearest" });
+  }
+}
+
 function sendCurrentInput(mode: "single" | "multi"): void {
   const inputEl = mode === "single" ? singleMessageInput : messageInput;
   const text = inputEl ? inputEl.value : "";
@@ -459,7 +604,7 @@ sendSingleButton?.addEventListener("click", () => {
 });
 
 completionButton?.addEventListener("click", () => {
-  insertTextAtCursor("@");
+  openCompletionModal();
 });
 
 completeButton?.addEventListener("click", () => {
@@ -492,10 +637,84 @@ singleMessageInput?.addEventListener("keydown", (event) => {
   }
 });
 
+closeCompletionModalButton?.addEventListener("click", () => {
+  closeCompletionModal(true);
+});
+
+completionModalOverlay?.addEventListener("click", (event) => {
+  if (event.target === completionModalOverlay) {
+    closeCompletionModal(true);
+  }
+});
+
+completionSearchInput?.addEventListener("input", () => {
+  const query = completionSearchInput.value.trim();
+  selectedCompletionIndex = -1;
+  if (!query) {
+    searchedCompletions = [];
+    setCompletionStatus("");
+    renderCompletionList();
+    return;
+  }
+  setCompletionStatus("正在搜索补全...");
+  renderCompletionList();
+  vscode.postMessage({ type: "searchCompletions", query });
+});
+
+completionSearchInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeCompletionModal(true);
+    return;
+  }
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    moveCompletionSelection(1);
+    return;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    moveCompletionSelection(-1);
+    return;
+  }
+  if (event.key === "Enter") {
+    const items = getMergedCompletions();
+    if (selectedCompletionIndex >= 0 && selectedCompletionIndex < items.length) {
+      event.preventDefault();
+      insertCompletionItem(items[selectedCompletionIndex]);
+    }
+  }
+});
+
 window.addEventListener(
   "message",
-  (event: MessageEvent<{ type?: string; payload?: StatePayload }>) => {
+  (event: MessageEvent<{ type?: string; payload?: StatePayload & { items?: CompletionItem[]; query?: string; error?: string } }>) => {
     const data = event.data || {};
+    if (data.type === "completionsResult") {
+      const payload = data.payload || {};
+      baseCompletions = Array.isArray(payload.items) ? payload.items : [];
+      searchedCompletions = [];
+      selectedCompletionIndex = -1;
+      setCompletionStatus(String(payload.error || ""), Boolean(payload.error));
+      renderCompletionList();
+      completionModalOverlay?.classList.add("visible");
+      requestAnimationFrame(() => {
+        completionSearchInput?.focus();
+      });
+      return;
+    }
+    if (data.type === "completionSearchResult") {
+      const payload = data.payload || {};
+      const currentQuery = completionSearchInput?.value.trim() || "";
+      if (String(payload.query || "") !== currentQuery) {
+        return;
+      }
+      searchedCompletions = Array.isArray(payload.items) ? payload.items : [];
+      selectedCompletionIndex = -1;
+      setCompletionStatus(String(payload.error || ""), Boolean(payload.error));
+      renderCompletionList();
+      return;
+    }
     if (data.type !== "state") {
       return;
     }
