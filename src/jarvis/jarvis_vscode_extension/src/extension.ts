@@ -34,7 +34,7 @@ interface AgentChatState {
   hasConnectionError: boolean;
   inputMode: "single" | "multi";
   inputTip: string;
-  executionStatus: "running" | "waiting_single" | "waiting_multi";
+  executionStatus: "running" | "waiting_single" | "waiting_multi" | "stopped";
   messages: ChatMessageItem[];
   pendingRequestId?: string;
   pendingStreamText: string;
@@ -61,7 +61,7 @@ interface ChatPanelState {
   hasConnectionError: boolean;
   inputMode: "single" | "multi";
   inputTip: string;
-  executionStatus: "running" | "waiting_single" | "waiting_multi";
+  executionStatus: "running" | "waiting_single" | "waiting_multi" | "stopped";
   connectionLockEnabled: boolean;
   messages: ChatMessageItem[];
   pendingRequestId?: string;
@@ -988,6 +988,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             worktree: Boolean(agent.worktree),
           };
         });
+
+      for (const agentItem of newAgentItems) {
+        if (agentItem.statusClass !== "stopped") {
+          continue;
+        }
+        this.withAgentState(agentItem.id, (state) => {
+          state.executionStatus = "stopped";
+          state.pendingRequestId = undefined;
+          state.inputTip = "";
+          state.activeExecutionId = undefined;
+        });
+      }
 
       // 检查数据是否有变化，无变化则不重新渲染
       const newAgentItemsJson = JSON.stringify(newAgentItems);
@@ -2099,7 +2111,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (
       normalizedStatus === "waiting_single" ||
       normalizedStatus === "waiting_multi" ||
-      normalizedStatus === "running"
+      normalizedStatus === "running" ||
+      normalizedStatus === "stopped"
     ) {
       state.executionStatus = normalizedStatus;
     } else {
