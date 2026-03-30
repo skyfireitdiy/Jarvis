@@ -367,6 +367,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <div class="agent-title-row">
             <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
             <div class="agent-status ${agentItem.statusClass}">${escapeHtml(agentItem.statusText)}</div>
+            ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
+            ${agentItem.worktree ? '<div class="agent-worktree" title="已启用 worktree">🌿</div>' : ""}
           </div>
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
@@ -411,6 +413,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-status.waiting_multi { background: rgba(255, 193, 7, 0.18); color: #8a6d00; border-color: rgba(255, 193, 7, 0.28); }
     .agent-status.waiting_single { background: rgba(255, 152, 0, 0.18); color: #a85d00; border-color: rgba(255, 152, 0, 0.28); }
     .agent-status.stopped { background: rgba(158, 158, 158, 0.18); color: #666; border-color: rgba(158, 158, 158, 0.28); }
+    .agent-llm-group { font-size: 12px; opacity: 0.9; }
+    .agent-worktree { font-size: 13px; }
     .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
     .agent-actions { display: flex; gap: 6px; }
     .icon-button { padding: 4px 6px; min-width: auto; }
