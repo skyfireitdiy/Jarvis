@@ -616,6 +616,11 @@ manualInterruptButton?.addEventListener("click", () => {
 });
 
 messageInput?.addEventListener("keydown", (event) => {
+  if (!event.ctrlKey && !event.metaKey && event.key === "@") {
+    event.preventDefault();
+    openCompletionModal();
+    return;
+  }
   if (event.ctrlKey && event.key === "Enter") {
     event.preventDefault();
     const text = messageInput.value;
@@ -627,6 +632,11 @@ messageInput?.addEventListener("keydown", (event) => {
 });
 
 singleMessageInput?.addEventListener("keydown", (event) => {
+  if (!event.ctrlKey && !event.metaKey && event.key === "@") {
+    event.preventDefault();
+    openCompletionModal();
+    return;
+  }
   if (event.ctrlKey && event.key === "Enter") {
     event.preventDefault();
     const text = singleMessageInput.value;
