@@ -56,6 +56,15 @@ const sendButton = document.getElementById(
 const sendSingleButton = document.getElementById(
   "sendSingleButton",
 ) as HTMLButtonElement | null;
+const completionButton = document.getElementById(
+  "completionButton",
+) as HTMLButtonElement | null;
+const completeButton = document.getElementById(
+  "completeButton",
+) as HTMLButtonElement | null;
+const manualInterruptButton = document.getElementById(
+  "manualInterruptButton",
+) as HTMLButtonElement | null;
 const runningIndicator = document.getElementById(
   "runningIndicator",
 ) as HTMLDivElement | null;
@@ -407,6 +416,26 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
   }
 }
 
+function getActiveInputElement(): HTMLInputElement | HTMLTextAreaElement | null {
+  return singleInputRow?.style.display === "flex" ? singleMessageInput : messageInput;
+}
+
+function insertTextAtCursor(textToInsert: string): void {
+  const inputElement = getActiveInputElement();
+  if (!inputElement) {
+    return;
+  }
+  const start = inputElement.selectionStart ?? inputElement.value.length;
+  const end = inputElement.selectionEnd ?? inputElement.value.length;
+  const currentValue = inputElement.value;
+  const nextValue =
+    currentValue.slice(0, start) + textToInsert + currentValue.slice(end);
+  inputElement.value = nextValue;
+  const nextCursorPosition = start + textToInsert.length;
+  inputElement.setSelectionRange(nextCursorPosition, nextCursorPosition);
+  inputElement.focus();
+}
+
 function sendCurrentInput(mode: "single" | "multi"): void {
   const inputEl = mode === "single" ? singleMessageInput : messageInput;
   const text = inputEl ? inputEl.value : "";
@@ -426,6 +455,18 @@ sendButton?.addEventListener("click", () => {
 
 sendSingleButton?.addEventListener("click", () => {
   sendCurrentInput("single");
+});
+
+completionButton?.addEventListener("click", () => {
+  insertTextAtCursor("@");
+});
+
+completeButton?.addEventListener("click", () => {
+  vscode.postMessage({ type: "sendCompletionSignal" });
+});
+
+manualInterruptButton?.addEventListener("click", () => {
+  vscode.postMessage({ type: "sendManualInterrupt" });
 });
 
 messageInput?.addEventListener("keydown", (event) => {
@@ -474,6 +515,18 @@ window.addEventListener(
     if (runningIndicator) {
       runningIndicator.style.display =
         payload.executionStatus === "running" ? "flex" : "none";
+    }
+    const isWaitingMulti = payload.executionStatus === "waiting_multi";
+    if (completeButton) {
+      completeButton.disabled = !isWaitingMulti;
+    }
+    if (completionButton) {
+      completionButton.disabled = !isWaitingMulti;
+    }
+    if (manualInterruptButton) {
+      manualInterruptButton.style.display =
+        payload.executionStatus === "running" ? "inline-flex" : "none";
+      manualInterruptButton.disabled = payload.executionStatus !== "running";
     }
     syncInputMode(payload.inputMode || "multi", payload.inputTip || "");
     renderMessages(payload.messages || [], currentSelectedAgentId);

@@ -617,6 +617,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .execution-terminal { height: 240px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
+    .input-actions { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .secondary-button { background: var(--vscode-button-secondaryBackground, var(--vscode-button-background)); color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground)); }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
     textarea { min-height: 84px; resize: vertical; }
     button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px 12px; cursor: pointer; }
@@ -646,6 +648,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         <div class="running-spinner"></div>
         <span class="running-text">Agent 正在执行中...</span>
       </div>
+      <div class="input-actions">
+        <button id="completionButton" class="secondary-button" title="插入 @">@</button>
+        <button id="completeButton" class="secondary-button" title="完成（发送完成信号）">完成</button>
+        <button id="manualInterruptButton" class="secondary-button" title="人工干预" style="display:none;">人工干预</button>
+      </div>
       <div class="row" id="singleInputRow" style="display:none;">
         <input id="singleMessageInput" placeholder="输入单行内容，按 Ctrl+Enter 发送..." />
         <button id="sendSingleButton">发送</button>
@@ -668,6 +675,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     if (message.type === "sendMessage") {
       await this.sendAgentMessage(message.text ?? "");
+      return;
+    }
+    if (message.type === "sendCompletionSignal") {
+      await this.sendCompletionSignal();
+      return;
+    }
+    if (message.type === "sendManualInterrupt") {
+      await this.sendManualInterrupt();
       return;
     }
     if (message.type === "sendTerminalInput") {
@@ -997,6 +1012,51 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.executionStatus = "running";
     this.syncSelectedAgentState();
     this.postPanelState();
+  }
+
+  private async sendCompletionSignal(): Promise<void> {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      this.appendPanelMessage("请先在左侧选择 Agent", "error");
+      return;
+    }
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      this.appendPanelMessage("当前 Agent WebSocket 未连接，无法发送完成信号", "error", agentId);
+      return;
+    }
+    this.sendSocketMessage(agentSocket, {
+      type: "input_result",
+      payload: {
+        text: "__CTRL_C_PRESSED__",
+        request_id: this.panelState.pendingRequestId,
+      },
+    });
+    this.withAgentState(agentId, (state) => {
+      state.pendingRequestId = undefined;
+      state.inputTip = "";
+      state.executionStatus = "running";
+      state.inputMode = "multi";
+    });
+    this.postPanelState();
+  }
+
+  private async sendManualInterrupt(): Promise<void> {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      this.appendPanelMessage("请先在左侧选择 Agent", "error");
+      return;
+    }
+    const agentSocket = this.agentSockets.get(agentId);
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      this.appendPanelMessage("当前 Agent WebSocket 未连接，无法发送人工干预", "error", agentId);
+      return;
+    }
+    this.sendSocketMessage(agentSocket, {
+      type: "manual_interrupt",
+      payload: {},
+    });
+    this.appendPanelMessage("已发送人工干预请求", "system", agentId);
   }
 
   private async sendTerminalInput(
