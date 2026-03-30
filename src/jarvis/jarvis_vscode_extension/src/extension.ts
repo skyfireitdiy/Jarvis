@@ -2296,7 +2296,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             executionId: selectedSession.executionId,
           };
         }
-        return { agentId: selectedAgentId, executionId: targetExecutionId };
       }
       for (const session of this.executionTerminalSessions.values()) {
         if (session.executionId === targetExecutionId && !session.closed) {
@@ -2312,9 +2311,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (!agentState.activeExecutionId) {
       return undefined;
     }
+    const activeSession = this.executionTerminalSessions.get(
+      this.getExecutionSessionKey(selectedAgentId, agentState.activeExecutionId),
+    );
+    if (!activeSession || activeSession.closed) {
+      return undefined;
+    }
     return {
-      agentId: selectedAgentId,
-      executionId: agentState.activeExecutionId,
+      agentId: activeSession.agentId,
+      executionId: activeSession.executionId,
     };
   }
 
