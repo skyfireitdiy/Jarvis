@@ -689,7 +689,7 @@ class AgentRunLoop:
                             should_auto_complete = True
 
                     if should_auto_complete:
-                        if getattr(ag, "return_control_on_auto_complete", False):
+                        if ag.return_control_on_auto_complete:
                             ag.return_control_on_auto_complete = False
                             if ag.non_interactive:
                                 ag.set_non_interactive(False)
@@ -697,13 +697,13 @@ class AgentRunLoop:
                             PrettyOutput.auto_print(
                                 "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
                             )
-                            return current_response
-                        # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
-                        result = ag._complete_task(auto_completed=True)
-                        # 若不需要summary，则将最后一条LLM输出作为返回值
-                        if not getattr(ag, "need_summary", True):
-                            return current_response
-                        return result
+                        else:
+                            # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
+                            result = ag._complete_task(auto_completed=True)
+                            # 若不需要summary，则将最后一条LLM输出作为返回值
+                            if not getattr(ag, "need_summary", True):
+                                return current_response
+                            return result
 
                 # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
                 has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
