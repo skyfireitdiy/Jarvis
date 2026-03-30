@@ -589,6 +589,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     body { font-family: var(--vscode-font-family); padding: 0; margin: 0; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
     .layout { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
     .section { padding: 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+    .input-section { position: relative; }
     .messages { overflow: auto; padding: 12px; }
     .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: var(--vscode-sideBar-background); white-space: normal; overflow-wrap: anywhere; }
     .message.system { border-left: 3px solid var(--vscode-textLink-foreground); }
@@ -626,7 +627,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 12px; opacity: 0.75; }
     .meta { display: flex; flex-direction: column; gap: 6px; }
-    .running-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; margin-top: 4px; animation: fadeIn 0.3s ease-in-out; }
+    .running-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; margin-top: 4px; margin-bottom: 8px; animation: fadeIn 0.3s ease-in-out; position: sticky; bottom: 0; z-index: 1; backdrop-filter: blur(2px); }
     .running-spinner { width: 16px; height: 16px; border: 2px solid rgba(59, 130, 246, 0.3); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; flex-shrink: 0; }
     .running-text { font-size: 13px; color: #3b82f6; font-weight: 500; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -643,7 +644,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <div class="hint">连接与 Agent 管理请在左侧边栏完成；执行终端将在当前 Chat Panel 中以内嵌终端显示。</div>
     </div>
     <div class="messages" id="messages"></div>
-    <div class="section">
+    <div class="section input-section">
       <div class="running-indicator" id="runningIndicator" style="display:none;">
         <div class="running-spinner"></div>
         <span class="running-text">Agent 正在执行中...</span>
