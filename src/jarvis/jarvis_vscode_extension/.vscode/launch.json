@@ -9,13 +9,13 @@
             "type": "extensionHost",
             "request": "launch",
             "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/src/jarvis/jarvis_vscode_extension"
+                "--extensionDevelopmentPath=${workspaceFolder}"
             ],
             "outFiles": [
-                "${workspaceFolder}/src/jarvis/jarvis_vscode_extension/dist/**/*.js"
+                "${workspaceFolder}/dist/**/*.js"
             ],
             "preLaunchTask": "npm: install-and-build",
-            "cwd": "${workspaceFolder}/src/jarvis/jarvis_vscode_extension"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
