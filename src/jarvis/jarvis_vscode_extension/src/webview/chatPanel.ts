@@ -92,6 +92,7 @@ const completionStatus = document.getElementById(
 ) as HTMLDivElement | null;
 let currentSelectedAgentId = "";
 let wasRunningIndicatorVisible = false;
+let currentExecutionStatus = "running";
 let completionCursorPos = -1;
 let baseCompletions: CompletionItem[] = [];
 let searchedCompletions: CompletionItem[] = [];
@@ -586,6 +587,24 @@ function moveCompletionSelection(delta: number): void {
   }
 }
 
+function shouldTriggerCompletionSignalByCtrlC(): boolean {
+  if (currentExecutionStatus !== "waiting_multi") {
+    return false;
+  }
+  if (completionModalOverlay?.classList.contains("visible")) {
+    return false;
+  }
+  if (singleInputRow?.style.display === "flex") {
+    return false;
+  }
+  const selectedText = String(window.getSelection?.()?.toString() || "").trim();
+  if (selectedText) {
+    return false;
+  }
+  const multiLineText = String(messageInput?.value || "");
+  return !multiLineText.trim();
+}
+
 function sendCurrentInput(mode: "single" | "multi"): void {
   const inputEl = mode === "single" ? singleMessageInput : messageInput;
   const text = inputEl ? inputEl.value : "";
@@ -700,6 +719,17 @@ completionSearchInput?.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("keydown", (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "c") {
+    return;
+  }
+  if (!shouldTriggerCompletionSignalByCtrlC()) {
+    return;
+  }
+  event.preventDefault();
+  vscode.postMessage({ type: "sendCompletionSignal" });
+});
+
 window.addEventListener(
   "message",
   (event: MessageEvent<{ type?: string; payload?: StatePayload & { items?: CompletionItem[]; query?: string; error?: string } }>) => {
@@ -734,6 +764,7 @@ window.addEventListener(
     }
     const payload = data.payload || {};
     currentSelectedAgentId = String(payload.selectedAgentId || "").trim();
+    currentExecutionStatus = String(payload.executionStatus || "running");
     if (selectedAgentLabel) {
       selectedAgentLabel.textContent =
         payload.selectedAgentId || "未选择 Agent";
