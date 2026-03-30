@@ -68,6 +68,13 @@ interface ChatPanelState {
   pendingStreamText: string;
 }
 
+interface CompletionItem {
+  value?: string;
+  display?: string;
+  description?: string;
+  type?: string;
+}
+
 interface CreateAgentFormState {
   isVisible: boolean;
   agentType: "agent" | "codeagent";
@@ -630,6 +637,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .running-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; margin-top: 4px; margin-bottom: 8px; animation: fadeIn 0.3s ease-in-out; position: sticky; bottom: 0; z-index: 1; backdrop-filter: blur(2px); }
     .running-spinner { width: 16px; height: 16px; border: 2px solid rgba(59, 130, 246, 0.3); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; flex-shrink: 0; }
     .running-text { font-size: 13px; color: #3b82f6; font-weight: 500; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.38); display: none; align-items: center; justify-content: center; z-index: 20; }
+    .modal-overlay.visible { display: flex; }
+    .completions-modal { width: min(720px, calc(100vw - 32px)); max-height: min(70vh, 640px); display: flex; flex-direction: column; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); border: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.12)); border-radius: 10px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35); overflow: hidden; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.1)); }
+    .modal-title { font-size: 14px; font-weight: 600; }
+    .icon-button { border: 1px solid var(--vscode-button-border, transparent); background: transparent; color: inherit; padding: 6px 10px; cursor: pointer; }
+    .completions-search { padding: 12px 14px; border-bottom: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.08)); }
+    .completions-search input { width: 100%; }
+    .completions-list { overflow: auto; padding: 6px 0; }
+    .completion-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(127, 127, 127, 0.08); }
+    .completion-item:hover, .completion-item.selected { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.08)); }
+    .completion-value { font-size: 13px; font-weight: 600; }
+    .completion-desc { font-size: 12px; opacity: 0.78; margin-top: 2px; }
+    .completion-empty { padding: 18px 14px; font-size: 12px; opacity: 0.75; }
+    .completion-status { padding: 8px 14px; font-size: 12px; opacity: 0.82; border-bottom: 1px solid rgba(127, 127, 127, 0.08); }
+    .completion-status.error { color: var(--vscode-errorForeground); }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
   </style>
@@ -666,6 +689,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
   </div>
+  <div class="modal-overlay" id="completionModalOverlay">
+    <div class="completions-modal" role="dialog" aria-modal="true" aria-label="插入补全">
+      <div class="modal-header">
+        <div class="modal-title">插入补全</div>
+        <button id="closeCompletionModalButton" class="icon-button" title="关闭">✕</button>
+      </div>
+      <div class="completions-search">
+        <input id="completionSearchInput" type="text" placeholder="搜索补全..." />
+      </div>
+      <div id="completionStatus" class="completion-status" style="display:none;"></div>
+      <div id="completionList" class="completions-list"></div>
+    </div>
+  </div>
   <script nonce="${nonce}" src="${chatPanelJsUri}"></script>
 </body>
 </html>`;
@@ -684,6 +720,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     if (message.type === "sendManualInterrupt") {
       await this.sendManualInterrupt();
+      return;
+    }
+    if (message.type === "openCompletions") {
+      await this.openCompletions();
+      return;
+    }
+    if (message.type === "searchCompletions") {
+      await this.searchCompletions(String(message.query || ""));
       return;
     }
     if (message.type === "sendTerminalInput") {
@@ -1058,6 +1102,121 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       payload: {},
     });
     this.appendPanelMessage("已发送人工干预请求", "system", agentId);
+  }
+
+  private async openCompletions(): Promise<void> {
+    const agentId = String(this.panelState.selectedAgentId || "").trim();
+    if (!agentId) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionsResult",
+        payload: {
+          items: [],
+          error: "请先在左侧选择 Agent",
+          query: "",
+        },
+      });
+      return;
+    }
+    if (!this.panelState.token) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionsResult",
+        payload: {
+          items: [],
+          error: "请先连接并登录 Jarvis 网关",
+          query: "",
+        },
+      });
+      return;
+    }
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const response = await this.fetchWithAuth(
+        buildHttpUrl(gatewayAddress, `/api/completions/${agentId}`),
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: CompletionItem[];
+        error?: { message?: string };
+      };
+      if (!response.ok || !result.success || !Array.isArray(result.data)) {
+        throw new Error(result.error?.message || "获取补全列表失败");
+      }
+      this.currentPanel?.webview.postMessage({
+        type: "completionsResult",
+        payload: {
+          items: result.data,
+          query: "",
+        },
+      });
+    } catch (error) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionsResult",
+        payload: {
+          items: [],
+          error: getErrorMessage(error),
+          query: "",
+        },
+      });
+    }
+  }
+
+  private async searchCompletions(query: string): Promise<void> {
+    const agentId = String(this.panelState.selectedAgentId || "").trim();
+    const trimmedQuery = String(query || "").trim();
+    if (!agentId || !trimmedQuery) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionSearchResult",
+        payload: {
+          items: [],
+          query: trimmedQuery,
+        },
+      });
+      return;
+    }
+    if (!this.panelState.token) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionSearchResult",
+        payload: {
+          items: [],
+          query: trimmedQuery,
+          error: "请先连接并登录 Jarvis 网关",
+        },
+      });
+      return;
+    }
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const response = await this.fetchWithAuth(
+        buildHttpUrl(
+          gatewayAddress,
+          `/api/completions/${agentId}/search?query=${encodeURIComponent(trimmedQuery)}`,
+        ),
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: CompletionItem[];
+        error?: { message?: string };
+      };
+      if (!response.ok || !result.success || !Array.isArray(result.data)) {
+        throw new Error(result.error?.message || "搜索补全失败");
+      }
+      this.currentPanel?.webview.postMessage({
+        type: "completionSearchResult",
+        payload: {
+          items: result.data,
+          query: trimmedQuery,
+        },
+      });
+    } catch (error) {
+      this.currentPanel?.webview.postMessage({
+        type: "completionSearchResult",
+        payload: {
+          items: [],
+          query: trimmedQuery,
+          error: getErrorMessage(error),
+        },
+      });
+    }
   }
 
   private async sendTerminalInput(
@@ -2214,6 +2373,7 @@ interface ChatPanelMessage {
   gatewayUrl?: string;
   password?: string;
   text?: string;
+  query?: string;
   executionId?: string;
   confirmed?: boolean;
   cols?: number;
