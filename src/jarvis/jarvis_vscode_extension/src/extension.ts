@@ -676,9 +676,42 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       color: #fbbf24;
       border-color: rgba(245, 158, 11, 0.3);
     }
+    #sendButton,
+    #sendSingleButton {
+      min-width: 72px;
+      min-height: 36px;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.92), rgba(37, 99, 235, 0.92));
+      color: #ffffff;
+      border-color: rgba(59, 130, 246, 0.38);
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22);
+    }
+    #sendButton:hover,
+    #sendSingleButton:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.26);
+    }
+    #sendButton:active,
+    #sendSingleButton:active {
+      transform: translateY(0);
+      filter: brightness(0.98);
+      box-shadow: 0 3px 8px rgba(37, 99, 235, 0.22);
+    }
+    #sendButton:disabled,
+    #sendSingleButton:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+      filter: none;
+    }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
     textarea { min-height: 84px; resize: vertical; }
-    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px 12px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px 12px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
     .status { font-size: 12px; opacity: 0.8; }
     .status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 12px; opacity: 0.75; }
