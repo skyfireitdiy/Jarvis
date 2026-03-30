@@ -629,11 +629,56 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .execution-terminal { height: 240px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
-    .input-actions { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-    .secondary-button { background: var(--vscode-button-secondaryBackground, var(--vscode-button-background)); color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground)); }
+    .input-actions { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .secondary-button {
+      background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+      color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+      border-radius: 999px;
+      min-height: 34px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background 0.15s ease;
+    }
+    .secondary-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+      filter: brightness(1.04);
+    }
+    .secondary-button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      filter: brightness(0.98);
+    }
+    .secondary-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+      filter: none;
+    }
+    #completionButton {
+      background: rgba(59, 130, 246, 0.16);
+      color: #60a5fa;
+      border-color: rgba(59, 130, 246, 0.32);
+      min-width: 42px;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+    #completeButton {
+      background: rgba(34, 197, 94, 0.14);
+      color: #4ade80;
+      border-color: rgba(34, 197, 94, 0.28);
+    }
+    #manualInterruptButton {
+      background: rgba(245, 158, 11, 0.14);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
     input, textarea { flex: 1; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); box-sizing: border-box; }
     textarea { min-height: 84px; resize: vertical; }
-    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px 12px; cursor: pointer; }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 8px 12px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
     .status { font-size: 12px; opacity: 0.8; }
     .status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 12px; opacity: 0.75; }
