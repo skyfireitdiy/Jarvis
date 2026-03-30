@@ -603,7 +603,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .input-section { position: relative; }
     .messages { overflow: auto; padding: 12px; }
     .message { margin-bottom: 12px; padding: 10px; border-radius: 8px; background: var(--vscode-sideBar-background); white-space: normal; overflow-wrap: anywhere; }
-    .message.system { border-left: 3px solid var(--vscode-textLink-foreground); }
+    .message.system { background: rgba(59, 130, 246, 0.16); border-left: 3px solid #3b82f6; }
     .message.error { border-left: 3px solid var(--vscode-errorForeground); }
     .message.output { border-left: 3px solid var(--vscode-testing-iconPassed); }
     .message.stream { border-left: 3px solid var(--vscode-charts-blue); }
