@@ -69,6 +69,7 @@ const runningIndicator = document.getElementById(
   "runningIndicator",
 ) as HTMLDivElement | null;
 let currentSelectedAgentId = "";
+let wasRunningIndicatorVisible = false;
 
 type ExecutionTerminalEntry = {
   wrapper: HTMLDivElement;
@@ -512,9 +513,10 @@ window.addEventListener(
       executionStatusHint.textContent =
         "执行状态：" + (payload.executionStatus || "running");
     }
+    const isRunningIndicatorVisible = payload.executionStatus === "running";
     if (runningIndicator) {
       runningIndicator.style.display =
-        payload.executionStatus === "running" ? "flex" : "none";
+        isRunningIndicatorVisible ? "flex" : "none";
     }
     const isWaitingMulti = payload.executionStatus === "waiting_multi";
     if (completeButton) {
@@ -530,5 +532,11 @@ window.addEventListener(
     }
     syncInputMode(payload.inputMode || "multi", payload.inputTip || "");
     renderMessages(payload.messages || [], currentSelectedAgentId);
+    if (messages && isRunningIndicatorVisible && !wasRunningIndicatorVisible) {
+      requestAnimationFrame(() => {
+        messages.scrollTop = messages.scrollHeight;
+      });
+    }
+    wasRunningIndicatorVisible = isRunningIndicatorVisible;
   },
 );
