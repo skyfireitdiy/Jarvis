@@ -641,18 +641,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         <div class="running-spinner"></div>
         <span class="running-text">Agent 正在执行中...</span>
       </div>
-      <div class="hint" id="inputTip">当前为多行输入模式</div>
+      <div class="hint" id="inputTip">当前为多行输入模式，按 Ctrl+Enter 发送</div>
       <div class="hint">连接与 Agent 管理请在左侧边栏完成；执行终端将在当前 Chat Panel 中以内嵌终端显示。</div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="section">
       <div class="row" id="singleInputRow" style="display:none;">
-        <input id="singleMessageInput" placeholder="输入单行内容..." />
+        <input id="singleMessageInput" placeholder="输入单行内容，按 Ctrl+Enter 发送..." />
         <button id="sendSingleButton">发送</button>
       </div>
       <div id="multiInputRow">
         <div class="row">
-          <textarea id="messageInput" placeholder="输入消息..."></textarea>
+          <textarea id="messageInput" placeholder="输入消息，按 Ctrl+Enter 发送..."></textarea>
           <button id="sendButton">发送</button>
         </div>
       </div>

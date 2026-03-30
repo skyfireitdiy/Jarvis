@@ -391,7 +391,9 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
     multiInputRow.style.display = isSingle ? "none" : "block";
   }
   // 将 tip 显示到输入框的 placeholder
-  const defaultPlaceholder = isSingle ? "输入单行内容..." : "输入消息...";
+  const defaultPlaceholder = isSingle
+    ? "输入单行内容，按 Ctrl+Enter 发送..."
+    : "输入消息，按 Ctrl+Enter 发送...";
   const placeholder = tipText || defaultPlaceholder;
   if (singleMessageInput) {
     singleMessageInput.placeholder = placeholder;
@@ -438,8 +440,12 @@ messageInput?.addEventListener("keydown", (event) => {
 });
 
 singleMessageInput?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
+  if (event.ctrlKey && event.key === "Enter") {
     event.preventDefault();
+    const text = singleMessageInput.value;
+    if (!text.trim()) {
+      return;
+    }
     sendCurrentInput("single");
   }
 });
