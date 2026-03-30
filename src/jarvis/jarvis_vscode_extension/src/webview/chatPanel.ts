@@ -282,8 +282,12 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
   const terminal = new Terminal({
     convertEol: false,
     cursorBlink: true,
-    fontFamily: "var(--vscode-editor-font-family)",
-    fontSize: 13,
+    fontFamily:
+      '"JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace',
+    fontSize: 14,
+    lineHeight: 1.2,
+    fontWeight: "400",
+    fontWeightBold: "600",
     theme: {
       background: "#1e1e1e",
     },
