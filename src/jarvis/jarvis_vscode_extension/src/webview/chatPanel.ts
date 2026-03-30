@@ -56,6 +56,9 @@ const sendButton = document.getElementById(
 const sendSingleButton = document.getElementById(
   "sendSingleButton",
 ) as HTMLButtonElement | null;
+const runningIndicator = document.getElementById(
+  "runningIndicator",
+) as HTMLDivElement | null;
 let currentSelectedAgentId = "";
 
 type ExecutionTerminalEntry = {
@@ -185,7 +188,10 @@ function isNearBottom(container: HTMLDivElement, threshold = 24): boolean {
   return distanceToBottom <= threshold;
 }
 
-function ensureMessageNode(item: ChatMessageItem, index: number): HTMLDivElement {
+function ensureMessageNode(
+  item: ChatMessageItem,
+  index: number,
+): HTMLDivElement {
   if (!messages) {
     const fallbackNode = document.createElement("div");
     fallbackNode.className = "message " + (item.variant || "system");
@@ -385,18 +391,18 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
     multiInputRow.style.display = isSingle ? "none" : "block";
   }
   // 将 tip 显示到输入框的 placeholder
-	const defaultPlaceholder = isSingle ? "输入单行内容..." : "输入消息...";
-	const placeholder = tipText || defaultPlaceholder;
-	if (singleMessageInput) {
-		singleMessageInput.placeholder = placeholder;
-	}
-	if (messageInput) {
-		messageInput.placeholder = placeholder;
-	}
-	// 隐藏 inputTip 元素的文本显示
-	if (inputTip) {
-		inputTip.textContent = "";
-	}
+  const defaultPlaceholder = isSingle ? "输入单行内容..." : "输入消息...";
+  const placeholder = tipText || defaultPlaceholder;
+  if (singleMessageInput) {
+    singleMessageInput.placeholder = placeholder;
+  }
+  if (messageInput) {
+    messageInput.placeholder = placeholder;
+  }
+  // 隐藏 inputTip 元素的文本显示
+  if (inputTip) {
+    inputTip.textContent = "";
+  }
 }
 
 function sendCurrentInput(mode: "single" | "multi"): void {
@@ -458,6 +464,10 @@ window.addEventListener(
     if (executionStatusHint) {
       executionStatusHint.textContent =
         "执行状态：" + (payload.executionStatus || "running");
+    }
+    if (runningIndicator) {
+      runningIndicator.style.display =
+        payload.executionStatus === "running" ? "flex" : "none";
     }
     syncInputMode(payload.inputMode || "multi", payload.inputTip || "");
     renderMessages(payload.messages || [], currentSelectedAgentId);
