@@ -1,0 +1,32 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"label": "npm: build",
+			"detail": "build webview and compile TypeScript (tsc -p ./tsconfig.json)"
+		},
+		{
+			"type": "npm",
+			"script": "build:webview",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: build:webview",
+			"detail": "esbuild ./src/webview/chatPanel.ts --bundle --format=iife --platform=browser --outfile=./media/chatPanel.js"
+		},
+		{
+			"type": "npm",
+			"script": "install",
+			"group": "clean",
+			"problemMatcher": [],
+			"label": "npm: install",
+			"detail": "install dependencies from package"
+		}
+	]
+}
