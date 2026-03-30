@@ -14,7 +14,7 @@
             "outFiles": [
                 "${workspaceFolder}/src/jarvis/jarvis_vscode_extension/dist/**/*.js"
             ],
-            "preLaunchTask": "npm: build",
+            "preLaunchTask": "npm: install-and-build",
             "cwd": "${workspaceFolder}/src/jarvis/jarvis_vscode_extension"
         }
     ]
