@@ -384,10 +384,19 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
   if (multiInputRow) {
     multiInputRow.style.display = isSingle ? "none" : "block";
   }
-  if (inputTip) {
-    inputTip.textContent =
-      tipText || (isSingle ? "当前为单行输入模式" : "当前为多行输入模式");
-  }
+  // 将 tip 显示到输入框的 placeholder
+	const defaultPlaceholder = isSingle ? "输入单行内容..." : "输入消息...";
+	const placeholder = tipText || defaultPlaceholder;
+	if (singleMessageInput) {
+		singleMessageInput.placeholder = placeholder;
+	}
+	if (messageInput) {
+		messageInput.placeholder = placeholder;
+	}
+	// 隐藏 inputTip 元素的文本显示
+	if (inputTip) {
+		inputTip.textContent = "";
+	}
 }
 
 function sendCurrentInput(mode: "single" | "multi"): void {
