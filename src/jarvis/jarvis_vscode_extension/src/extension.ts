@@ -1660,8 +1660,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           mode === "single" ? "waiting_single" : "waiting_multi";
         state.inputTip = String(parsedMessage.payload?.tip || "Agent 请求输入");
       });
-      const agentState = this.getAgentState(agentId);
-      this.appendPanelMessage(agentState.inputTip, "system", agentId);
       return;
     }
 
