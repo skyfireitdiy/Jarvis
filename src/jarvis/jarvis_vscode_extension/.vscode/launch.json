@@ -1,0 +1,21 @@
+{
+    // 使用 IntelliSense 了解相关属性。
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "启动扩展",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/src/jarvis/jarvis_vscode_extension"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/src/jarvis/jarvis_vscode_extension/dist/**/*.js"
+            ],
+            "preLaunchTask": "npm: build",
+            "cwd": "${workspaceFolder}/src/jarvis/jarvis_vscode_extension"
+        }
+    ]
+}
