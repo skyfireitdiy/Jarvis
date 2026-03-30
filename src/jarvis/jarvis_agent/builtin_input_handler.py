@@ -354,7 +354,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             agent.set_non_interactive(True)
             agent.return_control_on_auto_complete = True
             PrettyOutput.auto_print(
-                "🤖 已切换到自动完成模式：LLM 完成后将恢复交互并把控制权交还给用户"
+                "🤖 已切换到自动完成模式：Agent 完成后将恢复交互并把控制权交还给用户"
             )
             modified_input = modified_input.replace("'<AutoComplete>'", "")
             continue
