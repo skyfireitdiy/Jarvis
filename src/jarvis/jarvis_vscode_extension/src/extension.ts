@@ -403,12 +403,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <label for="llmGroup">模型组</label>
       <input id="llmGroup" value="${escapeHtml(this.createAgentFormState.llmGroup)}" placeholder="${escapeHtml(this.defaultLlmGroup || "请输入模型组")}" />
     </div>`;
-    const remoteDirectoryErrorMarkup = this.remoteDirectoryBrowserState.errorMessage
+    const remoteDirectoryErrorMarkup = this.remoteDirectoryBrowserState
+      .errorMessage
       ? `<div class="form-error">${escapeHtml(this.remoteDirectoryBrowserState.errorMessage)}</div>`
       : "";
-    const remoteDirectorySearchText = this.remoteDirectoryBrowserState.searchText
-      .toLowerCase()
-      .trim();
+    const remoteDirectorySearchText =
+      this.remoteDirectoryBrowserState.searchText.toLowerCase().trim();
     const filteredRemoteDirectoryItems = remoteDirectorySearchText
       ? this.remoteDirectoryBrowserState.items.filter(
           (item) =>
@@ -437,7 +437,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       filteredRemoteDirectoryItems.length === 0
         ? `<div class="remote-directory-empty">${this.remoteDirectoryBrowserState.searchText.trim() ? "没有匹配的目录" : "该目录下没有子目录"}</div>`
         : "";
-    const remoteDirectoryBrowserMarkup = this.remoteDirectoryBrowserState.isVisible
+    const remoteDirectoryBrowserMarkup = this.remoteDirectoryBrowserState
+      .isVisible
       ? `
   <div class="remote-directory-browser">
     <div class="remote-directory-header">
@@ -463,6 +464,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const createAgentFormMarkup = this.createAgentFormState.isVisible
       ? `
   <div class="create-agent-panel">
+    <div class="panel-section-title create-agent-title">创建 Agent</div>
     <div class="form-group">
       <label for="agentType">Agent 类型</label>
       <select id="agentType">
@@ -516,16 +518,25 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </li>`;
       })
       .join("");
+    const agentListSectionMarkup = `
+  <div class="agents-list-panel">
+    <div class="panel-section-title agents-list-title">Agents 列表</div>
+    <ul>${agentListMarkup}</ul>
+  </div>`;
     const connectionStatusClass = this.panelState.gatewayHasConnectionError
       ? "status-banner error"
       : "status-banner";
     const restartButtonDisabled =
       this.isRestartingGateway || !this.panelState.token ? "disabled" : "";
-    const restartButtonLabel = this.isRestartingGateway ? "重启中..." : "重启服务";
+    const restartButtonLabel = this.isRestartingGateway
+      ? "重启中..."
+      : "重启服务";
     const connectionLockChecked = this.panelState.connectionLockEnabled
       ? "checked"
       : "";
-    const settingsButtonLabel = this.isSettingsPanelVisible ? "关闭设置" : "连接设置";
+    const settingsButtonLabel = this.isSettingsPanelVisible
+      ? "关闭设置"
+      : "连接设置";
     const settingsPanelMarkup = this.isSettingsPanelVisible
       ? `
   <div class="settings-panel">
@@ -567,9 +578,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     body { font-family: var(--vscode-font-family); padding: 12px; color: var(--vscode-foreground); }
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
     .toolbar-actions { display: flex; gap: 8px; }
-    .settings-panel { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--vscode-sideBar-background); display: flex; flex-direction: column; gap: 12px; }
+    .settings-panel { border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: rgba(59, 130, 246, 0.08); display: flex; flex-direction: column; gap: 12px; box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.08); }
     .settings-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .settings-panel-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .settings-panel-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; color: #93c5fd; }
     .settings-panel-subtitle { font-size: 12px; opacity: 0.75; line-height: 1.45; }
     .settings-card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px 12px; background: var(--vscode-editor-background); }
     .settings-card-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
@@ -604,7 +615,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
     .agent-actions { display: flex; gap: 6px; }
     .icon-button { padding: 4px 6px; min-width: auto; }
-    .create-agent-panel { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+    .create-agent-panel { border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 10px; padding: 10px; margin-bottom: 12px; background: rgba(34, 197, 94, 0.07); box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.08); }
+    .panel-section-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.01em; }
+    .create-agent-title { color: #86efac; }
+    .agents-list-panel { border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 10px; padding: 10px; margin-top: 12px; background: rgba(168, 85, 247, 0.06); box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.08); }
+    .agents-list-title { color: #d8b4fe; }
     .form-group { margin-bottom: 10px; }
     .form-group label { display: block; font-size: 12px; margin-bottom: 4px; opacity: 0.9; }
     .path-row { display: flex; gap: 8px; align-items: center; }
@@ -640,8 +655,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   ${settingsPanelMarkup}
   <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.gatewayConnectionStatusText)}</div>
   ${createAgentFormMarkup}
-  <ul>${agentListMarkup}
-  </ul>
+  ${agentListSectionMarkup}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const toggleSettingsPanelButton = document.getElementById('toggleSettingsPanelButton');
@@ -841,7 +855,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private getChatPanelHtml(agentId?: string): string {
     const nonce = createNonce();
-    const selectedAgentLabel = agentId ?? "未选择 Agent";
+    const selectedAgentLabel = this.getAgentDisplayLabel(agentId);
     const webview = this.currentPanel?.webview;
     const xtermCssUri = webview
       ? webview.asWebviewUri(
@@ -1016,7 +1030,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     <div class="section meta">
       <div><strong>当前 Agent：</strong><span id="selectedAgentLabel">${selectedAgentLabel}</span></div>
       <div class="status" id="connectionStatus">未连接</div>
-      <div class="hint" id="executionStatusHint">执行状态：running</div>
+      <div class="hint" id="executionStatusHint">执行状态：${this.getExecutionStatusLabel(this.panelState.executionStatus)}</div>
       <div class="hint" id="inputTip">当前为多行输入模式，按 Ctrl+Enter 发送</div>
       <div class="hint">连接与 Agent 管理请在左侧边栏完成；执行终端将在当前 Chat Panel 中以内嵌终端显示。</div>
     </div>
@@ -1273,7 +1287,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const token = await this.loginWithPassword(this.panelState.password);
       this.panelState.token = token;
       this.panelState.password = "";
-      this.panelState.gatewayConnectionStatusText = "已登录，正在连接主 WebSocket";
+      this.panelState.gatewayConnectionStatusText = "已登录，正在连接主网关";
       this.panelState.gatewayHasConnectionError = false;
       this.leftViewLoginState.errorMessage = "";
       this.panelState.messages = [];
@@ -1431,7 +1445,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const agentSocket = this.agentSockets.get(agentId);
     if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
-      this.appendPanelMessage("当前 Agent WebSocket 未连接，无法发送完成信号", "error", agentId);
+      this.appendPanelMessage(
+        "当前 Agent WebSocket 未连接，无法发送完成信号",
+        "error",
+        agentId,
+      );
       return;
     }
     this.sendSocketMessage(agentSocket, {
@@ -1458,7 +1476,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const agentSocket = this.agentSockets.get(agentId);
     if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
-      this.appendPanelMessage("当前 Agent WebSocket 未连接，无法发送人工干预", "error", agentId);
+      this.appendPanelMessage(
+        "当前 Agent WebSocket 未连接，无法发送人工干预",
+        "error",
+        agentId,
+      );
       return;
     }
     this.sendSocketMessage(agentSocket, {
@@ -1899,17 +1921,26 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.remoteDirectoryBrowserState.errorMessage = "";
     this.remoteDirectoryBrowserState.selectedIndex = -1;
     this.remoteDirectoryBrowserState.searchText = "";
-    await this.loadRemoteDirectories(this.createAgentFormState.workingDir || "~");
+    await this.loadRemoteDirectories(
+      this.createAgentFormState.workingDir || "~",
+    );
   }
 
   private async loadRemoteDirectories(path?: string): Promise<void> {
     if (!this.panelState.token) {
       this.remoteDirectoryBrowserState.isVisible = true;
-      this.remoteDirectoryBrowserState.errorMessage = "请先连接并登录 Jarvis 网关";
+      this.remoteDirectoryBrowserState.errorMessage =
+        "请先连接并登录 Jarvis 网关";
       this.renderAgentListView();
       return;
     }
-    const requestedPath = String(path || this.remoteDirectoryBrowserState.selectedPath || this.createAgentFormState.workingDir || "~").trim() || "~";
+    const requestedPath =
+      String(
+        path ||
+          this.remoteDirectoryBrowserState.selectedPath ||
+          this.createAgentFormState.workingDir ||
+          "~",
+      ).trim() || "~";
     this.remoteDirectoryBrowserState.isVisible = true;
     this.remoteDirectoryBrowserState.isLoading = true;
     this.remoteDirectoryBrowserState.errorMessage = "";
@@ -1917,7 +1948,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, `/api/directories?path=${encodeURIComponent(requestedPath)}`),
+        buildHttpUrl(
+          gatewayAddress,
+          `/api/directories?path=${encodeURIComponent(requestedPath)}`,
+        ),
       );
       const result = (await response.json()) as {
         success?: boolean;
@@ -1930,8 +1964,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const directoryItems = Array.isArray(result.data.items)
         ? result.data.items.filter((item) => item?.type === "directory")
         : [];
-      this.remoteDirectoryBrowserState.currentPath = String(result.data.current_path || requestedPath);
-      this.remoteDirectoryBrowserState.selectedPath = this.remoteDirectoryBrowserState.currentPath;
+      this.remoteDirectoryBrowserState.currentPath = String(
+        result.data.current_path || requestedPath,
+      );
+      this.remoteDirectoryBrowserState.selectedPath =
+        this.remoteDirectoryBrowserState.currentPath;
       this.remoteDirectoryBrowserState.selectedIndex = -1;
       this.remoteDirectoryBrowserState.searchText = "";
       this.remoteDirectoryBrowserState.items = directoryItems.map((item) => ({
@@ -2041,13 +2078,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getParentDirectoryPath(): string {
-    const currentPath = String(this.remoteDirectoryBrowserState.currentPath || this.createAgentFormState.workingDir || "~").trim() || "~";
+    const currentPath =
+      String(
+        this.remoteDirectoryBrowserState.currentPath ||
+          this.createAgentFormState.workingDir ||
+          "~",
+      ).trim() || "~";
     if (currentPath === "~" || currentPath === "/") {
       return currentPath;
     }
-    const normalizedPath = currentPath.endsWith("/") && currentPath.length > 1
-      ? currentPath.slice(0, -1)
-      : currentPath;
+    const normalizedPath =
+      currentPath.endsWith("/") && currentPath.length > 1
+        ? currentPath.slice(0, -1)
+        : currentPath;
     const lastSeparatorIndex = normalizedPath.lastIndexOf("/");
     if (lastSeparatorIndex <= 0) {
       return normalizedPath.startsWith("~/") ? "~" : "/";
@@ -2056,7 +2099,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private confirmRemoteDirectorySelection(): void {
-    const selectedPath = String(this.remoteDirectoryBrowserState.currentPath || this.remoteDirectoryBrowserState.selectedPath || "").trim();
+    const selectedPath = String(
+      this.remoteDirectoryBrowserState.currentPath ||
+        this.remoteDirectoryBrowserState.selectedPath ||
+        "",
+    ).trim();
     if (!selectedPath) {
       this.remoteDirectoryBrowserState.errorMessage = "请选择工作目录";
       this.renderAgentListView();
@@ -2280,15 +2327,47 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private getExecutionStatusLabel(
+    status: "running" | "waiting_single" | "waiting_multi" | "stopped",
+  ): string {
+    if (status === "waiting_single") {
+      return "等待单行输入";
+    }
+    if (status === "waiting_multi") {
+      return "等待多行输入";
+    }
+    if (status === "stopped") {
+      return "已完成";
+    }
+    return "运行中";
+  }
+
+  private getAgentDisplayLabel(agentId?: string): string {
+    const resolvedAgentId = String(agentId || "").trim();
+    if (!resolvedAgentId) {
+      return "未选择 Agent";
+    }
+    const matchedAgent = this.agentItems.find(
+      (item) => item.id === resolvedAgentId,
+    );
+    const displayName = String(
+      matchedAgent?.displayName || matchedAgent?.name || resolvedAgentId,
+    ).trim();
+    if (!displayName || displayName === resolvedAgentId) {
+      return resolvedAgentId;
+    }
+    return `${displayName} (${resolvedAgentId})`;
+  }
+
   private getChatPanelTitle(): string {
     return this.panelState.selectedAgentId
-      ? `Jarvis · ${this.panelState.selectedAgentId}`
+      ? `Jarvis · ${this.getAgentDisplayLabel(this.panelState.selectedAgentId)}`
       : "Jarvis";
   }
 
   private connectGatewaySocket(): void {
     this.disposeSocket("gatewaySocket");
-    this.panelState.gatewayConnectionStatusText = "主 WebSocket 连接中...";
+    this.panelState.gatewayConnectionStatusText = "主网关连接中...";
     this.panelState.gatewayHasConnectionError = false;
     this.renderAgentListView();
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
@@ -2296,7 +2375,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const gatewaySocket = new WebSocket(socketUrl);
 
     gatewaySocket.on("open", () => {
-      this.panelState.gatewayConnectionStatusText = "主 WebSocket 已连接";
+      this.panelState.gatewayConnectionStatusText = "主网关已连接";
       this.panelState.gatewayHasConnectionError = false;
       this.sendSocketMessage(gatewaySocket, {
         type: "auth",
@@ -2314,13 +2393,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     });
 
     gatewaySocket.on("error", () => {
-      this.panelState.gatewayConnectionStatusText = "主 WebSocket 连接异常";
+      this.panelState.gatewayConnectionStatusText = "主网关连接异常";
       this.panelState.gatewayHasConnectionError = true;
       this.postPanelState();
     });
 
     gatewaySocket.on("close", () => {
-      this.panelState.gatewayConnectionStatusText = "主 WebSocket 已关闭";
+      this.panelState.gatewayConnectionStatusText = "主网关已关闭";
       this.postPanelState();
     });
 
@@ -2438,7 +2517,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           payload: {},
         });
         this.withAgentState(agentId, (state) => {
-          state.connectionStatusText = `已连接 Agent：${agentId}`;
+          state.connectionStatusText = `已连接 Agent：${this.getAgentDisplayLabel(agentId)}`;
           state.hasConnectionError = false;
         });
         resolve();
@@ -2473,12 +2552,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           return;
         }
         this.withAgentState(agentId, (state) => {
-          state.connectionStatusText = `Agent WebSocket 已关闭：${agentId}`;
+          state.connectionStatusText = `Agent 连接已关闭：${this.getAgentDisplayLabel(agentId)}`;
         });
       });
     }).catch(async (error) => {
       this.withAgentState(agentId, (state) => {
-        state.connectionStatusText = `等待 Agent 就绪：${agentId} (${retryCount + 1}/${AGENT_CONNECTION_MAX_RETRIES})`;
+        state.connectionStatusText = `等待 Agent 就绪：${this.getAgentDisplayLabel(agentId)} (${retryCount + 1}/${AGENT_CONNECTION_MAX_RETRIES})`;
         state.hasConnectionError =
           retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES;
       });
@@ -2511,7 +2590,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             state,
             parsedMessage.payload?.execution_status,
           );
-          state.connectionStatusText = `状态：${state.executionStatus}`;
+          state.connectionStatusText = `执行状态：${this.getExecutionStatusLabel(state.executionStatus)}`;
           state.hasConnectionError = false;
         });
       }
@@ -2839,7 +2918,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         : "未连接";
       this.panelState.hasConnectionError = false;
       this.panelState.gatewayConnectionStatusText = this.panelState.token
-        ? this.panelState.gatewayConnectionStatusText || "已登录，正在连接主 WebSocket"
+        ? this.panelState.gatewayConnectionStatusText ||
+          "已登录，正在连接主 WebSocket"
         : "未连接";
       this.panelState.gatewayHasConnectionError = false;
       return;
@@ -2973,7 +3053,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return undefined;
     }
     const activeSession = this.executionTerminalSessions.get(
-      this.getExecutionSessionKey(selectedAgentId, agentState.activeExecutionId),
+      this.getExecutionSessionKey(
+        selectedAgentId,
+        agentState.activeExecutionId,
+      ),
     );
     if (!activeSession || activeSession.closed) {
       return undefined;
