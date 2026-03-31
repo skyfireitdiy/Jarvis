@@ -75,6 +75,21 @@ interface CompletionItem {
   type?: string;
 }
 
+interface RemoteDirectoryItem {
+  name: string;
+  path: string;
+  type: string;
+}
+
+interface RemoteDirectoryBrowserState {
+  isVisible: boolean;
+  currentPath: string;
+  selectedPath: string;
+  items: RemoteDirectoryItem[];
+  isLoading: boolean;
+  errorMessage: string;
+}
+
 interface CreateAgentFormState {
   isVisible: boolean;
   agentType: "agent" | "codeagent";
@@ -108,6 +123,8 @@ interface AgentListViewMessage {
   name?: string;
   llmGroup?: string;
   useWorktree?: boolean;
+  enabled?: boolean;
+  path?: string;
 }
 
 interface SavedConnectionInfo {
@@ -190,9 +207,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     errorMessage: "",
     isSubmitting: false,
   };
+  private readonly remoteDirectoryBrowserState: RemoteDirectoryBrowserState = {
+    isVisible: false,
+    currentPath: "~",
+    selectedPath: "~",
+    items: [],
+    isLoading: false,
+    errorMessage: "",
+  };
   private modelGroups: ModelGroupItem[] = [];
   private defaultLlmGroup = "";
   private lastAgentItemsJson: string = "";
+  private isRestartingGateway = false;
+  private isSettingsPanelVisible = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -223,8 +250,33 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           this.toggleCreateAgentForm();
           return;
         }
+        if (message?.type === "toggleSettingsPanel") {
+          this.isSettingsPanelVisible = !this.isSettingsPanelVisible;
+          this.renderAgentListView();
+          return;
+        }
         if (message?.type === "pickWorkingDirectory") {
           await this.pickWorkingDirectory();
+          return;
+        }
+        if (message?.type === "browseRemoteDirectory") {
+          await this.loadRemoteDirectories(message.path);
+          return;
+        }
+        if (message?.type === "browseRemoteDirectoryParent") {
+          await this.loadRemoteDirectories(this.getParentDirectoryPath());
+          return;
+        }
+        if (message?.type === "selectRemoteDirectory") {
+          this.selectRemoteDirectory(message.path);
+          return;
+        }
+        if (message?.type === "confirmRemoteDirectory") {
+          this.confirmRemoteDirectorySelection();
+          return;
+        }
+        if (message?.type === "cancelRemoteDirectory") {
+          this.closeRemoteDirectoryBrowser();
           return;
         }
         if (message?.type === "cancelCreateAgent") {
@@ -242,6 +294,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "deleteAgent") {
           await this.deleteAgent(message.agentId);
+          return;
+        }
+        if (message?.type === "toggleConnectionLock") {
+          await this.setConnectionLockEnabled(Boolean(message.enabled));
+          return;
+        }
+        if (message?.type === "restartGateway") {
+          await this.restartGatewayService();
         }
       },
     );
@@ -325,6 +385,44 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <label for="llmGroup">模型组</label>
       <input id="llmGroup" value="${escapeHtml(this.createAgentFormState.llmGroup)}" placeholder="${escapeHtml(this.defaultLlmGroup || "请输入模型组")}" />
     </div>`;
+    const remoteDirectoryErrorMarkup = this.remoteDirectoryBrowserState.errorMessage
+      ? `<div class="form-error">${escapeHtml(this.remoteDirectoryBrowserState.errorMessage)}</div>`
+      : "";
+    const remoteDirectoryItemsMarkup = this.remoteDirectoryBrowserState.items
+      .map(
+        (item) => `
+      <li class="remote-directory-item ${item.path === this.remoteDirectoryBrowserState.selectedPath ? "selected" : ""}" data-remote-directory-path="${escapeHtml(item.path)}">
+        <div class="remote-directory-name">📁 ${escapeHtml(item.name || item.path)}</div>
+        <div class="remote-directory-path">${escapeHtml(item.path)}</div>
+      </li>`,
+      )
+      .join("");
+    const remoteDirectoryEmptyMarkup =
+      !this.remoteDirectoryBrowserState.isLoading &&
+      !this.remoteDirectoryBrowserState.errorMessage &&
+      this.remoteDirectoryBrowserState.items.length === 0
+        ? '<div class="remote-directory-empty">该目录下没有子目录</div>'
+        : "";
+    const remoteDirectoryBrowserMarkup = this.remoteDirectoryBrowserState.isVisible
+      ? `
+  <div class="remote-directory-browser">
+    <div class="remote-directory-header">
+      <strong>选择远端工作目录</strong>
+      <div class="remote-directory-actions-inline">
+        <button id="refreshRemoteDirectoryButton" type="button" ${createButtonDisabled}>刷新</button>
+        <button id="goParentRemoteDirectoryButton" type="button" ${createButtonDisabled}>上一级</button>
+      </div>
+    </div>
+    <div class="remote-directory-current-path">${escapeHtml(this.remoteDirectoryBrowserState.currentPath)}</div>
+    ${remoteDirectoryErrorMarkup}
+    <ul class="remote-directory-list">${remoteDirectoryItemsMarkup}</ul>
+    ${this.remoteDirectoryBrowserState.isLoading ? '<div class="remote-directory-empty">目录加载中...</div>' : remoteDirectoryEmptyMarkup}
+    <div class="form-actions">
+      <button id="cancelRemoteDirectoryButton" type="button" ${createButtonDisabled}>取消</button>
+      <button id="confirmRemoteDirectoryButton" type="button" ${createButtonDisabled}>确认</button>
+    </div>
+  </div>`
+      : "";
     const createAgentFormMarkup = this.createAgentFormState.isVisible
       ? `
   <div class="create-agent-panel">
@@ -338,10 +436,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     <div class="form-group">
       <label for="workingDir">工作目录</label>
       <div class="path-row">
-        <input id="workingDir" value="${escapeHtml(this.createAgentFormState.workingDir)}" placeholder="请选择工作目录" readonly />
+        <input id="workingDir" value="${escapeHtml(this.createAgentFormState.workingDir)}" placeholder="请输入远端工作目录，例如：~/workspace" />
         <button id="pickWorkingDirButton" type="button" ${createButtonDisabled}>选择目录</button>
       </div>
     </div>
+    ${remoteDirectoryBrowserMarkup}
     <div class="form-group">
       <label for="agentName">名称</label>
       <input id="agentName" value="${escapeHtml(this.createAgentFormState.name)}" placeholder="通用Agent" />
@@ -383,6 +482,42 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const connectionStatusClass = this.panelState.hasConnectionError
       ? "status-banner error"
       : "status-banner";
+    const restartButtonDisabled =
+      this.isRestartingGateway || !this.panelState.token ? "disabled" : "";
+    const restartButtonLabel = this.isRestartingGateway ? "重启中..." : "重启服务";
+    const connectionLockChecked = this.panelState.connectionLockEnabled
+      ? "checked"
+      : "";
+    const settingsButtonLabel = this.isSettingsPanelVisible ? "关闭设置" : "连接设置";
+    const settingsPanelMarkup = this.isSettingsPanelVisible
+      ? `
+  <div class="settings-panel">
+    <div class="settings-panel-header">
+      <div>
+        <div class="settings-panel-title">连接设置与服务管理</div>
+        <div class="settings-panel-subtitle">这些功能不常用，已从 Agents 主面板中独立出来。</div>
+      </div>
+      <button id="closeSettingsPanelButton" type="button">关闭</button>
+    </div>
+    <div class="settings-card">
+      <div class="settings-card-title">连接设置</div>
+      <label class="toggle-switch-row" for="connectionLockToggle">
+        <input id="connectionLockToggle" type="checkbox" ${connectionLockChecked} />
+        <div class="toggle-switch-text">
+          <span class="toggle-switch-label">锁定连接（拒绝新连接）</span>
+          <span class="toggle-switch-help">启用后，当已有活跃连接时，新连接将被拒绝；禁用后，新连接会替换旧连接。</span>
+        </div>
+      </label>
+    </div>
+    <div class="settings-card">
+      <div class="settings-card-title">服务管理</div>
+      <div class="settings-card-row">
+        <div class="settings-card-help">重启 Jarvis 服务会短暂中断当前连接，执行前会要求确认。</div>
+        <button id="restartGatewayButton" class="settings-action-button" ${restartButtonDisabled}>${restartButtonLabel}</button>
+      </div>
+    </div>
+  </div>`
+      : "";
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -395,6 +530,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     body { font-family: var(--vscode-font-family); padding: 12px; color: var(--vscode-foreground); }
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
     .toolbar-actions { display: flex; gap: 8px; }
+    .settings-panel { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--vscode-sideBar-background); display: flex; flex-direction: column; gap: 12px; }
+    .settings-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .settings-panel-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .settings-panel-subtitle { font-size: 12px; opacity: 0.75; line-height: 1.45; }
+    .settings-card { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 10px 12px; background: var(--vscode-editor-background); }
+    .settings-card-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
+    .settings-card-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .settings-card-help { font-size: 12px; opacity: 0.75; line-height: 1.45; }
+    .settings-action-button { width: 100%; justify-content: center; font-weight: 600; }
+    .toggle-switch-row { display: flex; align-items: center; gap: 10px; }
+    .toggle-switch-row input { width: auto; margin: 0; }
+    .toggle-switch-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .toggle-switch-label { font-size: 12px; font-weight: 600; }
+    .toggle-switch-help { font-size: 12px; opacity: 0.75; line-height: 1.4; }
     button, select, input { border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 4px; }
     button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 6px 10px; cursor: pointer; }
     input, select { width: 100%; padding: 6px 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); box-sizing: border-box; }
@@ -424,6 +573,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .path-row { display: flex; gap: 8px; align-items: center; }
     .path-row input { flex: 1; }
     .path-row button { white-space: nowrap; }
+    .remote-directory-browser { margin-bottom: 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; background: var(--vscode-editor-background); }
+    .remote-directory-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .remote-directory-actions-inline { display: flex; gap: 8px; }
+    .remote-directory-current-path { font-size: 12px; opacity: 0.8; margin-bottom: 8px; word-break: break-all; }
+    .remote-directory-list { max-height: 220px; overflow: auto; border: 1px solid var(--vscode-panel-border); border-radius: 6px; }
+    .remote-directory-item { padding: 8px 10px; border-bottom: 1px solid rgba(127, 127, 127, 0.12); cursor: pointer; }
+    .remote-directory-item:last-child { border-bottom: none; }
+    .remote-directory-item.selected, .remote-directory-item:hover { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.06)); }
+    .remote-directory-name { font-size: 12px; font-weight: 600; }
+    .remote-directory-path { font-size: 11px; opacity: 0.75; margin-top: 2px; word-break: break-all; }
+    .remote-directory-empty { padding: 10px 0; font-size: 12px; opacity: 0.75; }
     .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
     .checkbox-row input { width: auto; }
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -436,19 +596,49 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   <div class="toolbar">
     <strong>Agents</strong>
     <div class="toolbar-actions">
+      <button id="toggleSettingsPanelButton">${settingsButtonLabel}</button>
       <button id="toggleCreateAgentButton" ${createButtonDisabled}>${createButtonLabel}</button>
     </div>
   </div>
+  ${settingsPanelMarkup}
   <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
   ${createAgentFormMarkup}
   <ul>${agentListMarkup}
   </ul>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+    const toggleSettingsPanelButton = document.getElementById('toggleSettingsPanelButton');
+    if (toggleSettingsPanelButton) {
+      toggleSettingsPanelButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleSettingsPanel' });
+      });
+    }
+    const closeSettingsPanelButton = document.getElementById('closeSettingsPanelButton');
+    if (closeSettingsPanelButton) {
+      closeSettingsPanelButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleSettingsPanel' });
+      });
+    }
     const toggleCreateAgentButton = document.getElementById('toggleCreateAgentButton');
     if (toggleCreateAgentButton) {
       toggleCreateAgentButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'toggleCreateAgentForm' });
+      });
+    }
+    const connectionLockToggle = document.getElementById('connectionLockToggle');
+    if (connectionLockToggle) {
+      connectionLockToggle.addEventListener('change', () => {
+        vscode.postMessage({ type: 'toggleConnectionLock', enabled: Boolean(connectionLockToggle.checked) });
+      });
+    }
+    const restartGatewayButton = document.getElementById('restartGatewayButton');
+    if (restartGatewayButton) {
+      restartGatewayButton.addEventListener('click', () => {
+        const confirmed = window.confirm('确认重启 Jarvis 服务吗？这会短暂中断当前连接。');
+        if (!confirmed) {
+          return;
+        }
+        vscode.postMessage({ type: 'restartGateway' });
       });
     }
     const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');
@@ -457,6 +647,38 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'pickWorkingDirectory' });
       });
     }
+    const refreshRemoteDirectoryButton = document.getElementById('refreshRemoteDirectoryButton');
+    if (refreshRemoteDirectoryButton) {
+      refreshRemoteDirectoryButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'browseRemoteDirectory' });
+      });
+    }
+    const goParentRemoteDirectoryButton = document.getElementById('goParentRemoteDirectoryButton');
+    if (goParentRemoteDirectoryButton) {
+      goParentRemoteDirectoryButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'browseRemoteDirectoryParent' });
+      });
+    }
+    const cancelRemoteDirectoryButton = document.getElementById('cancelRemoteDirectoryButton');
+    if (cancelRemoteDirectoryButton) {
+      cancelRemoteDirectoryButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'cancelRemoteDirectory' });
+      });
+    }
+    const confirmRemoteDirectoryButton = document.getElementById('confirmRemoteDirectoryButton');
+    if (confirmRemoteDirectoryButton) {
+      confirmRemoteDirectoryButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'confirmRemoteDirectory' });
+      });
+    }
+    document.querySelectorAll('[data-remote-directory-path]').forEach((item) => {
+      item.addEventListener('click', () => {
+        vscode.postMessage({ type: 'selectRemoteDirectory', path: item.getAttribute('data-remote-directory-path') });
+      });
+      item.addEventListener('dblclick', () => {
+        vscode.postMessage({ type: 'browseRemoteDirectory', path: item.getAttribute('data-remote-directory-path') });
+      });
+    });
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
     if (submitCreateAgentButton) {
       submitCreateAgentButton.addEventListener('click', () => {
@@ -1407,10 +1629,64 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (init?.body && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
-    return fetch(url, {
+    const response = await fetch(url, {
       ...init,
       headers,
     });
+    if (
+      this.panelState.token &&
+      (response.status === 401 || response.status === 403)
+    ) {
+      this.handleAuthExpired("登录已失效，请重新连接 Jarvis");
+    }
+    return response;
+  }
+
+  private isInvalidTokenMessage(message: string): boolean {
+    const normalizedMessage = String(message || "").toLowerCase();
+    return (
+      normalizedMessage.includes("invalid token") ||
+      normalizedMessage.includes("token invalid") ||
+      normalizedMessage.includes("token expired") ||
+      normalizedMessage.includes("jwt expired") ||
+      normalizedMessage.includes("unauthorized") ||
+      normalizedMessage.includes("认证失败") ||
+      normalizedMessage.includes("登录失效") ||
+      normalizedMessage.includes("令牌失效")
+    );
+  }
+
+  private handleAuthExpired(message: string): void {
+    if (!this.panelState.token) {
+      return;
+    }
+    this.stopAgentListRefresh();
+    this.disposeSocket("gatewaySocket");
+    for (const socket of this.agentSockets.values()) {
+      try {
+        socket.close();
+      } catch {
+        // ignore close error
+      }
+    }
+    this.agentSockets.clear();
+    this.agentConnectionAttempts.clear();
+    this.panelState.token = "";
+    this.panelState.selectedAgentId = undefined;
+    this.panelState.gatewaySocket = undefined;
+    this.panelState.messages = [];
+    this.panelState.terminalOutput = "暂无终端输出";
+    this.panelState.inputMode = "multi";
+    this.panelState.inputTip = "";
+    this.panelState.executionStatus = "running";
+    this.panelState.pendingRequestId = undefined;
+    this.panelState.pendingStreamText = "";
+    this.panelState.connectionStatusText = message;
+    this.panelState.hasConnectionError = true;
+    this.leftViewLoginState.errorMessage = message;
+    this.leftViewLoginState.isSubmitting = false;
+    this.postPanelState();
+    this.renderAgentListView();
   }
 
   private async loadModelGroups(): Promise<void> {
@@ -1439,6 +1715,82 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (resolvedDefaultGroup) {
       this.createAgentFormState.llmGroup = resolvedDefaultGroup;
     }
+  }
+
+  private async setConnectionLockEnabled(enabled: boolean): Promise<void> {
+    this.panelState.connectionLockEnabled = enabled;
+    await this.saveConnectionInfo();
+    const gatewaySocket = this.panelState.gatewaySocket;
+    if (gatewaySocket && gatewaySocket.readyState === WebSocket.OPEN) {
+      this.sendSocketMessage(gatewaySocket, {
+        type: "connection_lock",
+        payload: { enabled },
+      });
+    }
+    this.renderAgentListView();
+  }
+
+  private async restartGatewayService(): Promise<void> {
+    if (this.isRestartingGateway || !this.panelState.token) {
+      return;
+    }
+    this.isRestartingGateway = true;
+    this.renderAgentListView();
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const response = await this.fetchWithAuth(
+        buildHttpUrl(gatewayAddress, "/api/service/restart"),
+        { method: "POST" },
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { message?: string };
+        error?: { message?: string };
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || "重启服务失败");
+      }
+      this.resetConnectionStateAfterGatewayRestart(
+        result.data?.message || "Jarvis 服务已重启，请重新连接登录",
+      );
+    } catch (error) {
+      this.appendPanelMessage(
+        getErrorMessage(error) || "重启服务失败",
+        "error",
+      );
+    } finally {
+      this.isRestartingGateway = false;
+      this.renderAgentListView();
+    }
+  }
+
+  private resetConnectionStateAfterGatewayRestart(message: string): void {
+    this.stopAgentListRefresh();
+    this.disposeSocket("gatewaySocket");
+    for (const socket of this.agentSockets.values()) {
+      try {
+        socket.close();
+      } catch {
+        // ignore close error
+      }
+    }
+    this.agentSockets.clear();
+    this.agentConnectionAttempts.clear();
+    this.panelState.token = "";
+    this.panelState.selectedAgentId = undefined;
+    this.panelState.gatewaySocket = undefined;
+    this.panelState.messages = [];
+    this.panelState.terminalOutput = "暂无终端输出";
+    this.panelState.inputMode = "multi";
+    this.panelState.inputTip = "";
+    this.panelState.executionStatus = "running";
+    this.panelState.pendingRequestId = undefined;
+    this.panelState.pendingStreamText = "";
+    this.panelState.connectionStatusText = message;
+    this.panelState.hasConnectionError = false;
+    this.leftViewLoginState.errorMessage = "";
+    this.leftViewLoginState.isSubmitting = false;
+    this.postPanelState();
   }
 
   private postPanelState(): void {
@@ -1495,17 +1847,95 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async pickWorkingDirectory(): Promise<void> {
-    const selectedUris = await vscode.window.showOpenDialog({
-      canSelectFiles: false,
-      canSelectFolders: true,
-      canSelectMany: false,
-      openLabel: "选择工作目录",
-    });
-    if (!selectedUris || selectedUris.length === 0) {
+    this.remoteDirectoryBrowserState.isVisible = true;
+    this.remoteDirectoryBrowserState.errorMessage = "";
+    await this.loadRemoteDirectories(this.createAgentFormState.workingDir || "~");
+  }
+
+  private async loadRemoteDirectories(path?: string): Promise<void> {
+    if (!this.panelState.token) {
+      this.remoteDirectoryBrowserState.isVisible = true;
+      this.remoteDirectoryBrowserState.errorMessage = "请先连接并登录 Jarvis 网关";
+      this.renderAgentListView();
       return;
     }
-    this.createAgentFormState.workingDir = selectedUris[0].fsPath;
+    const requestedPath = String(path || this.remoteDirectoryBrowserState.selectedPath || this.createAgentFormState.workingDir || "~").trim() || "~";
+    this.remoteDirectoryBrowserState.isVisible = true;
+    this.remoteDirectoryBrowserState.isLoading = true;
+    this.remoteDirectoryBrowserState.errorMessage = "";
+    this.renderAgentListView();
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const response = await this.fetchWithAuth(
+        buildHttpUrl(gatewayAddress, `/api/directories?path=${encodeURIComponent(requestedPath)}`),
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { current_path?: string; items?: RemoteDirectoryItem[] };
+        error?: { message?: string };
+      };
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error?.message || "获取目录列表失败");
+      }
+      const directoryItems = Array.isArray(result.data.items)
+        ? result.data.items.filter((item) => item?.type === "directory")
+        : [];
+      this.remoteDirectoryBrowserState.currentPath = String(result.data.current_path || requestedPath);
+      this.remoteDirectoryBrowserState.selectedPath = this.remoteDirectoryBrowserState.currentPath;
+      this.remoteDirectoryBrowserState.items = directoryItems.map((item) => ({
+        name: String(item.name || item.path || ""),
+        path: String(item.path || ""),
+        type: String(item.type || "directory"),
+      }));
+    } catch (error) {
+      this.remoteDirectoryBrowserState.errorMessage = getErrorMessage(error);
+      this.remoteDirectoryBrowserState.items = [];
+    } finally {
+      this.remoteDirectoryBrowserState.isLoading = false;
+      this.renderAgentListView();
+    }
+  }
+
+  private selectRemoteDirectory(path?: string): void {
+    const selectedPath = String(path || "").trim();
+    if (!selectedPath) {
+      return;
+    }
+    this.remoteDirectoryBrowserState.selectedPath = selectedPath;
+    this.renderAgentListView();
+  }
+
+  private getParentDirectoryPath(): string {
+    const currentPath = String(this.remoteDirectoryBrowserState.currentPath || this.createAgentFormState.workingDir || "~").trim() || "~";
+    if (currentPath === "~" || currentPath === "/") {
+      return currentPath;
+    }
+    const normalizedPath = currentPath.endsWith("/") && currentPath.length > 1
+      ? currentPath.slice(0, -1)
+      : currentPath;
+    const lastSeparatorIndex = normalizedPath.lastIndexOf("/");
+    if (lastSeparatorIndex <= 0) {
+      return normalizedPath.startsWith("~/") ? "~" : "/";
+    }
+    return normalizedPath.slice(0, lastSeparatorIndex);
+  }
+
+  private confirmRemoteDirectorySelection(): void {
+    const selectedPath = String(this.remoteDirectoryBrowserState.selectedPath || this.remoteDirectoryBrowserState.currentPath || "").trim();
+    if (!selectedPath) {
+      this.remoteDirectoryBrowserState.errorMessage = "请选择工作目录";
+      this.renderAgentListView();
+      return;
+    }
+    this.createAgentFormState.workingDir = selectedPath;
     this.createAgentFormState.errorMessage = "";
+    this.closeRemoteDirectoryBrowser();
+  }
+
+  private closeRemoteDirectoryBrowser(): void {
+    this.remoteDirectoryBrowserState.isVisible = false;
+    this.remoteDirectoryBrowserState.isLoading = false;
+    this.remoteDirectoryBrowserState.errorMessage = "";
     this.renderAgentListView();
   }
 
@@ -1519,6 +1949,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.useWorktree = false;
     this.createAgentFormState.isSubmitting = false;
     this.createAgentFormState.errorMessage = "";
+    this.remoteDirectoryBrowserState.isVisible = false;
+    this.remoteDirectoryBrowserState.currentPath = "~";
+    this.remoteDirectoryBrowserState.selectedPath = "~";
+    this.remoteDirectoryBrowserState.items = [];
+    this.remoteDirectoryBrowserState.isLoading = false;
+    this.remoteDirectoryBrowserState.errorMessage = "";
   }
 
   private updateCreateAgentDefaults(agentType: "agent" | "codeagent"): void {
@@ -1715,11 +2151,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.disposeSocket("gatewaySocket");
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const socketUrl = buildWebSocketUrl(gatewayAddress);
-    const gatewaySocket = new WebSocket(socketUrl, {
-      headers: {
-        Authorization: `Bearer ${this.panelState.token}`,
-      },
-    });
+    const gatewaySocket = new WebSocket(socketUrl);
 
     gatewaySocket.on("open", () => {
       this.panelState.connectionStatusText = "主 WebSocket 已连接";
@@ -1833,11 +2265,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId);
 
     await new Promise<void>((resolve, reject) => {
-      const agentSocket = new WebSocket(socketUrl, {
-        headers: {
-          Authorization: `Bearer ${this.panelState.token}`,
-        },
-      });
+      const agentSocket = new WebSocket(socketUrl);
       let connectionHandled = false;
       const timeoutId = setTimeout(() => {
         if (connectionHandled) {
@@ -1956,6 +2384,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       if (agentId) {
         this.handleExecutionPayload(agentId, parsedMessage.payload);
       }
+      return;
+    }
+    if (parsedMessage.type === "error") {
+      const errorMessage = String(
+        parsedMessage.payload?.message || "主通道发生未知错误",
+      );
+      if (this.isInvalidTokenMessage(errorMessage)) {
+        this.handleAuthExpired(errorMessage);
+        return;
+      }
+      this.appendPanelMessage(errorMessage, "error");
     }
   }
 
@@ -2003,11 +2442,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (parsedMessage.type === "error") {
-      this.appendPanelMessage(
-        String(parsedMessage.payload?.message || "未知错误"),
-        "error",
-        agentId,
-      );
+      const errorMessage = String(parsedMessage.payload?.message || "未知错误");
+      if (this.isInvalidTokenMessage(errorMessage)) {
+        this.handleAuthExpired(errorMessage);
+        return;
+      }
+      this.appendPanelMessage(errorMessage, "error", agentId);
       return;
     }
 
