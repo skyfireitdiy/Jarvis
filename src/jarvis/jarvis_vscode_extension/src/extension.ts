@@ -56,6 +56,8 @@ interface ChatPanelState {
   token: string;
   selectedAgentId?: string;
   gatewaySocket?: WebSocket;
+  gatewayConnectionStatusText: string;
+  gatewayHasConnectionError: boolean;
   terminalOutput: string;
   connectionStatusText: string;
   hasConnectionError: boolean;
@@ -178,6 +180,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     token: "",
     selectedAgentId: undefined,
     gatewaySocket: undefined,
+    gatewayConnectionStatusText: "未连接",
+    gatewayHasConnectionError: false,
     terminalOutput: "暂无终端输出",
     connectionStatusText: "未连接",
     hasConnectionError: false,
@@ -512,7 +516,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </li>`;
       })
       .join("");
-    const connectionStatusClass = this.panelState.hasConnectionError
+    const connectionStatusClass = this.panelState.gatewayHasConnectionError
       ? "status-banner error"
       : "status-banner";
     const restartButtonDisabled =
@@ -634,7 +638,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
   ${settingsPanelMarkup}
-  <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
+  <div class="${connectionStatusClass}">当前连接状态：${escapeHtml(this.panelState.gatewayConnectionStatusText)}</div>
   ${createAgentFormMarkup}
   <ul>${agentListMarkup}
   </ul>
@@ -803,7 +807,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="login-panel">
     <div class="panel-title">连接到 Jarvis</div>
-    <div class="status-text ${this.panelState.hasConnectionError ? "error" : ""}">当前连接状态：${escapeHtml(this.panelState.connectionStatusText)}</div>
+    <div class="status-text ${this.panelState.gatewayHasConnectionError ? "error" : ""}">当前连接状态：${escapeHtml(this.panelState.gatewayConnectionStatusText)}</div>
     ${loginErrorMarkup}
     <div class="form-group">
       <label for="gatewayUrl">网关地址</label>
@@ -1269,8 +1273,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const token = await this.loginWithPassword(this.panelState.password);
       this.panelState.token = token;
       this.panelState.password = "";
-      this.panelState.connectionStatusText = "已登录，正在连接主 WebSocket";
-      this.panelState.hasConnectionError = false;
+      this.panelState.gatewayConnectionStatusText = "已登录，正在连接主 WebSocket";
+      this.panelState.gatewayHasConnectionError = false;
       this.leftViewLoginState.errorMessage = "";
       this.panelState.messages = [];
       this.panelState.terminalOutput = "暂无终端输出";
@@ -1288,8 +1292,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.appendPanelMessage("登录成功", "system");
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      this.panelState.connectionStatusText = `连接失败：${errorMessage}`;
-      this.panelState.hasConnectionError = true;
+      this.panelState.gatewayConnectionStatusText = `连接失败：${errorMessage}`;
+      this.panelState.gatewayHasConnectionError = true;
       this.leftViewLoginState.errorMessage = errorMessage;
       this.postPanelState();
       this.renderAgentListView();
@@ -1368,8 +1372,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
       }
 
-      this.panelState.connectionStatusText = "已连接并加载 Agents";
-      this.panelState.hasConnectionError = false;
       this.postPanelState();
       this.connectAgentSocket();
     } catch (error) {
@@ -1727,8 +1729,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.executionStatus = "running";
     this.panelState.pendingRequestId = undefined;
     this.panelState.pendingStreamText = "";
-    this.panelState.connectionStatusText = message;
-    this.panelState.hasConnectionError = true;
+    this.panelState.gatewayConnectionStatusText = message;
+    this.panelState.gatewayHasConnectionError = true;
     this.leftViewLoginState.errorMessage = message;
     this.leftViewLoginState.isSubmitting = false;
     this.postPanelState();
@@ -1832,8 +1834,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.panelState.executionStatus = "running";
     this.panelState.pendingRequestId = undefined;
     this.panelState.pendingStreamText = "";
-    this.panelState.connectionStatusText = message;
-    this.panelState.hasConnectionError = false;
+    this.panelState.gatewayConnectionStatusText = message;
+    this.panelState.gatewayHasConnectionError = false;
     this.leftViewLoginState.errorMessage = "";
     this.leftViewLoginState.isSubmitting = false;
     this.postPanelState();
@@ -2286,13 +2288,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private connectGatewaySocket(): void {
     this.disposeSocket("gatewaySocket");
+    this.panelState.gatewayConnectionStatusText = "主 WebSocket 连接中...";
+    this.panelState.gatewayHasConnectionError = false;
+    this.renderAgentListView();
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const socketUrl = buildWebSocketUrl(gatewayAddress);
     const gatewaySocket = new WebSocket(socketUrl);
 
     gatewaySocket.on("open", () => {
-      this.panelState.connectionStatusText = "主 WebSocket 已连接";
-      this.panelState.hasConnectionError = false;
+      this.panelState.gatewayConnectionStatusText = "主 WebSocket 已连接";
+      this.panelState.gatewayHasConnectionError = false;
       this.sendSocketMessage(gatewaySocket, {
         type: "auth",
         payload: { token: this.panelState.token },
@@ -2309,13 +2314,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     });
 
     gatewaySocket.on("error", () => {
-      this.panelState.connectionStatusText = "主 WebSocket 连接异常";
-      this.panelState.hasConnectionError = true;
+      this.panelState.gatewayConnectionStatusText = "主 WebSocket 连接异常";
+      this.panelState.gatewayHasConnectionError = true;
       this.postPanelState();
     });
 
     gatewaySocket.on("close", () => {
-      this.panelState.connectionStatusText = "主 WebSocket 已关闭";
+      this.panelState.gatewayConnectionStatusText = "主 WebSocket 已关闭";
       this.postPanelState();
     });
 
@@ -2509,9 +2514,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           state.connectionStatusText = `状态：${state.executionStatus}`;
           state.hasConnectionError = false;
         });
-      } else {
-        this.panelState.connectionStatusText = "状态：running";
-        this.panelState.hasConnectionError = false;
       }
       this.postPanelState();
       return;
@@ -2836,6 +2838,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         ? "已连接并加载 Agents"
         : "未连接";
       this.panelState.hasConnectionError = false;
+      this.panelState.gatewayConnectionStatusText = this.panelState.token
+        ? this.panelState.gatewayConnectionStatusText || "已登录，正在连接主 WebSocket"
+        : "未连接";
+      this.panelState.gatewayHasConnectionError = false;
       return;
     }
     const agentState = this.getAgentState(agentId);
