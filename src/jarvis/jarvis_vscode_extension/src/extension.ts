@@ -85,6 +85,7 @@ interface RemoteDirectoryBrowserState {
   isVisible: boolean;
   currentPath: string;
   selectedPath: string;
+  selectedIndex: number;
   searchText: string;
   items: RemoteDirectoryItem[];
   isLoading: boolean;
@@ -127,6 +128,7 @@ interface AgentListViewMessage {
   enabled?: boolean;
   path?: string;
   searchText?: string;
+  key?: string;
 }
 
 interface SavedConnectionInfo {
@@ -213,6 +215,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     isVisible: false,
     currentPath: "~",
     selectedPath: "~",
+    selectedIndex: -1,
     searchText: "",
     items: [],
     isLoading: false,
@@ -276,6 +279,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "updateRemoteDirectorySearch") {
           this.updateRemoteDirectorySearch(message.searchText);
+          return;
+        }
+        if (message?.type === "handleRemoteDirectoryKeydown") {
+          await this.handleRemoteDirectoryKeydown(message.key);
           return;
         }
         if (message?.type === "confirmRemoteDirectory") {
@@ -405,10 +412,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             item.path.toLowerCase().includes(remoteDirectorySearchText),
         )
       : this.remoteDirectoryBrowserState.items;
+    const remoteDirectorySelectedIndex =
+      this.remoteDirectoryBrowserState.selectedIndex >= 0 &&
+      this.remoteDirectoryBrowserState.selectedIndex <
+        filteredRemoteDirectoryItems.length
+        ? this.remoteDirectoryBrowserState.selectedIndex
+        : -1;
     const remoteDirectoryItemsMarkup = filteredRemoteDirectoryItems
       .map(
-        (item) => `
-      <li class="remote-directory-item ${item.path === this.remoteDirectoryBrowserState.selectedPath ? "selected" : ""}" data-remote-directory-path="${escapeHtml(item.path)}">
+        (item, index) => `
+      <li class="remote-directory-item ${item.path === this.remoteDirectoryBrowserState.selectedPath || index === remoteDirectorySelectedIndex ? "selected" : ""}" data-remote-directory-path="${escapeHtml(item.path)}">
         <div class="remote-directory-name">📁 ${escapeHtml(item.name || item.path)}</div>
         <div class="remote-directory-path">${escapeHtml(item.path)}</div>
       </li>`,
@@ -695,6 +708,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (remoteDirectorySearchInput) {
       remoteDirectorySearchInput.addEventListener('input', () => {
         vscode.postMessage({ type: 'updateRemoteDirectorySearch', searchText: remoteDirectorySearchInput.value });
+      });
+      remoteDirectorySearchInput.addEventListener('keydown', (event) => {
+        const supportedKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
+        if (!supportedKeys.includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        vscode.postMessage({ type: 'handleRemoteDirectoryKeydown', key: event.key });
       });
     }
     document.querySelectorAll('[data-remote-directory-path]').forEach((item) => {
@@ -1874,6 +1895,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private async pickWorkingDirectory(): Promise<void> {
     this.remoteDirectoryBrowserState.isVisible = true;
     this.remoteDirectoryBrowserState.errorMessage = "";
+    this.remoteDirectoryBrowserState.selectedIndex = -1;
     this.remoteDirectoryBrowserState.searchText = "";
     await this.loadRemoteDirectories(this.createAgentFormState.workingDir || "~");
   }
@@ -1908,6 +1930,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         : [];
       this.remoteDirectoryBrowserState.currentPath = String(result.data.current_path || requestedPath);
       this.remoteDirectoryBrowserState.selectedPath = this.remoteDirectoryBrowserState.currentPath;
+      this.remoteDirectoryBrowserState.selectedIndex = -1;
       this.remoteDirectoryBrowserState.searchText = "";
       this.remoteDirectoryBrowserState.items = directoryItems.map((item) => ({
         name: String(item.name || item.path || ""),
@@ -1929,12 +1952,90 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this.remoteDirectoryBrowserState.selectedPath = selectedPath;
+    this.remoteDirectoryBrowserState.selectedIndex =
+      this.getFilteredRemoteDirectoryItems().findIndex(
+        (item) => item.path === selectedPath,
+      );
     this.renderAgentListView();
   }
 
   private updateRemoteDirectorySearch(searchText?: string): void {
     this.remoteDirectoryBrowserState.searchText = String(searchText || "");
+    this.remoteDirectoryBrowserState.selectedIndex = -1;
     this.renderAgentListView();
+  }
+
+  private getFilteredRemoteDirectoryItems(): RemoteDirectoryItem[] {
+    const normalizedSearchText = this.remoteDirectoryBrowserState.searchText
+      .toLowerCase()
+      .trim();
+    if (!normalizedSearchText) {
+      return this.remoteDirectoryBrowserState.items;
+    }
+    return this.remoteDirectoryBrowserState.items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(normalizedSearchText) ||
+        item.path.toLowerCase().includes(normalizedSearchText),
+    );
+  }
+
+  private async handleRemoteDirectoryKeydown(key?: string): Promise<void> {
+    const filteredItems = this.getFilteredRemoteDirectoryItems();
+    const maxIndex = filteredItems.length - 1;
+
+    if (key === "Escape") {
+      this.closeRemoteDirectoryBrowser();
+      return;
+    }
+
+    if (key === "ArrowDown") {
+      if (this.remoteDirectoryBrowserState.selectedIndex < maxIndex) {
+        this.remoteDirectoryBrowserState.selectedIndex += 1;
+      } else if (this.remoteDirectoryBrowserState.selectedIndex === -1) {
+        this.remoteDirectoryBrowserState.selectedIndex = 0;
+      }
+      if (
+        this.remoteDirectoryBrowserState.selectedIndex >= 0 &&
+        this.remoteDirectoryBrowserState.selectedIndex <= maxIndex
+      ) {
+        this.remoteDirectoryBrowserState.selectedPath =
+          filteredItems[this.remoteDirectoryBrowserState.selectedIndex].path;
+      }
+      this.renderAgentListView();
+      return;
+    }
+
+    if (key === "ArrowUp") {
+      if (this.remoteDirectoryBrowserState.selectedIndex > 0) {
+        this.remoteDirectoryBrowserState.selectedIndex -= 1;
+      } else if (this.remoteDirectoryBrowserState.selectedIndex === -1) {
+        this.remoteDirectoryBrowserState.selectedIndex = maxIndex;
+      } else {
+        this.remoteDirectoryBrowserState.selectedIndex = -1;
+      }
+      if (
+        this.remoteDirectoryBrowserState.selectedIndex >= 0 &&
+        this.remoteDirectoryBrowserState.selectedIndex <= maxIndex
+      ) {
+        this.remoteDirectoryBrowserState.selectedPath =
+          filteredItems[this.remoteDirectoryBrowserState.selectedIndex].path;
+      }
+      this.renderAgentListView();
+      return;
+    }
+
+    if (key === "Enter") {
+      if (
+        this.remoteDirectoryBrowserState.selectedIndex >= 0 &&
+        this.remoteDirectoryBrowserState.selectedIndex <= maxIndex
+      ) {
+        await this.loadRemoteDirectories(
+          filteredItems[this.remoteDirectoryBrowserState.selectedIndex].path,
+        );
+        return;
+      }
+      this.confirmRemoteDirectorySelection();
+    }
   }
 
   private getParentDirectoryPath(): string {
@@ -1968,6 +2069,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.remoteDirectoryBrowserState.isVisible = false;
     this.remoteDirectoryBrowserState.isLoading = false;
     this.remoteDirectoryBrowserState.errorMessage = "";
+    this.remoteDirectoryBrowserState.selectedIndex = -1;
     this.remoteDirectoryBrowserState.searchText = "";
     this.renderAgentListView();
   }
@@ -1985,6 +2087,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.remoteDirectoryBrowserState.isVisible = false;
     this.remoteDirectoryBrowserState.currentPath = "~";
     this.remoteDirectoryBrowserState.selectedPath = "~";
+    this.remoteDirectoryBrowserState.selectedIndex = -1;
     this.remoteDirectoryBrowserState.searchText = "";
     this.remoteDirectoryBrowserState.items = [];
     this.remoteDirectoryBrowserState.isLoading = false;
