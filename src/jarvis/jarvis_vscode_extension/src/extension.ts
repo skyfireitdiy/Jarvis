@@ -85,6 +85,7 @@ interface RemoteDirectoryBrowserState {
   isVisible: boolean;
   currentPath: string;
   selectedPath: string;
+  searchText: string;
   items: RemoteDirectoryItem[];
   isLoading: boolean;
   errorMessage: string;
@@ -125,6 +126,7 @@ interface AgentListViewMessage {
   useWorktree?: boolean;
   enabled?: boolean;
   path?: string;
+  searchText?: string;
 }
 
 interface SavedConnectionInfo {
@@ -211,6 +213,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     isVisible: false,
     currentPath: "~",
     selectedPath: "~",
+    searchText: "",
     items: [],
     isLoading: false,
     errorMessage: "",
@@ -269,6 +272,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "selectRemoteDirectory") {
           this.selectRemoteDirectory(message.path);
+          return;
+        }
+        if (message?.type === "updateRemoteDirectorySearch") {
+          this.updateRemoteDirectorySearch(message.searchText);
           return;
         }
         if (message?.type === "confirmRemoteDirectory") {
@@ -388,7 +395,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const remoteDirectoryErrorMarkup = this.remoteDirectoryBrowserState.errorMessage
       ? `<div class="form-error">${escapeHtml(this.remoteDirectoryBrowserState.errorMessage)}</div>`
       : "";
-    const remoteDirectoryItemsMarkup = this.remoteDirectoryBrowserState.items
+    const remoteDirectorySearchText = this.remoteDirectoryBrowserState.searchText
+      .toLowerCase()
+      .trim();
+    const filteredRemoteDirectoryItems = remoteDirectorySearchText
+      ? this.remoteDirectoryBrowserState.items.filter(
+          (item) =>
+            item.name.toLowerCase().includes(remoteDirectorySearchText) ||
+            item.path.toLowerCase().includes(remoteDirectorySearchText),
+        )
+      : this.remoteDirectoryBrowserState.items;
+    const remoteDirectoryItemsMarkup = filteredRemoteDirectoryItems
       .map(
         (item) => `
       <li class="remote-directory-item ${item.path === this.remoteDirectoryBrowserState.selectedPath ? "selected" : ""}" data-remote-directory-path="${escapeHtml(item.path)}">
@@ -400,8 +417,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const remoteDirectoryEmptyMarkup =
       !this.remoteDirectoryBrowserState.isLoading &&
       !this.remoteDirectoryBrowserState.errorMessage &&
-      this.remoteDirectoryBrowserState.items.length === 0
-        ? '<div class="remote-directory-empty">该目录下没有子目录</div>'
+      filteredRemoteDirectoryItems.length === 0
+        ? `<div class="remote-directory-empty">${this.remoteDirectoryBrowserState.searchText.trim() ? "没有匹配的目录" : "该目录下没有子目录"}</div>`
         : "";
     const remoteDirectoryBrowserMarkup = this.remoteDirectoryBrowserState.isVisible
       ? `
@@ -414,6 +431,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
     <div class="remote-directory-current-path">${escapeHtml(this.remoteDirectoryBrowserState.currentPath)}</div>
+    <div class="form-group">
+      <input id="remoteDirectorySearchInput" value="${escapeHtml(this.remoteDirectoryBrowserState.searchText)}" placeholder="🔍 搜索目录..." />
+    </div>
     ${remoteDirectoryErrorMarkup}
     <ul class="remote-directory-list">${remoteDirectoryItemsMarkup}</ul>
     ${this.remoteDirectoryBrowserState.isLoading ? '<div class="remote-directory-empty">目录加载中...</div>' : remoteDirectoryEmptyMarkup}
@@ -671,12 +691,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'confirmRemoteDirectory' });
       });
     }
+    const remoteDirectorySearchInput = document.getElementById('remoteDirectorySearchInput');
+    if (remoteDirectorySearchInput) {
+      remoteDirectorySearchInput.addEventListener('input', () => {
+        vscode.postMessage({ type: 'updateRemoteDirectorySearch', searchText: remoteDirectorySearchInput.value });
+      });
+    }
     document.querySelectorAll('[data-remote-directory-path]').forEach((item) => {
       item.addEventListener('click', () => {
-        vscode.postMessage({ type: 'selectRemoteDirectory', path: item.getAttribute('data-remote-directory-path') });
-      });
-      item.addEventListener('dblclick', () => {
-        vscode.postMessage({ type: 'browseRemoteDirectory', path: item.getAttribute('data-remote-directory-path') });
+        const path = item.getAttribute('data-remote-directory-path');
+        vscode.postMessage({ type: 'selectRemoteDirectory', path });
+        vscode.postMessage({ type: 'browseRemoteDirectory', path });
       });
     });
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
@@ -1849,6 +1874,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private async pickWorkingDirectory(): Promise<void> {
     this.remoteDirectoryBrowserState.isVisible = true;
     this.remoteDirectoryBrowserState.errorMessage = "";
+    this.remoteDirectoryBrowserState.searchText = "";
     await this.loadRemoteDirectories(this.createAgentFormState.workingDir || "~");
   }
 
@@ -1882,6 +1908,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         : [];
       this.remoteDirectoryBrowserState.currentPath = String(result.data.current_path || requestedPath);
       this.remoteDirectoryBrowserState.selectedPath = this.remoteDirectoryBrowserState.currentPath;
+      this.remoteDirectoryBrowserState.searchText = "";
       this.remoteDirectoryBrowserState.items = directoryItems.map((item) => ({
         name: String(item.name || item.path || ""),
         path: String(item.path || ""),
@@ -1905,6 +1932,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.renderAgentListView();
   }
 
+  private updateRemoteDirectorySearch(searchText?: string): void {
+    this.remoteDirectoryBrowserState.searchText = String(searchText || "");
+    this.renderAgentListView();
+  }
+
   private getParentDirectoryPath(): string {
     const currentPath = String(this.remoteDirectoryBrowserState.currentPath || this.createAgentFormState.workingDir || "~").trim() || "~";
     if (currentPath === "~" || currentPath === "/") {
@@ -1921,7 +1953,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private confirmRemoteDirectorySelection(): void {
-    const selectedPath = String(this.remoteDirectoryBrowserState.selectedPath || this.remoteDirectoryBrowserState.currentPath || "").trim();
+    const selectedPath = String(this.remoteDirectoryBrowserState.currentPath || this.remoteDirectoryBrowserState.selectedPath || "").trim();
     if (!selectedPath) {
       this.remoteDirectoryBrowserState.errorMessage = "请选择工作目录";
       this.renderAgentListView();
@@ -1936,6 +1968,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.remoteDirectoryBrowserState.isVisible = false;
     this.remoteDirectoryBrowserState.isLoading = false;
     this.remoteDirectoryBrowserState.errorMessage = "";
+    this.remoteDirectoryBrowserState.searchText = "";
     this.renderAgentListView();
   }
 
@@ -1952,6 +1985,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.remoteDirectoryBrowserState.isVisible = false;
     this.remoteDirectoryBrowserState.currentPath = "~";
     this.remoteDirectoryBrowserState.selectedPath = "~";
+    this.remoteDirectoryBrowserState.searchText = "";
     this.remoteDirectoryBrowserState.items = [];
     this.remoteDirectoryBrowserState.isLoading = false;
     this.remoteDirectoryBrowserState.errorMessage = "";
