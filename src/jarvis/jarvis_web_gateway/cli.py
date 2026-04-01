@@ -6,6 +6,7 @@ from typing import Optional
 import typer
 from rich import print as rprint
 
+from jarvis.jarvis_utils.utils import init_env
 from .app import run
 
 app = typer.Typer(help="Jarvis Web Gateway 服务")
@@ -32,4 +33,5 @@ def serve(
 
 
 def main(argv: Optional[list[str]] = None) -> None:
+    init_env("")
     app(standalone_mode=True)

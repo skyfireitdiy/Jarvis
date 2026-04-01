@@ -16,6 +16,7 @@ import typer
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 DEFAULT_GATEWAY_HOST = "127.0.0.1"
 DEFAULT_GATEWAY_PORT = 8000
@@ -29,6 +30,8 @@ FRONTEND_RELATIVE_PATH = Path("src/jarvis/jarvis_service/frontend")
 
 app = typer.Typer(help="Jarvis Service 服务")
 SINGLE_INSTANCE_LOCK_HANDLE: Optional[object] = None
+
+init_env("")
 
 
 class LoopAction(Enum):

@@ -20,12 +20,15 @@ from jarvis.jarvis_lsp.protocol import (
 )
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.daemon_client import LSPDaemonClient
+from jarvis.jarvis_utils.utils import init_env
 
 
 app = typer.Typer(
     help="Jarvis LSP 客户端工具 - 与语言服务器通信的命令行接口",
     no_args_is_help=True,
 )
+
+init_env("")
 
 
 def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:

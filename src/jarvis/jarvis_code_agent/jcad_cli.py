@@ -17,6 +17,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.input import (
     get_multiline_input as get_multiline_input_enhanced,
 )
+from jarvis.jarvis_utils.utils import init_env
 
 # 创建 typer 应用
 app = typer.Typer(help="Jarvis Code Agent Dispatcher - jca 的便捷封装")
@@ -144,6 +145,7 @@ def main(
         None, help="任务内容（可选，不提供则进入交互模式）"
     ),
 ) -> None:
+    init_env("")
     """Jarvis Code Agent Dispatcher - jca 的便捷封装
 
     用法:
