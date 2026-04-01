@@ -9,27 +9,24 @@ GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
 GITHUB_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
 DEFAULT_BRANCH="main"
+DEPS_DIR_RELATIVE="src/jarvis/jarvis_data/deps/x86_64_linux"
 
-ensure_uv_installed() {
-    echo "--- 1. 检查或安装 uv 环境 ---"
-    if command -v uv &> /dev/null; then
-        echo "uv 已安装."
-        echo "发现 uv: $(uv --version)"
-        return
+ensure_uv_available() {
+    echo "--- 1. 检查仓库内置 uv 环境 ---"
+
+    local deps_dir="$DEST_DIR/$DEPS_DIR_RELATIVE"
+    if [ ! -d "$deps_dir" ]; then
+        echo "错误: 当前仓库版本未找到内置依赖目录: $deps_dir"
+        echo "请确认当前平台受支持，或手动安装 uv 后重试。"
+        exit 1
     fi
 
-    echo "'uv' 未安装，正在尝试自动安装..."
-    curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
-
-    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-    if [ -f "$HOME/.cargo/env" ]; then
-        # shellcheck disable=SC1090
-        source "$HOME/.cargo/env"
-    fi
+    export PATH="$deps_dir:$PATH"
+    echo "已将内置依赖目录加入 PATH: $deps_dir"
 
     if ! command -v uv &> /dev/null; then
-        echo "错误: 'uv' 自动安装失败。"
-        echo "请访问 https://github.com/astral-sh/uv#installation 手动安装后重试。"
+        echo "错误: 未在仓库内置依赖目录中找到 uv。"
+        echo "请确认当前平台受支持，或手动安装 uv 后重试。"
         exit 1
     fi
 
@@ -76,7 +73,7 @@ checkout_source_ref() {
 }
 
 prepare_source_tree() {
-    echo -e "\n--- 2. 下载 Jarvis 源码 ---"
+    echo -e "\n--- 1. 下载 Jarvis 源码 ---"
     resolve_source_reference
     echo "目标版本: $SOURCE_REF"
     echo "下载源: $SOURCE_URL"
@@ -123,8 +120,8 @@ install_tools() {
     uv tool install ddgr
 }
 
-ensure_uv_installed
 prepare_source_tree
+ensure_uv_available
 install_tools
 
 echo -e "\n--- 4. 安装完成! ---"
