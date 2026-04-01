@@ -21,7 +21,10 @@ from playwright.async_api import async_playwright
 from markdownify import markdownify as html_to_markdown
 
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.utils import init_env
 
+
+init_env("")
 
 # Global playwright context and browser sessions
 _playwright_context = None

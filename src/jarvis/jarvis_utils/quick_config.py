@@ -13,6 +13,7 @@ import requests
 
 from .output import PrettyOutput
 from .input import get_single_line_input, user_confirm
+from .utils import init_env
 
 app = typer.Typer(help="快速配置 LLM 平台信息到 Jarvis 配置文件")
 console = Console()
@@ -20,6 +21,7 @@ console = Console()
 
 @app.command()
 def quick_config():
+    init_env("")
     """快速配置 LLM 平台信息到 Jarvis 配置文件的 llms 部分"""
 
     # 提示用户输入参数

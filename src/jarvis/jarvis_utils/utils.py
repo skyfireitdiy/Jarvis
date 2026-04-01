@@ -5,6 +5,7 @@ import errno
 import hashlib
 import json
 import os
+import platform
 import signal
 import subprocess
 import sys
@@ -12,6 +13,8 @@ import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
+from pathlib import PurePath
+from pathlib import PureWindowsPath
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import yaml
@@ -40,6 +43,107 @@ def get_yes_no(*args, **kwargs):
 
 # 防止 init_env 重复调用的全局标志
 _init_env_called = False
+
+
+def _get_bundled_deps_platform_key() -> Optional[str]:
+    """返回当前平台对应的 bundled deps 目录名。
+
+    参数:
+        无
+
+    返回:
+        当前平台目录名，例如 `x86_64_linux`；若当前平台或架构无法识别，则返回 None
+
+    示例:
+        >>> key = _get_bundled_deps_platform_key()
+        >>> key in {None, "x86_64_linux", "x86_64_windows", "arm64_macos"}
+        True
+    """
+    system_name = platform.system().lower()
+    machine = platform.machine().lower()
+
+    arch_aliases = {
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "arm64": "arm64",
+        "aarch64": "arm64",
+    }
+    system_aliases = {
+        "linux": "linux",
+        "windows": "windows",
+        "darwin": "macos",
+    }
+
+    normalized_arch = arch_aliases.get(machine)
+    normalized_system = system_aliases.get(system_name)
+    if not normalized_arch or not normalized_system:
+        return None
+    return f"{normalized_arch}_{normalized_system}"
+
+
+def _get_editable_project_root() -> Optional[Path]:
+    """推断可编辑安装场景下的项目根目录。"""
+    current_file = Path(__file__).resolve()
+    for candidate in current_file.parents:
+        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "jarvis").exists():
+            return candidate
+    return None
+
+
+def ensure_bundled_deps_in_path() -> Optional[Path]:
+    """将当前平台对应的仓库内置依赖目录加入 PATH。
+
+    为什么这样做：Jarvis 已将部分运行时工具内置到源码仓库中。
+    在可编辑安装或源码运行场景下，尽早把该目录加入 PATH，能避免用户
+    额外安装 `uv`、`rg`、`fd`、`tmux` 等工具，也能让 CLI 子进程继承同样环境。
+
+    参数:
+        无
+
+    返回:
+        成功加入 PATH 的目录；如果当前不是可识别/可用的源码场景，则返回 None
+
+    示例:
+        >>> result = ensure_bundled_deps_in_path()
+        >>> result is None or isinstance(result, Path)
+        True
+    """
+    platform_key = _get_bundled_deps_platform_key()
+    if not platform_key:
+        return None
+
+    project_root = _get_editable_project_root()
+    if not project_root:
+        return None
+
+    deps_dir = project_root / "src" / "jarvis" / "jarvis_data" / "deps" / platform_key
+    if not deps_dir.is_dir():
+        return None
+
+    deps_dir_str = str(deps_dir)
+    current_path = os.environ.get("PATH", "")
+    path_entries: List[str]
+    if current_path:
+        path_entries = current_path.split(os.pathsep)
+    else:
+        path_entries = []
+
+    if os.name == "nt":
+        normalized_target = str(PureWindowsPath(deps_dir_str)).lower()
+        normalized_entries = {
+            str(PureWindowsPath(entry)).lower()
+            for entry in path_entries
+            if entry
+        }
+    else:
+        normalized_target = str(PurePath(deps_dir_str))
+        normalized_entries = {str(PurePath(entry)) for entry in path_entries if entry}
+
+    if normalized_target in normalized_entries:
+        return deps_dir
+
+    os.environ["PATH"] = deps_dir_str if not current_path else deps_dir_str + os.pathsep + current_path
+    return deps_dir
 
 
 def decode_output(data: bytes) -> str:
@@ -860,7 +964,13 @@ def init_env(
     except Exception:
         pass
 
-    # 2. 设置配置文件
+    # 2. 注入仓库内置依赖目录，确保后续命令和子进程可直接找到 bundled tools
+    try:
+        ensure_bundled_deps_in_path()
+    except Exception:
+        pass
+
+    # 3. 设置配置文件
     global g_config_file
     g_config_file = config_file
     try:

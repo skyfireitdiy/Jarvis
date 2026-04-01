@@ -8,10 +8,12 @@ import subprocess
 import sys
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 
 def install_chromium() -> None:
     """安装 Playwright Chromium 浏览器驱动"""
+    init_env("")
     PrettyOutput.auto_print("🔧 正在安装 Playwright Chromium 浏览器驱动...")
     PrettyOutput.auto_print("这可能需要几分钟时间，请耐心等待...")
     PrettyOutput.auto_print("")

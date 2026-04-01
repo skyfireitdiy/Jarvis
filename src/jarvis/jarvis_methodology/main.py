@@ -25,6 +25,7 @@ from jarvis.jarvis_utils.methodology import _get_methodology_directory
 from jarvis.jarvis_utils.methodology import _get_project_methodology_directory
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
 from jarvis.jarvis_utils.methodology import _load_methodologies_from_dir
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="方法论管理工具")
 
@@ -471,6 +472,7 @@ def extract_methodology_from_url(
 
 
 def main() -> None:
+    init_env("")
     """Application entry point"""
     app()
 

@@ -18,6 +18,7 @@ from .web_app import create_app
 
 # 获取 jarvis_data 目录路径
 from importlib import resources
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis 配置工具 - 基于 JSON Schema 动态生成配置页面")
 
@@ -60,6 +61,8 @@ def web(
         jarvis-config --port 3000 --no-browser
         jarvis-config -s schema.json -o output.yaml -p 8080
     """
+
+    init_env("")
 
     # 设置默认值
     if schema_file is None:

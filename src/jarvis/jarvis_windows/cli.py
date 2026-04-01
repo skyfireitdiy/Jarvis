@@ -30,11 +30,14 @@ else:
 # They use typer.app which is defined above
 from jarvis.jarvis_utils.config import get_data_dir  # noqa: E402
 from jarvis.jarvis_utils.config import get_default_encoding  # noqa: E402
+from jarvis.jarvis_utils.utils import init_env  # noqa: E402
 
 app = typer.Typer(
     help="Windows App CLI Tool - Desktop application automation (Windows only)",
     no_args_is_help=True,
 )
+
+init_env("")
 
 config_app = typer.Typer(help="Windows 常用系统配置修改")
 

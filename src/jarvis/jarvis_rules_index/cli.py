@@ -8,6 +8,7 @@ import typer
 
 from jarvis.jarvis_rules_index.core import get_rules_index_formatted
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis 规则索引命令行工具")
 
@@ -38,6 +39,7 @@ def cli() -> None:
 
 def main() -> None:
     """Main entry point for the script."""
+    init_env("")
     cli()
 
 
