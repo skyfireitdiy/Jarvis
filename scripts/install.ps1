@@ -7,23 +7,25 @@ $GITEE_URL = "https://gitee.com/skyfireitdiy/Jarvis.git"
 $GITHUB_URL = "https://github.com/skyfireitdiy/Jarvis.git"
 $DEST_DIR = "$env:USERPROFILE\Jarvis"
 $DEFAULT_BRANCH = "main"
+$DEPS_DIR_RELATIVE = "src\jarvis\jarvis_data\deps\x86_64_windows"
 
-function Ensure-UvInstalled {
-    Write-Host "--- 1. Check or install uv environment ---" -ForegroundColor Green
-    $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
-    if ($uvCommand) {
-        Write-Host "Found uv: $(uv --version)" -ForegroundColor Cyan
-        return
+function Ensure-UvAvailable {
+    Write-Host "--- 2. Check bundled uv environment ---" -ForegroundColor Green
+
+    $depsDir = Join-Path $DEST_DIR $DEPS_DIR_RELATIVE
+    if (-not (Test-Path $depsDir)) {
+        Write-Host "Error: Current repository version does not contain bundled Windows dependencies: $depsDir" -ForegroundColor Red
+        Write-Host "Please use a repository version that includes Windows bundled dependencies, or install uv manually and try again." -ForegroundColor Yellow
+        exit 1
     }
 
-    Write-Host "'uv' not found, attempting automatic installation..." -ForegroundColor Yellow
-    irm https://astral.sh/uv/install.ps1 | iex
-    $env:Path = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;" + $env:Path
+    $env:Path = "$depsDir;" + $env:Path
+    Write-Host "Added bundled dependency directory to PATH: $depsDir" -ForegroundColor Cyan
 
     $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
     if (-not $uvCommand) {
-        Write-Host "Error: 'uv' automatic installation failed." -ForegroundColor Red
-        Write-Host "Please visit https://github.com/astral-sh/uv#installation to install manually and try again." -ForegroundColor Yellow
+        Write-Host "Error: uv was not found in the bundled dependency directory." -ForegroundColor Red
+        Write-Host "Please use a repository version that includes Windows bundled dependencies, or install uv manually and try again." -ForegroundColor Yellow
         exit 1
     }
 
@@ -71,7 +73,7 @@ function Checkout-SourceReference {
 }
 
 function Prepare-SourceTree {
-    Write-Host "`n--- 2. Download Jarvis source code ---" -ForegroundColor Green
+    Write-Host "`n--- 1. Download Jarvis source code ---" -ForegroundColor Green
     Resolve-SourceReference
     Write-Host "Target version: $script:SOURCE_REF" -ForegroundColor Cyan
     Write-Host "Source URL: $script:SOURCE_URL" -ForegroundColor Cyan
@@ -123,8 +125,8 @@ function Install-Tools {
     uv tool install ddgr
 }
 
-Ensure-UvInstalled
 Prepare-SourceTree
+Ensure-UvAvailable
 Install-Tools
 
 Write-Host "`n--- 4. Installation complete! ---" -ForegroundColor Green

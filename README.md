@@ -115,22 +115,25 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 
 安装脚本会自动完成以下操作：
 
-- 安装 `uv`
 - 下载 Jarvis 最新 tag 对应的源码（浅克隆，减少下载体积）
-- 执行 `uv tool install -e .`
+- 将仓库内置依赖目录加入当前会话 `PATH`
+- 使用仓库内置 `uv` 执行 `uv tool install -e .`
 - 额外安装 `playwright` 与 `ddgr`
+
+> 提示：当前仓库已内置 `x86_64_linux` 平台依赖。一键安装脚本会优先使用仓库内置 `uv`；如果当前平台没有对应内置依赖，脚本会明确提示您手动安装 `uv` 或改用受支持的版本。
 
 **手动源码安装**
 
 ```bash
 git clone --depth 1 --branch <latest-tag> https://github.com/skyfireitdiy/Jarvis.git
 cd Jarvis
+export PATH="$(pwd)/src/jarvis/jarvis_data/deps/x86_64_linux:$PATH"
 uv tool install -e .
 uv tool install playwright
 uv tool install ddgr
 ```
 
-> Docker 相关说明请参考仓库中的容器/部署文档；主安装入口已统一为源码 + `uv tool` 方式。
+> Docker 相关说明请参考仓库中的容器/部署文档；主安装入口已统一为“源码下载 + 仓库内置 `uv` + `uv tool` 安装”方式。
 
 ### 第一个任务
 
