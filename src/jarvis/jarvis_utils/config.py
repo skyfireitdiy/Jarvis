@@ -139,7 +139,10 @@ def calculate_token_limit(remaining_tokens: int) -> int:
 def set_global_config_data(env_data: Dict[str, Any]) -> None:
     """设置全局环境变量数据"""
     global GLOBAL_CONFIG_DATA
-    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
+    # 原地更新，避免其他模块通过 `from ... import GLOBAL_CONFIG_DATA`
+    # 持有的旧引用在配置重载后失效。
+    GLOBAL_CONFIG_DATA.clear()
+    GLOBAL_CONFIG_DATA.update(env_data)
 
 
 def get_global_config_data() -> CaseInsensitiveDict:
