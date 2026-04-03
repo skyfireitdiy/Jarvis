@@ -44,6 +44,10 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
 from jarvis.jarvis_web_gateway.token_manager import (
     generate_gateway_token,
 )
+from jarvis.jarvis_web_gateway.node_config import NodeRuntimeConfig, build_node_runtime_config
+from jarvis.jarvis_web_gateway.node_manager import ChildNodeClient, NodeConnectionManager
+from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_WS_REQUEST
+from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
@@ -559,7 +563,10 @@ class WebSocketConnectionManager:
             return
 
 
-def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
+def create_app(
+    custom_app: Optional[FastAPI] = None,
+    node_config: Optional[NodeRuntimeConfig] = None,
+) -> FastAPI:
     """创建 FastAPI 应用。
 
     Args:
@@ -568,6 +575,9 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     Returns:
         FastAPI 应用实例
     """
+
+    node_config = node_config or build_node_runtime_config()
+    node_runtime = NodeRuntime(node_config)
 
     # 生成并设置 Gateway Token（启动时生成一次，永久使用）
     gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", generate_gateway_token())
@@ -588,6 +598,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
     # 创建 AgentProxyManager
     agent_proxy_manager = AgentProxyManager(agent_manager)
+    node_connection_manager = NodeConnectionManager(node_runtime, agent_manager, agent_proxy_manager)
+    child_node_client = ChildNodeClient(node_runtime, agent_manager) if node_config.is_child else None
 
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
@@ -617,6 +629,12 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     # 使用自定义 app 或创建新 app
     app = custom_app if custom_app is not None else FastAPI()
     app.state.timer_manager = timer_manager
+    app.state.node_config = node_config
+    app.state.node_runtime = node_runtime
+    app.state.agent_manager = agent_manager
+    app.state.agent_proxy_manager = agent_proxy_manager
+    app.state.node_connection_manager = node_connection_manager
+    app.state.child_node_client = child_node_client
 
     # 添加 CORS 中间件，允许前端跨域访问
     app.add_middleware(
@@ -687,6 +705,12 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         agent_manager.set_event_loop(asyncio.get_running_loop())
         # 为运行中的 Agent 启动监控任务
         await agent_manager.start_monitoring_for_running_agents()
+        if node_config.is_master:
+            node_runtime.mark_ready()
+        else:
+            node_runtime.mark_degraded()
+            if child_node_client is not None:
+                child_node_client.start()
 
     @app.on_event("shutdown")
     async def _shutdown() -> None:
@@ -696,6 +720,8 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         await agent_proxy_manager.cleanup()
         # 清理所有终端会话
         terminal_session_manager.cleanup()
+        if child_node_client is not None:
+            await child_node_client.stop()
         timer_manager.shutdown()
         set_current_gateway(None)
 
@@ -799,6 +825,15 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
     async def websocket_endpoint(websocket: WebSocket) -> None:
         await manager.handle(websocket)
 
+    @app.websocket("/ws/node")
+    async def node_websocket_endpoint(websocket: WebSocket) -> None:
+        if not node_config.is_master:
+            await websocket.accept()
+            await _send_error(websocket, "UNSUPPORTED", "child mode does not accept node connections")
+            await websocket.close(code=4404)
+            return
+        await node_connection_manager.handle_node_websocket(websocket)
+
     # WebSocket 代理：代理到 Agent WebSocket
     @app.websocket("/api/agent/{agent_id}/ws")
     async def agent_websocket_proxy(agent_id: str, websocket: WebSocket) -> None:
@@ -824,6 +859,37 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             return
 
         await websocket.accept()
+
+        route = node_runtime.agent_route_registry.get(agent_id)
+        if route is not None and route.node_id not in (node_runtime.local_node_id, "master"):
+            try:
+                messages: list[str] = []
+                while True:
+                    try:
+                        data = await asyncio.wait_for(websocket.receive_text(), timeout=0.2)
+                        messages.append(data)
+                    except asyncio.TimeoutError:
+                        break
+                response = await node_connection_manager.send_request_to_node(
+                    route.node_id,
+                    AGENT_WS_REQUEST,
+                    {
+                        "agent_id": agent_id,
+                        "path": "ws",
+                        "messages": messages,
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    await websocket.close(code=4003, reason=(payload.get("error") or {}).get("message", "Remote websocket proxy failed"))
+                    return
+                for item in payload.get("messages") or []:
+                    await websocket.send_text(str(item))
+                await websocket.close(code=1000)
+            except Exception as e:
+                logger.error(f"[WS PROXY] Remote websocket proxy error: {e}")
+                await websocket.close(code=4003, reason="Remote websocket proxy failed")
+            return
 
         try:
             await agent_proxy_manager.proxy_websocket(websocket, agent_id)
@@ -862,6 +928,44 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         logger = logging.getLogger(__name__)
         logger.info(f"[HTTP PROXY] {request.method} /api/agent/{agent_id}/{path}")
 
+        route = node_runtime.agent_route_registry.get(agent_id)
+        if route is not None and route.node_id not in (node_runtime.local_node_id, "master"):
+            try:
+                body = (await request.body()).decode("utf-8", errors="replace")
+                response = await node_connection_manager.send_request_to_node(
+                    route.node_id,
+                    AGENT_HTTP_REQUEST,
+                    {
+                        "agent_id": agent_id,
+                        "method": request.method,
+                        "path": path,
+                        "query": str(request.query_params),
+                        "headers": dict(request.headers),
+                        "body": body,
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return Response(
+                        content=f'{{"error": "{error.get("message", "Remote HTTP proxy failed")}"}}',
+                        status_code=502,
+                        media_type="application/json",
+                    )
+                return Response(
+                    content=payload.get("body", ""),
+                    status_code=int(payload.get("status_code", 200)),
+                    headers=payload.get("headers") or {},
+                    media_type=(payload.get("headers") or {}).get("content-type"),
+                )
+            except Exception as e:
+                logger.error(f"[HTTP PROXY] Remote HTTP proxy error: {e}")
+                return Response(
+                    content='{"error": "Remote HTTP proxy failed"}',
+                    status_code=502,
+                    media_type="application/json",
+                )
+
         try:
             return await agent_proxy_manager.proxy_http_request(request, agent_id, path)
         except AgentNotFoundError:
@@ -892,6 +996,24 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 status_code=500,
                 media_type="application/json",
             )
+
+    @app.get("/api/node/status", dependencies=[Depends(verify_token)])
+    async def get_node_status() -> Dict[str, Any]:
+        return {
+            "success": True,
+            "data": {
+                "node": node_config.to_dict(),
+                "runtime_status": node_runtime.status,
+                "token_sync": {
+                    "last_synced_at": node_runtime.token_sync_state.last_synced_at,
+                    "sync_status": node_runtime.token_sync_state.sync_status,
+                    "source_node_id": node_runtime.token_sync_state.source_node_id,
+                    "error_message": node_runtime.token_sync_state.error_message,
+                },
+                "nodes": node_runtime.node_registry.list_all(),
+                "agent_routes": node_runtime.agent_route_registry.list_all(),
+            },
+        }
 
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
     async def restart_service() -> Dict[str, Any]:
@@ -962,6 +1084,7 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
             task = request.get("task")
             additional_args = request.get("additional_args")
             worktree = bool(request.get("worktree", False))
+            target_node_id = str(request.get("node_id") or "").strip()
 
             if not agent_type:
                 return {
@@ -980,6 +1103,63 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                     },
                 }
 
+            resolved_target_node = target_node_id or node_runtime.local_node_id
+
+            if resolved_target_node not in (node_runtime.local_node_id, "master"):
+                node_info = node_runtime.node_registry.get(resolved_target_node)
+                if node_info is None:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_NOT_FOUND",
+                            "message": f"Node not found: {resolved_target_node}",
+                        },
+                    }
+                if node_info.status != "online":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_OFFLINE",
+                            "message": f"Node is offline: {resolved_target_node}",
+                        },
+                    }
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    AGENT_CREATE_REQUEST,
+                    {
+                        "agent_type": agent_type,
+                        "working_dir": working_dir,
+                        "name": name,
+                        "llm_group": llm_group,
+                        "tool_group": tool_group,
+                        "config_file": config_file,
+                        "task": task,
+                        "additional_args": additional_args,
+                        "worktree": worktree,
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "AGENT_CREATE_FAILED"),
+                            "message": error.get("message", "Remote agent creation failed"),
+                        },
+                    }
+                agent_info = payload.get("agent_info") or {}
+                node_runtime.agent_route_registry.register(
+                    AgentRouteInfo(
+                        agent_id=agent_info["agent_id"],
+                        node_id=resolved_target_node,
+                        status=agent_info.get("status", "running"),
+                        working_dir=agent_info.get("working_dir"),
+                        port=agent_info.get("port"),
+                    )
+                )
+                return {"success": True, "data": agent_info}
+
             # 从环境变量获取当前 Token 并传递给 Agent
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
 
@@ -994,6 +1174,16 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
                 task=task,
                 additional_args=additional_args,
                 worktree=worktree,
+                node_id=node_runtime.local_node_id,
+            )
+            node_runtime.agent_route_registry.register(
+                AgentRouteInfo(
+                    agent_id=agent_info["agent_id"],
+                    node_id=agent_info.get("node_id", node_runtime.local_node_id),
+                    status=agent_info.get("status", "running"),
+                    working_dir=agent_info.get("working_dir"),
+                    port=agent_info.get("port"),
+                )
             )
 
             return {"success": True, "data": agent_info}
@@ -1019,6 +1209,12 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
         """获取 Agent 列表。"""
         try:
             agents = agent_manager.get_agent_list()
+            for agent in agents:
+                route = node_runtime.agent_route_registry.get(agent.get("agent_id"))
+                if route is not None:
+                    agent.setdefault("node_id", route.node_id)
+                else:
+                    agent.setdefault("node_id", node_runtime.local_node_id)
             return {"success": True, "data": agents}
         except Exception as e:
             return {
@@ -2327,7 +2523,10 @@ def create_app(custom_app: Optional[FastAPI] = None) -> FastAPI:
 
 
 def run(
-    host: str = "127.0.0.1", port: int = 8000, password: Optional[str] = None
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    password: Optional[str] = None,
+    node_config: Optional[NodeRuntimeConfig] = None,
 ) -> None:
     """本地启动入口。"""
 
@@ -2346,7 +2545,7 @@ def run(
         GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
         GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
-    uvicorn.run(create_app(), host=host, port=port)
+    uvicorn.run(create_app(node_config=node_config), host=host, port=port)
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:

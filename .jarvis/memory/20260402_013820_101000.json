@@ -1,0 +1,14 @@
+{
+  "id": "20260402_013820_101000",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "详细设计",
+    "系统设计",
+    "node_mode",
+    "task-8"
+  ],
+  "content": "已继续完成 Jarvis node 模式功能点级详细设计文档，补齐 .jarvis/spec/node_mode_features/01~12 共 12 个子文档，覆盖 CLI与配置、运行时启动、子节点连接鉴权、token同步、节点注册与心跳、Agent元数据与路由、Agent创建路由、HTTP转发、WS转发、节点消息协议、安全与可观测性、测试与发布验证。当前 task-8 设计产物已齐备，可作为后续 task-5 实现输入。node_mode 最终规范仍为 master|child，无 standalone。",
+  "created_at": "2026-04-02T01:38:20.101042",
+  "updated_at": "2026-04-02T01:38:20.101049"
+}

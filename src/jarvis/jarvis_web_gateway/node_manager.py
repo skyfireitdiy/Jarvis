@@ -1,0 +1,416 @@
+# -*- coding: utf-8 -*-
+"""Node 主子节点连接与基础状态管理。"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import uuid
+from typing import Any, Dict, Optional
+
+import websockets
+from fastapi import WebSocket
+
+from .agent_manager import AgentManager
+from .node_protocol import (
+    AGENT_CREATE_REQUEST,
+    AGENT_CREATE_RESPONSE,
+    AGENT_HTTP_REQUEST,
+    AGENT_HTTP_RESPONSE,
+    AGENT_WS_REQUEST,
+    AGENT_WS_RESPONSE,
+    NODE_AUTH,
+    NODE_AUTH_RESULT,
+    NODE_HEARTBEAT,
+    build_error_message,
+    build_node_message,
+)
+from .node_runtime import AgentRouteInfo, NodeInfo, NodeRuntime
+
+logger = logging.getLogger(__name__)
+
+
+class NodeConnectionManager:
+    def __init__(self, node_runtime: NodeRuntime, agent_manager: AgentManager, agent_proxy_manager: Any) -> None:
+        self._node_runtime = node_runtime
+        self._agent_manager = agent_manager
+        self._agent_proxy_manager = agent_proxy_manager
+        self._connections: Dict[str, WebSocket] = {}
+        self._connection_to_node: Dict[str, str] = {}
+        self._pending_requests: Dict[str, asyncio.Future] = {}
+
+    async def handle_node_websocket(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        connection_id = str(uuid.uuid4())
+        try:
+            message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+        except Exception:
+            await websocket.send_json(
+                build_error_message(
+                    "NODE_AUTH_REQUIRED",
+                    "first message must be node_auth",
+                )
+            )
+            await websocket.close(code=4401)
+            return
+
+        if not isinstance(message, dict) or message.get("type") != NODE_AUTH:
+            await websocket.send_json(
+                build_error_message("INVALID_NODE_MESSAGE", "first message must be node_auth")
+            )
+            await websocket.close(code=4401)
+            return
+
+        payload = message.get("payload") or {}
+        node_id = str(payload.get("node_id") or "").strip()
+        secret = str(payload.get("secret") or "").strip()
+        if not node_id or not secret:
+            await websocket.send_json(
+                build_error_message("NODE_AUTH_FAILED", "node_id and secret are required")
+            )
+            await websocket.close(code=4401)
+            return
+
+        expected_secret = os.environ.get("JARVIS_NODE_SECRET")
+        if not expected_secret or secret != expected_secret:
+            await websocket.send_json(
+                build_error_message("NODE_AUTH_FAILED", "invalid node credentials")
+            )
+            await websocket.close(code=4401)
+            return
+
+        self._connections[node_id] = websocket
+        self._connection_to_node[connection_id] = node_id
+        self._node_runtime.node_registry.upsert(
+            NodeInfo(
+                node_id=node_id,
+                status="online",
+                connection_id=connection_id,
+                capabilities=payload.get("capabilities") or {},
+                metadata={},
+            )
+        )
+        await websocket.send_json(
+            build_node_message(
+                "node_auth_result",
+                {
+                    "success": True,
+                    "node_id": node_id,
+                    "token": os.environ.get("JARVIS_AUTH_TOKEN"),
+                    "heartbeat_interval": 10,
+                },
+                request_id=message.get("request_id"),
+            )
+        )
+
+        try:
+            while True:
+                next_message = await websocket.receive_json()
+                if not isinstance(next_message, dict):
+                    continue
+                message_type = next_message.get("type")
+                request_id = next_message.get("request_id")
+                if message_type == NODE_HEARTBEAT:
+                    self._node_runtime.node_registry.mark_heartbeat(node_id)
+                    continue
+                if message_type in (AGENT_CREATE_RESPONSE, AGENT_HTTP_RESPONSE, AGENT_WS_RESPONSE) and request_id:
+                    future = self._pending_requests.pop(request_id, None)
+                    if future is not None and not future.done():
+                        future.set_result(next_message)
+                    continue
+                if message_type == AGENT_CREATE_REQUEST:
+                    response = self._handle_agent_create_request(next_message, node_id)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_HTTP_REQUEST:
+                    response = await self._handle_agent_http_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_WS_REQUEST:
+                    response = await self._handle_agent_ws_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+        except Exception:
+            logger.info("[NODE] node disconnected: %s", node_id)
+        finally:
+            self._node_runtime.node_registry.mark_offline(node_id)
+            self._connections.pop(node_id, None)
+            self._connection_to_node.pop(connection_id, None)
+
+    def get_node_connection(self, node_id: str) -> Optional[WebSocket]:
+        return self._connections.get(node_id)
+
+    async def send_request_to_node(
+        self,
+        node_id: str,
+        message_type: str,
+        payload: Dict[str, Any],
+        timeout: float = 60.0,
+    ) -> Dict[str, Any]:
+        websocket = self._connections.get(node_id)
+        if websocket is None:
+            raise RuntimeError(f"node connection not found: {node_id}")
+        request_id = str(uuid.uuid4())
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future = loop.create_future()
+        self._pending_requests[request_id] = future
+        try:
+            await websocket.send_json(
+                build_node_message(message_type, payload, request_id=request_id)
+            )
+            response = await asyncio.wait_for(future, timeout=timeout)
+            if not isinstance(response, dict):
+                raise RuntimeError("invalid node response")
+            return response
+        finally:
+            self._pending_requests.pop(request_id, None)
+
+    def _handle_agent_create_request(self, message: Dict[str, Any], source_node_id: str) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        try:
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            agent_info = self._agent_manager.create_agent(
+                auth_token=auth_token,
+                agent_type=payload.get("agent_type"),
+                working_dir=payload.get("working_dir"),
+                name=payload.get("name"),
+                llm_group=payload.get("llm_group", "default"),
+                tool_group=payload.get("tool_group", "default"),
+                config_file=payload.get("config_file"),
+                task=payload.get("task"),
+                additional_args=payload.get("additional_args"),
+                worktree=bool(payload.get("worktree", False)),
+                node_id=self._node_runtime.local_node_id,
+            )
+            self._node_runtime.agent_route_registry.register(
+                AgentRouteInfo(
+                    agent_id=agent_info["agent_id"],
+                    node_id=agent_info.get("node_id", self._node_runtime.local_node_id),
+                    status=agent_info.get("status", "running"),
+                    working_dir=agent_info.get("working_dir"),
+                    port=agent_info.get("port"),
+                )
+            )
+            return build_node_message(
+                AGENT_CREATE_RESPONSE,
+                {
+                    "success": True,
+                    "agent_info": agent_info,
+                    "source_node_id": source_node_id,
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_CREATE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "AGENT_CREATE_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_http_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        try:
+            from fastapi import Request
+            from starlette.requests import Request as StarletteRequest
+
+            scope = {
+                "type": "http",
+                "method": payload.get("method", "GET"),
+                "path": "/" + str(payload.get("path") or "").lstrip("/"),
+                "query_string": str(payload.get("query") or "").encode("utf-8"),
+                "headers": [
+                    (str(k).lower().encode("utf-8"), str(v).encode("utf-8"))
+                    for k, v in (payload.get("headers") or {}).items()
+                ],
+                "client": ("127.0.0.1", 0),
+                "server": ("127.0.0.1", 0),
+                "scheme": "http",
+            }
+            body = str(payload.get("body") or "").encode("utf-8")
+
+            async def receive() -> Dict[str, Any]:
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            request = StarletteRequest(scope, receive)
+            response = await self._agent_proxy_manager.proxy_http_request(
+                request,
+                str(payload.get("agent_id") or ""),
+                str(payload.get("path") or ""),
+            )
+            response_body = response.body.decode("utf-8", errors="replace") if response.body else ""
+            headers = {k: v for k, v in response.headers.items()}
+            return build_node_message(
+                AGENT_HTTP_RESPONSE,
+                {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "headers": headers,
+                    "body": response_body,
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_HTTP_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "HTTP_PROXY_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_ws_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        try:
+            agent_id = str(payload.get("agent_id") or "")
+            ws_path = str(payload.get("path") or "ws")
+            port = await self._agent_proxy_manager.get_agent_port(agent_id)
+            agent_url = f"ws://127.0.0.1:{port}/ws"
+            async with websockets.connect(agent_url, close_timeout=30, proxy=None) as agent_ws:
+                auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+                if auth_token:
+                    await agent_ws.send(json.dumps({"type": "auth", "payload": {"token": auth_token}}))
+                for item in payload.get("messages") or []:
+                    await agent_ws.send(str(item))
+                collected: list[str] = []
+                while True:
+                    try:
+                        reply = await asyncio.wait_for(agent_ws.recv(), timeout=0.5)
+                        collected.append(reply if isinstance(reply, str) else reply.decode())
+                    except asyncio.TimeoutError:
+                        break
+            return build_node_message(
+                AGENT_WS_RESPONSE,
+                {
+                    "success": True,
+                    "messages": collected,
+                    "path": ws_path,
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_WS_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "WS_PROXY_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+
+class ChildNodeClient:
+    def __init__(self, node_runtime: NodeRuntime, agent_manager: AgentManager) -> None:
+        self._node_runtime = node_runtime
+        self._agent_manager = agent_manager
+        self._ws: Optional[Any] = None
+        self._task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        if self._task is None:
+            self._task = asyncio.create_task(self._run())
+
+    async def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+        if self._ws is not None:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+            self._ws = None
+
+    async def _run(self) -> None:
+        config = self._node_runtime.config
+        if not config.master_url:
+            self._node_runtime.token_sync_state.mark_failed("master_url is missing")
+            self._node_runtime.mark_degraded()
+            return
+
+        master_url = config.master_url.rstrip("/")
+        if master_url.startswith("https://"):
+            ws_url = "wss://" + master_url[len("https://"):]
+        elif master_url.startswith("http://"):
+            ws_url = "ws://" + master_url[len("http://"):]
+        else:
+            ws_url = master_url
+        ws_url = ws_url.rstrip("/") + "/ws/node"
+
+        try:
+            self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=None)
+            await self._ws.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_AUTH,
+                        {
+                            "node_id": config.effective_node_id,
+                            "secret": config.node_secret,
+                            "capabilities": {
+                                "agent_creation": True,
+                                "agent_proxy": True,
+                            },
+                        },
+                    )
+                )
+            )
+            raw_message = await self._ws.recv()
+            message = json.loads(raw_message)
+            if (
+                not isinstance(message, dict)
+                or message.get("type") != NODE_AUTH_RESULT
+                or not (message.get("payload") or {}).get("success")
+            ):
+                self._node_runtime.token_sync_state.mark_failed("node auth failed")
+                self._node_runtime.mark_degraded()
+                return
+
+            token = (message.get("payload") or {}).get("token")
+            if not token:
+                self._node_runtime.token_sync_state.mark_failed("missing token from master")
+                self._node_runtime.mark_degraded()
+                return
+
+            os.environ["JARVIS_AUTH_TOKEN"] = token
+            self._node_runtime.token_sync_state.mark_success("master")
+            self._node_runtime.mark_ready()
+
+            while True:
+                await asyncio.sleep(10)
+                if self._ws is None:
+                    break
+                await self._ws.send(
+                    json.dumps(
+                        build_node_message(
+                            NODE_HEARTBEAT,
+                            {"node_id": config.effective_node_id},
+                        )
+                    )
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("[NODE] child node connection failed: %s", exc)
+            self._node_runtime.token_sync_state.mark_failed(str(exc), source_node_id="master")
+            self._node_runtime.mark_degraded()
