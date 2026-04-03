@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import uuid
 from typing import Any, Dict, Optional
 
@@ -31,9 +32,18 @@ from .node_runtime import AgentRouteInfo, NodeInfo, NodeRuntime
 
 logger = logging.getLogger(__name__)
 
+CHILD_HEARTBEAT_INTERVAL_SECONDS = 10
+CHILD_RECONNECT_MIN_SECONDS = 5
+CHILD_RECONNECT_MAX_SECONDS = 10
+
 
 class NodeConnectionManager:
-    def __init__(self, node_runtime: NodeRuntime, agent_manager: AgentManager, agent_proxy_manager: Any) -> None:
+    def __init__(
+        self,
+        node_runtime: NodeRuntime,
+        agent_manager: AgentManager,
+        agent_proxy_manager: Any,
+    ) -> None:
         self._node_runtime = node_runtime
         self._agent_manager = agent_manager
         self._agent_proxy_manager = agent_proxy_manager
@@ -58,7 +68,9 @@ class NodeConnectionManager:
 
         if not isinstance(message, dict) or message.get("type") != NODE_AUTH:
             await websocket.send_json(
-                build_error_message("INVALID_NODE_MESSAGE", "first message must be node_auth")
+                build_error_message(
+                    "INVALID_NODE_MESSAGE", "first message must be node_auth"
+                )
             )
             await websocket.close(code=4401)
             return
@@ -68,7 +80,9 @@ class NodeConnectionManager:
         secret = str(payload.get("secret") or "").strip()
         if not node_id or not secret:
             await websocket.send_json(
-                build_error_message("NODE_AUTH_FAILED", "node_id and secret are required")
+                build_error_message(
+                    "NODE_AUTH_FAILED", "node_id and secret are required"
+                )
             )
             await websocket.close(code=4401)
             return
@@ -115,7 +129,11 @@ class NodeConnectionManager:
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
                     continue
-                if message_type in (AGENT_CREATE_RESPONSE, AGENT_HTTP_RESPONSE, AGENT_WS_RESPONSE) and request_id:
+                if (
+                    message_type
+                    in (AGENT_CREATE_RESPONSE, AGENT_HTTP_RESPONSE, AGENT_WS_RESPONSE)
+                    and request_id
+                ):
                     future = self._pending_requests.pop(request_id, None)
                     if future is not None and not future.done():
                         future.set_result(next_message)
@@ -167,7 +185,9 @@ class NodeConnectionManager:
         finally:
             self._pending_requests.pop(request_id, None)
 
-    def _handle_agent_create_request(self, message: Dict[str, Any], source_node_id: str) -> Dict[str, Any]:
+    def _handle_agent_create_request(
+        self, message: Dict[str, Any], source_node_id: str
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         try:
@@ -216,7 +236,9 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    async def _handle_agent_http_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_agent_http_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         try:
@@ -247,7 +269,9 @@ class NodeConnectionManager:
                 str(payload.get("agent_id") or ""),
                 str(payload.get("path") or ""),
             )
-            response_body = response.body.decode("utf-8", errors="replace") if response.body else ""
+            response_body = (
+                response.body.decode("utf-8", errors="replace") if response.body else ""
+            )
             headers = {k: v for k, v in response.headers.items()}
             return build_node_message(
                 AGENT_HTTP_RESPONSE,
@@ -280,17 +304,23 @@ class NodeConnectionManager:
             ws_path = str(payload.get("path") or "ws")
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
-            async with websockets.connect(agent_url, close_timeout=30, proxy=None) as agent_ws:
+            async with websockets.connect(
+                agent_url, close_timeout=30, proxy=None
+            ) as agent_ws:
                 auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
                 if auth_token:
-                    await agent_ws.send(json.dumps({"type": "auth", "payload": {"token": auth_token}}))
+                    await agent_ws.send(
+                        json.dumps({"type": "auth", "payload": {"token": auth_token}})
+                    )
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
                 collected: list[str] = []
                 while True:
                     try:
                         reply = await asyncio.wait_for(agent_ws.recv(), timeout=0.5)
-                        collected.append(reply if isinstance(reply, str) else reply.decode())
+                        collected.append(
+                            reply if isinstance(reply, str) else reply.decode()
+                        )
                     except asyncio.TimeoutError:
                         break
             return build_node_message(
@@ -351,66 +381,83 @@ class ChildNodeClient:
 
         master_url = config.master_url.rstrip("/")
         if master_url.startswith("https://"):
-            ws_url = "wss://" + master_url[len("https://"):]
+            ws_url = "wss://" + master_url[len("https://") :]
         elif master_url.startswith("http://"):
-            ws_url = "ws://" + master_url[len("http://"):]
+            ws_url = "ws://" + master_url[len("http://") :]
         else:
             ws_url = master_url
         ws_url = ws_url.rstrip("/") + "/ws/node"
 
-        try:
-            self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=None)
+        while True:
+            try:
+                await self._connect_once(ws_url)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.error("[NODE] child node connection failed: %s", exc)
+                self._node_runtime.token_sync_state.mark_failed(
+                    str(exc), source_node_id="master"
+                )
+                self._node_runtime.mark_degraded()
+            finally:
+                if self._ws is not None:
+                    try:
+                        await self._ws.close()
+                    except Exception:
+                        pass
+                    self._ws = None
+
+            reconnect_delay = random.uniform(
+                CHILD_RECONNECT_MIN_SECONDS,
+                CHILD_RECONNECT_MAX_SECONDS,
+            )
+            logger.info("[NODE] reconnect to master in %.2f seconds", reconnect_delay)
+            await asyncio.sleep(reconnect_delay)
+
+    async def _connect_once(self, ws_url: str) -> None:
+        config = self._node_runtime.config
+        self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=None)
+        await self._ws.send(
+            json.dumps(
+                build_node_message(
+                    NODE_AUTH,
+                    {
+                        "node_id": config.effective_node_id,
+                        "secret": config.node_secret,
+                        "capabilities": {
+                            "agent_creation": True,
+                            "agent_proxy": True,
+                        },
+                    },
+                )
+            )
+        )
+        raw_message = await self._ws.recv()
+        message = json.loads(raw_message)
+        if (
+            not isinstance(message, dict)
+            or message.get("type") != NODE_AUTH_RESULT
+            or not (message.get("payload") or {}).get("success")
+        ):
+            raise RuntimeError("node auth failed")
+
+        token = (message.get("payload") or {}).get("token")
+        if not token:
+            raise RuntimeError("missing token from master")
+
+        os.environ["JARVIS_AUTH_TOKEN"] = token
+        self._node_runtime.token_sync_state.mark_success("master")
+        self._node_runtime.mark_ready()
+
+        while True:
+            await asyncio.sleep(CHILD_HEARTBEAT_INTERVAL_SECONDS)
+            if self._ws is None:
+                raise RuntimeError("node websocket is closed")
             await self._ws.send(
                 json.dumps(
                     build_node_message(
-                        NODE_AUTH,
-                        {
-                            "node_id": config.effective_node_id,
-                            "secret": config.node_secret,
-                            "capabilities": {
-                                "agent_creation": True,
-                                "agent_proxy": True,
-                            },
-                        },
+                        NODE_HEARTBEAT,
+                        {"node_id": config.effective_node_id},
                     )
                 )
             )
-            raw_message = await self._ws.recv()
-            message = json.loads(raw_message)
-            if (
-                not isinstance(message, dict)
-                or message.get("type") != NODE_AUTH_RESULT
-                or not (message.get("payload") or {}).get("success")
-            ):
-                self._node_runtime.token_sync_state.mark_failed("node auth failed")
-                self._node_runtime.mark_degraded()
-                return
-
-            token = (message.get("payload") or {}).get("token")
-            if not token:
-                self._node_runtime.token_sync_state.mark_failed("missing token from master")
-                self._node_runtime.mark_degraded()
-                return
-
-            os.environ["JARVIS_AUTH_TOKEN"] = token
-            self._node_runtime.token_sync_state.mark_success("master")
-            self._node_runtime.mark_ready()
-
-            while True:
-                await asyncio.sleep(10)
-                if self._ws is None:
-                    break
-                await self._ws.send(
-                    json.dumps(
-                        build_node_message(
-                            NODE_HEARTBEAT,
-                            {"node_id": config.effective_node_id},
-                        )
-                    )
-                )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.error("[NODE] child node connection failed: %s", exc)
-            self._node_runtime.token_sync_state.mark_failed(str(exc), source_node_id="master")
-            self._node_runtime.mark_degraded()
