@@ -3,6 +3,7 @@
 
 import atexit
 import os
+import secrets
 import shutil
 import signal
 import subprocess
@@ -10,7 +11,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TextIO
 
 import typer
 
@@ -27,9 +28,11 @@ PROCESS_TERMINATE_TIMEOUT_SECONDS = 10
 ROOT_MARKER_FILES = ("pyproject.toml",)
 ROOT_MARKER_DIRECTORIES = ("src/jarvis",)
 FRONTEND_RELATIVE_PATH = Path("src/jarvis/jarvis_service/frontend")
+MASTER_NODE_SECRET_RELATIVE_PATH = Path(".jarvis/node_mode/master_node_secret")
+AUTO_GENERATED_SECRET_NBYTES = 24
 
 app = typer.Typer(help="Jarvis Service 服务")
-SINGLE_INSTANCE_LOCK_HANDLE: Optional[object] = None
+SINGLE_INSTANCE_LOCK_HANDLE: Optional[TextIO] = None
 
 init_env("")
 
@@ -52,6 +55,10 @@ class ServiceConfig:
     frontend_host: str
     frontend_port: int
     gateway_password: Optional[str]
+    node_mode: str
+    node_id: Optional[str]
+    master_url: Optional[str]
+    node_secret: Optional[str]
 
 
 @dataclass
@@ -148,6 +155,14 @@ class ServiceController:
         ]
         if self._config.gateway_password:
             command.extend(["--gateway-password", self._config.gateway_password])
+        if self._config.node_mode:
+            command.extend(["--node-mode", self._config.node_mode])
+        if self._config.node_id:
+            command.extend(["--node-id", self._config.node_id])
+        if self._config.master_url:
+            command.extend(["--master-url", self._config.master_url])
+        if self._config.node_secret:
+            command.extend(["--node-secret", self._config.node_secret])
         process = subprocess.Popen(command, cwd=self._config.project_root)
         PrettyOutput.auto_print(f"✅ 网关已启动 (PID: {process.pid})")
         return process
@@ -250,20 +265,82 @@ def is_project_root(candidate_root: Path) -> bool:
     return has_marker_files and has_marker_directories
 
 
-def build_service_config() -> ServiceConfig:
-    """根据环境变量构建服务配置。"""
+def get_master_node_secret_path(project_root: Path) -> Path:
+    """返回 master 节点密钥持久化文件路径。"""
+    return project_root / MASTER_NODE_SECRET_RELATIVE_PATH
+
+
+def load_or_create_master_node_secret(project_root: Path) -> tuple[str, bool]:
+    """读取或创建 master 节点密钥。"""
+    secret_path = get_master_node_secret_path(project_root)
+    secret_path.parent.mkdir(parents=True, exist_ok=True)
+    if secret_path.exists():
+        existing_secret = secret_path.read_text(encoding="utf-8").strip()
+        if existing_secret:
+            return existing_secret, False
+    generated_secret = secrets.token_urlsafe(AUTO_GENERATED_SECRET_NBYTES)
+    secret_path.write_text(f"{generated_secret}\n", encoding="utf-8")
+    try:
+        os.chmod(secret_path, 0o600)
+    except OSError:
+        pass
+    return generated_secret, True
+
+
+def build_service_config(
+    gateway_host: Optional[str] = None,
+    gateway_port: Optional[int] = None,
+    frontend_host: Optional[str] = None,
+    frontend_port: Optional[int] = None,
+    gateway_password: Optional[str] = None,
+    node_mode: Optional[str] = None,
+    node_id: Optional[str] = None,
+    master_url: Optional[str] = None,
+    node_secret: Optional[str] = None,
+) -> ServiceConfig:
+    """根据命令行参数与环境变量构建服务配置。"""
     project_root = resolve_project_root()
     frontend_root = project_root / FRONTEND_RELATIVE_PATH
+    resolved_gateway_host = gateway_host or os.getenv(
+        "JARVIS_GATEWAY_HOST", DEFAULT_GATEWAY_HOST
+    )
+    resolved_gateway_port = gateway_port or int(
+        os.getenv("JARVIS_GATEWAY_PORT", str(DEFAULT_GATEWAY_PORT))
+    )
+    resolved_frontend_host = frontend_host or os.getenv(
+        "JARVIS_FRONTEND_HOST", DEFAULT_FRONTEND_HOST
+    )
+    resolved_frontend_port = frontend_port or int(
+        os.getenv("JARVIS_FRONTEND_PORT", str(DEFAULT_FRONTEND_PORT))
+    )
+    resolved_gateway_password = (
+        gateway_password or os.getenv("JARVIS_GATEWAY_PASSWORD") or None
+    )
+    resolved_node_mode = node_mode or os.getenv("JARVIS_NODE_MODE", "master")
+    resolved_node_id = node_id or os.getenv("JARVIS_NODE_ID") or None
+    resolved_master_url = master_url or os.getenv("JARVIS_MASTER_URL") or None
+    resolved_node_secret = node_secret or os.getenv("JARVIS_NODE_SECRET") or None
+    if resolved_node_mode == "master" and not resolved_node_secret:
+        resolved_node_secret, secret_created = load_or_create_master_node_secret(project_root)
+        secret_path = get_master_node_secret_path(project_root)
+        if secret_created:
+            PrettyOutput.auto_print("🔐 master 模式未传入 node-secret，已自动生成并保存")
+        else:
+            PrettyOutput.auto_print("🔐 master 模式未传入 node-secret，已加载已保存的密钥")
+        PrettyOutput.auto_print(f"🔑 node-secret: {resolved_node_secret}")
+        PrettyOutput.auto_print(f"📄 密钥文件: {secret_path}")
     return ServiceConfig(
         project_root=project_root,
         frontend_root=frontend_root,
-        gateway_host=os.getenv("JARVIS_GATEWAY_HOST", DEFAULT_GATEWAY_HOST),
-        gateway_port=int(os.getenv("JARVIS_GATEWAY_PORT", str(DEFAULT_GATEWAY_PORT))),
-        frontend_host=os.getenv("JARVIS_FRONTEND_HOST", DEFAULT_FRONTEND_HOST),
-        frontend_port=int(
-            os.getenv("JARVIS_FRONTEND_PORT", str(DEFAULT_FRONTEND_PORT))
-        ),
-        gateway_password=os.getenv("JARVIS_GATEWAY_PASSWORD") or None,
+        gateway_host=resolved_gateway_host,
+        gateway_port=resolved_gateway_port,
+        frontend_host=resolved_frontend_host,
+        frontend_port=resolved_frontend_port,
+        gateway_password=resolved_gateway_password,
+        node_mode=resolved_node_mode,
+        node_id=resolved_node_id,
+        master_url=resolved_master_url,
+        node_secret=resolved_node_secret,
     )
 
 
@@ -302,10 +379,9 @@ def acquire_single_instance_lock() -> None:
     atexit.register(release_single_instance_lock)
 
 
-def run_service() -> None:
+def run_service(config: ServiceConfig) -> None:
     """启动 Jarvis 服务循环。"""
     acquire_single_instance_lock()
-    config = build_service_config()
     controller = ServiceController(config)
     signal.signal(signal.SIGINT, controller.request_exit)
     signal.signal(signal.SIGTERM, controller.request_exit)
@@ -313,9 +389,77 @@ def run_service() -> None:
     controller.run_forever()
 
 
+@app.command(name="start")
+def start_command(
+    gateway_host: str = typer.Option(
+        DEFAULT_GATEWAY_HOST,
+        "--gateway-host",
+        help="Gateway 监听地址（默认可被 JARVIS_GATEWAY_HOST 覆盖）",
+    ),
+    gateway_port: int = typer.Option(
+        DEFAULT_GATEWAY_PORT,
+        "--gateway-port",
+        help="Gateway 监听端口（默认可被 JARVIS_GATEWAY_PORT 覆盖）",
+    ),
+    frontend_host: str = typer.Option(
+        DEFAULT_FRONTEND_HOST,
+        "--frontend-host",
+        help="前端预览服务监听地址（默认可被 JARVIS_FRONTEND_HOST 覆盖）",
+    ),
+    frontend_port: int = typer.Option(
+        DEFAULT_FRONTEND_PORT,
+        "--frontend-port",
+        help="前端预览服务监听端口（默认可被 JARVIS_FRONTEND_PORT 覆盖）",
+    ),
+    gateway_password: Optional[str] = typer.Option(
+        None,
+        "--gateway-password",
+        help="Gateway 密码（默认可被 JARVIS_GATEWAY_PASSWORD 覆盖）",
+    ),
+    node_mode: Optional[str] = typer.Option(
+        None,
+        "--node-mode",
+        help="节点模式：master 或 child（默认可被 JARVIS_NODE_MODE 覆盖）",
+    ),
+    node_id: Optional[str] = typer.Option(
+        None,
+        "--node-id",
+        help="当前节点 ID（默认可被 JARVIS_NODE_ID 覆盖）",
+    ),
+    master_url: Optional[str] = typer.Option(
+        None,
+        "--master-url",
+        help="主节点地址（child 模式使用，默认可被 JARVIS_MASTER_URL 覆盖）",
+    ),
+    node_secret: Optional[str] = typer.Option(
+        None,
+        "--node-secret",
+        help="主子节点共享密钥（默认可被 JARVIS_NODE_SECRET 覆盖）",
+    ),
+) -> None:
+    """启动 Jarvis Service。"""
+    config = build_service_config(
+        gateway_host=gateway_host,
+        gateway_port=gateway_port,
+        frontend_host=frontend_host,
+        frontend_port=frontend_port,
+        gateway_password=gateway_password,
+        node_mode=node_mode,
+        node_id=node_id,
+        master_url=master_url,
+        node_secret=node_secret,
+    )
+    run_service(config)
+
+
 def main() -> None:
-    """应用入口。"""
-    run_service()
+    """兼容旧脚本入口，优先处理 help，再转交给 Typer app。"""
+    import sys
+
+    if any(arg in {"--help", "-h"} for arg in sys.argv[1:]):
+        app(["start", "--help"])
+        return
+    app(["start", *sys.argv[1:]])
 
 
 if __name__ == "__main__":

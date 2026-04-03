@@ -37,6 +37,7 @@ class AgentInfo:
         name: Optional[str] = None,
         llm_group: str = "default",
         worktree: bool = False,
+        node_id: str = "master",
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -48,6 +49,7 @@ class AgentInfo:
         self.llm_group = llm_group
         self.worktree = worktree
         self.status = "running"
+        self.node_id = node_id
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
 
@@ -63,6 +65,7 @@ class AgentInfo:
             "working_dir": self.working_dir,
             "llm_group": self.llm_group,
             "worktree": self.worktree,
+            "node_id": self.node_id,
             "created_at": self.created_at,
         }
 
@@ -113,6 +116,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]] = None,
         auth_token: Optional[str] = None,
         worktree: bool = False,
+        node_id: str = "master",
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -207,6 +211,7 @@ class AgentManager:
             name=name,
             llm_group=llm_group,
             worktree=worktree,
+            node_id=node_id,
         )
 
         # 保存到内存

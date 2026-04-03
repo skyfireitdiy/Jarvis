@@ -25,6 +25,7 @@
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
             <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
+            <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
             <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
           </div>
@@ -98,6 +99,7 @@
         <div class="current-agent-info desktop-only" v-if="currentAgent">
           <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
           <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
+          <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeLabel(currentAgent) }}</span>
           <span class="agent-dir">{{ currentAgent.working_dir }}</span>
         </div>
         
@@ -621,6 +623,16 @@
               {{ group.name }} ({{ group.smart_model }}, {{ group.normal_model }}, {{ group.cheap_model }})
             </option>
           </select>
+        </div>
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>目标节点</label>
+          <select v-model="newAgentNodeId" class="form-control">
+            <option value="">默认节点（当前网关决定）</option>
+            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+              {{ formatNodeOptionLabel(node) }}
+            </option>
+          </select>
+          <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
         </div>
         <div v-if="newAgentType === 'codeagent'" class="form-group">
           <div class="toggle-wrapper">
@@ -2484,6 +2496,8 @@ const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为
 const modelGroups = ref([])        // 模型组列表
 const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 default）
 const newCodeAgentWorktree = ref(false) // 新代码 Agent 是否启用 worktree
+const availableNodeOptions = ref([])
+const newAgentNodeId = ref('')
 
 // 监听 Agent 类型变化，自动填充默认名称
 watch(newAgentType, (newType) => {
@@ -2783,6 +2797,7 @@ async function connect() {
     startAgentListRefresh()
     // 获取模型组列表
     fetchModelGroups()
+    fetchNodeStatus()
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
@@ -3467,7 +3482,11 @@ function cancelDirDialog() {
 // 打开创建 Agent 弹窗
 async function openCreateAgentModal() {
   // 先刷新模型组列表，确保获取最新的配置
-  await fetchModelGroups()
+  await Promise.all([
+    fetchModelGroups(),
+    fetchNodeStatus(),
+  ])
+  newAgentNodeId.value = ''
   showCreateAgentModal.value = true
 }
 
@@ -3476,12 +3495,10 @@ async function fetchModelGroups() {
   try {
     const { host, port } = getGatewayAddress()
     const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/model-groups`)
-    
     if (!response.ok) {
       console.error('[MODEL GROUP] 获取模型组列表失败:', response.status)
       return
     }
-    
     const result = await response.json()
     if (result.success && result.data) {
       modelGroups.value = result.data
@@ -3490,7 +3507,6 @@ async function fetchModelGroups() {
         const defaultGroup = result.default_llm_group || ''
         const hasDefaultGroup = defaultGroup && modelGroups.value.some(g => g.name === defaultGroup)
         const hasCurrentGroup = modelGroups.value.some(g => g.name === newAgentModelGroup.value)
-        
         if (hasDefaultGroup) {
           // 使用配置的默认模型组
           newAgentModelGroup.value = defaultGroup
@@ -3505,9 +3521,41 @@ async function fetchModelGroups() {
   }
 }
 
+async function fetchNodeStatus() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/node/status`)
+    if (!response.ok) {
+      console.warn('[NODE] 获取节点状态失败:', response.status)
+      availableNodeOptions.value = []
+      return
+    }
+    const result = await response.json()
+    const nodes = Array.isArray(result?.data?.nodes) ? result.data.nodes : []
+    availableNodeOptions.value = nodes
+      .filter(node => node && String(node.node_id || '').trim())
+      .map(node => ({
+        ...node,
+        node_id: String(node.node_id || '').trim(),
+      }))
+  } catch (error) {
+    console.error('[NODE] 获取节点状态出错:', error)
+    availableNodeOptions.value = []
+  }
+}
+
+function formatNodeOptionLabel(node) {
+  const nodeId = String(node?.node_id || '').trim()
+  const status = String(node?.status || node?.runtime_status || '').trim()
+  return status ? `${nodeId} (${status})` : nodeId
+}
+
+function getAgentNodeLabel(agent) {
+  return String(agent?.node_id || '').trim() || 'master'
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
-  
   try {
     const { host, port } = getGatewayAddress()
     const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
@@ -3517,39 +3565,36 @@ async function createAgent() {
         working_dir: newAgentDir.value,
         name: newAgentName.value || undefined,
         llm_group: newAgentModelGroup.value,
-        worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false
+        worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false,
+        node_id: newAgentNodeId.value || undefined,
       })
     })
-    
     if (!response.ok) {
       const error = await response.json()
       alert(`创建失败: ${error.error?.message || error.detail || '未知错误'}`)
       return
     }
-    
     const result = await response.json()
     console.log('[AGENT] Created:', result)
-    
     // 后端返回格式: { success: true, data: agent }
     if (result.success && result.data) {
-      const agent = result.data
-      
+      const agent = {
+        ...result.data,
+        node_id: String(result.data?.node_id || '').trim() || 'master',
+      }
       // 添加到列表开头（让后创建的 agent 排在前面）
       agentList.value.unshift(agent)
-      
       // 关闭创建弹窗
       showCreateAgentModal.value = false
       newAgentDir.value = '~' // 重置为默认值
       newCodeAgentWorktree.value = false
+      newAgentNodeId.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = newAgentType.value === 'agent' ? '通用Agent' : '代码Agent'
-      
       // 立即切换到新创建的 agent
       await switchAgent(agent)
-      
       // 刷新列表
       await fetchAgentList()
-      
       // 开始定时刷新列表
       startAgentListRefresh()
     } else {
@@ -3765,7 +3810,10 @@ async function fetchAgentList() {
     // 更新列表（后端返回格式: { success: true, data: agents }）
     if (result.success && result.data) {
       // 反转数组，让后创建的 agent 排在前面
-      agentList.value = result.data.slice().reverse()
+      agentList.value = result.data.slice().reverse().map(agent => ({
+        ...agent,
+        node_id: String(agent?.node_id || '').trim() || 'master',
+      }))
     }
     
     // 更新当前 Agent 状态
@@ -3779,13 +3827,14 @@ async function fetchAgentList() {
 }
 
 // 构造复制 Agent 的请求参数
-function buildCopiedAgentPayload(agent, copiedName) {
+function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
   return {
     agent_type: agent.agent_type,
     working_dir: agent.working_dir,
     name: copiedName,
     llm_group: agent.llm_group || 'default',
-    worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false
+    worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false,
+    node_id: targetNodeId || agent.node_id || undefined,
   }
 }
 
