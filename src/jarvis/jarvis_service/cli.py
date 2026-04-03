@@ -28,7 +28,7 @@ PROCESS_TERMINATE_TIMEOUT_SECONDS = 10
 ROOT_MARKER_FILES = ("pyproject.toml",)
 ROOT_MARKER_DIRECTORIES = ("src/jarvis",)
 FRONTEND_RELATIVE_PATH = Path("src/jarvis/jarvis_service/frontend")
-MASTER_NODE_SECRET_RELATIVE_PATH = Path(".jarvis/node_mode/master_node_secret")
+MASTER_NODE_SECRET_RELATIVE_PATH = Path("node_mode/master_node_secret")
 AUTO_GENERATED_SECRET_NBYTES = 24
 
 app = typer.Typer(help="Jarvis Service 服务")
@@ -66,7 +66,7 @@ class ServiceProcesses:
     """运行中的服务进程。"""
 
     gateway_process: subprocess.Popen[bytes]
-    frontend_process: subprocess.Popen[bytes]
+    frontend_process: Optional[subprocess.Popen[bytes]]
 
 
 class ServiceController:
@@ -101,16 +101,23 @@ class ServiceController:
             PrettyOutput.auto_print("🔄 接收到重启信号，正在重新启动服务")
 
     def _start_services(self) -> ServiceProcesses:
-        """启动 gateway 与 frontend 服务。"""
+        """按节点模式启动服务进程。"""
         self._validate_runtime_dependencies()
         PrettyOutput.auto_print("🚀 启动 Jarvis 服务")
         PrettyOutput.auto_print(f"📁 项目根目录: {self._config.project_root}")
 
         gateway_process = self._start_gateway_process()
         self._wait_for_gateway_ready()
-        self._prepare_frontend_assets()
-        frontend_process = self._start_frontend_process()
-        self._print_service_summary(gateway_process.pid, frontend_process.pid)
+
+        frontend_process: Optional[subprocess.Popen[bytes]] = None
+        if self._config.node_mode == "master":
+            self._prepare_frontend_assets()
+            frontend_process = self._start_frontend_process()
+
+        self._print_service_summary(
+            gateway_pid=gateway_process.pid,
+            frontend_pid=frontend_process.pid if frontend_process else None,
+        )
         return ServiceProcesses(
             gateway_process=gateway_process,
             frontend_process=frontend_process,
@@ -124,18 +131,22 @@ class ServiceController:
             if self._signal_received:
                 return self._requested_action
             if processes.gateway_process.poll() is not None:
-                PrettyOutput.auto_print("⚠️ 网关服务已退出，服务循环将结束")
+                PrettyOutput.auto_print("⚠️ 网关服务已退出，Jarvis Service 即将停止")
                 return LoopAction.EXIT
-            if processes.frontend_process.poll() is not None:
-                PrettyOutput.auto_print("⚠️ 前端服务已退出，服务循环将结束")
+            if (
+                processes.frontend_process is not None
+                and processes.frontend_process.poll() is not None
+            ):
+                PrettyOutput.auto_print("⚠️ 前端服务已退出，Jarvis Service 即将停止")
                 return LoopAction.EXIT
             time.sleep(1)
 
     def _validate_runtime_dependencies(self) -> None:
         """校验运行时依赖命令。"""
         self._require_command("python", "未找到 Python 环境")
-        self._require_command("npm", "未找到 npm 环境")
         self._require_command("jwg", "未找到 jwg 命令，请确保 Jarvis 已正确安装")
+        if self._config.node_mode == "master":
+            self._require_command("npm", "未找到 npm 环境")
 
     def _require_command(self, command_name: str, error_message: str) -> None:
         """确保命令存在。"""
@@ -211,7 +222,8 @@ class ServiceController:
     def _stop_services(self, processes: ServiceProcesses) -> None:
         """停止所有服务进程。"""
         PrettyOutput.auto_print("🛑 正在停止服务")
-        self._terminate_process(processes.frontend_process, "前端服务")
+        if processes.frontend_process is not None:
+            self._terminate_process(processes.frontend_process, "前端服务")
         self._terminate_process(processes.gateway_process, "网关服务")
 
     def _terminate_process(
@@ -228,18 +240,21 @@ class ServiceController:
             process.kill()
             process.wait()
 
-    def _print_service_summary(self, gateway_pid: int, frontend_pid: int) -> None:
+    def _print_service_summary(
+        self, gateway_pid: int, frontend_pid: Optional[int]
+    ) -> None:
         """打印启动结果摘要。"""
         PrettyOutput.auto_print(
-            f"ℹ️ 网关地址: http://{self._config.gateway_host}:{self._config.gateway_port}"
+            f"ℹ️ Gateway: http://{self._config.gateway_host}:{self._config.gateway_port} (PID: {gateway_pid})"
         )
-        PrettyOutput.auto_print(
-            f"ℹ️ 前端地址: http://{self._config.frontend_host}:{self._config.frontend_port}"
-        )
-        PrettyOutput.auto_print(
-            f"ℹ️ 运行中的 PID: gateway={gateway_pid}, frontend={frontend_pid}"
-        )
-        PrettyOutput.auto_print("ℹ️ 提示: Ctrl+C 停止全部服务，发送 SIGUSR1 触发重启")
+        if frontend_pid is not None:
+            PrettyOutput.auto_print(
+                f"ℹ️ Frontend: http://{self._config.frontend_host}:{self._config.frontend_port} (PID: {frontend_pid})"
+            )
+        else:
+            PrettyOutput.auto_print("ℹ️ Frontend: child 模式下未启动")
+        PrettyOutput.auto_print(f"ℹ️ Node mode: {self._config.node_mode}")
+        PrettyOutput.auto_print("ℹ️ 按 Ctrl+C 停止服务")
 
 
 def resolve_project_root() -> Path:
@@ -265,14 +280,14 @@ def is_project_root(candidate_root: Path) -> bool:
     return has_marker_files and has_marker_directories
 
 
-def get_master_node_secret_path(project_root: Path) -> Path:
+def get_master_node_secret_path() -> Path:
     """返回 master 节点密钥持久化文件路径。"""
-    return project_root / MASTER_NODE_SECRET_RELATIVE_PATH
+    return Path(get_data_dir()) / MASTER_NODE_SECRET_RELATIVE_PATH
 
 
-def load_or_create_master_node_secret(project_root: Path) -> tuple[str, bool]:
+def load_or_create_master_node_secret() -> tuple[str, bool]:
     """读取或创建 master 节点密钥。"""
-    secret_path = get_master_node_secret_path(project_root)
+    secret_path = get_master_node_secret_path()
     secret_path.parent.mkdir(parents=True, exist_ok=True)
     if secret_path.exists():
         existing_secret = secret_path.read_text(encoding="utf-8").strip()
@@ -320,13 +335,24 @@ def build_service_config(
     resolved_node_id = node_id or os.getenv("JARVIS_NODE_ID") or None
     resolved_master_url = master_url or os.getenv("JARVIS_MASTER_URL") or None
     resolved_node_secret = node_secret or os.getenv("JARVIS_NODE_SECRET") or None
+
+    if resolved_gateway_host is None:
+        resolved_gateway_host = DEFAULT_GATEWAY_HOST
+    if resolved_frontend_host is None:
+        resolved_frontend_host = DEFAULT_FRONTEND_HOST
+    if resolved_node_mode is None:
+        resolved_node_mode = "master"
     if resolved_node_mode == "master" and not resolved_node_secret:
-        resolved_node_secret, secret_created = load_or_create_master_node_secret(project_root)
-        secret_path = get_master_node_secret_path(project_root)
+        resolved_node_secret, secret_created = load_or_create_master_node_secret()
+        secret_path = get_master_node_secret_path()
         if secret_created:
-            PrettyOutput.auto_print("🔐 master 模式未传入 node-secret，已自动生成并保存")
+            PrettyOutput.auto_print(
+                "🔐 master 模式未传入 node-secret，已自动生成并保存"
+            )
         else:
-            PrettyOutput.auto_print("🔐 master 模式未传入 node-secret，已加载已保存的密钥")
+            PrettyOutput.auto_print(
+                "🔐 master 模式未传入 node-secret，已加载已保存的密钥"
+            )
         PrettyOutput.auto_print(f"🔑 node-secret: {resolved_node_secret}")
         PrettyOutput.auto_print(f"📄 密钥文件: {secret_path}")
     return ServiceConfig(
@@ -453,13 +479,8 @@ def start_command(
 
 
 def main() -> None:
-    """兼容旧脚本入口，优先处理 help，再转交给 Typer app。"""
-    import sys
-
-    if any(arg in {"--help", "-h"} for arg in sys.argv[1:]):
-        app(["start", "--help"])
-        return
-    app(["start", *sys.argv[1:]])
+    """兼容旧脚本入口，统一转交给 Typer app。"""
+    app()
 
 
 if __name__ == "__main__":
