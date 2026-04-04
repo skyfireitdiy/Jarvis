@@ -21,6 +21,8 @@ from .node_protocol import (
     AGENT_CREATE_RESPONSE,
     AGENT_HTTP_REQUEST,
     AGENT_HTTP_RESPONSE,
+    AGENT_LIST_REQUEST,
+    AGENT_LIST_RESPONSE,
     AGENT_WS_CLOSE_REQUEST,
     AGENT_WS_CLOSE_RESPONSE,
     AGENT_WS_OPEN_REQUEST,
@@ -152,6 +154,7 @@ class NodeConnectionManager:
                     in (
                         AGENT_CREATE_RESPONSE,
                         AGENT_HTTP_RESPONSE,
+                        AGENT_LIST_RESPONSE,
                         AGENT_WS_RESPONSE,
                         AGENT_WS_OPEN_RESPONSE,
                         AGENT_WS_SEND_RESPONSE,
@@ -171,6 +174,10 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
                     response = await self._handle_agent_http_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_LIST_REQUEST:
+                    response = self._handle_agent_list_request(next_message)
                     await websocket.send_json(response)
                     continue
                 if message_type == AGENT_WS_REQUEST:
@@ -307,6 +314,27 @@ class NodeConnectionManager:
                         "code": "AGENT_CREATE_FAILED",
                         "message": str(exc),
                     },
+                },
+                request_id=request_id,
+            )
+
+    def _handle_agent_list_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = message.get("request_id")
+        try:
+            agents = self._agent_manager.get_agent_list()
+            for agent in agents:
+                agent.setdefault("node_id", self._node_runtime.local_node_id)
+            return build_node_message(
+                AGENT_LIST_RESPONSE,
+                {"success": True, "agents": agents},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_LIST_FAILED", "message": str(exc)},
                 },
                 request_id=request_id,
             )
@@ -802,6 +830,12 @@ class ChildNodeClient:
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
                     response = await self._node_connection_manager._handle_agent_http_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_LIST_REQUEST:
+                    response = self._node_connection_manager._handle_agent_list_request(
                         next_message
                     )
                     await self._ws.send(json.dumps(response))

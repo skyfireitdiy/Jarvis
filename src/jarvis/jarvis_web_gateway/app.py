@@ -1289,19 +1289,36 @@ def create_app(
                 else:
                     agent.setdefault("node_id", node_runtime.local_node_id)
 
-            for route in node_runtime.agent_route_registry.list_all():
-                if route.agent_id in known_agent_ids:
+            for node_info in node_runtime.node_registry.list_all():
+                if node_info.node_id == node_runtime.local_node_id or node_info.status != "online":
                     continue
-                agents.append(
-                    {
-                        "agent_id": route.agent_id,
-                        "node_id": route.node_id,
-                        "status": route.status,
-                        "working_dir": route.working_dir,
-                        "port": route.port,
-                    }
-                )
-                known_agent_ids.add(route.agent_id)
+                try:
+                    response = await node_connection_manager.send_request_to_node(
+                        node_info.node_id,
+                        AGENT_LIST_REQUEST,
+                        {},
+                        timeout=10.0,
+                    )
+                    payload = response.get("payload") or {}
+                    if not payload.get("success"):
+                        logger.warning(
+                            "[AGENTS] remote list failed node_id=%s error=%s",
+                            node_info.node_id,
+                            (payload.get("error") or {}).get("message"),
+                        )
+                        continue
+                    for agent in payload.get("agents") or []:
+                        agent_id = str((agent or {}).get("agent_id") or "")
+                        if not agent_id or agent_id in known_agent_ids:
+                            continue
+                        agents.append(agent)
+                        known_agent_ids.add(agent_id)
+                except Exception as exc:
+                    logger.warning(
+                        "[AGENTS] remote list request failed node_id=%s error=%s",
+                        node_info.node_id,
+                        exc,
+                    )
             return {"success": True, "data": agents}
         except Exception as e:
             return {
