@@ -910,12 +910,26 @@ def create_app(
         target_node_id = requested_node_id
         if not target_node_id and route is not None:
             target_node_id = str(route.node_id or "").strip()
+        logger.info(
+            "[WS PROXY] agent_id=%s requested_node_id=%s route_node_id=%s resolved_target_node_id=%s local_node_id=%s",
+            agent_id,
+            requested_node_id,
+            str(route.node_id or "").strip() if route is not None else "",
+            target_node_id,
+            node_runtime.local_node_id,
+        )
 
         if target_node_id and target_node_id not in (
             node_runtime.local_node_id,
             "master",
         ):
             remote_ws_session_id = str(uuid.uuid4())
+            logger.info(
+                "[WS PROXY] opening remote agent ws agent_id=%s target_node_id=%s session_id=%s",
+                agent_id,
+                target_node_id,
+                remote_ws_session_id,
+            )
             try:
                 open_response = await node_connection_manager.send_request_to_node(
                     target_node_id,
@@ -927,12 +941,27 @@ def create_app(
                     },
                 )
                 open_payload = open_response.get("payload") or {}
+                logger.info(
+                    "[WS PROXY] remote open response agent_id=%s target_node_id=%s session_id=%s payload=%s",
+                    agent_id,
+                    target_node_id,
+                    remote_ws_session_id,
+                    open_payload,
+                )
                 if not open_payload.get("success"):
+                    close_reason = (open_payload.get("error") or {}).get(
+                        "message", "Remote websocket open failed"
+                    )
+                    logger.warning(
+                        "[WS PROXY] remote open failed agent_id=%s target_node_id=%s session_id=%s reason=%s",
+                        agent_id,
+                        target_node_id,
+                        remote_ws_session_id,
+                        close_reason,
+                    )
                     await websocket.close(
                         code=4003,
-                        reason=(open_payload.get("error") or {}).get(
-                            "message", "Remote websocket open failed"
-                        ),
+                        reason=close_reason,
                     )
                     return
 
@@ -993,10 +1022,22 @@ def create_app(
                     if exc is not None:
                         raise exc
             except Exception as e:
-                logger.error(f"[WS PROXY] Remote websocket proxy error: {e}")
+                logger.error(
+                    "[WS PROXY] Remote websocket proxy error agent_id=%s target_node_id=%s session_id=%s error=%s",
+                    agent_id,
+                    target_node_id,
+                    remote_ws_session_id,
+                    e,
+                )
                 await websocket.close(code=4003, reason="Remote websocket proxy failed")
             finally:
                 try:
+                    logger.info(
+                        "[WS PROXY] closing remote agent ws agent_id=%s target_node_id=%s session_id=%s",
+                        agent_id,
+                        target_node_id,
+                        remote_ws_session_id,
+                    )
                     await node_connection_manager.send_request_to_node(
                         target_node_id,
                         AGENT_WS_CLOSE_REQUEST,
@@ -1004,7 +1045,11 @@ def create_app(
                     )
                 except Exception as close_exc:
                     logger.warning(
-                        f"[WS PROXY] Remote websocket close warning: {close_exc}"
+                        "[WS PROXY] Remote websocket close warning agent_id=%s target_node_id=%s session_id=%s error=%s",
+                        agent_id,
+                        target_node_id,
+                        remote_ws_session_id,
+                        close_exc,
                     )
             return
 
