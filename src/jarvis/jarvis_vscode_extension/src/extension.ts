@@ -1356,7 +1356,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, "/api/agents"),
+        buildNodeHttpUrl(gatewayAddress, "master", "agents"),
       );
       const result = (await response.json()) as AgentListResponse;
       if (!response.ok || !result.success || !Array.isArray(result.data)) {
@@ -1552,7 +1552,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const response = await this.fetchWithAuth(
         buildHttpUrl(
           gatewayAddress,
-          appendNodeIdToPath(`/api/completions/${agentId}`, agentNodeId),
+          `/api/node/${encodeURIComponent(String(agentNodeId || "master").trim() || "master")}/completions/${agentId}`,
         ),
       );
       const result = (await response.json()) as {
@@ -1613,10 +1613,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const response = await this.fetchWithAuth(
         buildHttpUrl(
           gatewayAddress,
-          appendNodeIdToPath(
-            `/api/completions/${agentId}/search?query=${encodeURIComponent(trimmedQuery)}`,
-            agentNodeId,
-          ),
+          `/api/node/${encodeURIComponent(String(agentNodeId || "master").trim() || "master")}/completions/${agentId}/search?query=${encodeURIComponent(trimmedQuery)}`,
         ),
       );
       const result = (await response.json()) as {
@@ -1806,7 +1803,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const response = await this.fetchWithAuth(
-      buildHttpUrl(gatewayAddress, "/api/model-groups"),
+      buildNodeHttpUrl(gatewayAddress, "master", "model-groups"),
     );
     const result = (await response.json()) as ModelGroupsResponse;
     if (!response.ok || !result.success) {
@@ -1835,7 +1832,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const response = await this.fetchWithAuth(
-      buildHttpUrl(gatewayAddress, "/api/node/status"),
+      buildNodeHttpUrl(gatewayAddress, "master", "node/status"),
     );
     const result = (await response.json()) as {
       success?: boolean;
@@ -1876,7 +1873,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, "/api/service/restart"),
+        buildNodeHttpUrl(gatewayAddress, "master", "service/restart"),
         { method: "POST" },
       );
       const result = (await response.json()) as {
@@ -2018,10 +2015,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const response = await this.fetchWithAuth(
         buildHttpUrl(
           gatewayAddress,
-          appendNodeIdToPath(
-            `/api/directories?path=${encodeURIComponent(requestedPath)}`,
-            targetNodeId,
-          ),
+          `/api/node/${encodeURIComponent(String(targetNodeId || "master").trim() || "master")}/directories?path=${encodeURIComponent(requestedPath)}`,
         ),
       );
       const result = (await response.json()) as {
@@ -2236,8 +2230,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const normalizedNodeId =
+        String(sourceAgent.nodeId || "master").trim() || "master";
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, "/api/agents"),
+        buildNodeHttpUrl(gatewayAddress, normalizedNodeId, "agents"),
         {
           method: "POST",
           body: JSON.stringify({
@@ -2246,7 +2242,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             name: sourceAgent.name || undefined,
             llm_group:
               sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
-            node_id: sourceAgent.nodeId || undefined,
+            node_id: normalizedNodeId,
             worktree:
               sourceAgent.agentType === "codeagent"
                 ? sourceAgent.worktree
@@ -2292,10 +2288,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
       const targetNodeId =
         this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
+      const normalizedNodeId =
+        String(targetNodeId || "master").trim() || "master";
       const response = await this.fetchWithAuth(
-        buildHttpUrl(
+        buildNodeHttpUrl(
           gatewayAddress,
-          appendNodeIdToPath(`/api/agents/${agentId}`, targetNodeId),
+          normalizedNodeId,
+          `agents/${agentId}`,
         ),
         {
           method: "DELETE",
@@ -2372,8 +2371,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const normalizedNodeId = String(nodeId || "master").trim() || "master";
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, "/api/agents"),
+        buildNodeHttpUrl(gatewayAddress, normalizedNodeId, "agents"),
         {
           method: "POST",
           body: JSON.stringify({
@@ -2381,7 +2381,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             working_dir: workingDir,
             name: agentName || undefined,
             llm_group: llmGroup,
-            node_id: nodeId || undefined,
+            node_id: normalizedNodeId,
             worktree: useWorktree,
           }),
         },
@@ -3306,17 +3306,19 @@ function parseGatewayAddress(address: string): GatewayAddress {
   return { host: trimmedAddress, port: "8000" };
 }
 
-function buildHttpUrl(gatewayAddress: GatewayAddress, path: string): string {
-  return `http://${gatewayAddress.host}:${gatewayAddress.port}${path}`;
+function buildNodeHttpUrl(
+  gatewayAddress: GatewayAddress,
+  nodeId: string = "master",
+  path: string = "",
+): string {
+  const normalizedNodeId = String(nodeId || "master").trim() || "master";
+  const normalizedPath = `/${String(path || "").replace(/^\/+/, "")}`;
+  return `http://${gatewayAddress.host}:${gatewayAddress.port}/api/node/${encodeURIComponent(normalizedNodeId)}${normalizedPath}`;
 }
 
-function appendNodeIdToPath(path: string, nodeId?: string): string {
-  const normalizedNodeId = String(nodeId || "").trim();
-  if (!normalizedNodeId) {
-    return path;
-  }
-  const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}node_id=${encodeURIComponent(normalizedNodeId)}`;
+function buildHttpUrl(gatewayAddress: GatewayAddress, path: string): string {
+  const normalizedPath = String(path || "").replace(/^\/+/, "");
+  return buildNodeHttpUrl(gatewayAddress, "master", normalizedPath);
 }
 
 function buildWebSocketProtocols(token?: string): string[] | undefined {
@@ -3327,8 +3329,18 @@ function buildWebSocketProtocols(token?: string): string[] | undefined {
   return ["jarvis-client", `jarvis-token.${encodeURIComponent(normalizedToken)}`];
 }
 
+function buildNodeWebSocketUrl(
+  gatewayAddress: GatewayAddress,
+  nodeId: string = "master",
+  path: string = "",
+): string {
+  const normalizedNodeId = String(nodeId || "master").trim() || "master";
+  const normalizedPath = `/${String(path || "").replace(/^\/+/, "")}`;
+  return `ws://${gatewayAddress.host}:${gatewayAddress.port}/api/node/${encodeURIComponent(normalizedNodeId)}${normalizedPath}`;
+}
+
 function buildWebSocketUrl(gatewayAddress: GatewayAddress): string {
-  return `ws://${gatewayAddress.host}:${gatewayAddress.port}/ws`;
+  return buildNodeWebSocketUrl(gatewayAddress, "master", "ws");
 }
 
 function buildAgentWebSocketUrl(
@@ -3336,7 +3348,8 @@ function buildAgentWebSocketUrl(
   agentId: string,
   nodeId?: string,
 ): string {
-  return `ws://${gatewayAddress.host}:${gatewayAddress.port}${appendNodeIdToPath(`/api/agent/${agentId}/ws`, nodeId)}`;
+  const normalizedNodeId = String(nodeId || "master").trim() || "master";
+  return buildNodeWebSocketUrl(gatewayAddress, normalizedNodeId, `agent/${agentId}/ws`);
 }
 
 function parseSocketMessage(

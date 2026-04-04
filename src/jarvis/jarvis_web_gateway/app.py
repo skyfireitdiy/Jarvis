@@ -868,6 +868,10 @@ def create_app(
     async def websocket_endpoint(websocket: WebSocket) -> None:
         await manager.handle(websocket)
 
+    @app.websocket("/api/node/master/ws")
+    async def master_websocket_endpoint(websocket: WebSocket) -> None:
+        await manager.handle(websocket)
+
     @app.websocket("/ws/node")
     async def node_websocket_endpoint(websocket: WebSocket) -> None:
         if not node_config.is_master:
@@ -1069,6 +1073,18 @@ def create_app(
             await websocket.close(code=4999, reason="Internal error")
         finally:
             logger.info(f"[WS PROXY] WebSocket connection closed for agent {agent_id}")
+
+    @app.websocket("/api/node/{node_id}/agent/{agent_id}/ws")
+    async def node_agent_websocket_proxy(
+        node_id: str, agent_id: str, websocket: WebSocket
+    ) -> None:
+        websocket.scope.setdefault("query_string", b"")
+        if str(node_id or "").strip():
+            query_string = websocket.scope.get("query_string", b"") or b""
+            separator = b"&" if query_string else b""
+            extra = f"node_id={node_id}".encode("utf-8")
+            websocket.scope["query_string"] = query_string + separator + extra
+        await agent_websocket_proxy(agent_id, websocket)
 
     @app.api_route(
         "/api/node/{node_id}/{path:path}",
@@ -3009,6 +3025,38 @@ def create_app(
             result = await _handle_file_stat_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-write":
             result = await _handle_file_write_request(payload)
+        elif normalized_method == "GET" and normalized_path == "/node/status":
+            result = await get_node_status()
+        elif normalized_method == "POST" and normalized_path == "/service/restart":
+            result = await restart_service()
+        elif normalized_method == "GET" and normalized_path == "/agents":
+            result = await get_agents()
+        elif normalized_method == "POST" and normalized_path == "/agents":
+            result = await create_agent(payload)
+        elif normalized_path.startswith("/agents/") and normalized_path.endswith("/sessions"):
+            agent_id = normalized_path[len("/agents/") : -len("/sessions")].strip("/")
+            if normalized_method == "GET":
+                result = await list_agent_sessions(agent_id, str(payload.get("node_id") or ""))
+            elif normalized_method == "POST":
+                result = await restore_agent_session(agent_id, payload)
+            else:
+                result = {
+                    "success": False,
+                    "error": {"code": "METHOD_NOT_ALLOWED", "message": "Unsupported method"},
+                }
+        elif normalized_path.startswith("/completions/") and normalized_path.endswith("/search"):
+            agent_id = normalized_path[len("/completions/") : -len("/search")].strip("/")
+            result = await search_completions(
+                agent_id,
+                query=str(payload.get("query") or ""),
+                node_id=str(payload.get("node_id") or ""),
+            )
+        elif normalized_path.startswith("/completions/"):
+            agent_id = normalized_path[len("/completions/") :].strip("/")
+            result = await get_completions(agent_id, str(payload.get("node_id") or ""))
+        elif normalized_path.startswith("/global-search/") and normalized_method == "POST":
+            agent_id = normalized_path[len("/global-search/") :].strip("/")
+            result = await global_search(agent_id, payload)
         else:
             return {
                 "success": False,
