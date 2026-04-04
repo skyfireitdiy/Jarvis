@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import pathlib
 import random
 import uuid
 from typing import Any, Dict, Optional
@@ -133,7 +134,12 @@ class NodeConnectionManager:
                     continue
                 if (
                     message_type
-                    in (AGENT_CREATE_RESPONSE, AGENT_HTTP_RESPONSE, AGENT_WS_RESPONSE)
+                    in (
+                        AGENT_CREATE_RESPONSE,
+                        AGENT_HTTP_RESPONSE,
+                        AGENT_WS_RESPONSE,
+                        DIRECTORY_LIST_RESPONSE,
+                    )
                     and request_id
                 ):
                     future = self._pending_requests.pop(request_id, None)
