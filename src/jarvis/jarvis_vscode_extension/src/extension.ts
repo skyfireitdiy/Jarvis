@@ -1547,8 +1547,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const agentNodeId =
+        this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, `/api/completions/${agentId}`),
+        buildHttpUrl(
+          gatewayAddress,
+          appendNodeIdToPath(`/api/completions/${agentId}`, agentNodeId),
+        ),
       );
       const result = (await response.json()) as {
         success?: boolean;
@@ -1603,10 +1608,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const agentNodeId =
+        this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
       const response = await this.fetchWithAuth(
         buildHttpUrl(
           gatewayAddress,
-          `/api/completions/${agentId}/search?query=${encodeURIComponent(trimmedQuery)}`,
+          appendNodeIdToPath(
+            `/api/completions/${agentId}/search?query=${encodeURIComponent(trimmedQuery)}`,
+            agentNodeId,
+          ),
         ),
       );
       const result = (await response.json()) as {
@@ -1998,6 +2008,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           this.createAgentFormState.workingDir ||
           "~",
       ).trim() || "~";
+    const targetNodeId = String(this.createAgentFormState.nodeId || "").trim();
     this.remoteDirectoryBrowserState.isVisible = true;
     this.remoteDirectoryBrowserState.isLoading = true;
     this.remoteDirectoryBrowserState.errorMessage = "";
@@ -2007,7 +2018,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const response = await this.fetchWithAuth(
         buildHttpUrl(
           gatewayAddress,
-          `/api/directories?path=${encodeURIComponent(requestedPath)}`,
+          appendNodeIdToPath(
+            `/api/directories?path=${encodeURIComponent(requestedPath)}`,
+            targetNodeId,
+          ),
         ),
       );
       const result = (await response.json()) as {
@@ -2276,8 +2290,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     try {
       const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const targetNodeId =
+        this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
       const response = await this.fetchWithAuth(
-        buildHttpUrl(gatewayAddress, `/api/agents/${agentId}`),
+        buildHttpUrl(
+          gatewayAddress,
+          appendNodeIdToPath(`/api/agents/${agentId}`, targetNodeId),
+        ),
         {
           method: "DELETE",
         },
@@ -2434,15 +2453,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.renderAgentListView();
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const socketUrl = buildWebSocketUrl(gatewayAddress);
-    const gatewaySocket = new WebSocket(socketUrl);
+    const gatewaySocket = new WebSocket(
+      socketUrl,
+      buildWebSocketProtocols(this.panelState.token),
+    );
 
     gatewaySocket.on("open", () => {
       this.panelState.gatewayConnectionStatusText = "主网关已连接";
       this.panelState.gatewayHasConnectionError = false;
-      this.sendSocketMessage(gatewaySocket, {
-        type: "auth",
-        payload: { token: this.panelState.token },
-      });
       this.sendSocketMessage(gatewaySocket, {
         type: "connection_lock",
         payload: { enabled: this.panelState.connectionLockEnabled },
@@ -2545,10 +2563,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
 
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-    const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId);
+    const agentNodeId =
+      this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
+    const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId, agentNodeId);
 
     await new Promise<void>((resolve, reject) => {
-      const agentSocket = new WebSocket(socketUrl);
+      const agentSocket = new WebSocket(
+        socketUrl,
+        buildWebSocketProtocols(this.panelState.token),
+      );
       let connectionHandled = false;
       const timeoutId = setTimeout(() => {
         if (connectionHandled) {
@@ -2570,10 +2593,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         connectionHandled = true;
         clearTimeout(timeoutId);
         this.agentSockets.set(agentId, agentSocket);
-        this.sendSocketMessage(agentSocket, {
-          type: "auth",
-          payload: { token: this.panelState.token },
-        });
         this.sendSocketMessage(agentSocket, {
           type: "get_status",
           payload: {},
@@ -3291,6 +3310,23 @@ function buildHttpUrl(gatewayAddress: GatewayAddress, path: string): string {
   return `http://${gatewayAddress.host}:${gatewayAddress.port}${path}`;
 }
 
+function appendNodeIdToPath(path: string, nodeId?: string): string {
+  const normalizedNodeId = String(nodeId || "").trim();
+  if (!normalizedNodeId) {
+    return path;
+  }
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}node_id=${encodeURIComponent(normalizedNodeId)}`;
+}
+
+function buildWebSocketProtocols(token?: string): string[] | undefined {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) {
+    return undefined;
+  }
+  return ["jarvis-client", `jarvis-token.${encodeURIComponent(normalizedToken)}`];
+}
+
 function buildWebSocketUrl(gatewayAddress: GatewayAddress): string {
   return `ws://${gatewayAddress.host}:${gatewayAddress.port}/ws`;
 }
@@ -3298,8 +3334,9 @@ function buildWebSocketUrl(gatewayAddress: GatewayAddress): string {
 function buildAgentWebSocketUrl(
   gatewayAddress: GatewayAddress,
   agentId: string,
+  nodeId?: string,
 ): string {
-  return `ws://${gatewayAddress.host}:${gatewayAddress.port}/api/agent/${agentId}/ws`;
+  return `ws://${gatewayAddress.host}:${gatewayAddress.port}${appendNodeIdToPath(`/api/agent/${agentId}/ws`, nodeId)}`;
 }
 
 function parseSocketMessage(

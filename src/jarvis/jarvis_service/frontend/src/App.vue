@@ -1167,12 +1167,13 @@ function buildWebSocketUrl(host, port, protocol = null) {
 }
 
 // 构建 Agent WebSocket URL（通过网关代理）
-function buildAgentWebSocketUrl(host, agentId, protocol = null, port = null) {
+function buildAgentWebSocketUrl(host, agentId, protocol = null, port = null, nodeId = '') {
   // 如果没有指定协议，根据当前页面自动检测
   const wsProtocol = protocol || getWebSocketProtocol()
   // 通过网关代理路径连接：/api/agent/{agentId}/ws
   const portStr = port ? `:${port}` : ''
-  return `${wsProtocol}://${host}${portStr}/api/agent/${agentId}/ws`
+  const baseUrl = `${wsProtocol}://${host}${portStr}/api/agent/${agentId}/ws`
+  return appendNodeIdToUrl(baseUrl, nodeId)
 }
 
 // 构建 HTTP URL
@@ -1180,6 +1181,14 @@ function buildHttpUrl(host, port, path, protocol = null) {
   // 如果没有指定协议，根据当前页面自动检测
   const httpProtocol = protocol || getHttpProtocol()
   return `${httpProtocol}://${host}:${port}${path}`
+}
+
+function buildWebSocketProtocols() {
+  const token = String(auth.value?.token || '').trim()
+  if (!token) {
+    return ['jarvis-ws']
+  }
+  return ['jarvis-ws', `jarvis-token.${encodeURIComponent(token)}`]
 }
 
 // 获取网关地址（host和port）
@@ -1755,9 +1764,12 @@ function resolveAgentRelativePath(relativePath) {
 
 async function fetchGlobalSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
-  const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/global-search/${agentId}`, {
+  const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/global-search/${agentId}`, getCurrentAgentNodeId()), {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      ...payload,
+      node_id: getCurrentAgentNodeId() || undefined,
+    })
   })
   const result = await response.json()
   if (!response.ok || !result.success || !result.data) {
@@ -1893,7 +1905,7 @@ async function fetchFileContent(path) {
   const { host, port } = getGatewayAddress()
   const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-content`, {
     method: 'POST',
-    body: JSON.stringify({ path })
+    body: JSON.stringify({ path, node_id: getCurrentAgentNodeId() || undefined })
   })
 
   const result = await response.json()
@@ -1907,7 +1919,7 @@ async function fetchFileStat(path) {
   const { host, port } = getGatewayAddress()
   const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-stat`, {
     method: 'POST',
-    body: JSON.stringify({ path })
+    body: JSON.stringify({ path, node_id: getCurrentAgentNodeId() || undefined })
   })
 
   const result = await response.json()
@@ -2063,7 +2075,7 @@ async function saveEditorTab(path) {
   const { host, port } = getGatewayAddress()
   const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/file-write`, {
     method: 'POST',
-    body: JSON.stringify({ path, content })
+    body: JSON.stringify({ path, content, node_id: getCurrentAgentNodeId() || undefined })
   })
   const result = await response.json()
 
@@ -2585,7 +2597,10 @@ watch(completionSearch, async (newSearch) => {
     try {
       const { host, port } = getGatewayAddress()
       const response = await fetchWithAuth(
-        `${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}/search?query=${encodeURIComponent(newSearch)}`
+        appendNodeIdToUrl(
+          `${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}/search?query=${encodeURIComponent(newSearch)}`,
+          getCurrentAgentNodeId()
+        )
       )
       
       const result = await response.json()
@@ -2784,7 +2799,7 @@ async function connect() {
   const port = parsed.port || '8000'
   const url = buildWebSocketUrl(host, port, parsed.protocol)
   connecting.value = true
-  const ws = new WebSocket(url)
+  const ws = new WebSocket(url, buildWebSocketProtocols())
   ws.onopen = () => {
     console.log('[ws] open')
     connecting.value = false
@@ -2804,12 +2819,6 @@ async function connect() {
       loadHistoryMessages(false)
     } else {
       console.log('[HISTORY] Skip loading history, messages already exist')
-    }
-    const payload = {}
-    if (auth.value.token) payload.token = auth.value.token
-    if (Object.keys(payload).length > 0) {
-      ws.send(JSON.stringify({ type: 'auth', payload }))
-      console.log('[ws] auth sent', payload)
     }
     // 发送连接锁定设置
     ws.send(JSON.stringify({
@@ -2985,14 +2994,14 @@ async function connectToAgent(agent, retryCount = 0) {
   
   const { host, port } = getGatewayAddress()
   // 通过网关代理连接：/api/agent/{agentId}/ws
-  const url = buildAgentWebSocketUrl(host, agentId, null, port)
+  const url = buildAgentWebSocketUrl(host, agentId, null, port, String(agent?.node_id || '').trim())
   
   connecting.value = true
   
   // 返回 Promise，等待连接真正建立
   return new Promise((resolve, reject) => {
     try {
-      const ws = new WebSocket(url)
+      const ws = new WebSocket(url, buildWebSocketProtocols())
       let connectionHandled = false // 防止重复处理连接结果
       
       // 设置连接超时
@@ -3074,13 +3083,6 @@ async function connectToAgent(agent, retryCount = 0) {
           allOutputs.value.set(agentId, [])
         }
         
-        // 发送认证
-        const payload = {}
-        if (auth.value.token) payload.token = auth.value.token
-        if (Object.keys(payload).length > 0) {
-          ws.send(JSON.stringify({ type: 'auth', payload }))
-          console.log(`[AGENT ${agentId}] auth sent`, payload)
-        }
         
         // 标记连接已完成（在onclose中用于判断是否需要重试）
         ws._connectionCompleted = true
@@ -3256,7 +3258,7 @@ async function fetchAgentStatus(agent) {
   try {
     const { host, port } = getGatewayAddress()
     // 通过网关代理查询状态：/api/agent/{agentId}/status
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agent/${agent.agent_id}/status`)
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agent/${agent.agent_id}/status`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()))
     
     if (!response.ok) {
       console.warn(`[AGENT STATUS] Failed to fetch status for agent ${agent.agent_id}:`, response.status)
@@ -3304,9 +3306,9 @@ async function restoreSession(sessionFile) {
 
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${currentAgentId.value}/sessions`, {
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents/${currentAgentId.value}/sessions`, getCurrentAgentNodeId()), {
       method: 'POST',
-      body: JSON.stringify({ session_file: sessionFile })
+      body: JSON.stringify({ session_file: sessionFile, node_id: getCurrentAgentNodeId() || undefined })
     })
 
     const result = await response.json()
@@ -3582,6 +3584,25 @@ function getAgentNodeLabel(agent) {
   return String(agent?.node_id || '').trim() || 'master'
 }
 
+function getCurrentAgentNodeId() {
+  return String(currentAgent.value?.node_id || '').trim()
+}
+
+function appendNodeIdToUrl(url, nodeId) {
+  const normalizedNodeId = String(nodeId || '').trim()
+  if (!normalizedNodeId) {
+    return url
+  }
+
+  const targetUrl = new URL(url, window.location.origin)
+  targetUrl.searchParams.set('node_id', normalizedNodeId)
+
+  if (/^https?:\/\//i.test(url)) {
+    return targetUrl.toString()
+  }
+  return `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
   try {
@@ -3648,7 +3669,7 @@ async function openCompletions() {
   // 获取补全列表
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}`)
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/completions/${currentAgent.value.agent_id}`, getCurrentAgentNodeId()))
     
     const result = await response.json()
     console.log('[COMPLETIONS] API response:', result)
@@ -3828,7 +3849,7 @@ function insertCompletion(item) {
 async function fetchAgentList() {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`)
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents`, getCurrentAgentNodeId()))
     
     if (!response.ok) return
     
@@ -3870,7 +3891,7 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
 async function copyAgent(agent) {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()), {
       method: 'POST',
       body: JSON.stringify(buildCopiedAgentPayload(agent, agent.name || undefined))
     })
@@ -3921,7 +3942,7 @@ async function batchCopyAgents() {
     for (const agent of selectedAgentList) {
       try {
         const { host, port } = getGatewayAddress()
-        const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents`, {
+        const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()), {
           method: 'POST',
           body: JSON.stringify(
             buildCopiedAgentPayload(agent, agent.name ? `${agent.name}_copy` : undefined)
@@ -3982,7 +4003,7 @@ async function confirmRename() {
       ? { name: null } 
       : { name: newName }
     
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}`, {
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()), {
       method: 'PATCH',
       body: JSON.stringify(body)
     })
@@ -4012,7 +4033,8 @@ async function deleteAgent(agentId) {
     async () => {
       try {
         const { host, port } = getGatewayAddress()
-        const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
+        const agent = agentList.value.find(item => item.agent_id === agentId)
+        const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()), {
           method: 'DELETE'
         })
         
@@ -4070,7 +4092,8 @@ async function batchDeleteAgents() {
         for (const agentId of selectedIds) {
           try {
             const { host, port } = getGatewayAddress()
-            const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, {
+            const agent = agentList.value.find(item => item.agent_id === agentId)
+            const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents/${agentId}`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()), {
               method: 'DELETE'
             })
             const result = await response.json()
@@ -4136,7 +4159,7 @@ async function loadFileTreeNode(agentId, node) {
   
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(node.path)}`)
+    const response = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(node.path)}`, getCurrentAgentNodeId()))
     
     if (!response.ok) {
       const error = await response.json()
@@ -4373,7 +4396,7 @@ async function switchAgent(agent) {
         console.log('[AGENT] No history found, checking for recoverable sessions...')
         try {
           const { host, port } = getGatewayAddress()
-          const sessionsResponse = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`)
+          const sessionsResponse = await fetchWithAuth(appendNodeIdToUrl(`${getHttpProtocol()}://${host}:${port}/api/agents/${agent.agent_id}/sessions`, String(agent?.node_id || '').trim() || getCurrentAgentNodeId()))
           const sessionsData = await sessionsResponse.json()
           if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
             console.log('[AGENT] Found recoverable sessions:', sessionsData.data)
