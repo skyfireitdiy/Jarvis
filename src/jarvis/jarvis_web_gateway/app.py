@@ -601,7 +601,11 @@ def create_app(
     # 创建 AgentProxyManager
     agent_proxy_manager = AgentProxyManager(agent_manager)
     node_connection_manager = NodeConnectionManager(node_runtime, agent_manager, agent_proxy_manager)
-    child_node_client = ChildNodeClient(node_runtime, agent_manager) if node_config.is_child else None
+    child_node_client = (
+        ChildNodeClient(node_runtime, agent_manager, agent_proxy_manager)
+        if node_config.is_child
+        else None
+    )
 
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
