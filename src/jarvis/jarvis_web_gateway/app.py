@@ -54,6 +54,8 @@ from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt
 
+logger = logging.getLogger(__name__)
+
 # 导入 agent 状态管理器（用于处理 get_status 消息）
 try:
     from jarvis.jarvis_agent.jarvis import get_agent_status_manager
