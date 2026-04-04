@@ -22,6 +22,8 @@ from .node_protocol import (
     AGENT_HTTP_RESPONSE,
     AGENT_WS_REQUEST,
     AGENT_WS_RESPONSE,
+    DIRECTORY_LIST_REQUEST,
+    DIRECTORY_LIST_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -148,6 +150,10 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = await self._handle_agent_ws_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == DIRECTORY_LIST_REQUEST:
+                    response = self._handle_directory_list_request(next_message)
                     await websocket.send_json(response)
                     continue
         except Exception:
@@ -339,6 +345,101 @@ class NodeConnectionManager:
                     "success": False,
                     "error": {
                         "code": "WS_PROXY_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+    def _handle_directory_list_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        raw_path = str(payload.get("path") or "").strip()
+        try:
+            if not raw_path or raw_path == "~":
+                target_path = pathlib.Path.home()
+            else:
+                target_path = pathlib.Path(raw_path).expanduser()
+
+            target_path = target_path.resolve()
+
+            if not target_path.exists():
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_FOUND",
+                            "message": f"Path does not exist: {raw_path}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            if not target_path.is_dir():
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_A_DIRECTORY",
+                            "message": f"Path is not a directory: {raw_path}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            parent_path = None
+            if target_path.parent != target_path:
+                parent_path = str(target_path.parent)
+
+            items = []
+            try:
+                for entry in target_path.iterdir():
+                    if not entry.name.startswith('.'):
+                        entry_type = 'directory' if entry.is_dir() else 'file'
+                        items.append(
+                            {
+                                'name': entry.name,
+                                'path': str(entry),
+                                'type': entry_type,
+                            }
+                        )
+                items.sort(key=lambda item: (item['type'] != 'directory', item['name']))
+            except PermissionError:
+                pass
+
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "current_path": str(target_path),
+                        "parent_path": parent_path,
+                        "items": items,
+                    },
+                },
+                request_id=request_id,
+            )
+        except PermissionError:
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied",
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "DIRECTORY_LIST_FAILED",
                         "message": str(exc),
                     },
                 },

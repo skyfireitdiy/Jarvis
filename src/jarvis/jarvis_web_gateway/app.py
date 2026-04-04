@@ -46,7 +46,7 @@ from jarvis.jarvis_web_gateway.token_manager import (
 )
 from jarvis.jarvis_web_gateway.node_config import NodeRuntimeConfig, build_node_runtime_config
 from jarvis.jarvis_web_gateway.node_manager import ChildNodeClient, NodeConnectionManager
-from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_WS_REQUEST
+from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_WS_REQUEST, DIRECTORY_LIST_REQUEST
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
@@ -2338,7 +2338,7 @@ def create_app(
             }
 
     @app.get("/api/directories", dependencies=[Depends(verify_token)])
-    async def list_directories(path: str = "") -> Dict[str, Any]:
+    async def list_directories(path: str = "", node_id: str = "") -> Dict[str, Any]:
         """获取指定路径下的目录列表。
 
         Args:
@@ -2360,6 +2360,46 @@ def create_app(
         import pathlib
 
         try:
+            resolved_node_id = str(node_id or "").strip()
+            target_node_id = resolved_node_id or node_runtime.local_node_id
+
+            if target_node_id not in (node_runtime.local_node_id, "master"):
+                node_info = node_runtime.node_registry.get(target_node_id)
+                if node_info is None:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_NOT_FOUND",
+                            "message": f"Node not found: {target_node_id}",
+                        },
+                    }
+                if node_info.status != "online":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_OFFLINE",
+                            "message": f"Node is offline: {target_node_id}",
+                        },
+                    }
+                response = await node_connection_manager.send_request_to_node(
+                    target_node_id,
+                    DIRECTORY_LIST_REQUEST,
+                    {
+                        "path": path,
+                    },
+                )
+                payload = response.get("payload") or {}
+                if payload.get("success"):
+                    return {"success": True, "data": payload.get("data") or {}}
+                error = payload.get("error") or {}
+                return {
+                    "success": False,
+                    "error": {
+                        "code": error.get("code", "DIRECTORY_LIST_FAILED"),
+                        "message": error.get("message", "Remote directory listing failed"),
+                    },
+                }
+
             # 解析路径，如果为空则使用用户主目录
             if not path or path == "~":
                 target_path = pathlib.Path.home()
