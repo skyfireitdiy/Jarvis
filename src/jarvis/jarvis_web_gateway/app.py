@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -14,6 +15,7 @@ import signal
 import subprocess
 import uuid
 from datetime import datetime
+from urllib.parse import parse_qsl
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -1025,9 +1027,16 @@ def create_app(
                 )
             body = (await request.body()).decode("utf-8", errors="replace")
             if normalized_node_id in (node_runtime.local_node_id, "master"):
+                result = await _dispatch_node_http_request(
+                    method=request.method,
+                    path=path,
+                    query=str(request.query_params),
+                    headers=dict(request.headers),
+                    body=body,
+                )
                 return Response(
-                    content='{"error": "local node unified proxy not implemented yet"}',
-                    status_code=501,
+                    content=result.get("body", "{}"),
+                    status_code=int(result.get("status_code", 200)),
                     media_type="application/json",
                 )
             response = await node_connection_manager.send_request_to_node(
@@ -2888,6 +2897,9 @@ def create_app(
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
+
+    # Inject local HTTP dispatcher into node_connection_manager
+    node_connection_manager._node_http_dispatcher = _dispatch_node_http_request
 
     return app
 
