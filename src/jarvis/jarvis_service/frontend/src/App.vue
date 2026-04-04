@@ -2770,6 +2770,12 @@ function saveConnectionLockSetting() {
 
 // 连接到 Gateway
 async function connect() {
+  console.log('[ws] connect() called', {
+    hasSocket: !!socket.value,
+    socketState: socket.value?.readyState,
+    connecting: connecting.value,
+    gatewayUrl: gatewayUrl.value,
+  })
   // 清空之前的错误信息
   connectErrorMessage.value = ''
   if (socket.value) return
@@ -2800,8 +2806,9 @@ async function connect() {
   const url = buildWebSocketUrl(host, port, parsed.protocol)
   connecting.value = true
   const ws = new WebSocket(url, buildWebSocketProtocols())
+  console.log('[ws] new WebSocket created', { url, readyState: ws.readyState })
   ws.onopen = () => {
-    console.log('[ws] open')
+    console.log('[ws] open', { url, readyState: ws.readyState })
     connecting.value = false
     socket.value = ws
     showConnectModal.value = false
@@ -2838,8 +2845,14 @@ async function connect() {
     console.log('[ws] message', message)
     handleMessage(message)
   }
-  ws.onclose = () => {
-    console.log('[ws] close')
+  ws.onclose = (event) => {
+    console.log('[ws] close', {
+      code: event?.code,
+      reason: event?.reason,
+      wasClean: event?.wasClean,
+      readyState: ws.readyState,
+      currentSocketMatched: socket.value === ws,
+    })
     socket.value = null
     connecting.value = false
     // 连接断开，销毁所有独立终端
@@ -2850,8 +2863,12 @@ async function connect() {
     showConnectModal.value = true
     // 不清空连接错误信息，保留错误提示
   }
-  ws.onerror = () => {
-    console.error('[ws] error')
+  ws.onerror = (event) => {
+    console.error('[ws] error', {
+      event,
+      readyState: ws.readyState,
+      currentSocketMatched: socket.value === ws,
+    })
     connecting.value = false
   }
 }
@@ -6563,6 +6580,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  console.log('[app] onUnmounted', {
+    hasSocket: !!socket.value,
+    socketState: socket.value?.readyState,
+    connecting: connecting.value,
+  })
   stopAgentSidebarResize()
   stopEditorPanelInteraction()
   stopEditorFileHeartbeat()
