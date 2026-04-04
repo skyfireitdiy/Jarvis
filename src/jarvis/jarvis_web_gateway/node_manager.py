@@ -87,7 +87,7 @@ class NodeConnectionManager:
             await websocket.close(code=4401)
             return
 
-        expected_secret = os.environ.get("JARVIS_NODE_SECRET")
+        expected_secret = (self._node_runtime.config.node_secret or "").strip()
         if not expected_secret or secret != expected_secret:
             await websocket.send_json(
                 build_error_message("NODE_AUTH_FAILED", "invalid node credentials")
