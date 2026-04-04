@@ -521,14 +521,16 @@ class NodeConnectionManager:
             ws_path = str(payload.get("path") or "ws")
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            subprotocols = ["jarvis-ws"]
+            if auth_token:
+                subprotocols.append(f"jarvis-token.{auth_token}")
             async with websockets.connect(
-                agent_url, close_timeout=30, proxy=None
+                agent_url,
+                close_timeout=30,
+                proxy=None,
+                subprotocols=subprotocols,
             ) as agent_ws:
-                auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
-                if auth_token:
-                    await agent_ws.send(
-                        json.dumps({"type": "auth", "payload": {"token": auth_token}})
-                    )
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
                 collected: list[str] = []
@@ -576,12 +578,16 @@ class NodeConnectionManager:
                 raise ValueError("agent_id is required")
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
-            agent_ws = await websockets.connect(agent_url, close_timeout=30, proxy=None)
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            subprotocols = ["jarvis-ws"]
             if auth_token:
-                await agent_ws.send(
-                    json.dumps({"type": "auth", "payload": {"token": auth_token}})
-                )
+                subprotocols.append(f"jarvis-token.{auth_token}")
+            agent_ws = await websockets.connect(
+                agent_url,
+                close_timeout=30,
+                proxy=None,
+                subprotocols=subprotocols,
+            )
             self._agent_ws_sessions[session_id] = agent_ws
             return build_node_message(
                 AGENT_WS_OPEN_RESPONSE,
