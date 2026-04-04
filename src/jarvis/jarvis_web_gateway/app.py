@@ -360,7 +360,7 @@ class WebSocketConnectionManager:
         self._connection_state_lock = asyncio.Lock()
 
     async def handle(self, websocket: WebSocket) -> None:
-        await websocket.accept()
+        await websocket.accept(subprotocol="jarvis-ws")
         session_id = "default"  # 固定使用 default session，简化重连逻辑
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
@@ -898,12 +898,12 @@ def create_app(
             authorized = manager._auth_store.get("default") is not None
             reason = "Authentication required"
         if not authorized:
-            await websocket.accept()
+            await websocket.accept(subprotocol="jarvis-ws")
             await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
             await websocket.close(code=4401, reason="Unauthorized")
             return
 
-        await websocket.accept()
+        await websocket.accept(subprotocol="jarvis-ws")
 
         requested_node_id = str(websocket.query_params.get("node_id") or "").strip()
         route = node_runtime.agent_route_registry.get(agent_id)
