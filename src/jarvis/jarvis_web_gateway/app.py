@@ -1665,12 +1665,12 @@ def create_app(
                             ),
                         },
                     }
-                node_runtime.agent_route_registry.unregister(agent_id)
+                node_runtime.agent_route_registry.remove(agent_id)
                 return {"success": True, "data": payload.get("result")}
             # Try local first
             try:
                 result = agent_manager.delete_agent(agent_id)
-                node_runtime.agent_route_registry.unregister(agent_id)
+                node_runtime.agent_route_registry.remove(agent_id)
                 return {"success": True, "data": result}
             except (KeyError, Exception):
                 pass
@@ -1686,7 +1686,7 @@ def create_app(
                     )
                     payload = response.get("payload") or {}
                     if payload.get("success"):
-                        node_runtime.agent_route_registry.unregister(agent_id)
+                        node_runtime.agent_route_registry.remove(agent_id)
                         return {"success": True, "data": payload.get("result")}
                 except Exception:
                     pass
