@@ -571,6 +571,12 @@ class NodeConnectionManager:
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
         agent_id = str(payload.get("agent_id") or "").strip()
+        logger.info(
+            "[NODE AGENT WS OPEN] request_id=%s agent_id=%s session_id=%s",
+            request_id,
+            agent_id,
+            session_id,
+        )
         try:
             if not session_id:
                 raise ValueError("session_id is required")
@@ -582,6 +588,13 @@ class NodeConnectionManager:
             subprotocols = ["jarvis-ws"]
             if auth_token:
                 subprotocols.append(f"jarvis-token.{auth_token}")
+            logger.info(
+                "[NODE AGENT WS OPEN] connecting agent_id=%s session_id=%s agent_url=%s subprotocol_count=%s",
+                agent_id,
+                session_id,
+                agent_url,
+                len(subprotocols),
+            )
             agent_ws = await websockets.connect(
                 agent_url,
                 close_timeout=30,
@@ -589,12 +602,24 @@ class NodeConnectionManager:
                 subprotocols=subprotocols,
             )
             self._agent_ws_sessions[session_id] = agent_ws
+            logger.info(
+                "[NODE AGENT WS OPEN] success agent_id=%s session_id=%s",
+                agent_id,
+                session_id,
+            )
             return build_node_message(
                 AGENT_WS_OPEN_RESPONSE,
                 {"success": True, "session_id": session_id},
                 request_id=request_id,
             )
         except Exception as exc:
+            logger.error(
+                "[NODE AGENT WS OPEN] failed request_id=%s agent_id=%s session_id=%s error=%s",
+                request_id,
+                agent_id,
+                session_id,
+                exc,
+            )
             return build_node_message(
                 AGENT_WS_OPEN_RESPONSE,
                 {
@@ -610,6 +635,12 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
+        logger.info(
+            "[NODE AGENT WS SEND] request_id=%s session_id=%s message_count=%s",
+            request_id,
+            session_id,
+            len(payload.get("messages") or []),
+        )
         try:
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
@@ -622,6 +653,12 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
         except Exception as exc:
+            logger.error(
+                "[NODE AGENT WS SEND] failed request_id=%s session_id=%s error=%s",
+                request_id,
+                session_id,
+                exc,
+            )
             return build_node_message(
                 AGENT_WS_SEND_RESPONSE,
                 {
@@ -650,12 +687,24 @@ class NodeConnectionManager:
                     timeout = 0.05
                 except asyncio.TimeoutError:
                     break
+            logger.info(
+                "[NODE AGENT WS RECV] request_id=%s session_id=%s message_count=%s",
+                request_id,
+                session_id,
+                len(messages),
+            )
             return build_node_message(
                 AGENT_WS_RECV_RESPONSE,
                 {"success": True, "session_id": session_id, "messages": messages},
                 request_id=request_id,
             )
         except Exception as exc:
+            logger.error(
+                "[NODE AGENT WS RECV] failed request_id=%s session_id=%s error=%s",
+                request_id,
+                session_id,
+                exc,
+            )
             return build_node_message(
                 AGENT_WS_RECV_RESPONSE,
                 {
@@ -671,6 +720,11 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
+        logger.info(
+            "[NODE AGENT WS CLOSE] request_id=%s session_id=%s",
+            request_id,
+            session_id,
+        )
         agent_ws = self._agent_ws_sessions.pop(session_id, None)
         try:
             if agent_ws is not None:
@@ -681,6 +735,12 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
         except Exception as exc:
+            logger.error(
+                "[NODE AGENT WS CLOSE] failed request_id=%s session_id=%s error=%s",
+                request_id,
+                session_id,
+                exc,
+            )
             return build_node_message(
                 AGENT_WS_CLOSE_RESPONSE,
                 {
