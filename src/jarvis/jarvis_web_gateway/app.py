@@ -1637,16 +1637,19 @@ def create_app(
 
     # HTTP API：删除 Agent
     @app.delete("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
-    async def delete_agent(agent_id: str) -> Dict[str, Any]:
+    async def delete_agent(agent_id: str, node_id: str = "") -> Dict[str, Any]:
         """删除 Agent。"""
         try:
+            resolved_target_node = str(node_id or "").strip()
             route = node_runtime.agent_route_registry.get(agent_id)
-            if route is not None and route.node_id not in (
+            if not resolved_target_node and route is not None:
+                resolved_target_node = str(route.node_id or "").strip()
+            if resolved_target_node and resolved_target_node not in (
                 node_runtime.local_node_id,
                 "master",
             ):
                 response = await node_connection_manager.send_request_to_node(
-                    route.node_id,
+                    resolved_target_node,
                     AGENT_DELETE_REQUEST,
                     {"agent_id": agent_id},
                 )
