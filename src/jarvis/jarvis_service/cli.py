@@ -417,23 +417,23 @@ def run_service(config: ServiceConfig) -> None:
 
 @app.command(name="start")
 def start_command(
-    gateway_host: str = typer.Option(
-        DEFAULT_GATEWAY_HOST,
+    gateway_host: Optional[str] = typer.Option(
+        None,
         "--gateway-host",
         help="Gateway 监听地址（默认可被 JARVIS_GATEWAY_HOST 覆盖）",
     ),
-    gateway_port: int = typer.Option(
-        DEFAULT_GATEWAY_PORT,
+    gateway_port: Optional[int] = typer.Option(
+        None,
         "--gateway-port",
         help="Gateway 监听端口（默认可被 JARVIS_GATEWAY_PORT 覆盖）",
     ),
-    frontend_host: str = typer.Option(
-        DEFAULT_FRONTEND_HOST,
+    frontend_host: Optional[str] = typer.Option(
+        None,
         "--frontend-host",
         help="前端预览服务监听地址（默认可被 JARVIS_FRONTEND_HOST 覆盖）",
     ),
-    frontend_port: int = typer.Option(
-        DEFAULT_FRONTEND_PORT,
+    frontend_port: Optional[int] = typer.Option(
+        None,
         "--frontend-port",
         help="前端预览服务监听端口（默认可被 JARVIS_FRONTEND_PORT 覆盖）",
     ),
