@@ -398,10 +398,6 @@ class WebSocketConnectionManager:
         auth_payload = _extract_auth_from_headers(websocket)
         authorized, reason = self._gateway._check_auth(auth_payload)
         if not authorized:
-            auth_payload, authorized, reason = await _await_auth_message(
-                websocket, self._gateway
-            )
-        if not authorized:
             await _send_error(websocket, "AUTH_FAILED", reason or "auth failed")
             await websocket.close()
             return
@@ -463,13 +459,6 @@ class WebSocketConnectionManager:
             return
         message_type = message.get("type")
         payload = message.get("payload") or {}
-        if message_type == "auth":
-            auth_payload = _normalize_auth_payload(payload)
-            authorized, _ = self._gateway._check_auth(auth_payload)
-            if not authorized:
-                return
-            self._auth_store[session_id] = auth_payload
-            return
         if message_type == "connection_lock":
             enabled = payload.get("enabled", False)
             self._connection_lock_enabled = enabled
@@ -895,15 +884,20 @@ def create_app(
 
         await websocket.accept()
 
+        requested_node_id = str(websocket.query_params.get("node_id") or "").strip()
         route = node_runtime.agent_route_registry.get(agent_id)
-        if route is not None and route.node_id not in (
+        target_node_id = requested_node_id
+        if not target_node_id and route is not None:
+            target_node_id = str(route.node_id or "").strip()
+
+        if target_node_id and target_node_id not in (
             node_runtime.local_node_id,
             "master",
         ):
             remote_ws_session_id = str(uuid.uuid4())
             try:
                 open_response = await node_connection_manager.send_request_to_node(
-                    route.node_id,
+                    target_node_id,
                     AGENT_WS_OPEN_REQUEST,
                     {
                         "agent_id": agent_id,
@@ -926,7 +920,7 @@ def create_app(
                         data = await websocket.receive_text()
                         send_response = (
                             await node_connection_manager.send_request_to_node(
-                                route.node_id,
+                                target_node_id,
                                 AGENT_WS_SEND_REQUEST,
                                 {
                                     "session_id": remote_ws_session_id,
@@ -946,7 +940,7 @@ def create_app(
                     while True:
                         recv_response = (
                             await node_connection_manager.send_request_to_node(
-                                route.node_id,
+                                target_node_id,
                                 AGENT_WS_RECV_REQUEST,
                                 {
                                     "session_id": remote_ws_session_id,
@@ -983,7 +977,7 @@ def create_app(
             finally:
                 try:
                     await node_connection_manager.send_request_to_node(
-                        route.node_id,
+                        target_node_id,
                         AGENT_WS_CLOSE_REQUEST,
                         {"session_id": remote_ws_session_id},
                     )
@@ -1562,6 +1556,7 @@ def create_app(
         """更新 Agent 信息（目前只支持重命名）。"""
         try:
             name = request.get("name")
+            target_node_id = str(request.get("node_id") or "").strip()
 
             if name is not None and not isinstance(name, str):
                 return {
@@ -1571,6 +1566,40 @@ def create_app(
                         "message": "name must be a string or null",
                     },
                 }
+
+            resolved_target_node = target_node_id
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "PATCH",
+                        "path": f"agents/{agent_id}",
+                        "query": "",
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps({"name": name}),
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "AGENT_UPDATE_FAILED"),
+                            "message": error.get("message", "Remote agent update failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
 
             result = agent_manager.rename_agent(agent_id, name)
             return {"success": True, "data": result}
@@ -1649,9 +1678,43 @@ def create_app(
 
     # HTTP API：获取可恢复的 session 列表
     @app.get("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
-    async def list_agent_sessions(agent_id: str) -> Dict[str, Any]:
+    async def list_agent_sessions(agent_id: str, node_id: str = "") -> Dict[str, Any]:
         """获取可恢复的 session 列表。"""
         try:
+            resolved_target_node = str(node_id or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "GET",
+                        "path": f"agents/{agent_id}/sessions",
+                        "query": "",
+                        "headers": {},
+                        "body": "",
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "SESSION_LIST_FAILED"),
+                            "message": error.get("message", "Remote session list failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
+
             agent_info = agent_manager.get_agent_info(agent_id)
             if agent_info is None:
                 return {
@@ -1685,6 +1748,42 @@ def create_app(
     ) -> Dict[str, Any]:
         """恢复指定的 session。"""
         try:
+            resolved_target_node = str(request.get("node_id") or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                forward_body = dict(request)
+                forward_body.pop("node_id", None)
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "POST",
+                        "path": f"agents/{agent_id}/sessions",
+                        "query": "",
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps(forward_body),
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "SESSION_RESTORE_FAILED"),
+                            "message": error.get("message", "Remote session restore failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
+
             agent_info = agent_manager.get_agent_info(agent_id)
             if agent_info is None:
                 return {
@@ -1713,9 +1812,43 @@ def create_app(
 
     # HTTP API：获取补全列表
     @app.get("/api/completions/{agent_id}", dependencies=[Depends(verify_token)])
-    async def get_completions(agent_id: str) -> Dict[str, Any]:
+    async def get_completions(agent_id: str, node_id: str = "") -> Dict[str, Any]:
         """获取所有可用补全项（不包括文件）。"""
         try:
+            resolved_target_node = str(node_id or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "GET",
+                        "path": f"completions/{agent_id}",
+                        "query": "",
+                        "headers": {},
+                        "body": "",
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "COMPLETIONS_FAILED"),
+                            "message": error.get("message", "Remote completions failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
+
             from jarvis.jarvis_utils.config import get_replace_map
             from jarvis.jarvis_utils.tag import ot
             from jarvis.jarvis_utils.input import BUILTIN_COMMANDS
@@ -1817,7 +1950,7 @@ def create_app(
             }
 
     @app.get("/api/completions/{agent_id}/search", dependencies=[Depends(verify_token)])
-    async def search_completions(agent_id: str, query: str = "") -> Dict[str, Any]:
+    async def search_completions(agent_id: str, query: str = "", node_id: str = "") -> Dict[str, Any]:
         """搜索文件补全项。
 
         Args:
@@ -1839,6 +1972,41 @@ def create_app(
             }
         """
         try:
+            resolved_target_node = str(node_id or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                forward_query = urlencode({"query": query})
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "GET",
+                        "path": f"completions/{agent_id}/search",
+                        "query": forward_query,
+                        "headers": {},
+                        "body": "",
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "COMPLETION_SEARCH_FAILED"),
+                            "message": error.get("message", "Remote completion search failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
+
             import subprocess
             from fuzzywuzzy import process
             from jarvis.jarvis_utils.utils import decode_output
@@ -1903,6 +2071,42 @@ def create_app(
     async def global_search(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
         """在 Agent 工作目录内执行全局文件内容搜索。"""
         try:
+            resolved_target_node = str(request.get("node_id") or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                forward_body = dict(request)
+                forward_body.pop("node_id", None)
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "POST",
+                        "path": f"global-search/{agent_id}",
+                        "query": "",
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps(forward_body),
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "GLOBAL_SEARCH_FAILED"),
+                            "message": error.get("message", "Remote global search failed"),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return json.loads(body)
+
             agent = agent_manager.get_agent(agent_id)
             if not agent:
                 return {
@@ -2984,27 +3188,15 @@ def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
 
 
 def _extract_auth_from_headers(websocket: WebSocket) -> Optional[Dict[str, Any]]:
-    """从 WebSocket HTTP Header 提取认证信息。
-
-    Args:
-        websocket: WebSocket 连接对象
-
-    Returns:
-        认证负载，包含 token（如果存在）
-    """
-    # 支持两种方式：
-    # 1. x-jarvis-token Header（旧格式，保持兼容）
-    token = websocket.headers.get("x-jarvis-token")
-    if token:
-        return {"token": token}
-
-    # 2. Authorization: Bearer <token> Header（新格式）
-    authorization = websocket.headers.get("Authorization")
-    if authorization:
-        parts = authorization.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            return {"token": parts[1]}
-
+    """从 WebSocket 握手 Header 提取认证信息。"""
+    protocol_header = websocket.headers.get("sec-websocket-protocol", "")
+    for item in protocol_header.split(","):
+        protocol = item.strip()
+        if protocol.startswith("jarvis-token."):
+            encoded_token = protocol[len("jarvis-token.") :]
+            token = unquote(encoded_token)
+            if token:
+                return {"token": token}
     return None
 
 
@@ -3026,43 +3218,6 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
             print(f"[WebSocket Sender] Error scheduling send: {e}")
 
     return _sender
-
-
-async def _await_auth_message(
-    websocket: WebSocket, gateway: WebGateway
-) -> Tuple[Optional[Dict[str, Any]], bool, Optional[str]]:
-    """等待 WebSocket 的第一条认证消息。
-
-    Args:
-        websocket: WebSocket 连接对象
-        gateway: WebGateway 实例
-
-    Returns:
-        (认证负载, 是否认证成功, 错误原因)
-    """
-    try:
-        message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
-    except Exception:
-        return (
-            None,
-            False,
-            "Authentication required. First message must be an auth message with type 'auth' and payload containing 'token'.",
-        )
-
-    if not isinstance(message, dict) or message.get("type") != "auth":
-        return (
-            None,
-            False,
-            "Authentication required. First message must be an auth message with type 'auth' and payload containing 'token'.",
-        )
-
-    payload = _normalize_auth_payload(message.get("payload") or {})
-    authorized, reason = gateway._check_auth(payload)
-
-    if not authorized:
-        return payload, False, reason or "Invalid token"
-
-    return payload, True, "Authorized"
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
