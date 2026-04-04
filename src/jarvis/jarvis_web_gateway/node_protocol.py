@@ -17,6 +17,8 @@ AGENT_HTTP_REQUEST = "agent_http_request"
 AGENT_HTTP_RESPONSE = "agent_http_response"
 AGENT_WS_REQUEST = "agent_ws_request"
 AGENT_WS_RESPONSE = "agent_ws_response"
+DIRECTORY_LIST_REQUEST = "directory_list_request"
+DIRECTORY_LIST_RESPONSE = "directory_list_response"
 ERROR = "error"
 
 

@@ -605,6 +605,16 @@
             </label>
           </div>
         </div>
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>目标节点</label>
+          <select v-model="newAgentNodeId" class="form-control">
+            <option value="">默认节点（当前网关决定）</option>
+            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+              {{ formatNodeOptionLabel(node) }}
+            </option>
+          </select>
+          <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
+        </div>
         <div class="form-group">
           <label>Agent 名称（可选）</label>
           <input v-model="newAgentName" type="text" class="form-control" placeholder="例如：开发环境Agent" />
@@ -623,16 +633,6 @@
               {{ group.name }} ({{ group.smart_model }}, {{ group.normal_model }}, {{ group.cheap_model }})
             </option>
           </select>
-        </div>
-        <div class="form-group" v-if="availableNodeOptions.length > 0">
-          <label>目标节点</label>
-          <select v-model="newAgentNodeId" class="form-control">
-            <option value="">默认节点（当前网关决定）</option>
-            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-              {{ formatNodeOptionLabel(node) }}
-            </option>
-          </select>
-          <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
         </div>
         <div v-if="newAgentType === 'codeagent'" class="form-group">
           <div class="toggle-wrapper">
@@ -3334,10 +3334,29 @@ function cancelSessionDialog() {
 
 // 创建 Agent
 // 目录选择相关函数
+function getCreateAgentDirectoryNodeId() {
+  return (newAgentNodeId.value || '').trim()
+}
+
+function resetDirectorySelectionState() {
+  showDirDialog.value = false
+  currentDirPath.value = ''
+  dirList.value = []
+  selectedDir.value = null
+  dirSearchText.value = ''
+  selectedDirIndex.value = -1
+}
+
+watch(newAgentNodeId, () => {
+  newAgentDir.value = '~'
+  resetDirectorySelectionState()
+})
+
 async function openDirDialog() {
   showDirDialog.value = true
   selectedDir.value = newAgentDir.value || '~'
   dirSearchText.value = '' // 清空搜索
+  selectedDirIndex.value = -1
   await fetchDirectories(selectedDir.value)
   // PC端自动聚焦到搜索框，移动端不聚焦
   if (windowWidth.value > 768) {
@@ -3350,7 +3369,12 @@ async function openDirDialog() {
 async function fetchDirectories(path = '') {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/directories?path=${encodeURIComponent(path)}`)
+    const params = new URLSearchParams({ path })
+    const nodeId = getCreateAgentDirectoryNodeId()
+    if (nodeId) {
+      params.set('node_id', nodeId)
+    }
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/directories?${params.toString()}`)
     
     if (!response.ok) {
       const error = await response.json()
@@ -3477,6 +3501,8 @@ async function confirmDirectory() {
 function cancelDirDialog() {
   showDirDialog.value = false
   selectedDir.value = null
+  dirSearchText.value = ''
+  selectedDirIndex.value = -1
 }
 
 // 打开创建 Agent 弹窗
@@ -3487,6 +3513,8 @@ async function openCreateAgentModal() {
     fetchNodeStatus(),
   ])
   newAgentNodeId.value = ''
+  newAgentDir.value = '~'
+  resetDirectorySelectionState()
   showCreateAgentModal.value = true
 }
 
