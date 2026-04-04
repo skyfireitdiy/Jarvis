@@ -516,10 +516,12 @@ class ChildNodeClient:
         node_runtime: NodeRuntime,
         agent_manager: AgentManager,
         agent_proxy_manager: Any,
+        node_connection_manager: NodeConnectionManager,
     ) -> None:
         self._node_runtime = node_runtime
         self._agent_manager = agent_manager
         self._agent_proxy_manager = agent_proxy_manager
+        self._node_connection_manager = node_connection_manager
         self._ws: Optional[Any] = None
         self._task: Optional[asyncio.Task] = None
 
@@ -650,20 +652,26 @@ class ChildNodeClient:
                     request_id,
                 )
                 if message_type == AGENT_CREATE_REQUEST:
-                    response = self._handle_agent_create_request(next_message, "master")
+                    response = self._node_connection_manager._handle_agent_create_request(
+                        next_message, "master"
+                    )
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
-                    response = await self._handle_agent_http_request(next_message)
+                    response = await self._node_connection_manager._handle_agent_http_request(
+                        next_message
+                    )
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == AGENT_WS_REQUEST:
-                    response = await self._handle_agent_ws_request(next_message)
+                    response = await self._node_connection_manager._handle_agent_ws_request(
+                        next_message
+                    )
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
-                    response = NodeConnectionManager._handle_directory_list_request(
-                        self, next_message
+                    response = self._node_connection_manager._handle_directory_list_request(
+                        next_message
                     )
                     await self._ws.send(json.dumps(response))
                     continue
