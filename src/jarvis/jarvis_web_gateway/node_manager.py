@@ -612,16 +612,76 @@ class ChildNodeClient:
         os.environ["JARVIS_AUTH_TOKEN"] = token
         self._node_runtime.token_sync_state.mark_success("master")
         self._node_runtime.mark_ready()
+        logger.info("[NODE] child connected to master node_id=%s ws_url=%s", config.effective_node_id, ws_url)
 
-        while True:
-            await asyncio.sleep(CHILD_HEARTBEAT_INTERVAL_SECONDS)
-            if self._ws is None:
-                raise RuntimeError("node websocket is closed")
-            await self._ws.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HEARTBEAT,
-                        {"node_id": config.effective_node_id},
+        async def heartbeat_loop() -> None:
+            while True:
+                await asyncio.sleep(CHILD_HEARTBEAT_INTERVAL_SECONDS)
+                if self._ws is None:
+                    raise RuntimeError("node websocket is closed")
+                await self._ws.send(
+                    json.dumps(
+                        build_node_message(
+                            NODE_HEARTBEAT,
+                            {"node_id": config.effective_node_id},
+                        )
                     )
                 )
-            )
+
+        async def recv_loop() -> None:
+            while True:
+                if self._ws is None:
+                    raise RuntimeError("node websocket is closed")
+                raw_next_message = await self._ws.recv()
+                next_message = json.loads(raw_next_message)
+                if not isinstance(next_message, dict):
+                    continue
+                message_type = next_message.get("type")
+                request_id = next_message.get("request_id")
+                logger.info(
+                    "[NODE] child recv message type=%s request_id=%s",
+                    message_type,
+                    request_id,
+                )
+                if message_type == AGENT_CREATE_REQUEST:
+                    response = NodeConnectionManager._handle_agent_create_request(
+                        self, next_message, "master"
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_HTTP_REQUEST:
+                    response = await NodeConnectionManager._handle_agent_http_request(
+                        self, next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_REQUEST:
+                    response = await NodeConnectionManager._handle_agent_ws_request(
+                        self, next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == DIRECTORY_LIST_REQUEST:
+                    response = NodeConnectionManager._handle_directory_list_request(
+                        self, next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                logger.warning(
+                    "[NODE] child unhandled message type=%s request_id=%s",
+                    message_type,
+                    request_id,
+                )
+
+        heartbeat_task = asyncio.create_task(heartbeat_loop())
+        recv_task = asyncio.create_task(recv_loop())
+        done, pending = await asyncio.wait(
+            {heartbeat_task, recv_task},
+            return_when=asyncio.FIRST_EXCEPTION,
+        )
+        for task in pending:
+            task.cancel()
+        for task in done:
+            exc = task.exception()
+            if exc is not None:
+                raise exc
