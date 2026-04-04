@@ -15,8 +15,14 @@ AGENT_CREATE_REQUEST = "agent_create_request"
 AGENT_CREATE_RESPONSE = "agent_create_response"
 AGENT_HTTP_REQUEST = "agent_http_request"
 AGENT_HTTP_RESPONSE = "agent_http_response"
+NODE_HTTP_PROXY_REQUEST = "node_http_proxy_request"
+NODE_HTTP_PROXY_RESPONSE = "node_http_proxy_response"
 AGENT_LIST_REQUEST = "agent_list_request"
 AGENT_LIST_RESPONSE = "agent_list_response"
+AGENT_STOP_REQUEST = "agent_stop_request"
+AGENT_STOP_RESPONSE = "agent_stop_response"
+AGENT_DELETE_REQUEST = "agent_delete_request"
+AGENT_DELETE_RESPONSE = "agent_delete_response"
 AGENT_WS_REQUEST = "agent_ws_request"
 AGENT_WS_RESPONSE = "agent_ws_response"
 AGENT_WS_OPEN_REQUEST = "agent_ws_open_request"
@@ -48,8 +54,9 @@ def build_node_message(
     }
 
 
-
-def build_error_message(code: str, message: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+def build_error_message(
+    code: str, message: str, request_id: Optional[str] = None
+) -> Dict[str, Any]:
     return build_node_message(
         ERROR,
         {

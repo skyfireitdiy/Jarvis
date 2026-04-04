@@ -21,8 +21,14 @@ from .node_protocol import (
     AGENT_CREATE_RESPONSE,
     AGENT_HTTP_REQUEST,
     AGENT_HTTP_RESPONSE,
+    NODE_HTTP_PROXY_REQUEST,
+    NODE_HTTP_PROXY_RESPONSE,
     AGENT_LIST_REQUEST,
     AGENT_LIST_RESPONSE,
+    AGENT_STOP_REQUEST,
+    AGENT_STOP_RESPONSE,
+    AGENT_DELETE_REQUEST,
+    AGENT_DELETE_RESPONSE,
     AGENT_WS_CLOSE_REQUEST,
     AGENT_WS_CLOSE_RESPONSE,
     AGENT_WS_OPEN_REQUEST,
@@ -56,10 +62,12 @@ class NodeConnectionManager:
         node_runtime: NodeRuntime,
         agent_manager: AgentManager,
         agent_proxy_manager: Any,
+        node_http_dispatcher: Optional[Any] = None,
     ) -> None:
         self._node_runtime = node_runtime
         self._agent_manager = agent_manager
         self._agent_proxy_manager = agent_proxy_manager
+        self._node_http_dispatcher = node_http_dispatcher
         self._connections: Dict[str, WebSocket] = {}
         self._connection_to_node: Dict[str, str] = {}
         self._pending_requests: Dict[str, asyncio.Future] = {}
@@ -154,7 +162,10 @@ class NodeConnectionManager:
                     in (
                         AGENT_CREATE_RESPONSE,
                         AGENT_HTTP_RESPONSE,
+                        NODE_HTTP_PROXY_RESPONSE,
                         AGENT_LIST_RESPONSE,
+                        AGENT_STOP_RESPONSE,
+                        AGENT_DELETE_RESPONSE,
                         AGENT_WS_RESPONSE,
                         AGENT_WS_OPEN_RESPONSE,
                         AGENT_WS_SEND_RESPONSE,
@@ -176,8 +187,20 @@ class NodeConnectionManager:
                     response = await self._handle_agent_http_request(next_message)
                     await websocket.send_json(response)
                     continue
+                if message_type == NODE_HTTP_PROXY_REQUEST:
+                    response = await self._handle_node_http_proxy_request(next_message)
+                    await websocket.send_json(response)
+                    continue
                 if message_type == AGENT_LIST_REQUEST:
                     response = self._handle_agent_list_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_STOP_REQUEST:
+                    response = self._handle_agent_stop_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_DELETE_REQUEST:
+                    response = self._handle_agent_delete_request(next_message)
                     await websocket.send_json(response)
                     continue
                 if message_type == AGENT_WS_REQUEST:
@@ -323,7 +346,7 @@ class NodeConnectionManager:
         try:
             agents = self._agent_manager.get_agent_list()
             for agent in agents:
-                agent.setdefault("node_id", self._node_runtime.local_node_id)
+                agent["node_id"] = self._node_runtime.local_node_id
             return build_node_message(
                 AGENT_LIST_RESPONSE,
                 {"success": True, "agents": agents},
@@ -335,6 +358,97 @@ class NodeConnectionManager:
                 {
                     "success": False,
                     "error": {"code": "AGENT_LIST_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_node_http_proxy_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        try:
+            if self._node_http_dispatcher is None:
+                raise RuntimeError("node http dispatcher is not configured")
+
+            result = await self._node_http_dispatcher(
+                method=str(payload.get("method") or "GET"),
+                path=str(payload.get("path") or ""),
+                query=str(payload.get("query") or ""),
+                headers=payload.get("headers") or {},
+                body=str(payload.get("body") or ""),
+            )
+            return build_node_message(
+                NODE_HTTP_PROXY_RESPONSE,
+                result,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                NODE_HTTP_PROXY_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "NODE_HTTP_PROXY_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    def _handle_agent_stop_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        agent_id = str(payload.get("agent_id") or "").strip()
+        try:
+            result = self._agent_manager.stop_agent(agent_id)
+            return build_node_message(
+                AGENT_STOP_RESPONSE,
+                {"success": True, "result": result},
+                request_id=request_id,
+            )
+        except KeyError as exc:
+            return build_node_message(
+                AGENT_STOP_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_STOP_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_STOP_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    def _handle_agent_delete_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        agent_id = str(payload.get("agent_id") or "").strip()
+        try:
+            result = self._agent_manager.delete_agent(agent_id)
+            return build_node_message(
+                AGENT_DELETE_RESPONSE,
+                {"success": True, "result": result},
+                request_id=request_id,
+            )
+        except KeyError as exc:
+            return build_node_message(
+                AGENT_DELETE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_DELETE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_DELETE_FAILED", "message": str(exc)},
                 },
                 request_id=request_id,
             )
@@ -448,7 +562,9 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    async def _handle_agent_ws_open_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_agent_ws_open_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
@@ -482,7 +598,9 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    async def _handle_agent_ws_send_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_agent_ws_send_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
@@ -507,7 +625,9 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    async def _handle_agent_ws_recv_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_agent_ws_recv_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
@@ -539,7 +659,9 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    async def _handle_agent_ws_close_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_agent_ws_close_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         session_id = str(payload.get("session_id") or "").strip()
@@ -612,16 +734,16 @@ class NodeConnectionManager:
             items = []
             try:
                 for entry in target_path.iterdir():
-                    if not entry.name.startswith('.'):
-                        entry_type = 'directory' if entry.is_dir() else 'file'
+                    if not entry.name.startswith("."):
+                        entry_type = "directory" if entry.is_dir() else "file"
                         items.append(
                             {
-                                'name': entry.name,
-                                'path': str(entry),
-                                'type': entry_type,
+                                "name": entry.name,
+                                "path": str(entry),
+                                "type": entry_type,
                             }
                         )
-                items.sort(key=lambda item: (item['type'] != 'directory', item['name']))
+                items.sort(key=lambda item: (item["type"] != "directory", item["name"]))
             except PermissionError:
                 pass
 
@@ -791,7 +913,11 @@ class ChildNodeClient:
         os.environ["JARVIS_AUTH_TOKEN"] = token
         self._node_runtime.token_sync_state.mark_success("master")
         self._node_runtime.mark_ready()
-        logger.info("[NODE] child connected to master node_id=%s ws_url=%s", config.effective_node_id, ws_url)
+        logger.info(
+            "[NODE] child connected to master node_id=%s ws_url=%s",
+            config.effective_node_id,
+            ws_url,
+        )
 
         async def heartbeat_loop() -> None:
             while True:
@@ -823,13 +949,23 @@ class ChildNodeClient:
                     request_id,
                 )
                 if message_type == AGENT_CREATE_REQUEST:
-                    response = self._node_connection_manager._handle_agent_create_request(
-                        next_message, "master"
+                    response = (
+                        self._node_connection_manager._handle_agent_create_request(
+                            next_message, "master"
+                        )
                     )
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
-                    response = await self._node_connection_manager._handle_agent_http_request(
+                    response = (
+                        await self._node_connection_manager._handle_agent_http_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == NODE_HTTP_PROXY_REQUEST:
+                    response = await self._node_connection_manager._handle_node_http_proxy_request(
                         next_message
                     )
                     await self._ws.send(json.dumps(response))
@@ -840,9 +976,25 @@ class ChildNodeClient:
                     )
                     await self._ws.send(json.dumps(response))
                     continue
-                if message_type == AGENT_WS_REQUEST:
-                    response = await self._node_connection_manager._handle_agent_ws_request(
+                if message_type == AGENT_STOP_REQUEST:
+                    response = self._node_connection_manager._handle_agent_stop_request(
                         next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_DELETE_REQUEST:
+                    response = (
+                        self._node_connection_manager._handle_agent_delete_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_REQUEST:
+                    response = (
+                        await self._node_connection_manager._handle_agent_ws_request(
+                            next_message
+                        )
                     )
                     await self._ws.send(json.dumps(response))
                     continue
@@ -871,8 +1023,10 @@ class ChildNodeClient:
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
-                    response = self._node_connection_manager._handle_directory_list_request(
-                        next_message
+                    response = (
+                        self._node_connection_manager._handle_directory_list_request(
+                            next_message
+                        )
                     )
                     await self._ws.send(json.dumps(response))
                     continue

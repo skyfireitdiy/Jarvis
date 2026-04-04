@@ -44,9 +44,24 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
 from jarvis.jarvis_web_gateway.token_manager import (
     generate_gateway_token,
 )
-from jarvis.jarvis_web_gateway.node_config import NodeRuntimeConfig, build_node_runtime_config
-from jarvis.jarvis_web_gateway.node_manager import ChildNodeClient, NodeConnectionManager
-from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_LIST_REQUEST, AGENT_WS_REQUEST, DIRECTORY_LIST_REQUEST
+from jarvis.jarvis_web_gateway.node_config import (
+    NodeRuntimeConfig,
+    build_node_runtime_config,
+)
+from jarvis.jarvis_web_gateway.node_manager import (
+    ChildNodeClient,
+    NodeConnectionManager,
+)
+from jarvis.jarvis_web_gateway.node_protocol import (
+    AGENT_CREATE_REQUEST,
+    AGENT_HTTP_REQUEST,
+    AGENT_LIST_REQUEST,
+    AGENT_STOP_REQUEST,
+    AGENT_DELETE_REQUEST,
+    NODE_HTTP_PROXY_REQUEST,
+    AGENT_WS_REQUEST,
+    DIRECTORY_LIST_REQUEST,
+)
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
@@ -600,7 +615,12 @@ def create_app(
 
     # 创建 AgentProxyManager
     agent_proxy_manager = AgentProxyManager(agent_manager)
-    node_connection_manager = NodeConnectionManager(node_runtime, agent_manager, agent_proxy_manager)
+    node_connection_manager = NodeConnectionManager(
+        node_runtime,
+        agent_manager,
+        agent_proxy_manager,
+        node_http_dispatcher=None,
+    )
     child_node_client = (
         ChildNodeClient(
             node_runtime,
@@ -840,7 +860,9 @@ def create_app(
     async def node_websocket_endpoint(websocket: WebSocket) -> None:
         if not node_config.is_master:
             await websocket.accept()
-            await _send_error(websocket, "UNSUPPORTED", "child mode does not accept node connections")
+            await _send_error(
+                websocket, "UNSUPPORTED", "child mode does not accept node connections"
+            )
             await websocket.close(code=4404)
             return
         await node_connection_manager.handle_node_websocket(websocket)
@@ -872,7 +894,10 @@ def create_app(
         await websocket.accept()
 
         route = node_runtime.agent_route_registry.get(agent_id)
-        if route is not None and route.node_id not in (node_runtime.local_node_id, "master"):
+        if route is not None and route.node_id not in (
+            node_runtime.local_node_id,
+            "master",
+        ):
             remote_ws_session_id = str(uuid.uuid4())
             try:
                 open_response = await node_connection_manager.send_request_to_node(
@@ -897,13 +922,15 @@ def create_app(
                 async def forward_client_to_remote() -> None:
                     while True:
                         data = await websocket.receive_text()
-                        send_response = await node_connection_manager.send_request_to_node(
-                            route.node_id,
-                            AGENT_WS_SEND_REQUEST,
-                            {
-                                "session_id": remote_ws_session_id,
-                                "messages": [data],
-                            },
+                        send_response = (
+                            await node_connection_manager.send_request_to_node(
+                                route.node_id,
+                                AGENT_WS_SEND_REQUEST,
+                                {
+                                    "session_id": remote_ws_session_id,
+                                    "messages": [data],
+                                },
+                            )
                         )
                         send_payload = send_response.get("payload") or {}
                         if not send_payload.get("success"):
@@ -915,14 +942,16 @@ def create_app(
 
                 async def forward_remote_to_client() -> None:
                     while True:
-                        recv_response = await node_connection_manager.send_request_to_node(
-                            route.node_id,
-                            AGENT_WS_RECV_REQUEST,
-                            {
-                                "session_id": remote_ws_session_id,
-                                "timeout": 1.0,
-                            },
-                            timeout=65.0,
+                        recv_response = (
+                            await node_connection_manager.send_request_to_node(
+                                route.node_id,
+                                AGENT_WS_RECV_REQUEST,
+                                {
+                                    "session_id": remote_ws_session_id,
+                                    "timeout": 1.0,
+                                },
+                                timeout=65.0,
+                            )
                         )
                         recv_payload = recv_response.get("payload") or {}
                         if not recv_payload.get("success"):
@@ -957,7 +986,9 @@ def create_app(
                         {"session_id": remote_ws_session_id},
                     )
                 except Exception as close_exc:
-                    logger.warning(f"[WS PROXY] Remote websocket close warning: {close_exc}")
+                    logger.warning(
+                        f"[WS PROXY] Remote websocket close warning: {close_exc}"
+                    )
             return
 
         try:
@@ -976,6 +1007,61 @@ def create_app(
             await websocket.close(code=4999, reason="Internal error")
         finally:
             logger.info(f"[WS PROXY] WebSocket connection closed for agent {agent_id}")
+
+    @app.api_route(
+        "/api/node/{node_id}/{path:path}",
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        dependencies=[Depends(verify_token)],
+    )
+    async def node_http_proxy(node_id: str, path: str, request: Request) -> Response:
+        """统一节点 HTTP 代理。"""
+        try:
+            normalized_node_id = str(node_id or "").strip()
+            if not normalized_node_id:
+                return Response(
+                    content='{"error": "node_id is required"}',
+                    status_code=400,
+                    media_type="application/json",
+                )
+            body = (await request.body()).decode("utf-8", errors="replace")
+            if normalized_node_id in (node_runtime.local_node_id, "master"):
+                return Response(
+                    content='{"error": "local node unified proxy not implemented yet"}',
+                    status_code=501,
+                    media_type="application/json",
+                )
+            response = await node_connection_manager.send_request_to_node(
+                normalized_node_id,
+                NODE_HTTP_PROXY_REQUEST,
+                {
+                    "method": request.method,
+                    "path": path,
+                    "query": str(request.query_params),
+                    "headers": dict(request.headers),
+                    "body": body,
+                },
+            )
+            payload = response.get("payload") or {}
+            if not payload.get("success"):
+                error = payload.get("error") or {}
+                return Response(
+                    content=f'{{"error": "{error.get("message", "Node HTTP proxy failed")}"}}',
+                    status_code=502,
+                    media_type="application/json",
+                )
+            return Response(
+                content=payload.get("body", ""),
+                status_code=int(payload.get("status_code", 200)),
+                headers=payload.get("headers") or {},
+                media_type=(payload.get("headers") or {}).get("content-type"),
+            )
+        except Exception as e:
+            logger.error(f"[NODE HTTP PROXY] error node_id={node_id} path={path}: {e}")
+            return Response(
+                content='{"error": "Node HTTP proxy failed"}',
+                status_code=502,
+                media_type="application/json",
+            )
 
     # HTTP 代理：代理到 Agent HTTP API
     @app.api_route(
@@ -998,7 +1084,10 @@ def create_app(
         logger.info(f"[HTTP PROXY] {request.method} /api/agent/{agent_id}/{path}")
 
         route = node_runtime.agent_route_registry.get(agent_id)
-        if route is not None and route.node_id not in (node_runtime.local_node_id, "master"):
+        if route is not None and route.node_id not in (
+            node_runtime.local_node_id,
+            "master",
+        ):
             try:
                 body = (await request.body()).decode("utf-8", errors="replace")
                 response = await node_connection_manager.send_request_to_node(
@@ -1214,7 +1303,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "AGENT_CREATE_FAILED"),
-                            "message": error.get("message", "Remote agent creation failed"),
+                            "message": error.get(
+                                "message", "Remote agent creation failed"
+                            ),
                         },
                     }
                 agent_info = payload.get("agent_info") or {}
@@ -1404,6 +1495,27 @@ def create_app(
     async def stop_agent(agent_id: str) -> Dict[str, Any]:
         """停止 Agent。"""
         try:
+            route = node_runtime.agent_route_registry.get(agent_id)
+            if route is not None and route.node_id not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    route.node_id,
+                    AGENT_STOP_REQUEST,
+                    {"agent_id": agent_id},
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "AGENT_STOP_FAILED"),
+                            "message": error.get("message", "Remote agent stop failed"),
+                        },
+                    }
+                return {"success": True, "data": payload.get("result")}
             result = agent_manager.stop_agent(agent_id)
             return {"success": True, "data": result}
         except KeyError as e:
@@ -1451,7 +1563,32 @@ def create_app(
     async def delete_agent(agent_id: str) -> Dict[str, Any]:
         """删除 Agent。"""
         try:
+            route = node_runtime.agent_route_registry.get(agent_id)
+            if route is not None and route.node_id not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    route.node_id,
+                    AGENT_DELETE_REQUEST,
+                    {"agent_id": agent_id},
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "AGENT_DELETE_FAILED"),
+                            "message": error.get(
+                                "message", "Remote agent delete failed"
+                            ),
+                        },
+                    }
+                node_runtime.agent_route_registry.unregister(agent_id)
+                return {"success": True, "data": payload.get("result")}
             result = agent_manager.delete_agent(agent_id)
+            node_runtime.agent_route_registry.unregister(agent_id)
             return {"success": True, "data": result}
         except KeyError as e:
             return {
@@ -2213,11 +2350,9 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/file-content", dependencies=[Depends(verify_token)])
-    async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
-        """读取指定绝对路径文件的内容。"""
+    async def _handle_file_content_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            file_path = str(request.get("path", "")).strip()
+            file_path = str(payload.get("path", "")).strip()
             try:
                 target_path = _validate_absolute_file_path(file_path)
             except ValueError as exc:
@@ -2299,11 +2434,9 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/file-stat", dependencies=[Depends(verify_token)])
-    async def get_file_stat(request: Dict[str, Any]) -> Dict[str, Any]:
-        """读取指定绝对路径文件的元信息。"""
+    async def _handle_file_stat_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            file_path = str(request.get("path", "")).strip()
+            file_path = str(payload.get("path", "")).strip()
             try:
                 target_path = _validate_absolute_file_path(file_path)
             except ValueError as exc:
@@ -2354,11 +2487,9 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/file-write", dependencies=[Depends(verify_token)])
-    async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
-        """写入指定绝对路径文本文件的内容。"""
+    async def _handle_file_write_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            file_path = str(request.get("path", "")).strip()
+            file_path = str(payload.get("path", "")).strip()
             if not file_path:
                 return {
                     "success": False,
@@ -2378,7 +2509,7 @@ def create_app(
                     },
                 }
 
-            file_content = request.get("content")
+            file_content = payload.get("content")
             if not isinstance(file_content, str):
                 return {
                     "success": False,
@@ -2443,28 +2574,157 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.get("/api/directories", dependencies=[Depends(verify_token)])
-    async def list_directories(path: str = "", node_id: str = "") -> Dict[str, Any]:
-        """获取指定路径下的目录列表。
-
-        Args:
-            path: 目录路径，默认为用户主目录
-
-        Returns:
-            {
-                "success": True,
-                "data": {
-                    "current_path": "/path/to/dir",
-                    "parent_path": "/path/to",  # 如果存在
-                    "directories": [
-                        {"name": "dir1", "path": "/path/to/dir/dir1"},
-                        ...
-                    ]
-                }
-            }
-        """
+    async def _handle_directories_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         import pathlib
 
+        try:
+            path = str(payload.get("path", ""))
+            if not path or path == "~":
+                target_path = pathlib.Path.home()
+            else:
+                target_path = pathlib.Path(path).expanduser()
+
+            target_path = target_path.resolve()
+
+            if not target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Path does not exist: {path}",
+                    },
+                }
+
+            if not target_path.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_A_DIRECTORY",
+                        "message": f"Path is not a directory: {path}",
+                    },
+                }
+
+            parent_path = None
+            if target_path.parent != target_path:
+                parent_path = str(target_path.parent)
+
+            items = []
+            try:
+                for entry in target_path.iterdir():
+                    if not entry.name.startswith("."):
+                        entry_type = "directory" if entry.is_dir() else "file"
+                        items.append(
+                            {
+                                "name": entry.name,
+                                "path": str(entry),
+                                "type": entry_type,
+                            }
+                        )
+                items.sort(key=lambda x: (x["type"] != "directory", x["name"]))
+            except PermissionError:
+                pass
+
+            return {
+                "success": True,
+                "data": {
+                    "current_path": str(target_path),
+                    "parent_path": parent_path,
+                    "items": items,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            logger.exception("[DIRECTORIES] list_directories failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+    async def _dispatch_node_http_request(
+        method: str,
+        path: str,
+        query: str,
+        headers: Dict[str, Any],
+        body: str,
+    ) -> Dict[str, Any]:
+        normalized_method = str(method or "GET").upper()
+        normalized_path = "/" + str(path or "").lstrip("/")
+        if normalized_path.startswith("/api/"):
+            normalized_path = "/" + normalized_path[len("/api/") :].lstrip("/")
+
+        payload: Dict[str, Any] = {}
+        if normalized_method == "GET":
+            params = dict(parse_qsl(query, keep_blank_values=True))
+            payload.update(params)
+        elif body:
+            try:
+                parsed_body = json.loads(body)
+                if isinstance(parsed_body, dict):
+                    payload = parsed_body
+                else:
+                    return {
+                        "success": False,
+                        "status_code": 400,
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps(
+                            {"error": "request body must be a JSON object"}
+                        ),
+                    }
+            except json.JSONDecodeError:
+                return {
+                    "success": False,
+                    "status_code": 400,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps({"error": "invalid JSON body"}),
+                }
+
+        if normalized_method == "GET" and normalized_path == "/directories":
+            result = await _handle_directories_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-content":
+            result = await _handle_file_content_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-stat":
+            result = await _handle_file_stat_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-write":
+            result = await _handle_file_write_request(payload)
+        else:
+            return {
+                "success": False,
+                "status_code": 404,
+                "headers": {"content-type": "application/json"},
+                "body": json.dumps(
+                    {"error": f"unsupported node api path: {normalized_path}"}
+                ),
+            }
+
+        return {
+            "success": result.get("success", False),
+            "status_code": 200 if result.get("success") else 400,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps(result),
+        }
+
+    @app.post("/api/file-content", dependencies=[Depends(verify_token)])
+    async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+        """读取指定绝对路径文件的内容。"""
+        return await _handle_file_content_request(request)
+
+    @app.post("/api/file-stat", dependencies=[Depends(verify_token)])
+    async def get_file_stat(request: Dict[str, Any]) -> Dict[str, Any]:
+        """读取指定绝对路径文件的元信息。"""
+        return await _handle_file_stat_request(request)
+
+    @app.post("/api/file-write", dependencies=[Depends(verify_token)])
+    async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+        """写入指定绝对路径文本文件的内容。"""
+        return await _handle_file_write_request(request)
+
+    @app.get("/api/directories", dependencies=[Depends(verify_token)])
+    async def list_directories(path: str = "", node_id: str = "") -> Dict[str, Any]:
+        """获取指定路径下的目录列表。"""
         try:
             resolved_node_id = str(node_id or "").strip()
             target_node_id = resolved_node_id or node_runtime.local_node_id
@@ -2478,7 +2738,9 @@ def create_app(
                 )
                 node_info = node_runtime.node_registry.get(target_node_id)
                 if node_info is None:
-                    logger.warning("[DIRECTORIES] target node not found: %s", target_node_id)
+                    logger.warning(
+                        "[DIRECTORIES] target node not found: %s", target_node_id
+                    )
                     return {
                         "success": False,
                         "error": {
@@ -2506,7 +2768,9 @@ def create_app(
                         "path": path,
                     },
                 )
-                logger.info("[DIRECTORIES] remote node response type=%s", response.get("type"))
+                logger.info(
+                    "[DIRECTORIES] remote node response type=%s", response.get("type")
+                )
                 payload = response.get("payload") or {}
                 if payload.get("success"):
                     logger.info(
@@ -2525,77 +2789,13 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": error.get("code", "DIRECTORY_LIST_FAILED"),
-                        "message": error.get("message", "Remote directory listing failed"),
+                        "message": error.get(
+                            "message", "Remote directory listing failed"
+                        ),
                     },
                 }
 
-            # 解析路径，如果为空则使用用户主目录
-            if not path or path == "~":
-                target_path = pathlib.Path.home()
-            else:
-                target_path = pathlib.Path(path).expanduser()
-
-            # 规范化为绝对路径
-            target_path = target_path.resolve()
-
-            # 检查路径是否存在且是目录
-            if not target_path.exists():
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "NOT_FOUND",
-                        "message": f"Path does not exist: {path}",
-                    },
-                }
-
-            if not target_path.is_dir():
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "NOT_A_DIRECTORY",
-                        "message": f"Path is not a directory: {path}",
-                    },
-                }
-
-            # 获取父目录路径（如果存在）
-            parent_path = None
-            if target_path.parent != target_path:  # 不是根目录
-                parent_path = str(target_path.parent)
-
-            # 获取子目录和文件列表
-            items = []
-            try:
-                for entry in target_path.iterdir():
-                    # 过滤隐藏文件（以 . 开头）
-                    if not entry.name.startswith("."):
-                        # 判断是目录还是文件
-                        entry_type = "directory" if entry.is_dir() else "file"
-                        items.append(
-                            {
-                                "name": entry.name,
-                                "path": str(entry),
-                                "type": entry_type,
-                            }
-                        )
-                # 按名称排序，目录在前，文件在后
-                items.sort(key=lambda x: (x["type"] != "directory", x["name"]))
-            except PermissionError:
-                # 忽略权限错误，返回空列表
-                pass
-
-            return {
-                "success": True,
-                "data": {
-                    "current_path": str(target_path),
-                    "parent_path": parent_path,
-                    "items": items,
-                },
-            }
-        except PermissionError:
-            return {
-                "success": False,
-                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
-            }
+            return await _handle_directories_request({"path": path})
         except Exception as e:
             logger.exception("[DIRECTORIES] list_directories failed: %r", e)
             return {
