@@ -404,12 +404,11 @@ class WebSocketConnectionManager:
             return
 
         self._auth_store[session_id] = auth_payload
-        logger.info(
-            "[WS AUTH] authenticated session_id=%s connection_id=%s has_token=%s auth_store_keys=%s",
-            session_id,
-            connection_id,
-            bool((auth_payload or {}).get("token")),
-            list(self._auth_store.keys()),
+        print(
+            "[WS AUTH] authenticated "
+            f"session_id={session_id} connection_id={connection_id} "
+            f"has_token={bool((auth_payload or {}).get('token'))} "
+            f"auth_store_keys={list(self._auth_store.keys())}"
         )
         self._router.register(
             connection_id,
@@ -451,18 +450,16 @@ class WebSocketConnectionManager:
                 message = await websocket.receive_json()
                 await self._handle_message(session_id, message)
         except WebSocketDisconnect:
-            logger.info(
-                "[WS DISCONNECT] session_id=%s connection_id=%s active_auth=%s",
-                session_id,
-                connection_id,
-                session_id in self._auth_store,
+            print(
+                "[WS DISCONNECT] "
+                f"session_id={session_id} connection_id={connection_id} "
+                f"active_auth={session_id in self._auth_store}"
             )
         finally:
-            logger.info(
-                "[WS CLEANUP] begin session_id=%s connection_id=%s active_auth_before=%s",
-                session_id,
-                connection_id,
-                session_id in self._auth_store,
+            print(
+                "[WS CLEANUP] begin "
+                f"session_id={session_id} connection_id={connection_id} "
+                f"active_auth_before={session_id in self._auth_store}"
             )
             self._router.unregister(connection_id, session_id=session_id)
             self._input_registry.unregister_provider(session_id)
@@ -472,11 +469,10 @@ class WebSocketConnectionManager:
                 if active_connection and active_connection[0] == connection_id:
                     self._active_connections.pop(session_id, None)
                     self._auth_store.pop(session_id, None)
-            logger.info(
-                "[WS CLEANUP] end session_id=%s connection_id=%s active_auth_after=%s",
-                session_id,
-                connection_id,
-                session_id in self._auth_store,
+            print(
+                "[WS CLEANUP] end "
+                f"session_id={session_id} connection_id={connection_id} "
+                f"active_auth_after={session_id in self._auth_store}"
             )
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
