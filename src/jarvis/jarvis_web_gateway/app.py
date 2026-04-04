@@ -873,33 +873,91 @@ def create_app(
 
         route = node_runtime.agent_route_registry.get(agent_id)
         if route is not None and route.node_id not in (node_runtime.local_node_id, "master"):
+            remote_ws_session_id = str(uuid.uuid4())
             try:
-                messages: list[str] = []
-                while True:
-                    try:
-                        data = await asyncio.wait_for(websocket.receive_text(), timeout=0.2)
-                        messages.append(data)
-                    except asyncio.TimeoutError:
-                        break
-                response = await node_connection_manager.send_request_to_node(
+                open_response = await node_connection_manager.send_request_to_node(
                     route.node_id,
-                    AGENT_WS_REQUEST,
+                    AGENT_WS_OPEN_REQUEST,
                     {
                         "agent_id": agent_id,
                         "path": "ws",
-                        "messages": messages,
+                        "session_id": remote_ws_session_id,
                     },
                 )
-                payload = response.get("payload") or {}
-                if not payload.get("success"):
-                    await websocket.close(code=4003, reason=(payload.get("error") or {}).get("message", "Remote websocket proxy failed"))
+                open_payload = open_response.get("payload") or {}
+                if not open_payload.get("success"):
+                    await websocket.close(
+                        code=4003,
+                        reason=(open_payload.get("error") or {}).get(
+                            "message", "Remote websocket open failed"
+                        ),
+                    )
                     return
-                for item in payload.get("messages") or []:
-                    await websocket.send_text(str(item))
-                await websocket.close(code=1000)
+
+                async def forward_client_to_remote() -> None:
+                    while True:
+                        data = await websocket.receive_text()
+                        send_response = await node_connection_manager.send_request_to_node(
+                            route.node_id,
+                            AGENT_WS_SEND_REQUEST,
+                            {
+                                "session_id": remote_ws_session_id,
+                                "messages": [data],
+                            },
+                        )
+                        send_payload = send_response.get("payload") or {}
+                        if not send_payload.get("success"):
+                            raise RuntimeError(
+                                (send_payload.get("error") or {}).get(
+                                    "message", "Remote websocket send failed"
+                                )
+                            )
+
+                async def forward_remote_to_client() -> None:
+                    while True:
+                        recv_response = await node_connection_manager.send_request_to_node(
+                            route.node_id,
+                            AGENT_WS_RECV_REQUEST,
+                            {
+                                "session_id": remote_ws_session_id,
+                                "timeout": 1.0,
+                            },
+                            timeout=65.0,
+                        )
+                        recv_payload = recv_response.get("payload") or {}
+                        if not recv_payload.get("success"):
+                            raise RuntimeError(
+                                (recv_payload.get("error") or {}).get(
+                                    "message", "Remote websocket receive failed"
+                                )
+                            )
+                        for item in recv_payload.get("messages") or []:
+                            await websocket.send_text(str(item))
+
+                client_to_remote_task = asyncio.create_task(forward_client_to_remote())
+                remote_to_client_task = asyncio.create_task(forward_remote_to_client())
+                done, pending = await asyncio.wait(
+                    {client_to_remote_task, remote_to_client_task},
+                    return_when=asyncio.FIRST_EXCEPTION,
+                )
+                for task in pending:
+                    task.cancel()
+                for task in done:
+                    exc = task.exception()
+                    if exc is not None:
+                        raise exc
             except Exception as e:
                 logger.error(f"[WS PROXY] Remote websocket proxy error: {e}")
                 await websocket.close(code=4003, reason="Remote websocket proxy failed")
+            finally:
+                try:
+                    await node_connection_manager.send_request_to_node(
+                        route.node_id,
+                        AGENT_WS_CLOSE_REQUEST,
+                        {"session_id": remote_ws_session_id},
+                    )
+                except Exception as close_exc:
+                    logger.warning(f"[WS PROXY] Remote websocket close warning: {close_exc}")
             return
 
         try:

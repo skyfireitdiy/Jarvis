@@ -21,8 +21,16 @@ from .node_protocol import (
     AGENT_CREATE_RESPONSE,
     AGENT_HTTP_REQUEST,
     AGENT_HTTP_RESPONSE,
+    AGENT_WS_CLOSE_REQUEST,
+    AGENT_WS_CLOSE_RESPONSE,
+    AGENT_WS_OPEN_REQUEST,
+    AGENT_WS_OPEN_RESPONSE,
+    AGENT_WS_RECV_REQUEST,
+    AGENT_WS_RECV_RESPONSE,
     AGENT_WS_REQUEST,
     AGENT_WS_RESPONSE,
+    AGENT_WS_SEND_REQUEST,
+    AGENT_WS_SEND_RESPONSE,
     DIRECTORY_LIST_REQUEST,
     DIRECTORY_LIST_RESPONSE,
     NODE_AUTH,
@@ -53,6 +61,7 @@ class NodeConnectionManager:
         self._connections: Dict[str, WebSocket] = {}
         self._connection_to_node: Dict[str, str] = {}
         self._pending_requests: Dict[str, asyncio.Future] = {}
+        self._agent_ws_sessions: Dict[str, Any] = {}
 
     async def handle_node_websocket(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -144,6 +153,10 @@ class NodeConnectionManager:
                         AGENT_CREATE_RESPONSE,
                         AGENT_HTTP_RESPONSE,
                         AGENT_WS_RESPONSE,
+                        AGENT_WS_OPEN_RESPONSE,
+                        AGENT_WS_SEND_RESPONSE,
+                        AGENT_WS_RECV_RESPONSE,
+                        AGENT_WS_CLOSE_RESPONSE,
                         DIRECTORY_LIST_RESPONSE,
                     )
                     and request_id
@@ -162,6 +175,22 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = await self._handle_agent_ws_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_WS_OPEN_REQUEST:
+                    response = await self._handle_agent_ws_open_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_WS_SEND_REQUEST:
+                    response = await self._handle_agent_ws_send_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_WS_RECV_REQUEST:
+                    response = await self._handle_agent_ws_recv_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_WS_CLOSE_REQUEST:
+                    response = await self._handle_agent_ws_close_request(next_message)
                     await websocket.send_json(response)
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
@@ -387,6 +416,120 @@ class NodeConnectionManager:
                         "code": "WS_PROXY_FAILED",
                         "message": str(exc),
                     },
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_ws_open_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        agent_id = str(payload.get("agent_id") or "").strip()
+        try:
+            if not session_id:
+                raise ValueError("session_id is required")
+            if not agent_id:
+                raise ValueError("agent_id is required")
+            port = await self._agent_proxy_manager.get_agent_port(agent_id)
+            agent_url = f"ws://127.0.0.1:{port}/ws"
+            agent_ws = await websockets.connect(agent_url, close_timeout=30, proxy=None)
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            if auth_token:
+                await agent_ws.send(
+                    json.dumps({"type": "auth", "payload": {"token": auth_token}})
+                )
+            self._agent_ws_sessions[session_id] = agent_ws
+            return build_node_message(
+                AGENT_WS_OPEN_RESPONSE,
+                {"success": True, "session_id": session_id},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_WS_OPEN_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "WS_OPEN_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_ws_send_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        try:
+            agent_ws = self._agent_ws_sessions.get(session_id)
+            if agent_ws is None:
+                raise RuntimeError(f"ws session not found: {session_id}")
+            for item in payload.get("messages") or []:
+                await agent_ws.send(str(item))
+            return build_node_message(
+                AGENT_WS_SEND_RESPONSE,
+                {"success": True, "session_id": session_id},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_WS_SEND_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "WS_SEND_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_ws_recv_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        timeout = float(payload.get("timeout") or 0.5)
+        try:
+            agent_ws = self._agent_ws_sessions.get(session_id)
+            if agent_ws is None:
+                raise RuntimeError(f"ws session not found: {session_id}")
+            messages: list[str] = []
+            while True:
+                try:
+                    reply = await asyncio.wait_for(agent_ws.recv(), timeout=timeout)
+                    messages.append(reply if isinstance(reply, str) else reply.decode())
+                    timeout = 0.05
+                except asyncio.TimeoutError:
+                    break
+            return build_node_message(
+                AGENT_WS_RECV_RESPONSE,
+                {"success": True, "session_id": session_id, "messages": messages},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_WS_RECV_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "WS_RECV_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_agent_ws_close_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        agent_ws = self._agent_ws_sessions.pop(session_id, None)
+        try:
+            if agent_ws is not None:
+                await agent_ws.close()
+            return build_node_message(
+                AGENT_WS_CLOSE_RESPONSE,
+                {"success": True, "session_id": session_id},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_WS_CLOSE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "WS_CLOSE_FAILED", "message": str(exc)},
                 },
                 request_id=request_id,
             )
@@ -665,6 +808,30 @@ class ChildNodeClient:
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = await self._node_connection_manager._handle_agent_ws_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_OPEN_REQUEST:
+                    response = await self._node_connection_manager._handle_agent_ws_open_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_SEND_REQUEST:
+                    response = await self._node_connection_manager._handle_agent_ws_send_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_RECV_REQUEST:
+                    response = await self._node_connection_manager._handle_agent_ws_recv_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_WS_CLOSE_REQUEST:
+                    response = await self._node_connection_manager._handle_agent_ws_close_request(
                         next_message
                     )
                     await self._ws.send(json.dumps(response))
