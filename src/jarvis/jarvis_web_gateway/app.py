@@ -2364,8 +2364,15 @@ def create_app(
             target_node_id = resolved_node_id or node_runtime.local_node_id
 
             if target_node_id not in (node_runtime.local_node_id, "master"):
+                logger.info(
+                    "[DIRECTORIES] remote list request path=%s target_node_id=%s local_node_id=%s",
+                    path,
+                    target_node_id,
+                    node_runtime.local_node_id,
+                )
                 node_info = node_runtime.node_registry.get(target_node_id)
                 if node_info is None:
+                    logger.warning("[DIRECTORIES] target node not found: %s", target_node_id)
                     return {
                         "success": False,
                         "error": {
@@ -2373,6 +2380,11 @@ def create_app(
                             "message": f"Node not found: {target_node_id}",
                         },
                     }
+                logger.info(
+                    "[DIRECTORIES] target node status=%s connection_id=%s",
+                    node_info.status,
+                    node_info.connection_id,
+                )
                 if node_info.status != "online":
                     return {
                         "success": False,
@@ -2388,10 +2400,21 @@ def create_app(
                         "path": path,
                     },
                 )
+                logger.info("[DIRECTORIES] remote node response type=%s", response.get("type"))
                 payload = response.get("payload") or {}
                 if payload.get("success"):
+                    logger.info(
+                        "[DIRECTORIES] remote list success current_path=%s item_count=%s",
+                        (payload.get("data") or {}).get("current_path"),
+                        len((payload.get("data") or {}).get("items") or []),
+                    )
                     return {"success": True, "data": payload.get("data") or {}}
                 error = payload.get("error") or {}
+                logger.warning(
+                    "[DIRECTORIES] remote list failed code=%s message=%s",
+                    error.get("code"),
+                    error.get("message"),
+                )
                 return {
                     "success": False,
                     "error": {
@@ -2468,9 +2491,10 @@ def create_app(
                 "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
             }
         except Exception as e:
+            logger.exception("[DIRECTORIES] list_directories failed: %r", e)
             return {
                 "success": False,
-                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
     # HTTP API：创建终端会话
