@@ -129,6 +129,12 @@ class NodeConnectionManager:
                     continue
                 message_type = next_message.get("type")
                 request_id = next_message.get("request_id")
+                logger.info(
+                    "[NODE] recv message node_id=%s type=%s request_id=%s",
+                    node_id,
+                    message_type,
+                    request_id,
+                )
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
                     continue
@@ -159,9 +165,25 @@ class NodeConnectionManager:
                     await websocket.send_json(response)
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
+                    logger.info(
+                        "[NODE] handling directory list request node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
                     response = self._handle_directory_list_request(next_message)
                     await websocket.send_json(response)
+                    logger.info(
+                        "[NODE] sent directory list response node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
                     continue
+                logger.warning(
+                    "[NODE] unhandled message node_id=%s type=%s request_id=%s",
+                    node_id,
+                    message_type,
+                    request_id,
+                )
         except Exception:
             logger.info("[NODE] node disconnected: %s", node_id)
         finally:
@@ -187,10 +209,22 @@ class NodeConnectionManager:
         future: asyncio.Future = loop.create_future()
         self._pending_requests[request_id] = future
         try:
+            logger.info(
+                "[NODE] send request node_id=%s type=%s request_id=%s",
+                node_id,
+                message_type,
+                request_id,
+            )
             await websocket.send_json(
                 build_node_message(message_type, payload, request_id=request_id)
             )
             response = await asyncio.wait_for(future, timeout=timeout)
+            logger.info(
+                "[NODE] received response node_id=%s type=%s request_id=%s",
+                node_id,
+                response.get("type") if isinstance(response, dict) else None,
+                request_id,
+            )
             if not isinstance(response, dict):
                 raise RuntimeError("invalid node response")
             return response
@@ -361,6 +395,11 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         raw_path = str(payload.get("path") or "").strip()
+        logger.info(
+            "[NODE] _handle_directory_list_request path=%s request_id=%s",
+            raw_path,
+            request_id,
+        )
         try:
             if not raw_path or raw_path == "~":
                 target_path = pathlib.Path.home()
@@ -415,6 +454,13 @@ class NodeConnectionManager:
             except PermissionError:
                 pass
 
+            logger.info(
+                "[NODE] directory list success path=%s resolved=%s item_count=%s request_id=%s",
+                raw_path,
+                target_path,
+                len(items),
+                request_id,
+            )
             return build_node_message(
                 DIRECTORY_LIST_RESPONSE,
                 {
@@ -428,6 +474,11 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
         except PermissionError:
+            logger.warning(
+                "[NODE] directory list permission denied path=%s request_id=%s",
+                raw_path,
+                request_id,
+            )
             return build_node_message(
                 DIRECTORY_LIST_RESPONSE,
                 {
@@ -440,6 +491,12 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
         except Exception as exc:
+            logger.exception(
+                "[NODE] directory list failed path=%s request_id=%s error=%r",
+                raw_path,
+                request_id,
+                exc,
+            )
             return build_node_message(
                 DIRECTORY_LIST_RESPONSE,
                 {
