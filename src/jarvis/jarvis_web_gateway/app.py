@@ -1290,11 +1290,13 @@ def create_app(
                     agent.setdefault("node_id", node_runtime.local_node_id)
 
             for node_info in node_runtime.node_registry.list_all():
-                if node_info.node_id == node_runtime.local_node_id or node_info.status != "online":
+                node_id = str((node_info or {}).get("node_id") or "")
+                node_status = str((node_info or {}).get("status") or "")
+                if node_id == node_runtime.local_node_id or node_status != "online":
                     continue
                 try:
                     response = await node_connection_manager.send_request_to_node(
-                        node_info.node_id,
+                        node_id,
                         AGENT_LIST_REQUEST,
                         {},
                         timeout=10.0,
@@ -1303,7 +1305,7 @@ def create_app(
                     if not payload.get("success"):
                         logger.warning(
                             "[AGENTS] remote list failed node_id=%s error=%s",
-                            node_info.node_id,
+                            node_id,
                             (payload.get("error") or {}).get("message"),
                         )
                         continue
@@ -1316,7 +1318,7 @@ def create_app(
                 except Exception as exc:
                     logger.warning(
                         "[AGENTS] remote list request failed node_id=%s error=%s",
-                        node_info.node_id,
+                        node_id,
                         exc,
                     )
             return {"success": True, "data": agents}
