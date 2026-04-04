@@ -46,7 +46,7 @@ from jarvis.jarvis_web_gateway.token_manager import (
 )
 from jarvis.jarvis_web_gateway.node_config import NodeRuntimeConfig, build_node_runtime_config
 from jarvis.jarvis_web_gateway.node_manager import ChildNodeClient, NodeConnectionManager
-from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_WS_REQUEST, DIRECTORY_LIST_REQUEST
+from jarvis.jarvis_web_gateway.node_protocol import AGENT_CREATE_REQUEST, AGENT_HTTP_REQUEST, AGENT_LIST_REQUEST, AGENT_WS_REQUEST, DIRECTORY_LIST_REQUEST
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
