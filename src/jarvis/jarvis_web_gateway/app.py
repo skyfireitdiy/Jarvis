@@ -1525,12 +1525,30 @@ def create_app(
                         },
                     }
                 return {"success": True, "data": payload.get("result")}
-            result = agent_manager.stop_agent(agent_id)
-            return {"success": True, "data": result}
-        except KeyError as e:
+            # Try local first
+            try:
+                result = agent_manager.stop_agent(agent_id)
+                return {"success": True, "data": result}
+            except (KeyError, Exception):
+                pass
+            # Not found locally and not in route registry — try all online child nodes
+            for node_info in node_runtime.node_registry.list_all():
+                nid = str((node_info or {}).get("node_id") or "")
+                nst = str((node_info or {}).get("status") or "")
+                if nid == node_runtime.local_node_id or nst != "online":
+                    continue
+                try:
+                    response = await node_connection_manager.send_request_to_node(
+                        nid, AGENT_STOP_REQUEST, {"agent_id": agent_id}, timeout=10.0,
+                    )
+                    payload = response.get("payload") or {}
+                    if payload.get("success"):
+                        return {"success": True, "data": payload.get("result")}
+                except Exception:
+                    pass
             return {
                 "success": False,
-                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+                "error": {"code": "AGENT_NOT_FOUND", "message": f"Agent not found: {agent_id}"},
             }
         except Exception as e:
             return {
@@ -1596,13 +1614,32 @@ def create_app(
                     }
                 node_runtime.agent_route_registry.unregister(agent_id)
                 return {"success": True, "data": payload.get("result")}
-            result = agent_manager.delete_agent(agent_id)
-            node_runtime.agent_route_registry.unregister(agent_id)
-            return {"success": True, "data": result}
-        except KeyError as e:
+            # Try local first
+            try:
+                result = agent_manager.delete_agent(agent_id)
+                node_runtime.agent_route_registry.unregister(agent_id)
+                return {"success": True, "data": result}
+            except (KeyError, Exception):
+                pass
+            # Not found locally and not in route registry — try all online child nodes
+            for node_info in node_runtime.node_registry.list_all():
+                nid = str((node_info or {}).get("node_id") or "")
+                nst = str((node_info or {}).get("status") or "")
+                if nid == node_runtime.local_node_id or nst != "online":
+                    continue
+                try:
+                    response = await node_connection_manager.send_request_to_node(
+                        nid, AGENT_DELETE_REQUEST, {"agent_id": agent_id}, timeout=10.0,
+                    )
+                    payload = response.get("payload") or {}
+                    if payload.get("success"):
+                        node_runtime.agent_route_registry.unregister(agent_id)
+                        return {"success": True, "data": payload.get("result")}
+                except Exception:
+                    pass
             return {
                 "success": False,
-                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+                "error": {"code": "AGENT_NOT_FOUND", "message": f"Agent not found: {agent_id}"},
             }
         except Exception as e:
             return {
