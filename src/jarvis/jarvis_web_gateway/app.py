@@ -1278,12 +1278,30 @@ def create_app(
         """获取 Agent 列表。"""
         try:
             agents = agent_manager.get_agent_list()
+            known_agent_ids: set[str] = set()
             for agent in agents:
+                agent_id = str(agent.get("agent_id") or "")
+                if agent_id:
+                    known_agent_ids.add(agent_id)
                 route = node_runtime.agent_route_registry.get(agent.get("agent_id"))
                 if route is not None:
                     agent.setdefault("node_id", route.node_id)
                 else:
                     agent.setdefault("node_id", node_runtime.local_node_id)
+
+            for route in node_runtime.agent_route_registry.list_all():
+                if route.agent_id in known_agent_ids:
+                    continue
+                agents.append(
+                    {
+                        "agent_id": route.agent_id,
+                        "node_id": route.node_id,
+                        "status": route.status,
+                        "working_dir": route.working_dir,
+                        "port": route.port,
+                    }
+                )
+                known_agent_ids.add(route.agent_id)
             return {"success": True, "data": agents}
         except Exception as e:
             return {
