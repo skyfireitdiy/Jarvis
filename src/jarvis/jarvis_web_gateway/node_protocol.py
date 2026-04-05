@@ -35,6 +35,9 @@ AGENT_WS_CLOSE_REQUEST = "agent_ws_close_request"
 AGENT_WS_CLOSE_RESPONSE = "agent_ws_close_response"
 DIRECTORY_LIST_REQUEST = "directory_list_request"
 DIRECTORY_LIST_RESPONSE = "directory_list_response"
+NODE_TERMINAL_REQUEST = "node_terminal_request"
+NODE_TERMINAL_RESPONSE = "node_terminal_response"
+NODE_TERMINAL_OUTPUT = "node_terminal_output"
 ERROR = "error"
 
 

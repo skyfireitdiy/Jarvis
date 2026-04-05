@@ -3377,9 +3377,11 @@ function resetDirectorySelectionState() {
   selectedDirIndex.value = -1
 }
 
-watch(newAgentNodeId, () => {
+watch(newAgentNodeId, (newNodeId) => {
   newAgentDir.value = '~'
   resetDirectorySelectionState()
+  // 切换节点时重新获取对应节点的模型组列表
+  fetchModelGroups(newNodeId || 'master')
 })
 
 async function openDirDialog() {
@@ -3546,10 +3548,11 @@ async function openCreateAgentModal() {
 }
 
 // 获取模型组列表
-async function fetchModelGroups() {
+async function fetchModelGroups(nodeId = 'master') {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'model-groups'))
+    const targetNodeId = String(nodeId || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'model-groups'))
     if (!response.ok) {
       console.error('[MODEL GROUP] 获取模型组列表失败:', response.status)
       return
