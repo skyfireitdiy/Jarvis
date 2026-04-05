@@ -156,6 +156,39 @@
         color: var(--t1);
         font-size: 24px;
         cursor: pointer;
+        z-index: 101;
+      }
+      .nk-mobile {
+        position: fixed;
+        top: 0;
+        right: -280px;
+        width: 280px;
+        height: 100vh;
+        background: var(--bg);
+        border-left: 1px solid var(--bd);
+        padding: 80px 20px 40px;
+        z-index: 99;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+      }
+      .nk-mobile.active {
+        right: 0;
+      }
+      .nk-mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 98;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+      }
+      .nk-mobile-overlay.active {
+        opacity: 1;
+        visibility: visible;
       }
       .hero {
         padding: 160px 0 100px;
@@ -616,6 +649,37 @@
         color: var(--gr);
         border-color: rgba(52, 211, 153, 0.3);
       }
+      .nk-mobile a {
+        display: block;
+        padding: 14px 16px;
+        color: var(--t2);
+        font-size: 16px;
+        font-weight: 500;
+        border-bottom: 1px solid var(--bd);
+        min-height: 48px;
+        line-height: 1.3;
+        transition: color 0.2s, background 0.2s;
+      }
+      .nk-mobile a:hover {
+        color: var(--t1);
+        background: var(--c);
+      }
+      .nk-mobile .nc-mobile {
+        display: block;
+        margin-top: 20px;
+        padding: 14px 20px;
+        background: var(--ac);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        text-align: center;
+        border-bottom: none;
+      }
+      .nk-mobile .nc-mobile:hover {
+        background: var(--al);
+        color: #fff;
+      }
       @media (max-width: 900px) {
         .g3 {
           grid-template-columns: 1fr;
@@ -629,6 +693,9 @@
         }
         .nm {
           display: block;
+        }
+        .nc {
+          display: none;
         }
         .hero {
           padding: 120px 0 60px;
@@ -674,17 +741,21 @@
         >
         <button
           class="nm"
-          onclick="
-            document.querySelector('.nk').style.display =
-              document.querySelector('.nk').style.display === 'flex'
-                ? 'none'
-                : 'flex'
-          "
+          onclick="toggleMobileMenu()"
         >
           &#9776;
         </button>
       </div>
     </nav>
+    <div class="nk-mobile-overlay" onclick="toggleMobileMenu()"></div>
+    <div class="nk-mobile">
+      <a href="#modes" onclick="toggleMobileMenu()">产品形态</a>
+      <a href="#features" onclick="toggleMobileMenu()">核心能力</a>
+      <a href="#quickstart" onclick="toggleMobileMenu()">快速开始</a>
+      <a href="#compare" onclick="toggleMobileMenu()">方案对比</a>
+      <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" onclick="toggleMobileMenu()">文档</a>
+      <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" class="nc-mobile" onclick="toggleMobileMenu()">&#11088; GitHub</a>
+    </div>
 
     <section class="hero">
       <div class="ctn">
@@ -1122,6 +1193,16 @@
         { threshold: 0.1 },
       );
       document.querySelectorAll(".fin").forEach((el) => obs.observe(el));
+
+      function toggleMobileMenu() {
+        const menu = document.querySelector('.nk-mobile');
+        const overlay = document.querySelector('.nk-mobile-overlay');
+        const isActive = menu.classList.contains('active');
+        menu.classList.toggle('active');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = isActive ? '' : 'hidden';
+      }
+
       function copyCmd(btn) {
         var txt = btn.getAttribute("data-cmd");
         navigator.clipboard
