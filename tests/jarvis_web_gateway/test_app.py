@@ -3,6 +3,10 @@
 
 import json
 import os
+
+# 必须在导入 jarvis 模块之前设置环境变量，避免触发交互式配置
+os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
+
 from datetime import datetime
 from datetime import timedelta
 from unittest.mock import Mock
@@ -19,13 +23,10 @@ from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 
 # 测试用的认证 Token
 TEST_AUTH_TOKEN = "test-token-for-unit-tests"
+os.environ["JARVIS_AUTH_TOKEN"] = TEST_AUTH_TOKEN
 
 
 def create_test_client() -> TestClient:
-    # 在测试环境中跳过交互式配置
-    os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
-    # 设置认证 Token 环境变量
-    os.environ["JARVIS_AUTH_TOKEN"] = TEST_AUTH_TOKEN
     app = create_app()
     return TestClient(app)
 
