@@ -1,182 +1,1154 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jarvis AI - 让你的开发效率飞起来</title>
-<meta name="description" content="本地运行、开箱即用、可深度定制的 AI 开发助手">
-<link rel="icon" href="../images/jarvis.png" type="image/png">
-<style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0a0a0f;--bg2:#12121a;--c:rgba(255,255,255,.04);--ch:rgba(255,255,255,.08);--bd:rgba(255,255,255,.08);--bh:rgba(255,255,255,.15);--t1:#f0f0f5;--t2:#8888a0;--t3:#55556a;--ac:#6366f1;--al:#818cf8;--ag:rgba(99,102,241,.25);--gr:#34d399;--bl:#60a5fa;--or:#fb923c;--r:16px;--rs:10px}
-html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;overflow-x:hidden}
-a{color:var(--al);text-decoration:none;transition:color .2s}a:hover{color:#a5b4fc}
-.ctn{max-width:1200px;margin:0 auto;padding:0 24px}
-section{padding:100px 0;position:relative}
-.sl{display:inline-block;font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--al);margin-bottom:16px;padding:4px 14px;border:1px solid var(--ag);border-radius:20px;background:rgba(99,102,241,.08)}
-.st{font-size:clamp(28px,4vw,42px);font-weight:700;line-height:1.2;margin-bottom:16px;background:linear-gradient(135deg,#f0f0f5,#8888a0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.sd{font-size:17px;color:var(--t2);max-width:600px;margin-bottom:48px}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;backdrop-filter:blur(20px);background:rgba(10,10,15,.8);border-bottom:1px solid var(--bd)}
-nav .ctn{display:flex;align-items:center;justify-content:space-between}
-.nl{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;color:var(--t1)}.nl img{width:32px;height:32px;border-radius:8px}
-.nk{display:flex;gap:32px;list-style:none}.nk a{color:var(--t2);font-size:14px;font-weight:500}.nk a:hover{color:var(--t1)}
-.nc{padding:8px 20px;background:var(--ac);color:#fff;border-radius:8px;font-size:14px;font-weight:600;transition:all .2s}.nc:hover{background:var(--al);color:#fff}
-.nm{display:none;background:none;border:none;color:var(--t1);font-size:24px;cursor:pointer}
-.hero{padding:160px 0 100px;text-align:center;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,var(--ag),transparent 70%);pointer-events:none}
-.hb{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:var(--c);border:1px solid var(--bd);border-radius:20px;font-size:13px;color:var(--t2);margin-bottom:32px}
-.hb .dot{width:6px;height:6px;background:var(--gr);border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.15;margin-bottom:24px;background:linear-gradient(135deg,#fff,#818cf8 50%,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero>p{font-size:clamp(16px,2vw,20px);color:var(--t2);max-width:640px;margin:0 auto 40px;line-height:1.7}
-.hbs{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:64px}
-.bp{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:var(--ac);color:#fff;border-radius:12px;font-size:16px;font-weight:600;transition:all .2s}.bp:hover{background:var(--al);color:#fff;transform:translateY(-2px);box-shadow:0 8px 30px var(--ag)}
-.bs{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:var(--c);color:var(--t1);border:1px solid var(--bd);border-radius:12px;font-size:16px;font-weight:600;transition:all .2s}.bs:hover{background:var(--ch);border-color:var(--bh);transform:translateY(-2px)}
-.term{max-width:680px;margin:0 auto;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;text-align:left;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.term-h{display:flex;align-items:center;gap:8px;padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--bd)}
-.td{width:12px;height:12px;border-radius:50%}.td.r{background:#ff5f57}.td.y{background:#ffbd2e}.td.g{background:#28c840}
-.term-t{flex:1;text-align:center;font-size:12px;color:var(--t3)}
-.term-b{padding:20px;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:14px;line-height:1.8;min-height:180px}
-.tl{margin-bottom:4px}.tp{color:var(--gr)}.tc{color:var(--t1)}.to{color:var(--t2)}.th{color:var(--al)}.tt{color:var(--t3)}
-.cur{display:inline-block;width:8px;height:16px;background:var(--al);animation:blink 1s step-end infinite;vertical-align:text-bottom}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-.mc{background:var(--c);border:1px solid var(--bd);border-radius:var(--r);padding:36px 28px;transition:all .3s;position:relative;overflow:hidden}
-.mc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ac),var(--gr));opacity:0;transition:opacity .3s}
-.mc:hover{border-color:var(--bh);background:var(--ch);transform:translateY(-4px)}.mc:hover::before{opacity:1}
-.mi{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:24px;margin-bottom:20px}
-.mi.c1{background:rgba(52,211,153,.12);color:var(--gr)}.mi.c2{background:rgba(99,102,241,.12);color:var(--al)}.mi.c3{background:rgba(96,165,250,.12);color:var(--bl)}
-.mc h3{font-size:20px;font-weight:700;margin-bottom:12px}.mc>p{font-size:14px;color:var(--t2);margin-bottom:20px;line-height:1.7}
-.mc-img{width:100%;border-radius:var(--rs);border:1px solid var(--bd);margin-bottom:20px;display:block}
-.cb{background:var(--bg);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--t2);overflow-x:auto}
-.fc{background:var(--c);border:1px solid var(--bd);border-radius:var(--r);padding:32px 24px;transition:all .3s}
-.fc:hover{border-color:var(--bh);background:var(--ch);transform:translateY(-2px)}
-.fc .fi{font-size:28px;margin-bottom:16px;display:block}
-.fc h3{font-size:17px;font-weight:700;margin-bottom:8px}.fc p{font-size:14px;color:var(--t2);line-height:1.6}
-.steps{display:flex;gap:32px;justify-content:center;flex-wrap:wrap}
-.step{flex:1;min-width:260px;max-width:340px;text-align:center}
-.sn{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--al));color:#fff;font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
-.step h3{font-size:18px;font-weight:700;margin-bottom:10px}.step p{font-size:14px;color:var(--t2)}
-.sc{margin-top:16px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 16px;font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--gr);text-align:left}
-.ctw{overflow-x:auto;border:1px solid var(--bd);border-radius:var(--r)}
-.ct{width:100%;border-collapse:collapse;font-size:14px}
-.ct th{text-align:left;padding:16px 20px;background:rgba(255,255,255,.03);font-weight:600;color:var(--t2);border-bottom:1px solid var(--bd);white-space:nowrap}
-.ct td{padding:14px 20px;border-bottom:1px solid var(--bd);color:var(--t2)}
-.ct tr:last-child td{border-bottom:none}
-.ct .hl td{color:var(--t1);background:rgba(99,102,241,.05)}
-.ck{color:var(--gr);font-weight:bold}.cx{color:var(--t3)}
-.cc{background:var(--c);border:1px solid var(--bd);border-radius:var(--r);padding:36px 28px;text-align:center;transition:all .3s}
-.cc:hover{border-color:var(--bh);transform:translateY(-2px)}
-.cc h3{font-size:18px;font-weight:700;margin-bottom:8px}.cc p{font-size:14px;color:var(--t2);margin-bottom:16px}
-footer{padding:48px 0;border-top:1px solid var(--bd);text-align:center}
-.fl{display:flex;justify-content:center;gap:32px;margin-bottom:24px;flex-wrap:wrap}.fl a{color:var(--t2);font-size:14px}.fl a:hover{color:var(--t1)}
-.fcopy{font-size:13px;color:var(--t3)}
-.fin{opacity:0;transform:translateY(30px);transition:all .6s cubic-bezier(.16,1,.3,1)}.fin.vis{opacity:1;transform:translateY(0)}
-.copy-wrap{position:relative}.copy-btn{position:absolute;top:8px;right:8px;padding:4px 10px;background:rgba(255,255,255,.1);border:1px solid var(--bd);border-radius:6px;color:var(--t2);font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;z-index:1}.copy-btn:hover{background:rgba(255,255,255,.18);color:var(--t1)}.copy-btn.copied{background:rgba(52,211,153,.15);color:var(--gr);border-color:rgba(52,211,153,.3)}
-@media(max-width:900px){.g3{grid-template-columns:1fr}.steps{flex-direction:column;align-items:center}.nk{display:none}.nm{display:block}.hero{padding:120px 0 60px}section{padding:60px 0}}
-@media(max-width:600px){.hbs{flex-direction:column;align-items:center}.term{margin:0 -12px;border-radius:12px}}
-</style>
-</head>
-<body>
-<nav><div class="ctn">
-<a href="#" class="nl"><img src="../images/jarvis.png" alt="Jarvis"><span>Jarvis AI</span></a>
-<ul class="nk"><li><a href="#modes">产品形态</a></li><li><a href="#features">核心能力</a></li><li><a href="#quickstart">快速开始</a></li><li><a href="#compare">方案对比</a></li><li><a href="https://github.com/skyfireitdiy/Jarvis" target="_blank">文档</a></li></ul>
-<a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" class="nc">&#11088; GitHub</a>
-<button class="nm" onclick="document.querySelector('.nk').style.display=document.querySelector('.nk').style.display==='flex'?'none':'flex'">&#9776;</button>
-</div></nav>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jarvis AI - 让你的开发效率飞起来</title>
+    <meta
+      name="description"
+      content="本地运行、开箱即用、可深度定制的 AI 开发助手"
+    />
+    <link rel="icon" href="jarvis.png" type="image/png" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --bg: #0a0a0f;
+        --bg2: #12121a;
+        --c: rgba(255, 255, 255, 0.04);
+        --ch: rgba(255, 255, 255, 0.08);
+        --bd: rgba(255, 255, 255, 0.08);
+        --bh: rgba(255, 255, 255, 0.15);
+        --t1: #f0f0f5;
+        --t2: #8888a0;
+        --t3: #55556a;
+        --ac: #6366f1;
+        --al: #818cf8;
+        --ag: rgba(99, 102, 241, 0.25);
+        --gr: #34d399;
+        --bl: #60a5fa;
+        --or: #fb923c;
+        --r: 16px;
+        --rs: 10px;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--t1);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+      a {
+        color: var(--al);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      a:hover {
+        color: #a5b4fc;
+      }
+      .ctn {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      section {
+        padding: 100px 0;
+        position: relative;
+      }
+      .sl {
+        display: inline-block;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--al);
+        margin-bottom: 16px;
+        padding: 4px 14px;
+        border: 1px solid var(--ag);
+        border-radius: 20px;
+        background: rgba(99, 102, 241, 0.08);
+      }
+      .st {
+        font-size: clamp(28px, 4vw, 42px);
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 16px;
+        background: linear-gradient(135deg, #f0f0f5, #8888a0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .sd {
+        font-size: 17px;
+        color: var(--t2);
+        max-width: 600px;
+        margin-bottom: 48px;
+      }
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 16px 0;
+        backdrop-filter: blur(20px);
+        background: rgba(10, 10, 15, 0.8);
+        border-bottom: 1px solid var(--bd);
+      }
+      nav .ctn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--t1);
+      }
+      .nl img {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+      }
+      .nk {
+        display: flex;
+        gap: 32px;
+        list-style: none;
+      }
+      .nk a {
+        color: var(--t2);
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .nk a:hover {
+        color: var(--t1);
+      }
+      .nc {
+        padding: 8px 20px;
+        background: var(--ac);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .nc:hover {
+        background: var(--al);
+        color: #fff;
+      }
+      .nm {
+        display: none;
+        background: none;
+        border: none;
+        color: var(--t1);
+        font-size: 24px;
+        cursor: pointer;
+      }
+      .hero {
+        padding: 160px 0 100px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -200px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 800px;
+        background: radial-gradient(circle, var(--ag), transparent 70%);
+        pointer-events: none;
+      }
+      .hb {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        background: var(--c);
+        border: 1px solid var(--bd);
+        border-radius: 20px;
+        font-size: 13px;
+        color: var(--t2);
+        margin-bottom: 32px;
+      }
+      .hb .dot {
+        width: 6px;
+        height: 6px;
+        background: var(--gr);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .hero h1 {
+        font-size: clamp(36px, 6vw, 64px);
+        font-weight: 800;
+        line-height: 1.15;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, #fff, #818cf8 50%, #34d399);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero > p {
+        font-size: clamp(16px, 2vw, 20px);
+        color: var(--t2);
+        max-width: 640px;
+        margin: 0 auto 40px;
+        line-height: 1.7;
+      }
+      .hbs {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 64px;
+      }
+      .bp {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 32px;
+        background: var(--ac);
+        color: #fff;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .bp:hover {
+        background: var(--al);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px var(--ag);
+      }
+      .bs {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 32px;
+        background: var(--c);
+        color: var(--t1);
+        border: 1px solid var(--bd);
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .bs:hover {
+        background: var(--ch);
+        border-color: var(--bh);
+        transform: translateY(-2px);
+      }
+      .term {
+        max-width: 680px;
+        margin: 0 auto;
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        border-radius: var(--r);
+        overflow: hidden;
+        text-align: left;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      .term-h {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid var(--bd);
+      }
+      .td {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .td.r {
+        background: #ff5f57;
+      }
+      .td.y {
+        background: #ffbd2e;
+      }
+      .td.g {
+        background: #28c840;
+      }
+      .term-t {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        color: var(--t3);
+      }
+      .term-b {
+        padding: 20px;
+        font-family: "SF Mono", "Fira Code", Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.8;
+        min-height: 180px;
+      }
+      .tl {
+        margin-bottom: 4px;
+      }
+      .tp {
+        color: var(--gr);
+      }
+      .tc {
+        color: var(--t1);
+      }
+      .to {
+        color: var(--t2);
+      }
+      .th {
+        color: var(--al);
+      }
+      .tt {
+        color: var(--t3);
+      }
+      .cur {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        background: var(--al);
+        animation: blink 1s step-end infinite;
+        vertical-align: text-bottom;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
+      .g3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      .mc {
+        background: var(--c);
+        border: 1px solid var(--bd);
+        border-radius: var(--r);
+        padding: 36px 28px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+      .mc::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--ac), var(--gr));
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .mc:hover {
+        border-color: var(--bh);
+        background: var(--ch);
+        transform: translateY(-4px);
+      }
+      .mc:hover::before {
+        opacity: 1;
+      }
+      .mi {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+      .mi.c1 {
+        background: rgba(52, 211, 153, 0.12);
+        color: var(--gr);
+      }
+      .mi.c2 {
+        background: rgba(99, 102, 241, 0.12);
+        color: var(--al);
+      }
+      .mi.c3 {
+        background: rgba(96, 165, 250, 0.12);
+        color: var(--bl);
+      }
+      .mc h3 {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .mc > p {
+        font-size: 14px;
+        color: var(--t2);
+        margin-bottom: 20px;
+        line-height: 1.7;
+      }
+      .mc-img {
+        width: 100%;
+        border-radius: var(--rs);
+        border: 1px solid var(--bd);
+        margin-bottom: 20px;
+        display: block;
+      }
+      .cb {
+        background: var(--bg);
+        border: 1px solid var(--bd);
+        border-radius: var(--rs);
+        padding: 14px 16px;
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 13px;
+        color: var(--t2);
+        overflow-x: auto;
+      }
+      .fc {
+        background: var(--c);
+        border: 1px solid var(--bd);
+        border-radius: var(--r);
+        padding: 32px 24px;
+        transition: all 0.3s;
+      }
+      .fc:hover {
+        border-color: var(--bh);
+        background: var(--ch);
+        transform: translateY(-2px);
+      }
+      .fc .fi {
+        font-size: 28px;
+        margin-bottom: 16px;
+        display: block;
+      }
+      .fc h3 {
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .fc p {
+        font-size: 14px;
+        color: var(--t2);
+        line-height: 1.6;
+      }
+      .steps {
+        display: flex;
+        gap: 32px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .step {
+        flex: 1;
+        min-width: 260px;
+        max-width: 340px;
+        text-align: center;
+      }
+      .sn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--ac), var(--al));
+        color: #fff;
+        font-size: 20px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+      }
+      .step h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .step p {
+        font-size: 14px;
+        color: var(--t2);
+      }
+      .sc {
+        margin-top: 16px;
+        background: var(--bg2);
+        border: 1px solid var(--bd);
+        border-radius: var(--rs);
+        padding: 12px 16px;
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 13px;
+        color: var(--gr);
+        text-align: left;
+      }
+      .ctw {
+        overflow-x: auto;
+        border: 1px solid var(--bd);
+        border-radius: var(--r);
+      }
+      .ct {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .ct th {
+        text-align: left;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        font-weight: 600;
+        color: var(--t2);
+        border-bottom: 1px solid var(--bd);
+        white-space: nowrap;
+      }
+      .ct td {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--bd);
+        color: var(--t2);
+      }
+      .ct tr:last-child td {
+        border-bottom: none;
+      }
+      .ct .hl td {
+        color: var(--t1);
+        background: rgba(99, 102, 241, 0.05);
+      }
+      .ck {
+        color: var(--gr);
+        font-weight: bold;
+      }
+      .cx {
+        color: var(--t3);
+      }
+      .cc {
+        background: var(--c);
+        border: 1px solid var(--bd);
+        border-radius: var(--r);
+        padding: 36px 28px;
+        text-align: center;
+        transition: all 0.3s;
+      }
+      .cc:hover {
+        border-color: var(--bh);
+        transform: translateY(-2px);
+      }
+      .cc h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .cc p {
+        font-size: 14px;
+        color: var(--t2);
+        margin-bottom: 16px;
+      }
+      footer {
+        padding: 48px 0;
+        border-top: 1px solid var(--bd);
+        text-align: center;
+      }
+      .fl {
+        display: flex;
+        justify-content: center;
+        gap: 32px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .fl a {
+        color: var(--t2);
+        font-size: 14px;
+      }
+      .fl a:hover {
+        color: var(--t1);
+      }
+      .fcopy {
+        font-size: 13px;
+        color: var(--t3);
+      }
+      .fin {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .fin.vis {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .copy-wrap {
+        position: relative;
+      }
+      .copy-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 4px 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--bd);
+        border-radius: 6px;
+        color: var(--t2);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+        z-index: 1;
+      }
+      .copy-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        color: var(--t1);
+      }
+      .copy-btn.copied {
+        background: rgba(52, 211, 153, 0.15);
+        color: var(--gr);
+        border-color: rgba(52, 211, 153, 0.3);
+      }
+      @media (max-width: 900px) {
+        .g3 {
+          grid-template-columns: 1fr;
+        }
+        .steps {
+          flex-direction: column;
+          align-items: center;
+        }
+        .nk {
+          display: none;
+        }
+        .nm {
+          display: block;
+        }
+        .hero {
+          padding: 120px 0 60px;
+        }
+        section {
+          padding: 60px 0;
+        }
+      }
+      @media (max-width: 600px) {
+        .hbs {
+          flex-direction: column;
+          align-items: center;
+        }
+        .term {
+          margin: 0 -12px;
+          border-radius: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="ctn">
+        <a href="#" class="nl"
+          ><img src="jarvis.png" alt="Jarvis" /><span>Jarvis AI</span></a
+        >
+        <ul class="nk">
+          <li><a href="#modes">产品形态</a></li>
+          <li><a href="#features">核心能力</a></li>
+          <li><a href="#quickstart">快速开始</a></li>
+          <li><a href="#compare">方案对比</a></li>
+          <li>
+            <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank"
+              >文档</a
+            >
+          </li>
+        </ul>
+        <a
+          href="https://github.com/skyfireitdiy/Jarvis"
+          target="_blank"
+          class="nc"
+          >&#11088; GitHub</a
+        >
+        <button
+          class="nm"
+          onclick="
+            document.querySelector('.nk').style.display =
+              document.querySelector('.nk').style.display === 'flex'
+                ? 'none'
+                : 'flex'
+          "
+        >
+          &#9776;
+        </button>
+      </div>
+    </nav>
 
-<section class="hero"><div class="ctn">
-<div class="hb"><span class="dot"></span><span>开源 · MIT 协议 · 活跃开发中</span></div>
-<h1>像钢铁侠的 Jarvis 一样<br>让你的开发效率飞起来</h1>
-<p>本地运行、开箱即用、可深度定制的 AI 开发助手。<br>写代码、做审查、跑自动化、做安全分析，一个命令搞定。</p>
-<div class="hbs">
-<a href="https://github.com/skyfireitdiy/Jarvis#-快速开始" target="_blank" class="bp">&#128640; 快速开始</a>
-<a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" class="bs"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"/></svg> GitHub</a>
-</div>
-<div class="term">
-<div class="term-h"><span class="td r"></span><span class="td y"></span><span class="td g"></span><span class="term-t">Terminal — jarvis</span></div>
-<div class="term-b copy-wrap">
-<button class="copy-btn" data-cmd='bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"' onclick="copyCmd(this)">复制</button>
-<div class="tl"><span class="tp">$ </span><span class="tc">bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"</span></div>
-<div class="tl"><span class="to">✓ 安装完成 · jarvis-ai-assistant 已就绪</span></div>
-<div class="tl"><br></div>
-<div class="tl"><span class="tp">$ </span><span class="tc">jca</span><span class="tt">  # 启动 Code Agent</span></div>
-<div class="tl"><span class="th">🤖 Jarvis Code Agent 已就绪</span></div>
-<div class="tl"><span class="to">已加载 23 个工具 · 记忆系统就绪 · 规则引擎就绪</span></div>
-<div class="tl"><span class="tp">You: </span><span class="tc">帮我重构这个模块并添加单元测试</span><span class="cur"></span></div>
-</div></div>
-</div></section>
+    <section class="hero">
+      <div class="ctn">
+        <div class="hb">
+          <span class="dot"></span><span>开源 · MIT 协议 · 活跃开发中</span>
+        </div>
+        <h1>像钢铁侠的 Jarvis 一样<br />让你的开发效率飞起来</h1>
+        <p>
+          本地运行、开箱即用、可深度定制的 AI 开发助手。<br />写代码、做审查、跑自动化、做安全分析，一个命令搞定。
+        </p>
+        <div class="hbs">
+          <a
+            href="https://github.com/skyfireitdiy/Jarvis#-快速开始"
+            target="_blank"
+            class="bp"
+            >&#128640; 快速开始</a
+          >
+          <a
+            href="https://github.com/skyfireitdiy/Jarvis"
+            target="_blank"
+            class="bs"
+            ><svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path
+                d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"
+              />
+            </svg>
+            GitHub</a
+          >
+        </div>
+        <div class="term">
+          <div class="term-h">
+            <span class="td r"></span><span class="td y"></span
+            ><span class="td g"></span
+            ><span class="term-t">Terminal — jarvis</span>
+          </div>
+          <div class="term-b copy-wrap">
+            <button
+              class="copy-btn"
+              data-cmd='bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"'
+              onclick="copyCmd(this)"
+            >
+              复制
+            </button>
+            <div class="tl">
+              <span class="tp">$ </span
+              ><span class="tc"
+                >bash -c "$(curl -fsSL
+                https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"</span
+              >
+            </div>
+            <div class="tl">
+              <span class="to">✓ 安装完成 · jarvis-ai-assistant 已就绪</span>
+            </div>
+            <div class="tl"><br /></div>
+            <div class="tl">
+              <span class="tp">$ </span><span class="tc">jca</span
+              ><span class="tt"> # 启动 Code Agent</span>
+            </div>
+            <div class="tl">
+              <span class="th">🤖 Jarvis Code Agent 已就绪</span>
+            </div>
+            <div class="tl">
+              <span class="to"
+                >已加载 23 个工具 · 记忆系统就绪 · 规则引擎就绪</span
+              >
+            </div>
+            <div class="tl">
+              <span class="tp">You: </span
+              ><span class="tc">帮我重构这个模块并添加单元测试</span
+              ><span class="cur"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<section id="modes"><div class="ctn">
-<div class="fin"><span class="sl">产品形态</span><h2 class="st">三种形态，一致体验</h2><p class="sd">无论你偏爱命令行的高效、Web 的直观，还是 IDE 的集成体验，Jarvis 都能无缝融入你的工作流。</p></div>
-<div class="g3 fin">
-<div class="mc"><div class="mi c1">⌨️</div><h3>CLI 命令行</h3><p>极客首选。一条命令启动，支持交互式对话、管道组合、脚本集成，适合追求效率的开发者。</p><img class="mc-img" src="../images/screenshot-cli.png" alt="CLI 命令行截图"><div class="cb"><div><span style="color:var(--gr)">$</span> <span style="color:var(--t1)">jca</span> <span style="color:var(--t3)"># Code Agent</span></div><div><span style="color:var(--gr)">$</span> <span style="color:var(--t1)">jvs</span> <span style="color:var(--t3)"># 通用 Agent</span></div><div><span style="color:var(--gr)">$</span> <span style="color:var(--t1)">jcad</span> <span style="color:var(--t3)"># 守护进程</span></div></div></div>
-<div class="mc"><div class="mi c2">🌐</div><h3>Web 界面</h3><p>可视化操作。浏览器即开即用，多会话管理、实时终端、文件浏览，支持多节点分布式协作。</p><img class="mc-img" src="../images/screenshot-web.png" alt="Web 界面截图"><div class="cb"><div><span style="color:var(--gr)">$</span> <span style="color:var(--t1)">./start.sh</span></div><div style="color:var(--t3)">→ http://localhost:8000</div></div></div>
-<div class="mc"><div class="mi c3">💎</div><h3>VS Code 扩展</h3><p>深度集成。在编辑器中直接与 AI 对话，代码上下文自动感知，无需切换窗口。</p><img class="mc-img" src="../images/screenshot-vscode.png" alt="VS Code 扩展截图"><div class="cb"><div style="color:var(--t3)">VS Code 侧边栏</div><div style="color:var(--t3)">→ Jarvis 面板</div><div style="color:var(--t3)">→ 创建 Agent 开始协作</div></div></div>
-</div></div></section>
+    <section id="modes">
+      <div class="ctn">
+        <div class="fin">
+          <span class="sl">产品形态</span>
+          <h2 class="st">三种形态，一致体验</h2>
+          <p class="sd">
+            无论你偏爱命令行的高效、Web 的直观，还是 IDE 的集成体验，Jarvis
+            都能无缝融入你的工作流。
+          </p>
+        </div>
+        <div class="g3 fin">
+          <div class="mc">
+            <div class="mi c1">⌨️</div>
+            <h3>CLI 命令行</h3>
+            <p>
+              极客首选。一条命令启动，支持交互式对话、管道组合、脚本集成，适合追求效率的开发者。
+            </p>
+            <img
+              class="mc-img"
+              src="../images/screenshot-cli.png"
+              alt="CLI 命令行截图"
+            />
+            <div class="cb">
+              <div>
+                <span style="color: var(--gr)">$</span>
+                <span style="color: var(--t1)">jca</span>
+                <span style="color: var(--t3)"># Code Agent</span>
+              </div>
+              <div>
+                <span style="color: var(--gr)">$</span>
+                <span style="color: var(--t1)">jvs</span>
+                <span style="color: var(--t3)"># 通用 Agent</span>
+              </div>
+              <div>
+                <span style="color: var(--gr)">$</span>
+                <span style="color: var(--t1)">jcad</span>
+                <span style="color: var(--t3)"># 守护进程</span>
+              </div>
+            </div>
+          </div>
+          <div class="mc">
+            <div class="mi c2">🌐</div>
+            <h3>Web 界面</h3>
+            <p>
+              可视化操作。浏览器即开即用，多会话管理、实时终端、文件浏览，支持多节点分布式协作。
+            </p>
+            <img
+              class="mc-img"
+              src="../images/screenshot-web.png"
+              alt="Web 界面截图"
+            />
+            <div class="cb">
+              <div>
+                <span style="color: var(--gr)">$</span>
+                <span style="color: var(--t1)">./start.sh</span>
+              </div>
+              <div style="color: var(--t3)">→ http://localhost:8000</div>
+            </div>
+          </div>
+          <div class="mc">
+            <div class="mi c3">💎</div>
+            <h3>VS Code 扩展</h3>
+            <p>
+              深度集成。在编辑器中直接与 AI
+              对话，代码上下文自动感知，无需切换窗口。
+            </p>
+            <img
+              class="mc-img"
+              src="../images/screenshot-vscode.png"
+              alt="VS Code 扩展截图"
+            />
+            <div class="cb">
+              <div style="color: var(--t3)">VS Code 侧边栏</div>
+              <div style="color: var(--t3)">→ Jarvis 面板</div>
+              <div style="color: var(--t3)">→ 创建 Agent 开始协作</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<section id="features" style="background:var(--bg2)"><div class="ctn">
-<div class="fin"><span class="sl">核心能力</span><h2 class="st">不只是聊天，而是真正能动手</h2><p class="sd">从代码分析到自动验证，从记忆管理到工具自举，覆盖开发全流程。</p></div>
-<div class="g3 fin">
-<div class="fc"><span class="fi">💻</span><h3>代码优先</h3><p>自动 Git、构建验证、静态检查、波及分析、交叉引用，专为代码开发设计。</p></div>
-<div class="fc"><span class="fi">🧠</span><h3>越用越聪明</h3><p>方法论自动沉淀，记忆分层管理（短期/项目/全局），规则按需加载，经验可复用。</p></div>
-<div class="fc"><span class="fi">🔒</span><h3>本地可控</h3><p>数据留在本机，支持多种 LLM 后端，无 vendor lock-in，你的代码你做主。</p></div>
-<div class="fc"><span class="fi">🔌</span><h3>高度可扩展</h3><p>自定义工具、MCP 集成、元代理自举、新平台适配，想加就加。</p></div>
-<div class="fc"><span class="fi">👥</span><h3>人机协作</h3><p>执行前确认、虚拟终端、关键节点可介入，确保过程透明可控。</p></div>
-<div class="fc"><span class="fi">⛈️</span><h3>多平台支持</h3><p>Linux / Windows / macOS，支持 Docker 部署，CLI / Web / VSCode 三端覆盖。</p></div>
-</div></div></section>
+    <section id="features" style="background: var(--bg2)">
+      <div class="ctn">
+        <div class="fin">
+          <span class="sl">核心能力</span>
+          <h2 class="st">不只是聊天，而是真正能动手</h2>
+          <p class="sd">
+            从代码分析到自动验证，从记忆管理到工具自举，覆盖开发全流程。
+          </p>
+        </div>
+        <div class="g3 fin">
+          <div class="fc">
+            <span class="fi">💻</span>
+            <h3>代码优先</h3>
+            <p>
+              自动
+              Git、构建验证、静态检查、波及分析、交叉引用，专为代码开发设计。
+            </p>
+          </div>
+          <div class="fc">
+            <span class="fi">🧠</span>
+            <h3>越用越聪明</h3>
+            <p>
+              方法论自动沉淀，记忆分层管理（短期/项目/全局），规则按需加载，经验可复用。
+            </p>
+          </div>
+          <div class="fc">
+            <span class="fi">🔒</span>
+            <h3>本地可控</h3>
+            <p>
+              数据留在本机，支持多种 LLM 后端，无 vendor
+              lock-in，你的代码你做主。
+            </p>
+          </div>
+          <div class="fc">
+            <span class="fi">🔌</span>
+            <h3>高度可扩展</h3>
+            <p>自定义工具、MCP 集成、元代理自举、新平台适配，想加就加。</p>
+          </div>
+          <div class="fc">
+            <span class="fi">👥</span>
+            <h3>人机协作</h3>
+            <p>执行前确认、虚拟终端、关键节点可介入，确保过程透明可控。</p>
+          </div>
+          <div class="fc">
+            <span class="fi">⛈️</span>
+            <h3>多平台支持</h3>
+            <p>
+              Linux / Windows / macOS，支持 Docker 部署，CLI / Web / VSCode
+              三端覆盖。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<section id="quickstart"><div class="ctn">
-<div class="fin" style="text-align:center"><span class="sl">快速开始</span><h2 class="st">30 秒上手</h2><p class="sd" style="margin:0 auto 48px">安装后运行一条命令，即可开始与 AI 协作开发。</p></div>
-<div class="steps fin">
-<div class="step"><div class="sn">1</div><h3>安装</h3><p>一键安装，自动配置环境</p><div class="sc copy-wrap"><button class="copy-btn" data-cmd='bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"' onclick="copyCmd(this)">复制</button><span style="color:var(--t3)"># Linux/macOS</span>
-bash -c "$(curl -fsSL https://...install.sh)"
-<span style="color:var(--t3)"># Windows PowerShell</span>
-iex (New-Object Net.WebClient).DownloadString(...)</div></div>
-<div class="step"><div class="sn">2</div><h3>配置</h3><p>首次运行按提示配置 API Key</p><div class="sc">jvs  <span style="color:var(--t3)"># 按提示配置</span></div></div>
-<div class="step"><div class="sn">3</div><h3>开始协作</h3><p>选择 Agent 模式，开始开发</p><div class="sc">jca  <span style="color:var(--t3)"># Code Agent</span></div></div>
-</div></div></section>
+    <section id="quickstart">
+      <div class="ctn">
+        <div class="fin" style="text-align: center">
+          <span class="sl">快速开始</span>
+          <h2 class="st">30 秒上手</h2>
+          <p class="sd" style="margin: 0 auto 48px">
+            安装后运行一条命令，即可开始与 AI 协作开发。
+          </p>
+        </div>
+        <div class="steps fin">
+          <div class="step">
+            <div class="sn">1</div>
+            <h3>安装</h3>
+            <p>一键安装，自动配置环境</p>
+            <div class="sc copy-wrap">
+              <button
+                class="copy-btn"
+                data-cmd='bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"'
+                onclick="copyCmd(this)"
+              >
+                复制</button
+              ><span style="color: var(--t3)"># Linux/macOS</span>
+              bash -c "$(curl -fsSL https://...install.sh)"
+              <span style="color: var(--t3)"># Windows PowerShell</span>
+              iex (New-Object Net.WebClient).DownloadString(...)
+            </div>
+          </div>
+          <div class="step">
+            <div class="sn">2</div>
+            <h3>配置</h3>
+            <p>首次运行按提示配置 API Key</p>
+            <div class="sc">
+              jvs <span style="color: var(--t3)"># 按提示配置</span>
+            </div>
+          </div>
+          <div class="step">
+            <div class="sn">3</div>
+            <h3>开始协作</h3>
+            <p>选择 Agent 模式，开始开发</p>
+            <div class="sc">
+              jca <span style="color: var(--t3)"># Code Agent</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<section id="compare" style="background:var(--bg2)"><div class="ctn">
-<div class="fin"><span class="sl">方案对比</span><h2 class="st">为什么选择 Jarvis？</h2><p class="sd">与主流方案的客观对比。</p></div>
-<div class="ctw fin"><table class="ct">
-<thead><tr><th>特性</th><th>Jarvis</th><th>LangChain</th><th>AutoGPT</th><th>Cursor</th></tr></thead>
-<tbody>
-<tr class="hl"><td>定位</td><td>AI 开发助手</td><td>LLM 框架</td><td>自主 Agent</td><td>AI 编辑器</td></tr>
-<tr><td>本地化运行</td><td class="ck">✔</td><td class="ck">✔</td><td class="ck">✔</td><td class="cx">✘</td></tr>
-<tr><td>代码开发专项</td><td class="ck">✔</td><td class="cx">✘</td><td class="cx">✘</td><td class="ck">✔</td></tr>
-<tr><td>自动 Git 管理</td><td class="ck">✔</td><td class="cx">✘</td><td class="cx">✘</td><td class="cx">✘</td></tr>
-<tr><td>方法论沉淀</td><td class="ck">✔</td><td class="cx">✘</td><td class="cx">✘</td><td class="cx">✘</td></tr>
-<tr><td>记忆系统</td><td class="ck">✔</td><td class="ck">✔</td><td class="ck">✔</td><td class="cx">✘</td></tr>
-<tr><td>工具自举</td><td class="ck">✔</td><td class="cx">✘</td><td class="cx">✘</td><td class="cx">✘</td></tr>
-<tr><td>多端支持</td><td>CLI/Web/VSCode</td><td>Python SDK</td><td>Web</td><td>桌面 App</td></tr>
-<tr><td>开源协议</td><td>MIT</td><td>MIT</td><td>MIT</td><td>商业</td></tr>
-</tbody></table></div>
-</div></section>
+    <section id="compare" style="background: var(--bg2)">
+      <div class="ctn">
+        <div class="fin">
+          <span class="sl">方案对比</span>
+          <h2 class="st">为什么选择 Jarvis？</h2>
+          <p class="sd">与主流方案的客观对比。</p>
+        </div>
+        <div class="ctw fin">
+          <table class="ct">
+            <thead>
+              <tr>
+                <th>特性</th>
+                <th>Jarvis</th>
+                <th>LangChain</th>
+                <th>AutoGPT</th>
+                <th>Cursor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="hl">
+                <td>定位</td>
+                <td>AI 开发助手</td>
+                <td>LLM 框架</td>
+                <td>自主 Agent</td>
+                <td>AI 编辑器</td>
+              </tr>
+              <tr>
+                <td>本地化运行</td>
+                <td class="ck">✔</td>
+                <td class="ck">✔</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+              </tr>
+              <tr>
+                <td>代码开发专项</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+                <td class="ck">✔</td>
+              </tr>
+              <tr>
+                <td>自动 Git 管理</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+              </tr>
+              <tr>
+                <td>方法论沉淀</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+              </tr>
+              <tr>
+                <td>记忆系统</td>
+                <td class="ck">✔</td>
+                <td class="ck">✔</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+              </tr>
+              <tr>
+                <td>工具自举</td>
+                <td class="ck">✔</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+                <td class="cx">✘</td>
+              </tr>
+              <tr>
+                <td>多端支持</td>
+                <td>CLI/Web/VSCode</td>
+                <td>Python SDK</td>
+                <td>Web</td>
+                <td>桌面 App</td>
+              </tr>
+              <tr>
+                <td>开源协议</td>
+                <td>MIT</td>
+                <td>MIT</td>
+                <td>MIT</td>
+                <td>商业</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
-<section id="community"><div class="ctn">
-<div class="fin" style="text-align:center"><span class="sl">社区</span><h2 class="st">加入我们</h2><p class="sd" style="margin:0 auto 48px">Jarvis 是一个开源项目，欢迎参与贡献和交流。</p></div>
-<div class="g3 fin">
-<div class="cc"><span style="font-size:36px;display:block;margin-bottom:16px">⭐</span><h3>GitHub</h3><p>查看源码、提交 Issue、参与讨论</p><a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" class="bp" style="font-size:14px;padding:10px 24px">访问仓库</a></div>
-<div class="cc"><span style="font-size:36px;display:block;margin-bottom:16px">📖</span><h3>文档中心</h3><p>完整的用户手册和最佳实践</p><a href="https://github.com/skyfireitdiy/Jarvis/tree/main/docs" target="_blank" class="bp" style="font-size:14px;padding:10px 24px">查看文档</a></div>
-<div class="cc"><span style="font-size:36px;display:block;margin-bottom:16px">💬</span><h3>微信交流群</h3><p>扫码加入开发者社区</p><a href="../images/wechat.png" target="_blank" class="bp" style="font-size:14px;padding:10px 24px">扫码加入</a></div>
-</div></div></section>
+    <section id="community">
+      <div class="ctn">
+        <div class="fin" style="text-align: center">
+          <span class="sl">社区</span>
+          <h2 class="st">加入我们</h2>
+          <p class="sd" style="margin: 0 auto 48px">
+            Jarvis 是一个开源项目，欢迎参与贡献和交流。
+          </p>
+        </div>
+        <div class="g3 fin">
+          <div class="cc">
+            <span style="font-size: 36px; display: block; margin-bottom: 16px"
+              >⭐</span
+            >
+            <h3>GitHub</h3>
+            <p>查看源码、提交 Issue、参与讨论</p>
+            <a
+              href="https://github.com/skyfireitdiy/Jarvis"
+              target="_blank"
+              class="bp"
+              style="font-size: 14px; padding: 10px 24px"
+              >访问仓库</a
+            >
+          </div>
+          <div class="cc">
+            <span style="font-size: 36px; display: block; margin-bottom: 16px"
+              >📖</span
+            >
+            <h3>文档中心</h3>
+            <p>完整的用户手册和最佳实践</p>
+            <a
+              href="https://github.com/skyfireitdiy/Jarvis/tree/main/docs"
+              target="_blank"
+              class="bp"
+              style="font-size: 14px; padding: 10px 24px"
+              >查看文档</a
+            >
+          </div>
+          <div class="cc">
+            <span style="font-size: 36px; display: block; margin-bottom: 16px"
+              >💬</span
+            >
+            <h3>微信交流群</h3>
+            <p>扫码加入开发者社区</p>
+            <a
+              href="wechat.png"
+              target="_blank"
+              class="bp"
+              style="font-size: 14px; padding: 10px 24px"
+              >扫码加入</a
+            >
+          </div>
+        </div>
+      </div>
+    </section>
 
-<footer><div class="ctn">
-<div class="fl">
-<a href="https://github.com/skyfireitdiy/Jarvis">GitHub</a>
-<a href="https://github.com/skyfireitdiy/Jarvis/tree/main/docs">文档</a>
-<a href="https://github.com/skyfireitdiy/Jarvis/issues">反馈</a>
-<a href="https://github.com/skyfireitdiy/Jarvis/blob/main/LICENSE">MIT License</a>
-</div>
-<p class="fcopy">© 2024 Jarvis AI. Built with ❤️ for developers.</p>
-</div></footer>
+    <footer>
+      <div class="ctn">
+        <div class="fl">
+          <a href="https://github.com/skyfireitdiy/Jarvis">GitHub</a>
+          <a href="https://github.com/skyfireitdiy/Jarvis/tree/main/docs"
+            >文档</a
+          >
+          <a href="https://github.com/skyfireitdiy/Jarvis/issues">反馈</a>
+          <a href="https://github.com/skyfireitdiy/Jarvis/blob/main/LICENSE"
+            >MIT License</a
+          >
+        </div>
+        <p class="fcopy">© 2024 Jarvis AI. Built with ❤️ for developers.</p>
+      </div>
+    </footer>
 
-<script>
-const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('vis');obs.unobserve(e.target)}})},{threshold:0.1});
-document.querySelectorAll('.fin').forEach(el=>obs.observe(el));
-function copyCmd(btn){var txt=btn.getAttribute('data-cmd');navigator.clipboard.writeText(txt).then(()=>{btn.textContent='已复制 ✓';btn.classList.add('copied');setTimeout(()=>{btn.textContent='复制';btn.classList.remove('copied')},2000)}).catch(()=>{var t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);btn.textContent='已复制 ✓';btn.classList.add('copied');setTimeout(()=>{btn.textContent='复制';btn.classList.remove('copied')},2000)})}
-</script>
-</body>
+    <script>
+      const obs = new IntersectionObserver(
+        (es) => {
+          es.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add("vis");
+              obs.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+      document.querySelectorAll(".fin").forEach((el) => obs.observe(el));
+      function copyCmd(btn) {
+        var txt = btn.getAttribute("data-cmd");
+        navigator.clipboard
+          .writeText(txt)
+          .then(() => {
+            btn.textContent = "已复制 ✓";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.textContent = "复制";
+              btn.classList.remove("copied");
+            }, 2000);
+          })
+          .catch(() => {
+            var t = document.createElement("textarea");
+            t.value = txt;
+            document.body.appendChild(t);
+            t.select();
+            document.execCommand("copy");
+            document.body.removeChild(t);
+            btn.textContent = "已复制 ✓";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.textContent = "复制";
+              btn.classList.remove("copied");
+            }, 2000);
+          });
+      }
+    </script>
+  </body>
 </html>
