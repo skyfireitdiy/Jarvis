@@ -198,14 +198,32 @@ jgc
 Jarvis 除了 CLI 之外，还支持通过 **Web Gateway** 对外提供浏览器和本地客户端访问入口。
 
 - 单节点使用时，可直接启动 `jwg`，再在浏览器中连接该网关
-- 多节点部署时，可通过 `--node master` / `--node child` 让多个 Gateway 组成主子节点结构
+- 多节点部署时，可通过 `--node-mode master` / `--node-mode child` 让多个 Gateway 组成主子节点结构
 - 在 node 模式下，客户端仍然只连接主节点，但可以按 `node_id` 创建 Agent，并由主节点把 HTTP / WebSocket 流量转发到目标子节点
 - Web 前端与 VSCode 插件都已支持展示 Agent 所属节点，并在创建 Agent 时选择目标节点
+
+### 分布式网关快速部署
+
+**启动主节点**：
+
+```bash
+jwg --node-mode master --host 0.0.0.0 --port 8000 --gateway-password your_password
+```
+
+**启动子节点**：
+
+```bash
+jwg --node-mode child \
+    --node-id worker-01 \
+    --master-url ws://master-host:8000 \
+    --node-secret your_secret_key
+```
 
 推荐阅读：
 
 - [Web 界面与网关用户手册](docs/用户手册/04_web_界面与网关/)
 - [VSCode 插件用户手册](docs/用户手册/07_VSCode_插件/)
+- [分布式网关部署方法](docs/用户手册/04_web_界面与网关/分布式网关部署方法.md) - 完整的分布式部署指南，包括 Docker、systemd 等生产环境部署方案
 - [Node 模式部署与联调手册](docs/用户手册/04_web_界面与网关/Node_模式部署与联调手册.md)
 
 ---
