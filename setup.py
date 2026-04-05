@@ -27,7 +27,7 @@ class PostInstallCommand(install):
 
 setup(
     name="jarvis-ai-assistant",
-    version="2.0.31",
+    version="3.0.0",
     author="skyfire",
     author_email="skyfireitdiy@hotmail.com",
     description="An AI assistant that uses various tools to interact with the system",
