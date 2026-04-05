@@ -13,39 +13,6 @@ Jarvis AI Assistant 是一个强大的 VS Code 扩展，为开发者提供智能
 - 🎨 **Markdown 渲染**：支持完整的 Markdown 渲染，包括代码高亮
 - 📊 **PlantUML 支持**：支持 PlantUML 图表渲染
 
-## 系统要求
-
-- VS Code 版本：1.82.0 或更高
-- 操作系统：Windows、macOS、Linux
-
-## 安装步骤
-
-### 方式一：从 VSIX 文件安装
-
-1. 下载最新的 `jarvis-vscode-extension-0.0.1.vsix` 文件
-2. 打开 VS Code
-3. 按 `Ctrl+Shift+P`（macOS：`Cmd+Shift+P`）打开命令面板
-4. 输入 `Extensions: Install from VSIX...`
-5. 选择下载的 VSIX 文件
-6. 重启 VS Code
-
-### 方式二：从源码构建
-
-```bash
-# 克隆仓库
-git clone https://github.com/skyfireitdiy/Jarvis.git
-cd Jarvis/src/jarvis/jarvis_vscode_extension
-
-# 安装依赖
-npm install
-
-# 构建扩展
-npm run build
-
-# 打包扩展（可选）
-npm run package
-```
-
 ## 快速开始
 
 1. **打开 Jarvis 面板**
@@ -115,10 +82,10 @@ jarvis-service --gateway-password your_password
 
 ### 常用启动参数
 
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `--host` | 监听地址 | `--host 0.0.0.0` |
-| `--port` | 监听端口 | `--port 9000` |
+| 参数                 | 说明     | 示例                        |
+| -------------------- | -------- | --------------------------- |
+| `--host`             | 监听地址 | `--host 0.0.0.0`            |
+| `--port`             | 监听端口 | `--port 9000`               |
 | `--gateway-password` | 访问密码 | `--gateway-password mypass` |
 
 ## 使用示例
