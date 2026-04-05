@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -15,13 +16,14 @@ import signal
 import subprocess
 import uuid
 from datetime import datetime
-from urllib.parse import parse_qsl
-from urllib.parse import unquote
 from typing import Any
+from typing import AsyncGenerator
 from typing import Callable
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+from urllib.parse import parse_qsl
+from urllib.parse import unquote
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi import WebSocketDisconnect
@@ -713,8 +715,33 @@ def create_app(
 
     set_current_gateway(gateway)
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """Lifespan context manager for startup and shutdown events."""
+        # Startup
+        agent_manager.set_event_loop(asyncio.get_running_loop())
+        await agent_manager.start_monitoring_for_running_agents()
+        if node_config.is_master:
+            node_runtime.mark_ready()
+        else:
+            node_runtime.mark_degraded()
+            if child_node_client is not None:
+                child_node_client.start()
+        yield
+        # Shutdown
+        await agent_manager.cleanup()
+        await agent_proxy_manager.cleanup()
+        terminal_session_manager.cleanup()
+        if child_node_client is not None:
+            await child_node_client.stop()
+        timer_manager.shutdown()
+        set_current_gateway(None)
+
     # 使用自定义 app 或创建新 app
-    app = custom_app if custom_app is not None else FastAPI()
+    if custom_app is not None:
+        app = custom_app
+    else:
+        app = FastAPI(lifespan=lifespan)
     app.state.timer_manager = timer_manager
     app.state.node_config = node_config
     app.state.node_runtime = node_runtime
@@ -783,34 +810,6 @@ def create_app(
         if manager._auth_store.get("default") is not None:
             return
         verify_token(request)
-
-    @app.on_event("startup")
-    async def _startup() -> None:
-        # 初始化环境并加载配置文件（已在 run() 函数中调用，此处避免重复）
-        # from jarvis.jarvis_utils.utils import init_env
-        # init_env(welcome_str="", config_file=None)
-        agent_manager.set_event_loop(asyncio.get_running_loop())
-        # 为运行中的 Agent 启动监控任务
-        await agent_manager.start_monitoring_for_running_agents()
-        if node_config.is_master:
-            node_runtime.mark_ready()
-        else:
-            node_runtime.mark_degraded()
-            if child_node_client is not None:
-                child_node_client.start()
-
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        # 清理所有 Agent
-        await agent_manager.cleanup()
-        # 清理代理管理器
-        await agent_proxy_manager.cleanup()
-        # 清理所有终端会话
-        terminal_session_manager.cleanup()
-        if child_node_client is not None:
-            await child_node_client.stop()
-        timer_manager.shutdown()
-        set_current_gateway(None)
 
     # HTTP API：登录接口
     @app.post("/api/auth/login")
