@@ -63,6 +63,10 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     AGENT_DELETE_REQUEST,
     NODE_HTTP_PROXY_REQUEST,
     AGENT_WS_REQUEST,
+    AGENT_WS_OPEN_REQUEST,
+    AGENT_WS_SEND_REQUEST,
+    AGENT_WS_RECV_REQUEST,
+    AGENT_WS_CLOSE_REQUEST,
     DIRECTORY_LIST_REQUEST,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -1078,13 +1082,167 @@ def create_app(
     async def node_agent_websocket_proxy(
         node_id: str, agent_id: str, websocket: WebSocket
     ) -> None:
-        websocket.scope.setdefault("query_string", b"")
-        if str(node_id or "").strip():
-            query_string = websocket.scope.get("query_string", b"") or b""
-            separator = b"&" if query_string else b""
-            extra = f"node_id={node_id}".encode("utf-8")
-            websocket.scope["query_string"] = query_string + separator + extra
-        await agent_websocket_proxy(agent_id, websocket)
+        logger = logging.getLogger(__name__)
+        normalized_node_id = str(node_id or "").strip()
+
+        # 本地节点：委托给 agent_websocket_proxy
+        if not normalized_node_id or normalized_node_id in (
+            node_runtime.local_node_id,
+            "master",
+        ):
+            await agent_websocket_proxy(agent_id, websocket)
+            return
+
+        # --- 远端节点：通过隧道转发 ---
+        logger.info(
+            "[NODE AGENT WS] remote agent ws node_id=%s agent_id=%s",
+            normalized_node_id,
+            agent_id,
+        )
+
+        # 认证
+        auth_payload = _extract_auth_from_headers(websocket)
+        if auth_payload is not None:
+            authorized, reason = gateway._check_auth(auth_payload)
+        else:
+            authorized = manager._auth_store.get("default") is not None
+            reason = "Authentication required"
+        if not authorized:
+            await websocket.accept(subprotocol="jarvis-ws")
+            await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
+            await websocket.close(code=4401, reason="Unauthorized")
+            return
+
+        await websocket.accept(subprotocol="jarvis-ws")
+
+        remote_ws_session_id = str(uuid.uuid4())
+        logger.info(
+            "[NODE AGENT WS] opening remote agent ws node_id=%s agent_id=%s session_id=%s",
+            normalized_node_id,
+            agent_id,
+            remote_ws_session_id,
+        )
+        try:
+            open_response = await node_connection_manager.send_request_to_node(
+                normalized_node_id,
+                AGENT_WS_OPEN_REQUEST,
+                {
+                    "agent_id": agent_id,
+                    "path": "ws",
+                    "session_id": remote_ws_session_id,
+                },
+            )
+            open_payload = open_response.get("payload") or {}
+            logger.info(
+                "[NODE AGENT WS] remote open response node_id=%s agent_id=%s session_id=%s payload=%s",
+                normalized_node_id,
+                agent_id,
+                remote_ws_session_id,
+                open_payload,
+            )
+            if not open_payload.get("success"):
+                close_reason = (open_payload.get("error") or {}).get(
+                    "message", "Remote websocket open failed"
+                )
+                logger.warning(
+                    "[NODE AGENT WS] remote open failed node_id=%s agent_id=%s session_id=%s reason=%s",
+                    normalized_node_id,
+                    agent_id,
+                    remote_ws_session_id,
+                    close_reason,
+                )
+                await websocket.close(code=4003, reason=close_reason)
+                return
+
+            async def forward_client_to_remote() -> None:
+                while True:
+                    data = await websocket.receive_text()
+                    send_response = (
+                        await node_connection_manager.send_request_to_node(
+                            normalized_node_id,
+                            AGENT_WS_SEND_REQUEST,
+                            {
+                                "session_id": remote_ws_session_id,
+                                "messages": [data],
+                            },
+                        )
+                    )
+                    send_payload = send_response.get("payload") or {}
+                    if not send_payload.get("success"):
+                        raise RuntimeError(
+                            (send_payload.get("error") or {}).get(
+                                "message", "Remote websocket send failed"
+                            )
+                        )
+
+            async def forward_remote_to_client() -> None:
+                while True:
+                    recv_response = (
+                        await node_connection_manager.send_request_to_node(
+                            normalized_node_id,
+                            AGENT_WS_RECV_REQUEST,
+                            {
+                                "session_id": remote_ws_session_id,
+                                "timeout": 1.0,
+                            },
+                            timeout=65.0,
+                        )
+                    )
+                    recv_payload = recv_response.get("payload") or {}
+                    if not recv_payload.get("success"):
+                        raise RuntimeError(
+                            (recv_payload.get("error") or {}).get(
+                                "message", "Remote websocket receive failed"
+                            )
+                        )
+                    for item in recv_payload.get("messages") or []:
+                        await websocket.send_text(str(item))
+
+            client_to_remote_task = asyncio.create_task(forward_client_to_remote())
+            remote_to_client_task = asyncio.create_task(forward_remote_to_client())
+            done, pending = await asyncio.wait(
+                {client_to_remote_task, remote_to_client_task},
+                return_when=asyncio.FIRST_EXCEPTION,
+            )
+            for task in pending:
+                task.cancel()
+            for task in done:
+                exc = task.exception()
+                if exc is not None:
+                    raise exc
+        except Exception as e:
+            logger.error(
+                "[NODE AGENT WS] remote ws proxy error node_id=%s agent_id=%s session_id=%s error=%s",
+                normalized_node_id,
+                agent_id,
+                remote_ws_session_id,
+                e,
+            )
+            try:
+                await websocket.close(code=4003, reason="Remote websocket proxy failed")
+            except Exception:
+                pass
+        finally:
+            try:
+                logger.info(
+                    "[NODE AGENT WS] closing remote agent ws node_id=%s agent_id=%s session_id=%s",
+                    normalized_node_id,
+                    agent_id,
+                    remote_ws_session_id,
+                )
+                await node_connection_manager.send_request_to_node(
+                    normalized_node_id,
+                    AGENT_WS_CLOSE_REQUEST,
+                    {"session_id": remote_ws_session_id},
+                )
+            except Exception as close_exc:
+                logger.warning(
+                    "[NODE AGENT WS] remote ws close warning node_id=%s agent_id=%s session_id=%s error=%s",
+                    normalized_node_id,
+                    agent_id,
+                    remote_ws_session_id,
+                    close_exc,
+                )
 
     @app.api_route(
         "/api/node/{node_id}/{path:path}",
