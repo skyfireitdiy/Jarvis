@@ -272,16 +272,31 @@ def load_methodology(
         platform.reset()
         platform.set_suppress_output(False)
 
-        # 从响应中提取<NUM>标签内的内容
+        # 从响应中提取序号 - 支持多种格式，包括<NUM>标签和直接数字
         import re
 
+        selected_indices_str = ""
+        
+        # 首先尝试提取<NUM>标签内的内容
         num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
-
-        if not num_match:
-            # 如果没有找到<NUM>标签，尝试直接解析响应
-            selected_indices_str = response
-        else:
+        if num_match:
             selected_indices_str = num_match.group(1).strip()
+        
+        # 如果没有找到<NUM>标签，或者内容为空，尝试从整个响应中提取数字
+        if not selected_indices_str:
+            # 查找所有数字（支持逗号或空格分隔，如 "1,2,3" 或 "1 2 3"）
+            # 先尝试匹配 "1,2,3" 或 "1, 2, 3" 格式
+            number_pattern = r"(?:^|\s|,)(\d+)(?:\s*,\s*|\s+|\s*$)"
+            numbers = re.findall(number_pattern, response)
+            if numbers:
+                selected_indices_str = ",".join(numbers)
+            else:
+                # 如果上面的模式没找到，尝试更宽松的匹配：直接找所有数字
+                all_numbers = re.findall(r"\d+", response)
+                # 过滤掉可能是年份等的大数字（假设方法论数量不会超过1000）
+                valid_numbers = [n for n in all_numbers if int(n) <= len(methodologies)]
+                if valid_numbers:
+                    selected_indices_str = ",".join(valid_numbers)
 
         if selected_indices_str.lower() == "none":
             return "没有历史方法论可参考"
