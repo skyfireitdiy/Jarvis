@@ -4684,13 +4684,14 @@ function handleMessage(message, agentId = null) {
     if (terminalId) {
       terminalSessions.value.push({
         terminal_id: terminalId,
+        node_id: payload?.node_id || getCurrentAgentNodeId() || '',
         interpreter: payload?.interpreter || 'bash',
         working_dir: payload?.working_dir || '.',
         terminal: null,
         hostEl: null,
         fitAddon: null,
         resizeObserver: null,  // ResizeObserver 实例
-        history: []  // 保存历史输出，用于面板隐藏后再显示时恢复
+        history: [],  // 保存历史输出，用于面板隐藏后再显示时恢复
       })
       // 自动切换到新创建的 terminal
       activeTerminalId.value = terminalId
@@ -5917,7 +5918,11 @@ function createTerminal() {
   }
   
   console.log('[independent-terminal] Creating new terminal')
+  const nodeId = getCurrentAgentNodeId() || ''
   const payload = {}
+  if (nodeId) {
+    payload.node_id = nodeId
+  }
   const currentWorkingDir = currentAgent.value?.working_dir?.trim()
   if (currentWorkingDir) {
     payload.working_dir = currentWorkingDir
@@ -5931,6 +5936,10 @@ function createTerminal() {
 
 function closeTerminal(terminalId) {
   console.log(`[independent-terminal] Closing terminal ${terminalId}`)
+
+  // 先获取 node_id（清理前）
+  const closingSession = terminalSessions.value.find(t => t.terminal_id === terminalId)
+  const nodeId = closingSession?.node_id || ""
   
   // 清理终端实例
   const sessionIndex = terminalSessions.value.findIndex(t => t.terminal_id === terminalId)
@@ -5954,11 +5963,13 @@ function closeTerminal(terminalId) {
   
   // 发送关闭消息到后端
   if (socket.value) {
+    const payload = { terminal_id: terminalId }
+    if (nodeId) {
+      payload.node_id = nodeId
+    }
     const message = {
       type: 'terminal_close',
-      payload: {
-        terminal_id: terminalId,
-      },
+      payload,
     }
     socket.value.send(JSON.stringify(message))
   }
@@ -6288,12 +6299,14 @@ function sendTerminalInput(terminalId, data) {
     return
   }
   
+  const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+  const payload = { terminal_id: terminalId, data }
+  if (session?.node_id) {
+    payload.node_id = session.node_id
+  }
   const message = {
     type: 'terminal_session_input',
-    payload: {
-      terminal_id: terminalId,
-      data,
-    },
+    payload,
   }
   socket.value.send(JSON.stringify(message))
 }
@@ -6304,13 +6317,14 @@ function sendTerminalResize(terminalId, rows, cols) {
     return
   }
   
+  const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+  const payload = { terminal_id: terminalId, rows, cols }
+  if (session?.node_id) {
+    payload.node_id = session.node_id
+  }
   const message = {
     type: 'terminal_session_resize',
-    payload: {
-      terminal_id: terminalId,
-      rows,
-      cols,
-    },
+    payload,
   }
   socket.value.send(JSON.stringify(message))
 }

@@ -885,6 +885,37 @@ class NodeConnectionManager:
             )
 
 
+class NodeTerminalOutputProxy:
+    """代理 Publisher，将 child 端终端输出通过 NODE_TERMINAL_OUTPUT 推送给 master。
+
+    TerminalSession._publish_output 在同步线程中调用 publish()，
+    因此需要用 asyncio.run_coroutine_threadsafe 桥接到事件循环。
+    """
+
+    def __init__(self, ws: Any, loop: asyncio.AbstractEventLoop) -> None:
+        self._ws = ws
+        self._loop = loop
+
+    def publish(self, message: Any, session_id: str = "default") -> None:
+        """将终端输出消息通过 NODE_TERMINAL_OUTPUT 发送给 master。"""
+        try:
+            output_msg = json.dumps(
+                build_node_message(
+                    NODE_TERMINAL_OUTPUT,
+                    {
+                        "session_id": session_id,
+                        "message": message,
+                    },
+                )
+            )
+            future = asyncio.run_coroutine_threadsafe(
+                self._ws.send(output_msg), self._loop
+            )
+            future.result(timeout=5)
+        except Exception as e:
+            logger.warning("[NODE TERMINAL PROXY] failed to send output: %s", e)
+
+
 class ChildNodeClient:
     def __init__(
         self,
@@ -1136,3 +1167,115 @@ class ChildNodeClient:
             exc = task.exception()
             if exc is not None:
                 raise exc
+
+    async def _handle_node_terminal_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理 master 转发的终端请求（child 端）。"""
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        action = str(payload.get("action") or "").strip()
+        inner_payload = payload.get("payload") or {}
+        session_id = str(payload.get("session_id") or "default")
+        tsm = self._node_connection_manager._terminal_session_manager
+
+        logger.info(
+            "[NODE TERMINAL] child handling action=%s request_id=%s",
+            action,
+            request_id,
+        )
+
+        if tsm is None:
+            return build_node_message(
+                NODE_TERMINAL_RESPONSE,
+                {"success": False, "error": {"code": "NO_TERMINAL_MANAGER", "message": "terminal session manager not available"}},
+                request_id=request_id,
+            )
+
+        try:
+            if action == "terminal_create":
+                interpreter = inner_payload.get("interpreter") or os.environ.get("SHELL", "bash")
+                raw_working_dir = inner_payload.get("working_dir")
+                working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
+                if not working_dir:
+                    import pathlib as _pathlib
+                    working_dir = str(_pathlib.Path.home())
+                # 创建代理 publisher，将终端输出推送回 master
+                proxy_publisher = NodeTerminalOutputProxy(
+                    self._ws, asyncio.get_running_loop()
+                )
+                terminal_id, error = tsm.create_session(
+                    interpreter=interpreter,
+                    working_dir=working_dir,
+                    stream_publisher=proxy_publisher,
+                    session_id=session_id,
+                )
+                if terminal_id:
+                    return build_node_message(
+                        NODE_TERMINAL_RESPONSE,
+                        {
+                            "success": True,
+                            "data": {
+                                "terminal_id": terminal_id,
+                                "interpreter": interpreter,
+                                "working_dir": working_dir,
+                            },
+                        },
+                        request_id=request_id,
+                    )
+                else:
+                    return build_node_message(
+                        NODE_TERMINAL_RESPONSE,
+                        {"success": False, "error": {"code": "TERMINAL_CREATE_FAILED", "message": error or "unknown error"}},
+                        request_id=request_id,
+                    )
+
+            elif action == "terminal_close":
+                terminal_id = str(inner_payload.get("terminal_id") or "").strip()
+                if terminal_id:
+                    tsm.close_session(terminal_id)
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {"success": True},
+                    request_id=request_id,
+                )
+
+            elif action == "terminal_session_input":
+                terminal_id = str(inner_payload.get("terminal_id") or "").strip()
+                data = inner_payload.get("data", "")
+                if terminal_id:
+                    tsm.write_input(terminal_id, data)
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {"success": True},
+                    request_id=request_id,
+                )
+
+            elif action == "terminal_session_resize":
+                terminal_id = str(inner_payload.get("terminal_id") or "").strip()
+                rows = int(inner_payload.get("rows") or 24)
+                cols = int(inner_payload.get("cols") or 80)
+                if terminal_id:
+                    tsm.resize(terminal_id, rows, cols)
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {"success": True},
+                    request_id=request_id,
+                )
+
+            else:
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {"success": False, "error": {"code": "UNKNOWN_ACTION", "message": f"unknown terminal action: {action}"}},
+                    request_id=request_id,
+                )
+
+        except Exception as exc:
+            logger.error(
+                "[NODE TERMINAL] child action=%s failed: %s", action, exc
+            )
+            return build_node_message(
+                NODE_TERMINAL_RESPONSE,
+                {"success": False, "error": {"code": "TERMINAL_ERROR", "message": str(exc)}},
+                request_id=request_id,
+            )
