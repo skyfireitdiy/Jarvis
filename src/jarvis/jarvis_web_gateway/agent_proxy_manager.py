@@ -220,12 +220,19 @@ class AgentProxyManager:
         agent_url = f"ws://127.0.0.1:{port}/ws"
         logger.info(f"[PROXY MANAGER] Proxying WebSocket to {agent_url}")
 
+        # 准备子协议（Agent Gateway要求）
+        auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+        subprotocols = ["jarvis-ws"]
+        if auth_token:
+            subprotocols.append(f"jarvis-token.{auth_token}")
+
         # 连接到 Agent
         try:
             agent_ws = await websockets.connect(
                 agent_url,
                 close_timeout=self._ws_timeout,
                 proxy=None,  # 禁用自动代理，直接连接本地Agent
+                subprotocols=subprotocols,
             )
         except Exception as e:
             logger.error(f"[PROXY MANAGER] Failed to connect to agent WebSocket: {e}")
@@ -237,8 +244,6 @@ class AgentProxyManager:
         try:
             # 发送认证消息给 Agent Gateway
             # Agent Gateway 要求首条消息必须是认证消息
-            import os
-
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             if auth_token:
                 auth_message = json.dumps(
