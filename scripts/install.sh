@@ -5,6 +5,9 @@ set -e
 export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
 echo "已设置 Python 安装镜像: $UV_PYTHON_INSTALL_MIRROR"
 
+export UV_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple/"
+echo "已设置 PyPI 镜像 (中科大): $UV_INDEX_URL"
+
 GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
 GITHUB_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
