@@ -542,10 +542,8 @@ class WebSocketConnectionManager:
                         "payload": {"execution_status": current_status},
                     }
                     self._router.publish(status_message, session_id=session_id)
-                    print(f"[GET_STATUS] Sent agent status: {current_status}")
                 except Exception as e:
-                    # 获取状态失败
-                    print(f"[GET_STATUS] Failed to get status: {e}")
+                    pass
             return
         # 独立终端会话消息处理
         # 检查是否需要转发到远端节点
@@ -578,7 +576,7 @@ class WebSocketConnectionManager:
                         }
                         self._router.publish(result_msg, session_id=session_id)
                 except Exception as e:
-                    print(f"[TERMINAL PROXY] Failed to forward {message_type} to node {terminal_node_id}: {e}")
+                    pass
                 return
 
         if message_type == "terminal_create":
@@ -655,8 +653,6 @@ def create_app(
     gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", generate_gateway_token())
     # 统一设置到环境变量，供子进程（Agent）使用
     os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
-    print(f"[GATEWAY] Generated token: {gateway_token}")
-
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
 
@@ -905,7 +901,6 @@ def create_app(
                 },
             }
         except Exception as e:
-            print(f"[AUTH DEBUG] 登录过程发生异常: {type(e).__name__}: {e}")
             logger.error(f"[AUTH] Login failed with exception: {type(e).__name__}: {e}")
             return {
                 "success": False,
@@ -3611,18 +3606,14 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
     def _sender(message: Dict[str, Any]) -> None:
         async def _send():
             try:
-                print(
-                    f"[WebSocket Sender] Sending message: type={message.get('type')}, exec_id={message.get('payload', {}).get('execution_id')}"
-                )
                 await websocket.send_json(message)
-                print("[WebSocket Sender] Message sent successfully")
             except Exception as e:
-                print(f"[WebSocket Sender] Error sending message: {e}")
+                pass
 
         try:
             asyncio.run_coroutine_threadsafe(_send(), loop)
         except Exception as e:
-            print(f"[WebSocket Sender] Error scheduling send: {e}")
+            pass
 
     return _sender
 
