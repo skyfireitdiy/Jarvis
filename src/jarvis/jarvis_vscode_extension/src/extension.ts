@@ -3335,8 +3335,8 @@ function buildNodeHttpUrl(
 }
 
 function buildHttpUrl(gatewayAddress: GatewayAddress, path: string): string {
-  const normalizedPath = String(path || "").replace(/^\/+/, "");
-  return buildNodeHttpUrl(gatewayAddress, "master", normalizedPath);
+  const normalizedPath = `/${String(path || "").replace(/^\/+/, "")}`;
+  return `http://${gatewayAddress.host}:${gatewayAddress.port}${normalizedPath}`;
 }
 
 function buildWebSocketProtocols(token?: string): string[] | undefined {
@@ -3344,7 +3344,7 @@ function buildWebSocketProtocols(token?: string): string[] | undefined {
   if (!normalizedToken) {
     return undefined;
   }
-  return ["jarvis-client", `jarvis-token.${encodeURIComponent(normalizedToken)}`];
+  return ["jarvis-ws", `jarvis-token.${encodeURIComponent(normalizedToken)}`];
 }
 
 function buildNodeWebSocketUrl(
