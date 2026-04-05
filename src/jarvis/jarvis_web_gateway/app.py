@@ -122,6 +122,8 @@ _router: Optional[SessionOutputRouter] = None
 
 # 全局 TerminalSessionManager，用于独立终端会话管理
 _terminal_session_manager: Optional[TerminalSessionManager] = None
+_node_connection_manager: Optional["NodeConnectionManager"] = None
+_node_runtime: Optional["NodeRuntime"] = None
 
 MAX_FILE_SIZE_BYTES = 1024 * 1024
 BINARY_FILE_SAMPLE_SIZE = 4096
@@ -549,10 +551,10 @@ class WebSocketConnectionManager:
         # 检查是否需要转发到远端节点
         if message_type in ("terminal_create", "terminal_close", "terminal_session_input", "terminal_session_resize"):
             terminal_node_id = str(payload.get("node_id") or "").strip()
-            if terminal_node_id and terminal_node_id not in (node_connection_manager._node_runtime.local_node_id, "master", ""):
+            if terminal_node_id and terminal_node_id not in (_node_runtime.local_node_id if _node_runtime else "master", "master", ""):
                 # 转发到远端节点
                 try:
-                    response = await node_connection_manager.send_request_to_node(
+                    response = await _node_connection_manager.send_request_to_node(
                         terminal_node_id,
                         NODE_TERMINAL_REQUEST,
                         {
@@ -699,9 +701,11 @@ def create_app(
     timer_manager = TimerManager(task_factory=_build_callback_from_metadata)
 
     # 保存 router 到全局，用于状态更新时推送消息
-    global _router, _terminal_session_manager
+    global _router, _terminal_session_manager, _node_connection_manager, _node_runtime
     _router = router
     _terminal_session_manager = terminal_session_manager
+    _node_connection_manager = node_connection_manager
+    _node_runtime = node_runtime
     # 将 router 和 terminal_session_manager 也注入到 node_connection_manager，用于终端转发
     node_connection_manager._router = router
     node_connection_manager._terminal_session_manager = terminal_session_manager
