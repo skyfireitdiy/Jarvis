@@ -38,6 +38,8 @@ DIRECTORY_LIST_RESPONSE = "directory_list_response"
 NODE_TERMINAL_REQUEST = "node_terminal_request"
 NODE_TERMINAL_RESPONSE = "node_terminal_response"
 NODE_TERMINAL_OUTPUT = "node_terminal_output"
+SERVICE_RESTART_REQUEST = "service_restart_request"
+SERVICE_RESTART_RESPONSE = "service_restart_response"
 ERROR = "error"
 
 

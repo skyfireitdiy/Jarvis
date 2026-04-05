@@ -73,6 +73,8 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     NODE_TERMINAL_REQUEST,
     NODE_TERMINAL_RESPONSE,
     NODE_TERMINAL_OUTPUT,
+    SERVICE_RESTART_REQUEST,
+    SERVICE_RESTART_RESPONSE,
     build_node_message,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -1527,9 +1529,62 @@ def create_app(
         }
 
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
-    async def restart_service() -> Dict[str, Any]:
-        """请求 jarvis-service 通过 SIGUSR1 重启服务。"""
+    async def restart_service(request: Dict[str, Any]) -> Dict[str, Any]:
+        """请求 jarvis-service 通过 SIGUSR1 重启服务。
+
+        Args:
+            request: 请求体，可包含 node_id 字段指定要重启的节点
+        """
         try:
+            target_node_id = str(request.get("node_id") or "").strip()
+
+            # 如果指定了远端节点，转发重启请求
+            if target_node_id and target_node_id not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                node_info = node_runtime.node_registry.get(target_node_id)
+                if node_info is None:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_NOT_FOUND",
+                            "message": f"Node not found: {target_node_id}",
+                        },
+                    }
+                if node_info.status != "online":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_OFFLINE",
+                            "message": f"Node is offline: {target_node_id}",
+                        },
+                    }
+                response = await node_connection_manager.send_request_to_node(
+                    target_node_id,
+                    SERVICE_RESTART_REQUEST,
+                    {},
+                    timeout=30.0,
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "RESTART_FAILED"),
+                            "message": error.get("message", "Remote restart failed"),
+                        },
+                    }
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": target_node_id,
+                        "message": f"已请求节点 {target_node_id} 重启服务",
+                    },
+                }
+
+            # 本地重启
             lock_file_path = get_single_instance_lock_path()
             if not lock_file_path.exists():
                 return {
