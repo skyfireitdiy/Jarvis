@@ -788,9 +788,19 @@
             清除历史记录
           </button>
         </div>
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>重启节点服务</label>
+          <select v-model="restartNodeId" class="node-select">
+            <option value="">本节点 (master)</option>
+            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+              {{ formatNodeOptionLabel(node) }}
+            </option>
+          </select>
+          <span class="form-help">选择要重启服务的节点，默认为本节点</span>
+        </div>
         <div class="form-group">
           <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
-            {{ isRestartingGateway ? '重启中...' : '重启服务' }}
+            {{ isRestartingGateway ? '重启中...' : (restartNodeId ? `重启节点 ${restartNodeId} 服务` : '重启本节点服务') }}
           </button>
         </div>
         <div class="modal-actions">
@@ -1047,6 +1057,7 @@ const connecting = ref(false)
 const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 const isRestartingGateway = ref(false)
+const restartNodeId = ref('') // 重启服务时选择的节点ID
 
 // 登录函数：使用密码获取 Token
 async function loginWithPassword(password) {
@@ -2408,6 +2419,13 @@ watch(showBufferPanel, (newVal) => {
   }
 })
 
+// 监听设置面板打开，自动获取节点状态
+watch(showSettingsModal, (newVal) => {
+  if (newVal) {
+    fetchNodeStatus()
+  }
+})
+
 // Agent 管理
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
@@ -2896,8 +2914,12 @@ function confirmRestartGateway() {
   }
 
   showSettingsModal.value = false
+  const targetNodeId = restartNodeId.value
+  const confirmMessage = targetNodeId
+    ? `确认重启节点 "${targetNodeId}" 的服务吗？这将短暂中断该节点的连接。`
+    : '确认重启本节点服务吗？这将短暂中断当前连接。'
   showConfirm(
-    '确认重启服务吗？这将短暂中断当前连接。',
+    confirmMessage,
     () => {
       restartGateway()
     },
@@ -2914,8 +2936,10 @@ async function restartGateway() {
   try {
     isRestartingGateway.value = true
     const { host, port } = getGatewayAddress()
+    const targetNodeId = restartNodeId.value || 'master'
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify({ node_id: targetNodeId })
     })
     const result = await response.json()
 
@@ -9302,6 +9326,33 @@ body::-webkit-scrollbar {
   background: rgba(13, 17, 23, 0.9);
 }
 
+.form-group select {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background-color: rgba(13, 17, 23, 0.9);
+}
+
+.form-group select option {
+  background: #161b22;
+  color: #e6edf3;
+  padding: 8px;
+}
 
 
 .modal-header {

@@ -44,6 +44,8 @@ from .node_protocol import (
     NODE_TERMINAL_REQUEST,
     NODE_TERMINAL_RESPONSE,
     NODE_TERMINAL_OUTPUT,
+    SERVICE_RESTART_REQUEST,
+    SERVICE_RESTART_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -1149,6 +1151,12 @@ class ChildNodeClient:
                     )
                     await self._ws.send(json.dumps(response))
                     continue
+                if message_type == SERVICE_RESTART_REQUEST:
+                    response = await self._handle_service_restart_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
                 logger.warning(
                     "[NODE] child unhandled message type=%s request_id=%s",
                     message_type,
@@ -1277,5 +1285,105 @@ class ChildNodeClient:
             return build_node_message(
                 NODE_TERMINAL_RESPONSE,
                 {"success": False, "error": {"code": "TERMINAL_ERROR", "message": str(exc)}},
+                request_id=request_id,
+            )
+
+    async def _handle_service_restart_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理 master 转发的服务重启请求（child 端）。"""
+        request_id = message.get("request_id")
+        logger.info(
+            "[NODE RESTART] child handling service restart request_id=%s",
+            request_id,
+        )
+
+        try:
+            from jarvis.jarvis_service.cli import get_single_instance_lock_path
+
+            lock_file_path = get_single_instance_lock_path()
+            if not lock_file_path.exists():
+                return build_node_message(
+                    SERVICE_RESTART_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "UNSUPPORTED",
+                            "message": "当前环境不支持重启：未检测到 jarvis-service 锁文件",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            service_pid_text = lock_file_path.read_text(encoding="utf-8").strip()
+            if not service_pid_text:
+                return build_node_message(
+                    SERVICE_RESTART_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "UNSUPPORTED",
+                            "message": "当前环境不支持重启：未检测到 service PID",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            import signal
+
+            service_pid = int(service_pid_text)
+            os.kill(service_pid, signal.SIGUSR1)
+            logger.info(
+                "[NODE RESTART] child service restart requested pid=%s request_id=%s",
+                service_pid,
+                request_id,
+            )
+            return build_node_message(
+                SERVICE_RESTART_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "pid": service_pid,
+                        "message": "已请求 jarvis-service 重启服务",
+                    },
+                },
+                request_id=request_id,
+            )
+        except (ValueError, ProcessLookupError):
+            return build_node_message(
+                SERVICE_RESTART_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "UNSUPPORTED",
+                        "message": "当前环境不支持重启：未通过 jarvis-service 启动",
+                    },
+                },
+                request_id=request_id,
+            )
+        except PermissionError:
+            return build_node_message(
+                SERVICE_RESTART_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "无权限向 jarvis-service 发送重启信号",
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE RESTART] child restart failed request_id=%s error=%s",
+                request_id,
+                exc,
+            )
+            return build_node_message(
+                SERVICE_RESTART_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+                },
                 request_id=request_id,
             )
