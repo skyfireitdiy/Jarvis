@@ -1347,6 +1347,16 @@ def create_app(
                 },
             )
             payload = response.get("payload") or {}
+            # 如果 payload 中有 body，说明 child 端已正确处理请求，
+            # 直接返回其 status_code 和 body（即使业务级 success=False）。
+            # 只有当 payload 中没有 body（真正的代理失败）时才返回 502。
+            if "body" in payload:
+                return Response(
+                    content=payload.get("body", ""),
+                    status_code=int(payload.get("status_code", 200)),
+                    headers=payload.get("headers") or {},
+                    media_type=(payload.get("headers") or {}).get("content-type"),
+                )
             if not payload.get("success"):
                 error = payload.get("error") or {}
                 return Response(
