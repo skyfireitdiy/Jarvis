@@ -308,6 +308,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           this.closeRemoteDirectoryBrowser();
           return;
         }
+        if (message?.type === "changeNodeId") {
+          const newNodeId = String(message.nodeId || "").trim();
+          this.createAgentFormState.nodeId = newNodeId;
+          try {
+            await this.loadModelGroups(newNodeId || undefined);
+          } catch {
+            // keep current model groups on failure
+          }
+          this.renderAgentListView();
+          return;
+        }
         if (message?.type === "cancelCreateAgent") {
           this.resetCreateAgentForm();
           this.renderAgentListView();
@@ -770,6 +781,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'browseRemoteDirectory', path });
       });
     });
+    const nodeIdSelect = document.getElementById('nodeId');
+    if (nodeIdSelect) {
+      nodeIdSelect.addEventListener('change', () => {
+        vscode.postMessage({ type: 'changeNodeId', nodeId: nodeIdSelect.value });
+      });
+    }
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
     if (submitCreateAgentButton) {
       submitCreateAgentButton.addEventListener('click', () => {
@@ -1797,13 +1814,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.renderAgentListView();
   }
 
-  private async loadModelGroups(): Promise<void> {
+  private async loadModelGroups(nodeId?: string): Promise<void> {
     if (!this.panelState.token) {
       return;
     }
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    const targetNodeId = String(nodeId || "master").trim() || "master";
     const response = await this.fetchWithAuth(
-      buildNodeHttpUrl(gatewayAddress, "master", "model-groups"),
+      buildNodeHttpUrl(gatewayAddress, targetNodeId, "model-groups"),
     );
     const result = (await response.json()) as ModelGroupsResponse;
     if (!response.ok || !result.success) {
