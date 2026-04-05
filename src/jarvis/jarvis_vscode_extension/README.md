@@ -65,7 +65,7 @@ pip install -e .
 jarvis-service
 
 # 指定监听地址和端口
-jarvis-service --host 0.0.0.0 --port 9000
+jarvis-service --gateway-host 0.0.0.0 --gateway-port 9000
 
 # 设置访问密码
 jarvis-service --gateway-password your_password
@@ -81,8 +81,8 @@ jarvis-service --gateway-password your_password
 
 | 参数                 | 说明     | 示例                        |
 | -------------------- | -------- | --------------------------- |
-| `--host`             | 监听地址 | `--host 0.0.0.0`            |
-| `--port`             | 监听端口 | `--port 9000`               |
+| `--gateway-host`     | 监听地址 | `--gateway-host 0.0.0.0`    |
+| `--gateway-port`     | 监听端口 | `--gateway-port 9000`       |
 | `--gateway-password` | 访问密码 | `--gateway-password mypass` |
 
 ## 使用示例
