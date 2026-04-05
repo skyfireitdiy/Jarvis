@@ -41,6 +41,9 @@ from .node_protocol import (
     AGENT_WS_SEND_RESPONSE,
     DIRECTORY_LIST_REQUEST,
     DIRECTORY_LIST_RESPONSE,
+    NODE_TERMINAL_REQUEST,
+    NODE_TERMINAL_RESPONSE,
+    NODE_TERMINAL_OUTPUT,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -63,11 +66,15 @@ class NodeConnectionManager:
         agent_manager: AgentManager,
         agent_proxy_manager: Any,
         node_http_dispatcher: Optional[Any] = None,
+        router: Optional[Any] = None,
+        terminal_session_manager: Optional[Any] = None,
     ) -> None:
         self._node_runtime = node_runtime
         self._agent_manager = agent_manager
         self._agent_proxy_manager = agent_proxy_manager
         self._node_http_dispatcher = node_http_dispatcher
+        self._router = router
+        self._terminal_session_manager = terminal_session_manager
         self._connections: Dict[str, WebSocket] = {}
         self._connection_to_node: Dict[str, str] = {}
         self._pending_requests: Dict[str, asyncio.Future] = {}
@@ -172,12 +179,21 @@ class NodeConnectionManager:
                         AGENT_WS_RECV_RESPONSE,
                         AGENT_WS_CLOSE_RESPONSE,
                         DIRECTORY_LIST_RESPONSE,
+                        NODE_TERMINAL_RESPONSE,
                     )
                     and request_id
                 ):
                     future = self._pending_requests.pop(request_id, None)
                     if future is not None and not future.done():
                         future.set_result(next_message)
+                    continue
+                if message_type == NODE_TERMINAL_OUTPUT:
+                    # child 端推送的终端输出，转发给前端
+                    terminal_payload = (next_message.get("payload") or {})
+                    output_session_id = terminal_payload.get("session_id") or "default"
+                    output_message = terminal_payload.get("message")
+                    if output_message and self._router:
+                        self._router.publish(output_message, session_id=output_session_id)
                     continue
                 if message_type == AGENT_CREATE_REQUEST:
                     response = self._handle_agent_create_request(next_message, node_id)
@@ -1093,6 +1109,12 @@ class ChildNodeClient:
                         self._node_connection_manager._handle_directory_list_request(
                             next_message
                         )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == NODE_TERMINAL_REQUEST:
+                    response = await self._handle_node_terminal_request(
+                        next_message
                     )
                     await self._ws.send(json.dumps(response))
                     continue

@@ -68,6 +68,10 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     AGENT_WS_RECV_REQUEST,
     AGENT_WS_CLOSE_REQUEST,
     DIRECTORY_LIST_REQUEST,
+    NODE_TERMINAL_REQUEST,
+    NODE_TERMINAL_RESPONSE,
+    NODE_TERMINAL_OUTPUT,
+    build_node_message,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
@@ -542,6 +546,39 @@ class WebSocketConnectionManager:
                     print(f"[GET_STATUS] Failed to get status: {e}")
             return
         # 独立终端会话消息处理
+        # 检查是否需要转发到远端节点
+        if message_type in ("terminal_create", "terminal_close", "terminal_session_input", "terminal_session_resize"):
+            terminal_node_id = str(payload.get("node_id") or "").strip()
+            if terminal_node_id and terminal_node_id not in (node_runtime.local_node_id, "master", ""):
+                # 转发到远端节点
+                try:
+                    response = await node_connection_manager.send_request_to_node(
+                        terminal_node_id,
+                        NODE_TERMINAL_REQUEST,
+                        {
+                            "action": message_type,
+                            "payload": payload,
+                            "session_id": session_id,
+                        },
+                    )
+                    resp_payload = response.get("payload") or {}
+                    # 对于 terminal_create，将响应转发给前端
+                    if message_type == "terminal_create" and resp_payload.get("success"):
+                        result_msg = {
+                            "type": "terminal_created",
+                            "payload": resp_payload.get("data") or {},
+                        }
+                        self._router.publish(result_msg, session_id=session_id)
+                    elif message_type == "terminal_close" and resp_payload.get("success"):
+                        result_msg = {
+                            "type": "terminal_closed",
+                            "payload": {"terminal_id": payload.get("terminal_id")},
+                        }
+                        self._router.publish(result_msg, session_id=session_id)
+                except Exception as e:
+                    print(f"[TERMINAL PROXY] Failed to forward {message_type} to node {terminal_node_id}: {e}")
+                return
+
         if message_type == "terminal_create":
             interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
             raw_working_dir = payload.get("working_dir")
@@ -665,6 +702,9 @@ def create_app(
     global _router, _terminal_session_manager
     _router = router
     _terminal_session_manager = terminal_session_manager
+    # 将 router 和 terminal_session_manager 也注入到 node_connection_manager，用于终端转发
+    node_connection_manager._router = router
+    node_connection_manager._terminal_session_manager = terminal_session_manager
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     manager = WebSocketConnectionManager(
