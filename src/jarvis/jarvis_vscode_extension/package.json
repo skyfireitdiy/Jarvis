@@ -4,6 +4,7 @@
   "description": "Jarvis VS Code extension with agent sidebar, chat panel and terminal panel.",
   "version": "0.0.1",
   "publisher": "jarvis-ai-assistant",
+  "icon": "media/jarvis-128.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/skyfireitdiy/Jarvis.git"
