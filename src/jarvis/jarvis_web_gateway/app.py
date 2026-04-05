@@ -1102,6 +1102,68 @@ def create_app(
                     media_type="application/json",
                 )
             body = (await request.body()).decode("utf-8", errors="replace")
+
+            # --- agent HTTP 代理：path 以 agent/ 开头 ---
+            normalized_path = str(path or "").strip("/")
+            if normalized_path.startswith("agent/"):
+                # 解析 agent/{agent_id}/{sub_path}
+                agent_parts = normalized_path[len("agent/"):].split("/", 1)
+                agent_id = agent_parts[0]
+                agent_sub_path = agent_parts[1] if len(agent_parts) > 1 else ""
+                if normalized_node_id in (node_runtime.local_node_id, "master"):
+                    # 本地 agent HTTP 代理
+                    try:
+                        return await agent_proxy_manager.proxy_http_request(
+                            request, agent_id, agent_sub_path
+                        )
+                    except AgentNotFoundError:
+                        return Response(
+                            content='{"error": "Agent not found"}',
+                            status_code=404,
+                            media_type="application/json",
+                        )
+                    except AgentNotRunningError as e:
+                        return Response(
+                            content='{"error": "Agent not running"}',
+                            status_code=503,
+                            media_type="application/json",
+                        )
+                    except ProxyConnectionError as e:
+                        return Response(
+                            content='{"error": "Proxy connection failed"}',
+                            status_code=502,
+                            media_type="application/json",
+                        )
+                else:
+                    # 远端 agent HTTP 代理
+                    response = await node_connection_manager.send_request_to_node(
+                        normalized_node_id,
+                        AGENT_HTTP_REQUEST,
+                        {
+                            "agent_id": agent_id,
+                            "method": request.method,
+                            "path": agent_sub_path,
+                            "query": str(request.query_params),
+                            "headers": dict(request.headers),
+                            "body": body,
+                        },
+                    )
+                    payload = response.get("payload") or {}
+                    if not payload.get("success"):
+                        error = payload.get("error") or {}
+                        return Response(
+                            content=f'{{"error": "{error.get("message", "Remote agent HTTP proxy failed")}"}}',
+                            status_code=502,
+                            media_type="application/json",
+                        )
+                    return Response(
+                        content=payload.get("body", ""),
+                        status_code=int(payload.get("status_code", 200)),
+                        headers=payload.get("headers") or {},
+                        media_type=(payload.get("headers") or {}).get("content-type"),
+                    )
+
+            # --- 节点级 API ---
             if normalized_node_id in (node_runtime.local_node_id, "master"):
                 result = await _dispatch_node_http_request(
                     method=request.method,
