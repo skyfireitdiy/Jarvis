@@ -551,9 +551,18 @@ class WebSocketConnectionManager:
             return
         # 独立终端会话消息处理
         # 检查是否需要转发到远端节点
-        if message_type in ("terminal_create", "terminal_close", "terminal_session_input", "terminal_session_resize"):
+        if message_type in (
+            "terminal_create",
+            "terminal_close",
+            "terminal_session_input",
+            "terminal_session_resize",
+        ):
             terminal_node_id = str(payload.get("node_id") or "").strip()
-            if terminal_node_id and terminal_node_id not in (_node_runtime.local_node_id if _node_runtime else "master", "master", ""):
+            if terminal_node_id and terminal_node_id not in (
+                _node_runtime.local_node_id if _node_runtime else "master",
+                "master",
+                "",
+            ):
                 # 转发到远端节点
                 try:
                     response = await _node_connection_manager.send_request_to_node(
@@ -567,13 +576,17 @@ class WebSocketConnectionManager:
                     )
                     resp_payload = response.get("payload") or {}
                     # 对于 terminal_create，将响应转发给前端
-                    if message_type == "terminal_create" and resp_payload.get("success"):
+                    if message_type == "terminal_create" and resp_payload.get(
+                        "success"
+                    ):
                         result_msg = {
                             "type": "terminal_created",
                             "payload": resp_payload.get("data") or {},
                         }
                         self._router.publish(result_msg, session_id=session_id)
-                    elif message_type == "terminal_close" and resp_payload.get("success"):
+                    elif message_type == "terminal_close" and resp_payload.get(
+                        "success"
+                    ):
                         result_msg = {
                             "type": "terminal_closed",
                             "payload": {"terminal_id": payload.get("terminal_id")},
@@ -1197,15 +1210,13 @@ def create_app(
             async def forward_client_to_remote() -> None:
                 while True:
                     data = await websocket.receive_text()
-                    send_response = (
-                        await node_connection_manager.send_request_to_node(
-                            normalized_node_id,
-                            AGENT_WS_SEND_REQUEST,
-                            {
-                                "session_id": remote_ws_session_id,
-                                "messages": [data],
-                            },
-                        )
+                    send_response = await node_connection_manager.send_request_to_node(
+                        normalized_node_id,
+                        AGENT_WS_SEND_REQUEST,
+                        {
+                            "session_id": remote_ws_session_id,
+                            "messages": [data],
+                        },
                     )
                     send_payload = send_response.get("payload") or {}
                     if not send_payload.get("success"):
@@ -1217,16 +1228,14 @@ def create_app(
 
             async def forward_remote_to_client() -> None:
                 while True:
-                    recv_response = (
-                        await node_connection_manager.send_request_to_node(
-                            normalized_node_id,
-                            AGENT_WS_RECV_REQUEST,
-                            {
-                                "session_id": remote_ws_session_id,
-                                "timeout": 1.0,
-                            },
-                            timeout=65.0,
-                        )
+                    recv_response = await node_connection_manager.send_request_to_node(
+                        normalized_node_id,
+                        AGENT_WS_RECV_REQUEST,
+                        {
+                            "session_id": remote_ws_session_id,
+                            "timeout": 1.0,
+                        },
+                        timeout=65.0,
                     )
                     recv_payload = recv_response.get("payload") or {}
                     if not recv_payload.get("success"):
@@ -1305,7 +1314,7 @@ def create_app(
             normalized_path = str(path or "").strip("/")
             if normalized_path.startswith("agent/"):
                 # 解析 agent/{agent_id}/{sub_path}
-                agent_parts = normalized_path[len("agent/"):].split("/", 1)
+                agent_parts = normalized_path[len("agent/") :].split("/", 1)
                 agent_id = agent_parts[0]
                 agent_sub_path = agent_parts[1] if len(agent_parts) > 1 else ""
                 if normalized_node_id in (node_runtime.local_node_id, "master"):
@@ -1938,7 +1947,10 @@ def create_app(
                     continue
                 try:
                     response = await node_connection_manager.send_request_to_node(
-                        nid, AGENT_STOP_REQUEST, {"agent_id": agent_id}, timeout=10.0,
+                        nid,
+                        AGENT_STOP_REQUEST,
+                        {"agent_id": agent_id},
+                        timeout=10.0,
                     )
                     payload = response.get("payload") or {}
                     if payload.get("success"):
@@ -1947,7 +1959,10 @@ def create_app(
                     pass
             return {
                 "success": False,
-                "error": {"code": "AGENT_NOT_FOUND", "message": f"Agent not found: {agent_id}"},
+                "error": {
+                    "code": "AGENT_NOT_FOUND",
+                    "message": f"Agent not found: {agent_id}",
+                },
             }
         except Exception as e:
             return {
@@ -2000,7 +2015,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "AGENT_UPDATE_FAILED"),
-                            "message": error.get("message", "Remote agent update failed"),
+                            "message": error.get(
+                                "message", "Remote agent update failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -2066,7 +2083,10 @@ def create_app(
                     continue
                 try:
                     response = await node_connection_manager.send_request_to_node(
-                        nid, AGENT_DELETE_REQUEST, {"agent_id": agent_id}, timeout=10.0,
+                        nid,
+                        AGENT_DELETE_REQUEST,
+                        {"agent_id": agent_id},
+                        timeout=10.0,
                     )
                     payload = response.get("payload") or {}
                     if payload.get("success"):
@@ -2076,7 +2096,10 @@ def create_app(
                     pass
             return {
                 "success": False,
-                "error": {"code": "AGENT_NOT_FOUND", "message": f"Agent not found: {agent_id}"},
+                "error": {
+                    "code": "AGENT_NOT_FOUND",
+                    "message": f"Agent not found: {agent_id}",
+                },
             }
         except Exception as e:
             return {
@@ -2117,7 +2140,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "SESSION_LIST_FAILED"),
-                            "message": error.get("message", "Remote session list failed"),
+                            "message": error.get(
+                                "message", "Remote session list failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -2186,7 +2211,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "SESSION_RESTORE_FAILED"),
-                            "message": error.get("message", "Remote session restore failed"),
+                            "message": error.get(
+                                "message", "Remote session restore failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -2251,7 +2278,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "COMPLETIONS_FAILED"),
-                            "message": error.get("message", "Remote completions failed"),
+                            "message": error.get(
+                                "message", "Remote completions failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -2358,7 +2387,9 @@ def create_app(
             }
 
     @app.get("/api/completions/{agent_id}/search", dependencies=[Depends(verify_token)])
-    async def search_completions(agent_id: str, query: str = "", node_id: str = "") -> Dict[str, Any]:
+    async def search_completions(
+        agent_id: str, query: str = "", node_id: str = ""
+    ) -> Dict[str, Any]:
         """搜索文件补全项。
 
         Args:
@@ -2409,7 +2440,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "COMPLETION_SEARCH_FAILED"),
-                            "message": error.get("message", "Remote completion search failed"),
+                            "message": error.get(
+                                "message", "Remote completion search failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -2509,7 +2542,9 @@ def create_app(
                         "success": False,
                         "error": {
                             "code": error.get("code", "GLOBAL_SEARCH_FAILED"),
-                            "message": error.get("message", "Remote global search failed"),
+                            "message": error.get(
+                                "message", "Remote global search failed"
+                            ),
                         },
                     }
                 body = payload.get("body") or "{}"
@@ -3351,24 +3386,35 @@ def create_app(
         elif normalized_method == "GET" and normalized_path == "/node/status":
             result = await get_node_status()
         elif normalized_method == "POST" and normalized_path == "/service/restart":
-            result = await restart_service()
+            result = await restart_service(payload)
         elif normalized_method == "GET" and normalized_path == "/agents":
             result = await get_agents()
         elif normalized_method == "POST" and normalized_path == "/agents":
             result = await create_agent(payload)
-        elif normalized_path.startswith("/agents/") and normalized_path.endswith("/sessions"):
+        elif normalized_path.startswith("/agents/") and normalized_path.endswith(
+            "/sessions"
+        ):
             agent_id = normalized_path[len("/agents/") : -len("/sessions")].strip("/")
             if normalized_method == "GET":
-                result = await list_agent_sessions(agent_id, str(payload.get("node_id") or ""))
+                result = await list_agent_sessions(
+                    agent_id, str(payload.get("node_id") or "")
+                )
             elif normalized_method == "POST":
                 result = await restore_agent_session(agent_id, payload)
             else:
                 result = {
                     "success": False,
-                    "error": {"code": "METHOD_NOT_ALLOWED", "message": "Unsupported method"},
+                    "error": {
+                        "code": "METHOD_NOT_ALLOWED",
+                        "message": "Unsupported method",
+                    },
                 }
-        elif normalized_path.startswith("/completions/") and normalized_path.endswith("/search"):
-            agent_id = normalized_path[len("/completions/") : -len("/search")].strip("/")
+        elif normalized_path.startswith("/completions/") and normalized_path.endswith(
+            "/search"
+        ):
+            agent_id = normalized_path[len("/completions/") : -len("/search")].strip(
+                "/"
+            )
             result = await search_completions(
                 agent_id,
                 query=str(payload.get("query") or ""),
@@ -3377,12 +3423,17 @@ def create_app(
         elif normalized_path.startswith("/completions/"):
             agent_id = normalized_path[len("/completions/") :].strip("/")
             result = await get_completions(agent_id, str(payload.get("node_id") or ""))
-        elif normalized_path.startswith("/global-search/") and normalized_method == "POST":
+        elif (
+            normalized_path.startswith("/global-search/")
+            and normalized_method == "POST"
+        ):
             agent_id = normalized_path[len("/global-search/") :].strip("/")
             result = await global_search(agent_id, payload)
         elif normalized_method == "GET" and normalized_path == "/model-groups":
             result = await get_model_groups()
-        elif normalized_path.startswith("/agents/") and "/" not in normalized_path[len("/agents/"):].strip("/"):
+        elif normalized_path.startswith("/agents/") and "/" not in normalized_path[
+            len("/agents/") :
+        ].strip("/"):
             agent_id = normalized_path[len("/agents/") :].strip("/")
             if normalized_method == "DELETE":
                 result = await delete_agent(agent_id, str(payload.get("node_id") or ""))
@@ -3391,9 +3442,16 @@ def create_app(
             else:
                 result = {
                     "success": False,
-                    "error": {"code": "METHOD_NOT_ALLOWED", "message": "Unsupported method"},
+                    "error": {
+                        "code": "METHOD_NOT_ALLOWED",
+                        "message": "Unsupported method",
+                    },
                 }
-        elif normalized_path.startswith("/agents/") and normalized_path.endswith("/stop") and normalized_method == "DELETE":
+        elif (
+            normalized_path.startswith("/agents/")
+            and normalized_path.endswith("/stop")
+            and normalized_method == "DELETE"
+        ):
             agent_id = normalized_path[len("/agents/") : -len("/stop")].strip("/")
             result = await stop_agent(agent_id)
         else:
