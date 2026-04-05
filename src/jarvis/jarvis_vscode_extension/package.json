@@ -1,6 +1,6 @@
 {
   "name": "jarvis-ai-assistant",
-  "displayName": "Jarvis",
+  "displayName": "Jarvis AI Assistant",
   "description": "Jarvis VS Code extension with agent sidebar, chat panel and terminal panel.",
   "version": "0.0.1",
   "publisher": "jarvis-ai-assistant",
