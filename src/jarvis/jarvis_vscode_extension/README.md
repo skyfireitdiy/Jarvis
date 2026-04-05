@@ -73,7 +73,7 @@ jarvis-service --gateway-password your_password
 
 ### 验证服务状态
 
-1. 打开浏览器访问 `http://localhost:8000`
+1. vscode插件中配置网关地址 `127.0.0.1:8000`
 2. 如果看到 Jarvis 界面，说明服务启动成功
 3. 现在可以打开 VSCode 使用 Jarvis 扩展了
 
