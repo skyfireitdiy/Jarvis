@@ -3057,6 +3057,22 @@ def create_app(
         elif normalized_path.startswith("/global-search/") and normalized_method == "POST":
             agent_id = normalized_path[len("/global-search/") :].strip("/")
             result = await global_search(agent_id, payload)
+        elif normalized_method == "GET" and normalized_path == "/model-groups":
+            result = await get_model_groups()
+        elif normalized_path.startswith("/agents/") and "/" not in normalized_path[len("/agents/"):].strip("/"):
+            agent_id = normalized_path[len("/agents/") :].strip("/")
+            if normalized_method == "DELETE":
+                result = await delete_agent(agent_id, str(payload.get("node_id") or ""))
+            elif normalized_method == "PATCH":
+                result = await patch_agent(agent_id, payload)
+            else:
+                result = {
+                    "success": False,
+                    "error": {"code": "METHOD_NOT_ALLOWED", "message": "Unsupported method"},
+                }
+        elif normalized_path.startswith("/agents/") and normalized_path.endswith("/stop") and normalized_method == "DELETE":
+            agent_id = normalized_path[len("/agents/") : -len("/stop")].strip("/")
+            result = await stop_agent(agent_id)
         else:
             return {
                 "success": False,
