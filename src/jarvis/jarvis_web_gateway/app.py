@@ -549,7 +549,7 @@ class WebSocketConnectionManager:
         # 检查是否需要转发到远端节点
         if message_type in ("terminal_create", "terminal_close", "terminal_session_input", "terminal_session_resize"):
             terminal_node_id = str(payload.get("node_id") or "").strip()
-            if terminal_node_id and terminal_node_id not in (node_runtime.local_node_id, "master", ""):
+            if terminal_node_id and terminal_node_id not in (node_connection_manager._node_runtime.local_node_id, "master", ""):
                 # 转发到远端节点
                 try:
                     response = await node_connection_manager.send_request_to_node(
