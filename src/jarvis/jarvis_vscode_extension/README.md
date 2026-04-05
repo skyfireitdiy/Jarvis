@@ -1,8 +1,5 @@
 # Jarvis AI Assistant - VS Code Extension
 
-[![Version](https://img.shields.io/badge/version-0.0.1-blue)](https://github.com/skyfireitdiy/Jarvis)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.82.0-blue)](https://code.visualstudio.com/)
-
 Jarvis AI Assistant 是一个强大的 VS Code 扩展，为开发者提供智能 AI 编程助手。它集成了 Agent 侧边栏、聊天面板和终端面板，让 AI 辅助编程更加便捷高效。
 
 ## 功能特性
