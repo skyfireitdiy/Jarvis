@@ -18,13 +18,13 @@
 ### 1. 启动主节点
 
 1. 在主节点机器上启动 Web Gateway。
-2. 示例：`jwg --node master`
+2. 示例：`jarvis-service --node master`
 3. 如有需要，再补充监听地址、端口和密码参数。
 
 ### 2. 启动子节点
 
 1. 在子节点机器上启动 Web Gateway。
-2. 示例：`jwg --node child`
+2. 示例：`jarvis-service --node child`
 3. 确保子节点具备接入主节点所需的网络可达性与配置。
 
 ### 3. 验证子节点接入
