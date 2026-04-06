@@ -541,18 +541,23 @@ class WebSocketConnectionManager:
             return
         if message_type == "get_status":
             # 处理前端主动请求状态的请求
+            logger.info("[WS MESSAGE] Received get_status request")
             if get_agent_status_manager is not None:
                 try:
                     status_manager = get_agent_status_manager()
                     current_status = status_manager.get_status()
+                    logger.info(f"[WS MESSAGE] Current agent status: {current_status}")
                     # 返回 status_update 消息
                     status_message = {
                         "type": "status_update",
                         "payload": {"execution_status": current_status},
                     }
                     self._router.publish(status_message, session_id=session_id)
+                    logger.info(f"[WS MESSAGE] Published status_update to session {session_id}")
                 except Exception as e:
-                    pass
+                    logger.error(f"[WS MESSAGE] Error handling get_status: {e}", exc_info=True)
+            else:
+                logger.warning("[WS MESSAGE] get_agent_status_manager is not available")
             return
         # 独立终端会话消息处理
         # 检查是否需要转发到远端节点

@@ -682,6 +682,10 @@ class NodeConnectionManager:
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
+            # 清理已关闭的会话
+            if agent_ws.closed:
+                self._agent_ws_sessions.pop(session_id, None)
+                raise RuntimeError(f"ws session already closed: {session_id}")
             for item in payload.get("messages") or []:
                 await agent_ws.send(str(item))
             return build_node_message(
@@ -716,6 +720,10 @@ class NodeConnectionManager:
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
+            # 清理已关闭的会话
+            if agent_ws.closed:
+                self._agent_ws_sessions.pop(session_id, None)
+                raise RuntimeError(f"ws session already closed: {session_id}")
             messages: list[str] = []
             while True:
                 try:
