@@ -184,7 +184,9 @@
         z-index: 98;
         opacity: 0;
         visibility: hidden;
-        transition: opacity 0.3s, visibility 0.3s;
+        transition:
+          opacity 0.3s,
+          visibility 0.3s;
       }
       .nk-mobile-overlay.active {
         opacity: 1;
@@ -296,7 +298,7 @@
         transform: translateY(-2px);
       }
       .term {
-        max-width: 680px;
+        max-width: 800px;
         margin: 0 auto;
         background: var(--bg2);
         border: 1px solid var(--bd);
@@ -343,6 +345,7 @@
       .tl {
         margin-bottom: 4px;
       }
+
       .tp {
         color: var(--gr);
       }
@@ -352,9 +355,7 @@
       .to {
         color: var(--t2);
       }
-      .th {
-        color: var(--al);
-      }
+
       .tt {
         color: var(--t3);
       }
@@ -658,7 +659,9 @@
         border-bottom: 1px solid var(--bd);
         min-height: 48px;
         line-height: 1.3;
-        transition: color 0.2s, background 0.2s;
+        transition:
+          color 0.2s,
+          background 0.2s;
       }
       .nk-mobile a:hover {
         color: var(--t1);
@@ -726,7 +729,6 @@
           <li><a href="#modes">产品形态</a></li>
           <li><a href="#features">核心能力</a></li>
           <li><a href="#quickstart">快速开始</a></li>
-          <li><a href="#compare">方案对比</a></li>
           <li>
             <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank"
               >文档</a
@@ -739,12 +741,7 @@
           class="nc"
           >&#11088; GitHub</a
         >
-        <button
-          class="nm"
-          onclick="toggleMobileMenu()"
-        >
-          &#9776;
-        </button>
+        <button class="nm" onclick="toggleMobileMenu()">&#9776;</button>
       </div>
     </nav>
     <div class="nk-mobile-overlay" onclick="toggleMobileMenu()"></div>
@@ -752,9 +749,19 @@
       <a href="#modes" onclick="toggleMobileMenu()">产品形态</a>
       <a href="#features" onclick="toggleMobileMenu()">核心能力</a>
       <a href="#quickstart" onclick="toggleMobileMenu()">快速开始</a>
-      <a href="#compare" onclick="toggleMobileMenu()">方案对比</a>
-      <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" onclick="toggleMobileMenu()">文档</a>
-      <a href="https://github.com/skyfireitdiy/Jarvis" target="_blank" class="nc-mobile" onclick="toggleMobileMenu()">&#11088; GitHub</a>
+      <a
+        href="https://github.com/skyfireitdiy/Jarvis"
+        target="_blank"
+        onclick="toggleMobileMenu()"
+        >文档</a
+      >
+      <a
+        href="https://github.com/skyfireitdiy/Jarvis"
+        target="_blank"
+        class="nc-mobile"
+        onclick="toggleMobileMenu()"
+        >&#11088; GitHub</a
+      >
     </div>
 
     <section class="hero">
@@ -819,16 +826,27 @@
               <span class="tp">$ </span><span class="tc">jca</span
               ><span class="tt"> # 启动 Code Agent</span>
             </div>
+            <div class="tl"><br /></div>
             <div class="tl">
-              <span class="th">🤖 Jarvis Code Agent 已就绪</span>
+              <img
+                src="screenshot-cli.png"
+                alt="Jarvis CLI"
+                style="
+                  width: 100%;
+                  max-width: 800px;
+                  display: block;
+                  margin: 0 auto;
+                  border-radius: 6px;
+                "
+              />
+            </div>
+            <div class="tl"><br /></div>
+            <div class="tl">
+              <span class="tp">👤 &gt; </span
+              ><span class="to">请输入你的需求（Ctrl+C 退出）</span>
             </div>
             <div class="tl">
-              <span class="to"
-                >已加载 23 个工具 · 记忆系统就绪 · 规则引擎就绪</span
-              >
-            </div>
-            <div class="tl">
-              <span class="tp">You: </span
+              <span class="tp">👤 &gt; </span
               ><span class="tc">帮我重构这个模块并添加单元测试</span
               ><span class="cur"></span>
             </div>
@@ -861,19 +879,51 @@
             />
             <div class="cb">
               <div>
-                <span style="color: var(--gr)">$</span>
-                <span style="color: var(--t1)">jca</span>
-                <span style="color: var(--t3)"># Code Agent</span>
+                <span style="color: var(--al)">jqc</span>
+                <span style="color: var(--t3)">jarvis-quick-config</span>
+                <span style="color: var(--t2)">— 快速配置 LLM 平台</span>
               </div>
               <div>
-                <span style="color: var(--gr)">$</span>
-                <span style="color: var(--t1)">jvs</span>
-                <span style="color: var(--t3)"># 通用 Agent</span>
+                <span style="color: var(--al)">jca</span>
+                <span style="color: var(--t3)">jarvis-code-agent</span>
+                <span style="color: var(--t2)">— 代码分析与生成</span>
               </div>
               <div>
-                <span style="color: var(--gr)">$</span>
-                <span style="color: var(--t1)">jcad</span>
-                <span style="color: var(--t3)"># 守护进程</span>
+                <span style="color: var(--al)">jcad</span>
+                <span style="color: var(--t3)"
+                  >jarvis-code-agent-dispatcher</span
+                >
+                <span style="color: var(--t2)">— 代码代理（派发模式）</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jvs</span>
+                <span style="color: var(--t3)">jarvis</span>
+                <span style="color: var(--t2)">— 通用 AI 代理</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jvsd</span>
+                <span style="color: var(--t3)">jarvis-agent-dispatcher</span>
+                <span style="color: var(--t2)">— 通用代理（派发模式）</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jgc</span>
+                <span style="color: var(--t3)">jarvis-git-commit</span>
+                <span style="color: var(--t2)">— 自动生成提交信息</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jgs</span>
+                <span style="color: var(--t3)">jarvis-git-squash</span>
+                <span style="color: var(--t2)">— 提交历史整理</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jpm</span>
+                <span style="color: var(--t3)">jarvis-platform-manager</span>
+                <span style="color: var(--t2)">— LLM 平台管理</span>
+              </div>
+              <div>
+                <span style="color: var(--al)">jc2r</span>
+                <span style="color: var(--t3)">jarvis-c2rust</span>
+                <span style="color: var(--t2)">— C→Rust 迁移套件</span>
               </div>
             </div>
           </div>
@@ -883,17 +933,61 @@
             <p>
               可视化操作。浏览器即开即用，多会话管理、实时终端、文件浏览，支持多节点分布式协作。
             </p>
-            <img
-              class="mc-img"
-              src="./screenshot-web.png"
-              alt="Web 界面截图"
-            />
+            <img class="mc-img" src="./screenshot-web.png" alt="Web 界面截图" />
             <div class="cb">
               <div>
-                <span style="color: var(--gr)">$</span>
-                <span style="color: var(--t1)">./start.sh</span>
+                <span style="color: var(--t3)"># Master 模式（主节点）</span>
               </div>
-              <div style="color: var(--t3)">→ http://localhost:8000</div>
+              <div>
+                <span style="color: var(--al)">jarvis-service</span> start
+                <span style="color: var(--t2)">--node-mode master</span>
+              </div>
+              <div><br /></div>
+              <div>
+                <span style="color: var(--t3)"
+                  ># Child 模式（子节点，连接主节点）</span
+                >
+              </div>
+              <div>
+                <span style="color: var(--al)">jarvis-service</span> start
+                <span style="color: var(--t2)"
+                  >--node-mode child --master-url ws://master:8000 --node-secret
+                  YOUR_SECRET</span
+                >
+              </div>
+              <div><br /></div>
+              <div><span style="color: var(--t3)"># 常用环境变量</span></div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_GATEWAY_HOST</span>
+                <span style="color: var(--t3)">=127.0.0.1</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_GATEWAY_PORT</span>
+                <span style="color: var(--t3)">=8000</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_FRONTEND_HOST</span>
+                <span style="color: var(--t3)">=127.0.0.1</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_FRONTEND_PORT</span>
+                <span style="color: var(--t3)">=5173</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_NODE_MODE</span>
+                <span style="color: var(--t3)">=master/child</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_MASTER_URL</span>
+                <span style="color: var(--t3)">=ws://master:8000</span>
+              </div>
+              <div>
+                <span style="color: var(--t2)">JARVIS_NODE_SECRET</span>
+                <span style="color: var(--t3)">=your_secret</span>
+              </div>
+              <div style="color: var(--t3)">
+                → Gateway http://localhost:8000 | Frontend http://localhost:5173
+              </div>
             </div>
           </div>
           <div class="mc">
@@ -909,9 +1003,20 @@
               alt="VS Code 扩展截图"
             />
             <div class="cb">
-              <div style="color: var(--t3)">VS Code 侧边栏</div>
-              <div style="color: var(--t3)">→ Jarvis 面板</div>
-              <div style="color: var(--t3)">→ 创建 Agent 开始协作</div>
+              <div>
+                <span style="color: var(--t3)">插件名称：</span
+                ><span style="color: var(--al)">Jarvis AI Assistant</span>
+              </div>
+              <div>
+                <span style="color: var(--t3)">插件 ID：</span
+                ><span style="color: var(--t2)"
+                  >jarvis-ai-assistant.jarvis-ai-assistant</span
+                >
+              </div>
+              <div><br /></div>
+              <div style="color: var(--t3)">
+                VS Code 侧边栏 → Jarvis 面板 → 连接网关 → 创建 Agent 开始协作
+              </div>
             </div>
           </div>
         </div>
@@ -1002,10 +1107,12 @@
           </div>
           <div class="step">
             <div class="sn">2</div>
-            <h3>配置</h3>
-            <p>首次运行按提示配置 API Key</p>
-            <div class="sc">
-              jvs <span style="color: var(--t3)"># 按提示配置</span>
+            <h3>快速配置</h3>
+            <p>运行配置向导，选择 LLM 平台并输入 API Key</p>
+            <div class="sc copy-wrap">
+              <button class="copy-btn" data-cmd="jqc" onclick="copyCmd(this)">
+                复制</button
+              >jqc <span style="color: var(--t3)"># 快速配置</span>
             </div>
           </div>
           <div class="step">
@@ -1016,94 +1123,6 @@
               jca <span style="color: var(--t3)"># Code Agent</span>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="compare" style="background: var(--bg2)">
-      <div class="ctn">
-        <div class="fin">
-          <span class="sl">方案对比</span>
-          <h2 class="st">为什么选择 Jarvis？</h2>
-          <p class="sd">与主流方案的客观对比。</p>
-        </div>
-        <div class="ctw fin">
-          <table class="ct">
-            <thead>
-              <tr>
-                <th>特性</th>
-                <th>Jarvis</th>
-                <th>LangChain</th>
-                <th>AutoGPT</th>
-                <th>Cursor</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr class="hl">
-                <td>定位</td>
-                <td>AI 开发助手</td>
-                <td>LLM 框架</td>
-                <td>自主 Agent</td>
-                <td>AI 编辑器</td>
-              </tr>
-              <tr>
-                <td>本地化运行</td>
-                <td class="ck">✔</td>
-                <td class="ck">✔</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-              </tr>
-              <tr>
-                <td>代码开发专项</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-                <td class="ck">✔</td>
-              </tr>
-              <tr>
-                <td>自动 Git 管理</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-              </tr>
-              <tr>
-                <td>方法论沉淀</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-              </tr>
-              <tr>
-                <td>记忆系统</td>
-                <td class="ck">✔</td>
-                <td class="ck">✔</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-              </tr>
-              <tr>
-                <td>工具自举</td>
-                <td class="ck">✔</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-                <td class="cx">✘</td>
-              </tr>
-              <tr>
-                <td>多端支持</td>
-                <td>CLI/Web/VSCode</td>
-                <td>Python SDK</td>
-                <td>Web</td>
-                <td>桌面 App</td>
-              </tr>
-              <tr>
-                <td>开源协议</td>
-                <td>MIT</td>
-                <td>MIT</td>
-                <td>MIT</td>
-                <td>商业</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </section>
@@ -1195,12 +1214,12 @@
       document.querySelectorAll(".fin").forEach((el) => obs.observe(el));
 
       function toggleMobileMenu() {
-        const menu = document.querySelector('.nk-mobile');
-        const overlay = document.querySelector('.nk-mobile-overlay');
-        const isActive = menu.classList.contains('active');
-        menu.classList.toggle('active');
-        overlay.classList.toggle('active');
-        document.body.style.overflow = isActive ? '' : 'hidden';
+        const menu = document.querySelector(".nk-mobile");
+        const overlay = document.querySelector(".nk-mobile-overlay");
+        const isActive = menu.classList.contains("active");
+        menu.classList.toggle("active");
+        overlay.classList.toggle("active");
+        document.body.style.overflow = isActive ? "" : "hidden";
       }
 
       function copyCmd(btn) {
