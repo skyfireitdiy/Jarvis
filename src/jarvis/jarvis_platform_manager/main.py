@@ -317,6 +317,8 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
         PrettyOutput.auto_print("\n[bold]可用模型列表:[/]")
         for i, model in enumerate(models, 1):
             PrettyOutput.auto_print(f"  {i}. {model}")
+        manual_input_option = len(models) + 1
+        PrettyOutput.auto_print(f"  {manual_input_option}. 手动输入模型名称")
 
         configure_all = user_confirm("是否配置所有模型？", default=False)
 
@@ -324,17 +326,32 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             selected_models = models
         else:
             model_choices = get_single_line_input(
-                "请输入要配置的模型序号（用逗号分隔）:"
+                f"请输入要配置的模型序号（用逗号分隔，输入 {manual_input_option} 可手动输入模型名称）:"
             )
             try:
                 indices = [int(x.strip()) - 1 for x in model_choices.split(",")]
                 selected_models = []
+                use_manual_input = False
                 for idx in indices:
                     if 0 <= idx < len(models):
                         selected_models.append(models[idx])
+                    elif idx == len(models):
+                        use_manual_input = True
                     else:
                         PrettyOutput.auto_print(f"❌ 无效的模型序号: {idx + 1}")
                         raise typer.Exit(code=1)
+
+                if use_manual_input:
+                    model_input = get_single_line_input(
+                        "请输入模型名称（多个模型用逗号分隔，如: gpt-4o,gpt-3.5-turbo）:"
+                    )
+                    manual_models = [
+                        m.strip() for m in model_input.split(",") if m.strip()
+                    ]
+                    if not manual_models:
+                        PrettyOutput.auto_print("❌ 未输入有效模型名称")
+                        raise typer.Exit(code=1)
+                    selected_models.extend(manual_models)
 
                 selected_models = list(dict.fromkeys(selected_models))
                 if not selected_models:
@@ -356,9 +373,9 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     # 6. 为每个选中的模型创建配置
     added_count = 0
     for model in selected_models:
-        # 生成配置名称：{base_config}_{model_normalized}
+        # 生成配置名称：{platform}_{model_normalized}
         model_config_name = (
-            f"{base_config_name}_{model.replace('.', '_').replace('-', '_')}"
+            f"{platform}_{model.replace('.', '_').replace('-', '_')}"
         )
 
         # 检查是否已存在
