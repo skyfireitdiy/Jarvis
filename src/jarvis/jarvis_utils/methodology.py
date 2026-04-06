@@ -224,7 +224,7 @@ def load_methodology(
             PrettyOutput.auto_print("❌ 无法创建平台实例")
             return ""
 
-        platform.set_suppress_output(True)
+        platform.set_suppress_output(False)
 
         # 步骤1：获取所有方法论的标题
         methodology_titles = [title for title, _ in methodologies]
@@ -260,13 +260,7 @@ def load_methodology(
 注意：只返回<NUM>标签内的内容，不要有其他任何输出。
 """
 
-        # 获取大模型选择的方法论序号（限制输出最大50字）
-        with console.status(
-            "[bold blue]🔍 正在分析需求并推荐方法论...", spinner="dots"
-        ):
-            response = platform.chat_until_success(
-                selection_prompt
-            ).strip()
+        response = platform.chat_until_success(selection_prompt).strip()
 
         # 重置平台，恢复输出
         platform.reset()
@@ -276,12 +270,12 @@ def load_methodology(
         import re
 
         selected_indices_str = ""
-        
+
         # 首先尝试提取<NUM>标签内的内容
         num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
         if num_match:
             selected_indices_str = num_match.group(1).strip()
-        
+
         # 如果没有找到<NUM>标签，或者内容为空，尝试从整个响应中提取数字
         if not selected_indices_str:
             # 查找所有数字（支持逗号或空格分隔，如 "1,2,3" 或 "1 2 3"）

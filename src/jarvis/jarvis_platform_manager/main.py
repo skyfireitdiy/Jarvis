@@ -237,14 +237,229 @@ def llm_delete(
         raise typer.Exit(code=1)
 
 
+def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
+    """基于已有配置批量添加LLM模型
+
+    Args:
+        config: 配置字典
+        base_config_name: 基础配置名称
+    """
+    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
+
+    # 1. 验证基础配置是否存在
+    if base_config_name not in config.get("llms", {}):
+        PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 不存在")
+        PrettyOutput.auto_print(
+            "可用的配置: " + ", ".join(config.get("llms", {}).keys())
+        )
+        raise typer.Exit(code=1)
+
+    base_llm_config = config["llms"][base_config_name]
+    if not isinstance(base_llm_config, dict):
+        PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 格式无效")
+        raise typer.Exit(code=1)
+
+    # 2. 提取基础配置信息
+    platform = base_llm_config.get("platform", "").strip().lower()
+    if not platform:
+        PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 缺少平台信息")
+        raise typer.Exit(code=1)
+
+    llm_config_dict = base_llm_config.get("llm_config", {})
+    if not llm_config_dict:
+        PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 缺少llm_config信息")
+        raise typer.Exit(code=1)
+
+    # 提取base_url和api_key
+    base_url = None
+    api_key = None
+    if platform == "openai":
+        base_url = llm_config_dict.get("openai_api_base")
+        api_key = llm_config_dict.get("openai_api_key")
+    elif platform == "claude":
+        base_url = llm_config_dict.get("anthropic_base_url")
+        api_key = llm_config_dict.get("anthropic_api_key")
+    else:
+        base_url = llm_config_dict.get(f"{platform}_base_url")
+        api_key = llm_config_dict.get(f"{platform}_api_key")
+
+    if not base_url or not api_key:
+        PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 缺少URL或API Key")
+        raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"📋 基础配置: 平台={platform}, URL={base_url}")
+
+    # 3. 获取可用模型列表
+    from jarvis.jarvis_utils.quick_config import get_models
+
+    models = get_models(platform, base_url, api_key)
+    if not models:
+        PrettyOutput.auto_print("⚠️ 未能从API获取模型列表")
+        use_manual_input = user_confirm("是否手动输入模型名称？", default=True)
+        if use_manual_input:
+            model_input = get_single_line_input(
+                "请输入模型名称（多个模型用逗号分隔，如: gpt-4o,gpt-3.5-turbo）:"
+            )
+            models = [m.strip() for m in model_input.split(",") if m.strip()]
+            if not models:
+                PrettyOutput.auto_print("❌ 未输入有效模型名称")
+                raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("❌ 未提供模型名称")
+            raise typer.Exit(code=0)
+
+    PrettyOutput.auto_print(
+        f"📋 可用模型: {', '.join(models[:10])}{'...' if len(models) > 10 else ''}"
+    )
+
+    # 4. 选择要添加的模型
+    if len(models) > 1:
+        PrettyOutput.auto_print("\n[bold]可用模型列表:[/]")
+        for i, model in enumerate(models, 1):
+            PrettyOutput.auto_print(f"  {i}. {model}")
+
+        configure_all = user_confirm("是否配置所有模型？", default=False)
+
+        if configure_all:
+            selected_models = models
+        else:
+            model_choices = get_single_line_input(
+                "请输入要配置的模型序号（用逗号分隔）:"
+            )
+            try:
+                indices = [int(x.strip()) - 1 for x in model_choices.split(",")]
+                selected_models = []
+                for idx in indices:
+                    if 0 <= idx < len(models):
+                        selected_models.append(models[idx])
+                    else:
+                        PrettyOutput.auto_print(f"❌ 无效的模型序号: {idx + 1}")
+                        raise typer.Exit(code=1)
+
+                selected_models = list(dict.fromkeys(selected_models))
+                if not selected_models:
+                    PrettyOutput.auto_print("❌ 没有选择任何有效模型")
+                    raise typer.Exit(code=1)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 请输入有效的数字序号，用逗号分隔")
+                raise typer.Exit(code=1)
+    else:
+        selected_models = [models[0]]
+
+    PrettyOutput.auto_print(
+        f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
+    )
+
+    # 5. 设置默认最大token数
+    default_max_tokens = base_llm_config.get("max_input_token_count", 128000)
+
+    # 6. 为每个选中的模型创建配置
+    added_count = 0
+    for model in selected_models:
+        # 生成配置名称：{base_config}_{model_normalized}
+        model_config_name = (
+            f"{base_config_name}_{model.replace('.', '_').replace('-', '_')}"
+        )
+
+        # 检查是否已存在
+        if model_config_name in config["llms"]:
+            if not user_confirm(
+                f"配置 '{model_config_name}' 已存在，是否覆盖？", default=True
+            ):
+                PrettyOutput.auto_print(f"⏭️ 跳过模型: {model}")
+                continue
+
+        # 根据平台类型生成配置字典
+        if platform == "openai":
+            llm_config_dict_new = {
+                "openai_api_key": api_key,
+                "openai_api_base": base_url,
+            }
+        elif platform == "claude":
+            llm_config_dict_new = {
+                "anthropic_api_key": api_key,
+                "anthropic_base_url": base_url,
+            }
+        else:
+            llm_config_dict_new = {
+                f"{platform}_api_key": api_key,
+                f"{platform}_base_url": base_url,
+            }
+
+        # 创建LLM配置
+        llm_config_new: Dict[str, Any] = {
+            "platform": platform,
+            "model": model,
+            "max_input_token_count": default_max_tokens,
+            "llm_config": llm_config_dict_new,
+        }
+
+        config["llms"][model_config_name] = llm_config_new
+        added_count += 1
+        PrettyOutput.auto_print(f"✅ 已添加配置: {model_config_name} -> {model}")
+
+    # 7. 保存配置
+    if added_count > 0:
+        if _save_config(config):
+            PrettyOutput.auto_print(f"\n✅ 成功添加 {added_count} 个模型配置")
+        else:
+            PrettyOutput.auto_print("❌ 保存配置失败")
+            raise typer.Exit(code=1)
+    else:
+        PrettyOutput.auto_print("ℹ️ 没有添加任何新配置")
+
+
 @llm_app.command("add")
-def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
+def llm_add() -> None:
     """添加新的 LLM 配置（交互式）"""
-    from jarvis.jarvis_utils.input import get_single_line_input
+    from jarvis.jarvis_utils.input import get_single_line_input, user_confirm
 
     config = _load_config()
     if "llms" not in config:
         config["llms"] = {}
+
+    # 询问添加模式
+    existing_llms = list(config.get("llms", {}).keys())
+    use_batch_mode = False
+    base_config_name = None
+
+    if existing_llms:
+        use_batch_mode = user_confirm(
+            "是否基于已有配置批量添加模型？（复用平台、URL、Key信息）",
+            default=False,
+        )
+
+    if use_batch_mode:
+        # 让用户选择基础配置
+        PrettyOutput.auto_print("\n📋 可用的LLM配置:")
+        for i, llm_name in enumerate(existing_llms, 1):
+            llm_info = config["llms"].get(llm_name, {})
+            platform = llm_info.get("platform", "未知")
+            model = llm_info.get("model", "未知")
+            PrettyOutput.auto_print(
+                f"  {i}. {llm_name} (平台: {platform}, 模型: {model})"
+            )
+
+        choice = get_single_line_input("请选择基础配置序号: ").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(existing_llms):
+                base_config_name = existing_llms[idx]
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的序号: {choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            PrettyOutput.auto_print("❌ 请输入有效的数字序号")
+            raise typer.Exit(code=1)
+
+        _llm_add_batch(config, base_config_name)
+        return
+
+    # 交互式添加单个模型
+    name = get_single_line_input("请输入LLM配置名称: ").strip()
+    if not name:
+        PrettyOutput.auto_print("❌ 请提供LLM配置名称")
+        raise typer.Exit(code=1)
 
     if name in config["llms"]:
         from jarvis.jarvis_utils.input import user_confirm
