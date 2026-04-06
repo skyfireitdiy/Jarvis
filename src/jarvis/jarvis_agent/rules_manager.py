@@ -1012,14 +1012,8 @@ class RulesManager:
 
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
-
-            # 使用 Status 显示进度
-            with Status(
-                "🔍 正在分析任务并选择规则...",
-                spinner="dots",
-                console=console,
-            ):
-                response = model.chat_until_success(prompt, max_output=100).strip()
+            model.set_suppress_output(False)
+            response = model.chat_until_success(prompt, max_output=100).strip()
 
             # 从响应中提取<NUM>标签内的内容
             import re
@@ -1160,13 +1154,9 @@ class RulesManager:
 
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
-            # 使用 Status 显示进度
-            with Status(
-                "🔍 正在过滤规则内容...",
-                spinner="dots",
-                console=console,
-            ):
-                response = model.chat_until_success(prompt, max_output=200).strip()
+            model.set_suppress_output(False)
+            
+            response = model.chat_until_success(prompt, max_output=200).strip()
             model.set_suppress_output(False)
 
             # 从响应中提取<VALID>标签内的内容
