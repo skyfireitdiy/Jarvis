@@ -9,8 +9,11 @@ import logging
 import os
 import pathlib
 import random
+import shutil
 import uuid
 from typing import Any, Dict, Optional
+
+import yaml
 
 import websockets
 from fastapi import WebSocket
@@ -46,6 +49,8 @@ from .node_protocol import (
     NODE_TERMINAL_OUTPUT,
     SERVICE_RESTART_REQUEST,
     SERVICE_RESTART_RESPONSE,
+    CONFIG_SYNC_REQUEST,
+    CONFIG_SYNC_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -251,6 +256,20 @@ class NodeConnectionManager:
                     await websocket.send_json(response)
                     logger.info(
                         "[NODE] sent directory list response node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
+                    continue
+                if message_type == CONFIG_SYNC_REQUEST:
+                    logger.info(
+                        "[NODE] handling config sync request node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
+                    response = await self._handle_config_sync_request(next_message)
+                    await websocket.send_json(response)
+                    logger.info(
+                        "[NODE] sent config sync response node_id=%s request_id=%s",
                         node_id,
                         request_id,
                     )
@@ -882,6 +901,87 @@ class NodeConnectionManager:
                         "code": "DIRECTORY_LIST_FAILED",
                         "message": str(exc),
                     },
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_config_sync_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理配置同步请求（child 端）。"""
+        request_id = message.get("request_id")
+        payload = message.get("payload") or {}
+        config_sections = payload.get("config_sections", [])
+        config_data = payload.get("config_data", {})
+        
+        logger.info(
+            "[NODE CONFIG SYNC] child handling config sync request_id=%s sections=%s",
+            request_id,
+            config_sections,
+        )
+        
+        try:
+            # 获取配置文件路径
+            config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+            
+            # 备份原配置文件
+            backup_file = config_file.with_suffix(".yaml.bak")
+            if config_file.exists():
+                shutil.copy2(config_file, backup_file)
+                logger.info("[NODE CONFIG SYNC] backed up config to %s", backup_file)
+            
+            # 读取现有配置
+            existing_config = {}
+            if config_file.exists():
+                with open(config_file, "r", encoding="utf-8") as f:
+                    existing_config = yaml.safe_load(f) or {}
+            
+            # 更新配置
+            updated_config = existing_config.copy()
+            for section in config_sections:
+                if section in config_data:
+                    updated_config[section] = config_data[section]
+                    logger.info("[NODE CONFIG SYNC] updated section: %s", section)
+            
+            # 保存配置
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file, "w", encoding="utf-8") as f:
+                yaml.safe_dump(updated_config, f, allow_unicode=True, default_flow_style=False)
+            
+            logger.info(
+                "[NODE CONFIG SYNC] child config sync completed request_id=%s",
+                request_id,
+            )
+            return build_node_message(
+                CONFIG_SYNC_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "message": "配置同步成功",
+                        "backup_file": str(backup_file),
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE CONFIG SYNC] child config sync failed request_id=%s error=%s",
+                request_id,
+                exc,
+            )
+            # 尝试恢复备份
+            try:
+                if backup_file.exists():
+                    shutil.copy2(backup_file, config_file)
+                    logger.info("[NODE CONFIG SYNC] restored config from backup")
+            except Exception as restore_exc:
+                logger.error("[NODE CONFIG SYNC] failed to restore backup: %s", restore_exc)
+            
+            return build_node_message(
+                CONFIG_SYNC_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "CONFIG_SYNC_ERROR", "message": str(exc)},
                 },
                 request_id=request_id,
             )

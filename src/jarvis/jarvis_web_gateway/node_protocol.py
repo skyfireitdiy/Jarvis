@@ -40,6 +40,8 @@ NODE_TERMINAL_RESPONSE = "node_terminal_response"
 NODE_TERMINAL_OUTPUT = "node_terminal_output"
 SERVICE_RESTART_REQUEST = "service_restart_request"
 SERVICE_RESTART_RESPONSE = "service_restart_response"
+CONFIG_SYNC_REQUEST = "config_sync_request"
+CONFIG_SYNC_RESPONSE = "config_sync_response"
 ERROR = "error"
 
 
