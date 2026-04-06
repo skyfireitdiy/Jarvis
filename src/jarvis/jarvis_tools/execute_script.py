@@ -603,6 +603,8 @@ class ScriptTool:
 
         captured: List[str] = []
         captured_lock = threading.Lock()
+        raw_captured: List[bytes] = []
+        raw_captured_lock = threading.Lock()
         stop_event = threading.Event()
         exc_holder: List[BaseException] = []
         sequence_lock = threading.Lock()
@@ -678,6 +680,9 @@ class ScriptTool:
                         execution_id=execution_id,
                         sequence=next_sequence(),
                     )
+                    # 保存原始字节数据用于后续 pyte 处理
+                    with raw_captured_lock:
+                        raw_captured.append(data)
                     # 对于本地输出，仍然需要解码
                     raw_text = data.decode("utf-8", errors="replace")
                     if not raw_text:
@@ -842,7 +847,25 @@ class ScriptTool:
         except Exception:
             pass
 
-        output = "".join(captured).strip()
+        # 使用 pyte 处理原始字节数据，得到正确的显示输出（处理控制字符）
+        try:
+            import pyte
+
+            raw_data = b"".join(raw_captured)
+            screen = pyte.Screen(300, 100000)
+            stream = pyte.ByteStream(screen)
+            stream.feed(raw_data)
+            # 清理每行右侧空格，并过滤空行
+            cleaned_lines: List[str] = []
+            for y in range(screen.lines):
+                line = screen.buffer[y]
+                stripped = "".join(char.data for char in line.values()).rstrip()
+                if stripped:
+                    cleaned_lines.append(stripped)
+            output = "\n".join(cleaned_lines).strip()
+        except Exception:
+            # 如果 pyte 处理失败，回退到原来的逻辑
+            output = "".join(captured).strip()
         exit_code = proc.returncode if proc.returncode is not None else -1
         if timed_out:
             self._publish_execution_event(
