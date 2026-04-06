@@ -268,6 +268,10 @@ class OpenAIModel(BasePlatform):
             if self.reasoning_effort:
                 api_params["reasoning_effort"] = self.reasoning_effort
 
+            # 如果没有指定 max_tokens，设置为 1M 确保有足够空间处理 reasoning_content
+            if "max_tokens" not in api_params:
+                api_params["max_tokens"] = 64000
+
             response = self.client.chat.completions.create(**api_params)
 
             full_response = ""
@@ -285,9 +289,12 @@ class OpenAIModel(BasePlatform):
                         # 获取内容增量
                         if choice.delta:
                             # 处理 reasoning_content（推理过程，如 GLM 模型）
-                            if hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content:
+                            if (
+                                hasattr(choice.delta, "reasoning_content")
+                                and choice.delta.reasoning_content
+                            ):
                                 text = choice.delta.reasoning_content
-                                full_response += text
+                                # full_response += text  # 不加到 full_response，只流式打印
                                 yield text
                             # 处理 content（正文内容）
                             if choice.delta.content:
@@ -308,9 +315,11 @@ class OpenAIModel(BasePlatform):
                     )
                     if fallback_response.choices and len(fallback_response.choices) > 0:
                         fallback_message = fallback_response.choices[0].message
-                        fallback_reasoning = getattr(fallback_message, 'reasoning_content', None) or ""
+                        # fallback_reasoning = (
+                        #     getattr(fallback_message, "reasoning_content", None) or ""
+                        # )  # 不使用 reasoning
                         fallback_text = fallback_message.content or ""
-                        fallback_content = fallback_reasoning + fallback_text
+                        fallback_content = fallback_text
                         if fallback_content:
                             self.messages.append(
                                 {"role": "assistant", "content": fallback_content}
@@ -323,9 +332,9 @@ class OpenAIModel(BasePlatform):
                 if response.choices and len(response.choices) > 0:
                     message = response.choices[0].message
                     # 处理 reasoning_content（推理过程，如 GLM 模型）
-                    reasoning = getattr(message, 'reasoning_content', None) or ""
+                    # reasoning = getattr(message, "reasoning_content", None) or ""  # 不使用 reasoning
                     content = message.content or ""
-                    full_response = reasoning + content
+                    full_response = content
                 if full_response:
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
