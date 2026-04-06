@@ -1256,7 +1256,7 @@ class PrettyOutput:
 
         with Live(panel, refresh_per_second=10, transient=True) as live:
 
-            def _update_panel_content(content: str, style: str = "bright_white", update_subtitle: bool = False):
+            def _update_panel_content(content: str, style: str = "bright_white", update_subtitle: bool = False, show_cursor: bool = True):
                 nonlocal \
                     response, \
                     last_subtitle_update_time, \
@@ -1268,8 +1268,15 @@ class PrettyOutput:
                 new_text_obj = Text(overflow="fold")
                 # 只在 text_content 不为空时才追加旧内容
                 if text_content.plain:
-                    new_text_obj.append(text_content.plain, style=text_content.style)
+                    plain_text = text_content.plain
+                    # 每次更新时移除末尾旧光标（避免光标累积）
+                    if plain_text.endswith("▌"):
+                        plain_text = plain_text[:-1]
+                    new_text_obj.append(plain_text, style=text_content.style)
                 new_text_obj.append(content, style=style)
+                # 添加动态光标效果
+                if show_cursor and content:
+                    new_text_obj.append("▌", style="bold cyan")
                 update_count += 1
 
                 max_text_height = console.height - 5
@@ -1413,7 +1420,7 @@ class PrettyOutput:
             _flush_buffer()
             end_time = time.time()
             duration = end_time - start_time
-            _update_panel_content("", update_subtitle=True)
+            _update_panel_content("", update_subtitle=True, show_cursor=False)
             with _lock:
                 _update_panel_subtitle(
                     panel,
