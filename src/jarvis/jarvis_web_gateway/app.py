@@ -12,9 +12,12 @@ import json
 import logging
 import os
 import pathlib
+import shutil
 import signal
 import subprocess
 import uuid
+
+import yaml
 from datetime import datetime
 from typing import Any
 from typing import AsyncGenerator
@@ -1692,7 +1695,6 @@ def create_app(
                 }
 
             with open(config_file, "r", encoding="utf-8") as f:
-                import yaml
                 source_config = yaml.safe_load(f) or {}
 
             # 提取要同步的配置
