@@ -931,7 +931,7 @@ class PrettyOutput:
         theme: str = "monokai",
     ) -> None:
         """
-        使用Panel显示带markdown语法高亮的内容。
+        使用Panel显示带Markdown渲染的内容（标题左对齐）。
 
         参数：
             content: 要显示的markdown格式内容
@@ -939,16 +939,44 @@ class PrettyOutput:
             border_style: 边框样式（默认"bright_blue"）
             theme: markdown高亮主题（默认"monokai"）
         """
+        from rich import box
+        from rich.markdown import Markdown, Heading
         from rich.panel import Panel
+        from rich.text import Text
 
-        # 创建markdown语法高亮对象
-        syntax = Syntax(content, "markdown", theme=theme, word_wrap=True)
+        # 保存原始方法
+        _original_rich_console = Heading.__rich_console__
 
-        # 创建Panel包装Syntax对象
-        panel = Panel(syntax, title=title, border_style=border_style, expand=True)
+        def _left_aligned_heading_rich_console(self, console, options):
+            """自定义Heading渲染，让标题左对齐"""
+            text = self.text
+            text.justify = "left"  # 改为左对齐
+            if self.tag == "h1":
+                yield Panel(
+                    text,
+                    box=box.HEAVY,
+                    style="markdown.h1.border",
+                )
+            else:
+                if self.tag == "h2":
+                    yield Text("")
+                yield text
 
-        # 打印Panel到终端
-        console.print(panel)
+        # 临时应用patch
+        Heading.__rich_console__ = _left_aligned_heading_rich_console
+
+        try:
+            # 创建Markdown渲染对象
+            markdown = Markdown(content, code_theme=theme)
+
+            # 创建Panel包装Markdown对象
+            panel = Panel(markdown, title=title, border_style=border_style, expand=True)
+
+            # 打印Panel到终端
+            console.print(panel)
+        finally:
+            # 恢复原始方法
+            Heading.__rich_console__ = _original_rich_console
 
         # 通过事件系统输出到Gateway（用于Web界面）
         # 注意：只在 Gateway 模式下发送事件，避免 CLI 模式下重复打印
