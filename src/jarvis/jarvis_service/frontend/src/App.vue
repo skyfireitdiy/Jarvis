@@ -806,9 +806,23 @@
 
         <!-- 配置同步 -->
         <div class="form-group" v-if="availableNodeOptions.length > 0">
-          <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
-            {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
-          </button>
+          <label>配置同步</label>
+          <div class="config-sync-section">
+            <div class="config-sync-row">
+              <span class="config-sync-label">源节点:</span>
+              <select v-model="syncConfigSourceNode" class="node-select">
+                <option value="">本节点 (master)</option>
+                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                  {{ formatNodeOptionLabel(node) }}
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
+              <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
+                {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
+              </button>
+            </div>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
@@ -2977,7 +2991,7 @@ async function syncConfig() {
   try {
     isSyncingConfig.value = true
     const { host, port } = getGatewayAddress()
-    const sourceNodeId = 'master'
+    const sourceNodeId = syncConfigSourceNode.value || 'master'
 
     // 自动选择除源节点外的所有节点作为目标
     const targetNodeIds = availableNodeOptions.value
