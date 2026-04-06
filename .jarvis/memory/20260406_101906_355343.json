@@ -1,0 +1,8 @@
+{
+  "id": "20260406_101906_355343",
+  "type": "project_long_term",
+  "tags": ["openai_platform", "streaming_fix", "proxy_compatibility"],
+  "content": "【流式请求空响应修复】\n\n问题：某些本地代理（如 Clash/V2Ray）对 SSE（Server-Sent Events）流式传输处理不当，导致流式请求返回 HTTP 200 但 content-length: 0（空响应）。\n\n影响：OpenAIModel.chat() 方法在流式模式下返回空响应，抛出 'Chat failed: No response from model' 错误。\n\n解决方案：在 chat() 方法中，当流式请求返回空响应时，自动回退到非流式请求（stream=false）。\n\n修复位置：src/jarvis/jarvis_platform/openai.py - chat() 方法\n提交：87188a61a49279073a050ac759b9379a50c7dd97\n\n验证方式：\n- 流式请求空时会打印 '⚠ 流式响应为空，回退到非流式请求...'\n- 自动重试非流式请求获取响应\n- 非流式也失败才抛出异常",
+  "created_at": "2026-04-06T10:19:06.355382",
+  "updated_at": "2026-04-06T10:19:06.355386"
+}
