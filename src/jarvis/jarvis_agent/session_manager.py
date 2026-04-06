@@ -76,6 +76,7 @@ class SessionManager:
             cheap_model = registry.create_platform(platform_type="cheap")
             if cheap_model is None:
                 return "未命名会话"
+            cheap_model.set_suppress_output(False)
             prompt = f"""请根据以下用户输入，生成一个简洁的会话名称（3-8个中文字符）。
 要求：
 1. 名称要能概括会话主题
@@ -87,13 +88,7 @@ class SessionManager:
 会话名称："""
 
             # 调用模型生成
-            response = ""
-            with Status("正在生成会话名称...", console=console) as status:
-                for chunk_type, chunk_content in cheap_model.chat(prompt):
-                    # 只拼接 content 类型
-                    if chunk_type == "content":
-                        response += chunk_content
-                    status.update(f"正在生成会话名称... ({len(response)} 字符)")
+            response = cheap_model.chat_until_success(prompt).strip()
 
             # 清理响应
             session_name = response.strip()

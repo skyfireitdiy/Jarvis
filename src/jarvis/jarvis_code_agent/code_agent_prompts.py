@@ -136,6 +136,7 @@ def classify_user_request(user_input: str) -> str:
     try:
         # 获取 normal_llm 平台
         platform = PlatformRegistry().get_normal_platform()
+        platform.set_suppress_output(False)
 
         # 从文件加载场景类型定义
         scenarios = _load_scenario_types()
