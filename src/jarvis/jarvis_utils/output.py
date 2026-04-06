@@ -1256,7 +1256,7 @@ class PrettyOutput:
 
         with Live(panel, refresh_per_second=10, transient=True) as live:
 
-            def _update_panel_content(content: str, update_subtitle: bool = False):
+            def _update_panel_content(content: str, style: str = "bright_white", update_subtitle: bool = False):
                 nonlocal \
                     response, \
                     last_subtitle_update_time, \
@@ -1264,9 +1264,10 @@ class PrettyOutput:
                     text_content, \
                     panel
 
-                current_text = text_content.plain
-                new_content = current_text + content
-                new_text_obj = Text(new_content, overflow="fold", style="bright_white")
+                # 使用 Text.append 支持不同样式
+                new_text_obj = Text(overflow="fold")
+                new_text_obj.append(text_content.plain, style=text_content.style)
+                new_text_obj.append(content, style=style)
                 update_count += 1
 
                 max_text_height = console.height - 5
@@ -1316,9 +1317,13 @@ class PrettyOutput:
 
             # 解包元组 (chunk_type, chunk_content)
             first_chunk_type, first_chunk_content = first_chunk
-            response += first_chunk_content
+            # 只有 content 类型才拼接到 response
+            if first_chunk_type == "content":
+                response += first_chunk_content
             if first_chunk_content:
-                _update_panel_content(first_chunk_content, update_subtitle=True)
+                # 根据类型设置样式
+                first_style = "dim" if first_chunk_type == "reason" else "bright_white"
+                _update_panel_content(first_chunk_content, style=first_style, update_subtitle=True)
                 # 解析 title 获取 agent_name 和 model_name
                 agent_name = ""
                 model_name = ""
@@ -1352,7 +1357,7 @@ class PrettyOutput:
                         )
                     )
 
-            buffer = ""
+            buffer: List[Tuple[str, str]] = []
             last_update_time = time.time()
             update_interval = 1
             min_buffer_size = 1
@@ -1360,17 +1365,20 @@ class PrettyOutput:
             def _flush_buffer():
                 nonlocal buffer, last_update_time
                 if buffer:
-                    _update_panel_content(buffer)
-                    buffer = ""
+                    for content, style in buffer:
+                        _update_panel_content(content, style=style)
+                    buffer = []
                     last_update_time = time.time()
 
             for chunk_type, chunk_content in chat_iterator:
                 if not chunk_content:
                     continue
+                # 所有内容都显示，reason用灰色样式
+                style = "dim" if chunk_type == "reason" else "bright_white"
+                buffer.append((chunk_content, style))
                 # 只有 content 类型才拼接到 response
                 if chunk_type == "content":
                     response += chunk_content
-                    buffer += chunk_content
                 # 发送流式 chunk 事件（reason 和 content 都发送）
                 if chunk_content:
                     emit_output(
@@ -1501,8 +1509,9 @@ class PrettyOutput:
         for chunk_type, chunk_content in chat_iterator:
             if chunk_content and first_token_time == 0.0:
                 first_token_time = time.time() - start_time
-            # 打印时不区分 reason 和 content，都打印
-            console.print(chunk_content, end="")
+            # 打印时 reason 和 content 都显示，reason用灰色样式
+            style = "dim" if chunk_type == "reason" else "bright_white"
+            console.print(chunk_content, end="", style=style)
             # 返回时只拼接 content 类型
             if chunk_type == "content":
                 response += chunk_content
