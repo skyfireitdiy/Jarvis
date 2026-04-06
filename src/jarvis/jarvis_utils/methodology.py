@@ -265,7 +265,7 @@ def load_methodology(
             "[bold blue]🔍 正在分析需求并推荐方法论...", spinner="dots"
         ):
             response = platform.chat_until_success(
-                selection_prompt, max_output=50
+                selection_prompt
             ).strip()
 
         # 重置平台，恢复输出
