@@ -2998,6 +2998,11 @@ async function syncConfig() {
       .map(node => node.node_id)
       .filter(id => id !== sourceNodeId)
 
+    // 如果源节点不是 master，将 master 加入目标节点列表
+    if (sourceNodeId !== 'master' && !targetNodeIds.includes('master')) {
+      targetNodeIds.unshift('master')
+    }
+
     if (targetNodeIds.length === 0) {
       showToast('没有其他节点可以同步', 'warning')
       return
