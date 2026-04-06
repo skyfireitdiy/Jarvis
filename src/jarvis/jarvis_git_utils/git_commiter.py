@@ -287,6 +287,7 @@ class GitCommitTool:
                 from jarvis.jarvis_utils.config import get_normal_model_name
 
                 platform = PlatformRegistry().get_normal_platform()
+                platform.set_suppress_output(False)
 
                 # 生成提交信息
                 model_display_name = get_normal_model_name() or (
@@ -396,12 +397,7 @@ commit信息
                     )
 
                     # 使用 Status 显示进度
-                    with Status(
-                        f"✨ 正在使用{model_display_name}生成提交信息...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        commit_message = platform.chat_until_success(prompt)
+                    commit_message = platform.chat_until_success(prompt)
                 elif use_file_list:
                     # 降级策略：使用文件列表生成提交信息
                     # 格式化文件列表，如果太长则截断
@@ -429,13 +425,7 @@ commit信息
 """
                     )
 
-                    # 使用 Status 显示进度
-                    with Status(
-                        f"✨ 正在使用{model_display_name}生成提交信息...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        commit_message = platform.chat_until_success(prompt)
+                    commit_message = platform.chat_until_success(prompt)
                 else:
                     # 正常情况：直接使用 diff 内容
                     prompt = (
@@ -446,13 +436,7 @@ commit信息
 """
                     )
 
-                    # 使用 Status 显示进度
-                    with Status(
-                        f"✨ 正在使用{model_display_name}生成提交信息...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        commit_message = platform.chat_until_success(prompt)
+                    commit_message = platform.chat_until_success(prompt)
 
                 while True:
                     # 只在特定情况下重新获取commit_message
@@ -461,13 +445,7 @@ commit信息
                         and not is_large_content
                         and not commit_message
                     ):
-                        # 使用 Status 显示进度
-                        with Status(
-                            f"✨ 正在使用{model_display_name}生成提交信息...",
-                            spinner="dots",
-                            console=console,
-                        ):
-                            commit_message = platform.chat_until_success(prompt)
+                        commit_message = platform.chat_until_success(prompt)
                     extracted_message = self._extract_commit_message(commit_message)
                     # 如果成功提取，就跳出循环
                     if extracted_message:
@@ -484,13 +462,7 @@ commit信息
                     {ct("COMMIT_MESSAGE")}
                     """
 
-                    # 使用 Status 显示进度
-                    with Status(
-                        f"✨ 正在使用{model_display_name}生成提交信息...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        commit_message = platform.chat_until_success(prompt)
+                    commit_message = platform.chat_until_success(prompt)
 
                 # 执行提交
 
