@@ -283,8 +283,8 @@ def quick_config():
     model_max_tokens = {}
 
     for model in unique_role_models:
-        existing_model_config = existing_model_configs.get(model, {})
-        existing_max_tokens = existing_model_config.get("max_input_token_count")
+        prev_model_config = existing_model_configs.get(model, {})
+        existing_max_tokens = prev_model_config.get("max_input_token_count")
         default_token_count = (
             existing_max_tokens
             if isinstance(existing_max_tokens, int) and existing_max_tokens > 0
@@ -327,10 +327,28 @@ def quick_config():
                 existing_model_config = llm_config
                 break
 
-        if existing_config_name is not None:
+        if existing_config_name is not None and existing_model_config is not None:
             model_config_names[model] = existing_config_name
+            # 覆盖更新已有配置的所有关键字段
+            existing_model_config["platform"] = platform
+            existing_model_config["model"] = model
             existing_model_config["max_input_token_count"] = model_max_tokens[model]
-            PrettyOutput.auto_print(f"✅ 复用已有模型配置: {existing_config_name} -> {model}")
+            if platform == "openai":
+                existing_model_config["llm_config"] = {
+                    "openai_api_key": api_key,
+                    "openai_api_base": base_url,
+                }
+            elif platform == "claude":
+                existing_model_config["llm_config"] = {
+                    "anthropic_api_key": api_key,
+                    "anthropic_base_url": base_url,
+                }
+            else:
+                existing_model_config["llm_config"] = {
+                    f"{platform}_api_key": api_key,
+                    f"{platform}_base_url": base_url,
+                }
+            PrettyOutput.auto_print(f"✅ 已更新模型配置: {existing_config_name} -> {model}")
             continue
 
         # 统一使用配置名称+模型名的方式避免命名冲突，保持单模型和多模型配置结构一致
