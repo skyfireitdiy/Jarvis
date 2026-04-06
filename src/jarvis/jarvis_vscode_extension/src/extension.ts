@@ -1771,6 +1771,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     this.agentSockets.clear();
     this.agentConnectionAttempts.clear();
+    // 关闭右侧 Chat Panel
+    if (this.currentPanel) {
+      this.currentPanel.dispose();
+      this.currentPanel = undefined;
+    }
     this.panelState.token = "";
     this.panelState.selectedAgentId = undefined;
     this.panelState.gatewaySocket = undefined;
@@ -2409,8 +2414,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     });
 
     gatewaySocket.on("close", () => {
-      this.panelState.gatewayConnectionStatusText = "主网关已关闭";
-      this.postPanelState();
+      this.panelState.gatewayConnectionStatusText = "主网关已断开连接";
+      this.panelState.gatewayHasConnectionError = true;
+      this.handleAuthExpired("主网关已断开连接，请重新连接");
     });
 
     this.panelState.gatewaySocket = gatewaySocket;
