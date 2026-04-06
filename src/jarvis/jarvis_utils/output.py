@@ -1094,7 +1094,7 @@ class PrettyOutput:
 
     @staticmethod
     def stream_chat_with_panel(
-        chat_iterator: Generator[str, None, None],
+        chat_iterator: Generator[Tuple[str, str], None, None],
         title: str,
         status_message: str,
         get_used_token_count: Callable[[], int],
@@ -1154,7 +1154,7 @@ class PrettyOutput:
                         append_session_history(message, "")
                         return "", 0.0
                     first_chunk = next(chat_iterator)
-                    if first_chunk:
+                    if first_chunk and first_chunk[1]:  # 检查内容非空
                         first_token_time = time.time() - start_time
                         break
             except StopIteration:
@@ -1314,9 +1314,11 @@ class PrettyOutput:
                     except (IndexError, RuntimeError):
                         pass
 
-            response += first_chunk
-            if first_chunk:
-                _update_panel_content(first_chunk, update_subtitle=True)
+            # 解包元组 (chunk_type, chunk_content)
+            first_chunk_type, first_chunk_content = first_chunk
+            response += first_chunk_content
+            if first_chunk_content:
+                _update_panel_content(first_chunk_content, update_subtitle=True)
                 # 解析 title 获取 agent_name 和 model_name
                 agent_name = ""
                 model_name = ""
@@ -1341,10 +1343,10 @@ class PrettyOutput:
                 )
 
                 # 发送第一个chunk（避免第一个chunk丢失）
-                if first_chunk:
+                if first_chunk_content:
                     emit_output(
                         OutputEvent(
-                            text=first_chunk,
+                            text=first_chunk_content,
                             output_type=OutputType.STREAM_CHUNK,
                             timestamp=False,
                         )
@@ -1362,16 +1364,20 @@ class PrettyOutput:
                     buffer = ""
                     last_update_time = time.time()
 
-            for s in chat_iterator:
-                if not s:
+            for chunk_type, chunk_content in chat_iterator:
+                if not chunk_content:
                     continue
-                response += s
-                buffer += s
-                # 发送流式 chunk 事件
-                if s:
+                # 只有 content 类型才拼接到 response
+                if chunk_type == "content":
+                    response += chunk_content
+                    buffer += chunk_content
+                # 发送流式 chunk 事件（reason 和 content 都发送）
+                if chunk_content:
                     emit_output(
                         OutputEvent(
-                            text=s, output_type=OutputType.STREAM_CHUNK, timestamp=False
+                            text=chunk_content,
+                            output_type=OutputType.STREAM_CHUNK,
+                            timestamp=False,
                         )
                     )
 
@@ -1436,7 +1442,7 @@ class PrettyOutput:
 
     @staticmethod
     def stream_chat_simple(
-        chat_iterator: Generator[str, None, None],
+        chat_iterator: Generator[Tuple[str, str], None, None],
         prefix: str,
         start_time: float,
         message: str = "",
@@ -1492,16 +1498,21 @@ class PrettyOutput:
             )
         )
 
-        for s in chat_iterator:
-            if s and first_token_time == 0.0:
+        for chunk_type, chunk_content in chat_iterator:
+            if chunk_content and first_token_time == 0.0:
                 first_token_time = time.time() - start_time
-            console.print(s, end="")
-            response += s
+            # 打印时不区分 reason 和 content，都打印
+            console.print(chunk_content, end="")
+            # 返回时只拼接 content 类型
+            if chunk_type == "content":
+                response += chunk_content
             # 发送流式 chunk 事件
-            if s:
+            if chunk_content:
                 emit_output(
                     OutputEvent(
-                        text=s, output_type=OutputType.STREAM_CHUNK, timestamp=False
+                        text=chunk_content,
+                        output_type=OutputType.STREAM_CHUNK,
+                        timestamp=False,
                     )
                 )
             if max_output > 0 and len(response) >= max_output:

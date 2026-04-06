@@ -237,7 +237,7 @@ class OpenAIModel(BasePlatform):
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
-    def chat(self, message: str) -> Generator[str, None, None]:
+    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
         """
         执行对话并返回生成器
 
@@ -295,12 +295,12 @@ class OpenAIModel(BasePlatform):
                             ):
                                 text = choice.delta.reasoning_content
                                 # full_response += text  # 不加到 full_response，只流式打印
-                                yield text
+                                yield ("reason", text)
                             # 处理 content（正文内容）
                             if choice.delta.content:
                                 text = choice.delta.content
                                 full_response += text
-                                yield text
+                                yield ("content", text)
                 if full_response:
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
@@ -324,22 +324,22 @@ class OpenAIModel(BasePlatform):
                             self.messages.append(
                                 {"role": "assistant", "content": fallback_content}
                             )
-                            yield fallback_content
+                            yield ("content", fallback_content)
                             return
                     raise Exception("No response from model")
             else:
                 # 非流式模式：直接获取完整响应
                 if response.choices and len(response.choices) > 0:
-                    message = response.choices[0].message
+                    response_message = response.choices[0].message
                     # 处理 reasoning_content（推理过程，如 GLM 模型）
-                    # reasoning = getattr(message, "reasoning_content", None) or ""  # 不使用 reasoning
-                    content = message.content or ""
+                    # reasoning = getattr(response_message, "reasoning_content", None) or ""  # 不使用 reasoning
+                    content = response_message.content or ""
                     full_response = content
                 if full_response:
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
                     )
-                    yield full_response
+                    yield ("content", full_response)
                 else:
                     raise Exception("No response from model")
         except Exception as e:

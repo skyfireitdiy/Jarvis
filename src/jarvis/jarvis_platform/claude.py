@@ -169,7 +169,7 @@ class ClaudeModel(BasePlatform):
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
-    def chat(self, message: str) -> Generator[str, None, None]:
+    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
         """
         执行对话并返回生成器
 
@@ -177,7 +177,9 @@ class ClaudeModel(BasePlatform):
             message: 用户输入的消息内容
 
         返回:
-            Generator[str, None, None]: 生成器，逐块返回AI响应内容
+            Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
+            类型: "reason" 表示推理过程，"content" 表示正文内容
+            注意: Claude 模型没有 reasoning_content，所有内容都是 content 类型
 
         异常:
             当API调用失败时会抛出异常并打印错误信息
@@ -242,7 +244,7 @@ class ClaudeModel(BasePlatform):
                 for text in stream.text_stream:
                     full_response += text
                     accumulated_response += text
-                    yield text
+                    yield ("content", text)
 
             # 将响应添加到消息历史
             if accumulated_response:
