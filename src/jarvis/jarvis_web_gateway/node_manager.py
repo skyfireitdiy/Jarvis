@@ -187,6 +187,8 @@ class NodeConnectionManager:
                         AGENT_WS_CLOSE_RESPONSE,
                         DIRECTORY_LIST_RESPONSE,
                         NODE_TERMINAL_RESPONSE,
+                        SERVICE_RESTART_RESPONSE,
+                        CONFIG_SYNC_RESPONSE,
                     )
                     and request_id
                 ):
