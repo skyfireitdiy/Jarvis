@@ -247,10 +247,14 @@ def llm_add(name: str = typer.Argument(..., help="LLM 配置名称")) -> None:
         config["llms"] = {}
 
     if name in config["llms"]:
-        PrettyOutput.auto_print(f"❌ LLM 配置 '{name}' 已存在")
-        raise typer.Exit(code=1)
+        from jarvis.jarvis_utils.input import user_confirm
 
-    PrettyOutput.auto_print(f"📝 添加 LLM 配置: {name}")
+        if not user_confirm(f"LLM 配置 '{name}' 已存在，是否覆盖？", default=True):
+            PrettyOutput.auto_print("ℹ️ 已取消操作")
+            raise typer.Exit(code=0)
+        PrettyOutput.auto_print(f"📝 覆盖 LLM 配置: {name}")
+    else:
+        PrettyOutput.auto_print(f"📝 添加 LLM 配置: {name}")
 
     platform = get_single_line_input("平台名称 (openai/claude/other): ").strip().lower()
     if not platform:
@@ -496,8 +500,11 @@ def group_add(name: str = typer.Argument(..., help="模型组名称")) -> None:
         config["llm_groups"] = {}
 
     if name in config["llm_groups"]:
-        PrettyOutput.auto_print(f"❌ 模型组 '{name}' 已存在")
-        raise typer.Exit(code=1)
+        from jarvis.jarvis_utils.input import user_confirm
+
+        if not user_confirm(f"模型组 '{name}' 已存在，是否覆盖？", default=True):
+            PrettyOutput.auto_print("ℹ️ 已取消操作")
+            raise typer.Exit(code=0)
 
     # 获取可用的 LLM 配置列表
     llms = config.get("llms", {})
