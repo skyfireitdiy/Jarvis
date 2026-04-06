@@ -75,6 +75,8 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     NODE_TERMINAL_OUTPUT,
     SERVICE_RESTART_REQUEST,
     SERVICE_RESTART_RESPONSE,
+    CONFIG_SYNC_REQUEST,
+    CONFIG_SYNC_RESPONSE,
     build_node_message,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -1637,6 +1639,145 @@ def create_app(
                 "error": {
                     "code": "PERMISSION_DENIED",
                     "message": "无权限向 jarvis-service 发送重启信号",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/config/sync", dependencies=[Depends(verify_token)])
+    async def sync_config(request: Dict[str, Any]) -> Dict[str, Any]:
+        """同步配置到其他节点。
+
+        Args:
+            request: 请求体，包含以下字段：
+                - source_node_id: 源节点ID（可选，默认为本节点）
+                - target_node_ids: 目标节点ID列表
+                - config_sections: 要同步的配置类型列表（llms, llm_groups）
+        """
+        try:
+            source_node_id = str(request.get("source_node_id") or "").strip() or node_runtime.local_node_id
+            target_node_ids = request.get("target_node_ids", [])
+            config_sections = request.get("config_sections", [])
+
+            if not target_node_ids:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "target_node_ids is required",
+                    },
+                }
+
+            if not config_sections:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "config_sections is required",
+                    },
+                }
+
+            # 读取源节点配置
+            config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+            if not config_file.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "CONFIG_NOT_FOUND",
+                        "message": "Config file not found",
+                    },
+                }
+
+            with open(config_file, "r", encoding="utf-8") as f:
+                import yaml
+                source_config = yaml.safe_load(f) or {}
+
+            # 提取要同步的配置
+            config_data = {}
+            for section in config_sections:
+                if section in source_config:
+                    config_data[section] = source_config[section]
+
+            if not config_data:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NO_CONFIG_TO_SYNC",
+                        "message": "No config data to sync",
+                    },
+                }
+
+            # 同步到目标节点
+            results = []
+            for target_node_id in target_node_ids:
+                try:
+                    # 检查节点状态
+                    node_info = node_runtime.node_registry.get(target_node_id)
+                    if node_info is None:
+                        results.append({
+                            "node_id": target_node_id,
+                            "success": False,
+                            "error": {
+                                "code": "NODE_NOT_FOUND",
+                                "message": f"Node not found: {target_node_id}",
+                            },
+                        })
+                        continue
+
+                    if node_info.status != "online":
+                        results.append({
+                            "node_id": target_node_id,
+                            "success": False,
+                            "error": {
+                                "code": "NODE_OFFLINE",
+                                "message": f"Node is offline: {target_node_id}",
+                            },
+                        })
+                        continue
+
+                    # 发送配置同步请求
+                    response = await node_connection_manager.send_request_to_node(
+                        target_node_id,
+                        CONFIG_SYNC_REQUEST,
+                        {
+                            "config_sections": config_sections,
+                            "config_data": config_data,
+                        },
+                        timeout=30.0,
+                    )
+
+                    payload = response.get("payload") or {}
+                    if payload.get("success"):
+                        results.append({
+                            "node_id": target_node_id,
+                            "success": True,
+                            "data": payload.get("data", {}),
+                        })
+                    else:
+                        error = payload.get("error") or {}
+                        results.append({
+                            "node_id": target_node_id,
+                            "success": False,
+                            "error": error,
+                        })
+                except Exception as e:
+                    results.append({
+                        "node_id": target_node_id,
+                        "success": False,
+                        "error": {
+                            "code": "SYNC_FAILED",
+                            "message": str(e),
+                        },
+                    })
+
+            return {
+                "success": True,
+                "data": {
+                    "source_node_id": source_node_id,
+                    "results": results,
                 },
             }
         except Exception as e:

@@ -803,6 +803,49 @@
             {{ isRestartingGateway ? '重启中...' : (restartNodeId ? `重启节点 ${restartNodeId} 服务` : '重启本节点服务') }}
           </button>
         </div>
+
+        <!-- 配置同步 -->
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>配置同步</label>
+          <div class="config-sync-section">
+            <div class="config-sync-row">
+              <span class="config-sync-label">源节点:</span>
+              <select v-model="syncConfigSourceNode" class="node-select">
+                <option value="">本节点 (master)</option>
+                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                  {{ formatNodeOptionLabel(node) }}
+                </option>
+              </select>
+            </div>
+            <div class="config-sync-row">
+              <span class="config-sync-label">目标节点:</span>
+              <div class="config-sync-targets">
+                <label v-for="node in availableNodeOptions" :key="node.node_id" class="config-sync-checkbox">
+                  <input type="checkbox" :value="node.node_id" v-model="syncConfigTargetNodes">
+                  {{ formatNodeOptionLabel(node) }}
+                </label>
+              </div>
+            </div>
+            <div class="config-sync-row">
+              <span class="config-sync-label">配置类型:</span>
+              <div class="config-sync-types">
+                <label class="config-sync-checkbox">
+                  <input type="checkbox" value="llms" v-model="syncConfigSections">
+                  LLM 配置 (llms)
+                </label>
+                <label class="config-sync-checkbox">
+                  <input type="checkbox" value="llm_groups" v-model="syncConfigSections">
+                  模型组 (llm_groups)
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig || syncConfigTargetNodes.length === 0 || syncConfigSections.length === 0">
+                {{ isSyncingConfig ? '同步中...' : '同步配置' }}
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
           <button class="primary-btn" @click="reconnect">重新连接</button>
@@ -1058,6 +1101,12 @@ const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
+
+// 配置同步相关状态
+const syncConfigSourceNode = ref('') // 配置同步的源节点ID
+const syncConfigTargetNodes = ref([]) // 配置同步的目标节点ID数组
+const syncConfigSections = ref([]) // 要同步的配置类型数组（llms, llm_groups）
+const isSyncingConfig = ref(false) // 是否正在同步配置
 
 // 登录函数：使用密码获取 Token
 async function loginWithPassword(password) {
@@ -2953,6 +3002,56 @@ async function restartGateway() {
     showToast(error.message || '重启服务失败', 'error')
   } finally {
     isRestartingGateway.value = false
+  }
+}
+
+async function syncConfig() {
+  if (isSyncingConfig.value) {
+    return
+  }
+
+  if (syncConfigTargetNodes.value.length === 0) {
+    showToast('请选择至少一个目标节点', 'error')
+    return
+  }
+
+  if (syncConfigSections.value.length === 0) {
+    showToast('请选择至少一种配置类型', 'error')
+    return
+  }
+
+  try {
+    isSyncingConfig.value = true
+    const { host, port } = getGatewayAddress()
+    const sourceNodeId = syncConfigSourceNode.value || 'master'
+    
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'config/sync'), {
+      method: 'POST',
+      body: JSON.stringify({
+        source_node_id: sourceNodeId,
+        target_node_ids: syncConfigTargetNodes.value,
+        config_sections: syncConfigSections.value
+      })
+    })
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || '配置同步失败')
+    }
+
+    const successCount = result.data?.success_count || 0
+    const totalCount = syncConfigTargetNodes.value.length
+    
+    if (successCount === totalCount) {
+      showToast(`配置同步成功，已同步到 ${successCount} 个节点`, 'success')
+    } else {
+      showToast(`配置同步部分成功，成功 ${successCount}/${totalCount} 个节点`, 'warning')
+    }
+  } catch (error) {
+    console.error('[SETTINGS] Failed to sync config:', error)
+    showToast(error.message || '配置同步失败', 'error')
+  } finally {
+    isSyncingConfig.value = false
   }
 }
 
@@ -10366,6 +10465,94 @@ body::-webkit-scrollbar {
 .toggle-switch:hover .toggle-slider {
   backdrop-filter: blur(60px) saturate(180%);
   -webkit-backdrop-filter: blur(60px) saturate(180%);
+}
+
+/* 配置同步样式 */
+.config-sync-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(28, 28, 30, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(113, 113, 122, 0.3);
+}
+
+.config-sync-row {
+  margin-bottom: 16px;
+}
+
+.config-sync-row:last-child {
+  margin-bottom: 0;
+}
+
+.config-sync-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.config-sync-section .node-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(28, 28, 30, 0.6);
+  border: 1px solid rgba(113, 113, 122, 0.4);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.config-sync-section .node-select:hover {
+  border-color: rgba(113, 113, 122, 0.6);
+}
+
+.config-sync-section .node-select:focus {
+  outline: none;
+  border-color: #007AFF;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.config-sync-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(28, 28, 30, 0.3);
+  border-radius: 8px;
+}
+
+.config-sync-types {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-sync-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(28, 28, 30, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.config-sync-checkbox:hover {
+  background: rgba(28, 28, 30, 0.6);
+}
+
+.config-sync-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #007AFF;
 }
 
 .toggle-switch:hover .toggle-slider:before {
