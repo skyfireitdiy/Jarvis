@@ -367,10 +367,49 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
         f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
     )
 
-    # 5. 设置默认最大token数
-    default_max_tokens = base_llm_config.get("max_input_token_count", 128000)
+    # 5. 测试 normal 模型API连通性
+    from jarvis.jarvis_utils.quick_config import test_model_connection
+    
+    test_model = selected_models[0]
+    PrettyOutput.auto_print(f"🔍 正在测试模型 {test_model} 的API连通性...")
+    success, error_msg = test_model_connection(platform, base_url, api_key, test_model)
+    
+    if success:
+        PrettyOutput.auto_print("✅ API连通性测试通过")
+    else:
+        PrettyOutput.auto_print(f"❌ API连通性测试失败: {error_msg}")
+        force_save = user_confirm("测试失败，是否仍要保存配置到文件？", default=False)
+        if not force_save:
+            PrettyOutput.auto_print("👋 已取消配置保存")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("⚠️ 将继续保存配置，但API可能无法正常使用")
 
-    # 6. 为每个选中的模型创建配置
+    # 6. 为每个模型设置最大token数
+    default_max_tokens = base_llm_config.get("max_input_token_count", 128000)
+    model_max_tokens = {}
+    
+    for model in selected_models:
+        while True:
+            max_tokens_input = get_single_line_input(
+                f"请输入模型 {model} 的最大token数 (默认: {default_max_tokens}):"
+            )
+            if not max_tokens_input.strip():
+                model_max_tokens[model] = default_max_tokens
+                PrettyOutput.auto_print(f"✅ 模型 {model} 使用默认最大token数: {default_max_tokens}")
+                break
+            try:
+                max_tokens = int(max_tokens_input.strip())
+                if max_tokens <= 0:
+                    PrettyOutput.auto_print("❌ 最大token数必须为正整数")
+                    continue
+                model_max_tokens[model] = max_tokens
+                PrettyOutput.auto_print(f"✅ 模型 {model} 最大token数设置为: {max_tokens}")
+                break
+            except ValueError:
+                PrettyOutput.auto_print("❌ 请输入有效的正整数")
+
+    # 7. 为每个选中的模型创建配置
     added_count = 0
     for model in selected_models:
         # 生成配置名称：{platform}_{model_normalized}
@@ -407,7 +446,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
         llm_config_new: Dict[str, Any] = {
             "platform": platform,
             "model": model,
-            "max_input_token_count": default_max_tokens,
+            "max_input_token_count": model_max_tokens.get(model, default_max_tokens),
             "llm_config": llm_config_dict_new,
         }
 
@@ -606,6 +645,55 @@ def llm_update(
             llm_config["max_input_token_count"] = max_tokens
         except ValueError:
             PrettyOutput.auto_print("❌ 无效的token数，保持原值")
+
+    # 更新 API Base URL 和 API Key
+    current_platform = llm_config.get('platform', '').strip().lower()
+    llm_config_dict = llm_config.get("llm_config", {})
+    
+    # 获取当前的 URL 和 Key
+    current_base_url = None
+    current_api_key = None
+    if current_platform == "openai":
+        current_base_url = llm_config_dict.get("openai_api_base", "")
+        current_api_key = llm_config_dict.get("openai_api_key", "")
+    elif current_platform == "claude":
+        current_base_url = llm_config_dict.get("anthropic_base_url", "")
+        current_api_key = llm_config_dict.get("anthropic_api_key", "")
+    else:
+        current_base_url = llm_config_dict.get(f"{current_platform}_base_url", "")
+        current_api_key = llm_config_dict.get(f"{current_platform}_api_key", "")
+
+    base_url = get_single_line_input(
+        f"API基础URL (当前: {current_base_url or '未设置'}, 留空不变): "
+    ).strip()
+    
+    api_key = get_single_line_input(
+        f"API密钥 (当前: {'已设置' if current_api_key else '未设置'}, 留空不变): "
+    ).strip()
+
+    # 如果有更新，应用到配置
+    if base_url or api_key:
+        if "llm_config" not in llm_config:
+            llm_config["llm_config"] = {}
+        
+        # 使用更新后的 platform（如果用户修改了）
+        updated_platform = llm_config.get('platform', '').strip().lower()
+        
+        if updated_platform == "openai":
+            if base_url:
+                llm_config["llm_config"]["openai_api_base"] = base_url
+            if api_key:
+                llm_config["llm_config"]["openai_api_key"] = api_key
+        elif updated_platform == "claude":
+            if base_url:
+                llm_config["llm_config"]["anthropic_base_url"] = base_url
+            if api_key:
+                llm_config["llm_config"]["anthropic_api_key"] = api_key
+        else:
+            if base_url:
+                llm_config["llm_config"][f"{updated_platform}_base_url"] = base_url
+            if api_key:
+                llm_config["llm_config"][f"{updated_platform}_api_key"] = api_key
 
     # 保存配置
     if _save_config(config):
