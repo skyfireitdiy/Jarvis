@@ -3528,6 +3528,8 @@ def create_app(
             result = await get_node_status()
         elif normalized_method == "POST" and normalized_path == "/service/restart":
             result = await restart_service(payload)
+        elif normalized_method == "POST" and normalized_path == "/config/sync":
+            result = await sync_config(payload)
         elif normalized_method == "GET" and normalized_path == "/agents":
             result = await get_agents()
         elif normalized_method == "POST" and normalized_path == "/agents":
