@@ -3008,7 +3008,7 @@ async function syncConfig() {
       return
     }
     
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'config/sync'), {
+    const response = await fetchWithAuth(buildHttpUrl(host, port, 'config/sync'), {
       method: 'POST',
       body: JSON.stringify({
         source_node_id: sourceNodeId,
