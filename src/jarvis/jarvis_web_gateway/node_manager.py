@@ -1393,9 +1393,13 @@ class ChildNodeClient:
     ) -> Dict[str, Any]:
         """处理 master 转发的服务重启请求（child 端）。"""
         request_id = message.get("request_id")
+        payload = message.get("payload") or {}
+        restart_frontend = bool(payload.get("restart_frontend", True))
+        
         logger.info(
-            "[NODE RESTART] child handling service restart request_id=%s",
+            "[NODE RESTART] child handling service restart request_id=%s restart_frontend=%s",
             request_id,
+            restart_frontend,
         )
 
         try:
@@ -1432,10 +1436,20 @@ class ChildNodeClient:
             import signal
 
             service_pid = int(service_pid_text)
-            os.kill(service_pid, signal.SIGUSR1)
+            # 根据 restart_frontend 参数选择信号
+            signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
+            signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
+            os.kill(service_pid, signal_to_send)
+            
+            message_text = (
+                "已请求 jarvis-service 重启所有服务"
+                if restart_frontend
+                else "已请求 jarvis-service 只重启网关服务"
+            )
             logger.info(
-                "[NODE RESTART] child service restart requested pid=%s request_id=%s",
+                "[NODE RESTART] child service restart requested pid=%s signal=%s request_id=%s",
                 service_pid,
+                signal_name,
                 request_id,
             )
             return build_node_message(
@@ -1444,7 +1458,8 @@ class ChildNodeClient:
                     "success": True,
                     "data": {
                         "pid": service_pid,
-                        "message": "已请求 jarvis-service 重启服务",
+                        "signal": signal_name,
+                        "message": message_text,
                     },
                 },
                 request_id=request_id,

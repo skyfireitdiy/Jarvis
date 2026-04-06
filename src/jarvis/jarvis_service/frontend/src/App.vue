@@ -798,9 +798,16 @@
           </select>
           <span class="form-help">选择要重启服务的节点，默认为本节点</span>
         </div>
+        <div class="form-group" v-if="!restartNodeId || restartNodeId === 'master'">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="restartFrontendService" />
+            <span>同时重启前端服务</span>
+          </label>
+          <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
+        </div>
         <div class="form-group">
           <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
-            {{ isRestartingGateway ? '重启中...' : (restartNodeId ? `重启节点 ${restartNodeId} 服务` : '重启本节点服务') }}
+            {{ isRestartingGateway ? '请稍候...' : (restartNodeId ? `重启节点 ${restartNodeId} 服务` : '重启本节点服务') }}
           </button>
         </div>
 
@@ -1079,6 +1086,7 @@ const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
+const restartFrontendService = ref(false) // 是否同时重启前端服务
 
 // 配置同步相关状态
 const syncConfigSourceNode = ref('') // 配置同步的源节点ID
@@ -2960,26 +2968,33 @@ async function restartGateway() {
     return
   }
 
+  const targetNodeId = restartNodeId.value || 'master'
+  
   try {
     isRestartingGateway.value = true
     const { host, port } = getGatewayAddress()
-    const targetNodeId = restartNodeId.value || 'master'
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
+    
+    // 发送重启请求，不等待响应结果
+    fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
       method: 'POST',
-      body: JSON.stringify({ node_id: targetNodeId })
+      body: JSON.stringify({ 
+        node_id: targetNodeId,
+        restart_frontend: restartFrontendService.value
+      })
+    }).catch(() => {
+      // 忽略请求错误（服务重启会导致连接中断）
     })
-    const result = await response.json()
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.error?.message || '重启服务失败')
-    }
-
-    showToast(result.data?.message || '已请求服务重启', 'success')
+    
+    // 请求发出即视为成功
+    showToast(`已向节点 "${targetNodeId}" 发送重启请求`, 'success')
   } catch (error) {
     console.error('[SETTINGS] Failed to restart gateway:', error)
     showToast(error.message || '重启服务失败', 'error')
   } finally {
-    isRestartingGateway.value = false
+    // 延迟重置状态，防止用户重复点击
+    setTimeout(() => {
+      isRestartingGateway.value = false
+    }, 3000)
   }
 }
 
@@ -10531,6 +10546,30 @@ body::-webkit-scrollbar {
 
 .config-sync-checkbox:hover {
   background: rgba(28, 28, 30, 0.6);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(28, 28, 30, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.checkbox-label:hover {
+  background: rgba(28, 28, 30, 0.6);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #007AFF;
 }
 
 .config-sync-checkbox input[type="checkbox"] {
