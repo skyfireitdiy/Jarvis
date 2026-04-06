@@ -806,45 +806,9 @@
 
         <!-- 配置同步 -->
         <div class="form-group" v-if="availableNodeOptions.length > 0">
-          <label>配置同步</label>
-          <div class="config-sync-section">
-            <div class="config-sync-row">
-              <span class="config-sync-label">源节点:</span>
-              <select v-model="syncConfigSourceNode" class="node-select">
-                <option value="">本节点 (master)</option>
-                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                  {{ formatNodeOptionLabel(node) }}
-                </option>
-              </select>
-            </div>
-            <div class="config-sync-row">
-              <span class="config-sync-label">目标节点:</span>
-              <div class="config-sync-targets">
-                <label v-for="node in availableNodeOptions" :key="node.node_id" class="config-sync-checkbox">
-                  <input type="checkbox" :value="node.node_id" v-model="syncConfigTargetNodes">
-                  {{ formatNodeOptionLabel(node) }}
-                </label>
-              </div>
-            </div>
-            <div class="config-sync-row">
-              <span class="config-sync-label">配置类型:</span>
-              <div class="config-sync-types">
-                <label class="config-sync-checkbox">
-                  <input type="checkbox" value="llms" v-model="syncConfigSections">
-                  LLM 配置 (llms)
-                </label>
-                <label class="config-sync-checkbox">
-                  <input type="checkbox" value="llm_groups" v-model="syncConfigSections">
-                  模型组 (llm_groups)
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig || syncConfigTargetNodes.length === 0 || syncConfigSections.length === 0">
-                {{ isSyncingConfig ? '同步中...' : '同步配置' }}
-              </button>
-            </div>
-          </div>
+          <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
+            {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
+          </button>
         </div>
         <div class="modal-actions">
           <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
@@ -1105,7 +1069,7 @@ const restartNodeId = ref('') // 重启服务时选择的节点ID
 // 配置同步相关状态
 const syncConfigSourceNode = ref('') // 配置同步的源节点ID
 const syncConfigTargetNodes = ref([]) // 配置同步的目标节点ID数组
-const syncConfigSections = ref([]) // 要同步的配置类型数组（llms, llm_groups）
+const syncConfigSections = ref(['llms', 'llm_groups']) // 要同步的配置类型数组（llms, llm_groups）
 const isSyncingConfig = ref(false) // 是否正在同步配置
 
 // 登录函数：使用密码获取 Token
@@ -3010,26 +2974,26 @@ async function syncConfig() {
     return
   }
 
-  if (syncConfigTargetNodes.value.length === 0) {
-    showToast('请选择至少一个目标节点', 'error')
-    return
-  }
-
-  if (syncConfigSections.value.length === 0) {
-    showToast('请选择至少一种配置类型', 'error')
-    return
-  }
-
   try {
     isSyncingConfig.value = true
     const { host, port } = getGatewayAddress()
-    const sourceNodeId = syncConfigSourceNode.value || 'master'
+    const sourceNodeId = 'master'
+
+    // 自动选择除源节点外的所有节点作为目标
+    const targetNodeIds = availableNodeOptions.value
+      .map(node => node.node_id)
+      .filter(id => id !== sourceNodeId)
+
+    if (targetNodeIds.length === 0) {
+      showToast('没有其他节点可以同步', 'warning')
+      return
+    }
     
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'config/sync'), {
       method: 'POST',
       body: JSON.stringify({
         source_node_id: sourceNodeId,
-        target_node_ids: syncConfigTargetNodes.value,
+        target_node_ids: targetNodeIds,
         config_sections: syncConfigSections.value
       })
     })
@@ -3040,7 +3004,7 @@ async function syncConfig() {
     }
 
     const successCount = result.data?.success_count || 0
-    const totalCount = syncConfigTargetNodes.value.length
+    const totalCount = targetNodeIds.length
     
     if (successCount === totalCount) {
       showToast(`配置同步成功，已同步到 ${successCount} 个节点`, 'success')
@@ -9377,6 +9341,8 @@ body::-webkit-scrollbar {
 /* Settings Modal - 更宽的布局以容纳更多配置项 */
 .settings-modal {
   max-width: 640px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .settings-modal h2 {
