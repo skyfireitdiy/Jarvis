@@ -1714,7 +1714,52 @@ def create_app(
             results = []
             for target_node_id in target_node_ids:
                 try:
-                    # 检查节点状态
+                    # 检查是否是本地节点
+                    if target_node_id in (node_runtime.local_node_id, "master"):
+                        # 本地节点直接应用配置
+                        try:
+                            # 备份原配置文件
+                            backup_file = config_file.with_suffix(".yaml.bak")
+                            if config_file.exists():
+                                shutil.copy2(config_file, backup_file)
+                            
+                            # 读取现有配置
+                            existing_config = {}
+                            if config_file.exists():
+                                with open(config_file, "r", encoding="utf-8") as f:
+                                    existing_config = yaml.safe_load(f) or {}
+                            
+                            # 更新配置
+                            updated_config = existing_config.copy()
+                            for section in config_sections:
+                                if section in config_data:
+                                    updated_config[section] = config_data[section]
+                            
+                            # 保存配置
+                            config_file.parent.mkdir(parents=True, exist_ok=True)
+                            with open(config_file, "w", encoding="utf-8") as f:
+                                yaml.safe_dump(updated_config, f, allow_unicode=True, default_flow_style=False)
+                            
+                            results.append({
+                                "node_id": target_node_id,
+                                "success": True,
+                                "data": {
+                                    "message": "配置同步成功",
+                                    "backup_file": str(backup_file),
+                                },
+                            })
+                        except Exception as e:
+                            results.append({
+                                "node_id": target_node_id,
+                                "success": False,
+                                "error": {
+                                    "code": "CONFIG_SYNC_ERROR",
+                                    "message": str(e),
+                                },
+                            })
+                        continue
+
+                    # 检查远程节点状态
                     node_info = node_runtime.node_registry.get(target_node_id)
                     if node_info is None:
                         results.append({
@@ -1738,7 +1783,7 @@ def create_app(
                         })
                         continue
 
-                    # 发送配置同步请求
+                    # 发送配置同步请求到远程节点
                     response = await node_connection_manager.send_request_to_node(
                         target_node_id,
                         CONFIG_SYNC_REQUEST,
