@@ -42,6 +42,7 @@ class LoopAction(Enum):
 
     EXIT = "exit"
     RESTART = "restart"
+    RESTART_GATEWAY_ONLY = "restart_gateway_only"
 
 
 @dataclass
@@ -87,30 +88,56 @@ class ServiceController:
         self._requested_action = LoopAction.RESTART
         self._signal_received = True
 
+    def request_restart_gateway_only(self, _signum: int, _frame: object) -> None:
+        """接收到信号时只重启网关服务，保持前端运行。"""
+        self._requested_action = LoopAction.RESTART_GATEWAY_ONLY
+        self._signal_received = True
+
     def run_forever(self) -> None:
         """无限循环运行服务，直到收到退出信号。"""
+        frontend_process: Optional[subprocess.Popen[bytes]] = None
         while True:
             self._signal_received = False
             self._requested_action = LoopAction.EXIT
-            processes = self._start_services()
+            processes = self._start_services(frontend_process)
             next_action = self._wait_for_signal_or_process_exit(processes)
+            
+            if next_action == LoopAction.RESTART_GATEWAY_ONLY:
+                # 只重启网关，保持前端运行
+                PrettyOutput.auto_print("🔄 只重启网关服务，保持前端运行")
+                frontend_process = processes.frontend_process
+                self._stop_gateway_only(processes)
+                continue
+            
+            # 完全停止所有服务
+            frontend_process = None
             self._stop_services(processes)
             if next_action == LoopAction.EXIT:
                 PrettyOutput.auto_print("🛑 服务已停止")
                 return
             PrettyOutput.auto_print("🔄 接收到重启信号，正在重新启动服务")
 
-    def _start_services(self) -> ServiceProcesses:
-        """按节点模式启动服务进程。"""
+    def _start_services(
+        self, existing_frontend: Optional[subprocess.Popen[bytes]] = None
+    ) -> ServiceProcesses:
+        """按节点模式启动服务进程。
+        
+        Args:
+            existing_frontend: 已存在的前端进程（只重启网关时使用）
+        """
         self._validate_runtime_dependencies()
-        PrettyOutput.auto_print("🚀 启动 Jarvis 服务")
+        
+        if existing_frontend is not None:
+            PrettyOutput.auto_print("🚀 重新启动网关服务（保持前端运行）")
+        else:
+            PrettyOutput.auto_print("🚀 启动 Jarvis 服务")
         PrettyOutput.auto_print(f"📁 项目根目录: {self._config.project_root}")
 
         gateway_process = self._start_gateway_process()
         self._wait_for_gateway_ready()
 
-        frontend_process: Optional[subprocess.Popen[bytes]] = None
-        if self._config.node_mode == "master":
+        frontend_process = existing_frontend
+        if frontend_process is None and self._config.node_mode == "master":
             self._prepare_frontend_assets()
             frontend_process = self._start_frontend_process()
 
@@ -224,6 +251,11 @@ class ServiceController:
         PrettyOutput.auto_print("🛑 正在停止服务")
         if processes.frontend_process is not None:
             self._terminate_process(processes.frontend_process, "前端服务")
+        self._terminate_process(processes.gateway_process, "网关服务")
+
+    def _stop_gateway_only(self, processes: ServiceProcesses) -> None:
+        """只停止网关服务，保持前端运行。"""
+        PrettyOutput.auto_print("🛑 正在停止网关服务")
         self._terminate_process(processes.gateway_process, "网关服务")
 
     def _terminate_process(
@@ -412,6 +444,7 @@ def run_service(config: ServiceConfig) -> None:
     signal.signal(signal.SIGINT, controller.request_exit)
     signal.signal(signal.SIGTERM, controller.request_exit)
     signal.signal(signal.SIGUSR1, controller.request_restart)
+    signal.signal(signal.SIGUSR2, controller.request_restart_gateway_only)
     controller.run_forever()
 
 

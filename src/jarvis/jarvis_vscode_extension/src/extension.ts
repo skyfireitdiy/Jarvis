@@ -239,9 +239,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private availableNodeOptions: NodeOptionItem[] = [];
   private defaultLlmGroup = "";
   private lastAgentItemsJson: string = "";
-  private isRestartingGateway = false;
   private isSettingsPanelVisible = false;
-  private restartTargetNodeId = "master";
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -341,14 +339,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           await this.setConnectionLockEnabled(Boolean(message.enabled));
           return;
         }
-        if (message?.type === "changeRestartTargetNode") {
-          this.restartTargetNodeId = String(message.nodeId || "master").trim() || "master";
-          this.renderAgentListView();
-          return;
-        }
-        if (message?.type === "restartGateway") {
-          await this.restartGatewayService(this.restartTargetNodeId);
-        }
+
       },
     );
   }
@@ -570,34 +561,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const connectionStatusClass = this.panelState.gatewayHasConnectionError
       ? "status-banner error"
       : "status-banner";
-    const restartButtonDisabled =
-      this.isRestartingGateway || !this.panelState.token ? "disabled" : "";
-    const restartButtonLabel = this.isRestartingGateway
-      ? "重启中..."
-      : "重启服务";
     const connectionLockChecked = this.panelState.connectionLockEnabled
       ? "checked"
       : "";
     const settingsButtonLabel = this.isSettingsPanelVisible
       ? "关闭设置"
       : "连接设置";
-    const restartNodeSelectOptions = [`<option value="master" ${this.restartTargetNodeId === "master" ? "selected" : ""}>master (主节点)</option>`]
-      .concat(
-        this.availableNodeOptions
-          .filter((node) => node.nodeId !== "master")
-          .map((node) => {
-            const selected = node.nodeId === this.restartTargetNodeId ? "selected" : "";
-            const label = node.status ? `${node.nodeId} (${node.status})` : node.nodeId;
-            return `<option value="${escapeHtml(node.nodeId)}" ${selected}>${escapeHtml(label)}</option>`;
-          }),
-      )
-      .join("");
     const settingsPanelMarkup = this.isSettingsPanelVisible
       ? `
   <div class="settings-panel">
     <div class="settings-panel-header">
       <div>
-        <div class="settings-panel-title">连接设置与服务管理</div>
+        <div class="settings-panel-title">连接设置</div>
         <div class="settings-panel-subtitle">这些功能不常用，已从 Agents 主面板中独立出来。</div>
       </div>
       <button id="closeSettingsPanelButton" type="button">关闭</button>
@@ -611,17 +586,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <span class="toggle-switch-help">启用后，当已有活跃连接时，新连接将被拒绝；禁用后，新连接会替换旧连接。</span>
         </div>
       </label>
-    </div>
-    <div class="settings-card">
-      <div class="settings-card-title">服务管理</div>
-      <div class="form-group" style="margin-bottom: 10px;">
-        <label for="restartTargetNodeId" style="display: block; font-size: 12px; margin-bottom: 4px; opacity: 0.9;">目标节点</label>
-        <select id="restartTargetNodeId">${restartNodeSelectOptions}</select>
-      </div>
-      <div class="settings-card-row">
-        <div class="settings-card-help">重启 Jarvis 服务会短暂中断当前连接，执行前会要求确认。</div>
-        <button id="restartGatewayButton" class="settings-action-button" ${restartButtonDisabled}>${restartButtonLabel}</button>
-      </div>
     </div>
   </div>`
       : "";
@@ -739,27 +703,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (connectionLockToggle) {
       connectionLockToggle.addEventListener('change', () => {
         vscode.postMessage({ type: 'toggleConnectionLock', enabled: Boolean(connectionLockToggle.checked) });
-      });
-    }
-    const restartTargetNodeIdSelect = document.getElementById('restartTargetNodeId');
-    if (restartTargetNodeIdSelect) {
-      restartTargetNodeIdSelect.addEventListener('change', () => {
-        vscode.postMessage({ type: 'changeRestartTargetNode', nodeId: restartTargetNodeIdSelect.value });
-      });
-    }
-    const restartGatewayButton = document.getElementById('restartGatewayButton');
-    if (restartGatewayButton) {
-      restartGatewayButton.addEventListener('click', () => {
-        const targetNode = document.getElementById('restartTargetNodeId')?.value || 'master';
-        const isMaster = targetNode === 'master';
-        const confirmMessage = isMaster
-          ? '确认重启主节点 (master) 的 Jarvis 服务吗？这会短暂中断当前连接。'
-          : '确认重启节点 "' + targetNode + '" 的 Jarvis 服务吗？';
-        const confirmed = window.confirm(confirmMessage);
-        if (!confirmed) {
-          return;
-        }
-        vscode.postMessage({ type: 'restartGateway' });
       });
     }
     const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');
@@ -1912,83 +1855,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       });
     }
     this.renderAgentListView();
-  }
-
-  private async restartGatewayService(nodeId?: string): Promise<void> {
-    if (this.isRestartingGateway || !this.panelState.token) {
-      return;
-    }
-    const targetNodeId = String(nodeId || "master").trim() || "master";
-    this.isRestartingGateway = true;
-    this.renderAgentListView();
-    try {
-      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-      const response = await this.fetchWithAuth(
-        buildNodeHttpUrl(gatewayAddress, targetNodeId, "service/restart"),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ node_id: targetNodeId }),
-        },
-      );
-      const result = (await response.json()) as {
-        success?: boolean;
-        data?: { message?: string; node_id?: string };
-        error?: { message?: string };
-      };
-      if (!response.ok || !result.success) {
-        throw new Error(result.error?.message || "重启服务失败");
-      }
-      // 如果重启的是当前连接的节点，重置连接状态
-      if (targetNodeId === "master") {
-        this.resetConnectionStateAfterGatewayRestart(
-          result.data?.message || "Jarvis 服务已重启，请重新连接登录",
-        );
-      } else {
-        // 重启的是子节点，显示成功消息但不断开连接
-        this.appendPanelMessage(
-          result.data?.message || `节点 ${targetNodeId} 服务重启中...`,
-          "system",
-        );
-      }
-    } catch (error) {
-      this.appendPanelMessage(
-        getErrorMessage(error) || "重启服务失败",
-        "error",
-      );
-    } finally {
-      this.isRestartingGateway = false;
-      this.renderAgentListView();
-    }
-  }
-
-  private resetConnectionStateAfterGatewayRestart(message: string): void {
-    this.stopAgentListRefresh();
-    this.disposeSocket("gatewaySocket");
-    for (const socket of this.agentSockets.values()) {
-      try {
-        socket.close();
-      } catch {
-        // ignore close error
-      }
-    }
-    this.agentSockets.clear();
-    this.agentConnectionAttempts.clear();
-    this.panelState.token = "";
-    this.panelState.selectedAgentId = undefined;
-    this.panelState.gatewaySocket = undefined;
-    this.panelState.messages = [];
-    this.panelState.terminalOutput = "暂无终端输出";
-    this.panelState.inputMode = "multi";
-    this.panelState.inputTip = "";
-    this.panelState.executionStatus = "running";
-    this.panelState.pendingRequestId = undefined;
-    this.panelState.pendingStreamText = "";
-    this.panelState.gatewayConnectionStatusText = message;
-    this.panelState.gatewayHasConnectionError = false;
-    this.leftViewLoginState.errorMessage = "";
-    this.leftViewLoginState.isSubmitting = false;
-    this.postPanelState();
   }
 
   private postPanelState(): void {

@@ -1544,13 +1544,16 @@ def create_app(
 
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
     async def restart_service(request: Dict[str, Any]) -> Dict[str, Any]:
-        """请求 jarvis-service 通过 SIGUSR1 重启服务。
+        """请求 jarvis-service 通过 SIGUSR1/SIGUSR2 重启服务。
 
         Args:
-            request: 请求体，可包含 node_id 字段指定要重启的节点
+            request: 请求体，可包含以下字段：
+                - node_id: 要重启的节点ID
+                - restart_frontend: 是否同时重启前端服务（默认 true）
         """
         try:
             target_node_id = str(request.get("node_id") or "").strip()
+            restart_frontend = bool(request.get("restart_frontend", True))
 
             # 如果指定了远端节点，转发重启请求
             if target_node_id and target_node_id not in (
@@ -1577,7 +1580,7 @@ def create_app(
                 response = await node_connection_manager.send_request_to_node(
                     target_node_id,
                     SERVICE_RESTART_REQUEST,
-                    {},
+                    {"restart_frontend": restart_frontend},
                     timeout=30.0,
                 )
                 payload = response.get("payload") or {}
@@ -1620,12 +1623,23 @@ def create_app(
                 }
 
             service_pid = int(service_pid_text)
-            os.kill(service_pid, signal.SIGUSR1)
+            # 根据 restart_frontend 参数选择信号
+            # SIGUSR1: 重启所有服务（包括前端）
+            # SIGUSR2: 只重启网关服务
+            signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
+            signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
+            os.kill(service_pid, signal_to_send)
+            message = (
+                "已请求 jarvis-service 重启所有服务"
+                if restart_frontend
+                else "已请求 jarvis-service 只重启网关服务（前端保持运行）"
+            )
             return {
                 "success": True,
                 "data": {
                     "pid": service_pid,
-                    "message": "已请求 jarvis-service 重启服务",
+                    "signal": signal_name,
+                    "message": message,
                 },
             }
         except (ValueError, ProcessLookupError):
