@@ -396,12 +396,7 @@ class CodeAgent(Agent):
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
             if self.first:
-                with Status(
-                    "🔍 正在分析需求类型...",
-                    spinner="dots",
-                    console=console,
-                ):
-                    scenario = classify_user_request(user_input)
+                scenario = classify_user_request(user_input)
 
                 # 根据分类结果获取对应的系统提示词并更新
                 scenario_system_prompt = get_system_prompt(scenario)
