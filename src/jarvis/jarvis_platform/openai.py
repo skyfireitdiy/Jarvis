@@ -138,6 +138,9 @@ class OpenAIModel(BasePlatform):
                 )
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
+        self._streaming_disabled: bool = (
+            False  # 流式兼容性标志，检测到代理不支持SSE时设为True
+        )
 
     def set_messages(self, messages: List[Dict[str, str]]) -> None:
         """替换对话历史
@@ -255,10 +258,11 @@ class OpenAIModel(BasePlatform):
 
             # 循环处理，直到不是因为长度限制而结束
             # 构造 API 调用参数
+            use_streaming = not self._streaming_disabled
             api_params: Dict[str, Any] = {
                 "model": self.model_name,
                 "messages": self.messages,
-                "stream": True,
+                "stream": use_streaming,
             }
             # 只有在配置了 reasoning_effort 时才添加 extra_body 参数
             if self.reasoning_effort:
@@ -268,23 +272,59 @@ class OpenAIModel(BasePlatform):
 
             full_response = ""
 
-            for chunk in response:
-                # 使用类型注解明确chunk的类型，避免union类型错误
-                from openai.types.chat import ChatCompletionChunk
+            if use_streaming:
+                # 流式模式：迭代 chunk 增量输出
+                for chunk in response:
+                    # 使用类型注解明确chunk的类型，避免union类型错误
+                    from openai.types.chat import ChatCompletionChunk
 
-                chunk_typed: ChatCompletionChunk = cast(ChatCompletionChunk, chunk)
-                if chunk_typed.choices and len(chunk_typed.choices) > 0:
-                    choice = chunk_typed.choices[0]
+                    chunk_typed: ChatCompletionChunk = cast(ChatCompletionChunk, chunk)
+                    if chunk_typed.choices and len(chunk_typed.choices) > 0:
+                        choice = chunk_typed.choices[0]
 
-                    # 获取内容增量
-                    if choice.delta and choice.delta.content:
-                        text = choice.delta.content
-                        full_response += text
-                        yield text
-            if full_response:
-                self.messages.append({"role": "assistant", "content": full_response})
+                        # 获取内容增量
+                        if choice.delta and choice.delta.content:
+                            text = choice.delta.content
+                            full_response += text
+                            yield text
+                if full_response:
+                    self.messages.append(
+                        {"role": "assistant", "content": full_response}
+                    )
+                else:
+                    # 流式请求返回空，自动回退到非流式请求
+                    # 常见原因：本地代理对 SSE 流式传输处理不当
+                    PrettyOutput.auto_print(
+                        "⚠ 流式响应为空，本会话将禁用流式传输（可能受本地代理影响）"
+                    )
+                    self._streaming_disabled = True
+                    fallback_params = api_params.copy()
+                    fallback_params["stream"] = False
+                    fallback_response = self.client.chat.completions.create(
+                        **fallback_params
+                    )
+                    if fallback_response.choices and len(fallback_response.choices) > 0:
+                        fallback_content = (
+                            fallback_response.choices[0].message.content or ""
+                        )
+                        if fallback_content:
+                            self.messages.append(
+                                {"role": "assistant", "content": fallback_content}
+                            )
+                            yield fallback_content
+                            return
+                    raise Exception("No response from model")
             else:
-                raise Exception("No response from model")
+                # 非流式模式：直接获取完整响应
+                if response.choices and len(response.choices) > 0:
+                    full_response = response.choices[0].message.content or ""
+                if full_response:
+                    self.messages.append(
+                        {"role": "assistant", "content": full_response}
+                    )
+                    yield full_response
+                else:
+                    raise Exception("No response from model")
         except Exception as e:
             # 失败时回滚：移除已添加的用户消息
             if len(self.messages) > messages_before_user:
