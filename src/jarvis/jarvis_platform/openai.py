@@ -283,10 +283,17 @@ class OpenAIModel(BasePlatform):
                         choice = chunk_typed.choices[0]
 
                         # 获取内容增量
-                        if choice.delta and choice.delta.content:
-                            text = choice.delta.content
-                            full_response += text
-                            yield text
+                        if choice.delta:
+                            # 处理 reasoning_content（推理过程，如 GLM 模型）
+                            if hasattr(choice.delta, 'reasoning_content') and choice.delta.reasoning_content:
+                                text = choice.delta.reasoning_content
+                                full_response += text
+                                yield text
+                            # 处理 content（正文内容）
+                            if choice.delta.content:
+                                text = choice.delta.content
+                                full_response += text
+                                yield text
                 if full_response:
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
@@ -300,9 +307,10 @@ class OpenAIModel(BasePlatform):
                         **fallback_params
                     )
                     if fallback_response.choices and len(fallback_response.choices) > 0:
-                        fallback_content = (
-                            fallback_response.choices[0].message.content or ""
-                        )
+                        fallback_message = fallback_response.choices[0].message
+                        fallback_reasoning = getattr(fallback_message, 'reasoning_content', None) or ""
+                        fallback_text = fallback_message.content or ""
+                        fallback_content = fallback_reasoning + fallback_text
                         if fallback_content:
                             self.messages.append(
                                 {"role": "assistant", "content": fallback_content}
@@ -313,7 +321,11 @@ class OpenAIModel(BasePlatform):
             else:
                 # 非流式模式：直接获取完整响应
                 if response.choices and len(response.choices) > 0:
-                    full_response = response.choices[0].message.content or ""
+                    message = response.choices[0].message
+                    # 处理 reasoning_content（推理过程，如 GLM 模型）
+                    reasoning = getattr(message, 'reasoning_content', None) or ""
+                    content = message.content or ""
+                    full_response = reasoning + content
                 if full_response:
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
