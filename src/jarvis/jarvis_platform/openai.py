@@ -293,10 +293,6 @@ class OpenAIModel(BasePlatform):
                     )
                 else:
                     # 流式请求返回空，自动回退到非流式请求
-                    # 常见原因：本地代理对 SSE 流式传输处理不当
-                    PrettyOutput.auto_print(
-                        "⚠ 流式响应为空，本会话将禁用流式传输（可能受本地代理影响）"
-                    )
                     self._streaming_disabled = True
                     fallback_params = api_params.copy()
                     fallback_params["stream"] = False
