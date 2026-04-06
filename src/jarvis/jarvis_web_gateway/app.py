@@ -1820,10 +1820,14 @@ def create_app(
                         },
                     })
 
+            # 统计成功数量
+            success_count = sum(1 for r in results if r.get("success"))
+            
             return {
                 "success": True,
                 "data": {
                     "source_node_id": source_node_id,
+                    "success_count": success_count,
                     "results": results,
                 },
             }
