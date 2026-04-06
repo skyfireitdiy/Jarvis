@@ -89,8 +89,10 @@ class SessionManager:
             # 调用模型生成
             response = ""
             with Status("正在生成会话名称...", console=console) as status:
-                for chunk in cheap_model.chat(prompt):
-                    response += chunk
+                for chunk_type, chunk_content in cheap_model.chat(prompt):
+                    # 只拼接 content 类型
+                    if chunk_type == "content":
+                        response += chunk_content
                     status.update(f"正在生成会话名称... ({len(response)} 字符)")
 
             # 清理响应

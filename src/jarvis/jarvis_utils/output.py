@@ -1266,7 +1266,9 @@ class PrettyOutput:
 
                 # 使用 Text.append 支持不同样式
                 new_text_obj = Text(overflow="fold")
-                new_text_obj.append(text_content.plain, style=text_content.style)
+                # 只在 text_content 不为空时才追加旧内容
+                if text_content.plain:
+                    new_text_obj.append(text_content.plain, style=text_content.style)
                 new_text_obj.append(content, style=style)
                 update_count += 1
 

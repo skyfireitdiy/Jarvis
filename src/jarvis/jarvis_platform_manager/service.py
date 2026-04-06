@@ -313,9 +313,9 @@ def start_service(
 
         def producer() -> None:
             try:
-                for chunk in platform.chat(message):
-                    if chunk:
-                        asyncio.run_coroutine_threadsafe(queue.put(chunk), loop)
+                for chunk_type, chunk_content in platform.chat(message):
+                    if chunk_content:
+                        asyncio.run_coroutine_threadsafe(queue.put(chunk_content), loop)
             except Exception as exc:
                 # Use a special dict to pass error across thread boundary
                 asyncio.run_coroutine_threadsafe(

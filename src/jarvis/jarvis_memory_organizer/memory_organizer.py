@@ -191,8 +191,10 @@ class MemoryOrganizer:
 
             # 调用大模型 - 收集完整响应
             response_parts = []
-            for chunk in self.platform.chat(prompt):
-                response_parts.append(chunk)
+            for chunk_type, chunk_content in self.platform.chat(prompt):
+                # 只收集 content 类型
+                if chunk_type == "content":
+                    response_parts.append(chunk_content)
             response = "".join(response_parts)
 
             # 解析响应

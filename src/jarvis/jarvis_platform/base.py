@@ -252,8 +252,10 @@ class BasePlatform(ABC):
             str: 模型响应
         """
         response = ""
-        for s in self.chat(message):
-            response += s
+        for chunk_type, chunk_content in self.chat(message):
+            # 只拼接 content 类型
+            if chunk_type == "content":
+                response += chunk_content
             # 检查是否达到最大输出长度
             if max_output > 0 and len(response) >= max_output:
                 self._append_session_history(message, response)
