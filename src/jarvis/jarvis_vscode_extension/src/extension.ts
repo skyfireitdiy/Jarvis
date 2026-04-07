@@ -553,6 +553,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
             ${agentItem.worktree ? '<div class="agent-worktree" title="已启用 worktree">🌿</div>' : ""}
+            ${agentItem.quickMode ? '<div class="agent-quick-mode" title="极速模式">⚡</div>' : ""}
           </div>
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
@@ -1385,6 +1386,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             workingDir: agent.working_dir || "",
             llmGroup: agent.llm_group || "",
             worktree: Boolean(agent.worktree),
+            quickMode: Boolean((agent as any).quick_mode),
             nodeId: String((agent as any).node_id || "").trim() || "master",
           };
         });
