@@ -646,6 +646,18 @@
             </div>
           </div>
         </div>
+        <div class="form-group">
+          <div class="toggle-wrapper">
+            <label class="toggle-switch">
+              <input v-model="newAgentQuickMode" type="checkbox" class="toggle-input" />
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="toggle-info">
+              <span class="toggle-label-text">极速模式</span>
+              <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions">
           <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
           <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
@@ -2574,6 +2586,7 @@ const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为
 const modelGroups = ref([])        // 模型组列表
 const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 default）
 const newCodeAgentWorktree = ref(false) // 新代码 Agent 是否启用 worktree
+const newAgentQuickMode = ref(false) // 新 Agent 是否启用极速模式
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 
@@ -3750,6 +3763,7 @@ async function createAgent() {
         name: newAgentName.value || undefined,
         llm_group: newAgentModelGroup.value,
         worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false,
+        quick_mode: newAgentQuickMode.value,
         node_id: targetNodeId,
       })
     })
@@ -3772,6 +3786,7 @@ async function createAgent() {
       showCreateAgentModal.value = false
       newAgentDir.value = '~' // 重置为默认值
       newCodeAgentWorktree.value = false
+      newAgentQuickMode.value = false
       newAgentNodeId.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = newAgentType.value === 'agent' ? '通用Agent' : '代码Agent'
