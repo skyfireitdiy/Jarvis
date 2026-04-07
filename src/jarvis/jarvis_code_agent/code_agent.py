@@ -396,8 +396,9 @@ class CodeAgent(Agent):
 
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
-            # === 阶段1: 需求分类 ===
             if self.first:
+                
+                # === 阶段1: 需求分类 ===
                 scenario = classify_user_request(user_input)
 
                 # 根据分类结果获取对应的系统提示词并更新
