@@ -543,9 +543,8 @@ class ContextRecommender:
 
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")
-
-            # 设置抑制输出，因为这是后台任务
-            llm_model.set_suppress_output(True)
+            
+            llm_model.set_suppress_output(False)
 
             return llm_model
         except Exception as e:
