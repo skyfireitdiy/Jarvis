@@ -397,7 +397,6 @@ class CodeAgent(Agent):
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
             if self.first:
-                
                 # === 阶段1: 需求分类 ===
                 scenario = classify_user_request(user_input)
 
@@ -411,27 +410,30 @@ class CodeAgent(Agent):
                         prompt_text = self.prompt_manager.build_system_prompt(self)
                         self.model.set_system_prompt(prompt_text)
 
-            # === 阶段2: 生成非交互模式说明 ===
-            # 根据当前模式生成额外说明，供 LLM 感知执行策略
+            # === 阶段2-6: 提示词生成与增强输入构建（仅首次运行执行） ===
             prev_dir = os.getcwd()
-            non_interactive_note = ""
-            if getattr(self, "non_interactive", False):
-                non_interactive_note = (
-                    "\n\n[系统说明]\n"
-                    "本次会话处于**非交互模式**：\n"
-                    "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                    '- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n'
-                    "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
-                )
-
-            # === 阶段3: Git环境初始化 ===
-            self.git_manager.init_env(prefix, suffix, self)
             start_commit = get_latest_commit_hash()
             self.start_commit = start_commit
 
-            # 将初始 commit 信息添加到 addon_prompt（安全回退点）
-            if start_commit:
-                initial_commit_prompt = f"""
+            if self.first:
+                # === 阶段2: 生成非交互模式说明 ===
+                # 根据当前模式生成额外说明，供 LLM 感知执行策略
+                non_interactive_note = ""
+                if getattr(self, "non_interactive", False):
+                    non_interactive_note = (
+                        "\n\n[系统说明]\n"
+                        "本次会话处于**非交互模式**：\n"
+                        "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
+                        '- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n'
+                        "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+                    )
+
+                # === 阶段3: Git环境初始化 ===
+                self.git_manager.init_env(prefix, suffix, self)
+
+                # 将初始 commit 信息添加到 addon_prompt（安全回退点）
+                if start_commit:
+                    initial_commit_prompt = f"""
 **🔖 初始 Git Commit（安全回退点）**：
 本次任务开始时的初始 commit 是：`{start_commit}`
 
@@ -441,16 +443,16 @@ git reset --hard {start_commit}
 ```
 这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。
 """
-                # 将初始 commit 信息追加到现有的 addon_prompt
-                current_addon = self.session.addon_prompt or ""
-                self.set_addon_prompt(
-                    f"{current_addon}\n{initial_commit_prompt}".strip()
-                )
+                    # 将初始 commit 信息追加到现有的 addon_prompt
+                    current_addon = self.session.addon_prompt or ""
+                    self.set_addon_prompt(
+                        f"{current_addon}\n{initial_commit_prompt}".strip()
+                    )
 
-            # === 阶段4: 获取项目概况 ===
-            project_overview = get_project_overview(self.root_dir)
+                # === 阶段4: 获取项目概况 ===
+                project_overview = get_project_overview(self.root_dir)
 
-            first_tip = """请严格遵循以下规范进行代码修改任务：
+                first_tip = """请严格遵循以下规范进行代码修改任务：
             1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。
             2. 充分利用工具理解用户需求和现有代码，禁止凭空假设。
             3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件，明确目标后再进行编辑。
@@ -461,39 +463,41 @@ git reset --hard {start_commit}
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
 
-            # === 阶段5: 智能上下文推荐 ===
-            # 智能上下文推荐：根据用户输入推荐相关上下文
-            context_recommendation_text = ""
-            if self.context_recommender and is_enable_intent_recognition():
-                recommendation = self.context_recommender.recommend_context(
-                    user_input=user_input,
-                )
+                # === 阶段5: 智能上下文推荐 ===
+                # 智能上下文推荐：根据用户输入推荐相关上下文
+                context_recommendation_text = ""
+                if self.context_recommender and is_enable_intent_recognition():
+                    recommendation = self.context_recommender.recommend_context(
+                        user_input=user_input,
+                    )
 
-                # 格式化推荐结果
-                context_recommendation_text = (
-                    self.context_recommender.format_recommendation(recommendation)
-                )
+                    # 格式化推荐结果
+                    context_recommendation_text = (
+                        self.context_recommender.format_recommendation(recommendation)
+                    )
 
-            # === 阶段6: 构建增强输入 ===
-
-            if project_overview:
-                enhanced_input = (
-                    project_overview
-                    + "\n\n"
-                    + first_tip
-                    + non_interactive_note
-                    + context_recommendation_text
-                    + "\n\n任务描述：\n"
-                    + user_input
-                )
+                # === 阶段6: 构建增强输入 ===
+                if project_overview:
+                    enhanced_input = (
+                        project_overview
+                        + "\n\n"
+                        + first_tip
+                        + non_interactive_note
+                        + context_recommendation_text
+                        + "\n\n任务描述：\n"
+                        + user_input
+                    )
+                else:
+                    enhanced_input = (
+                        first_tip
+                        + non_interactive_note
+                        + context_recommendation_text
+                        + "\n\n任务描述：\n"
+                        + user_input
+                    )
             else:
-                enhanced_input = (
-                    first_tip
-                    + non_interactive_note
-                    + context_recommendation_text
-                    + "\n\n任务描述：\n"
-                    + user_input
-                )
+                # 会话恢复时，直接使用用户输入（上下文已从会话中恢复）
+                enhanced_input = user_input
 
             try:
                 # === 阶段7: 执行LLM调用 ===
@@ -502,7 +506,9 @@ git reset --hard {start_commit}
                     self.model.set_suppress_output(False)
                 result = super().run(enhanced_input)
                 t7_end = time.time()
-                PrettyOutput.auto_print(f"[性能打点] 阶段7-LLM执行: {t7_end-t7_start:.3f}s")
+                PrettyOutput.auto_print(
+                    f"[性能打点] 阶段7-LLM执行: {t7_end - t7_start:.3f}s"
+                )
                 # 确保返回值是 str 或 None
                 if result is None:
                     result_str = None
