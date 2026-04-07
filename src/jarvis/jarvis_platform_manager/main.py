@@ -827,34 +827,47 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
         PrettyOutput.auto_print("❌ 没有可用的 LLM 配置，请先添加 LLM 配置")
         raise typer.Exit(code=1)
 
+    llm_list: List[str] = sorted(llms.keys())
     PrettyOutput.auto_print("可用的 LLM 配置:")
-    for llm_name in sorted(llms.keys()):
-        PrettyOutput.auto_print(f"  • {llm_name}")
+    for i, llm_name in enumerate(llm_list, 1):
+        PrettyOutput.auto_print(f"  {i}. {llm_name}")
+
+    def resolve_llm_choice(prompt: str, allow_empty: bool = False) -> str:
+        """解析用户选择，支持序号或名称"""
+        choice = get_single_line_input(prompt).strip()
+        if not choice:
+            return ""
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(llm_list):
+                return llm_list[idx]
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的序号: {choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            # 用户输入了名称
+            if choice in llms:
+                return choice
+            else:
+                PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {choice}")
+                raise typer.Exit(code=1)
 
     # 交互式输入
-    normal_llm = get_single_line_input("Normal LLM 配置名称 (必需): ").strip()
+    normal_llm = resolve_llm_choice("Normal LLM 配置 (序号或名称，必需): ")
     if not normal_llm:
-        PrettyOutput.auto_print("❌ Normal LLM 配置名称不能为空")
-        raise typer.Exit(code=1)
-
-    if normal_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
+        PrettyOutput.auto_print("❌ Normal LLM 配置不能为空")
         raise typer.Exit(code=1)
 
     # 可选的 cheap 和 smart
-    cheap_llm = get_single_line_input(
-        "Cheap LLM 配置名称 (留空则与 normal 相同): "
-    ).strip()
-    if cheap_llm and cheap_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
-        raise typer.Exit(code=1)
+    cheap_llm = resolve_llm_choice(
+        "Cheap LLM 配置 (序号或名称，留空则与 normal 相同): ",
+        allow_empty=True
+    )
 
-    smart_llm = get_single_line_input(
-        "Smart LLM 配置名称 (留空则与 normal 相同): "
-    ).strip()
-    if smart_llm and smart_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
-        raise typer.Exit(code=1)
+    smart_llm = resolve_llm_choice(
+        "Smart LLM 配置 (序号或名称，留空则与 normal 相同): ",
+        allow_empty=True
+    )
 
     # 自动生成模型组名称（如果未提供）
     if name is None:
