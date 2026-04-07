@@ -369,11 +369,11 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
 
     # 5. 测试 normal 模型API连通性
     from jarvis.jarvis_utils.quick_config import test_model_connection
-    
+
     test_model = selected_models[0]
     PrettyOutput.auto_print(f"🔍 正在测试模型 {test_model} 的API连通性...")
     success, error_msg = test_model_connection(platform, base_url, api_key, test_model)
-    
+
     if success:
         PrettyOutput.auto_print("✅ API连通性测试通过")
     else:
@@ -388,7 +388,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     # 6. 为每个模型设置最大token数
     default_max_tokens = base_llm_config.get("max_input_token_count", 128000)
     model_max_tokens = {}
-    
+
     for model in selected_models:
         while True:
             max_tokens_input = get_single_line_input(
@@ -396,7 +396,9 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             )
             if not max_tokens_input.strip():
                 model_max_tokens[model] = default_max_tokens
-                PrettyOutput.auto_print(f"✅ 模型 {model} 使用默认最大token数: {default_max_tokens}")
+                PrettyOutput.auto_print(
+                    f"✅ 模型 {model} 使用默认最大token数: {default_max_tokens}"
+                )
                 break
             try:
                 max_tokens = int(max_tokens_input.strip())
@@ -404,7 +406,9 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
                     PrettyOutput.auto_print("❌ 最大token数必须为正整数")
                     continue
                 model_max_tokens[model] = max_tokens
-                PrettyOutput.auto_print(f"✅ 模型 {model} 最大token数设置为: {max_tokens}")
+                PrettyOutput.auto_print(
+                    f"✅ 模型 {model} 最大token数设置为: {max_tokens}"
+                )
                 break
             except ValueError:
                 PrettyOutput.auto_print("❌ 请输入有效的正整数")
@@ -413,9 +417,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     added_count = 0
     for model in selected_models:
         # 生成配置名称：{platform}_{model_normalized}
-        model_config_name = (
-            f"{platform}_{model.replace('.', '_').replace('-', '_')}"
-        )
+        model_config_name = f"{platform}_{model.replace('.', '_').replace('-', '_')}"
 
         # 检查是否已存在
         if model_config_name in config["llms"]:
@@ -647,9 +649,9 @@ def llm_update(
             PrettyOutput.auto_print("❌ 无效的token数，保持原值")
 
     # 更新 API Base URL 和 API Key
-    current_platform = llm_config.get('platform', '').strip().lower()
+    current_platform = llm_config.get("platform", "").strip().lower()
     llm_config_dict = llm_config.get("llm_config", {})
-    
+
     # 获取当前的 URL 和 Key
     current_base_url = None
     current_api_key = None
@@ -666,7 +668,7 @@ def llm_update(
     base_url = get_single_line_input(
         f"API基础URL (当前: {current_base_url or '未设置'}, 留空不变): "
     ).strip()
-    
+
     api_key = get_single_line_input(
         f"API密钥 (当前: {'已设置' if current_api_key else '未设置'}, 留空不变): "
     ).strip()
@@ -675,10 +677,10 @@ def llm_update(
     if base_url or api_key:
         if "llm_config" not in llm_config:
             llm_config["llm_config"] = {}
-        
+
         # 使用更新后的 platform（如果用户修改了）
-        updated_platform = llm_config.get('platform', '').strip().lower()
-        
+        updated_platform = llm_config.get("platform", "").strip().lower()
+
         if updated_platform == "openai":
             if base_url:
                 llm_config["llm_config"]["openai_api_base"] = base_url
@@ -811,13 +813,63 @@ def group_delete(
 
 
 @group_app.command("add")
-def group_add(name: str = typer.Argument(..., help="模型组名称")) -> None:
+def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")) -> None:
     """添加新的模型组（交互式）"""
     from jarvis.jarvis_utils.input import get_single_line_input
 
     config = _load_config()
     if "llm_groups" not in config:
         config["llm_groups"] = {}
+
+    # 获取可用的 LLM 配置列表
+    llms = config.get("llms", {})
+    if not llms:
+        PrettyOutput.auto_print("❌ 没有可用的 LLM 配置，请先添加 LLM 配置")
+        raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print("可用的 LLM 配置:")
+    for llm_name in sorted(llms.keys()):
+        PrettyOutput.auto_print(f"  • {llm_name}")
+
+    # 交互式输入
+    normal_llm = get_single_line_input("Normal LLM 配置名称 (必需): ").strip()
+    if not normal_llm:
+        PrettyOutput.auto_print("❌ Normal LLM 配置名称不能为空")
+        raise typer.Exit(code=1)
+
+    if normal_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
+        raise typer.Exit(code=1)
+
+    # 可选的 cheap 和 smart
+    cheap_llm = get_single_line_input(
+        "Cheap LLM 配置名称 (留空则与 normal 相同): "
+    ).strip()
+    if cheap_llm and cheap_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
+        raise typer.Exit(code=1)
+
+    smart_llm = get_single_line_input(
+        "Smart LLM 配置名称 (留空则与 normal 相同): "
+    ).strip()
+    if smart_llm and smart_llm not in llms:
+        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
+        raise typer.Exit(code=1)
+
+    # 自动生成模型组名称（如果未提供）
+    if name is None:
+        # 根据选择的配置生成名称
+        if cheap_llm and smart_llm:
+            if cheap_llm == smart_llm == normal_llm:
+                name = normal_llm
+            else:
+                name = f"{normal_llm}+{cheap_llm}+{smart_llm}"
+        elif cheap_llm and cheap_llm != normal_llm:
+            name = f"{normal_llm}+{cheap_llm}"
+        elif smart_llm and smart_llm != normal_llm:
+            name = f"{normal_llm}+{smart_llm}"
+        else:
+            name = normal_llm
 
     if name in config["llm_groups"]:
         from jarvis.jarvis_utils.input import user_confirm
