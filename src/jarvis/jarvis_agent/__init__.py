@@ -471,6 +471,7 @@ class Agent:
         optimize_system_prompt: bool = False,
         enable_auto_rule_select: bool = True,
         model_type: str = "normal",
+        quick_mode: bool = False,
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例

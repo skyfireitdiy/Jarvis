@@ -31,6 +31,7 @@ class AgentManager:
         allow_savesession: bool = False,
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
+        quick_mode: bool = False,
     ):
         self.tool_group = tool_group
         self.restore_session = restore_session
@@ -44,6 +45,7 @@ class AgentManager:
         self.allow_savesession = allow_savesession
         self.rule_names = rule_names
         self.optimize_system_prompt = optimize_system_prompt
+        self.quick_mode = quick_mode
 
     def _merge_rule_names(self, cli_rule_names: Optional[str]) -> Optional[str]:
         """合并配置文件默认规则和命令行规则
@@ -99,6 +101,7 @@ class AgentManager:
             allow_savesession=self.allow_savesession,
             rule_names=merged_rule_names,
             optimize_system_prompt=self.optimize_system_prompt,
+            quick_mode=self.quick_mode,
         )
 
         # 尝试恢复会话
