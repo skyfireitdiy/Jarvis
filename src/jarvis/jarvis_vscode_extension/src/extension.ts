@@ -103,6 +103,7 @@ interface CreateAgentFormState {
   llmGroup: string;
   nodeId: string;
   useWorktree: boolean;
+  quickMode: boolean;
   isSubmitting: boolean;
   errorMessage: string;
 }
@@ -218,6 +219,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     llmGroup: "default",
     nodeId: "",
     useWorktree: false,
+    quickMode: false,
     isSubmitting: false,
     errorMessage: "",
   };
@@ -339,7 +341,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           await this.setConnectionLockEnabled(Boolean(message.enabled));
           return;
         }
-
       },
     );
   }
@@ -398,6 +399,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const worktreeChecked = this.createAgentFormState.useWorktree
       ? "checked"
       : "";
+    const quickModeChecked = this.createAgentFormState.quickMode
+      ? "checked"
+      : "";
     const worktreeDisabled =
       this.createAgentFormState.agentType === "codeagent" ? "" : "disabled";
     const createAgentErrorMarkup = this.createAgentFormState.errorMessage
@@ -425,8 +429,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const nodeSelectOptions = [`<option value="">默认主节点（master）</option>`]
       .concat(
         this.availableNodeOptions.map((node) => {
-          const selected = node.nodeId === this.createAgentFormState.nodeId ? "selected" : "";
-          const label = node.status ? `${node.nodeId} (${node.status})` : node.nodeId;
+          const selected =
+            node.nodeId === this.createAgentFormState.nodeId ? "selected" : "";
+          const label = node.status
+            ? `${node.nodeId} (${node.status})`
+            : node.nodeId;
           return `<option value="${escapeHtml(node.nodeId)}" ${selected}>${escapeHtml(label)}</option>`;
         }),
       )
@@ -522,6 +529,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     <label class="checkbox-row">
       <input id="useWorktree" type="checkbox" ${worktreeChecked} ${worktreeDisabled} />
       <span>codeagent 使用 worktree</span>
+    </label>
+    <label class="checkbox-row">
+      <input id="useQuickMode" type="checkbox" ${quickModeChecked} />
+      <span>极速模式</span>
     </label>
     ${createAgentErrorMarkup}
     <div class="form-actions">
@@ -771,6 +782,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         const llmGroup = document.getElementById('llmGroup');
         const nodeId = document.getElementById('nodeId');
         const useWorktree = document.getElementById('useWorktree');
+        const useQuickMode = document.getElementById('useQuickMode');
         vscode.postMessage({
           type: 'createAgent',
           agentType: agentType ? agentType.value : 'agent',
@@ -778,7 +790,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           name: agentName ? agentName.value : '',
           llmGroup: llmGroup ? llmGroup.value : '',
           nodeId: nodeId ? nodeId.value : '',
-          useWorktree: Boolean(useWorktree && useWorktree.checked)
+          useWorktree: Boolean(useWorktree && useWorktree.checked),
+          quickMode: Boolean(useQuickMode && useQuickMode.checked)
         });
       });
     }
@@ -1834,7 +1847,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     );
     const result = (await response.json()) as {
       success?: boolean;
-      data?: { nodes?: Array<{ node_id?: string; status?: string; runtime_status?: string }> };
+      data?: {
+        nodes?: Array<{
+          node_id?: string;
+          status?: string;
+          runtime_status?: string;
+        }>;
+      };
       error?: { message?: string };
     };
     if (!response.ok || !result.success) {
@@ -1844,7 +1863,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.availableNodeOptions = nodes
       .map((node) => ({
         nodeId: String(node?.node_id || "").trim(),
-        status: String(node?.status || node?.runtime_status || "").trim() || undefined,
+        status:
+          String(node?.status || node?.runtime_status || "").trim() ||
+          undefined,
       }))
       .filter((node) => Boolean(node.nodeId));
   }
@@ -2132,6 +2153,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.defaultLlmGroup || this.modelGroups[0]?.name || "";
     this.createAgentFormState.nodeId = "";
     this.createAgentFormState.useWorktree = false;
+    this.createAgentFormState.quickMode = false;
     this.createAgentFormState.isSubmitting = false;
     this.createAgentFormState.errorMessage = "";
     this.remoteDirectoryBrowserState.isVisible = false;
@@ -2226,11 +2248,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const normalizedNodeId =
         String(targetNodeId || "master").trim() || "master";
       const response = await this.fetchWithAuth(
-        buildNodeHttpUrl(
-          gatewayAddress,
-          normalizedNodeId,
-          `agents/${agentId}`,
-        ),
+        buildNodeHttpUrl(gatewayAddress, normalizedNodeId, `agents/${agentId}`),
         {
           method: "DELETE",
         },
@@ -2279,6 +2297,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const nodeId = String(message.nodeId || "").trim();
     const useWorktree =
       requestedAgentType === "codeagent" ? Boolean(message.useWorktree) : false;
+    const quickMode = Boolean(message.quickMode);
 
     this.updateCreateAgentDefaults(requestedAgentType);
     this.createAgentFormState.workingDir = workingDir;
@@ -2287,6 +2306,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.llmGroup = llmGroup;
     this.createAgentFormState.nodeId = nodeId;
     this.createAgentFormState.useWorktree = useWorktree;
+    this.createAgentFormState.quickMode = quickMode;
     this.createAgentFormState.isVisible = true;
 
     if (!workingDir) {
@@ -2318,6 +2338,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             llm_group: llmGroup,
             node_id: normalizedNodeId,
             worktree: useWorktree,
+            quick_mode: quickMode,
           }),
         },
       );
@@ -2501,7 +2522,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const agentNodeId =
       this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
-    const socketUrl = buildAgentWebSocketUrl(gatewayAddress, agentId, agentNodeId);
+    const socketUrl = buildAgentWebSocketUrl(
+      gatewayAddress,
+      agentId,
+      agentNodeId,
+    );
 
     await new Promise<void>((resolve, reject) => {
       const agentSocket = new WebSocket(
@@ -3285,7 +3310,11 @@ function buildAgentWebSocketUrl(
   nodeId?: string,
 ): string {
   const normalizedNodeId = String(nodeId || "master").trim() || "master";
-  return buildNodeWebSocketUrl(gatewayAddress, normalizedNodeId, `agent/${agentId}/ws`);
+  return buildNodeWebSocketUrl(
+    gatewayAddress,
+    normalizedNodeId,
+    `agent/${agentId}/ws`,
+  );
 }
 
 function parseSocketMessage(

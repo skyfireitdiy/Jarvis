@@ -38,6 +38,7 @@ class AgentInfo:
         llm_group: str = "default",
         worktree: bool = False,
         node_id: str = "master",
+        quick_mode: bool = False,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -48,6 +49,7 @@ class AgentInfo:
         self.process = process
         self.llm_group = llm_group
         self.worktree = worktree
+        self.quick_mode = quick_mode
         self.status = "running"
         self.node_id = node_id
         self.created_at = datetime.now().isoformat()
@@ -65,6 +67,7 @@ class AgentInfo:
             "working_dir": self.working_dir,
             "llm_group": self.llm_group,
             "worktree": self.worktree,
+            "quick_mode": self.quick_mode,
             "node_id": self.node_id,
             "created_at": self.created_at,
         }
@@ -117,6 +120,7 @@ class AgentManager:
         auth_token: Optional[str] = None,
         worktree: bool = False,
         node_id: str = "master",
+        quick_mode: bool = False,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -131,6 +135,7 @@ class AgentManager:
             additional_args: 额外参数
             auth_token: 认证 Token，将通过环境变量传递给 Agent
             worktree: 是否为 codeagent 启用 git worktree 模式
+            quick_mode: 是否启用极速模式
 
         Returns:
             Agent 信息字典
@@ -171,6 +176,7 @@ class AgentManager:
             task=task,
             additional_args=additional_args,
             worktree=worktree,
+            quick_mode=quick_mode,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -200,6 +206,7 @@ class AgentManager:
             llm_group=llm_group,
             worktree=worktree,
             node_id=node_id,
+            quick_mode=quick_mode,
         )
 
         # 保存到内存
@@ -484,6 +491,7 @@ class AgentManager:
         task: Optional[str],
         additional_args: Optional[Dict[str, Any]],
         worktree: bool = False,
+        quick_mode: bool = False,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -496,6 +504,7 @@ class AgentManager:
             task: 任务描述
             additional_args: 额外参数
             worktree: 是否为 codeagent 启用 git worktree 模式
+            quick_mode: 是否启用极速模式
 
         Returns:
             命令列表
@@ -520,6 +529,10 @@ class AgentManager:
 
         if agent_type == "codeagent" and worktree:
             cmd.append("-w")
+
+        # 添加极速模式参数
+        if quick_mode:
+            cmd.append("-q")
 
         # 添加额外参数
         if additional_args:

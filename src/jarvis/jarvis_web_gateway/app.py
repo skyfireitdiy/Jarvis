@@ -553,9 +553,13 @@ class WebSocketConnectionManager:
                         "payload": {"execution_status": current_status},
                     }
                     self._router.publish(status_message, session_id=session_id)
-                    logger.info(f"[WS MESSAGE] Published status_update to session {session_id}")
+                    logger.info(
+                        f"[WS MESSAGE] Published status_update to session {session_id}"
+                    )
                 except Exception as e:
-                    logger.error(f"[WS MESSAGE] Error handling get_status: {e}", exc_info=True)
+                    logger.error(
+                        f"[WS MESSAGE] Error handling get_status: {e}", exc_info=True
+                    )
             else:
                 logger.warning("[WS MESSAGE] get_agent_status_manager is not available")
             return
@@ -1680,7 +1684,10 @@ def create_app(
                 - config_sections: 要同步的配置类型列表（llms, llm_groups）
         """
         try:
-            source_node_id = str(request.get("source_node_id") or "").strip() or node_runtime.local_node_id
+            source_node_id = (
+                str(request.get("source_node_id") or "").strip()
+                or node_runtime.local_node_id
+            )
             target_node_ids = request.get("target_node_ids", [])
             config_sections = request.get("config_sections", [])
 
@@ -1743,65 +1750,78 @@ def create_app(
                             backup_file = config_file.with_suffix(".yaml.bak")
                             if config_file.exists():
                                 shutil.copy2(config_file, backup_file)
-                            
+
                             # 读取现有配置
                             existing_config = {}
                             if config_file.exists():
                                 with open(config_file, "r", encoding="utf-8") as f:
                                     existing_config = yaml.safe_load(f) or {}
-                            
+
                             # 更新配置
                             updated_config = existing_config.copy()
                             for section in config_sections:
                                 if section in config_data:
                                     updated_config[section] = config_data[section]
-                            
+
                             # 保存配置
                             config_file.parent.mkdir(parents=True, exist_ok=True)
                             with open(config_file, "w", encoding="utf-8") as f:
-                                yaml.safe_dump(updated_config, f, allow_unicode=True, default_flow_style=False)
-                            
-                            results.append({
-                                "node_id": target_node_id,
-                                "success": True,
-                                "data": {
-                                    "message": "配置同步成功",
-                                    "backup_file": str(backup_file),
-                                },
-                            })
+                                yaml.safe_dump(
+                                    updated_config,
+                                    f,
+                                    allow_unicode=True,
+                                    default_flow_style=False,
+                                )
+
+                            results.append(
+                                {
+                                    "node_id": target_node_id,
+                                    "success": True,
+                                    "data": {
+                                        "message": "配置同步成功",
+                                        "backup_file": str(backup_file),
+                                    },
+                                }
+                            )
                         except Exception as e:
-                            results.append({
-                                "node_id": target_node_id,
-                                "success": False,
-                                "error": {
-                                    "code": "CONFIG_SYNC_ERROR",
-                                    "message": str(e),
-                                },
-                            })
+                            results.append(
+                                {
+                                    "node_id": target_node_id,
+                                    "success": False,
+                                    "error": {
+                                        "code": "CONFIG_SYNC_ERROR",
+                                        "message": str(e),
+                                    },
+                                }
+                            )
                         continue
 
                     # 检查远程节点状态
                     node_info = node_runtime.node_registry.get(target_node_id)
                     if node_info is None:
-                        results.append({
-                            "node_id": target_node_id,
-                            "success": False,
-                            "error": {
-                                "code": "NODE_NOT_FOUND",
-                                "message": f"Node not found: {target_node_id}",
-                            },
-                        })
+                        results.append(
+                            {
+                                "node_id": target_node_id,
+                                "success": False,
+                                "error": {
+                                    "code": "NODE_NOT_FOUND",
+                                    "message": f"Node not found: {target_node_id}",
+                                },
+                            }
+                        )
                         continue
 
                     if node_info.status != "online":
-                        results.append({
-                            "node_id": target_node_id,
-                            "success": False,
-                            "error": {
-                                "code": "NODE_OFFLINE",
-                                "message": f"Node is offline: {target_node_id}",
-                            },
-                        })
+                        results.append(
+                            {
+                                "node_id": target_node_id,
+                                "success": False,
+                                "error": {
+                                    "code": "NODE_OFFLINE",
+                                    "message": f"Node is offline: {target_node_id}",
+                                },
+                            }
+                        )
                         continue
 
                     # 发送配置同步请求到远程节点
@@ -1817,31 +1837,37 @@ def create_app(
 
                     payload = response.get("payload") or {}
                     if payload.get("success"):
-                        results.append({
-                            "node_id": target_node_id,
-                            "success": True,
-                            "data": payload.get("data", {}),
-                        })
+                        results.append(
+                            {
+                                "node_id": target_node_id,
+                                "success": True,
+                                "data": payload.get("data", {}),
+                            }
+                        )
                     else:
                         error = payload.get("error") or {}
-                        results.append({
+                        results.append(
+                            {
+                                "node_id": target_node_id,
+                                "success": False,
+                                "error": error,
+                            }
+                        )
+                except Exception as e:
+                    results.append(
+                        {
                             "node_id": target_node_id,
                             "success": False,
-                            "error": error,
-                        })
-                except Exception as e:
-                    results.append({
-                        "node_id": target_node_id,
-                        "success": False,
-                        "error": {
-                            "code": "SYNC_FAILED",
-                            "message": str(e),
-                        },
-                    })
+                            "error": {
+                                "code": "SYNC_FAILED",
+                                "message": str(e),
+                            },
+                        }
+                    )
 
             # 统计成功数量
             success_count = sum(1 for r in results if r.get("success"))
-            
+
             return {
                 "success": True,
                 "data": {
@@ -1870,6 +1896,7 @@ def create_app(
             task = request.get("task")
             additional_args = request.get("additional_args")
             worktree = bool(request.get("worktree", False))
+            quick_mode = bool(request.get("quick_mode", False))
             target_node_id = str(request.get("node_id") or "").strip()
 
             if not agent_type:
@@ -1922,6 +1949,7 @@ def create_app(
                         "task": task,
                         "additional_args": additional_args,
                         "worktree": worktree,
+                        "quick_mode": quick_mode,
                     },
                 )
                 payload = response.get("payload") or {}
@@ -1963,6 +1991,7 @@ def create_app(
                 additional_args=additional_args,
                 worktree=worktree,
                 node_id=node_runtime.local_node_id,
+                quick_mode=quick_mode,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
