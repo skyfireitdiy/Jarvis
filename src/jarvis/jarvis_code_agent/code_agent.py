@@ -92,7 +92,7 @@ class CodeAgent(Agent):
     ) -> None:
         # 存储极速模式标志
         self.quick_mode = quick_mode
-        
+
         # CodeAgent 基础属性初始化
         self._init_code_agent_base_attributes(
             tool_group, disable_review, review_max_iterations
@@ -299,6 +299,14 @@ class CodeAgent(Agent):
         # name 使用传入的值，如果没有传入则使用默认值 "CodeAgent"
         name = kwargs.pop("name", "CodeAgent")
 
+        # 极速模式下禁用方法论加载和自动规则选择
+        if self.quick_mode:
+            use_methodology = False
+            enable_auto_rule_select = False
+        else:
+            # 非极速模式下，根据 kwargs 或默认值设置 enable_auto_rule_select
+            enable_auto_rule_select = kwargs.pop("enable_auto_rule_select", True)
+
         # 准备显式传递给 super().__init__ 的参数
         # 注意：这些参数如果也在 kwargs 中，需要先移除，避免重复传递错误
         explicit_params = {
@@ -312,6 +320,7 @@ class CodeAgent(Agent):
             "use_tools": base_tools,
             "optimize_system_prompt": optimize_system_prompt,
             "rule_names": merged_rule_names,
+            "enable_auto_rule_select": enable_auto_rule_select,
         }
 
         # 自动移除所有显式传递的参数，避免重复传递错误
@@ -407,10 +416,12 @@ class CodeAgent(Agent):
             if self.first:
                 # 极速模式：跳过任务分类、规则自动加载、上下文推荐、方法论加载
                 if self.quick_mode:
-                    PrettyOutput.auto_print("⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐")
+                    PrettyOutput.auto_print(
+                        "⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐"
+                    )
                     # === 阶段3: Git环境初始化 ===
                     self.git_manager.init_env(prefix, suffix, self)
-                    
+
                     # 将初始 commit 信息添加到 addon_prompt（安全回退点）
                     if start_commit:
                         initial_commit_prompt = f"""
@@ -428,14 +439,14 @@ git reset --hard {start_commit}
                         self.set_addon_prompt(
                             f"{current_addon}\n{initial_commit_prompt}".strip()
                         )
-                    
+
                     # 极速模式下直接使用用户输入
                     enhanced_input = user_input
                 else:
                     # 正常模式：执行所有阶段
                     # === 阶段1: 需求分类 ===
                     scenario = classify_user_request(user_input)
-                    
+
                     # === 阶段2-6 ===
                     # 根据分类结果获取对应的系统提示词并更新
                     scenario_system_prompt = get_system_prompt(scenario)
@@ -446,7 +457,7 @@ git reset --hard {start_commit}
                             # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
                             prompt_text = self.prompt_manager.build_system_prompt(self)
                             self.model.set_system_prompt(prompt_text)
-                    
+
                     # === 阶段2: 生成非交互模式说明 ===
                     # 根据当前模式生成额外说明，供 LLM 感知执行策略
                     non_interactive_note = ""
@@ -458,10 +469,10 @@ git reset --hard {start_commit}
                             '- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n'
                             "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
                         )
-                    
+
                     # === 阶段3: Git环境初始化 ===
                     self.git_manager.init_env(prefix, suffix, self)
-                    
+
                     # 将初始 commit 信息添加到 addon_prompt（安全回退点）
                     if start_commit:
                         initial_commit_prompt = f"""
@@ -479,10 +490,10 @@ git reset --hard {start_commit}
                         self.set_addon_prompt(
                             f"{current_addon}\n{initial_commit_prompt}".strip()
                         )
-                    
+
                     # === 阶段4: 获取项目概况 ===
                     project_overview = get_project_overview(self.root_dir)
-                    
+
                     first_tip = """请严格遵循以下规范进行代码修改任务：
             1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。
             2. 充分利用工具理解用户需求和现有代码，禁止凭空假设。
@@ -493,7 +504,7 @@ git reset --hard {start_commit}
             7. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
-                    
+
                     # === 阶段5: 智能上下文推荐 ===
                     # 智能上下文推荐：根据用户输入推荐相关上下文
                     context_recommendation_text = ""
@@ -501,12 +512,14 @@ git reset --hard {start_commit}
                         recommendation = self.context_recommender.recommend_context(
                             user_input=user_input,
                         )
-                        
+
                         # 格式化推荐结果
                         context_recommendation_text = (
-                            self.context_recommender.format_recommendation(recommendation)
+                            self.context_recommender.format_recommendation(
+                                recommendation
+                            )
                         )
-                    
+
                     # === 阶段6: 构建增强输入 ===
                     if project_overview:
                         enhanced_input = (
@@ -526,7 +539,6 @@ git reset --hard {start_commit}
                             + "\n\n任务描述：\n"
                             + user_input
                         )
-
 
             else:
                 # 会话恢复时，直接使用用户输入（上下文已从会话中恢复）

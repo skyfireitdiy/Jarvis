@@ -897,6 +897,12 @@ def run_cli(
         "--optimize-system-prompt",
         help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
     ),
+    quick_mode: bool = typer.Option(
+        False,
+        "-q",
+        "--quick-mode",
+        help="极速模式：跳过方法论加载、规则筛选等，直接执行任务",
+    ),
     quick_config: bool = typer.Option(
         False,
         "--quick-config",
@@ -1302,6 +1308,7 @@ def run_cli(
             allow_savesession=True,
             rule_names=rule_names,
             optimize_system_prompt=optimize_system_prompt,
+            quick_mode=quick_mode,
         )
         agent_manager.initialize()
 
