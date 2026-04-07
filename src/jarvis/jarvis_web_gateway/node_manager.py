@@ -17,6 +17,7 @@ import yaml
 
 import websockets
 from fastapi import WebSocket
+from websockets.asyncio.connection import State
 
 from .agent_manager import AgentManager
 from .node_protocol import (
@@ -685,7 +686,7 @@ class NodeConnectionManager:
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
             # 清理已关闭的会话
-            if agent_ws.closed:
+            if agent_ws.state != State.OPEN:
                 self._agent_ws_sessions.pop(session_id, None)
                 raise RuntimeError(f"ws session already closed: {session_id}")
             for item in payload.get("messages") or []:
@@ -723,7 +724,7 @@ class NodeConnectionManager:
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
             # 清理已关闭的会话
-            if agent_ws.closed:
+            if agent_ws.state != State.OPEN:
                 self._agent_ws_sessions.pop(session_id, None)
                 raise RuntimeError(f"ws session already closed: {session_id}")
             messages: list[str] = []
