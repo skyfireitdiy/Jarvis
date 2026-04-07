@@ -891,41 +891,7 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
             PrettyOutput.auto_print("ℹ️ 已取消操作")
             raise typer.Exit(code=0)
 
-    # 获取可用的 LLM 配置列表
-    llms = config.get("llms", {})
-    if not llms:
-        PrettyOutput.auto_print("❌ 没有可用的 LLM 配置，请先添加 LLM 配置")
-        raise typer.Exit(code=1)
-
     PrettyOutput.auto_print(f"📝 添加模型组: {name}")
-    PrettyOutput.auto_print("可用的 LLM 配置:")
-    for llm_name in sorted(llms.keys()):
-        PrettyOutput.auto_print(f"  • {llm_name}")
-
-    # 交互式输入
-    normal_llm = get_single_line_input("Normal LLM 配置名称 (必需): ").strip()
-    if not normal_llm:
-        PrettyOutput.auto_print("❌ Normal LLM 配置名称不能为空")
-        raise typer.Exit(code=1)
-
-    if normal_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
-        raise typer.Exit(code=1)
-
-    # 可选的 cheap 和 smart
-    cheap_llm = get_single_line_input(
-        "Cheap LLM 配置名称 (留空则与 normal 相同): "
-    ).strip()
-    if cheap_llm and cheap_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
-        raise typer.Exit(code=1)
-
-    smart_llm = get_single_line_input(
-        "Smart LLM 配置名称 (留空则与 normal 相同): "
-    ).strip()
-    if smart_llm and smart_llm not in llms:
-        PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
-        raise typer.Exit(code=1)
 
     # 创建配置
     group_config = {
