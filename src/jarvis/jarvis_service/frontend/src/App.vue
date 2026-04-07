@@ -28,6 +28,7 @@
             <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
             <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
+            <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
           </div>
           <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
           <div class="agent-actions">
