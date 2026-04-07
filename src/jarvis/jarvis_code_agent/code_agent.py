@@ -87,8 +87,12 @@ class CodeAgent(Agent):
         review_max_iterations: int = 0,
         enable_task_list_manager: bool = True,
         optimize_system_prompt: bool = False,
+        quick_mode: bool = False,
         **kwargs: Any,
     ) -> None:
+        # 存储极速模式标志
+        self.quick_mode = quick_mode
+        
         # CodeAgent 基础属性初始化
         self._init_code_agent_base_attributes(
             tool_group, disable_review, review_max_iterations
@@ -394,46 +398,22 @@ class CodeAgent(Agent):
                     user_input = processed_input
                 break
 
-            # 需求分类：仅在首次运行时执行（未恢复会话）
-            # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
-            if self.first:
-                # === 阶段1: 需求分类 ===
-                scenario = classify_user_request(user_input)
-
-                # 根据分类结果获取对应的系统提示词并更新
-                scenario_system_prompt = get_system_prompt(scenario)
-                if scenario_system_prompt != self.system_prompt:
-                    self.system_prompt = scenario_system_prompt
-                    # 更新模型的系统提示词
-                    if self.model:
-                        # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                        prompt_text = self.prompt_manager.build_system_prompt(self)
-                        self.model.set_system_prompt(prompt_text)
-
-            # === 阶段2-6: 提示词生成与增强输入构建（仅首次运行执行） ===
             prev_dir = os.getcwd()
             start_commit = get_latest_commit_hash()
             self.start_commit = start_commit
 
+            # 需求分类：仅在首次运行时执行（未恢复会话）
+            # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
             if self.first:
-                # === 阶段2: 生成非交互模式说明 ===
-                # 根据当前模式生成额外说明，供 LLM 感知执行策略
-                non_interactive_note = ""
-                if getattr(self, "non_interactive", False):
-                    non_interactive_note = (
-                        "\n\n[系统说明]\n"
-                        "本次会话处于**非交互模式**：\n"
-                        "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                        '- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n'
-                        "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
-                    )
-
-                # === 阶段3: Git环境初始化 ===
-                self.git_manager.init_env(prefix, suffix, self)
-
-                # 将初始 commit 信息添加到 addon_prompt（安全回退点）
-                if start_commit:
-                    initial_commit_prompt = f"""
+                # 极速模式：跳过任务分类、规则自动加载、上下文推荐、方法论加载
+                if self.quick_mode:
+                    PrettyOutput.auto_print("⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐")
+                    # === 阶段3: Git环境初始化 ===
+                    self.git_manager.init_env(prefix, suffix, self)
+                    
+                    # 将初始 commit 信息添加到 addon_prompt（安全回退点）
+                    if start_commit:
+                        initial_commit_prompt = f"""
 **🔖 初始 Git Commit（安全回退点）**：
 本次任务开始时的初始 commit 是：`{start_commit}`
 
@@ -443,16 +423,67 @@ git reset --hard {start_commit}
 ```
 这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。
 """
-                    # 将初始 commit 信息追加到现有的 addon_prompt
-                    current_addon = self.session.addon_prompt or ""
-                    self.set_addon_prompt(
-                        f"{current_addon}\n{initial_commit_prompt}".strip()
-                    )
+                        # 将初始 commit 信息追加到现有的 addon_prompt
+                        current_addon = self.session.addon_prompt or ""
+                        self.set_addon_prompt(
+                            f"{current_addon}\n{initial_commit_prompt}".strip()
+                        )
+                    
+                    # 极速模式下直接使用用户输入
+                    enhanced_input = user_input
+                else:
+                    # 正常模式：执行所有阶段
+                    # === 阶段1: 需求分类 ===
+                    scenario = classify_user_request(user_input)
+                    
+                    # === 阶段2-6 ===
+                    # 根据分类结果获取对应的系统提示词并更新
+                    scenario_system_prompt = get_system_prompt(scenario)
+                    if scenario_system_prompt != self.system_prompt:
+                        self.system_prompt = scenario_system_prompt
+                        # 更新模型的系统提示词
+                        if self.model:
+                            # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                            prompt_text = self.prompt_manager.build_system_prompt(self)
+                            self.model.set_system_prompt(prompt_text)
+                    
+                    # === 阶段2: 生成非交互模式说明 ===
+                    # 根据当前模式生成额外说明，供 LLM 感知执行策略
+                    non_interactive_note = ""
+                    if getattr(self, "non_interactive", False):
+                        non_interactive_note = (
+                            "\n\n[系统说明]\n"
+                            "本次会话处于**非交互模式**：\n"
+                            "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
+                            '- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n'
+                            "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+                        )
+                    
+                    # === 阶段3: Git环境初始化 ===
+                    self.git_manager.init_env(prefix, suffix, self)
+                    
+                    # 将初始 commit 信息添加到 addon_prompt（安全回退点）
+                    if start_commit:
+                        initial_commit_prompt = f"""
+**🔖 初始 Git Commit（安全回退点）**：
+本次任务开始时的初始 commit 是：`{start_commit}`
 
-                # === 阶段4: 获取项目概况 ===
-                project_overview = get_project_overview(self.root_dir)
-
-                first_tip = """请严格遵循以下规范进行代码修改任务：
+**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：
+```bash
+git reset --hard {start_commit}
+```
+这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。
+"""
+                        # 将初始 commit 信息追加到现有的 addon_prompt
+                        current_addon = self.session.addon_prompt or ""
+                        self.set_addon_prompt(
+                            f"{current_addon}\n{initial_commit_prompt}".strip()
+                        )
+                    
+                    # === 阶段4: 获取项目概况 ===
+                    project_overview = get_project_overview(self.root_dir)
+                    
+                    first_tip = """请严格遵循以下规范进行代码修改任务：
             1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。
             2. 充分利用工具理解用户需求和现有代码，禁止凭空假设。
             3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件，明确目标后再进行编辑。
@@ -462,53 +493,49 @@ git reset --hard {start_commit}
             7. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
+                    
+                    # === 阶段5: 智能上下文推荐 ===
+                    # 智能上下文推荐：根据用户输入推荐相关上下文
+                    context_recommendation_text = ""
+                    if self.context_recommender and is_enable_intent_recognition():
+                        recommendation = self.context_recommender.recommend_context(
+                            user_input=user_input,
+                        )
+                        
+                        # 格式化推荐结果
+                        context_recommendation_text = (
+                            self.context_recommender.format_recommendation(recommendation)
+                        )
+                    
+                    # === 阶段6: 构建增强输入 ===
+                    if project_overview:
+                        enhanced_input = (
+                            project_overview
+                            + "\n\n"
+                            + first_tip
+                            + non_interactive_note
+                            + context_recommendation_text
+                            + "\n\n任务描述：\n"
+                            + user_input
+                        )
+                    else:
+                        enhanced_input = (
+                            first_tip
+                            + non_interactive_note
+                            + context_recommendation_text
+                            + "\n\n任务描述：\n"
+                            + user_input
+                        )
 
-                # === 阶段5: 智能上下文推荐 ===
-                # 智能上下文推荐：根据用户输入推荐相关上下文
-                context_recommendation_text = ""
-                if self.context_recommender and is_enable_intent_recognition():
-                    recommendation = self.context_recommender.recommend_context(
-                        user_input=user_input,
-                    )
 
-                    # 格式化推荐结果
-                    context_recommendation_text = (
-                        self.context_recommender.format_recommendation(recommendation)
-                    )
-
-                # === 阶段6: 构建增强输入 ===
-                if project_overview:
-                    enhanced_input = (
-                        project_overview
-                        + "\n\n"
-                        + first_tip
-                        + non_interactive_note
-                        + context_recommendation_text
-                        + "\n\n任务描述：\n"
-                        + user_input
-                    )
-                else:
-                    enhanced_input = (
-                        first_tip
-                        + non_interactive_note
-                        + context_recommendation_text
-                        + "\n\n任务描述：\n"
-                        + user_input
-                    )
             else:
                 # 会话恢复时，直接使用用户输入（上下文已从会话中恢复）
                 enhanced_input = user_input
 
             try:
-                # === 阶段7: 执行LLM调用 ===
-                t7_start = time.time()
                 if self.model:
                     self.model.set_suppress_output(False)
                 result = super().run(enhanced_input)
-                t7_end = time.time()
-                PrettyOutput.auto_print(
-                    f"[性能打点] 阶段7-LLM执行: {t7_end - t7_start:.3f}s"
-                )
                 # 确保返回值是 str 或 None
                 if result is None:
                     result_str = None
@@ -1406,6 +1433,12 @@ def cli(
         "--web-gateway",
         help="启用 Web Gateway 服务（WebSocket 输入输出）",
     ),
+    quick_mode: bool = typer.Option(
+        False,
+        "-q",
+        "--quick",
+        help="极速模式：取消任务分类、规则自动加载、上下文推荐、方法论加载",
+    ),
     web_gateway_port: int = typer.Option(
         8000,
         "--web-gateway-port",
@@ -1677,6 +1710,7 @@ def cli(
                         review_max_iterations=review_max_iterations,
                         allow_savesession=True,
                         optimize_system_prompt=optimize_system_prompt,
+                        quick_mode=quick_mode,
                     )
 
                     # 尝试恢复会话
@@ -1709,6 +1743,7 @@ def cli(
                         review_max_iterations=review_max_iterations,
                         allow_savesession=True,
                         optimize_system_prompt=optimize_system_prompt,
+                        quick_mode=quick_mode,
                     )
 
                     # 检测与当前commit一致的历史会话（仅在交互模式且未指定restore_session时）
