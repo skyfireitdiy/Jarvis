@@ -138,9 +138,7 @@ class OpenAIModel(BasePlatform):
                 )
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
-        self._streaming_disabled: bool = (
-            False  # 流式兼容性标志，检测到代理不支持SSE时设为True
-        )
+        self._streaming_disabled: Optional[bool] = None
 
     def set_messages(self, messages: List[Dict[str, str]]) -> None:
         """替换对话历史
@@ -302,12 +300,15 @@ class OpenAIModel(BasePlatform):
                                 full_response += text
                                 yield ("content", text)
                 if full_response:
+                    # 曾经成功过，说明流式请求是可以的
+                    self._streaming_disabled = False
                     self.messages.append(
                         {"role": "assistant", "content": full_response}
                     )
                 else:
-                    # 流式请求返回空，自动回退到非流式请求
-                    self._streaming_disabled = True
+                    # 未设置的状态才设置为True
+                    if self._streaming_disabled is None:
+                        self._streaming_disabled = True
                     fallback_params = api_params.copy()
                     fallback_params["stream"] = False
                     fallback_response = self.client.chat.completions.create(
