@@ -48,22 +48,21 @@
   },
   "scripts": {
     "build:webview": "esbuild ./src/webview/chatPanel.ts --bundle --format=iife --platform=browser --outfile=./media/chatPanel.js",
-    "build": "npm run build:webview && tsc -p ./tsconfig.json",
-    "package": "npx @vscode/vsce package --no-dependencies"
+    "build:extension": "esbuild ./src/extension.ts --bundle --platform=node --target=node18 --format=cjs --outfile=./dist/extension.js --external:vscode --minify",
+    "build": "npm run build:webview && npm run build:extension",
+    "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/vscode": "^1.82.0",
     "@types/ws": "^8.18.1",
     "@vscode/vsce": "^3.2.2",
-    "esbuild": "^0.25.12",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
+    "esbuild": "^0.25.12",
     "marked": "^15.0.7",
     "plantuml-encoder": "^1.4.0",
+    "typescript": "^5.9.3",
     "ws": "^8.18.0",
     "xterm": "^5.3.0"
   }
