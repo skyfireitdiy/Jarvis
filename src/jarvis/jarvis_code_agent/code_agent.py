@@ -5,6 +5,7 @@
 
 import hashlib
 import os
+import time
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from rich.status import Status
@@ -395,6 +396,7 @@ class CodeAgent(Agent):
 
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
+            # === 阶段1: 需求分类 ===
             if self.first:
                 scenario = classify_user_request(user_input)
 
@@ -408,6 +410,7 @@ class CodeAgent(Agent):
                         prompt_text = self.prompt_manager.build_system_prompt(self)
                         self.model.set_system_prompt(prompt_text)
 
+            # === 阶段2: 生成非交互模式说明 ===
             # 根据当前模式生成额外说明，供 LLM 感知执行策略
             prev_dir = os.getcwd()
             non_interactive_note = ""
@@ -420,6 +423,7 @@ class CodeAgent(Agent):
                     "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
                 )
 
+            # === 阶段3: Git环境初始化 ===
             self.git_manager.init_env(prefix, suffix, self)
             start_commit = get_latest_commit_hash()
             self.start_commit = start_commit
@@ -442,7 +446,7 @@ git reset --hard {start_commit}
                     f"{current_addon}\n{initial_commit_prompt}".strip()
                 )
 
-            # 获取项目概况信息
+            # === 阶段4: 获取项目概况 ===
             project_overview = get_project_overview(self.root_dir)
 
             first_tip = """请严格遵循以下规范进行代码修改任务：
@@ -456,31 +460,20 @@ git reset --hard {start_commit}
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
 
+            # === 阶段5: 智能上下文推荐 ===
             # 智能上下文推荐：根据用户输入推荐相关上下文
             context_recommendation_text = ""
             if self.context_recommender and is_enable_intent_recognition():
-                # 在意图识别和上下文推荐期间抑制模型输出
-                was_suppressed = False
-                if self.model:
-                    was_suppressed = getattr(self.model, "_suppress_output", False)
-                    self.model.set_suppress_output(True)
-                try:
-                    # 生成上下文推荐（基于关键词和项目上下文）
-                    recommendation = self.context_recommender.recommend_context(
-                        user_input=user_input,
-                    )
+                recommendation = self.context_recommender.recommend_context(
+                    user_input=user_input,
+                )
 
-                    # 格式化推荐结果
-                    context_recommendation_text = (
-                        self.context_recommender.format_recommendation(recommendation)
-                    )
-                except Exception:
-                    # 上下文推荐失败不应该影响主流程
-                    pass
-                finally:
-                    # 恢复模型输出设置
-                    if self.model:
-                        self.model.set_suppress_output(was_suppressed)
+                # 格式化推荐结果
+                context_recommendation_text = (
+                    self.context_recommender.format_recommendation(recommendation)
+                )
+
+            # === 阶段6: 构建增强输入 ===
 
             if project_overview:
                 enhanced_input = (
@@ -502,9 +495,13 @@ git reset --hard {start_commit}
                 )
 
             try:
+                # === 阶段7: 执行LLM调用 ===
+                t7_start = time.time()
                 if self.model:
                     self.model.set_suppress_output(False)
                 result = super().run(enhanced_input)
+                t7_end = time.time()
+                PrettyOutput.auto_print(f"[性能打点] 阶段7-LLM执行: {t7_end-t7_start:.3f}s")
                 # 确保返回值是 str 或 None
                 if result is None:
                     result_str = None
