@@ -308,6 +308,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           this.renderAgentListView();
           return;
         }
+        if (message?.type === "changeAgentType") {
+          const agentType = String(message.agentType || "agent").trim();
+          this.updateCreateAgentDefaults(agentType as "agent" | "codeagent");
+          this.renderAgentListView();
+          return;
+        }
         if (message?.type === "cancelCreateAgent") {
           this.resetCreateAgentForm();
           this.renderAgentListView();
@@ -765,6 +771,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (nodeIdSelect) {
       nodeIdSelect.addEventListener('change', () => {
         vscode.postMessage({ type: 'changeNodeId', nodeId: nodeIdSelect.value });
+      });
+    }
+    const agentTypeSelect = document.getElementById('agentType');
+    if (agentTypeSelect) {
+      agentTypeSelect.addEventListener('change', () => {
+        vscode.postMessage({ type: 'changeAgentType', agentType: agentTypeSelect.value });
       });
     }
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
