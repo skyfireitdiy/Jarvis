@@ -261,6 +261,8 @@ class OpenAIModel(BasePlatform):
                 "model": self.model_name,
                 "messages": self.messages,
                 "stream": use_streaming,
+                "temperature": 0.1,
+                "top_p": 0.3,
             }
             # 只有在配置了 reasoning_effort 时才添加 extra_body 参数
             if self.reasoning_effort:
