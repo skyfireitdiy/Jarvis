@@ -1904,6 +1904,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         messages: agentStatus?.messages || [],
       },
     });
+    console.log(
+      "[POST STATE]",
+      this.panelState.selectedAgentId,
+      agentStatus?.execution_status,
+    );
   }
 
   private renderAgentListView(): void {
@@ -2618,6 +2623,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private handleGatewaySocketMessage(rawData: RawData): void {
     const parsedMessage = parseSocketMessage(rawData);
+    console.log("[GATEWAY MSG]", parsedMessage?.type, parsedMessage);
     if (!parsedMessage) {
       return;
     }
@@ -2683,6 +2689,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private handleAgentSocketMessage(agentId: string, rawData: RawData): void {
     const parsedMessage = parseSocketMessage(rawData);
+    console.log("[AGENT MSG]", agentId, parsedMessage?.type, parsedMessage);
     if (!parsedMessage) {
       return;
     }
@@ -2912,6 +2919,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private updateExecutionStatus(state: AgentStatus, status: unknown): void {
     const normalizedStatus = String(status || "running");
+    // 如果当前正在等待输入（waiting_*），不被running状态覆盖
+    const isWaitingInput =
+      state.execution_status === "waiting_single" ||
+      state.execution_status === "waiting_multi";
+    if (isWaitingInput && normalizedStatus === "running") {
+      console.log(
+        "[STATUS PROTECT] ignoring running status, keeping:",
+        state.execution_status,
+      );
+      return;
+    }
     if (
       normalizedStatus === "waiting_single" ||
       normalizedStatus === "waiting_multi" ||
