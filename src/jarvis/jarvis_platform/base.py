@@ -116,7 +116,7 @@ class BasePlatform(ABC):
     @abstractmethod
     def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
         """执行对话
-        
+
         返回:
             Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
             类型: "reason" 表示推理过程，"content" 表示正文内容
@@ -344,6 +344,11 @@ class BasePlatform(ABC):
 
         # 处理响应并保存会话历史
         response = self._process_response(response)
+
+        # 如果发生中断且响应为空，设置提示消息
+        if not response and get_interrupt():
+            response = "<输出被用户中断>"
+
         self._append_session_history(message, response)
 
         # 确保消息被正确添加到 messages 中（特别是中断的情况下）
