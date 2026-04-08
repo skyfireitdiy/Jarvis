@@ -748,8 +748,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
     const remoteDirectorySearchInput = document.getElementById('remoteDirectorySearchInput');
     if (remoteDirectorySearchInput) {
+      let searchDebounceTimer = undefined;
       remoteDirectorySearchInput.addEventListener('input', () => {
-        vscode.postMessage({ type: 'updateRemoteDirectorySearch', searchText: remoteDirectorySearchInput.value });
+        if (searchDebounceTimer) {
+          clearTimeout(searchDebounceTimer);
+        }
+        searchDebounceTimer = setTimeout(() => {
+          vscode.postMessage({ type: 'updateRemoteDirectorySearch', searchText: remoteDirectorySearchInput.value });
+        }, 300);
       });
       remoteDirectorySearchInput.addEventListener('keydown', (event) => {
         const supportedKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
@@ -824,6 +830,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'openAgent', agentId: item.getAttribute('data-agent-id') });
       });
     });
+    // 恢复搜索框焦点（如果正在搜索）
+    const searchInput = document.getElementById('remoteDirectorySearchInput');
+    if (searchInput && searchInput.value) {
+      searchInput.focus();
+      searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
   </script>
 </body>
 </html>`;
