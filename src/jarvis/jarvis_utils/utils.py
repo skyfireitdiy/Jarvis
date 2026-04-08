@@ -34,13 +34,6 @@ from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrup
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
-# 向后兼容：导出 get_yes_no 供外部模块引用（延迟导入以避免循环依赖）
-def get_yes_no(*args, **kwargs):
-    from jarvis.jarvis_utils.input import user_confirm
-
-    return user_confirm(*args, **kwargs)
-
-
 # 防止 init_env 重复调用的全局标志
 _init_env_called = False
 
@@ -85,7 +78,9 @@ def _get_editable_project_root() -> Optional[Path]:
     """推断可编辑安装场景下的项目根目录。"""
     current_file = Path(__file__).resolve()
     for candidate in current_file.parents:
-        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "jarvis").exists():
+        if (candidate / "pyproject.toml").exists() and (
+            candidate / "src" / "jarvis"
+        ).exists():
             return candidate
     return None
 
@@ -131,9 +126,7 @@ def ensure_bundled_deps_in_path() -> Optional[Path]:
     if os.name == "nt":
         normalized_target = str(PureWindowsPath(deps_dir_str)).lower()
         normalized_entries = {
-            str(PureWindowsPath(entry)).lower()
-            for entry in path_entries
-            if entry
+            str(PureWindowsPath(entry)).lower() for entry in path_entries if entry
         }
     else:
         normalized_target = str(PurePath(deps_dir_str))
@@ -142,7 +135,9 @@ def ensure_bundled_deps_in_path() -> Optional[Path]:
     if normalized_target in normalized_entries:
         return deps_dir
 
-    os.environ["PATH"] = deps_dir_str if not current_path else deps_dir_str + os.pathsep + current_path
+    os.environ["PATH"] = (
+        deps_dir_str if not current_path else deps_dir_str + os.pathsep + current_path
+    )
     return deps_dir
 
 
@@ -785,16 +780,9 @@ def _check_jarvis_updates() -> bool:
 
     # 检查是否有等待重启的更新标记（小版本更新已完成）
     if _has_update_reboot_flag():
-        # 静默处理，不打印任何信息
-        from jarvis.jarvis_utils.input import user_confirm
-
-        if user_confirm("是否现在重启以应用更新？", default=True):
-            _clear_update_reboot_flag()
-            return True
-        else:
-            PrettyOutput.auto_print(
-                "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
-            )
+        # 自动重启应用更新
+        _clear_update_reboot_flag()
+        return True
 
     # 从当前文件目录向上查找包含 .git 的仓库根目录，修复原先只检查 src/jarvis 的问题
     try:
@@ -818,18 +806,11 @@ def _check_jarvis_updates() -> bool:
         pending_version = _has_major_update_pending()
         if pending_version:
             PrettyOutput.auto_print(f"\n🎉 检测到等待的主版本升级: {pending_version}")
-            from jarvis.jarvis_utils.input import user_confirm
 
-            if user_confirm(
-                "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
-                default=True,
-            ):
-                PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
-                # 清除标记，执行实际更新
-                _clear_major_update_flag()
-                updated = check_and_update_git_repo(str(repo_root))
-            else:
-                PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+            PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+            # 清除标记，执行实际更新
+            _clear_major_update_flag()
+            updated = check_and_update_git_repo(str(repo_root))
 
         return updated
 
@@ -1054,18 +1035,10 @@ def init_env(
             # 检查是否有等待重启的更新标记（小版本更新已完成）
             if _has_update_reboot_flag():
                 PrettyOutput.auto_print(
-                    "\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。"
+                    "\n✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
                 )
-                from jarvis.jarvis_utils.input import user_confirm
-
-                if user_confirm("是否现在重启以应用更新？", default=True):
-                    _clear_update_reboot_flag()
-                    should_restart = True
-                else:
-                    PrettyOutput.auto_print(
-                        "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
-                    )
-
+                _clear_update_reboot_flag()
+                should_restart = True
             # 检查是否有待处理的大版本更新
             pending_version = _has_major_update_pending()
             if pending_version:
@@ -1074,16 +1047,10 @@ def init_env(
                 )
                 from jarvis.jarvis_utils.input import user_confirm
 
-                if user_confirm(
-                    "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
-                    default=True,
-                ):
-                    PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
-                    # 清除标记，执行实际更新
-                    _clear_major_update_flag()
-                    should_restart = _check_jarvis_updates()
-                else:
-                    PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+                PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+                # 清除标记，执行实际更新
+                _clear_major_update_flag()
+                should_restart = _check_jarvis_updates()
 
             if should_restart:
                 os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -1100,36 +1067,20 @@ def init_env(
             # 检查是否有等待重启的更新标记（小版本更新已完成）
             if _has_update_reboot_flag():
                 PrettyOutput.auto_print(
-                    "\n✅ 检测到Jarvis已完成更新，建议重启以应用新版本。"
+                    "\n✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
                 )
-                from jarvis.jarvis_utils.input import user_confirm
-
-                if user_confirm("是否现在重启以应用更新？", default=True):
-                    _clear_update_reboot_flag()
-                    should_restart = True
-                else:
-                    PrettyOutput.auto_print(
-                        "ℹ️ 已跳过重启，将继续使用当前版本。您可以在任何时间手动重启应用更新。"
-                    )
-
+                _clear_update_reboot_flag()
+                should_restart = True
             # 检查是否有待处理的大版本更新
             pending_version = _has_major_update_pending()
             if pending_version:
                 PrettyOutput.auto_print(
                     f"\n🎉 检测到等待的主版本升级: {pending_version}"
                 )
-                from jarvis.jarvis_utils.input import user_confirm
-
-                if user_confirm(
-                    "是否现在执行主版本升级？（升级后可能包含不兼容的API变更）",
-                    default=True,
-                ):
-                    PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
-                    # 清除标记，执行实际更新
-                    _clear_major_update_flag()
-                    should_restart = _check_jarvis_updates()
-                else:
-                    PrettyOutput.auto_print("ℹ️ 已跳过本次升级，下次启动时会再次询问。")
+                PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
+                # 清除标记，执行实际更新
+                _clear_major_update_flag()
+                should_restart = _check_jarvis_updates()
 
             if should_restart:
                 os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -1249,10 +1200,10 @@ def load_config() -> None:
                 set_global_config_data(merged_config)
                 _process_env_variables(merged_config)
             except Exception:
-                from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+                from jarvis.jarvis_utils.input import user_confirm
 
                 PrettyOutput.auto_print("❌ 加载配置文件失败")
-                if get_yes_no("配置文件格式错误，是否删除并重新配置？"):
+                if user_confirm("配置文件格式错误，是否删除并重新配置？"):
                     try:
                         os.remove(main_config_file)
                         PrettyOutput.auto_print(
@@ -1381,7 +1332,7 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         jarvis_dir: Jarvis数据目录路径
         config_file: 配置文件路径
     """
-    from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+    from jarvis.jarvis_utils.input import user_confirm
 
     try:
         content, config_data = _load_config_file(config_file)
@@ -1390,7 +1341,7 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
         _process_env_variables(config_data)
     except Exception:
         PrettyOutput.auto_print("❌ 加载配置文件失败")
-        if get_yes_no("配置文件格式错误，是否删除并重新配置？"):
+        if user_confirm("配置文件格式错误，是否删除并重新配置？"):
             try:
                 os.remove(config_file)
                 PrettyOutput.auto_print(
