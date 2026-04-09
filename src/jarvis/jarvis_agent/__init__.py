@@ -518,6 +518,8 @@ class Agent:
 
         # 模型类型配置
         self._model_type = model_type
+        # 极速模式配置
+        self.quick_mode = quick_mode
 
         # 核心组件初始化
         self._init_model()
@@ -2154,6 +2156,13 @@ class Agent:
             # 必须在获取规则内容之前执行，否则规则索引会被错误的规则内容覆盖
             if self.first:
                 self._first_run()
+                # 极速模式提示
+                if self.quick_mode:
+                    from jarvis.jarvis_utils.output import PrettyOutput
+
+                    PrettyOutput.auto_print(
+                        "⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐"
+                    )
 
             # 将已激活的规则内容添加到用户输入的最前面
             active_rules_content = self.rules_manager.get_active_rules_content()
@@ -2352,12 +2361,14 @@ class Agent:
         # 准备记忆标签提示
         memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
 
-        # 处理文件上传和方法论加载
-        self.file_methodology_manager.handle_files_and_methodology()
+        # 极速模式下跳过文件上传、方法论加载和自动规则选择
+        if not self.quick_mode:
+            # 处理文件上传和方法论加载
+            self.file_methodology_manager.handle_files_and_methodology()
 
-        # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
-        if self.session.prompt and self._enable_auto_rule_select:
-            self.auto_select_and_load_rules(self.session.prompt)
+            # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
+            if self.session.prompt and self._enable_auto_rule_select:
+                self.auto_select_and_load_rules(self.session.prompt)
 
         # 添加记忆标签提示
         if memory_tags_prompt:
