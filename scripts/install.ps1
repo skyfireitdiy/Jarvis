@@ -120,7 +120,7 @@ function Prepare-SourceTree {
 function Install-Tools {
     Write-Host "`n--- 3. Install Jarvis from source ---" -ForegroundColor Green
     Set-Location $DEST_DIR
-    uv tool install -e .
+    uv tool install -e . --python 3.12
     uv tool install playwright
     uv tool install ddgr
 }

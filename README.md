@@ -174,7 +174,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 
 - 下载 Jarvis 最新 tag 对应的源码（浅克隆，减少下载体积）
 - 将仓库内置依赖目录加入当前会话 `PATH`
-- 使用仓库内置 `uv` 执行 `uv tool install -e .`
+- 使用仓库内置 `uv` 执行 `uv tool install -e . --python 3.12`
 - 额外安装 `playwright` 与 `ddgr`
 
 > 提示：当前仓库已内置 `x86_64_linux` 平台依赖。一键安装脚本会优先使用仓库内置 `uv`；如果当前平台没有对应内置依赖，脚本会明确提示您手动安装 `uv` 或改用受支持的版本。
@@ -185,7 +185,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 git clone --depth 1 --branch <latest-tag> https://github.com/skyfireitdiy/Jarvis.git
 cd Jarvis
 export PATH="$(pwd)/src/jarvis/jarvis_data/deps/x86_64_linux:$PATH"
-uv tool install -e .
+uv tool install -e . --python 3.12
 uv tool install playwright
 uv tool install ddgr
 ```
