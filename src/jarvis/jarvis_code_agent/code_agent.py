@@ -5,11 +5,8 @@
 
 import hashlib
 import os
-import time
 
 from jarvis.jarvis_utils.output import PrettyOutput
-from rich.status import Status
-from jarvis.jarvis_utils.globals import console
 
 # -*- coding: utf-8 -*-
 import subprocess
@@ -34,9 +31,6 @@ from jarvis.jarvis_code_agent.code_agent_prompts import (
     get_system_prompt,
 )
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
-from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
-    ContextRecommender,
-)
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -166,8 +160,6 @@ class CodeAgent(Agent):
         """初始化 CodeAgent 上下文管理相关组件"""
         # 初始化上下文管理器（用于代码分析和上下文追踪）
         self.context_manager = ContextManager(self.root_dir)
-        # 上下文推荐器将在父类 Agent 创建后初始化（需要 LLM 模型）
-        self.context_recommender: Optional[ContextRecommender] = None
 
     def _init_code_agent_managers(self) -> None:
         """初始化 CodeAgent 代码管理相关的各个管理器"""
@@ -339,15 +331,6 @@ class CodeAgent(Agent):
         # 建立 CodeAgent 与 Agent 的关联，便于工具获取上下文管理器
         self._code_agent = self
 
-        # 初始化上下文推荐器（需要父类 Agent 的模型实例）
-        # 上下文推荐器用于根据用户输入智能推荐相关代码上下文
-        try:
-            self.context_recommender = ContextRecommender(self.context_manager)
-        except Exception as e:
-            # LLM 推荐器初始化失败不影响主流程，仅跳过上下文推荐功能
-            PrettyOutput.auto_print(
-                f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能"
-            )
 
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
@@ -506,20 +489,6 @@ git reset --hard {start_commit}
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
 
-                    # === 阶段5: 智能上下文推荐 ===
-                    # 智能上下文推荐：根据用户输入推荐相关上下文
-                    context_recommendation_text = ""
-                    if self.context_recommender and is_enable_intent_recognition():
-                        recommendation = self.context_recommender.recommend_context(
-                            user_input=user_input,
-                        )
-
-                        # 格式化推荐结果
-                        context_recommendation_text = (
-                            self.context_recommender.format_recommendation(
-                                recommendation
-                            )
-                        )
 
                     # === 阶段6: 构建增强输入 ===
                     if project_overview:
