@@ -473,92 +473,31 @@ class AgentRunLoop:
                     ag._no_tool_call_count = 0
                     continue
 
-                # 检查自动完成（仅在非交互模式下触发）
-                if (
-                    ag.auto_complete
-                    and ag.non_interactive
-                    and is_auto_complete(current_response)
-                ):
+                # 检查自动完成
+                if ag.auto_complete and is_auto_complete(current_response):
                     ag._no_tool_call_count = 0
 
-                    # 检查是否有代码修改（仅对CodeAgent）
-                    should_auto_complete = True
-                    try:
-                        if hasattr(ag, "start_commit") and ag.start_commit:
-                            from jarvis.jarvis_utils.git_utils import (
-                                get_latest_commit_hash,
-                            )
+                    if ag.non_interactive:
+                        # 非交互模式：必须经过LLM二次确认
+                        # 收集上下文信息
+                        context_parts = []
 
-                            current_commit = get_latest_commit_hash()
-                            if current_commit and ag.start_commit == current_commit:
-                                # 没有代码修改，询问LLM是否应该结束
-                                no_code_mod_prompt_parts = [
-                                    "检测到本次任务没有产生任何代码修改。"
-                                ]
-                                no_code_mod_prompt_parts.append(
-                                    "\n请确认是否要完成任务（自动完成）。"
-                                )
-                                no_code_mod_prompt_parts.append(
-                                    "如果确认完成，请回复 <!!!YES!!!>"
-                                )
-                                no_code_mod_prompt_parts.append(
-                                    "如果要继续执行任务，请回复 <!!!NO!!!>"
+                        # 1. 检查代码修改情况
+                        try:
+                            if hasattr(ag, "start_commit") and ag.start_commit:
+                                from jarvis.jarvis_utils.git_utils import (
+                                    get_latest_commit_hash,
                                 )
 
-                                no_code_mod_prompt = "\n".join(no_code_mod_prompt_parts)
-
-                                # 询问 LLM
-                                try:
-                                    llm_response = ag._call_model(
-                                        no_code_mod_prompt, False, False
-                                    )
-                                except KeyboardInterrupt:
-                                    # 获取用户补充信息并继续主循环下一轮
-                                    addon_info = self._handle_interrupt_with_input()
-                                    if addon_info:
-                                        ag.session.addon_prompt = join_prompts(
-                                            [ag.session.addon_prompt, addon_info]
-                                        )
-                                    # 在中断后，设置标志以在下一轮执行input handler
-                                    ag.run_input_handlers_next_turn = True
-                                    should_auto_complete = False
-                                    continue
-
-                                # 解析响应
-                                if "<!!!NO!!!>" in llm_response:
-                                    should_auto_complete = False
-                                    ag.set_addon_prompt(
-                                        "本次任务没有代码修改，但LLM选择继续执行。"
-                                    )
-                                    PrettyOutput.auto_print(
-                                        "📝 未检测到代码修改，将继续执行任务。"
-                                    )
-                                elif "<!!!YES!!!>" in llm_response:
-                                    should_auto_complete = True
-                                    PrettyOutput.auto_print(
-                                        "✅ 确认完成当前任务，即使没有代码修改。"
-                                    )
+                                current_commit = get_latest_commit_hash()
+                                if current_commit and ag.start_commit != current_commit:
+                                    context_parts.append("✅ 检测到代码修改。")
                                 else:
-                                    # 无法明确判断，默认不完成（安全优先）
-                                    should_auto_complete = False
-                                    ag.set_addon_prompt(
-                                        "本次任务没有代码修改，请继续执行任务。"
-                                    )
-                                    PrettyOutput.auto_print(
-                                        "⚠️ 未收到明确的完成确认，将继续执行任务。"
-                                    )
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        # 检查过程出错，默认继续原有流程
-                        PrettyOutput.auto_print(
-                            f"⚠️ 检查代码修改时出错: {str(e)}，继续原有流程。"
-                        )
-                        should_auto_complete = True
+                                    context_parts.append("⚠️ 未检测到代码修改。")
+                        except Exception:
+                            context_parts.append("❓ 无法检测代码修改情况。")
 
-                    if should_auto_complete:
-                        # 检查是否有未完成的任务
-                        should_auto_complete = True
+                        # 2. 检查未完成任务情况
                         all_unfinished_tasks = []
                         try:
                             if (
@@ -602,116 +541,70 @@ class AgentRunLoop:
                                                         ),
                                                     }
                                                 )
+                        except Exception:
+                            pass
 
-                            if all_unfinished_tasks:
-                                # 构造任务提示
-                                task_prompt_parts = [
-                                    "检测到以下任务列表中还有未完成的任务：\n"
-                                ]
-                                for task_list_info in set(
-                                    (t["task_list_id"], t["main_goal"])
-                                    for t in all_unfinished_tasks
-                                ):
-                                    task_prompt_parts.append(
-                                        f"任务列表 ID: {task_list_info[0]}"
-                                    )
-                                    task_prompt_parts.append(
-                                        f"主目标: {task_list_info[1]}\n"
-                                    )
-                                    task_prompt_parts.append("未完成任务列表：")
-                                    for task in [
-                                        t
-                                        for t in all_unfinished_tasks
-                                        if t["task_list_id"] == task_list_info[0]
-                                    ]:
-                                        task_prompt_parts.append(
-                                            f"  - 任务ID: {task['task_id']} | 名称: {task['task_name']} | 状态: {task['status']}"
-                                        )
-                                        task_prompt_parts.append(
-                                            f"    描述: {task['task_desc']}"
-                                        )
-
-                                task_prompt_parts.append(
-                                    "\n请确认是否要完成当前任务（自动完成）。"
+                        if all_unfinished_tasks:
+                            context_parts.append(f"📋 检测到 {len(all_unfinished_tasks)} 个未完成任务：")
+                            for task in all_unfinished_tasks[:5]:  # 最多显示5个
+                                context_parts.append(
+                                    f"  - {task.get('task_name', 'Unknown')}: {task.get('status', 'Unknown')}"
                                 )
-                                task_prompt_parts.append(
-                                    "如果确认完成，请回复 <!!!YES!!!>"
-                                )
-                                task_prompt_parts.append(
-                                    "如果要继续执行上述未完成的任务，请回复 <!!!NO!!!>"
-                                )
-
-                                task_prompt = "\n".join(task_prompt_parts)
-
-                                # 询问 LLM
-                                try:
-                                    llm_response = ag._call_model(
-                                        task_prompt, False, False
-                                    )
-                                except KeyboardInterrupt:
-                                    # 获取用户补充信息并继续主循环下一轮
-                                    addon_info = self._handle_interrupt_with_input()
-                                    if addon_info:
-                                        ag.session.addon_prompt = join_prompts(
-                                            [ag.session.addon_prompt, addon_info]
-                                        )
-                                    # 在中断后，设置标志以在下一轮执行input handler
-                                    ag.run_input_handlers_next_turn = True
-                                    should_auto_complete = False
-                                    continue
-
-                                # 解析响应
-                                if "<!!!NO!!!>" in llm_response:
-                                    should_auto_complete = False
-                                    ag.set_addon_prompt(
-                                        "请继续执行未完成的任务列表中的任务。"
-                                    )
-                                    PrettyOutput.auto_print(
-                                        "📋 检测到未完成任务，将继续执行任务列表。"
-                                    )
-                                elif "<!!!YES!!!>" in llm_response:
-                                    should_auto_complete = True
-                                    PrettyOutput.auto_print(
-                                        "✅ 确认完成当前任务，忽略任务列表中的未完成任务。"
-                                    )
-                                else:
-                                    # 无法明确判断，默认不完成（安全优先）
-                                    should_auto_complete = False
-                                    ag.set_addon_prompt(
-                                        "请继续执行未完成的任务列表中的任务。"
-                                    )
-                                    PrettyOutput.auto_print(
-                                        "⚠️ 未收到明确的完成确认，将继续执行任务列表。"
-                                    )
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            # 检查过程出错，默认继续自动完成
-                            PrettyOutput.auto_print(
-                                f"⚠️ 检查任务列表时出错: {str(e)}，继续自动完成。"
-                            )
-                            should_auto_complete = True
-
-                    if should_auto_complete:
-                        if ag.return_control_on_auto_complete:
-                            ag.return_control_on_auto_complete = False
-                            if ag.non_interactive:
-                                ag.set_non_interactive(False)
-                            ag.run_input_handlers_next_turn = True
-                            PrettyOutput.auto_print(
-                                "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
-                            )
                         else:
-                            # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
-                            result = ag._complete_task(auto_completed=True)
-                            # 若不需要summary，则将最后一条LLM输出作为返回值
-                            if not getattr(ag, "need_summary", True):
-                                return current_response
-                            return result
+                            context_parts.append("✅ 没有未完成的任务。")
+
+                        # 构建确认提示
+                        confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
+                        confirm_prompt_parts.extend(context_parts)
+                        confirm_prompt_parts.append("\n请确认是否要完成任务（自动完成）。")
+                        confirm_prompt_parts.append("如果确认完成，请回复 <!!!YES!!!>")
+                        confirm_prompt_parts.append("如果要继续执行任务，请回复 <!!!NO!!!>")
+
+                        confirm_prompt = "\n".join(confirm_prompt_parts)
+
+                        # 询问 LLM
+                        try:
+                            llm_response = ag._call_model(confirm_prompt, False, False)
+                        except KeyboardInterrupt:
+                            addon_info = self._handle_interrupt_with_input()
+                            if addon_info:
+                                ag.session.addon_prompt = join_prompts(
+                                    [ag.session.addon_prompt, addon_info]
+                                )
+                            ag.run_input_handlers_next_turn = True
+                            continue
+
+                        # 解析响应
+                        if "<!!!NO!!!>" in llm_response:
+                            ag.set_addon_prompt("LLM选择继续执行任务。")
+                            PrettyOutput.auto_print("📝 LLM确认继续执行任务。")
+                            continue
+                        elif "<!!!YES!!!>" in llm_response:
+                            PrettyOutput.auto_print("✅ LLM确认完成当前任务。")
+                        else:
+                            ag.set_addon_prompt("请继续执行任务。")
+                            PrettyOutput.auto_print("⚠️ 无法明确判断，继续执行任务。")
+                            continue
+
+                    # 执行自动完成（交互模式直接执行，非交互模式LLM确认后执行）
+                    if ag.return_control_on_auto_complete:
+                        ag.return_control_on_auto_complete = False
+                        if ag.non_interactive:
+                            ag.set_non_interactive(False)
+                        ag.run_input_handlers_next_turn = True
+                        PrettyOutput.auto_print(
+                            "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
+                        )
+                    else:
+                        # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
+                        result = ag._complete_task(auto_completed=True)
+                        # 若不需要summary，则将最后一条LLM输出作为返回值
+                        if not getattr(ag, "need_summary", True):
+                            return current_response
+                        return result
 
                 # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
                 has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
-
                 # 保存当前响应内容供用户手动修复工具调用
                 ag._last_response_content = current_response
 
