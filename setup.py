@@ -57,7 +57,6 @@ setup(
         "tiktoken==0.7.0",
         "markitdown>=0.0.1",
         "defusedxml",
-        "pillow==10.2.0",
         "openai==1.78.1",
         "python-lsp-server>=1.14.0",
         "tabulate==0.9.0",
