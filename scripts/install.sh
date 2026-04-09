@@ -118,7 +118,7 @@ prepare_source_tree() {
 install_tools() {
     echo -e "\n--- 3. 从源码安装 Jarvis ---"
     cd "$DEST_DIR"
-    uv tool install -e .
+    uv tool install -e . --python 3.12
     uv tool install playwright
     uv tool install ddgr
 }

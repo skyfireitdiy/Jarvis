@@ -68,11 +68,24 @@ dependencies = [
     "tree-sitter-sql==0.3.11",
     "pywinauto>=0.6.9; sys_platform == 'win32'",
     "pywinpty>=2.0.0; sys_platform == 'win32'",
+    "pytest",
+    "pytest-cov",
+    "coverage",
+    "pytest-xdist",
+    "pytest-benchmark",
+    "pytest-asyncio",
+    "ruff",
+    "mypy",
+    "bandit",
+    "build",
+    "twine",
+    "mkdocs-material",
+    "mkdocs-git-revision-date-localized-plugin",
+    "pymdown-extensions"
     ]
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
-    dev = ["pytest", "pytest-cov", "coverage", "pytest-xdist", "pytest-benchmark", "pytest-asyncio", "ruff", "mypy", "bandit", "build", "twine", "mkdocs-material", "mkdocs-git-revision-date-localized-plugin", "pymdown-extensions"]
     browser = ["playwright==1.48.0"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
@@ -143,7 +156,7 @@ dependencies = [
     ]
 
     [project.scripts]
-    # Playwright 浏览器驱动安装脚本
+# Playwright 浏览器驱动安装脚本
     install-playwright = "jarvis.scripts.install_playwright:install_chromium"
     jarvis = "jarvis.jarvis_agent.jarvis:main"
     jarvis-agent-dispatcher = "jarvis.jarvis_agent.jvsd_cli:app"
