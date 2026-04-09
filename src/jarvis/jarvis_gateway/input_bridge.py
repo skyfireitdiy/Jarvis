@@ -247,7 +247,9 @@ class InputSessionRegistry:
         with self._lock:
             self._pending_confirm_requests.pop(session_id, None)
 
-    def disconnect_confirm_session(self, session_id: str, reason: str = "remote session disconnected") -> None:
+    def disconnect_confirm_session(
+        self, session_id: str, reason: str = "remote session disconnected"
+    ) -> None:
         """断开确认会话。"""
         with self._lock:
             session = self._confirm_sessions.pop(session_id, None)

@@ -143,25 +143,17 @@ class LSPConfigReader:
 
         for lang_name, lang_data in languages_data.items():
             if not isinstance(lang_data, dict):
-                raise ValueError(
-                    f"语言配置格式错误: {lang_name}"
-                )
+                raise ValueError(f"语言配置格式错误: {lang_name}")
 
             # 验证必需字段
             if "command" not in lang_data:
-                raise ValueError(
-                    f"语言 {lang_name} 缺少必需字段: command"
-                )
+                raise ValueError(f"语言 {lang_name} 缺少必需字段: command")
 
             if "args" not in lang_data:
-                raise ValueError(
-                    f"语言 {lang_name} 缺少必需字段: args"
-                )
+                raise ValueError(f"语言 {lang_name} 缺少必需字段: args")
 
             if "file_extensions" not in lang_data:
-                raise ValueError(
-                    f"语言 {lang_name} 缺少必需字段: file_extensions"
-                )
+                raise ValueError(f"语言 {lang_name} 缺少必需字段: file_extensions")
 
             # 用户配置覆盖默认配置
             languages[lang_name] = LanguageConfig(

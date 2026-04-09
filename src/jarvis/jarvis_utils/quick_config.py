@@ -314,7 +314,6 @@ def quick_config():
             except ValueError:
                 PrettyOutput.auto_print("❌ 请输入有效的正整数")
 
-
     model_config_names = {}
 
     # 为每个实际使用的模型创建配置
@@ -348,7 +347,9 @@ def quick_config():
                     f"{platform}_api_key": api_key,
                     f"{platform}_base_url": base_url,
                 }
-            PrettyOutput.auto_print(f"✅ 已更新模型配置: {existing_config_name} -> {model}")
+            PrettyOutput.auto_print(
+                f"✅ 已更新模型配置: {existing_config_name} -> {model}"
+            )
             continue
 
         # 统一使用配置名称+模型名的方式避免命名冲突，保持单模型和多模型配置结构一致

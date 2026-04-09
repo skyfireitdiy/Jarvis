@@ -543,7 +543,7 @@ class ContextRecommender:
 
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")
-            
+
             llm_model.set_suppress_output(False)
 
             return llm_model

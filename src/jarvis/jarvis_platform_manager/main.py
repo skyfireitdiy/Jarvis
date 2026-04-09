@@ -860,13 +860,11 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
 
     # 可选的 cheap 和 smart
     cheap_llm = resolve_llm_choice(
-        "Cheap LLM 配置 (序号或名称，留空则与 normal 相同): ",
-        allow_empty=True
+        "Cheap LLM 配置 (序号或名称，留空则与 normal 相同): ", allow_empty=True
     )
 
     smart_llm = resolve_llm_choice(
-        "Smart LLM 配置 (序号或名称，留空则与 normal 相同): ",
-        allow_empty=True
+        "Smart LLM 配置 (序号或名称，留空则与 normal 相同): ", allow_empty=True
     )
 
     # 自动生成模型组名称（如果未提供）

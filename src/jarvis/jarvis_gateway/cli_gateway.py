@@ -71,7 +71,9 @@ class CLIGateway(BaseGateway):
             auth_payload = request.metadata.get("auth")
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
-            return GatewayConfirmResult(confirmed=request.default, metadata={"error": reason})
+            return GatewayConfirmResult(
+                confirmed=request.default, metadata={"error": reason}
+            )
         provider = get_current_input_provider()
         # 使用 get_multiline_input 接收用户输入
         suffix = "[Y/n]" if request.default else "[y/N]"

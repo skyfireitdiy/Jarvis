@@ -1284,7 +1284,12 @@ class PrettyOutput:
 
         with Live(panel, refresh_per_second=10, transient=True) as live:
 
-            def _update_panel_content(content: str, style: str = "bright_white", update_subtitle: bool = False, show_cursor: bool = True):
+            def _update_panel_content(
+                content: str,
+                style: str = "bright_white",
+                update_subtitle: bool = False,
+                show_cursor: bool = True,
+            ):
                 nonlocal \
                     response, \
                     last_subtitle_update_time, \
@@ -1360,7 +1365,9 @@ class PrettyOutput:
             if first_chunk_content:
                 # 根据类型设置样式
                 first_style = "dim" if first_chunk_type == "reason" else "bright_white"
-                _update_panel_content(first_chunk_content, style=first_style, update_subtitle=True)
+                _update_panel_content(
+                    first_chunk_content, style=first_style, update_subtitle=True
+                )
                 # 解析 title 获取 agent_name 和 model_name
                 agent_name = ""
                 model_name = ""

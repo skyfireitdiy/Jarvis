@@ -67,15 +67,18 @@ def build_node_runtime_config(
 
     config = NodeRuntimeConfig(
         node_mode=normalized_mode,
-        node_id=(node_id.strip() if isinstance(node_id, str) and node_id.strip() else None),
+        node_id=(
+            node_id.strip() if isinstance(node_id, str) and node_id.strip() else None
+        ),
         master_url=(
-            master_url.strip() if isinstance(master_url, str) and master_url.strip() else None
+            master_url.strip()
+            if isinstance(master_url, str) and master_url.strip()
+            else None
         ),
         node_secret=normalized_secret,
     )
     validate_node_config(config)
     return config
-
 
 
 def validate_node_config(config: NodeRuntimeConfig) -> None:

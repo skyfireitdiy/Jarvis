@@ -31,9 +31,7 @@ def _load_scenario_types() -> Dict[str, Dict[str, str]]:
         ValueError: 如果文件格式不正确
     """
     if not _PROMPTS_DIR.exists():
-        raise FileNotFoundError(
-            f"提示词目录不存在: {_PROMPTS_DIR}"
-        )
+        raise FileNotFoundError(f"提示词目录不存在: {_PROMPTS_DIR}")
 
     scenarios = {}
 
@@ -88,14 +86,10 @@ def _load_scenario_types() -> Dict[str, Dict[str, str]]:
             except ValueError:
                 raise
             except Exception as e:
-                raise IOError(
-                    f"加载文件 '{md_file.name}' 失败: {e}"
-                ) from e
+                raise IOError(f"加载文件 '{md_file.name}' 失败: {e}") from e
 
         if not scenarios:
-            raise FileNotFoundError(
-                f"在目录 {_PROMPTS_DIR} 中未找到有效的提示词文件"
-            )
+            raise FileNotFoundError(f"在目录 {_PROMPTS_DIR} 中未找到有效的提示词文件")
 
         return scenarios
 
@@ -221,7 +215,7 @@ def _load_prompt_from_file(scenario: str) -> str:
             end_marker = content.find("\n---", 4)
             if end_marker != -1:
                 # 跳过 front matter，返回后面的内容
-                content = content[end_marker + 4:]  # +4 跳过 "\n---"
+                content = content[end_marker + 4 :]  # +4 跳过 "\n---"
 
         content = content.strip()
         if not content:

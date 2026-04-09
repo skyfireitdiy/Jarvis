@@ -26,7 +26,7 @@ def load_config(config_path: str) -> dict[str, Any]:
     """
     # 展开路径中的 ~ 符号
     config_path = os.path.expanduser(config_path)
-    
+
     if not os.path.exists(config_path):
         PrettyOutput.auto_print(f"⚠️ 配置文件 {config_path} 不存在，使用默认配置")
         return {}

@@ -324,11 +324,11 @@ class AgentRunLoop:
 
     def _handle_tool_calls(self, ag, current_response: str) -> tuple[bool, Any, str]:
         """处理工具调用
-        
+
         参数:
             ag: agent实例
             current_response: 当前响应内容
-            
+
         返回:
             tuple[bool, Any, str]: (是否需要返回结果, 返回的结果或None, safe_tool_prompt)
                 - 如果工具要求立即返回结果，返回 (True, tool_prompt, safe_tool_prompt)
@@ -344,7 +344,7 @@ class AgentRunLoop:
             )
         except Exception:
             pass
-        
+
         try:
             need_return, tool_prompt = ag._call_tools(current_response)
         except KeyboardInterrupt:
@@ -358,18 +358,18 @@ class AgentRunLoop:
             ag.run_input_handlers_next_turn = True
             need_return = False
             tool_prompt = ""
-        
+
         # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
         if need_return:
             ag._no_tool_call_count = 0
             safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
             return True, tool_prompt, safe_tool_prompt
-        
+
         # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
         safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
-        
+
         ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
-        
+
         # 关键流程：直接调用 after_tool_call 回调函数
         try:
             # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
@@ -388,7 +388,7 @@ class AgentRunLoop:
                     pass
         except Exception:
             pass
-        
+
         # 非关键流程：广播工具调用后的事件（用于日志、监控等）
         try:
             ag.event_bus.emit(
@@ -400,12 +400,12 @@ class AgentRunLoop:
             )
         except Exception:
             pass
-        
+
         # 检查是否需要继续
         if ag.session.prompt or ag.session.addon_prompt:
             ag._no_tool_call_count = 0
             return True, None, safe_tool_prompt
-        
+
         return False, None, safe_tool_prompt
 
     def _collect_auto_complete_context(self, ag) -> str:
@@ -445,7 +445,10 @@ class AgentRunLoop:
                                     {
                                         "task_id": task.get("task_id"),
                                         "task_name": task.get("task_name"),
-                                        "task_desc": task.get("task_desc", "")[:100] + "..." if len(task.get("task_desc", "")) > 100 else task.get("task_desc", ""),
+                                        "task_desc": task.get("task_desc", "")[:100]
+                                        + "..."
+                                        if len(task.get("task_desc", "")) > 100
+                                        else task.get("task_desc", ""),
                                         "status": task.get("status"),
                                         "task_list_id": task_list_id,
                                         "main_goal": summary.get("main_goal", ""),
@@ -455,9 +458,13 @@ class AgentRunLoop:
             pass
 
         if all_unfinished_tasks:
-            context_parts.append(f"📋 检测到 {len(all_unfinished_tasks)} 个未完成任务：")
+            context_parts.append(
+                f"📋 检测到 {len(all_unfinished_tasks)} 个未完成任务："
+            )
             for task in all_unfinished_tasks[:5]:  # 最多显示5个
-                context_parts.append(f"  - {task.get('task_name', 'Unknown')}: {task.get('status', 'Unknown')}")
+                context_parts.append(
+                    f"  - {task.get('task_name', 'Unknown')}: {task.get('status', 'Unknown')}"
+                )
         else:
             context_parts.append("✅ 没有未完成的任务。")
 
@@ -492,7 +499,9 @@ class AgentRunLoop:
                 return False, current_response
             return False, result
 
-    def _track_no_tool_call(self, ag, safe_tool_prompt: str, current_response: str) -> Any:
+    def _track_no_tool_call(
+        self, ag, safe_tool_prompt: str, current_response: str
+    ) -> Any:
         """跟踪无工具调用情况并在必要时尝试修复
 
         参数:
@@ -520,9 +529,7 @@ class AgentRunLoop:
                 if ag._no_tool_call_count >= 2:
                     from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
 
-                    error_msg = (
-                        "连续2次对话没有工具调用，请使用工具来完成你的任务"
-                    )
+                    error_msg = "连续2次对话没有工具调用，请使用工具来完成你的任务"
                     PrettyOutput.auto_print(f"⚠ {error_msg}")
 
                     # 尝试使用大模型修复
@@ -557,11 +564,11 @@ class AgentRunLoop:
 
     def _check_auto_complete(self, ag, current_response: str) -> tuple[bool, Any]:
         """检查并处理自动完成
-        
+
         参数:
             ag: agent实例
             current_response: 当前响应内容
-            
+
         返回:
             tuple[bool, Any]: (是否继续下一轮, 返回的结果或None)
                 - 如果需要继续下一轮，返回 (True, None)
@@ -570,33 +577,35 @@ class AgentRunLoop:
         """
         if not (ag.auto_complete and is_auto_complete(current_response)):
             return False, None
-        
+
         ag._no_tool_call_count = 0
-        
+
         if ag.non_interactive:
             # 非交互模式：必须经过LLM二次确认
             # 收集上下文信息
             context = self._collect_auto_complete_context(ag)
-            
+
             # 构建确认提示
             confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
             confirm_prompt_parts.append(context)
             confirm_prompt_parts.append("\n请确认是否要完成任务（自动完成）。")
             confirm_prompt_parts.append("如果确认完成，请回复 <!!!YES!!!>")
             confirm_prompt_parts.append("如果要继续执行任务，请回复 <!!!NO!!!>")
-            
+
             confirm_prompt = "\n".join(confirm_prompt_parts)
-            
+
             # 询问 LLM
             try:
                 llm_response = ag._call_model(confirm_prompt, False, False)
             except KeyboardInterrupt:
                 addon_info = self._handle_interrupt_with_input()
                 if addon_info:
-                    ag.session.addon_prompt = join_prompts([ag.session.addon_prompt, addon_info])
+                    ag.session.addon_prompt = join_prompts(
+                        [ag.session.addon_prompt, addon_info]
+                    )
                 ag.run_input_handlers_next_turn = True
                 return True, None
-            
+
             # 解析响应
             if "<!!!NO!!!>" in llm_response:
                 ag.set_addon_prompt("LLM选择继续执行任务。")
@@ -608,7 +617,7 @@ class AgentRunLoop:
                 ag.set_addon_prompt("请继续执行任务。")
                 PrettyOutput.auto_print("⚠ LLM响应不明确，默认继续执行任务。")
                 return True, None
-        
+
         # 执行自动完成（交互模式直接执行，非交互模式LLM确认后执行）
         return self._execute_auto_complete(ag, current_response)
 
@@ -707,7 +716,9 @@ class AgentRunLoop:
                     return interrupt_result
 
                 # 处理工具调用
-                should_return, result, safe_tool_prompt = self._handle_tool_calls(ag, current_response)
+                should_return, result, safe_tool_prompt = self._handle_tool_calls(
+                    ag, current_response
+                )
                 if should_return:
                     if result is not None:
                         # 工具要求立即返回结果
@@ -717,14 +728,18 @@ class AgentRunLoop:
                         continue
 
                 # 检查自动完成
-                should_continue, result = self._check_auto_complete(ag, current_response)
+                should_continue, result = self._check_auto_complete(
+                    ag, current_response
+                )
                 if should_continue:
                     continue
                 if result is not None:
                     return result
 
                 # 跟踪无工具调用情况
-                track_result = self._track_no_tool_call(ag, safe_tool_prompt, current_response)
+                track_result = self._track_no_tool_call(
+                    ag, safe_tool_prompt, current_response
+                )
                 if track_result is not None:
                     return track_result
 

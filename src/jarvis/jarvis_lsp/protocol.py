@@ -59,7 +59,9 @@ class HoverInfo:
     """
 
     contents: str
-    range: Optional[tuple[int, int, int, int]]  # (start_line, start_char, end_line, end_char)
+    range: Optional[
+        tuple[int, int, int, int]
+    ]  # (start_line, start_char, end_line, end_char)
     file_path: str
     line: int
     character: int
@@ -207,7 +209,7 @@ class LSPMessageCodec:
         """
         # 去除前面可能的空行
         data = data.lstrip(b"\r\n")
-        
+
         # 解析 Content-Length 头
         try:
             headers, content = data.split(b"\r\n\r\n", 1)
