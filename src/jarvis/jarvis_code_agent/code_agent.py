@@ -331,7 +331,6 @@ class CodeAgent(Agent):
         # 建立 CodeAgent 与 Agent 的关联，便于工具获取上下文管理器
         self._code_agent = self
 
-
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
@@ -489,7 +488,6 @@ git reset --hard {start_commit}
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
 
-
                     # === 阶段6: 构建增强输入 ===
                     if project_overview:
                         enhanced_input = (
@@ -497,7 +495,6 @@ git reset --hard {start_commit}
                             + "\n\n"
                             + first_tip
                             + non_interactive_note
-                            + context_recommendation_text
                             + "\n\n任务描述：\n"
                             + user_input
                         )
@@ -505,7 +502,6 @@ git reset --hard {start_commit}
                         enhanced_input = (
                             first_tip
                             + non_interactive_note
-                            + context_recommendation_text
                             + "\n\n任务描述：\n"
                             + user_input
                         )
