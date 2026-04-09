@@ -102,7 +102,9 @@ class NodeTokenSyncState:
         self.source_node_id = source_node_id
         self.error_message = None
 
-    def mark_failed(self, error_message: str, source_node_id: Optional[str] = None) -> None:
+    def mark_failed(
+        self, error_message: str, source_node_id: Optional[str] = None
+    ) -> None:
         self.last_synced_at = datetime.utcnow().isoformat()
         self.sync_status = "failed"
         self.source_node_id = source_node_id
@@ -112,7 +114,9 @@ class NodeTokenSyncState:
 class NodeRuntime:
     def __init__(self, config: NodeRuntimeConfig) -> None:
         self.config = config
-        self.local_node_id = config.effective_node_id if config.is_child else DEFAULT_LOCAL_NODE_ID
+        self.local_node_id = (
+            config.effective_node_id if config.is_child else DEFAULT_LOCAL_NODE_ID
+        )
         self.node_registry = NodeRegistry()
         self.agent_route_registry = AgentRouteRegistry()
         self.token_sync_state = NodeTokenSyncState()

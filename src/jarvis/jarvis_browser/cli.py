@@ -147,7 +147,9 @@ class BrowserDaemon:
                     break
                 except OSError as e:
                     # 98=Linux EADDRINUSE, 10048=Windows WSAEADDRINUSE
-                    if "address already in use" in str(e).lower() or getattr(e, "errno", 0) in (98, 10048):
+                    if "address already in use" in str(e).lower() or getattr(
+                        e, "errno", 0
+                    ) in (98, 10048):
                         continue
                     raise
 
@@ -162,7 +164,9 @@ class BrowserDaemon:
             try:
                 loop = asyncio.get_running_loop()
                 for sig in (signal.SIGTERM, signal.SIGINT):
-                    loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+                    loop.add_signal_handler(
+                        sig, lambda: asyncio.create_task(self.stop())
+                    )
             except NotImplementedError:
                 pass
 
@@ -250,9 +254,7 @@ class BrowserDaemon:
                     # Log browser activity
                     action = request.get("action")
                     if action:
-                        self._log_activity(
-                            action, request.get("params", {}), response
-                        )
+                        self._log_activity(action, request.get("params", {}), response)
 
                     # Send response
                     response_json = json.dumps(response, ensure_ascii=False)
@@ -316,7 +318,10 @@ class BrowserDaemon:
             if len(str(params["url"])) > 60:
                 url += "..."
             parts.append(f"url={url}")
-        elif action in ("click", "gettext", "get_element_info", "element_screenshot") and "selector" in params:
+        elif (
+            action in ("click", "gettext", "get_element_info", "element_screenshot")
+            and "selector" in params
+        ):
             parts.append(f"selector={params['selector'][:50]}")
         elif action == "type" and "selector" in params:
             text_len = len(str(params.get("text", "")))
@@ -421,7 +426,9 @@ class BrowserDaemon:
         elif action == "screenshot":
             return await screenshot(
                 browser_id=params.get("browser_id", "default"),
-                path=params.get("path", str(_get_browser_temp_dir() / "screenshot.png")),
+                path=params.get(
+                    "path", str(_get_browser_temp_dir() / "screenshot.png")
+                ),
             )
         elif action == "gettext":
             err = self._check_selector_or_index(params, "gettext")
@@ -710,7 +717,11 @@ class BrowserDaemon:
 
 
 @app.command()
-def daemon(foreground: bool = typer.Option(False, "--foreground", help="Run in foreground (used internally)")):
+def daemon(
+    foreground: bool = typer.Option(
+        False, "--foreground", help="Run in foreground (used internally)"
+    ),
+):
     """Run as daemon process for persistent browser sessions.
 
     The daemon runs in the background and maintains browser sessions across
@@ -786,9 +797,9 @@ def daemon(foreground: bool = typer.Option(False, "--foreground", help="Run in f
         if hasattr(subprocess, "DETACHED_PROCESS"):
             flags |= subprocess.DETACHED_PROCESS
         with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*60}\n")
+            f.write(f"\n{'=' * 60}\n")
             f.write(f"Daemon process started at {datetime.now().isoformat()}\n")
-            f.write(f"{'='*60}\n")
+            f.write(f"{'=' * 60}\n")
         proc = subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
@@ -833,9 +844,9 @@ def daemon(foreground: bool = typer.Option(False, "--foreground", help="Run in f
     log_dir = get_daemon_log_dir()
     log_file = log_dir / "daemon.log"
     log_f = open(log_file, "a", encoding="utf-8")
-    log_f.write(f"\n{'='*60}\n")
+    log_f.write(f"\n{'=' * 60}\n")
     log_f.write(f"Daemon process started at {datetime.now().isoformat()}\n")
-    log_f.write(f"{'='*60}\n")
+    log_f.write(f"{'=' * 60}\n")
     log_f.flush()
     os.dup2(log_f.fileno(), sys.stdout.fileno())
     os.dup2(log_f.fileno(), sys.stderr.fileno())
@@ -922,7 +933,11 @@ def click_cmd(
     Click by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -949,7 +964,11 @@ def type(
     Type text by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"text": text, "browser_id": browser_id}
     if index is not None:
@@ -966,7 +985,10 @@ def type(
 def screenshot_cmd(
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
     path: str = typer.Option(
-        str(_get_browser_temp_dir() / "screenshot.png"), "--path", "-p", help="Screenshot path"
+        str(_get_browser_temp_dir() / "screenshot.png"),
+        "--path",
+        "-p",
+        help="Screenshot path",
     ),
 ) -> None:
     """Take screenshot
@@ -992,7 +1014,11 @@ def gettext(
     Get text by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -1106,7 +1132,11 @@ def getattribute(
     Get attribute by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"attribute": attribute, "browser_id": browser_id}
     if index is not None:
@@ -1132,7 +1162,11 @@ def getelementinfo(
     Get element info by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -1212,7 +1246,11 @@ def hover_cmd(
     Hover by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -1265,7 +1303,11 @@ def doubleclick(
     Double click by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -1653,7 +1695,11 @@ def elementscreenshot(
     Screenshot by CSS selector or by interactable index (from jb list-interactables).
     """
     if selector is None and index is None:
-        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        print(
+            json.dumps(
+                {"success": False, "stdout": "", "stderr": "Need --selector or --index"}
+            )
+        )
         raise typer.Exit(code=1)
     params: Dict[str, Any] = {"browser_id": browser_id}
     if index is not None:
@@ -2069,12 +2115,14 @@ async def _get_interactables_list(
                             return tag;
                         }
                     """)
-                interactables.append({
-                    "index": len(interactables) + 1,
-                    "type": element_type,
-                    "selector": element_selector,
-                    "text": text,
-                })
+                interactables.append(
+                    {
+                        "index": len(interactables) + 1,
+                        "type": element_type,
+                        "selector": element_selector,
+                        "text": text,
+                    }
+                )
                 if len(interactables) >= 100:
                     break
             except Exception:
@@ -2872,7 +2920,11 @@ async def download_file(
         # Set download directory
         import os
 
-        download_dir = str(Path(get_data_dir()) / "browser_temp" / "playwright_downloads") if _IS_WINDOWS else "/tmp/playwright_downloads"
+        download_dir = (
+            str(Path(get_data_dir()) / "browser_temp" / "playwright_downloads")
+            if _IS_WINDOWS
+            else "/tmp/playwright_downloads"
+        )
         os.makedirs(download_dir, exist_ok=True)
 
         # Start download, wait for download to complete

@@ -112,9 +112,7 @@ class TerminalInputRegistry:
         session = self.register_execution(execution_id)
         session.submit_resize(rows, cols)
 
-    def get_input_callback(
-        self, execution_id: str
-    ) -> Callable[[float], Optional[str]]:
+    def get_input_callback(self, execution_id: str) -> Callable[[float], Optional[str]]:
         session = self.register_execution(execution_id)
 
         def _callback(timeout: float) -> Optional[str]:

@@ -1155,7 +1155,7 @@ class RulesManager:
             # 调用模型，限制输出长度
             model.set_suppress_output(True)
             model.set_suppress_output(False)
-            
+
             response = model.chat_until_success(prompt, max_output=200).strip()
             model.set_suppress_output(False)
 

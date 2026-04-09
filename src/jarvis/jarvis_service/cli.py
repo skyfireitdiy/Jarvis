@@ -101,14 +101,14 @@ class ServiceController:
             self._requested_action = LoopAction.EXIT
             processes = self._start_services(frontend_process)
             next_action = self._wait_for_signal_or_process_exit(processes)
-            
+
             if next_action == LoopAction.RESTART_GATEWAY_ONLY:
                 # 只重启网关，保持前端运行
                 PrettyOutput.auto_print("🔄 只重启网关服务，保持前端运行")
                 frontend_process = processes.frontend_process
                 self._stop_gateway_only(processes)
                 continue
-            
+
             # 完全停止所有服务
             frontend_process = None
             self._stop_services(processes)
@@ -121,12 +121,12 @@ class ServiceController:
         self, existing_frontend: Optional[subprocess.Popen[bytes]] = None
     ) -> ServiceProcesses:
         """按节点模式启动服务进程。
-        
+
         Args:
             existing_frontend: 已存在的前端进程（只重启网关时使用）
         """
         self._validate_runtime_dependencies()
-        
+
         if existing_frontend is not None:
             PrettyOutput.auto_print("🚀 重新启动网关服务（保持前端运行）")
         else:

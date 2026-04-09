@@ -199,11 +199,13 @@ class NodeConnectionManager:
                     continue
                 if message_type == NODE_TERMINAL_OUTPUT:
                     # child 端推送的终端输出，转发给前端
-                    terminal_payload = (next_message.get("payload") or {})
+                    terminal_payload = next_message.get("payload") or {}
                     output_session_id = terminal_payload.get("session_id") or "default"
                     output_message = terminal_payload.get("message")
                     if output_message and self._router:
-                        self._router.publish(output_message, session_id=output_session_id)
+                        self._router.publish(
+                            output_message, session_id=output_session_id
+                        )
                     continue
                 if message_type == AGENT_CREATE_REQUEST:
                     response = self._handle_agent_create_request(next_message, node_id)
@@ -924,41 +926,43 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         config_sections = payload.get("config_sections", [])
         config_data = payload.get("config_data", {})
-        
+
         logger.info(
             "[NODE CONFIG SYNC] child handling config sync request_id=%s sections=%s",
             request_id,
             config_sections,
         )
-        
+
         try:
             # 获取配置文件路径
             config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
-            
+
             # 备份原配置文件
             backup_file = config_file.with_suffix(".yaml.bak")
             if config_file.exists():
                 shutil.copy2(config_file, backup_file)
                 logger.info("[NODE CONFIG SYNC] backed up config to %s", backup_file)
-            
+
             # 读取现有配置
             existing_config = {}
             if config_file.exists():
                 with open(config_file, "r", encoding="utf-8") as f:
                     existing_config = yaml.safe_load(f) or {}
-            
+
             # 更新配置
             updated_config = existing_config.copy()
             for section in config_sections:
                 if section in config_data:
                     updated_config[section] = config_data[section]
                     logger.info("[NODE CONFIG SYNC] updated section: %s", section)
-            
+
             # 保存配置
             config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(config_file, "w", encoding="utf-8") as f:
-                yaml.safe_dump(updated_config, f, allow_unicode=True, default_flow_style=False)
-            
+                yaml.safe_dump(
+                    updated_config, f, allow_unicode=True, default_flow_style=False
+                )
+
             logger.info(
                 "[NODE CONFIG SYNC] child config sync completed request_id=%s",
                 request_id,
@@ -986,8 +990,10 @@ class NodeConnectionManager:
                     shutil.copy2(backup_file, config_file)
                     logger.info("[NODE CONFIG SYNC] restored config from backup")
             except Exception as restore_exc:
-                logger.error("[NODE CONFIG SYNC] failed to restore backup: %s", restore_exc)
-            
+                logger.error(
+                    "[NODE CONFIG SYNC] failed to restore backup: %s", restore_exc
+                )
+
             return build_node_message(
                 CONFIG_SYNC_RESPONSE,
                 {
@@ -1257,15 +1263,11 @@ class ChildNodeClient:
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == NODE_TERMINAL_REQUEST:
-                    response = await self._handle_node_terminal_request(
-                        next_message
-                    )
+                    response = await self._handle_node_terminal_request(next_message)
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == SERVICE_RESTART_REQUEST:
-                    response = await self._handle_service_restart_request(
-                        next_message
-                    )
+                    response = await self._handle_service_restart_request(next_message)
                     await self._ws.send(json.dumps(response))
                     continue
                 logger.warning(
@@ -1307,17 +1309,26 @@ class ChildNodeClient:
         if tsm is None:
             return build_node_message(
                 NODE_TERMINAL_RESPONSE,
-                {"success": False, "error": {"code": "NO_TERMINAL_MANAGER", "message": "terminal session manager not available"}},
+                {
+                    "success": False,
+                    "error": {
+                        "code": "NO_TERMINAL_MANAGER",
+                        "message": "terminal session manager not available",
+                    },
+                },
                 request_id=request_id,
             )
 
         try:
             if action == "terminal_create":
-                interpreter = inner_payload.get("interpreter") or os.environ.get("SHELL", "bash")
+                interpreter = inner_payload.get("interpreter") or os.environ.get(
+                    "SHELL", "bash"
+                )
                 raw_working_dir = inner_payload.get("working_dir")
                 working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
                 if not working_dir:
                     import pathlib as _pathlib
+
                     working_dir = str(_pathlib.Path.home())
                 # 创建代理 publisher，将终端输出推送回 master
                 proxy_publisher = NodeTerminalOutputProxy(
@@ -1345,7 +1356,13 @@ class ChildNodeClient:
                 else:
                     return build_node_message(
                         NODE_TERMINAL_RESPONSE,
-                        {"success": False, "error": {"code": "TERMINAL_CREATE_FAILED", "message": error or "unknown error"}},
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "TERMINAL_CREATE_FAILED",
+                                "message": error or "unknown error",
+                            },
+                        },
                         request_id=request_id,
                     )
 
@@ -1385,17 +1402,24 @@ class ChildNodeClient:
             else:
                 return build_node_message(
                     NODE_TERMINAL_RESPONSE,
-                    {"success": False, "error": {"code": "UNKNOWN_ACTION", "message": f"unknown terminal action: {action}"}},
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "UNKNOWN_ACTION",
+                            "message": f"unknown terminal action: {action}",
+                        },
+                    },
                     request_id=request_id,
                 )
 
         except Exception as exc:
-            logger.error(
-                "[NODE TERMINAL] child action=%s failed: %s", action, exc
-            )
+            logger.error("[NODE TERMINAL] child action=%s failed: %s", action, exc)
             return build_node_message(
                 NODE_TERMINAL_RESPONSE,
-                {"success": False, "error": {"code": "TERMINAL_ERROR", "message": str(exc)}},
+                {
+                    "success": False,
+                    "error": {"code": "TERMINAL_ERROR", "message": str(exc)},
+                },
                 request_id=request_id,
             )
 
@@ -1406,7 +1430,7 @@ class ChildNodeClient:
         request_id = message.get("request_id")
         payload = message.get("payload") or {}
         restart_frontend = bool(payload.get("restart_frontend", True))
-        
+
         logger.info(
             "[NODE RESTART] child handling service restart request_id=%s restart_frontend=%s",
             request_id,
@@ -1451,7 +1475,7 @@ class ChildNodeClient:
             signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
             signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
             os.kill(service_pid, signal_to_send)
-            
+
             message_text = (
                 "已请求 jarvis-service 重启所有服务"
                 if restart_frontend

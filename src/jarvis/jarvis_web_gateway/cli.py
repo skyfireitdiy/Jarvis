@@ -20,10 +20,18 @@ def serve(
     gateway_password: Optional[str] = typer.Option(
         None, "--gateway-password", help="Web Gateway 密码（如未设置将禁用密码认证）"
     ),
-    node_mode: str = typer.Option("master", "--node-mode", help="节点模式：master 或 child"),
-    node_id: Optional[str] = typer.Option(None, "--node-id", help="当前节点 ID（child 模式必填）"),
-    master_url: Optional[str] = typer.Option(None, "--master-url", help="主节点 URL（child 模式必填）"),
-    node_secret: Optional[str] = typer.Option(None, "--node-secret", help="节点共享密钥（child 模式必填）"),
+    node_mode: str = typer.Option(
+        "master", "--node-mode", help="节点模式：master 或 child"
+    ),
+    node_id: Optional[str] = typer.Option(
+        None, "--node-id", help="当前节点 ID（child 模式必填）"
+    ),
+    master_url: Optional[str] = typer.Option(
+        None, "--master-url", help="主节点 URL（child 模式必填）"
+    ),
+    node_secret: Optional[str] = typer.Option(
+        None, "--node-secret", help="节点共享密钥（child 模式必填）"
+    ),
 ) -> None:
     """启动 Web Gateway 服务。"""
 

@@ -92,13 +92,9 @@ def run_command_ignore_errors(cmd: List[str], error_msg: str) -> bool:
         return False
 
 
-
-
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
-        print(
-            "ℹ️ Usage: python scripts/publish.py [major|minor|patch]"
-        )
+        print("ℹ️ Usage: python scripts/publish.py [major|minor|patch]")
         sys.exit(1)
     version_type = sys.argv[1]
     try:
