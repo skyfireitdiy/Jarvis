@@ -12,8 +12,6 @@ import sys
 import subprocess
 from pathlib import Path
 from typing import Tuple, List
-from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.utils import decode_output
 
 
 def get_current_version() -> Tuple[int, int, int]:
@@ -74,8 +72,8 @@ def run_command(cmd: List[str], error_msg: str) -> None:
             capture_output=True,
         )
     except subprocess.CalledProcessError as e:
-        PrettyOutput.auto_print(f"❌ Error: {error_msg}")
-        PrettyOutput.auto_print(f"❌ Stderr: {decode_output(e.stderr)}")
+        print(f"❌ Error: {error_msg}")
+        print(f"❌ Stderr: {e.stderr}")
         sys.exit(1)
 
 
@@ -89,34 +87,16 @@ def run_command_ignore_errors(cmd: List[str], error_msg: str) -> bool:
         )
         return True
     except subprocess.CalledProcessError as e:
-        PrettyOutput.auto_print(f"⚠️  Warning: {error_msg}")
-        PrettyOutput.auto_print(f"⚠️  Stderr: {decode_output(e.stderr)}")
+        print(f"⚠️  Warning: {error_msg}")
+        print(f"⚠️  Stderr: {e.stderr}")
         return False
 
 
-def remove_pycache_directories():
-    """删除所有的 __pycache__ 目录"""
-    import shutil
-
-    for root, dirs, files in os.walk("."):
-        for dir_name in dirs:
-            if dir_name == "__pycache__":
-                pycache_dir = os.path.join(root, dir_name)
-                PrettyOutput.auto_print(f"🗑️ Removing {pycache_dir}")
-                shutil.rmtree(pycache_dir)
-    # 新增清理.mypy_cache目录
-    PrettyOutput.auto_print("🗑️ Removing .mypy_cache directories...")
-    # 使用Python的跨平台方式来查找和删除.mypy_cache目录
-    for root, dirs, files in os.walk("."):
-        if ".mypy_cache" in dirs:
-            mypy_cache_path = os.path.join(root, ".mypy_cache")
-            PrettyOutput.auto_print(f"🗑️ Removing {mypy_cache_path}")
-            shutil.rmtree(mypy_cache_path)
 
 
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
-        PrettyOutput.auto_print(
+        print(
             "ℹ️ Usage: python scripts/publish.py [major|minor|patch]"
         )
         sys.exit(1)
@@ -124,13 +104,10 @@ def main():
     try:
         # 更新版本号
         new_version = update_version(version_type)
-        PrettyOutput.auto_print(f"✅ Updated version to {new_version}")
-        # 删除所有的 __pycache__ 目录
-        PrettyOutput.auto_print("🗑️ Removing __pycache__ directories...")
-        remove_pycache_directories()
+        print(f"✅ Updated version to {new_version}")
 
         # 提交版本更新
-        PrettyOutput.auto_print("📝 Committing version update...")
+        print("📝 Committing version update...")
         run_command(["git", "add", "."], "Failed to stage files")
         run_command(
             [
@@ -144,10 +121,10 @@ def main():
             "Failed to commit version update",
         )
         # 创建标签
-        PrettyOutput.auto_print("🏷️ Creating git tag...")
+        print("🏷️ Creating git tag...")
         run_command(["git", "tag", f"v{new_version}"], "Failed to create tag")
         # 推送到远程仓库
-        PrettyOutput.auto_print("🚀 Pushing to all remotes...")
+        print("🚀 Pushing to all remotes...")
         # 获取所有remotes
         remotes_result = subprocess.run(
             ["git", "remote"],
@@ -161,7 +138,7 @@ def main():
         for remote in remotes:
             if not remote:
                 continue
-            PrettyOutput.auto_print(f"  Pushing to {remote}...")
+            print(f"  Pushing to {remote}...")
             # Push main branch
             if run_command_ignore_errors(
                 ["git", "push", remote, "main"], f"Failed to push main to {remote}"
@@ -174,15 +151,15 @@ def main():
                     success_count += 1
 
         if success_count > 0:
-            PrettyOutput.auto_print(
+            print(
                 f"✅ Successfully pushed to {success_count}/{len(remotes)} remotes. The GitHub Action will now handle publishing to PyPI."
             )
         else:
-            PrettyOutput.auto_print(
+            print(
                 "⚠️  Warning: Failed to push to any remote. Please check the errors above."
             )
     except Exception as e:
-        PrettyOutput.auto_print(f"❌ Error: {str(e)}")
+        print(f"❌ Error: {str(e)}")
         sys.exit(1)
 
 
