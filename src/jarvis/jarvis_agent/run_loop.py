@@ -473,8 +473,12 @@ class AgentRunLoop:
                     ag._no_tool_call_count = 0
                     continue
 
-                # 检查自动完成
-                if ag.auto_complete and is_auto_complete(current_response):
+                # 检查自动完成（仅在非交互模式下触发）
+                if (
+                    ag.auto_complete
+                    and ag.non_interactive
+                    and is_auto_complete(current_response)
+                ):
                     ag._no_tool_call_count = 0
 
                     # 检查是否有代码修改（仅对CodeAgent）
