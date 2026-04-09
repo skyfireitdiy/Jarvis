@@ -77,7 +77,6 @@ class AgentRunLoop:
             str: 过滤后的响应内容（不包含工具调用部分）
         """
         from jarvis.jarvis_utils.tag import ct
-        from jarvis.jarvis_utils.tag import ot
 
         # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复（忽略大小写）
         close_tag = ct("TOOL_CALL")
@@ -283,6 +282,336 @@ class AgentRunLoop:
             # 压缩检查失败不影响对话流程
             PrettyOutput.auto_print(f"⚠️ 压缩检查失败: {str(e)}")
 
+    def _handle_summary(self, ag, current_response: str) -> tuple[bool, str]:
+        """处理SUMMARY标记
+
+        参数:
+            ag: agent实例
+            current_response: 当前响应内容
+
+        返回:
+            tuple[bool, str]: (是否继续下一轮, 处理后的响应内容)
+        """
+
+        if ot("!!!SUMMARY!!!") not in current_response:
+            return False, current_response
+
+        PrettyOutput.auto_print(f"ℹ️ {ot('!!!SUMMARY!!!')}")
+        # 移除标记，避免在后续处理中出现
+        current_response = current_response.replace(ot("!!!SUMMARY!!!"), "").strip()
+        # 在总结前获取git diff（仅对CodeAgent类型）
+        try:
+            if hasattr(ag, "start_commit") and ag.start_commit:
+                self._git_diff = self.get_git_diff()
+            else:
+                self._git_diff = None
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
+            self._git_diff = f"获取git diff失败: {str(e)}"
+        # 直接使用全量总结
+        summary_text = ag._summarize_and_clear_history(trigger_reason="手动触发")
+        if summary_text:
+            # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
+            ag.session.addon_prompt = join_prompts(
+                [ag.session.addon_prompt, summary_text]
+            )
+        # 如果响应中还有其他内容，继续处理；否则继续下一轮
+        if not current_response:
+            return True, current_response
+        return False, current_response
+
+    def _handle_tool_calls(self, ag, current_response: str) -> tuple[bool, Any, str]:
+        """处理工具调用
+        
+        参数:
+            ag: agent实例
+            current_response: 当前响应内容
+            
+        返回:
+            tuple[bool, Any, str]: (是否需要返回结果, 返回的结果或None, safe_tool_prompt)
+                - 如果工具要求立即返回结果，返回 (True, tool_prompt, safe_tool_prompt)
+                - 如果需要继续下一轮，返回 (True, None, safe_tool_prompt)
+                - 否则返回 (False, None, safe_tool_prompt) 继续执行后续逻辑
+        """
+        # 非关键流程：广播工具调用前事件（用于日志、监控等）
+        try:
+            ag.event_bus.emit(
+                BEFORE_TOOL_CALL,
+                agent=ag,
+                current_response=current_response,
+            )
+        except Exception:
+            pass
+        
+        try:
+            need_return, tool_prompt = ag._call_tools(current_response)
+        except KeyboardInterrupt:
+            # 获取用户补充信息并继续执行
+            addon_info = self._handle_interrupt_with_input()
+            if addon_info:
+                ag.session.addon_prompt = join_prompts(
+                    [ag.session.addon_prompt, addon_info]
+                )
+            # 在中断后，设置标志以在下一轮执行input handler
+            ag.run_input_handlers_next_turn = True
+            need_return = False
+            tool_prompt = ""
+        
+        # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
+        if need_return:
+            ag._no_tool_call_count = 0
+            safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+            return True, tool_prompt, safe_tool_prompt
+        
+        # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
+        safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+        
+        ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
+        
+        # 关键流程：直接调用 after_tool_call 回调函数
+        try:
+            # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
+            listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
+            for listener_tuple in listeners:
+                try:
+                    # listener_tuple 是 (priority, order, callback)
+                    _, _, callback = listener_tuple
+                    callback(
+                        agent=ag,
+                        current_response=current_response,
+                        need_return=need_return,
+                        tool_prompt=tool_prompt,
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # 非关键流程：广播工具调用后的事件（用于日志、监控等）
+        try:
+            ag.event_bus.emit(
+                AFTER_TOOL_CALL,
+                agent=ag,
+                current_response=current_response,
+                need_return=need_return,
+                tool_prompt=tool_prompt,
+            )
+        except Exception:
+            pass
+        
+        # 检查是否需要继续
+        if ag.session.prompt or ag.session.addon_prompt:
+            ag._no_tool_call_count = 0
+            return True, None, safe_tool_prompt
+        
+        return False, None, safe_tool_prompt
+
+    def _collect_auto_complete_context(self, ag) -> str:
+        """收集自动完成所需的上下文信息
+
+        参数:
+            ag: agent实例
+
+        返回:
+            str: 格式化的上下文信息字符串
+        """
+        context_parts = []
+
+        # 1. 检查代码修改情况
+        try:
+            if hasattr(ag, "start_commit") and ag.start_commit:
+                from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+                current_commit = get_latest_commit_hash()
+                if current_commit and ag.start_commit != current_commit:
+                    context_parts.append("✅ 检测到代码修改。")
+                else:
+                    context_parts.append("⚠ 未检测到代码修改。")
+        except Exception:
+            context_parts.append("❓ 无法检测代码修改情况。")
+
+        # 2. 检查未完成任务情况
+        all_unfinished_tasks = []
+        try:
+            if hasattr(ag, "task_list_manager") and ag.task_list_manager.task_lists:
+                for task_list_id, task_list in ag.task_list_manager.task_lists.items():
+                    summary = ag.task_list_manager.get_task_list_summary(task_list_id)
+                    if summary:
+                        for task in summary.get("tasks", []):
+                            if task.get("status") in ["pending", "running"]:
+                                all_unfinished_tasks.append(
+                                    {
+                                        "task_id": task.get("task_id"),
+                                        "task_name": task.get("task_name"),
+                                        "task_desc": task.get("task_desc", "")[:100] + "..." if len(task.get("task_desc", "")) > 100 else task.get("task_desc", ""),
+                                        "status": task.get("status"),
+                                        "task_list_id": task_list_id,
+                                        "main_goal": summary.get("main_goal", ""),
+                                    }
+                                )
+        except Exception:
+            pass
+
+        if all_unfinished_tasks:
+            context_parts.append(f"📋 检测到 {len(all_unfinished_tasks)} 个未完成任务：")
+            for task in all_unfinished_tasks[:5]:  # 最多显示5个
+                context_parts.append(f"  - {task.get('task_name', 'Unknown')}: {task.get('status', 'Unknown')}")
+        else:
+            context_parts.append("✅ 没有未完成的任务。")
+
+        return "\n".join(context_parts)
+
+    def _execute_auto_complete(self, ag, current_response: str) -> tuple[bool, Any]:
+        """执行自动完成操作
+
+        参数:
+            ag: agent实例
+            current_response: 当前响应内容
+
+        返回:
+            tuple[bool, Any]: (是否继续下一轮, 返回的结果或None)
+                - 如果需要继续下一轮，返回 (True, None)
+                - 如果需要返回结果，返回 (False, result)
+        """
+        if ag.return_control_on_auto_complete:
+            ag.return_control_on_auto_complete = False
+            if ag.non_interactive:
+                ag.set_non_interactive(False)
+            ag.run_input_handlers_next_turn = True
+            PrettyOutput.auto_print(
+                "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
+            )
+            return True, None
+        else:
+            # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
+            result = ag._complete_task(auto_completed=True)
+            # 若不需要summary，则将最后一条LLM输出作为返回值
+            if not getattr(ag, "need_summary", True):
+                return False, current_response
+            return False, result
+
+    def _track_no_tool_call(self, ag, safe_tool_prompt: str, current_response: str) -> Any:
+        """跟踪无工具调用情况并在必要时尝试修复
+
+        参数:
+            ag: agent实例
+            safe_tool_prompt: 安全的工具提示内容
+            current_response: 当前响应内容
+
+        返回:
+            Any: 如果需要立即返回结果，返回该结果；否则返回None
+        """
+        # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
+        has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
+        # 保存当前响应内容供用户手动修复工具调用
+        ag._last_response_content = current_response
+
+        # 在非交互模式下，跟踪连续没有工具调用的次数
+        if ag.non_interactive:
+            if has_tool_call:
+                # 有工具调用，重置计数器
+                ag._no_tool_call_count = 0
+            else:
+                # 没有工具调用，增加计数器
+                ag._no_tool_call_count += 1
+                # 如果连续2次没有工具调用，尝试使用大模型修复
+                if ag._no_tool_call_count >= 2:
+                    from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
+
+                    error_msg = (
+                        "连续2次对话没有工具调用，请使用工具来完成你的任务"
+                    )
+                    PrettyOutput.auto_print(f"⚠ {error_msg}")
+
+                    # 尝试使用大模型修复
+                    fixed_content = fix_tool_call_with_llm(
+                        current_response, ag, error_msg
+                    )
+
+                    if fixed_content:
+                        # 修复成功，直接重新解析并执行工具调用
+                        need_return, tool_prompt = ag._call_tools(fixed_content)
+
+                        # 如果工具要求立即返回结果，直接返回该结果
+                        if need_return:
+                            ag._no_tool_call_count = 0
+                            return tool_prompt
+
+                        # 将上一个提示和工具提示安全地拼接起来
+                        safe_tool_prompt = (
+                            tool_prompt if isinstance(tool_prompt, str) else ""
+                        )
+
+                        ag.session.prompt = join_prompts(
+                            [ag.session.prompt, safe_tool_prompt]
+                        )
+                    else:
+                        # 修复失败，发送工具使用提示
+                        tool_usage_prompt = ag.get_tool_usage_prompt()
+                        ag.set_addon_prompt(tool_usage_prompt)
+
+                    # 重置计数器，避免重复添加
+                    ag._no_tool_call_count = 0
+
+    def _check_auto_complete(self, ag, current_response: str) -> tuple[bool, Any]:
+        """检查并处理自动完成
+        
+        参数:
+            ag: agent实例
+            current_response: 当前响应内容
+            
+        返回:
+            tuple[bool, Any]: (是否继续下一轮, 返回的结果或None)
+                - 如果需要继续下一轮，返回 (True, None)
+                - 如果需要返回结果，返回 (False, result)
+                - 否则返回 (False, None) 继续执行后续逻辑
+        """
+        if not (ag.auto_complete and is_auto_complete(current_response)):
+            return False, None
+        
+        ag._no_tool_call_count = 0
+        
+        if ag.non_interactive:
+            # 非交互模式：必须经过LLM二次确认
+            # 收集上下文信息
+            context = self._collect_auto_complete_context(ag)
+            
+            # 构建确认提示
+            confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
+            confirm_prompt_parts.append(context)
+            confirm_prompt_parts.append("\n请确认是否要完成任务（自动完成）。")
+            confirm_prompt_parts.append("如果确认完成，请回复 <!!!YES!!!>")
+            confirm_prompt_parts.append("如果要继续执行任务，请回复 <!!!NO!!!>")
+            
+            confirm_prompt = "\n".join(confirm_prompt_parts)
+            
+            # 询问 LLM
+            try:
+                llm_response = ag._call_model(confirm_prompt, False, False)
+            except KeyboardInterrupt:
+                addon_info = self._handle_interrupt_with_input()
+                if addon_info:
+                    ag.session.addon_prompt = join_prompts([ag.session.addon_prompt, addon_info])
+                ag.run_input_handlers_next_turn = True
+                return True, None
+            
+            # 解析响应
+            if "<!!!NO!!!>" in llm_response:
+                ag.set_addon_prompt("LLM选择继续执行任务。")
+                PrettyOutput.auto_print("📝 LLM确认继续执行任务。")
+                return True, None
+            elif "<!!!YES!!!>" in llm_response:
+                PrettyOutput.auto_print("✅ LLM确认完成当前任务。")
+            else:
+                ag.set_addon_prompt("请继续执行任务。")
+                PrettyOutput.auto_print("⚠ LLM响应不明确，默认继续执行任务。")
+                return True, None
+        
+        # 执行自动完成（交互模式直接执行，非交互模式LLM确认后执行）
+        return self._execute_auto_complete(ag, current_response)
+
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
         run_input_handlers = True
@@ -356,37 +685,12 @@ class AgentRunLoop:
                             filtered_response, border_style="bright_blue"
                         )
 
-                if ot("!!!SUMMARY!!!") in current_response:
-                    PrettyOutput.auto_print(
-                        f"ℹ️ 检测到 {ot('!!!SUMMARY!!!')} 标记，正在触发总结并清空历史..."
-                    )
-                    # 移除标记，避免在后续处理中出现
-                    current_response = current_response.replace(
-                        ot("!!!SUMMARY!!!"), ""
-                    ).strip()
-                    # 在总结前获取git diff（仅对CodeAgent类型）
-                    try:
-                        if hasattr(ag, "start_commit") and ag.start_commit:
-                            self._git_diff = self.get_git_diff()
-                        else:
-                            self._git_diff = None
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
-                        self._git_diff = f"获取git diff失败: {str(e)}"
-                    # 直接使用全量总结
-                    summary_text = ag._summarize_and_clear_history(
-                        trigger_reason="手动触发"
-                    )
-                    if summary_text:
-                        # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
-                        ag.session.addon_prompt = join_prompts(
-                            [ag.session.addon_prompt, summary_text]
-                        )
-                    # 如果响应中还有其他内容，继续处理；否则继续下一轮
-                    if not current_response:
-                        continue
+                # 处理SUMMARY标记
+                should_continue, current_response = self._handle_summary(
+                    ag, current_response
+                )
+                if should_continue:
+                    continue
 
                 # 处理中断
                 interrupt_result = ag._handle_run_interrupt(current_response)
@@ -403,260 +707,26 @@ class AgentRunLoop:
                     return interrupt_result
 
                 # 处理工具调用
-                # 非关键流程：广播工具调用前事件（用于日志、监控等）
-                try:
-                    ag.event_bus.emit(
-                        BEFORE_TOOL_CALL,
-                        agent=ag,
-                        current_response=current_response,
-                    )
-                except Exception:
-                    pass
-
-                try:
-                    need_return, tool_prompt = ag._call_tools(current_response)
-                except KeyboardInterrupt:
-                    # 获取用户补充信息并继续执行
-                    addon_info = self._handle_interrupt_with_input()
-                    if addon_info:
-                        ag.session.addon_prompt = join_prompts(
-                            [ag.session.addon_prompt, addon_info]
-                        )
-                    # 在中断后，设置标志以在下一轮执行input handler
-                    ag.run_input_handlers_next_turn = True
-                    need_return = False
-                    tool_prompt = ""
-
-                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
-                if need_return:
-                    ag._no_tool_call_count = 0
-                    return tool_prompt
-
-                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
-                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
-
-                ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
-
-                # 关键流程：直接调用 after_tool_call 回调函数
-                try:
-                    # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
-                    listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
-                    for listener_tuple in listeners:
-                        try:
-                            # listener_tuple 是 (priority, order, callback)
-                            _, _, callback = listener_tuple
-                            callback(
-                                agent=ag,
-                                current_response=current_response,
-                                need_return=need_return,
-                                tool_prompt=tool_prompt,
-                            )
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
-                # 非关键流程：广播工具调用后的事件（用于日志、监控等）
-                try:
-                    ag.event_bus.emit(
-                        AFTER_TOOL_CALL,
-                        agent=ag,
-                        current_response=current_response,
-                        need_return=need_return,
-                        tool_prompt=tool_prompt,
-                    )
-                except Exception:
-                    pass
-
-                # 检查是否需要继续
-                if ag.session.prompt or ag.session.addon_prompt:
-                    ag._no_tool_call_count = 0
-                    continue
+                should_return, result, safe_tool_prompt = self._handle_tool_calls(ag, current_response)
+                if should_return:
+                    if result is not None:
+                        # 工具要求立即返回结果
+                        return result
+                    else:
+                        # 需要继续下一轮
+                        continue
 
                 # 检查自动完成
-                if ag.auto_complete and is_auto_complete(current_response):
-                    ag._no_tool_call_count = 0
+                should_continue, result = self._check_auto_complete(ag, current_response)
+                if should_continue:
+                    continue
+                if result is not None:
+                    return result
 
-                    if ag.non_interactive:
-                        # 非交互模式：必须经过LLM二次确认
-                        # 收集上下文信息
-                        context_parts = []
-
-                        # 1. 检查代码修改情况
-                        try:
-                            if hasattr(ag, "start_commit") and ag.start_commit:
-                                from jarvis.jarvis_utils.git_utils import (
-                                    get_latest_commit_hash,
-                                )
-
-                                current_commit = get_latest_commit_hash()
-                                if current_commit and ag.start_commit != current_commit:
-                                    context_parts.append("✅ 检测到代码修改。")
-                                else:
-                                    context_parts.append("⚠️ 未检测到代码修改。")
-                        except Exception:
-                            context_parts.append("❓ 无法检测代码修改情况。")
-
-                        # 2. 检查未完成任务情况
-                        all_unfinished_tasks = []
-                        try:
-                            if (
-                                hasattr(ag, "task_list_manager")
-                                and ag.task_list_manager.task_lists
-                            ):
-                                for (
-                                    task_list_id,
-                                    task_list,
-                                ) in ag.task_list_manager.task_lists.items():
-                                    summary = (
-                                        ag.task_list_manager.get_task_list_summary(
-                                            task_list_id
-                                        )
-                                    )
-                                    if summary:
-                                        for task in summary.get("tasks", []):
-                                            if task.get("status") in [
-                                                "pending",
-                                                "running",
-                                            ]:
-                                                all_unfinished_tasks.append(
-                                                    {
-                                                        "task_id": task.get("task_id"),
-                                                        "task_name": task.get(
-                                                            "task_name"
-                                                        ),
-                                                        "task_desc": task.get(
-                                                            "task_desc", ""
-                                                        )[:100]
-                                                        + "..."
-                                                        if len(
-                                                            task.get("task_desc", "")
-                                                        )
-                                                        > 100
-                                                        else task.get("task_desc", ""),
-                                                        "status": task.get("status"),
-                                                        "task_list_id": task_list_id,
-                                                        "main_goal": summary.get(
-                                                            "main_goal", ""
-                                                        ),
-                                                    }
-                                                )
-                        except Exception:
-                            pass
-
-                        if all_unfinished_tasks:
-                            context_parts.append(f"📋 检测到 {len(all_unfinished_tasks)} 个未完成任务：")
-                            for task in all_unfinished_tasks[:5]:  # 最多显示5个
-                                context_parts.append(
-                                    f"  - {task.get('task_name', 'Unknown')}: {task.get('status', 'Unknown')}"
-                                )
-                        else:
-                            context_parts.append("✅ 没有未完成的任务。")
-
-                        # 构建确认提示
-                        confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
-                        confirm_prompt_parts.extend(context_parts)
-                        confirm_prompt_parts.append("\n请确认是否要完成任务（自动完成）。")
-                        confirm_prompt_parts.append("如果确认完成，请回复 <!!!YES!!!>")
-                        confirm_prompt_parts.append("如果要继续执行任务，请回复 <!!!NO!!!>")
-
-                        confirm_prompt = "\n".join(confirm_prompt_parts)
-
-                        # 询问 LLM
-                        try:
-                            llm_response = ag._call_model(confirm_prompt, False, False)
-                        except KeyboardInterrupt:
-                            addon_info = self._handle_interrupt_with_input()
-                            if addon_info:
-                                ag.session.addon_prompt = join_prompts(
-                                    [ag.session.addon_prompt, addon_info]
-                                )
-                            ag.run_input_handlers_next_turn = True
-                            continue
-
-                        # 解析响应
-                        if "<!!!NO!!!>" in llm_response:
-                            ag.set_addon_prompt("LLM选择继续执行任务。")
-                            PrettyOutput.auto_print("📝 LLM确认继续执行任务。")
-                            continue
-                        elif "<!!!YES!!!>" in llm_response:
-                            PrettyOutput.auto_print("✅ LLM确认完成当前任务。")
-                        else:
-                            ag.set_addon_prompt("请继续执行任务。")
-                            PrettyOutput.auto_print("⚠️ 无法明确判断，继续执行任务。")
-                            continue
-
-                    # 执行自动完成（交互模式直接执行，非交互模式LLM确认后执行）
-                    if ag.return_control_on_auto_complete:
-                        ag.return_control_on_auto_complete = False
-                        if ag.non_interactive:
-                            ag.set_non_interactive(False)
-                        ag.run_input_handlers_next_turn = True
-                        PrettyOutput.auto_print(
-                            "🤝 AutoComplete 已完成当前自动执行阶段，现已恢复交互模式并将控制权交还给用户。"
-                        )
-                    else:
-                        # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
-                        result = ag._complete_task(auto_completed=True)
-                        # 若不需要summary，则将最后一条LLM输出作为返回值
-                        if not getattr(ag, "need_summary", True):
-                            return current_response
-                        return result
-
-                # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
-                has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
-                # 保存当前响应内容供用户手动修复工具调用
-                ag._last_response_content = current_response
-
-                # 在非交互模式下，跟踪连续没有工具调用的次数
-                if ag.non_interactive:
-                    if has_tool_call:
-                        # 有工具调用，重置计数器
-                        ag._no_tool_call_count = 0
-                    else:
-                        # 没有工具调用，增加计数器
-                        ag._no_tool_call_count += 1
-                        # 如果连续2次没有工具调用，尝试使用大模型修复
-                        if ag._no_tool_call_count >= 2:
-                            from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
-
-                            error_msg = (
-                                "连续2次对话没有工具调用，请使用工具来完成你的任务"
-                            )
-                            PrettyOutput.auto_print(f"⚠️ {error_msg}")
-
-                            # 保存最近一次失败的工具调用内容（供手动修复使用）
-                            # ag._last_failed_tool_call_content = current_response  # 暂时注释掉，因为Agent类未定义此属性
-
-                            # 尝试使用大模型修复
-                            fixed_content = fix_tool_call_with_llm(
-                                current_response, ag, error_msg
-                            )
-
-                            if fixed_content:
-                                # 修复成功，直接重新解析并执行工具调用
-                                need_return, tool_prompt = ag._call_tools(fixed_content)
-
-                                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
-                                if need_return:
-                                    ag._no_tool_call_count = 0
-                                    return tool_prompt
-
-                                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
-                                safe_tool_prompt = (
-                                    tool_prompt if isinstance(tool_prompt, str) else ""
-                                )
-
-                                ag.session.prompt = join_prompts(
-                                    [ag.session.prompt, safe_tool_prompt]
-                                )
-                            else:
-                                # 修复失败，发送工具使用提示
-                                tool_usage_prompt = ag.get_tool_usage_prompt()
-                                ag.set_addon_prompt(tool_usage_prompt)
-
-                            # 重置计数器，避免重复添加
-                            ag._no_tool_call_count = 0
+                # 跟踪无工具调用情况
+                track_result = self._track_no_tool_call(ag, safe_tool_prompt, current_response)
+                if track_result is not None:
+                    return track_result
 
                 # 获取下一步用户输入
                 try:
