@@ -321,6 +321,7 @@ class CodeAgent(Agent):
             "optimize_system_prompt": optimize_system_prompt,
             "rule_names": merged_rule_names,
             "enable_auto_rule_select": enable_auto_rule_select,
+            "quick_mode": self.quick_mode,  # 传递极速模式标志到父类
         }
 
         # 自动移除所有显式传递的参数，避免重复传递错误

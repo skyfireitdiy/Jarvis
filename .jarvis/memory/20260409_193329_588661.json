@@ -1,0 +1,8 @@
+{
+  "id": "20260409_193329_588661",
+  "type": "project_long_term",
+  "tags": ["jca", "quick_mode", "bug修复", "参数传递"],
+  "content": "jca -q参数问题修复：\n问题根因：CodeAgent.__init__中设置了self.quick_mode = quick_mode，但在调用super().__init__()时没有将quick_mode传递给父类，导致父类Agent.__init__使用默认值False覆盖了之前的设置。\n修复方案：在_prepare_code_agent_parent_init方法的explicit_params字典中添加'quick_mode': self.quick_mode，确保quick_mode正确传递到父类。",
+  "created_at": "2026-04-09T19:33:29.588682",
+  "updated_at": "2026-04-09T19:33:29.588686"
+}
