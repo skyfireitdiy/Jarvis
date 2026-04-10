@@ -745,6 +745,25 @@ git reset --hard {start_commit}
                         final_ret += f"\n\n代码已修改完成{commit_info}\n"
                     else:
                         final_ret += "\n\n修改没有生效\n"
+                
+                # 
+                latest_commit_hash = get_latest_commit_hash()
+                diff_lines = get_diff_between_commits(self.start_commit, latest_commit_hash)
+                if diff_lines:
+                    lines_added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+                    lines_removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+                    total_lines = lines_added + lines_removed
+                    commits = self.git_manager.show_commit_history(self.start_commit, latest_commit_hash)
+                    if total_lines > 1000:
+                        self.git_manager.handle_commit_confirmation(
+                            commits,
+                            self.start_commit,
+                            prefix=self.prefix,
+                            suffix=self.suffix,
+                            agent=self,
+                            post_process_func=self.post_process_manager.post_process_modified_files,
+                            skip_confirm=True,
+                        )
             else:
                 final_ret += "\n修改被拒绝\n"
                 final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"

@@ -332,9 +332,10 @@ class GitManager:
         suffix: str,
         agent: Any,
         post_process_func: Any,
+        skip_confirm: bool = False,
     ) -> None:
         """处理提交确认和可能的重置"""
-        if commits and user_confirm("是否接受以上提交记录？", True):
+        if commits and (skip_confirm or user_confirm("是否接受以上提交记录？", True)):
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
                 stdout=subprocess.DEVNULL,
