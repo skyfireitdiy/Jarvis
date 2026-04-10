@@ -37,6 +37,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
+from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_utils.config import is_use_analysis
 from jarvis.jarvis_utils.config import is_use_methodology
@@ -1686,7 +1687,7 @@ def cli(
                         review_max_iterations=review_max_iterations,
                         allow_savesession=True,
                         optimize_system_prompt=optimize_system_prompt,
-                        quick_mode=quick_mode,
+                        quick_mode=quick_mode or is_enable_quick_mode(),
                     )
 
                     # 尝试恢复会话
@@ -1719,7 +1720,7 @@ def cli(
                         review_max_iterations=review_max_iterations,
                         allow_savesession=True,
                         optimize_system_prompt=optimize_system_prompt,
-                        quick_mode=quick_mode,
+                        quick_mode=quick_mode or is_enable_quick_mode(),
                     )
 
                     # 检测与当前commit一致的历史会话（仅在交互模式且未指定restore_session时）

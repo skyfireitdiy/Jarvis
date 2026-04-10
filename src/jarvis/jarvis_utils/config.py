@@ -962,6 +962,20 @@ def is_enable_request_classification() -> bool:
     return bool(GLOBAL_CONFIG_DATA.get("enable_request_classification", False))
 
 
+def is_enable_quick_mode() -> bool:
+    """
+    获取是否启用极速模式。
+
+    当启用时，CodeAgent 将跳过任务分类、规则自动加载、上下文推荐、方法论加载等步骤，直接处理用户请求。
+    默认关闭，可通过配置文件设置 enable_quick_mode: true 启用。
+    命令行参数 -q/--quick 也会启用此模式。
+
+    返回：
+        bool: 如果启用极速模式则返回True，默认为False
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_quick_mode", False))
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。
