@@ -4,7 +4,6 @@
 该模块提供任务列表管理功能，支持多任务动态管理、上下文分层共享、Agent权限隔离。
 """
 
-import json
 import os
 import time
 from collections import OrderedDict
@@ -19,8 +18,6 @@ from typing import List
 from typing import Optional
 from typing import Set
 from typing import Tuple
-
-from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TaskStatus(Enum):
@@ -229,13 +226,7 @@ class TaskListManager:
         # 权限隔离：agent_id -> Set[task_id]
         self.agent_task_mapping: Dict[str, Set[str]] = {}
 
-        # 版本快照：task_list_id -> List[Dict] (按版本号排序)
-        self.version_snapshots: dict[str, list[dict[str, Any]]] = {}
-
         self._lock = Lock()
-
-        # 加载持久化数据
-        self._load_persisted_data()
 
     @classmethod
     def _get_next_task_id(cls) -> str:
@@ -258,42 +249,6 @@ class TaskListManager:
         with cls._counter_lock:
             cls._global_tasklist_counter += 1
             return f"tasklist-{cls._global_tasklist_counter}"
-
-    def _load_persisted_data(self) -> None:
-        """从磁盘加载持久化数据。"""
-        snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
-        if os.path.exists(snapshot_file):
-            try:
-                with open(snapshot_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.version_snapshots = data.get("snapshots", {})
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 加载快照数据失败: {e}")
-
-    def _save_snapshot(self, task_list_id: str, task_list: TaskList) -> None:
-        """保存版本快照。"""
-        snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
-        try:
-            snapshot_data = task_list.to_dict()
-            if task_list_id not in self.version_snapshots:
-                self.version_snapshots[task_list_id] = []
-            self.version_snapshots[task_list_id].append(snapshot_data)
-            # 只保留最近 10 个版本
-            if len(self.version_snapshots[task_list_id]) > 10:
-                self.version_snapshots[task_list_id] = self.version_snapshots[
-                    task_list_id
-                ][-10:]
-
-            # 保存到磁盘
-            with open(snapshot_file, "w", encoding="utf-8") as f:
-                json.dump(
-                    {"snapshots": self.version_snapshots},
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 保存快照失败: {e}")
 
     def _check_agent_permission(
         self, agent_id: str, task_id: str, is_main_agent: bool
@@ -335,9 +290,6 @@ class TaskListManager:
                 self.task_lists[task_list_id] = task_list
                 # 主 Agent 拥有所有权限
                 self.agent_task_mapping[agent_id] = set()
-
-            # 保存快照
-            self._save_snapshot(task_list_id, task_list)
 
             return task_list_id, True, None
         except Exception as e:
@@ -398,9 +350,6 @@ class TaskListManager:
 
                 if not task_list.add_task(task):
                     return None, False, "添加任务失败：任务ID已存在或依赖无效"
-
-                # 保存快照
-                self._save_snapshot(task_list_id, task_list)
 
                 return task_id, True, None
         except ValueError as e:
@@ -556,9 +505,6 @@ class TaskListManager:
                             f"添加任务 {task.task_id} 失败：任务ID已存在或依赖无效",
                         )
 
-                # 保存快照
-                self._save_snapshot(task_list_id, task_list)
-
                 return added_task_ids, True, None
         except ValueError as e:
             return [], False, f"字段格式错误: {str(e)}"
@@ -681,40 +627,6 @@ class TaskListManager:
 
             return ready_tasks[0], None
 
-    def rollback_task_list(
-        self, task_list_id: str, version: int, agent_id: str
-    ) -> Tuple[bool, Optional[str]]:
-        """回滚任务列表至指定版本。
-
-        参数:
-            task_list_id: 任务列表 ID
-            version: 目标版本号
-            agent_id: 主 Agent ID
-
-        返回:
-            Tuple[status, msg]
-        """
-        with self._lock:
-            if task_list_id not in self.version_snapshots:
-                return False, "任务列表不存在"
-
-            snapshots = self.version_snapshots[task_list_id]
-            target_snapshot = None
-            for snapshot in snapshots:
-                if snapshot.get("version") == version:
-                    target_snapshot = snapshot
-                    break
-
-            if not target_snapshot:
-                return False, "版本无效"
-
-            try:
-                task_list = TaskList.from_dict(target_snapshot)
-                self.task_lists[task_list_id] = task_list
-                return True, None
-            except Exception as e:
-                return False, f"回滚失败: {str(e)}"
-
     # ========== 接口层：主 Agent / 子 Agent 共享接口 ==========
 
     def update_task_status(
@@ -763,9 +675,6 @@ class TaskListManager:
                     return False, f"无效的状态转换: {task.status.value} -> {status}"
 
                 task_list.version += 1
-
-                # 保存快照
-                self._save_snapshot(task_list_id, task_list)
 
                 return True, None
         except Exception as e:
