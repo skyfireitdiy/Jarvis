@@ -399,9 +399,7 @@ class CodeAgent(Agent):
             if self.first:
                 # 极速模式：跳过任务分类、规则自动加载、上下文推荐、方法论加载
                 if self.quick_mode:
-                    PrettyOutput.auto_print(
-                        "⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐"
-                    )
+                    # 极速模式已启用，跳过相关步骤
                     # === 阶段3: Git环境初始化 ===
                     self.git_manager.init_env(prefix, suffix, self)
 
@@ -1519,7 +1517,6 @@ def cli(
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             if auth_token:
                 # Token 认证：validate_gateway_token() 会直接从环境变量读取
-                print("[CODE AGENT] Using JARVIS_AUTH_TOKEN for authentication")
             elif gateway_password:
                 # 旧密码认证（兼容模式）
                 from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
@@ -1529,9 +1526,6 @@ def cli(
                 GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
                 GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
                 GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
-                print(
-                    "[CODE AGENT] Using gateway_password for authentication (legacy mode)"
-                )
 
             # 创建自定义 FastAPI app，添加状态查询接口
             from fastapi import FastAPI
