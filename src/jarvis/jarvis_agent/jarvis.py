@@ -458,6 +458,7 @@ def try_switch_to_jca_if_git_repo(
     restore_session: bool,
     task: Optional[str],
     keep_jvs: bool = False,
+    quick_mode: bool = False,
 ) -> None:
     """在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）。"""
     # 非交互模式下跳过代码模式自动切换
@@ -491,6 +492,8 @@ def try_switch_to_jca_if_git_repo(
                     args += ["--restore-session"]
                 if task:
                     args += ["-T", task]
+                if quick_mode:
+                    args += ["-q"]
                 os.execvp(args[0], args)
     except Exception:
         # 静默忽略检测异常，不影响主流程
@@ -1105,7 +1108,13 @@ def run_cli(
     # 如果指定了 -T/--task 参数或 --web-gateway 参数，跳过自动切换
     if not non_interactive and not task and not web_gateway:
         try_switch_to_jca_if_git_repo(
-            llm_group, tool_group, config_file, restore_session, task, keep_jvs
+            llm_group,
+            tool_group,
+            config_file,
+            restore_session,
+            task,
+            keep_jvs,
+            quick_mode,
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
