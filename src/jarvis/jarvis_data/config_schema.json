@@ -299,6 +299,11 @@
       "description": "是否启用需求分类功能。启用后，CodeAgent 首次运行会对用户需求进行分类，并根据分类结果加载对应的系统提示词",
       "default": false
     },
+    "enable_quick_mode": {
+      "type": "boolean",
+      "description": "是否启用极速模式。启用后，CodeAgent 将跳过任务分类、规则自动加载、上下文推荐、方法论加载等步骤，直接处理用户请求。命令行参数 -q/--quick 也会启用此模式",
+      "default": false
+    },
     "tool_group": {
       "type": "string",
       "description": "选择一个预定义的工具配置组",

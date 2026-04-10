@@ -40,6 +40,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 
 # 本地库导入
 # jarvis_agent 相关
+from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
@@ -518,8 +519,8 @@ class Agent:
 
         # 模型类型配置
         self._model_type = model_type
-        # 极速模式配置
-        self.quick_mode = quick_mode
+        # 极速模式配置（合并命令行参数和配置项）
+        self.quick_mode = quick_mode or is_enable_quick_mode()
 
         # 核心组件初始化
         self._init_model()
