@@ -207,7 +207,7 @@ class BasePlatform(ABC):
 
     def _chat_with_pretty_output(
         self, message: str, start_time: float, max_output: int = 0
-    ) -> Tuple[str, float]:
+    ) -> Tuple[str, str, float]:
         """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
         return PrettyOutput.stream_chat_with_panel(
             chat_iterator=self.chat(message),
@@ -227,9 +227,9 @@ class BasePlatform(ABC):
 
     def _chat_with_simple_output(
         self, message: str, start_time: float, max_output: int = 0
-    ) -> str:
+    ) -> Tuple[str, str, float]:
         """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
-        response, _ = PrettyOutput.stream_chat_simple(
+        response, reasoning_content, first_token_time = PrettyOutput.stream_chat_simple(
             chat_iterator=self.chat(message),
             prefix=f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
             start_time=start_time,
@@ -239,9 +239,11 @@ class BasePlatform(ABC):
             append_session_history=self._append_session_history,
             get_context_token_count=get_context_token_count,
         )
-        return response
+        return response, reasoning_content, first_token_time
 
-    def _chat_with_suppressed_output(self, message: str, max_output: int = 0) -> str:
+    def _chat_with_suppressed_output(
+        self, message: str, max_output: int = 0
+    ) -> Tuple[str, str]:
         """使用无人值守模式进行聊天
 
         参数:
@@ -249,21 +251,25 @@ class BasePlatform(ABC):
             max_output: 最大输出长度，0表示无限制
 
         返回:
-            str: 模型响应
+            Tuple[str, str]: (模型响应, 推理内容)
         """
         response = ""
+        reasoning_content = ""
         for chunk_type, chunk_content in self.chat(message):
-            # 只拼接 content 类型
+            # 拼接 content 类型
             if chunk_type == "content":
                 response += chunk_content
+            # 拼接 reason 类型
+            elif chunk_type == "reason":
+                reasoning_content += chunk_content
             # 检查是否达到最大输出长度
             if max_output > 0 and len(response) >= max_output:
                 self._append_session_history(message, response)
-                return response
+                return response, reasoning_content
             if is_immediate_abort() and get_interrupt():
                 self._append_session_history(message, response)
-                return response
-        return response
+                return response, reasoning_content
+        return response, reasoning_content
 
     def _process_response(self, response: str) -> str:
         """处理响应，移除 think 标签
@@ -297,14 +303,15 @@ class BasePlatform(ABC):
 
         # 根据输出模式选择不同的处理方式
         first_token_time = 0.0
+        reasoning_content = ""
         if not self.suppress_output:
             if get_pretty_output():
-                response, first_token_time = self._chat_with_pretty_output(
-                    message, start_time, max_output
+                response, reasoning_content, first_token_time = (
+                    self._chat_with_pretty_output(message, start_time, max_output)
                 )
             else:
-                response = self._chat_with_simple_output(
-                    message, start_time, max_output
+                response, reasoning_content, first_token_time = (
+                    self._chat_with_simple_output(message, start_time, max_output)
                 )
 
             # 计算响应时间并打印总结
@@ -340,7 +347,9 @@ class BasePlatform(ABC):
                     f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
                 )
         else:
-            response = self._chat_with_suppressed_output(message, max_output)
+            response, reasoning_content = self._chat_with_suppressed_output(
+                message, max_output
+            )
 
         # 处理响应并保存会话历史
         response = self._process_response(response)
@@ -348,6 +357,9 @@ class BasePlatform(ABC):
         # 如果发生中断且响应为空，设置提示消息
         if not response and get_interrupt():
             response = "<输出被用户中断>"
+        # 如果 content 为空但 reasoning_content 不为空且非用户中断，返回 reasoning_content
+        elif not response and reasoning_content and not get_interrupt():
+            response = reasoning_content
 
         self._append_session_history(message, response)
 
