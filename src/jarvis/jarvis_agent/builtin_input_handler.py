@@ -559,7 +559,7 @@ def check_context_limit(
 
     if token_limit is None:
         # 使用默认限制
-        token_limit = 128000
+        token_limit = 200000
 
     # 检查是否超出限制（留出 10% 的余量）
     if current_tokens > token_limit * 0.9:

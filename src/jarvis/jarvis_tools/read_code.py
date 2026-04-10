@@ -62,8 +62,8 @@ class ReadCodeTool:
             limit_tokens = int(max_input_tokens * 1 / 2)
             return limit_tokens
         except Exception:
-            # 如果获取失败，使用默认值（假设128000 token，2/3是85333）
-            return 21333
+            # 如果获取失败，使用默认值（假设200000 token，2/3是133333）
+            return 33333
 
     def _handle_single_file(
         self,

@@ -273,7 +273,7 @@ def quick_config():
     PrettyOutput.auto_print(f"✅ 模型组名称: {group_name}")
 
     # 为每个实际使用的模型分别输入最大token数；同一模型被多个角色复用时只设置一次
-    default_max_tokens = 128000
+    default_max_tokens = 200000
     unique_role_models = list(dict.fromkeys([normal_model, smart_model, cheap_model]))
     existing_model_configs = {
         llm_config.get("model"): llm_config

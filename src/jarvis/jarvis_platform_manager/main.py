@@ -386,7 +386,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             PrettyOutput.auto_print("⚠️ 将继续保存配置，但API可能无法正常使用")
 
     # 6. 为每个模型设置最大token数
-    default_max_tokens = base_llm_config.get("max_input_token_count", 128000)
+    default_max_tokens = base_llm_config.get("max_input_token_count", 200000)
     model_max_tokens = {}
 
     for model in selected_models:
@@ -539,12 +539,12 @@ def llm_add() -> None:
         PrettyOutput.auto_print("❌ 模型名称不能为空")
         raise typer.Exit(code=1)
 
-    max_tokens_input = get_single_line_input("最大token数 (默认: 128000): ").strip()
+    max_tokens_input = get_single_line_input("最大token数 (默认: 200000): ").strip()
     try:
-        max_tokens = int(max_tokens_input) if max_tokens_input else 128000
+        max_tokens = int(max_tokens_input) if max_tokens_input else 200000
     except ValueError:
-        PrettyOutput.auto_print("❌ 无效的token数，使用默认值 128000")
-        max_tokens = 128000
+        PrettyOutput.auto_print("❌ 无效的token数，使用默认值 200000")
+        max_tokens = 200000
 
     base_url = get_single_line_input("API基础URL: ").strip()
     if not base_url:
@@ -639,7 +639,7 @@ def llm_update(
         llm_config["model"] = model
 
     max_tokens_input = get_single_line_input(
-        f"最大token数 (当前: {llm_config.get('max_input_token_count', 128000)}, 留空不变): "
+        f"最大token数 (当前: {llm_config.get('max_input_token_count', 200000)}, 留空不变): "
     ).strip()
     if max_tokens_input:
         try:
