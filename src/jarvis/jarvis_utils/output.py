@@ -1135,7 +1135,7 @@ class PrettyOutput:
         max_output: int = 0,
         check_interrupt: Callable[[], bool] = lambda: False,
         panel_lock: Optional[threading.RLock] = None,
-    ) -> Tuple[str, float]:
+    ) -> Tuple[str, str, float]:
         """
         使用Live+Panel进行流式聊天输出（pretty output模式）。
 
@@ -1155,7 +1155,7 @@ class PrettyOutput:
             panel_lock: 用于保护panel更新的线程锁（可选）
 
         返回：
-            Tuple[str, float]: (模型响应, 首token时间)
+            Tuple[str, str, float]: (模型响应, 推理内容, 首token时间)
         """
         import time
 
@@ -1180,14 +1180,14 @@ class PrettyOutput:
                 while True:
                     if is_immediate_abort() and check_interrupt():
                         append_session_history(message, "")
-                        return "", 0.0
+                        return "", "", 0.0
                     first_chunk = next(chat_iterator)
                     if first_chunk and first_chunk[1]:  # 检查内容非空
                         first_token_time = time.time() - start_time
                         break
             except StopIteration:
                 append_session_history(message, "")
-                return "", 0.0
+                return "", "", 0.0
 
         _lock = panel_lock if panel_lock is not None else threading.RLock()
 
@@ -1278,6 +1278,7 @@ class PrettyOutput:
         )
 
         response = ""
+        reasoning_content = ""
         last_subtitle_update_time = time.time()
         subtitle_update_interval = 1
         update_count = 0
@@ -1416,6 +1417,9 @@ class PrettyOutput:
                 # 只有 content 类型才拼接到 response
                 if chunk_type == "content":
                     response += chunk_content
+                # 收集 reason 类型内容
+                elif chunk_type == "reason":
+                    reasoning_content += chunk_content
                 # 发送流式 chunk 事件（reason 和 content 都发送）
                 if chunk_content:
                     emit_output(
@@ -1483,7 +1487,7 @@ class PrettyOutput:
             )
         )
 
-        return response, first_token_time
+        return response, reasoning_content, first_token_time
 
     @staticmethod
     def stream_chat_simple(
@@ -1495,7 +1499,7 @@ class PrettyOutput:
         check_interrupt: Callable[[], bool] = lambda: False,
         append_session_history: Callable[[str, str], None] = lambda a, b: None,
         get_context_token_count: Optional[Callable[[str], int]] = None,
-    ) -> Tuple[str, float]:
+    ) -> Tuple[str, str, float]:
         """
         使用简单模式进行流式聊天输出（逐字符打印）。
 
@@ -1511,7 +1515,7 @@ class PrettyOutput:
             output_sink: 输出后端（可选），用于 Gateway 模式流式发送
 
         返回：
-            Tuple[str, float]: (模型响应, 首token时间)
+            Tuple[str, str, float]: (模型响应, 推理内容, 首token时间)
         """
         import time
 
@@ -1527,6 +1531,7 @@ class PrettyOutput:
 
         console.print(prefix, soft_wrap=False)
         response = ""
+        reasoning_content = ""
         first_token_time = 0.0
 
         # 发送流式开始事件
@@ -1552,6 +1557,9 @@ class PrettyOutput:
             # 返回时只拼接 content 类型
             if chunk_type == "content":
                 response += chunk_content
+            # 收集 reason 类型内容
+            elif chunk_type == "reason":
+                reasoning_content += chunk_content
             # 发送流式 chunk 事件
             if chunk_content:
                 emit_output(
@@ -1563,10 +1571,10 @@ class PrettyOutput:
                 )
             if max_output > 0 and len(response) >= max_output:
                 append_session_history(message, response)
-                return response, first_token_time
+                return response, reasoning_content, first_token_time
             if check_interrupt():
                 append_session_history(message, response)
-                return response, first_token_time
+                return response, reasoning_content, first_token_time
         console.print()
         end_time = time.time()
         duration = end_time - start_time
@@ -1598,4 +1606,4 @@ class PrettyOutput:
             )
         )
 
-        return response, first_token_time
+        return response, reasoning_content, first_token_time
