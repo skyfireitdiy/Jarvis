@@ -1516,6 +1516,7 @@ def cli(
             # 检测认证方式：Token 认证（新）或密码认证（旧）
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             if auth_token:
+                pass
                 # Token 认证：validate_gateway_token() 会直接从环境变量读取
             elif gateway_password:
                 # 旧密码认证（兼容模式）
