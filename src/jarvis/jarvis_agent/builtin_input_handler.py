@@ -416,7 +416,8 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 prefix=agent.prefix,
                 suffix=agent.suffix,
                 agent=agent,
-                post_process_func=lambda files: None,  # 简化实现，不需要后处理
+                post_process_func=agent.post_process_manager.post_process_modified_files, 
+                skip_confirm=True,  
             )
 
             return "", True
