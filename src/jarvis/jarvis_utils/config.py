@@ -949,6 +949,19 @@ def is_enable_auto_methodology_extraction() -> bool:
     return bool(GLOBAL_CONFIG_DATA.get("auto_methodology_extraction", False))
 
 
+def is_enable_request_classification() -> bool:
+    """
+    获取是否启用需求分类功能。
+
+    当启用时，CodeAgent 首次运行会对用户需求进行分类，并根据分类结果加载对应的系统提示词。
+    默认关闭，可通过配置文件设置 enable_request_classification: true 启用。
+
+    返回：
+        bool: 如果启用需求分类则返回True，默认为False
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_request_classification", False))
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。

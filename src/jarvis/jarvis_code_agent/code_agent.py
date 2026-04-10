@@ -37,6 +37,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
+from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_utils.config import is_use_analysis
 from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.config import set_config
@@ -425,19 +426,21 @@ git reset --hard {start_commit}
                     enhanced_input = user_input
                 else:
                     # 正常模式：执行所有阶段
-                    # === 阶段1: 需求分类 ===
-                    scenario = classify_user_request(user_input)
+                    # === 阶段1: 需求分类（仅在启用时执行） ===
+                    if is_enable_request_classification():
+                        scenario = classify_user_request(user_input)
 
-                    # === 阶段2-6 ===
-                    # 根据分类结果获取对应的系统提示词并更新
-                    scenario_system_prompt = get_system_prompt(scenario)
-                    if scenario_system_prompt != self.system_prompt:
-                        self.system_prompt = scenario_system_prompt
-                        # 更新模型的系统提示词
-                        if self.model:
-                            # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                            prompt_text = self.prompt_manager.build_system_prompt(self)
-                            self.model.set_system_prompt(prompt_text)
+                        # === 阶段2: 根据分类结果获取对应的系统提示词并更新 ===
+                        scenario_system_prompt = get_system_prompt(scenario)
+                        if scenario_system_prompt != self.system_prompt:
+                            self.system_prompt = scenario_system_prompt
+                            # 更新模型的系统提示词
+                            if self.model:
+                                # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                                prompt_text = self.prompt_manager.build_system_prompt(
+                                    self
+                                )
+                                self.model.set_system_prompt(prompt_text)
 
                     # === 阶段2: 生成非交互模式说明 ===
                     # 根据当前模式生成额外说明，供 LLM 感知执行策略
