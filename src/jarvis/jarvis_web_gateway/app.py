@@ -88,6 +88,7 @@ from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionMa
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 
 logger = logging.getLogger(__name__)
 
@@ -2077,11 +2078,40 @@ def create_app(
             }
 
     # HTTP API：获取模型组列表
+    def _reload_model_groups_config() -> Dict[str, Any]:
+        """重新加载模型组相关配置，不影响全局配置。"""
+        try:
+            # 查找并加载配置文件
+
+            # 获取用户主目录的配置文件
+            user_config_path = os.path.expanduser("~/.jarvis/config.yaml")
+            config_files = []
+
+            # 添加用户配置文件（如果存在）
+            if os.path.exists(user_config_path):
+                config_files.append(user_config_path)
+
+            # 查找项目配置文件
+            project_config_files = _find_all_config_files(os.getcwd())
+            config_files.extend(project_config_files)
+
+            if not config_files:
+                return {}
+
+            # 合并配置（项目配置覆盖用户配置）
+            _, merged_config = _merge_configs(config_files)
+            return merged_config
+
+        except Exception:
+            # 如果重新加载失败，返回空配置
+            return {}
+
     @app.get("/api/model-groups", dependencies=[Depends(verify_token)])
     async def get_model_groups() -> Dict[str, Any]:
         """获取模型组列表。"""
         try:
-            config = get_global_config_data()
+            # 每次请求都重新加载配置，确保获取最新数据
+            config = _reload_model_groups_config()
             llm_groups = config.get("llm_groups", {})
             llms = config.get("llms", {})
             default_llm_group = config.get("llm_group", "")
