@@ -1,6 +1,50 @@
 import * as vscode from "vscode";
 import WebSocket, { RawData } from "ws";
 
+// 节流函数：在指定时间间隔内最多执行一次
+function throttle<T extends Function>(func: T, delay: number): T {
+  let lastCall = 0;
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function (this: unknown, ...args: any[]) {
+    const now = Date.now();
+    const remaining = delay - (now - lastCall);
+
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      lastCall = now;
+      return (func as Function).apply(this, args);
+    } else if (!timeoutId) {
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now();
+        timeoutId = null;
+        (func as Function).apply(this, args);
+      }, remaining);
+    }
+  } as unknown as T;
+}
+
+// 防抖函数：在指定时间间隔内多次调用只执行最后一次
+function debounce<T extends Function>(func: T, delay: number): T {
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function (this: unknown, ...args: any[]) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      (func as Function).apply(this, args);
+    }, delay);
+  } as unknown as T;
+}
+
 interface AgentListItem {
   id: string;
   name?: string;
@@ -1240,7 +1284,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private async persistAgentHistory(agentId: string): Promise<void> {
+  private async persistAgentHistoryImmediate(agentId: string): Promise<void> {
     const agentState = this.agentStatuses.get(agentId);
     if (!agentState) {
       return;
@@ -1255,6 +1299,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     allHistory[agentId] = persistedMessages;
     await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
   }
+
+  private persistAgentHistory = debounce((agentId: string) => {
+    void this.persistAgentHistoryImmediate(agentId);
+  }, 500);
 
   private loadPersistedAgentHistory(agentId: string): void {
     const allHistory = this.getPersistedAgentChatHistory();
@@ -1410,8 +1458,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             workingDir: agent.working_dir || "",
             llmGroup: agent.llm_group || "",
             worktree: Boolean(agent.worktree),
-            quickMode: Boolean((agent as any).quick_mode),
-            nodeId: String((agent as any).node_id || "").trim() || "master",
+            quickMode: Boolean(agent.quick_mode),
+            nodeId: String(agent.node_id || "").trim() || "master",
           };
         });
 
@@ -1908,7 +1956,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.renderAgentListView();
   }
 
-  private postPanelState(): void {
+  private postPanelStateImmediate(): void {
     if (!this.currentPanel) {
       return;
     }
@@ -1935,12 +1983,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  private renderAgentListView(): void {
+  private postPanelState = throttle(() => {
+    this.postPanelStateImmediate();
+  }, 100);
+
+  private renderAgentListViewImmediate(): void {
     if (!this.currentView) {
       return;
     }
     this.currentView.webview.html = this.getAgentListHtml();
   }
+
+  private renderAgentListView = debounce(() => {
+    this.renderAgentListViewImmediate();
+  }, 100);
 
   private async connectFromLeftView(
     message: AgentListViewMessage,
@@ -2856,7 +2912,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           streamingMessage.lang = "markdown";
         }
       });
-      this.postPanelState();
+      // 注意：withAgentState内部已经调用了postPanelState，无需重复调用
       return;
     }
     if (outputType === "STREAM_END") {
@@ -3268,6 +3324,8 @@ interface AgentListResponse {
     working_dir?: string;
     llm_group?: string;
     worktree?: boolean;
+    quick_mode?: boolean;
+    node_id?: string;
   }>;
   error?: {
     message?: string;
@@ -3416,7 +3474,7 @@ function escapeHtml(value: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
 
