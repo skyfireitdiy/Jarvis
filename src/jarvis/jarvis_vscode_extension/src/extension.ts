@@ -2235,6 +2235,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
               sourceAgent.agentType === "codeagent"
                 ? sourceAgent.worktree
                 : false,
+            quick_mode: Boolean(sourceAgent.quickMode),
           }),
         },
       );

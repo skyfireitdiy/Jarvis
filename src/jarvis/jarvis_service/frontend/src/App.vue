@@ -4036,6 +4036,7 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
     name: copiedName,
     llm_group: agent.llm_group || 'default',
     worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false,
+    quick_mode: Boolean(agent.quick_mode),
     node_id: targetNodeId || agent.node_id || undefined,
   }
 }
