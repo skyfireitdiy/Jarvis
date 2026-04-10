@@ -1282,7 +1282,7 @@ class PrettyOutput:
         subtitle_update_interval = 1
         update_count = 0
 
-        with Live(panel, refresh_per_second=10, transient=True) as live:
+        with Live(panel, refresh_per_second=6, transient=True) as live:
 
             def _update_panel_content(
                 content: str,
@@ -1330,15 +1330,8 @@ class PrettyOutput:
 
                 with _lock:
                     text_content = final_text
-                    current_subtitle = panel.subtitle
-                    panel = Panel(
-                        text_content,
-                        title=panel.title,
-                        subtitle=current_subtitle,
-                        border_style="cyan",
-                        box=box.ROUNDED,
-                        expand=True,
-                    )
+                    # 直接更新panel的内部内容，避免重建整个Panel
+                    panel.renderable = text_content
 
                     current_time = time.time()
                     should_update_subtitle = (
@@ -1403,8 +1396,8 @@ class PrettyOutput:
 
             buffer: List[Tuple[str, str]] = []
             last_update_time = time.time()
-            update_interval = 1
-            min_buffer_size = 1
+            update_interval = 0.2
+            min_buffer_size = 5
 
             def _flush_buffer():
                 nonlocal buffer, last_update_time
