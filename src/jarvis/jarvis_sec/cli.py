@@ -40,7 +40,7 @@ from jarvis.jarvis_utils.utils import init_env
 # 常量定义
 # ---------------------------
 
-JSEC_DIRNAME = "jsec"
+JSEC_DIRNAME = "sec"
 CONFIG_JSON = "config.json"
 
 
@@ -225,7 +225,7 @@ def config(
     clear: bool = typer.Option(False, "--clear", help="清空配置"),
 ) -> None:
     """
-    管理安全扫描配置文件（.jarvis/jsec/config.json）。
+    管理安全扫描配置文件（.jarvis/sec/config.json）。
 
     可以设置扫描目标（文件或目录）、语言过滤、排除目录、输出格式、分析参数等。
     这些配置会被 scan 命令自动读取和使用。
@@ -493,7 +493,7 @@ def analyze(
 @app.command("scan", help="执行安全扫描（从配置文件读取）")
 def scan() -> None:
     """
-    执行安全扫描，从配置文件（.jarvis/jsec/config.json）读取所有配置。
+    执行安全扫描，从配置文件（.jarvis/sec/config.json）读取所有配置。
 
     如果配置文件不存在，会给出友好提示引导用户使用 config 命令。
 
