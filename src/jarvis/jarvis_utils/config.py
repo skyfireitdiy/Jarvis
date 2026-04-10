@@ -253,7 +253,7 @@ def get_max_input_token_count() -> int:
         int: 模型能处理的最大输入token数量。
     """
     config = _get_resolved_model_config()
-    return int(config.get("max_input_token_count", "128000"))
+    return int(config.get("max_input_token_count", "200000"))
 
 
 def calculate_content_token_limit(agent: Any = None) -> int:
@@ -437,7 +437,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     expanded_config["platform"] = llm_ref.get("platform", "openai")
     expanded_config["model"] = llm_ref.get("model", "gpt-5")
     expanded_config["max_input_token_count"] = llm_ref.get(
-        "max_input_token_count", 128000
+        "max_input_token_count", 200000
     )
     # 合并 llm_config
     if "llm_config" in llm_ref:
@@ -460,7 +460,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
             expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["cheap_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 128000
+                "max_input_token_count", 200000
             )
             # 合并 llm_config
             if "llm_config" in llm_ref:
@@ -482,7 +482,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
             expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["smart_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 128000
+                "max_input_token_count", 200000
             )
             # 合并 llm_config
             if "llm_config" in llm_ref:
