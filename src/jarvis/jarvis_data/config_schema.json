@@ -294,6 +294,11 @@
       "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
       "default": false
     },
+    "enable_request_classification": {
+      "type": "boolean",
+      "description": "是否启用需求分类功能。启用后，CodeAgent 首次运行会对用户需求进行分类，并根据分类结果加载对应的系统提示词",
+      "default": false
+    },
     "tool_group": {
       "type": "string",
       "description": "选择一个预定义的工具配置组",
