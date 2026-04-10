@@ -79,55 +79,21 @@ RUN groupadd -g 1000 jarvis \
     && chown -R jarvis:jarvis /home/jarvis /workspace \
     && echo "✅ jarvis 用户创建完成"
 
-# 使用 jarvis 用户安装 Rust 工具链
-USER jarvis
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && . "$HOME/.cargo/env" \
-    && rustup default stable \
-    && rustup component add rust-analyzer \
-    && rustup component add rustfmt \
-    && rustup component add clippy \
-    && echo "✅ Rust 安装完成" \
-    && rustc --version && cargo --version
 
-# 使用 jarvis 用户安装 ripgrep (rg)
-RUN . "$HOME/.cargo/env" \
-    && cargo install ripgrep --locked \
-    && rg --version \
-    && rm -rf "$HOME/.cargo/registry/cache" \
-    && rm -rf "$HOME/.cargo/git" \
-    && rm -rf /tmp/*
 
-# 使用 jarvis 用户安装 fd
-RUN . "$HOME/.cargo/env" \
-    && cargo install fd-find --locked \
-    && fd --version \
-    && rm -rf "$HOME/.cargo/registry/cache" \
-    && rm -rf "$HOME/.cargo/git" \
-    && rm -rf /tmp/*
 
-# 使用 jarvis 用户安装 loc 工具（代码行数统计工具）
-RUN . "$HOME/.cargo/env" \
-    && cargo install loc --locked \
-    && loc --version \
-    && rm -rf "$HOME/.cargo/registry/cache" \
-    && rm -rf "$HOME/.cargo/git" \
-    && rm -rf /tmp/*
+
+
+
+
 
 # 切换回 root 用户安装系统级工具
 USER root
 
-# 安装 fzf（系统级工具，所有用户可用）
-RUN git clone --depth 1 https://github.com/junegunn/fzf.git /tmp/fzf \
-    && /tmp/fzf/install --bin \
-    && mv /tmp/fzf/bin/fzf /usr/local/bin/fzf \
-    && rm -rf /tmp/fzf \
-    && fzf --version
 
-# 设置 Rust 环境变量（指向 jarvis 用户的 cargo）
-ENV PATH="/app/.venv/bin:/home/jarvis/.cargo/bin:/usr/local/bin:/usr/bin:/bin" \
-    CARGO_HOME="/home/jarvis/.cargo" \
-    RUSTUP_HOME="/home/jarvis/.rustup" \
+
+# 设置环境变量
+ENV PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
     USER=jarvis \
     HOME=/home/jarvis \
     TERM=xterm-256color
@@ -174,8 +140,6 @@ WORKDIR /app
 # 清理所有临时文件和缓存，释放磁盘空间
 RUN rm -rf /tmp/* /var/tmp/* \
     && rm -rf /root/.cache/* \
-    && rm -rf /root/.cargo/registry/cache \
-    && rm -rf /root/.cargo/git \
     && find /usr/local/lib/python3.12 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.12 -type f -name "*.pyc" -delete 2>/dev/null || true \
     && find /usr/local/lib/python3.12 -type f -name "*.pyo" -delete 2>/dev/null || true \
@@ -193,15 +157,6 @@ RUN mkdir -p /root/.config/fish; \
 # 验证安装的工具
 RUN echo "=== 验证工具安装 ==="; \
     and python --version; \
-    and rustc --version; \
-    and cargo --version; \
-    and rust-analyzer --version; or echo "rust-analyzer installed"; \
-    and cargo clippy --version; or echo "cargo clippy installed"; \
-    and rustfmt --version; or echo "rustfmt installed"; \
-    and rg --version; \
-    and fd --version; \
-    and fzf --version; \
-    and loc --version; \
     and git --version; \
     and clang-19 --version | head -1; \
     and clang-tidy --version | head -1; \
