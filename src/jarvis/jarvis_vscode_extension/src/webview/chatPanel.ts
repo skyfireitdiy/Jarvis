@@ -98,6 +98,13 @@ let baseCompletions: CompletionItem[] = [];
 let searchedCompletions: CompletionItem[] = [];
 let selectedCompletionIndex = -1;
 
+// 输入历史记录相关
+const INPUT_HISTORY_STORAGE_KEY = "jarvis_vscode_input_history";
+const MAX_INPUT_HISTORY_COUNT = 100;
+let inputHistory: string[] = [];
+let historyIndex = -1; // 当前浏览的历史记录索引（-1 表示未浏览历史）
+let currentTempInput = ""; // 保存当前正在编辑的临时内容
+
 type ExecutionTerminalEntry = {
   wrapper: HTMLDivElement;
   terminalHost: HTMLDivElement;
@@ -754,9 +761,109 @@ function shouldTriggerCompletionSignalByCtrlC(): boolean {
   return !multiLineText.trim();
 }
 
+// 检查光标是否在第一行
+function isCursorAtFirstLine(textarea: HTMLTextAreaElement): boolean {
+  const cursorPosition = textarea.selectionStart;
+  const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+  return !textBeforeCursor.includes("\n");
+}
+
+// 检查光标是否在最后一行
+function isCursorAtLastLine(textarea: HTMLTextAreaElement): boolean {
+  const cursorPosition = textarea.selectionEnd;
+  const textAfterCursor = textarea.value.substring(cursorPosition);
+  return !textAfterCursor.includes("\n");
+}
+
+// 保存输入历史到 localStorage
+function saveInputHistoryToStorage(): void {
+  try {
+    localStorage.setItem(
+      INPUT_HISTORY_STORAGE_KEY,
+      JSON.stringify(inputHistory),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// 从 localStorage 加载输入历史
+function loadInputHistoryFromStorage(): void {
+  try {
+    const saved = localStorage.getItem(INPUT_HISTORY_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        inputHistory = parsed.filter(
+          (item) => typeof item === "string" && item.trim(),
+        );
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// 添加输入到历史记录
+function addToInputHistory(text: string): void {
+  const trimmedText = text.trim();
+  if (!trimmedText) {
+    return;
+  }
+  // 避免重复添加相同的记录
+  if (inputHistory.length > 0 && inputHistory[0] === trimmedText) {
+    return;
+  }
+  inputHistory.unshift(trimmedText);
+  // 限制历史记录数量
+  if (inputHistory.length > MAX_INPUT_HISTORY_COUNT) {
+    inputHistory.pop();
+  }
+  saveInputHistoryToStorage();
+  // 重置历史浏览状态
+  historyIndex = -1;
+  currentTempInput = "";
+}
+
+// 翻阅历史记录
+function navigateHistory(direction: "up" | "down"): void {
+  if (direction === "up") {
+    // 向上翻阅：加载更早的历史记录
+    if (historyIndex < inputHistory.length - 1) {
+      // 第一次翻阅时，保存当前正在编辑的内容
+      if (historyIndex === -1) {
+        const activeInput = getActiveInputElement();
+        currentTempInput = activeInput ? activeInput.value : "";
+      }
+      historyIndex++;
+      const activeInput = getActiveInputElement();
+      if (activeInput) {
+        activeInput.value = inputHistory[historyIndex];
+      }
+    }
+  } else if (direction === "down") {
+    // 向下翻阅：加载更新的历史记录
+    if (historyIndex > -1) {
+      historyIndex--;
+      const activeInput = getActiveInputElement();
+      if (activeInput) {
+        if (historyIndex === -1) {
+          // 回到最新状态，恢复临时编辑的内容
+          activeInput.value = currentTempInput;
+        } else {
+          activeInput.value = inputHistory[historyIndex];
+        }
+      }
+    }
+  }
+}
+
 function sendCurrentInput(mode: "single" | "multi"): void {
   const inputEl = mode === "single" ? singleMessageInput : messageInput;
   const text = inputEl ? inputEl.value : "";
+  if (text.trim()) {
+    addToInputHistory(text);
+  }
   vscode.postMessage({ type: "sendMessage", text });
   if (inputEl) {
     inputEl.value = "";
@@ -800,6 +907,23 @@ messageInput?.addEventListener("keydown", (event) => {
       return;
     }
     sendCurrentInput("multi");
+    return;
+  }
+  // 向上箭头：检查是否在第一行，是才触发历史
+  if (event.key === "ArrowUp") {
+    if (isCursorAtFirstLine(messageInput)) {
+      event.preventDefault();
+      navigateHistory("up");
+    }
+    return;
+  }
+  // 向下箭头：检查是否在最后一行，是才触发历史
+  if (event.key === "ArrowDown") {
+    if (isCursorAtLastLine(messageInput)) {
+      event.preventDefault();
+      navigateHistory("down");
+    }
+    return;
   }
 });
 
@@ -971,3 +1095,6 @@ window.addEventListener(
     wasRunningIndicatorVisible = isRunningIndicatorVisible;
   },
 );
+
+// 初始化：加载输入历史
+loadInputHistoryFromStorage();
