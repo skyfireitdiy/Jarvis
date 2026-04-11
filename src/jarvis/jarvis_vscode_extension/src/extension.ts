@@ -100,6 +100,16 @@ interface ExecutionTerminalSession {
   closed: boolean;
 }
 
+interface AgentTerminalSession {
+  terminalId: string;
+  agentId: string;
+  terminal: vscode.Terminal;
+  pty: AgentTerminalPty;
+  nodeId: string;
+  workingDir: string;
+  closed: boolean;
+}
+
 interface ChatPanelState {
   gatewayUrl: string;
   password: string;
@@ -206,6 +216,121 @@ const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
 const AGENT_CONNECTION_TIMEOUT_MS = 10000;
 const AGENT_LIST_REFRESH_INTERVAL_MS = 3000;
 
+class AgentTerminalPty implements vscode.Pseudoterminal {
+  private writeEmitter = new vscode.EventEmitter<string>();
+  private closeEmitter = new vscode.EventEmitter<number>();
+  public onDidWrite: vscode.Event<string> = this.writeEmitter.event;
+  public onDidClose?: vscode.Event<number> = this.closeEmitter.event;
+
+  private terminalId: string;
+  private agentId: string;
+  private nodeId: string;
+  private workingDir: string;
+  private gatewaySocket: WebSocket | undefined;
+  private closed = false;
+
+  constructor(
+    terminalId: string,
+    agentId: string,
+    nodeId: string,
+    workingDir: string,
+    gatewaySocket: WebSocket | undefined,
+  ) {
+    this.terminalId = terminalId;
+    this.agentId = agentId;
+    this.nodeId = nodeId;
+    this.workingDir = workingDir;
+    this.gatewaySocket = gatewaySocket;
+  }
+
+  open(initialDimensions: vscode.TerminalDimensions | undefined): void {
+    // 终端打开时，可以发送初始大小
+    if (initialDimensions) {
+      this.setDimensions(initialDimensions);
+    }
+  }
+
+  close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    // 发送关闭消息到后端
+    if (
+      this.gatewaySocket &&
+      this.gatewaySocket.readyState === WebSocket.OPEN
+    ) {
+      const message = {
+        type: "terminal_close",
+        payload: {
+          terminal_id: this.terminalId,
+          node_id: this.nodeId,
+        },
+      };
+      this.gatewaySocket.send(JSON.stringify(message));
+    }
+    this.closeEmitter.fire(0);
+  }
+
+  handleInput(data: string): void {
+    if (this.closed) {
+      return;
+    }
+    // 将用户输入发送到后端
+    if (
+      this.gatewaySocket &&
+      this.gatewaySocket.readyState === WebSocket.OPEN
+    ) {
+      const message = {
+        type: "terminal_input",
+        payload: {
+          terminal_id: this.terminalId,
+          data: data,
+        },
+      };
+      this.gatewaySocket.send(JSON.stringify(message));
+    }
+  }
+
+  setDimensions(dimensions: vscode.TerminalDimensions): void {
+    if (this.closed) {
+      return;
+    }
+    // 发送终端大小调整消息到后端
+    if (
+      this.gatewaySocket &&
+      this.gatewaySocket.readyState === WebSocket.OPEN
+    ) {
+      const message = {
+        type: "terminal_resize",
+        payload: {
+          terminal_id: this.terminalId,
+          rows: dimensions.rows,
+          cols: dimensions.columns,
+        },
+      };
+      this.gatewaySocket.send(JSON.stringify(message));
+    }
+  }
+
+  // 用于从后端接收输出并写入终端
+  write(data: string): void {
+    if (this.closed) {
+      return;
+    }
+    this.writeEmitter.fire(data);
+  }
+
+  // 用于从后端关闭终端
+  closeFromBackend(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    this.closeEmitter.fire(0);
+  }
+}
+
 class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "jarvis.agentListView";
 
@@ -238,6 +363,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readonly agentStatuses = new Map<string, AgentStatus>();
   private readonly agentSockets = new Map<string, WebSocket>();
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
+  private readonly agentTerminalSessions = new Map<
+    string,
+    AgentTerminalSession
+  >();
   private agentListRefreshTimer: NodeJS.Timeout | undefined;
   private readonly executionTerminalSessions = new Map<
     string,
@@ -375,6 +504,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           await this.deleteAgent(message.agentId);
           return;
         }
+        if (message?.type === "openTerminal") {
+          await this.openTerminalForAgent(message.agentId);
+          return;
+        }
         if (message?.type === "toggleConnectionLock") {
           await this.setConnectionLockEnabled(Boolean(message.enabled));
           return;
@@ -422,6 +555,87 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.postPanelState();
     }, 100);
     await this.currentPanel.reveal(vscode.ViewColumn.Beside, false);
+  }
+
+  async openTerminalForAgent(agentId?: string): Promise<void> {
+    if (!agentId) {
+      vscode.window.showErrorMessage("未指定Agent");
+      return;
+    }
+
+    // 检查是否已有该Agent的活跃终端
+    const existingSession = this.agentTerminalSessions.get(agentId);
+    if (existingSession && !existingSession.closed) {
+      // 聚焦到已有终端
+      existingSession.terminal.show();
+      return;
+    }
+
+    // 检查WebSocket连接
+    if (
+      !this.panelState.gatewaySocket ||
+      this.panelState.gatewaySocket.readyState !== WebSocket.OPEN
+    ) {
+      vscode.window.showErrorMessage("未连接到网关");
+      return;
+    }
+
+    // 获取Agent信息
+    const agentItem = this.agentItems.find((item) => item.id === agentId);
+    if (!agentItem) {
+      vscode.window.showErrorMessage("Agent不存在");
+      return;
+    }
+
+    // 生成终端ID
+    const terminalId = `terminal_${agentId}_${Date.now()}`;
+    const nodeId = agentItem.nodeId || "";
+    const workingDir = agentItem.workingDir || "";
+
+    // 创建Pseudoterminal
+    const pty = new AgentTerminalPty(
+      terminalId,
+      agentId,
+      nodeId,
+      workingDir,
+      this.panelState.gatewaySocket,
+    );
+
+    // 创建VS Code终端
+    const terminal = vscode.window.createTerminal({
+      name: `Jarvis: ${agentItem.displayName}`,
+      pty: pty,
+    });
+
+    // 创建会话对象
+    const session: AgentTerminalSession = {
+      terminalId: terminalId,
+      agentId: agentId,
+      terminal: terminal,
+      pty: pty,
+      nodeId: nodeId,
+      workingDir: workingDir,
+      closed: false,
+    };
+
+    // 保存会话
+    this.agentTerminalSessions.set(agentId, session);
+
+    // 发送创建终端消息到后端
+    const createMessage = {
+      type: "terminal_create",
+      payload: {} as { node_id?: string; working_dir?: string },
+    };
+    if (nodeId) {
+      createMessage.payload.node_id = nodeId;
+    }
+    if (workingDir) {
+      createMessage.payload.working_dir = workingDir;
+    }
+    this.panelState.gatewaySocket.send(JSON.stringify(createMessage));
+
+    // 显示终端
+    terminal.show();
   }
 
   private getAgentListHtml(): string {
@@ -601,6 +815,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
         <div class="agent-actions">
+          <button class="icon-button" type="button" data-open-terminal-agent-id="${agentItem.id}" title="打开终端">🖥️</button></button>
           <button class="icon-button" type="button" data-copy-agent-id="${agentItem.id}" title="复制 Agent">📋</button>
           <button class="icon-button" type="button" data-delete-agent-id="${agentItem.id}" title="删除 Agent">🗑</button>
         </div>
@@ -867,6 +1082,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       item.addEventListener('click', (event) => {
         event.stopPropagation();
         vscode.postMessage({ type: 'deleteAgent', agentId: item.getAttribute('data-delete-agent-id') });
+      });
+    });
+    document.querySelectorAll('[data-open-terminal-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'openTerminal', agentId: item.getAttribute('data-open-terminal-agent-id') });
       });
     });
     document.querySelectorAll('[data-agent-id]').forEach((item) => {
@@ -2831,6 +3052,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       this.appendPanelMessage(errorMessage, "error");
     }
+    if (parsedMessage.type === "terminal_created") {
+      this.handleTerminalCreated(parsedMessage.payload);
+      return;
+    }
+    if (parsedMessage.type === "terminal_output") {
+      this.handleTerminalOutput(parsedMessage.payload);
+      return;
+    }
+    if (parsedMessage.type === "terminal_closed") {
+      this.handleTerminalClosed(parsedMessage.payload);
+      return;
+    }
   }
 
   private handleAgentSocketMessage(agentId: string, rawData: RawData): void {
@@ -2956,6 +3189,63 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       state.execution_status = "running";
     });
     this.postPanelState();
+  }
+
+  private handleTerminalCreated(
+    payload: Record<string, unknown> | undefined,
+  ): void {
+    const terminalId = String(payload?.terminal_id || "");
+    if (!terminalId) {
+      return;
+    }
+
+    // 查找对应的会话（通过terminalId前缀匹配agentId）
+    for (const [agentId, session] of this.agentTerminalSessions) {
+      if (session.terminalId === terminalId) {
+        // 更新会话信息
+        session.terminalId = terminalId;
+        console.log(`[Terminal] Created: ${terminalId} for agent ${agentId}`);
+        break;
+      }
+    }
+  }
+
+  private handleTerminalOutput(
+    payload: Record<string, unknown> | undefined,
+  ): void {
+    const terminalId = String(payload?.terminal_id || "");
+    const data = String(payload?.data || "");
+    if (!terminalId || !data) {
+      return;
+    }
+
+    // 查找对应的会话并写入输出
+    for (const [agentId, session] of this.agentTerminalSessions) {
+      if (session.terminalId === terminalId && !session.closed) {
+        session.pty.write(data);
+        break;
+      }
+    }
+  }
+
+  private handleTerminalClosed(
+    payload: Record<string, unknown> | undefined,
+  ): void {
+    const terminalId = String(payload?.terminal_id || "");
+    if (!terminalId) {
+      return;
+    }
+
+    // 查找对应的会话并关闭
+    for (const [agentId, session] of this.agentTerminalSessions) {
+      if (session.terminalId === terminalId) {
+        session.closed = true;
+        session.pty.closeFromBackend();
+        this.agentTerminalSessions.delete(agentId);
+        console.log(`[Terminal] Closed: ${terminalId} for agent ${agentId}`);
+        break;
+      }
+    }
   }
 
   private handleOutputPayload(
@@ -3342,6 +3632,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   public dispose(): void {
     this.stopAgentListRefresh();
+    // 清理所有Agent终端会话
+    for (const [agentId, session] of this.agentTerminalSessions) {
+      if (!session.closed) {
+        session.closed = true;
+        try {
+          session.terminal.dispose();
+        } catch {
+          // ignore dispose error
+        }
+      }
+    }
+    this.agentTerminalSessions.clear();
     this.disposeSocket("gatewaySocket");
   }
 }
