@@ -2856,6 +2856,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (!targetAgentId || !this.panelState.token) {
       return;
     }
+    // 检查Agent是否已完成，如果已完成则跳过连接
+    const agentItem = this.agentItems.find((item) => item.id === targetAgentId);
+    if (agentItem && agentItem.statusClass === "stopped") {
+      return;
+    }
     if (retryCount === 0) {
       const pendingAttempt = this.agentConnectionAttempts.get(targetAgentId);
       if (pendingAttempt) {
