@@ -1,0 +1,8 @@
+{
+  "id": "20260411_125803_890227",
+  "type": "project_long_term",
+  "tags": ["VS Code扩展", "chatPanel", "回车发送", "功能实现"],
+  "content": "在 chatPanel.ts 中为单行输入框添加了回车键发送功能：\n- 修改了 singleMessageInput 的 keydown 事件监听器\n- 添加了对 Enter 键的处理（无修饰键时）\n- 保持原有的 Ctrl+Enter 和 @ 键功能不变\n- 输入框为空时回车键不发送消息",
+  "created_at": "2026-04-11T12:58:03.890257",
+  "updated_at": "2026-04-11T12:58:03.890261"
+}
