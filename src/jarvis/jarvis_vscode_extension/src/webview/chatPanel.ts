@@ -433,7 +433,7 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
   }
   // 将 tip 显示到输入框的 placeholder
   const defaultPlaceholder = isSingle
-    ? "输入单行内容，按 Ctrl+Enter 发送..."
+    ? "输入单行内容，按回车或 Ctrl+Enter 发送..."
     : "输入消息，按 Ctrl+Enter 发送...";
   const placeholder = tipText || defaultPlaceholder;
   if (singleMessageInput) {
@@ -674,10 +674,6 @@ singleMessageInput?.addEventListener("keydown", (event) => {
   }
   if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
     event.preventDefault();
-    const text = singleMessageInput.value;
-    if (!text.trim()) {
-      return;
-    }
     sendCurrentInput("single");
     return;
   }
