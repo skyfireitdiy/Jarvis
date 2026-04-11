@@ -1045,6 +1045,12 @@ function showConfirmDialog(
     }
   }
   confirmDialog?.classList.add("visible");
+  // 自动聚焦到默认按钮
+  if (defaultConfirm && confirmConfirmButton) {
+    confirmConfirmButton.focus();
+  } else if (!defaultConfirm && confirmCancelButton) {
+    confirmCancelButton.focus();
+  }
 }
 
 function hideConfirmDialog(): void {
