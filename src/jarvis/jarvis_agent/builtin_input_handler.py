@@ -404,7 +404,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             end_commit = get_latest_commit_hash()
 
             # 获取提交历史
-            commits = agent.git_manager.show_commit_history(
+            commits = agent.git_manager.show_commit_between(
                 agent.start_commit, end_commit
             )
 
