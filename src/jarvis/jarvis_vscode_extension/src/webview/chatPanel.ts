@@ -604,6 +604,11 @@ function shouldTriggerCompletionSignalByCtrlC(): boolean {
   if (singleInputRow?.style.display === "flex") {
     return false;
   }
+  // 检查焦点是否在多行输入框上
+  const activeElement = document.activeElement;
+  if (activeElement !== messageInput) {
+    return false;
+  }
   const selectedText = String(window.getSelection?.()?.toString() || "").trim();
   if (selectedText) {
     return false;
