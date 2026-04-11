@@ -1380,6 +1380,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .confirm-box { background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); border: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.12)); border-radius: 10px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35); padding: 20px; min-width: 320px; max-width: 480px; }
     .confirm-message { font-size: 14px; margin-bottom: 16px; line-height: 1.5; }
     .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .confirm-btn { order: 0; }
+    .confirm-btn.default { order: 1; }
     .confirm-btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
     .confirm-btn:hover { background: var(--vscode-button-hoverBackground); }
     .confirm-btn.default { background: linear-gradient(135deg, rgba(59, 130, 246, 0.92), rgba(37, 99, 235, 0.92)); color: #ffffff; border-color: rgba(59, 130, 246, 0.38); }
