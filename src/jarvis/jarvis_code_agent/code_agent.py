@@ -5,6 +5,7 @@
 
 import hashlib
 import os
+from datetime import datetime
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -755,6 +756,26 @@ git reset --hard {start_commit}
                     total_lines = lines_added + lines_removed
                     commits = self.git_manager.show_commit_history(self.start_commit, latest_commit_hash)
                     if total_lines > 1000:
+                        # 在压缩前创建备份分支
+                        try:
+                            # 生成备份分支名（格式：backup/YYYY-MM-DD_HH-MM-SS）
+                            backup_branch = f"backup/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+                            
+                            # 创建备份分支指向 latest_commit_hash
+                            # 注意：git branch 只创建分支，不会切换当前分支
+                            subprocess.run(
+                                ["git", "branch", backup_branch, latest_commit_hash],
+                                capture_output=True,
+                                check=True,
+                            )
+                            PrettyOutput.auto_print(f"✅ 已创建备份分支: {backup_branch}")
+                        except subprocess.CalledProcessError as e:
+                            PrettyOutput.auto_print(f"⚠️ 创建备份分支失败: {str(e)}")
+                            PrettyOutput.auto_print("将继续执行压缩操作...")
+                        except Exception as e:
+                            PrettyOutput.auto_print(f"⚠️ 备份分支创建异常: {str(e)}")
+                            PrettyOutput.auto_print("将继续执行压缩操作...")
+                        
                         self.git_manager.handle_commit_confirmation(
                             commits,
                             self.start_commit,
