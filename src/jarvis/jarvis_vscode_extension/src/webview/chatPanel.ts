@@ -90,7 +90,20 @@ const completionList = document.getElementById(
 const completionStatus = document.getElementById(
   "completionStatus",
 ) as HTMLDivElement | null;
+const confirmDialog = document.getElementById(
+  "confirmDialog",
+) as HTMLDivElement | null;
+const confirmMessage = document.getElementById(
+  "confirmMessage",
+) as HTMLParagraphElement | null;
+const confirmCancelButton = document.getElementById(
+  "confirmCancelButton",
+) as HTMLButtonElement | null;
+const confirmConfirmButton = document.getElementById(
+  "confirmConfirmButton",
+) as HTMLButtonElement | null;
 let currentSelectedAgentId = "";
+let currentConfirmAgentId = "";
 let wasRunningIndicatorVisible = false;
 let currentExecutionStatus = "running";
 let completionCursorPos = -1;
@@ -1011,6 +1024,67 @@ document.addEventListener("keydown", (event) => {
   vscode.postMessage({ type: "sendCompletionSignal" });
 });
 
+// 确认对话框相关函数
+function showConfirmDialog(
+  message: string,
+  defaultConfirm: boolean,
+  agentId: string,
+): void {
+  currentConfirmAgentId = agentId;
+  if (confirmMessage) {
+    confirmMessage.textContent = message;
+  }
+  if (confirmCancelButton && confirmConfirmButton) {
+    // 根据默认选项设置按钮样式
+    if (defaultConfirm) {
+      confirmCancelButton.classList.remove("default");
+      confirmConfirmButton.classList.add("default");
+    } else {
+      confirmCancelButton.classList.add("default");
+      confirmConfirmButton.classList.remove("default");
+    }
+  }
+  confirmDialog?.classList.add("visible");
+}
+
+function hideConfirmDialog(): void {
+  confirmDialog?.classList.remove("visible");
+  currentConfirmAgentId = "";
+}
+
+function sendConfirmResult(confirmed: boolean): void {
+  vscode.postMessage({
+    type: "confirmResult",
+    confirmed,
+    agentId: currentConfirmAgentId,
+  });
+  hideConfirmDialog();
+}
+
+// 确认对话框按钮事件监听
+confirmCancelButton?.addEventListener("click", () => {
+  sendConfirmResult(false);
+});
+
+confirmConfirmButton?.addEventListener("click", () => {
+  sendConfirmResult(true);
+});
+
+// 确认对话框键盘事件监听（Enter 键触发默认按钮）
+confirmDialog?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    // 检查哪个按钮是默认按钮
+    const isConfirmDefault =
+      confirmConfirmButton?.classList.contains("default");
+    sendConfirmResult(isConfirmDefault);
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    sendConfirmResult(false);
+  }
+});
+
 window.addEventListener(
   "message",
   (
@@ -1020,10 +1094,22 @@ window.addEventListener(
         items?: CompletionItem[];
         query?: string;
         error?: string;
+        message?: string;
+        defaultConfirm?: boolean;
+        agentId?: string;
       };
     }>,
   ) => {
     const data = event.data || {};
+    if (data.type === "showConfirm") {
+      const payload = data.payload || {};
+      showConfirmDialog(
+        String(payload.message || "请确认"),
+        payload.defaultConfirm !== false,
+        String(payload.agentId || ""),
+      );
+      return;
+    }
     if (data.type === "completionsResult") {
       const payload = data.payload || {};
       baseCompletions = Array.isArray(payload.items) ? payload.items : [];

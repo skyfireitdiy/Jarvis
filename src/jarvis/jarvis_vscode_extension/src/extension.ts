@@ -1153,6 +1153,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .completion-status.error { color: var(--vscode-errorForeground); }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    /* Confirm dialog styles */
+    .confirm-dialog { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 30; }
+    .confirm-dialog.visible { display: flex; }
+    .confirm-box { background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); border: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.12)); border-radius: 10px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35); padding: 20px; min-width: 320px; max-width: 480px; }
+    .confirm-message { font-size: 14px; margin-bottom: 16px; line-height: 1.5; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .confirm-btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .confirm-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .confirm-btn.default { background: linear-gradient(135deg, rgba(59, 130, 246, 0.92), rgba(37, 99, 235, 0.92)); color: #ffffff; border-color: rgba(59, 130, 246, 0.38); }
+    .confirm-btn.default:hover { filter: brightness(1.03); }
   </style>
 </head>
 <body>
@@ -1200,6 +1210,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <div id="completionList" class="completions-list"></div>
     </div>
   </div>
+  <div class="confirm-dialog" id="confirmDialog">
+    <div class="confirm-box">
+      <p class="confirm-message" id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button id="confirmCancelButton" class="confirm-btn">取消</button>
+        <button id="confirmConfirmButton" class="confirm-btn default">确认</button>
+      </div>
+    </div>
+  </div>
   <script nonce="${nonce}" src="${chatPanelJsUri}"></script>
 </body>
 </html>`;
@@ -1241,9 +1260,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (message.type === "confirmResult") {
-      const agentId = this.panelState.selectedAgentId;
+      const agentId = String(
+        message.agentId || this.panelState.selectedAgentId || "",
+      ).trim();
       if (!agentId) {
-        this.appendPanelMessage("请先在左侧选择 Agent", "error");
+        this.appendPanelMessage("无法确定 Agent ID", "error");
         return;
       }
       await this.sendConfirmResult(agentId, Boolean(message.confirmed));
@@ -2051,9 +2072,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private toggleCreateAgentForm(): void {
+  private async toggleCreateAgentForm(): Promise<void> {
     this.createAgentFormState.isVisible = !this.createAgentFormState.isVisible;
     this.createAgentFormState.errorMessage = "";
+    // 打开表单时，加载当前选择节点的模型组列表
+    if (this.createAgentFormState.isVisible) {
+      try {
+        await this.loadModelGroups(
+          this.createAgentFormState.nodeId || undefined,
+        );
+      } catch {
+        // keep current model groups on failure
+      }
+    }
     this.renderAgentListView();
   }
 
@@ -2875,12 +2906,27 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           : undefined;
     });
     const message = String(payload?.message || "请确认");
-    const confirmed = await vscode.window.showInformationMessage(
-      message,
-      { modal: true },
-      "确认",
-    );
-    await this.sendConfirmResult(agentId, confirmed === "确认");
+    const defaultConfirm = payload?.defaultConfirm !== false; // 默认为 true
+
+    // 通过 webview 显示确认对话框
+    if (this.currentPanel) {
+      this.currentPanel.webview.postMessage({
+        type: "showConfirm",
+        payload: {
+          message,
+          defaultConfirm,
+          agentId,
+        },
+      });
+    } else {
+      // 如果没有 webview，使用原生对话框作为后备
+      const confirmed = await vscode.window.showInformationMessage(
+        message,
+        { modal: true },
+        "确认",
+      );
+      await this.sendConfirmResult(agentId, confirmed === "确认");
+    }
   }
 
   private async sendConfirmResult(
@@ -3310,6 +3356,7 @@ interface ChatPanelMessage {
   confirmed?: boolean;
   cols?: number;
   rows?: number;
+  agentId?: string;
 }
 
 interface ModelGroupsResponse {
