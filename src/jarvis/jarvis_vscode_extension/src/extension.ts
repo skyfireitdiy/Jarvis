@@ -1099,6 +1099,24 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 12px; opacity: 0.75; }
     .meta { display: flex; flex-direction: column; gap: 6px; }
+    
+    /* Diff styles */
+    .diff-side-by-side { margin: 8px 0; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
+    .diff-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); font-size: 12px; }
+    .diff-file-path { font-weight: 600; }
+    .diff-stats { font-size: 11px; opacity: 0.8; }
+    .diff-additions { color: var(--vscode-testing-iconPassed); }
+    .diff-deletions { color: var(--vscode-errorForeground); }
+    .diff-table { width: 100%; border-collapse: collapse; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+    .diff-row { border-bottom: 1px solid rgba(127, 127, 127, 0.1); }
+    .diff-row:last-child { border-bottom: none; }
+    .diff-line-num { width: 40px; padding: 4px 8px; text-align: right; background: var(--vscode-sideBar-background); color: var(--vscode-descriptionForeground); font-size: 11px; border-right: 1px solid var(--vscode-panel-border); user-select: none; }
+    .diff-content { padding: 4px 8px; white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
+    .diff-old-content { border-right: 1px solid var(--vscode-panel-border); }
+    .diff-new-content { }
+    .diff-added { background: rgba(76, 175, 80, 0.15); }
+    .diff-deleted { background: rgba(244, 67, 54, 0.15); }
+    .diff-error { padding: 10px; text-align: center; color: var(--vscode-errorForeground); font-size: 12px; }
     .running-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; margin-top: 4px; margin-bottom: 8px; animation: fadeIn 0.3s ease-in-out; position: sticky; bottom: 0; z-index: 1; backdrop-filter: blur(2px); }
     .running-spinner { width: 16px; height: 16px; border: 2px solid rgba(59, 130, 246, 0.3); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; flex-shrink: 0; }
     .running-text { font-size: 13px; color: #3b82f6; font-weight: 500; }
