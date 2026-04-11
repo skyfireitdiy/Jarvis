@@ -448,8 +448,13 @@ function syncInputMode(mode: "single" | "multi", tipText: string): void {
   }
 }
 
-function getActiveInputElement(): HTMLInputElement | HTMLTextAreaElement | null {
-  return singleInputRow?.style.display === "flex" ? singleMessageInput : messageInput;
+function getActiveInputElement():
+  | HTMLInputElement
+  | HTMLTextAreaElement
+  | null {
+  return singleInputRow?.style.display === "flex"
+    ? singleMessageInput
+    : messageInput;
 }
 
 function insertTextAtCursor(textToInsert: string): void {
@@ -504,7 +509,8 @@ function renderCompletionList(): void {
   items.forEach((item, index) => {
     const node = document.createElement("div");
     node.className =
-      "completion-item" + (selectedCompletionIndex === index ? " selected" : "");
+      "completion-item" +
+      (selectedCompletionIndex === index ? " selected" : "");
     const typeClass = String(item.type || "").trim();
     if (typeClass) {
       node.classList.add(`completion-${typeClass}`);
@@ -538,7 +544,8 @@ function setCompletionStatus(message: string, isError = false): void {
 
 function openCompletionModal(): void {
   const inputElement = getActiveInputElement();
-  completionCursorPos = inputElement?.selectionStart ?? inputElement?.value.length ?? -1;
+  completionCursorPos =
+    inputElement?.selectionStart ?? inputElement?.value.length ?? -1;
   selectedCompletionIndex = -1;
   searchedCompletions = [];
   setCompletionStatus("正在加载补全...");
@@ -660,6 +667,15 @@ singleMessageInput?.addEventListener("keydown", (event) => {
     openCompletionModal();
     return;
   }
+  if (event.key === "Enter" && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    const text = singleMessageInput.value;
+    if (!text.trim()) {
+      return;
+    }
+    sendCurrentInput("single");
+    return;
+  }
   if (event.ctrlKey && event.key === "Enter") {
     event.preventDefault();
     const text = singleMessageInput.value;
@@ -712,7 +728,10 @@ completionSearchInput?.addEventListener("keydown", (event) => {
   }
   if (event.key === "Enter") {
     const items = getMergedCompletions();
-    if (selectedCompletionIndex >= 0 && selectedCompletionIndex < items.length) {
+    if (
+      selectedCompletionIndex >= 0 &&
+      selectedCompletionIndex < items.length
+    ) {
       event.preventDefault();
       insertCompletionItem(items[selectedCompletionIndex]);
     }
@@ -732,7 +751,16 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener(
   "message",
-  (event: MessageEvent<{ type?: string; payload?: StatePayload & { items?: CompletionItem[]; query?: string; error?: string } }>) => {
+  (
+    event: MessageEvent<{
+      type?: string;
+      payload?: StatePayload & {
+        items?: CompletionItem[];
+        query?: string;
+        error?: string;
+      };
+    }>,
+  ) => {
     const data = event.data || {};
     if (data.type === "completionsResult") {
       const payload = data.payload || {};
@@ -779,8 +807,9 @@ window.addEventListener(
     }
     const isRunningIndicatorVisible = payload.executionStatus === "running";
     if (runningIndicator) {
-      runningIndicator.style.display =
-        isRunningIndicatorVisible ? "flex" : "none";
+      runningIndicator.style.display = isRunningIndicatorVisible
+        ? "flex"
+        : "none";
     }
     const isWaitingMulti = payload.executionStatus === "waiting_multi";
     if (completeButton) {
