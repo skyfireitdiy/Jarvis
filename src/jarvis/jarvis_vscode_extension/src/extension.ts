@@ -1244,7 +1244,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .message-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.85; }
     .execution-hint { font-size: 12px; opacity: 0.82; margin-bottom: 8px; }
     .execution-terminal { height: 240px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
-    .xterm-helpers { visibility: hidden; position: absolute; left: -9999px; top: -9999px; width: 0; height: 0; overflow: hidden; }
+    .xterm-helpers { position: absolute; left: -9999px; top: -9999px; width: 0; height: 0; overflow: hidden; }
     .execution-finished { margin-top: 8px; font-size: 12px; opacity: 0.75; }
     .row { display: flex; gap: 8px; align-items: center; }
     .input-actions { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
