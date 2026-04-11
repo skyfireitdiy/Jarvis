@@ -3167,7 +3167,7 @@ CA -> CA : 显示提交历史并处理确认
   7. 任务完成后处理：
      - 处理未提交修改（\_handle_uncommitted_changes）：交互式确认并提交
      - 记录结束提交哈希：`end_commit = get_latest_commit_hash()`
-     - 显示提交历史（\_show_commit_history）：展示 start_commit 到 end_commit 之间的提交
+     - 显示提交历史（\_show_commit_between）：展示 start_commit 到 end_commit 之间的提交
      - 处理提交确认（\_handle_commit_confirmation）：
        - 若用户接受提交：重置到起始提交，使用 GitCommitTool 重新提交（应用 prefix/suffix）
        - 若用户拒绝：询问是否重置到起始提交

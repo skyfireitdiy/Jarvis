@@ -300,7 +300,7 @@ class GitManager:
             except subprocess.CalledProcessError as e:
                 PrettyOutput.auto_print(f"❌ 提交失败: {str(e)}")
 
-    def show_commit_history(
+    def show_commit_between(
         self, start_commit: Optional[str], end_commit: Optional[str]
     ) -> List[Tuple[str, str]]:
         """显示两个提交之间的提交历史

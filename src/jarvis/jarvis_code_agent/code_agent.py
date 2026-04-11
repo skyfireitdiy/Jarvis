@@ -556,7 +556,7 @@ git reset --hard {start_commit}
                         PrettyOutput.auto_print(f"⚠️ 任务分析失败: {str(e)}")
 
             end_commit = get_latest_commit_hash()
-            commits = self.git_manager.show_commit_history(
+            commits = self.git_manager.show_commit_between(
                 self.start_commit, end_commit
             )
             self.git_manager.handle_commit_confirmation(
@@ -753,7 +753,7 @@ git reset --hard {start_commit}
                     lines_added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
                     lines_removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
                     total_lines = lines_added + lines_removed
-                    commits = self.git_manager.show_commit_history(self.start_commit, latest_commit_hash)
+                    commits = self.git_manager.get_commits_between(self.start_commit, latest_commit_hash)
                     if total_lines > 1000:
                         # 在压缩前创建备份分支
                         try:
