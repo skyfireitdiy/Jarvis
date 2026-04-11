@@ -680,6 +680,12 @@ function openCompletionModal(): void {
   selectedCompletionIndex = -1;
   searchedCompletions = [];
   setCompletionStatus("正在加载补全...");
+
+  // 清空搜索输入框
+  if (completionSearchInput) {
+    completionSearchInput.value = "";
+  }
+
   renderCompletionList();
   completionModalOverlay?.classList.add("visible");
   vscode.postMessage({ type: "openCompletions" });
