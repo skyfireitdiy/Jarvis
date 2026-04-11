@@ -4,9 +4,7 @@
 """
 
 import os
-import random
 import shutil
-import string
 import subprocess
 from datetime import datetime
 from typing import Optional
@@ -109,12 +107,13 @@ class WorktreeManager:
         """生成 worktree 分支名
 
         返回:
-            str: 格式为 jarvis-{project_name}-YYYYMMDD-HHMMSS-<4位随机字符>
+            str: 格式为 jarvis-{project_name}-YYYYMMDD-HHMMSS-fff（fff为毫秒）
         """
         project_name = self._get_project_name()
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        random_suffix = "".join(random.choices(string.ascii_lowercase, k=4))
-        return f"jarvis-{project_name}-{timestamp}-{random_suffix}"
+        # 生成时间戳，包含毫秒（微秒的前3位）
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d-%H%M%S") + f"-{now.microsecond // 1000:03d}"
+        return f"jarvis-{project_name}-{timestamp}"
 
     def get_current_branch(self) -> str:
         """获取当前分支名
