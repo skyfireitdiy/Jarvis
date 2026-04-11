@@ -1101,19 +1101,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .meta { display: flex; flex-direction: column; gap: 6px; }
     
     /* Diff styles */
-    .diff-side-by-side { margin: 8px 0; border: 1px solid var(--vscode-panel-border); border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
-    .diff-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); font-size: 12px; }
+    .diff-side-by-side { margin: 8px 0; border-radius: 6px; overflow: hidden; background: var(--vscode-editor-background); }
+    .diff-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--vscode-sideBar-background); font-size: 12px; }
     .diff-file-path { font-weight: 600; }
     .diff-stats { font-size: 11px; opacity: 0.8; }
     .diff-additions { color: var(--vscode-testing-iconPassed); }
     .diff-deletions { color: var(--vscode-errorForeground); }
     .diff-table { width: 100%; border-collapse: collapse; font-family: var(--vscode-editor-font-family); font-size: 12px; }
-    .diff-row { border-bottom: 1px solid rgba(127, 127, 127, 0.1); }
-    .diff-row:last-child { border-bottom: none; }
-    .diff-line-num { width: 40px; padding: 4px 8px; text-align: right; background: var(--vscode-sideBar-background); color: var(--vscode-descriptionForeground); font-size: 11px; border-right: 1px solid var(--vscode-panel-border); user-select: none; }
+
+    .diff-line-num { width: 40px; padding: 4px 8px; text-align: right; background: var(--vscode-sideBar-background); color: var(--vscode-descriptionForeground); font-size: 11px; user-select: none; }
     .diff-content { padding: 4px 8px; white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-    .diff-old-content { border-right: 1px solid var(--vscode-panel-border); }
-    .diff-new-content { }
+
     .diff-added { background: rgba(76, 175, 80, 0.15); }
     .diff-deleted { background: rgba(244, 67, 54, 0.15); }
     .diff-error { padding: 10px; text-align: center; color: var(--vscode-errorForeground); font-size: 12px; }
