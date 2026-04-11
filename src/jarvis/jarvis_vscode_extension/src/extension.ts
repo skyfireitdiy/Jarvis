@@ -66,7 +66,7 @@ interface GatewayAddress {
 
 interface ChatMessageItem {
   text: string;
-  variant: "system" | "error" | "output" | "stream" | "execution";
+  variant: "system" | "error" | "output" | "stream" | "execution" | "DIFF";
   lang?: "markdown" | "diff" | "text";
   streamId?: string;
   executionId?: string;
@@ -190,7 +190,7 @@ interface SavedConnectionInfo {
 
 interface PersistedChatMessageItem {
   text: string;
-  variant: "system" | "error" | "output" | "execution";
+  variant: "system" | "error" | "output" | "execution" | "DIFF";
   lang?: "markdown" | "diff" | "text";
   executionId?: string;
   executionBuffer?: string;
@@ -2947,6 +2947,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.postPanelState();
       return;
     }
+    // 处理 DIFF 类型：side by side diff 渲染
+    if (outputType === "DIFF") {
+      const outputText = String(payload?.text || "");
+      if (outputText) {
+        this.appendPanelMessage(outputText, "DIFF", agentId);
+      }
+      return;
+    }
     const outputText = String(payload?.text || "");
     if (outputText) {
       const lang =
@@ -3238,7 +3246,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private appendPanelMessage(
     text: string,
-    variant: "system" | "error" | "output" | "stream" = "system",
+    variant: "system" | "error" | "output" | "stream" | "DIFF" = "system",
     agentId?: string,
     lang: "markdown" | "diff" | "text" = "text",
   ): void {
