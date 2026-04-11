@@ -743,7 +743,7 @@
         </div>
         <div class="form-group">
           <label>密码</label>
-          <input v-model="auth.password" type="password" placeholder="可选" />
+          <input v-model="auth.password" type="password" placeholder="可选" @keydown.enter="connect" />
         </div>
         <div class="form-group">
           <label>网关地址</label>
@@ -764,7 +764,7 @@
         </div>
         <div class="form-group">
           <label>密码</label>
-          <input v-model="auth.password" type="password" placeholder="可选" />
+          <input v-model="auth.password" type="password" placeholder="可选" @keydown.enter="connect" />
         </div>
         <div class="form-group">
           <label>网关地址</label>

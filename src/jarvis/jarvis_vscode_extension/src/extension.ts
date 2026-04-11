@@ -944,6 +944,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         });
       });
     }
+    const passwordInput = document.getElementById('password');
+    if (passwordInput) {
+      passwordInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          const gatewayUrl = document.getElementById('gatewayUrl');
+          const password = document.getElementById('password');
+          vscode.postMessage({
+            type: 'connect',
+            gatewayUrl: gatewayUrl ? gatewayUrl.value : '',
+            password: password ? password.value : ''
+          });
+        }
+      });
+    }
   </script>
 </body>
 </html>`;
