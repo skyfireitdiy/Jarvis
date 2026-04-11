@@ -179,8 +179,139 @@ markedRenderer.code = (token: Parameters<typeof defaultCodeRenderer>[0]) => {
 };
 marked.setOptions({ renderer: markedRenderer });
 
+function getLanguageFromFilename(filename: string): string {
+  if (!filename) return "plaintext";
+
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (!ext) return "plaintext";
+
+  const languageMap: Record<string, string> = {
+    js: "javascript",
+    jsx: "javascript",
+    ts: "typescript",
+    tsx: "typescript",
+    py: "python",
+    java: "java",
+    cpp: "cpp",
+    c: "c",
+    cs: "csharp",
+    php: "php",
+    rb: "ruby",
+    go: "go",
+    rs: "rust",
+    html: "html",
+    css: "css",
+    scss: "scss",
+    json: "json",
+    xml: "xml",
+    yaml: "yaml",
+    yml: "yaml",
+    md: "markdown",
+    sql: "sql",
+    sh: "bash",
+    bash: "bash",
+  };
+
+  return languageMap[ext] || "plaintext";
+}
+
+function renderSideBySideDiff(diffData: any): string {
+  if (!diffData || !diffData.rows) {
+    return '<div class="diff-error">No diff data</div>';
+  }
+
+  const { file_path, additions, deletions, rows } = diffData;
+
+  // 推断语言类型用于语法高亮
+  const language = getLanguageFromFilename(file_path);
+
+  let html = '<div class="diff-side-by-side">';
+
+  // 标题
+  html += '<div class="diff-header">';
+  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || "Unknown")}</span>`;
+  html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`;
+  html += "</div>";
+
+  // 表格
+  html += '<table class="diff-table">';
+
+  rows.forEach((row: any) => {
+    const { type, old_line_num, old_line, new_line_num, new_line } = row;
+
+    // 行背景色类
+    let rowClass = "diff-row diff-row-" + type;
+    html += `<tr class="${rowClass}">`;
+
+    // 旧代码列
+    if (type === "equal" || type === "delete" || type === "replace") {
+      html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ""))}</td>`;
+
+      // 统计并保留缩进
+      let oldContent = "";
+      if (old_line) {
+        const leadingSpaces = old_line.match(/^(\s*)/)?.[0] || "";
+        // 简化版本：不使用highlight.js，直接转义HTML
+        oldContent =
+          "&nbsp;".repeat(leadingSpaces.length) + escapeHtml(old_line);
+      }
+
+      // 对于 replace 和 delete，添加删除背景色到 td
+      const oldClass =
+        type === "replace" || type === "delete" ? "diff-deleted" : "";
+      html += `<td class="diff-content diff-old-content ${oldClass}"><code>${oldContent}</code></td>`;
+    } else {
+      html += '<td class="diff-line-num diff-old-num"></td>';
+      html += '<td class="diff-content diff-old-content"></td>';
+    }
+
+    // 新代码列
+    if (type === "equal" || type === "insert" || type === "replace") {
+      html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ""))}</td>`;
+
+      // 统计并保留缩进
+      let newContent = "";
+      if (new_line) {
+        const leadingSpaces = new_line.match(/^(\s*)/)?.[0] || "";
+        // 简化版本：不使用highlight.js，直接转义HTML
+        newContent =
+          "&nbsp;".repeat(leadingSpaces.length) + escapeHtml(new_line);
+      }
+
+      // 对于 replace 和 insert，添加新增背景色到 td
+      const newClass =
+        type === "replace" || type === "insert" ? "diff-added" : "";
+      html += `<td class="diff-content diff-new-content ${newClass}"><code>${newContent}</code></td>`;
+    } else {
+      html += '<td class="diff-line-num diff-new-num"></td>';
+      html += '<td class="diff-content diff-new-content"></td>';
+    }
+
+    html += "</tr>";
+  });
+
+  html += "</table>";
+  html += "</div>";
+
+  return html;
+}
+
 function renderMessageHtml(item: ChatMessageItem): string {
   const text = String(item.text || "");
+
+  // 检查是否是DIFF类型消息
+  if (item.variant === "DIFF") {
+    try {
+      const diffData = JSON.parse(text);
+      if (diffData.diff_type === "side_by_side") {
+        return renderSideBySideDiff(diffData);
+      }
+    } catch (e) {
+      console.error("[DIFF] Failed to parse side by side diff:", e);
+      return escapeHtml(text);
+    }
+  }
+
   if (item.lang === "markdown") {
     return marked.parse(text) as string;
   }
