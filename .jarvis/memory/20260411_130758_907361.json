@@ -1,0 +1,8 @@
+{
+  "id": "20260411_130758_907361",
+  "type": "project_long_term",
+  "tags": ["VS Code扩展", "终端会话", "UI分析", "问题确认"],
+  "content": "用户反馈终端执行完成后多了一个多行文本框控件。经详细分析：\n1. 终端会话结构正常：header + hint + terminalHost + execution-finished\n2. terminalHost使用.execution-terminal样式（高度240px，边框）\n3. 所有createElement调用都是创建div，没有textarea或input\n4. 用户看到的\"多行文本框\"实际上是终端显示区域的正常UI设计\n5. 确认没有多余的控件，这是预期的显示效果",
+  "created_at": "2026-04-11T13:07:58.907383",
+  "updated_at": "2026-04-11T13:07:58.907388"
+}
