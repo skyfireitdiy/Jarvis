@@ -2345,6 +2345,30 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const targetNodeId = nodeId || "master";
 
+    // 检查是否已经打开了相同路径的文件
+    for (const [localPath, mapping] of this.remoteFileEditors.entries()) {
+      if (
+        mapping.remotePath === filePath &&
+        mapping.agentId === agentId &&
+        mapping.nodeId === targetNodeId
+      ) {
+        // 文件已打开，尝试激活它
+        try {
+          const existingDoc =
+            await vscode.workspace.openTextDocument(localPath);
+          await vscode.window.showTextDocument(existingDoc, {
+            viewColumn: vscode.ViewColumn.One,
+            preserveFocus: false,
+            preview: false,
+          });
+          return;
+        } catch {
+          // 文件可能已被删除，从映射中移除
+          this.remoteFileEditors.delete(localPath);
+        }
+      }
+    }
+
     try {
       // 读取文件内容
       const response = await fetch(
@@ -2369,14 +2393,21 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
       const content = result.data.content || "";
 
-      // 创建临时文件
+      // 创建临时文件（使用稳定的文件名，基于远端路径的 hash）
       const fileName = filePath.split("/").pop() || "untitled";
-      const tempDir = path.join(os.tmpdir(), "jarvis-remote-files", agentId);
+      const tempDir = path.join(
+        os.tmpdir(),
+        "jarvis-remote-files",
+        agentId,
+        targetNodeId,
+      );
       await fs.promises.mkdir(tempDir, { recursive: true });
 
-      // 使用原始文件名，但添加唯一标识避免冲突
-      const uniqueId = Date.now().toString(36);
-      const tempFilePath = path.join(tempDir, `${uniqueId}_${fileName}`);
+      // 使用远端路径的 base64 编码作为唯一标识，确保相同路径生成相同文件名
+      const pathHash = Buffer.from(filePath)
+        .toString("base64")
+        .replace(/[/+=]/g, "_");
+      const tempFilePath = path.join(tempDir, `${pathHash}_${fileName}`);
 
       await fs.promises.writeFile(tempFilePath, content, "utf-8");
 
@@ -2387,10 +2418,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         nodeId: targetNodeId,
       });
 
-      // 在 VSCode 中打开文件（在对话面板旁边打开，不替换对话面板）
+      // 在 VSCode 中打开文件（在第一列打开，会话面板在最右边）
       const document = await vscode.workspace.openTextDocument(tempFilePath);
       await vscode.window.showTextDocument(document, {
-        viewColumn: vscode.ViewColumn.Two,
+        viewColumn: vscode.ViewColumn.One,
         preserveFocus: false,
         preview: false,
       });
