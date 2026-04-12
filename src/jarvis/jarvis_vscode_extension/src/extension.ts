@@ -1203,6 +1203,82 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       color: #fbbf24;
       border-color: rgba(245, 158, 11, 0.3);
     }
+    #clearBufferBtn {
+      background: rgba(239, 68, 68, 0.14);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.28);
+      display: none;
+    }
+    .buffer-indicator {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #fbbf24;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background 0.15s ease;
+    }
+    .buffer-indicator:hover {
+      background: rgba(251, 191, 36, 0.2);
+    }
+    .buffer-indicator .buffer-icon { font-size: 14px; }
+    .buffer-indicator .buffer-text { opacity: 0.9; }
+    .buffer-modal {
+      width: 90%;
+      max-width: 500px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .buffer-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .buffer-panel-title { font-weight: 600; font-size: 14px; }
+    .buffer-panel-actions { display: flex; gap: 8px; }
+    .buffer-panel-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 4px;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-panel-border);
+      cursor: pointer;
+    }
+    .buffer-panel-btn:hover { filter: brightness(1.1); }
+    .buffer-panel-btn.close-btn { background: rgba(239, 68, 68, 0.14); color: #f87171; }
+    .buffer-panel-content { padding: 16px; }
+    .buffer-edit-textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 10px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 13px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .buffer-panel-footer { margin-top: 12px; text-align: right; }
+    .buffer-save-btn {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.9), rgba(22, 163, 74, 0.9));
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .buffer-save-btn:hover { filter: brightness(1.05); }
+    .buffer-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     #sendButton,
     #sendSingleButton {
       min-width: 72px;
@@ -1312,7 +1388,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         <div class="running-spinner"></div>
         <span class="running-text">Agent 正在执行中...</span>
       </div>
+      <div class="buffer-indicator" id="bufferIndicator">
+        <span class="buffer-icon">📝</span>
+        <span class="buffer-text">缓冲区有内容，点击管理</span>
+      </div>
       <div class="input-actions">
+        <button id="clearBufferBtn" class="secondary-button" title="清空缓冲区">清空</button>
         <button id="completionButton" class="secondary-button" title="插入 @">@</button>
         <button id="completeButton" class="secondary-button" title="完成（发送完成信号）">完成</button>
         <button id="manualInterruptButton" class="secondary-button" title="人工干预" style="display:none;">人工干预</button>

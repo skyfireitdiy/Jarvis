@@ -106,6 +106,11 @@ let currentSelectedAgentId = "";
 let currentConfirmAgentId = "";
 let wasRunningIndicatorVisible = false;
 let currentExecutionStatus = "running";
+
+// 缓冲区相关状态
+const inputBuffers = new Map<string, string>(); // 每个 Agent 的输入缓冲区
+let showBufferPanel = false;
+let bufferEditText = "";
 let completionCursorPos = -1;
 let baseCompletions: CompletionItem[] = [];
 let searchedCompletions: CompletionItem[] = [];
@@ -874,16 +879,40 @@ function navigateHistory(direction: "up" | "down"): void {
 function sendCurrentInput(mode: "single" | "multi"): void {
   const inputEl = mode === "single" ? singleMessageInput : messageInput;
   const text = inputEl ? inputEl.value : "";
-  if (text.trim()) {
+
+  // 单行输入模式：直接发送
+  // 多行输入模式：根据执行状态决定是直接发送还是保存到缓冲区
+  if (mode === "single" || currentExecutionStatus === "waiting_multi") {
+    // 后端正在等待输入，直接发送
+    if (text.trim()) {
+      addToInputHistory(text);
+    }
+    vscode.postMessage({ type: "sendMessage", text });
+    if (inputEl) {
+      inputEl.value = "";
+    }
+  } else {
+    // 后端没有等待输入，保存到缓冲区
+    if (!text.trim()) return;
     addToInputHistory(text);
-  }
-  vscode.postMessage({ type: "sendMessage", text });
-  if (inputEl) {
-    inputEl.value = "";
+    appendToInputBuffer(currentSelectedAgentId, text);
+    if (inputEl) {
+      inputEl.value = "";
+    }
+    // 显示提示消息
+    vscode.postMessage({
+      type: "bufferAppended",
+      text: "✓ 输入已追加到缓冲区，等待后端请求",
+    });
   }
 }
 
 sendButton?.addEventListener("click", () => {
+  // 如果有缓冲区内容且不在等待多行输入状态，发送缓冲区
+  if (hasBufferedInput() && currentExecutionStatus !== "waiting_multi") {
+    sendBufferedInput();
+    return;
+  }
   const text = messageInput ? messageInput.value : "";
   if (!text.trim()) {
     return;
@@ -905,6 +934,22 @@ completeButton?.addEventListener("click", () => {
 
 manualInterruptButton?.addEventListener("click", () => {
   vscode.postMessage({ type: "sendManualInterrupt" });
+});
+
+// 缓冲区指示器和清空按钮
+const bufferIndicator = document.getElementById(
+  "bufferIndicator",
+) as HTMLDivElement | null;
+const clearBufferBtn = document.getElementById(
+  "clearBufferBtn",
+) as HTMLButtonElement | null;
+
+bufferIndicator?.addEventListener("click", () => {
+  openBufferPanel();
+});
+
+clearBufferBtn?.addEventListener("click", () => {
+  clearBuffer();
 });
 
 messageInput?.addEventListener("keydown", (event) => {
@@ -1185,8 +1230,213 @@ window.addEventListener(
       });
     }
     wasRunningIndicatorVisible = isRunningIndicatorVisible;
+
+    // 更新缓冲区 UI
+    updateBufferUI();
+
+    // 当状态变为 waiting_multi 时，检查是否有缓冲区内容需要自动发送
+    if (isWaitingMulti && hasBufferedInput()) {
+      const bufferedText = inputBuffers.get(currentSelectedAgentId) || "";
+      // 完成信号只发送给多行输入
+      const isCompletionSignal = bufferedText === "__CTRL_C_PRESSED__";
+      if (!isCompletionSignal || payload.inputMode === "multi") {
+        console.log("[BUFFER] Auto-sending buffered input");
+        inputBuffers.delete(currentSelectedAgentId);
+        updateBufferUI();
+        vscode.postMessage({ type: "sendMessage", text: bufferedText });
+      } else {
+        // 完成信号不能发送给单行输入，清空缓冲区
+        console.log(
+          "[BUFFER] Completion signal in buffer but request is single-line, discarding",
+        );
+        inputBuffers.delete(currentSelectedAgentId);
+        updateBufferUI();
+      }
+    }
   },
 );
 
 // 初始化：加载输入历史
 loadInputHistoryFromStorage();
+
+// ========== 缓冲区功能 ==========
+
+// 检查当前 Agent 是否有缓冲区内容
+function hasBufferedInput(): boolean {
+  return currentSelectedAgentId
+    ? inputBuffers.has(currentSelectedAgentId)
+    : false;
+}
+
+// 更新缓冲区内容
+function updateInputBuffer(agentId: string, nextValue: string): void {
+  inputBuffers.set(agentId, nextValue);
+  if (currentSelectedAgentId === agentId) {
+    bufferEditText = nextValue;
+  }
+  updateBufferUI();
+}
+
+// 追加内容到缓冲区
+function appendToInputBuffer(agentId: string, text: string): void {
+  const existingText = inputBuffers.get(agentId) || "";
+  const nextValue = existingText ? `${existingText}\n${text}` : text;
+  updateInputBuffer(agentId, nextValue);
+}
+
+// 清空缓冲区
+function clearBuffer(): void {
+  if (!currentSelectedAgentId) return;
+  inputBuffers.delete(currentSelectedAgentId);
+  updateBufferUI();
+  // 发送系统消息
+  vscode.postMessage({
+    type: "bufferCleared",
+    text: "🗑️ 缓冲区已清空",
+  });
+}
+
+// 加载缓冲区内容到输入框
+function loadBufferToInput(): void {
+  if (!currentSelectedAgentId || !inputBuffers.has(currentSelectedAgentId))
+    return;
+  const bufferedText = inputBuffers.get(currentSelectedAgentId) || "";
+  const inputElement = getActiveInputElement();
+  if (inputElement) {
+    inputElement.value = bufferedText;
+    inputElement.focus();
+  }
+  closeBufferPanel();
+}
+
+// 保存缓冲区编辑
+function saveBufferEdit(): void {
+  if (!currentSelectedAgentId || !bufferEditText.trim()) return;
+  updateInputBuffer(currentSelectedAgentId, bufferEditText.trim());
+  closeBufferPanel();
+}
+
+// 发送缓冲区内容
+function sendBufferedInput(): void {
+  if (!currentSelectedAgentId || !inputBuffers.has(currentSelectedAgentId))
+    return;
+  const bufferedText = inputBuffers.get(currentSelectedAgentId) || "";
+  inputBuffers.delete(currentSelectedAgentId);
+  updateBufferUI();
+  vscode.postMessage({ type: "sendMessage", text: bufferedText });
+}
+
+// 打开缓冲区管理面板
+function openBufferPanel(): void {
+  if (!hasBufferedInput()) return;
+  bufferEditText = inputBuffers.get(currentSelectedAgentId) || "";
+  showBufferPanel = true;
+  renderBufferPanel();
+}
+
+// 关闭缓冲区管理面板
+function closeBufferPanel(): void {
+  showBufferPanel = false;
+  renderBufferPanel();
+}
+
+// 更新缓冲区 UI 状态
+function updateBufferUI(): void {
+  const hasBuffer = hasBufferedInput();
+  const isNotWaitingMulti = currentExecutionStatus !== "waiting_multi";
+  const shouldShowIndicator = hasBuffer && isNotWaitingMulti;
+
+  // 更新缓冲区指示器
+  const bufferIndicator = document.getElementById("bufferIndicator");
+  if (bufferIndicator) {
+    bufferIndicator.style.display = shouldShowIndicator ? "flex" : "none";
+  }
+
+  // 更新清空缓冲区按钮
+  const clearBufferBtn = document.getElementById("clearBufferBtn");
+  if (clearBufferBtn) {
+    (clearBufferBtn as HTMLButtonElement).style.display = shouldShowIndicator
+      ? "inline-flex"
+      : "none";
+  }
+
+  // 更新发送按钮文本
+  const sendBtn = sendButton || sendSingleButton;
+  if (sendBtn) {
+    sendBtn.textContent = shouldShowIndicator ? "发送缓冲区" : "发送";
+  }
+}
+
+// 渲染缓冲区管理面板
+function renderBufferPanel(): void {
+  let overlay = document.getElementById("bufferPanelOverlay");
+
+  if (!showBufferPanel) {
+    if (overlay) {
+      overlay.remove();
+    }
+    return;
+  }
+
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "bufferPanelOverlay";
+    overlay.className = "modal-overlay visible";
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeBufferPanel();
+    });
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML = `
+    <div class="modal buffer-modal">
+      <div class="buffer-panel-header">
+        <span class="buffer-panel-title">📝 输入缓存</span>
+        <div class="buffer-panel-actions">
+          <button class="buffer-panel-btn" id="loadBufferBtn" title="加载到输入框">↙ 加载</button>
+          <button class="buffer-panel-btn" id="clearBufferPanelBtn" title="清空缓存">🗑️</button>
+          <button class="buffer-panel-btn close-btn" id="closeBufferPanelBtn" title="关闭面板">✕</button>
+        </div>
+      </div>
+      <div class="buffer-panel-content">
+        <textarea id="bufferEditTextarea" class="buffer-edit-textarea" placeholder="缓存内容...">${bufferEditText}</textarea>
+        <div class="buffer-panel-footer">
+          <button class="buffer-save-btn" id="saveBufferBtn">保存修改 (Ctrl+Enter)</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 绑定事件
+  document
+    .getElementById("loadBufferBtn")
+    ?.addEventListener("click", loadBufferToInput);
+  document
+    .getElementById("clearBufferPanelBtn")
+    ?.addEventListener("click", () => {
+      clearBuffer();
+      closeBufferPanel();
+    });
+  document
+    .getElementById("closeBufferPanelBtn")
+    ?.addEventListener("click", closeBufferPanel);
+  document
+    .getElementById("saveBufferBtn")
+    ?.addEventListener("click", saveBufferEdit);
+
+  const textarea = document.getElementById(
+    "bufferEditTextarea",
+  ) as HTMLTextAreaElement;
+  if (textarea) {
+    textarea.addEventListener("input", () => {
+      bufferEditText = textarea.value;
+    });
+    textarea.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.key === "Enter") {
+        e.preventDefault();
+        saveBufferEdit();
+      }
+    });
+    textarea.focus();
+  }
+}
