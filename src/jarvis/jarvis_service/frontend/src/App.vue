@@ -4002,7 +4002,8 @@ function insertCompletion(item) {
 async function fetchAgentList() {
   try {
     const { host, port } = getGatewayAddress()
-    const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    // 始终使用 'master' 节点来获取所有节点的 agent 列表
+    const targetNodeId = 'master'
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'))
     
     if (!response.ok) return
