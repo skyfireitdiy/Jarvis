@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
 import WebSocket, { RawData } from "ws";
+import * as path from "path";
+import * as fs from "fs";
+import * as os from "os";
 
 // 节流函数：在指定时间间隔内最多执行一次
 function throttle<T extends Function>(func: T, delay: number): T {
@@ -135,6 +138,16 @@ interface RemoteDirectoryItem {
   type: string;
 }
 
+// 文件树节点
+interface FileTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  expanded?: boolean;
+  loaded?: boolean;
+  children?: FileTreeNode[];
+}
+
 interface RemoteDirectoryBrowserState {
   isVisible: boolean;
   currentPath: string;
@@ -257,6 +270,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readonly independentTerminalSessions = new Map<
     string,
     IndependentTerminalSession
+  >();
+  // 文件树状态：agentId -> FileTreeNode[]
+  private readonly fileTreeState = new Map<string, FileTreeNode[]>();
+  // 文件树展开状态：agentId -> Set<expandedPaths>
+  private readonly fileTreeExpanded = new Map<string, Set<string>>();
+  // 远端文件编辑：本地临时文件路径 -> { agentId, remotePath, nodeId }
+  private readonly remoteFileEditors = new Map<
+    string,
+    { agentId: string; remotePath: string; nodeId: string }
   >();
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
@@ -392,6 +414,25 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "createTerminal") {
           await this.createTerminalForAgent(message.agentId);
+          return;
+        }
+        if (message?.type === "toggleFileTree") {
+          await this.handleToggleFileTree(
+            message.agentId,
+            message.workingDir,
+            message.nodeId,
+          );
+          return;
+        }
+        if (message?.type === "toggleFileTreeNode") {
+          await this.handleToggleFileTreeNode(
+            message.agentId,
+            message.nodePath,
+          );
+          return;
+        }
+        if (message?.type === "openRemoteFile") {
+          await this.handleOpenRemoteFile(message.agentId, message.filePath);
           return;
         }
         if (message?.type === "toggleConnectionLock") {
@@ -605,6 +646,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       : "";
     const agentListMarkup = this.agentItems
       .map((agentItem) => {
+        const hasFileTree = this.fileTreeState.has(agentItem.id);
+        const fileTreeHtml = hasFileTree
+          ? this.generateFileTreeHtml(agentItem.id)
+          : '<div class="file-tree-empty">点击 📂 加载文件树</div>';
+        const fileTreeExpanded =
+          hasFileTree &&
+          (this.fileTreeState.get(agentItem.id)?.length || 0) > 0;
         return `
     <li data-agent-id="${agentItem.id}" class="agent-item ${agentItem.statusClass}">
       <div class="agent-row">
@@ -620,9 +668,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
         <div class="agent-actions">
+          <button class="icon-button" type="button" data-filetree-agent-id="${agentItem.id}" data-working-dir="${escapeHtml(agentItem.workingDir || "")}" data-node-id="${escapeHtml(agentItem.nodeId || "")}" title="文件树">📂</button>
           <button class="icon-button" type="button" data-terminal-agent-id="${agentItem.id}" title="创建终端">💻</button>
           <button class="icon-button" type="button" data-copy-agent-id="${agentItem.id}" title="复制 Agent">📋</button>
           <button class="icon-button" type="button" data-delete-agent-id="${agentItem.id}" title="删除 Agent">🗑</button>
+        </div>
+      </div>
+      <div class="file-tree-container ${fileTreeExpanded ? "expanded" : ""}" data-agent-id="${agentItem.id}">
+        <div class="file-tree-content">
+          ${fileTreeHtml}
         </div>
       </div>
     </li>`;
@@ -718,6 +772,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
     .agent-actions { display: flex; gap: 6px; }
     .icon-button { padding: 4px 6px; min-width: auto; }
+    .file-tree-container { max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out; border-top: none; margin-top: 0; }
+    .file-tree-container.expanded { max-height: 300px; overflow-y: auto; border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 8px; }
+    .file-tree-content { font-size: 12px; }
+    .file-tree-empty { padding: 8px; opacity: 0.6; font-size: 12px; }
+    .file-tree-node { display: flex; align-items: center; padding: 3px 4px; cursor: pointer; border-radius: 3px; }
+    .file-tree-node:hover { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.06)); }
+    .expand-arrow { width: 16px; font-size: 10px; opacity: 0.7; flex-shrink: 0; }
+    .expand-arrow-placeholder { width: 16px; flex-shrink: 0; }
+    .file-icon { margin-right: 4px; }
+    .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .create-agent-panel { border: 1px solid rgba(34, 197, 94, 0.35); border-radius: 10px; padding: 10px; margin-bottom: 12px; background: rgba(34, 197, 94, 0.07); box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.08); }
     .panel-section-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.01em; }
     .create-agent-title { color: #86efac; }
@@ -898,6 +962,30 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       item.addEventListener('click', (event) => {
         event.stopPropagation();
         vscode.postMessage({ type: 'deleteAgent', agentId: item.getAttribute('data-delete-agent-id') });
+      });
+    });
+    // 文件树按钮点击
+    document.querySelectorAll('[data-filetree-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const agentId = item.getAttribute('data-filetree-agent-id');
+        const workingDir = item.getAttribute('data-working-dir');
+        const nodeId = item.getAttribute('data-node-id');
+        vscode.postMessage({ type: 'toggleFileTree', agentId, workingDir, nodeId });
+      });
+    });
+    // 文件树节点点击
+    document.querySelectorAll('.file-tree-node').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const nodePath = item.getAttribute('data-path');
+        const nodeType = item.getAttribute('data-type');
+        const agentId = item.getAttribute('data-agent-id');
+        if (nodeType === 'directory') {
+          vscode.postMessage({ type: 'toggleFileTreeNode', agentId, nodePath });
+        } else {
+          vscode.postMessage({ type: 'openRemoteFile', agentId, filePath: nodePath });
+        }
       });
     });
     document.querySelectorAll('[data-agent-id]').forEach((item) => {
@@ -2097,6 +2185,358 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.independentTerminalSessions.delete(terminalId);
   }
 
+  // ========== 文件树功能 ==========
+
+  // 初始化文件树状态
+  private initFileTreeState(agentId: string): void {
+    if (!this.fileTreeState.has(agentId)) {
+      this.fileTreeState.set(agentId, []);
+      this.fileTreeExpanded.set(agentId, new Set());
+    }
+  }
+
+  // 加载目录内容
+  private async loadFileTreeNode(
+    agentId: string,
+    node: FileTreeNode,
+    nodeId?: string,
+  ): Promise<void> {
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    const targetNodeId = nodeId || "master";
+    const url = buildNodeHttpUrl(
+      gatewayAddress,
+      targetNodeId,
+      `directories?path=${encodeURIComponent(node.path)}`,
+    );
+
+    try {
+      const response = await fetch(url, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        console.error("[FILETREE] 加载目录失败:", await response.text());
+        return;
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        const children: FileTreeNode[] = (result.data.items || []).map(
+          (item: RemoteDirectoryItem) => {
+            if (item.type === "file") {
+              return {
+                name: item.name,
+                path: item.path,
+                type: "file" as const,
+              };
+            }
+            return {
+              name: item.name,
+              path: item.path,
+              type: "directory" as const,
+              expanded: false,
+              loaded: false,
+              children: [],
+            };
+          },
+        );
+        node.children = children;
+        node.loaded = true;
+      }
+    } catch (error) {
+      console.error("[FILETREE] 加载目录出错:", error);
+    }
+  }
+
+  // 初始化文件树（加载根目录）
+  private async initFileTree(
+    agentId: string,
+    rootPath: string,
+    nodeId?: string,
+  ): Promise<void> {
+    this.initFileTreeState(agentId);
+
+    const rootNode: FileTreeNode = {
+      name: rootPath.split("/").pop() || rootPath,
+      path: rootPath,
+      type: "directory",
+      expanded: true,
+      loaded: false,
+      children: [],
+    };
+
+    await this.loadFileTreeNode(agentId, rootNode, nodeId);
+    this.fileTreeState.set(agentId, [rootNode]);
+    this.fileTreeExpanded.get(agentId)?.add(rootPath);
+  }
+
+  // 切换节点展开/收缩
+  private async toggleFileTreeNode(
+    agentId: string,
+    nodePath: string,
+    nodeId?: string,
+  ): Promise<void> {
+    const treeNodes = this.fileTreeState.get(agentId);
+    if (!treeNodes) return;
+
+    const node = this.findFileTreeNode(treeNodes, nodePath);
+    if (!node || node.type !== "directory") return;
+
+    const expandedSet = this.fileTreeExpanded.get(agentId);
+    if (!expandedSet) return;
+
+    if (node.expanded) {
+      node.expanded = false;
+      expandedSet.delete(nodePath);
+    } else {
+      node.expanded = true;
+      expandedSet.add(nodePath);
+      if (!node.loaded) {
+        await this.loadFileTreeNode(agentId, node, nodeId);
+      }
+    }
+  }
+
+  // 递归查找节点
+  private findFileTreeNode(
+    nodes: FileTreeNode[],
+    path: string,
+  ): FileTreeNode | null {
+    for (const node of nodes) {
+      if (node.path === path) {
+        return node;
+      }
+      if (node.children && node.children.length > 0) {
+        const found = this.findFileTreeNode(node.children, path);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // 获取可见的文件树节点（扁平化）
+  private getVisibleFileTreeNodes(
+    agentId: string,
+  ): Array<{ node: FileTreeNode; depth: number }> {
+    const treeNodes = this.fileTreeState.get(agentId) || [];
+    return this.flattenFileTreeNodes(treeNodes, 0);
+  }
+
+  private flattenFileTreeNodes(
+    nodes: FileTreeNode[],
+    depth: number,
+  ): Array<{ node: FileTreeNode; depth: number }> {
+    const result: Array<{ node: FileTreeNode; depth: number }> = [];
+    for (const node of nodes) {
+      result.push({ node, depth });
+      if (node.expanded && node.children && node.children.length > 0) {
+        result.push(...this.flattenFileTreeNodes(node.children, depth + 1));
+      }
+    }
+    return result;
+  }
+
+  // 打开远端文件进行编辑
+  private async openRemoteFile(
+    agentId: string,
+    filePath: string,
+    nodeId?: string,
+  ): Promise<void> {
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    const targetNodeId = nodeId || "master";
+
+    try {
+      // 读取文件内容
+      const response = await fetch(
+        buildNodeHttpUrl(gatewayAddress, targetNodeId, "file-content"),
+        {
+          method: "POST",
+          headers: {
+            ...this.getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ path: filePath, node_id: targetNodeId }),
+        },
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.data) {
+        vscode.window.showErrorMessage(
+          `读取文件失败: ${result.error?.message || "未知错误"}`,
+        );
+        return;
+      }
+
+      const content = result.data.content || "";
+
+      // 创建临时文件
+      const fileName = filePath.split("/").pop() || "untitled";
+      const tempDir = path.join(os.tmpdir(), "jarvis-remote-files", agentId);
+      await fs.promises.mkdir(tempDir, { recursive: true });
+
+      // 使用原始文件名，但添加唯一标识避免冲突
+      const uniqueId = Date.now().toString(36);
+      const tempFilePath = path.join(tempDir, `${uniqueId}_${fileName}`);
+
+      await fs.promises.writeFile(tempFilePath, content, "utf-8");
+
+      // 记录映射关系
+      this.remoteFileEditors.set(tempFilePath, {
+        agentId,
+        remotePath: filePath,
+        nodeId: targetNodeId,
+      });
+
+      // 在 VSCode 中打开文件
+      const document = await vscode.workspace.openTextDocument(tempFilePath);
+      await vscode.window.showTextDocument(document);
+
+      vscode.window.showInformationMessage(
+        `已打开远端文件: ${filePath} (保存时将同步到远端)`,
+      );
+    } catch (error) {
+      console.error("[FILETREE] 打开文件出错:", error);
+      vscode.window.showErrorMessage(`打开文件失败: ${error}`);
+    }
+  }
+
+  // 保存文件到远端
+  private async saveRemoteFile(localPath: string): Promise<boolean> {
+    const mapping = this.remoteFileEditors.get(localPath);
+    if (!mapping) {
+      return false;
+    }
+
+    const { remotePath, nodeId } = mapping;
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+
+    try {
+      const content = await fs.promises.readFile(localPath, "utf-8");
+
+      const response = await fetch(
+        buildNodeHttpUrl(gatewayAddress, nodeId, "file-write"),
+        {
+          method: "POST",
+          headers: {
+            ...this.getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            path: remotePath,
+            content,
+            node_id: nodeId,
+          }),
+        },
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        vscode.window.showErrorMessage(
+          `保存到远端失败: ${result.error?.message || "未知错误"}`,
+        );
+        return false;
+      }
+
+      vscode.window.showInformationMessage(`已同步到远端: ${remotePath}`);
+      return true;
+    } catch (error) {
+      console.error("[FILETREE] 保存文件出错:", error);
+      vscode.window.showErrorMessage(`保存文件失败: ${error}`);
+      return false;
+    }
+  }
+
+  // 生成文件树 HTML
+  private generateFileTreeHtml(agentId: string): string {
+    const visibleNodes = this.getVisibleFileTreeNodes(agentId);
+    if (visibleNodes.length === 0) {
+      return '<div class="file-tree-empty">点击上方按钮加载文件树</div>';
+    }
+
+    return visibleNodes
+      .map(({ node, depth }) => {
+        const indent = depth * 16;
+        const isDir = node.type === "directory";
+        const icon = isDir ? (node.expanded ? "📂" : "📁") : "📄";
+        const expandArrow = isDir
+          ? `<span class="expand-arrow ${node.expanded ? "expanded" : ""}">${node.expanded ? "▼" : "▶"}</span>`
+          : '<span class="expand-arrow-placeholder"></span>';
+
+        return `
+          <div class="file-tree-node" style="padding-left: ${indent}px;" 
+               data-path="${escapeHtml(node.path)}" 
+               data-type="${node.type}"
+               data-agent-id="${agentId}">
+            ${expandArrow}
+            <span class="file-icon">${icon}</span>
+            <span class="file-name">${escapeHtml(node.name)}</span>
+          </div>`;
+      })
+      .join("");
+  }
+
+  // 处理文件树按钮点击
+  private async handleToggleFileTree(
+    agentId: string,
+    workingDir: string,
+    nodeId?: string,
+  ): Promise<void> {
+    if (!agentId || !workingDir) {
+      vscode.window.showWarningMessage("无法加载文件树：缺少工作目录信息");
+      return;
+    }
+
+    // 如果已有文件树，切换展开/收缩状态
+    if (this.fileTreeState.has(agentId)) {
+      const treeNodes = this.fileTreeState.get(agentId);
+      if (treeNodes && treeNodes.length > 0) {
+        // 清除文件树（收缩）
+        this.fileTreeState.delete(agentId);
+        this.fileTreeExpanded.delete(agentId);
+      } else {
+        // 重新加载
+        await this.initFileTree(agentId, workingDir, nodeId);
+      }
+    } else {
+      // 初始化文件树
+      await this.initFileTree(agentId, workingDir, nodeId);
+    }
+
+    this.renderAgentListView();
+  }
+
+  // 处理文件树节点点击
+  private async handleToggleFileTreeNode(
+    agentId: string,
+    nodePath: string,
+  ): Promise<void> {
+    // 获取 agent 的 nodeId
+    const agent = this.agentItems.find((a) => a.id === agentId);
+    const nodeId = agent?.nodeId;
+
+    await this.toggleFileTreeNode(agentId, nodePath, nodeId);
+    this.renderAgentListView();
+  }
+
+  // 处理打开远端文件
+  private async handleOpenRemoteFile(
+    agentId: string,
+    filePath: string,
+  ): Promise<void> {
+    // 获取 agent 的 nodeId
+    const agent = this.agentItems.find((a) => a.id === agentId);
+    const nodeId = agent?.nodeId;
+
+    await this.openRemoteFile(agentId, filePath, nodeId);
+  }
+
+  // 同步远端文件（公共方法，供 activate 中的事件监听调用）
+  public async syncRemoteFile(localPath: string): Promise<void> {
+    await this.saveRemoteFile(localPath);
+  }
+
+  // ========== 文件树功能结束 ==========
+
   private async loginWithPassword(password: string): Promise<string> {
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const response = await fetch(
@@ -2114,6 +2554,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       throw new Error(result.error?.message || "登录失败");
     }
     return result.data.token;
+  }
+
+  // 获取认证头
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (this.panelState.token) {
+      headers["Authorization"] = `Bearer ${this.panelState.token}`;
+    }
+    return headers;
   }
 
   private async fetchWithAuth(
@@ -3939,6 +4388,17 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("jarvis.openPanel", async () => {
       await provider.openChatPanel();
+    }),
+  );
+
+  // 监听文件保存事件，同步远端文件
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
+      const localPath = document.uri.fsPath;
+      // 检查是否是远端文件编辑
+      if (localPath.includes("jarvis-remote-files")) {
+        await provider.syncRemoteFile(localPath);
+      }
     }),
   );
 }
