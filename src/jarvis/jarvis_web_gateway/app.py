@@ -594,9 +594,12 @@ class WebSocketConnectionManager:
                     if message_type == "terminal_create" and resp_payload.get(
                         "success"
                     ):
+                        result_data = resp_payload.get("data") or {}
+                        # 添加 node_id 以便前端知道终端在哪个节点上
+                        result_data["node_id"] = terminal_node_id
                         result_msg = {
                             "type": "terminal_created",
-                            "payload": resp_payload.get("data") or {},
+                            "payload": result_data,
                         }
                         self._router.publish(result_msg, session_id=session_id)
                     elif message_type == "terminal_close" and resp_payload.get(

@@ -100,6 +100,17 @@ interface ExecutionTerminalSession {
   closed: boolean;
 }
 
+interface IndependentTerminalSession {
+  terminalId: string;
+  nodeId: string;
+  interpreter: string;
+  workingDir: string;
+  vscodeTerminal: vscode.Terminal | undefined;
+  pty: vscode.Pseudoterminal | undefined;
+  writeEmitter: vscode.EventEmitter<string> | undefined;
+  closed: boolean;
+}
+
 interface ChatPanelState {
   gatewayUrl: string;
   password: string;
@@ -243,6 +254,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     string,
     ExecutionTerminalSession
   >();
+  private readonly independentTerminalSessions = new Map<
+    string,
+    IndependentTerminalSession
+  >();
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "agent",
@@ -373,6 +388,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "deleteAgent") {
           await this.deleteAgent(message.agentId);
+          return;
+        }
+        if (message?.type === "createTerminal") {
+          await this.createTerminalForAgent(message.agentId);
           return;
         }
         if (message?.type === "toggleConnectionLock") {
@@ -601,6 +620,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
         <div class="agent-actions">
+          <button class="icon-button" type="button" data-terminal-agent-id="${agentItem.id}" title="创建终端">💻</button>
           <button class="icon-button" type="button" data-copy-agent-id="${agentItem.id}" title="复制 Agent">📋</button>
           <button class="icon-button" type="button" data-delete-agent-id="${agentItem.id}" title="删除 Agent">🗑</button>
         </div>
@@ -862,6 +882,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'cancelCreateAgent' });
       });
     }
+    document.querySelectorAll('[data-terminal-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'createTerminal', agentId: item.getAttribute('data-terminal-agent-id') });
+      });
+    });
     document.querySelectorAll('[data-copy-agent-id]').forEach((item) => {
       item.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -1852,6 +1878,218 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private async createTerminalForAgent(agentId?: string): Promise<void> {
+    const targetAgentId = String(
+      agentId || this.panelState.selectedAgentId || "",
+    ).trim();
+    if (!targetAgentId) {
+      vscode.window.showErrorMessage("请先选择一个 Agent");
+      return;
+    }
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage("请先连接 Jarvis 网关");
+      return;
+    }
+    const gatewaySocket = this.panelState.gatewaySocket;
+    if (!gatewaySocket || gatewaySocket.readyState !== WebSocket.OPEN) {
+      vscode.window.showErrorMessage("网关未连接，无法创建终端");
+      return;
+    }
+
+    const agentItem = this.agentItems.find((item) => item.id === targetAgentId);
+    const nodeId = String(agentItem?.nodeId || "").trim();
+    const workingDir = String(agentItem?.workingDir || "").trim();
+
+    const payload: Record<string, string> = {};
+    if (nodeId) {
+      payload.node_id = nodeId;
+    }
+    if (workingDir) {
+      payload.working_dir = workingDir;
+    }
+
+    this.sendSocketMessage(gatewaySocket, {
+      type: "terminal_create",
+      payload,
+    });
+  }
+
+  private handleTerminalCreated(payload: Record<string, unknown>): void {
+    const terminalId = String(payload?.terminal_id || "").trim();
+    if (!terminalId) {
+      return;
+    }
+
+    const nodeId = String(payload?.node_id || "").trim();
+    const interpreter = String(payload?.interpreter || "bash").trim();
+    const workingDir = String(payload?.working_dir || ".").trim();
+
+    // 创建 EventEmitter 用于向终端写入数据
+    const writeEmitter = new vscode.EventEmitter<string>();
+
+    // 创建 Pseudoterminal
+    const pty: vscode.Pseudoterminal = {
+      onDidWrite: writeEmitter.event,
+      open: (initialDimensions?: vscode.TerminalDimensions) => {
+        writeEmitter.fire(`\x1b[32mJarvis Terminal [${terminalId}]\x1b[0m\r\n`);
+        writeEmitter.fire(`Working directory: ${workingDir}\r\n\r\n`);
+        // 发送初始尺寸
+        console.log("[TERMINAL OPEN] initialDimensions:", initialDimensions);
+        if (initialDimensions) {
+          this.sendIndependentTerminalResize(
+            terminalId,
+            initialDimensions.columns,
+            initialDimensions.rows,
+          );
+        } else {
+          // 如果没有初始尺寸，使用默认值
+          this.sendIndependentTerminalResize(terminalId, 80, 24);
+        }
+      },
+      close: () => {
+        this.closeIndependentTerminal(terminalId);
+      },
+      handleInput: (data: string) => {
+        this.sendIndependentTerminalInput(terminalId, data);
+      },
+      setDimensions: (dimensions: vscode.TerminalDimensions) => {
+        this.sendIndependentTerminalResize(
+          terminalId,
+          dimensions.columns,
+          dimensions.rows,
+        );
+      },
+    };
+
+    // 创建 VSCode 终端
+    const vscodeTerminal = vscode.window.createTerminal({
+      name: `Jarvis: ${interpreter}`,
+      pty,
+    });
+
+    // 保存会话
+    const session: IndependentTerminalSession = {
+      terminalId,
+      nodeId,
+      interpreter,
+      workingDir,
+      vscodeTerminal,
+      pty,
+      writeEmitter,
+      closed: false,
+    };
+    this.independentTerminalSessions.set(terminalId, session);
+
+    // 显示终端
+    vscodeTerminal.show();
+  }
+
+  private sendIndependentTerminalInput(terminalId: string, data: string): void {
+    const session = this.independentTerminalSessions.get(terminalId);
+    if (!session || session.closed) {
+      return;
+    }
+    const gatewaySocket = this.panelState.gatewaySocket;
+    if (!gatewaySocket || gatewaySocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const payload: Record<string, string> = {
+      terminal_id: terminalId,
+      data,
+    };
+    if (session.nodeId) {
+      payload.node_id = session.nodeId;
+    }
+
+    this.sendSocketMessage(gatewaySocket, {
+      type: "terminal_session_input",
+      payload,
+    });
+  }
+
+  private sendIndependentTerminalResize(
+    terminalId: string,
+    rows: number,
+    cols: number,
+  ): void {
+    const session = this.independentTerminalSessions.get(terminalId);
+    if (!session || session.closed) {
+      return;
+    }
+    const gatewaySocket = this.panelState.gatewaySocket;
+    if (!gatewaySocket || gatewaySocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const payload: Record<string, string | number> = {
+      terminal_id: terminalId,
+      rows,
+      cols,
+    };
+    if (session.nodeId) {
+      payload.node_id = session.nodeId;
+    }
+
+    this.sendSocketMessage(gatewaySocket, {
+      type: "terminal_session_resize",
+      payload,
+    });
+  }
+
+  private handleIndependentTerminalOutput(
+    terminalId: string,
+    data: string,
+    encoded: boolean,
+  ): void {
+    const session = this.independentTerminalSessions.get(terminalId);
+    if (!session || session.closed || !session.writeEmitter) {
+      return;
+    }
+
+    let outputData = data;
+    if (encoded) {
+      try {
+        outputData = Buffer.from(data, "base64").toString("utf-8");
+      } catch {
+        outputData = data;
+      }
+    }
+
+    session.writeEmitter.fire(outputData);
+  }
+
+  private closeIndependentTerminal(terminalId: string): void {
+    const session = this.independentTerminalSessions.get(terminalId);
+    if (!session) {
+      return;
+    }
+
+    session.closed = true;
+
+    // 发送关闭消息到后端
+    const gatewaySocket = this.panelState.gatewaySocket;
+    if (gatewaySocket && gatewaySocket.readyState === WebSocket.OPEN) {
+      const payload: Record<string, string> = {
+        terminal_id: terminalId,
+      };
+      if (session.nodeId) {
+        payload.node_id = session.nodeId;
+      }
+      this.sendSocketMessage(gatewaySocket, {
+        type: "terminal_close",
+        payload,
+      });
+    }
+
+    // 清理资源
+    if (session.writeEmitter) {
+      session.writeEmitter.dispose();
+    }
+
+    this.independentTerminalSessions.delete(terminalId);
+  }
+
   private async loginWithPassword(password: string): Promise<string> {
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const response = await fetch(
@@ -2806,6 +3044,32 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (parsedMessage.type === "execution") {
+      // 检查是否是独立终端的输出
+      const executionId = String(
+        parsedMessage.payload?.execution_id || "",
+      ).trim();
+      console.log(
+        "[GATEWAY] execution message:",
+        executionId,
+        "sessions:",
+        Array.from(this.independentTerminalSessions.keys()),
+      );
+      if (executionId.startsWith("terminal_")) {
+        const terminalId = executionId.replace("terminal_", "");
+        const data = String(parsedMessage.payload?.data || "");
+        const encoded = Boolean(parsedMessage.payload?.encoded);
+        console.log(
+          "[GATEWAY TERMINAL] output for:",
+          terminalId,
+          "data length:",
+          data.length,
+          "encoded:",
+          encoded,
+        );
+        this.handleIndependentTerminalOutput(terminalId, data, encoded);
+        return;
+      }
+      // 非独立终端的执行输出
       const agentId = this.panelState.selectedAgentId;
       if (agentId) {
         this.handleExecutionPayload(agentId, parsedMessage.payload);
@@ -2830,6 +3094,63 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           );
         });
         this.postPanelState();
+      }
+      return;
+    }
+    if (parsedMessage.type === "terminal_created") {
+      this.handleTerminalCreated(
+        parsedMessage.payload as Record<string, unknown>,
+      );
+      return;
+    }
+    if (parsedMessage.type === "terminal_closed") {
+      const terminalId = String(
+        parsedMessage.payload?.terminal_id || "",
+      ).trim();
+      if (terminalId) {
+        const session = this.independentTerminalSessions.get(terminalId);
+        if (session && !session.closed) {
+          session.closed = true;
+          if (session.writeEmitter) {
+            session.writeEmitter.fire(
+              "\r\n\x1b[33m[Terminal closed by server]\x1b[0m\r\n",
+            );
+          }
+          this.independentTerminalSessions.delete(terminalId);
+        }
+      }
+      return;
+    }
+    if (parsedMessage.type === "execution") {
+      // 检查是否是独立终端的输出
+      const executionId = String(
+        parsedMessage.payload?.execution_id || "",
+      ).trim();
+      console.log(
+        "[MAIN SOCKET] execution message:",
+        executionId,
+        "sessions:",
+        Array.from(this.independentTerminalSessions.keys()),
+      );
+      if (executionId.startsWith("terminal_")) {
+        const terminalId = executionId.replace("terminal_", "");
+        const data = String(parsedMessage.payload?.data || "");
+        const encoded = Boolean(parsedMessage.payload?.encoded);
+        console.log(
+          "[INDEPENDENT TERMINAL] output for:",
+          terminalId,
+          "data length:",
+          data.length,
+          "encoded:",
+          encoded,
+        );
+        this.handleIndependentTerminalOutput(terminalId, data, encoded);
+        return;
+      }
+      // 非独立终端的执行输出
+      const agentId = this.panelState.selectedAgentId;
+      if (agentId) {
+        this.handleExecutionPayload(agentId, parsedMessage.payload);
       }
       return;
     }
@@ -3355,6 +3676,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public dispose(): void {
     this.stopAgentListRefresh();
     this.disposeSocket("gatewaySocket");
+    // 清理所有独立终端会话
+    for (const session of this.independentTerminalSessions.values()) {
+      if (session.writeEmitter) {
+        session.writeEmitter.dispose();
+      }
+      if (session.vscodeTerminal) {
+        session.vscodeTerminal.dispose();
+      }
+    }
+    this.independentTerminalSessions.clear();
   }
 }
 
