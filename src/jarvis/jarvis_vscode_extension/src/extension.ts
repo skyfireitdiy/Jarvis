@@ -322,6 +322,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private defaultLlmGroup = "";
   private lastAgentItemsJson: string = "";
   private isSettingsPanelVisible = false;
+  // 批量选择状态
+  private selectedAgents = new Set<string>();
+  private isBatchMode = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -421,6 +424,27 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "deleteAgent") {
           await this.deleteAgent(message.agentId);
+          return;
+        }
+        // 批量操作消息处理
+        if (message?.type === "toggleBatchMode") {
+          this.toggleBatchMode();
+          return;
+        }
+        if (message?.type === "toggleSelectAgent") {
+          this.toggleSelectAgent(message.agentId || "");
+          return;
+        }
+        if (message?.type === "toggleSelectAll") {
+          this.toggleSelectAll();
+          return;
+        }
+        if (message?.type === "batchCopyAgents") {
+          await this.batchCopyAgents();
+          return;
+        }
+        if (message?.type === "batchDeleteAgents") {
+          await this.batchDeleteAgents();
           return;
         }
         if (message?.type === "createTerminal") {
@@ -664,9 +688,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         const fileTreeExpanded =
           hasFileTree &&
           (this.fileTreeState.get(agentItem.id)?.length || 0) > 0;
+        const isSelected = this.selectedAgents.has(agentItem.id);
+        const batchModeClass = this.isBatchMode ? "batch-mode" : "";
+        const selectedClass = isSelected ? "selected" : "";
+        const checkboxMarkup = this.isBatchMode
+          ? `<input type="checkbox" class="agent-checkbox" data-select-agent-id="${agentItem.id}" ${isSelected ? "checked" : ""} />`
+          : "";
         return `
-    <li data-agent-id="${agentItem.id}" class="agent-item ${agentItem.statusClass}">
+    <li data-agent-id="${agentItem.id}" class="agent-item ${agentItem.statusClass} ${batchModeClass} ${selectedClass}">
       <div class="agent-row">
+        ${checkboxMarkup}
         <div class="agent-main">
           <div class="agent-title-row">
             <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
@@ -693,9 +724,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </li>`;
       })
       .join("");
+    const batchToolbarMarkup = this.isBatchMode
+      ? `
+  <div class="batch-toolbar">
+    <span class="batch-toolbar-info">已选择 ${this.selectedAgents.size} 个</span>
+    <div class="batch-toolbar-actions">
+      <button id="toggleSelectAllButton">${this.isAllSelected() ? "取消全选" : "全选"}</button>
+      <button id="batchCopyButton" class="batch-copy-btn" ${this.selectedAgents.size === 0 ? "disabled" : ""}>批量复制</button>
+      <button id="batchDeleteButton" class="batch-delete-btn" ${this.selectedAgents.size === 0 ? "disabled" : ""}>批量删除</button>
+      <button id="exitBatchModeButton">退出</button>
+    </div>
+  </div>`
+      : "";
     const agentListSectionMarkup = `
   <div class="agents-list-panel">
     <div class="panel-section-title agents-list-title">Agents 列表</div>
+    ${batchToolbarMarkup}
     <ul>${agentListMarkup}</ul>
   </div>`;
     const connectionStatusClass = this.panelState.gatewayHasConnectionError
@@ -820,12 +864,26 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .form-error { color: var(--vscode-errorForeground); font-size: 12px; margin-bottom: 10px; }
     .status-banner { margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; font-size: 12px; opacity: 0.9; }
     .status-banner.error { color: var(--vscode-errorForeground); border-color: var(--vscode-errorForeground); }
+    /* 批量选择样式 */
+    .batch-mode-btn { min-width: auto; padding: 6px 8px; }
+    .batch-mode-btn.active { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.5); }
+    .batch-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 12px; border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; background: rgba(59, 130, 246, 0.08); flex-wrap: wrap; }
+    .batch-toolbar-info { font-size: 12px; font-weight: 600; color: #60a5fa; }
+    .batch-toolbar-actions { display: flex; gap: 6px; margin-left: auto; }
+    .batch-toolbar button { padding: 4px 10px; font-size: 12px; }
+    .batch-toolbar .batch-delete-btn { background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+    .batch-toolbar .batch-copy-btn { background: rgba(34, 197, 94, 0.15); color: #4ade80; border-color: rgba(34, 197, 94, 0.3); }
+    .agent-checkbox { width: 16px; height: 16px; margin-right: 8px; cursor: pointer; flex-shrink: 0; }
+    .agent-item.batch-mode { cursor: default; }
+    .agent-item.batch-mode .agent-row { cursor: pointer; }
+    .agent-item.selected { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
   </style>
 </head>
 <body>
   <div class="toolbar">
     <strong>Agents</strong>
     <div class="toolbar-actions">
+      <button id="toggleBatchModeButton" class="batch-mode-btn ${this.isBatchMode ? "active" : ""}" title="批量选择">☑</button>
       <button id="toggleSettingsPanelButton">${settingsButtonLabel}</button>
       <button id="toggleCreateAgentButton" ${createButtonDisabled}>${createButtonLabel}</button>
     </div>
@@ -1002,6 +1060,48 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     document.querySelectorAll('[data-agent-id]').forEach((item) => {
       item.addEventListener('click', () => {
         vscode.postMessage({ type: 'openAgent', agentId: item.getAttribute('data-agent-id') });
+      });
+    });
+    // 批量选择模式按钮
+    const toggleBatchModeButton = document.getElementById('toggleBatchModeButton');
+    if (toggleBatchModeButton) {
+      toggleBatchModeButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleBatchMode' });
+      });
+    }
+    // 全选按钮
+    const toggleSelectAllButton = document.getElementById('toggleSelectAllButton');
+    if (toggleSelectAllButton) {
+      toggleSelectAllButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleSelectAll' });
+      });
+    }
+    // 批量复制按钮
+    const batchCopyButton = document.getElementById('batchCopyButton');
+    if (batchCopyButton) {
+      batchCopyButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'batchCopyAgents' });
+      });
+    }
+    // 批量删除按钮
+    const batchDeleteButton = document.getElementById('batchDeleteButton');
+    if (batchDeleteButton) {
+      batchDeleteButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'batchDeleteAgents' });
+      });
+    }
+    // 退出批量模式按钮
+    const exitBatchModeButton = document.getElementById('exitBatchModeButton');
+    if (exitBatchModeButton) {
+      exitBatchModeButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleBatchMode' });
+      });
+    }
+    // Agent checkbox 点击
+    document.querySelectorAll('[data-select-agent-id]').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'toggleSelectAgent', agentId: item.getAttribute('data-select-agent-id') });
       });
     });
     // 恢复搜索框焦点（如果正在搜索）
@@ -3601,6 +3701,194 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       vscode.window.showErrorMessage(getErrorMessage(error));
     }
   }
+
+  // ========== 批量操作方法 ==========
+
+  private toggleBatchMode(): void {
+    this.isBatchMode = !this.isBatchMode;
+    if (!this.isBatchMode) {
+      this.selectedAgents.clear();
+    }
+    this.renderAgentListView();
+  }
+
+  private toggleSelectAgent(agentId: string): void {
+    if (this.selectedAgents.has(agentId)) {
+      this.selectedAgents.delete(agentId);
+    } else {
+      this.selectedAgents.add(agentId);
+    }
+    this.renderAgentListView();
+  }
+
+  private isAllSelected(): boolean {
+    if (this.agentItems.length === 0) return false;
+    return this.agentItems.every((item) => this.selectedAgents.has(item.id));
+  }
+
+  private toggleSelectAll(): void {
+    if (this.isAllSelected()) {
+      this.selectedAgents.clear();
+    } else {
+      this.agentItems.forEach((item) => this.selectedAgents.add(item.id));
+    }
+    this.renderAgentListView();
+  }
+
+  private async batchCopyAgents(): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage("请先连接并登录 Jarvis 网关");
+      return;
+    }
+    if (this.selectedAgents.size === 0) {
+      vscode.window.showWarningMessage("请先选择要复制的 Agent");
+      return;
+    }
+
+    const confirmed = await vscode.window.showInformationMessage(
+      `确认复制选中的 ${this.selectedAgents.size} 个 Agent？`,
+      { modal: true },
+      "复制",
+    );
+    if (confirmed !== "复制") {
+      return;
+    }
+
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const agentId of this.selectedAgents) {
+      const sourceAgent = this.agentItems.find((item) => item.id === agentId);
+      if (!sourceAgent) {
+        failCount++;
+        continue;
+      }
+      try {
+        const normalizedNodeId =
+          String(sourceAgent.nodeId || "master").trim() || "master";
+        const response = await this.fetchWithAuth(
+          buildNodeHttpUrl(gatewayAddress, normalizedNodeId, "agents"),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              agent_type: sourceAgent.agentType,
+              working_dir: sourceAgent.workingDir,
+              name: sourceAgent.name || undefined,
+              llm_group:
+                sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
+              node_id: normalizedNodeId,
+              worktree:
+                sourceAgent.agentType === "codeagent"
+                  ? sourceAgent.worktree
+                  : false,
+              quick_mode: Boolean(sourceAgent.quickMode),
+            }),
+          },
+        );
+        const result = (await response.json()) as CreateAgentResponse;
+        if (response.ok && result.success && result.data?.agent_id) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    await this.refreshAgents();
+    this.selectedAgents.clear();
+    this.isBatchMode = false;
+    this.renderAgentListView();
+
+    if (failCount === 0) {
+      vscode.window.showInformationMessage(`成功复制 ${successCount} 个 Agent`);
+    } else {
+      vscode.window.showWarningMessage(
+        `复制完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+      );
+    }
+  }
+
+  private async batchDeleteAgents(): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage("请先连接并登录 Jarvis 网关");
+      return;
+    }
+    if (this.selectedAgents.size === 0) {
+      vscode.window.showWarningMessage("请先选择要删除的 Agent");
+      return;
+    }
+
+    const confirmed = await vscode.window.showWarningMessage(
+      `确认删除选中的 ${this.selectedAgents.size} 个 Agent？删除后将无法恢复。`,
+      { modal: true },
+      "删除",
+    );
+    if (confirmed !== "删除") {
+      return;
+    }
+
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const agentId of this.selectedAgents) {
+      try {
+        const targetNodeId =
+          this.agentItems.find((item) => item.id === agentId)?.nodeId || "";
+        const normalizedNodeId =
+          String(targetNodeId || "master").trim() || "master";
+        const response = await this.fetchWithAuth(
+          buildNodeHttpUrl(
+            gatewayAddress,
+            normalizedNodeId,
+            `agents/${agentId}`,
+          ),
+          {
+            method: "DELETE",
+          },
+        );
+        const result = (await response.json()) as DeleteAgentResponse;
+        if (response.ok && result.success) {
+          successCount++;
+          if (this.panelState.selectedAgentId === agentId) {
+            this.panelState.selectedAgentId = undefined;
+          }
+          this.agentStatuses.delete(agentId);
+          await this.clearPersistedAgentHistory(agentId);
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    await this.refreshAgents();
+    this.selectedAgents.clear();
+    this.isBatchMode = false;
+    this.renderAgentListView();
+
+    if (this.currentPanel) {
+      this.currentPanel.title = this.getChatPanelTitle();
+      this.currentPanel.webview.html = this.getChatPanelHtml(
+        this.panelState.selectedAgentId,
+      );
+      this.postPanelState();
+    }
+
+    if (failCount === 0) {
+      vscode.window.showInformationMessage(`成功删除 ${successCount} 个 Agent`);
+    } else {
+      vscode.window.showWarningMessage(
+        `删除完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+      );
+    }
+  }
+
+  // ========== 批量操作方法结束 ==========
 
   private async createAgent(message: AgentListViewMessage): Promise<void> {
     if (!this.panelState.token) {
