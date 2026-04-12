@@ -289,6 +289,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   >();
   // 远端文件心跳检查定时器
   private remoteFileHeartbeatTimer: NodeJS.Timeout | undefined;
+  // 远端文件只读状态栏
+  private readOnlyStatusBarItem: vscode.StatusBarItem | undefined;
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "agent",
@@ -2418,6 +2420,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         .replace(/[/+=]/g, "_");
       const tempFilePath = path.join(tempDir, `${pathHash}_${fileName}`);
 
+      // 检查文件是否已存在且是只读的，如果是则先改为可写
+      try {
+        const stat = await fs.promises.stat(tempFilePath);
+        if (stat && (stat.mode & 0o200) === 0) {
+          // 文件存在且是只读的，先改为可写
+          await fs.promises.chmod(tempFilePath, 0o644);
+        }
+      } catch {
+        // 文件不存在，忽略
+      }
+
       await fs.promises.writeFile(tempFilePath, content, "utf-8");
 
       // 设置文件为只读（权限 444）
@@ -2447,9 +2460,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       // 启动心跳检查
       this.startRemoteFileHeartbeat();
 
-      vscode.window.showInformationMessage(
-        `已打开远端文件: ${filePath} (只读模式，使用命令 "Jarvis: 开启编辑" 可编辑)`,
-      );
+      // 显示只读状态栏按钮
+      this.showReadOnlyStatusBar(filePath);
     } catch (error) {
       console.error("[FILETREE] 打开文件出错:", error);
       vscode.window.showErrorMessage(`打开文件失败: ${error}`);
@@ -2697,8 +2709,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
       const content = result.data.content || "";
 
+      // 检查文件是否是只读的，如果是则先改为可写
+      const isReadOnly = mapping.readOnly;
+      if (isReadOnly) {
+        await fs.promises.chmod(localPath, 0o644);
+      }
+
       // 更新本地文件
       await fs.promises.writeFile(localPath, content, "utf-8");
+
+      // 如果原来是只读的，写入后恢复只读
+      if (isReadOnly) {
+        await fs.promises.chmod(localPath, 0o444);
+      }
 
       // 获取最新的文件状态
       const remoteStat = await this.fetchRemoteFileStat(remotePath, nodeId);
@@ -2736,6 +2759,52 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // 显示只读状态栏按钮
+  private showReadOnlyStatusBar(remotePath: string): void {
+    if (!this.readOnlyStatusBarItem) {
+      this.readOnlyStatusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        100, // 高优先级，显示在左边显眼位置
+      );
+      this.readOnlyStatusBarItem.command = "jarvis.enableRemoteFileEdit";
+    }
+
+    this.readOnlyStatusBarItem.text = "$(lock) 只读模式 - 点击开启编辑";
+    this.readOnlyStatusBarItem.tooltip = `远端文件: ${remotePath}\n点击开启编辑模式`;
+    this.readOnlyStatusBarItem.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.warningBackground",
+    );
+    this.readOnlyStatusBarItem.color = new vscode.ThemeColor(
+      "statusBarItem.warningForeground",
+    );
+    this.readOnlyStatusBarItem.show();
+  }
+
+  // 隐藏只读状态栏按钮
+  private hideReadOnlyStatusBar(): void {
+    if (this.readOnlyStatusBarItem) {
+      this.readOnlyStatusBarItem.hide();
+    }
+  }
+
+  // 更新状态栏（根据当前活动编辑器）
+  public updateReadOnlyStatusBar(): void {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+      this.hideReadOnlyStatusBar();
+      return;
+    }
+
+    const localPath = activeEditor.document.uri.fsPath;
+    const mapping = this.remoteFileEditors.get(localPath);
+
+    if (mapping && mapping.readOnly) {
+      this.showReadOnlyStatusBar(mapping.remotePath);
+    } else {
+      this.hideReadOnlyStatusBar();
+    }
+  }
+
   // 开启远端文件编辑模式
   public async enableRemoteFileEdit(): Promise<void> {
     const activeEditor = vscode.window.activeTextEditor;
@@ -2760,6 +2829,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       // 将文件权限改为可写（权限 644）
       await fs.promises.chmod(localPath, 0o644);
       mapping.readOnly = false;
+
+      // 隐藏只读状态栏
+      this.hideReadOnlyStatusBar();
 
       // 重新打开文件以刷新编辑器状态
       const document = await vscode.workspace.openTextDocument(localPath);
@@ -4649,6 +4721,13 @@ export function activate(context: vscode.ExtensionContext): void {
       if (localPath.includes("jarvis-remote-files")) {
         await provider.syncRemoteFile(localPath);
       }
+    }),
+  );
+
+  // 监听编辑器切换事件，更新只读状态栏
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      provider.updateReadOnlyStatusBar();
     }),
   );
 }
