@@ -592,7 +592,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         <div class="agent-main">
           <div class="agent-title-row">
             <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
-            <div class="agent-status ${agentItem.statusClass}">${escapeHtml(agentItem.statusText)}</div>
+            <div class="agent-status-dot ${agentItem.statusClass}" title="${escapeHtml(agentItem.statusText)}"></div>
             ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
             ${agentItem.worktree ? '<div class="agent-worktree" title="已启用 worktree">🌿</div>' : ""}
@@ -688,6 +688,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-status.waiting_multi { background: rgba(255, 193, 7, 0.18); color: #8a6d00; border-color: rgba(255, 193, 7, 0.28); }
     .agent-status.waiting_single { background: rgba(255, 152, 0, 0.18); color: #a85d00; border-color: rgba(255, 152, 0, 0.28); }
     .agent-status.stopped { background: rgba(158, 158, 158, 0.18); color: #666; border-color: rgba(158, 158, 158, 0.28); }
+    .agent-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 8px; flex-shrink: 0; }
+    .agent-status-dot.running { background: #4caf50; box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2); }
+    .agent-status-dot.waiting_multi { background: #ffc107; box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2); }
+    .agent-status-dot.waiting_single { background: #ff9800; box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.2); }
+    .agent-status-dot.stopped { background: #f44336; box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2); }
     .agent-llm-group { font-size: 12px; opacity: 0.9; }
     .agent-worktree { font-size: 13px; }
     .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
