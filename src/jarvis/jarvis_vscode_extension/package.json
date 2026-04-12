@@ -25,6 +25,10 @@
       {
         "command": "jarvis.openPanel",
         "title": "Jarvis: Open Panel"
+      },
+      {
+        "command": "jarvis.enableRemoteFileEdit",
+        "title": "Jarvis: 开启编辑"
       }
     ],
     "viewsContainers": {
