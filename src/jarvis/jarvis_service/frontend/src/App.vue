@@ -32,7 +32,8 @@
           </div>
           <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
           <div class="agent-actions">
-            <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏️</button>
+            <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
+            <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
             <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
             <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
           </div>
@@ -6072,6 +6073,13 @@ function createTerminal() {
   socket.value.send(JSON.stringify(message))
 }
 
+function createTerminalForAgent(agent) {
+  // 先切换到指定的 agent
+  handleAgentItemClick(agent)
+  // 然后创建终端
+  createTerminal()
+}
+
 function closeTerminal(terminalId) {
   console.log(`[independent-terminal] Closing terminal ${terminalId}`)
 
@@ -7998,6 +8006,11 @@ body::-webkit-scrollbar {
 
 .icon-btn-small:active {
   transform: translateY(0);
+}
+
+.icon-btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .agent-actions .icon-btn-small.stop-btn:hover {
