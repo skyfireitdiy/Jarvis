@@ -33,6 +33,10 @@
       {
         "command": "jarvis.disableRemoteFileEdit",
         "title": "Jarvis: 恢复只读"
+      },
+      {
+        "command": "jarvis.restartNodeService",
+        "title": "Jarvis: 重启节点服务"
       }
     ],
     "viewsContainers": {
