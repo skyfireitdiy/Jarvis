@@ -3132,6 +3132,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const terminalId = String(
         parsedMessage.payload?.terminal_id || "",
       ).trim();
+      console.log("[TERMINAL CLOSED] terminalId:", terminalId);
       if (terminalId) {
         const session = this.independentTerminalSessions.get(terminalId);
         if (session && !session.closed) {
@@ -3140,6 +3141,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             session.writeEmitter.fire(
               "\r\n\x1b[33m[Terminal closed by server]\x1b[0m\r\n",
             );
+          }
+          // 关闭 VSCode 终端
+          if (session.vscodeTerminal) {
+            session.vscodeTerminal.dispose();
           }
           this.independentTerminalSessions.delete(terminalId);
         }
