@@ -721,7 +721,7 @@ def create_app(
     router = SessionOutputRouter()
     input_registry = InputSessionRegistry()
     terminal_input_registry = TerminalInputRegistry()
-    terminal_session_manager = TerminalSessionManager(max_sessions=5)
+    terminal_session_manager = TerminalSessionManager(max_sessions=None)
 
     def _build_callback_from_metadata(metadata: Dict[str, Any]):
         action_metadata = metadata.get("action")
