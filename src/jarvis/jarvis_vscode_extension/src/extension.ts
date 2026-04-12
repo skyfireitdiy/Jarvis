@@ -275,11 +275,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readonly fileTreeState = new Map<string, FileTreeNode[]>();
   // 文件树展开状态：agentId -> Set<expandedPaths>
   private readonly fileTreeExpanded = new Map<string, Set<string>>();
-  // 远端文件编辑：本地临时文件路径 -> { agentId, remotePath, nodeId }
+  // 远端文件编辑：本地临时文件路径 -> { agentId, remotePath, nodeId, mtimeNs, fileSize, readOnly }
   private readonly remoteFileEditors = new Map<
     string,
-    { agentId: string; remotePath: string; nodeId: string }
+    {
+      agentId: string;
+      remotePath: string;
+      nodeId: string;
+      mtimeNs?: number;
+      fileSize?: number;
+      readOnly: boolean;
+    }
   >();
+  // 远端文件心跳检查定时器
+  private remoteFileHeartbeatTimer: NodeJS.Timeout | undefined;
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "agent",
@@ -2411,11 +2420,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
       await fs.promises.writeFile(tempFilePath, content, "utf-8");
 
-      // 记录映射关系
+      // 设置文件为只读（权限 444）
+      await fs.promises.chmod(tempFilePath, 0o444);
+
+      // 获取文件状态用于后续同步检查
+      const fileStat = await this.fetchRemoteFileStat(filePath, targetNodeId);
+
+      // 记录映射关系（包含 mtime 和 size 用于同步检查，默认只读）
       this.remoteFileEditors.set(tempFilePath, {
         agentId,
         remotePath: filePath,
         nodeId: targetNodeId,
+        mtimeNs: fileStat?.mtime_ns,
+        fileSize: fileStat?.size,
+        readOnly: true,
       });
 
       // 在 VSCode 中打开文件（在第一列打开，会话面板在最右边）
@@ -2426,8 +2444,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         preview: false,
       });
 
+      // 启动心跳检查
+      this.startRemoteFileHeartbeat();
+
       vscode.window.showInformationMessage(
-        `已打开远端文件: ${filePath} (保存时将同步到远端)`,
+        `已打开远端文件: ${filePath} (只读模式，使用命令 "Jarvis: 开启编辑" 可编辑)`,
       );
     } catch (error) {
       console.error("[FILETREE] 打开文件出错:", error);
@@ -2568,6 +2589,193 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   // 同步远端文件（公共方法，供 activate 中的事件监听调用）
   public async syncRemoteFile(localPath: string): Promise<void> {
     await this.saveRemoteFile(localPath);
+  }
+
+  // 获取远端文件状态
+  private async fetchRemoteFileStat(
+    filePath: string,
+    nodeId: string,
+  ): Promise<{ mtime_ns?: number; size?: number } | null> {
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    try {
+      const response = await fetch(
+        buildNodeHttpUrl(gatewayAddress, nodeId, "file-stat"),
+        {
+          method: "POST",
+          headers: {
+            ...this.getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ path: filePath, node_id: nodeId }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.data) {
+        return null;
+      }
+      return result.data;
+    } catch {
+      return null;
+    }
+  }
+
+  // 检查远端文件是否有变化
+  private async checkRemoteFileChanges(): Promise<void> {
+    // 获取当前活动的编辑器
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) return;
+
+    const localPath = activeEditor.document.uri.fsPath;
+    const mapping = this.remoteFileEditors.get(localPath);
+    if (!mapping) return;
+
+    const { remotePath, nodeId, mtimeNs, fileSize } = mapping;
+
+    // 获取远端文件状态
+    const remoteStat = await this.fetchRemoteFileStat(remotePath, nodeId);
+    if (!remoteStat) return;
+
+    const remoteMtimeNs = remoteStat.mtime_ns;
+    const remoteFileSize = remoteStat.size;
+
+    // 检查是否有变化
+    const hasChange =
+      (remoteMtimeNs !== undefined && remoteMtimeNs !== mtimeNs) ||
+      (remoteFileSize !== undefined && remoteFileSize !== fileSize);
+
+    if (!hasChange) return;
+
+    // 检查本地是否有未保存的修改
+    if (activeEditor.document.isDirty) {
+      vscode.window
+        .showWarningMessage(
+          `远端文件 ${remotePath} 已被修改，但本地有未保存的更改。请先保存或放弃本地更改。`,
+          "刷新（丢弃本地更改）",
+          "保留本地更改",
+        )
+        .then(async (choice) => {
+          if (choice === "刷新（丢弃本地更改）") {
+            await this.refreshRemoteFile(localPath);
+          }
+        });
+      return;
+    }
+
+    // 自动刷新
+    await this.refreshRemoteFile(localPath);
+    vscode.window.showInformationMessage(
+      `远端文件 ${remotePath} 已更新，已自动刷新。`,
+    );
+  }
+
+  // 刷新远端文件内容
+  private async refreshRemoteFile(localPath: string): Promise<void> {
+    const mapping = this.remoteFileEditors.get(localPath);
+    if (!mapping) return;
+
+    const { remotePath, nodeId } = mapping;
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+
+    try {
+      // 获取最新内容
+      const response = await fetch(
+        buildNodeHttpUrl(gatewayAddress, nodeId, "file-content"),
+        {
+          method: "POST",
+          headers: {
+            ...this.getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ path: remotePath, node_id: nodeId }),
+        },
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.data) {
+        return;
+      }
+
+      const content = result.data.content || "";
+
+      // 更新本地文件
+      await fs.promises.writeFile(localPath, content, "utf-8");
+
+      // 获取最新的文件状态
+      const remoteStat = await this.fetchRemoteFileStat(remotePath, nodeId);
+      if (remoteStat) {
+        mapping.mtimeNs = remoteStat.mtime_ns;
+        mapping.fileSize = remoteStat.size;
+      }
+
+      // 重新加载文档
+      const document = await vscode.workspace.openTextDocument(localPath);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        preserveFocus: false,
+        preview: false,
+      });
+    } catch (error) {
+      console.error("[FILETREE] 刷新文件出错:", error);
+    }
+  }
+
+  // 启动远端文件心跳检查
+  public startRemoteFileHeartbeat(): void {
+    this.stopRemoteFileHeartbeat();
+    // 每3秒检查一次
+    this.remoteFileHeartbeatTimer = setInterval(() => {
+      this.checkRemoteFileChanges();
+    }, 3000);
+  }
+
+  // 停止远端文件心跳检查
+  public stopRemoteFileHeartbeat(): void {
+    if (this.remoteFileHeartbeatTimer) {
+      clearInterval(this.remoteFileHeartbeatTimer);
+      this.remoteFileHeartbeatTimer = undefined;
+    }
+  }
+
+  // 开启远端文件编辑模式
+  public async enableRemoteFileEdit(): Promise<void> {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+      vscode.window.showWarningMessage("没有打开的文件");
+      return;
+    }
+
+    const localPath = activeEditor.document.uri.fsPath;
+    const mapping = this.remoteFileEditors.get(localPath);
+    if (!mapping) {
+      vscode.window.showWarningMessage("当前文件不是远端文件");
+      return;
+    }
+
+    if (!mapping.readOnly) {
+      vscode.window.showInformationMessage("当前文件已经是可编辑状态");
+      return;
+    }
+
+    try {
+      // 将文件权限改为可写（权限 644）
+      await fs.promises.chmod(localPath, 0o644);
+      mapping.readOnly = false;
+
+      // 重新打开文件以刷新编辑器状态
+      const document = await vscode.workspace.openTextDocument(localPath);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        preserveFocus: false,
+        preview: false,
+      });
+
+      vscode.window.showInformationMessage(
+        `已开启编辑模式: ${mapping.remotePath} (保存时将同步到远端)`,
+      );
+    } catch (error) {
+      console.error("[FILETREE] 开启编辑模式失败:", error);
+      vscode.window.showErrorMessage(`开启编辑模式失败: ${error}`);
+    }
   }
 
   // ========== 文件树功能结束 ==========
@@ -4426,6 +4634,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  // 注册开启远端文件编辑命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand("jarvis.enableRemoteFileEdit", async () => {
+      await provider.enableRemoteFileEdit();
+    }),
+  );
+
   // 监听文件保存事件，同步远端文件
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -4441,6 +4656,7 @@ export function activate(context: vscode.ExtensionContext): void {
 let activeProvider: JarvisAgentListViewProvider | undefined;
 
 export function deactivate(): void {
+  activeProvider?.stopRemoteFileHeartbeat();
   activeProvider?.dispose();
 }
 
