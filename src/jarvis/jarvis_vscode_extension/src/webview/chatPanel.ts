@@ -436,7 +436,7 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
     cursorBlink: true,
     fontFamily:
       '"JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace',
-    fontSize: 14,
+    fontSize: 13,
     lineHeight: 1.2,
     fontWeight: "400",
     fontWeightBold: "600",
