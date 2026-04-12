@@ -6071,6 +6071,9 @@ function createTerminal() {
     payload,
   }
   socket.value.send(JSON.stringify(message))
+  
+  // 自动打开终端面板
+  showTerminalPanel.value = true
 }
 
 function createTerminalForAgent(agent) {
