@@ -6078,10 +6078,31 @@ function createTerminal() {
 }
 
 function createTerminalForAgent(agent) {
-  // 先切换到指定的 agent
-  handleAgentItemClick(agent)
-  // 然后创建终端
-  createTerminal()
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+
+  console.log('[independent-terminal] Creating terminal for agent:', agent.name)
+  
+  // 直接使用传入的 agent 参数创建终端，不依赖异步切换
+  const nodeId = String(agent?.node_id || '').trim() || ''
+  const payload = {}
+  if (nodeId) {
+    payload.node_id = nodeId
+  }
+  const workingDir = agent?.working_dir?.trim()
+  if (workingDir) {
+    payload.working_dir = workingDir
+  }
+  const message = {
+    type: 'terminal_create',
+    payload,
+  }
+  socket.value.send(JSON.stringify(message))
+  
+  // 自动打开终端面板
+  showTerminalPanel.value = true
 }
 
 function closeTerminal(terminalId) {
