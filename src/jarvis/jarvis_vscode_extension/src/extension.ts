@@ -455,7 +455,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       this.currentPanel = vscode.window.createWebviewPanel(
         "jarvis.chatPanel",
         this.getChatPanelTitle(),
-        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
+        { viewColumn: vscode.ViewColumn.Three, preserveFocus: false },
         {
           enableScripts: true,
           retainContextWhenHidden: true,
@@ -2387,9 +2387,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         nodeId: targetNodeId,
       });
 
-      // 在 VSCode 中打开文件
+      // 在 VSCode 中打开文件（在对话面板旁边打开，不替换对话面板）
       const document = await vscode.workspace.openTextDocument(tempFilePath);
-      await vscode.window.showTextDocument(document);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.Two,
+        preserveFocus: false,
+        preview: false,
+      });
 
       vscode.window.showInformationMessage(
         `已打开远端文件: ${filePath} (保存时将同步到远端)`,
