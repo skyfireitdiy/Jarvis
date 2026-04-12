@@ -592,6 +592,16 @@
     <div class="modal-overlay" v-if="showCreateAgentModal">
       <div class="modal create-agent-modal">
         <h2>创建 Agent</h2>
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>目标节点</label>
+          <select v-model="newAgentNodeId" class="form-control">
+            <option value="">默认节点（当前网关决定）</option>
+            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+              {{ formatNodeOptionLabel(node) }}
+            </option>
+          </select>
+          <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
+        </div>
         <div class="form-group">
           <label>Agent 类型</label>
           <div class="radio-group">
@@ -606,16 +616,6 @@
               <span class="radio-desc">专注于代码分析和开发任务</span>
             </label>
           </div>
-        </div>
-        <div class="form-group" v-if="availableNodeOptions.length > 0">
-          <label>目标节点</label>
-          <select v-model="newAgentNodeId" class="form-control">
-            <option value="">默认节点（当前网关决定）</option>
-            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-              {{ formatNodeOptionLabel(node) }}
-            </option>
-          </select>
-          <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
         </div>
         <div class="form-group">
           <label>Agent 名称（可选）</label>
