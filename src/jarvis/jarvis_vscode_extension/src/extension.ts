@@ -4459,7 +4459,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           : undefined;
     });
     const message = String(payload?.message || "请确认");
-    const defaultConfirm = payload?.defaultConfirm !== false; // 默认为 true
+    const defaultConfirm = payload?.default !== false; // 默认为 true
 
     // 通过 webview 显示确认对话框
     if (this.currentPanel) {

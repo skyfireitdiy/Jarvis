@@ -2641,14 +2641,20 @@ function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = 
 
 // 处理确认对话框的键盘事件
 function handleConfirmKeydown(event) {
-  if (event.key === 'Enter' && confirmDialog.value) {
-    const activeElement = document.activeElement
-    // 根据当前焦点元素决定调用哪个回调
-    if (activeElement === confirmConfirmBtn.value) {
+  if (!confirmDialog.value) return
+  
+  if (event.key === 'Enter') {
+    // 根据默认按钮决定调用哪个回调
+    const isDefaultConfirm = confirmConfirmBtn.value?.classList.contains('default')
+    if (isDefaultConfirm) {
       confirmDialog.value.confirmCallback()
-    } else if (activeElement === confirmCancelBtn.value) {
+    } else {
       confirmDialog.value.cancelCallback()
     }
+  } else if (event.key === 'y' || event.key === 'Y') {
+    confirmDialog.value.confirmCallback()
+  } else if (event.key === 'n' || event.key === 'N') {
+    confirmDialog.value.cancelCallback()
   }
 }
 
