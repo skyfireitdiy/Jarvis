@@ -1915,12 +1915,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private handleTerminalCreated(payload: Record<string, unknown>): void {
+    console.log("[TERMINAL CREATED] payload:", payload);
     const terminalId = String(payload?.terminal_id || "").trim();
     if (!terminalId) {
       return;
     }
 
     const nodeId = String(payload?.node_id || "").trim();
+    console.log(
+      "[TERMINAL CREATED] terminalId:",
+      terminalId,
+      "nodeId:",
+      nodeId,
+    );
     const interpreter = String(payload?.interpreter || "bash").trim();
     const workingDir = String(payload?.working_dir || ".").trim();
 
@@ -1986,11 +1993,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private sendIndependentTerminalInput(terminalId: string, data: string): void {
     const session = this.independentTerminalSessions.get(terminalId);
+    console.log(
+      "[TERMINAL INPUT] terminalId:",
+      terminalId,
+      "session:",
+      session ? { nodeId: session.nodeId, closed: session.closed } : null,
+    );
     if (!session || session.closed) {
       return;
     }
     const gatewaySocket = this.panelState.gatewaySocket;
     if (!gatewaySocket || gatewaySocket.readyState !== WebSocket.OPEN) {
+      console.log("[TERMINAL INPUT] gateway socket not ready");
       return;
     }
 
@@ -2002,6 +2016,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       payload.node_id = session.nodeId;
     }
 
+    console.log("[TERMINAL INPUT] sending:", payload);
     this.sendSocketMessage(gatewaySocket, {
       type: "terminal_session_input",
       payload,
