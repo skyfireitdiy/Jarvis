@@ -322,6 +322,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private defaultLlmGroup = "";
   private lastAgentItemsJson: string = "";
   private isSettingsPanelVisible = false;
+  // 重启服务状态
+  private restartNodeId = ""; // 空字符串表示本节点(master)
+  private restartFrontendService = false;
+  private isRestartingService = false;
   // 批量选择状态
   private selectedAgents = new Set<string>();
   private isBatchMode = false;
@@ -472,6 +476,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "toggleConnectionLock") {
           await this.setConnectionLockEnabled(Boolean(message.enabled));
+          return;
+        }
+        if (message?.type === "updateRestartNodeId") {
+          this.panelState.restartNodeId = String(message.nodeId || "");
+          this.renderAgentListView();
+          return;
+        }
+        if (message?.type === "updateRestartFrontend") {
+          this.panelState.restartFrontendService = Boolean(message.enabled);
+          return;
+        }
+        if (message?.type === "restartNodeService") {
+          await this.restartNodeService();
           return;
         }
       },
@@ -750,14 +767,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       : "";
     const settingsButtonLabel = this.isSettingsPanelVisible
       ? "关闭设置"
-      : "连接设置";
+      : "设置";
     const settingsPanelMarkup = this.isSettingsPanelVisible
       ? `
   <div class="settings-panel">
     <div class="settings-panel-header">
       <div>
-        <div class="settings-panel-title">连接设置</div>
-        <div class="settings-panel-subtitle">这些功能不常用，已从 Agents 主面板中独立出来。</div>
+        <div class="settings-panel-title">设置</div>
+        <div class="settings-panel-subtitle">连接设置和服务管理功能。</div>
       </div>
       <button id="closeSettingsPanelButton" type="button">关闭</button>
     </div>
@@ -770,6 +787,29 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           <span class="toggle-switch-help">启用后，当已有活跃连接时，新连接将被拒绝；禁用后，新连接会替换旧连接。</span>
         </div>
       </label>
+    </div>
+    <div class="settings-card">
+      <div class="settings-card-title">服务管理</div>
+      <div class="restart-service-form">
+        <div class="form-group">
+          <label>重启节点服务</label>
+          <select id="restartNodeSelect">
+            <option value="">本节点 (master)</option>
+            ${this.availableNodeOptions.map((node) => `<option value="${escapeHtml(node.nodeId)}" ${this.panelState.restartNodeId === node.nodeId ? "selected" : ""}>${escapeHtml(node.nodeId)}${node.status ? ` (${escapeHtml(node.status)})` : ""}</option>`).join("")}
+          </select>
+          <span class="form-help">选择要重启服务的节点，默认为本节点</span>
+        </div>
+        <div class="form-group" ${this.panelState.restartNodeId && this.panelState.restartNodeId !== "master" ? 'style="display:none"' : ""}>
+          <label class="checkbox-label">
+            <input type="checkbox" id="restartFrontendCheckbox" ${this.panelState.restartFrontendService ? "checked" : ""} />
+            <span>同时重启前端服务</span>
+          </label>
+          <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
+        </div>
+        <button id="restartNodeServiceButton" type="button" ${this.panelState.isRestartingService ? "disabled" : ""}>
+          ${this.panelState.isRestartingService ? "请稍候..." : this.panelState.restartNodeId ? `重启节点 ${escapeHtml(this.panelState.restartNodeId)} 服务` : "重启本节点服务"}
+        </button>
+      </div>
     </div>
   </div>`
       : "";
@@ -793,6 +833,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .settings-card-title { font-size: 12px; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
     .settings-card-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .settings-card-help { font-size: 12px; opacity: 0.75; line-height: 1.45; }
+    .restart-service-form { display: flex; flex-direction: column; gap: 10px; }
+    .restart-service-form .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .restart-service-form label { font-size: 12px; font-weight: 600; }
+    .restart-service-form .form-help { font-size: 11px; opacity: 0.7; }
+    .restart-service-form .checkbox-label { display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; }
+    .restart-service-form .checkbox-label input { width: auto; margin: 0; }
     .settings-action-button { width: 100%; justify-content: center; font-weight: 600; }
     .toggle-switch-row { display: flex; align-items: center; gap: 10px; }
     .toggle-switch-row input { width: auto; margin: 0; }
@@ -916,6 +962,24 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (connectionLockToggle) {
       connectionLockToggle.addEventListener('change', () => {
         vscode.postMessage({ type: 'toggleConnectionLock', enabled: Boolean(connectionLockToggle.checked) });
+      });
+    }
+    const restartNodeSelect = document.getElementById('restartNodeSelect');
+    if (restartNodeSelect) {
+      restartNodeSelect.addEventListener('change', () => {
+        vscode.postMessage({ type: 'updateRestartNodeId', nodeId: restartNodeSelect.value });
+      });
+    }
+    const restartFrontendCheckbox = document.getElementById('restartFrontendCheckbox');
+    if (restartFrontendCheckbox) {
+      restartFrontendCheckbox.addEventListener('change', () => {
+        vscode.postMessage({ type: 'updateRestartFrontend', enabled: restartFrontendCheckbox.checked });
+      });
+    }
+    const restartNodeServiceButton = document.getElementById('restartNodeServiceButton');
+    if (restartNodeServiceButton) {
+      restartNodeServiceButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'restartNodeService' });
       });
     }
     const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');
@@ -3270,6 +3334,77 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       .filter((node) => Boolean(node.nodeId));
   }
 
+  /**
+   * 重启节点服务
+   * 使用面板状态中的 restartNodeId 和 restartFrontendService
+   */
+  public async restartNodeService(): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage("请先连接并登录 Jarvis 网关");
+      return;
+    }
+
+    // 防止重复点击
+    if (this.panelState.isRestartingService) {
+      return;
+    }
+
+    // 从面板状态获取参数
+    const targetNodeId = this.panelState.restartNodeId || "master";
+    const shouldRestartFrontend =
+      targetNodeId === "master"
+        ? this.panelState.restartFrontendService
+        : false;
+
+    // 确认重启
+    const confirmMessage =
+      targetNodeId === "master"
+        ? `确认重启本节点服务吗？这将短暂中断当前连接。`
+        : `确认重启节点 "${targetNodeId}" 的服务吗？这将短暂中断该节点的连接。`;
+
+    const confirmed = await vscode.window.showWarningMessage(
+      confirmMessage,
+      { modal: true },
+      "确认重启",
+    );
+
+    if (confirmed !== "确认重启") {
+      return;
+    }
+
+    // 设置重启中状态
+    this.panelState.isRestartingService = true;
+    this.renderAgentListView();
+
+    // 发送重启请求
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      // 发送重启请求，不等待响应结果（服务重启会导致连接中断）
+      this.fetchWithAuth(
+        buildNodeHttpUrl(gatewayAddress, "master", "service/restart"),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            node_id: targetNodeId,
+            restart_frontend: shouldRestartFrontend,
+          }),
+        },
+      ).catch(() => {
+        // 忽略请求错误（服务重启会导致连接中断）
+      });
+
+      vscode.window.showInformationMessage(
+        `已向节点 "${targetNodeId}" 发送重启请求`,
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(`重启服务失败: ${getErrorMessage(error)}`);
+    } finally {
+      // 重置重启中状态
+      this.panelState.isRestartingService = false;
+      this.renderAgentListView();
+    }
+  }
+
   private async setConnectionLockEnabled(enabled: boolean): Promise<void> {
     this.panelState.connectionLockEnabled = enabled;
     await this.saveConnectionInfo();
@@ -5165,6 +5300,13 @@ export function activate(context: vscode.ExtensionContext): void {
         await provider.disableRemoteFileEdit();
       },
     ),
+  );
+
+  // 注册重启节点服务命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand("jarvis.restartNodeService", async () => {
+      await provider.restartNodeService();
+    }),
   );
 
   // 监听文件保存事件，同步远端文件
