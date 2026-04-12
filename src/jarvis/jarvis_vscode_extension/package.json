@@ -29,6 +29,10 @@
       {
         "command": "jarvis.enableRemoteFileEdit",
         "title": "Jarvis: 开启编辑"
+      },
+      {
+        "command": "jarvis.disableRemoteFileEdit",
+        "title": "Jarvis: 恢复只读"
       }
     ],
     "viewsContainers": {

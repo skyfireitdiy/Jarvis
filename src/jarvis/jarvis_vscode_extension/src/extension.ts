@@ -2460,8 +2460,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       // 启动心跳检查
       this.startRemoteFileHeartbeat();
 
-      // 显示只读状态栏按钮
-      this.showReadOnlyStatusBar(filePath);
+      // 显示远端文件状态栏按钮
+      this.showRemoteFileStatusBar(filePath, true);
     } catch (error) {
       console.error("[FILETREE] 打开文件出错:", error);
       vscode.window.showErrorMessage(`打开文件失败: ${error}`);
@@ -2759,29 +2759,41 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  // 显示只读状态栏按钮
-  private showReadOnlyStatusBar(remotePath: string): void {
+  // 显示远端文件状态栏按钮
+  private showRemoteFileStatusBar(
+    remotePath: string,
+    isReadOnly: boolean,
+  ): void {
     if (!this.readOnlyStatusBarItem) {
       this.readOnlyStatusBarItem = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,
         100, // 高优先级，显示在左边显眼位置
       );
-      this.readOnlyStatusBarItem.command = "jarvis.enableRemoteFileEdit";
     }
 
-    this.readOnlyStatusBarItem.text = "$(lock) 只读模式 - 点击开启编辑";
-    this.readOnlyStatusBarItem.tooltip = `远端文件: ${remotePath}\n点击开启编辑模式`;
-    this.readOnlyStatusBarItem.backgroundColor = new vscode.ThemeColor(
-      "statusBarItem.warningBackground",
-    );
+    if (isReadOnly) {
+      this.readOnlyStatusBarItem.text = "$(lock) 只读模式 - 点击开启编辑";
+      this.readOnlyStatusBarItem.tooltip = `远端文件: ${remotePath}\n点击开启编辑模式`;
+      this.readOnlyStatusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
+      this.readOnlyStatusBarItem.command = "jarvis.enableRemoteFileEdit";
+    } else {
+      this.readOnlyStatusBarItem.text = "$(unlock) 编辑模式 - 点击恢复只读";
+      this.readOnlyStatusBarItem.tooltip = `远端文件: ${remotePath}\n保存时将同步到远端\n点击恢复只读模式`;
+      this.readOnlyStatusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.prominentBackground",
+      );
+      this.readOnlyStatusBarItem.command = "jarvis.disableRemoteFileEdit";
+    }
     this.readOnlyStatusBarItem.color = new vscode.ThemeColor(
       "statusBarItem.warningForeground",
     );
     this.readOnlyStatusBarItem.show();
   }
 
-  // 隐藏只读状态栏按钮
-  private hideReadOnlyStatusBar(): void {
+  // 隐藏远端文件状态栏按钮
+  private hideRemoteFileStatusBar(): void {
     if (this.readOnlyStatusBarItem) {
       this.readOnlyStatusBarItem.hide();
     }
@@ -2791,17 +2803,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public updateReadOnlyStatusBar(): void {
     const activeEditor = vscode.window.activeTextEditor;
     if (!activeEditor) {
-      this.hideReadOnlyStatusBar();
+      this.hideRemoteFileStatusBar();
       return;
     }
 
     const localPath = activeEditor.document.uri.fsPath;
     const mapping = this.remoteFileEditors.get(localPath);
 
-    if (mapping && mapping.readOnly) {
-      this.showReadOnlyStatusBar(mapping.remotePath);
+    if (mapping) {
+      this.showRemoteFileStatusBar(mapping.remotePath, mapping.readOnly);
     } else {
-      this.hideReadOnlyStatusBar();
+      this.hideRemoteFileStatusBar();
     }
   }
 
@@ -2830,8 +2842,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       await fs.promises.chmod(localPath, 0o644);
       mapping.readOnly = false;
 
-      // 隐藏只读状态栏
-      this.hideReadOnlyStatusBar();
+      // 更新状态栏显示为编辑模式
+      this.showRemoteFileStatusBar(mapping.remotePath, false);
 
       // 重新打开文件以刷新编辑器状态
       const document = await vscode.workspace.openTextDocument(localPath);
@@ -2847,6 +2859,69 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       console.error("[FILETREE] 开启编辑模式失败:", error);
       vscode.window.showErrorMessage(`开启编辑模式失败: ${error}`);
+    }
+  }
+
+  // 恢复远端文件只读模式
+  public async disableRemoteFileEdit(): Promise<void> {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+      vscode.window.showWarningMessage("没有打开的文件");
+      return;
+    }
+
+    const localPath = activeEditor.document.uri.fsPath;
+    const mapping = this.remoteFileEditors.get(localPath);
+    if (!mapping) {
+      vscode.window.showWarningMessage("当前文件不是远端文件");
+      return;
+    }
+
+    if (mapping.readOnly) {
+      vscode.window.showInformationMessage("当前文件已经是只读状态");
+      return;
+    }
+
+    // 检查是否有未保存的修改
+    if (activeEditor.document.isDirty) {
+      const choice = await vscode.window.showWarningMessage(
+        "当前文件有未保存的修改，恢复只读将丢弃这些修改。",
+        "保存并恢复只读",
+        "丢弃修改并恢复只读",
+        "取消",
+      );
+      if (choice === "保存并恢复只读") {
+        await activeEditor.document.save();
+      } else if (choice === "丢弃修改并恢复只读") {
+        // 重新加载文件内容
+        await vscode.commands.executeCommand("workbench.action.files.revert");
+      } else {
+        return;
+      }
+    }
+
+    try {
+      // 将文件权限改为只读（权限 444）
+      await fs.promises.chmod(localPath, 0o444);
+      mapping.readOnly = true;
+
+      // 更新状态栏显示为只读模式
+      this.showRemoteFileStatusBar(mapping.remotePath, true);
+
+      // 重新打开文件以刷新编辑器状态
+      const document = await vscode.workspace.openTextDocument(localPath);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        preserveFocus: false,
+        preview: false,
+      });
+
+      vscode.window.showInformationMessage(
+        `已恢复只读模式: ${mapping.remotePath}`,
+      );
+    } catch (error) {
+      console.error("[FILETREE] 恢复只读模式失败:", error);
+      vscode.window.showErrorMessage(`恢复只读模式失败: ${error}`);
     }
   }
 
@@ -4711,6 +4786,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("jarvis.enableRemoteFileEdit", async () => {
       await provider.enableRemoteFileEdit();
     }),
+  );
+
+  // 注册恢复远端文件只读命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "jarvis.disableRemoteFileEdit",
+      async () => {
+        await provider.disableRemoteFileEdit();
+      },
+    ),
   );
 
   // 监听文件保存事件，同步远端文件
