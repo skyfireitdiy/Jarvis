@@ -24,7 +24,7 @@
           </div>
           <div class="agent-info">
             <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-            <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusText(agent) }}</span>
+            <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
             <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
@@ -99,7 +99,7 @@
         
         <div class="current-agent-info desktop-only" v-if="currentAgent">
           <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
-          <span class="agent-status" :class="getStatusClass(currentAgent)">{{ getStatusText(currentAgent) }}</span>
+          <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
           <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeLabel(currentAgent) }}</span>
           <span class="agent-dir">{{ currentAgent.working_dir }}</span>
         </div>
@@ -7920,6 +7920,35 @@ body::-webkit-scrollbar {
 .agent-status.stopped {
   background: rgba(248, 81, 73, 0.2);
   color: #f85149;
+}
+
+.agent-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.agent-status-dot.running {
+  background: #3fb950;
+  box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
+}
+
+.agent-status-dot.stopped {
+  background: #f85149;
+  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
+}
+
+.agent-status-dot.waiting_multi {
+  background: #d29922;
+  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+}
+
+.agent-status-dot.waiting_single {
+  background: #f85149;
+  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
 }
 
 .agent-llm-group {
