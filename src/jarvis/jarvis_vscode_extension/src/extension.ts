@@ -660,6 +660,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       ? `
   <div class="create-agent-panel">
     <div class="panel-section-title create-agent-title">创建 Agent</div>
+    ${nodeFieldMarkup}
     <div class="form-group">
       <label for="agentType">Agent 类型</label>
       <select id="agentType">
@@ -680,7 +681,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <input id="agentName" value="${escapeHtml(this.createAgentFormState.name)}" placeholder="通用Agent" />
     </div>
     ${llmGroupFieldMarkup}
-    ${nodeFieldMarkup}
     <label class="checkbox-row">
       <input id="useWorktree" type="checkbox" ${worktreeChecked} ${worktreeDisabled} />
       <span>codeagent 使用 worktree</span>
