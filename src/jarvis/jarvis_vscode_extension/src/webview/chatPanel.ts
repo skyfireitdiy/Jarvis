@@ -1090,12 +1090,14 @@ function showConfirmDialog(
     }
   }
   confirmDialog?.classList.add("visible");
-  // 自动聚焦到默认按钮
-  if (defaultConfirm && confirmConfirmButton) {
-    confirmConfirmButton.focus();
-  } else if (!defaultConfirm && confirmCancelButton) {
-    confirmCancelButton.focus();
-  }
+  // 自动聚焦到默认按钮（延迟确保 DOM 渲染完成）
+  requestAnimationFrame(() => {
+    if (defaultConfirm && confirmConfirmButton) {
+      confirmConfirmButton.focus();
+    } else if (!defaultConfirm && confirmCancelButton) {
+      confirmCancelButton.focus();
+    }
+  });
 }
 
 function hideConfirmDialog(): void {
@@ -1125,12 +1127,17 @@ confirmConfirmButton?.addEventListener("click", () => {
 confirmDialog?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    // 检查哪个按钮是默认按钮
-    const isConfirmDefault =
+    // 根据默认按钮决定结果
+    const isDefaultConfirm =
       confirmConfirmButton?.classList.contains("default");
-    sendConfirmResult(isConfirmDefault);
-  }
-  if (event.key === "Escape") {
+    sendConfirmResult(!!isDefaultConfirm);
+  } else if (event.key === "y" || event.key === "Y") {
+    event.preventDefault();
+    sendConfirmResult(true);
+  } else if (event.key === "n" || event.key === "N") {
+    event.preventDefault();
+    sendConfirmResult(false);
+  } else if (event.key === "Escape") {
     event.preventDefault();
     sendConfirmResult(false);
   }
