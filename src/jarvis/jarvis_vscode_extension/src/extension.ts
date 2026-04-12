@@ -2025,10 +2025,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private sendIndependentTerminalResize(
     terminalId: string,
-    rows: number,
     cols: number,
+    rows: number,
   ): void {
     const session = this.independentTerminalSessions.get(terminalId);
+    console.log(
+      "[TERMINAL RESIZE] terminalId:",
+      terminalId,
+      "cols:",
+      cols,
+      "rows:",
+      rows,
+      "nodeId:",
+      session?.nodeId,
+    );
     if (!session || session.closed) {
       return;
     }
