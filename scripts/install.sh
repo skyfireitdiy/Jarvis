@@ -121,6 +121,9 @@ install_tools() {
     uv tool install -e . --python 3.12
     uv tool install playwright
     uv tool install ddgr
+    
+    echo -e "\n--- 更新 shell 环境配置 ---"
+    uv tool update-shell || echo "提示: 如果需要手动配置，请运行: uv tool update-shell"
 }
 
 prepare_source_tree
