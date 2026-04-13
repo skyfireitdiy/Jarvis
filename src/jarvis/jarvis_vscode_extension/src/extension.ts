@@ -123,6 +123,9 @@ interface ChatPanelState {
   gatewayConnectionStatusText: string;
   gatewayHasConnectionError: boolean;
   connectionLockEnabled: boolean;
+  restartNodeId?: string;
+  restartFrontendService?: boolean;
+  isRestartingService?: boolean;
 }
 
 interface CompletionItem {
@@ -205,6 +208,8 @@ interface AgentListViewMessage {
   path?: string;
   searchText?: string;
   key?: string;
+  nodePath?: string;
+  filePath?: string;
 }
 
 interface SavedConnectionInfo {
@@ -223,7 +228,7 @@ interface PersistedChatMessageItem {
 
 const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
 const AGENT_CHAT_HISTORY_KEY = "jarvis.agentChatHistory";
-const MAX_PERSISTED_MESSAGES_PER_AGENT = 100;
+const MAX_PERSISTED_MESSAGES_PER_AGENT = 1000;
 const MAX_PERSISTED_EXECUTION_BUFFER_LENGTH = 50000;
 const AGENT_CONNECTION_MAX_RETRIES = 12;
 const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
@@ -457,21 +462,24 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "toggleFileTree") {
           await this.handleToggleFileTree(
-            message.agentId,
-            message.workingDir,
+            message.agentId || "",
+            message.workingDir || "",
             message.nodeId,
           );
           return;
         }
         if (message?.type === "toggleFileTreeNode") {
           await this.handleToggleFileTreeNode(
-            message.agentId,
-            message.nodePath,
+            message.agentId || "",
+            message.nodePath || "",
           );
           return;
         }
         if (message?.type === "openRemoteFile") {
-          await this.handleOpenRemoteFile(message.agentId, message.filePath);
+          await this.handleOpenRemoteFile(
+            message.agentId || "",
+            message.filePath || "",
+          );
           return;
         }
         if (message?.type === "toggleConnectionLock") {
@@ -1664,6 +1672,81 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         return;
       }
       await this.sendConfirmResult(agentId, Boolean(message.confirmed));
+    }
+    if (message.type === "loadMoreHistory") {
+      await this.loadMoreHistory(
+        message.payload?.offset || 0,
+        message.payload?.limit || 50,
+      );
+    }
+  }
+
+  private async loadMoreHistory(offset: number, limit: number): Promise<void> {
+    const agentId = this.panelState.selectedAgentId;
+    if (!agentId) {
+      console.log("[HISTORY] No active agent, skip loading more history");
+      return;
+    }
+
+    console.log(
+      "[HISTORY] Loading more history for agent:",
+      agentId,
+      "offset:",
+      offset,
+      "limit:",
+      limit,
+    );
+
+    // 获取持久化的历史消息
+    const allHistory = this.getPersistedAgentChatHistory();
+    const agentHistory = allHistory[agentId] || [];
+
+    // 计算要加载的消息范围（从旧到新）
+    // offset 是已经加载的消息数量，我们要加载 offset 之前的 limit 条消息
+    // 确保偏移量不超过总消息数
+    const effectiveOffset = Math.min(offset, agentHistory.length);
+    const startIndex = Math.max(
+      0,
+      agentHistory.length - effectiveOffset - limit,
+    );
+    const endIndex = Math.max(0, agentHistory.length - effectiveOffset);
+    const historyMessages = agentHistory.slice(startIndex, endIndex);
+
+    console.log(
+      "[HISTORY] History range: total=",
+      agentHistory.length,
+      "offset=",
+      offset,
+      "start=",
+      startIndex,
+      "end=",
+      endIndex,
+    );
+
+    console.log(
+      "[HISTORY] Found",
+      historyMessages.length,
+      "messages from",
+      startIndex,
+      "to",
+      endIndex,
+    );
+
+    // 将持久化消息转换为聊天消息格式
+    const chatMessages: ChatMessageItem[] = historyMessages.map((msg) => ({
+      text: msg.text,
+      variant: msg.variant,
+      lang: msg.lang,
+    }));
+
+    // 发送历史消息到前端（使用特定类型标识历史加载）
+    if (this.currentPanel?.webview) {
+      this.currentPanel.webview.postMessage({
+        type: "historyLoaded",
+        payload: {
+          messages: chatMessages,
+        },
+      });
     }
   }
 
@@ -5126,6 +5209,10 @@ interface ChatPanelMessage {
   cols?: number;
   rows?: number;
   agentId?: string;
+  payload?: {
+    offset?: number;
+    limit?: number;
+  };
 }
 
 interface ModelGroupsResponse {
