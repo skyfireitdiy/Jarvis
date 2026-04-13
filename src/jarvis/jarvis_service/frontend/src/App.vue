@@ -825,6 +825,17 @@
           </button>
         </div>
 
+        <!-- 连接管理 -->
+        <div class="form-group">
+          <label>连接管理</label>
+          <div class="connection-management-section">
+            <button class="danger-btn" @click="disconnectAll" :disabled="!socket">
+              断开连接
+            </button>
+            <span class="form-help">断开所有WebSocket连接并刷新页面</span>
+          </div>
+        </div>
+
         <!-- 配置同步 -->
         <div class="form-group" v-if="availableNodeOptions.length > 0">
           <label>配置同步</label>
@@ -3092,6 +3103,40 @@ function reconnect() {
   showSettingsModal.value = false
   // 重新连接
   connect()
+}
+
+function disconnectAll() {
+  console.log('[WS] Disconnecting all WebSocket connections')
+  
+  // 关闭设置弹窗
+  showSettingsModal.value = false
+  
+  // 关闭所有Agent WebSocket连接
+  sockets.value.forEach((ws, agentId) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log(`[WS] Closing WebSocket connection for agent ${agentId}`)
+      ws.close()
+    }
+  })
+  sockets.value.clear()
+  
+  // 关闭主Gateway连接
+  if (socket.value) {
+    console.log('[WS] Closing main Gateway WebSocket connection')
+    socket.value.close()
+    socket.value = null
+  }
+  
+  // 清空连接状态
+  currentAgentId.value = null
+  agentList.value = []
+  agentStatuses.value.clear()
+  
+  // 强制刷新页面确保状态重置
+  console.log('[WS] Forcing page refresh after disconnection')
+  setTimeout(() => {
+    window.location.reload()
+  }, 500)
 }
 
 // ========== Agent 管理方法 ==========
