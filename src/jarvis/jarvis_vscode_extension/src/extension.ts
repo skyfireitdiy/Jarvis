@@ -811,6 +811,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         </button>
       </div>
     </div>
+    <div class="settings-card">
+      <div class="settings-card-title">连接管理</div>
+      <div class="settings-card-row">
+        <span class="settings-card-help">断开当前连接并清空认证信息，用于切换网关服务器</span>
+        <button id="disconnectButton" type="button" class="settings-action-button" style="background-color: #dc2626;">
+          断开连接
+        </button>
+      </div>
+    </div>
   </div>`
       : "";
 
@@ -980,6 +989,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (restartNodeServiceButton) {
       restartNodeServiceButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'restartNodeService' });
+      });
+    }
+    const disconnectButton = document.getElementById('disconnectButton');
+    if (disconnectButton) {
+      disconnectButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'disconnect' });
       });
     }
     const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');
@@ -1604,6 +1619,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private async handleChatPanelMessage(
     message: ChatPanelMessage,
   ): Promise<void> {
+    if (message.type === "disconnect") {
+      await this.disconnectAll();
+      return;
+    }
     if (message.type === "sendMessage") {
       await this.sendAgentMessage(message.text ?? "");
       return;
@@ -1646,6 +1665,43 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       await this.sendConfirmResult(agentId, Boolean(message.confirmed));
     }
+  }
+
+  private async disconnectAll(): Promise<void> {
+    // 断开所有WebSocket连接
+    this.stopAgentListRefresh();
+    this.disposeSocket("gatewaySocket");
+
+    // 关闭所有Agent WebSocket连接
+    for (const socket of this.agentSockets.values()) {
+      try {
+        socket.close();
+      } catch {
+        // ignore close error
+      }
+    }
+    this.agentSockets.clear();
+    this.agentConnectionAttempts.clear();
+
+    // 清空token和连接状态
+    this.panelState.token = "";
+    this.panelState.selectedAgentId = undefined;
+    this.panelState.gatewaySocket = undefined;
+
+    // 清理所有agent状态
+    this.agentStatuses.clear();
+
+    // 关闭右侧Chat Panel
+    if (this.currentPanel) {
+      this.currentPanel.dispose();
+      this.currentPanel = undefined;
+    }
+
+    // 重新渲染界面
+    this.renderAgentListView();
+
+    // 显示断开连接成功提示
+    vscode.window.showInformationMessage("已断开连接，可以切换网关服务器");
   }
 
   private restoreSavedConnectionInfo(): void {
