@@ -1767,14 +1767,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }));
 
     // 发送历史消息到前端（使用特定类型标识历史加载）
-    if (this.currentPanel?.webview) {
-      this.currentPanel.webview.postMessage({
-        type: "historyLoaded",
-        payload: {
-          messages: chatMessages,
-        },
-      });
-    }
+    this.postMessageToChatPanel({
+      type: "historyLoaded",
+      payload: {
+        messages: chatMessages,
+      },
+    });
   }
 
   private async disconnectAll(): Promise<void> {
@@ -2205,7 +2203,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private async openCompletions(): Promise<void> {
     const agentId = String(this.panelState.selectedAgentId || "").trim();
     if (!agentId) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionsResult",
         payload: {
           items: [],
@@ -2216,7 +2214,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (!this.panelState.token) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionsResult",
         payload: {
           items: [],
@@ -2244,7 +2242,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       if (!response.ok || !result.success || !Array.isArray(result.data)) {
         throw new Error(result.error?.message || "获取补全列表失败");
       }
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionsResult",
         payload: {
           items: result.data,
@@ -2252,7 +2250,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         },
       });
     } catch (error) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionsResult",
         payload: {
           items: [],
@@ -2267,7 +2265,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const agentId = String(this.panelState.selectedAgentId || "").trim();
     const trimmedQuery = String(query || "").trim();
     if (!agentId || !trimmedQuery) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionSearchResult",
         payload: {
           items: [],
@@ -2277,7 +2275,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     if (!this.panelState.token) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionSearchResult",
         payload: {
           items: [],
@@ -2305,7 +2303,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       if (!response.ok || !result.success || !Array.isArray(result.data)) {
         throw new Error(result.error?.message || "搜索补全失败");
       }
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionSearchResult",
         payload: {
           items: result.data,
@@ -2313,7 +2311,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         },
       });
     } catch (error) {
-      this.currentPanel?.webview.postMessage({
+      this.postMessageToChatPanel({
         type: "completionSearchResult",
         payload: {
           items: [],
@@ -3636,6 +3634,31 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.postPanelStateImmediate();
   }, 100);
 
+  private postMessageToChatPanel(message: any): void {
+    // 发送到 WebviewPanel（向后兼容）
+    if (this.currentPanel?.webview) {
+      this.currentPanel.webview.postMessage(message);
+    }
+    // 发送到 WebviewView
+    if (this.chatPanelViewProvider) {
+      this.chatPanelViewProvider.postMessage(message);
+    }
+  }
+
+  private updateChatPanelHtml(): void {
+    // 更新 WebviewPanel（向后兼容）
+    if (this.currentPanel) {
+      this.currentPanel.title = this.getChatPanelTitle();
+      this.currentPanel.webview.html = this.getChatPanelHtml(
+        this.panelState.selectedAgentId,
+      );
+    }
+    // 更新 WebviewView
+    if (this.chatPanelViewProvider) {
+      this.chatPanelViewProvider.updateHtml();
+    }
+  }
+
   private renderAgentListViewImmediate(): void {
     if (!this.currentView) {
       return;
@@ -4012,13 +4035,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       await this.refreshAgents();
       this.renderAgentListView();
       this.appendPanelMessage(`已删除 Agent：${agentId}`, "system");
-      if (this.currentPanel) {
-        this.currentPanel.title = this.getChatPanelTitle();
-        this.currentPanel.webview.html = this.getChatPanelHtml(
-          this.panelState.selectedAgentId,
-        );
-        this.postPanelState();
-      }
+      this.updateChatPanelHtml();
+      this.postPanelState();
     } catch (error) {
       vscode.window.showErrorMessage(getErrorMessage(error));
     }
@@ -4193,13 +4211,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.isBatchMode = false;
     this.renderAgentListView();
 
-    if (this.currentPanel) {
-      this.currentPanel.title = this.getChatPanelTitle();
-      this.currentPanel.webview.html = this.getChatPanelHtml(
-        this.panelState.selectedAgentId,
-      );
-      this.postPanelState();
-    }
+    this.updateChatPanelHtml();
+    this.postPanelState();
 
     if (failCount === 0) {
       vscode.window.showInformationMessage(`成功删除 ${successCount} 个 Agent`);
@@ -4784,8 +4797,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const defaultConfirm = payload?.default !== false; // 默认为 true
 
     // 通过 webview 显示确认对话框
-    if (this.currentPanel) {
-      this.currentPanel.webview.postMessage({
+    if (this.currentPanel || this.chatPanelViewProvider) {
+      this.postMessageToChatPanel({
         type: "showConfirm",
         payload: {
           message,
