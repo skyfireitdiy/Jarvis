@@ -235,10 +235,60 @@ const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
 const AGENT_CONNECTION_TIMEOUT_MS = 10000;
 const AGENT_LIST_REFRESH_INTERVAL_MS = 3000;
 
+class ChatPanelViewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "jarvis.chatPanel";
+
+  private currentView: vscode.WebviewView | undefined;
+
+  constructor(private readonly parentProvider: JarvisAgentListViewProvider) {}
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+    this.currentView = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+    };
+
+    webviewView.webview.html = this.parentProvider.getChatPanelHtml(
+      (this.parentProvider as any).panelState.selectedAgentId,
+    );
+
+    webviewView.webview.onDidReceiveMessage(
+      async (message: ChatPanelMessage) => {
+        await this.parentProvider.handleChatPanelMessage(message);
+      },
+    );
+
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        // 延迟发送状态，确保WebView加载完成
+        setTimeout(() => {
+          this.parentProvider.postPanelStateImmediate();
+        }, 100);
+      }
+    });
+  }
+
+  updateHtml(): void {
+    if (this.currentView) {
+      this.currentView.webview.html = this.parentProvider.getChatPanelHtml(
+        (this.parentProvider as any).panelState.selectedAgentId,
+      );
+    }
+  }
+
+  postMessage(message: any): void {
+    if (this.currentView) {
+      this.currentView.webview.postMessage(message);
+    }
+  }
+}
+
 class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "jarvis.agentListView";
 
   private currentPanel: vscode.WebviewPanel | undefined;
+  private chatPanelViewProvider: ChatPanelViewProvider | undefined;
   private agentItems: AgentListItem[] = [
     {
       id: "default-agent",
@@ -515,37 +565,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       agentState.input_mode = "multi";
     }
 
-    if (!this.currentPanel) {
-      this.currentPanel = vscode.window.createWebviewPanel(
-        "jarvis.chatPanel",
-        this.getChatPanelTitle(),
-        { viewColumn: vscode.ViewColumn.Three, preserveFocus: false },
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-        },
-      );
-
-      this.currentPanel.webview.onDidReceiveMessage(
-        async (message: ChatPanelMessage) => {
-          await this.handleChatPanelMessage(message);
-        },
-      );
-
-      this.currentPanel.onDidDispose(() => {
-        this.currentPanel = undefined;
-      });
-    }
-
-    this.currentPanel.title = this.getChatPanelTitle();
-    this.currentPanel.webview.html = this.getChatPanelHtml(
-      this.panelState.selectedAgentId,
-    );
-    // 延迟发送状态，确保WebView加载完成
-    setTimeout(() => {
-      this.postPanelState();
-    }, 100);
-    await this.currentPanel.reveal(vscode.ViewColumn.Beside, false);
+    // 显示侧边栏视图
+    await vscode.commands.executeCommand("jarvis.chatPanel.focus");
   }
 
   private getAgentListHtml(): string {
@@ -1284,10 +1305,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
-  private getChatPanelHtml(agentId?: string): string {
+  public getChatPanelHtml(agentId?: string): string {
     const nonce = createNonce();
     const selectedAgentLabel = this.getAgentDisplayLabel(agentId);
-    const webview = this.currentPanel?.webview;
+    const webview =
+      (this.chatPanelViewProvider as any)?.currentView?.webview ||
+      this.currentPanel?.webview;
     const xtermCssUri = webview
       ? webview.asWebviewUri(
           vscode.Uri.joinPath(
@@ -1628,7 +1651,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 
-  private async handleChatPanelMessage(
+  public async handleChatPanelMessage(
     message: ChatPanelMessage,
   ): Promise<void> {
     if (message.type === "disconnect") {
@@ -3576,12 +3599,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.renderAgentListView();
   }
 
-  private postPanelStateImmediate(): void {
-    if (!this.currentPanel) {
-      return;
-    }
+  public postPanelStateImmediate(): void {
     const agentStatus = this.getSelectedAgentStatus();
-    this.currentPanel.webview.postMessage({
+    const message = {
       type: "state",
       payload: {
         gatewayUrl: this.panelState.gatewayUrl,
@@ -3595,7 +3615,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         executionStatus: agentStatus?.execution_status || "stopped",
         messages: agentStatus?.messages || [],
       },
-    });
+    };
+
+    // 发送到 WebviewPanel（向后兼容）
+    if (this.currentPanel) {
+      this.currentPanel.webview.postMessage(message);
+    }
+    // 发送到 WebviewView
+    if (this.chatPanelViewProvider) {
+      this.chatPanelViewProvider.postMessage(message);
+    }
     console.log(
       "[POST STATE]",
       this.panelState.selectedAgentId,
@@ -5434,10 +5463,21 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   activeProvider = provider;
 
+  // 创建并注册 ChatPanelViewProvider
+  const chatPanelProvider = new ChatPanelViewProvider(provider);
+  provider["chatPanelViewProvider"] = chatPanelProvider;
+
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       JarvisAgentListViewProvider.viewType,
       provider,
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      ChatPanelViewProvider.viewType,
+      chatPanelProvider,
     ),
   );
 
