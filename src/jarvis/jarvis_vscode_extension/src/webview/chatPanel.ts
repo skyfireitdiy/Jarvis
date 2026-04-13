@@ -1182,6 +1182,8 @@ completionModalOverlay?.addEventListener("click", (event) => {
   }
 });
 
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+
 completionSearchInput?.addEventListener("input", () => {
   const query = completionSearchInput.value.trim();
   selectedCompletionIndex = -1;
@@ -1193,7 +1195,12 @@ completionSearchInput?.addEventListener("input", () => {
   }
   setCompletionStatus("正在搜索补全...");
   renderCompletionList();
-  vscode.postMessage({ type: "searchCompletions", query });
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+  searchDebounceTimer = setTimeout(() => {
+    vscode.postMessage({ type: "searchCompletions", query });
+  }, 300);
 });
 
 completionSearchInput?.addEventListener("keydown", (event) => {
