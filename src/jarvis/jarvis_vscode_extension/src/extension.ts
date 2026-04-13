@@ -3356,6 +3356,21 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         ? this.panelState.restartFrontendService
         : false;
 
+    // 检查是否有运行中的agent
+    const runningAgents = this.agentItems.filter(
+      (agent) => agent.statusClass === "running",
+    );
+    if (runningAgents.length > 0) {
+      const agentNames = runningAgents
+        .map((agent) => agent.displayName || agent.id)
+        .join(", ");
+      vscode.window.showWarningMessage(
+        `检测到 ${runningAgents.length} 个运行中的 Agent：${agentNames}\n\n请先手动停止或完成这些 Agent 后再重启节点服务`,
+        { modal: true },
+      );
+      return;
+    }
+
     // 确认重启
     const confirmMessage =
       targetNodeId === "master"
