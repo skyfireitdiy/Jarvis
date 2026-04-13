@@ -745,21 +745,35 @@ git reset --hard {start_commit}
                         final_ret += f"\n\n代码已修改完成{commit_info}\n"
                     else:
                         final_ret += "\n\n修改没有生效\n"
-                
-                # 
+
+                #
                 latest_commit_hash = get_latest_commit_hash()
-                diff_lines = get_diff_between_commits(self.start_commit, latest_commit_hash)
+                diff_lines = get_diff_between_commits(
+                    self.start_commit, latest_commit_hash
+                )
                 if diff_lines:
-                    lines_added = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
-                    lines_removed = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
+                    lines_added = sum(
+                        1
+                        for line in diff_lines
+                        if line.startswith("+") and not line.startswith("+++")
+                    )
+                    lines_removed = sum(
+                        1
+                        for line in diff_lines
+                        if line.startswith("-") and not line.startswith("---")
+                    )
                     total_lines = lines_added + lines_removed
-                    commits = self.git_manager.get_commits_between(self.start_commit, latest_commit_hash)
+                    commits = self.git_manager.get_commits_between(
+                        self.start_commit, latest_commit_hash
+                    )
                     if total_lines > 1000:
                         # 在压缩前创建备份分支
                         try:
                             # 生成备份分支名（格式：backup/YYYY-MM-DD_HH-MM-SS）
-                            backup_branch = f"backup/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-                            
+                            backup_branch = (
+                                f"backup/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+                            )
+
                             # 创建备份分支指向 latest_commit_hash
                             # 注意：git branch 只创建分支，不会切换当前分支
                             subprocess.run(
@@ -767,14 +781,16 @@ git reset --hard {start_commit}
                                 capture_output=True,
                                 check=True,
                             )
-                            PrettyOutput.auto_print(f"✅ 已创建备份分支: {backup_branch}")
+                            PrettyOutput.auto_print(
+                                f"✅ 已创建备份分支: {backup_branch}"
+                            )
                         except subprocess.CalledProcessError as e:
                             PrettyOutput.auto_print(f"⚠️ 创建备份分支失败: {str(e)}")
                             PrettyOutput.auto_print("将继续执行压缩操作...")
                         except Exception as e:
                             PrettyOutput.auto_print(f"⚠️ 备份分支创建异常: {str(e)}")
                             PrettyOutput.auto_print("将继续执行压缩操作...")
-                        
+
                         self.git_manager.handle_commit_confirmation(
                             commits,
                             self.start_commit,
@@ -1010,12 +1026,13 @@ git reset --hard {start_commit}
 - 只关注本次修改相关的问题，不要审查无关代码
 - **尊重用户原始需求**：如果用户在需求中明确支持某个方案或实现方式，不应将其判定为风险或问题，除非该方案存在明显的错误或违反安全原则"""
 
+        commit_info = f"【起始 Commit】\n{start_commit}\n\n" if start_commit else ""
         user_prompt = f"""请审查以下代码修改是否正确完成了用户需求。
 
 【用户需求】
 {user_input}
 
-{f"【起始 Commit】\n{start_commit}\n\n" if start_commit else ""}【完整的修改历史】
+{commit_info}【完整的修改历史】
 {modification_history if modification_history else "无修改历史（如为空，说明主 Agent 未生成总结或未进行修复）"}
 
 【代码修改（Git Diff）】
@@ -1293,6 +1310,7 @@ git reset --hard {start_commit}
                 non_interactive=self.non_interactive,
                 use_methodology=True,
                 use_analysis=False,
+                quick_mode=self.quick_mode,
             )
 
             # 运行 review
