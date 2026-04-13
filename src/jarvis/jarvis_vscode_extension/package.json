@@ -54,6 +54,11 @@
           "id": "jarvis.agentListView",
           "name": "Agents",
           "type": "webview"
+        },
+        {
+          "id": "jarvis.chatPanel",
+          "name": "Chat",
+          "type": "webview"
         }
       ]
     }
