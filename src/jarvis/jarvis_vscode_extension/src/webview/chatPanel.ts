@@ -35,6 +35,13 @@ declare function acquireVsCodeApi(): {
 
 const vscode = acquireVsCodeApi();
 const messages = document.getElementById("messages") as HTMLDivElement | null;
+
+// 分页加载相关变量
+const MESSAGES_PER_PAGE = 50;
+let currentMessages: ChatMessageItem[] = [];
+let historyOffset = 0;
+let isLoadingHistory = false;
+let hasMoreHistory = false;
 const connectionStatus = document.getElementById(
   "connectionStatus",
 ) as HTMLDivElement | null;
@@ -671,10 +678,28 @@ function renderExecutionMessage(
   return entry.wrapper;
 }
 
-function renderMessages(messageList: ChatMessageItem[], agentId: string): void {
+function renderMessages(
+  messageList: ChatMessageItem[],
+  agentId: string,
+  isInitialLoad = false,
+): void {
   if (!messages) {
     return;
   }
+
+  // 如果是初始加载，更新当前消息列表
+  if (isInitialLoad) {
+    currentMessages = messageList || [];
+    historyOffset = currentMessages.length;
+    hasMoreHistory = historyOffset >= MESSAGES_PER_PAGE;
+    console.log(
+      "[HISTORY] Initial load:",
+      currentMessages.length,
+      "messages, hasMore:",
+      hasMoreHistory,
+    );
+  }
+
   const shouldAutoScroll = isNearBottom(messages);
   const nextNodes: HTMLDivElement[] = [];
   (messageList || []).forEach((item, index) => {
@@ -1334,6 +1359,13 @@ window.addEventListener(
       renderCompletionList();
       return;
     }
+    if (data.type === "historyLoaded") {
+      const payload = data.payload || {};
+      if (isLoadingHistory && payload.messages && payload.messages.length > 0) {
+        handleHistoryLoaded(payload.messages);
+      }
+      return;
+    }
     if (data.type !== "state") {
       return;
     }
@@ -1371,7 +1403,14 @@ window.addEventListener(
       manualInterruptButton.disabled = payload.executionStatus !== "running";
     }
     syncInputMode(payload.inputMode || "multi", payload.inputTip || "");
-    renderMessages(payload.messages || [], currentSelectedAgentId);
+
+    // 检查是否是历史消息加载响应
+    if (isLoadingHistory && payload.messages && payload.messages.length > 0) {
+      handleHistoryLoaded(payload.messages);
+    } else {
+      // 正常的状态更新
+      renderMessages(payload.messages || [], currentSelectedAgentId, true);
+    }
     if (messages && isRunningIndicatorVisible && !wasRunningIndicatorVisible) {
       requestAnimationFrame(() => {
         messages.scrollTop = messages.scrollHeight;
@@ -1588,3 +1627,98 @@ function renderBufferPanel(): void {
     textarea.focus();
   }
 }
+
+/**
+ * 检查是否接近滚动区域顶部
+ */
+function isNearTop(element: HTMLElement): boolean {
+  const SCROLL_THRESHOLD = 100;
+  return element.scrollTop <= SCROLL_THRESHOLD;
+}
+
+/**
+ * 加载更多历史消息
+ */
+function loadMoreHistory(): void {
+  if (isLoadingHistory || !hasMoreHistory) {
+    return;
+  }
+
+  isLoadingHistory = true;
+  console.log("[HISTORY] Loading more history, offset:", historyOffset);
+
+  // 请求加载更多历史消息
+  vscode.postMessage({
+    type: "loadMoreHistory",
+    payload: {
+      offset: historyOffset,
+      limit: MESSAGES_PER_PAGE,
+    },
+  });
+}
+
+/**
+ * 处理历史消息加载结果
+ */
+function handleHistoryLoaded(newMessages: ChatMessageItem[]): void {
+  if (newMessages.length === 0) {
+    hasMoreHistory = false;
+    isLoadingHistory = false;
+    console.log("[HISTORY] No more history messages");
+    return;
+  }
+
+  // 保存当前的滚动位置
+  let scrollPosition = 0;
+  if (messages) {
+    scrollPosition = messages.scrollHeight - messages.scrollTop;
+  }
+
+  // 将新消息插入到当前消息列表的开头
+  currentMessages = [...newMessages, ...currentMessages];
+
+  // 更新偏移量
+  historyOffset += newMessages.length;
+
+  // 重新渲染消息（不是初始加载）
+  renderMessages(currentMessages, currentSelectedAgentId, false);
+
+  // 恢复滚动位置
+  if (messages) {
+    requestAnimationFrame(() => {
+      const newScrollHeight = messages.scrollHeight;
+      messages.scrollTop = newScrollHeight - scrollPosition;
+      console.log("[HISTORY] Scroll position restored");
+    });
+  }
+
+  isLoadingHistory = false;
+  console.log(
+    "[HISTORY] Loaded",
+    newMessages.length,
+    "more messages, total loaded:",
+    historyOffset,
+  );
+}
+
+/**
+ * 初始化分页加载
+ */
+function initPagination(): void {
+  if (!messages) {
+    return;
+  }
+
+  // 添加滚动事件监听
+  messages.addEventListener("scroll", () => {
+    if (isNearTop(messages) && !isLoadingHistory && hasMoreHistory) {
+      console.log("[HISTORY] Scrolled to top, loading more history");
+      loadMoreHistory();
+    }
+  });
+
+  console.log("[HISTORY] Pagination initialized");
+}
+
+// 初始化分页加载
+initPagination();
