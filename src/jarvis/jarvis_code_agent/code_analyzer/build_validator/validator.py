@@ -163,39 +163,9 @@ class BuildValidator:
                 # 配置文件中保存的构建系统无效，继续检测
                 pass
 
-        # 使用LLM检测构建系统（基于文件统计和文件列表）
-        detected_systems = self.detector.detect_with_llm_and_confirm()
-
-        if not detected_systems:
-            # 用户取消或未检测到构建系统，使用兜底验证器
-            PrettyOutput.auto_print("ℹ️ 未检测到构建系统或用户取消，使用兜底验证器")
-            return self._fallback_validator.validate(modified_files)
-
-        # 使用检测到的第一个构建系统（用户已确认）
-        build_system = detected_systems[0]
-
-        if build_system == BuildSystem.UNKNOWN:
-            # 未知构建系统，使用兜底验证器
-            PrettyOutput.auto_print("ℹ️ 构建系统为unknown，使用兜底验证器")
-            return self._fallback_validator.validate(modified_files)
-
-        if build_system in self._validators:
-            validator = self._validators[build_system]
-            PrettyOutput.auto_print(
-                f"ℹ️ 使用构建系统: {build_system.value}, 验证器: {validator.__class__.__name__}"
-            )
-            try:
-                return validator.validate(modified_files)
-            except Exception as e:
-                PrettyOutput.auto_print(
-                    f"⚠️ 验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器"
-                )
-                # 验证器执行失败时，使用兜底验证器
-                return self._fallback_validator.validate(modified_files)
-        else:
-            # 未找到对应的验证器，使用兜底验证器
-            PrettyOutput.auto_print("ℹ️ 未找到对应的验证器，使用兜底验证器")
-            return self._fallback_validator.validate(modified_files)
+        # 配置文件中没有保存的构建系统，直接使用兜底验证器
+        PrettyOutput.auto_print("ℹ️ 配置文件中未指定构建系统，使用兜底验证器")
+        return self._fallback_validator.validate(modified_files)
 
     def register_validator(
         self, build_system: BuildSystem, validator: BuildValidatorBase
