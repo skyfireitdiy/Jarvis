@@ -123,6 +123,12 @@ function Install-Tools {
     uv tool install -e . --python 3.12
     uv tool install playwright
     uv tool install ddgr
+    
+    Write-Host "`n--- Update shell environment configuration ---" -ForegroundColor Green
+    uv tool update-shell
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Note: If you need to configure manually, please run: uv tool update-shell" -ForegroundColor Yellow
+    }
 }
 
 Prepare-SourceTree
