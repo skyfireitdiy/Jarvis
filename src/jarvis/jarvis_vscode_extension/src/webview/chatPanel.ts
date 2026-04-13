@@ -196,7 +196,7 @@ function renderPlantUmlBlock(plantUmlSource: string): string {
 
 const markedRenderer = new marked.Renderer();
 const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer);
-markedRenderer.code = (token: Parameters<typeof defaultCodeRenderer>[0]) => {
+markedRenderer.code = (token: any) => {
   if (isPlantUmlLanguage(token.lang)) {
     return renderPlantUmlBlock(token.text);
   }
@@ -381,6 +381,174 @@ function isNearBottom(container: HTMLDivElement, threshold = 24): boolean {
   return distanceToBottom <= threshold;
 }
 
+function showCopySuccess(): void {
+  // 创建提示元素
+  const notification = document.createElement("div");
+  notification.textContent = "已复制";
+  notification.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  `;
+
+  document.body.appendChild(notification);
+
+  // 显示提示
+  requestAnimationFrame(() => {
+    notification.style.opacity = "1";
+  });
+
+  // 2秒后自动消失
+  setTimeout(() => {
+    notification.style.opacity = "0";
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 2000);
+}
+
+function copyMessageToClipboard(item: ChatMessageItem): void {
+  const text = String(item.text || "");
+  if (!text.trim()) {
+    return;
+  }
+
+  // 使用现代Clipboard API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        // 显示复制成功提示
+        showCopySuccess();
+      })
+      .catch((err) => {
+        console.error("复制失败:", err);
+        // 降级方案：使用传统方法
+        fallbackCopyToClipboard(text);
+      });
+  } else {
+    fallbackCopyToClipboard(text);
+  }
+}
+
+function fallbackCopyToClipboard(text: string): void {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  textArea.style.top = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand("copy");
+    if (successful) {
+      showCopySuccess();
+    } else {
+      console.error("复制失败");
+    }
+  } catch (err) {
+    console.error("复制失败:", err);
+  }
+
+  document.body.removeChild(textArea);
+}
+
+function insertMessageToEditor(item: ChatMessageItem): void {
+  const text = String(item.text || "");
+  if (!text.trim()) {
+    return;
+  }
+
+  // 通过VS Code API发送消息，请求插入文本到编辑器
+  vscode.postMessage({
+    type: "insertToEditor",
+    text: text,
+  });
+}
+
+function addMessageActions(
+  messageNode: HTMLDivElement,
+  item: ChatMessageItem,
+): void {
+  // 检查是否已经添加了操作图标
+  if (messageNode.querySelector(".message-actions")) {
+    return;
+  }
+
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "message-actions";
+  actionsContainer.style.cssText = `
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  `;
+
+  // 复制图标
+  const copyButton = document.createElement("button");
+  copyButton.innerHTML = "📋";
+  copyButton.title = "复制到剪贴板";
+  copyButton.style.cssText = `
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+  `;
+  copyButton.addEventListener("click", () => {
+    copyMessageToClipboard(item);
+  });
+
+  // 插入图标
+  const insertButton = document.createElement("button");
+  insertButton.innerHTML = "📝";
+  insertButton.title = "插入到编辑器";
+  insertButton.style.cssText = `
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+  `;
+  insertButton.addEventListener("click", () => {
+    insertMessageToEditor(item);
+  });
+
+  actionsContainer.appendChild(copyButton);
+  actionsContainer.appendChild(insertButton);
+
+  // 添加悬停效果
+  messageNode.style.position = "relative";
+  messageNode.addEventListener("mouseenter", () => {
+    actionsContainer.style.opacity = "1";
+  });
+  messageNode.addEventListener("mouseleave", () => {
+    actionsContainer.style.opacity = "0";
+  });
+
+  messageNode.appendChild(actionsContainer);
+}
+
 function ensureMessageNode(
   item: ChatMessageItem,
   index: number,
@@ -405,12 +573,16 @@ function ensureMessageNode(
     if (existingNode.innerHTML !== nextHtml) {
       existingNode.innerHTML = nextHtml;
     }
+    // 为现有节点添加操作图标
+    addMessageActions(existingNode, item);
     return existingNode;
   }
 
   const node = document.createElement("div");
   node.className = "message " + (item.variant || "system");
   node.innerHTML = renderMessageHtml(item);
+  // 为新节点添加操作图标
+  addMessageActions(node, item);
   return node;
 }
 
