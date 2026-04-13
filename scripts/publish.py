@@ -6,7 +6,6 @@
     python scripts/publish.py [major|minor|patch]
 """
 
-import os
 import re
 import sys
 import subprocess
@@ -52,6 +51,10 @@ def update_version(version_type: str) -> str:
         "pyproject.toml": (
             r'version\s*=\s*["\']([^"\']+)["\']',
             f'version = "{new_version}"',
+        ),
+        "src/jarvis/jarvis_vscode_extension/package.json": (
+            r'"version"\s*:\s*"([^"]+)"',
+            f'"version": "{new_version}"',
         ),
     }
     for file_path, (pattern, replacement) in files_to_update.items():
