@@ -1886,6 +1886,9 @@ class task_list_manager:
                                     "background": background,
                                     "name": agent_name,
                                     "agent": parent_agent,
+                                    "quick_mode": getattr(
+                                        parent_agent, "quick_mode", False
+                                    ),
                                 }
                             )
                         else:
@@ -1931,6 +1934,9 @@ class task_list_manager:
                                     "system_prompt": system_prompt,
                                     "summary_prompt": summary_prompt,
                                     "agent": parent_agent,
+                                    "quick_mode": getattr(
+                                        parent_agent, "quick_mode", False
+                                    ),
                                 }
                             )
 
