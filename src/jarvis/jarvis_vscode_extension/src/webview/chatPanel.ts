@@ -466,19 +466,6 @@ function fallbackCopyToClipboard(text: string): void {
   document.body.removeChild(textArea);
 }
 
-function insertMessageToEditor(item: ChatMessageItem): void {
-  const text = String(item.text || "");
-  if (!text.trim()) {
-    return;
-  }
-
-  // 通过VS Code API发送消息，请求插入文本到编辑器
-  vscode.postMessage({
-    type: "insertToEditor",
-    text: text,
-  });
-}
-
 function addMessageActions(
   messageNode: HTMLDivElement,
   item: ChatMessageItem,
@@ -517,25 +504,7 @@ function addMessageActions(
     copyMessageToClipboard(item);
   });
 
-  // 插入图标
-  const insertButton = document.createElement("button");
-  insertButton.innerHTML = "📝";
-  insertButton.title = "插入到编辑器";
-  insertButton.style.cssText = `
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 3px;
-    font-size: 14px;
-    transition: background-color 0.2s ease;
-  `;
-  insertButton.addEventListener("click", () => {
-    insertMessageToEditor(item);
-  });
-
   actionsContainer.appendChild(copyButton);
-  actionsContainer.appendChild(insertButton);
 
   // 添加悬停效果
   messageNode.style.position = "relative";
