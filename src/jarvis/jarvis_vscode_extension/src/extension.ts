@@ -369,6 +369,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           this.renderAgentListView();
           return;
         }
+        if (message?.type === "disconnect") {
+          await this.disconnectAll();
+          return;
+        }
         if (message?.type === "pickWorkingDirectory") {
           await this.pickWorkingDirectory();
           return;
