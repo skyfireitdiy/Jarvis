@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TextIO
 
 import typer
 
@@ -633,6 +633,53 @@ WantedBy=default.target
     service_file_path.write_text(service_content, encoding="utf-8")
 
     PrettyOutput.auto_print(f"✅ systemd 服务文件已创建: {service_file_path}")
+
+    # 启用 linger 模式，使服务在用户注销后继续运行
+    try:
+        import getpass
+
+        username = getpass.getuser()
+
+        # 检查是否已启用 linger
+        result = subprocess.run(
+            ["loginctl", "show-user", username, "--property=Linger"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        linger_enabled = False
+        if result.returncode == 0:
+            linger_enabled = "Linger=yes" in result.stdout
+
+        if not linger_enabled:
+            PrettyOutput.auto_print(
+                "\n🔧 正在启用 linger 模式（使服务在用户注销后继续运行）..."
+            )
+            enable_result = subprocess.run(
+                ["loginctl", "enable-linger", username],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if enable_result.returncode == 0:
+                PrettyOutput.auto_print(
+                    "✅ Linger 模式已启用，服务将在用户注销后继续运行"
+                )
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠️  自动启用 linger 失败: {enable_result.stderr}"
+                )
+                PrettyOutput.auto_print(
+                    f"💡 请手动执行: sudo loginctl enable-linger {username}"
+                )
+        else:
+            PrettyOutput.auto_print("✅ Linger 模式已启用，服务将在用户注销后继续运行")
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️  检查/启用 linger 时出错: {e}")
+        PrettyOutput.auto_print("💡 服务可能需要在用户登录时运行，或手动启用 linger")
+
     PrettyOutput.auto_print("\n📋 服务管理命令:")
     PrettyOutput.auto_print("  systemctl --user daemon-reload")
     PrettyOutput.auto_print("  systemctl --user enable jarvis-service.service")
