@@ -2264,6 +2264,10 @@ async function handleFileTreeNodeClick(agentId, node) {
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
+
+// 智能滚动控制
+const isUserScrolling = ref(false) // 用户是否正在手动滚动
+const scrollTimeout = ref(null) // 滚动超时计时器
 const terminalHosts = ref(new Map())
 const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
 
@@ -4713,7 +4717,7 @@ function handleMessage(message, agentId = null) {
         streamingMessage.html = renderMessageHtml(streamingMessage)
         // 仅当前 Agent 的流式消息触发滚动
         nextTick(() => {
-          if (isCurrentAgent(targetAgentId) && outputList.value) {
+          if (isCurrentAgent(targetAgentId) && outputList.value && !isUserScrolling.value) {
             outputList.value.scrollTop = outputList.value.scrollHeight
           }
         })
@@ -4799,7 +4803,7 @@ function handleMessage(message, agentId = null) {
       }
       
       // 输入框显示后，如果之前在底部且请求属于当前 Agent，就滚动到底部
-      if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value) {
+      if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value && !isUserScrolling.value) {
         requestAnimationFrame(() => {
           const scrollHeight = outputList.value.scrollHeight
           const scrollTop = outputList.value.scrollTop
@@ -4930,7 +4934,7 @@ function handleMessage(message, agentId = null) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
       console.log('[ws] Agent execution status updated:', payload.execution_status, 'for agent:', targetAgentId)
       // 当当前 Agent 开始思考时，自动滚动到底部
-      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId)) {
+      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId) && !isUserScrolling.value) {
         nextTick(() => {
           if (outputList.value) {
             outputList.value.scrollTop = outputList.value.scrollHeight
@@ -5129,7 +5133,7 @@ function appendOutput(payload, agentId = null) {
   nextTick(() => {
     nextTick(() => {
       requestAnimationFrame(() => {
-        if (shouldAutoScroll && outputList.value) {
+        if (shouldAutoScroll && outputList.value && !isUserScrolling.value) {
           const scrollHeight = outputList.value.scrollHeight
           outputList.value.scrollTop = scrollHeight
           console.log('[SCROLL] Auto-scrolled to bottom')
@@ -6727,6 +6731,30 @@ onMounted(() => {
   
   if (outputList.value) {
     outputList.value.addEventListener('scroll', () => {
+      // 智能滚动控制：检测用户手动滚动
+      if (scrollTimeout.value) {
+        clearTimeout(scrollTimeout.value)
+      }
+      
+      // 用户正在滚动，设置手动滚动标记
+      isUserScrolling.value = true
+      
+      // 设置超时，当用户停止滚动一段时间后重置标记
+      scrollTimeout.value = setTimeout(() => {
+        isUserScrolling.value = false
+        console.log('[SCROLL] User scrolling ended, auto-scroll enabled')
+      }, 150)
+      
+      // 检查是否滚动到底部，如果是则立即重置手动滚动标记
+      const scrollTop = outputList.value.scrollTop
+      const scrollHeight = outputList.value.scrollHeight
+      const clientHeight = outputList.value.clientHeight
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10 // 10px容差
+      
+      if (isAtBottom) {
+        isUserScrolling.value = false
+        console.log('[SCROLL] Scrolled to bottom, auto-scroll enabled')
+      }
       // 清除之前的定时器
       if (scrollDebounceTimer) {
         clearTimeout(scrollDebounceTimer)
