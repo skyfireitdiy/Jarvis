@@ -62,13 +62,13 @@ pip install -e .
 
 ```bash
 # 启动网关服务（默认监听 localhost:8000）
-jarvis-service
+jarvis-service start
 
 # 指定监听地址和端口
-jarvis-service --gateway-host 0.0.0.0 --gateway-port 9000
+jarvis-service start --gateway-host 0.0.0.0 --gateway-port 9000
 
 # 设置访问密码
-jarvis-service --gateway-password your_password
+jarvis-service start --gateway-password your_password
 ```
 
 ### 验证服务状态

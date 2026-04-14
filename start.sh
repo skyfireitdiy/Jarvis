@@ -9,4 +9,4 @@ cd "$PROJECT_ROOT"
 # 忽略 SIGUSR1 和 SIGUSR2 信号，让 jarvis-service 自己处理
 trap '' SIGUSR1 SIGUSR2
 
-exec jarvis-service
+exec jarvis-service start
