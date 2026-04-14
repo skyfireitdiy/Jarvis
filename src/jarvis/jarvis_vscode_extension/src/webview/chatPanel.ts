@@ -641,6 +641,43 @@ function renderExecutionMessage(
   _agentId: string,
 ): HTMLDivElement {
   const executionId = String(item.executionId || "").trim();
+
+  // 如果执行已完成，销毁 xterm 并显示静态内容
+  if (item.finished) {
+    const existingEntry = executionTerminals.get(executionId || "default");
+    if (existingEntry) {
+      // 销毁 xterm 资源
+      existingEntry.terminal.dispose();
+      existingEntry.fitAddon.dispose();
+      existingEntry.resizeObserver.disconnect();
+      executionTerminals.delete(executionId || "default");
+
+      // 创建静态内容显示
+      const staticWrapper = document.createElement("div");
+      staticWrapper.className = "message execution terminal-history";
+
+      const header = document.createElement("div");
+      header.className = "message-header";
+      header.textContent = item.text || "执行完成";
+      staticWrapper.appendChild(header);
+
+      const hint = document.createElement("div");
+      hint.className = "execution-hint";
+      hint.textContent = executionId
+        ? `终端会话：${executionId}（已完成）`
+        : "终端会话已完成";
+      staticWrapper.appendChild(hint);
+
+      const content = document.createElement("pre");
+      content.className = "terminal-history-content";
+      content.textContent = String(item.executionBuffer || "");
+      staticWrapper.appendChild(content);
+
+      return staticWrapper;
+    }
+  }
+
+  // 执行未完成，继续使用 xterm
   const entry = ensureExecutionTerminal(executionId || "default");
   const header = entry.wrapper.querySelector(".message-header");
   if (header instanceof HTMLDivElement) {
