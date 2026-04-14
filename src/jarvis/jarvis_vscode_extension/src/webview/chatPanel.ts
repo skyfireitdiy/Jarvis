@@ -1176,6 +1176,63 @@ clearBufferBtn?.addEventListener("click", () => {
   clearBuffer();
 });
 
+// 处理文件拖放功能
+function handleFileDrop(event: DragEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const files = event.dataTransfer?.files;
+  if (!files || files.length === 0) {
+    return;
+  }
+
+  // 在VS Code环境中，文件路径可能通过dataTransfer的items获取
+  const items = event.dataTransfer?.items;
+  if (items && items.length > 0) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          // 在VS Code环境中，文件路径可能通过文件名或其他方式获取
+          // 这里我们使用文件名作为路径（在实际使用中可能需要更复杂的逻辑）
+          const fileName = file.name;
+          const quotedPath = `'${fileName}'`;
+          insertTextAtCursor(quotedPath);
+          return;
+        }
+      }
+    }
+  }
+
+  // 备用方案：如果无法通过items获取，尝试使用第一个文件的name属性
+  const fileName = files[0].name;
+  if (fileName) {
+    const quotedPath = `'${fileName}'`;
+    insertTextAtCursor(quotedPath);
+  }
+}
+
+messageInput?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  messageInput.style.backgroundColor = "#f0f8ff";
+});
+
+messageInput?.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  messageInput.style.backgroundColor = "#e6f3ff";
+});
+
+messageInput?.addEventListener("dragleave", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  messageInput.style.backgroundColor = "";
+});
+
+messageInput?.addEventListener("drop", handleFileDrop);
+
 messageInput?.addEventListener("keydown", (event) => {
   if (!event.ctrlKey && !event.metaKey && event.key === "@") {
     event.preventDefault();
