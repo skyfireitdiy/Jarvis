@@ -585,20 +585,23 @@ def _install_systemd_service(config: ServiceConfig) -> None:
         raise typer.Exit(code=1)
 
     # 构建服务文件内容
+    current_path = os.environ.get("PATH", "")
     service_content = """[Unit]
 Description=Jarvis Service
 After=network.target
 
 [Service]
 Type=simple
+Environment=PATH={path}
 WorkingDirectory={project_root}
 ExecStart={service_executable} start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
+        path=current_path,
         project_root=config.project_root,
         service_executable=service_executable,
         gateway_host=config.gateway_host,
         gateway_port=config.gateway_port,
         frontend_host=config.frontend_host,
-        frontend_port=config.frontend_port
+        frontend_port=config.frontend_port,
     )
 
     # 添加可选参数
