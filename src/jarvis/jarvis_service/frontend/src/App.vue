@@ -710,7 +710,7 @@
             :key="dir.path"
             class="dir-item"
             :class="{ selected: selectedDir === dir.path }"
-            @click="enterDirectory(dir.path, false)"
+            @click="selectDirectory(dir.path); enterDirectory(dir.path, false)"
           >
             <div class="dir-icon">📁</div>
             <div class="dir-name">{{ dir.name }}</div>
@@ -3667,7 +3667,9 @@ function handleDirSearchKeydown(event) {
     // 回车键：如果选中了列表项，则进入该目录；否则确认当前选择
     if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
       // 有选中列表项，进入该目录
-      enterDirectory(filteredDirList.value[selectedDirIndex.value].path)
+      const selectedPath = filteredDirList.value[selectedDirIndex.value].path
+      selectDirectory(selectedPath)
+      enterDirectory(selectedPath)
       event.preventDefault()
     } else if (selectedDir.value) {
       // 没有选中列表项，但已经有选中的目录，确认并关闭
