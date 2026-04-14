@@ -2942,8 +2942,9 @@ async function connect() {
     console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
     allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
-    // 连接断开，重新显示连接对话框
-    showConnectModal.value = true
+    // 连接断开，强制刷新页面
+    console.log('[ws] Connection closed, forcing page refresh')
+    window.location.reload()
     // 不清空连接错误信息，保留错误提示
   }
   ws.onerror = (event) => {
