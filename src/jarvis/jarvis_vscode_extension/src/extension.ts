@@ -3946,7 +3946,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private resetCreateAgentForm(): void {
     this.createAgentFormState.isVisible = false;
-    this.createAgentFormState.agentType = "agent";
+    this.createAgentFormState.agentType = "codeagent";
     this.createAgentFormState.workingDir = "~";
     this.createAgentFormState.name = "通用Agent";
     this.createAgentFormState.llmGroup =
