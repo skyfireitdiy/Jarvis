@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Optional
 
 import typer
 
@@ -576,38 +576,34 @@ def start_command(
 
 def _install_systemd_service(config: ServiceConfig) -> None:
     """安装 Jarvis Service 为 systemd 用户服务。"""
-    import getpass
-
-    # 获取当前用户名
-    username = getpass.getuser()
 
     # 构建服务文件内容
-    service_content = f"""[Unit]
+    service_content = """[Unit]
 Description=Jarvis Service
 After=network.target
 
 [Service]
 Type=simple
-User={username}
-WorkingDirectory={config.project_root}
-ExecStart={config.project_root / ".venv" / "bin" / "python"} -m jarvis.jarvis_service.cli start \\
-    --gateway-host {config.gateway_host} \\
-    --gateway-port {config.gateway_port} \\
-    --frontend-host {config.frontend_host} \\
-    --frontend-port {config.frontend_port}
-"""
+WorkingDirectory={project_root}
+ExecStart=jarvis-service start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
+        project_root=config.project_root,
+        gateway_host=config.gateway_host,
+        gateway_port=config.gateway_port,
+        frontend_host=config.frontend_host,
+        frontend_port=config.frontend_port
+    )
 
     # 添加可选参数
     if config.gateway_password:
-        service_content += f"    --gateway-password {config.gateway_password}\\n"
+        service_content += " --gateway-password {}".format(config.gateway_password)
     if config.node_mode:
-        service_content += f"    --node-mode {config.node_mode}\\n"
+        service_content += " --node-mode {}".format(config.node_mode)
     if config.node_id:
-        service_content += f"    --node-id {config.node_id}\\n"
+        service_content += " --node-id {}".format(config.node_id)
     if config.master_url:
-        service_content += f"    --master-url {config.master_url}\\n"
+        service_content += " --master-url {}".format(config.master_url)
     if config.node_secret:
-        service_content += f"    --node-secret {config.node_secret}\\n"
+        service_content += " --node-secret {}".format(config.node_secret)
 
     service_content += """
 Restart=always
@@ -634,7 +630,7 @@ WantedBy=default.target
 
 
 def main() -> None:
-    """兼容旧脚本入口，统一转交给 Typer app。"""
+    """Compatible with old script entry, delegate to Typer app."""
     app()
 
 
