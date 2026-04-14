@@ -710,8 +710,7 @@
             :key="dir.path"
             class="dir-item"
             :class="{ selected: selectedDir === dir.path }"
-            @click="windowWidth.value <= 768 ? enterDirectory(dir.path, false) : selectDirectory(dir.path)"
-            @dblclick="enterDirectory(dir.path, false)"
+            @click="enterDirectory(dir.path, false)"
           >
             <div class="dir-icon">📁</div>
             <div class="dir-name">{{ dir.name }}</div>
