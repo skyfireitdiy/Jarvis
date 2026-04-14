@@ -130,13 +130,6 @@
       <div class="messages" ref="outputList">
         <article v-for="(item, index) in outputs" :key="index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
           <div class="message-content">
-            <div class="message-meta-left">
-              <span class="agent-name">{{ item.agent_name || '' }}</span>
-              <span class="non-interactive" v-if="item.non_interactive">🔕</span>
-              <span class="interactive" v-if="item.non_interactive === false">💬</span>
-              <span class="interactive" v-if="item.non_interactive === undefined"></span>
-              <span class="timestamp">{{ item.timestamp || '' }}</span>
-            </div>
             <button class="icon-btn copy-message-btn" @click="copyToClipboard(item.text, index)" title="复制到剪贴板" v-if="item.text">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -764,14 +757,6 @@
           <button class="close-btn" @click="showSettingsModal = false">×</button>
         </div>
         <div class="form-group">
-          <label>密码</label>
-          <input v-model="auth.password" type="password" placeholder="可选" @keydown.enter="connect" />
-        </div>
-        <div class="form-group">
-          <label>网关地址</label>
-          <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
-        </div>
-        <div class="form-group">
           <div class="toggle-wrapper">
             <label class="toggle-switch">
               <input type="checkbox" v-model="connectionLockEnabled" @change="saveConnectionLockSetting" class="toggle-input" />
@@ -857,8 +842,7 @@
           </div>
         </div>
         <div class="modal-actions">
-          <button class="ghost-btn" @click="showSettingsModal = false">取消</button>
-          <button class="primary-btn" @click="reconnect">重新连接</button>
+          <button class="ghost-btn" @click="showSettingsModal = false">关闭</button>
         </div>
       </div>
     </div>
@@ -3106,6 +3090,9 @@ function reconnect() {
 }
 
 function disconnectAll() {
+  if (!confirm('确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。')) {
+    return
+  }
   console.log('[WS] Disconnecting all WebSocket connections')
   
   // 关闭设置弹窗
