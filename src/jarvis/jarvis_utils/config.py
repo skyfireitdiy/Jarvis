@@ -954,12 +954,12 @@ def is_enable_request_classification() -> bool:
     获取是否启用需求分类功能。
 
     当启用时，CodeAgent 首次运行会对用户需求进行分类，并根据分类结果加载对应的系统提示词。
-    默认关闭，可通过配置文件设置 enable_request_classification: true 启用。
+    默认启用，可通过配置文件设置 enable_request_classification: false 禁用。
 
     返回：
-        bool: 如果启用需求分类则返回True，默认为False
+        bool: 如果启用需求分类则返回True，默认为True
     """
-    return bool(GLOBAL_CONFIG_DATA.get("enable_request_classification", False))
+    return bool(GLOBAL_CONFIG_DATA.get("enable_request_classification", True))
 
 
 def is_enable_quick_mode() -> bool:
