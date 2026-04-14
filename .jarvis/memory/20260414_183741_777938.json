@@ -1,0 +1,8 @@
+{
+  "id": "20260414_183741_777938",
+  "type": "project_long_term",
+  "tags": ["框架接口映射对比工具", "详细设计", "Agent集成", "已更新"],
+  "content": "已根据现有Jarvis Agent实现更新框架接口映射对比工具的详细设计文档。主要更新：1) Agent客户端设计调整为使用jarvis.jarvis_c2rust.agent_factory.create_agent()创建Agent实例；2) 每次分析调用重新创建Agent，避免状态污染；3) 利用Agent内置的重试机制（最多30秒）；4) 支持非交互模式，适合批量处理；5) 支持选择不同模型类型（normal/smart/cheap）；6) 添加了详细的实现代码示例，包括系统提示词构建、分析提示词构造、Agent调用和响应解析。文档位置：/home/skyfire/code/Jarvis/.jarvis/rules/spec/framework_interface_mapping_spec.md",
+  "created_at": "2026-04-14T18:37:41.777974",
+  "updated_at": "2026-04-14T18:37:41.777979"
+}
