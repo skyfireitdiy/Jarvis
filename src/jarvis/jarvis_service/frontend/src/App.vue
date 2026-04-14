@@ -2577,7 +2577,7 @@ const isWaitingMultiDisabled = computed(() => {
   const executionStatus = agentStatuses.value.get(currentAgentId.value)?.execution_status
   return executionStatus !== 'waiting_multi' // 只有在等待多行输入时才使能
 })
-const newAgentType = ref('agent') // 新 Agent 类型
+const newAgentType = ref('codeagent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为'通用Agent'）
 const modelGroups = ref([])        // 模型组列表
