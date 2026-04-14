@@ -577,6 +577,13 @@ def start_command(
 def _install_systemd_service(config: ServiceConfig) -> None:
     """安装 Jarvis Service 为 systemd 用户服务。"""
 
+    service_executable = shutil.which("jarvis-service")
+    if service_executable is None:
+        PrettyOutput.auto_print(
+            "❌ 未找到 jarvis-service 可执行文件，请确保 Jarvis 已正确安装"
+        )
+        raise typer.Exit(code=1)
+
     # 构建服务文件内容
     service_content = """[Unit]
 Description=Jarvis Service
@@ -585,8 +592,9 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory={project_root}
-ExecStart=jarvis-service start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
+ExecStart={service_executable} start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
         project_root=config.project_root,
+        service_executable=service_executable,
         gateway_host=config.gateway_host,
         gateway_port=config.gateway_port,
         frontend_host=config.frontend_host,
