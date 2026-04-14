@@ -420,7 +420,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           return;
         }
         if (message?.type === "disconnect") {
-          await this.disconnectAll();
+          const result = await vscode.window.showWarningMessage(
+            "确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。",
+            { modal: true },
+            "确定",
+          );
+          if (result === "确定") {
+            await this.disconnectAll();
+          }
           return;
         }
         if (message?.type === "pickWorkingDirectory") {
@@ -1655,7 +1662,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     message: ChatPanelMessage,
   ): Promise<void> {
     if (message.type === "disconnect") {
-      await this.disconnectAll();
+      const result = await vscode.window.showWarningMessage(
+        "确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。",
+        { modal: true },
+        "确定",
+      );
+      if (result === "确定") {
+        await this.disconnectAll();
+      }
       return;
     }
     if (message.type === "sendMessage") {
