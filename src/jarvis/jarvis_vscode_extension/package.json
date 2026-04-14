@@ -80,6 +80,7 @@
     "esbuild": "^0.25.12",
     "eslint": "^10.2.0",
     "globals": "^17.4.0",
+    "highlight.js": "^11.9.0",
     "marked": "^15.0.7",
     "plantuml-encoder": "^1.4.0",
     "typescript": "^5.9.3",

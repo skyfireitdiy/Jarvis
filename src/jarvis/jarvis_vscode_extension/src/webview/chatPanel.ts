@@ -2,6 +2,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { marked } from "marked";
 import plantumlEncoder from "plantuml-encoder";
+import hljs from "highlight.js";
 
 type ChatMessageItem = {
   text?: string;
@@ -203,13 +204,33 @@ function renderPlantUmlBlock(plantUmlSource: string): string {
 
 const markedRenderer = new marked.Renderer();
 const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer);
-markedRenderer.code = (token: any) => {
-  if (isPlantUmlLanguage(token.lang)) {
-    return renderPlantUmlBlock(token.text);
+(markedRenderer as any).code = function (
+  code: string,
+  language?: string,
+  isEscaped?: boolean,
+) {
+  if (isPlantUmlLanguage(language)) {
+    return renderPlantUmlBlock(code);
   }
-  return defaultCodeRenderer(token);
+  return (defaultCodeRenderer as any)(code, language, isEscaped);
 };
-marked.setOptions({ renderer: markedRenderer });
+
+// 配置 marked 使用 highlight.js 进行语法高亮，并启用 GFM 换行处理
+marked.setOptions({
+  renderer: markedRenderer,
+  highlight: function (code: string, lang: string) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value;
+      } catch (e) {
+        console.error("[highlight.js] Error highlighting code:", e);
+      }
+    }
+    return hljs.highlightAuto(code).value;
+  },
+  breaks: true, // 启用 GFM 换行处理（换行显示为 <br>）
+  gfm: true, // 启用 GitHub Flavored Markdown
+} as any);
 
 function getLanguageFromFilename(filename: string): string {
   if (!filename) return "plaintext";
