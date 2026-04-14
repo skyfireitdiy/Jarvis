@@ -32,7 +32,7 @@ MASTER_NODE_SECRET_RELATIVE_PATH = Path("node_mode/master_node_secret")
 AUTO_GENERATED_SECRET_NBYTES = 24
 
 app = typer.Typer(help="Jarvis Service 服务")
-SINGLE_INSTANCE_LOCK_HANDLE: Optional[TextIO] = None
+SINGLE_INSTANCE_LOCK_HANDLE = None  # type: Optional[TextIO]
 
 init_env("")
 
@@ -448,6 +448,69 @@ def run_service(config: ServiceConfig) -> None:
     controller.run_forever()
 
 
+@app.command(name="install")
+def install_command(
+    gateway_host: Optional[str] = typer.Option(
+        None,
+        "--gateway-host",
+        help="Gateway 监听地址（默认可被 JARVIS_GATEWAY_HOST 覆盖）",
+    ),
+    gateway_port: Optional[int] = typer.Option(
+        None,
+        "--gateway-port",
+        help="Gateway 监听端口（默认可被 JARVIS_GATEWAY_PORT 覆盖）",
+    ),
+    frontend_host: Optional[str] = typer.Option(
+        None,
+        "--frontend-host",
+        help="前端预览服务监听地址（默认可被 JARVIS_FRONTEND_HOST 覆盖）",
+    ),
+    frontend_port: Optional[int] = typer.Option(
+        None,
+        "--frontend-port",
+        help="前端预览服务监听端口（默认可被 JARVIS_FRONTEND_PORT 覆盖）",
+    ),
+    gateway_password: Optional[str] = typer.Option(
+        None,
+        "--gateway-password",
+        help="Gateway 密码（默认可被 JARVIS_GATEWAY_PASSWORD 覆盖）",
+    ),
+    node_mode: Optional[str] = typer.Option(
+        None,
+        "--node-mode",
+        help="节点模式：master 或 child（默认可被 JARVIS_NODE_MODE 覆盖）",
+    ),
+    node_id: Optional[str] = typer.Option(
+        None,
+        "--node-id",
+        help="当前节点 ID（默认可被 JARVIS_NODE_ID 覆盖）",
+    ),
+    master_url: Optional[str] = typer.Option(
+        None,
+        "--master-url",
+        help="主节点地址（child 模式使用，默认可被 JARVIS_MASTER_URL 覆盖）",
+    ),
+    node_secret: Optional[str] = typer.Option(
+        None,
+        "--node-secret",
+        help="主子节点共享密钥（默认可被 JARVIS_NODE_SECRET 覆盖）",
+    ),
+) -> None:
+    """安装 Jarvis Service 为 systemd 用户服务。"""
+    config = build_service_config(
+        gateway_host=gateway_host,
+        gateway_port=gateway_port,
+        frontend_host=frontend_host,
+        frontend_port=frontend_port,
+        gateway_password=gateway_password,
+        node_mode=node_mode,
+        node_id=node_id,
+        master_url=master_url,
+        node_secret=node_secret,
+    )
+    _install_systemd_service(config)
+
+
 @app.command(name="start")
 def start_command(
     gateway_host: Optional[str] = typer.Option(
@@ -509,6 +572,65 @@ def start_command(
         node_secret=node_secret,
     )
     run_service(config)
+
+
+def _install_systemd_service(config: ServiceConfig) -> None:
+    """安装 Jarvis Service 为 systemd 用户服务。"""
+    import getpass
+
+    # 获取当前用户名
+    username = getpass.getuser()
+
+    # 构建服务文件内容
+    service_content = f"""[Unit]
+Description=Jarvis Service
+After=network.target
+
+[Service]
+Type=simple
+User={username}
+WorkingDirectory={config.project_root}
+ExecStart={config.project_root / ".venv" / "bin" / "python"} -m jarvis.jarvis_service.cli start \\
+    --gateway-host {config.gateway_host} \\
+    --gateway-port {config.gateway_port} \\
+    --frontend-host {config.frontend_host} \\
+    --frontend-port {config.frontend_port}
+"""
+
+    # 添加可选参数
+    if config.gateway_password:
+        service_content += f"    --gateway-password {config.gateway_password}\\n"
+    if config.node_mode:
+        service_content += f"    --node-mode {config.node_mode}\\n"
+    if config.node_id:
+        service_content += f"    --node-id {config.node_id}\\n"
+    if config.master_url:
+        service_content += f"    --master-url {config.master_url}\\n"
+    if config.node_secret:
+        service_content += f"    --node-secret {config.node_secret}\\n"
+
+    service_content += """
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+"""
+
+    # 确定 systemd 用户目录
+    systemd_user_dir = Path.home() / ".config" / "systemd" / "user"
+    systemd_user_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入服务文件
+    service_file_path = systemd_user_dir / "jarvis-service.service"
+    service_file_path.write_text(service_content, encoding="utf-8")
+
+    PrettyOutput.auto_print(f"✅ systemd 服务文件已创建: {service_file_path}")
+    PrettyOutput.auto_print("\n📋 服务管理命令:")
+    PrettyOutput.auto_print("  systemctl --user daemon-reload")
+    PrettyOutput.auto_print("  systemctl --user enable jarvis-service.service")
+    PrettyOutput.auto_print("  systemctl --user start jarvis-service.service")
+    PrettyOutput.auto_print("  systemctl --user status jarvis-service.service")
 
 
 def main() -> None:
