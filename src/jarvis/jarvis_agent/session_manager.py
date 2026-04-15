@@ -934,38 +934,26 @@ class SessionManager:
                 return False
 
         # 交互模式：显示列表让用户选择
-        PrettyOutput.auto_print("📋 找到多个会话文件：")
+        session_list_text = "📋 找到多个会话文件：\n"
         for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
             sessions, 1
         ):
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" - {session_name}" if session_name else ""
 
-            # 根据commit状态添加颜色标注
-            from rich.text import Text
-            from rich.console import Console as RichConsole
-
-            rich_console = RichConsole()
-
-            # 构建带颜色的文本
-            text = Text()
-            text.append(f"  {idx}. ")
-            text.append(os.path.basename(file_path))
-            text.append(f" [{time_str}]")
-            if session_name:
-                text.append(f" - {session_name}")
-
-            # 添加commit状态标注
+            # 根据commit状态添加标注
+            commit_status_str = ""
             if commit_status == "consistent":
-                text.append(" [commit一致]", style="green")
+                commit_status_str = " [commit一致]"
             elif commit_status == "inconsistent":
-                text.append(" [commit不一致]", style="red")
+                commit_status_str = " [commit不一致]"
             elif commit_status == "no_commit":
-                text.append(" [无commit信息]", style="yellow")
+                commit_status_str = " [无commit信息]"
 
-            rich_console.print(text)
+            session_list_text += f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}{commit_status_str}\n"
         # 添加取消选项
-        PrettyOutput.auto_print("  0. 取消恢复")
+        session_list_text += "  0. 取消恢复"
+        PrettyOutput.auto_print(session_list_text)
 
         try:
             while True:

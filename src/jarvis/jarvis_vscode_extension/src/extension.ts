@@ -753,7 +753,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </label>
     <label class="checkbox-row">
       <input id="useRestoreSession" type="checkbox" ${restoreSessionChecked} />
-      <span>恢复会话</span>
+      <span>启动时恢复会话</span>
     </label>
     ${createAgentErrorMarkup}
     <div class="form-actions">
@@ -789,7 +789,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
             ${agentItem.worktree ? '<div class="agent-worktree" title="已启用 worktree">🌿</div>' : ""}
             ${agentItem.quickMode ? '<div class="agent-quick-mode" title="极速模式">⚡</div>' : ""}
-            ${agentItem.restoreSession ? '<div class="agent-restore-session" title="恢复会话">🔄</div>' : ""}
+            ${agentItem.restoreSession ? '<div class="agent-restore-session" title="启动时恢复会话">🔄</div>' : ""}
           </div>
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
