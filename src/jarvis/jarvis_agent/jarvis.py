@@ -1137,27 +1137,14 @@ def run_cli(
 
     # 在 init_env 之后检测是否自动恢复会话（配置已加载）
     try:
-        # 调试日志：显示当前配置状态
         from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
-        PrettyOutput.auto_print(
-            f"🔧 [DEBUG] 配置加载完成，auto_resume_session 配置值: {GLOBAL_CONFIG_DATA.get('auto_resume_session', '未设置')}"
-        )
-        PrettyOutput.auto_print(f"🔧 [DEBUG] restore_session 参数值: {restore_session}")
-
         auto_resume_result = is_auto_resume_session()
-        PrettyOutput.auto_print(
-            f"🔧 [DEBUG] is_auto_resume_session() 返回值: {auto_resume_result}"
-        )
-
         if restore_session or auto_resume_result:
             set_config("restore_session", True)
-            PrettyOutput.auto_print("✅ [DEBUG] 已设置 restore_session: True")
-        else:
-            PrettyOutput.auto_print("🔧 [DEBUG] 不设置自动恢复会话")
-    except Exception as e:
+            restore_session = True  # 更新参数值以匹配配置
+    except Exception:
         # 静默忽略异常，不影响主流程
-        PrettyOutput.auto_print(f"⚠️ [DEBUG] 自动恢复会话检测异常: {e}")
         pass
 
     if web_gateway:
@@ -1312,9 +1299,6 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
-        if restore_session or is_auto_resume_session():
-            set_config("restore_session", True)
-            restore_session = True  # 更新参数值以匹配配置
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
@@ -1332,7 +1316,6 @@ def run_cli(
             optimize_system_prompt=optimize_system_prompt,
             quick_mode=quick_mode,
         )
-        agent_manager.initialize()
 
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
         output_content = ""
