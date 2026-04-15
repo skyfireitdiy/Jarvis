@@ -1414,7 +1414,7 @@ def cli(
         False,
         "-r",
         "--restore-session",
-        help="从 .jarvis/saved_session.json 恢复会话状态",
+        help="启动时恢复会话",
     ),
     prefix: str = typer.Option(
         "",

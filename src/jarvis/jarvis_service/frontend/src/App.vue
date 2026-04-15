@@ -660,8 +660,8 @@
               <span class="toggle-slider"></span>
             </label>
             <div class="toggle-info">
-              <span class="toggle-label-text">恢复会话</span>
-              <span class="form-help">启动时从 .jarvis/saved_session.json 恢复上次会话。</span>
+              <span class="toggle-label-text">启动时恢复会话</span>
+              <span class="form-help">启动时自动恢复上次会话。</span>
             </div>
           </div>
         </div>
