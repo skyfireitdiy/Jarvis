@@ -1215,12 +1215,18 @@ def run_cli(
 
                     # 格式化返回
                     session_list = []
-                    for session_file, timestamp, session_name in sessions:
+                    for (
+                        session_file,
+                        timestamp,
+                        session_name,
+                        commit_status,
+                    ) in sessions:
                         session_list.append(
                             {
                                 "file": session_file,
                                 "timestamp": timestamp,
                                 "name": session_name,
+                                "commit_status": commit_status,
                             }
                         )
 
