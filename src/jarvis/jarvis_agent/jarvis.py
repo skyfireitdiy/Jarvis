@@ -1023,6 +1023,19 @@ def run_cli(
 
     # CLI 标志：非交互模式（不依赖配置文件，仅作为 Agent 实例属性）
 
+    # 提前加载配置文件，确保后续功能能读取到正确的配置值
+    # 修复：auto_resume_session 配置不生效的问题
+    try:
+        from jarvis.jarvis_utils import utils
+
+        # 设置全局配置文件路径（与 init_env 中的逻辑一致）
+        utils.g_config_file = config_file
+        # 加载配置文件
+        utils.load_config()
+    except Exception:
+        # 静默失败，不影响主流程
+        pass
+
     # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
     try:
         if llm_group:
@@ -1091,19 +1104,6 @@ def run_cli(
     # 交互式配置（基于现有配置补充设置）
     if handle_interactive_config_option(interactive_config, config_file):
         return
-
-    # 提前加载配置文件，确保后续功能能读取到正确的配置值
-    # 修复：enable_startup_config_selector 配置不生效的问题
-    try:
-        from jarvis.jarvis_utils import utils
-
-        # 设置全局配置文件路径（与 init_env 中的逻辑一致）
-        utils.g_config_file = config_file
-        # 加载配置文件
-        utils.load_config()
-    except Exception:
-        # 静默失败，不影响主流程
-        pass
 
     # 在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）
     # 如果指定了 -T/--task 参数或 --web-gateway 参数，跳过自动切换
