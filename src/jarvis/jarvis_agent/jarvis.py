@@ -1023,19 +1023,6 @@ def run_cli(
 
     # CLI 标志：非交互模式（不依赖配置文件，仅作为 Agent 实例属性）
 
-    # 提前加载配置文件，确保后续功能能读取到正确的配置值
-    # 修复：auto_resume_session 配置不生效的问题
-    try:
-        from jarvis.jarvis_utils import utils
-
-        # 设置全局配置文件路径（与 init_env 中的逻辑一致）
-        utils.g_config_file = config_file
-        # 加载配置文件
-        utils.load_config()
-    except Exception:
-        # 静默失败，不影响主流程
-        pass
-
     # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
     try:
         if llm_group:
@@ -1045,8 +1032,7 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
-        if restore_session or is_auto_resume_session():
-            set_config("restore_session", True)
+        # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
@@ -1148,6 +1134,31 @@ def run_cli(
         config_file=config_file,
         llm_group=llm_group,
     )
+
+    # 在 init_env 之后检测是否自动恢复会话（配置已加载）
+    try:
+        # 调试日志：显示当前配置状态
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        PrettyOutput.auto_print(
+            f"🔧 [DEBUG] 配置加载完成，auto_resume_session 配置值: {GLOBAL_CONFIG_DATA.get('auto_resume_session', '未设置')}"
+        )
+        PrettyOutput.auto_print(f"🔧 [DEBUG] restore_session 参数值: {restore_session}")
+
+        auto_resume_result = is_auto_resume_session()
+        PrettyOutput.auto_print(
+            f"🔧 [DEBUG] is_auto_resume_session() 返回值: {auto_resume_result}"
+        )
+
+        if restore_session or auto_resume_result:
+            set_config("restore_session", True)
+            PrettyOutput.auto_print("✅ [DEBUG] 已设置 restore_session: True")
+        else:
+            PrettyOutput.auto_print("🔧 [DEBUG] 不设置自动恢复会话")
+    except Exception as e:
+        # 静默忽略异常，不影响主流程
+        PrettyOutput.auto_print(f"⚠️ [DEBUG] 自动恢复会话检测异常: {e}")
+        pass
 
     if web_gateway:
         try:
@@ -1303,6 +1314,7 @@ def run_cli(
             set_config("use_analysis", False)
         if restore_session or is_auto_resume_session():
             set_config("restore_session", True)
+            restore_session = True  # 更新参数值以匹配配置
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
