@@ -954,7 +954,10 @@ class ToolRegistry(OutputHandlerProtocol):
                     error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}和{ct('TOOL_CALL')}标签，但JSON解析失败。请检查JSON格式是否正确，确保包含name和arguments字段。\n{tool_call_help}{long_hint}"
                 elif has_open and not has_close:
                     # 只有开始标签，没有结束标签
-                    error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}标签，但未找到{ct('TOOL_CALL')}标签。请确保工具调用包含完整的开始和结束标签。\n{tool_call_help}{long_hint}"
+                    if len(content) > 1000:
+                        error_msg = f"工具调用的参数可能过长，建议拆分为多次调用。当前内容长度：{len(content)}字符，超过1000字符限制。\n{tool_call_help}"
+                    else:
+                        error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}标签，但未找到{ct('TOOL_CALL')}标签。请确保工具调用包含完整的开始和结束标签。\n{tool_call_help}{long_hint}"
                 else:
                     # 其他情况
                     error_msg = f"工具调用格式错误：无法解析工具调用内容。请检查工具调用格式。\n{tool_call_help}{long_hint}"
