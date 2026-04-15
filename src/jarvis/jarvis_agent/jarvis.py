@@ -28,6 +28,7 @@ from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_roles_dirs
+from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_non_interactive
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -1031,7 +1032,7 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
-        if restore_session:
+        if restore_session or is_auto_resume_session():
             set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
@@ -1300,7 +1301,7 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
-        if restore_session:
+        if restore_session or is_auto_resume_session():
             set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
