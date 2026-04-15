@@ -783,7 +783,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         ${checkboxMarkup}
         <div class="agent-main">
           <div class="agent-title-row">
-            <div class="agent-name">${escapeHtml(agentItem.displayName)}</div>
+            <div class="agent-name">${agentItem.agentType === "agent" ? "🤖" : agentItem.agentType === "codeagent" ? "👨‍💻" : "❓"} ${escapeHtml(agentItem.displayName)}</div>
             <div class="agent-status-dot ${agentItem.statusClass}" title="${escapeHtml(agentItem.statusText)}"></div>
             ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
@@ -4387,13 +4387,19 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const matchedAgent = this.agentItems.find(
       (item) => item.id === resolvedAgentId,
     );
+    const agentTypeIcon =
+      matchedAgent?.agentType === "agent"
+        ? "🤖"
+        : matchedAgent?.agentType === "codeagent"
+          ? "👨‍💻"
+          : "❓";
     const displayName = String(
       matchedAgent?.displayName || matchedAgent?.name || resolvedAgentId,
     ).trim();
     if (!displayName || displayName === resolvedAgentId) {
-      return resolvedAgentId;
+      return `${agentTypeIcon} ${resolvedAgentId}`;
     }
-    return `${displayName} (${resolvedAgentId})`;
+    return `${agentTypeIcon} ${displayName} (${resolvedAgentId})`;
   }
 
   private getChatPanelTitle(): string {

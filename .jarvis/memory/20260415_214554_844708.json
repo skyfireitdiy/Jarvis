@@ -1,0 +1,16 @@
+{
+  "id": "20260415_214554_844708",
+  "type": "project_long_term",
+  "tags": [
+    "UI优化",
+    "前端",
+    "Vue",
+    "VS Code扩展",
+    "agent列表",
+    "图标标识",
+    "已完成"
+  ],
+  "content": "已完成：在App.vue和extension.ts中为不同agent类型使用不同图标标识。\n\n修改文件：\n1. App.vue（前端）：\n   - 第26行：agent列表中的图标显示\n   - 第102行：当前agent信息中的图标显示\n\n2. extension.ts（VS Code扩展）：\n   - 第786行：agent列表中的图标显示\n   - 第4382-4398行：getAgentDisplayLabel函数中的图标显示\n\n图标映射：\n- agent类型='agent'显示🤖\n- agent类型='codeagent'显示👨‍💻\n- 其他类型显示❓",
+  "created_at": "2026-04-15T21:45:54.844748",
+  "updated_at": "2026-04-15T21:45:54.844754"
+}
