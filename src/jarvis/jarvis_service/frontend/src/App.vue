@@ -653,6 +653,18 @@
             </div>
           </div>
         </div>
+        <div class="form-group">
+          <div class="toggle-wrapper">
+            <label class="toggle-switch">
+              <input v-model="newAgentRestoreSession" type="checkbox" class="toggle-input" />
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="toggle-info">
+              <span class="toggle-label-text">恢复会话</span>
+              <span class="form-help">启动时从 .jarvis/saved_session.json 恢复上次会话。</span>
+            </div>
+          </div>
+        </div>
         <div class="modal-actions">
           <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
           <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
@@ -2583,6 +2595,7 @@ const modelGroups = ref([])        // 模型组列表
 const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 default）
 const newCodeAgentWorktree = ref(false) // 新代码 Agent 是否启用 worktree
 const newAgentQuickMode = ref(false) // 新 Agent 是否启用极速模式
+const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 
@@ -3815,6 +3828,7 @@ async function createAgent() {
         llm_group: newAgentModelGroup.value,
         worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false,
         quick_mode: newAgentQuickMode.value,
+        restore_session: newAgentRestoreSession.value,
         node_id: targetNodeId,
       })
     })
@@ -3838,6 +3852,7 @@ async function createAgent() {
       newAgentDir.value = '~' // 重置为默认值
       newCodeAgentWorktree.value = false
       newAgentQuickMode.value = false
+      newAgentRestoreSession.value = false
       newAgentNodeId.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = newAgentType.value === 'agent' ? '通用Agent' : '代码Agent'
@@ -4088,6 +4103,7 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
     llm_group: agent.llm_group || 'default',
     worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false,
     quick_mode: Boolean(agent.quick_mode),
+    restore_session: Boolean(agent.restore_session),
     node_id: targetNodeId || agent.node_id || undefined,
   }
 }

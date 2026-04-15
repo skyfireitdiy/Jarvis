@@ -171,6 +171,7 @@ interface CreateAgentFormState {
   nodeId: string;
   useWorktree: boolean;
   quickMode: boolean;
+  restoreSession: boolean;
   isSubmitting: boolean;
   errorMessage: string;
 }
@@ -372,6 +373,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     nodeId: "",
     useWorktree: false,
     quickMode: false,
+    restoreSession: false,
     isSubmitting: false,
     errorMessage: "",
   };
@@ -614,6 +616,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const quickModeChecked = this.createAgentFormState.quickMode
       ? "checked"
       : "";
+    const restoreSessionChecked = this.createAgentFormState.restoreSession
+      ? "checked"
+      : "";
     const worktreeDisabled =
       this.createAgentFormState.agentType === "codeagent" ? "" : "disabled";
     const createAgentErrorMarkup = this.createAgentFormState.errorMessage
@@ -746,6 +751,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <input id="useQuickMode" type="checkbox" ${quickModeChecked} />
       <span>极速模式</span>
     </label>
+    <label class="checkbox-row">
+      <input id="useRestoreSession" type="checkbox" ${restoreSessionChecked} />
+      <span>恢复会话</span>
+    </label>
     ${createAgentErrorMarkup}
     <div class="form-actions">
       <button id="cancelCreateAgentButton" type="button" ${createButtonDisabled}>取消</button>
@@ -780,6 +789,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
             ${agentItem.worktree ? '<div class="agent-worktree" title="已启用 worktree">🌿</div>' : ""}
             ${agentItem.quickMode ? '<div class="agent-quick-mode" title="极速模式">⚡</div>' : ""}
+            ${agentItem.restoreSession ? '<div class="agent-restore-session" title="恢复会话">🔄</div>' : ""}
           </div>
           <div class="agent-dir">${escapeHtml(agentItem.workingDir || "未提供工作目录")}</div>
         </div>
@@ -936,6 +946,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-status-dot.stopped { background: #f44336; box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2); }
     .agent-llm-group { font-size: 12px; opacity: 0.9; }
     .agent-worktree { font-size: 13px; }
+    .agent-restore-session { font-size: 13px; }
     .agent-dir { opacity: 0.8; font-size: 12px; margin-top: 6px; word-break: break-all; }
     .agent-actions { display: flex; gap: 6px; }
     .icon-button { padding: 4px 6px; min-width: auto; }
@@ -1133,6 +1144,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         const nodeId = document.getElementById('nodeId');
         const useWorktree = document.getElementById('useWorktree');
         const useQuickMode = document.getElementById('useQuickMode');
+        const useRestoreSession = document.getElementById('useRestoreSession');
         vscode.postMessage({
           type: 'createAgent',
           agentType: agentType ? agentType.value : 'agent',
@@ -1141,7 +1153,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           llmGroup: llmGroup ? llmGroup.value : '',
           nodeId: nodeId ? nodeId.value : '',
           useWorktree: Boolean(useWorktree && useWorktree.checked),
-          quickMode: Boolean(useQuickMode && useQuickMode.checked)
+          quickMode: Boolean(useQuickMode && useQuickMode.checked),
+          restoreSession: Boolean(useRestoreSession && useRestoreSession.checked)
         });
       });
     }
@@ -4008,6 +4021,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
                 ? sourceAgent.worktree
                 : false,
             quick_mode: Boolean(sourceAgent.quickMode),
+            restore_session: Boolean(sourceAgent.restoreSession),
           }),
         },
       );
@@ -4157,6 +4171,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
                   ? sourceAgent.worktree
                   : false,
               quick_mode: Boolean(sourceAgent.quickMode),
+              restore_session: Boolean(sourceAgent.restoreSession),
             }),
           },
         );
@@ -4280,6 +4295,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const useWorktree =
       requestedAgentType === "codeagent" ? Boolean(message.useWorktree) : false;
     const quickMode = Boolean(message.quickMode);
+    const restoreSession = Boolean(message.restoreSession);
 
     this.updateCreateAgentDefaults(requestedAgentType);
     this.createAgentFormState.workingDir = workingDir;
@@ -4289,6 +4305,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.nodeId = nodeId;
     this.createAgentFormState.useWorktree = useWorktree;
     this.createAgentFormState.quickMode = quickMode;
+    this.createAgentFormState.restoreSession = restoreSession;
     this.createAgentFormState.isVisible = true;
 
     if (!workingDir) {
@@ -4321,6 +4338,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             node_id: normalizedNodeId,
             worktree: useWorktree,
             quick_mode: quickMode,
+            restore_session: restoreSession,
           }),
         },
       );

@@ -39,6 +39,7 @@ class AgentInfo:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
+        restore_session: bool = False,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -50,6 +51,7 @@ class AgentInfo:
         self.llm_group = llm_group
         self.worktree = worktree
         self.quick_mode = quick_mode
+        self.restore_session = restore_session
         self.status = "running"
         self.node_id = node_id
         self.created_at = datetime.now().isoformat()
@@ -68,6 +70,7 @@ class AgentInfo:
             "llm_group": self.llm_group,
             "worktree": self.worktree,
             "quick_mode": self.quick_mode,
+            "restore_session": self.restore_session,
             "node_id": self.node_id,
             "created_at": self.created_at,
         }
@@ -121,6 +124,7 @@ class AgentManager:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
+        restore_session: bool = False,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -177,6 +181,7 @@ class AgentManager:
             additional_args=additional_args,
             worktree=worktree,
             quick_mode=quick_mode,
+            restore_session=restore_session,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -207,6 +212,7 @@ class AgentManager:
             worktree=worktree,
             node_id=node_id,
             quick_mode=quick_mode,
+            restore_session=restore_session,
         )
 
         # 保存到内存
@@ -492,6 +498,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]],
         worktree: bool = False,
         quick_mode: bool = False,
+        restore_session: bool = False,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -505,6 +512,7 @@ class AgentManager:
             additional_args: 额外参数
             worktree: 是否为 codeagent 启用 git worktree 模式
             quick_mode: 是否启用极速模式
+            restore_session: 是否启用恢复会话
 
         Returns:
             命令列表
@@ -533,6 +541,10 @@ class AgentManager:
         # 添加极速模式参数
         if quick_mode:
             cmd.append("-q")
+
+        # 添加恢复会话参数
+        if restore_session:
+            cmd.append("-r")
 
         # 添加额外参数
         if additional_args:

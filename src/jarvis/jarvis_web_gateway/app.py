@@ -1901,6 +1901,7 @@ def create_app(
             additional_args = request.get("additional_args")
             worktree = bool(request.get("worktree", False))
             quick_mode = bool(request.get("quick_mode", False))
+            restore_session = bool(request.get("restore_session", False))
             target_node_id = str(request.get("node_id") or "").strip()
 
             if not agent_type:
@@ -1996,6 +1997,7 @@ def create_app(
                 worktree=worktree,
                 node_id=node_runtime.local_node_id,
                 quick_mode=quick_mode,
+                restore_session=restore_session,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
