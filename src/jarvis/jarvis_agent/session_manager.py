@@ -4,8 +4,6 @@ import json
 import os
 import subprocess
 from datetime import datetime
-from rich.status import Status
-from jarvis.jarvis_utils.globals import console
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
@@ -314,7 +312,10 @@ class SessionManager:
                 if saved_commit == commit_hash:
                     timestamp = self._extract_timestamp(file_path)
                     session_name = self._read_session_name(file_path)
-                    matching_sessions.append((file_path, timestamp, session_name))
+                    commit_status = self._check_commit_status(file_path)
+                    matching_sessions.append(
+                        (file_path, timestamp, session_name, commit_status)
+                    )
 
             except Exception:
                 # 读取失败时跳过该会话
@@ -325,13 +326,13 @@ class SessionManager:
         return matching_sessions
 
     def _prompt_to_restore_matching_sessions(
-        self, matching_sessions: List[Tuple[str, Optional[str], Optional[str]]]
+        self, matching_sessions: List[Tuple[str, Optional[str], Optional[str], str]]
     ) -> Optional[str]:
         """
         提示用户选择是否恢复匹配的会话。
 
         Args:
-            matching_sessions: 匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称)
+            matching_sessions: 匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态)
 
         Returns:
             恢复的会话文件路径，如果用户选择不恢复则返回 None
@@ -340,7 +341,7 @@ class SessionManager:
             return None
 
         PrettyOutput.auto_print("\n🔍 检测到与当前commit一致的历史会话：")
-        for idx, (file_path, timestamp, session_name) in enumerate(
+        for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
             matching_sessions, 1
         ):
             time_str = timestamp if timestamp else "(无时间戳)"
@@ -856,7 +857,7 @@ class SessionManager:
 
         # 如果只有一个会话文件，直接恢复
         if len(sessions) == 1:
-            session_file, timestamp, session_name = sessions[0]
+            session_file, timestamp, session_name, commit_status = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
@@ -896,7 +897,7 @@ class SessionManager:
         # 检查是否为非交互模式
         if self.non_interactive:
             # 非交互模式：自动恢复最新的会话
-            session_file, timestamp, session_name = sessions[0]
+            session_file, timestamp, session_name, commit_status = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
@@ -934,12 +935,35 @@ class SessionManager:
 
         # 交互模式：显示列表让用户选择
         PrettyOutput.auto_print("📋 找到多个会话文件：")
-        for idx, (file_path, timestamp, session_name) in enumerate(sessions, 1):
+        for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
+            sessions, 1
+        ):
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" - {session_name}" if session_name else ""
-            PrettyOutput.auto_print(
-                f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}"
-            )
+
+            # 根据commit状态添加颜色标注
+            from rich.text import Text
+            from rich.console import Console as RichConsole
+
+            rich_console = RichConsole()
+
+            # 构建带颜色的文本
+            text = Text()
+            text.append(f"  {idx}. ")
+            text.append(os.path.basename(file_path))
+            text.append(f" [{time_str}]")
+            if session_name:
+                text.append(f" - {session_name}")
+
+            # 添加commit状态标注
+            if commit_status == "consistent":
+                text.append(" [commit一致]", style="green")
+            elif commit_status == "inconsistent":
+                text.append(" [commit不一致]", style="red")
+            elif commit_status == "no_commit":
+                text.append(" [无commit信息]", style="yellow")
+
+            rich_console.print(text)
         # 添加取消选项
         PrettyOutput.auto_print("  0. 取消恢复")
 
@@ -969,7 +993,7 @@ class SessionManager:
                 break
 
             # 恢复选中的会话
-            session_file, timestamp, session_name = sessions[choice_idx]
+            session_file, timestamp, session_name, commit_status = sessions[choice_idx]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
