@@ -23,7 +23,7 @@
             <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
           </div>
           <div class="agent-info">
-            <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
+            <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
             <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
             <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
@@ -99,7 +99,7 @@
         </div>
         
         <div class="current-agent-info desktop-only" v-if="currentAgent">
-          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : '💻') }}</span>
+          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
           <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
           <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeLabel(currentAgent) }}</span>
           <span class="agent-dir">{{ currentAgent.working_dir }}</span>
