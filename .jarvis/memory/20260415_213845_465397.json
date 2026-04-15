@@ -1,0 +1,16 @@
+{
+  "id": "20260415_213845_465397",
+  "type": "project_long_term",
+  "tags": [
+    "UI优化",
+    "前端",
+    "Vue",
+    "App.vue",
+    "agent列表",
+    "图标标识",
+    "已完成"
+  ],
+  "content": "已完成：在App.vue的agent列表中为不同agent类型使用不同图标标识。修改位置：第26行（agent列表）和第102行（当前agent信息）。图标映射：agent类型='agent'显示🤖，agent类型='codeagent'显示👨‍💻，其他类型显示❓。",
+  "created_at": "2026-04-15T21:38:45.465442",
+  "updated_at": "2026-04-15T21:38:45.465450"
+}
