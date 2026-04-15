@@ -201,13 +201,16 @@ class SessionManager:
             # 读取失败不影响主流程，返回 None
             return None
 
-    def _parse_session_files(self) -> List[Tuple[str, Optional[str], Optional[str]]]:
+    def _parse_session_files(
+        self,
+    ) -> List[Tuple[str, Optional[str], Optional[str], str]]:
         """
-        解析会话文件列表，返回包含文件路径、时间戳和会话名称的列表。
+        解析会话文件列表，返回包含文件路径、时间戳、会话名称和commit状态的列表。
 
         Returns:
-            会话信息列表，每个元素为 (文件路径, 时间戳, 会话名称)，按时间戳降序排列。
+            会话信息列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态)，按时间戳降序排列。
             如果文件没有时间戳，时间戳为 None；如果没有会话名称，会话名称为 None。
+            commit状态可能的值："consistent"（一致）、"inconsistent"（不一致）、"no_commit"（无commit信息）
         """
         files = self._list_session_files()
 
@@ -215,16 +218,75 @@ class SessionManager:
         for file_path in files:
             timestamp = self._extract_timestamp(file_path)
             session_name = self._read_session_name(file_path)
-            sessions.append((file_path, timestamp, session_name))
+            commit_status = self._check_commit_status(file_path)
+            sessions.append((file_path, timestamp, session_name, commit_status))
 
         # 按时间戳降序排列（最新的在前），没有时间戳的排在最后
         sessions.sort(key=lambda x: (x[1] is None, x[1] or ""), reverse=True)
 
         return sessions
 
+    def _check_commit_status(self, session_file: str) -> str:
+        """
+        检查会话文件的commit状态。
+
+        Args:
+            session_file: 会话文件路径
+
+        Returns:
+            str: commit状态，可能的值：
+                - "consistent": commit一致（绿色）
+                - "inconsistent": commit不一致（红色）
+                - "no_commit": 没有commit信息（黄色）
+        """
+        try:
+            # 从 _commit.json 文件读取保存时的 commit
+            commit_file = session_file[:-5] + "_commit.json"
+
+            # 如果 commit 文件不存在，返回没有commit信息
+            if not os.path.exists(commit_file):
+                return "no_commit"
+
+            with open(commit_file, "r", encoding="utf-8") as f:
+                commit_data = json.load(f)
+
+            saved_commit = commit_data.get("current_commit", "")
+
+            # 如果会话文件中没有保存 commit 信息，返回没有commit信息
+            if not saved_commit:
+                return "no_commit"
+
+            # 获取当前 HEAD commit
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                current_commit = result.stdout.strip()
+
+                # 如果不在 git 仓库中，返回没有commit信息
+                if result.returncode != 0:
+                    return "no_commit"
+
+            except Exception:
+                # git 命令执行失败，返回没有commit信息
+                return "no_commit"
+
+            # 检查 commit 是否一致
+            if saved_commit == current_commit:
+                return "consistent"
+            else:
+                return "inconsistent"
+
+        except Exception:
+            # 任何异常都返回没有commit信息
+            return "no_commit"
+
     def _find_sessions_by_commit(
         self, commit_hash: str
-    ) -> List[Tuple[str, Optional[str], Optional[str]]]:
+    ) -> List[Tuple[str, Optional[str], Optional[str], str]]:
         """
         查找与指定commit匹配的会话列表。
 
