@@ -1,10 +1,10 @@
 ---
 name: Publish VSCode Extension
 
-'on':
+"on":
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   vscode-publish:
@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install dependencies
         run: npm ci
@@ -29,6 +29,8 @@ jobs:
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           echo "Setting version to $VERSION"
+          # Sync package-lock.json with package.json before updating version
+          npm install --package-lock-only
           npm version "$VERSION" --no-git-tag-version
 
       - name: Build extension
