@@ -31,61 +31,98 @@ _DETECT_ENCODINGS = ["utf-8", "gbk", "gb2312", "utf-16-le", "utf-16-be", "latin1
 _DETECT_SAMPLE_SIZE = 16384  # 读取前 16KB 用于检测
 
 
+def _score_chinese_text(text: str) -> int:
+    """评估文本中有效中文字符的数量（用于区分 GBK 和 Big5）"""
+    score = 0
+    for char in text:
+        # 常用中文字符范围：CJK 统一汉字（最常用）
+        if "\u4e00" <= char <= "\u9fff":
+            score += 10
+        # 扩展 A 区汉字
+        elif "\u3400" <= char <= "\u4dbf":
+            score += 5
+        # 其他 CJK 符号和标点
+        elif "\u3000" <= char <= "\u303f":
+            score += 3
+        # 全角字符
+        elif "\uff00" <= char <= "\uffef":
+            score += 2
+        # ASCII 字母数字
+        elif char.isascii() and char.isalnum():
+            score += 1
+    return score
+
+
 def detect_file_encoding(
     file_path: str, sample_size: int = _DETECT_SAMPLE_SIZE
 ) -> Optional[str]:
     """根据文件内容检测编码
 
-    读取文件前 N 字节，依次尝试常见编码解码，返回第一个成功的编码。
+    使用 charset_normalizer 库进行编码检测，提供更准确的结果。
     优先 UTF-8（现代文件、JSON、YAML 等），其次 GBK（Windows 中文）。
 
     Args:
         file_path: 文件路径
-        sample_size: 用于检测的字节数，默认 8KB
+        sample_size: 用于检测的字节数，默认 16KB
 
     Returns:
         检测到的编码名称，若均失败则返回 None
     """
     try:
         with open(file_path, "rb") as f:
-            sample = f.read(sample_size)
+            raw_data = f.read(sample_size)
 
-        if not sample:
+        if not raw_data:
             return "utf-8"
 
-        # BOM 检测
-        if sample.startswith(b"\xef\xbb\xbf"):
+        # BOM 检测（优先级最高）
+        if raw_data.startswith(b"\xef\xbb\xbf"):
             return "utf-8"
-        if sample.startswith(b"\xff\xfe") or sample.startswith(b"\xfe\xff"):
+        if raw_data.startswith(b"\xff\xfe") or raw_data.startswith(b"\xfe\xff"):
             return "utf-16"
 
-        # 优先尝试 UTF-8，如果失败且错误位置在样本末尾附近，则增加样本重新检测
-        # 避免多字节字符被截断导致误判
-        utf8_encoding = "utf-8"
-        for attempt in range(3):  # 最多尝试 3 次
-            try:
-                sample.decode(utf8_encoding)
-                return utf8_encoding
-            except UnicodeDecodeError as e:
-                # 如果错误位置在样本末尾 100 字节内，可能是截断导致，尝试增加样本
-                if e.end >= len(sample) - 100:
-                    with open(file_path, "rb") as f:
-                        new_sample = f.read(sample_size * (attempt + 2))
-                    if len(new_sample) > len(sample):
-                        sample = new_sample
-                        continue
-                # 其他错误或文件已读完，跳出循环
-                break
-            except LookupError:
-                break
+        # 使用 charset_normalizer 检测编码
+        result = from_bytes(raw_data).best()
+        if result is not None and result.encoding:
+            detected = result.encoding.lower().replace("-", "_").replace("-", "")
+            # 标准化编码名称
+            encoding_map = {"gb2312": "gbk", "gb18030": "gbk"}
+            detected = encoding_map.get(detected, detected)
 
-        # UTF-8 检测失败，继续尝试其他编码
-        for encoding in _DETECT_ENCODINGS[1:]:  # 跳过 utf-8
+            # 验证检测到的编码
             try:
-                sample.decode(encoding)
-                return encoding
-            except (UnicodeDecodeError, LookupError):
+                decoded = raw_data.decode(detected)
+                re_encoded = decoded.encode(detected)
+                if re_encoded == raw_data:
+                    # 对于中文编码（GBK/Big5），需要额外验证解码结果是否有效
+                    if detected in ("gbk", "big5", "gb2312"):
+                        # 尝试所有中文编码，选择能产生最多有效中文字符的
+                        best_enc = detected
+                        best_score = _score_chinese_text(decoded)
+                        for enc in ("gbk", "big5", "gb2312"):
+                            try:
+                                alt_decoded = raw_data.decode(enc)
+                                alt_score = _score_chinese_text(alt_decoded)
+                                if alt_score > best_score:
+                                    best_enc = enc
+                                    best_score = alt_score
+                            except (UnicodeDecodeError, LookupError):
+                                continue
+                        return best_enc
+                    return detected
+            except (UnicodeDecodeError, LookupError, UnicodeEncodeError):
+                pass
+
+        # 如果 charset_normalizer 检测失败或验证失败，尝试常见编码
+        for enc in _DETECT_ENCODINGS:
+            try:
+                decoded = raw_data.decode(enc)
+                re_encoded = decoded.encode(enc)
+                if re_encoded == raw_data:
+                    return enc
+            except (UnicodeDecodeError, LookupError, UnicodeEncodeError):
                 continue
+
     except OSError:
         pass
     return None

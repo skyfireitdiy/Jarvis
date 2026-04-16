@@ -932,3 +932,156 @@ def func3():
                 os.remove(temp_path)
             if os.path.exists(temp_path + ".bak"):
                 os.remove(temp_path + ".bak")
+
+
+class TestEditFileEncoding:
+    """测试文件编码检测和一致性"""
+
+    @pytest.fixture
+    def tool(self):
+        """创建测试用的 EditFileNormalTool 实例"""
+        return EditFileNormalTool()
+
+    def test_utf8_encoding_preserved(self, tool):
+        """测试 UTF-8 编码文件编辑后编码保持一致"""
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+            content = "你好世界\nHello World\n"
+            f.write(content.encode("utf-8"))
+            temp_path = f.name
+
+        try:
+            args = {
+                "files": [
+                    {
+                        "file_path": temp_path,
+                        "diffs": [
+                            {
+                                "search": "你好世界",
+                                "replace": "你好 Jarvis",
+                            }
+                        ],
+                    }
+                ]
+            }
+
+            result = tool.execute(args)
+            assert result["success"] is True
+
+            with open(temp_path, "rb") as f:
+                raw_content = f.read()
+            decoded = raw_content.decode("utf-8")
+            assert "你好 Jarvis" in decoded
+            assert "你好世界" not in decoded
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_gbk_encoding_preserved(self, tool):
+        """测试 GBK 编码文件编辑后编码保持一致"""
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+            content = "中文测试\nGBK编码\n"
+            f.write(content.encode("gbk"))
+            temp_path = f.name
+
+        try:
+            args = {
+                "files": [
+                    {
+                        "file_path": temp_path,
+                        "diffs": [
+                            {
+                                "search": "中文测试",
+                                "replace": "修改成功",
+                            }
+                        ],
+                    }
+                ]
+            }
+
+            result = tool.execute(args)
+            assert result["success"] is True
+
+            with open(temp_path, "rb") as f:
+                raw_content = f.read()
+            decoded = raw_content.decode("gbk")
+            assert "修改成功" in decoded
+            assert "中文测试" not in decoded
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_encoding_detection_with_bom(self, tool):
+        """测试带 BOM 的 UTF-8 文件处理"""
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+            content = "BOM测试\nTest with BOM\n"
+            f.write(b"\xef\xbb\xbf")
+            f.write(content.encode("utf-8"))
+            temp_path = f.name
+
+        try:
+            args = {
+                "files": [
+                    {
+                        "file_path": temp_path,
+                        "diffs": [
+                            {
+                                "search": "BOM测试",
+                                "replace": "BOM修改",
+                            }
+                        ],
+                    }
+                ]
+            }
+
+            result = tool.execute(args)
+            assert result["success"] is True
+
+            with open(temp_path, "rb") as f:
+                raw_content = f.read()
+            decoded = raw_content.decode("utf-8-sig")
+            assert "BOM修改" in decoded
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_empty_file_encoding(self, tool):
+        """测试空文件的编码处理"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            temp_path = f.name
+
+        try:
+            args = {
+                "files": [
+                    {
+                        "file_path": temp_path,
+                        "diffs": [
+                            {
+                                "search": "",
+                                "replace": "新内容\n",
+                            }
+                        ],
+                    }
+                ]
+            }
+
+            result = tool.execute(args)
+            assert result["success"] is True
+
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            assert "新内容" in content
+
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
