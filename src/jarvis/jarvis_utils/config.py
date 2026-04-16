@@ -94,21 +94,14 @@ def detect_file_encoding(
                 decoded = raw_data.decode(detected)
                 re_encoded = decoded.encode(detected)
                 if re_encoded == raw_data:
-                    # 对于中文编码（GBK/Big5），需要额外验证解码结果是否有效
+                    # 对于中文编码（GBK/Big5），优先返回 GBK（更常用）
                     if detected in ("gbk", "big5", "gb2312"):
-                        # 尝试所有中文编码，选择能产生最多有效中文字符的
-                        best_enc = detected
-                        best_score = _score_chinese_text(decoded)
-                        for enc in ("gbk", "big5", "gb2312"):
-                            try:
-                                alt_decoded = raw_data.decode(enc)
-                                alt_score = _score_chinese_text(alt_decoded)
-                                if alt_score > best_score:
-                                    best_enc = enc
-                                    best_score = alt_score
-                            except (UnicodeDecodeError, LookupError):
-                                continue
-                        return best_enc
+                        # 优先尝试 GBK，因为 GBK 更常用且兼容性更好
+                        try:
+                            raw_data.decode("gbk")
+                            return "gbk"
+                        except (UnicodeDecodeError, LookupError):
+                            pass
                     return detected
             except (UnicodeDecodeError, LookupError, UnicodeEncodeError):
                 pass
