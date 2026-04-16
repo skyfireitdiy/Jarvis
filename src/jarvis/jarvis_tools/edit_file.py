@@ -151,21 +151,26 @@ class EditFileNormalTool:
         return None
 
     @staticmethod
-    def _read_file_with_backup(file_path: str) -> Tuple[str, Optional[str]]:
+    def _read_file_with_backup(
+        file_path: str,
+    ) -> Tuple[str, Optional[str], Optional[str]]:
         """读取文件并创建备份
 
         Args:
             file_path: 文件路径
 
         Returns:
-            (文件内容, 备份文件路径或None)
+            (文件内容, 备份文件路径或None, 检测到的编码或None)
         """
         abs_path = os.path.abspath(file_path)
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
         file_content = ""
         backup_path = None
+        detected_encoding = None
         if os.path.exists(abs_path):
+            # 先检测编码
+            detected_encoding = detect_file_encoding(abs_path)
             file_content = read_text_file(abs_path)
             # 创建备份文件
             backup_path = abs_path + ".bak"
@@ -175,11 +180,14 @@ class EditFileNormalTool:
                 # 备份失败不影响主流程
                 backup_path = None
 
-        return file_content, backup_path
+        return file_content, backup_path, detected_encoding
 
     @staticmethod
     def _write_file_with_rollback(
-        abs_path: str, content: str, backup_path: Optional[str]
+        abs_path: str,
+        content: str,
+        backup_path: Optional[str],
+        encoding: Optional[str] = None,
     ) -> Tuple[bool, Optional[str]]:
         """写入文件，失败时回滚
 
@@ -187,11 +195,12 @@ class EditFileNormalTool:
             abs_path: 文件绝对路径
             content: 要写入的内容
             backup_path: 备份文件路径或None
+            encoding: 指定编码，若为None则自动检测
 
         Returns:
             (是否成功, 错误信息或None)
         """
-        enc = detect_file_encoding(abs_path) or get_default_encoding()
+        enc = encoding or detect_file_encoding(abs_path) or get_default_encoding()
         try:
             with open(abs_path, "w", encoding=enc, errors="replace") as f:
                 f.write(content)
@@ -586,6 +595,7 @@ class EditFileNormalTool:
                 (
                     original_content,
                     backup_path,
+                    detected_encoding,
                 ) = EditFileNormalTool._read_file_with_backup(file_path)
 
                 # 应用所有普通编辑，使用循环处理所有可能的确认情况
@@ -739,7 +749,7 @@ class EditFileNormalTool:
                     write_success,
                     write_error,
                 ) = EditFileNormalTool._write_file_with_rollback(
-                    abs_path, result_or_error, backup_path
+                    abs_path, result_or_error, backup_path, detected_encoding
                 )
                 if write_success:
                     # 写入成功，删除备份文件
