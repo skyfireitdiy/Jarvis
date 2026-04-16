@@ -10,6 +10,7 @@ from typing import cast
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict
+from charset_normalizer import from_bytes
 
 # 全局环境变量存储
 
