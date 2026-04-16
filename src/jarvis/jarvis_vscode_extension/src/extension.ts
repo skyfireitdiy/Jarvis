@@ -3,6 +3,7 @@ import WebSocket, { RawData } from "ws";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import { execSync } from "child_process";
 
 // 节流函数：在指定时间间隔内最多执行一次
 function throttle<T extends Function>(func: T, delay: number): T {
@@ -333,6 +334,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     connectionLockEnabled: false,
   };
   private readonly agentStatuses = new Map<string, AgentStatus>();
+  // Code Agent 起始 commit ID：agentId -> commitId
+  private readonly codeAgentStartCommits = new Map<string, string>();
   private readonly agentSockets = new Map<string, WebSocket>();
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
   private agentListRefreshTimer: NodeJS.Timeout | undefined;
@@ -2116,6 +2119,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           state.input_tip = "";
           state.active_execution_id = undefined;
         });
+
+        // 如果是 Code Agent 且有记录的起始 commit ID，展示 diff
+        if (agentItem.agentType === "codeagent") {
+          const startCommitId = this.codeAgentStartCommits.get(agentItem.id);
+          if (startCommitId) {
+            this.showCodeAgentDiff(
+              agentItem.id,
+              startCommitId,
+              agentItem.workingDir,
+            );
+          }
+        }
       }
 
       // 检查数据是否有变化，无变化则不重新渲染
@@ -4348,6 +4363,31 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
 
       this.panelState.selectedAgentId = result.data.agent_id;
+
+      // 如果是 Code Agent 且网关地址是本地回环地址，记录起始 commit ID
+      if (requestedAgentType === "codeagent") {
+        const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+        const isLocalhost =
+          gatewayAddress.host === "127.0.0.1" ||
+          gatewayAddress.host === "::1" ||
+          gatewayAddress.host === "localhost";
+        if (isLocalhost) {
+          try {
+            const startCommitId = execSync("git rev-parse HEAD", {
+              cwd: workingDir,
+              encoding: "utf-8",
+              timeout: 5000,
+            }).trim();
+            this.codeAgentStartCommits.set(result.data.agent_id, startCommitId);
+            console.log(
+              `[CodeAgent] 记录起始 commit ID: ${startCommitId} for agent ${result.data.agent_id}`,
+            );
+          } catch (gitError) {
+            console.warn(`[CodeAgent] 获取 commit ID 失败:`, gitError);
+          }
+        }
+      }
+
       this.resetCreateAgentForm();
       await this.refreshAgents();
       this.renderAgentListView();
@@ -5284,6 +5324,112 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       // ignore close error
     }
     this.panelState[socketKey] = undefined;
+  }
+
+  /**
+   * 展示 Code Agent 的变更 diff
+   * @param agentId Agent ID
+   * @param startCommitId 起始 commit ID
+   * @param workingDir 工作目录
+   */
+  private async showCodeAgentDiff(
+    agentId: string,
+    startCommitId: string,
+    workingDir: string,
+  ): Promise<void> {
+    try {
+      // 获取当前 commit ID
+      const currentCommitId = execSync("git rev-parse HEAD", {
+        cwd: workingDir,
+        encoding: "utf-8",
+        timeout: 5000,
+      }).trim();
+
+      // 如果 commit ID 没有变化，不展示 diff
+      if (startCommitId === currentCommitId) {
+        console.log(
+          `[CodeAgent] Agent ${agentId} 没有变更 (commit: ${startCommitId})`,
+        );
+        return;
+      }
+
+      console.log(
+        `[CodeAgent] Agent ${agentId} 有变更: ${startCommitId} -> ${currentCommitId}`,
+      );
+
+      // 获取 diff 内容
+      const diffContent = execSync(
+        `git diff ${startCommitId} ${currentCommitId}`,
+        {
+          cwd: workingDir,
+          encoding: "utf-8",
+          timeout: 10000,
+          maxBuffer: 10 * 1024 * 1024, // 10MB
+        },
+      );
+
+      // 如果没有 diff 内容，不展示
+      if (!diffContent || diffContent.trim() === "") {
+        console.log(`[CodeAgent] Agent ${agentId} 没有文件变更`);
+        return;
+      }
+
+      // 创建临时文件来展示 diff
+      const tempDir = os.tmpdir();
+      const startTempFile = path.join(
+        tempDir,
+        `jarvis-codeagent-${agentId}-start.diff`,
+      );
+      const endTempFile = path.join(
+        tempDir,
+        `jarvis-codeagent-${agentId}-end.diff`,
+      );
+
+      // 写入 diff 内容到临时文件
+      fs.writeFileSync(endTempFile, diffContent, "utf-8");
+      fs.writeFileSync(startTempFile, "", "utf-8"); // 空文件作为对比基准
+
+      // 使用 VS Code 的 diff 命令展示变更
+      const leftUri = vscode.Uri.file(startTempFile);
+      const rightUri = vscode.Uri.file(endTempFile);
+      const diffTitle = `Code Agent 变更: ${agentId} (${startCommitId.substring(0, 8)} -> ${currentCommitId.substring(0, 8)})`;
+
+      await vscode.commands.executeCommand(
+        "vscode.diff",
+        leftUri,
+        rightUri,
+        diffTitle,
+        { preview: true },
+      );
+
+      // 清理临时文件（延迟清理，确保 VS Code 已经读取）
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(startTempFile)) {
+            fs.unlinkSync(startTempFile);
+          }
+          if (fs.existsSync(endTempFile)) {
+            fs.unlinkSync(endTempFile);
+          }
+        } catch (cleanupError) {
+          console.warn(`[CodeAgent] 清理临时文件失败:`, cleanupError);
+        }
+      }, 5000);
+
+      this.appendPanelMessage(
+        `Code Agent ${agentId} 完成，变更已展示 (commit: ${startCommitId.substring(0, 8)} -> ${currentCommitId.substring(0, 8)})`,
+        "system",
+      );
+    } catch (error) {
+      console.error(`[CodeAgent] 展示 diff 失败:`, error);
+      this.appendPanelMessage(
+        `Code Agent ${agentId} 完成，但展示变更失败: ${error instanceof Error ? error.message : String(error)}`,
+        "error",
+      );
+    } finally {
+      // 清除记录的起始 commit ID
+      this.codeAgentStartCommits.delete(agentId);
+    }
   }
 
   public dispose(): void {
