@@ -136,7 +136,7 @@ class TestSessionManager:
         with patch.object(
             session_manager,
             "_parse_session_files",
-            return_value=[(mock_session_file, "20250107_120000", None)],
+            return_value=[(mock_session_file, "20250107_120000", None, "consistent")],
         ):
             with patch.object(
                 session_manager, "_check_commit_consistency", return_value=True
@@ -197,8 +197,8 @@ class TestSessionManager:
             session_manager,
             "_parse_session_files",
             return_value=[
-                (mock_newer_file, "20250107_120000", None),
-                (mock_older_file, "20250106_080000", None),
+                (mock_newer_file, "20250107_120000", None, "consistent"),
+                (mock_older_file, "20250106_080000", None, "consistent"),
             ],
         ):
             with patch.object(
@@ -243,7 +243,7 @@ class TestSessionManager:
         with patch.object(
             session_manager,
             "_parse_session_files",
-            return_value=[(mock_session_file, "20250107_120000", None)],
+            return_value=[(mock_session_file, "20250107_120000", None, "consistent")],
         ):
             with patch.object(
                 session_manager, "_check_commit_consistency", return_value=True
