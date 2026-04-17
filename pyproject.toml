@@ -82,7 +82,10 @@ dependencies = [
     "twine",
     "mkdocs-material",
     "mkdocs-git-revision-date-localized-plugin",
-    "pymdown-extensions"
+    "pymdown-extensions",
+    "textual",
+    "websockets",
+    "httpx",
     ]
     requires-python = "==3.12.*"
 
