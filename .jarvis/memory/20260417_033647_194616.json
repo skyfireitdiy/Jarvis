@@ -1,0 +1,8 @@
+{
+  "id": "20260417_033647_194616",
+  "type": "project_long_term",
+  "tags": ["tui", "code-review", "bug", "missing-files"],
+  "content": "Jarvis TUI 代码审查发现：1) __main__.py 导入不存在的 app.py 模块；2) 缺少主应用实现和 UI 界面；3) spec 中定义的终端面板、快捷键等功能未实现；4) 接口定义与 spec 不一致。需要创建 app.py 并实现基本 UI 框架。",
+  "created_at": "2026-04-17T03:36:47.194654",
+  "updated_at": "2026-04-17T03:36:47.194661"
+}

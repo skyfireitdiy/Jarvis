@@ -1,0 +1,247 @@
+/* Jarvis TUI 样式 */
+
+/* 全局样式 */
+Screen {
+  background: $background;
+}
+
+Header {
+  background: $primary;
+  color: $text;
+  dock: top;
+}
+
+Footer {
+  background: $surface;
+  color: $text-muted;
+  dock: bottom;
+}
+
+/* 登录界面 */
+#login-container {
+  align: center middle;
+  width: 100%;
+  height: 100%;
+}
+
+#login-form {
+  width: 60;
+  height: auto;
+  padding: 2 4;
+  border: solid $primary;
+  background: $surface;
+  border-radius: 2;
+}
+
+#title {
+  width: 100%;
+  content-align: center middle;
+  text-style: bold;
+  color: $primary;
+  margin-bottom: 1;
+  text-align: center;
+}
+
+#server-row,
+#password-row {
+  height: 3;
+  margin-bottom: 1;
+}
+
+#server-row Label,
+#password-row Label {
+  width: 12;
+  content-align: right middle;
+  padding-right: 1;
+}
+
+#server-input,
+#password-input {
+  width: 1fr;
+}
+
+#login-button {
+  width: 100%;
+  margin-top: 1;
+}
+
+#error-message {
+  color: $error;
+  height: 1;
+  margin-top: 1;
+}
+
+/* 主界面 */
+#main-container {
+  width: 100%;
+  height: 100%;
+}
+
+#connection-status {
+  height: 1;
+  padding: 0 1;
+  background: $surface;
+  border-bottom: solid $primary-background;
+}
+
+/* 侧边栏 */
+#sidebar {
+  width: 25;
+  min-width: 20;
+  height: 100%;
+  border-right: solid $primary-background;
+  background: $surface;
+}
+
+.sidebar-title {
+  width: 100%;
+  height: 3;
+  content-align: center middle;
+  text-style: bold;
+  background: $primary;
+  color: $text;
+}
+
+#agent-list {
+  height: 1fr;
+  overflow-y: auto;
+  background: $surface;
+}
+
+AgentItem {
+  height: 3;
+  padding: 0 1;
+  background: $surface;
+}
+
+AgentItem:hover {
+  background: $primary-background;
+}
+
+AgentItem.-selected {
+  background: $primary;
+  color: $text;
+}
+
+.sidebar-buttons {
+  height: 3;
+  width: 100%;
+  align: center middle;
+  background: $surface;
+  border-top: solid $primary-background;
+}
+
+.sidebar-buttons Button {
+  width: 10;
+  margin: 0 1;
+}
+
+/* 主内容区 */
+#main-content {
+  width: 1fr;
+  height: 100%;
+}
+
+/* 聊天面板 */
+#chat-panel {
+  width: 100%;
+  height: 1fr;
+  overflow-y: auto;
+  background: $background;
+  scrollbar-size: 1 1;
+}
+
+#messages-container {
+  width: 100%;
+  height: auto;
+  padding: 1;
+}
+
+.message-left {
+  margin-right: 10;
+  margin-bottom: 1;
+  padding: 1 2;
+  background: $surface;
+  width: auto;
+  max-width: 80%;
+  border-left: thick $primary;
+}
+
+.message-right {
+  margin-left: 10;
+  margin-bottom: 1;
+  padding: 1 2;
+  background: $primary-background;
+  width: auto;
+  max-width: 80%;
+  align: right top;
+  border-right: thick $accent;
+}
+
+.message-center {
+  margin: 1 10;
+  padding: 1 2;
+  background: $surface-darken-1;
+  width: auto;
+  max-width: 80%;
+  align: center top;
+  border: round $primary-background;
+}
+
+/* 输入面板 */
+#input-panel {
+  width: 100%;
+  height: 5;
+  dock: bottom;
+  background: $surface;
+  border-top: solid $primary-background;
+  padding: 1;
+}
+
+#message-input {
+  width: 1fr;
+  height: 3;
+}
+
+#send-button {
+  width: 10;
+  height: 3;
+  margin-left: 1;
+}
+
+/* 终端面板 */
+#terminal-panel {
+  width: 1fr;
+  height: 100%;
+  background: #1e1e1e;
+  border-left: solid $primary-background;
+}
+
+#terminal-output {
+  width: 100%;
+  height: 1fr;
+  overflow-y: auto;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 1;
+}
+
+#terminal-input {
+  width: 100%;
+  height: 3;
+  background: #2d2d2d;
+  border-top: solid #3d3d3d;
+}
+
+/* 通知样式 */
+.-information {
+  background: $success;
+}
+
+.-warning {
+  background: $warning;
+}
+
+.-error {
+  background: $error;
+}
