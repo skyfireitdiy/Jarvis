@@ -203,6 +203,86 @@ class ChatManager:
         else:
             logger.debug(f"[OUTPUT] Unknown output type: {output_type}")
 
+    async def load_history_messages(
+        self, agent_id: str, limit: int = 50, before: Optional[str] = None
+    ) -> List[Message]:
+        """加载历史消息
+
+        Args:
+            agent_id: Agent ID
+            limit: 加载数量限制
+            before: 加载此时间之前的消息
+
+        Returns:
+            List[Message]: 消息列表
+        """
+        # 这个方法需要通过connection_manager调用API
+        # 这里返回本地缓存的消息
+        messages = self._messages.get(agent_id, [])
+        if before:
+            # 过滤before时间之前的消息
+            from datetime import datetime
+
+            try:
+                before_time = datetime.fromisoformat(before)
+                messages = [m for m in messages if m.timestamp < before_time]
+            except ValueError:
+                logger.warning(f"Invalid before time format: {before}")
+
+        # 限制返回数量
+        return messages[-limit:] if len(messages) > limit else messages
+
+    def get_message_count(self, agent_id: str) -> int:
+        """获取Agent消息数量"""
+        return len(self._messages.get(agent_id, []))
+
+    def export_messages(self, agent_id: str, format: str = "json") -> str:
+        """导出消息
+
+        Args:
+            agent_id: Agent ID
+            format: 导出格式 (json/markdown/text)
+
+        Returns:
+            str: 导出内容
+        """
+        import json
+
+        messages = self._messages.get(agent_id, [])
+
+        if format == "json":
+            return json.dumps(
+                [
+                    {
+                        "role": m.role.value,
+                        "content": m.content,
+                        "timestamp": m.timestamp.isoformat(),
+                        "agent_name": m.agent_name,
+                        "message_type": m.message_type.value,
+                    }
+                    for m in messages
+                ],
+                ensure_ascii=False,
+                indent=2,
+            )
+        elif format == "markdown":
+            lines = []
+            for m in messages:
+                role = "User" if m.role == MessageRole.USER else "Assistant"
+                lines.append(
+                    f"### {role} ({m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})\n"
+                )
+                lines.append(f"{m.content}\n")
+            return "\n".join(lines)
+        elif format == "text":
+            lines = []
+            for m in messages:
+                role = "User" if m.role == MessageRole.USER else "Assistant"
+                lines.append(f"[{role}] {m.content}")
+            return "\n".join(lines)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
     def clear_messages(self, agent_id: str) -> None:
         """清空Agent的消息"""
         if agent_id in self._messages:

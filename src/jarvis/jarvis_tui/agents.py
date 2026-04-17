@@ -26,6 +26,7 @@ class AgentManager:
     def __init__(self):
         self._agents: Dict[str, AgentInfo] = {}
         self._current_agent_id: Optional[str] = None
+        self._selected_agents: set = set()
 
     def get_agents(self) -> List[AgentInfo]:
         """获取所有Agent列表"""
@@ -111,6 +112,102 @@ class AgentManager:
             else:
                 # 添加新Agent
                 self._agents[agent_id] = agent
+
+    async def rename_agent(self, agent_id: str, new_name: str) -> bool:
+        """重命名Agent
+
+        Args:
+            agent_id: Agent ID
+            new_name: 新名称
+
+        Returns:
+            bool: 重命名是否成功
+
+        Raises:
+            AgentNotFoundError: Agent不存在
+            ValueError: 名称无效
+        """
+        if not new_name or len(new_name.strip()) == 0:
+            raise ValueError("Agent名称不能为空")
+
+        if len(new_name) > 64:
+            raise ValueError("Agent名称不能超过64个字符")
+
+        if agent_id not in self._agents:
+            raise AgentNotFoundError(f"Agent不存在: {agent_id}")
+
+        self._agents[agent_id].name = new_name.strip()
+        logger.info(f"Agent {agent_id} renamed to: {new_name}")
+        return True
+
+    def get_agent_by_name(self, name: str) -> Optional[AgentInfo]:
+        """根据名称获取Agent"""
+        for agent in self._agents.values():
+            if agent.name == name:
+                return agent
+        return None
+
+    async def batch_delete_agents(self, agent_ids: List[str]) -> Dict[str, bool]:
+        """批量删除Agent
+
+        Args:
+            agent_ids: Agent ID列表（最多50个）
+
+        Returns:
+            Dict[str, bool]: 每个Agent的删除结果
+        """
+        if len(agent_ids) > 50:
+            raise ValueError("批量删除最多支持50个Agent")
+
+        results: Dict[str, bool] = {}
+
+        for agent_id in agent_ids:
+            try:
+                if agent_id in self._agents:
+                    del self._agents[agent_id]
+
+                    # 如果删除的是当前Agent，切换到其他Agent
+                    if self._current_agent_id == agent_id:
+                        if self._agents:
+                            self._current_agent_id = next(iter(self._agents))
+                        else:
+                            self._current_agent_id = None
+
+                    results[agent_id] = True
+                    logger.info(f"Agent deleted: {agent_id}")
+                else:
+                    results[agent_id] = False
+                    logger.warning(f"Agent not found: {agent_id}")
+            except Exception as e:
+                results[agent_id] = False
+                logger.error(f"Failed to delete agent {agent_id}: {e}")
+
+        return results
+
+    def get_selected_agents(self) -> List[str]:
+        """获取选中的Agent列表"""
+        return list(self._selected_agents)
+
+    def select_agent(self, agent_id: str) -> None:
+        """选中Agent"""
+        if agent_id in self._agents:
+            self._selected_agents.add(agent_id)
+
+    def deselect_agent(self, agent_id: str) -> None:
+        """取消选中Agent"""
+        self._selected_agents.discard(agent_id)
+
+    def select_all_agents(self) -> None:
+        """选中所有Agent"""
+        self._selected_agents = set(self._agents.keys())
+
+    def deselect_all_agents(self) -> None:
+        """取消选中所有Agent"""
+        self._selected_agents.clear()
+
+    def is_agent_selected(self, agent_id: str) -> bool:
+        """检查Agent是否被选中"""
+        return agent_id in self._selected_agents
 
 
 class AgentNotFoundError(Exception):
