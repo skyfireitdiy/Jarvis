@@ -82,6 +82,22 @@ class AgentManager:
         """移除Agent"""
     def process_agent_list(self, agents_data: List[Dict[str, Any]]) -> None:
         """处理从Gateway收到的Agent列表"""
+    async def rename_agent(self, agent_id: str, new_name: str) -> bool:
+        """重命名Agent
+
+        Args:
+            agent_id: Agent ID
+            new_name: 新名称（1-64字符）
+
+        Returns:
+            bool: 重命名是否成功
+
+        Raises:
+            AgentNotFoundError: Agent不存在
+            ValueError: 名称无效
+        """
+    def get_agent_by_name(self, name: str) -> Optional[AgentInfo]:
+        """根据名称获取Agent"""
 ```
 
 ### 4. 消息接口
@@ -90,6 +106,29 @@ class AgentManager:
 class ChatManager:
     async def send_message(self, message: str, agent_id: Optional[str] = None) -> None:
         """发送消息到Agent"""
+    async def load_history_messages(self, agent_id: str, limit: int = 50, before: Optional[str] = None) -> List[Message]:
+        """加载历史消息
+
+        Args:
+            agent_id: Agent ID
+            limit: 加载数量限制（1-500）
+            before: 加载此时间之前的消息（ISO格式）
+
+        Returns:
+            List[Message]: 消息列表
+        """
+    def get_message_count(self, agent_id: str) -> int:
+        """获取Agent消息数量"""
+    def export_messages(self, agent_id: str, format: str = "json") -> str:
+        """导出消息
+
+        Args:
+            agent_id: Agent ID
+            format: 导出格式 (json/markdown/text)
+
+        Returns:
+            str: 导出内容
+        """
 ```
 
 ## 输入输出说明
