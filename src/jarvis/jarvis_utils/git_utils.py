@@ -79,8 +79,59 @@ def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
     return git_root
 
 
-def has_uncommitted_changes() -> bool:
+def find_git_root(start_dir: str = ".", allow_init: bool = False) -> str:
+    """
+    查找给定路径的Git根目录（不切换工作目录）。
+
+    参数:
+        start_dir (str): 起始查找目录，默认为当前目录。
+        allow_init (bool): 如果不是Git仓库，是否允许初始化新的Git仓库。默认为False。
+
+    返回:
+        str: Git仓库根目录路径。
+
+    异常:
+        subprocess.CalledProcessError: 如果不是Git仓库且不允许初始化。
+    """
+    abs_start_dir = os.path.abspath(start_dir)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=abs_start_dir,
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+        git_root = decode_output(result.stdout).strip()
+        if not git_root:
+            if allow_init:
+                subprocess.run(
+                    ["git", "init"], cwd=abs_start_dir, check=True, capture_output=True
+                )
+                git_root = abs_start_dir
+            else:
+                raise subprocess.CalledProcessError(
+                    1, ["git", "rev-parse", "--show-toplevel"]
+                )
+    except subprocess.CalledProcessError:
+        # 如果不是Git仓库
+        if allow_init:
+            subprocess.run(
+                ["git", "init"], cwd=abs_start_dir, check=True, capture_output=True
+            )
+            git_root = abs_start_dir
+        else:
+            raise
+    return git_root
+
+
+def has_uncommitted_changes(cwd: Optional[str] = None) -> bool:
     """检查Git仓库中是否有未提交的更改
+
+    参数:
+        cwd: 工作目录路径，如果为None则使用当前目录
+
+    返回:
 
     返回:
         bool: 如果有未提交的更改返回True，否则返回False
@@ -88,6 +139,7 @@ def has_uncommitted_changes() -> bool:
     # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）
     process = subprocess.Popen(
         ["git", "diff", "--cached", "--name-only"],
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
@@ -649,15 +701,14 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
         if last_check_date == today_str:
             return
 
-    curr_dir = os.path.abspath(os.getcwd())
     try:
-        git_root = find_git_root_and_cd(repo_path)
+        git_root = find_git_root(repo_path)
     except Exception:
         return
 
     try:
         # 检查是否有未提交的修改
-        if has_uncommitted_changes():
+        if has_uncommitted_changes(cwd=git_root):
             return
 
         # 获取远程tag更新
@@ -718,7 +769,6 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
 
                     _set_major_update_pending(remote_tag)
                     # 更新检查日期，避免重复提示
-                    os.chdir(curr_dir)
                     with open(last_check_file, "w") as f:
                         f.write(today_str)
                     return
@@ -824,7 +874,7 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
     finally:
-        os.chdir(curr_dir)
+        pass
 
 
 def check_and_update_git_repo(repo_path: str) -> bool:
@@ -845,15 +895,14 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         if last_check_date == today_str:
             return False
 
-    curr_dir = os.path.abspath(os.getcwd())
     try:
-        git_root = find_git_root_and_cd(repo_path)
+        git_root = find_git_root(repo_path)
     except Exception:
         return False
 
     try:
         # 检查是否有未提交的修改
-        if has_uncommitted_changes():
+        if has_uncommitted_changes(cwd=git_root):
             return False
 
         # 获取远程tag更新
@@ -918,7 +967,6 @@ def check_and_update_git_repo(repo_path: str) -> bool:
 
                     _set_major_update_pending(remote_tag)
                     # 更新检查日期,避免重复提示
-                    os.chdir(curr_dir)
                     with open(last_check_file, "w") as f:
                         f.write(today_str)
                     return False
@@ -1025,7 +1073,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
         PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
         return False
     finally:
-        os.chdir(curr_dir)
+        pass
 
 
 def get_diff_file_list() -> List[str]:
