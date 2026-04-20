@@ -206,6 +206,8 @@ dependencies = [
     jqc = "jarvis.jarvis_utils.quick_config:app"
     jarvis-rules-index = "jarvis.jarvis_rules_index.cli:main"
     jri = "jarvis.jarvis_rules_index.cli:main"
+    jarvis-tui = "jarvis.jarvis_tui.__main__:main"
+    jtui = "jarvis.jarvis_tui.__main__:main"
 
 
 
