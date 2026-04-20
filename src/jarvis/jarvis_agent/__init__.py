@@ -988,8 +988,10 @@ class Agent:
                                         for c in ret:
                                             if callable(c):
                                                 candidates.append(c)
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    PrettyOutput.auto_print(
+                                        f"⚠️ 回调工厂方法 get_after_tool_call_cb 执行错误 [{type(e).__name__}]: {e}"
+                                    )
 
                         # 3) 工厂方法：register_after_tool_call_cb()
                         if hasattr(module, "register_after_tool_call_cb"):
@@ -1003,8 +1005,10 @@ class Agent:
                                         for c in ret2:
                                             if callable(c):
                                                 candidates.append(c)
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    PrettyOutput.auto_print(
+                                        f"⚠️ 回调工厂方法 register_after_tool_call_cb 执行错误 [{type(e).__name__}]: {e}"
+                                    )
 
                         for cb in candidates:
                             try:
@@ -1016,16 +1020,20 @@ class Agent:
                                         try:
                                             agent = kwargs.get("agent")
                                             callback(agent)
-                                        except Exception:
-                                            pass
+                                        except Exception as e:
+                                            PrettyOutput.auto_print(
+                                                f"⚠️ 回调函数执行错误 [{type(e).__name__}]: {e}"
+                                            )
 
                                     return _wrapper
 
                                 self.event_bus.subscribe(
                                     AFTER_TOOL_CALL, _make_wrapper(cb)
                                 )
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"⚠️ 回调函数订阅错误 [{type(e).__name__}]: {e}"
+                                )
 
                     except Exception as e:
                         PrettyOutput.auto_print(f"⚠️ 从 {file_path} 加载回调失败: {e}")
