@@ -37,6 +37,10 @@ declare function acquireVsCodeApi(): {
 const vscode = acquireVsCodeApi();
 const messages = document.getElementById("messages") as HTMLDivElement | null;
 
+// 渲染缓存：避免对未变化的消息重复调用 renderMessageHtml
+const renderHtmlCache = new Map<string, string>();
+let prevMessageList: ChatMessageItem[] = [];
+
 // 分页加载相关变量
 const MESSAGES_PER_PAGE = 50;
 let currentMessages: ChatMessageItem[] = [];
@@ -351,27 +355,37 @@ function renderSideBySideDiff(diffData: any): string {
 
 function renderMessageHtml(item: ChatMessageItem): string {
   const text = String(item.text || "");
+  const cacheKey = `${item.variant || ""}|${item.lang || ""}|${text}`;
+  const cached = renderHtmlCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  let html: string;
 
   // 检查是否是DIFF类型消息
   if (item.variant === "DIFF") {
     try {
       const diffData = JSON.parse(text);
       if (diffData.diff_type === "side_by_side") {
-        return renderSideBySideDiff(diffData);
+        html = renderSideBySideDiff(diffData);
+      } else {
+        html = escapeHtml(text);
       }
     } catch (e) {
       console.error("[DIFF] Failed to parse side by side diff:", e);
-      return escapeHtml(text);
+      html = escapeHtml(text);
     }
+  } else if (item.lang === "markdown") {
+    html = marked.parse(text) as string;
+  } else if (item.lang === "diff") {
+    html = marked.parse(`\`\`\`diff\n${text}\n\`\`\``) as string;
+  } else {
+    html = escapeHtml(text);
   }
 
-  if (item.lang === "markdown") {
-    return marked.parse(text) as string;
-  }
-  if (item.lang === "diff") {
-    return marked.parse(`\`\`\`diff\n${text}\n\`\`\``) as string;
-  }
-  return escapeHtml(text);
+  renderHtmlCache.set(cacheKey, html);
+  return html;
 }
 
 function sendTerminalResize(
@@ -758,9 +772,41 @@ function renderMessages(
     );
   }
 
+  const safeList = messageList || [];
   const shouldAutoScroll = isNearBottom(messages);
+
+  // 增量追加快速路径：如果新列表是旧列表末尾追加，只处理新增消息
+  if (
+    safeList.length >= prevMessageList.length &&
+    prevMessageList.length > 0 &&
+    isAppendOnly(prevMessageList, safeList)
+  ) {
+    const startIndex = prevMessageList.length;
+    // 先更新最后一条旧消息（可能是 streaming 内容变化）
+    if (startIndex > 0) {
+      const lastOldItem = safeList[startIndex - 1];
+      if (lastOldItem.variant !== "execution") {
+        ensureMessageNode(lastOldItem, startIndex - 1);
+      }
+    }
+    for (let i = startIndex; i < safeList.length; i++) {
+      const item = safeList[i];
+      const node =
+        item.variant === "execution"
+          ? renderExecutionMessage(item, agentId)
+          : ensureMessageNode(item, i);
+      messages.appendChild(node);
+    }
+    prevMessageList = safeList;
+    if (shouldAutoScroll) {
+      messages.scrollTop = messages.scrollHeight;
+    }
+    return;
+  }
+
+  // 全量渲染路径（首次加载、切换 agent、历史加载等）
   const nextNodes: HTMLDivElement[] = [];
-  (messageList || []).forEach((item, index) => {
+  safeList.forEach((item, index) => {
     if (item.variant === "execution") {
       nextNodes.push(renderExecutionMessage(item, agentId));
       return;
@@ -798,9 +844,32 @@ function renderMessages(
     messages.removeChild(lastChild);
   }
 
+  prevMessageList = safeList;
   if (shouldAutoScroll) {
     messages.scrollTop = messages.scrollHeight;
   }
+}
+
+/** 检查 newList 是否只是在 oldList 末尾追加了消息（前缀完全相同） */
+function isAppendOnly(
+  oldList: ChatMessageItem[],
+  newList: ChatMessageItem[],
+): boolean {
+  for (let i = 0; i < oldList.length; i++) {
+    const o = oldList[i];
+    const n = newList[i];
+    // 快速引用比较，再逐字段比较
+    if (o === n) continue;
+    if (
+      o.text !== n.text ||
+      o.variant !== n.variant ||
+      o.lang !== n.lang ||
+      o.executionId !== n.executionId
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function syncInputMode(mode: "single" | "multi", tipText: string): void {
