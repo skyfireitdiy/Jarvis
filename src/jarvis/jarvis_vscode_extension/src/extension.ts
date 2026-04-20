@@ -298,7 +298,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       displayName: "default-agent",
       statusText: "示例 Agent（MVP 占位）",
       statusClass: "running",
-      agentType: "agent",
+      agentType: "codeagent",
       workingDir: "~",
       llmGroup: "",
       worktree: false,
@@ -352,7 +352,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readOnlyStatusBarItem: vscode.StatusBarItem | undefined;
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
-    agentType: "agent",
+    agentType: "codeagent",
     workingDir: "~",
     name: "通用Agent",
     llmGroup: "default",
