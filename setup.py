@@ -206,6 +206,8 @@ setup(
             "jwg=jarvis.jarvis_web_gateway.cli:app",
             "jarvis-service=jarvis.jarvis_service.cli:main",
             "jservice=jarvis.jarvis_service.cli:main",
+            "jarvis-tui=jarvis.jarvis_tui.__main__:main",
+            "jtui=jarvis.jarvis_tui.__main__:main",
         ],
     },
     python_requires="==3.12.*",
