@@ -963,6 +963,56 @@ class Agent:
                             sys.path.insert(0, parent_dir)
                             added_path = True
                         module_name = file_path.stem
+
+                        # 解析文件头部的 requirements 注释
+                        requirements: List[str] = []
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                for line in f:
+                                    line = line.strip()
+                                    if line.startswith("# requirements:"):
+                                        deps_str = line[
+                                            len("# requirements:") :
+                                        ].strip()
+                                        if deps_str:
+                                            requirements = deps_str.split()
+                                        break
+                        except Exception as e:
+                            PrettyOutput.auto_print(
+                                f"⚠️ 读取回调文件依赖声明失败 [{file_path.name}]: {e}"
+                            )
+
+                        # 安装依赖
+                        if requirements:
+                            PrettyOutput.auto_print(
+                                f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
+                            )
+                            try:
+                                import subprocess
+
+                                result = subprocess.run(
+                                    ["uv", "pip", "install"] + requirements,
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=120,
+                                )
+                                if result.returncode == 0:
+                                    PrettyOutput.auto_print(
+                                        f"✅ 依赖安装成功 [{file_path.name}]"
+                                    )
+                                else:
+                                    PrettyOutput.auto_print(
+                                        f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
+                                    )
+                            except subprocess.TimeoutExpired:
+                                PrettyOutput.auto_print(
+                                    f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
+                                )
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"❌ 依赖安装异常 [{file_path.name}]: {e}"
+                                )
+
                         module = __import__(module_name)
                         PrettyOutput.auto_print(
                             f"📦 从配置文件加载回调文件：{file_path}"
