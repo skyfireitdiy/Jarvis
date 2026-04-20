@@ -29,9 +29,16 @@ jobs:
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           echo "Setting version to $VERSION"
-          # Sync package-lock.json with package.json before updating version
-          npm install --package-lock-only
-          npm version "$VERSION" --no-git-tag-version
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            echo "Version already up to date, skipping npm version"
+          else
+            # Sync package-lock.json with package.json before updating version
+            npm install --package-lock-only
+            npm version "$VERSION" --no-git-tag-version
+          fi
 
       - name: Build extension
         run: npm run build
