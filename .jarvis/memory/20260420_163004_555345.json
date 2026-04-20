@@ -1,0 +1,8 @@
+{
+  "id": "20260420_163004_555345",
+  "type": "project_long_term",
+  "tags": ["execute_script", "timeout", "超时配置", "交互模式", "非交互模式"],
+  "content": "execute_script 工具超时配置：\n1. 非交互模式默认超时：180秒（3分钟），通过 get_script_execution_timeout() 函数获取\n2. 交互模式无超时限制：get_timeout=None，允许脚本长时间运行\n3. 设计权衡：非交互模式需要超时保护避免脚本卡死，交互模式支持需要用户输入的长时间运行程序\n4. 相关代码：src/jarvis/jarvis_utils/config.py (get_script_execution_timeout) 和 src/jarvis/jarvis_tools/execute_script.py",
+  "created_at": "2026-04-20T16:30:04.555384",
+  "updated_at": "2026-04-20T16:30:04.555389"
+}
