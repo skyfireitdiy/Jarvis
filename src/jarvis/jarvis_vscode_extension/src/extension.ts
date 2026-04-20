@@ -3679,6 +3679,28 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.postPanelStateImmediate();
   }, 100);
 
+  /**
+   * 增量发送单条消息到 Chat Panel
+   * 用于优化性能，避免每次都发送完整消息列表
+   */
+  private appendMessageToChatPanel(
+    text: string,
+    variant: "system" | "error" | "output" | "stream" | "DIFF" = "system",
+    agentId?: string,
+    lang: "markdown" | "diff" | "text" = "text",
+  ): void {
+    const message = {
+      type: "messageAppended",
+      payload: {
+        text,
+        variant,
+        lang,
+        agentId,
+      },
+    };
+    this.postMessageToChatPanel(message);
+  }
+
   private postMessageToChatPanel(message: any): void {
     // 发送到 WebviewPanel（向后兼容）
     if (this.currentPanel?.webview) {
@@ -5280,20 +5302,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     agentId?: string,
     lang: "markdown" | "diff" | "text" = "text",
   ): void {
-    if (agentId) {
-      const agentState = this.getAgentState(agentId);
+    const targetAgentId = agentId || this.panelState.selectedAgentId;
+    if (targetAgentId) {
+      const agentState = this.getAgentState(targetAgentId);
       agentState.messages.push({ text, variant, lang });
-      void this.persistAgentHistory(agentId);
+      void this.persistAgentHistory(targetAgentId);
+
+      // 使用增量消息发送，避免全量更新
+      this.appendMessageToChatPanel(text, variant, targetAgentId, lang);
     } else {
-      // 如果没有指定 agentId，添加到当前选中的 agent
-      const selectedAgentId = this.panelState.selectedAgentId;
-      if (selectedAgentId) {
-        const agentState = this.getAgentState(selectedAgentId);
-        agentState.messages.push({ text, variant, lang });
-        void this.persistAgentHistory(selectedAgentId);
-      }
+      // 如果没有指定 agentId 且没有选中的 agent，使用全量更新
+      this.postPanelState();
     }
-    this.postPanelState();
   }
 
   private disposeSocket(socketKey: "gatewaySocket"): void {
