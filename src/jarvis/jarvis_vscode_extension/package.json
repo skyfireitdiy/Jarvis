@@ -2,7 +2,7 @@
   "name": "jarvis-ai-assistant",
   "displayName": "Jarvis AI Assistant - VS Code Extension",
   "description": "Jarvis VS Code extension with agent sidebar, chat panel and terminal panel.",
-  "version": "3.0.28",
+  "version": "3.0.29",
   "publisher": "jarvis-ai-assistant",
   "icon": "media/jarvis-128.png",
   "repository": {
