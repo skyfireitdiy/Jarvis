@@ -46,6 +46,13 @@
           "title": "Jarvis",
           "icon": "media/jarvis-activitybar.png"
         }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "jarvis-chat",
+          "title": "Jarvis Chat",
+          "icon": "media/jarvis-activitybar.png"
+        }
       ]
     },
     "views": {
@@ -54,7 +61,9 @@
           "id": "jarvis.agentListView",
           "name": "Agents",
           "type": "webview"
-        },
+        }
+      ],
+      "jarvis-chat": [
         {
           "id": "jarvis.chatPanel",
           "name": "Chat",

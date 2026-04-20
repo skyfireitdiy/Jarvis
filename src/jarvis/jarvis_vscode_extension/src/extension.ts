@@ -269,23 +269,6 @@ class ChatPanelViewProvider implements vscode.WebviewViewProvider {
         }, 100);
       }
     });
-
-    // 自动将chatPanel移动到第二侧边栏
-    setTimeout(async () => {
-      try {
-        // 首先聚焦到chatPanel
-        await vscode.commands.executeCommand("jarvis.chatPanel.focus");
-        // 然后执行移动视图命令
-        await vscode.commands.executeCommand(
-          "workbench.action.moveSidePanelViewToPanel",
-        );
-      } catch (error) {
-        console.warn(
-          "Failed to automatically move chatPanel to secondary sidebar:",
-          error,
-        );
-      }
-    }, 500);
   }
 
   updateHtml(): void {
