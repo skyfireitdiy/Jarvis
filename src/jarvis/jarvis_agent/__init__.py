@@ -964,6 +964,9 @@ class Agent:
                             added_path = True
                         module_name = file_path.stem
                         module = __import__(module_name)
+                        PrettyOutput.auto_print(
+                            f"📦 从配置文件加载回调文件：{file_path}"
+                        )
 
                         candidates: List[Callable[[Any], None]] = []
 
