@@ -277,7 +277,7 @@ class ChatPanelViewProvider implements vscode.WebviewViewProvider {
         await vscode.commands.executeCommand("jarvis.chatPanel.focus");
         // 然后执行移动视图命令
         await vscode.commands.executeCommand(
-          "workbench.action.moveViewToSecondarySideBar",
+          "workbench.action.moveSidePanelViewToPanel",
         );
       } catch (error) {
         console.warn(
