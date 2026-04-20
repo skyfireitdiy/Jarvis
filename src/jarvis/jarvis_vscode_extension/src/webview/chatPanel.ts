@@ -23,6 +23,13 @@ type StatePayload = {
   messages?: ChatMessageItem[];
 };
 
+type MessageAppendedPayload = {
+  text?: string;
+  variant?: string;
+  lang?: string;
+  agentId?: string;
+};
+
 type CompletionItem = {
   value?: string;
   display?: string;
@@ -1486,6 +1493,20 @@ window.addEventListener(
       if (isLoadingHistory && payload.messages && payload.messages.length > 0) {
         handleHistoryLoaded(payload.messages);
       }
+      return;
+    }
+    // 增量消息处理：只追加新消息，避免全量渲染
+    if (data.type === "messageAppended") {
+      const payload = (data.payload || {}) as MessageAppendedPayload;
+      const messageItem: ChatMessageItem = {
+        text: payload.text,
+        variant: payload.variant,
+        lang: payload.lang,
+      };
+      // 追加到当前消息列表
+      currentMessages.push(messageItem);
+      // 增量渲染：只渲染新增的消息
+      renderMessages([messageItem], currentSelectedAgentId, false);
       return;
     }
     if (data.type !== "state") {
