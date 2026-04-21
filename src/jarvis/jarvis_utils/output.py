@@ -1408,46 +1408,53 @@ class PrettyOutput:
                     buffer = []
                     last_update_time = time.time()
 
-            for chunk_type, chunk_content in chat_iterator:
-                if not chunk_content:
-                    continue
-                # 所有内容都显示，reason用灰色样式
-                style = "dim" if chunk_type == "reason" else "bright_white"
-                buffer.append((chunk_content, style))
-                # 只有 content 类型才拼接到 response
-                if chunk_type == "content":
-                    response += chunk_content
-                # 收集 reason 类型内容
-                elif chunk_type == "reason":
-                    reasoning_content += chunk_content
-                # 发送流式 chunk 事件（reason 和 content 都发送）
-                if chunk_content:
-                    emit_output(
-                        OutputEvent(
-                            text=chunk_content,
-                            output_type=OutputType.STREAM_CHUNK,
-                            timestamp=False,
+            try:
+                for chunk_type, chunk_content in chat_iterator:
+                    if not chunk_content:
+                        continue
+                    # 所有内容都显示，reason用灰色样式
+                    style = "dim" if chunk_type == "reason" else "bright_white"
+                    buffer.append((chunk_content, style))
+                    # 只有 content 类型才拼接到 response
+                    if chunk_type == "content":
+                        response += chunk_content
+                    # 收集 reason 类型内容
+                    elif chunk_type == "reason":
+                        reasoning_content += chunk_content
+                    # 发送流式 chunk 事件（reason 和 content 都发送）
+                    if chunk_content:
+                        emit_output(
+                            OutputEvent(
+                                text=chunk_content,
+                                output_type=OutputType.STREAM_CHUNK,
+                                timestamp=False,
+                            )
                         )
+
+                    if max_output > 0 and len(response) >= max_output:
+                        _flush_buffer()
+                        append_session_history(message, response)
+                        break
+
+                    current_time = time.time()
+                    should_update = (
+                        len(buffer) >= min_buffer_size
+                        or (current_time - last_update_time) >= update_interval
                     )
 
-                if max_output > 0 and len(response) >= max_output:
-                    _flush_buffer()
-                    append_session_history(message, response)
-                    break
+                    if should_update:
+                        _flush_buffer()
 
-                current_time = time.time()
-                should_update = (
-                    len(buffer) >= min_buffer_size
-                    or (current_time - last_update_time) >= update_interval
-                )
-
-                if should_update:
-                    _flush_buffer()
-
-                if is_immediate_abort() and check_interrupt():
-                    _flush_buffer()
-                    append_session_history(message, response)
-                    break
+                    if is_immediate_abort() and check_interrupt():
+                        _flush_buffer()
+                        append_session_history(message, response)
+                        break
+            except Exception as e:
+                # 发生异常时，打印错误信息并返回已收集的内容
+                PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+                _flush_buffer()
+                append_session_history(message, response)
+                return response, reasoning_content, first_token_time
 
             _flush_buffer()
             end_time = time.time()
@@ -1548,33 +1555,40 @@ class PrettyOutput:
             )
         )
 
-        for chunk_type, chunk_content in chat_iterator:
-            if chunk_content and first_token_time == 0.0:
-                first_token_time = time.time() - start_time
-            # 打印时 reason 和 content 都显示，reason用灰色样式
-            style = "dim" if chunk_type == "reason" else "bright_white"
-            console.print(chunk_content, end="", style=style)
-            # 返回时只拼接 content 类型
-            if chunk_type == "content":
-                response += chunk_content
-            # 收集 reason 类型内容
-            elif chunk_type == "reason":
-                reasoning_content += chunk_content
-            # 发送流式 chunk 事件
-            if chunk_content:
-                emit_output(
-                    OutputEvent(
-                        text=chunk_content,
-                        output_type=OutputType.STREAM_CHUNK,
-                        timestamp=False,
+        try:
+            for chunk_type, chunk_content in chat_iterator:
+                if chunk_content and first_token_time == 0.0:
+                    first_token_time = time.time() - start_time
+                # 打印时 reason 和 content 都显示，reason用灰色样式
+                style = "dim" if chunk_type == "reason" else "bright_white"
+                console.print(chunk_content, end="", style=style)
+                # 返回时只拼接 content 类型
+                if chunk_type == "content":
+                    response += chunk_content
+                # 收集 reason 类型内容
+                elif chunk_type == "reason":
+                    reasoning_content += chunk_content
+                # 发送流式 chunk 事件
+                if chunk_content:
+                    emit_output(
+                        OutputEvent(
+                            text=chunk_content,
+                            output_type=OutputType.STREAM_CHUNK,
+                            timestamp=False,
+                        )
                     )
-                )
-            if max_output > 0 and len(response) >= max_output:
-                append_session_history(message, response)
-                return response, reasoning_content, first_token_time
-            if check_interrupt():
-                append_session_history(message, response)
-                return response, reasoning_content, first_token_time
+                if max_output > 0 and len(response) >= max_output:
+                    append_session_history(message, response)
+                    return response, reasoning_content, first_token_time
+                if check_interrupt():
+                    append_session_history(message, response)
+                    return response, reasoning_content, first_token_time
+        except Exception as e:
+            # 发生异常时，打印错误信息并返回已收集的内容
+            PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+            append_session_history(message, response)
+            return response, reasoning_content, first_token_time
+
         console.print()
         end_time = time.time()
         duration = end_time - start_time

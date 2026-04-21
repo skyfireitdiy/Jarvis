@@ -255,20 +255,26 @@ class BasePlatform(ABC):
         """
         response = ""
         reasoning_content = ""
-        for chunk_type, chunk_content in self.chat(message):
-            # 拼接 content 类型
-            if chunk_type == "content":
-                response += chunk_content
-            # 拼接 reason 类型
-            elif chunk_type == "reason":
-                reasoning_content += chunk_content
-            # 检查是否达到最大输出长度
-            if max_output > 0 and len(response) >= max_output:
-                self._append_session_history(message, response)
-                return response, reasoning_content
-            if is_immediate_abort() and get_interrupt():
-                self._append_session_history(message, response)
-                return response, reasoning_content
+        try:
+            for chunk_type, chunk_content in self.chat(message):
+                # 拼接 content 类型
+                if chunk_type == "content":
+                    response += chunk_content
+                # 拼接 reason 类型
+                elif chunk_type == "reason":
+                    reasoning_content += chunk_content
+                # 检查是否达到最大输出长度
+                if max_output > 0 and len(response) >= max_output:
+                    self._append_session_history(message, response)
+                    return response, reasoning_content
+                if is_immediate_abort() and get_interrupt():
+                    self._append_session_history(message, response)
+                    return response, reasoning_content
+        except Exception as e:
+            # 发生异常时，打印错误信息并返回已收集的内容
+            PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+            self._append_session_history(message, response)
+            return response, reasoning_content
         return response, reasoning_content
 
     def _process_response(self, response: str) -> str:
