@@ -393,8 +393,6 @@ class CodeAgent(Agent):
                 break
 
             prev_dir = os.getcwd()
-            start_commit = get_latest_commit_hash()
-            self.start_commit = start_commit
 
             # 需求分类：仅在首次运行时执行（未恢复会话）
             # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
@@ -404,7 +402,9 @@ class CodeAgent(Agent):
                     # 极速模式已启用，跳过相关步骤
                     # === 阶段3: Git环境初始化 ===
                     self.git_manager.init_env(prefix, suffix, self)
-
+                    # 获取初始 commit（在 Git 环境初始化之后）
+                    start_commit = get_latest_commit_hash()
+                    self.start_commit = start_commit
                     # 将初始 commit 信息添加到 addon_prompt（安全回退点）
                     if start_commit:
                         initial_commit_prompt = f"""
@@ -457,7 +457,9 @@ git reset --hard {start_commit}
 
                     # === 阶段3: Git环境初始化 ===
                     self.git_manager.init_env(prefix, suffix, self)
-
+                    # 获取初始 commit（在 Git 环境初始化之后）
+                    start_commit = get_latest_commit_hash()
+                    self.start_commit = start_commit
                     # 将初始 commit 信息添加到 addon_prompt（安全回退点）
                     if start_commit:
                         initial_commit_prompt = f"""
