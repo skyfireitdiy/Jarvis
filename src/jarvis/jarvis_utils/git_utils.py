@@ -126,16 +126,30 @@ def find_git_root(start_dir: str = ".", allow_init: bool = False) -> str:
 
 
 def has_uncommitted_changes(cwd: Optional[str] = None) -> bool:
-    """检查Git仓库中是否有未提交的更改
+    """检查 Git 仓库中是否有未提交的更改
 
     参数:
-        cwd: 工作目录路径，如果为None则使用当前目录
+        cwd: 工作目录路径，如果为 None 则使用当前目录
 
     返回:
-
-    返回:
-        bool: 如果有未提交的更改返回True，否则返回False
+        bool: 如果有未提交的更改返回 True，否则返回 False
     """
+    # 兼容空仓库：使用 git status --porcelain 检测所有未提交的更改
+    # git diff 在空仓库中无法工作（没有 HEAD commit 作为基准），会错误地返回无差异
+    try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        # 如果 status 输出非空，说明有未提交的更改（包括未跟踪文件、修改文件、暂存文件等）
+        if status_result.stdout.strip():
+            return True
+    except Exception:
+        pass
+
     # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）
     process = subprocess.Popen(
         ["git", "diff", "--cached", "--name-only"],

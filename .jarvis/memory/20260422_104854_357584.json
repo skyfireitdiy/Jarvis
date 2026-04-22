@@ -1,0 +1,8 @@
+{
+  "id": "20260422_104854_357584",
+  "type": "project_long_term",
+  "tags": ["bug_fix", "git", "empty_repository", "has_uncommitted_changes"],
+  "content": "**问题**：在空仓库（无任何 commit）时，JCA 结束时没有进行 git commit。\n\n**根本原因**：`has_uncommitted_changes()` 函数使用 `git diff --exit-code` 检测更改，但在空仓库中 `git diff` 没有基准 commit 可比较，错误地返回无差异（exit code 0）。\n\n**解决方案**：在 `src/jarvis/jarvis_utils/git_utils.py` 的 `has_uncommitted_changes()` 函数中，在使用 `git diff` 之前先使用 `git status --porcelain` 检测所有未提交的更改。`git status` 在空仓库和非空仓库都能正确工作。\n\n**修改位置**：第 137-151 行，添加了 git status 检查逻辑，如果 status 输出非空则直接返回 True。\n\n**验证结果**：\n- ✅ 空仓库 + 新文件：正确返回 True\n- ✅ 非空仓库 + 无更改：正确返回 False\n- ✅ 向后兼容：不影响原有功能",
+  "created_at": "2026-04-22T10:48:54.357615",
+  "updated_at": "2026-04-22T10:48:54.357619"
+}
