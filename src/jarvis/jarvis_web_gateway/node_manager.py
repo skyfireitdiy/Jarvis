@@ -319,7 +319,12 @@ class NodeConnectionManager:
             await websocket.send_json(
                 build_node_message(message_type, payload, request_id=request_id)
             )
-            response = await asyncio.wait_for(future, timeout=timeout)
+            try:
+                response = await asyncio.wait_for(future, timeout=timeout)
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError(
+                    f"node request timed out: node_id={node_id}, type={message_type}, request_id={request_id}, timeout={timeout}s"
+                ) from exc
             logger.info(
                 "[NODE] received response node_id=%s type=%s request_id=%s",
                 node_id,
@@ -327,7 +332,9 @@ class NodeConnectionManager:
                 request_id,
             )
             if not isinstance(response, dict):
-                raise RuntimeError("invalid node response")
+                raise RuntimeError(
+                    f"invalid node response: node_id={node_id}, type={message_type}, request_id={request_id}"
+                )
             return response
         finally:
             self._pending_requests.pop(request_id, None)
