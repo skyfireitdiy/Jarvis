@@ -508,7 +508,6 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         try:
-            from fastapi import Request
             from starlette.requests import Request as StarletteRequest
 
             scope = {
@@ -1264,6 +1263,14 @@ class ChildNodeClient:
                 if message_type == DIRECTORY_LIST_REQUEST:
                     response = (
                         self._node_connection_manager._handle_directory_list_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == CONFIG_SYNC_REQUEST:
+                    response = (
+                        await self._node_connection_manager._handle_config_sync_request(
                             next_message
                         )
                     )
