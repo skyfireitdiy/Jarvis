@@ -15,29 +15,71 @@
         </div>
       </div>
       <div class="agent-list">
-        <div v-for="agent in agentList" :key="agent.agent_id" 
-             class="agent-item" 
-             :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
-             @click="handleAgentItemClick(agent, $event)">
-          <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
-            <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
+        <template v-for="agentGroup in agentDisplayGroups" :key="agentGroup.key">
+          <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
+            <button class="agent-collapsed-toggle" @click="showStoppedAgents = !showStoppedAgents">
+              <span class="agent-collapsed-arrow">{{ showStoppedAgents ? '▼' : '▶' }}</span>
+              <span class="agent-collapsed-title">{{ agentGroup.title }}</span>
+              <span class="agent-collapsed-count">{{ agentGroup.agents.length }}</span>
+            </button>
+            <div v-if="showStoppedAgents">
+              <div
+                v-for="agent in agentGroup.agents"
+                :key="agent.agent_id"
+                class="agent-item"
+                :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
+                @click="handleAgentItemClick(agent, $event)"
+              >
+                <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
+                  <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
+                </div>
+                <div class="agent-info">
+                  <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : agent.agent_type) }}</span>
+                  <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
+                  <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
+                  <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
+                  <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
+                  <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
+                </div>
+                <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
+                <div class="agent-actions">
+                  <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
+                  <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
+                  <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
+                  <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="agent-info">
-            <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
-            <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-            <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
-            <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
-            <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
-            <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
-          </div>
-          <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
-          <div class="agent-actions">
-            <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
-            <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
-            <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
-            <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
-          </div>
-        </div>
+          <template v-else>
+            <div
+              v-for="agent in agentGroup.agents"
+              :key="agent.agent_id"
+              class="agent-item"
+              :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
+              @click="handleAgentItemClick(agent, $event)"
+            >
+              <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
+                <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
+              </div>
+              <div class="agent-info">
+                <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : agent.agent_type) }}</span>
+                <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
+                <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
+                <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
+                <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
+                <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
+              </div>
+              <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
+              <div class="agent-actions">
+                <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
+                <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
+                <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
+                <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
+              </div>
+            </div>
+          </template>
+        </template>
         <!-- 批量操作按钮栏 -->
         <div v-if="isBatchMode && agentList.length > 0" class="batch-actions-bar">
           <div class="batch-actions-info">
@@ -2485,9 +2527,44 @@ watch(showSettingsModal, (newVal) => {
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
+const showStoppedAgents = ref(false)
+
+function isStoppedAgent(agent) {
+  if (!agent) return false
+  return getStatusClass(agent) === 'stopped'
+}
+
+const activeAgents = computed(() => {
+  return agentList.value.filter(agent => !isStoppedAgent(agent))
+})
+const stoppedAgents = computed(() => {
+  return agentList.value.filter(agent => isStoppedAgent(agent))
+})
+const agentDisplayGroups = computed(() => {
+  return [
+    {
+      key: 'active',
+      title: '运行中 Agent',
+      agents: activeAgents.value,
+      isCollapsible: false,
+    },
+    {
+      key: 'stopped',
+      title: '已停止 Agent',
+      agents: stoppedAgents.value,
+      isCollapsible: true,
+    }
+  ]
+})
 const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
 })
+
+watch([currentAgentId, agentList], () => {
+  if (currentAgent.value && isStoppedAgent(currentAgent.value)) {
+    showStoppedAgents.value = true
+  }
+}, { deep: true })
 
 watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
   if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {
@@ -7904,6 +7981,47 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.agent-collapsed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-collapsed-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #8b949e;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-collapsed-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6edf3;
+}
+
+.agent-collapsed-arrow {
+  width: 16px;
+  color: #58a6ff;
+}
+
+.agent-collapsed-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.agent-collapsed-count {
+  font-size: 12px;
+  color: #6e7681;
 }
 
 .agent-item {
