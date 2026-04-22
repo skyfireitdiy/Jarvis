@@ -1858,13 +1858,29 @@ def create_app(
                             }
                         )
                 except Exception as e:
+                    error_message = str(e).strip()
+                    if not error_message:
+                        if isinstance(e, TimeoutError):
+                            error_message = (
+                                f"Config sync timed out for node: {target_node_id}"
+                            )
+                        else:
+                            error_message = (
+                                f"Config sync failed for node: {target_node_id}"
+                            )
+                    logger.error(
+                        "[CONFIG SYNC] sync failed target_node_id=%s error=%s",
+                        target_node_id,
+                        error_message,
+                        exc_info=True,
+                    )
                     results.append(
                         {
                             "node_id": target_node_id,
                             "success": False,
                             "error": {
                                 "code": "SYNC_FAILED",
-                                "message": str(e),
+                                "message": error_message,
                             },
                         }
                     )
