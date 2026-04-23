@@ -1,0 +1,11 @@
+{
+  "id": "20260423_201414_240291",
+  "type": "project_long_term",
+  "tags": [
+    "架构",
+    "内置命令系统"
+  ],
+  "content": "内置命令系统使用tag格式'<CmdName>'，在builtin_input_handler中处理，在input.py的BUILTIN_COMMANDS中定义补全",
+  "created_at": "2026-04-23T20:14:14.240298",
+  "updated_at": "2026-04-23T20:14:14.240301"
+}
