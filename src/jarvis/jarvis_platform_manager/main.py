@@ -10,6 +10,8 @@ import yaml
 
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from rich.console import Console
+from rich.table import Table
 
 # -*- coding: utf-8 -*-
 from typing import Any
@@ -720,11 +722,24 @@ def group_list() -> None:
         PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
         return
 
-    PrettyOutput.auto_print("✅ 模型组列表:")
+    # 创建 rich 表格
+    table = Table(title="✅ 模型组列表", expand=True)
+    table.add_column("组名", style="cyan", justify="left", ratio=1, no_wrap=True)
+    table.add_column("normal", style="green", justify="left", ratio=2, no_wrap=True)
+    table.add_column("smart", style="yellow", justify="left", ratio=2, no_wrap=True)
+    table.add_column("cheap", style="blue", justify="left", ratio=2, no_wrap=True)
+
+    # 添加数据行
     for name in sorted(llm_groups.keys()):
         group_config = llm_groups[name]
         normal_llm = group_config.get("normal_llm", "N/A")
-        PrettyOutput.auto_print(f"  • {name} (normal: {normal_llm})")
+        smart_llm = group_config.get("smart_llm", "N/A")
+        cheap_llm = group_config.get("cheap_llm", "N/A")
+        table.add_row(name, normal_llm, smart_llm, cheap_llm)
+
+    # 打印表格
+    console = Console()
+    console.print(table)
 
 
 @group_app.command("show")
