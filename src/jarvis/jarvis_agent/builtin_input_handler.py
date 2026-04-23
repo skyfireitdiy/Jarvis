@@ -19,6 +19,9 @@ from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.config import get_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 
+# btw 命令相关导入
+from jarvis.jarvis_platform_manager.main import chat_with_model
+
 
 def _print_table_for_terminal_or_frontend(table: Table) -> None:
     """根据运行环境选择终端富样式或前端纯文本输出表格。"""
@@ -390,6 +393,15 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 PrettyOutput.auto_print("❌ 模型组切换失败或已取消。")
             return "", True
+        elif tag == "Btw":
+            # 处理临时聊天命令，不干扰主 agent 上下文
+            try:
+                PrettyOutput.auto_print("💬 进入临时聊天模式（输入 /bye 或空行退出）")
+                chat_with_model("")
+                PrettyOutput.auto_print("✅ 已返回主 Agent")
+            except Exception as exc:
+                PrettyOutput.auto_print(f"❌ 聊天失败: {str(exc)}")
+            return "", True
         elif tag == "Commit":
             # 处理代码提交命令（仅在 code agent 中可用）
             if not hasattr(agent, "git_manager"):
@@ -416,8 +428,8 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 prefix=agent.prefix,
                 suffix=agent.suffix,
                 agent=agent,
-                post_process_func=agent.post_process_manager.post_process_modified_files, 
-                skip_confirm=True,  
+                post_process_func=agent.post_process_manager.post_process_modified_files,
+                skip_confirm=True,
             )
 
             return "", True
