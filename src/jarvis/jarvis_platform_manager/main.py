@@ -958,6 +958,11 @@ def group_update(
 
     # 获取可用的 LLM 配置列表
     llms = config.get("llms", {})
+    if not llms:
+        PrettyOutput.auto_print("❌ 没有可用的 LLM 配置，请先添加 LLM 配置")
+        raise typer.Exit(code=1)
+
+    llm_list: List[str] = sorted(llms.keys())
 
     group_config = config["llm_groups"][name]
     PrettyOutput.auto_print(f"📝 更新模型组: {name}")
@@ -965,35 +970,46 @@ def group_update(
         f"  当前值 - normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, smart: {group_config.get('smart_llm', 'N/A')}"
     )
     PrettyOutput.auto_print("可用的 LLM 配置:")
-    for llm_name in sorted(llms.keys()):
-        PrettyOutput.auto_print(f"  • {llm_name}")
+    for i, llm_name in enumerate(llm_list, 1):
+        PrettyOutput.auto_print(f"  {i}. {llm_name}")
+
+    def resolve_llm_choice(prompt: str) -> str:
+        """解析用户选择，支持序号或名称"""
+        choice = get_single_line_input(prompt).strip()
+        if not choice:
+            return ""
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(llm_list):
+                return llm_list[idx]
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的序号: {choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            # 用户输入了名称
+            if choice in llms:
+                return choice
+            else:
+                PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {choice}")
+                raise typer.Exit(code=1)
 
     # 更新各个字段
-    normal_llm = get_single_line_input(
-        f"Normal LLM (当前: {group_config.get('normal_llm', '')}, 留空不变): "
-    ).strip()
+    normal_llm = resolve_llm_choice(
+        f"Normal LLM (当前: {group_config.get('normal_llm', '')}, 序号或名称，留空不变): "
+    )
     if normal_llm:
-        if normal_llm not in llms:
-            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {normal_llm}")
-            raise typer.Exit(code=1)
         group_config["normal_llm"] = normal_llm
 
-    cheap_llm = get_single_line_input(
-        f"Cheap LLM (当前: {group_config.get('cheap_llm', '')}, 留空不变): "
-    ).strip()
+    cheap_llm = resolve_llm_choice(
+        f"Cheap LLM (当前: {group_config.get('cheap_llm', '')}, 序号或名称，留空不变): "
+    )
     if cheap_llm:
-        if cheap_llm not in llms:
-            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {cheap_llm}")
-            raise typer.Exit(code=1)
         group_config["cheap_llm"] = cheap_llm
 
-    smart_llm = get_single_line_input(
-        f"Smart LLM (当前: {group_config.get('smart_llm', '')}, 留空不变): "
-    ).strip()
+    smart_llm = resolve_llm_choice(
+        f"Smart LLM (当前: {group_config.get('smart_llm', '')}, 序号或名称，留空不变): "
+    )
     if smart_llm:
-        if smart_llm not in llms:
-            PrettyOutput.auto_print(f"❌ 未找到 LLM 配置: {smart_llm}")
-            raise typer.Exit(code=1)
         group_config["smart_llm"] = smart_llm
 
     # 保存配置
