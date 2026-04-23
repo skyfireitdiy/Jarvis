@@ -49,7 +49,7 @@ def _get_bundled_deps_platform_key() -> Optional[str]:
 
     示例:
         >>> key = _get_bundled_deps_platform_key()
-        >>> key in {None, "x86_64_linux", "x86_64_windows", "arm64_macos"}
+        >>> key in {None, "x86_64_linux", "x86_64_windows", "aarch64_macos"}
         True
     """
     system_name = platform.system().lower()
@@ -58,8 +58,8 @@ def _get_bundled_deps_platform_key() -> Optional[str]:
     arch_aliases = {
         "x86_64": "x86_64",
         "amd64": "x86_64",
-        "arm64": "arm64",
-        "aarch64": "arm64",
+        "arm64": "aarch64",
+        "aarch64": "aarch64",
     }
     system_aliases = {
         "linux": "linux",
