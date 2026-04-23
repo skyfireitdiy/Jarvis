@@ -389,6 +389,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   // 批量选择状态
   private selectedAgents = new Set<string>();
   private isBatchMode = false;
+  private showStoppedAgents = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -421,6 +422,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         }
         if (message?.type === "toggleSettingsPanel") {
           this.isSettingsPanelVisible = !this.isSettingsPanelVisible;
+          this.renderAgentListView();
+          return;
+        }
+        if (message?.type === "toggleStoppedAgents") {
+          this.showStoppedAgents = !this.showStoppedAgents;
           this.renderAgentListView();
           return;
         }
@@ -748,28 +754,26 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>`
       : "";
-    const agentListMarkup = this.agentItems
-      .map((agentItem) => {
-        const hasFileTree = this.fileTreeState.has(agentItem.id);
-        const fileTreeHtml = hasFileTree
-          ? this.generateFileTreeHtml(agentItem.id)
-          : '<div class="file-tree-empty">点击 📂 加载文件树</div>';
-        const fileTreeExpanded =
-          hasFileTree &&
-          (this.fileTreeState.get(agentItem.id)?.length || 0) > 0;
-        const isSelected = this.selectedAgents.has(agentItem.id);
-        const batchModeClass = this.isBatchMode ? "batch-mode" : "";
-        const selectedClass = isSelected ? "selected" : "";
-        const checkboxMarkup = this.isBatchMode
-          ? `<input type="checkbox" class="agent-checkbox" data-select-agent-id="${agentItem.id}" ${isSelected ? "checked" : ""} />`
-          : "";
-        return `
+    const renderAgentItem = (agentItem: AgentListItem): string => {
+      const hasFileTree = this.fileTreeState.has(agentItem.id);
+      const fileTreeHtml = hasFileTree
+        ? this.generateFileTreeHtml(agentItem.id)
+        : '<div class="file-tree-empty">点击 📂 加载文件树</div>';
+      const fileTreeExpanded =
+        hasFileTree && (this.fileTreeState.get(agentItem.id)?.length || 0) > 0;
+      const isSelected = this.selectedAgents.has(agentItem.id);
+      const batchModeClass = this.isBatchMode ? "batch-mode" : "";
+      const selectedClass = isSelected ? "selected" : "";
+      const checkboxMarkup = this.isBatchMode
+        ? `<input type="checkbox" class="agent-checkbox" data-select-agent-id="${agentItem.id}" ${isSelected ? "checked" : ""} />`
+        : "";
+      return `
     <li data-agent-id="${agentItem.id}" class="agent-item ${agentItem.statusClass} ${batchModeClass} ${selectedClass}">
       <div class="agent-row">
         ${checkboxMarkup}
         <div class="agent-main">
           <div class="agent-title-row">
-            <div class="agent-name">${agentItem.agentType === "agent" ? "🤖" : agentItem.agentType === "codeagent" ? "👨‍💻" : "❓"} ${escapeHtml(agentItem.displayName)}</div>
+            <div class="agent-name">${agentItem.agentType === "agent" ? "🤖" : agentItem.agentType === "codeagent" ? "👨‍💻" : "🤖"} ${escapeHtml(agentItem.displayName || agentItem.name)}</div>
             <div class="agent-status-dot ${agentItem.statusClass}" title="${escapeHtml(agentItem.statusText)}"></div>
             ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
@@ -792,8 +796,35 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
     </li>`;
-      })
+    };
+    const activeAgentItems = this.agentItems.filter(
+      (agentItem) => agentItem.statusClass !== "stopped",
+    );
+    const stoppedAgentItems = this.agentItems.filter(
+      (agentItem) => agentItem.statusClass === "stopped",
+    );
+    const shouldShowStoppedAgents =
+      this.showStoppedAgents ||
+      stoppedAgentItems.some(
+        (agentItem) => agentItem.id === this.panelState.selectedAgentId,
+      );
+    const activeAgentListMarkup = activeAgentItems
+      .map(renderAgentItem)
       .join("");
+    const stoppedAgentListMarkup = stoppedAgentItems
+      .map(renderAgentItem)
+      .join("");
+    const stoppedAgentSectionMarkup = stoppedAgentItems.length
+      ? `
+    <div class="agent-collapsed-section">
+      <button id="toggleStoppedAgentsButton" class="agent-collapsed-toggle" type="button" aria-expanded="${shouldShowStoppedAgents ? "true" : "false"}">
+        <span class="agent-collapsed-title">${shouldShowStoppedAgents ? "▼" : "▶"} 已停止 Agent</span>
+        <span class="agent-collapsed-count">${stoppedAgentItems.length}</span>
+      </button>
+      ${shouldShowStoppedAgents ? `<ul>${stoppedAgentListMarkup}</ul>` : ""}
+    </div>`
+      : "";
+    const agentListMarkup = `${activeAgentListMarkup}${stoppedAgentSectionMarkup}`;
     const batchToolbarMarkup = this.isBatchMode
       ? `
   <div class="batch-toolbar">
@@ -986,6 +1017,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     .agent-item.batch-mode { cursor: default; }
     .agent-item.batch-mode .agent-row { cursor: pointer; }
     .agent-item.selected { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.4); }
+    .agent-collapsed-section { margin-top: 8px; }
+    .agent-collapsed-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; background: rgba(158, 158, 158, 0.12); border-color: rgba(158, 158, 158, 0.28); color: var(--vscode-foreground); }
+    .agent-collapsed-title { font-size: 12px; font-weight: 600; }
+    .agent-collapsed-count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: rgba(158, 158, 158, 0.2); font-size: 11px; text-align: center; }
   </style>
 </head>
 <body>
@@ -1019,6 +1054,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (toggleCreateAgentButton) {
       toggleCreateAgentButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'toggleCreateAgentForm' });
+      });
+    }
+    const toggleStoppedAgentsButton = document.getElementById('toggleStoppedAgentsButton');
+    if (toggleStoppedAgentsButton) {
+      toggleStoppedAgentsButton.addEventListener('click', () => {
+        vscode.postMessage({ type: 'toggleStoppedAgents' });
       });
     }
     const connectionLockToggle = document.getElementById('connectionLockToggle');
