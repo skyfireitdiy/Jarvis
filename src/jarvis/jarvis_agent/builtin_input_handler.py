@@ -8,6 +8,7 @@ from typing import Tuple
 
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import add_additional_completion_dir
 from jarvis.jarvis_utils.input import get_single_line_input
 from rich.table import Table
 from rich.console import Console
@@ -257,6 +258,23 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_utils.utils import load_config
 
             load_config()
+            return "", True
+        elif tag == "AddDir":
+            tag_marker = "'<AddDir>'"
+            tag_index = modified_input.find(tag_marker)
+            inline_arg = ""
+            if tag_index != -1:
+                inline_arg = modified_input[tag_index + len(tag_marker) :].strip()
+            if not inline_arg:
+                PrettyOutput.auto_print(
+                    "❌ AddDir 仅支持内联参数形式，例如：'<AddDir>' /path/to/dir"
+                )
+                return "", True
+            target_dir = inline_arg.strip().strip('"').strip("'")
+            if add_additional_completion_dir(target_dir):
+                PrettyOutput.auto_print(f"✅ 已添加附加补全目录: {target_dir}")
+            else:
+                PrettyOutput.auto_print(f"❌ 目录不存在或不可用: {target_dir}")
             return "", True
         elif tag == "ListRule":
             # 列出所有规则及其状态

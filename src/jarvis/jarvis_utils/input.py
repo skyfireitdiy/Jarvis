@@ -179,8 +179,78 @@ BUILTIN_COMMANDS = [
     ("AutoComplete", "自动完成后转交用户"),
     ("FixToolCall", "修复工具调用"),
     ("SwitchModel", "切换模型组"),
+    ("AddDir", "添加附加补全目录"),
     ("Btw", "临时聊天"),
 ]
+
+_ADDITIONAL_COMPLETION_DIRS: List[str] = []
+_ADDITIONAL_COMPLETION_DIRS_LOCK = threading.RLock()
+
+
+def add_additional_completion_dir(dir_path: str) -> bool:
+    """添加会话级附加补全目录。"""
+    normalized = os.path.abspath(os.path.expanduser(dir_path.strip()))
+    if not normalized or not os.path.isdir(normalized):
+        return False
+    with _ADDITIONAL_COMPLETION_DIRS_LOCK:
+        if normalized not in _ADDITIONAL_COMPLETION_DIRS:
+            _ADDITIONAL_COMPLETION_DIRS.append(normalized)
+    return True
+
+
+def get_additional_completion_dirs() -> List[str]:
+    """获取当前会话已添加的附加补全目录。"""
+    with _ADDITIONAL_COMPLETION_DIRS_LOCK:
+        return list(_ADDITIONAL_COMPLETION_DIRS)
+
+
+def _scan_files_under_dir(
+    base_dir: str,
+    exclude_git: bool = False,
+    max_files: int = 10000,
+) -> List[str]:
+    """扫描指定目录下的文件，并带目录前缀避免重名歧义。"""
+    files: List[str] = []
+    try:
+        base_dir_abs = _os.path.abspath(base_dir)
+        display_prefix = _os.path.basename(base_dir_abs.rstrip(_os.sep)) or base_dir_abs
+        for root, dirs, fnames in _os.walk(base_dir_abs, followlinks=False):
+            if exclude_git:
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if d
+                    not in {
+                        ".git",
+                        "__pycache__",
+                        ".pytest_cache",
+                        ".mypy_cache",
+                        ".ruff_cache",
+                        "node_modules",
+                        "target",
+                    }
+                ]
+            for name in fnames:
+                abs_path = _os.path.join(root, name)
+                rel_path = _os.path.relpath(abs_path, base_dir_abs)
+                files.append(_os.path.join(display_prefix, rel_path))
+                if len(files) >= max_files:
+                    return files
+    except Exception:
+        return []
+    return files
+
+
+def _merge_unique_paths(*path_groups: List[str]) -> List[str]:
+    """按顺序合并并去重路径列表。"""
+    merged: List[str] = []
+    seen = set()
+    for group in path_groups:
+        for path in group:
+            if path not in seen:
+                seen.add(path)
+                merged.append(path)
+    return merged
 
 
 class InputProviderTimeoutError(TimeoutError):
@@ -335,6 +405,25 @@ def _get_git_files() -> List[str]:
     return files
 
 
+def _get_additional_dir_files(
+    exclude_git: bool = False, max_files: int = 10000
+) -> List[str]:
+    """获取已添加附加目录中的文件列表。"""
+    files: List[str] = []
+    remaining = max_files
+    for dir_path in get_additional_completion_dirs():
+        if remaining <= 0:
+            break
+        current_files = _scan_files_under_dir(
+            dir_path,
+            exclude_git=exclude_git,
+            max_files=remaining,
+        )
+        files.extend(current_files)
+        remaining = max_files - len(files)
+    return files
+
+
 def _get_all_files(exclude_git: bool = False) -> List[str]:
     """获取所有文件列表。
 
@@ -367,8 +456,14 @@ def _get_files_for_fzf(use_git: bool = True) -> List[str]:
     if use_git:
         files = _get_git_files()
         if files:
-            return files
-    return _get_all_files(exclude_git=True)
+            return _merge_unique_paths(
+                files,
+                _get_additional_dir_files(exclude_git=True),
+            )
+    return _merge_unique_paths(
+        _get_all_files(exclude_git=True),
+        _get_additional_dir_files(exclude_git=True),
+    )
 
 
 def _parse_fzf_payload(
@@ -796,6 +891,7 @@ class FileCompleter(Completer):
 
         # File path candidates
         try:
+            additional_paths = _get_additional_dir_files(exclude_git=True)
             if current_sym == "@":
                 if self._git_files_cache is None:
                     result = _subprocess.run(
@@ -812,7 +908,9 @@ class FileCompleter(Completer):
                         ]
                     else:
                         self._git_files_cache = []
-                paths: List[str] = self._git_files_cache or []
+                paths = _merge_unique_paths(
+                    self._git_files_cache or [], additional_paths
+                )
             else:
                 if self._all_files_cache is None:
                     files: List[str] = []
@@ -841,7 +939,9 @@ class FileCompleter(Completer):
                         if len(files) > self._max_walk_files:
                             break
                     self._all_files_cache = files
-                paths = self._all_files_cache or []
+                paths = _merge_unique_paths(
+                    self._all_files_cache or [], additional_paths
+                )
             all_completions.extend([(path, "File") for path in paths])
         except Exception:
             pass
