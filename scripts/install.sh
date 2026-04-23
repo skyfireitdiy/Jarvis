@@ -12,7 +12,21 @@ GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
 GITHUB_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
 DEFAULT_BRANCH="main"
-DEPS_DIR_RELATIVE="src/jarvis/jarvis_data/deps/x86_64_linux"
+# 检测系统架构并设置对应的依赖目录
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)
+        DEPS_DIR_RELATIVE="src/jarvis/jarvis_data/deps/x86_64_linux"
+        ;;
+    aarch64|arm64)
+        DEPS_DIR_RELATIVE="src/jarvis/jarvis_data/deps/aarch64_linux"
+        ;;
+    *)
+        echo "错误: 不支持的系统架构: $ARCH"
+        echo "当前支持的架构: x86_64, aarch64"
+        exit 1
+        ;;
+esac
 
 ensure_uv_available() {
     echo "--- 1. 检查仓库内置 uv 环境 ---"
