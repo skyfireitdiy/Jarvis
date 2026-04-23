@@ -179,6 +179,7 @@ BUILTIN_COMMANDS = [
     ("AutoComplete", "自动完成后转交用户"),
     ("FixToolCall", "修复工具调用"),
     ("SwitchModel", "切换模型组"),
+    ("Btw", "临时聊天"),
 ]
 
 
