@@ -1,0 +1,8 @@
+{
+  "id": "20260424_175146_581253",
+  "type": "project_long_term",
+  "tags": ["input.py", "AddDir", "fzf", "绝对路径", "路径补全"],
+  "content": "修改了 src/jarvis/jarvis_utils/input.py 中的 AddDir 功能：\n1. _scan_files_under_dir 函数添加 use_absolute_path 参数\n2. _get_additional_dir_files 调用时传入 use_absolute_path=True\n3. 使 AddDir 添加的目录在 fzf 中使用绝对路径，解决当前工作目录不在目标目录时路径无法访问的问题",
+  "created_at": "2026-04-24T17:51:46.581277",
+  "updated_at": "2026-04-24T17:51:46.581281"
+}

@@ -208,8 +208,16 @@ def _scan_files_under_dir(
     base_dir: str,
     exclude_git: bool = False,
     max_files: int = 10000,
+    use_absolute_path: bool = False,
 ) -> List[str]:
-    """扫描指定目录下的文件，并带目录前缀避免重名歧义。"""
+    """扫描指定目录下的文件，并带目录前缀避免重名歧义。
+
+    Args:
+        base_dir: 要扫描的目录
+        exclude_git: 是否排除.git目录
+        max_files: 最大文件数
+        use_absolute_path: 是否使用绝对路径（默认False，使用相对路径）
+    """
     files: List[str] = []
     try:
         base_dir_abs = _os.path.abspath(base_dir)
@@ -232,8 +240,11 @@ def _scan_files_under_dir(
                 ]
             for name in fnames:
                 abs_path = _os.path.join(root, name)
-                rel_path = _os.path.relpath(abs_path, base_dir_abs)
-                files.append(_os.path.join(display_prefix, rel_path))
+                if use_absolute_path:
+                    files.append(abs_path)
+                else:
+                    rel_path = _os.path.relpath(abs_path, base_dir_abs)
+                    files.append(_os.path.join(display_prefix, rel_path))
                 if len(files) >= max_files:
                     return files
     except Exception:
@@ -418,6 +429,7 @@ def _get_additional_dir_files(
             dir_path,
             exclude_git=exclude_git,
             max_files=remaining,
+            use_absolute_path=True,
         )
         files.extend(current_files)
         remaining = max_files - len(files)
