@@ -1,28 +1,5 @@
 # -*- coding: utf-8 -*-
-import subprocess
-import sys
-from setuptools import setup, find_packages
-from setuptools.command.install import install
-
-
-class PostInstallCommand(install):
-    """自定义安装命令，安装后自动安装 Playwright 浏览器驱动"""
-
-    def run(self):
-        install.run(self)
-        # 尝试安装 Playwright 浏览器驱动
-        try:
-            print("\n正在安装 Playwright 浏览器驱动...")
-            subprocess.check_call(
-                [sys.executable, "-m", "playwright", "install", "chromium"]
-            )
-            print("✅ Playwright 浏览器驱动安装成功！")
-        except subprocess.CalledProcessError:
-            print(
-                "⚠️  Playwright 浏览器驱动安装失败，您也可以稍后手动运行: python -m playwright install chromium"
-            )
-        except Exception as e:
-            print(f"⚠️  安装 Playwright 浏览器驱动时出错: {e}")
+from setuptools import find_packages, setup
 
 
 setup(
@@ -108,9 +85,6 @@ setup(
         "mkdocs-git-revision-date-localized-plugin",
         "pymdown-extensions",
     ],
-    cmdclass={
-        "install": PostInstallCommand,
-    },
     extras_require={
         "clang16": ["clang==16.*"],
         "clang17": ["clang==17.*"],
@@ -167,7 +141,7 @@ setup(
             "jarvis=jarvis.jarvis_agent.jarvis:main",
             "jarvis-agent-dispatcher=jarvis.jarvis_agent.jvsd_cli:app",
             "jvs=jarvis.jarvis_agent.jarvis:main",
-            "jvsd=jarvis.jarvis_agent.jvsd_cli:main",
+            "jvsd=jarvis.jarvis_agent.jvsd_cli:app",
             "jarvis-code-agent=jarvis.jarvis_code_agent.code_agent:main",
             "jca=jarvis.jarvis_code_agent.code_agent:main",
             "jarvis-code-agent-dispatcher=jarvis.jarvis_code_agent.jcad_cli:app",
@@ -178,8 +152,6 @@ setup(
             "jpm=jarvis.jarvis_platform_manager.main:main",
             "jarvis-git-commit=jarvis.jarvis_git_utils.git_commiter:main",
             "jgc=jarvis.jarvis_git_utils.git_commiter:main",
-            "jarvis-code-review=jarvis.jarvis_code_analysis.code_review:main",
-            "jcr=jarvis.jarvis_code_analysis.code_review:main",
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jgs=jarvis.jarvis_git_squash.main:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
@@ -204,8 +176,8 @@ setup(
             "jw=jarvis.jarvis_windows.cli:app",
             "jarvis-web-gateway=jarvis.jarvis_web_gateway.cli:app",
             "jwg=jarvis.jarvis_web_gateway.cli:app",
-            "jarvis-service=jarvis.jarvis_service.cli:main",
-            "jservice=jarvis.jarvis_service.cli:main",
+            "jarvis-service=jarvis.jarvis_service.cli:app",
+            "jservice=jarvis.jarvis_service.cli:app",
         ],
     },
     python_requires="==3.12.*",
