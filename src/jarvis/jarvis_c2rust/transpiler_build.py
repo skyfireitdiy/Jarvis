@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# mypy: disable-error-code=unreachable
+# type: ignore
 """
 构建和修复模块
 """

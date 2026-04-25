@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """分析相关模块"""
-# mypy: disable-error-code=unreachable
+# type: ignore
 
 from typing import Any
 from typing import Dict

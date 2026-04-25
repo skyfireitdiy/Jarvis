@@ -101,7 +101,7 @@ class LintManager:
                     # 仍然向用户显示执行的命令
                     PrettyOutput.auto_print(f"ℹ️ 执行: {command}")
 
-                    # 执行命令（静态分析工具：ruff/mypy等，command来自配置）
+                    # 执行命令（静态分析工具：ruff/ty等，command来自配置）
                     result = subprocess.run(
                         command,
                         shell=True,  # nosec B602

@@ -19,7 +19,7 @@ class TestLintTools:
         assert ".py" in LINT_COMMAND_TEMPLATES_BY_FILE
         py_templates = LINT_COMMAND_TEMPLATES_BY_FILE[".py"]
         assert any("ruff check" in t for t in py_templates)
-        assert any("mypy" in t for t in py_templates)
+        assert any("ty check" in t for t in py_templates)
 
         assert ".js" in LINT_COMMAND_TEMPLATES_BY_FILE
         js_templates = LINT_COMMAND_TEMPLATES_BY_FILE[".js"]
@@ -82,10 +82,10 @@ class TestLintTools:
         """测试通过文件扩展名获取lint命令"""
         # Python文件
         cmds = get_lint_commands_for_files(["test.py"], None)
-        assert len(cmds) >= 2  # ruff 和 mypy
+        assert len(cmds) >= 2  # ruff 和 ty
         cmd_strs = [cmd for _, cmd in cmds]
         assert any("ruff check" in cmd for cmd in cmd_strs)
-        assert any("mypy" in cmd for cmd in cmd_strs)
+        assert any("ty check" in cmd for cmd in cmd_strs)
 
         # JavaScript文件
         cmds = get_lint_commands_for_files(["app.js"], None)

@@ -23,7 +23,7 @@ from jarvis.jarvis_utils.config import get_data_dir, read_text_file
 LINT_AUTO_FIX_COMMANDS: Dict[str, List[str]] = {
     # Python
     "ruff": ["ruff check --fix {file_path}", "ruff format {file_path}"],
-    "mypy": [],  # mypy没有自动修复功能
+    "ty": [],  # ty没有自动修复功能
     "pylint": [],  # pylint没有自动修复功能
     "flake8": [],  # flake8没有自动修复功能
     # JavaScript/TypeScript
@@ -76,23 +76,23 @@ LINT_COMMAND_TEMPLATES_BY_FILE: Dict[str, List[str]] = {
     # Python
     ".py": [
         "ruff check {file_path}",
-        "mypy {file_path}",
+        "ty check {file_path}",
     ],
     ".pyw": [
         "ruff check {file_path}",
-        "mypy {file_path}",
+        "ty check {file_path}",
     ],
     ".pyi": [
         "ruff check {file_path}",
-        "mypy {file_path}",
+        "ty check {file_path}",
     ],
     ".pyx": [
         "ruff check {file_path}",
-        "mypy {file_path}",
+        "ty check {file_path}",
     ],
     ".pxd": [
         "ruff check {file_path}",
-        "mypy {file_path}",
+        "ty check {file_path}",
     ],
     # Rust
     ".rs": ["cargo clippy --message-format=short"],

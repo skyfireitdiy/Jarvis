@@ -84,11 +84,11 @@ LINT_TOOLS_CONFIG: List[Dict[str, str]] = [
         "\n  或访问 https://docs.astral.sh/ruff/ 查看文档",
     },
     {
-        "name": "mypy",
-        "command": "mypy",
-        "description": "Python静态类型检查器",
-        "install_hint": "安装：pip install mypy"
-        "\n  或访问 https://mypy.readthedocs.io/ 查看文档",
+        "name": "ty",
+        "command": "ty check",
+        "description": "Python静态类型检查器（极速）",
+        "install_hint": "安装：pip install ty"
+        "\n  或访问 https://docs.astral.sh/ty/ 查看文档",
     },
     {
         "name": "shellcheck",

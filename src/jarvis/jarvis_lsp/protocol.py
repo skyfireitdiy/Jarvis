@@ -258,7 +258,7 @@ class DiagnosticInfo:
         range: 问题位置范围 (start_line, start_char, end_line, end_char)
         severity: 严重级别 (Error=1, Warning=2, Info=3, Hint=4)
         code: 错误代码（可选）
-        source: 诊断来源（pylint、mypy、pyflakes 等）
+        source: 诊断来源（pylint、ty、pyflakes 等）
         message: 错误信息
     """
 

@@ -100,7 +100,7 @@ setup(
         "pytest-benchmark",
         "pytest-asyncio",
         "ruff",
-        "mypy",
+        "ty",
         "bandit",
         "build",
         "twine",

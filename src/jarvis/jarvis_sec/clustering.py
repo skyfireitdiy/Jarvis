@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# mypy: disable-error-code=unreachable
+# type: ignore
 """聚类相关模块"""
 
 import json
