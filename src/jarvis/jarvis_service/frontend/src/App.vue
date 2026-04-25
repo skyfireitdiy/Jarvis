@@ -8348,7 +8348,7 @@ body::-webkit-scrollbar {
 
 /* 创建 Agent 弹窗 */
 .create-agent-modal {
-  max-width: 900px;
+  max-width: 1200px;
   width: 90%;
   max-height: calc(var(--app-height, 100vh) - 40px);
   overflow-y: auto;
