@@ -4040,45 +4040,36 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       vscode.window.showErrorMessage("未找到要复制的 Agent");
       return;
     }
+
+    // 填充创建表单
+    this.createAgentFormState.agentType = sourceAgent.agentType || "codeagent";
+    this.createAgentFormState.workingDir = sourceAgent.workingDir || "~";
+    this.createAgentFormState.name = sourceAgent.name
+      ? `${sourceAgent.name} (副本)`
+      : "";
+    this.createAgentFormState.llmGroup =
+      sourceAgent.llmGroup || this.defaultLlmGroup || "";
+    this.createAgentFormState.nodeId = String(sourceAgent.nodeId || "").trim();
+    this.createAgentFormState.useWorktree =
+      sourceAgent.agentType === "codeagent"
+        ? Boolean(sourceAgent.worktree)
+        : false;
+    this.createAgentFormState.quickMode = Boolean(sourceAgent.quickMode);
+    this.createAgentFormState.restoreSession = Boolean(
+      sourceAgent.restoreSession,
+    );
+    this.createAgentFormState.errorMessage = "";
+
+    // 加载模型组列表
     try {
-      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-      const normalizedNodeId =
-        String(sourceAgent.nodeId || "master").trim() || "master";
-      const response = await this.fetchWithAuth(
-        buildNodeHttpUrl(gatewayAddress, normalizedNodeId, "agents"),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            agent_type: sourceAgent.agentType,
-            working_dir: sourceAgent.workingDir,
-            name: sourceAgent.name || undefined,
-            llm_group:
-              sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
-            node_id: normalizedNodeId,
-            worktree:
-              sourceAgent.agentType === "codeagent"
-                ? sourceAgent.worktree
-                : false,
-            quick_mode: Boolean(sourceAgent.quickMode),
-            restore_session: Boolean(sourceAgent.restoreSession),
-          }),
-        },
-      );
-      const result = (await response.json()) as CreateAgentResponse;
-      if (!response.ok || !result.success || !result.data?.agent_id) {
-        throw new Error(result.error?.message || "复制 Agent 失败");
-      }
-      this.panelState.selectedAgentId = result.data.agent_id;
-      await this.refreshAgents();
-      this.renderAgentListView();
-      this.appendPanelMessage(
-        `已复制 Agent：${result.data.name || result.data.agent_id}`,
-        "system",
-      );
-      await this.openChatPanel(result.data.agent_id);
-    } catch (error) {
-      vscode.window.showErrorMessage(getErrorMessage(error));
+      await this.loadModelGroups(this.createAgentFormState.nodeId || undefined);
+    } catch {
+      // ignore
     }
+
+    // 显示创建表单
+    this.createAgentFormState.isVisible = true;
+    this.renderAgentListView();
   }
 
   private async deleteAgent(agentId?: string): Promise<void> {

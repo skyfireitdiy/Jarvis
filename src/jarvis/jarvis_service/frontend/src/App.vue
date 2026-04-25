@@ -4193,47 +4193,31 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
   }
 }
 
-// 复制 Agent
+// 复制 Agent - 弹出创建面板并预填充参数
 async function copyAgent(agent) {
-  try {
-    const { host, port } = getGatewayAddress()
-    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
-      method: 'POST',
-      body: JSON.stringify(buildCopiedAgentPayload(agent, agent.name || undefined, targetNodeId))
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      alert(`复制失败: ${error.error?.message || error.detail || '未知错误'}`)
-      return
-    }
-    
-    const result = await response.json()
-    console.log('[AGENT] Copied:', result)
-    
-    // 后端返回格式: { success: true, data: agent }
-    if (result.success && result.data) {
-      const newAgent = result.data
-      
-      // 添加到列表开头
-      agentList.value.unshift(newAgent)
-      
-      // 立即切换到新复制的 agent
-      await switchAgent(newAgent)
-      
-      // 刷新列表
-      await fetchAgentList()
-      
-      console.log(`[AGENT] Successfully copied agent ${agent.agent_id}`)
-    } else {
-      alert('复制失败：返回数据格式错误')
-    }
-  } catch (error) {
-    console.error('[AGENT] Copy failed:', error)
-    alert(`复制失败: ${error.message}`)
-  }
+  // 先刷新模型组列表和节点状态
+  await Promise.all([
+    fetchModelGroups(agent?.node_id || 'master'),
+    fetchNodeStatus(),
+  ])
+
+  // 填充表单变量
+  newAgentType.value = agent.agent_type || 'codeagent'
+  newAgentDir.value = agent.working_dir || '~'
+  newAgentName.value = agent.name ? `${agent.name} (副本)` : ''
+  newAgentModelGroup.value = agent.llm_group || 'default'
+  newCodeAgentWorktree.value = agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false
+  newAgentQuickMode.value = Boolean(agent.quick_mode)
+  newAgentRestoreSession.value = Boolean(agent.restore_session)
+  newAgentNodeId.value = String(agent?.node_id || '').trim()
+
+  // 重置目录选择状态
+  resetDirectorySelectionState()
+
+  // 打开创建弹窗
+  showCreateAgentModal.value = true
 }
+
 
 // 批量复制 Agent
 async function batchCopyAgents() {
