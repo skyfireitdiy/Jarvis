@@ -1,6 +1,8 @@
 """普通文件编辑工具（基于 search/replace 的非结构化编辑）"""
 
+import difflib
 import os
+import re
 import shutil
 
 from jarvis.jarvis_utils.config import (
@@ -15,6 +17,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Sequence
 from typing import Tuple
 
 
@@ -291,6 +294,458 @@ class EditFileNormalTool:
             return 0
         return content.count(search_text)
 
+    MATCH_MODE_EXACT = "exact"
+    MATCH_MODE_NORMALIZED_WHITESPACE = "normalized_whitespace"
+    MATCH_MODE_INDENT_FLEXIBLE = "indent_flexible"
+    MATCH_MODE_ANCHORED = "anchored"
+    MATCH_MODE_SIMILAR = "similar"
+    ANCHORED_CONTEXT_LINE_COUNT = 2
+    SIMILARITY_THRESHOLD = 0.9
+
+    @staticmethod
+    def _normalize_line_whitespace(line: str) -> str:
+        """标准化单行中的空白字符。"""
+        return re.sub(r"[ 	]+", " ", line.rstrip())
+
+    @staticmethod
+    def _normalize_text_whitespace(text: str) -> str:
+        """标准化文本中的空白字符与换行。"""
+        normalized_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        return "\n".join(
+            EditFileNormalTool._normalize_line_whitespace(line)
+            for line in normalized_lines
+        )
+
+    @staticmethod
+    def _strip_common_indent(lines: Sequence[str]) -> List[str]:
+        """移除多行文本的共同前导缩进。"""
+        non_empty_lines = [line for line in lines if line.strip()]
+        if not non_empty_lines:
+            return list(lines)
+        indent_lengths = [
+            len(line) - len(line.lstrip(" 	")) for line in non_empty_lines
+        ]
+        common_indent = min(indent_lengths)
+        if common_indent <= 0:
+            return list(lines)
+        return [
+            line[common_indent:] if len(line) >= common_indent else line
+            for line in lines
+        ]
+
+    @staticmethod
+    def _normalize_indent_flexible_text(text: str) -> str:
+        """标准化多行文本的共同缩进与空白。"""
+        raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        normalized_lines = EditFileNormalTool._strip_common_indent(raw_lines)
+        return "\n".join(
+            EditFileNormalTool._normalize_line_whitespace(line)
+            for line in normalized_lines
+        )
+
+    @staticmethod
+    def _find_exact_match_ranges(
+        content: str, search_text: str
+    ) -> List[Tuple[int, int]]:
+        """查找精确匹配区间。"""
+        if not search_text:
+            return []
+        ranges: List[Tuple[int, int]] = []
+        start_index = 0
+        while True:
+            found_index = content.find(search_text, start_index)
+            if found_index < 0:
+                break
+            ranges.append((found_index, found_index + len(search_text)))
+            start_index = found_index + len(search_text)
+        return ranges
+
+    @staticmethod
+    def _find_window_by_normalized_text(
+        content: str,
+        search_text: str,
+        normalizer: Any,
+    ) -> Optional[Tuple[int, int]]:
+        """通过标准化文本查找唯一窗口。"""
+        if not search_text or len(search_text) > len(content):
+            return None
+        normalized_search = normalizer(search_text)
+        if not normalized_search:
+            return None
+        found_range: Optional[Tuple[int, int]] = None
+        max_start = len(content) - len(search_text)
+        for start_index in range(max_start + 1):
+            end_index = start_index + len(search_text)
+            candidate_text = content[start_index:end_index]
+            if normalizer(candidate_text) != normalized_search:
+                continue
+            if found_range is not None:
+                return None
+            found_range = (start_index, end_index)
+        return found_range
+
+    @staticmethod
+    def _build_candidate_result(
+        match_mode: str,
+        match_range: Tuple[int, int],
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Dict[str, Any]:
+        """构建匹配候选结果。"""
+        start_index, end_index = match_range
+        matched_text = content[start_index:end_index]
+        modified_content = content[:start_index] + replace_text + content[end_index:]
+        return {
+            "mode": match_mode,
+            "match_range": match_range,
+            "matched_text": matched_text,
+            "search_text": search_text,
+            "replace_text": replace_text,
+            "modified_content": modified_content,
+            "match_count": 1,
+        }
+
+    @staticmethod
+    def _find_normalized_whitespace_match(
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """查找空白宽松匹配。"""
+        match_range = EditFileNormalTool._find_window_by_normalized_text(
+            content,
+            search_text,
+            EditFileNormalTool._normalize_text_whitespace,
+        )
+        if match_range is None:
+            return None
+        return EditFileNormalTool._build_candidate_result(
+            EditFileNormalTool.MATCH_MODE_NORMALIZED_WHITESPACE,
+            match_range,
+            content,
+            search_text,
+            replace_text,
+        )
+
+    @staticmethod
+    def _find_indent_flexible_match(
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """查找缩进宽松匹配。"""
+        if "\n" not in search_text:
+            return None
+        match_range = EditFileNormalTool._find_window_by_normalized_text(
+            content,
+            search_text,
+            EditFileNormalTool._normalize_indent_flexible_text,
+        )
+        if match_range is None:
+            return None
+        return EditFileNormalTool._build_candidate_result(
+            EditFileNormalTool.MATCH_MODE_INDENT_FLEXIBLE,
+            match_range,
+            content,
+            search_text,
+            replace_text,
+        )
+
+    @staticmethod
+    def _extract_anchor_lines(search_text: str) -> Tuple[List[str], List[str], int]:
+        """提取前后锚点行。"""
+        lines = search_text.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+        if len(lines) < 3:
+            return [], [], 0
+        anchor_line_count = min(
+            EditFileNormalTool.ANCHORED_CONTEXT_LINE_COUNT, len(lines) - 1
+        )
+        if anchor_line_count <= 0:
+            return [], [], 0
+        return lines[:anchor_line_count], lines[-anchor_line_count:], len(lines)
+
+    @staticmethod
+    def _find_anchor_positions(
+        content_lines: Sequence[str], anchor_lines: Sequence[str]
+    ) -> List[int]:
+        """查找锚点起始行位置。"""
+        if not anchor_lines:
+            return []
+        positions: List[int] = []
+        anchor_length = len(anchor_lines)
+        max_start = len(content_lines) - anchor_length
+        for start_index in range(max_start + 1):
+            if list(content_lines[start_index : start_index + anchor_length]) == list(
+                anchor_lines
+            ):
+                positions.append(start_index)
+        return positions
+
+    @staticmethod
+    def _line_index_to_char_offset(
+        content_lines_with_endings: Sequence[str], line_index: int
+    ) -> int:
+        """将行索引转换为字符偏移。"""
+        return sum(len(line) for line in content_lines_with_endings[:line_index])
+
+    @staticmethod
+    def _build_anchor_candidate_from_start(
+        content_lines_with_endings: Sequence[str],
+        search_line_count: int,
+        start_line_index: int,
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """根据起始行构建锚点候选。"""
+        end_line_index = start_line_index + search_line_count
+        if end_line_index > len(content_lines_with_endings):
+            return None
+        match_range = (
+            EditFileNormalTool._line_index_to_char_offset(
+                content_lines_with_endings, start_line_index
+            ),
+            EditFileNormalTool._line_index_to_char_offset(
+                content_lines_with_endings, end_line_index
+            ),
+        )
+        return EditFileNormalTool._build_candidate_result(
+            EditFileNormalTool.MATCH_MODE_ANCHORED,
+            match_range,
+            content,
+            search_text,
+            replace_text,
+        )
+
+    @staticmethod
+    def _find_anchored_match(
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """根据前后锚点查找唯一候选区间。"""
+        prefix_anchor_lines, suffix_anchor_lines, search_line_count = (
+            EditFileNormalTool._extract_anchor_lines(search_text)
+        )
+        if search_line_count == 0:
+            return None
+        content_lines = content.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+        content_lines_with_endings = content.splitlines(keepends=True)
+        prefix_positions = EditFileNormalTool._find_anchor_positions(
+            content_lines, prefix_anchor_lines
+        )
+        suffix_positions = EditFileNormalTool._find_anchor_positions(
+            content_lines, suffix_anchor_lines
+        )
+        start_candidate = prefix_positions[0] if len(prefix_positions) == 1 else None
+        suffix_candidate = None
+        if len(suffix_positions) == 1:
+            suffix_end = suffix_positions[0] + len(suffix_anchor_lines)
+            suffix_candidate = suffix_end - search_line_count
+            if suffix_candidate < 0:
+                suffix_candidate = None
+        if start_candidate is not None and suffix_candidate is not None:
+            if start_candidate != suffix_candidate:
+                return None
+            return EditFileNormalTool._build_anchor_candidate_from_start(
+                content_lines_with_endings,
+                search_line_count,
+                start_candidate,
+                content,
+                search_text,
+                replace_text,
+            )
+        if start_candidate is not None and not suffix_positions:
+            return EditFileNormalTool._build_anchor_candidate_from_start(
+                content_lines_with_endings,
+                search_line_count,
+                start_candidate,
+                content,
+                search_text,
+                replace_text,
+            )
+        if suffix_candidate is not None and not prefix_positions:
+            return EditFileNormalTool._build_anchor_candidate_from_start(
+                content_lines_with_endings,
+                search_line_count,
+                suffix_candidate,
+                content,
+                search_text,
+                replace_text,
+            )
+        return None
+
+    @staticmethod
+    def _find_similar_match(
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """查找高相似度候选。"""
+        if not search_text or len(search_text) > len(content):
+            return None
+        best_ratio = 0.0
+        best_range: Optional[Tuple[int, int]] = None
+        max_start = len(content) - len(search_text)
+        for start_index in range(max_start + 1):
+            end_index = start_index + len(search_text)
+            candidate_text = content[start_index:end_index]
+            ratio = difflib.SequenceMatcher(None, search_text, candidate_text).ratio()
+            if ratio < EditFileNormalTool.SIMILARITY_THRESHOLD:
+                continue
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_range = (start_index, end_index)
+            elif ratio == best_ratio:
+                return None
+        if best_range is None:
+            return None
+        candidate = EditFileNormalTool._build_candidate_result(
+            EditFileNormalTool.MATCH_MODE_SIMILAR,
+            best_range,
+            content,
+            search_text,
+            replace_text,
+        )
+        candidate["similarity"] = best_ratio
+        return candidate
+
+    @staticmethod
+    def _find_flexible_match_candidate(
+        content: str,
+        search_text: str,
+        replace_text: str,
+    ) -> Optional[Dict[str, Any]]:
+        """按 Spec 顺序查找宽松匹配候选。"""
+        for finder in (
+            EditFileNormalTool._find_normalized_whitespace_match,
+            EditFileNormalTool._find_indent_flexible_match,
+            EditFileNormalTool._find_anchored_match,
+            EditFileNormalTool._find_similar_match,
+        ):
+            candidate = finder(content, search_text, replace_text)
+            if candidate is not None:
+                return candidate
+        return None
+
+    @staticmethod
+    def _build_exact_confirm_info(
+        content: str,
+        search_text: str,
+        replace_text: str,
+        diff_index: int,
+        match_count: int,
+    ) -> Dict[str, Any]:
+        """构建精确多匹配确认信息。"""
+        return {
+            "mode": EditFileNormalTool.MATCH_MODE_EXACT,
+            "match_count": match_count,
+            "search_text": search_text,
+            "replace_text": replace_text,
+            "modified_content": content.replace(search_text, replace_text),
+            "matched_text": search_text,
+            "diff_idx": diff_index,
+        }
+
+    @staticmethod
+    def _build_non_exact_confirm_info(
+        candidate: Dict[str, Any], diff_index: int
+    ) -> Dict[str, Any]:
+        """构建非精确匹配确认信息。"""
+        confirm_info = dict(candidate)
+        confirm_info["diff_idx"] = diff_index
+        return confirm_info
+
+    @staticmethod
+    def _build_failed_match_error(
+        search_text: str,
+        file_path: Optional[str],
+        has_candidate: bool = False,
+        confirmation_rejected: bool = False,
+    ) -> str:
+        """构建匹配失败错误信息。"""
+        error_message = "未找到可接受的匹配文本"
+        error_message += "\n已尝试的匹配策略: exact -> normalized_whitespace -> indent_flexible -> anchored -> similar"
+        error_message += f"\n是否找到候选: {'是' if has_candidate else '否'}"
+        error_message += (
+            f"\n候选是否被确认拒绝: {'是' if confirmation_rejected else '否'}"
+        )
+        if not has_candidate:
+            error_message += "\n未找到精确匹配的文本"
+        if search_text:
+            error_message += f"\n搜索文本: {search_text[:200]}..."
+        error_message += "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
+        error_message += (
+            "\n   1. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
+        )
+        error_message += "\n   2. 文件内容存在缩进、局部改写或相似版本差异"
+        error_message += "\n   3. **文件可能已被更新**：如果文件在其他地方被修改了，搜索文本可能已经不存在或已改变"
+        if file_path:
+            error_message += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
+            error_message += (
+                "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
+            )
+        return error_message
+
+    @staticmethod
+    def _confirm_non_exact_match(
+        agent: Any,
+        file_path: str,
+        original_content: str,
+        modified_content: str,
+        match_mode: str,
+        search_text: str,
+        replace_text: str,
+        matched_text: str,
+    ) -> bool:
+        """使用大模型确认非精确匹配是否合理。"""
+        try:
+            from jarvis.jarvis_agent import Agent
+
+            agent_instance: Agent = agent
+            if not agent_instance or not agent_instance.model:
+                return False
+            diff_preview = EditFileNormalTool._generate_diff_preview(
+                original_content,
+                modified_content,
+                file_path,
+            )
+            prompt = f"""检测到文件编辑操作使用了非精确匹配，需要您确认是否继续修改：
+
+文件路径：{file_path}
+匹配模式：{match_mode}
+搜索文本长度：{len(search_text)} 字符
+实际命中文本长度：{len(matched_text)} 字符
+替换文本长度：{len(replace_text)} 字符
+
+实际命中的原文：
+{matched_text}
+
+修改预览（diff）：
+{diff_preview}
+
+请仔细分析：虽然未找到精确匹配，但系统找到了一个非精确候选。请判断该候选是否就是用户真正想修改的位置。
+
+请使用以下协议回答（必须包含且仅包含以下标记之一）：
+- 如果认为这些修改是合理的，回答: <!!!YES!!!>
+- 如果认为这些修改不合理或存在风险，回答: <!!!NO!!!>
+
+请严格按照协议格式回答，不要添加其他内容。"""
+            PrettyOutput.auto_print("🤖 正在询问大模型确认非精确匹配的修改是否合理...")
+            response = agent_instance.model.chat_until_success(prompt)
+            response_text = str(response or "")
+            if "<!!!YES!!!>" in response_text:
+                PrettyOutput.auto_print("✅ 大模型确认：非精确匹配修改合理，继续执行")
+                return True
+            PrettyOutput.auto_print(
+                "⚠️ 大模型确认：非精确匹配修改不合理或未按协议回答，已取消"
+            )
+            return False
+        except Exception as error:
+            PrettyOutput.auto_print(f"⚠️ 非精确匹配确认失败：{error}")
+            return False
+
     @staticmethod
     def _is_file_in_workspace_subdir(file_path: str) -> bool:
         """检查文件是否在当前工作目录的子级目录下
@@ -448,94 +903,80 @@ class EditFileNormalTool:
     ) -> Tuple[
         bool, str, List[Dict[str, Any]], Optional[Dict[str, Any]], Optional[int]
     ]:
-        """对文件内容按顺序应用普通 search/replace 编辑（使用字符串替换）
-
-        Args:
-            original_content: 原始文件内容（或已部分修改的内容）
-            diffs: diff 列表
-            agent: 可选的 agent 实例
-            file_path: 可选的文件路径
-            start_idx: 从哪个 diff 索引开始处理（0-based，用于继续处理剩余 diffs）
-
-        返回:
-            (是否全部成功, 最终内容, diff执行结果列表, 确认信息字典或None, 需要确认的diff索引或None)
-            diff执行结果列表格式: [{idx: int, success: bool, error: str or None}]
-            确认信息字典包含: match_count, search_text, replace_text, modified_content, current_content
-        """
+        """对文件内容按顺序应用普通 search/replace 编辑。"""
+        del agent
         content = original_content
-        diff_results: List[Dict[str, Any]] = []  # 记录每个 diff 的执行结果
-        all_success = True  # 标记是否所有 diff 都成功
+        diff_results: List[Dict[str, Any]] = []
+        all_success = True
 
         for idx, diff in enumerate(diffs[start_idx:], start=start_idx + 1):
-            search = diff["search"]
-            replace = diff["replace"]
+            search_text = diff["search"]
+            replace_text = diff["replace"]
 
-            # 处理空字符串search的特殊情况
-            if search == "":
-                # 空字符串表示直接重写整个文件
-                content = replace
-                # 记录这个 diff 成功
+            if search_text == "":
+                content = replace_text
                 diff_results.append({"idx": idx, "success": True, "error": None})
-                # 空search只处理第一个diff，跳过后续所有diffs
                 break
 
-            # 检查 search 和 replace 是否完全一致（无效操作）
-            if search == replace:
+            if search_text == replace_text:
                 all_success = False
-                error_info = (
-                    "search 和 replace 内容完全相同，这是一个无效操作（没有实际修改）"
+                diff_results.append(
+                    {
+                        "idx": idx,
+                        "success": False,
+                        "error": "search 和 replace 内容完全相同，这是一个无效操作（没有实际修改）",
+                    }
                 )
-                diff_results.append({"idx": idx, "success": False, "error": error_info})
-                continue  # 继续处理后续 diffs
-
-            # 验证 search 文本
-            if not isinstance(search, str):
-                all_success = False
-                error_info = "search 文本必须是字符串"
-                diff_results.append({"idx": idx, "success": False, "error": error_info})
                 continue
 
-            # 统计匹配次数
-            match_count = EditFileNormalTool._count_matches(content, search)
-
-            if match_count == 0:
-                # 找不到匹配
+            if not isinstance(search_text, str):
                 all_success = False
-                error_info = "未找到精确匹配的文本"
-                if search:
-                    error_info += f"\n搜索文本: {search[:200]}..."
-                    error_info += (
-                        "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
-                    )
-                    error_info += "\n   1. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
-                    error_info += "\n   2. **文件可能已被更新**：如果文件在其他地方被修改了，搜索文本可能已经不存在或已改变"
-                    if file_path:
-                        error_info += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
-                        error_info += "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
-                diff_results.append({"idx": idx, "success": False, "error": error_info})
+                diff_results.append(
+                    {"idx": idx, "success": False, "error": "search 文本必须是字符串"}
+                )
                 continue
 
-            if match_count == 1:
-                # 唯一匹配，直接替换
-                content = content.replace(search, replace, 1)
+            exact_matches = EditFileNormalTool._find_exact_match_ranges(
+                content, search_text
+            )
+            if len(exact_matches) == 1:
+                content = content.replace(search_text, replace_text, 1)
                 diff_results.append({"idx": idx, "success": True, "error": None})
-            else:
-                # 多个匹配，需要确认
-                # 生成修改后的内容（替换所有匹配）
-                modified_content = content.replace(search, replace)
-                # 返回确认信息，包含当前内容以便继续处理后续 diffs
-                # 注意：这里返回时，之前成功的 diff 的修改已经应用到 content 中了
-                confirm_info = {
-                    "match_count": match_count,
-                    "search_text": search,
-                    "replace_text": replace,
-                    "modified_content": modified_content,
-                    "current_content": content,  # 保存当前内容，用于继续处理
-                    "diff_idx": idx,  # 保存当前 diff 索引
-                    "diff_results_before_confirm": diff_results,  # 保存之前成功的结果
-                }
-                # 返回 False 表示需要确认，但之前成功的修改已经保留在 diff_results 中
+                continue
+
+            if len(exact_matches) > 1:
+                confirm_info = EditFileNormalTool._build_exact_confirm_info(
+                    content,
+                    search_text,
+                    replace_text,
+                    idx,
+                    len(exact_matches),
+                )
                 return False, content, diff_results, confirm_info, idx
+
+            flexible_candidate = EditFileNormalTool._find_flexible_match_candidate(
+                content,
+                search_text,
+                replace_text,
+            )
+            if flexible_candidate is not None:
+                confirm_info = EditFileNormalTool._build_non_exact_confirm_info(
+                    flexible_candidate,
+                    idx,
+                )
+                return False, content, diff_results, confirm_info, idx
+
+            all_success = False
+            diff_results.append(
+                {
+                    "idx": idx,
+                    "success": False,
+                    "error": EditFileNormalTool._build_failed_match_error(
+                        search_text,
+                        file_path,
+                    ),
+                }
+            )
 
         return all_success, content, diff_results, None, None
 
@@ -638,15 +1079,30 @@ class EditFileNormalTool:
                         and iter_confirm_diff_idx is not None
                     ):
                         # 需要确认
-                        confirmed = EditFileNormalTool._confirm_multiple_matches(
-                            agent,
-                            file_path,
-                            original_content,
-                            iter_confirm_info["modified_content"],
-                            iter_confirm_info["match_count"],
-                            iter_confirm_info["search_text"],
-                            iter_confirm_info["replace_text"],
-                        )
+                        if (
+                            iter_confirm_info.get("mode")
+                            == EditFileNormalTool.MATCH_MODE_EXACT
+                        ):
+                            confirmed = EditFileNormalTool._confirm_multiple_matches(
+                                agent,
+                                file_path,
+                                original_content,
+                                iter_confirm_info["modified_content"],
+                                iter_confirm_info["match_count"],
+                                iter_confirm_info["search_text"],
+                                iter_confirm_info["replace_text"],
+                            )
+                        else:
+                            confirmed = EditFileNormalTool._confirm_non_exact_match(
+                                agent,
+                                file_path,
+                                original_content,
+                                iter_confirm_info["modified_content"],
+                                iter_confirm_info["mode"],
+                                iter_confirm_info["search_text"],
+                                iter_confirm_info["replace_text"],
+                                iter_confirm_info.get("matched_text", ""),
+                            )
 
                         if confirmed:
                             # 确认继续，应用当前 diff 的所有匹配替换
