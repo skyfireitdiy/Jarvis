@@ -2684,15 +2684,19 @@ const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 
+// 复制 Agent 时跳过 watch 中的名称设置
+let skipNameWatch = false
+
 // 监听 Agent 类型变化，自动填充默认名称
 watch(newAgentType, (newType) => {
+  if (skipNameWatch) return
   if (newType === 'agent') {
     newAgentName.value = '通用Agent'
     newCodeAgentWorktree.value = false
   } else if (newType === 'codeagent') {
     newAgentName.value = '代码Agent'
   }
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback, defaultConfirm }
@@ -3661,9 +3665,11 @@ function resetDirectorySelectionState() {
 watch(newAgentNodeId, (newNodeId) => {
   newAgentDir.value = '~'
   resetDirectorySelectionState()
-  // 切换节点时重新获取对应节点的模型组列表
-  fetchModelGroups(newNodeId || 'master')
-})
+  // 切换节点时重新获取对应节点的模型组列表（复制 Agent 时跳过）
+  if (!skipNameWatch) {
+    fetchModelGroups(newNodeId || 'master')
+  }
+}, { flush: 'sync' })
 
 async function openDirDialog() {
   showDirDialog.value = true
@@ -3831,7 +3837,7 @@ async function openCreateAgentModal() {
 }
 
 // 获取模型组列表
-async function fetchModelGroups(nodeId = 'master') {
+async function fetchModelGroups(nodeId = 'master', autoSelect = true) {
   try {
     const { host, port } = getGatewayAddress()
     const targetNodeId = String(nodeId || 'master').trim() || 'master'
@@ -3844,7 +3850,7 @@ async function fetchModelGroups(nodeId = 'master') {
     if (result.success && result.data) {
       modelGroups.value = result.data
       // 如果模型组列表不为空，优先使用配置的默认模型组
-      if (modelGroups.value.length > 0) {
+      if (autoSelect && modelGroups.value.length > 0) {
         const defaultGroup = result.default_llm_group || ''
         const hasDefaultGroup = defaultGroup && modelGroups.value.some(g => g.name === defaultGroup)
         const hasCurrentGroup = modelGroups.value.some(g => g.name === newAgentModelGroup.value)
@@ -3873,12 +3879,17 @@ async function fetchNodeStatus() {
     }
     const result = await response.json()
     const nodes = Array.isArray(result?.data?.nodes) ? result.data.nodes : []
-    availableNodeOptions.value = nodes
+    const processedNodes = nodes
       .filter(node => node && String(node.node_id || '').trim())
       .map(node => ({
         ...node,
         node_id: String(node.node_id || '').trim(),
       }))
+    // 确保 master 节点始终在选项列表中
+    if (!processedNodes.some(n => n.node_id === 'master')) {
+      processedNodes.unshift({ node_id: 'master', status: 'running' })
+    }
+    availableNodeOptions.value = processedNodes
   } catch (error) {
     console.error('[NODE] 获取节点状态出错:', error)
     availableNodeOptions.value = []
@@ -4195,27 +4206,36 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
 
 // 复制 Agent - 弹出创建面板并预填充参数
 async function copyAgent(agent) {
-  // 先刷新模型组列表和节点状态
+  // 先设置标志位，跳过 watch 中的名称设置和模型组自动选择
+  skipNameWatch = true
+
+  // 刷新模型组列表和节点状态（不自动选择模型组）
   await Promise.all([
-    fetchModelGroups(agent?.node_id || 'master'),
+    fetchModelGroups(agent?.node_id || 'master', false),
     fetchNodeStatus(),
   ])
 
   // 填充表单变量
   newAgentType.value = agent.agent_type || 'codeagent'
-  newAgentDir.value = agent.working_dir || '~'
-  newAgentName.value = agent.name ? `${agent.name} (副本)` : ''
   newAgentModelGroup.value = agent.llm_group || 'default'
   newCodeAgentWorktree.value = agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false
   newAgentQuickMode.value = Boolean(agent.quick_mode)
   newAgentRestoreSession.value = Boolean(agent.restore_session)
+  // 先设置 node_id（会触发 watch 重置目录），再设置正确的目录
   newAgentNodeId.value = String(agent?.node_id || '').trim()
+  newAgentDir.value = agent.working_dir || '~'
+  // 设置正确的名称
+  newAgentName.value = agent.name ? `${agent.name} (副本)` : ''
 
   // 重置目录选择状态
   resetDirectorySelectionState()
 
   // 打开创建弹窗
   showCreateAgentModal.value = true
+
+  // 等待 DOM 更新后重置标志位
+  await nextTick()
+  skipNameWatch = false
 }
 
 
@@ -8347,8 +8367,8 @@ body::-webkit-scrollbar {
 }
 
 /* 创建 Agent 弹窗 */
-.create-agent-modal {
-  max-width: 1200px;
+.modal-overlay .modal.create-agent-modal {
+  max-width: 1800px !important;
   width: 90%;
   max-height: calc(var(--app-height, 100vh) - 40px);
   overflow-y: auto;

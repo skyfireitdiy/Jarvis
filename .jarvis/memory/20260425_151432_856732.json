@@ -1,0 +1,8 @@
+{
+  "id": "20260425_151432_856732",
+  "type": "project_long_term",
+  "tags": ["UI优化", "样式修复", "create-agent-modal", "panel宽度"],
+  "content": "create-agent-modal的max-width从1200px增加到1800px，解决宽屏下控件拥挤问题。文件位置：src/jarvis/jarvis_service/frontend/src/App.vue 第8351行。网格布局为3列，响应式断点：平板(1023px)2列，移动端(768px)单列。",
+  "created_at": "2026-04-25T15:14:32.856782",
+  "updated_at": "2026-04-25T15:14:32.856788"
+}
