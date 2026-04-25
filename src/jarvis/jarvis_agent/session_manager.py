@@ -59,55 +59,17 @@ class SessionManager:
             user_input: 用户第一条输入
 
         Returns:
-            str: 生成的会话名称（3-8个中文字符）
+            str: 使用用户输入前10个字符生成的会话名称
         """
         import re
-        from jarvis.jarvis_platform.registry import PlatformRegistry
 
-        # 限制输入长度，避免token过多
-        if len(user_input) > 200:
-            user_input = user_input[:200]
+        session_name = user_input[:10].strip()
+        session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", session_name)
 
-        # 使用cheap模型生成会话名称
-        try:
-            registry = PlatformRegistry.get_global_platform_registry()
-            cheap_model = registry.create_platform(platform_type="cheap")
-            if cheap_model is None:
-                return "未命名会话"
-            cheap_model.set_suppress_output(False)
-            prompt = f"""请根据以下用户输入，生成一个简洁的会话名称（3-8个中文字符）。
-要求：
-1. 名称要能概括会话主题
-2. 使用简洁的中文表达
-3. 只返回名称，不要其他内容
-
-用户输入：{user_input}
-
-会话名称："""
-
-            # 调用模型生成
-            response = cheap_model.chat_until_success(prompt).strip()
-
-            # 清理响应
-            session_name = response.strip()
-
-            # 限制长度（3-8个中文字符，约等于6-16个字符）
-            if len(session_name) > 16:
-                session_name = session_name[:16]
-
-            # 清理特殊字符，只保留中文、字母、数字、下划线、短横线
-            session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", session_name)
-
-            # 如果清理后为空，使用默认名称
-            if not session_name:
-                session_name = "未命名会话"
-
-            return session_name
-
-        except Exception as e:
-            # 生成失败时使用默认名称
-            PrettyOutput.auto_print(f"⚠️  生成会话名称失败: {e}，使用默认名称")
+        if not session_name:
             return "未命名会话"
+
+        return session_name
 
     def _list_session_files(self) -> List[str]:
         """
