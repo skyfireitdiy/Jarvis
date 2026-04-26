@@ -59,16 +59,16 @@ get_latest_tag() {
 
 resolve_source_reference() {
     local latest_tag
-    latest_tag="$(get_latest_tag "$GITEE_URL")"
+    latest_tag="$(get_latest_tag "$GITHUB_URL")"
     if [ -n "$latest_tag" ]; then
-        SOURCE_URL="$GITEE_URL"
+        SOURCE_URL="$GITHUB_URL"
         SOURCE_REF="$latest_tag"
         return
     fi
 
-    latest_tag="$(get_latest_tag "$GITHUB_URL")"
+    latest_tag="$(get_latest_tag "$GITEE_URL")"
     if [ -n "$latest_tag" ]; then
-        SOURCE_URL="$GITHUB_URL"
+        SOURCE_URL="$GITEE_URL"
         SOURCE_REF="$latest_tag"
         return
     fi
@@ -118,9 +118,9 @@ prepare_source_tree() {
         return
     fi
 
-    if [ "$SOURCE_URL" != "$GITHUB_URL" ]; then
-        SOURCE_URL="$GITHUB_URL"
-        echo "Gitee 下载失败，尝试从 GitHub 获取同版本源码..."
+    if [ "$SOURCE_URL" != "$GITEE_URL" ]; then
+        SOURCE_URL="$GITEE_URL"
+        echo "GitHub 下载失败，尝试从 Gitee 获取同版本源码..."
         git clone --depth 1 --branch "$SOURCE_REF" "$SOURCE_URL" "$DEST_DIR"
         return
     fi

@@ -42,15 +42,15 @@ function Get-LatestTag {
 }
 
 function Resolve-SourceReference {
-    $script:SOURCE_REF = Get-LatestTag -RepoUrl $GITEE_URL
-    if ($script:SOURCE_REF) {
-        $script:SOURCE_URL = $GITEE_URL
-        return
-    }
-
     $script:SOURCE_REF = Get-LatestTag -RepoUrl $GITHUB_URL
     if ($script:SOURCE_REF) {
         $script:SOURCE_URL = $GITHUB_URL
+        return
+    }
+
+    $script:SOURCE_REF = Get-LatestTag -RepoUrl $GITEE_URL
+    if ($script:SOURCE_REF) {
+        $script:SOURCE_URL = $GITEE_URL
         return
     }
 
@@ -105,9 +105,9 @@ function Prepare-SourceTree {
         return
     }
     catch {
-        if ($script:SOURCE_URL -ne $GITHUB_URL) {
-            $script:SOURCE_URL = $GITHUB_URL
-            Write-Host "Gitee download failed, retrying from GitHub..." -ForegroundColor Yellow
+        if ($script:SOURCE_URL -ne $GITEE_URL) {
+            $script:SOURCE_URL = $GITEE_URL
+            Write-Host "GitHub download failed, retrying from Gitee..." -ForegroundColor Yellow
             git clone --depth 1 --branch $script:SOURCE_REF $script:SOURCE_URL $DEST_DIR
             return
         }
