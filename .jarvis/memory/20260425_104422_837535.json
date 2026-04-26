@@ -1,8 +1,0 @@
-{
-  "id": "20260425_104422_837535",
-  "type": "project_long_term",
-  "tags": ["设计方案", "详细设计", "系统设计", "edit_file", "宽松匹配", "SDD"],
-  "content": "edit_file 工具增强方案：保持对外 schema 与调用格式不变，内部在 exact 匹配失败后自动按 A 空白宽松匹配、B 缩进宽松匹配、C 前n行/后n行锚点匹配、D 相似匹配 的顺序降级；所有非精确匹配（A/B/C/D）即使命中唯一候选也必须复用/参考现有多处匹配的大模型确认逻辑，确认通过后才允许替换；保留 exact 唯一匹配直接替换、exact 多处匹配需确认、search 为空字符串时整文件重写的现有语义。Spec 文件：.jarvis/rules/spec/edit_file_flexible_matching_spec.md",
-  "created_at": "2026-04-25T10:44:22.837557",
-  "updated_at": "2026-04-25T10:44:22.837562"
-}
