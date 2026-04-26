@@ -1,0 +1,47 @@
+---
+name: Publish VSCode Extension
+
+"on":
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  vscode-publish:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/jarvis/jarvis_vscode_extension
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version from tag
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Setting version to $VERSION"
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            echo "Version already up to date, skipping npm version"
+          else
+            # Sync package-lock.json with package.json before updating version
+            npm install --package-lock-only
+            npm version "$VERSION" --no-git-tag-version
+          fi
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Publish to Marketplace
+        run: npx @vscode/vsce publish --no-dependencies -p ${{ secrets.VSCE_PAT }}

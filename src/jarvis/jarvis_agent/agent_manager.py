@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+"""Agent管理器模块，负责Agent的初始化和任务执行"""
+
+from typing import Callable
+from typing import List
+from typing import Optional
+
+import typer
+
+from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent import get_multiline_input
+from jarvis.jarvis_agent import origin_agent_system_prompt
+from jarvis.jarvis_agent.task_manager import TaskManager
+from jarvis.jarvis_utils.config import is_non_interactive
+from jarvis.jarvis_utils.config import is_skip_predefined_tasks
+from jarvis.jarvis_utils.output import PrettyOutput
+
+
+class AgentManager:
+    """Agent管理器，负责Agent的生命周期管理"""
+
+    def __init__(
+        self,
+        tool_group: Optional[str] = None,
+        restore_session: bool = False,
+        use_methodology: Optional[bool] = None,
+        use_analysis: Optional[bool] = None,
+        multiline_inputer: Optional[Callable[[str], str]] = None,
+        confirm_callback: Optional[Callable[[str, bool], bool]] = None,
+        non_interactive: Optional[bool] = None,
+        allow_savesession: bool = False,
+        rule_names: Optional[str] = None,
+        optimize_system_prompt: bool = False,
+        quick_mode: bool = False,
+    ):
+        self.tool_group = tool_group
+        self.restore_session = restore_session
+        self.use_methodology = use_methodology
+        self.use_analysis = use_analysis
+        self.agent: Optional[Agent] = None
+        # 可选：注入输入与确认回调，用于Web模式等前端替代交互
+        self.multiline_inputer = multiline_inputer
+        self.confirm_callback = confirm_callback
+        self.non_interactive = non_interactive
+        self.allow_savesession = allow_savesession
+        self.rule_names = rule_names
+        self.optimize_system_prompt = optimize_system_prompt
+        self.quick_mode = quick_mode
+
+    def _merge_rule_names(self, cli_rule_names: Optional[str]) -> Optional[str]:
+        """合并配置文件默认规则和命令行规则
+
+        参数:
+            cli_rule_names: 命令行传入的规则名称（逗号分隔的字符串）
+
+        返回:
+            Optional[str]: 合并后的规则名称（逗号分隔的字符串），如果都为空则返回 None
+        """
+        from jarvis.jarvis_utils.config import get_default_rule_names
+
+        # 获取配置文件中的默认规则
+        default_rules = get_default_rule_names()
+
+        # 解析命令行规则
+        cli_rules: List[str] = []
+        if cli_rule_names and cli_rule_names.strip():
+            cli_rules = [
+                name.strip() for name in cli_rule_names.split(",") if name.strip()
+            ]
+
+        # 如果两个都没有，返回 None
+        if not default_rules and not cli_rules:
+            return None
+
+        # 合并并去重
+        all_rules = list(dict.fromkeys(default_rules + cli_rules))  # 保持顺序的去重
+
+        # 转换为逗号分隔的字符串
+        return ",".join(all_rules) if all_rules else None
+
+    def initialize(self) -> Agent:
+        """初始化Agent"""
+        # 如果提供了 tool_group 参数，设置到配置中
+        if self.tool_group:
+            from jarvis.jarvis_utils.config import set_config
+
+            set_config("tool_group", self.tool_group)
+
+        # 合并默认规则和命令行规则
+        merged_rule_names = self._merge_rule_names(self.rule_names)
+
+        self.agent = Agent(
+            system_prompt=origin_agent_system_prompt,
+            need_summary=False,
+            use_methodology=self.use_methodology,
+            use_analysis=self.use_analysis,
+            multiline_inputer=self.multiline_inputer,
+            confirm_callback=self.confirm_callback,
+            non_interactive=self.non_interactive,
+            auto_complete=self.non_interactive or False,  # 非交互模式下自动完成
+            allow_savesession=self.allow_savesession,
+            rule_names=merged_rule_names,
+            optimize_system_prompt=self.optimize_system_prompt,
+            quick_mode=self.quick_mode,
+        )
+
+        # 尝试恢复会话
+        if self.restore_session:
+            if self.agent.restore_session():
+                PrettyOutput.auto_print("✅ 会话已成功恢复。")
+            else:
+                PrettyOutput.auto_print("⚠️ 无法恢复会话。")
+
+        return self.agent
+
+    def run_task(self, task_content: Optional[str] = None) -> None:
+        """运行任务"""
+        if not self.agent:
+            raise RuntimeError("Agent not initialized")
+
+        # 优先处理命令行直接传入的任务
+        if task_content:
+            self.agent.run(task_content)
+            raise typer.Exit(code=0)
+
+        # 处理预定义任务（非交互模式下跳过；支持配置跳过加载；命令行指定任务时跳过）
+        if (
+            not is_non_interactive()
+            and not is_skip_predefined_tasks()
+            and not task_content
+            and self.agent.first
+        ):
+            task_manager = TaskManager()
+            tasks = task_manager.load_tasks()
+            if tasks and (selected_task := task_manager.select_task(tasks)):
+                PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                self.agent.run(selected_task)
+                raise typer.Exit(code=0)
+
+        # 获取用户输入
+        user_input = get_multiline_input("请输入你的任务（Ctrl+C 退出）")
+        if user_input:
+            self.agent.run(user_input)
+        raise typer.Exit(code=0)

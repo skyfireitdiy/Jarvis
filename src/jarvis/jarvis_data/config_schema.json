@@ -1,0 +1,382 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Jarvis系统配置模式",
+  "description": "Jarvis系统配置模式",
+  "type": "object",
+  "properties": {
+    "mcp": {
+      "type": "array",
+      "description": "MCP工具配置列表",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["sse", "streamable", "stdio"],
+            "description": "MCP客户端类型。sse/streamable类型需要base_url，stdio类型需要command"
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "MCP服务器基础URL（sse/streamable类型必需，stdio类型不需要）"
+          },
+          "auth_token": {
+            "type": "string",
+            "description": "认证令牌（sse/streamable类型可选）"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "额外的HTTP头（sse/streamable类型可选）"
+          },
+          "endpoint_path": {
+            "type": "string",
+            "default": "mcp",
+            "description": "MCP服务器端点路径（streamable类型可选）。如果base_url已包含端点路径，可设置为空字符串。默认值为'mcp'"
+          },
+          "timeout": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "default": [10, 300],
+            "description": "请求超时时间数组 [连接超时, 读取超时]（秒，streamable类型可选）。默认值为 [10, 300]，表示连接超时10秒，读取超时300秒"
+          },
+          "command": {
+            "type": "string",
+            "description": "要执行的命令（stdio类型必需，sse/streamable类型不需要）"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "命令参数列表（stdio类型可选）"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "环境变量（stdio类型可选）"
+          },
+          "name": {
+            "type": "string",
+            "description": "工具名称(可选)"
+          },
+          "enable": {
+            "type": "boolean",
+            "default": true,
+            "description": "是否启用该工具(可选)"
+          }
+        }
+      }
+    },
+    "ENV": {
+      "type": "object",
+      "description": "需要设置的额外环境变量",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "git_commit_prompt": {
+      "type": "string",
+      "description": "Git提交信息生成提示模板",
+      "default": ""
+    },
+    "llms": {
+      "type": "object",
+      "description": "可复用的LLM配置定义，可以在llm_groups中通过引用名称来使用",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "description": "平台名称",
+            "default": "openai"
+          },
+          "model": {
+            "type": "string",
+            "description": "模型名称"
+          },
+          "max_input_token_count": {
+            "type": "number",
+            "description": "最大输入token数量",
+            "default": 200000
+          },
+          "llm_config": {
+            "type": "object",
+            "description": "LLM特定的配置参数，会传递给LLM客户端",
+            "additionalProperties": true,
+            "default": {}
+          }
+        },
+        "required": ["platform", "model"]
+      },
+      "default": {}
+    },
+    "llm_group": {
+      "type": "string",
+      "description": "选择一个预定义的模型组",
+      "default": ""
+    },
+    "llm_groups": {
+      "type": "object",
+      "description": "预定义的模型配置组，使用组名作为 key。每个组必须通过 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置，不再支持直接定义 platform、model 等参数",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "normal_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的常规操作LLM配置名称（必需）"
+          },
+          "cheap_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的廉价操作LLM配置名称（可选）"
+          },
+          "smart_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的智能操作LLM配置名称（可选）"
+          },
+          "ENV": {
+            "type": "object",
+            "description": "该模型组特定的环境变量，会覆盖全局 ENV 配置",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["normal_llm"]
+      },
+      "default": {}
+    },
+    "execute_tool_confirm": {
+      "type": "boolean",
+      "description": "执行工具前是否需要确认",
+      "default": false
+    },
+    "tool_load_dirs": {
+      "type": "array",
+      "description": "自定义工具加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "methodology_dirs": {
+      "type": "array",
+      "description": "方法论加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "agent_definition_dirs": {
+      "type": "array",
+      "description": "agent 定义加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "roles_dirs": {
+      "type": "array",
+      "description": "roles 加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "rules_load_dirs": {
+      "type": "array",
+      "description": "规则加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "after_tool_call_cb_dirs": {
+      "type": "array",
+      "description": "工具调用后回调函数实现目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "central_methodology_repo": {
+      "type": "string",
+      "description": "中心方法论仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入方法论加载路径；若为Git URL则会克隆到数据目录后加载。",
+      "default": ""
+    },
+    "central_tool_repo": {
+      "type": "string",
+      "description": "中心工具仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加载其中的工具；若为Git URL则会克隆到数据目录并加载。",
+      "default": ""
+    },
+    "central_rules_repo": {
+      "type": "string",
+      "description": "中心规则仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入规则加载路径；若为Git URL则会克隆到数据目录并加载。",
+      "default": ""
+    },
+    "default_rule_names": {
+      "type": "array",
+      "description": "默认加载的规则名称列表。这些规则会与命令行参数 --rule-names 合并使用（去重后合并）。支持在配置文件中预定义常用规则，同时保留命令行覆盖的灵活性。",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "print_prompt": {
+      "type": "boolean",
+      "description": "是否打印提示",
+      "default": false
+    },
+    "enable_tmux": {
+      "type": "boolean",
+      "description": "是否启用tmux功能",
+      "default": false
+    },
+    "build_validation_timeout": {
+      "type": "number",
+      "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
+      "default": 30
+    },
+    "enable_startup_config_selector": {
+      "type": "boolean",
+      "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
+      "default": true
+    },
+    "enable_autonomous": {
+      "type": "boolean",
+      "description": "是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）",
+      "default": false
+    },
+    "gateway_auth": {
+      "type": "object",
+      "description": "Gateway 认证配置（密码）",
+      "properties": {
+        "enable": {
+          "type": "boolean",
+          "description": "是否启用 Gateway 认证",
+          "default": false
+        },
+        "password": {
+          "type": "string",
+          "description": "固定密码（可选）"
+        },
+        "allow_unset": {
+          "type": "boolean",
+          "description": "未配置认证信息时是否允许访问（默认允许，保持本地 CLI 兼容）",
+          "default": true
+        }
+      },
+      "default": {}
+    },
+    "save_session_history": {
+      "type": "boolean",
+      "description": "是否保存会话记录",
+      "default": false
+    },
+    "auto_resume_session": {
+      "type": "boolean",
+      "description": "是否自动恢复会话（启动时自动恢复最近的会话，无需手动选择）",
+      "default": false
+    },
+    "skip_predefined_tasks": {
+      "type": "boolean",
+      "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
+      "default": false
+    },
+    "enable_request_classification": {
+      "type": "boolean",
+      "description": "是否启用需求分类功能。启用后，CodeAgent 首次运行会对用户需求进行分类，并根据分类结果加载对应的系统提示词",
+      "default": false
+    },
+    "enable_quick_mode": {
+      "type": "boolean",
+      "description": "是否启用极速模式。启用后，CodeAgent 将跳过任务分类、规则自动加载、上下文推荐、方法论加载等步骤，直接处理用户请求。命令行参数 -q/--quick 也会启用此模式",
+      "default": false
+    },
+    "tool_group": {
+      "type": "string",
+      "description": "选择一个预定义的工具配置组",
+      "default": ""
+    },
+    "tool_groups": {
+      "type": "array",
+      "description": "预定义的工具配置组",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "use": {
+              "type": "array",
+              "description": "要使用的工具名称列表",
+              "items": {
+                "type": "string"
+              }
+            },
+            "dont_use": {
+              "type": "array",
+              "description": "不使用的工具名称列表",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "submit_keys": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "多行输入提交快捷键列表（数组格式）",
+          "items": {
+            "type": "string"
+          },
+          "default": ["c-j", "c-]"]
+        },
+        {
+          "type": "string",
+          "description": "多行输入提交快捷键（字符串格式，逗号分隔）",
+          "default": "c-j,c-]"
+        }
+      ],
+      "description": "多行输入提交快捷键。支持数组格式（如 [\"c-j\", \"c-]\"]）或字符串格式（如 \"c-j,c-]\"）。默认值为 Ctrl+J 和 Ctrl+]。常用快捷键：c-j (Ctrl+J), c-] (Ctrl+]), c-enter (Ctrl+Enter)"
+    },
+    "replace_map": {
+      "type": "object",
+      "description": "自定义替换映射表配置",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "append": {
+            "type": "boolean",
+            "description": "Whether to append to existing template"
+          },
+          "template": {
+            "type": "string",
+            "description": "Replacement template content"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the replacement"
+          }
+        },
+        "required": ["template"]
+      },
+      "default": {}
+    }
+  },
+  "additionalProperties": true
+}

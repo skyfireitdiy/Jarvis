@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Jarvis Robot Icon</title>
+  <desc id="desc">A robot-style SVG icon for the Jarvis PWA.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#0d1117" />
+    </linearGradient>
+    <linearGradient id="face" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#93c5fd" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <g transform="translate(256 256)">
+    <rect x="-116" y="-96" width="232" height="192" rx="56" fill="url(#face)" stroke="#dbeafe" stroke-width="14" />
+    <rect x="-88" y="-60" width="176" height="92" rx="28" fill="#0f172a" opacity="0.95" />
+    <circle cx="-46" cy="-14" r="22" fill="#67e8f9" />
+    <circle cx="46" cy="-14" r="22" fill="#67e8f9" />
+    <circle cx="-46" cy="-14" r="9" fill="#e0f2fe" />
+    <circle cx="46" cy="-14" r="9" fill="#e0f2fe" />
+    <rect x="-58" y="44" width="116" height="18" rx="9" fill="url(#accent)" />
+    <rect x="-16" y="-142" width="32" height="40" rx="16" fill="#dbeafe" />
+    <circle cx="0" cy="-158" r="24" fill="#38bdf8" stroke="#dbeafe" stroke-width="10" />
+    <rect x="-150" y="-42" width="32" height="108" rx="16" fill="#93c5fd" />
+    <rect x="118" y="-42" width="32" height="108" rx="16" fill="#93c5fd" />
+    <rect x="-78" y="108" width="36" height="70" rx="18" fill="#93c5fd" />
+    <rect x="42" y="108" width="36" height="70" rx="18" fill="#93c5fd" />
+  </g>
+</svg>
