@@ -1,0 +1,97 @@
+# ty configuration file
+# Migrated from mypy.ini
+
+[environment]
+python-version = "3.12"
+root = ["./src"]
+
+[analysis]
+# Ignore missing imports for third-party libraries
+allowed-unresolved-imports = [
+    "requests",
+    "tabulate",
+    "jarvis.jarvis_utils.http",
+    "jarvis.jarvis_utils.quick_config",
+    "jarvis.jarvis_tools.read_webpage",
+    "jarvis.jarvis_tools.search_web",
+    "jarvis.jarvis_tools.cli.main",
+    "jarvis.jarvis_mcp.*",
+]
+
+# Replace imports with Any for modules without type stubs
+replace-imports-with-any = [
+    "requests",
+    "tabulate",
+    "jarvis.jarvis_utils.http",
+    "jarvis.jarvis_utils.quick_config",
+    "jarvis.jarvis_tools.read_webpage",
+    "jarvis.jarvis_tools.search_web",
+    "jarvis.jarvis_tools.cli.main",
+]
+
+[src]
+exclude = [
+    "**/.venv/",
+    "**/venv/",
+    "**/env/",
+    "**/.tox/",
+    "**/build/",
+    "**/dist/",
+    "**/.mypy_cache/",
+    "**/site-packages/",
+    "**/tests/",
+    "**/test_cases/",
+    "**/docs/",
+    "**/scripts/",
+    "**/builtin/",
+]
+
+[rules]
+# Configure rule levels
+# Note: ty has different rule names than mypy, these are approximations
+possibly-unresolved-reference = "warn"
+division-by-zero = "warn"
+unresolved-import = "warn"
+
+# Module-specific overrides
+[[overrides]]
+include = ["src/jarvis/**"]
+[overrides.rules]
+# For project modules, be stricter
+unresolved-import = "error"
+
+[[overrides]]
+include = ["src/jarvis/jarvis_mcp/**"]
+[overrides.rules]
+# MCP module uses third-party libraries - be more permissive
+unresolved-import = "ignore"
+
+[[overrides]]
+include = ["src/jarvis/jarvis_sec/**"]
+[overrides.rules]
+# Critical modules - stricter checking
+untyped-definition = "error"
+
+[[overrides]]
+include = ["src/jarvis/jarvis_c2rust/**"]
+[overrides.rules]
+# Critical modules - stricter checking
+untyped-definition = "error"
+
+[[overrides]]
+include = ["src/jarvis/jarvis_code_agent/**"]
+[overrides.rules]
+# Critical modules - stricter checking
+untyped-definition = "error"
+
+[[overrides]]
+include = ["src/jarvis/jarvis_tools/**"]
+[overrides.rules]
+# Legacy code - allow gradual migration
+untyped-definition = "warn"
+
+[[overrides]]
+include = ["tests/**"]
+[overrides.rules]
+# Test files can be more permissive
+untyped-definition = "ignore"
