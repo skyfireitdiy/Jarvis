@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import (
@@ -14,8 +15,31 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class ReadCodeTool:
     name = "read_code"
     description = "读取源代码文件的指定行号范围，并为每行添加行号后返回。"
+
+    def _get_preferred_encodings(self) -> List[str]:
+        """获取工具级优先编码顺序。Windows 优先 gbk，其他平台优先 utf-8。"""
+        if sys.platform == "win32":
+            return ["gbk", "utf-8"]
+        return ["utf-8", "gbk"]
+
+    def _read_text_with_preferred_encoding(self, file_path: str) -> str:
+        """使用工具级优先编码顺序读取文本文件。"""
+        for encoding in self._get_preferred_encodings():
+            try:
+                return read_text_file(
+                    file_path,
+                    encoding=encoding,
+                    detect_encoding=False,
+                    errors="strict",
+                )
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                break
+
+        return read_text_file(file_path)
+
     parameters = {
-        "type": "object",
         "properties": {
             "files": {
                 "type": "array",
@@ -103,8 +127,8 @@ class ReadCodeTool:
                     "stderr": "文件过大 (>10MB)",
                 }
 
-            # 读取文件内容（先检测编码）
-            content = read_text_file(abs_path, errors="ignore")
+            # 使用与 edit_file 一致的编码优先策略读取文件内容
+            content = self._read_text_with_preferred_encoding(abs_path)
             lines = content.splitlines()
 
             total_lines = len(lines)
@@ -271,7 +295,7 @@ class ReadCodeTool:
                 or filepath not in context_manager._file_cache
             ):
                 try:
-                    content = read_text_file(filepath, errors="replace")
+                    content = self._read_text_with_preferred_encoding(filepath)
                     context_manager.update_context_for_file(filepath, content)
                 except Exception:
                     # 如果读取失败，尝试获取已有上下文

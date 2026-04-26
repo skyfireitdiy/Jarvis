@@ -4,6 +4,7 @@ import difflib
 import os
 import re
 import shutil
+import sys
 
 from jarvis.jarvis_utils.config import (
     detect_file_encoding,
@@ -154,6 +155,35 @@ class EditFileNormalTool:
         return None
 
     @staticmethod
+    def _get_preferred_encodings() -> List[str]:
+        """获取工具级优先编码顺序。Windows 优先 gbk，其他平台优先 utf-8。"""
+        if sys.platform == "win32":
+            return ["gbk", "utf-8"]
+        return ["utf-8", "gbk"]
+
+    @staticmethod
+    def _read_text_with_preferred_encoding(
+        file_path: str,
+    ) -> Tuple[str, Optional[str]]:
+        """使用工具级优先编码顺序读取文本文件。"""
+        for encoding in EditFileNormalTool._get_preferred_encodings():
+            try:
+                return read_text_file(
+                    file_path,
+                    encoding=encoding,
+                    detect_encoding=False,
+                    errors="strict",
+                ), encoding
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                break
+
+        detected_encoding = detect_file_encoding(file_path)
+        content = read_text_file(file_path)
+        return content, detected_encoding
+
+    @staticmethod
     def _read_file_with_backup(
         file_path: str,
     ) -> Tuple[str, Optional[str], Optional[str]]:
@@ -172,9 +202,9 @@ class EditFileNormalTool:
         backup_path = None
         detected_encoding = None
         if os.path.exists(abs_path):
-            # 先检测编码
-            detected_encoding = detect_file_encoding(abs_path)
-            file_content = read_text_file(abs_path)
+            file_content, detected_encoding = (
+                EditFileNormalTool._read_text_with_preferred_encoding(abs_path)
+            )
             # 创建备份文件
             backup_path = abs_path + ".bak"
             try:
@@ -203,7 +233,7 @@ class EditFileNormalTool:
         Returns:
             (是否成功, 错误信息或None)
         """
-        enc = encoding or detect_file_encoding(abs_path) or get_default_encoding()
+        enc = encoding or get_default_encoding()
         try:
             with open(abs_path, "w", encoding=enc, errors="replace") as f:
                 f.write(content)
