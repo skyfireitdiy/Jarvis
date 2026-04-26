@@ -1170,9 +1170,28 @@ def load_config() -> None:
             _read_old_config_file(user_config_path.parent / "env")
             return
         else:
-            # 用户配置文件不存在，需要交互式配置
-            _interactive_config_setup(user_config_path)
-            return
+            # 用户配置文件不存在，自动创建默认配置文件
+            PrettyOutput.auto_print("ℹ️  配置文件不存在，正在创建默认配置...")
+            try:
+                schema_path = str(
+                    Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
+                )
+                user_config_path.parent.mkdir(parents=True, exist_ok=True)
+                generate_default_config(schema_path, str(user_config_path))
+                PrettyOutput.auto_print(f"✅ 已创建默认配置文件: {user_config_path}")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 创建默认配置文件失败: {e}")
+                # 创建一个最小可用的空配置
+                try:
+                    user_config_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(user_config_path, "w", encoding="utf-8") as f:
+                        f.write("# Jarvis 配置文件\n")
+                    PrettyOutput.auto_print(f"✅ 已创建空配置文件: {user_config_path}")
+                except Exception:
+                    PrettyOutput.auto_print("❌ 无法创建配置文件")
+                    return
+            # 继续加载配置文件
+            config_files.append(str(user_config_path))
 
         # 然后查找当前目录及其父目录中的项目配置文件
         project_config_files = _find_all_config_files(os.getcwd())
