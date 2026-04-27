@@ -141,7 +141,10 @@ def multiply(x, y):
         # 验证 stderr 包含详细的错误信息
         assert "stderr" in result
         assert result["stderr"] != ""
-        assert "未找到精确匹配的文本" in result["stderr"]
+        assert (
+            "未找到精确匹配的文本" in result["stderr"]
+            or "未找到可匹配的文本" in result["stderr"]
+        )
         assert (
             temp_file in result["stderr"]
             or os.path.basename(temp_file) in result["stderr"]
@@ -177,6 +180,7 @@ def multiply(x, y):
         assert (
             "第 2 个diff失败" in result["stderr"]
             or "未找到精确匹配" in result["stderr"]
+            or "未找到可匹配的文本" in result["stderr"]
         )
         # 验证不是只有文件列表
         assert (
@@ -221,9 +225,144 @@ def multiply(x, y):
         assert "stderr" in result
         assert result["stderr"] != ""
         # 应该包含失败文件的错误信息
-        assert "未找到精确匹配" in result["stderr"] or "失败" in result["stderr"]
+        assert (
+            "未找到精确匹配" in result["stderr"]
+            or "未找到可匹配的文本" in result["stderr"]
+            or "失败" in result["stderr"]
+        )
         # 验证成功文件的信息在 stdout 中
         assert "成功" in result["stdout"] or "修改成功" in result["stdout"]
+
+    def test_multiple_matches_fail_without_replace_all(self, tool):
+        """测试多匹配时默认失败，要求显式 replace_all。"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as f:
+            f.write('print("hello")\nprint("hello")\n')
+            temp_path = f.name
+
+        try:
+            result = tool.execute(
+                {
+                    "files": [
+                        {
+                            "file_path": temp_path,
+                            "diffs": [
+                                {
+                                    "search": 'print("hello")',
+                                    "replace": 'print("world")',
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+
+            assert result["success"] is False
+            assert "replace_all=false" in result["stderr"]
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_multiple_matches_success_with_replace_all(self, tool):
+        """测试多匹配时 replace_all=true 可全部替换。"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as f:
+            f.write('print("hello")\nprint("hello")\n')
+            temp_path = f.name
+
+        try:
+            result = tool.execute(
+                {
+                    "files": [
+                        {
+                            "file_path": temp_path,
+                            "diffs": [
+                                {
+                                    "search": 'print("hello")',
+                                    "replace": 'print("world")',
+                                    "replace_all": True,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+
+            assert result["success"] is True
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            assert content.count('print("world")') == 2
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_quote_normalization_finds_actual_search_text(self, tool):
+        """测试直引号 search 可匹配文件中的弯引号实际文本。"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("message = “Hello”\n")
+            temp_path = f.name
+
+        try:
+            result = tool.execute(
+                {
+                    "files": [
+                        {
+                            "file_path": temp_path,
+                            "diffs": [
+                                {
+                                    "search": 'message = "Hello"',
+                                    "replace": 'message = "World"',
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+
+            assert result["success"] is True
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            assert "message = “World”" in content
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
+
+    def test_preserve_curly_single_quote_style(self, tool):
+        """测试匹配到弯单引号时，replace 结果保持弯单引号风格。"""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("status = ‘done’\n")
+            temp_path = f.name
+
+        try:
+            result = tool.execute(
+                {
+                    "files": [
+                        {
+                            "file_path": temp_path,
+                            "diffs": [
+                                {
+                                    "search": "status = 'done'",
+                                    "replace": "status = 'ready'",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+
+            assert result["success"] is True
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            assert "status = ‘ready’" in content
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(temp_path + ".bak"):
+                os.remove(temp_path + ".bak")
 
     def test_multiple_edits_first_success_second_failure(self, tool, temp_file):
         """测试多处编辑，第一个成功，第二个失败"""
@@ -254,11 +393,13 @@ def multiply(x, y):
         assert (
             "第 2 个diff失败" in result["stderr"]
             or "未找到精确匹配" in result["stderr"]
+            or "未找到可匹配的文本" in result["stderr"]
         )
-        # 验证文件被部分修改（第一个成功的diff已应用）
+        # 当前实现下，当同一文件的后续 diff 失败时，不会写入前面成功的内存修改
         with open(temp_file, "r", encoding="utf-8") as f:
             content = f.read()
-            assert "def add(a, b, c=0):" in content
+            assert "def add(a, b, c=0):" not in content
+            assert "def add(a, b):" in content
 
     def test_invalid_args_missing_files(self, tool):
         """测试缺少 files 参数"""
