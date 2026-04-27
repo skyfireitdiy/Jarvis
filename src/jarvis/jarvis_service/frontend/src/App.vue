@@ -218,9 +218,22 @@
       @mousedown="focusWindow('terminal')"
     >
       <div class="terminal-panel-header" @mousedown="startTerminalPanelMove" @dblclick.stop="toggleTerminalMaximize">
-        <h3>终端</h3>
+        <div class="terminal-panel-title-group">
+          <h3>终端</h3>
+          <select
+            v-if="availableNodeOptions.length > 0"
+            v-model="selectedTerminalNodeId"
+            class="terminal-node-select"
+            @mousedown.stop
+            @click.stop
+          >
+            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+              {{ formatNodeOptionLabel(node) }}
+            </option>
+          </select>
+        </div>
         <div class="terminal-panel-actions">
-          <button class="icon-btn" @click="createTerminal" :disabled="!socket" title="新建终端">➕</button>
+          <button class="icon-btn" @click="createTerminalForSelectedNode" :disabled="!socket" title="新建终端">➕</button>
           <button class="icon-btn maximize-btn" @click="toggleTerminalMaximize" :title="isTerminalMaximized ? '还原' : '最大化'">
             {{ isTerminalMaximized ? '🗗' : '🗖' }}
           </button>
@@ -2683,6 +2696,7 @@ const newAgentQuickMode = ref(false) // 新 Agent 是否启用极速模式
 const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
+const selectedTerminalNodeId = ref('master')
 
 // 复制 Agent 时跳过 watch 中的名称设置
 let skipNameWatch = false
@@ -3901,6 +3915,20 @@ function formatNodeOptionLabel(node) {
   const status = String(node?.status || node?.runtime_status || '').trim()
   return status ? `${nodeId} (${status})` : nodeId
 }
+
+function getDefaultTerminalNodeId(nodes = []) {
+  if (nodes.some(node => node.node_id === 'master')) {
+    return 'master'
+  }
+  return nodes[0]?.node_id || ''
+}
+
+watch(availableNodeOptions, (nodes) => {
+  const hasSelectedNode = nodes.some(node => node.node_id === selectedTerminalNodeId.value)
+  if (!hasSelectedNode) {
+    selectedTerminalNodeId.value = getDefaultTerminalNodeId(nodes)
+  }
+}, { immediate: true })
 
 function getAgentNodeLabel(agent) {
   return String(agent?.node_id || '').trim() || 'master'
@@ -6227,6 +6255,31 @@ function createTerminal() {
   }
   socket.value.send(JSON.stringify(message))
   
+  // 自动打开终端面板
+  showTerminalPanel.value = true
+}
+
+function createTerminalForSelectedNode() {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+
+  const nodeId = String(selectedTerminalNodeId.value || '').trim()
+  if (!nodeId) {
+    console.warn('[independent-terminal] No terminal node selected')
+    return
+  }
+
+  console.log('[independent-terminal] Creating terminal for node:', nodeId)
+  const message = {
+    type: 'terminal_create',
+    payload: {
+      node_id: nodeId,
+    },
+  }
+  socket.value.send(JSON.stringify(message))
+
   // 自动打开终端面板
   showTerminalPanel.value = true
 }
