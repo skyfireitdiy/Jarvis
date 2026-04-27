@@ -640,8 +640,18 @@
     <div class="modal-overlay" v-if="showCreateAgentModal">
       <div class="modal create-agent-modal">
         <h2>创建 Agent</h2>
-        <div class="form-grid">
-          <div class="form-column">
+        <div class="form-grid create-agent-layout">
+          <div class="form-column create-agent-column create-agent-column-left">
+            <div class="form-group" v-if="availableNodeOptions.length > 0">
+              <label>目标节点</label>
+              <select v-model="newAgentNodeId" class="form-control">
+                <option value="">默认节点（当前网关决定）</option>
+                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                  {{ formatNodeOptionLabel(node) }}
+                </option>
+              </select>
+              <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
+            </div>
             <div class="form-group">
               <label>Agent 类型</label>
               <div class="radio-group">
@@ -657,28 +667,11 @@
                 </label>
               </div>
             </div>
+          </div>
+          <div class="form-column create-agent-column create-agent-column-right">
             <div class="form-group">
               <label>Agent 名称（可选）</label>
               <input v-model="newAgentName" type="text" class="form-control" placeholder="例如：开发环境Agent" />
-            </div>
-            <div class="form-group">
-              <label>工作目录</label>
-              <div class="input-with-button">
-                <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
-                <button class="btn select-dir-btn" @click="openDirDialog">选择目录</button>
-              </div>
-            </div>
-          </div>
-          <div class="form-column">
-            <div class="form-group" v-if="availableNodeOptions.length > 0">
-              <label>目标节点</label>
-              <select v-model="newAgentNodeId" class="form-control">
-                <option value="">默认节点（当前网关决定）</option>
-                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                  {{ formatNodeOptionLabel(node) }}
-                </option>
-              </select>
-              <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
             </div>
             <div class="form-group">
               <label>模型组</label>
@@ -688,41 +681,48 @@
                 </option>
               </select>
             </div>
-          </div>
-          <div class="form-column">
-            <div v-if="newAgentType === 'codeagent'" class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input v-model="newCodeAgentWorktree" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">启用 worktree</span>
-                  <span class="form-help">为代码 Agent 使用独立 git worktree 进行隔离开发。</span>
-                </div>
+            <div class="form-group">
+              <label>工作目录</label>
+              <div class="input-with-button">
+                <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
+                <button class="btn select-dir-btn" @click="openDirDialog">选择目录</button>
               </div>
             </div>
-            <div class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input v-model="newAgentQuickMode" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">极速模式</span>
-                  <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
+            <div class="form-column create-agent-options-column">
+              <div v-if="newAgentType === 'codeagent'" class="form-group">
+                <div class="toggle-wrapper">
+                  <label class="toggle-switch">
+                    <input v-model="newCodeAgentWorktree" type="checkbox" class="toggle-input" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="toggle-info">
+                    <span class="toggle-label-text">启用 worktree</span>
+                    <span class="form-help">为代码 Agent 使用独立 git worktree 进行隔离开发。</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input v-model="newAgentRestoreSession" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">启动时恢复会话</span>
-                  <span class="form-help">启动时自动恢复上次会话。</span>
+              <div class="form-group">
+                <div class="toggle-wrapper">
+                  <label class="toggle-switch">
+                    <input v-model="newAgentQuickMode" type="checkbox" class="toggle-input" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="toggle-info">
+                    <span class="toggle-label-text">极速模式</span>
+                    <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <div class="toggle-wrapper">
+                  <label class="toggle-switch">
+                    <input v-model="newAgentRestoreSession" type="checkbox" class="toggle-input" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="toggle-info">
+                    <span class="toggle-label-text">启动时恢复会话</span>
+                    <span class="form-help">启动时自动恢复上次会话。</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -8418,8 +8418,8 @@ body::-webkit-scrollbar {
 
 /* 创建 Agent 弹窗 */
 .modal-overlay .modal.create-agent-modal {
-  max-width: 1800px !important;
-  width: 90%;
+  max-width: min(50vw, 960px) !important;
+  width: min(50vw, 960px);
   max-height: calc(var(--app-height, 100vh) - 40px);
   overflow-y: auto;
 }
@@ -8433,8 +8433,12 @@ body::-webkit-scrollbar {
 /* 响应式网格布局 */
 .create-agent-modal .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
+}
+
+.create-agent-modal .form-grid.create-agent-layout {
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+  align-items: start;
 }
 
 .create-agent-modal .form-column {
@@ -8443,16 +8447,30 @@ body::-webkit-scrollbar {
   gap: 16px;
 }
 
-/* 平板端：2列布局 */
+.create-agent-modal .create-agent-options-column {
+  gap: 12px;
+}
+
+/* 平板及以下：保持双列但允许更紧凑 */
 @media (max-width: 1023px) {
-  .create-agent-modal .form-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .modal-overlay .modal.create-agent-modal {
+    width: 90%;
+    max-width: 900px !important;
+  }
+
+  .create-agent-modal .form-grid.create-agent-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 /* 移动端：单列布局 */
 @media (max-width: 768px) {
-  .create-agent-modal .form-grid {
+  .modal-overlay .modal.create-agent-modal {
+    width: 100%;
+    max-width: 100% !important;
+  }
+
+  .create-agent-modal .form-grid.create-agent-layout {
     grid-template-columns: 1fr;
   }
 }
