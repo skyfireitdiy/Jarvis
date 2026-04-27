@@ -220,6 +220,8 @@
       <div class="terminal-panel-header" @mousedown="startTerminalPanelMove" @dblclick.stop="toggleTerminalMaximize">
         <div class="terminal-panel-title-group">
           <h3>终端</h3>
+        </div>
+        <div class="terminal-panel-actions">
           <select
             v-if="availableNodeOptions.length > 0"
             v-model="selectedTerminalNodeId"
@@ -231,8 +233,6 @@
               {{ formatNodeOptionLabel(node) }}
             </option>
           </select>
-        </div>
-        <div class="terminal-panel-actions">
           <button class="icon-btn" @click="createTerminalForSelectedNode" :disabled="!socket" title="新建终端">➕</button>
           <button class="icon-btn maximize-btn" @click="toggleTerminalMaximize" :title="isTerminalMaximized ? '还原' : '最大化'">
             {{ isTerminalMaximized ? '🗗' : '🗖' }}
@@ -6608,9 +6608,6 @@ watch(showTerminalPanel, (newValue, oldValue) => {
   } else if (newValue && !oldValue) {
     ensureTerminalPanelInViewport()
     saveTerminalPanelRect()
-    if (terminalSessions.value.length === 0 && !isCreatingTerminalSession.value) {
-      createTerminal()
-    }
     console.log('[independent-terminal] Panel showing, enabling ResizeObserver for active terminal')
     nextTick(() => {
       const activeSession = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
@@ -10167,6 +10164,42 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   color: #e6edf3;
+}
+
+.terminal-panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.terminal-node-select {
+  height: 32px;
+  min-width: 168px;
+  max-width: 240px;
+  padding: 0 32px 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  font-size: 13px;
+  line-height: 32px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.terminal-node-select:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.terminal-node-select:focus {
+  border-color: rgba(96, 165, 250, 0.9);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+.terminal-node-select option {
+  color: #111827;
 }
 
 .terminal-panel-actions {
