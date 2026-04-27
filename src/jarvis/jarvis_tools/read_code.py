@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
@@ -94,8 +95,36 @@ class ReadCodeTool:
             limit_tokens = int(max_input_tokens * 1 / 2)
             return limit_tokens
         except Exception:
-            # 如果获取失败，使用默认值（假设200000 token，2/3是133333）
-            return 33333
+            # 如果获取失败，使用安全回退值
+            return 33333  # noqa: 保守回退值，约等于假设100k tokens的1/3
+
+    @staticmethod
+    def _normalize_line_range(
+        start_line: int, end_line: int, total_lines: int
+    ) -> Tuple[int, int]:
+        """将可能为负数或-1的行号规范化为有效范围。"""
+        if end_line == -1:
+            end_line = total_lines
+        else:
+            end_line = (
+                max(1, min(end_line, total_lines))
+                if end_line >= 0
+                else total_lines + end_line + 1
+            )
+        start_line = (
+            max(1, min(start_line, total_lines))
+            if start_line >= 0
+            else total_lines + start_line + 1
+        )
+        return start_line, end_line
+
+    @staticmethod
+    def _format_numbered_lines(lines: List[str], start_line: int) -> str:
+        """为每行添加行号并拼接为字符串。"""
+        numbered = []
+        for i, line in enumerate(lines, start=start_line):
+            numbered.append(f"{i:4d}:{line.rstrip(chr(10) + chr(13))}")
+        return "\n".join(numbered)
 
     def _handle_single_file(
         self,
@@ -149,20 +178,8 @@ class ReadCodeTool:
                     "stderr": "",
                 }
 
-            # 处理特殊值-1表示文件末尾
-            if end_line == -1:
-                end_line = total_lines
-            else:
-                end_line = (
-                    max(1, min(end_line, total_lines))
-                    if end_line >= 0
-                    else total_lines + end_line + 1
-                )
-
-            start_line = (
-                max(1, min(start_line, total_lines))
-                if start_line >= 0
-                else total_lines + start_line + 1
+            start_line, end_line = self._normalize_line_range(
+                start_line, end_line, total_lines
             )
 
             if start_line > end_line:
@@ -174,18 +191,7 @@ class ReadCodeTool:
 
             # 读取指定行号范围的内容
             selected_lines = lines[start_line - 1 : end_line]
-
-            # 为每行添加行号
-            numbered_lines = []
-            for i, line in enumerate(selected_lines, start=start_line):
-                # 行号右对齐，占4位
-                line_number_str = f"{i:4d}"
-                # 移除行尾的换行符，因为我们会在后面统一添加
-                line_content = line.rstrip("\n\r")
-                numbered_lines.append(f"{line_number_str}:{line_content}")
-
-            # 构造输出内容
-            output_content = "\n".join(numbered_lines)
+            output_content = self._format_numbered_lines(selected_lines, start_line)
 
             # 估算token数
             content_tokens = get_context_token_count(output_content)
@@ -202,14 +208,9 @@ class ReadCodeTool:
 
                 # 读取安全范围内的内容
                 safe_selected_lines = lines[start_line - 1 : safe_end_line]
-                safe_numbered_lines = []
-                for i, line in enumerate(safe_selected_lines, start=start_line):
-                    line_number_str = f"{i:4d}"
-                    line_content = line.rstrip("\n\r")
-                    safe_numbered_lines.append(f"{line_number_str}:{line_content}")
-
-                # 构造部分读取结果
-                partial_content = "\n".join(safe_numbered_lines)
+                partial_content = self._format_numbered_lines(
+                    safe_selected_lines, start_line
+                )
 
                 return {
                     "success": True,
@@ -258,7 +259,14 @@ class ReadCodeTool:
                     files = [abs_path]
                 agent.set_user_data("files", files)
 
-            return {"success": True, "stdout": output, "stderr": ""}
+            return {
+                "success": True,
+                "stdout": output,
+                "stderr": "",
+                "actual_start_line": start_line,
+                "actual_end_line": end_line,
+                "total_lines": total_lines,
+            }
 
         except UnicodeDecodeError as e:
             error_msg = (
@@ -451,32 +459,18 @@ class ReadCodeTool:
             min_start = float("inf")
             max_end = 0
             for req in requests:
-                start_line = req.get("start_line", 1)
-                end_line = req.get("end_line", -1)
-
-                # 处理特殊值
-                if end_line == -1:
-                    end_line = total_lines
-                else:
-                    end_line = (
-                        max(1, min(end_line, total_lines))
-                        if end_line >= 0
-                        else total_lines + end_line + 1
-                    )
-                start_line = (
-                    max(1, min(start_line, total_lines))
-                    if start_line >= 0
-                    else total_lines + start_line + 1
+                start_line, end_line = self._normalize_line_range(
+                    req.get("start_line", 1),
+                    req.get("end_line", -1),
+                    total_lines,
                 )
-
                 min_start = min(min_start, start_line)
                 max_end = max(max_end, end_line)
 
             # 用合并后的范围读取一次，自然就去重了
-            result = self._handle_single_file(
+            return self._handle_single_file(
                 filepath, int(min_start), int(max_end), agent
             )
-            return result
 
         except Exception as e:
             return {
@@ -542,37 +536,16 @@ class ReadCodeTool:
                     if total_lines == 0:
                         continue
 
-                    # 计算实际要读取的行范围
-                    if end_line == -1:
-                        actual_end_line = total_lines
-                    else:
-                        actual_end_line = (
-                            max(1, min(end_line, total_lines))
-                            if end_line >= 0
-                            else total_lines + end_line + 1
-                        )
-
-                    actual_start_line = (
-                        max(1, min(start_line, total_lines))
-                        if start_line >= 0
-                        else total_lines + start_line + 1
+                    actual_start_line, actual_end_line = self._normalize_line_range(
+                        start_line, end_line, total_lines
                     )
 
                     if actual_start_line <= actual_end_line:
                         # 读取指定行号范围的内容
                         selected_lines = lines[actual_start_line - 1 : actual_end_line]
-
-                        # 为每行添加行号
-                        numbered_lines = []
-                        for i, line in enumerate(
-                            selected_lines, start=actual_start_line
-                        ):
-                            line_number_str = f"{i:4d}"
-                            line_content = line.rstrip("\n\r")
-                            numbered_lines.append(f"{line_number_str}:{line_content}")
-
-                        # 构造输出内容用于token估算
-                        output_content = "\n".join(numbered_lines)
+                        output_content = self._format_numbered_lines(
+                            selected_lines, actual_start_line
+                        )
                         content_tokens = get_context_token_count(output_content)
 
                         file_read_info.append(
@@ -614,8 +587,6 @@ class ReadCodeTool:
 
             # 第二遍：实际读取文件（按文件分组，合并同一文件的多个范围请求，避免块重复）
             # 按文件路径分组
-            from collections import defaultdict
-
             file_requests = defaultdict(list)
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
@@ -637,42 +608,13 @@ class ReadCodeTool:
                     )
                     if result["success"]:
                         all_outputs.append(result["stdout"])
-                        # 提取真实读取的实际范围信息
-                        try:
-                            # 从result输出中解析真实的读取范围
-                            stdout_lines = result["stdout"].split("\n")
-                            actual_range_line = None
-                            total_lines_line = None
-                            for line in stdout_lines:
-                                if "📊 读取范围:" in line:
-                                    actual_range_line = line
-                                elif "📄 总行数:" in line:
-                                    total_lines_line = line
-                            if actual_range_line and total_lines_line:
-                                # 从实际输出中提取真实范围
-                                import re
-
-                                range_match = re.search(
-                                    r"📊 读取范围: (\d+)-(\d+)", actual_range_line
-                                )
-                                if range_match:
-                                    actual_start = range_match.group(1)
-                                    actual_end = range_match.group(2)
-                                    status_lines.append(
-                                        f"✅ {file_info['path']} 文件读取成功 (实际范围: {actual_start}-{actual_end})"
-                                    )
-                                else:
-                                    # 如果无法解析范围，则显示请求的范围
-                                    status_lines.append(
-                                        f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
-                                    )
-                            else:
-                                # 如果无法从输出中找到范围信息，也显示请求的范围
-                                status_lines.append(
-                                    f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
-                                )
-                        except Exception:
-                            # 如果解析失败，回退到原始行为
+                        actual_start = result.get("actual_start_line")
+                        actual_end = result.get("actual_end_line")
+                        if actual_start is not None and actual_end is not None:
+                            status_lines.append(
+                                f"✅ {file_info['path']} 文件读取成功 (实际范围: {actual_start}-{actual_end})"
+                            )
+                        else:
                             status_lines.append(
                                 f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
                             )
@@ -690,60 +632,19 @@ class ReadCodeTool:
                     display_path = requests[0]["path"]
                     if merged_result["success"]:
                         all_outputs.append(merged_result["stdout"])
-                        # 获取真实读取的范围信息
-                        try:
-                            # 从merged_result输出中解析真实的读取范围
-                            stdout_lines = merged_result["stdout"].split("\n")
-                            actual_range_line = None
-                            total_lines_line = None
-                            for line in stdout_lines:
-                                if "📊 读取范围:" in line:
-                                    actual_range_line = line
-                                elif "📄 总行数:" in line:
-                                    total_lines_line = line
-                            if actual_range_line and total_lines_line:
-                                # 从实际输出中提取真实范围
-                                import re
-
-                                range_match = re.search(
-                                    r"📊 读取范围: (\d+)-(\d+)", actual_range_line
-                                )
-                                if range_match:
-                                    actual_start = range_match.group(1)
-                                    actual_end = range_match.group(2)
-                                    status_lines.append(
-                                        f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，实际范围: {actual_start}-{actual_end})"
-                                    )
-                                else:
-                                    # 如果无法解析范围，则显示请求的合并范围
-                                    min_start = min(
-                                        req.get("start_line", 1) for req in requests
-                                    )
-                                    max_end = max(
-                                        req.get("end_line", -1) for req in requests
-                                    )
-                                    status_lines.append(
-                                        f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
-                                    )
-                            else:
-                                # 如果无法从输出中找到范围信息，显示请求的合并范围
-                                min_start = min(
-                                    req.get("start_line", 1) for req in requests
-                                )
-                                max_end = max(
-                                    req.get("end_line", -1) for req in requests
-                                )
-                                status_lines.append(
-                                    f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
-                                )
-                        except Exception:
-                            # 如果解析失败，回退到原始行为
+                        actual_start = merged_result.get("actual_start_line")
+                        actual_end = merged_result.get("actual_end_line")
+                        if actual_start is not None and actual_end is not None:
+                            status_lines.append(
+                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，实际范围: {actual_start}-{actual_end})"
+                            )
+                        else:
                             min_start = min(
                                 req.get("start_line", 1) for req in requests
                             )
                             max_end = max(req.get("end_line", -1) for req in requests)
                             status_lines.append(
-                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，范围: {min_start}-{max_end})"
+                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
                             )
                     else:
                         all_outputs.append(
@@ -768,121 +669,3 @@ class ReadCodeTool:
         except Exception as e:
             PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}
-
-
-def main() -> None:
-    """测试读取功能"""
-    import os
-    import tempfile
-
-    tool = ReadCodeTool()
-
-    PrettyOutput.auto_print("=" * 80)
-    PrettyOutput.auto_print("测试读取功能")
-    PrettyOutput.auto_print("=" * 80)
-
-    # 测试1: 基本读取
-    PrettyOutput.auto_print("【测试1】基本读取")
-    PrettyOutput.auto_print("-" * 80)
-
-    test_code = """def hello():
-    PrettyOutput.auto_print("Hello, World!")
-
-def add(a, b):
-    return a + b
-
-def sub(a, b):
-    return a - b
-"""
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        test_file = f.name
-        f.write(test_code)
-
-    try:
-        result = tool.execute(
-            {
-                "files": [{"path": test_file, "start_line": 1, "end_line": -1}],
-                "agent": None,
-            }
-        )
-
-        if result["success"]:
-            PrettyOutput.auto_print("✅ 文件读取成功")
-            PrettyOutput.auto_print("输出内容:")
-            PrettyOutput.auto_print(result["stdout"])
-        else:
-            PrettyOutput.auto_print(f"❌ 文件读取失败: {result['stderr']}")
-    finally:
-        os.unlink(test_file)
-
-    # 测试2: 指定行号范围
-    PrettyOutput.auto_print("【测试2】指定行号范围读取")
-    PrettyOutput.auto_print("-" * 80)
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        test_file2 = f.name
-        f.write(test_code)
-
-    try:
-        result = tool.execute(
-            {
-                "files": [{"path": test_file2, "start_line": 1, "end_line": 3}],
-                "agent": None,
-            }
-        )
-
-        if result["success"]:
-            PrettyOutput.auto_print("✅ 指定范围读取成功")
-            PrettyOutput.auto_print("输出内容:")
-            PrettyOutput.auto_print(result["stdout"])
-        else:
-            PrettyOutput.auto_print(f"❌ 指定范围读取失败: {result['stderr']}")
-    finally:
-        os.unlink(test_file2)
-
-    # 测试3: 多个文件
-    PrettyOutput.auto_print("【测试3】多个文件读取")
-    PrettyOutput.auto_print("-" * 80)
-
-    with (
-        tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f1,
-        tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f2,
-    ):
-        test_file3 = f1.name
-        test_file4 = f2.name
-        f1.write(test_code)
-        f2.write(test_code)
-
-    try:
-        result = tool.execute(
-            {
-                "files": [
-                    {"path": test_file3, "start_line": 1, "end_line": -1},
-                    {"path": test_file4, "start_line": 1, "end_line": -1},
-                ],
-                "agent": None,
-            }
-        )
-
-        if result["success"]:
-            PrettyOutput.auto_print("✅ 多文件读取成功")
-            PrettyOutput.auto_print("输出内容（前500字符）:")
-            PrettyOutput.auto_print(
-                result["stdout"][:500] + "..."
-                if len(result["stdout"]) > 500
-                else result["stdout"]
-            )
-        else:
-            PrettyOutput.auto_print(f"❌ 多文件读取失败: {result['stderr']}")
-    finally:
-        os.unlink(test_file3)
-        os.unlink(test_file4)
-
-    PrettyOutput.auto_print("" + "=" * 80)
-    PrettyOutput.auto_print("测试完成")
-    PrettyOutput.auto_print("=" * 80)
-
-
-if __name__ == "__main__":
-    main()
