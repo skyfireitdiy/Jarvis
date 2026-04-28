@@ -25,21 +25,7 @@ class ReadCodeTool:
         return ["utf-8", "gbk"]
 
     def _read_text_with_preferred_encoding(self, file_path: str) -> str:
-        """使用工具级优先编码顺序严格读取文本文件。"""
-        last_decode_error: Optional[UnicodeDecodeError] = None
-        for encoding in self._get_preferred_encodings():
-            try:
-                return read_text_file(
-                    file_path,
-                    encoding=encoding,
-                    detect_encoding=False,
-                    errors="strict",
-                )
-            except UnicodeDecodeError as exc:
-                last_decode_error = exc
-                continue
-
-        # 优先编码尝试失败后，使用 detect_file_encoding 作为回退
+        """使用 detect_file_encoding 直接识别编码并读取文本文件。"""
         detected_encoding = detect_file_encoding(file_path)
         if detected_encoding:
             try:
@@ -52,15 +38,8 @@ class ReadCodeTool:
             except (UnicodeDecodeError, LookupError):
                 pass
 
-        if last_decode_error is not None:
-            raise last_decode_error
-        raise UnicodeDecodeError(
-            "unknown",
-            b"",
-            0,
-            1,
-            "无法按支持的编码读取文件，请使用 sed 直接读取原始字符",
-        )
+        # 回退到默认读取方式
+        return read_text_file(file_path)
 
     parameters = {
         "properties": {
