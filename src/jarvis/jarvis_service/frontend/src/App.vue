@@ -1165,6 +1165,7 @@ const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 const connecting = ref(false)
+const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
 const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 const isRestartingGateway = ref(false)
@@ -3328,7 +3329,7 @@ async function connectToAgent(agent, retryCount = 0) {
   const { host, port } = getGatewayAddress()
   const url = buildAgentWebSocketUrl(host, agentId, null, port, String(agent?.node_id || 'master').trim())
   
-  connecting.value = true
+  agentConnecting.value = true
   
   // 返回 Promise，等待连接真正建立
   return new Promise((resolve, reject) => {
@@ -3368,12 +3369,12 @@ async function connectToAgent(agent, retryCount = 0) {
           
           if (retryCount < maxRetries) {
             console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
-            connecting.value = false
+            agentConnecting.value = false
             setTimeout(() => {
               connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
             }, retryDelay)
           } else {
-            connecting.value = false
+            agentConnecting.value = false
             const error = new Error(`Connection failed after ${maxRetries} retries`)
             console.error(`[AGENT ${agentId}]`, error.message)
             reject(error)
@@ -3405,7 +3406,7 @@ async function connectToAgent(agent, retryCount = 0) {
         
         clearTimeout(timeoutId)
         console.log(`[AGENT ${agentId}] Connected to ${url}`)
-        connecting.value = false
+        agentConnecting.value = false
         
         // 保存连接
         sockets.value.set(agentId, ws)
@@ -3433,7 +3434,7 @@ async function connectToAgent(agent, retryCount = 0) {
         clearTimeout(timeoutId)
         console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason}`)
         sockets.value.delete(agentId)
-        if (connecting.value) connecting.value = false
+        if (agentConnecting.value) agentConnecting.value = false
         
         // 如果连接未完成就关闭，视为失败，触发重试
         if (!ws._connectionCompleted && retryCount < maxRetries) {
@@ -3474,7 +3475,7 @@ async function connectToAgent(agent, retryCount = 0) {
         
         clearTimeout(timeoutId)
         console.error(`[AGENT ${agentId}] Connection error:`, error)
-        if (connecting.value) connecting.value = false
+        if (agentConnecting.value) agentConnecting.value = false
         
         // 触发重试
         if (retryCount < maxRetries) {
@@ -3511,7 +3512,7 @@ async function connectToAgent(agent, retryCount = 0) {
       
     } catch (error) {
       console.error(`[AGENT ${agentId}] Failed to connect:`, error)
-      connecting.value = false
+      agentConnecting.value = false
       
       if (retryCount < maxRetries) {
         console.log(`[AGENT ${agentId}] Exception occurred, retrying... (${retryCount + 1}/${maxRetries})`)
