@@ -19,10 +19,7 @@ Jarvis 安全分析套件
 - 模块化重构：将功能拆分为多个模块（prompts, parsers, utils, agents, clustering, analysis, verification, review）
 """
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -38,7 +35,7 @@ from jarvis.jarvis_sec.utils import (
     group_candidates_by_file as _group_candidates_by_file,
 )
 from jarvis.jarvis_sec.utils import create_report_writer as _create_report_writer
-from jarvis.jarvis_sec.clustering import (
+from jarvis.jarvis_sec.clustering import (  # type: ignore[attr-defined]
     process_clustering_phase as _process_clustering_phase,
 )
 from jarvis.jarvis_sec.verification import (
@@ -198,7 +195,7 @@ def run_security_analysis(
         from jarvis.jarvis_sec.report import build_json_and_markdown
 
         result = build_json_and_markdown(
-            all_issues,  # type: ignore[arg-type]
+            all_issues,  # type: ignore
             scanned_root=summary.get("scanned_root"),
             scanned_files=summary.get("scanned_files"),
             meta=meta_records or None,

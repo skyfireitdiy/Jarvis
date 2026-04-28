@@ -4,7 +4,7 @@
 import os
 
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from prompt_toolkit import prompt
 from rich.console import Console
 from rich.table import Table

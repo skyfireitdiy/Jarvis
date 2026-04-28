@@ -342,7 +342,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("📋 未找到已保存的会话文件。")
             else:
                 PrettyOutput.auto_print(f"📋 找到 {len(sessions)} 个会话文件：")
-                for idx, (file_path, timestamp, session_name) in enumerate(sessions, 1):
+                for idx, (file_path, timestamp, session_name, _) in enumerate(
+                    sessions, 1
+                ):
                     # 获取文件大小
                     try:
                         file_size = os.path.getsize(file_path)
@@ -446,7 +448,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 prefix=agent.prefix,
                 suffix=agent.suffix,
                 agent=agent,
-                post_process_func=agent.post_process_manager.post_process_modified_files,
+                post_process_func=agent.post_process_manager.post_process_modified_files,  # type: ignore[attr-defined]
                 skip_confirm=True,
             )
 

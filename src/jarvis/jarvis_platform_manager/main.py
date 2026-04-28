@@ -6,7 +6,7 @@
 import os
 import sys
 from pathlib import Path
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -141,7 +141,7 @@ def llm_list() -> None:
 
 @llm_app.command("show")
 def llm_show(
-    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
 ) -> None:
     """显示指定 LLM 配置详情"""
     config = _load_config()
@@ -185,7 +185,7 @@ def llm_show(
 
 @llm_app.command("delete")
 def llm_delete(
-    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
 ) -> None:
     """删除指定的 LLM 配置"""
     config = _load_config()
@@ -591,7 +591,7 @@ def llm_add() -> None:
 
 @llm_app.command("update")
 def llm_update(
-    name: str = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="LLM 配置名称，不指定则交互式选择"),
 ) -> None:
     """更新指定的 LLM 配置（交互式）"""
     from jarvis.jarvis_utils.input import get_single_line_input
@@ -744,7 +744,7 @@ def group_list() -> None:
 
 @group_app.command("show")
 def group_show(
-    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
 ) -> None:
     """显示指定模型组详情"""
     config = _load_config()
@@ -780,7 +780,7 @@ def group_show(
 
 @group_app.command("delete")
 def group_delete(
-    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
 ) -> None:
     """删除指定的模型组"""
     config = _load_config()
@@ -926,7 +926,7 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
 
 @group_app.command("update")
 def group_update(
-    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
 ) -> None:
     """更新指定的模型组（交互式）"""
     from jarvis.jarvis_utils.input import get_single_line_input
@@ -1022,7 +1022,7 @@ def group_update(
 
 @group_app.command("set")
 def group_set(
-    name: str = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
+    name: Optional[str] = typer.Argument(None, help="模型组名称，不指定则交互式选择"),
 ) -> None:
     """设置当前激活的模型组"""
     config = _load_config()

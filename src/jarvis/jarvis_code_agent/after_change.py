@@ -14,7 +14,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_utils.config import get_data_dir, read_text_file
 

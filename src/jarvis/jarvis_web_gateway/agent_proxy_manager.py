@@ -233,7 +233,7 @@ class AgentProxyManager:
                 agent_url,
                 close_timeout=self._ws_timeout,
                 proxy=None,  # 禁用自动代理，直接连接本地Agent
-                subprotocols=subprotocols,
+                subprotocols=subprotocols,  # type: ignore[arg-type]
             )
         except Exception as e:
             logger.error(f"[PROXY MANAGER] Failed to connect to agent WebSocket: {e}")

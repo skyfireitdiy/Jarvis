@@ -13,7 +13,7 @@ import shutil
 import uuid
 from typing import Any, Dict, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 import websockets
 from fastapi import WebSocket
@@ -348,8 +348,8 @@ class NodeConnectionManager:
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             agent_info = self._agent_manager.create_agent(
                 auth_token=auth_token,
-                agent_type=payload.get("agent_type"),
-                working_dir=payload.get("working_dir"),
+                agent_type=str(payload.get("agent_type", "default")),
+                working_dir=str(payload.get("working_dir", ".")),
                 name=payload.get("name"),
                 llm_group=payload.get("llm_group", "default"),
                 tool_group=payload.get("tool_group", "default"),
@@ -577,7 +577,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,
+                subprotocols=subprotocols,  # type: ignore[arg-type]
             ) as agent_ws:
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
@@ -647,7 +647,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,
+                subprotocols=subprotocols,  # type: ignore[arg-type]
             )
             self._agent_ws_sessions[session_id] = agent_ws
             logger.info(
@@ -950,7 +950,7 @@ class NodeConnectionManager:
                 logger.info("[NODE CONFIG SYNC] backed up config to %s", backup_file)
 
             # 读取现有配置
-            existing_config = {}
+            existing_config: Dict[str, Any] = {}
             if config_file.exists():
                 with open(config_file, "r", encoding="utf-8") as f:
                     existing_config = yaml.safe_load(f) or {}

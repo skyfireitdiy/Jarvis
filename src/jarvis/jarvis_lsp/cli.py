@@ -6,6 +6,7 @@
 import asyncio
 import json
 import os
+from dataclasses import asdict
 from typing import Optional
 
 import typer
@@ -592,7 +593,7 @@ def callers_by_name_command(
         locations = await client.callers_by_name(
             language, project_path, file_path, symbol_name
         )
-        return locations
+        return [asdict(loc) for loc in locations]
 
     try:
         locations = asyncio.run(run())

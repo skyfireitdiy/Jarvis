@@ -2184,7 +2184,7 @@ class Agent:
         try:
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
         except ImportError:
-            CodeAgent = None
+            CodeAgent = None  # type: ignore[assignment, misc]
 
         try:
             # 保存原始任务目标（用于长期运行时的上下文保持）

@@ -5,7 +5,7 @@ Quick Config CLI 工具
 """
 
 import json
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pathlib import Path
 import typer
 from rich.console import Console

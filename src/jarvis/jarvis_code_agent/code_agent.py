@@ -750,9 +750,12 @@ git reset --hard {start_commit}
 
                 #
                 latest_commit_hash = get_latest_commit_hash()
-                diff_lines = get_diff_between_commits(
-                    self.start_commit, latest_commit_hash
-                )
+                if self.start_commit and latest_commit_hash:
+                    diff_lines = get_diff_between_commits(
+                        self.start_commit, latest_commit_hash
+                    )
+                else:
+                    diff_lines = ""
                 if diff_lines:
                     lines_added = sum(
                         1
@@ -765,9 +768,10 @@ git reset --hard {start_commit}
                         if line.startswith("-") and not line.startswith("---")
                     )
                     total_lines = lines_added + lines_removed
-                    commits = self.git_manager.get_commits_between(
-                        self.start_commit, latest_commit_hash
+                    assert (
+                        self.start_commit is not None and latest_commit_hash is not None
                     )
+                    commits = get_commits_between(self.start_commit, latest_commit_hash)
                     if total_lines > 1000:
                         # 在压缩前创建备份分支
                         try:

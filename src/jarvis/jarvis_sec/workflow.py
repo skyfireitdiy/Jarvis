@@ -610,7 +610,7 @@ def analyze_from_json(
             try:
                 # 创建临时输出文件
                 temp_output = ""
-                with tempfile.NamedTemporaryFile(  # type: ignore[arg-type]
+                with tempfile.NamedTemporaryFile(  # type: ignore[assignment]
                     mode="w", suffix=".json", delete=False, encoding="utf-8"
                 ) as f:
                     temp_output = f.name
@@ -662,7 +662,7 @@ def analyze_from_json(
 
     # 导入必要的模块
     from jarvis.jarvis_sec.utils import prepare_candidates as _prepare_candidates
-    from jarvis.jarvis_sec.clustering import (
+    from jarvis.jarvis_sec.clustering import (  # type: ignore[attr-defined]
         process_clustering_phase as _process_clustering_phase,
     )
     from jarvis.jarvis_sec.verification import (
@@ -685,20 +685,20 @@ def analyze_from_json(
 
         # 创建状态管理器（空实现）
         class DummyStatusManager:
-            def update_clustering(self, **kwargs):
+            def update_clustering(self, **kwargs: Any) -> None:
                 pass
 
-            def update_verification(self, **kwargs):
+            def update_verification(self, **kwargs: Any) -> None:
                 pass
 
         status_mgr = DummyStatusManager()
 
         # 进度回调（空实现）
-        def _progress_append(event):
+        def _progress_append(event: Any) -> None:
             pass
 
         # 创建报告写入函数
-        def _append_report(record):
+        def _append_report(record: Any) -> None:
             pass
 
         # 聚类阶段
@@ -727,7 +727,7 @@ def analyze_from_json(
         )
 
         # 生成最终报告
-        result = build_json_and_markdown(all_issues, sec_dir)
+        result = build_json_and_markdown(all_issues, str(sec_dir))  # type: ignore[arg-type]
 
         # 保存到输出文件（如果指定）
         if output_file:

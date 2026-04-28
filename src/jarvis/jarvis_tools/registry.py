@@ -16,7 +16,7 @@ from typing import Tuple
 from typing import Set
 from typing import cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient

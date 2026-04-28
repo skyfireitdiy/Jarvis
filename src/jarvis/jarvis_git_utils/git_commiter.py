@@ -8,7 +8,7 @@ from typing import Dict
 from typing import Optional
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status

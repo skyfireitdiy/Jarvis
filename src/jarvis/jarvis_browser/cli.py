@@ -109,7 +109,7 @@ class BrowserDaemon:
         while self.running:
             await asyncio.sleep(60)  # Check every minute
             if not self.running:
-                break
+                break  # type: ignore[unreachable]
             if time.monotonic() - self._last_activity_time >= DAEMON_IDLE_TIMEOUT:
                 print("Daemon idle for 30 minutes, shutting down")
                 await self.stop()
@@ -121,6 +121,7 @@ class BrowserDaemon:
         self._last_activity_time = time.monotonic()
 
         if self._is_unix:
+            assert isinstance(self.addr, str)
             socket_path = self.addr
             if os.path.exists(socket_path):
                 try:
@@ -133,6 +134,7 @@ class BrowserDaemon:
             )
             print(f"Playwright Browser Daemon started, socket: {socket_path}")
         else:
+            assert isinstance(self.addr, tuple)
             host, port = self.addr
             port_file = Path(get_data_dir()) / DAEMON_PORT_FILE
             for try_port in range(port, port + 10):
@@ -154,6 +156,7 @@ class BrowserDaemon:
                     raise
 
         # Start server task
+        assert self.server is not None
         self._server_task = asyncio.create_task(self.server.serve_forever())
 
         # Start idle check task
@@ -206,11 +209,13 @@ class BrowserDaemon:
             await self.server.wait_closed()
 
         # Delete socket file (Unix) or port file (Windows)
-        if self._is_unix and os.path.exists(self.addr):
-            try:
-                os.unlink(self.addr)
-            except OSError:
-                pass
+        if self._is_unix:
+            assert isinstance(self.addr, str)
+            if os.path.exists(self.addr):
+                try:
+                    os.unlink(self.addr)
+                except OSError:
+                    pass
         elif not self._is_unix:
             port_file = Path(get_data_dir()) / DAEMON_PORT_FILE
             if port_file.exists():
@@ -741,6 +746,7 @@ def daemon(
 
             async def _check():
                 if is_unix:
+                    assert isinstance(addr, str)
                     _, writer = await asyncio.open_unix_connection(addr)
                 else:
                     _, writer = await asyncio.open_connection(addr[0], addr[1])
@@ -759,6 +765,7 @@ def daemon(
                     pass
 
     if is_unix:
+        assert isinstance(addr, str)
         socket_path = Path(addr)
         if socket_path.exists():
             if check_daemon_running():
@@ -793,7 +800,7 @@ def daemon(
         exe = sys.executable
         cmd = [exe, "-m", "jarvis.jarvis_browser.cli", "daemon", "--foreground"]
         # DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP 使子进程独立于父进程
-        flags = subprocess.CREATE_NEW_PROCESS_GROUP
+        flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         if hasattr(subprocess, "DETACHED_PROCESS"):
             flags |= subprocess.DETACHED_PROCESS
         with open(log_file, "a", encoding="utf-8") as f:
