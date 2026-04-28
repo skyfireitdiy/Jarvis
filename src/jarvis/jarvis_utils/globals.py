@@ -18,6 +18,11 @@ from typing import Optional
 
 message_history: List[str] = []
 
+# 全局输入缓冲区：当收到前端输入但当前不在等待输入状态时，先存入此缓冲区
+# 缓冲区中的消息将在每一轮agent循环中一次性消费
+input_buffer: List[str] = []
+MAX_INPUT_BUFFER_SIZE = 100
+
 MAX_HISTORY_SIZE = 50
 
 # 短期记忆存储
@@ -327,6 +332,53 @@ def clear_short_term_memories() -> None:
     """
     global short_term_memories
     short_term_memories.clear()
+
+
+def add_input_buffer(message: str) -> None:
+    """
+    将消息添加到全局输入缓冲区。
+
+    参数:
+        message: 要添加的消息
+    """
+    global input_buffer
+    if message:
+        input_buffer.append(message)
+        # 如果超过最大数量，删除最旧的消息
+        if len(input_buffer) > MAX_INPUT_BUFFER_SIZE:
+            input_buffer.pop(0)
+
+
+def get_input_buffer() -> List[str]:
+    """
+    获取全局输入缓冲区中的所有消息，并清空缓冲区。
+
+    返回:
+        List[str]: 缓冲区中的消息列表
+    """
+    global input_buffer
+    messages = input_buffer.copy()
+    input_buffer.clear()
+    return messages
+
+
+def peek_input_buffer() -> List[str]:
+    """
+    查看全局输入缓冲区中的所有消息，但不清空缓冲区。
+
+    返回:
+        List[str]: 缓冲区中的消息列表（副本）
+    """
+    global input_buffer
+    return input_buffer.copy()
+
+
+def clear_input_buffer() -> None:
+    """
+    清空全局输入缓冲区。
+    """
+    global input_buffer
+    input_buffer.clear()
 
 
 def get_all_memory_tags() -> Dict[str, List[str]]:

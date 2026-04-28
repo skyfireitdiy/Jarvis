@@ -662,6 +662,16 @@ class AgentRunLoop:
                     current_message_tokens=current_message_tokens,
                 )
 
+                # 检查全局输入缓冲区，如果有内容则附加到提示词后面
+                from jarvis.jarvis_utils.globals import get_input_buffer
+
+                buffered_messages = get_input_buffer()
+                if buffered_messages:
+                    user_supplement = "\n".join(buffered_messages)
+                    ag.session.prompt = (
+                        ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
+                    )
+
                 # 调用模型获取响应
                 try:
                     current_response = ag._call_model(

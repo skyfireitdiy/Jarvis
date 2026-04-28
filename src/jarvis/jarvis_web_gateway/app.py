@@ -498,7 +498,16 @@ class WebSocketConnectionManager:
             return
         if message_type == "input_result":
             text = payload.get("text", "")
-            self._input_registry.submit_input(session_id, text)
+            # 检查当前是否正在等待输入
+            session = self._input_registry.get_or_create(session_id)
+            if session.is_waiting_for_input():
+                # 正在等待输入，直接提交
+                self._input_registry.submit_input(session_id, text)
+            else:
+                # 不在等待输入状态，存入全局缓冲区
+                from jarvis.jarvis_utils.globals import add_input_buffer
+
+                add_input_buffer(text)
             return
         if message_type == "confirm_result":
             confirmed = payload.get("confirmed", False)

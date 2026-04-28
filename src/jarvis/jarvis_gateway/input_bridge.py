@@ -45,6 +45,7 @@ class RemoteInputSession:
         self._queue: Queue[RemoteInputMessage] = Queue()
         self._disconnect_reason: Optional[str] = None
         self._state_lock = threading.Lock()
+        self._is_waiting_for_input: bool = False
 
     def submit_input(self, text: str) -> None:
         with self._state_lock:
@@ -63,23 +64,44 @@ class RemoteInputSession:
         with self._state_lock:
             self._disconnect_reason = None
 
+    def is_waiting_for_input(self) -> bool:
+        """检查当前是否正在等待输入。"""
+        with self._state_lock:
+            return self._is_waiting_for_input
+
     def wait_for_input(self, timeout: Optional[float] = None) -> str:
-        while True:
+        # 设置等待输入状态
+        with self._state_lock:
+            self._is_waiting_for_input = True
+        try:
+            # 优先消费全局缓冲区中的消息
+            from jarvis.jarvis_utils.globals import get_input_buffer
+
+            buffered_messages = get_input_buffer()
+            if buffered_messages:
+                # 将所有缓冲消息合并返回
+                return "\n".join(buffered_messages)
+
+            while True:
+                with self._state_lock:
+                    disconnect_reason = self._disconnect_reason
+                if disconnect_reason is not None and self._queue.empty():
+                    raise InputProviderDisconnectedError(disconnect_reason)
+                try:
+                    message = self._queue.get(timeout=timeout)
+                except Empty as exc:
+                    raise InputProviderTimeoutError(
+                        "timed out waiting for remote input"
+                    ) from exc
+                with self._state_lock:
+                    disconnect_reason = self._disconnect_reason
+                if disconnect_reason is not None and message.text == "":
+                    raise InputProviderDisconnectedError(disconnect_reason)
+                return message.text
+        finally:
+            # 清除等待输入状态
             with self._state_lock:
-                disconnect_reason = self._disconnect_reason
-            if disconnect_reason is not None and self._queue.empty():
-                raise InputProviderDisconnectedError(disconnect_reason)
-            try:
-                message = self._queue.get(timeout=timeout)
-            except Empty as exc:
-                raise InputProviderTimeoutError(
-                    "timed out waiting for remote input"
-                ) from exc
-            with self._state_lock:
-                disconnect_reason = self._disconnect_reason
-            if disconnect_reason is not None and message.text == "":
-                raise InputProviderDisconnectedError(disconnect_reason)
-            return message.text
+                self._is_waiting_for_input = False
 
 
 class RemoteConfirmSession:
