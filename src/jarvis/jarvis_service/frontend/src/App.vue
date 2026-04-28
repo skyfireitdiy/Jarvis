@@ -182,7 +182,7 @@
           </div>
           <!-- 终端嵌入 -->
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished" class="terminal-wrapper">
-            <div :ref="el => setTerminalRef(item.execution_id, el)" class="terminal-host"></div>
+            <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
           <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
@@ -2339,8 +2339,14 @@ async function handleFileTreeNodeClick(agentId, node) {
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
-const terminalHosts = ref(new Map())
-const terminals = ref([]) // [{ executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
+const terminalHosts = ref(new Map()) // executionSessionKey -> hostEl
+const terminals = ref([]) // [{ sessionKey, agentId, executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
+
+function getExecutionSessionKey(agentId, executionId) {
+  const normalizedAgentId = String(agentId || '').trim() || 'unknown-agent'
+  const normalizedExecutionId = String(executionId || 'default').trim() || 'default'
+  return `${normalizedAgentId}:${normalizedExecutionId}`
+}
 
 // 独立终端会话
 const terminalSessions = ref([]) // [{ terminal_id, interpreter, working_dir, terminal, hostEl, fitAddon }]
@@ -4673,9 +4679,6 @@ async function switchAgent(agent) {
   historyOffset.value = 0
   hasMoreHistory.value = true
   
-  // 清空当前 Agent 的消息列表
-  allOutputs.value.set(agent.agent_id, [])
-
   // 先加载历史消息，再连接 Agent
   console.log('[AGENT] Loading history before connecting...')
   await loadHistoryMessages(false)
@@ -4967,9 +4970,10 @@ function handleMessage(message, agentId = null) {
       has_data: 'data' in payload,
       data_len: payload?.data?.length || 0,
     })
-    appendExecution(payload)
+    appendExecution(payload, targetAgentId)
     // 只在首次创建终端时创建输出项
     const executionId = payload?.execution_id || 'default'
+    const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     const currentOutputs = allOutputs.value.get(targetAgentId) || []
     const existingItem = currentOutputs.find(
       item => item.output_type === 'execution' && item.execution_id === executionId
@@ -4988,11 +4992,11 @@ function handleMessage(message, agentId = null) {
       // 等待 DOM 渲染完成后立即初始化终端
       nextTick(() => {
         console.log(`[ws] DOM rendered, initializing terminal ${executionId}`)
-        const hostEl = terminalHosts.value.get(executionId)
+        const hostEl = terminalHosts.value.get(executionSessionKey)
         if (hostEl) {
-          setTerminalRef(executionId, hostEl)
+          setTerminalRef(executionId, hostEl, targetAgentId)
         } else {
-          console.warn(`[ws] terminal-host element not found for execution ${executionId}`)
+          console.warn(`[ws] terminal-host element not found for execution ${executionSessionKey}`)
         }
       })
     } else {
@@ -5306,9 +5310,10 @@ async function copyToClipboard(text, index) {
   }
 }
 
-function appendExecution(payload) {
+function appendExecution(payload, agentId = null) {
   const executionId = payload?.execution_id || 'default'
   const eventType = payload?.event_type
+  const targetAgentId = agentId || payload?.agent_id || currentAgentId.value
   
   console.log(`[terminal DEBUG] appendExecution: executionId=${executionId}, eventType=${eventType}, hasData=${!!payload?.data}, encoded=${payload?.encoded}`)
   
@@ -5382,11 +5387,15 @@ function appendExecution(payload) {
     }
   }
   
+  const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
+
   // 检查是否需要创建新终端
-  let termInfo = terminals.value.find(t => t.executionId === executionId)
+  let termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
   if (!termInfo) {
-    console.log(`[terminal] Creating new terminal for execution ${executionId}`)
+    console.log(`[terminal] Creating new terminal for execution ${executionSessionKey}`)
     termInfo = {
+      sessionKey: executionSessionKey,
+      agentId: targetAgentId,
       executionId,
       terminal: null,
       active: true,
@@ -5422,9 +5431,8 @@ function appendExecution(payload) {
         console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
         
         // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
-        const targetAgentId = currentAgentId.value
         const currentOutputs = allOutputs.value.get(targetAgentId) || []
-        console.log(`🚨 [terminal] Looking for execution message: ${executionId}`)
+        console.log(`🚨 [terminal] Looking for execution message: ${executionId} in agent: ${targetAgentId}`)
         
         const execIndex = currentOutputs.findIndex(
           item => item.output_type === 'execution' && item.execution_id === executionId
@@ -5892,6 +5900,20 @@ function sendConfirmResult(confirmed, agentId = null) {
   pendingConfirmAgentId.value = null
 }
 
+function sendMessageToAgentById(agentId, message) {
+  if (!agentId) {
+    console.warn('[SEND] No agent ID provided for message:', message?.type)
+    return
+  }
+
+  const ws = sockets.value.get(agentId)
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message))
+  } else {
+    console.warn(`[SEND] No open WebSocket for agent ${agentId}`)
+  }
+}
+
 function sendInterrupt() {
   const message = {
     type: 'interrupt',
@@ -5994,98 +6016,143 @@ function syncTerminalSize(executionId, termInfo) {
       cols: newCols,
     },
   }
-  sendMessageToAgent(message)
+  sendMessageToAgentById(termInfo.agentId, message)
+}
+
+function disposeExecutionTerminal(termInfo) {
+  if (termInfo?.resizeObserver) {
+    termInfo.resizeObserver.disconnect()
+  }
+  if (termInfo?.fitAddon) {
+    try {
+      termInfo.fitAddon.dispose()
+    } catch (error) {
+      console.warn('[terminal] Failed to dispose fitAddon', error)
+    }
+  }
+  if (termInfo?.terminal) {
+    try {
+      termInfo.terminal.dispose()
+    } catch (error) {
+      console.warn('[terminal] Failed to dispose terminal', error)
+    }
+  }
+
+  termInfo.resizeObserver = null
+  termInfo.fitAddon = null
+  termInfo.terminal = null
+  termInfo.hostEl = null
+}
+
+function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
+  const targetAgentId = agentId || termInfo?.agentId || currentAgentId.value
+  termInfo.hostEl = el
+  termInfo.terminal = new Terminal({
+    theme: {
+      background: '#0b1220',
+    },
+    fontSize: 12,
+  })
+  termInfo.terminal.open(el)
+
+  termInfo.fitAddon = new FitAddon()
+  termInfo.terminal.loadAddon(termInfo.fitAddon)
+  termInfo.fitAddon.fit()
+  console.log(`[terminal] FitAddon fit: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
+
+  if (typeof ResizeObserver !== 'undefined') {
+    termInfo.resizeObserver = new ResizeObserver(() => {
+      syncTerminalSize(executionId, termInfo)
+    })
+    termInfo.resizeObserver.observe(el)
+  }
+
+  termInfo.terminal.onData(data => {
+    if (!termInfo.active) return
+    const message = {
+      type: 'terminal_input',
+      payload: {
+        execution_id: executionId,
+        data,
+      },
+    }
+    const ws = targetAgentId ? sockets.value.get(targetAgentId) : null
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message))
+    } else {
+      console.warn(`[terminal] No open WebSocket for agent ${targetAgentId}, execution ${executionId}`)
+    }
+  })
+
+  requestAnimationFrame(() => {
+    syncTerminalSize(executionId, termInfo)
+    try {
+      termInfo.terminal.focus()
+    } catch (error) {
+      // ignore focus errors
+    }
+  })
+
+  setTimeout(() => {
+    syncTerminalSize(executionId, termInfo)
+  }, 300)
+
+  if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
+    termInfo.pendingChunks.forEach(chunk => {
+      try {
+        termInfo.terminal.write(chunk)
+      } catch (error) {
+        console.warn('[terminal] flush chunk failed', error)
+      }
+    })
+    termInfo.pendingChunks = []
+  }
+
+  if (termInfo.ended) {
+    getTerminalBufferContent(termInfo.terminal, true)
+  }
 }
 
 // 动态绑定终端 DOM 元素
-function setTerminalRef(executionId, el) {
-  const termInfo = terminals.value.find(t => t.executionId === executionId)
+function setTerminalRef(executionId, el, agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
+  const termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
   if (el) {
-    console.log(`[terminal] Setting ref for execution ${executionId}`)
+    console.log(`[terminal] Setting ref for execution ${executionSessionKey}`)
     console.log(`[terminal] Element properties: clientWidth=${el.clientWidth}, clientHeight=${el.clientHeight}, offsetWidth=${el.offsetWidth}, offsetHeight=${el.offsetHeight}`)
     console.log(`[terminal] Computed style: ${window.getComputedStyle(el).width} x ${window.getComputedStyle(el).height}`)
     console.log(`[terminal] Parent element:`, el.parentElement)
     if (el.parentElement) {
       console.log(`[terminal] Parent size: ${window.getComputedStyle(el.parentElement).width} x ${window.getComputedStyle(el.parentElement).height}`)
     }
-    terminalHosts.value.set(executionId, el)
-    if (termInfo) {
-      termInfo.hostEl = el
+    terminalHosts.value.set(executionSessionKey, el)
+    if (!termInfo) {
+      return
     }
-    // 立即初始化终端
-    if (termInfo && !termInfo.terminal) {
-      console.log(`[terminal] Initializing terminal for execution ${executionId}`)
+
+    const needsRebuild = !!termInfo.terminal && termInfo.hostEl !== el
+    if (needsRebuild) {
+      console.log(`[terminal] Rebuilding terminal for execution ${executionSessionKey} on new host element`)
+      disposeExecutionTerminal(termInfo)
+    }
+
+    if (!termInfo.terminal) {
+      console.log(`[terminal] Initializing terminal for execution ${executionSessionKey}`)
       console.log(`[terminal] Element size: width=${el.clientWidth}px, height=${el.clientHeight}px`)
-      
-      // 使用默认尺寸初始化
-      termInfo.terminal = new Terminal({
-        theme: {
-          background: '#0b1220',
-        },
-        fontSize: 12,
-      })
-      termInfo.terminal.open(el)
-      
-      // 创建并加载 FitAddon
-      termInfo.fitAddon = new FitAddon()
-      termInfo.terminal.loadAddon(termInfo.fitAddon)
-      
-      // 使用 FitAddon 适配终端尺寸
-      termInfo.fitAddon.fit()
-      console.log(`[terminal] FitAddon fit: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
-      
-      // 设置 ResizeObserver 监听尺寸变化
-      if (typeof ResizeObserver !== 'undefined') {
+      initExecutionTerminal(executionId, termInfo, el, targetAgentId)
+    } else {
+      termInfo.hostEl = el
+      if (!termInfo.resizeObserver && typeof ResizeObserver !== 'undefined') {
         termInfo.resizeObserver = new ResizeObserver(() => {
           syncTerminalSize(executionId, termInfo)
         })
         termInfo.resizeObserver.observe(el)
       }
-      
-      termInfo.terminal.onData(data => {
-        if (!termInfo.active) return
-        const message = {
-          type: 'terminal_input',
-          payload: {
-            execution_id: executionId,
-            data,
-          },
-        }
-        sendMessageToAgent(message)
-      })
-      
-      // 在下一帧触发初始尺寸计算
-      requestAnimationFrame(() => {
-        syncTerminalSize(executionId, termInfo)
-        try {
-          termInfo.terminal.focus()
-        } catch (error) {
-          // ignore focus errors
-        }
-      })
-      
-      // 额外延迟确保容器完全渲染
-      setTimeout(() => {
-        syncTerminalSize(executionId, termInfo)
-      }, 300)
-      if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
-        termInfo.pendingChunks.forEach(chunk => {
-          try {
-            termInfo.terminal.write(chunk)
-          } catch (error) {
-            console.warn('[terminal] flush chunk failed', error)
-          }
-        })
-        termInfo.pendingChunks = []
-      }
-      if (termInfo.ended) {
-        getTerminalBufferContent(termInfo.terminal, true)
-      }
-    } else if (termInfo) {
       syncTerminalSize(executionId, termInfo)
     }
   } else {
-    terminalHosts.value.delete(executionId)
+    terminalHosts.value.delete(executionSessionKey)
     if (termInfo?.resizeObserver) {
       termInfo.resizeObserver.disconnect()
       termInfo.resizeObserver = null
@@ -6146,6 +6213,7 @@ function initIndependentTerminal(terminalId, el) {
             }
           })
           resizeObserver.observe(el)
+          session.resizeObserver = resizeObserver
         }
         // 恢复历史输出
         console.log(`[independent-terminal] Restoring ${session.history.length} history entries`)
