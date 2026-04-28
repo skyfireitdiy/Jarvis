@@ -58,7 +58,7 @@ def detect_file_encoding(
 ) -> Optional[str]:
     """根据文件内容检测编码
 
-    使用 charset_normalizer 库进行编码检测，提供更准确的结果。
+    使用 charset_normalizer 库的 from_bytes 方法进行编码检测，提供更准确的结果。
     优先 UTF-8（现代文件、JSON、YAML 等），其次 GBK（Windows 中文）。
 
     Args:
@@ -69,6 +69,11 @@ def detect_file_encoding(
         检测到的编码名称，若均失败则返回 None
     """
     try:
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return None
+
+        # 读取原始数据用于BOM检测和验证
         with open(file_path, "rb") as f:
             raw_data = f.read(sample_size)
 
@@ -81,7 +86,7 @@ def detect_file_encoding(
         if raw_data.startswith(b"\xff\xfe") or raw_data.startswith(b"\xfe\xff"):
             return "utf-16"
 
-        # 使用 charset_normalizer 检测编码
+        # 使用 charset_normalizer 的 from_bytes 检测编码
         result = from_bytes(raw_data).best()
         if result is not None and result.encoding:
             detected = result.encoding.lower().replace("-", "_").replace("-", "")
