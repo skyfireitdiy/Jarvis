@@ -91,7 +91,12 @@ def detect_file_encoding(
         if result is not None and result.encoding:
             detected = result.encoding.lower().replace("-", "_").replace("-", "")
             # 标准化编码名称
-            encoding_map = {"gb2312": "gbk", "gb18030": "gbk"}
+            encoding_map = {
+                "gb2312": "gb18030",
+                "gbk": "gb18030",
+                "ascii": "utf-8",
+                "utf_8": "utf-8",
+            }
             detected = encoding_map.get(detected, detected)
 
             # 验证检测到的编码
@@ -99,12 +104,12 @@ def detect_file_encoding(
                 decoded = raw_data.decode(detected)
                 re_encoded = decoded.encode(detected)
                 if re_encoded == raw_data:
-                    # 对于中文编码（GBK/Big5），优先返回 GBK（更常用）
-                    if detected in ("gbk", "big5", "gb2312"):
-                        # 优先尝试 GBK，因为 GBK 更常用且兼容性更好
+                    # 对于中文编码（GBK/Big5），统一返回 gb18030
+                    if detected in ("gb18030", "gbk", "big5", "gb2312"):
+                        # 优先尝试 gb18030，因为 gb18030 兼容性更好
                         try:
-                            raw_data.decode("gbk")
-                            return "gbk"
+                            raw_data.decode("gb18030")
+                            return "gb18030"
                         except (UnicodeDecodeError, LookupError):
                             pass
                     return detected
