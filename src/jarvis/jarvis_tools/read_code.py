@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
+    detect_file_encoding,
     get_max_input_token_count,
     read_text_file,
 )
@@ -37,6 +38,19 @@ class ReadCodeTool:
             except UnicodeDecodeError as exc:
                 last_decode_error = exc
                 continue
+
+        # 优先编码尝试失败后，使用 detect_file_encoding 作为回退
+        detected_encoding = detect_file_encoding(file_path)
+        if detected_encoding:
+            try:
+                return read_text_file(
+                    file_path,
+                    encoding=detected_encoding,
+                    detect_encoding=False,
+                    errors="strict",
+                )
+            except (UnicodeDecodeError, LookupError):
+                pass
 
         if last_decode_error is not None:
             raise last_decode_error
