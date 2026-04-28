@@ -17,7 +17,7 @@ from pathlib import PurePath
 from pathlib import PureWindowsPath
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (

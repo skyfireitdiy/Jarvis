@@ -78,7 +78,7 @@ def get_git_tracked_files_info(
                 current_lines: int = 0,
             ) -> List[str]:
                 """格式化目录树（带行数限制）"""
-                lines = []
+                lines: List[str] = []
                 items = sorted(tree.items())
                 for i, (name, subtree) in enumerate(items):
                     # 检查行数限制

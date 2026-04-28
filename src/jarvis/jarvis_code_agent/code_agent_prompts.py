@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import Dict
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import PrettyOutput

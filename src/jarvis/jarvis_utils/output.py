@@ -963,7 +963,7 @@ class PrettyOutput:
                 yield text
 
         # 临时应用patch
-        Heading.__rich_console__ = _left_aligned_heading_rich_console
+        Heading.__rich_console__ = _left_aligned_heading_rich_console  # type: ignore[method-assign]
 
         try:
             # 创建Markdown渲染对象
@@ -976,7 +976,7 @@ class PrettyOutput:
             console.print(panel)
         finally:
             # 恢复原始方法
-            Heading.__rich_console__ = _original_rich_console
+            Heading.__rich_console__ = _original_rich_console  # type: ignore[method-assign]
 
         # 通过事件系统输出到Gateway（用于Web界面）
         # 注意：只在 Gateway 模式下发送事件，避免 CLI 模式下重复打印
@@ -1018,7 +1018,7 @@ class PrettyOutput:
         panel = Panel(
             renderable,
             title=title,
-            title_align=title_align,
+            title_align=title_align,  # type: ignore[arg-type]
             border_style=border_style,
             **kwargs,
         )
@@ -1472,7 +1472,9 @@ class PrettyOutput:
 
         # 发送流式结束事件
         response_tokens = (
-            get_context_token_count(response) if get_context_token_count else 0
+            get_context_token_count(response)
+            if get_context_token_count is not None
+            else 0
         )
         generation_time = (
             duration - first_token_time if duration > first_token_time else duration
@@ -1593,7 +1595,9 @@ class PrettyOutput:
         end_time = time.time()
         duration = end_time - start_time
         response_tokens = (
-            get_context_token_count(response) if get_context_token_count else 0
+            get_context_token_count(response)
+            if get_context_token_count is not None
+            else 0
         )
         generation_time = (
             duration - first_token_time if duration > first_token_time else duration

@@ -4,7 +4,7 @@ from typing import Any
 from typing import Optional
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.config import set_llm_group

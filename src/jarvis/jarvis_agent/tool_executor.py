@@ -116,7 +116,7 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     ):
         try:
             result = tool_to_execute.handle(response, agent)
-            return _normalize_tool_result(result)
+            return _normalize_tool_result(result)  # type: ignore[no-any-return]
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 工具执行失败: {str(e)}")
             return False, str(e)

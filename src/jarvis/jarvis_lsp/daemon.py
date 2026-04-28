@@ -57,6 +57,9 @@ class LSPDaemon:
 
         if self._is_unix:
             socket_path = self.addr
+            assert isinstance(socket_path, str), (
+                f"Expected str for Unix socket path, got {type(socket_path)}"
+            )
             if os.path.exists(socket_path):
                 try:
                     os.unlink(socket_path)
@@ -68,6 +71,9 @@ class LSPDaemon:
             )
             print(f"LSP 守护进程已启动，socket: {socket_path}")
         else:
+            assert isinstance(self.addr, tuple), (
+                f"Expected tuple for Windows address, got {type(self.addr)}"
+            )
             host, port = self.addr
             port_file = Path(get_data_dir()) / LSP_DAEMON_PORT_FILE
             for try_port in range(port, port + 10):
@@ -89,6 +95,7 @@ class LSPDaemon:
                     raise
 
         # 启动服务任务
+        assert self.server is not None, "Server should be initialized"
         self._server_task = asyncio.create_task(self.server.serve_forever())
 
         # 优雅退出（Unix 注册信号；Windows 信号支持有限，跳过）
@@ -134,9 +141,9 @@ class LSPDaemon:
             await self.server.wait_closed()
 
         # 删除 socket 文件（仅 Unix）
-        if self._is_unix and os.path.exists(self.addr):
+        if self._is_unix and os.path.exists(self.addr):  # type: ignore[arg-type]
             try:
-                os.unlink(self.addr)
+                os.unlink(self.addr)  # type: ignore[arg-type]
             except OSError:
                 pass
         elif not self._is_unix:

@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any
-from typing import Dict
+from typing import Any, Dict, Optional, Callable
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 
+if TYPE_CHECKING:
+    pass
+
 try:
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import sync_playwright as _sync_playwright
+
+    sync_playwright: Optional[Callable[[], Any]] = _sync_playwright
 except ImportError:
     sync_playwright = None
 
@@ -151,6 +156,9 @@ class WebpageTool:
                 if not self._ensure_playwright_ready(prompt_user=True):
                     raise ImportError("Playwright not available")
 
+                assert sync_playwright is not None, (
+                    "sync_playwright should not be None after _ensure_playwright_ready"
+                )
                 with sync_playwright() as p:
                     # 启动无头浏览器
                     browser = p.chromium.launch(headless=True)

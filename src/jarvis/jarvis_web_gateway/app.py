@@ -17,16 +17,12 @@ import signal
 import subprocess
 import uuid
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from datetime import datetime
-from typing import Any
-from typing import AsyncGenerator
-from typing import Callable
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+from typing import Any, AsyncGenerator, Callable, Dict, Optional, Tuple, cast
 from urllib.parse import parse_qsl
 from urllib.parse import unquote
+from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi import WebSocketDisconnect
@@ -67,20 +63,14 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     AGENT_STOP_REQUEST,
     AGENT_DELETE_REQUEST,
     NODE_HTTP_PROXY_REQUEST,
-    AGENT_WS_REQUEST,
     AGENT_WS_OPEN_REQUEST,
     AGENT_WS_SEND_REQUEST,
     AGENT_WS_RECV_REQUEST,
     AGENT_WS_CLOSE_REQUEST,
     DIRECTORY_LIST_REQUEST,
     NODE_TERMINAL_REQUEST,
-    NODE_TERMINAL_RESPONSE,
-    NODE_TERMINAL_OUTPUT,
     SERVICE_RESTART_REQUEST,
-    SERVICE_RESTART_RESPONSE,
     CONFIG_SYNC_REQUEST,
-    CONFIG_SYNC_RESPONSE,
-    build_node_message,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
@@ -102,7 +92,6 @@ except ImportError:
 # 导入配置相关函数
 from jarvis.jarvis_utils.config import (
     GLOBAL_CONFIG_DATA,
-    get_global_config_data,
     get_gateway_auth_config,
 )
 
@@ -348,7 +337,7 @@ class WebGateway(BaseGateway):
         self,
         execution_id: str,
     ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
-        return self._terminal_input_registry.get_input_callback(execution_id)
+        return self._terminal_input_registry.get_input_callback(execution_id)  # type: ignore[return-value]
 
     def get_execution_resize_callback(
         self,
@@ -528,6 +517,8 @@ class WebSocketConnectionManager:
             cols = payload.get("cols")
             if not execution_id:
                 return
+            if rows is None or cols is None:
+                return
             try:
                 rows_int = int(rows)
                 cols_int = int(cols)
@@ -562,7 +553,7 @@ class WebSocketConnectionManager:
                         f"[WS MESSAGE] Error handling get_status: {e}", exc_info=True
                     )
             else:
-                logger.warning("[WS MESSAGE] get_agent_status_manager is not available")
+                logger.warning("[WS MESSAGE] get_agent_status_manager is not available")  # type: ignore[unreachable]
             return
         # 独立终端会话消息处理
         # 检查是否需要转发到远端节点
@@ -579,6 +570,11 @@ class WebSocketConnectionManager:
                 "",
             ):
                 # 转发到远端节点
+                if _node_connection_manager is None:
+                    logger.error(
+                        "[WS MESSAGE] Node connection manager is not available"
+                    )
+                    return
                 try:
                     response = await _node_connection_manager.send_request_to_node(
                         terminal_node_id,
@@ -610,7 +606,7 @@ class WebSocketConnectionManager:
                             "payload": {"terminal_id": payload.get("terminal_id")},
                         }
                         self._router.publish(result_msg, session_id=session_id)
-                except Exception as e:
+                except Exception:
                     pass
                 return
 
@@ -659,6 +655,8 @@ class WebSocketConnectionManager:
             rows = payload.get("rows")
             cols = payload.get("cols")
             if terminal_id and _terminal_session_manager:
+                if rows is None or cols is None:
+                    return
                 try:
                     rows_int = int(rows)
                     cols_int = int(cols)
@@ -878,7 +876,7 @@ def create_app(
                 logger.info("[AUTH] Gateway password is not configured, login allowed")
             else:
                 if not password:
-                    logger.warning(f"[AUTH] Login failed: password is empty")
+                    logger.warning("[AUTH] Login failed: password is empty")
                     return {
                         "success": False,
                         "error": {
@@ -889,7 +887,7 @@ def create_app(
 
                 # 如果设置了密码，进行验证
                 if password != expected_password:
-                    logger.warning(f"[AUTH] Login failed: password mismatch")
+                    logger.warning("[AUTH] Login failed: password mismatch")
                     return {
                         "success": False,
                         "error": {
@@ -911,12 +909,12 @@ def create_app(
                     },
                 }
 
-            logger.info(f"[AUTH] Password verification passed")
+            logger.info("[AUTH] Password verification passed")
             # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
             token = os.environ.get("JARVIS_AUTH_TOKEN")
 
             if not token:
-                logger.error(f"[AUTH] Login failed: Token not generated")
+                logger.error("[AUTH] Login failed: Token not generated")
                 return {
                     "success": False,
                     "error": {
@@ -924,7 +922,7 @@ def create_app(
                         "message": "Token not generated",
                     },
                 }
-            logger.info(f"[AUTH] Login successful")
+            logger.info("[AUTH] Login successful")
             return {
                 "success": True,
                 "data": {
@@ -1347,13 +1345,13 @@ def create_app(
                             status_code=404,
                             media_type="application/json",
                         )
-                    except AgentNotRunningError as e:
+                    except AgentNotRunningError:
                         return Response(
                             content='{"error": "Agent not running"}',
                             status_code=503,
                             media_type="application/json",
                         )
-                    except ProxyConnectionError as e:
+                    except ProxyConnectionError:
                         return Response(
                             content='{"error": "Proxy connection failed"}',
                             status_code=502,
@@ -1756,7 +1754,7 @@ def create_app(
                                 shutil.copy2(config_file, backup_file)
 
                             # 读取现有配置
-                            existing_config = {}
+                            existing_config: Dict[str, Any] = {}
                             if config_file.exists():
                                 with open(config_file, "r", encoding="utf-8") as f:
                                     existing_config = yaml.safe_load(f) or {}
@@ -2053,7 +2051,7 @@ def create_app(
                 agent_id = str(agent.get("agent_id") or "")
                 if agent_id:
                     known_agent_ids.add(agent_id)
-                route = node_runtime.agent_route_registry.get(agent.get("agent_id"))
+                route = node_runtime.agent_route_registry.get(agent_id)
                 if route is not None:
                     agent.setdefault("node_id", route.node_id)
                 else:
@@ -2164,17 +2162,19 @@ def create_app(
                     if smart_llm_ref and smart_llm_ref in llms:
                         smart_config = llms[smart_llm_ref]
                         if isinstance(smart_config, dict):
-                            smart_model = smart_config.get("model", smart_llm_ref)
+                            smart_model = str(smart_config.get("model", smart_llm_ref))
 
                     if normal_llm_ref and normal_llm_ref in llms:
                         normal_config = llms[normal_llm_ref]
                         if isinstance(normal_config, dict):
-                            normal_model = normal_config.get("model", normal_llm_ref)
+                            normal_model = str(
+                                normal_config.get("model", normal_llm_ref)
+                            )
 
                     if cheap_llm_ref and cheap_llm_ref in llms:
                         cheap_config = llms[cheap_llm_ref]
                         if isinstance(cheap_config, dict):
-                            cheap_model = cheap_config.get("model", cheap_llm_ref)
+                            cheap_model = str(cheap_config.get("model", cheap_llm_ref))
 
                 data.append(
                     {
@@ -2190,8 +2190,6 @@ def create_app(
                 "data": data,
                 "default_llm_group": default_llm_group,
             }
-
-            return {"success": True, "data": data}
         except Exception as e:
             return {
                 "success": False,
@@ -2312,7 +2310,7 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return json.loads(body)  # type: ignore[no-any-return]
 
             result = agent_manager.rename_agent(agent_id, name)
             return {"success": True, "data": result}
@@ -2437,9 +2435,9 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return json.loads(body)  # type: ignore[no-any-return]
 
-            agent_info = agent_manager.get_agent_info(agent_id)
+            agent_info = agent_manager.get_agent(agent_id)
             if agent_info is None:
                 return {
                     "success": False,
@@ -2450,10 +2448,10 @@ def create_app(
             import httpx
 
             async with httpx.AsyncClient() as client:
-                response = await client.get(
+                http_response = await client.get(
                     f"http://127.0.0.1:{agent_info.port}/sessions"
                 )
-                return response.json()
+                return http_response.json()  # type: ignore[no-any-return]
         except KeyError as e:
             return {
                 "success": False,
@@ -2508,9 +2506,9 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return json.loads(body)  # type: ignore[no-any-return]
 
-            agent_info = agent_manager.get_agent_info(agent_id)
+            agent_info = agent_manager.get_agent(agent_id)
             if agent_info is None:
                 return {
                     "success": False,
@@ -2521,10 +2519,10 @@ def create_app(
             import httpx
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(
+                http_response = await client.post(
                     f"http://127.0.0.1:{agent_info.port}/sessions", json=request
                 )
-                return response.json()
+                return http_response.json()  # type: ignore[no-any-return]
         except KeyError as e:
             return {
                 "success": False,
@@ -2575,7 +2573,7 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return json.loads(body)  # type: ignore[no-any-return]
 
             from jarvis.jarvis_utils.config import get_replace_map
             from jarvis.jarvis_utils.tag import ot
@@ -2737,7 +2735,7 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return cast(Dict[str, Any], json.loads(body))
 
             import subprocess
             from fuzzywuzzy import process
@@ -2839,7 +2837,7 @@ def create_app(
                         },
                     }
                 body = payload.get("body") or "{}"
-                return json.loads(body)
+                return cast(Dict[str, Any], json.loads(body))
 
             agent = agent_manager.get_agent(agent_id)
             if not agent:
@@ -4012,12 +4010,12 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
         async def _send():
             try:
                 await websocket.send_json(message)
-            except Exception as e:
+            except Exception:
                 pass
 
         try:
             asyncio.run_coroutine_threadsafe(_send(), loop)
-        except Exception as e:
+        except Exception:
             pass
 
     return _sender

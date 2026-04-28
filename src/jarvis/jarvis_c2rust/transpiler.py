@@ -44,7 +44,7 @@ from jarvis.jarvis_c2rust.transpiler_agents import AgentManager
 from jarvis.jarvis_c2rust.transpiler_compile import CompileCommandsManager
 from jarvis.jarvis_c2rust.transpiler_config import ConfigManager
 from jarvis.jarvis_c2rust.transpiler_context import ContextCollector
-from jarvis.jarvis_c2rust.transpiler_executor import TranspilerExecutor
+from jarvis.jarvis_c2rust.transpiler_executor import TranspilerExecutor  # type: ignore[attr-defined]
 from jarvis.jarvis_c2rust.transpiler_generation import GenerationManager
 from jarvis.jarvis_c2rust.transpiler_git import GitManager
 from jarvis.jarvis_c2rust.transpiler_modules import ModuleManager
@@ -404,15 +404,15 @@ class Transpiler:
 
     def _get_code_agent(self) -> CodeAgent:
         """获取代码生成/修复Agent（委托给 AgentManager，保持向后兼容）"""
-        return self.agent_manager.get_code_agent()
+        return self.agent_manager.get_code_agent()  # type: ignore[return-value]
 
     def _get_generation_agent(self) -> CodeAgent:
         """获取代码生成Agent（委托给 AgentManager）"""
-        return self.agent_manager.get_generation_agent()
+        return self.agent_manager.get_generation_agent()  # type: ignore[return-value]
 
     def _get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgent:
         """获取修复Agent（委托给 AgentManager，每次重新创建）"""
-        return self.agent_manager.get_fix_agent(c_code)
+        return self.agent_manager.get_fix_agent(c_code)  # type: ignore[return-value]
 
     def _refresh_compact_context(
         self, rec: FnRecord, module: str, rust_sig: str
@@ -528,7 +528,7 @@ class Transpiler:
     def _init_build_manager(self) -> None:
         """初始化构建管理器"""
         if self.build_manager is None:
-            from jarvis.jarvis_c2rust.transpiler_build import BuildManager
+            from jarvis.jarvis_c2rust.transpiler_build import BuildManager  # type: ignore[attr-defined]
 
             self.build_manager = BuildManager(
                 self.crate_dir,
@@ -868,8 +868,9 @@ class Transpiler:
             consecutive_fix_failures_setter=lambda v: setattr(
                 self, "_consecutive_fix_failures", v
             ),
-            current_function_start_commit_getter=lambda: self._current_function_start_commit
-            or "",
+            current_function_start_commit_getter=lambda: (
+                self._current_function_start_commit or ""
+            ),
             current_function_start_commit_setter=lambda v: setattr(
                 self, "_current_function_start_commit", v
             ),

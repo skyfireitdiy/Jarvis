@@ -1027,7 +1027,7 @@ def hover(
                 return
             px, py = _get_control_center(ctrl)
         else:
-            px, py = x, y  # type: ignore
+            px, py = x, y
         win = app.window()
         win.move_mouse(coords=(px, py), absolute=True)
         _output({"success": True, "stdout": f"Moved to ({px}, {py})", "stderr": ""})
@@ -1113,7 +1113,7 @@ def drag(
                 return
             release_coords = _get_control_center(ctrl)
         else:
-            release_coords = (to_x, to_y)  # type: ignore
+            release_coords = (to_x, to_y)
 
         win.drag_mouse(
             button=button,

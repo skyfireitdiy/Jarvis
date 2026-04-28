@@ -17,7 +17,7 @@ from typing import Dict
 from typing import Optional
 from typing import cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 CONFIG_FILE_NAME = "build_validation_config.yaml"
 

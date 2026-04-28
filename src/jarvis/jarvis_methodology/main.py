@@ -18,7 +18,7 @@ from typing import Any
 
 
 import typer
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.methodology import _get_methodology_directory

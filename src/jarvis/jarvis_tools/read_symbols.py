@@ -117,7 +117,7 @@ class ReadSymbolsTool:
             results: Dict[str, List[Dict[str, Any]]] = {s: [] for s in requested}
 
             # 流式读取，避免载入整个大文件（先检测编码）
-            enc = detect_file_encoding(symbols_path) or get_default_encoding()
+            enc = detect_file_encoding(str(symbols_path)) or get_default_encoding()
             with open(symbols_path, "r", encoding=enc) as f:
                 for line in f:
                     line = line.strip()

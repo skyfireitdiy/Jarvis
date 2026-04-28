@@ -46,6 +46,8 @@ class LSPDaemonClient:
         async def _try_connect() -> bool:
             try:
                 if self._is_unix:
+                    # 在Unix情况下，self.addr是字符串
+                    assert isinstance(self.addr, str), "Unix socket地址必须是字符串"
                     reader, writer = await asyncio.wait_for(
                         asyncio.open_unix_connection(self.addr), timeout=2.0
                     )
@@ -74,7 +76,7 @@ class LSPDaemonClient:
             raise FileNotFoundError(f"守护进程脚本不存在: {daemon_script}")
 
         if _IS_WINDOWS:
-            flags = subprocess.CREATE_NEW_PROCESS_GROUP
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
             if hasattr(subprocess, "DETACHED_PROCESS"):
                 flags |= subprocess.DETACHED_PROCESS
             subprocess.Popen(
@@ -118,8 +120,10 @@ class LSPDaemonClient:
         # 自动启动守护进程（如果未运行）
         await self._ensure_daemon_running()
 
-        if self._is_unix and not os.path.exists(self.addr):
-            raise RuntimeError(f"守护进程启动失败。socket 文件不存在: {self.addr}")
+        if self._is_unix:
+            assert isinstance(self.addr, str), "Unix socket地址必须是字符串"
+            if not os.path.exists(self.addr):
+                raise RuntimeError(f"守护进程启动失败。socket 文件不存在: {self.addr}")
 
         request = {"method": method, "params": params}
         request_json = json.dumps(request, ensure_ascii=False)
@@ -129,6 +133,8 @@ class LSPDaemonClient:
 
         try:
             if self._is_unix:
+                # 在Unix情况下，self.addr是字符串
+                assert isinstance(self.addr, str), "Unix socket地址必须是字符串"
                 reader, writer = await asyncio.open_unix_connection(self.addr)
             else:
                 reader, writer = await asyncio.open_connection(
@@ -690,7 +696,7 @@ class LSPDaemonClient:
         if not response.get("success"):
             raise RuntimeError(response.get("error", "未知错误"))
 
-        return response.get("callers", [])
+        return response.get("callers", [])  # type: ignore[no-any-return]
 
     async def implementation_by_name(
         self, language: str, project_path: str, file_path: str, symbol_name: str

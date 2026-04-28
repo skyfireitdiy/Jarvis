@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 """分析相关模块"""
-# type: ignore
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional, cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -24,13 +20,13 @@ def _build_detailed_error_guidance(
 
     errors = []
     if not isinstance(prev_parsed_items, list):
-        errors.append("结果不是数组")
+        errors.append("结果不是数组")  # type: ignore[unreachable]
         error_text = "\n".join(f"- {err}" for err in errors)
         return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n{error_text}"
 
     for idx, item in enumerate(prev_parsed_items):
         if not isinstance(item, dict):
-            errors.append(f"元素{idx}不是字典")
+            errors.append(f"元素{idx}不是字典")  # type: ignore[unreachable]
             break
 
         # 基础字段检查
@@ -61,7 +57,7 @@ def _build_detailed_error_guidance(
                 break
             for g_idx, gid_val in enumerate(gids_list):
                 try:
-                    if int(gid_val) < 1:
+                    if int(str(gid_val)) < 1:
                         errors.append(f"元素{idx}的 gids[{g_idx}] 必须 >= 1")
                         break
                 except (ValueError, TypeError):
@@ -99,7 +95,7 @@ def valid_items(items: Optional[List[Dict[str, Any]]]) -> bool:
 
     for it in items:
         if not isinstance(it, dict):
-            return False
+            return False  # type: ignore[unreachable]
         has_gid = "gid" in it
         has_gids = "gids" in it
         if not has_gid and not has_gids:
@@ -260,11 +256,12 @@ def run_analysis_agent_with_retry(
                 except Exception:
                     pass
             elif isinstance(rep, list):
-                parsed_items = rep
+                parsed_items = cast(List[Dict[str, Any]], rep)
             elif isinstance(rep, dict):
-                items = rep.get("issues")
+                rep_dict = cast(Dict[str, Any], rep)
+                items = rep_dict.get("issues")
                 if isinstance(items, list):
-                    parsed_items = items
+                    parsed_items = cast(List[Dict[str, Any]], items)
 
         # 关键字段校验
         # 空数组 [] 是有效的（表示没有发现问题），需要单独处理
