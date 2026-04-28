@@ -7326,8 +7326,8 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   background: rgba(22, 27, 34, 0.85);
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
@@ -7355,7 +7355,7 @@ body::-webkit-scrollbar {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .editor-panel {
@@ -7378,12 +7378,12 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(13, 17, 23, 0.9);
   cursor: move;
-  gap: 10px;
-  min-height: 36px;
+  gap: 8px;
+  min-height: 32px;
 }
 
 .editor-panel-title-group {
@@ -7470,9 +7470,9 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 34px;
-  padding: 0 12px;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(22, 27, 34, 0.98);
@@ -8084,7 +8084,7 @@ body::-webkit-scrollbar {
 }
 
 .agent-sidebar-header {
-  padding: 16px;
+  padding: 12px;
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
@@ -8107,10 +8107,10 @@ body::-webkit-scrollbar {
 .agent-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .agent-collapsed-section {
@@ -8123,11 +8123,11 @@ body::-webkit-scrollbar {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.02);
   border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border-radius: 6px;
   color: #8b949e;
   cursor: pointer;
   text-align: left;
@@ -8946,22 +8946,22 @@ body::-webkit-scrollbar {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 24px 20px;
-  padding-left: max(20px, env(safe-area-inset-left, 0px));
-  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .message {
   background: rgba(22, 27, 34, 0.75);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 10px;
+  padding: 10px 14px;
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .message:hover {
@@ -9012,7 +9012,7 @@ body::-webkit-scrollbar {
 .message-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   align-items: stretch;
   text-align: left;
   position: relative;
@@ -9338,8 +9338,8 @@ body::-webkit-scrollbar {
 .input-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -10237,12 +10237,12 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: rgba(22, 27, 34, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
   cursor: move;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .terminal-panel-header h3 {
