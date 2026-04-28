@@ -145,6 +145,23 @@ type ExecutionTerminalEntry = {
 };
 
 const executionTerminals = new Map<string, ExecutionTerminalEntry>();
+
+function getExecutionTerminalKey(agentId: string, executionId: string): string {
+  const normalizedAgentId = String(agentId || "").trim() || "unknown-agent";
+  const normalizedExecutionId =
+    String(executionId || "default").trim() || "default";
+  return `${normalizedAgentId}:${normalizedExecutionId}`;
+}
+
+function disposeExecutionTerminal(entry: ExecutionTerminalEntry): void {
+  entry.terminal.dispose();
+  entry.fitAddon.dispose();
+  entry.resizeObserver.disconnect();
+}
+
+function isExecutionTerminalAttached(entry: ExecutionTerminalEntry): boolean {
+  return entry.wrapper.isConnected && entry.terminalHost.isConnected;
+}
 const PLANTUML_SERVER_URL = "https://www.plantuml.com/plantuml/svg/";
 const PLANTUML_BLOCK_LANGUAGE = "plantuml";
 
@@ -597,10 +614,18 @@ function ensureMessageNode(
   return node;
 }
 
-function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
-  const existing = executionTerminals.get(executionId);
+function ensureExecutionTerminal(
+  agentId: string,
+  executionId: string,
+): ExecutionTerminalEntry {
+  const terminalKey = getExecutionTerminalKey(agentId, executionId);
+  const existing = executionTerminals.get(terminalKey);
   if (existing) {
-    return existing;
+    if (isExecutionTerminalAttached(existing)) {
+      return existing;
+    }
+    disposeExecutionTerminal(existing);
+    executionTerminals.delete(terminalKey);
   }
 
   const wrapper = document.createElement("div");
@@ -667,24 +692,26 @@ function ensureExecutionTerminal(executionId: string): ExecutionTerminalEntry {
     resizeObserver,
     lastBuffer: "",
   };
-  executionTerminals.set(executionId, entry);
+  executionTerminals.set(terminalKey, entry);
   return entry;
 }
 
 function renderExecutionMessage(
   item: ChatMessageItem,
-  _agentId: string,
+  agentId: string,
 ): HTMLDivElement {
   const executionId = String(item.executionId || "").trim();
+  const terminalKey = getExecutionTerminalKey(
+    agentId,
+    executionId || "default",
+  );
 
   // 如果执行已完成，始终显示静态内容，避免为历史消息创建 xterm
   if (item.finished) {
-    const existingEntry = executionTerminals.get(executionId || "default");
+    const existingEntry = executionTerminals.get(terminalKey);
     if (existingEntry) {
-      existingEntry.terminal.dispose();
-      existingEntry.fitAddon.dispose();
-      existingEntry.resizeObserver.disconnect();
-      executionTerminals.delete(executionId || "default");
+      disposeExecutionTerminal(existingEntry);
+      executionTerminals.delete(terminalKey);
     }
 
     const staticWrapper = document.createElement("div");
@@ -711,7 +738,7 @@ function renderExecutionMessage(
   }
 
   // 执行未完成，继续使用 xterm
-  const entry = ensureExecutionTerminal(executionId || "default");
+  const entry = ensureExecutionTerminal(agentId, executionId || "default");
   const header = entry.wrapper.querySelector(".message-header");
   if (header instanceof HTMLDivElement) {
     header.textContent = item.text || "执行中";
@@ -862,7 +889,9 @@ function isAppendOnly(
       o.text !== n.text ||
       o.variant !== n.variant ||
       o.lang !== n.lang ||
-      o.executionId !== n.executionId
+      o.executionId !== n.executionId ||
+      o.executionBuffer !== n.executionBuffer ||
+      o.finished !== n.finished
     ) {
       return false;
     }
