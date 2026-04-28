@@ -166,21 +166,21 @@ class EditFileNormalTool:
     def _read_text_with_preferred_encoding(
         file_path: str,
     ) -> Tuple[str, Optional[str]]:
-        """使用工具级优先编码顺序读取文本文件。"""
-        for encoding in EditFileNormalTool._get_preferred_encodings():
+        """使用 detect_file_encoding 直接识别编码并读取文本文件。"""
+        detected_encoding = detect_file_encoding(file_path)
+        if detected_encoding:
             try:
-                return read_text_file(
+                content = read_text_file(
                     file_path,
-                    encoding=encoding,
+                    encoding=detected_encoding,
                     detect_encoding=False,
                     errors="strict",
-                ), encoding
-            except UnicodeDecodeError:
-                continue
-            except Exception:
-                break
+                )
+                return content, detected_encoding
+            except (UnicodeDecodeError, LookupError):
+                pass
 
-        detected_encoding = detect_file_encoding(file_path)
+        # 回退到默认读取方式
         content = read_text_file(file_path)
         return content, detected_encoding
 
