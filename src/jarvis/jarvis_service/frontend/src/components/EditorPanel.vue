@@ -842,4 +842,89 @@ defineExpose({ containerRef })
   bottom: -7px;
   cursor: nesw-resize;
 }
+
+/* tree-node 样式 */
+.tree-node {
+  margin: 2px 0;
+}
+
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.tree-node-content:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tree-node-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  color: #6e7681;
+  transition: transform 0.2s ease;
+  font-size: 12px;
+}
+
+.tree-node-icon.expand-arrow {
+  margin-right: 4px;
+  color: #8b949e;
+}
+
+.tree-node-icon.expand-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-node-icon.folder-icon {
+  color: #58a6ff;
+}
+
+.tree-node-icon.file-icon {
+  color: #8b949e;
+}
+
+.tree-node-text {
+  font-size: 13px;
+  color: #e6edf3;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-node-text.directory {
+  color: #58a6ff;
+  font-weight: 500;
+}
+
+.tree-node-text.file {
+  color: #c9d1d9;
+}
+
+.editor-file-tree-root {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #8b949e;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-file-tree-root:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.editor-file-tree-empty {
+  padding: 16px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 12px;
+}
 </style>
