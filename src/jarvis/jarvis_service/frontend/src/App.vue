@@ -420,7 +420,7 @@
           </button>
           <button 
             class="send-btn" 
-            @click="submitInput" 
+            @click="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? sendBufferedInput() : submitInput()" 
             :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'waiting_multi'))"
           >
             {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
