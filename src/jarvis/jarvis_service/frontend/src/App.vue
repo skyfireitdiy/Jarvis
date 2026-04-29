@@ -4377,10 +4377,7 @@ async function switchAgent(agent) {
     let cleanedCount = 0
     terminals.value.forEach((termInfo) => {
       if (termInfo.agentId === previousAgentId && termInfo.terminal) {
-        console.log(`[AGENT] Saving terminal content and disposing: ${termInfo.sessionKey}`)
-        // 保存终端内容以便重建时恢复
-        termInfo.savedContent = getTerminalBufferContent(termInfo.terminal, false)
-        console.log(`[AGENT] Saved ${termInfo.savedContent.length} chars of terminal content`)
+        console.log(`[AGENT] Disposing terminal: ${termInfo.sessionKey}, allChunks=${termInfo.allChunks?.length || 0}`)
         disposeExecutionTerminal(termInfo)
         cleanedCount++
       }
@@ -5125,6 +5122,7 @@ function appendExecution(payload, agentId = null) {
       active: true,
       hostEl: null,
       pendingChunks: [],
+      allChunks: [],
       ended: false,
     }
     terminals.value.push(termInfo)
@@ -5204,6 +5202,11 @@ function appendExecution(payload, agentId = null) {
   // 输出到终端
   console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${data.length}`)
   if (eventType === 'stdout' || eventType === 'stderr') {
+    if (data) {
+      // 保存所有原始消息以便切换回来时重放
+      if (!termInfo.allChunks) termInfo.allChunks = []
+      termInfo.allChunks.push(data)
+    }
     if (termInfo.terminal) {
       // 显示即将写入的数据（前100字符），用于调试
       const preview = data.substring(0, 100).replace(/\x1b/g, 'ESC').replace(/\r/g, 'CR').replace(/\n/g, 'LF')
@@ -5220,6 +5223,9 @@ function appendExecution(payload, agentId = null) {
     }
   } else if (eventType === 'status') {
     const statusLine = `\r\n[status] ${payload.data || ''}`
+    // 保存所有原始消息以便切换回来时重放
+    if (!termInfo.allChunks) termInfo.allChunks = []
+    termInfo.allChunks.push(statusLine)
     if (termInfo.terminal) {
       termInfo.terminal.writeln(statusLine)
     } else {
@@ -5821,15 +5827,16 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     syncTerminalSize(executionId, termInfo)
   }, 300)
 
-  // 恢复之前保存的终端内容（切换回来时）
-  if (termInfo.savedContent) {
-    console.log(`[terminal] Restoring saved content: ${termInfo.savedContent.length} chars`)
-    try {
-      termInfo.terminal.write(termInfo.savedContent)
-    } catch (error) {
-      console.warn('[terminal] Failed to restore saved content', error)
-    }
-    termInfo.savedContent = null
+  // 重放所有保存的原始消息（切换回来时）
+  if (termInfo.allChunks && termInfo.allChunks.length > 0) {
+    console.log(`[terminal] Replaying ${termInfo.allChunks.length} chunks`)
+    termInfo.allChunks.forEach((chunk, index) => {
+      try {
+        termInfo.terminal.write(chunk)
+      } catch (error) {
+        console.warn(`[terminal] Failed to replay chunk ${index}`, error)
+      }
+    })
   }
 
   if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
@@ -5875,6 +5882,7 @@ function setTerminalRef(executionId, el, agentId = null) {
         resizeObserver: null,
         lastSize: null,
         pendingChunks: [],
+        allChunks: [],
         ended: false
       }
       terminals.value.push(termInfo)
