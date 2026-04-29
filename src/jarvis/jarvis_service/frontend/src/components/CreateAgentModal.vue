@@ -152,7 +152,6 @@ const emit = defineEmits([
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 28px;
-  width: 100%;
 }
 
 .modal-overlay .modal.create-agent-modal {
