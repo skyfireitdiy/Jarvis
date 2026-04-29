@@ -913,35 +913,14 @@
     </div>
 
     <!-- Session 选择对话框 -->
-    <div class="modal-overlay" v-if="showSessionDialog">
-      <div class="modal session-modal">
-        <div class="modal-header">
-          <h2>选择会话恢复</h2>
-          <button class="close-btn" @click="cancelSessionDialog">×</button>
-        </div>
-        <div class="session-list" v-if="availableSessions.length > 0">
-          <div
-            v-for="session in availableSessions"
-            :key="session.file"
-            class="session-item"
-            :class="{ active: selectedSession === session.file }"
-            @click="selectedSession = session.file"
-          >
-            <div class="session-name">{{ session.name || '未命名会话' }}</div>
-            <div class="session-time">{{ session.timestamp }}</div>
-          </div>
-        </div>
-        <div class="empty-state" v-else>
-          <p>没有可恢复的会话</p>
-        </div>
-        <div class="modal-actions">
-          <button class="ghost-btn" @click="cancelSessionDialog">跳过</button>
-          <button class="primary-btn" @click="restoreSession(selectedSession)" :disabled="!selectedSession">
-            恢复会话
-          </button>
-        </div>
-      </div>
-    </div>
+    <SessionDialog
+      :visible="showSessionDialog"
+      :sessions="availableSessions"
+      :selectedSession="selectedSession"
+      @update:selectedSession="selectedSession = $event"
+      @restore="restoreSession"
+      @cancel="cancelSessionDialog"
+    />
     
     <!-- Toast 提示 -->
     <transition name="toast-fade">
