@@ -73,6 +73,20 @@ watch(() => props.visible, async (newVal) => {
   color: #e6edf3;
 }
 
+/* 表单组样式 */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.01em;
+}
+
 .create-agent-modal .form-control {
   width: 100%;
   padding: 10px 12px;

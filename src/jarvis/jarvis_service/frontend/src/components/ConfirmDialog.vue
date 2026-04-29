@@ -8,8 +8,8 @@
           <button ref="confirmBtnRef" class="confirm-btn default" @click="handleConfirm">确认</button>
         </template>
         <template v-else>
-          <button ref="confirmBtnRef" class="confirm-btn default" @click="handleConfirm">确认</button>
-          <button ref="cancelBtnRef" @click="handleCancel">取消</button>
+          <button ref="confirmBtnRef" class="confirm-btn" @click="handleConfirm">确认</button>
+          <button ref="cancelBtnRef" class="confirm-btn default" @click="handleCancel">取消</button>
         </template>
       </div>
     </div>
