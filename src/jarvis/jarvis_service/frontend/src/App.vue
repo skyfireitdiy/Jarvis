@@ -209,74 +209,30 @@
       </div>
     </main>
 
-    <!-- 终端面板 -->
-    <aside 
-      v-show="showTerminalPanel" 
-      class="terminal-panel"
-      :class="{ 'terminal-panel-dragging': terminalPanelInteraction.active }"
-      :style="terminalPanelStyle"
-      @mousedown="focusWindow('terminal')"
-    >
-      <div class="terminal-panel-header" @mousedown="startTerminalPanelMove" @dblclick.stop="toggleTerminalMaximize">
-        <div class="terminal-panel-title-group">
-          <h3>终端</h3>
-        </div>
-        <div class="terminal-panel-actions">
-          <select
-            v-if="availableNodeOptions.length > 0"
-            v-model="selectedTerminalNodeId"
-            class="terminal-node-select"
-            @mousedown.stop
-            @click.stop
-          >
-            <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-              {{ formatNodeOptionLabel(node) }}
-            </option>
-          </select>
-          <button class="icon-btn" @click="createTerminalForSelectedNode" :disabled="!socket" title="新建终端">➕</button>
-          <button class="icon-btn maximize-btn" @click="toggleTerminalMaximize" :title="isTerminalMaximized ? '还原' : '最大化'">
-            {{ isTerminalMaximized ? '🗗' : '🗖' }}
-          </button>
-          <button class="icon-btn" @click="showTerminalPanel = false" title="关闭面板">✕</button>
-        </div>
-      </div>
-      
-      <!-- 终端标签栏 -->
-      <div class="terminal-tabs" v-if="terminalSessions.length > 0">
-        <div 
-          v-for="session in terminalSessions" 
-          :key="session.terminal_id"
-          class="terminal-tab"
-          :class="{ active: activeTerminalId === session.terminal_id }"
-          @click="switchTerminal(session.terminal_id)"
-        >
-          <span class="terminal-tab-title">{{ session.interpreter }}</span>
-          <button class="terminal-tab-close" @click.stop="closeTerminal(session.terminal_id)">✕</button>
-        </div>
-      </div>
-      
-      <!-- 终端内容区域 -->
-      <div class="terminal-content">
-        <div v-if="terminalSessions.length === 0" class="terminal-empty">
-          暂无终端，点击 + 创建
-        </div>
-        <div 
-          v-else 
-          v-for="session in terminalSessions" 
-          :key="session.terminal_id"
-          v-show="activeTerminalId === session.terminal_id"
-          class="terminal-host-wrapper"
-        >
-          <div :ref="el => setTerminalHostRef(session.terminal_id, el)" class="terminal-host"></div>
-        </div>
-      </div>
-      <div
-        v-for="direction in terminalResizeDirections"
-        :key="direction"
-        :class="['terminal-resize-handle', `terminal-resize-${direction}`]"
-        @mousedown="startTerminalPanelResize($event, direction)"
-      ></div>
-    </aside>
+<!-- 终端面板 -->
+    <TerminalPanel
+      :visible="showTerminalPanel"
+      :interaction="terminalPanelInteraction"
+      :panelStyle="terminalPanelStyle"
+      :nodeOptions="availableNodeOptions"
+      :selectedNodeId="selectedTerminalNodeId"
+      :socket="socket"
+      :isMaximized="isTerminalMaximized"
+      :sessions="terminalSessions"
+      :activeId="activeTerminalId"
+      :resizeDirections="terminalResizeDirections"
+      :formatNodeLabel="formatNodeOptionLabel"
+      @focus="focusWindow"
+      @startMove="startTerminalPanelMove"
+      @toggleMaximize="toggleTerminalMaximize"
+      @update:selectedNodeId="selectedTerminalNodeId = $event"
+      @createTerminal="createTerminalForSelectedNode"
+      @close="showTerminalPanel = false"
+      @switch="switchTerminal"
+      @closeTerminal="closeTerminal"
+      @setHostRef="setTerminalHostRef"
+      @startResize="startTerminalPanelResize"
+    />
 
     <!-- 浮动编辑器面板 -->
     <aside
@@ -860,6 +816,7 @@ import BufferPanel from './components/BufferPanel.vue'
 import DirectoryDialog from './components/DirectoryDialog.vue'
 import SessionDialog from './components/SessionDialog.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
+import TerminalPanel from './components/TerminalPanel.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
