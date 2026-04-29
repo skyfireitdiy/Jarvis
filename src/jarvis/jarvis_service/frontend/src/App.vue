@@ -448,125 +448,40 @@
     />
 
     <!-- 创建 Agent 弹窗 -->
-    <div class="modal-overlay" v-if="showCreateAgentModal">
-      <div class="modal create-agent-modal">
-        <h2>创建 Agent</h2>
-        <div class="form-grid create-agent-layout">
-          <div class="form-column create-agent-column create-agent-column-left">
-            <div class="form-group" v-if="availableNodeOptions.length > 0">
-              <label>目标节点</label>
-              <select v-model="newAgentNodeId" class="form-control">
-                <option value="">默认节点（当前网关决定）</option>
-                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                  {{ formatNodeOptionLabel(node) }}
-                </option>
-              </select>
-              <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
-            </div>
-            <div class="form-group">
-              <label>Agent 类型</label>
-              <div class="radio-group">
-                <label class="radio-label">
-                  <input type="radio" v-model="newAgentType" value="agent" />
-                  <span class="radio-text">通用 Agent</span>
-                  <span class="radio-desc">适用于日常任务和通用操作</span>
-                </label>
-                <label class="radio-label">
-                  <input type="radio" v-model="newAgentType" value="codeagent" />
-                  <span class="radio-text">代码 Agent</span>
-                  <span class="radio-desc">专注于代码分析和开发任务</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="form-column create-agent-column create-agent-column-right">
-            <div class="form-group">
-              <label>Agent 名称（可选）</label>
-              <input v-model="newAgentName" type="text" class="form-control" placeholder="例如：开发环境Agent" />
-            </div>
-            <div class="form-group">
-              <label>模型组</label>
-              <select v-model="newAgentModelGroup" class="form-control">
-                <option v-for="group in modelGroups" :key="group.name" :value="group.name">
-                  {{ group.name }} ({{ group.smart_model }}, {{ group.normal_model }}, {{ group.cheap_model }})
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>工作目录</label>
-              <div class="input-with-button">
-                <input v-model="newAgentDir" type="text" class="form-control" placeholder="/path/to/workspace" />
-                <button class="btn select-dir-btn" @click="openDirDialog">选择目录</button>
-              </div>
-            </div>
-            <div class="form-column create-agent-options-column">
-              <div v-if="newAgentType === 'codeagent'" class="form-group">
-                <div class="toggle-wrapper">
-                  <label class="toggle-switch">
-                    <input v-model="newCodeAgentWorktree" type="checkbox" class="toggle-input" />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <div class="toggle-info">
-                    <span class="toggle-label-text">启用 worktree</span>
-                    <span class="form-help">为代码 Agent 使用独立 git worktree 进行隔离开发。</span>
-                  </div>
-                </div>
-              </div>
-              <div class="form-group">
-                <div class="toggle-wrapper">
-                  <label class="toggle-switch">
-                    <input v-model="newAgentQuickMode" type="checkbox" class="toggle-input" />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <div class="toggle-info">
-                    <span class="toggle-label-text">极速模式</span>
-                    <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
-                  </div>
-                </div>
-              </div>
-              <div class="form-group">
-                <div class="toggle-wrapper">
-                  <label class="toggle-switch">
-                    <input v-model="newAgentRestoreSession" type="checkbox" class="toggle-input" />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <div class="toggle-info">
-                    <span class="toggle-label-text">启动时恢复会话</span>
-                    <span class="form-help">启动时自动恢复上次会话。</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn secondary" @click="showCreateAgentModal = false">取消</button>
-          <button class="btn primary" @click="createAgent" :disabled="!newAgentDir.trim()">创建</button>
-        </div>
-      </div>
-    </div>
+    <CreateAgentModal
+      :visible="showCreateAgentModal"
+      :nodeOptions="availableNodeOptions"
+      :nodeId="newAgentNodeId"
+      @update:nodeId="newAgentNodeId = $event"
+      :agentType="newAgentType"
+      @update:agentType="newAgentType = $event"
+      :agentName="newAgentName"
+      @update:agentName="newAgentName = $event"
+      :modelGroups="modelGroups"
+      :modelGroup="newAgentModelGroup"
+      @update:modelGroup="newAgentModelGroup = $event"
+      :workDir="newAgentDir"
+      @update:workDir="newAgentDir = $event"
+      :codeAgentWorktree="newCodeAgentWorktree"
+      @update:codeAgentWorktree="newCodeAgentWorktree = $event"
+      :quickMode="newAgentQuickMode"
+      @update:quickMode="newAgentQuickMode = $event"
+      :restoreSession="newAgentRestoreSession"
+      @update:restoreSession="newAgentRestoreSession = $event"
+      :formatNodeLabel="formatNodeOptionLabel"
+      @cancel="showCreateAgentModal = false"
+      @create="createAgent"
+      @selectDir="openDirDialog"
+    />
 
     <!-- 重命名 Agent 弹窗 -->
-    <div class="modal-overlay" v-if="showRenameAgentModal">
-      <div class="modal create-agent-modal">
-        <h2>重命名 Agent</h2>
-        <div class="form-group">
-          <label>Agent 名称（可选）</label>
-          <input 
-            v-model="renameAgentName" 
-            type="text" 
-            class="form-control" 
-            placeholder="留空则使用默认名称"
-            ref="renameInput"
-            @keydown.enter="confirmRename"
-          />
-        </div>
-        <div class="modal-actions">
-          <button class="btn secondary" @click="showRenameAgentModal = false">取消</button>
-          <button class="btn primary" @click="confirmRename">确认</button>
-        </div>
-      </div>
-    </div>
+    <RenameAgentModal
+      :visible="showRenameAgentModal"
+      :name="renameAgentName"
+      @update:name="renameAgentName = $event"
+      @cancel="showRenameAgentModal = false"
+      @confirm="confirmRename"
+    />
 
     <!-- 目录选择对话框 -->
     <DirectoryDialog
@@ -655,6 +570,8 @@ import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import CreateAgentModal from './components/CreateAgentModal.vue'
+import RenameAgentModal from './components/RenameAgentModal.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -8206,199 +8123,7 @@ body::-webkit-scrollbar {
   }
 }
 
-/* 创建 Agent 弹窗 */
-.modal-overlay .modal.create-agent-modal {
-  max-width: min(50vw, 960px) !important;
-  width: min(50vw, 960px);
-  max-height: calc(var(--app-height, 100vh) - 40px);
-  overflow-y: auto;
-}
 
-.create-agent-modal h2 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
-  color: #e6edf3;
-}
-
-/* 响应式网格布局 */
-.create-agent-modal .form-grid {
-  display: grid;
-  gap: 20px;
-}
-
-.create-agent-modal .form-grid.create-agent-layout {
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
-  align-items: start;
-}
-
-.create-agent-modal .form-column {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.create-agent-modal .create-agent-options-column {
-  gap: 12px;
-}
-
-/* 平板及以下：保持双列但允许更紧凑 */
-@media (max-width: 1023px) {
-  .modal-overlay .modal.create-agent-modal {
-    width: 90%;
-    max-width: 900px !important;
-  }
-
-  .create-agent-modal .form-grid.create-agent-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* 移动端：单列布局 */
-@media (max-width: 768px) {
-  .modal-overlay .modal.create-agent-modal {
-    width: 100%;
-    max-width: 100% !important;
-  }
-
-  .create-agent-modal .form-grid.create-agent-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.create-agent-modal .form-control {
-  width: 100%;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: #e6edf3;
-  font-size: 14px;
-}
-
-.create-agent-modal .form-control:focus {
-  outline: none;
-  border-color: rgba(63, 185, 80, 0.6);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.create-agent-modal select.form-control option {
-  background: #1a1f2e;
-  color: #e6edf3;
-}
-
-.create-agent-modal .modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.create-agent-modal .btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-}
-
-.create-agent-modal .btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
-}
-
-.create-agent-modal .btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.create-agent-modal .btn.primary {
-  background: #3fb950;
-  color: white;
-}
-
-.create-agent-modal .btn.primary:hover {
-  transform: translateY(-1px);
-}
-
-.create-agent-modal .btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-/* 单选框组样式 */
-.create-agent-modal .radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.create-agent-modal .radio-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.create-agent-modal .radio-label:hover {
-  background: rgba(13, 17, 23, 0.8);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-}
-
-.create-agent-modal .radio-label:has(input:checked) {
-  background: rgba(56, 139, 253, 0.12);
-  border-color: rgba(56, 139, 253, 0.4);
-}
-
-.create-agent-modal .radio-label input[type="radio"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  background: rgba(13, 17, 23, 0.8);
-  cursor: pointer;
-  position: relative;
-}
-
-.create-agent-modal .radio-label input[type="radio"]:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.create-agent-modal .radio-label input[type="radio"]:checked {
-  border-color: #58a6ff;
-  background: rgba(56, 139, 253, 0.1);
-}
-
-.create-agent-modal .radio-label input[type="radio"]:checked::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  background: #58a6ff;
-  border-radius: 50%;
-}
-
-.create-agent-modal .radio-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e6edf3;
-}
-
-.create-agent-modal .radio-desc {
-  font-size: 12px;
-  color: #8b949e;
-  line-height: 1.4;
-}
 
 /* Session 恢复弹窗 */
 .session-modal {

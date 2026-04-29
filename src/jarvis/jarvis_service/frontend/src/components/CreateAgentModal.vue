@@ -130,6 +130,30 @@ const emit = defineEmits([
 </script>
 
 <style scoped>
+
+/* 模态框遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+/* 模态框基础样式 */
+.modal-overlay .modal {
+  background: rgba(22, 27, 34, 0.95);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 28px;
+}
+
 .modal-overlay .modal.create-agent-modal {
   max-width: min(50vw, 960px) !important;
   width: min(50vw, 960px);
@@ -321,5 +345,229 @@ const emit = defineEmits([
   font-size: 12px;
   color: #8b949e;
   line-height: 1.4;
+}
+
+/* 表单帮助文字样式 */
+.form-help {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: rgba(139, 148, 158, 0.85);
+}
+
+/* 表单组样式 */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.01em;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background-color: rgba(13, 17, 23, 0.9);
+}
+
+.form-group select option {
+  background: #161b22;
+  color: #e6edf3;
+  padding: 8px;
+}
+
+/* 输入框带按钮样式 */
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button .form-control {
+  flex: 1;
+}
+
+.select-dir-btn {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.select-dir-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Toggle 开关样式 */
+.toggle-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-wrapper:hover {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+  border-color: rgba(0, 122, 255, 0.3);
+  outline-color: rgba(0, 122, 255, 0.4);
+}
+
+.toggle-wrapper:active {
+  transform: scale(0.98);
+}
+
+.toggle-switch {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 3px;
+  bottom: 3px;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  border-color: rgba(0, 122, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  outline-color: rgba(0, 122, 255, 0.5);
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.toggle-switch:hover .toggle-slider {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+}
+
+.toggle-switch:hover .toggle-slider:before {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.toggle-switch:active .toggle-slider {
+  transform: scale(0.95);
+}
+
+.toggle-switch:active .toggle-slider:before {
+  transform: translateX(22px) scale(0.95);
+}
+
+.toggle-input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-info {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px;
+}
+
+.toggle-label-text {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
 }
 </style>
