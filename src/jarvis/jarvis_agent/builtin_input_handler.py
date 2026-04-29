@@ -452,6 +452,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 skip_confirm=True,
             )
 
+            # 提交完成后自动保存会话
+            if getattr(agent, "allow_savesession", False):
+                if agent.save_session():
+                    PrettyOutput.auto_print("✅ 会话已成功保存。")
+                else:
+                    PrettyOutput.auto_print("❌ 保存会话失败。")
+
             return "", True
 
         elif tag == "Pin":
