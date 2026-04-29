@@ -954,7 +954,7 @@ class PrettyOutput:
             if self.tag == "h1":
                 yield Panel(
                     text,
-                    box=box.HEAVY,
+                    box=box.HORIZONTALS,
                     style="markdown.h1.border",
                 )
             else:
@@ -970,7 +970,13 @@ class PrettyOutput:
             markdown = Markdown(content, code_theme=theme)
 
             # 创建Panel包装Markdown对象
-            panel = Panel(markdown, title=title, border_style=border_style, expand=True)
+            panel = Panel(
+                markdown,
+                title=title,
+                border_style=border_style,
+                box=box.HORIZONTALS,
+                expand=True,
+            )
 
             # 打印Panel到终端
             console.print(panel)
