@@ -1,115 +1,38 @@
 <template>
   <div class="app">
-    <!-- Agent 侧边栏 -->
-    <aside
-      class="agent-sidebar"
-      :class="{ collapsed: !showAgentSidebar, 'agent-sidebar-resizing': agentSidebarResizeState.active }"
-      :style="agentSidebarStyle"
-    >
-      <div class="agent-sidebar-header">
-        <h3>Agent 列表</h3>
-        <div class="sidebar-header-actions">
-          <button class="icon-btn" :class="{ active: isBatchMode }" @click="toggleBatchMode" title="批量选择模式">☑</button>
-          <button class="icon-btn" @click="openCreateAgentModal" title="创建新 Agent">➕</button>
-          <button class="icon-btn" @click="showAgentSidebar = false" title="关闭侧边栏">✕</button>
-        </div>
-      </div>
-      <div class="agent-list">
-        <template v-for="agentGroup in agentDisplayGroups" :key="agentGroup.key">
-          <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
-            <button class="agent-collapsed-toggle" @click="showStoppedAgents = !showStoppedAgents">
-              <span class="agent-collapsed-arrow">{{ showStoppedAgents ? '▼' : '▶' }}</span>
-              <span class="agent-collapsed-title">{{ agentGroup.title }}</span>
-              <span class="agent-collapsed-count">{{ agentGroup.agents.length }}</span>
-            </button>
-            <div v-if="showStoppedAgents">
-              <div
-                v-for="agent in agentGroup.agents"
-                :key="agent.agent_id"
-                class="agent-item"
-                :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
-                @click="handleAgentItemClick(agent, $event)"
-              >
-                <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
-                  <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
-                </div>
-                <div class="agent-info">
-                  <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : agent.agent_type) }}</span>
-                  <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-                  <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
-                  <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
-                  <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
-                  <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
-                </div>
-                <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
-                <div class="agent-actions">
-                  <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
-                  <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
-                  <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
-                  <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <template v-else>
-            <div
-              v-for="agent in agentGroup.agents"
-              :key="agent.agent_id"
-              class="agent-item"
-              :class="{ active: currentAgentId === agent.agent_id, selected: isAgentSelected(agent.agent_id) }"
-              @click="handleAgentItemClick(agent, $event)"
-            >
-              <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
-                <input type="checkbox" :checked="isAgentSelected(agent.agent_id)" @change="toggleSelectAgent(agent.agent_id)">
-              </div>
-              <div class="agent-info">
-                <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : agent.agent_type) }}</span>
-                <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-                <span class="agent-node" v-if="getAgentNodeLabel(agent)" :title="`节点: ${getAgentNodeLabel(agent)}`">🧭 {{ getAgentNodeLabel(agent) }}</span>
-                <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
-                <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
-                <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
-              </div>
-              <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
-              <div class="agent-actions">
-                <button class="icon-btn-small" @click.stop="createTerminalForAgent(agent)" :disabled="!socket" title="创建终端">💻</button>
-                <button class="icon-btn-small" @click.stop="renameAgent(agent)" title="重命名">✏</button>
-                <button class="icon-btn-small" @click.stop="copyAgent(agent)" title="复制 Agent">📋</button>
-                <button class="icon-btn-small stop-btn" @click.stop="deleteAgent(agent.agent_id)" title="删除 Agent">🗑</button>
-              </div>
-            </div>
-          </template>
-        </template>
-        <!-- 批量操作按钮栏 -->
-        <div v-if="isBatchMode && agentList.length > 0" class="batch-actions-bar">
-          <div class="batch-actions-info">
-            已选 {{ selectedAgents.size }} 个
-          </div>
-          <div class="batch-actions-buttons">
-            <button class="icon-btn-small" @click="toggleSelectAll" :title="isAllSelected ? '取消全选' : '全选'">
-              {{ isAllSelected ? '⬜' : '☑' }}
-            </button>
-            <button class="icon-btn-small" @click="batchCopyAgents" title="批量复制">
-              📋
-            </button>
-            <button class="icon-btn-small stop-btn" @click="batchDeleteAgents" title="批量删除">
-              🗑️
-            </button>
-            <button class="icon-btn-small" @click="toggleBatchMode" title="退出批量模式">
-              ✕
-            </button>
-          </div>
-        </div>
-        <div v-if="agentList.length === 0" class="agent-empty">
-          暂无 Agent，点击 + 创建
-        </div>
-      </div>
-      <div
-        v-if="showAgentSidebar && windowWidth > 768"
-        class="agent-sidebar-resize-handle"
-        @mousedown="startAgentSidebarResize"
-      ></div>
-    </aside>
+<!-- Agent 侧边栏 -->
+    <AgentSidebar
+      :visible="showAgentSidebar"
+      :resizeState="agentSidebarResizeState"
+      :sidebarStyle="agentSidebarStyle"
+      :isBatchMode="isBatchMode"
+      :displayGroups="agentDisplayGroups"
+      :showStopped="showStoppedAgents"
+      :currentAgentId="currentAgentId"
+      :selectedCount="selectedAgents.size"
+      :agentList="agentList"
+      :windowWidth="windowWidth"
+      :isAllSelected="isAllSelected"
+      :socket="socket"
+      :getStatusClass="getStatusClass"
+      :getStatusText="getStatusText"
+      :getNodeLabel="getAgentNodeLabel"
+      :isSelected="isAgentSelected"
+      @close="showAgentSidebar = false"
+      @toggleBatchMode="toggleBatchMode"
+      @createAgent="openCreateAgentModal"
+      @agentClick="handleAgentItemClick"
+      @toggleStoppedAgents="showStoppedAgents = !showStoppedAgents"
+      @toggleSelectAgent="toggleSelectAgent"
+      @createTerminal="createTerminalForAgent"
+      @renameAgent="renameAgent"
+      @copyAgent="copyAgent"
+      @deleteAgent="deleteAgent"
+      @toggleSelectAll="toggleSelectAll"
+      @batchCopy="batchCopyAgents"
+      @batchDelete="batchDeleteAgents"
+      @startResize="startAgentSidebarResize"
+    />
 
     <!-- 主内容区 -->
     <div class="main-content-wrapper">
@@ -815,6 +738,7 @@ import ConnectModal from './components/ConnectModal.vue'
 import BufferPanel from './components/BufferPanel.vue'
 import DirectoryDialog from './components/DirectoryDialog.vue'
 import SessionDialog from './components/SessionDialog.vue'
+import AgentSidebar from './components/AgentSidebar.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 
