@@ -370,45 +370,6 @@ const emit = defineEmits([
   letter-spacing: 0.01em;
 }
 
-.form-group input {
-  width: 100%;
-  padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 9px;
-  color: #e6edf3;
-  font-size: 14px;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
-}
-
-.form-group select {
-  width: 100%;
-  padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 9px;
-  color: #e6edf3;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.form-group select:focus {
-  outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background-color: rgba(13, 17, 23, 0.9);
-}
-
-.form-group select option {
-  background: #161b22;
-  color: #e6edf3;
-  padding: 8px;
-}
-
 /* 输入框带按钮样式 */
 .input-with-button {
   display: flex;
@@ -417,6 +378,7 @@ const emit = defineEmits([
 
 .input-with-button .form-control {
   flex: 1;
+  width: auto;
 }
 
 .select-dir-btn {
