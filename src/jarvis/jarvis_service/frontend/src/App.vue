@@ -860,6 +860,7 @@ import BufferPanel from './components/BufferPanel.vue'
 import DirectoryDialog from './components/DirectoryDialog.vue'
 import SessionDialog from './components/SessionDialog.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
+import TerminalPanel from './components/TerminalPanel.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
