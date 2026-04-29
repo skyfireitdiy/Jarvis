@@ -721,49 +721,21 @@
     </div>
 
     <!-- 目录选择对话框 -->
-    <div class="modal-overlay" v-if="showDirDialog">
-      <div class="modal dir-modal">
-        <div class="modal-header">
-          <h2>选择工作目录</h2>
-          <button class="close-btn" @click="cancelDirDialog">×</button>
-        </div>
-        <div class="path-header">
-          <button class="path-btn" @click="fetchDirectories(currentDirPath)">🔄 刷新</button>
-          <button class="path-btn" @click="goToParentDir">⬆️ 返回上级</button>
-        </div>
-        <div class="current-path">{{ currentDirPath }}</div>
-        <div class="dir-search">
-          <input 
-            ref="dirSearchInput"
-            v-model="dirSearchText"
-            type="text" 
-            class="dir-search-input"
-            placeholder="🔍 搜索目录..."
-            @keydown="handleDirSearchKeydown"
-          />
-        </div>
-        <div class="dir-list" v-if="filteredDirList.length > 0">
-          <div
-            v-for="dir in filteredDirList"
-            :key="dir.path"
-            class="dir-item"
-            :class="{ selected: selectedDir === dir.path }"
-            @click="selectDirectory(dir.path); enterDirectory(dir.path, false)"
-          >
-            <div class="dir-icon">📁</div>
-            <div class="dir-name">{{ dir.name }}</div>
-            <div class="dir-path">{{ dir.path }}</div>
-          </div>
-        </div>
-        <div class="empty-state" v-else>
-          <p>该目录下没有子目录</p>
-        </div>
-        <div class="modal-actions">
-          <button class="btn secondary" @click="cancelDirDialog">取消</button>
-          <button class="btn primary" @click="confirmDirectory">确认</button>
-        </div>
-      </div>
-    </div>
+    <DirectoryDialog
+      :visible="showDirDialog"
+      :currentPath="currentDirPath"
+      :selectedDir="selectedDir"
+      :searchText="dirSearchText"
+      :filteredDirs="filteredDirList"
+      @update:searchText="dirSearchText = $event"
+      @cancel="cancelDirDialog"
+      @confirm="confirmDirectory"
+      @refresh="fetchDirectories"
+      @go-parent="goToParentDir"
+      @select="selectDirectory"
+      @enter="enterDirectory"
+      @search-keydown="handleDirSearchKeydown"
+    />
 
     <!-- 连接弹窗 -->
     <ConnectModal
