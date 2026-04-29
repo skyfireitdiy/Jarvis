@@ -5025,6 +5025,8 @@ function appendExecution(payload, agentId = null) {
     termInfo.active = false
     termInfo.ended = true
     isExecuting.value = false // 更新执行状态
+    // 清理chunks，避免已完成的终端被恢复
+    termInfo.allChunks = []
     
     // 保存终端内容到消息列表
     if (termInfo.terminal) {
@@ -5710,7 +5712,8 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   }, 300)
 
   // 重放所有保存的原始消息（切换回来时）
-  if (termInfo.allChunks && termInfo.allChunks.length > 0) {
+  // 如果终端已结束（finished），不重放chunks，避免恢复已完成的终端
+  if (!termInfo.ended && termInfo.allChunks && termInfo.allChunks.length > 0) {
     console.log(`[terminal] Replaying ${termInfo.allChunks.length} chunks`)
     termInfo.allChunks.forEach((chunk, index) => {
       try {
