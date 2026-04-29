@@ -9,6 +9,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -301,7 +302,13 @@ class DiffVisualizer:
         # 显示 diff 表格（包裹在 Panel 中）
         if table.rows:
             title = f"📝 {file_path}" if file_path else "Diff"
-            panel = Panel(table, title=title, border_style="cyan", padding=(0, 1))
+            panel = Panel(
+                table,
+                title=title,
+                border_style="cyan",
+                box=box.HORIZONTALS,
+                padding=(0, 1),
+            )
             self.console.print(panel)
 
             # 发送到前端
@@ -352,7 +359,9 @@ class DiffVisualizer:
             stats_text.append("📈 总计: ", style="cyan")
             stats_text.append(f"{total_changes} 行", style="bold cyan")
 
-        panel = Panel(stats_text, border_style="cyan", padding=(1, 2))
+        panel = Panel(
+            stats_text, border_style="cyan", box=box.HORIZONTALS, padding=(1, 2)
+        )
         self.console.print(panel)
 
     def visualize_syntax_highlighted(
@@ -383,6 +392,7 @@ class DiffVisualizer:
                 syntax,
                 title=f"📝 {file_path}",
                 border_style="cyan",
+                box=box.HORIZONTALS,
                 padding=(0, 1),
             )
             self.console.print(panel)
@@ -461,7 +471,13 @@ class DiffVisualizer:
         if additions > 0 or deletions > 0:
             title += f"  [green]+{additions}[/green] / [red]-{deletions}[/red]"
 
-        panel = Panel(syntax, title=title, border_style="cyan", padding=(0, 1))
+        panel = Panel(
+            syntax,
+            title=title,
+            border_style="cyan",
+            box=box.HORIZONTALS,
+            padding=(0, 1),
+        )
         self.console.print(panel)
 
         # 发送到前端
@@ -883,7 +899,13 @@ class DiffVisualizer:
         title += f"  [bright_green]+{additions}[/bright_green] / [bright_red]-{deletions}[/bright_red]"
 
         # 包裹在 Panel 中显示 - 最小化padding以最大化内容区域
-        panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 0))
+        panel = Panel(
+            table,
+            title=title,
+            border_style="bright_cyan",
+            box=box.HORIZONTALS,
+            padding=(0, 0),
+        )
         self.console.print(panel)
 
         # 发送到前端（发送 side by side 结构化数据）
