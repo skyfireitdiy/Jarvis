@@ -803,25 +803,16 @@
     </div>
 
     <!-- 连接弹窗 -->
-    <div class="modal-overlay" v-if="showConnectModal">
-      <div class="modal connect-modal">
-        <h2>连接到 Jarvis</h2>
-        <div v-if="connectErrorMessage" class="error-message">
-          {{ connectErrorMessage }}
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input v-model="auth.password" type="password" placeholder="可选" @keydown.enter="connect" />
-        </div>
-        <div class="form-group">
-          <label>网关地址</label>
-          <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
-        </div>
-        <button class="primary-btn" @click="connect" :disabled="connecting">
-          {{ connecting ? '连接中...' : '连接' }}
-        </button>
-      </div>
-    </div>
+    <ConnectModal
+      :visible="showConnectModal"
+      :connecting="connecting"
+      :errorMessage="connectErrorMessage"
+      :gatewayUrl="gatewayUrl"
+      :password="auth.password"
+      @update:gatewayUrl="gatewayUrl = $event"
+      @update:password="auth.password = $event"
+      @connect="connect"
+    />
 
     <!-- 设置弹窗 -->
     <div class="modal-overlay" v-if="showSettingsModal">
