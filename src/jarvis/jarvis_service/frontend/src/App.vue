@@ -516,6 +516,7 @@
     <SettingsModal
       :visible="showSettingsModal"
       :connectionLockEnabled="connectionLockEnabled"
+      :autoLoginEnabled="autoLoginEnabled"
       :historyStorage="historyStorage"
       :availableNodeOptions="availableNodeOptions"
       :socket="socket"
@@ -523,7 +524,9 @@
       :isSyncingConfig="isSyncingConfig"
       @update:visible="showSettingsModal = $event"
       @update:connectionLockEnabled="connectionLockEnabled = $event"
+      @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveConnectionLockSetting="saveConnectionLockSetting"
+      @saveAutoLoginSetting="saveAutoLoginSetting"
       @confirmClearHistory="confirmClearHistory"
       @confirmRestartGateway="handleRestartGateway"
       @disconnectAll="disconnectAll"
@@ -794,6 +797,12 @@ async function loginWithPassword(password) {
     
     // 保存 Token（仅在内存中保存，页面刷新后会失效，需要重新登录）
     auth.value.token = result.data.token
+
+    // 如果免登录开启，将 Token 保存到 localStorage
+    if (autoLoginEnabled.value) {
+      localStorage.setItem('jarvis_auth_token', result.data.token)
+      console.log('[AUTH] Token saved to localStorage (auto login enabled)')
+    }
     
     // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
     auth.value.password = ''
@@ -809,6 +818,17 @@ async function loginWithPassword(password) {
 // 通用的带认证的 fetch 函数
 function hasAuthToken() {
   return Boolean(auth.value.token)
+}
+
+// 尝试从 localStorage 加载已保存的 token
+function loadSavedToken() {
+  const savedToken = localStorage.getItem('jarvis_auth_token')
+  if (savedToken) {
+    auth.value.token = savedToken
+    console.log('[AUTH] Loaded saved token from localStorage')
+    return true
+  }
+  return false
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -2544,6 +2564,17 @@ function saveConnectionLockSetting() {
   }
 }
 
+// 保存免登录设置
+function saveAutoLoginSetting() {
+  localStorage.setItem('jarvis_auto_login', autoLoginEnabled.value)
+  console.log('[SETTINGS] Auto login setting saved:', autoLoginEnabled.value)
+  // 如果关闭免登录，清除已保存的 token
+  if (!autoLoginEnabled.value) {
+    localStorage.removeItem('jarvis_auth_token')
+    console.log('[SETTINGS] Saved token cleared (auto login disabled)')
+  }
+}
+
 // 连接到 Gateway
 async function connect() {
   console.log('[ws] connect() called', {
@@ -2565,11 +2596,16 @@ async function connect() {
   
   const password = String(auth.value.password || '').trim()
 
-  try {
-    await loginWithPassword(password)
-  } catch (error) {
-    connectErrorMessage.value = error.message || '登录失败'
-    return
+  // 如果已有 token（从 localStorage 加载的），跳过密码登录
+  if (!hasAuthToken()) {
+    try {
+      await loginWithPassword(password)
+    } catch (error) {
+      connectErrorMessage.value = error.message || '登录失败'
+      return
+    }
+  } else {
+    console.log('[AUTH] Using existing token, skipping password login')
   }
   
   if (!hasAuthToken()) {
@@ -2635,9 +2671,20 @@ async function connect() {
     console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
     allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
-    // 连接断开，强制刷新页面
-    console.log('[ws] Connection closed, forcing page refresh')
-    window.location.reload()
+    // 如果是自动连接阶段失败，显示登录弹窗而不是刷新页面
+    if (isAutoConnecting.value) {
+      console.log('[ws] Auto connection failed, showing login modal')
+      isAutoConnecting.value = false
+      showConnectModal.value = true
+      // 清除失效的 token
+      localStorage.removeItem('jarvis_auth_token')
+      auth.value.token = ''
+      connectErrorMessage.value = '自动登录失败，请重新登录'
+    } else {
+      // 正常连接断开，强制刷新页面
+      console.log('[ws] Connection closed, forcing page refresh')
+      window.location.reload()
+    }
     // 不清空连接错误信息，保留错误提示
   }
   ws.onerror = (event) => {
@@ -2829,6 +2876,12 @@ function disconnectAll() {
   agentList.value = []
   agentStatuses.value.clear()
   
+  // 清除保存的 token 和免登录状态
+  localStorage.removeItem('jarvis_auth_token')
+  localStorage.removeItem('jarvis_auto_login')
+  auth.value.token = ''
+  autoLoginEnabled.value = false
+  console.log('[WS] Cleared saved token and auto login setting')
   // 强制刷新页面确保状态重置
   console.log('[WS] Forcing page refresh after disconnection')
   setTimeout(() => {
