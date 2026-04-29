@@ -408,4 +408,29 @@ const emit = defineEmits([
   color: #e6edf3;
   padding: 8px;
 }
+
+/* 输入框带按钮样式 */
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button .form-control {
+  flex: 1;
+}
+
+.select-dir-btn {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.select-dir-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
 </style>
