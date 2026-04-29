@@ -24,22 +24,28 @@ class ReadCodeTool:
             return ["gbk", "utf-8"]
         return ["utf-8", "gbk"]
 
-    def _read_text_with_preferred_encoding(self, file_path: str) -> str:
-        """使用 detect_file_encoding 直接识别编码并读取文本文件。"""
+    def _read_text_with_preferred_encoding(self, file_path: str) -> Tuple[str, str]:
+        """使用 detect_file_encoding 直接识别编码并读取文本文件。
+
+        Returns:
+            Tuple[str, str]: (文件内容, 编码)
+        """
         detected_encoding = detect_file_encoding(file_path)
         if detected_encoding:
             try:
-                return read_text_file(
+                content = read_text_file(
                     file_path,
                     encoding=detected_encoding,
                     detect_encoding=False,
                     errors="strict",
                 )
+                return content, detected_encoding
             except (UnicodeDecodeError, LookupError):
                 pass
 
         # 回退到默认读取方式
-        return read_text_file(file_path)
+        content = read_text_file(file_path)
+        return content, "utf-8"
 
     parameters = {
         "properties": {
@@ -158,7 +164,7 @@ class ReadCodeTool:
                 }
 
             # 使用与 edit_file 一致的编码优先策略读取文件内容
-            content = self._read_text_with_preferred_encoding(abs_path)
+            content, file_encoding = self._read_text_with_preferred_encoding(abs_path)
             lines = content.splitlines()
 
             total_lines = len(lines)
@@ -224,7 +230,7 @@ class ReadCodeTool:
 
             # 构造完整输出
             read_lines = end_line - start_line + 1
-            output = f"\n🔍 文件: {abs_path}\n📄 总行数: {total_lines}\n📊 读取范围: {start_line}-{end_line}\n📈 读取行数: {read_lines}\n"
+            output = f"\n🔍 文件: {abs_path}\n📄 总行数: {total_lines}\n📊 读取范围: {start_line}-{end_line}\n📈 读取行数: {read_lines}\n🔤 编码: {file_encoding}\n"
             output += "=" * 80 + "\n"
             output += output_content
             output += "\n" + "=" * 80 + "\n"

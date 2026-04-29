@@ -114,21 +114,13 @@
           </div>
         </article>
         <!-- 确认对话框 -->
-        <article v-if="confirmDialog" class="message message-confirm">
-          <div class="confirm-box">
-            <p class="confirm-message">{{ confirmDialog.message }}</p>
-            <div class="confirm-actions">
-              <template v-if="confirmDialog.defaultConfirm">
-                <button ref="confirmCancelBtn" class="confirm-btn" @click="confirmDialog.cancelCallback">取消</button>
-                <button ref="confirmConfirmBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
-              </template>
-              <template v-else>
-                <button ref="confirmCancelBtn" class="confirm-btn default" @click="confirmDialog.confirmCallback">确认</button>
-                <button ref="confirmConfirmBtn" @click="confirmDialog.cancelCallback">取消</button>
-              </template>
-            </div>
-          </div>
-        </article>
+        <ConfirmDialog
+          :visible="!!confirmDialog"
+          :message="confirmDialog?.message || ''"
+          :defaultConfirm="confirmDialog?.defaultConfirm ?? true"
+          @confirm="handleConfirmDialogConfirm"
+          @cancel="handleConfirmDialogCancel"
+        />
       </div>
     </main>
 
@@ -662,6 +654,7 @@ import AgentSidebar from './components/AgentSidebar.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -2410,68 +2403,40 @@ watch(newAgentType, (newType) => {
 
 // 确认对话框
 const confirmDialog = ref(null) // { message, confirmCallback, cancelCallback, defaultConfirm }
-const confirmConfirmBtn = ref(null) // 确认按钮引用
-const confirmCancelBtn = ref(null) // 取消按钮引用
+
 
 // 显示确认对话框（自动滚动到底部）
 function showConfirm(message, confirmCallback, cancelCallback, defaultConfirm = true) {
-  // 先设置 confirmDialog，让对话框显示
   confirmDialog.value = {
     message,
     defaultConfirm,
-    confirmCallback: () => {
-      confirmCallback()
-      confirmDialog.value = null
-    },
-    cancelCallback: cancelCallback ? () => {
-      cancelCallback()
-      confirmDialog.value = null
-    } : () => {
-      confirmDialog.value = null
-    }
+    confirmCallback,
+    cancelCallback
   }
-  
+
   // 等待 DOM 更新后滚动到底部，确保用户能看到确认对话框
   nextTick(() => {
     if (outputList.value) {
       outputList.value.scrollTop = outputList.value.scrollHeight
     }
-    // 根据 defaultConfirm 聚焦默认按钮
-    if (defaultConfirm && confirmConfirmBtn.value) {
-      confirmConfirmBtn.value.focus()
-    } else if (!defaultConfirm && confirmCancelBtn.value) {
-      confirmCancelBtn.value.focus()
-    }
   })
 }
 
-// 处理确认对话框的键盘事件
-function handleConfirmKeydown(event) {
-  if (!confirmDialog.value) return
-  
-  if (event.key === 'Enter') {
-    // 根据默认按钮决定调用哪个回调
-    const isDefaultConfirm = confirmConfirmBtn.value?.classList.contains('default')
-    if (isDefaultConfirm) {
-      confirmDialog.value.confirmCallback()
-    } else {
-      confirmDialog.value.cancelCallback()
-    }
-  } else if (event.key === 'y' || event.key === 'Y') {
+// 处理确认对话框确认事件
+function handleConfirmDialogConfirm() {
+  if (confirmDialog.value?.confirmCallback) {
     confirmDialog.value.confirmCallback()
-  } else if (event.key === 'n' || event.key === 'N') {
-    confirmDialog.value.cancelCallback()
   }
+  confirmDialog.value = null
 }
 
-// 监听确认对话框的显示状态，动态添加/移除键盘事件监听
-watch(confirmDialog, (newVal) => {
-  if (newVal) {
-    document.addEventListener('keydown', handleConfirmKeydown)
-  } else {
-    document.removeEventListener('keydown', handleConfirmKeydown)
+// 处理确认对话框取消事件
+function handleConfirmDialogCancel() {
+  if (confirmDialog.value?.cancelCallback) {
+    confirmDialog.value.cancelCallback()
   }
-})
+  confirmDialog.value = null
+}
 
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
@@ -9032,57 +8997,6 @@ body::-webkit-scrollbar {
   line-height: inherit;
 }
 
-/* 确认对话框 */
-.message-confirm {
-  background: rgba(33, 38, 45, 0.85);
-  border: 0.5px solid rgba(88, 166, 255, 0.3);
-}
-
-.confirm-box {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.confirm-message {
-  margin: 0;
-  color: #e6edf3;
-  font-size: 13px;
-}
-
-.confirm-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.confirm-btn {
-  padding: 9px 18px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  background: rgba(33, 38, 45, 0.8);
-  color: #e6edf3;
-}
-
-.confirm-btn:hover {
-  background: rgba(48, 54, 61, 0.9);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-}
-
-.confirm-btn.default {
-  background: #238636;
-  border-color: rgba(255, 255, 255, 0.2);
-  font-weight: 700;
-}
-
-.confirm-btn.default:hover {
-  background: #2ea043;
-  border-color: rgba(255, 255, 255, 0.25);
-}
 
 /* 输入区 */
 .input-area {
