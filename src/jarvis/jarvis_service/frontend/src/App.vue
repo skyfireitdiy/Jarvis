@@ -741,6 +741,7 @@ import SessionDialog from './components/SessionDialog.vue'
 import AgentSidebar from './components/AgentSidebar.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
+import EditorPanel from './components/EditorPanel.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
