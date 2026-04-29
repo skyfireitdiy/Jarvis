@@ -553,53 +553,16 @@
     </div> <!-- 结束 main-content-wrapper -->
 
     <!-- 缓存管理弹窗 -->
-    <div class="modal-overlay" v-if="hasBufferedInput && showBufferPanel" @click.self="showBufferPanel = false">
-      <div class="modal buffer-modal">
-        <div class="buffer-panel-header">
-          <span class="buffer-panel-title">📝 输入缓存</span>
-          <div class="buffer-panel-actions">
-            <button
-              class="buffer-panel-btn"
-              @click="loadBufferToInput"
-              title="加载到输入框"
-            >
-              ↙ 加载
-            </button>
-            <button
-              class="buffer-panel-btn"
-              @click="clearBuffer"
-              title="清空缓存"
-            >
-              🗑
-            </button>
-            <button
-              class="buffer-panel-btn close-btn"
-              @click="showBufferPanel = false"
-              title="关闭面板"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-        <div class="buffer-panel-content">
-          <textarea
-            v-model="bufferEditText"
-            class="buffer-edit-textarea"
-            placeholder="缓存内容..."
-            @keydown.ctrl.enter="saveBufferEdit"
-          ></textarea>
-          <div class="buffer-panel-footer">
-            <button
-              class="buffer-save-btn"
-              @click="saveBufferEdit"
-              :disabled="!bufferEditText.trim()"
-            >
-              保存修改 (Ctrl+Enter)
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <BufferPanel
+      :visible="showBufferPanel"
+      :hasBufferedInput="hasBufferedInput"
+      :editText="bufferEditText"
+      @update:editText="bufferEditText = $event"
+      @close="showBufferPanel = false"
+      @load="loadBufferToInput"
+      @clear="clearBuffer"
+      @save="saveBufferEdit"
+    />
 
     <!-- 补全列表弹窗 -->
     <div class="modal-overlay" v-if="showCompletions">
