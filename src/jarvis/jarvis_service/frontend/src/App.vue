@@ -944,6 +944,7 @@ import 'xterm/css/xterm.css'
 import plantumlEncoder from 'plantuml-encoder'
 import historyStorage from './historyStorage.js'
 import ConnectModal from './components/ConnectModal.vue'
+import BufferPanel from './components/BufferPanel.vue'
 import SessionDialog from './components/SessionDialog.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
