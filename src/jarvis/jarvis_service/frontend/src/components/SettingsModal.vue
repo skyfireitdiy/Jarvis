@@ -199,6 +199,224 @@ function syncConfig() {
 </script>
 
 <style scoped>
+/* ========== Form Group 样式（从 App.vue 全局样式迁移） ========== */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group.inline {
+  display: flex;
+  gap: 12px;
+}
+
+.form-group.inline .form-item {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.01em;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(13, 17, 23, 0.9);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(88, 166, 255, 0.5);
+  background-color: rgba(13, 17, 23, 0.9);
+}
+
+.form-group select option {
+  background: #161b22;
+  color: #e6edf3;
+  padding: 8px;
+}
+
+/* ========== Toggle Switch 样式（从 App.vue 全局样式迁移） ========== */
+.toggle-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-wrapper:hover {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+  border-color: rgba(0, 122, 255, 0.3);
+  outline-color: rgba(0, 122, 255, 0.4);
+}
+
+.toggle-wrapper:active {
+  transform: scale(0.98);
+}
+
+.toggle-switch {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 外描边效果 */
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 3px;
+  bottom: 3px;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  border-color: rgba(0, 122, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  outline-color: rgba(0, 122, 255, 0.5);
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+/* Hover 状态 */
+.toggle-switch:hover .toggle-slider {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+}
+
+.toggle-switch:hover .toggle-slider:before {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Active 状态 - 物理回弹反馈 */
+.toggle-switch:active .toggle-slider {
+  transform: scale(0.95);
+}
+
+.toggle-switch:active .toggle-slider:before {
+  transform: translateX(22px) scale(0.95);
+}
+
+/* 禁用状态 */
+.toggle-input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-info {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px;
+}
+
+.toggle-label-text {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+}
+
+.form-help {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: rgba(139, 148, 158, 0.85);
+  line-height: 1.4;
+}
+
+/* ========== SettingsModal 特有样式 ========== */
 .settings-modal {
   max-width: 640px;
   max-height: 80vh;
