@@ -767,8 +767,11 @@ class EditFileNormalTool:
                         # 但需要将整体操作标记为失败
                         overall_success = False
                     else:
-                        all_results.append(f"✅ {file_path}: 修改成功")
-                        successful_files.append(file_path)
+                        encoding_info = detected_encoding or "utf-8"
+                        all_results.append(
+                            f"✅ {file_path}: 修改成功 (🔤 编码: {encoding_info})"
+                        )
+                        successful_files.append((file_path, encoding_info))
                 else:
                     all_results.append(f"❌ {file_path}: {write_error}")
                     failed_files.append(file_path)
@@ -778,8 +781,8 @@ class EditFileNormalTool:
             output_lines = []
             if successful_files:
                 output_lines.append(f"✅ 成功修改 {len(successful_files)} 个文件:")
-                for file_path in successful_files:
-                    output_lines.append(f"   - {file_path}")
+                for file_path, encoding in successful_files:
+                    output_lines.append(f"   - {file_path} (🔤 编码: {encoding})")
 
             if failed_files:
                 output_lines.append(f"\n❌ 失败 {len(failed_files)} 个文件:")

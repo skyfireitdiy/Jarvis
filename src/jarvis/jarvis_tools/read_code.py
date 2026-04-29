@@ -265,6 +265,7 @@ class ReadCodeTool:
                 "actual_start_line": start_line,
                 "actual_end_line": end_line,
                 "total_lines": total_lines,
+                "file_encoding": file_encoding,
             }
 
         except UnicodeDecodeError as e:
@@ -317,7 +318,7 @@ class ReadCodeTool:
                 or filepath not in context_manager._file_cache
             ):
                 try:
-                    content = self._read_text_with_preferred_encoding(filepath)
+                    content, _ = self._read_text_with_preferred_encoding(filepath)
                     context_manager.update_context_for_file(filepath, content)
                 except Exception:
                     # 如果读取失败，尝试获取已有上下文
@@ -443,7 +444,7 @@ class ReadCodeTool:
                 }
 
             # 严格读取文件内容，解码失败时直接返回错误
-            content = self._read_text_with_preferred_encoding(filepath)
+            content, _ = self._read_text_with_preferred_encoding(filepath)
             lines = content.splitlines()
 
             total_lines = len(lines)
@@ -527,7 +528,7 @@ class ReadCodeTool:
 
                 try:
                     # 严格读取文件内容，解码失败时直接返回错误
-                    content = self._read_text_with_preferred_encoding(abs_path)
+                    content, _ = self._read_text_with_preferred_encoding(abs_path)
                     lines = content.splitlines()
 
                     total_lines = len(lines)
@@ -610,12 +611,14 @@ class ReadCodeTool:
                         actual_start = result.get("actual_start_line")
                         actual_end = result.get("actual_end_line")
                         if actual_start is not None and actual_end is not None:
+                            encoding = result.get("file_encoding", "utf-8")
                             status_lines.append(
-                                f"✅ {file_info['path']} 文件读取成功 (实际范围: {actual_start}-{actual_end})"
+                                f"✅ {file_info['path']} 文件读取成功 (实际范围: {actual_start}-{actual_end}, 🔤 编码: {encoding})"
                             )
                         else:
+                            encoding = result.get("file_encoding", "utf-8")
                             status_lines.append(
-                                f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
+                                f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)}, 🔤 编码: {encoding})"
                             )
                     else:
                         all_outputs.append(
@@ -634,16 +637,18 @@ class ReadCodeTool:
                         actual_start = merged_result.get("actual_start_line")
                         actual_end = merged_result.get("actual_end_line")
                         if actual_start is not None and actual_end is not None:
+                            encoding = merged_result.get("file_encoding", "utf-8")
                             status_lines.append(
-                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，实际范围: {actual_start}-{actual_end})"
+                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，实际范围: {actual_start}-{actual_end}, 🔤 编码: {encoding})"
                             )
                         else:
+                            encoding = merged_result.get("file_encoding", "utf-8")
                             min_start = min(
                                 req.get("start_line", 1) for req in requests
                             )
                             max_end = max(req.get("end_line", -1) for req in requests)
                             status_lines.append(
-                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
+                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end}, 🔤 编码: {encoding})"
                             )
                     else:
                         all_outputs.append(
