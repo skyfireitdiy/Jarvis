@@ -18,6 +18,18 @@
           </div>
         </div>
       </div>
+      <div class="form-group">
+        <div class="toggle-wrapper">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="localAutoLoginEnabled" @change="handleAutoLoginChange" class="toggle-input" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-info">
+            <span class="toggle-label-text">免登录（记住Token）</span>
+            <span class="form-help">启用后，登录成功时将Token保存在浏览器本地，下次打开时自动尝试连接。</span>
+          </div>
+        </div>
+      </div>
 
       <!-- 历史消息管理 -->
       <div class="form-group">
@@ -130,6 +142,10 @@ const props = defineProps({
   isSyncingConfig: {
     type: Boolean,
     default: false
+  },
+  autoLoginEnabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -140,11 +156,14 @@ const emit = defineEmits([
   'confirmClearHistory',
   'confirmRestartGateway',
   'disconnectAll',
-  'syncConfig'
+  'syncConfig',
+  'update:autoLoginEnabled',
+  'saveAutoLoginSetting'
 ])
 
 // 本地状态
 const localConnectionLockEnabled = ref(props.connectionLockEnabled)
+const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
 const localSyncConfigSourceNode = ref('')
@@ -152,6 +171,10 @@ const localSyncConfigSourceNode = ref('')
 // 监听props变化
 watch(() => props.connectionLockEnabled, (newVal) => {
   localConnectionLockEnabled.value = newVal
+})
+
+watch(() => props.autoLoginEnabled, (newVal) => {
+  localAutoLoginEnabled.value = newVal
 })
 
 // 关闭弹窗
@@ -163,6 +186,12 @@ function close() {
 function handleConnectionLockChange() {
   emit('update:connectionLockEnabled', localConnectionLockEnabled.value)
   emit('saveConnectionLockSetting')
+}
+
+// 处理免登录设置变更
+function handleAutoLoginChange() {
+  emit('update:autoLoginEnabled', localAutoLoginEnabled.value)
+  emit('saveAutoLoginSetting')
 }
 
 // 格式化节点选项标签
