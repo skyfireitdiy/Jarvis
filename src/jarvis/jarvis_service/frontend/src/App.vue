@@ -565,39 +565,16 @@
     />
 
     <!-- 补全列表弹窗 -->
-    <div class="modal-overlay" v-if="showCompletions">
-      <div class="modal completions-modal">
-        <div class="modal-header">
-          <h3>插入补全</h3>
-          <button class="icon-btn" @click="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1">✕</button>
-        </div>
-        <div class="completions-search">
-          <input 
-            type="text" 
-            v-model="completionSearch" 
-            placeholder="搜索补全..." 
-            ref="completionSearchInput"
-            @keydown="handleCompletionKeydown"
-          />
-        </div>
-        <div class="completions-list" ref="completionsListRef">
-          <div 
-            v-for="(item, index) in filteredCompletions" 
-            :key="index" 
-            :ref="el => { if (el) completionItemsRef[index] = el }"
-            class="completion-item"
-            :class="[`completion-${item.type}`, { 'selected': selectedIndex === index }]"
-            @click="insertCompletion(item)"
-          >
-            <div class="completion-value">{{ item.display }}</div>
-            <div class="completion-desc">{{ item.description }}</div>
-          </div>
-          <div v-if="filteredCompletions.length === 0" class="completion-empty">
-            没有找到匹配的补全
-          </div>
-        </div>
-      </div>
-    </div>
+    <CompletionsModal
+      :visible="showCompletions"
+      :searchText="completionSearch"
+      :filteredCompletions="filteredCompletions"
+      :selectedIndex="selectedIndex"
+      @update:searchText="completionSearch = $event"
+      @close="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1"
+      @select="insertCompletion"
+      @keydown="handleCompletionKeydown"
+    />
 
     <!-- 创建 Agent 弹窗 -->
     <div class="modal-overlay" v-if="showCreateAgentModal">
