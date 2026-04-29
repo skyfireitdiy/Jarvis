@@ -2603,8 +2603,11 @@ async function loadHistoryMessages(prepend = false) {
       // 插入到消息列表开头
       allOutputs.value.set(currentAgentId.value, [...processedMessages, ...currentOutputs])
     } else {
-      // 添加到消息列表末尾
-      allOutputs.value.set(currentAgentId.value, processedMessages)
+      // 保留未完成的execution消息（这些消息不会被保存到历史存储）
+      const unfinishedExecutions = currentOutputs.filter(msg => msg.output_type === 'execution' && !msg.is_finished)
+      console.log(`[HISTORY] Preserving ${unfinishedExecutions.length} unfinished execution messages`)
+      // 合并历史消息和未完成的execution消息
+      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...unfinishedExecutions])
     }
     
     // 更新偏移量
@@ -4367,6 +4370,24 @@ async function switchAgent(agent) {
   console.log('[AGENT] Switching to:', agent)
   console.log('[AGENT] Current sockets before switch:', [...sockets.value.keys()])
   console.log('[AGENT] Current agent statuses:', [...agentStatuses.value.keys()])
+  // 清理当前agent的终端实例（切换离开时，保留termInfo以便切换回来时重建）
+  const previousAgentId = currentAgentId.value
+  if (previousAgentId) {
+    console.log(`[AGENT] Cleaning up terminal instances for previous agent: ${previousAgentId}`)
+    let cleanedCount = 0
+    terminals.value.forEach((termInfo) => {
+      if (termInfo.agentId === previousAgentId && termInfo.terminal) {
+        console.log(`[AGENT] Saving terminal content and disposing: ${termInfo.sessionKey}`)
+        // 保存终端内容以便重建时恢复
+        termInfo.savedContent = getTerminalBufferContent(termInfo.terminal, false)
+        console.log(`[AGENT] Saved ${termInfo.savedContent.length} chars of terminal content`)
+        disposeExecutionTerminal(termInfo)
+        cleanedCount++
+      }
+    })
+    console.log(`[AGENT] Cleaned up ${cleanedCount} terminal instances`)
+  }
+
   
   // 清空输入状态
   lastInputRequest.value = null
@@ -5800,6 +5821,17 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     syncTerminalSize(executionId, termInfo)
   }, 300)
 
+  // 恢复之前保存的终端内容（切换回来时）
+  if (termInfo.savedContent) {
+    console.log(`[terminal] Restoring saved content: ${termInfo.savedContent.length} chars`)
+    try {
+      termInfo.terminal.write(termInfo.savedContent)
+    } catch (error) {
+      console.warn('[terminal] Failed to restore saved content', error)
+    }
+    termInfo.savedContent = null
+  }
+
   if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
     termInfo.pendingChunks.forEach(chunk => {
       try {
@@ -5831,7 +5863,21 @@ function setTerminalRef(executionId, el, agentId = null) {
     }
     terminalHosts.value.set(executionSessionKey, el)
     if (!termInfo) {
-      return
+      // termInfo不存在，创建新的终端记录
+      console.log(`[terminal] Creating new terminal record for execution ${executionSessionKey}`)
+      termInfo = {
+        sessionKey: executionSessionKey,
+        agentId: targetAgentId,
+        executionId: executionId,
+        terminal: null,
+        active: true,
+        hostEl: null,
+        resizeObserver: null,
+        lastSize: null,
+        pendingChunks: [],
+        ended: false
+      }
+      terminals.value.push(termInfo)
     }
 
     const needsRebuild = !!termInfo.terminal && termInfo.hostEl !== el
