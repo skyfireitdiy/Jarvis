@@ -433,4 +433,141 @@ const emit = defineEmits([
 .select-dir-btn:hover {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* Toggle 开关样式 */
+.toggle-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-wrapper:hover {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+  border-color: rgba(0, 122, 255, 0.3);
+  outline-color: rgba(0, 122, 255, 0.4);
+}
+
+.toggle-wrapper:active {
+  transform: scale(0.98);
+}
+
+.toggle-switch {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline-offset: -1px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 3px;
+  bottom: 3px;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  border-color: rgba(0, 122, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  outline-color: rgba(0, 122, 255, 0.5);
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.toggle-switch:hover .toggle-slider {
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+}
+
+.toggle-switch:hover .toggle-slider:before {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.toggle-switch:active .toggle-slider {
+  transform: scale(0.95);
+}
+
+.toggle-switch:active .toggle-slider:before {
+  transform: translateX(22px) scale(0.95);
+}
+
+.toggle-input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-info {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px;
+}
+
+.toggle-label-text {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+}
 </style>
