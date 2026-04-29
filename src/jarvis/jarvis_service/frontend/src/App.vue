@@ -553,88 +553,28 @@
     </div> <!-- 结束 main-content-wrapper -->
 
     <!-- 缓存管理弹窗 -->
-    <div class="modal-overlay" v-if="hasBufferedInput && showBufferPanel" @click.self="showBufferPanel = false">
-      <div class="modal buffer-modal">
-        <div class="buffer-panel-header">
-          <span class="buffer-panel-title">📝 输入缓存</span>
-          <div class="buffer-panel-actions">
-            <button
-              class="buffer-panel-btn"
-              @click="loadBufferToInput"
-              title="加载到输入框"
-            >
-              ↙ 加载
-            </button>
-            <button
-              class="buffer-panel-btn"
-              @click="clearBuffer"
-              title="清空缓存"
-            >
-              🗑
-            </button>
-            <button
-              class="buffer-panel-btn close-btn"
-              @click="showBufferPanel = false"
-              title="关闭面板"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-        <div class="buffer-panel-content">
-          <textarea
-            v-model="bufferEditText"
-            class="buffer-edit-textarea"
-            placeholder="缓存内容..."
-            @keydown.ctrl.enter="saveBufferEdit"
-          ></textarea>
-          <div class="buffer-panel-footer">
-            <button
-              class="buffer-save-btn"
-              @click="saveBufferEdit"
-              :disabled="!bufferEditText.trim()"
-            >
-              保存修改 (Ctrl+Enter)
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <BufferPanel
+      :visible="showBufferPanel"
+      :hasBufferedInput="hasBufferedInput"
+      :editText="bufferEditText"
+      @update:editText="bufferEditText = $event"
+      @close="showBufferPanel = false"
+      @load="loadBufferToInput"
+      @clear="clearBuffer"
+      @save="saveBufferEdit"
+    />
 
     <!-- 补全列表弹窗 -->
-    <div class="modal-overlay" v-if="showCompletions">
-      <div class="modal completions-modal">
-        <div class="modal-header">
-          <h3>插入补全</h3>
-          <button class="icon-btn" @click="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1">✕</button>
-        </div>
-        <div class="completions-search">
-          <input 
-            type="text" 
-            v-model="completionSearch" 
-            placeholder="搜索补全..." 
-            ref="completionSearchInput"
-            @keydown="handleCompletionKeydown"
-          />
-        </div>
-        <div class="completions-list" ref="completionsListRef">
-          <div 
-            v-for="(item, index) in filteredCompletions" 
-            :key="index" 
-            :ref="el => { if (el) completionItemsRef[index] = el }"
-            class="completion-item"
-            :class="[`completion-${item.type}`, { 'selected': selectedIndex === index }]"
-            @click="insertCompletion(item)"
-          >
-            <div class="completion-value">{{ item.display }}</div>
-            <div class="completion-desc">{{ item.description }}</div>
-          </div>
-          <div v-if="filteredCompletions.length === 0" class="completion-empty">
-            没有找到匹配的补全
-          </div>
-        </div>
-      </div>
-    </div>
+    <CompletionsModal
+      :visible="showCompletions"
+      :searchText="completionSearch"
+      :filteredCompletions="filteredCompletions"
+      :selectedIndex="selectedIndex"
+      @update:searchText="completionSearch = $event"
+      @close="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1"
+      @select="insertCompletion"
+      @keydown="handleCompletionKeydown"
+    />
 
     <!-- 创建 Agent 弹窗 -->
     <div class="modal-overlay" v-if="showCreateAgentModal">
@@ -758,70 +698,33 @@
     </div>
 
     <!-- 目录选择对话框 -->
-    <div class="modal-overlay" v-if="showDirDialog">
-      <div class="modal dir-modal">
-        <div class="modal-header">
-          <h2>选择工作目录</h2>
-          <button class="close-btn" @click="cancelDirDialog">×</button>
-        </div>
-        <div class="path-header">
-          <button class="path-btn" @click="fetchDirectories(currentDirPath)">🔄 刷新</button>
-          <button class="path-btn" @click="goToParentDir">⬆️ 返回上级</button>
-        </div>
-        <div class="current-path">{{ currentDirPath }}</div>
-        <div class="dir-search">
-          <input 
-            ref="dirSearchInput"
-            v-model="dirSearchText"
-            type="text" 
-            class="dir-search-input"
-            placeholder="🔍 搜索目录..."
-            @keydown="handleDirSearchKeydown"
-          />
-        </div>
-        <div class="dir-list" v-if="filteredDirList.length > 0">
-          <div
-            v-for="dir in filteredDirList"
-            :key="dir.path"
-            class="dir-item"
-            :class="{ selected: selectedDir === dir.path }"
-            @click="selectDirectory(dir.path); enterDirectory(dir.path, false)"
-          >
-            <div class="dir-icon">📁</div>
-            <div class="dir-name">{{ dir.name }}</div>
-            <div class="dir-path">{{ dir.path }}</div>
-          </div>
-        </div>
-        <div class="empty-state" v-else>
-          <p>该目录下没有子目录</p>
-        </div>
-        <div class="modal-actions">
-          <button class="btn secondary" @click="cancelDirDialog">取消</button>
-          <button class="btn primary" @click="confirmDirectory">确认</button>
-        </div>
-      </div>
-    </div>
+    <DirectoryDialog
+      :visible="showDirDialog"
+      :currentPath="currentDirPath"
+      :selectedDir="selectedDir"
+      :searchText="dirSearchText"
+      :filteredDirs="filteredDirList"
+      @update:searchText="dirSearchText = $event"
+      @cancel="cancelDirDialog"
+      @confirm="confirmDirectory"
+      @refresh="fetchDirectories"
+      @go-parent="goToParentDir"
+      @select="selectDirectory"
+      @enter="enterDirectory"
+      @search-keydown="handleDirSearchKeydown"
+    />
 
     <!-- 连接弹窗 -->
-    <div class="modal-overlay" v-if="showConnectModal">
-      <div class="modal connect-modal">
-        <h2>连接到 Jarvis</h2>
-        <div v-if="connectErrorMessage" class="error-message">
-          {{ connectErrorMessage }}
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input v-model="auth.password" type="password" placeholder="可选" @keydown.enter="connect" />
-        </div>
-        <div class="form-group">
-          <label>网关地址</label>
-          <input v-model="gatewayUrl" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
-        </div>
-        <button class="primary-btn" @click="connect" :disabled="connecting">
-          {{ connecting ? '连接中...' : '连接' }}
-        </button>
-      </div>
-    </div>
+    <ConnectModal
+      :visible="showConnectModal"
+      :connecting="connecting"
+      :errorMessage="connectErrorMessage"
+      :gatewayUrl="gatewayUrl"
+      :password="auth.password"
+      @update:gatewayUrl="gatewayUrl = $event"
+      @update:password="auth.password = $event"
+      @connect="connect"
+    />
 
     <!-- 设置弹窗 -->
     <div class="modal-overlay" v-if="showSettingsModal">
@@ -922,35 +825,14 @@
     </div>
 
     <!-- Session 选择对话框 -->
-    <div class="modal-overlay" v-if="showSessionDialog">
-      <div class="modal session-modal">
-        <div class="modal-header">
-          <h2>选择会话恢复</h2>
-          <button class="close-btn" @click="cancelSessionDialog">×</button>
-        </div>
-        <div class="session-list" v-if="availableSessions.length > 0">
-          <div
-            v-for="session in availableSessions"
-            :key="session.file"
-            class="session-item"
-            :class="{ active: selectedSession === session.file }"
-            @click="selectedSession = session.file"
-          >
-            <div class="session-name">{{ session.name || '未命名会话' }}</div>
-            <div class="session-time">{{ session.timestamp }}</div>
-          </div>
-        </div>
-        <div class="empty-state" v-else>
-          <p>没有可恢复的会话</p>
-        </div>
-        <div class="modal-actions">
-          <button class="ghost-btn" @click="cancelSessionDialog">跳过</button>
-          <button class="primary-btn" @click="restoreSession(selectedSession)" :disabled="!selectedSession">
-            恢复会话
-          </button>
-        </div>
-      </div>
-    </div>
+    <SessionDialog
+      :visible="showSessionDialog"
+      :sessions="availableSessions"
+      :selectedSession="selectedSession"
+      @update:selectedSession="selectedSession = $event"
+      @restore="restoreSession"
+      @cancel="cancelSessionDialog"
+    />
     
     <!-- Toast 提示 -->
     <transition name="toast-fade">
@@ -973,6 +855,11 @@ import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
 import plantumlEncoder from 'plantuml-encoder'
 import historyStorage from './historyStorage.js'
+import ConnectModal from './components/ConnectModal.vue'
+import BufferPanel from './components/BufferPanel.vue'
+import DirectoryDialog from './components/DirectoryDialog.vue'
+import SessionDialog from './components/SessionDialog.vue'
+import CompletionsModal from './components/CompletionsModal.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
