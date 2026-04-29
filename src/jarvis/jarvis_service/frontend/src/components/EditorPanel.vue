@@ -258,3 +258,342 @@ const containerRef = ref(null)
 
 defineExpose({ containerRef })
 </script>
+
+<style scoped>
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  color: #8b949e;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  transform: translateY(-1px);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-btn-small {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: #8b949e;
+  transition: all 0.2s ease;
+}
+
+.icon-btn-small:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  transform: translateY(-1px);
+}
+
+.icon-btn-small:active {
+  transform: translateY(0);
+}
+
+.icon-btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.editor-panel {
+  position: fixed;
+  background: rgba(22, 27, 34, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.editor-panel-dragging {
+  transition: none;
+}
+
+.editor-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 17, 23, 0.9);
+  cursor: move;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.editor-panel-title-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-panel-subtitle {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.editor-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 4px 0;
+  background: rgba(13, 17, 23, 0.92);
+  overflow-x: auto;
+}
+
+.editor-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: rgba(110, 118, 129, 0.16);
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.editor-tab.active {
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+.editor-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tab-dirty {
+  color: #f2cc60;
+  font-size: 10px;
+}
+
+.editor-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+}
+
+.editor-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(22, 27, 34, 0.98);
+}
+
+.editor-toolbar-status {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.editor-toolbar-status.error {
+  color: #f85149;
+}
+
+.editor-toolbar-spacer {
+  flex: 1;
+}
+
+.editor-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  background: rgba(110, 118, 129, 0.2);
+  color: #8b949e;
+  backdrop-filter: blur(20px);
+}
+
+.editor-edit-toggle:hover {
+  background: rgba(110, 118, 129, 0.3);
+}
+
+.editor-edit-toggle:active {
+  transform: scale(0.96);
+}
+
+.editor-edit-toggle.editable {
+  background: rgba(35, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.editor-edit-toggle.editable:hover {
+  background: rgba(35, 197, 94, 0.3);
+}
+
+.editor-edit-toggle-icon {
+  font-size: 12px;
+}
+
+.editor-edit-toggle-text {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.editor-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #0d1117;
+}
+
+.editor-activity-bar {
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(1, 4, 9, 0.96);
+}
+
+.editor-activity-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.editor-activity-button:hover,
+.editor-activity-button.active {
+  color: #e6edf3;
+  background: rgba(56, 139, 253, 0.18);
+  border-color: rgba(56, 139, 253, 0.32);
+}
+
+.editor-sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 17, 23, 0.98);
+}
+
+.editor-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.editor-sidebar-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-file-tree-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-file-tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editor-sidebar-placeholder {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px;
+  color: #8b949e;
+}
+
+.editor-sidebar-placeholder-icon {
+  font-size: 22px;
+}
+
+.editor-sidebar-placeholder-text {
+  font-size: 12px;
+  line-height: 1.6;
+}
