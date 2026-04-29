@@ -475,26 +475,13 @@
     />
 
     <!-- 重命名 Agent 弹窗 -->
-    <div class="modal-overlay" v-if="showRenameAgentModal">
-      <div class="modal create-agent-modal">
-        <h2>重命名 Agent</h2>
-        <div class="form-group">
-          <label>Agent 名称（可选）</label>
-          <input 
-            v-model="renameAgentName" 
-            type="text" 
-            class="form-control" 
-            placeholder="留空则使用默认名称"
-            ref="renameInput"
-            @keydown.enter="confirmRename"
-          />
-        </div>
-        <div class="modal-actions">
-          <button class="btn secondary" @click="showRenameAgentModal = false">取消</button>
-          <button class="btn primary" @click="confirmRename">确认</button>
-        </div>
-      </div>
-    </div>
+    <RenameAgentModal
+      :visible="showRenameAgentModal"
+      :name="renameAgentName"
+      @update:name="renameAgentName = $event"
+      @cancel="showRenameAgentModal = false"
+      @confirm="confirmRename"
+    />
 
     <!-- 目录选择对话框 -->
     <DirectoryDialog
