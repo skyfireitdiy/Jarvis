@@ -1798,6 +1798,7 @@ function renderBufferPanel(): void {
       <div class="buffer-panel-header">
         <span class="buffer-panel-title">📝 输入缓存</span>
         <div class="buffer-panel-actions">
+          <button class="buffer-panel-btn" id="sendBufferBtn" title="直接发送">ￄ 发送</button>
           <button class="buffer-panel-btn" id="loadBufferBtn" title="加载到输入框">↙ 加载</button>
           <button class="buffer-panel-btn" id="clearBufferPanelBtn" title="清空缓存">🗑️</button>
           <button class="buffer-panel-btn close-btn" id="closeBufferPanelBtn" title="关闭面板">✕</button>
@@ -1813,6 +1814,10 @@ function renderBufferPanel(): void {
   `;
 
   // 绑定事件
+  document.getElementById("sendBufferBtn")?.addEventListener("click", () => {
+    sendBufferedInput();
+    closeBufferPanel();
+  });
   document
     .getElementById("loadBufferBtn")
     ?.addEventListener("click", loadBufferToInput);
@@ -1829,12 +1834,23 @@ function renderBufferPanel(): void {
     .getElementById("saveBufferBtn")
     ?.addEventListener("click", saveBufferEdit);
 
+  // ????????????
+  const sendBtn = document.getElementById("sendBufferBtn");
+  if (sendBtn) {
+    sendBtn.style.display = bufferEditText.trim() ? "" : "none";
+  }
+
   const textarea = document.getElementById(
     "bufferEditTextarea",
   ) as HTMLTextAreaElement;
   if (textarea) {
     textarea.addEventListener("input", () => {
       bufferEditText = textarea.value;
+      // ??????????
+      const sendBtn = document.getElementById("sendBufferBtn");
+      if (sendBtn) {
+        sendBtn.style.display = bufferEditText.trim() ? "" : "none";
+      }
     });
     textarea.addEventListener("keydown", (e) => {
       if (e.ctrlKey && e.key === "Enter") {
