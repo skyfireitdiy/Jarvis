@@ -1012,6 +1012,7 @@ class PrettyOutput:
             border_style: 边框样式（默认"blue"）
             **kwargs: 传递给Panel的其他参数
         """
+        from rich import box
         from rich.align import Align
         from rich.panel import Panel
 
@@ -1020,6 +1021,7 @@ class PrettyOutput:
             title=title,
             title_align=title_align,  # type: ignore[arg-type]
             border_style=border_style,
+            box=box.HORIZONTALS,
             **kwargs,
         )
         console.print(Align.center(panel))
@@ -1040,6 +1042,7 @@ class PrettyOutput:
             lang: 语法高亮语言（默认"python"）
             theme: 高亮主题（默认"monokai"）
         """
+        from rich import box
         from rich.panel import Panel
 
         syntax = Syntax(
@@ -1049,7 +1052,7 @@ class PrettyOutput:
             line_numbers=True,
             word_wrap=True,
         )
-        panel = Panel(syntax, title=title, border_style="cyan")
+        panel = Panel(syntax, title=title, border_style="cyan", box=box.HORIZONTALS)
         console.print(panel)
 
         # 通过事件系统输出到Gateway（用于Web界面）
@@ -1273,7 +1276,7 @@ class PrettyOutput:
             title=f"[bold cyan]{title}[/bold cyan]",
             subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
             border_style="cyan",
-            box=box.ROUNDED,
+            box=box.HORIZONTALS,
             expand=True,
         )
 
