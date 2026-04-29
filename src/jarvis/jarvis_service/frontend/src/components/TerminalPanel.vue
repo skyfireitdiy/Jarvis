@@ -101,6 +101,37 @@ const emit = defineEmits([
 </script>
 
 <style scoped>
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  color: #8b949e;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
+  transform: translateY(-1px);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .terminal-panel {
   position: fixed;
   background: rgba(13, 17, 23, 0.95);
