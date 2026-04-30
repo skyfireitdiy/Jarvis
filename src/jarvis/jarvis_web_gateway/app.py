@@ -201,14 +201,14 @@ class WebGateway(BaseGateway):
         self._input_registry = input_registry
         self._auth_store = auth_store
         self._terminal_input_registry = terminal_input_registry
+        self._pending_outputs: List[Dict[str, Any]] = []  # 缓存WebSocket连接前的输出
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         # 单连接模式，固定使用 default session_id
         session_id = "default"
         auth_payload = self._auth_store.get(session_id)
         authorized, _ = self._check_auth(auth_payload)
-        if not authorized:
-            return
+
         context = dict(event.context) if event.context else {}
         payload = {
             "text": event.text,
@@ -222,6 +222,12 @@ class WebGateway(BaseGateway):
         if context.get("agent_id"):
             payload["agent_id"] = context["agent_id"]
         message = {"type": "output", "payload": payload}
+
+        if not authorized:
+            # WebSocket连接未建立，缓存消息
+            self._pending_outputs.append(message)
+            return
+
         self._router.publish(message, session_id=session_id)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
@@ -453,6 +459,14 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
+        # 发送缓存的输出消息
+        if self._gateway._pending_outputs:
+            print(
+                f"[WS CACHE] Sending {len(self._gateway._pending_outputs)} cached outputs"
+            )
+            for cached_message in self._gateway._pending_outputs:
+                await websocket.send_json(cached_message)
+            self._gateway._pending_outputs.clear()
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         print(
