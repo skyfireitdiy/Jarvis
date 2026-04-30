@@ -88,8 +88,8 @@ onUnmounted(() => {
 
 <style scoped>
 .message-confirm {
-  background: rgba(33, 38, 45, 0.85);
-  border: 0.5px solid rgba(88, 166, 255, 0.3);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-accent-subtle);
 }
 
 .confirm-box {
@@ -100,7 +100,7 @@ onUnmounted(() => {
 
 .confirm-message {
   margin: 0;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 13px;
 }
 
@@ -116,14 +116,14 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  background: rgba(33, 38, 45, 0.8);
-  color: #e6edf3;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 .confirm-btn:hover {
-  background: rgba(48, 54, 61, 0.9);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 

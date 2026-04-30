@@ -236,7 +236,7 @@ function syncConfig() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -246,8 +246,8 @@ function syncConfig() {
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
 }
@@ -271,33 +271,33 @@ function syncConfig() {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
 .form-group input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
 }
 
 .form-group select {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   cursor: pointer;
   appearance: none;
@@ -309,13 +309,13 @@ function syncConfig() {
 
 .form-group select:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background-color: rgba(13, 17, 23, 0.9);
+  border-color: var(--color-accent);
+  background-color: var(--color-bg-primary);
 }
 
 .form-group select option {
-  background: #161b22;
-  color: #e6edf3;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   padding: 8px;
 }
 
@@ -326,22 +326,22 @@ function syncConfig() {
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(28, 28, 30, 0.6);
+  background: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  border: 1px solid var(--color-border);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
   border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px var(--color-shadow), inset 0 1px 0 var(--color-border);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toggle-wrapper:hover {
   backdrop-filter: blur(60px) saturate(180%);
   -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border-color: rgba(0, 122, 255, 0.3);
-  outline-color: rgba(0, 122, 255, 0.4);
+  border-color: var(--color-accent);
+  outline-color: var(--color-accent-subtle);
 }
 
 .toggle-wrapper:active {
@@ -374,15 +374,15 @@ function syncConfig() {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.6);
+  background-color: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px var(--color-shadow), inset 0 1px 0 var(--color-border);
   border-radius: 15px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   /* 外描边效果 */
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
 
@@ -393,27 +393,27 @@ function syncConfig() {
   width: 24px;
   left: 3px;
   bottom: 3px;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: var(--color-text-secondary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border: 1px solid var(--color-border);
 }
 
 .toggle-input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  border-color: rgba(0, 122, 255, 0.6);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  outline-color: rgba(0, 122, 255, 0.5);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-secondary) 100%);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 var(--color-border);
+  outline-color: var(--color-accent-subtle);
 }
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
-  background-color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
+  background-color: var(--color-text-primary);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border-color: var(--color-accent-subtle);
 }
 
 /* Hover 状态 */
