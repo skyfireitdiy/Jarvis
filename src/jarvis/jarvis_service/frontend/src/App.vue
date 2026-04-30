@@ -4915,7 +4915,9 @@ function appendOutput(payload, agentId = null) {
     
     if (!isUnfinishedExecution) {
       // 只保存必要的数据，避免存储过大的内容
+      // 使用 execution_id 作为 id，确保更新时能找到原始消息
       const messageToSave = {
+        id: outputItem.execution_id ? `execution_${outputItem.execution_id}` : undefined,
         agent_id: targetAgentId, // 保存当前 Agent ID
         output_type: outputItem.output_type,
         text: outputItem.text,
@@ -5128,6 +5130,7 @@ function appendExecution(payload, agentId = null) {
           // 保存到历史记录（更新原有的 execution 消息）
           try {
             const updatedMessage = {
+              id: `execution_${executionId}`,
               agent_id: targetAgentId,
               output_type: 'execution',
               text: '',
