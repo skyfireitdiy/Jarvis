@@ -193,12 +193,12 @@ const emit = defineEmits([
 }
 
 .terminal-node-select:focus {
-  border-color: rgba(96, 165, 250, 0.9);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
 .terminal-node-select option {
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel-actions {
@@ -210,8 +210,8 @@ const emit = defineEmits([
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .terminal-tab {
@@ -219,23 +219,23 @@ const emit = defineEmits([
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
 .terminal-tab:hover {
-  background: rgba(56, 139, 253, 0.1);
-  color: #58a6ff;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .terminal-tab.active {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
-  border-color: rgba(56, 139, 253, 0.3);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .terminal-tab-title {
