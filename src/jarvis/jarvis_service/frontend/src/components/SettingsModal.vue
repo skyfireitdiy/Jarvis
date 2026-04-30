@@ -236,7 +236,7 @@ function syncConfig() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -246,8 +246,8 @@ function syncConfig() {
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
 }
@@ -271,33 +271,33 @@ function syncConfig() {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
 .form-group input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
 }
 
 .form-group select {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   cursor: pointer;
   appearance: none;
