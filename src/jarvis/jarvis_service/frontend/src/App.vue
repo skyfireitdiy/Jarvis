@@ -851,7 +851,17 @@ async function fetchWithAuth(url, options = {}) {
     fetchOptions.headers['Authorization'] = `Bearer ${auth.value.token}`
   }
   
-  return fetch(url, fetchOptions)
+  const response = await fetch(url, fetchOptions)
+  
+  // 检查401未授权错误
+  if (response.status === 401) {
+    console.log('[AUTH] Received 401 Unauthorized, showing login modal')
+    auth.value.token = ''
+    showConnectModal.value = true
+    connectErrorMessage.value = '登录已过期，请重新登录'
+  }
+  
+  return response
 }
 
 // URL 解析辅助函数：支持 HTTPS 协议和域名
