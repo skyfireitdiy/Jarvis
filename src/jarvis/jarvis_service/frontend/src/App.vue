@@ -5842,6 +5842,17 @@ function setTerminalRef(executionId, el, agentId = null) {
     }
     terminalHosts.value.set(executionSessionKey, el)
     if (!termInfo) {
+      // 检查对应的execution是否已经finished
+      const agentOutputs = allOutputs.value.get(targetAgentId) || []
+      const executionMessage = agentOutputs.find(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      
+      if (executionMessage?.is_finished) {
+        console.log(`[terminal] Execution ${executionSessionKey} already finished, skipping terminal creation`)
+        return
+      }
+      
       // termInfo不存在，创建新的终端记录
       console.log(`[terminal] Creating new terminal record for execution ${executionSessionKey}`)
       termInfo = {
