@@ -249,14 +249,15 @@ const emit = defineEmits([
   width: 16px;
   height: 16px;
   border: none;
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: var(--color-error-subtle);
+  color: var(--color-error);
   border-radius: 3px;
   cursor: pointer;
 }
 
 .terminal-tab-close:hover {
-  background: rgba(248, 81, 73, 0.4);
+  background: var(--color-error);
+  color: var(--color-text-primary);
 }
 
 .terminal-content {
@@ -271,7 +272,7 @@ const emit = defineEmits([
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
