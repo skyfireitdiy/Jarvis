@@ -58,6 +58,8 @@
         </div>
         
         <div class="header-title">
+          <img src="/icons/jarvis-logo.png" alt="Jarvis" class="header-logo" />
+          <span class="header-brand">JARVIS</span>
           <button class="icon-btn desktop-only" @click="toggleAgentSidebar()" title="切换 Agent 侧边栏">
             📋
           </button>
@@ -6881,7 +6883,7 @@ body::-webkit-scrollbar {
 
 /* Side by side Diff 样式 */
 .diff-side-by-side {
-  background: #1a1f2e;
+  background: var(--color-bg-tertiary);
   border-radius: 8px;
   overflow-x: auto;
   margin: 8px 0;
@@ -6891,7 +6893,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-header {
-  background: rgba(56, 139, 253, 0.1);
+  background: var(--color-accent-subtle);
   padding: 8px 12px;
   display: flex;
   justify-content: space-between;
@@ -6900,24 +6902,24 @@ body::-webkit-scrollbar {
 }
 
 .diff-file-path {
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
 }
 
 .diff-stats {
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .diff-additions {
-  color: #3fb950;
+  color: var(--color-success);
   font-weight: 600;
 }
 
 .diff-deletions {
-  color: #f85149;
+  color: var(--color-error);
   font-weight: 600;
 }
 
@@ -6949,7 +6951,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-line-num {
-  color: #8b949e;
+  color: var(--color-text-secondary);
   padding: 2px 6px;
   text-align: right;
   width: 50px;
@@ -6981,7 +6983,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-deleted {
-  background: rgba(248, 81, 73, 0.7);
+  background: rgba(255, 71, 87, 0.7);
   color: #fff;
 }
 
@@ -6990,7 +6992,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-added {
-  background: rgba(63, 185, 80, 0.7);
+  background: rgba(0, 255, 136, 0.7);
   color: #fff;
 }
 
@@ -6999,7 +7001,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-error {
-  color: #f85149;
+  color: var(--color-error);
   padding: 8px 12px;
   font-weight: 600;
 }
@@ -7041,8 +7043,8 @@ body::-webkit-scrollbar {
   padding: 0;
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-  background: #0d1117;
-  color: #e6edf3;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -7065,8 +7067,8 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 10px 16px;
   padding-top: calc(10px + env(safe-area-inset-top, 0px));
-  background: rgba(22, 27, 34, 0.85);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border-bottom: 0.5px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -7084,7 +7086,7 @@ body::-webkit-scrollbar {
   font-size: 17px;
   font-weight: 600;
   margin: 0;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.02em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -7097,8 +7099,8 @@ body::-webkit-scrollbar {
 
 .editor-panel {
   position: fixed;
-  background: rgba(22, 27, 34, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   display: flex;
@@ -7116,8 +7118,8 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(13, 17, 23, 0.9);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
   cursor: move;
   gap: 8px;
   min-height: 32px;
@@ -7138,7 +7140,7 @@ body::-webkit-scrollbar {
 
 .editor-panel-subtitle {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7156,7 +7158,7 @@ body::-webkit-scrollbar {
   align-items: stretch;
   gap: 2px;
   padding: 4px 4px 0;
-  background: rgba(13, 17, 23, 0.92);
+  background: var(--color-bg-primary);
   overflow-x: auto;
 }
 
@@ -7167,19 +7169,19 @@ body::-webkit-scrollbar {
   min-width: 0;
   max-width: 220px;
   padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border);
   border-bottom: none;
   border-radius: 6px 6px 0 0;
-  background: rgba(110, 118, 129, 0.16);
-  color: #8b949e;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 12px;
   line-height: 1.2;
 }
 
 .editor-tab.active {
-  background: #0d1117;
-  color: #e6edf3;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .editor-tab-name {
@@ -7210,18 +7212,18 @@ body::-webkit-scrollbar {
   gap: 8px;
   min-height: 30px;
   padding: 0 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(22, 27, 34, 0.98);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
 }
 
 .editor-toolbar-status {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-toolbar-status.error {
-  color: #f85149;
+  color: var(--color-error);
 }
 
 .editor-toolbar-spacer {
@@ -7239,13 +7241,13 @@ body::-webkit-scrollbar {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease-out;
-  background: rgba(110, 118, 129, 0.2);
-  color: #8b949e;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
   backdrop-filter: blur(20px);
 }
 
 .editor-edit-toggle:hover {
-  background: rgba(110, 118, 129, 0.3);
+  background: var(--color-bg-hover);
 }
 
 .editor-edit-toggle:active {
@@ -7253,12 +7255,12 @@ body::-webkit-scrollbar {
 }
 
 .editor-edit-toggle.editable {
-  background: rgba(35, 197, 94, 0.2);
-  color: #4ade80;
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--color-success);
 }
 
 .editor-edit-toggle.editable:hover {
-  background: rgba(35, 197, 94, 0.3);
+  background: rgba(0, 255, 136, 0.25);
 }
 
 .editor-edit-toggle-icon {
@@ -7274,7 +7276,7 @@ body::-webkit-scrollbar {
   flex: 1;
   min-height: 0;
   display: flex;
-  background: #0d1117;
+  background: var(--color-bg-primary);
 }
 
 .editor-activity-bar {
@@ -7284,8 +7286,8 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
   padding: 8px 4px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(1, 4, 9, 0.96);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
 }
 
 .editor-activity-button {
@@ -7299,16 +7301,16 @@ body::-webkit-scrollbar {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease-out;
 }
 
 .editor-activity-button:hover,
 .editor-activity-button.active {
-  color: #e6edf3;
-  background: rgba(56, 139, 253, 0.18);
-  border-color: rgba(56, 139, 253, 0.32);
+  color: var(--color-text-primary);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
 }
 
 .editor-sidebar {
@@ -7318,8 +7320,8 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(13, 17, 23, 0.98);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
 }
 
 .editor-sidebar-header {
@@ -7328,13 +7330,13 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .editor-sidebar-title {
   font-size: 12px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .editor-sidebar-content {
@@ -7364,7 +7366,7 @@ body::-webkit-scrollbar {
   text-align: center;
   gap: 10px;
   padding: 20px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-sidebar-placeholder-icon {
@@ -7381,23 +7383,23 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .editor-global-search-input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid rgba(139, 148, 158, 0.35);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: rgba(22, 27, 34, 0.9);
-  color: #e6edf3;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   font-size: 12px;
   box-sizing: border-box;
 }
 
 .editor-global-search-input:focus {
   outline: none;
-  border-color: rgba(56, 139, 253, 0.72);
+  border-color: var(--color-accent);
 }
 
 .editor-global-search-toolbar {
@@ -7412,7 +7414,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #c9d1d9;
+  color: var(--color-text-primary);
 }
 
 .editor-global-search-actions {
@@ -7437,12 +7439,12 @@ body::-webkit-scrollbar {
 .editor-global-search-summary {
   margin-bottom: 10px;
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-global-search-empty {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-global-search-file-group {
@@ -7455,14 +7457,14 @@ body::-webkit-scrollbar {
 .editor-global-search-file-path {
   font-size: 12px;
   font-weight: 600;
-  color: #79c0ff;
+  color: var(--color-accent);
   cursor: pointer;
   word-break: break-all;
 }
 
 .editor-global-search-file-count {
   margin-left: 4px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-global-search-match {
@@ -7470,24 +7472,24 @@ body::-webkit-scrollbar {
   display: flex;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: rgba(22, 27, 34, 0.85);
-  color: #c9d1d9;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
 }
 
 .editor-global-search-match:hover {
-  border-color: rgba(56, 139, 253, 0.3);
-  background: rgba(30, 41, 59, 0.72);
+  border-color: var(--color-border-active);
+  background: var(--color-bg-hover);
 }
 
 .editor-global-search-line {
   flex: 0 0 auto;
   min-width: 32px;
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .editor-global-search-text {
