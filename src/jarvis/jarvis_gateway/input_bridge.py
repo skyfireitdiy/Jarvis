@@ -14,6 +14,7 @@ from queue import Empty
 from queue import Queue
 import threading
 from typing import Dict
+from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.input import InputProvider
@@ -175,8 +176,12 @@ class InputSessionRegistry:
         self._lock = threading.RLock()
         self._sessions: Dict[str, RemoteInputSession] = {}
         self._confirm_sessions: Dict[str, RemoteConfirmSession] = {}  # 确认会话
-        self._pending_input_requests: Dict[str, dict] = {}  # 保存待处理的输入请求
-        self._pending_confirm_requests: Dict[str, dict] = {}  # 保存待处理的确认请求
+        self._pending_input_requests: Dict[
+            str, List[dict]
+        ] = {}  # 保存待处理的输入请求队列（FIFO）
+        self._pending_confirm_requests: Dict[
+            str, List[dict]
+        ] = {}  # 保存待处理的确认请求队列（FIFO）
 
     def get_or_create(self, session_id: str) -> RemoteInputSession:
         with self._lock:
@@ -210,19 +215,32 @@ class InputSessionRegistry:
         self.clear_input_request(session_id)
 
     def save_input_request(self, session_id: str, request: dict) -> None:
-        """保存输入请求，用于重连后恢复。"""
+        """保存输入请求到队列，用于重连后恢复。"""
         with self._lock:
-            self._pending_input_requests[session_id] = request
+            if session_id not in self._pending_input_requests:
+                self._pending_input_requests[session_id] = []
+            self._pending_input_requests[session_id].append(request)
+            queue_len = len(self._pending_input_requests[session_id])
             print(
-                f"[INPUT_REGISTRY] Saved input_request for session={session_id}, total={len(self._pending_input_requests)}"
+                f"[INPUT_REGISTRY] Saved input_request for session={session_id}, queue_len={queue_len}, total_sessions={len(self._pending_input_requests)}"
             )
 
     def get_input_request(self, session_id: str) -> Optional[dict]:
-        """获取并清除保存的输入请求。"""
+        """从队列头部获取并移除一个输入请求（FIFO）。"""
         with self._lock:
-            request = self._pending_input_requests.pop(session_id, None)
+            queue = self._pending_input_requests.get(session_id)
+            if not queue:
+                print(
+                    f"[INPUT_REGISTRY] Got input_request for session={session_id}, found=False, remaining=0"
+                )
+                return None
+            request = queue.pop(0)  # FIFO: 从头部取出
+            # 如果队列为空，清理字典条目
+            if not queue:
+                self._pending_input_requests.pop(session_id, None)
+            remaining = len(queue)
             print(
-                f"[INPUT_REGISTRY] Got input_request for session={session_id}, found={request is not None}, remaining={len(self._pending_input_requests)}"
+                f"[INPUT_REGISTRY] Got input_request for session={session_id}, found=True, remaining={remaining}"
             )
             return request
 
@@ -248,19 +266,32 @@ class InputSessionRegistry:
         self.clear_confirm_request(session_id)
 
     def save_confirm_request(self, session_id: str, request: dict) -> None:
-        """保存确认请求，用于重连后恢复。"""
+        """保存确认请求到队列，用于重连后恢复。"""
         with self._lock:
-            self._pending_confirm_requests[session_id] = request
+            if session_id not in self._pending_confirm_requests:
+                self._pending_confirm_requests[session_id] = []
+            self._pending_confirm_requests[session_id].append(request)
+            queue_len = len(self._pending_confirm_requests[session_id])
             print(
-                f"[CONFIRM_REGISTRY] Saved confirm_request for session={session_id}, total={len(self._pending_confirm_requests)}"
+                f"[CONFIRM_REGISTRY] Saved confirm_request for session={session_id}, queue_len={queue_len}, total_sessions={len(self._pending_confirm_requests)}"
             )
 
     def get_confirm_request(self, session_id: str) -> Optional[dict]:
-        """获取并清除保存的确认请求。"""
+        """从队列头部获取并移除一个确认请求（FIFO）。"""
         with self._lock:
-            request = self._pending_confirm_requests.pop(session_id, None)
+            queue = self._pending_confirm_requests.get(session_id)
+            if not queue:
+                print(
+                    f"[CONFIRM_REGISTRY] Got confirm_request for session={session_id}, found=False, remaining=0"
+                )
+                return None
+            request = queue.pop(0)  # FIFO: 从头部取出
+            # 如果队列为空，清理字典条目
+            if not queue:
+                self._pending_confirm_requests.pop(session_id, None)
+            remaining = len(queue)
             print(
-                f"[CONFIRM_REGISTRY] Got confirm_request for session={session_id}, found={request is not None}, remaining={len(self._pending_confirm_requests)}"
+                f"[CONFIRM_REGISTRY] Got confirm_request for session={session_id}, found=True, remaining={remaining}"
             )
             return request
 
