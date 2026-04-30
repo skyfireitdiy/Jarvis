@@ -374,15 +374,15 @@ function syncConfig() {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.6);
+  background-color: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px var(--color-shadow), inset 0 1px 0 var(--color-border);
   border-radius: 15px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   /* 外描边效果 */
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
 
@@ -411,9 +411,9 @@ function syncConfig() {
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
-  background-color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
+  background-color: var(--color-text-primary);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border-color: var(--color-accent-subtle);
 }
 
 /* Hover 状态 */
