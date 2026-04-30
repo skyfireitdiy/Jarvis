@@ -4,10 +4,10 @@
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
   /* 主色调 - 深蓝科技 */
-  --color-bg-primary: #0a0e1a;
-  --color-bg-secondary: #0f1629;
-  --color-bg-tertiary: #151d33;
-  --color-bg-hover: #1a2540;
+  --color-bg-primary: #050a18;
+  --color-bg-secondary: #0a1228;
+  --color-bg-tertiary: #0f1a38;
+  --color-bg-hover: #152548;
 
   /* 文字颜色 */
   --color-text-primary: #e8f0ff;
@@ -32,7 +32,7 @@
 
   /* 渐变 */
   --gradient-accent: linear-gradient(135deg, #00d4ff 0%, #4d9fff 50%, #00ff88 100%);
-  --gradient-bg: linear-gradient(180deg, #0a0e1a 0%, #0f1629 100%);
+  --gradient-bg: linear-gradient(180deg, #050a18 0%, #0a1228 50%, #0f1a38 100%);
   --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
