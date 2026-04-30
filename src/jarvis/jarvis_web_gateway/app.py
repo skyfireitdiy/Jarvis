@@ -233,7 +233,6 @@ class WebGateway(BaseGateway):
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         # 单连接模式，固定使用 default session_id
         session_id = "default"
-        print(f"[REQUEST_INPUT] start, tip={request.tip[:30]}..., mode={request.mode}")
         metadata = dict(request.metadata) if request.metadata else {}
         metadata["session_id"] = session_id
 
@@ -249,16 +248,9 @@ class WebGateway(BaseGateway):
             if authorized:
                 break
 
-            # 等待WebSocket连接建立并设置认证信息
-            if waited == 0 or int(waited) % 5 == 0:  # 开始时和每5秒打印一次
-                print(
-                    f"[REQUEST_INPUT] waiting for WebSocket auth, reason={reason}, waited={waited:.1f}s"
-                )
-
             time.sleep(wait_interval)
             waited += wait_interval
 
-        print(f"[REQUEST_INPUT] auth passed after waiting {waited:.1f}s")
         payload = {
             "tip": request.tip,
             "mode": request.mode or "multi",  # 默认多行模式
@@ -267,7 +259,6 @@ class WebGateway(BaseGateway):
             "metadata": metadata,
         }
         message = {"type": "input_request", "payload": payload}
-        print(f"[REQUEST_INPUT] publishing message to frontend")
         self._router.publish(message, session_id=session_id)
         # 保存输入请求，用于重连后恢复
         self._input_registry.save_input_request(session_id, message)
@@ -279,9 +270,7 @@ class WebGateway(BaseGateway):
             _update_status("waiting_multi")
 
         session = self._input_registry.get_or_create(session_id)
-        print(f"[REQUEST_INPUT] calling wait_for_input")
         text = session.wait_for_input()
-        print(f"[REQUEST_INPUT] wait_for_input returned: '{text}'")
 
         # 输入完成，恢复为运行状态
         _update_status("running")
@@ -461,35 +450,22 @@ class WebSocketConnectionManager:
         )
         # 发送缓存的输出消息
         if self._gateway._pending_outputs:
-            print(
-                f"[WS CACHE] Sending {len(self._gateway._pending_outputs)} cached outputs"
-            )
             for cached_message in self._gateway._pending_outputs:
                 await websocket.send_json(cached_message)
             self._gateway._pending_outputs.clear()
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
-        print(
-            f"[RECONNECT] session_id={session_id}, pending_request={pending_request is not None}"
-        )
         if pending_request:
             session = self._input_registry.get_or_create(session_id)
-            print("[RECONNECT] Got session, reconnecting...")
             session.reconnect()
-            print(f"[RECONNECT] Sending input_request: {pending_request}")
             await websocket.send_json(pending_request)
         # 恢复待处理的确认请求
         pending_confirm = self._input_registry.get_confirm_request(session_id)
-        print(
-            f"[RECONNECT] session_id={session_id}, pending_confirm={pending_confirm is not None}"
-        )
         if pending_confirm:
             confirm_session = self._input_registry.get_or_create_confirm_session(
                 session_id
             )
-            print("[RECONNECT] Got confirm session, reconnecting...")
             confirm_session.reconnect()
-            print(f"[RECONNECT] Sending confirm_request: {pending_confirm}")
             await websocket.send_json(pending_confirm)
         try:
             while True:
