@@ -369,28 +369,28 @@ const emit = defineEmits([
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-hover);
   margin-left: 8px;
 }
 
 .agent-item .agent-status.running {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .agent-item .agent-status.stopped {
-  background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--color-success);
 }
 
 .agent-item .agent-status.waiting_multi {
-  background: rgba(210, 153, 34, 0.2);
-  color: #d29922;
+  background: rgba(255, 170, 0, 0.15);
+  color: var(--color-warning);
 }
 
 .agent-item .agent-status.waiting_single {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--color-error);
 }
 
 .agent-info {
@@ -480,19 +480,19 @@ const emit = defineEmits([
 }
 
 .icon-btn-small {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }
 
 .icon-btn-small:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -506,15 +506,15 @@ const emit = defineEmits([
 }
 
 .agent-actions .icon-btn-small.stop-btn:hover {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--color-error);
 }
 
 .agent-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
   padding: 20px;
 }
