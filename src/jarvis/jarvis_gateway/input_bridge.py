@@ -49,12 +49,14 @@ class RemoteInputSession:
         self._is_waiting_for_input: bool = False
 
     def submit_input(self, text: str) -> None:
+        print(f"[SUBMIT_INPUT] session_id={self.session_id}, text='{text}'")
         with self._state_lock:
             if self._disconnect_reason is not None:
                 raise InputProviderDisconnectedError(self._disconnect_reason)
         self._queue.put(RemoteInputMessage(text=text))
 
     def disconnect(self, reason: str = "remote session disconnected") -> None:
+        print(f"[DISCONNECT] session_id={self.session_id}, reason={reason}")
         with self._state_lock:
             if self._disconnect_reason is None:
                 self._disconnect_reason = reason
@@ -226,8 +228,9 @@ class InputSessionRegistry:
                 self._pending_input_requests[session_id] = []
             self._pending_input_requests[session_id].append(request)
             queue_len = len(self._pending_input_requests[session_id])
+            tip = request.get("payload", {}).get("tip", "N/A")
             print(
-                f"[INPUT_REGISTRY] Saved input_request for session={session_id}, queue_len={queue_len}, total_sessions={len(self._pending_input_requests)}"
+                f"[INPUT_REGISTRY] Saved input_request for session={session_id}, tip='{tip[:50]}...', queue_len={queue_len}, total_sessions={len(self._pending_input_requests)}"
             )
 
     def get_input_request(self, session_id: str) -> Optional[dict]:
