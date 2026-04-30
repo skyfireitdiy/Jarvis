@@ -79,7 +79,7 @@ watch(() => props.visible, (newVal) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -88,8 +88,8 @@ watch(() => props.visible, (newVal) => {
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
   width: 100%;
@@ -111,20 +111,20 @@ watch(() => props.visible, (newVal) => {
 .modal-header h2 {
   margin: 0;
   font-size: 18px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
 }
 
 .close-btn:hover {
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .path-header {
@@ -136,26 +136,26 @@ watch(() => props.visible, (newVal) => {
 .path-btn {
   flex: 1;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
 }
 
 .path-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
   transform: translateY(-1px);
 }
 
 .current-path {
   padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-primary);
   border-radius: 8px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 13px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   margin-bottom: 16px;
   word-break: break-all;
   line-height: 1.4;
@@ -168,29 +168,29 @@ watch(() => props.visible, (newVal) => {
 .dir-search-input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .dir-search-input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
 }
 
 .dir-search-input::placeholder {
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .dir-list {
   max-height: 350px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-primary);
   border-radius: 8px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border: 0.5px solid var(--color-border);
   margin-bottom: 20px;
 }
 
@@ -204,16 +204,16 @@ watch(() => props.visible, (newVal) => {
 }
 
 .dir-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-tertiary);
 }
 
 .dir-item.selected {
-  background: rgba(63, 185, 80, 0.15);
-  border-color: rgba(63, 185, 80, 0.3);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 .dir-item.selected:hover {
-  background: rgba(63, 185, 80, 0.2);
+  background: var(--color-accent-subtle);
 }
 
 .dir-icon {
@@ -223,13 +223,13 @@ watch(() => props.visible, (newVal) => {
 
 .dir-name {
   font-size: 14px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .dir-path {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   margin-left: auto;
   word-break: break-all;
 }
@@ -237,7 +237,7 @@ watch(() => props.visible, (newVal) => {
 .empty-state {
   text-align: center;
   padding: 24px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .modal-actions {
@@ -248,7 +248,7 @@ watch(() => props.visible, (newVal) => {
 
 .btn {
   padding: 10px 20px;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
   font-size: 14px;
   font-weight: 600;
@@ -257,20 +257,20 @@ watch(() => props.visible, (newVal) => {
 
 .btn.secondary {
   background: transparent;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e6edf3;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .btn.primary {
-  background: #238636;
-  color: #ffffff;
+  background: var(--color-success);
+  color: var(--color-text-primary);
 }
 
 .btn.primary:hover {
-  background: #2ea043;
+  background: var(--color-success);
 }
 </style>
