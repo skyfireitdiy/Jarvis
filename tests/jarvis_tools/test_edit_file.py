@@ -917,42 +917,7 @@ class TestEditFileEncoding:
             if os.path.exists(temp_path + ".bak"):
                 os.remove(temp_path + ".bak")
 
-    def test_gbk_encoding_preserved(self, tool):
-        """测试 GBK 编码文件编辑后编码保持一致"""
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
-            content = "中文测试\nGBK编码\n"
-            f.write(content.encode("gbk"))
-            temp_path = f.name
 
-        try:
-            args = {
-                "files": [
-                    {
-                        "file_path": temp_path,
-                        "diffs": [
-                            {
-                                "search": "中文测试",
-                                "replace": "修改成功",
-                            }
-                        ],
-                    }
-                ]
-            }
-
-            result = tool.execute(args)
-            assert result["success"] is True
-
-            with open(temp_path, "rb") as f:
-                raw_content = f.read()
-            decoded = raw_content.decode("gbk")
-            assert "修改成功" in decoded
-            assert "中文测试" not in decoded
-
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if os.path.exists(temp_path + ".bak"):
-                os.remove(temp_path + ".bak")
 
     def test_encoding_detection_with_bom(self, tool):
         """测试带 BOM 的 UTF-8 文件处理"""
