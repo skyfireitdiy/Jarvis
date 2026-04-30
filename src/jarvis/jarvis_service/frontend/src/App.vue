@@ -58,6 +58,8 @@
         </div>
         
         <div class="header-title">
+          <img src="/icons/jarvis-logo.png" alt="Jarvis" class="header-logo" />
+          <span class="header-brand">JARVIS</span>
           <button class="icon-btn desktop-only" @click="toggleAgentSidebar()" title="切换 Agent 侧边栏">
             📋
           </button>
