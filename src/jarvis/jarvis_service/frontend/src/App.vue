@@ -6883,7 +6883,7 @@ body::-webkit-scrollbar {
 
 /* Side by side Diff 样式 */
 .diff-side-by-side {
-  background: #1a1f2e;
+  background: var(--color-bg-tertiary);
   border-radius: 8px;
   overflow-x: auto;
   margin: 8px 0;
@@ -6893,7 +6893,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-header {
-  background: rgba(56, 139, 253, 0.1);
+  background: var(--color-accent-subtle);
   padding: 8px 12px;
   display: flex;
   justify-content: space-between;
@@ -6902,24 +6902,24 @@ body::-webkit-scrollbar {
 }
 
 .diff-file-path {
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
 }
 
 .diff-stats {
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .diff-additions {
-  color: #3fb950;
+  color: var(--color-success);
   font-weight: 600;
 }
 
 .diff-deletions {
-  color: #f85149;
+  color: var(--color-error);
   font-weight: 600;
 }
 
@@ -6951,7 +6951,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-line-num {
-  color: #8b949e;
+  color: var(--color-text-secondary);
   padding: 2px 6px;
   text-align: right;
   width: 50px;
@@ -6983,7 +6983,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-deleted {
-  background: rgba(248, 81, 73, 0.7);
+  background: rgba(255, 71, 87, 0.7);
   color: #fff;
 }
 
@@ -6992,7 +6992,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-added {
-  background: rgba(63, 185, 80, 0.7);
+  background: rgba(0, 255, 136, 0.7);
   color: #fff;
 }
 
@@ -7001,7 +7001,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-error {
-  color: #f85149;
+  color: var(--color-error);
   padding: 8px 12px;
   font-weight: 600;
 }
