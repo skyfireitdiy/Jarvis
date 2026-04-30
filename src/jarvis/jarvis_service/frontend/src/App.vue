@@ -2756,19 +2756,26 @@ async function restartGateway() {
     isRestartingGateway.value = true
     const { host, port } = getGatewayAddress()
     
-    // 发送重启请求，不等待响应结果
-    fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
+    // 发送重启请求，等待响应结果
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         node_id: targetNodeId,
         restart_frontend: restartFrontendService.value
       })
-    }).catch(() => {
-      // 忽略请求错误（服务重启会导致连接中断）
     })
-    
-    // 请求发出即视为成功
-    showToast(`已向节点 "${targetNodeId}" 发送重启请求`, 'success')
+
+    // 检查响应状态
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}))
+      if (data.success === false) {
+        showToast(data.error?.message || '重启请求失败', 'error')
+      } else {
+        showToast(data.data?.message || `已向节点 "${targetNodeId}" 发送重启请求`, 'success')
+      }
+    } else {
+      showToast(`重启请求失败: HTTP ${response.status}`, 'error')
+    }
   } catch (error) {
     console.error('[SETTINGS] Failed to restart gateway:', error)
     showToast(error.message || '重启服务失败', 'error')
