@@ -610,17 +610,8 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
-    # 调试日志：确认非交互模式检测结果
-    from jarvis.jarvis_utils.output import PrettyOutput
-
     is_non_interactive = _is_non_interactive_for_current_agent()
-    PrettyOutput.auto_print(
-        f"🔍 get_single_line_input: is_non_interactive={is_non_interactive}, tip={tip[:50]}..."
-    )
     if is_non_interactive:
-        PrettyOutput.auto_print(
-            f"🔍 get_single_line_input: 非交互模式，直接返回默认值: {default}"
-        )
         return default
 
     # 检查是否在 Gateway 模式下
@@ -634,15 +625,10 @@ def get_single_line_input(tip: str, default: str = "") -> str:
 
         gateway = get_current_gateway()
         GatewayInputRequest = _GatewayInputRequest
-        PrettyOutput.auto_print(
-            f"🔍 get_single_line_input: gateway={gateway}, GatewayInputRequest={GatewayInputRequest}"
-        )
-    except Exception as e:
-        PrettyOutput.auto_print(f"🔍 get_single_line_input: 导入网关模块失败: {e}")
+    except Exception:
         gateway = None
 
     if gateway is not None and GatewayInputRequest is not None:
-        PrettyOutput.auto_print(f"🔍 get_single_line_input: 进入网关模式，发送输入请求")
         # Gateway 模式：发送输入请求到前端
         try:
             request = GatewayInputRequest(
