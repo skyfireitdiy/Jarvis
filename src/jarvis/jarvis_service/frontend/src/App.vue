@@ -770,6 +770,7 @@ const connecting = ref(false)
 const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
 const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
+const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
 const restartFrontendService = ref(false) // 是否同时重启前端服务
