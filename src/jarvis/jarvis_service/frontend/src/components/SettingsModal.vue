@@ -393,13 +393,13 @@ function syncConfig() {
   width: 24px;
   left: 3px;
   bottom: 3px;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: var(--color-text-secondary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border: 1px solid var(--color-border);
 }
 
 .toggle-input:checked + .toggle-slider {
