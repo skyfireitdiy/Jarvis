@@ -138,7 +138,7 @@ const emit = defineEmits([
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,8 +148,8 @@ const emit = defineEmits([
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
 }
@@ -164,7 +164,7 @@ const emit = defineEmits([
 .create-agent-modal h2 {
   margin: 0 0 20px 0;
   font-size: 18px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 /* 响应式网格布局 */
