@@ -152,13 +152,13 @@ const emit = defineEmits([
 
 <style scoped>
 .icon-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
   padding: 0;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
@@ -168,8 +168,8 @@ const emit = defineEmits([
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -183,17 +183,17 @@ const emit = defineEmits([
 }
 
 .icon-btn.active {
-  background: rgba(56, 139, 253, 0.3);
-  color: #58a6ff;
-  border-color: rgba(56, 139, 253, 0.5);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-border-active);
 }
 
 .agent-sidebar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: rgba(22, 27, 34, 0.95);
-  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border-right: 0.5px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -234,16 +234,16 @@ const emit = defineEmits([
 
 .agent-sidebar-resize-handle:hover::after,
 .agent-sidebar-resizing .agent-sidebar-resize-handle::after {
-  background: rgba(88, 166, 255, 0.6);
+  background: var(--color-accent-glow);
 }
 
 .agent-sidebar-header {
   padding: 12px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0.5px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-tertiary);
 }
 
 .sidebar-header-actions {
@@ -255,7 +255,7 @@ const emit = defineEmits([
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .agent-list {
@@ -279,22 +279,22 @@ const emit = defineEmits([
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
   text-align: left;
 }
 
 .agent-collapsed-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .agent-collapsed-arrow {
   width: 16px;
-  color: #58a6ff;
+  color: var(--color-accent);
 }
 
 .agent-collapsed-title {
@@ -305,31 +305,31 @@ const emit = defineEmits([
 
 .agent-collapsed-count {
   font-size: 12px;
-  color: #6e7681;
+  color: var(--color-text-muted);
 }
 
 .agent-item {
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   position: relative;
 }
 
 .agent-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-active);
 }
 
 .agent-item.active {
-  background: rgba(56, 139, 253, 0.15);
-  border-color: rgba(56, 139, 253, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
 }
 
 .agent-item.selected {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
 }
 
 .agent-checkbox {
@@ -342,7 +342,7 @@ const emit = defineEmits([
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #58a6ff;
+  accent-color: var(--color-accent);
 }
 
 .batch-actions-bar {
@@ -350,14 +350,14 @@ const emit = defineEmits([
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background: rgba(22, 27, 34, 0.9);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
   gap: 12px;
 }
 
 .batch-actions-info {
   font-size: 13px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .batch-actions-buttons {
@@ -369,28 +369,28 @@ const emit = defineEmits([
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-hover);
   margin-left: 8px;
 }
 
 .agent-item .agent-status.running {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .agent-item .agent-status.stopped {
-  background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--color-success);
 }
 
 .agent-item .agent-status.waiting_multi {
-  background: rgba(210, 153, 34, 0.2);
-  color: #d29922;
+  background: rgba(255, 170, 0, 0.15);
+  color: var(--color-warning);
 }
 
 .agent-item .agent-status.waiting_single {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--color-error);
 }
 
 .agent-info {
@@ -461,13 +461,13 @@ const emit = defineEmits([
 
 .agent-port {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   margin-left: auto;
 }
 
 .agent-dir {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   word-break: break-all;
   line-height: 1.4;
 }
@@ -480,19 +480,19 @@ const emit = defineEmits([
 }
 
 .icon-btn-small {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }
 
 .icon-btn-small:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -506,15 +506,15 @@ const emit = defineEmits([
 }
 
 .agent-actions .icon-btn-small.stop-btn:hover {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--color-error);
 }
 
 .agent-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
   padding: 20px;
 }

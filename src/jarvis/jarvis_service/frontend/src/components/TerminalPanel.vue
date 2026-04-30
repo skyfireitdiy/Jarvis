@@ -102,13 +102,13 @@ const emit = defineEmits([
 
 <style scoped>
 .icon-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
   padding: 0;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
@@ -118,8 +118,8 @@ const emit = defineEmits([
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -134,8 +134,8 @@ const emit = defineEmits([
 
 .terminal-panel {
   position: fixed;
-  background: rgba(13, 17, 23, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -151,8 +151,8 @@ const emit = defineEmits([
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: rgba(22, 27, 34, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
   border-radius: 6px 6px 0 0;
   cursor: move;
   min-height: 32px;
@@ -162,7 +162,7 @@ const emit = defineEmits([
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel-title-group {
@@ -193,12 +193,12 @@ const emit = defineEmits([
 }
 
 .terminal-node-select:focus {
-  border-color: rgba(96, 165, 250, 0.9);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
 .terminal-node-select option {
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel-actions {
@@ -210,8 +210,8 @@ const emit = defineEmits([
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .terminal-tab {
@@ -219,23 +219,23 @@ const emit = defineEmits([
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
 
 .terminal-tab:hover {
-  background: rgba(56, 139, 253, 0.1);
-  color: #58a6ff;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .terminal-tab.active {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
-  border-color: rgba(56, 139, 253, 0.3);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .terminal-tab-title {
@@ -249,14 +249,15 @@ const emit = defineEmits([
   width: 16px;
   height: 16px;
   border: none;
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: var(--color-error-subtle);
+  color: var(--color-error);
   border-radius: 3px;
   cursor: pointer;
 }
 
 .terminal-tab-close:hover {
-  background: rgba(248, 81, 73, 0.4);
+  background: var(--color-error);
+  color: var(--color-text-primary);
 }
 
 .terminal-content {
@@ -271,7 +272,7 @@ const emit = defineEmits([
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
