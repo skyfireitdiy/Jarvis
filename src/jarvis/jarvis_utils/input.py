@@ -634,10 +634,15 @@ def get_single_line_input(tip: str, default: str = "") -> str:
 
         gateway = get_current_gateway()
         GatewayInputRequest = _GatewayInputRequest
-    except Exception:
+        PrettyOutput.auto_print(
+            f"🔍 get_single_line_input: gateway={gateway}, GatewayInputRequest={GatewayInputRequest}"
+        )
+    except Exception as e:
+        PrettyOutput.auto_print(f"🔍 get_single_line_input: 导入网关模块失败: {e}")
         gateway = None
 
     if gateway is not None and GatewayInputRequest is not None:
+        PrettyOutput.auto_print(f"🔍 get_single_line_input: 进入网关模式，发送输入请求")
         # Gateway 模式：发送输入请求到前端
         try:
             request = GatewayInputRequest(
