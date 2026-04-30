@@ -10,7 +10,7 @@ from typing import cast
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict
-from charset_normalizer import from_bytes
+
 
 # 全局环境变量存储
 
@@ -58,76 +58,50 @@ def detect_file_encoding(
 ) -> Optional[str]:
     """根据文件内容检测编码
 
-    使用 charset_normalizer 库的 from_bytes 方法进行编码检测，提供更准确的结果。
-    优先 UTF-8（现代文件、JSON、YAML 等），其次 GBK（Windows 中文）。
+    使用 file --mime-encoding 命令进行编码检测。
 
     Args:
         file_path: 文件路径
-        sample_size: 用于检测的字节数，默认 16KB
+        sample_size: 未使用，保留参数以保持接口兼容
 
     Returns:
-        检测到的编码名称，若均失败则返回 None
+        检测到的编码名称，若失败则返回 None
     """
     try:
-        # 检查文件是否存在
         if not os.path.exists(file_path):
             return None
 
-        # 读取原始数据用于BOM检测和验证
-        with open(file_path, "rb") as f:
-            raw_data = f.read(sample_size)
+        import subprocess
 
-        if not raw_data:
-            return "utf-8"
+        result = subprocess.run(
+            ["file", "--mime-encoding", "-b", file_path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
-        # BOM 检测（优先级最高）
-        if raw_data.startswith(b"\xef\xbb\xbf"):
-            return "utf-8"
-        if raw_data.startswith(b"\xff\xfe") or raw_data.startswith(b"\xfe\xff"):
-            return "utf-16"
-
-        # 使用 charset_normalizer 的 from_bytes 检测编码
-        result = from_bytes(raw_data).best()
-        if result is not None and result.encoding:
-            detected = result.encoding.lower().replace("-", "_").replace("-", "")
+        if result.returncode == 0 and result.stdout.strip():
+            detected = result.stdout.strip().lower()
             # 标准化编码名称
             encoding_map = {
                 "gb2312": "gb18030",
                 "gbk": "gb18030",
                 "ascii": "utf-8",
-                "utf_8": "utf-8",
+                "us-ascii": "utf-8",
+                "iso-8859-1": "latin1",
+                "binary": None,
             }
             detected = encoding_map.get(detected, detected)
 
-            # 验证检测到的编码
-            try:
-                decoded = raw_data.decode(detected)
-                re_encoded = decoded.encode(detected)
-                if re_encoded == raw_data:
-                    # 对于中文编码（GBK/Big5），统一返回 gb18030
-                    if detected in ("gb18030", "gbk", "big5", "gb2312"):
-                        # 优先尝试 gb18030，因为 gb18030 兼容性更好
-                        try:
-                            raw_data.decode("gb18030")
-                            return "gb18030"
-                        except (UnicodeDecodeError, LookupError):
-                            pass
-                    return detected
-            except (UnicodeDecodeError, LookupError, UnicodeEncodeError):
-                pass
+            # 对于中文编码统一返回 gb18030
+            if detected in ("gb18030", "gbk", "big5", "gb2312"):
+                return "gb18030"
 
-        # 如果 charset_normalizer 检测失败或验证失败，尝试常见编码
-        for enc in _DETECT_ENCODINGS:
-            try:
-                decoded = raw_data.decode(enc)
-                re_encoded = decoded.encode(enc)
-                if re_encoded == raw_data:
-                    return enc
-            except (UnicodeDecodeError, LookupError, UnicodeEncodeError):
-                continue
+            return detected
 
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired, subprocess.SubprocessError):
         pass
+
     return None
 
 

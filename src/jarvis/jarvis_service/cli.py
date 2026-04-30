@@ -60,6 +60,7 @@ class ServiceConfig:
     node_id: Optional[str]
     master_url: Optional[str]
     node_secret: Optional[str]
+    dev_mode: bool = False
 
 
 @dataclass
@@ -215,25 +216,42 @@ class ServiceController:
         PrettyOutput.auto_print("⏳ 安装前端依赖")
         self._run_command(["npm", "install"], self._config.frontend_root)
         PrettyOutput.auto_print("✅ 前端依赖安装完成")
-        PrettyOutput.auto_print("⏳ 构建前端发布产物")
-        self._run_command(["npm", "run", "build"], self._config.frontend_root)
-        PrettyOutput.auto_print("✅ 前端发布版本构建完成")
+        if not self._config.dev_mode:
+            PrettyOutput.auto_print("⏳ 构建前端发布产物")
+            self._run_command(["npm", "run", "build"], self._config.frontend_root)
+            PrettyOutput.auto_print("✅ 前端发布版本构建完成")
+        else:
+            PrettyOutput.auto_print("⏩ 开发模式跳过构建步骤")
 
     def _start_frontend_process(self) -> subprocess.Popen[bytes]:
-        """启动前端预览服务。"""
-        PrettyOutput.auto_print("⏳ 启动前端发布服务")
-        command = [
-            "npm",
-            "run",
-            "preview",
-            "--",
-            "--host",
-            self._config.frontend_host,
-            "--port",
-            str(self._config.frontend_port),
-        ]
+        """启动前端服务。"""
+        if self._config.dev_mode:
+            PrettyOutput.auto_print("⏳ 启动前端开发服务（热加载模式）")
+            command = [
+                "npm",
+                "run",
+                "dev",
+                "--",
+                "--host",
+                self._config.frontend_host,
+                "--port",
+                str(self._config.frontend_port),
+            ]
+        else:
+            PrettyOutput.auto_print("⏳ 启动前端发布服务")
+            command = [
+                "npm",
+                "run",
+                "preview",
+                "--",
+                "--host",
+                self._config.frontend_host,
+                "--port",
+                str(self._config.frontend_port),
+            ]
         process = subprocess.Popen(command, cwd=self._config.frontend_root)
-        PrettyOutput.auto_print(f"✅ 前端发布服务已启动 (PID: {process.pid})")
+        mode_name = "开发" if self._config.dev_mode else "发布"
+        PrettyOutput.auto_print(f"✅ 前端{mode_name}服务已启动 (PID: {process.pid})")
         return process
 
     def _run_command(self, command: list[str], cwd: Path) -> None:
@@ -344,6 +362,7 @@ def build_service_config(
     node_id: Optional[str] = None,
     master_url: Optional[str] = None,
     node_secret: Optional[str] = None,
+    dev_mode: bool = False,
 ) -> ServiceConfig:
     """根据命令行参数与环境变量构建服务配置。"""
     project_root = resolve_project_root()
@@ -367,6 +386,11 @@ def build_service_config(
     resolved_node_id = node_id or os.getenv("JARVIS_NODE_ID") or None
     resolved_master_url = master_url or os.getenv("JARVIS_MASTER_URL") or None
     resolved_node_secret = node_secret or os.getenv("JARVIS_NODE_SECRET") or None
+    resolved_dev_mode = dev_mode or os.getenv("JARVIS_DEV_MODE", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
     if resolved_gateway_host is None:
         resolved_gateway_host = DEFAULT_GATEWAY_HOST
@@ -399,6 +423,7 @@ def build_service_config(
         node_id=resolved_node_id,
         master_url=resolved_master_url,
         node_secret=resolved_node_secret,
+        dev_mode=resolved_dev_mode,
     )
 
 
@@ -558,6 +583,11 @@ def start_command(
         "--node-secret",
         help="主子节点共享密钥（默认可被 JARVIS_NODE_SECRET 覆盖）",
     ),
+    dev_mode: bool = typer.Option(
+        False,
+        "--dev",
+        help="开发模式：前端以 dev 模式启动（热加载）",
+    ),
 ) -> None:
     """启动 Jarvis Service。"""
     config = build_service_config(
@@ -570,6 +600,7 @@ def start_command(
         node_id=node_id,
         master_url=master_url,
         node_secret=node_secret,
+        dev_mode=dev_mode,
     )
     run_service(config)
 
