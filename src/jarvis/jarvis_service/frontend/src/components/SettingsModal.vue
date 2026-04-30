@@ -403,10 +403,10 @@ function syncConfig() {
 }
 
 .toggle-input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  border-color: rgba(0, 122, 255, 0.6);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  outline-color: rgba(0, 122, 255, 0.5);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-secondary) 100%);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 var(--color-border);
+  outline-color: var(--color-accent-subtle);
 }
 
 .toggle-input:checked + .toggle-slider:before {
