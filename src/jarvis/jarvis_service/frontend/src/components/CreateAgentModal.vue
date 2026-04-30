@@ -338,12 +338,12 @@ const emit = defineEmits([
 .create-agent-modal .radio-text {
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .radio-desc {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -353,7 +353,7 @@ const emit = defineEmits([
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: rgba(139, 148, 158, 0.85);
+  color: var(--color-text-secondary);
 }
 
 /* 表单组样式 */
@@ -366,7 +366,7 @@ const emit = defineEmits([
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
@@ -383,9 +383,9 @@ const emit = defineEmits([
 
 .select-dir-btn {
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
@@ -393,7 +393,7 @@ const emit = defineEmits([
 }
 
 .select-dir-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
 }
 
 /* Toggle 开关样式 */
