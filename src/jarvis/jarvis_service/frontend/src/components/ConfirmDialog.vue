@@ -122,8 +122,8 @@ onUnmounted(() => {
 }
 
 .confirm-btn:hover {
-  background: rgba(48, 54, 61, 0.9);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
