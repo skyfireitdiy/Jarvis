@@ -79,9 +79,14 @@ class RemoteInputSession:
             from jarvis.jarvis_utils.globals import get_input_buffer
 
             buffered_messages = get_input_buffer()
+            print(
+                f"[WAIT_INPUT] session_id={self.session_id}, buffered_messages={buffered_messages}"
+            )
             if buffered_messages:
                 # 将所有缓冲消息合并返回
-                return "\n".join(buffered_messages)
+                result = "\n".join(buffered_messages)
+                print(f"[WAIT_INPUT] Returning buffered messages: {result}")
+                return result
 
             while True:
                 with self._state_lock:
