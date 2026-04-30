@@ -230,11 +230,37 @@ class WebGateway(BaseGateway):
         print(f"[REQUEST_INPUT] start, tip={request.tip[:30]}..., mode={request.mode}")
         metadata = dict(request.metadata) if request.metadata else {}
         metadata["session_id"] = session_id
-        auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
-        authorized, reason = self._check_auth(auth_payload)
-        if not authorized:
-            print(f"[REQUEST_INPUT] not authorized, reason={reason}")
-            return GatewayInputResult(text="", metadata={"error": reason})
+
+        # 等待WebSocket连接建立
+        import time
+
+        wait_interval = 0.5  # 秒
+        waited = 0
+
+        while True:
+            auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
+            authorized, reason = self._check_auth(auth_payload)
+            if authorized:
+                break
+
+            # 检查是否有活跃连接
+            if session_id in self._active_connections:
+                # 有连接但认证失败，可能是token问题，短暂等待后重试
+                if waited % 5 == 0:  # 每5秒打印一次
+                    print(
+                        f"[REQUEST_INPUT] connection exists but auth failed, reason={reason}, waited={waited:.1f}s"
+                    )
+            else:
+                # 没有连接，等待连接建立
+                if waited % 5 == 0:  # 每5秒打印一次
+                    print(
+                        f"[REQUEST_INPUT] waiting for WebSocket connection, waited={waited:.1f}s"
+                    )
+
+            time.sleep(wait_interval)
+            waited += wait_interval
+
+        print(f"[REQUEST_INPUT] auth passed after waiting {waited:.1f}s")
         payload = {
             "tip": request.tip,
             "mode": request.mode or "multi",  # 默认多行模式
