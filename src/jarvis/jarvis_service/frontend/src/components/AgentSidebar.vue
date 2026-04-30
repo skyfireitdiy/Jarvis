@@ -152,13 +152,13 @@ const emit = defineEmits([
 
 <style scoped>
 .icon-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
   padding: 0;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
@@ -168,8 +168,8 @@ const emit = defineEmits([
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -183,17 +183,17 @@ const emit = defineEmits([
 }
 
 .icon-btn.active {
-  background: rgba(56, 139, 253, 0.3);
-  color: #58a6ff;
-  border-color: rgba(56, 139, 253, 0.5);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-border-active);
 }
 
 .agent-sidebar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: rgba(22, 27, 34, 0.95);
-  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border-right: 0.5px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -234,16 +234,16 @@ const emit = defineEmits([
 
 .agent-sidebar-resize-handle:hover::after,
 .agent-sidebar-resizing .agent-sidebar-resize-handle::after {
-  background: rgba(88, 166, 255, 0.6);
+  background: var(--color-accent-glow);
 }
 
 .agent-sidebar-header {
   padding: 12px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0.5px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-tertiary);
 }
 
 .sidebar-header-actions {
@@ -255,7 +255,7 @@ const emit = defineEmits([
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .agent-list {
@@ -279,22 +279,22 @@ const emit = defineEmits([
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
   text-align: left;
 }
 
 .agent-collapsed-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .agent-collapsed-arrow {
   width: 16px;
-  color: #58a6ff;
+  color: var(--color-accent);
 }
 
 .agent-collapsed-title {
