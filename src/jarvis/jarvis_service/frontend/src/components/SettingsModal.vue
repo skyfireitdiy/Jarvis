@@ -529,10 +529,10 @@ function syncConfig() {
 
 .danger-btn {
   padding: 10px 20px;
-  background: #f85149;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-error);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -540,7 +540,7 @@ function syncConfig() {
 }
 
 .danger-btn:hover:not(:disabled) {
-  background: #ff6b6b;
+  background: var(--color-error);
   transform: translateY(-1px);
 }
 
@@ -558,8 +558,8 @@ function syncConfig() {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -571,31 +571,31 @@ function syncConfig() {
 
 .history-stat-label {
   font-size: 13px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .history-stat-value {
   font-size: 14px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .ghost-btn {
   padding: 10px 20px;
-  background: rgba(33, 38, 45, 0.5);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .ghost-btn:hover {
-  background: rgba(48, 54, 61, 0.7);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
