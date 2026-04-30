@@ -261,10 +261,10 @@ const emit = defineEmits([
 .agent-list {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .agent-collapsed-section {
@@ -278,7 +278,7 @@ const emit = defineEmits([
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   background: rgba(255, 255, 255, 0.02);
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
@@ -309,7 +309,7 @@ const emit = defineEmits([
 }
 
 .agent-item {
-  padding: 12px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -335,7 +335,7 @@ const emit = defineEmits([
 .agent-checkbox {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .agent-checkbox input[type="checkbox"] {
@@ -396,8 +396,8 @@ const emit = defineEmits([
 .agent-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .agent-type {
@@ -475,7 +475,7 @@ const emit = defineEmits([
 .agent-actions {
   display: flex;
   gap: 4px;
-  margin-top: 8px;
+  margin-top: 6px;
   justify-content: flex-end;
 }
 
