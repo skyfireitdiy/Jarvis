@@ -1,37 +1,39 @@
-/* Jarvis 科技感深色主题 */
+/* Jarvis 蓝色科技风主题 */
 :root {
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 */
-  --color-bg-primary: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-tertiary: #21262d;
-  --color-bg-hover: #30363d;
+  /* 主色调 - 深蓝科技 */
+  --color-bg-primary: #0a0e1a;
+  --color-bg-secondary: #0f1629;
+  --color-bg-tertiary: #151d33;
+  --color-bg-hover: #1a2540;
 
   /* 文字颜色 */
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-muted: #6e7681;
+  --color-text-primary: #e8f0ff;
+  --color-text-secondary: #8ba4d0;
+  --color-text-muted: #5a7099;
 
   /* 强调色 - 科技蓝 */
-  --color-accent: #58a6ff;
-  --color-accent-glow: rgba(88, 166, 255, 0.4);
-  --color-accent-subtle: rgba(88, 166, 255, 0.15);
+  --color-accent: #00d4ff;
+  --color-accent-glow: rgba(0, 212, 255, 0.5);
+  --color-accent-subtle: rgba(0, 212, 255, 0.12);
+  --color-accent-secondary: #4d9fff;
 
   /* 状态色 */
-  --color-success: #3fb950;
-  --color-warning: #d29922;
-  --color-error: #f85149;
-  --color-info: #58a6ff;
+  --color-success: #00ff88;
+  --color-warning: #ffaa00;
+  --color-error: #ff4757;
+  --color-info: #00d4ff;
 
   /* 边框 */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-active: rgba(88, 166, 255, 0.5);
+  --color-border: rgba(0, 212, 255, 0.15);
+  --color-border-active: rgba(0, 212, 255, 0.6);
 
   /* 渐变 */
-  --gradient-accent: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
-  --gradient-bg: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+  --gradient-accent: linear-gradient(135deg, #00d4ff 0%, #4d9fff 50%, #00ff88 100%);
+  --gradient-bg: linear-gradient(180deg, #0a0e1a 0%, #0f1629 100%);
+  --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
   background: var(--color-bg-primary);
