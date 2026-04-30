@@ -431,6 +431,8 @@ class ScriptTool:
 
         try:
             proc = PtyProcess.spawn(argv, cwd=os.getcwd(), env=env)
+            # 设置默认 tty 大小，避免无前端时输出被截断
+            apply_resize(100, 300)
         except Exception as e:
             PrettyOutput.auto_print(f"❌ PTY 启动失败: {str(e)}")
             return {
@@ -652,6 +654,9 @@ class ScriptTool:
                 return
             rows, cols = size
             apply_resize(rows, cols)
+
+        # 设置默认 tty 大小，避免无前端时输出被截断
+        apply_resize(100, 300)
 
         def reader(proc: subprocess.Popen[Any]) -> None:
             try:

@@ -39,7 +39,7 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -48,8 +48,8 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
   width: 100%;
@@ -60,17 +60,17 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   margin: 0 0 24px 0;
   font-size: 21px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
 .error-message {
-  background: rgba(248, 81, 73, 0.1);
-  border: 1px solid rgba(248, 81, 73, 0.3);
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 16px;
-  color: #f85149;
+  color: var(--color-error);
   font-size: 14px;
 }
 
@@ -83,37 +83,37 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
 .form-group input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: rgba(56, 139, 253, 0.5);
-  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.1);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .form-group input::placeholder {
-  color: #484f58;
+  color: var(--color-text-secondary);
 }
 
 .primary-btn {
   width: 100%;
   padding: 10px 20px;
-  background: #238636;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-success);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -121,7 +121,7 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: var(--color-success);
   transform: translateY(-1px);
 }
 

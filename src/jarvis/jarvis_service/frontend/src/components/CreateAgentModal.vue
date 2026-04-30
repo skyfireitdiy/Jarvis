@@ -138,7 +138,7 @@ const emit = defineEmits([
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,8 +148,8 @@ const emit = defineEmits([
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
 }
@@ -164,7 +164,7 @@ const emit = defineEmits([
 .create-agent-modal h2 {
   margin: 0 0 20px 0;
   font-size: 18px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 /* 响应式网格布局 */
@@ -215,22 +215,22 @@ const emit = defineEmits([
 .create-agent-modal .form-control {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .create-agent-modal .form-control:focus {
   outline: none;
-  border-color: rgba(63, 185, 80, 0.6);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal select.form-control option {
-  background: #1a1f2e;
-  color: #e6edf3;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .modal-actions {
@@ -250,17 +250,17 @@ const emit = defineEmits([
 }
 
 .create-agent-modal .btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal .btn.primary {
-  background: #3fb950;
-  color: white;
+  background: var(--color-success);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.primary:hover {
@@ -285,21 +285,21 @@ const emit = defineEmits([
   flex-direction: column;
   gap: 6px;
   padding: 14px 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 10px;
   cursor: pointer;
 }
 
 .create-agent-modal .radio-label:hover {
-  background: rgba(13, 17, 23, 0.8);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
 .create-agent-modal .radio-label:has(input:checked) {
-  background: rgba(56, 139, 253, 0.12);
-  border-color: rgba(56, 139, 253, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 .create-agent-modal .radio-label input[type="radio"] {
@@ -307,20 +307,20 @@ const emit = defineEmits([
   -webkit-appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--color-border);
   border-radius: 50%;
-  background: rgba(13, 17, 23, 0.8);
+  background: var(--color-bg-primary);
   cursor: pointer;
   position: relative;
 }
 
 .create-agent-modal .radio-label input[type="radio"]:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--color-border);
 }
 
 .create-agent-modal .radio-label input[type="radio"]:checked {
-  border-color: #58a6ff;
-  background: rgba(56, 139, 253, 0.1);
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 .create-agent-modal .radio-label input[type="radio"]:checked::before {
@@ -331,19 +331,19 @@ const emit = defineEmits([
   transform: translate(-50%, -50%);
   width: 8px;
   height: 8px;
-  background: #58a6ff;
+  background: var(--color-accent);
   border-radius: 50%;
 }
 
 .create-agent-modal .radio-text {
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .radio-desc {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -353,7 +353,7 @@ const emit = defineEmits([
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: rgba(139, 148, 158, 0.85);
+  color: var(--color-text-secondary);
 }
 
 /* 表单组样式 */
@@ -366,7 +366,7 @@ const emit = defineEmits([
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
@@ -383,9 +383,9 @@ const emit = defineEmits([
 
 .select-dir-btn {
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
@@ -393,7 +393,7 @@ const emit = defineEmits([
 }
 
 .select-dir-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
 }
 
 /* Toggle 开关样式 */
@@ -403,11 +403,11 @@ const emit = defineEmits([
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(28, 28, 30, 0.6);
+  background: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  border: 1px solid var(--color-border);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -417,8 +417,8 @@ const emit = defineEmits([
 .toggle-wrapper:hover {
   backdrop-filter: blur(60px) saturate(180%);
   -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border-color: rgba(0, 122, 255, 0.3);
-  outline-color: rgba(0, 122, 255, 0.4);
+  border-color: var(--color-accent);
+  outline-color: var(--color-accent);
 }
 
 .toggle-wrapper:active {
@@ -451,14 +451,14 @@ const emit = defineEmits([
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.6);
+  background-color: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--color-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border-radius: 15px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
 
@@ -469,27 +469,27 @@ const emit = defineEmits([
   width: 24px;
   left: 3px;
   bottom: 3px;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: var(--color-text-primary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--color-border);
 }
 
 .toggle-input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  border-color: rgba(0, 122, 255, 0.6);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  outline-color: rgba(0, 122, 255, 0.5);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  outline-color: var(--color-accent);
 }
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
-  background-color: #ffffff;
+  background-color: var(--color-text-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
+  border-color: var(--color-accent);
 }
 
 .toggle-switch:hover .toggle-slider {
@@ -498,7 +498,7 @@ const emit = defineEmits([
 }
 
 .toggle-switch:hover .toggle-slider:before {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--color-text-primary);
 }
 
 .toggle-switch:active .toggle-slider {
@@ -526,7 +526,7 @@ const emit = defineEmits([
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
   line-height: 1.4;
   margin: 0;

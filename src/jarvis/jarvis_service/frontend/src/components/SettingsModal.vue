@@ -423,7 +423,7 @@ function syncConfig() {
 }
 
 .toggle-switch:hover .toggle-slider:before {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--color-text-primary);
 }
 
 /* Active 状态 - 物理回弹反馈 */
@@ -453,7 +453,7 @@ function syncConfig() {
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
   line-height: 1.4;
   margin: 0;
@@ -465,7 +465,7 @@ function syncConfig() {
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: rgba(139, 148, 158, 0.85);
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -480,7 +480,7 @@ function syncConfig() {
   margin: 0 0 24px 0;
   font-size: 24px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.03em;
 }
 
@@ -495,16 +495,16 @@ function syncConfig() {
   margin: 0;
   font-size: 21px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 22px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -515,8 +515,8 @@ function syncConfig() {
 }
 
 .close-btn:hover {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
+  background: var(--color-error-subtle);
+  color: var(--color-error);
   transform: rotate(90deg);
 }
 
@@ -529,10 +529,10 @@ function syncConfig() {
 
 .danger-btn {
   padding: 10px 20px;
-  background: #f85149;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-error);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -540,7 +540,7 @@ function syncConfig() {
 }
 
 .danger-btn:hover:not(:disabled) {
-  background: #ff6b6b;
+  background: var(--color-error);
   transform: translateY(-1px);
 }
 
@@ -558,8 +558,8 @@ function syncConfig() {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -571,40 +571,40 @@ function syncConfig() {
 
 .history-stat-label {
   font-size: 13px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .history-stat-value {
   font-size: 14px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-weight: 600;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .ghost-btn {
   padding: 10px 20px;
-  background: rgba(33, 38, 45, 0.5);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .ghost-btn:hover {
-  background: rgba(48, 54, 61, 0.7);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
 .config-sync-section {
   margin-top: 16px;
   padding: 16px;
-  background: rgba(28, 28, 30, 0.4);
+  background: var(--color-bg-secondary);
   border-radius: 12px;
-  border: 1px solid rgba(113, 113, 122, 0.3);
+  border: 1px solid var(--color-border);
 }
 
 .config-sync-row {
@@ -620,29 +620,29 @@ function syncConfig() {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
 }
 
 .config-sync-section .node-select {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(28, 28, 30, 0.6);
-  border: 1px solid rgba(113, 113, 122, 0.4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .config-sync-section .node-select:hover {
-  border-color: rgba(113, 113, 122, 0.6);
+  border-color: var(--color-border);
 }
 
 .config-sync-section .node-select:focus {
   outline: none;
-  border-color: #007AFF;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .checkbox-label {
@@ -650,22 +650,22 @@ function syncConfig() {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(28, 28, 30, 0.4);
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--color-text-primary);
 }
 
 .checkbox-label:hover {
-  background: rgba(28, 28, 30, 0.6);
+  background: var(--color-bg-secondary);
 }
 
 .checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #007AFF;
+  accent-color: var(--color-accent);
 }
 </style>
