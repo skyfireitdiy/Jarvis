@@ -5815,7 +5815,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
 function setTerminalRef(executionId, el, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
   const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
-  const termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
+  let termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
   if (el) {
     console.log(`[terminal] Setting ref for execution ${executionSessionKey}`)
     console.log(`[terminal] Element properties: clientWidth=${el.clientWidth}, clientHeight=${el.clientHeight}, offsetWidth=${el.offsetWidth}, offsetHeight=${el.offsetHeight}`)
