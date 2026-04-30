@@ -51,7 +51,7 @@ watch(() => props.visible, async (newVal) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,8 +61,8 @@ watch(() => props.visible, async (newVal) => {
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
 }
@@ -70,7 +70,7 @@ watch(() => props.visible, async (newVal) => {
 .create-agent-modal h2 {
   margin: 0 0 20px 0;
   font-size: 18px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 /* 表单组样式 */
@@ -83,24 +83,24 @@ watch(() => props.visible, async (newVal) => {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   letter-spacing: 0.01em;
 }
 
 .create-agent-modal .form-control {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .create-agent-modal .form-control:focus {
   outline: none;
-  border-color: rgba(63, 185, 80, 0.6);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal .modal-actions {
@@ -120,17 +120,17 @@ watch(() => props.visible, async (newVal) => {
 }
 
 .create-agent-modal .btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal .btn.primary {
-  background: #3fb950;
-  color: white;
+  background: var(--color-success);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.primary:hover {
