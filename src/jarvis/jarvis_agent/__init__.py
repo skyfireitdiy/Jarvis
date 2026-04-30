@@ -498,12 +498,6 @@ class Agent:
             enable_auto_rule_select: 是否启用自动规则选择（默认True）
             model_type: 模型类型，可选 "normal"、"smart"、"cheap"（默认 "normal"）
         """
-        # 调试日志：确认non_interactive参数的值
-        from jarvis.jarvis_utils.output import PrettyOutput
-
-        PrettyOutput.auto_print(
-            f"🔍 Agent.__init__: non_interactive参数值={non_interactive}"
-        )
 
         # 基础属性初始化
         self._init_base_attributes(
