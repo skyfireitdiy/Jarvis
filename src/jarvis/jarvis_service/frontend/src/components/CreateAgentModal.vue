@@ -285,21 +285,21 @@ const emit = defineEmits([
   flex-direction: column;
   gap: 6px;
   padding: 14px 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 10px;
   cursor: pointer;
 }
 
 .create-agent-modal .radio-label:hover {
-  background: rgba(13, 17, 23, 0.8);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
   transform: translateY(-1px);
 }
 
 .create-agent-modal .radio-label:has(input:checked) {
-  background: rgba(56, 139, 253, 0.12);
-  border-color: rgba(56, 139, 253, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 .create-agent-modal .radio-label input[type="radio"] {
@@ -307,20 +307,20 @@ const emit = defineEmits([
   -webkit-appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--color-border);
   border-radius: 50%;
-  background: rgba(13, 17, 23, 0.8);
+  background: var(--color-bg-primary);
   cursor: pointer;
   position: relative;
 }
 
 .create-agent-modal .radio-label input[type="radio"]:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--color-border);
 }
 
 .create-agent-modal .radio-label input[type="radio"]:checked {
-  border-color: #58a6ff;
-  background: rgba(56, 139, 253, 0.1);
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
 }
 
 .create-agent-modal .radio-label input[type="radio"]:checked::before {
@@ -331,7 +331,7 @@ const emit = defineEmits([
   transform: translate(-50%, -50%);
   width: 8px;
   height: 8px;
-  background: #58a6ff;
+  background: var(--color-accent);
   border-radius: 50%;
 }
 
