@@ -458,7 +458,7 @@ const emit = defineEmits([
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border-radius: 15px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
 }
 
@@ -469,27 +469,27 @@ const emit = defineEmits([
   width: 24px;
   left: 3px;
   bottom: 3px;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: var(--color-text-primary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--color-border);
 }
 
 .toggle-input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  border-color: rgba(0, 122, 255, 0.6);
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  outline-color: rgba(0, 122, 255, 0.5);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  outline-color: var(--color-accent);
 }
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
-  background-color: #ffffff;
+  background-color: var(--color-text-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
+  border-color: var(--color-accent);
 }
 
 .toggle-switch:hover .toggle-slider {
@@ -498,7 +498,7 @@ const emit = defineEmits([
 }
 
 .toggle-switch:hover .toggle-slider:before {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--color-text-primary);
 }
 
 .toggle-switch:active .toggle-slider {
@@ -526,7 +526,7 @@ const emit = defineEmits([
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
   line-height: 1.4;
   margin: 0;
