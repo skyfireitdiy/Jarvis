@@ -215,22 +215,22 @@ const emit = defineEmits([
 .create-agent-modal .form-control {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 6px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .create-agent-modal .form-control:focus {
   outline: none;
-  border-color: rgba(63, 185, 80, 0.6);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--color-accent);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal select.form-control option {
-  background: #1a1f2e;
-  color: #e6edf3;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .modal-actions {
@@ -250,17 +250,17 @@ const emit = defineEmits([
 }
 
 .create-agent-modal .btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
 }
 
 .create-agent-modal .btn.primary {
-  background: #3fb950;
-  color: white;
+  background: var(--color-success);
+  color: var(--color-text-primary);
 }
 
 .create-agent-modal .btn.primary:hover {
