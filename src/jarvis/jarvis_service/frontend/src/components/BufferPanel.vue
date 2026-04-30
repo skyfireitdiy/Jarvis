@@ -69,7 +69,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,8 +78,8 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   width: 100%;
 }
@@ -108,14 +108,14 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: rgba(35, 134, 54, 0.1);
-  border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+  background: var(--color-accent-subtle);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .buffer-panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #3fb950;
+  color: var(--color-accent);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -128,10 +128,10 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 
 .buffer-panel-btn {
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.8);
-  border: 1px solid rgba(48, 54, 61, 0.8);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -139,15 +139,15 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 }
 
 .buffer-panel-btn:hover {
-  background: rgba(56, 139, 253, 0.15);
-  border-color: rgba(56, 139, 253, 0.5);
-  color: #58a6ff;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .buffer-panel-btn.close-btn:hover {
-  background: rgba(248, 81, 73, 0.15);
-  border-color: rgba(248, 81, 73, 0.5);
-  color: #f85149;
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 .buffer-panel-content {
@@ -160,10 +160,10 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   width: 100%;
   min-height: 220px;
   max-height: min(60vh, 520px);
-  background: rgba(13, 17, 23, 0.8);
+  background: var(--color-bg-primary);
   border: none;
   padding: 14px 16px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   resize: vertical;
@@ -172,23 +172,23 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 }
 
 .buffer-edit-textarea::placeholder {
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .buffer-panel-footer {
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.6);
-  border-top: 1px solid rgba(48, 54, 61, 0.6);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
 }
 
 .buffer-save-btn {
   padding: 8px 16px;
-  background: rgba(56, 139, 253, 0.15);
-  border: 1px solid rgba(56, 139, 253, 0.5);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
   border-radius: 6px;
-  color: #58a6ff;
+  color: var(--color-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -196,8 +196,8 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 }
 
 .buffer-save-btn:hover:not(:disabled) {
-  background: rgba(56, 139, 253, 0.25);
-  border-color: rgba(56, 139, 253, 0.8);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
   transform: translateY(-1px);
 }
 

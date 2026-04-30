@@ -80,7 +80,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,8 +89,8 @@ defineExpose({
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
   width: 100%;
@@ -114,20 +114,20 @@ defineExpose({
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .icon-btn {
   background: none;
   border: none;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
 }
 
 .icon-btn:hover {
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .completions-search {
@@ -137,26 +137,26 @@ defineExpose({
 .completions-search input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .completions-search input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
 }
 
 .completions-list {
   flex: 1;
   overflow-y: auto;
   max-height: 400px;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: 0.5px solid var(--color-border);
   border-radius: 10px;
-  background: rgba(13, 17, 23, 0.6);
+  background: var(--color-bg-primary);
 }
 
 .completion-item {
@@ -164,7 +164,7 @@ defineExpose({
   flex-direction: column;
   gap: 4px;
   padding: 12px 16px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.5px solid var(--color-border);
   cursor: pointer;
 }
 
@@ -173,47 +173,47 @@ defineExpose({
 }
 
 .completion-item:hover {
-  background: rgba(88, 166, 255, 0.1);
+  background: var(--color-accent-subtle);
 }
 
 .completion-item.selected {
-  background: rgba(88, 166, 255, 0.25);
+  background: var(--color-accent-subtle);
 }
 
 .completion-value {
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
 }
 
 .completion-desc {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .completion-item.completion-replace .completion-desc {
-  color: #58a6ff;
+  color: var(--color-accent);
 }
 
 .completion-item.completion-command .completion-desc {
-  color: #d29922;
+  color: var(--color-warning);
 }
 
 .completion-item.completion-rule .completion-desc {
-  color: #3fb950;
+  color: var(--color-success);
 }
 
 .completion-empty {
   padding: 24px;
   text-align: center;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .error-message {
-  background-color: #f85149;
-  color: white;
+  background-color: var(--color-error);
+  color: var(--color-text-primary);
   padding: 12px 16px;
   border-radius: 6px;
   margin-bottom: 16px;

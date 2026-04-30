@@ -53,7 +53,7 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -62,8 +62,8 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
   border-radius: 14px;
   padding: 28px;
   width: 100%;
@@ -77,7 +77,7 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 .session-modal h2 {
   margin: 0 0 20px 0;
   font-size: 18px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .modal-header {
@@ -90,28 +90,28 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 .close-btn {
   background: none;
   border: none;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
 }
 
 .close-btn:hover {
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .session-list {
   max-height: 300px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-primary);
   border-radius: 8px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border: 0.5px solid var(--color-border);
   margin-bottom: 20px;
 }
 
 .session-item {
   padding: 12px 14px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.5px solid var(--color-border);
   cursor: pointer;
   border-radius: 6px;
   margin: 4px;
@@ -122,30 +122,30 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 }
 
 .session-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-tertiary);
 }
 
 .session-item.active {
-  background: rgba(63, 185, 80, 0.15);
-  border-color: rgba(63, 185, 80, 0.3);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 .session-name {
   font-size: 14px;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   font-weight: 500;
   margin-bottom: 4px;
 }
 
 .session-time {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .empty-state {
   text-align: center;
   padding: 24px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .modal-actions {
@@ -157,32 +157,32 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 .ghost-btn {
   padding: 10px 20px;
   background: transparent;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .ghost-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e6edf3;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
 }
 
 .primary-btn {
   padding: 10px 20px;
-  background: #238636;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-success);
+  border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: var(--color-success);
 }
 
 .primary-btn:disabled {
