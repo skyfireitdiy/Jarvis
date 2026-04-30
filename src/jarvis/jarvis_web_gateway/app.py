@@ -227,11 +227,13 @@ class WebGateway(BaseGateway):
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         # 单连接模式，固定使用 default session_id
         session_id = "default"
+        print(f"[REQUEST_INPUT] start, tip={request.tip[:30]}..., mode={request.mode}")
         metadata = dict(request.metadata) if request.metadata else {}
         metadata["session_id"] = session_id
         auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
         authorized, reason = self._check_auth(auth_payload)
         if not authorized:
+            print(f"[REQUEST_INPUT] not authorized, reason={reason}")
             return GatewayInputResult(text="", metadata={"error": reason})
         payload = {
             "tip": request.tip,
@@ -241,6 +243,7 @@ class WebGateway(BaseGateway):
             "metadata": metadata,
         }
         message = {"type": "input_request", "payload": payload}
+        print(f"[REQUEST_INPUT] publishing message to frontend")
         self._router.publish(message, session_id=session_id)
         # 保存输入请求，用于重连后恢复
         self._input_registry.save_input_request(session_id, message)
@@ -252,7 +255,9 @@ class WebGateway(BaseGateway):
             _update_status("waiting_multi")
 
         session = self._input_registry.get_or_create(session_id)
+        print(f"[REQUEST_INPUT] calling wait_for_input")
         text = session.wait_for_input()
+        print(f"[REQUEST_INPUT] wait_for_input returned: '{text}'")
 
         # 输入完成，恢复为运行状态
         _update_status("running")
