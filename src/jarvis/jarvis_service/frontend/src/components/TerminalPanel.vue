@@ -102,13 +102,13 @@ const emit = defineEmits([
 
 <style scoped>
 .icon-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 18px;
   cursor: pointer;
   padding: 0;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
@@ -118,8 +118,8 @@ const emit = defineEmits([
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e6edf3;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
   transform: translateY(-1px);
 }
 
@@ -134,8 +134,8 @@ const emit = defineEmits([
 
 .terminal-panel {
   position: fixed;
-  background: rgba(13, 17, 23, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -151,8 +151,8 @@ const emit = defineEmits([
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: rgba(22, 27, 34, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
   border-radius: 6px 6px 0 0;
   cursor: move;
   min-height: 32px;
@@ -162,7 +162,7 @@ const emit = defineEmits([
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel-title-group {
