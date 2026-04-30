@@ -73,9 +73,14 @@ class RemoteInputSession:
             return self._is_waiting_for_input
 
     def wait_for_input(self, timeout: Optional[float] = None) -> str:
+        print(f"[WAIT_INPUT_START] session_id={self.session_id}, timeout={timeout}")
         # 设置等待输入状态
         with self._state_lock:
             self._is_waiting_for_input = True
+            initial_disconnect_reason = self._disconnect_reason
+        print(
+            f"[WAIT_INPUT_START] initial_disconnect_reason={initial_disconnect_reason}"
+        )
         try:
             # 优先消费全局缓冲区中的消息
             from jarvis.jarvis_utils.globals import get_input_buffer
@@ -93,7 +98,13 @@ class RemoteInputSession:
             while True:
                 with self._state_lock:
                     disconnect_reason = self._disconnect_reason
+                print(
+                    f"[WAIT_INPUT_LOOP] disconnect_reason={disconnect_reason}, queue_empty={self._queue.empty()}"
+                )
                 if disconnect_reason is not None and self._queue.empty():
+                    print(
+                        f"[WAIT_INPUT_DISCONNECTED] Raising InputProviderDisconnectedError: {disconnect_reason}"
+                    )
                     raise InputProviderDisconnectedError(disconnect_reason)
                 try:
                     message = self._queue.get(timeout=timeout)
