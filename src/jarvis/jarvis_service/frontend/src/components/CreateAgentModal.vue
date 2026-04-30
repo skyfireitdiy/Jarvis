@@ -403,11 +403,11 @@ const emit = defineEmits([
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(28, 28, 30, 0.6);
+  background: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  border: 1px solid var(--color-border);
+  outline: 1px solid var(--color-border);
   outline-offset: -1px;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -417,8 +417,8 @@ const emit = defineEmits([
 .toggle-wrapper:hover {
   backdrop-filter: blur(60px) saturate(180%);
   -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border-color: rgba(0, 122, 255, 0.3);
-  outline-color: rgba(0, 122, 255, 0.4);
+  border-color: var(--color-accent);
+  outline-color: var(--color-accent);
 }
 
 .toggle-wrapper:active {
@@ -451,10 +451,10 @@ const emit = defineEmits([
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.6);
+  background-color: var(--color-bg-secondary);
   backdrop-filter: blur(40px) saturate(150%);
   -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--color-border);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border-radius: 15px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
