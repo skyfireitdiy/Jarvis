@@ -1,37 +1,44 @@
-/* Jarvis 科技感深色主题 */
+/* Jarvis 蓝色科技风主题 */
 :root {
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 */
-  --color-bg-primary: #0d1117;
-  --color-bg-secondary: #161b22;
-  --color-bg-tertiary: #21262d;
-  --color-bg-hover: #30363d;
+  /* 主色调 - 深蓝科技 */
+  --color-bg-primary: #050a18;
+  --color-bg-secondary: #0a1228;
+  --color-bg-tertiary: #0f1a38;
+  --color-bg-hover: #152548;
 
   /* 文字颜色 */
-  --color-text-primary: #e6edf3;
-  --color-text-secondary: #8b949e;
-  --color-text-muted: #6e7681;
+  --color-text-primary: #e8f0ff;
+  --color-text-secondary: #8ba4d0;
+  --color-text-muted: #5a7099;
 
   /* 强调色 - 科技蓝 */
-  --color-accent: #58a6ff;
-  --color-accent-glow: rgba(88, 166, 255, 0.4);
-  --color-accent-subtle: rgba(88, 166, 255, 0.15);
+  --color-accent: #00d4ff;
+  --color-accent-glow: rgba(0, 212, 255, 0.5);
+  --color-accent-subtle: rgba(0, 212, 255, 0.12);
+  --color-accent-secondary: #4d9fff;
 
   /* 状态色 */
-  --color-success: #3fb950;
-  --color-warning: #d29922;
-  --color-error: #f85149;
-  --color-info: #58a6ff;
+  --color-success: #00ff88;
+  --color-warning: #ffaa00;
+  --color-error: #ff4757;
+  --color-info: #00d4ff;
 
   /* 边框 */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-active: rgba(88, 166, 255, 0.5);
+  --color-border: rgba(0, 212, 255, 0.15);
+  --color-border-active: rgba(0, 212, 255, 0.6);
 
   /* 渐变 */
-  --gradient-accent: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
-  --gradient-bg: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+  --gradient-accent: linear-gradient(
+    135deg,
+    #00d4ff 0%,
+    #4d9fff 50%,
+    #00ff88 100%
+  );
+  --gradient-bg: linear-gradient(180deg, #050a18 0%, #0a1228 50%, #0f1a38 100%);
+  --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
   background: var(--color-bg-primary);
@@ -61,7 +68,7 @@ p {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 /* 头部样式 - 科技感 */
@@ -71,8 +78,8 @@ p {
   align-items: center;
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -136,20 +143,20 @@ p {
 /* 面板样式 - 玻璃态 */
 .panel {
   background: var(--color-bg-secondary);
-  padding: 16px 20px;
-  border-radius: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   backdrop-filter: blur(10px);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 /* 输入框样式 */
@@ -157,8 +164,8 @@ input,
 textarea {
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 14px;
+  border-radius: 6px;
+  padding: 8px 12px;
   font-size: 14px;
   color: var(--color-text-primary);
   outline: none;
@@ -181,8 +188,8 @@ textarea:focus {
 /* 按钮样式 - 科技感 */
 button {
   border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
+  border-radius: 6px;
+  padding: 8px 14px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -230,7 +237,7 @@ button:disabled {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   scrollbar-width: thin;
   scrollbar-color: var(--color-bg-hover) transparent;
 }
@@ -250,12 +257,12 @@ button:disabled {
 
 .output-item {
   border-bottom: 1px solid var(--color-border);
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
 .output-meta {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -264,8 +271,8 @@ button:disabled {
 .badge {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -273,16 +280,16 @@ button:disabled {
 }
 
 .output-body {
-  margin-top: 8px;
-  line-height: 1.6;
+  margin-top: 6px;
+  line-height: 1.5;
   color: var(--color-text-primary);
 }
 
 .output-body pre {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  padding: 14px;
-  border-radius: 8px;
+  padding: 10px;
+  border-radius: 6px;
   overflow: auto;
   border: 1px solid var(--color-border);
   font-family: "JetBrains Mono", "Fira Code", monospace;
@@ -292,7 +299,7 @@ button:disabled {
 /* 输入区域 */
 .input-area {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-start;
 }
 
@@ -308,10 +315,10 @@ button:disabled {
 
 /* 终端样式 */
 .terminal-host {
-  height: 240px;
+  height: 200px;
   background: var(--color-bg-primary);
-  border-radius: 12px;
-  padding: 8px;
+  border-radius: 8px;
+  padding: 6px;
   border: 1px solid var(--color-border);
   box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
 }
@@ -339,4 +346,29 @@ button:disabled {
 ::selection {
   background: var(--color-accent-subtle);
   color: var(--color-text-primary);
+}
+
+/* Header Logo 样式 */
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px var(--color-accent-glow));
+}
+
+.header-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: var(--gradient-blue);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 20px var(--color-accent-glow);
 }
