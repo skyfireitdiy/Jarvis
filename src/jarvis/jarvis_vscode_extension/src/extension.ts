@@ -2494,6 +2494,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const nodeId = String(agentItem?.nodeId || "").trim();
     const workingDir = String(agentItem?.workingDir || "").trim();
 
+    // 检查是否为本地master节点，如果是则直接创建本地终端
+    const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+    if (isLocalMasterNode(gatewayAddress, nodeId)) {
+      this.createLocalTerminal(workingDir);
+      return;
+    }
+
     const payload: Record<string, string> = {};
     if (nodeId) {
       payload.node_id = nodeId;
@@ -2506,6 +2513,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       type: "terminal_create",
       payload,
     });
+  }
+
+  // 创建本地终端（用于本地master节点）
+  private createLocalTerminal(workingDir?: string): void {
+    const cwd = workingDir || process.cwd();
+    const terminal = vscode.window.createTerminal({
+      name: "Jarvis (Local)",
+      cwd: cwd,
+    });
+    terminal.show();
   }
 
   private handleTerminalCreated(payload: Record<string, unknown>): void {
@@ -2851,6 +2868,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
     const targetNodeId = nodeId || "master";
 
+    // 检查是否为本地master节点，如果是则直接打开本地文件
+    if (isLocalMasterNode(gatewayAddress, targetNodeId)) {
+      await this.openLocalFile(filePath);
+      return;
+    }
+
     // 检查是否已经打开了相同路径的文件
     for (const [localPath, mapping] of this.remoteFileEditors.entries()) {
       if (
@@ -2960,6 +2983,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       console.error("[FILETREE] 打开文件出错:", error);
       vscode.window.showErrorMessage(`打开文件失败: ${error}`);
+    }
+  }
+
+  // 打开本地文件（用于本地master节点）
+  private async openLocalFile(filePath: string): Promise<void> {
+    try {
+      const uri = vscode.Uri.file(filePath);
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        preserveFocus: false,
+        preview: false,
+      });
+    } catch (error) {
+      console.error("[FILETREE] 打开本地文件出错:", error);
+      vscode.window.showErrorMessage(`打开本地文件失败: ${error}`);
     }
   }
 
@@ -5559,6 +5598,23 @@ function parseGatewayAddress(address: string): GatewayAddress {
     return { host: host || "127.0.0.1", port: port || "8000" };
   }
   return { host: trimmedAddress, port: "8000" };
+}
+
+function isLocalAddress(host: string): boolean {
+  const normalizedHost = host.trim().toLowerCase();
+  return (
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "::1" ||
+    normalizedHost === "localhost"
+  );
+}
+
+function isLocalMasterNode(
+  gatewayAddress: GatewayAddress,
+  nodeId: string,
+): boolean {
+  const normalizedNodeId = String(nodeId || "master").trim() || "master";
+  return normalizedNodeId === "master" && isLocalAddress(gatewayAddress.host);
 }
 
 function buildNodeHttpUrl(
