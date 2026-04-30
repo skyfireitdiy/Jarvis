@@ -6649,6 +6649,13 @@ onMounted(() => {
   // 尝试从 localStorage 加载已保存的 token（免登录功能）
   loadSavedToken()
 
+  // 如果 token 加载成功，隐藏登录框并自动连接
+  if (hasAuthToken()) {
+    showConnectModal.value = false
+    console.log('[AUTH] Auto login: token loaded, connecting...')
+    connect()
+  }
+
   updateViewportHeight()
   visualViewportResizeHandler = () => {
     updateViewportHeight()
