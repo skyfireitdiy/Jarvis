@@ -6646,6 +6646,9 @@ onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
 
+  // 尝试从 localStorage 加载已保存的 token（免登录功能）
+  loadSavedToken()
+
   updateViewportHeight()
   visualViewportResizeHandler = () => {
     updateViewportHeight()
