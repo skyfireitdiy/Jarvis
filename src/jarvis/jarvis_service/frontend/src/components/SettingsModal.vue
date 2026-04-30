@@ -602,9 +602,9 @@ function syncConfig() {
 .config-sync-section {
   margin-top: 16px;
   padding: 16px;
-  background: rgba(28, 28, 30, 0.4);
+  background: var(--color-bg-secondary);
   border-radius: 12px;
-  border: 1px solid rgba(113, 113, 122, 0.3);
+  border: 1px solid var(--color-border);
 }
 
 .config-sync-row {
@@ -620,29 +620,29 @@ function syncConfig() {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
 }
 
 .config-sync-section .node-select {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(28, 28, 30, 0.6);
-  border: 1px solid rgba(113, 113, 122, 0.4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .config-sync-section .node-select:hover {
-  border-color: rgba(113, 113, 122, 0.6);
+  border-color: var(--color-border);
 }
 
 .config-sync-section .node-select:focus {
   outline: none;
-  border-color: #007AFF;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .checkbox-label {
@@ -650,22 +650,22 @@ function syncConfig() {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(28, 28, 30, 0.4);
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--color-text-primary);
 }
 
 .checkbox-label:hover {
-  background: rgba(28, 28, 30, 0.6);
+  background: var(--color-bg-secondary);
 }
 
 .checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #007AFF;
+  accent-color: var(--color-accent);
 }
 </style>
