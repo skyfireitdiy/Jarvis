@@ -305,31 +305,31 @@ const emit = defineEmits([
 
 .agent-collapsed-count {
   font-size: 12px;
-  color: #6e7681;
+  color: var(--color-text-muted);
 }
 
 .agent-item {
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   position: relative;
 }
 
 .agent-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-active);
 }
 
 .agent-item.active {
-  background: rgba(56, 139, 253, 0.15);
-  border-color: rgba(56, 139, 253, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
 }
 
 .agent-item.selected {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
 }
 
 .agent-checkbox {
@@ -342,7 +342,7 @@ const emit = defineEmits([
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #58a6ff;
+  accent-color: var(--color-accent);
 }
 
 .batch-actions-bar {
@@ -350,14 +350,14 @@ const emit = defineEmits([
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background: rgba(22, 27, 34, 0.9);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
   gap: 12px;
 }
 
 .batch-actions-info {
   font-size: 13px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
 }
 
 .batch-actions-buttons {
@@ -461,13 +461,13 @@ const emit = defineEmits([
 
 .agent-port {
   font-size: 12px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   margin-left: auto;
 }
 
 .agent-dir {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   word-break: break-all;
   line-height: 1.4;
 }
