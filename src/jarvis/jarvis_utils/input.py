@@ -610,7 +610,17 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
-    if _is_non_interactive_for_current_agent():
+    # 调试日志：确认非交互模式检测结果
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    is_non_interactive = _is_non_interactive_for_current_agent()
+    PrettyOutput.auto_print(
+        f"🔍 get_single_line_input: is_non_interactive={is_non_interactive}, tip={tip[:50]}..."
+    )
+    if is_non_interactive:
+        PrettyOutput.auto_print(
+            f"🔍 get_single_line_input: 非交互模式，直接返回默认值: {default}"
+        )
         return default
 
     # 检查是否在 Gateway 模式下
