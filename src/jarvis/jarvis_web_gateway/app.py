@@ -231,7 +231,7 @@ class WebGateway(BaseGateway):
         metadata = dict(request.metadata) if request.metadata else {}
         metadata["session_id"] = session_id
 
-        # 等待WebSocket连接建立
+        # 等待WebSocket连接建立（通过检查_auth_store中是否有认证信息）
         import time
 
         wait_interval = 0.5  # 秒
@@ -243,19 +243,11 @@ class WebGateway(BaseGateway):
             if authorized:
                 break
 
-            # 检查是否有活跃连接
-            if session_id in self._active_connections:
-                # 有连接但认证失败，可能是token问题，短暂等待后重试
-                if waited % 5 == 0:  # 每5秒打印一次
-                    print(
-                        f"[REQUEST_INPUT] connection exists but auth failed, reason={reason}, waited={waited:.1f}s"
-                    )
-            else:
-                # 没有连接，等待连接建立
-                if waited % 5 == 0:  # 每5秒打印一次
-                    print(
-                        f"[REQUEST_INPUT] waiting for WebSocket connection, waited={waited:.1f}s"
-                    )
+            # 等待WebSocket连接建立并设置认证信息
+            if waited == 0 or int(waited) % 5 == 0:  # 开始时和每5秒打印一次
+                print(
+                    f"[REQUEST_INPUT] waiting for WebSocket auth, reason={reason}, waited={waited:.1f}s"
+                )
 
             time.sleep(wait_interval)
             waited += wait_interval
