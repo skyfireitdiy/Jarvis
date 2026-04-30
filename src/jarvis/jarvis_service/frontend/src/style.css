@@ -342,3 +342,28 @@ button:disabled {
   background: var(--color-accent-subtle);
   color: var(--color-text-primary);
 }
+
+/* Header Logo 样式 */
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px var(--color-accent-glow));
+}
+
+.header-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: var(--gradient-blue);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 20px var(--color-accent-glow);
+}
