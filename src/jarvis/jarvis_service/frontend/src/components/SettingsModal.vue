@@ -423,7 +423,7 @@ function syncConfig() {
 }
 
 .toggle-switch:hover .toggle-slider:before {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--color-text-primary);
 }
 
 /* Active 状态 - 物理回弹反馈 */
@@ -453,7 +453,7 @@ function syncConfig() {
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.01em;
   line-height: 1.4;
   margin: 0;
@@ -465,7 +465,7 @@ function syncConfig() {
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: rgba(139, 148, 158, 0.85);
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -480,7 +480,7 @@ function syncConfig() {
   margin: 0 0 24px 0;
   font-size: 24px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.03em;
 }
 
@@ -495,16 +495,16 @@ function syncConfig() {
   margin: 0;
   font-size: 21px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
   border-radius: 8px;
   font-size: 22px;
-  color: #8b949e;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -515,8 +515,8 @@ function syncConfig() {
 }
 
 .close-btn:hover {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
+  background: var(--color-error-subtle);
+  color: var(--color-error);
   transform: rotate(90deg);
 }
 
