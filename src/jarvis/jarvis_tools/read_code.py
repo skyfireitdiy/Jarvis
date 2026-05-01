@@ -119,11 +119,8 @@ class ReadCodeTool:
 
     @staticmethod
     def _format_numbered_lines(lines: List[str], start_line: int) -> str:
-        """为每行添加行号并拼接为字符串。"""
-        numbered = []
-        for i, line in enumerate(lines, start=start_line):
-            numbered.append(f"{i:4d}:{line.rstrip(chr(10) + chr(13))}")
-        return "\n".join(numbered)
+        """将行列表拼接为字符串（不添加行号）。"""
+        return "\n".join(line.rstrip(chr(10) + chr(13)) for line in lines)
 
     def _handle_single_file(
         self,
