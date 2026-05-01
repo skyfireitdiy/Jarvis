@@ -6572,7 +6572,16 @@ function handleGlobalKeydown(event) {
       handleTextareaKeydown(event)
     }
   }
-  
+
+  // Ctrl + Alt + Enter 发送缓冲区内容（当缓冲区有内容时生效）
+  if (event.ctrlKey && event.altKey && event.key === 'Enter') {
+    if (hasBufferedInput.value) {
+      event.preventDefault()
+      sendBufferedInput()
+      console.log('[app] Sent buffered input via Ctrl+Alt+Enter')
+    }
+  }
+
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
     // 如果对话框打开，关闭对话框
