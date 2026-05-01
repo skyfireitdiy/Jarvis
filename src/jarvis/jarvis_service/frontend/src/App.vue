@@ -9574,6 +9574,17 @@ body::-webkit-scrollbar {
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .mobile-header-actions {
+    order: 2;
+  }
+
+  .header-title {
+    order: 1;
   }
   .header-title h1 {
     font-size: 16px;
