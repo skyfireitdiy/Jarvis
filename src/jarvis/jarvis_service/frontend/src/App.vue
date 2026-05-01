@@ -60,6 +60,10 @@
         <div class="header-title">
           <img src="/icons/jarvis-logo.png" alt="Jarvis" class="header-logo" />
           <span class="header-brand">JARVIS</span>
+          <div class="status mobile-only">
+            <span :class="['dot', connectionStatus]"></span>
+            {{ connectionLabel }}
+          </div>
           <button class="icon-btn desktop-only" @click="toggleAgentSidebar()" title="切换 Agent 侧边栏">
             📋
           </button>
@@ -7166,6 +7170,11 @@ body::-webkit-scrollbar {
   display: flex;
 }
 
+/* 移动端显示，桌面端隐藏 */
+.mobile-only {
+  display: none;
+}
+
 .header-title h1 {
   font-size: 17px;
   font-weight: 600;
@@ -10134,6 +10143,10 @@ body::-webkit-scrollbar {
 
   .desktop-only {
     display: none !important;
+  }
+
+  .mobile-only {
+    display: flex !important;
   }
   
   .mobile-header-actions {
