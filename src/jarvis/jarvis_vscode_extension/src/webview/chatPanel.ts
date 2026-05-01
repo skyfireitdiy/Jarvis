@@ -1443,6 +1443,16 @@ completionSearchInput?.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  // Ctrl + Alt + Enter 发送缓冲区内容（当缓冲区有内容时生效）
+  if (event.ctrlKey && event.altKey && event.key === "Enter") {
+    if (hasBufferedInput()) {
+      event.preventDefault();
+      sendBufferedInput();
+      console.log("[chatPanel] Sent buffered input via Ctrl+Alt+Enter");
+      return;
+    }
+  }
+
   if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "c") {
     return;
   }
