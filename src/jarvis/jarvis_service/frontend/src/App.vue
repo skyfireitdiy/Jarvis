@@ -2706,8 +2706,8 @@ async function connect() {
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
     allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
     
-    // 判断是否需要自动重连
-    const shouldReconnect = !userDisconnected.value && !isAutoConnecting.value
+    // 判断是否需要自动重连（token存在时才重连）
+    const shouldReconnect = !userDisconnected.value && !isAutoConnecting.value && hasAuthToken()
 
     if (shouldReconnect) {
       // 启动自动重连（固定间隔，无上限）
