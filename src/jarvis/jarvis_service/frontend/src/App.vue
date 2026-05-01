@@ -4389,6 +4389,21 @@ async function switchAgent(agent) {
     console.log(`[AGENT] Cleaned up ${cleanedCount} terminal instances`)
   }
 
+  // 清理前一个Agent的terminalHosts引用
+  if (previousAgentId) {
+    let cleanedHostsCount = 0
+    for (const [sessionKey, hostEl] of terminalHosts.value.entries()) {
+      // sessionKey格式为 agentId:executionId
+      const [agentId] = sessionKey.split(':')
+      if (agentId === previousAgentId) {
+        console.log(`[AGENT] Cleaning up terminalHost for session: ${sessionKey}`)
+        terminalHosts.value.delete(sessionKey)
+        cleanedHostsCount++
+      }
+    }
+    console.log(`[AGENT] Cleaned up ${cleanedHostsCount} terminalHost references`)
+  }
+
   
   // 清空输入状态
   lastInputRequest.value = null
