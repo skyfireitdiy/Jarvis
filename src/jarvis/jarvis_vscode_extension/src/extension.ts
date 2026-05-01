@@ -235,6 +235,7 @@ const MAX_PERSISTED_EXECUTION_BUFFER_LENGTH = 50000;
 const AGENT_CONNECTION_MAX_RETRIES = 12;
 const AGENT_CONNECTION_RETRY_DELAY_MS = 2000;
 const AGENT_CONNECTION_TIMEOUT_MS = 10000;
+const GATEWAY_RECONNECT_INTERVAL_MS = 5000;
 const AGENT_LIST_REFRESH_INTERVAL_MS = 3000;
 
 class ChatPanelViewProvider implements vscode.WebviewViewProvider {
@@ -322,6 +323,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readonly agentSockets = new Map<string, WebSocket>();
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
   private agentListRefreshTimer: NodeJS.Timeout | undefined;
+  // Gateway WebSocket重连相关状态
+  private gatewayReconnecting = false;
+  private gatewayReconnectAttempts = 0;
+  private gatewayReconnectTimer: NodeJS.Timeout | undefined;
+  private userDisconnected = false;
   private readonly executionTerminalSessions = new Map<
     string,
     ExecutionTerminalSession
@@ -1850,6 +1856,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async disconnectAll(): Promise<void> {
+    // 设置用户主动断开标志，防止自动重连
+    this.userDisconnected = true;
+
+    // 清理Gateway重连定时器
+    if (this.gatewayReconnectTimer) {
+      clearTimeout(this.gatewayReconnectTimer);
+      this.gatewayReconnectTimer = undefined;
+    }
+    this.gatewayReconnecting = false;
+    this.gatewayReconnectAttempts = 0;
+
     // 断开所有WebSocket连接
     this.stopAgentListRefresh();
     this.disposeSocket("gatewaySocket");
@@ -4517,6 +4534,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     gatewaySocket.on("open", () => {
       this.panelState.gatewayConnectionStatusText = "主网关已连接";
       this.panelState.gatewayHasConnectionError = false;
+      // 重置重连状态
+      this.gatewayReconnecting = false;
+      this.gatewayReconnectAttempts = 0;
+      if (this.gatewayReconnectTimer) {
+        clearTimeout(this.gatewayReconnectTimer);
+        this.gatewayReconnectTimer = undefined;
+      }
       this.sendSocketMessage(gatewaySocket, {
         type: "connection_lock",
         payload: { enabled: this.panelState.connectionLockEnabled },
@@ -4537,7 +4561,41 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     gatewaySocket.on("close", () => {
       this.panelState.gatewayConnectionStatusText = "主网关已断开连接";
       this.panelState.gatewayHasConnectionError = true;
-      this.handleAuthExpired("主网关已断开连接，请重新连接");
+
+      // 判断是否需要自动重连
+      const shouldReconnect = !this.userDisconnected && this.panelState.token;
+
+      if (shouldReconnect) {
+        // 启动自动重连（固定间隔，无上限）
+        this.gatewayReconnecting = true;
+        this.gatewayReconnectAttempts++;
+
+        console.log(
+          `[Gateway WS] Connection closed, attempting to reconnect (attempt ${this.gatewayReconnectAttempts}) in ${GATEWAY_RECONNECT_INTERVAL_MS}ms`,
+        );
+        this.panelState.gatewayConnectionStatusText = `主网关连接断开，${Math.ceil(GATEWAY_RECONNECT_INTERVAL_MS / 1000)}秒后重连...`;
+        this.postPanelState();
+
+        // 设置重连定时器（固定5秒间隔）
+        this.gatewayReconnectTimer = setTimeout(() => {
+          console.log(
+            `[Gateway WS] Reconnecting... attempt ${this.gatewayReconnectAttempts}`,
+          );
+          this.connectGatewaySocket();
+        }, GATEWAY_RECONNECT_INTERVAL_MS);
+      } else {
+        // 不需要重连
+        this.gatewayReconnecting = false;
+
+        if (this.userDisconnected) {
+          // 用户主动断开，不重连
+          console.log("[Gateway WS] User disconnected, not reconnecting");
+          this.userDisconnected = false; // 重置标志
+        } else {
+          // token失效或其他原因
+          this.handleAuthExpired("主网关已断开连接，请重新连接");
+        }
+      }
     });
 
     this.panelState.gatewaySocket = gatewaySocket;
@@ -4703,18 +4761,54 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         });
       });
     }).catch(async (error) => {
-      this.withAgentState(agentId, (state) => {
-        state.connection_status_text = `等待 Agent 就绪：${this.getAgentDisplayLabel(agentId)} (${retryCount + 1}/${AGENT_CONNECTION_MAX_RETRIES})`;
-        state.has_connection_error =
-          retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES;
-      });
-      if (retryCount + 1 >= AGENT_CONNECTION_MAX_RETRIES) {
-        this.appendPanelMessage(getErrorMessage(error), "error", agentId);
-        throw error;
+      // 检查Agent是否还在运行状态
+      const agentItem = this.agentItems.find((item) => item.id === agentId);
+      if (agentItem && agentItem.statusClass === "stopped") {
+        console.log(
+          `[Agent WS] Agent ${agentId} is stopped, skipping reconnect`,
+        );
+        this.withAgentState(agentId, (state) => {
+          state.connection_status_text = `Agent 已停止：${this.getAgentDisplayLabel(agentId)}`;
+        });
+        return;
       }
+
+      this.withAgentState(agentId, (state) => {
+        state.connection_status_text = `等待 Agent 就绪：${this.getAgentDisplayLabel(agentId)} (第${retryCount + 1}次重连)`;
+        state.has_connection_error = false;
+      });
+
+      // 检查是否用户已主动断开连接
+      if (this.userDisconnected || !this.panelState.token) {
+        console.log(
+          `[Agent WS] User disconnected or token cleared, stopping reconnect for agent ${agentId}`,
+        );
+        return;
+      }
+
+      console.log(
+        `[Agent WS] Connection failed for agent ${agentId}, retrying in ${AGENT_CONNECTION_RETRY_DELAY_MS}ms (attempt ${retryCount + 1})`,
+      );
       await new Promise((resolve) => {
         setTimeout(resolve, AGENT_CONNECTION_RETRY_DELAY_MS);
       });
+
+      // 再次检查是否用户已主动断开
+      if (this.userDisconnected || !this.panelState.token) {
+        return;
+      }
+
+      // 再次检查Agent是否还在运行（等待期间可能状态变化）
+      const agentItemAfterWait = this.agentItems.find(
+        (item) => item.id === agentId,
+      );
+      if (agentItemAfterWait && agentItemAfterWait.statusClass === "stopped") {
+        console.log(
+          `[Agent WS] Agent ${agentId} stopped during reconnect wait, skipping`,
+        );
+        return;
+      }
+
       await this.connectAgentSocketWithRetry(agentId, retryCount + 1);
     });
   }

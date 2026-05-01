@@ -777,6 +777,13 @@ const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
 const restartFrontendService = ref(false) // 是否同时重启前端服务
 
+// WebSocket重连相关状态
+const reconnecting = ref(false) // 是否正在重连
+const reconnectAttempts = ref(0) // 当前重连尝试次数
+const reconnectTimer = ref(null) // 重连定时器
+const reconnectInterval = 5000 // 固定重连间隔（毫秒）
+const userDisconnected = ref(false) // 用户主动断开连接标志
+
 // 配置同步相关状态
 const syncConfigSourceNode = ref('') // 配置同步的源节点ID
 const syncConfigTargetNodes = ref([]) // 配置同步的目标节点ID数组
@@ -2638,6 +2645,16 @@ async function connect() {
     socket.value = ws
     showConnectModal.value = false
     
+    // 重置重连状态
+    reconnecting.value = false
+    reconnectAttempts.value = 0
+    userDisconnected.value = false
+    if (reconnectTimer.value) {
+      clearTimeout(reconnectTimer.value)
+      reconnectTimer.value = null
+    }
+    console.log('[ws] Reconnect state reset')
+
     // 保存连接信息到 localStorage
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     console.log('[ws] Connection info saved:', gatewayUrl.value)
@@ -2684,19 +2701,40 @@ async function connect() {
     console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
     allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
-    // 如果是自动连接阶段失败，显示登录弹窗而不是刷新页面
-    if (isAutoConnecting.value) {
-      console.log('[ws] Auto connection failed, showing login modal')
-      isAutoConnecting.value = false
-      showConnectModal.value = true
-      // 清除失效的 token
-      localStorage.removeItem('jarvis_auth_token')
-      auth.value.token = ''
-      connectErrorMessage.value = '自动登录失败，请重新登录'
+    
+    // 判断是否需要自动重连
+    const shouldReconnect = !userDisconnected.value && !isAutoConnecting.value
+
+    if (shouldReconnect) {
+      // 启动自动重连（固定间隔，无上限）
+      reconnecting.value = true
+      reconnectAttempts.value++
+
+      console.log(`[ws] Connection closed, attempting to reconnect (attempt ${reconnectAttempts.value}) in ${reconnectInterval}ms`)
+
+      // 设置重连定时器（固定5秒间隔）
+      reconnectTimer.value = setTimeout(() => {
+        console.log(`[ws] Reconnecting... attempt ${reconnectAttempts.value}`)
+        connect()
+      }, reconnectInterval)
     } else {
-      // 正常连接断开，强制刷新页面
-      console.log('[ws] Connection closed, forcing page refresh')
-      window.location.reload()
+      // 不需要重连
+      reconnecting.value = false
+
+      if (isAutoConnecting.value) {
+        // 自动连接阶段失败，显示登录弹窗
+        console.log('[ws] Auto connection failed, showing login modal')
+        isAutoConnecting.value = false
+        showConnectModal.value = true
+        // 清除失效的 token
+        localStorage.removeItem('jarvis_auth_token')
+        auth.value.token = ''
+        connectErrorMessage.value = '自动登录失败，请重新登录'
+      } else if (userDisconnected.value) {
+        // 用户主动断开，不重连
+        console.log('[ws] User disconnected, not reconnecting')
+        userDisconnected.value = false // 重置标志
+      }
     }
     // 不清空连接错误信息，保留错误提示
   }
@@ -2711,6 +2749,17 @@ async function connect() {
 }
 
 function disconnect() {
+  // 设置用户主动断开标志，防止自动重连
+  userDisconnected.value = true
+  
+  // 清理重连定时器
+  if (reconnectTimer.value) {
+    clearTimeout(reconnectTimer.value)
+    reconnectTimer.value = null
+  }
+  reconnecting.value = false
+  reconnectAttempts.value = 0
+  
   if (socket.value) {
     socket.value.close()
   }
