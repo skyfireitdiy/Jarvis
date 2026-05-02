@@ -432,7 +432,8 @@ class ScriptTool:
         try:
             proc = PtyProcess.spawn(argv, cwd=os.getcwd(), env=env)
             # 设置默认 tty 大小，避免无前端时输出被截断
-            apply_resize(100, 300)
+            # 使用极大宽度（10000列）避免长行被自动换行
+            apply_resize(100, 10000)
         except Exception as e:
             PrettyOutput.auto_print(f"❌ PTY 启动失败: {str(e)}")
             return {
@@ -656,7 +657,8 @@ class ScriptTool:
             apply_resize(rows, cols)
 
         # 设置默认 tty 大小，避免无前端时输出被截断
-        apply_resize(100, 300)
+        # 使用极大宽度（10000列）避免长行被自动换行
+        apply_resize(100, 10000)
 
         def reader(proc: subprocess.Popen[Any]) -> None:
             try:
@@ -857,7 +859,7 @@ class ScriptTool:
             import pyte
 
             raw_data = b"".join(raw_captured)
-            screen = pyte.Screen(300, 100000)
+            screen = pyte.Screen(10000, 100000)
             stream = pyte.ByteStream(screen)
             stream.feed(raw_data)
             # 清理每行右侧空格，并过滤空行
@@ -1022,7 +1024,8 @@ class ScriptTool:
 
         import pyte
 
-        screen = pyte.Screen(300, 100000)
+        # 使用极大宽度（10000列）避免长行被自动换行
+        screen = pyte.Screen(10000, 100000)
         stream = pyte.ByteStream(screen)
         stream.feed(data)
 
@@ -1104,14 +1107,11 @@ class ScriptTool:
                     )
 
                 if force_non_interactive:
+                    # 使用 stty 设置终端宽度为 10000，避免 script 命令录制时因终端宽度导致自动换行
                     if self._is_macos():
-                        tee_command = (
-                            f"script -q {output_file} {interpreter} {script_path}"
-                        )
+                        tee_command = f"stty cols 10000 2>/dev/null; script -q {output_file} {interpreter} {script_path}"
                     else:
-                        tee_command = (
-                            f"script -q -c '{interpreter} {script_path}' {output_file}"
-                        )
+                        tee_command = f"stty cols 10000 2>/dev/null; script -q -c '{interpreter} {script_path}' {output_file}"
                     timed_out = False
                     proc = None
                     try:
