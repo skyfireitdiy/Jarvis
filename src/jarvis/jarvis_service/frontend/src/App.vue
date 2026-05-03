@@ -2531,9 +2531,11 @@ async function loadHistoryMessages(prepend = false) {
     } else {
       // 保留未完成的execution消息（这些消息不会被保存到历史存储）
       const unfinishedExecutions = currentOutputs.filter(msg => msg.output_type === 'execution' && !msg.is_finished)
-      console.log(`[HISTORY] Preserving ${unfinishedExecutions.length} unfinished execution messages`)
+      // 只保留最新的一个未完成的execution消息（避免恢复多个xterm）
+      const latestUnfinishedExecution = unfinishedExecutions.length > 0 ? [unfinishedExecutions[unfinishedExecutions.length - 1]] : []
+      console.log(`[HISTORY] Preserving ${latestUnfinishedExecution.length} unfinished execution messages (was ${unfinishedExecutions.length})`)
       // 合并历史消息和未完成的execution消息
-      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...unfinishedExecutions])
+      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...latestUnfinishedExecution])
     }
     
     // 更新偏移量
