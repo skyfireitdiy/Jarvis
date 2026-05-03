@@ -2512,6 +2512,11 @@ async function loadHistoryMessages(prepend = false) {
     }
     // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
     const processedMessages = historyMessages.map(msg => {
+        // 修复旧的execution消息：如果有terminal_content但没有is_finished，设置is_finished=true
+        if (msg.output_type === 'execution' && msg.terminal_content && !msg.is_finished) {
+          console.log(`[HISTORY] Fixing old execution message: ${msg.execution_id}, setting is_finished=true`)
+          msg.is_finished = true
+        }
         const html = renderMessageHtml(msg)
         return {
           ...msg,
@@ -5174,58 +5179,49 @@ function appendExecution(payload, agentId = null) {
     termInfo.allChunks = []
     
     // 保存终端内容到消息列表
-    if (termInfo.terminal) {
-      const terminalContent = getTerminalBufferContent(termInfo.terminal, true)
-      
-      // 获取终端内容并保存
-      try {
-        console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
-        
-        // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
-        const currentOutputs = allOutputs.value.get(targetAgentId) || []
-        console.log(`🚨 [terminal] Looking for execution message: ${executionId} in agent: ${targetAgentId}`)
-        
-        const execIndex = currentOutputs.findIndex(
-          item => item.output_type === 'execution' && item.execution_id === executionId
-        )
-        
-        if (execIndex !== -1) {
-          // 标记 execution 消息为已结束，并保存终端内容
-          currentOutputs[execIndex].is_finished = true
-          currentOutputs[execIndex].terminal_content = terminalContent
-          currentOutputs[execIndex].timestamp = new Date().toISOString()
-          console.log(`🚨 [terminal] Marked execution ${executionId} as finished, content length: ${terminalContent.length}`)
-          
-          // 触发响应式更新
-          allOutputs.value.set(targetAgentId, [...currentOutputs])
-          
-          // 保存到历史记录（更新原有的 execution 消息）
-          try {
-            const updatedMessage = {
-              id: `execution_${executionId}`,
-              agent_id: targetAgentId,
-              output_type: 'execution',
-              text: '',
-              lang: 'text',
-              non_interactive: false,
-              timestamp: currentOutputs[execIndex].timestamp,
-              execution_id: executionId,
-              is_finished: true,
-              terminal_content: terminalContent,
-            }
-            historyStorage.saveMessage(updatedMessage)
-            console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}`)
-          } catch (error) {
-            console.warn('[HISTORY] Failed to save terminal content:', error)
+    const terminalContent = termInfo.terminal ? getTerminalBufferContent(termInfo.terminal, true) : ''
+    // 获取终端内容并保存
+    try {
+      console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
+      // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
+      const currentOutputs = allOutputs.value.get(targetAgentId) || []
+      console.log(`🚨 [terminal] Looking for execution message: ${executionId} in agent: ${targetAgentId}`)
+      const execIndex = currentOutputs.findIndex(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      if (execIndex !== -1) {
+        // 标记 execution 消息为已结束，并保存终端内容
+        currentOutputs[execIndex].is_finished = true
+        currentOutputs[execIndex].terminal_content = terminalContent
+        currentOutputs[execIndex].timestamp = new Date().toISOString()
+        console.log(`🚨 [terminal] Marked execution ${executionId} as finished, content length: ${terminalContent.length}`)
+        // 触发响应式更新
+        allOutputs.value.set(targetAgentId, [...currentOutputs])
+        // 保存到历史记录（更新原有的 execution 消息）
+        try {
+          const updatedMessage = {
+            id: `execution_${executionId}`,
+            agent_id: targetAgentId,
+            output_type: 'execution',
+            text: '',
+            lang: 'text',
+            non_interactive: false,
+            timestamp: currentOutputs[execIndex].timestamp,
+            execution_id: executionId,
+            is_finished: true,
+            terminal_content: terminalContent,
           }
-        } else {
-          console.warn(`🚨 [terminal] execution message ${executionId} not found`)
+          historyStorage.saveMessage(updatedMessage)
+          console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}`)
+        } catch (error) {
+          console.warn('[HISTORY] Failed to save terminal content:', error)
         }
-        
-        console.log(`[terminal] Terminal content saved to message list and history for agent: ${targetAgentId}`)
-      } catch (error) {
-        console.error(`[terminal] Failed to save terminal content:`, error)
+      } else {
+        console.warn(`🚨 [terminal] execution message ${executionId} not found`)
       }
+      console.log(`[terminal] Terminal content saved to message list and history for agent: ${targetAgentId}`)
+    } catch (error) {
+      console.error(`[terminal] Failed to save terminal content:`, error)
     }
 
     // 从terminals数组中移除已完成的termInfo，避免切换回来时重建xterm
