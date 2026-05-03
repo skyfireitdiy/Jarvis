@@ -5947,10 +5947,12 @@ function setTerminalRef(executionId, el, agentId = null) {
       disposeExecutionTerminal(termInfo)
     }
 
-    if (!termInfo.terminal) {
+    if (!termInfo.terminal && !termInfo.ended) {
       console.log(`[terminal] Initializing terminal for execution ${executionSessionKey}`)
       console.log(`[terminal] Element size: width=${el.clientWidth}px, height=${el.clientHeight}px`)
       initExecutionTerminal(executionId, termInfo, el, targetAgentId)
+    } else if (termInfo.ended) {
+      console.log(`[terminal] Terminal for execution ${executionSessionKey} already ended, skipping initialization`)
     } else {
       termInfo.hostEl = el
       if (!termInfo.resizeObserver && typeof ResizeObserver !== 'undefined') {
