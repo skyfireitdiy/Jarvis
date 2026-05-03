@@ -447,8 +447,8 @@ const emit = defineEmits([
 }
 
 .agent-status-dot.waiting_single {
-  background: #f85149;
-  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
+  background: #d29922;
+  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
 .agent-llm-group {
