@@ -24,15 +24,16 @@ class EditFileNormalTool:
 
     name = "edit_file"
     description = (
-        "使用 search/replace 对文件进行普通文本编辑（不依赖块id），支持同时修改多个文件。\n\n"
+        "使用 search/replace 或行号范围对文件进行普通文本编辑，支持同时修改多个文件。\n\n"
         "💡 使用方式：\n"
         "1. 直接指定要编辑的文件路径\n"
-        "2. 为每个文件提供一组 search/replace 操作\n"
+        "2. 为每个文件提供一组编辑操作（search/replace 或行号范围）\n"
         "3. 使用精确匹配查找 search 文本，找到匹配后替换为新文本\n\n"
         "🚀 特殊功能：\n"
         '- 当 search 为空字符串 "" 时，表示直接重写整个文件，replace 的内容将作为文件的完整新内容\n'
         "- 如果存在多个diffs且第一个diff的search为空字符串，将只应用第一个diff（重写整个文件），跳过后续所有diffs\n"
-        "- **支持部分成功**：当某个文件的多个 diffs 中有部分失败时，已成功的修改仍会保留到文件中，并会详细报告每个 diff 的执行结果\n\n"
+        "- **支持部分成功**：当某个文件的多个 diffs 中有部分失败时，已成功的修改仍会保留到文件中，并会详细报告每个 diff 的执行结果\n"
+        "- **支持行号范围编辑**：通过 start_line 和 end_line 参数指定行范围，直接替换指定行范围内的内容\n\n"
         "⚠️ 提示：\n"
         "- search 使用精确字符串匹配，不支持正则表达式\n"
         "- **重要：search 必须提供足够的上下文来唯一定位目标位置**，避免匹配到错误的位置。建议包含：\n"
@@ -40,7 +41,8 @@ class EditFileNormalTool:
         "  * 目标代码附近的唯一标识符（如函数名、变量名、注释等）\n"
         "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
         "- 如果某个 search 在文件中找不到精确匹配（search非空时），该 diff 会失败，但已成功的修改会保留\n"
-        "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配"
+        "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配\n"
+        "- 行号范围编辑模式：当指定 start_line 和 end_line 时，将忽略 search 参数，直接替换指定行范围（从1开始，end_line包含）"
     )
 
     parameters = {
@@ -72,8 +74,16 @@ class EditFileNormalTool:
                                         "type": "boolean",
                                         "description": "是否替换所有匹配项。默认false：要求search唯一匹配；为true时允许替换全部匹配。",
                                     },
+                                    "start_line": {
+                                        "type": "integer",
+                                        "description": "起始行号（从1开始），与 end_line 配合使用可按行号范围替换内容。当指定 start_line 和 end_line 时，将忽略 search 参数。",
+                                    },
+                                    "end_line": {
+                                        "type": "integer",
+                                        "description": "结束行号（包含此行），与 start_line 配合使用可按行号范围替换内容。",
+                                    },
                                 },
-                                "required": ["search", "replace"],
+                                "required": ["replace"],
                             },
                             "description": "普通文本替换操作列表，按顺序依次应用到文件内容",
                         },
@@ -263,63 +273,114 @@ class EditFileNormalTool:
         search = diff.get("search")
         replace = diff.get("replace")
         replace_all = diff.get("replace_all", False)
+        start_line = diff.get("start_line")
+        end_line = diff.get("end_line")
 
-        if search is None:
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff缺少search参数",
-                },
-                None,
-            )
-        if not isinstance(search, str):
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的search参数必须是字符串",
-                },
-                None,
-            )
-        # 允许空字符串作为search参数，表示直接重写整个文件
+        # 检查是否使用行号模式
+        use_line_mode = start_line is not None or end_line is not None
 
-        if replace is None:
+        if use_line_mode:
+            # 行号模式验证
+            if start_line is None or end_line is None:
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff使用行号模式时，必须同时提供start_line和end_line参数",
+                    },
+                    None,
+                )
+            if not isinstance(start_line, int) or not isinstance(end_line, int):
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的start_line和end_line参数必须是整数",
+                    },
+                    None,
+                )
+            if start_line < 1:
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的start_line必须大于等于1",
+                    },
+                    None,
+                )
+            if end_line < start_line:
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的end_line必须大于等于start_line",
+                    },
+                    None,
+                )
             return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff缺少replace参数",
-                },
                 None,
+                {
+                    "replace": replace,
+                    "start_line": start_line,
+                    "end_line": end_line,
+                },
             )
-        if not isinstance(replace, str):
+        else:
+            # search/replace 模式验证
+            if search is None:
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff缺少search参数",
+                    },
+                    None,
+                )
+            if not isinstance(search, str):
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的search参数必须是字符串",
+                    },
+                    None,
+                )
+            # 允许空字符串作为search参数，表示直接重写整个文件
+            if replace is None:
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff缺少replace参数",
+                    },
+                    None,
+                )
+            if not isinstance(replace, str):
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的replace参数必须是字符串",
+                    },
+                    None,
+                )
+            if not isinstance(replace_all, bool):
+                return (
+                    {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"第 {idx} 个diff的replace_all参数必须是布尔值",
+                    },
+                    None,
+                )
             return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的replace参数必须是字符串",
-                },
                 None,
-            )
-        if not isinstance(replace_all, bool):
-            return (
                 {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的replace_all参数必须是布尔值",
+                    "search": search,
+                    "replace": replace,
+                    "replace_all": replace_all,
                 },
-                None,
             )
-
-        return (
-            None,
-            {
-                "search": search,
-                "replace": replace,
-                "replace_all": replace_all,
-            },
-        )
 
     @staticmethod
     def _normalize_line_endings(text: str) -> str:
@@ -518,7 +579,56 @@ class EditFileNormalTool:
         all_success = True
 
         for idx, diff in enumerate(diffs, start=1):
-            search = diff["search"]
+            # 检查是否使用行号模式
+            start_line = diff.get("start_line")
+            end_line = diff.get("end_line")
+
+            if start_line is not None and end_line is not None:
+                # 行号范围编辑模式
+                replace = diff["replace"]
+                lines = content.splitlines(keepends=True)
+                total_lines = len(lines)
+
+                # 验证行号范围
+                if start_line > total_lines:
+                    all_success = False
+                    error_info = (
+                        f"start_line ({start_line}) 超出文件总行数 ({total_lines})"
+                    )
+                    diff_results.append(
+                        {"idx": idx, "success": False, "error": error_info}
+                    )
+                    continue
+
+                # 构建新内容：保留 start_line 之前的行 + 替换内容 + 保留 end_line 之后的行
+                before_lines = lines[
+                    : start_line - 1
+                ]  # start_line 之前的行（0-indexed）
+                after_lines = (
+                    lines[end_line:] if end_line < total_lines else []
+                )  # end_line 之后的行
+
+                # 确保替换内容以换行符结尾（如果后面还有行）
+                replace_content = replace
+                if after_lines and not replace_content.endswith("\n"):
+                    replace_content += "\n"
+
+                # 组合新内容
+                new_content_parts = []
+                if before_lines:
+                    new_content_parts.append("".join(before_lines))
+                new_content_parts.append(replace_content)
+                if after_lines:
+                    if not replace_content.endswith("\n") and new_content_parts:
+                        new_content_parts.append("\n")
+                    new_content_parts.append("".join(after_lines))
+
+                content = "".join(new_content_parts)
+                diff_results.append({"idx": idx, "success": True, "error": None})
+                continue
+
+            # search/replace 模式
+            search = diff.get("search")
             replace = diff["replace"]
             replace_all = diff.get("replace_all", False)
 
