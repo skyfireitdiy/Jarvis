@@ -89,10 +89,6 @@
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙️
           </button>
-          <div class="status">
-            <span :class="['dot', connectionStatus]"></span>
-            {{ connectionLabel }}
-          </div>
         </div>
       </header>
 
