@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="jarvis-ai-assistant",
-    version="3.0.35",
+    version="3.0.36",
     author="skyfire",
     author_email="skyfireitdiy@hotmail.com",
     description="An AI assistant that uses various tools to interact with the system",
