@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import Callable
 from typing import Optional
 
+from jarvis.jarvis_gateway.events import GatewayChoiceRequest
+from jarvis.jarvis_gateway.events import GatewayChoiceResult
 from jarvis.jarvis_gateway.events import GatewayConfirmRequest
 from jarvis.jarvis_gateway.events import GatewayConfirmResult
 from jarvis.jarvis_gateway.events import GatewayExecutionEvent
