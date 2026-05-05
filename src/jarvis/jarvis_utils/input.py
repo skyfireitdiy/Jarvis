@@ -693,11 +693,6 @@ def get_choice(tip: str, choices: List[str]) -> str:
         except InputProviderDisconnectedError:
             PrettyOutput.auto_print("⚠️ 连接断开，使用默认选项")
             return choices[0]
-    """
-    提供一个可滚动的选择列表供用户选择。
-    """
-    if not choices:
-        raise ValueError("Choices cannot be empty.")
 
     try:
         terminal_height = os.get_terminal_size().lines
