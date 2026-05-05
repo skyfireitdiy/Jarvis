@@ -15,6 +15,7 @@ from jarvis.jarvis_gateway.events import GatewayInputRequest
 from jarvis.jarvis_gateway.events import GatewayInputResult
 from jarvis.jarvis_gateway.events import GatewayOutputEvent
 from jarvis.jarvis_gateway.gateway import BaseGateway
+from jarvis.jarvis_utils.input import get_choice
 from jarvis.jarvis_utils.input import get_current_input_provider
 from jarvis.jarvis_utils.output import OutputEvent
 from jarvis.jarvis_utils.output import OutputType
