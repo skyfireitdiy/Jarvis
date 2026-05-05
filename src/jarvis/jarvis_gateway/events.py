@@ -70,12 +70,7 @@ class GatewayChoiceResult:
     metadata: Optional[Dict[str, Any]] = None
 
 
-@dataclass(frozen=True)
-class GatewayConfirmResult:
-    """确认结果。"""
 
-    confirmed: bool
-    metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
