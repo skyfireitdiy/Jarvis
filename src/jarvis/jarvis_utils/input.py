@@ -663,6 +663,41 @@ def get_choice(tip: str, choices: List[str]) -> str:
     """
     if not choices:
         raise ValueError("Choices cannot be empty.")
+    
+    # 检查是否在 Gateway 模式下
+    gateway = None
+    GatewayChoiceRequest = None
+    try:
+        from jarvis.jarvis_gateway.events import (
+            GatewayChoiceRequest as _GatewayChoiceRequest,
+        )
+        from jarvis.jarvis_gateway.manager import get_current_gateway
+        gateway = get_current_gateway()
+        GatewayChoiceRequest = _GatewayChoiceRequest
+    except Exception:
+        gateway = None
+    
+    if gateway is not None and GatewayChoiceRequest is not None:
+        # Gateway 模式：发送选择请求到前端
+        try:
+            request = GatewayChoiceRequest(
+                tip=tip,
+                choices=choices,
+                default_index=0,
+            )
+            result = gateway.request_choice(request)
+            return result.selected_text if result is not None else choices[0]
+        except InputProviderTimeoutError:
+            PrettyOutput.auto_print("⚠️ 输入超时，使用默认选项")
+            return choices[0]
+        except InputProviderDisconnectedError:
+            PrettyOutput.auto_print("⚠️ 连接断开，使用默认选项")
+            return choices[0]
+    """
+    提供一个可滚动的选择列表供用户选择。
+    """
+    if not choices:
+        raise ValueError("Choices cannot be empty.")
 
     try:
         terminal_height = os.get_terminal_size().lines
