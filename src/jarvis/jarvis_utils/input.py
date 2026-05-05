@@ -664,6 +664,38 @@ def get_choice(tip: str, choices: List[str]) -> str:
     if not choices:
         raise ValueError("Choices cannot be empty.")
 
+    # 检查是否在 Gateway 模式下
+    gateway = None
+    GatewayInputRequest = None
+    try:
+        from jarvis.jarvis_gateway.events import (
+            GatewayInputRequest as _GatewayInputRequest,
+        )
+        from jarvis.jarvis_gateway.manager import get_current_gateway
+
+        gateway = get_current_gateway()
+        GatewayInputRequest = _GatewayInputRequest
+    except Exception:
+        gateway = None
+
+    if gateway is not None and GatewayInputRequest is not None:
+        # Gateway 模式：一次性打印选项列表，通过单行输入获取选择
+        lines = [tip]
+        for i, choice in enumerate(choices, 1):
+            lines.append(f"  {i}. {choice}")
+        PrettyOutput.auto_print("\n".join(lines))
+
+        result = get_single_line_input("请输入选项编号: ", default="1")
+        try:
+            index = int(result.strip()) - 1
+            if 0 <= index < len(choices):
+                return choices[index]
+        except ValueError:
+            pass
+        # 无效输入返回第一个选项作为默认
+        return choices[0]
+
+    # CLI 模式：使用 prompt_toolkit 全屏应用
     try:
         terminal_height = os.get_terminal_size().lines
     except OSError:
