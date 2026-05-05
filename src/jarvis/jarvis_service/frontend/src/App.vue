@@ -4075,6 +4075,7 @@ async function confirmRename() {
     if (!response.ok) {
       const error = await response.json()
       alert(`重命名失败: ${error.error?.message || error.detail || '未知错误'}`)
+      showRenameAgentModal.value = false
       return
     }
     
@@ -4085,6 +4086,7 @@ async function confirmRename() {
   } catch (error) {
     console.error('[AGENT] Rename failed:', error)
     alert(`重命名失败: ${error.message}`)
+    showRenameAgentModal.value = false
   }
 }
 
