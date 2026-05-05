@@ -37,6 +37,10 @@ class IGateway(ABC):
         """请求用户确认。"""
 
     @abstractmethod
+    def request_choice(self, request: GatewayChoiceRequest) -> GatewayChoiceResult:
+        """请求用户选择。"""
+
+    @abstractmethod
     def publish_execution_event(
         self,
         event: GatewayExecutionEvent,
