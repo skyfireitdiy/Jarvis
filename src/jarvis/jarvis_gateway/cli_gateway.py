@@ -85,6 +85,34 @@ class CLIGateway(BaseGateway):
         confirmed = request.default if result == "" else result.lower() == "y"
         return GatewayConfirmResult(confirmed=confirmed, metadata=request.metadata)
 
+    def request_choice(self, request: GatewayChoiceRequest) -> GatewayChoiceResult:
+        auth_payload = None
+        if request.metadata:
+            auth_payload = request.metadata.get("auth")
+        authorized, reason = self._check_auth(auth_payload)
+        if not authorized:
+            # 返回默认选择（第一个选项）
+            default_index = request.default_index if request.default_index is not None else 0
+            return GatewayChoiceResult(
+                selected_index=default_index,
+                selected_text=request.choices[default_index],
+                metadata={"error": reason}
+            )
+        # 调用 get_choice 函数获取用户选择
+        selected_text = get_choice(request.tip, request.choices)
+        # 找到选择的索引
+        try:
+            selected_index = request.choices.index(selected_text)
+        except ValueError:
+            # 如果找不到，使用默认索引
+            selected_index = request.default_index if request.default_index is not None else 0
+            selected_text = request.choices[selected_index]
+        return GatewayChoiceResult(
+            selected_index=selected_index,
+            selected_text=selected_text,
+            metadata=request.metadata
+        )
+
     def publish_execution_event(
         self,
         event: GatewayExecutionEvent,
