@@ -48,6 +48,25 @@ class GatewayConfirmRequest:
 
     message: str
     default: bool = True
+@dataclass(frozen=True)
+class GatewayConfirmResult:
+    """确认结果。"""
+    confirmed: bool
+    metadata: Optional[Dict[str, Any]] = None
+
+@dataclass(frozen=True)
+class GatewayChoiceRequest:
+    """选择请求。"""
+    tip: str
+    choices: List[str]
+    default_index: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+@dataclass(frozen=True)
+class GatewayChoiceResult:
+    """选择结果。"""
+    selected_index: int
+    selected_text: str
     metadata: Optional[Dict[str, Any]] = None
 
 
