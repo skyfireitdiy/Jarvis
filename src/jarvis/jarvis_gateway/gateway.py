@@ -146,6 +146,10 @@ class BaseGateway(IGateway):
         del request
         raise NotImplementedError
 
+    def request_choice(self, request: GatewayChoiceRequest) -> GatewayChoiceResult:
+        del request
+        raise NotImplementedError
+
     def publish_execution_event(
         self,
         event: GatewayExecutionEvent,
