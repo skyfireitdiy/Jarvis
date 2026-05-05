@@ -11,6 +11,8 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+from .events import GatewayChoiceRequest
+from .events import GatewayChoiceResult
 from .events import GatewayConfirmRequest
 from .events import GatewayConfirmResult
 from .events import GatewayExecutionEvent
