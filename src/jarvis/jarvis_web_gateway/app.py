@@ -408,14 +408,6 @@ class WebSocketConnectionManager:
                     "[WS CONNECTION] New connection replacing old one (connection lock disabled)"
                 )
                 try:
-                    await _send_error(
-                        old_websocket,
-                        "CONNECTION_REPLACED",
-                        "Connection replaced by a new login",
-                    )
-                except Exception:
-                    pass
-                try:
                     await old_websocket.close()
                 except Exception:
                     pass
