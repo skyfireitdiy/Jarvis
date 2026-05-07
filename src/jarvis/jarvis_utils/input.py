@@ -612,7 +612,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     is_non_interactive = _is_non_interactive_for_current_agent()
     if is_non_interactive:
-        return default
+        return default.strip()
 
     # 检查是否在 Gateway 模式下
     gateway = None
@@ -637,13 +637,13 @@ def get_single_line_input(tip: str, default: str = "") -> str:
                 preset=default,
             )
             result = gateway.request_input(request)
-            return result.text if result is not None else default
+            return result.text.strip() if result is not None else default.strip()
         except InputProviderTimeoutError:
-            PrettyOutput.auto_print("⚠️ 输入等待超时，已使用默认值")
-            return default
+            PrettyOutput.auto_print("⚠️ 输入超时，使用默认值")
+            return default.strip()
         except InputProviderDisconnectedError:
-            PrettyOutput.auto_print("⚠️ 远端输入连接已断开，已使用默认值")
-            return default
+            PrettyOutput.auto_print("⚠️ 输入提供者已断开，使用默认值")
+            return default.strip()
 
     # 非 Gateway 模式：使用命令行输入
     history_dir = get_data_dir()
@@ -654,7 +654,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
-    return str(session.prompt(prompt, default=default, style=style))
+    return str(session.prompt(prompt, default=default, style=style)).strip()
 
 
 def get_choice(tip: str, choices: List[str]) -> str:
