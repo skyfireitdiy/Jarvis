@@ -32,7 +32,8 @@
                 <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
               </div>
               <div class="agent-info">
-                <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
+                <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
+                <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
                 <span class="agent-node" v-if="getNodeLabel(agent)" :title="`节点: ${getNodeLabel(agent)}`">🧭 {{ getNodeLabel(agent) }}</span>
                 <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
@@ -61,7 +62,8 @@
               <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
             </div>
             <div class="agent-info">
-              <span class="agent-type">{{ agent.name || (agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
+              <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
+              <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               <span class="agent-node" v-if="getNodeLabel(agent)" :title="`节点: ${getNodeLabel(agent)}`">🧭 {{ getNodeLabel(agent) }}</span>
               <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
@@ -463,6 +465,18 @@ const emit = defineEmits([
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-left: auto;
+}
+
+.agent-type-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.agent-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
 }
 
 .agent-dir {
