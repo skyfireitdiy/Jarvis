@@ -8,8 +8,6 @@ from pathlib import Path
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-from rich.status import Status
-from jarvis.jarvis_utils.globals import console
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -1010,10 +1008,8 @@ class RulesManager:
 
 选择的规则序号："""
 
-            # 调用模型，限制输出长度
-            model.set_suppress_output(True)
-            model.set_suppress_output(False)
-            response = model.chat_until_success(prompt, max_output=100).strip()
+            # 调用模型选择规则
+            response = model.chat_until_success(prompt).strip()
 
             # 从响应中提取<NUM>标签内的内容
             import re
@@ -1152,12 +1148,8 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型，跳过过滤")
                 return rule_names
 
-            # 调用模型，限制输出长度
-            model.set_suppress_output(True)
-            model.set_suppress_output(False)
-
-            response = model.chat_until_success(prompt, max_output=200).strip()
-            model.set_suppress_output(False)
+            # 调用模型过滤规则
+            response = model.chat_until_success(prompt).strip()
 
             # 从响应中提取<VALID>标签内的内容
             import re
