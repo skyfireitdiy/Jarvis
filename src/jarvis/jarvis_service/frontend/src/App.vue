@@ -103,7 +103,7 @@
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
             </button>
-            <div class="message-body markdown-content" v-html="item.html"></div>
+            <div class="message-body" :class="{ 'markdown-content': item.output_type !== 'user_input' }"><pre v-if="item.output_type === 'user_input'" style="margin:0;white-space:pre-wrap;word-wrap:break-word;">{{ item.text }}</pre><template v-else v-html="item.html"></template></div>
           </div>
           <!-- 终端嵌入 -->
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished" class="terminal-wrapper">
@@ -8590,22 +8590,22 @@ body::-webkit-scrollbar {
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 16px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding: 8px;
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 .message {
   background: rgba(22, 27, 34, 0.75);
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-radius: 8px;
+  padding: 6px 10px;
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .message:hover {
