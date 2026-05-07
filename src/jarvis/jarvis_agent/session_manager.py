@@ -1050,14 +1050,6 @@ class SessionManager:
 
     def restore_session(self) -> bool:
         """Restores the session state from a file."""
-        # 调试日志：确认non_interactive的值
-        PrettyOutput.auto_print(
-            f"🔍 SessionManager.restore_session: non_interactive={self.non_interactive}, agent={self.agent}"
-        )
-        if self.agent:
-            PrettyOutput.auto_print(
-                f"🔍 SessionManager.restore_session: agent.non_interactive={getattr(self.agent, 'non_interactive', 'N/A')}"
-            )
         sessions = self._parse_session_files()
 
         if not sessions:
