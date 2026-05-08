@@ -1119,7 +1119,7 @@ class ChildNodeClient:
 
     async def _connect_once(self, ws_url: str) -> None:
         config = self._node_runtime.config
-        self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=None)
+        self._ws = await websockets.connect(ws_url, close_timeout=10)
         await self._ws.send(
             json.dumps(
                 build_node_message(
