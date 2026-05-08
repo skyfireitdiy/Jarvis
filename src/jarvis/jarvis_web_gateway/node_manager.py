@@ -1119,7 +1119,19 @@ class ChildNodeClient:
 
     async def _connect_once(self, ws_url: str) -> None:
         config = self._node_runtime.config
-        self._ws = await websockets.connect(ws_url, close_timeout=10)
+        # 从环境变量读取代理配置并规范化格式
+        proxy_env = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
+        proxy_url: Optional[str] = None
+        if proxy_env:
+            proxy_env = proxy_env.strip()
+            # 规范化代理 URL：如果缺少协议前缀，添加 http://
+            if proxy_env and not proxy_env.startswith(
+                ("http://", "https://", "socks://", "socks5://")
+            ):
+                proxy_url = f"http://{proxy_env}"
+            else:
+                proxy_url = proxy_env
+        self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=proxy_url)
         await self._ws.send(
             json.dumps(
                 build_node_message(
