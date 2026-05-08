@@ -181,6 +181,7 @@ BUILTIN_COMMANDS = [
     ("SwitchModel", "切换模型组"),
     ("AddDir", "添加附加补全目录"),
     ("Btw", "临时聊天"),
+    ("PrintConfig", "打印全局配置"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
