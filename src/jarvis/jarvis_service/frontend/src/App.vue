@@ -103,7 +103,7 @@
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
             </button>
-            <div class="message-body" :class="{ 'markdown-content': item.output_type !== 'user_input' }"><pre v-if="item.output_type === 'user_input'" style="margin:0;white-space:pre-wrap;word-wrap:break-word;">{{ item.text }}</pre><template v-else v-html="item.html"></template></div>
+            <div class="message-body markdown-content" v-html="item.html"></div>
           </div>
           <!-- 终端嵌入 -->
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished" class="terminal-wrapper">
