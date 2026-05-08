@@ -267,7 +267,7 @@ watch(() => props.visible, (newVal) => {
 
 .btn.primary {
   background: var(--color-success);
-  color: var(--color-text-primary);
+  color: #0a1228;
 }
 
 .btn.primary:hover {

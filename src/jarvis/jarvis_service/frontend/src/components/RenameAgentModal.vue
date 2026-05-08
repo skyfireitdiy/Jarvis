@@ -130,7 +130,7 @@ watch(() => props.visible, async (newVal) => {
 
 .create-agent-modal .btn.primary {
   background: var(--color-success);
-  color: var(--color-text-primary);
+  color: #0a1228;
 }
 
 .create-agent-modal .btn.primary:hover {

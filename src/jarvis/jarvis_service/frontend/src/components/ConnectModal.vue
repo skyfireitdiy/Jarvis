@@ -113,7 +113,7 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   background: var(--color-success);
   border: 0.5px solid var(--color-border);
   border-radius: 9px;
-  color: var(--color-text-primary);
+  color: #0a1228;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
