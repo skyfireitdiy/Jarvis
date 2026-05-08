@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Optional
 
 import typer
 
@@ -617,6 +617,27 @@ def _install_systemd_service(config: ServiceConfig) -> None:
 
     # 构建服务文件内容
     current_path = os.environ.get("PATH", "")
+
+    # 收集代理相关的环境变量
+    proxy_env_vars = []
+    for var_name in [
+        "http_proxy",
+        "HTTP_PROXY",
+        "https_proxy",
+        "HTTPS_PROXY",
+        "no_proxy",
+        "NO_PROXY",
+        "ftp_proxy",
+        "FTP_PROXY",
+        "socks_proxy",
+        "SOCKS_PROXY",
+    ]:
+        value = os.environ.get(var_name)
+        if value:
+            proxy_env_vars.append(f"Environment={var_name}={value}")
+
+    proxy_env_section = "\n".join(proxy_env_vars) if proxy_env_vars else ""
+
     service_content = """[Unit]
 Description=Jarvis Service
 After=network.target
@@ -624,6 +645,7 @@ After=network.target
 [Service]
 Type=simple
 Environment=PATH={path}
+{proxy_env}
 WorkingDirectory={project_root}
 ExecStart={service_executable} start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
         path=current_path,
@@ -633,6 +655,7 @@ ExecStart={service_executable} start --gateway-host {gateway_host} --gateway-por
         gateway_port=config.gateway_port,
         frontend_host=config.frontend_host,
         frontend_port=config.frontend_port,
+        proxy_env=proxy_env_section,
     )
 
     # 添加可选参数
