@@ -114,8 +114,20 @@ class SubAgentTool:
                     "stderr": "; ".join(errors),
                 }
 
-            # 基于父Agent（如有）继承部分配置后创建子Agent
+            # 基于父 Agent（如有）继承部分配置后创建子 Agent
             parent_agent = args.get("agent", None)
+            # 获取父 Agent 的对话历史（在创建子 Agent 之前）
+            parent_messages = None
+            if parent_agent and hasattr(parent_agent, "model"):
+                try:
+                    all_messages = parent_agent.model.get_messages()
+                    # 过滤掉系统消息，只保留对话历史（user/assistant/tool 消息）
+                    parent_messages = [
+                        msg for msg in all_messages if msg.get("role") != "system"
+                    ]
+                except Exception:
+                    # 获取失败不影响主流程
+                    pass
             # 使用当前模型组（不再从 parent_agent 继承）
             get_llm_group()
             parent_execute_tool_confirm = None
@@ -138,6 +150,19 @@ class SubAgentTool:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
 
+            # 在系统提示词中添加角色切换说明（如果继承了对话历史）
+            if parent_messages:
+                system_prompt = f"""【角色切换说明】
+你现在是 SubAgent，已继承父 Agent 的完整对话历史。
+你了解之前的分析过程和发现的问题。
+
+重要说明：
+- 任务列表已清空，你不继承父 Agent 的任务列表
+- 专注于完成以下子任务，无需重复已完成的步骤
+
+{system_prompt}
+"""
+
             agent = Agent(
                 system_prompt=system_prompt,
                 name=agent_name,
@@ -154,6 +179,14 @@ class SubAgentTool:
                 files=None,
                 non_interactive=True,
             )
+
+            # 设置继承的对话历史到子 Agent（在 Agent 创建后）
+            if parent_messages and hasattr(agent, "model"):
+                try:
+                    agent.model.set_messages(parent_messages)
+                except Exception:
+                    # 设置失败不影响主流程
+                    pass
 
             # 禁用 sub_agent 和 sub_code_agent，避免无限递归
             try:
