@@ -177,27 +177,28 @@ const emit = defineEmits([
   min-width: 168px;
   max-width: 240px;
   padding: 0 32px 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e5e7eb;
-  font-size: 13px;
-  line-height: 32px;
+  border: 0.5px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: 14px;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .terminal-node-select:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
 }
 
 .terminal-node-select:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px var(--color-accent-subtle);
+  background: var(--color-bg-tertiary);
 }
 
 .terminal-node-select option {
+  background: var(--color-bg-secondary);
   color: var(--color-text-primary);
 }
 
