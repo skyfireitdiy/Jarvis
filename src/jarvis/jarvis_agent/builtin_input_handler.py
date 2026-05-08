@@ -259,6 +259,26 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
             load_config()
             return "", True
+        elif tag == "PrintConfig":
+            import yaml
+            from jarvis.jarvis_utils.config import get_global_config_data
+
+            config = get_global_config_data()
+            PrettyOutput.auto_print("\n=== 全局配置 (YAML 格式) ===")
+            try:
+                # 转换为普通字典以便 YAML 序列化
+                config_dict = dict(config)
+                yaml_output = yaml.safe_dump(
+                    config_dict,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
+                PrettyOutput.auto_print(yaml_output)
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️  YAML 序列化失败：{e}")
+                PrettyOutput.auto_print(f"\n降级输出（字符串格式）:\n{config}")
+            return "", True
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)
