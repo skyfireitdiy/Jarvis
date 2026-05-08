@@ -7,7 +7,7 @@ description: "配置文件修改、参数调整、配置项添加/删除、配�
 
 ## 元指令
 
-- 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
+**IMPORTANT**: 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
 - 模式切换信号：ENTER ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW。
 - 简单任务直接执行；复杂任务才用 task_list_manager，避免过度拆分。
 - **ARCHER 工作流灵活性说明（配置修改场景）**：

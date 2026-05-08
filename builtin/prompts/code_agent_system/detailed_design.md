@@ -9,7 +9,7 @@ description: "需求分析、系统架构设计、模块设计、接口设计、
 
 ## 元指令
 
-- 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
+**IMPORTANT**: 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
 - 模式切换信号：ENTER ANALYZE/COLLECT/DESIGN/REVIEW。
 - **详细设计工作流特点**：专注于设计文档生成，不涉及代码实现。
 
