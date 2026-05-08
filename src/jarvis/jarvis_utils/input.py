@@ -182,6 +182,7 @@ BUILTIN_COMMANDS = [
     ("AddDir", "添加附加补全目录"),
     ("Btw", "临时聊天"),
     ("PrintConfig", "打印全局配置"),
+    ("SetConfig", "修改全局配置"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []

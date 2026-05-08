@@ -279,6 +279,79 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"⚠️  YAML 序列化失败：{e}")
                 PrettyOutput.auto_print(f"\n降级输出（字符串格式）:\n{config}")
             return "", True
+        elif tag == "SetConfig":
+            import yaml
+            from jarvis.jarvis_utils.config import get_global_config_data
+
+            tag_marker = "'<SetConfig>'"
+            tag_index = modified_input.find(tag_marker)
+            if tag_index == -1:
+                PrettyOutput.auto_print("❌ SetConfig 命令格式错误")
+                return "", True
+
+            # 提取标签后的参数部分
+            arg_str = modified_input[tag_index + len(tag_marker) :].strip()
+
+            if not arg_str:
+                PrettyOutput.auto_print(
+                    "❌ 用法：'<SetConfig>' key.path = value\n"
+                    "示例：\n"
+                    "  '<SetConfig>' llm_group = \"nebulacoder_v8_0\"\n"
+                    "  '<SetConfig>' ENV.http_proxy = \"http://proxy:8080\"\n"
+                    "  '<SetConfig>' build_validation_timeout = 60\n"
+                    "  '<SetConfig>' TEMP_KEY delete"
+                )
+                return "", True
+
+            config = get_global_config_data()
+
+            try:
+                # 检查是否是 delete 操作
+                if arg_str.rstrip().endswith(" delete"):
+                    key_path = arg_str.rsplit(" delete", 1)[0].strip()
+                    if not key_path:
+                        PrettyOutput.auto_print("❌ 错误：delete 操作需要指定 key 路径")
+                        return "", True
+
+                    # 删除嵌套键
+                    success, message = _delete_nested_config(config, key_path)
+                    if success:
+                        PrettyOutput.auto_print(f"✅ 已删除配置：{key_path}")
+                    else:
+                        PrettyOutput.auto_print(f"❌ {message}")
+                    return "", True
+
+                # 解析 key = value 格式（只分割第一个 '='）
+                if "=" not in arg_str:
+                    PrettyOutput.auto_print(
+                        "❌ 错误：缺少 '=' 分隔符，正确格式：key.path = value"
+                    )
+                    return "", True
+
+                key_part, value_part = arg_str.split("=", 1)
+                key_path = key_part.strip()
+                value_str = value_part.strip()
+
+                if not key_path:
+                    PrettyOutput.auto_print("❌ 错误：key 不能为空")
+                    return "", True
+
+                # 安全解析值
+                value = _safe_parse_value(value_str)
+
+                # 设置嵌套键
+                success, message = _set_nested_config(config, key_path, value)
+                if success:
+                    PrettyOutput.auto_print(
+                        f"✅ 已设置配置：{key_path} = {repr(value)}"
+                    )
+                else:
+                    PrettyOutput.auto_print(f"❌ {message}")
+
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 解析错误：{e}")
+
+            return "", True
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)
@@ -765,3 +838,112 @@ def switch_model_group(agent: Any) -> bool:
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换失败: {e}")
         return False
+
+
+def _safe_parse_value(value_str: str):
+    """
+    安全解析配置值，支持 YAML 兼容语法。
+
+    解析策略：
+    1. 尝试使用 yaml.safe_load() 解析（支持字符串、数字、布尔值、列表、字典）
+    2. 如果解析失败，原样返回为字符串
+    3. 绝对不使用 eval()，确保安全性
+
+    Args:
+        value_str: 值的字符串表示
+
+    Returns:
+        解析后的值（可能是任何 YAML 兼容类型）
+    """
+    import yaml
+
+    value_str = value_str.strip()
+
+    # 空字符串
+    if not value_str:
+        return ""
+
+    # 尝试 YAML 解析
+    try:
+        parsed = yaml.safe_load(value_str)
+        # yaml.safe_load 会将无引号的字符串解析为对应的类型
+        # 如果是 None（如输入 "null"），返回原始字符串
+        if parsed is None and value_str.lower() != "null":
+            return value_str
+        return parsed
+    except yaml.YAMLError:
+        # 解析失败，原样返回为字符串
+        return value_str
+
+
+def _set_nested_config(config, key_path: str, value) -> tuple[bool, str]:
+    """
+    设置嵌套配置键值。
+
+    Args:
+        config: 配置字典对象（CaseInsensitiveDict 或普通 dict）
+        key_path: 点号分隔的键路径（如 "ENV.http_proxy"）
+        value: 要设置的值
+
+    Returns:
+        (success: bool, message: str): 成功标志和消息
+    """
+    keys = key_path.split(".")
+
+    if not keys or not keys[0]:
+        return False, "key 路径不能为空"
+
+    # 遍历到倒数第二个键，创建中间节点（如果需要）
+    current = config
+    for i, key in enumerate(keys[:-1]):
+        if key not in current:
+            # 自动创建中间的字典节点
+            current[key] = {}
+        elif not isinstance(current[key], (dict, type(config))):
+            return False, f"路径冲突：'{key}' 已存在但不是字典类型（无法继续嵌套）"
+        current = current[key]
+
+    # 设置最后一个键的值
+    final_key = keys[-1]
+    try:
+        current[final_key] = value
+        return True, ""
+    except Exception as e:
+        return False, f"设置失败：{e}"
+
+
+def _delete_nested_config(config, key_path: str) -> tuple[bool, str]:
+    """
+    删除嵌套配置键。
+
+    Args:
+        config: 配置字典对象
+        key_path: 点号分隔的键路径
+
+    Returns:
+        (success: bool, message: str): 成功标志和消息
+    """
+    keys = key_path.split(".")
+
+    if not keys or not keys[0]:
+        return False, "key 路径不能为空"
+
+    # 遍历到倒数第二个键
+    current = config
+    for i, key in enumerate(keys[:-1]):
+        if key not in current:
+            return False, f"路径不存在：'{key}' 在层级 {i + 1}"
+        elif not isinstance(current[key], (dict, type(config))):
+            return False, f"路径无效：'{key}' 不是字典类型，无法继续访问嵌套键"
+        current = current[key]
+
+    # 删除最后一个键
+    final_key = keys[-1]
+    if final_key not in current:
+        return False, f"配置项不存在：{key_path}"
+
+    try:
+        del current[final_key]
+        return True, ""
+    except Exception as e:
+        return False, f"删除失败：{e}"
