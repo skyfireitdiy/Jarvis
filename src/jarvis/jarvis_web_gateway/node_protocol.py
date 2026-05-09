@@ -42,6 +42,8 @@ SERVICE_RESTART_REQUEST = "service_restart_request"
 SERVICE_RESTART_RESPONSE = "service_restart_response"
 CONFIG_SYNC_REQUEST = "config_sync_request"
 CONFIG_SYNC_RESPONSE = "config_sync_response"
+CODE_UPDATE_TO_MAIN_REQUEST = "code_update_to_main_request"
+CODE_UPDATE_TO_MAIN_RESPONSE = "code_update_to_main_response"
 ERROR = "error"
 
 

@@ -928,6 +928,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         </button>
       </div>
     </div>
+    <div class="settings-card">
+      <div class="settings-card-title">代码更新</div>
+      <div class="settings-card-row">
+        <span class="settings-card-help">通知所有节点切换到 main 分支并更新代码</span>
+        <button id="updateCodeToMainButton" type="button" class="settings-action-button" style="background-color: #2563eb;">
+          更新代码到 main 分支
+        </button>
+      </div>
+    </div>
   </div>`
       : "";
 
@@ -1114,6 +1123,46 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     if (disconnectButton) {
       disconnectButton.addEventListener('click', () => {
         vscode.postMessage({ type: 'disconnect' });
+      });
+    }
+    const updateCodeToMainButton = document.getElementById('updateCodeToMainButton');
+    if (updateCodeToMainButton) {
+      updateCodeToMainButton.addEventListener('click', async () => {
+        try {
+          updateCodeToMainButton.disabled = true;
+          updateCodeToMainButton.textContent = '更新中...';
+          const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+          const url = `http://${gatewayAddress.host}:${gatewayAddress.port}/api/code/update-to-main`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.panelState.token}`,
+            },
+            body: JSON.stringify({}),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.success) {
+            throw new Error(result.error?.message || '代码更新失败');
+          }
+          const successCount = result.data?.success_count || 0;
+          const totalCount = result.data?.total_nodes || 0;
+          const failedCount = result.data?.failed_count || 0;
+          let message = '';
+          if (successCount === totalCount) {
+            message = `✓ 代码更新成功，已更新 ${successCount}/${totalCount} 个节点`;
+          } else if (successCount > 0) {
+            message = `⚠ 代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`;
+          } else {
+            message = '✗ 代码更新失败，没有节点更新成功';
+          }
+          vscode.postMessage({ type: 'showNotification', message, level: successCount > 0 ? 'info' : 'error' });
+        } catch (error: any) {
+          vscode.postMessage({ type: 'showNotification', message: error.message || '代码更新失败', level: 'error' });
+        } finally {
+          updateCodeToMainButton.disabled = false;
+          updateCodeToMainButton.textContent = '更新代码到 main 分支';
+        }
       });
     }
     const pickWorkingDirButton = document.getElementById('pickWorkingDirButton');

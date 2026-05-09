@@ -1689,6 +1689,90 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.post("/api/code/update-to-main", dependencies=[Depends(verify_token)])
+    async def update_code_to_main(request: Dict[str, Any]) -> Dict[str, Any]:
+        """通知所有节点将 Jarvis 代码切换到 main 分支并更新。
+
+        Args:
+            request: 请求体，包含以下字段（可选）：
+                - target_node_ids: 目标节点 ID 列表，为空则更新所有在线节点
+        """
+        try:
+            target_node_ids = request.get("target_node_ids", [])
+            
+            # 获取所有在线节点
+            all_nodes = node_runtime.node_registry.list_all()
+            online_nodes = [
+                node for node in all_nodes 
+                if node.get("status") == "online"
+            ]
+            
+            # 如果指定了目标节点，只更新这些节点
+            if target_node_ids:
+                online_nodes = [
+                    node for node in online_nodes 
+                    if node.get("node_id") in target_node_ids
+                ]
+            
+            if not online_nodes:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NO_ONLINE_NODES",
+                        "message": "没有在线节点可更新",
+                    },
+                }
+            
+            results = []
+            for node_info in online_nodes:
+                node_id = node_info.get("node_id")
+                try:
+                    # 向节点发送更新请求
+                    response = await node_connection_manager.send_request_to_node(
+                        node_id,
+                        {
+                            "type": "CODE_UPDATE_TO_MAIN_REQUEST",
+                            "version": 1,
+                        },
+                        {},
+                        timeout=60.0,
+                    )
+                    
+                    payload = response.get("payload") or {}
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": payload.get("success", False),
+                            "message": payload.get("message", ""),
+                        }
+                    )
+                except Exception as e:
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": False,
+                            "message": f"请求失败：{str(e)}",
+                        }
+                    )
+            
+            success_count = sum(1 for r in results if r["success"])
+            total_count = len(results)
+            
+            return {
+                "success": True,
+                "data": {
+                    "total_nodes": total_count,
+                    "success_count": success_count,
+                    "failed_count": total_count - success_count,
+                    "results": results,
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     @app.post("/api/config/sync", dependencies=[Depends(verify_token)])
     async def sync_config(request: Dict[str, Any]) -> Dict[str, Any]:
         """同步配置到其他节点。
