@@ -87,6 +87,23 @@
                 </div>
               </div>
             </div>
+            <div class="form-group">
+              <div class="toggle-wrapper">
+                <label class="toggle-switch">
+                  <input :checked="noInteractionMode" @change="$emit('update:noInteractionMode', $event.target.checked)" type="checkbox" class="toggle-input" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <div class="toggle-info">
+                  <span class="toggle-label-text">无交互模式</span>
+                  <span class="form-help">启用后必须提供任务描述，Agent 将自动执行任务而不等待用户确认。</span>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" v-if="noInteractionMode">
+              <label>任务描述 <span class="required">*</span></label>
+              <textarea :value="taskDescription" @input="$emit('update:taskDescription', $event.target.value)" class="form-control" rows="4" placeholder="请输入任务描述..." :class="{ 'error-border': noInteractionMode && !taskDescription.trim() }"></textarea>
+              <div class="form-help" v-if="noInteractionMode && !taskDescription.trim()" style="color: var(--color-error);">无交互模式下必须提供任务描述</div>
+            </div>
           </div>
         </div>
       </div>
@@ -111,6 +128,8 @@ const props = defineProps({
   codeAgentWorktree: { type: Boolean, default: false },
   quickMode: { type: Boolean, default: false },
   restoreSession: { type: Boolean, default: false },
+  noInteractionMode: { type: Boolean, default: false },
+  taskDescription: { type: String, default: '' },
   formatNodeLabel: { type: Function, default: (node) => node.node_id }
 })
 
@@ -123,6 +142,8 @@ const emit = defineEmits([
   'update:codeAgentWorktree',
   'update:quickMode',
   'update:restoreSession',
+  'update:noInteractionMode',
+  'update:taskDescription',
   'cancel',
   'create',
   'selectDir'

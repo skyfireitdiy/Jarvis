@@ -40,6 +40,7 @@ class AgentInfo:
         node_id: str = "master",
         quick_mode: bool = False,
         restore_session: bool = False,
+        no_interaction_mode: bool = False,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -52,6 +53,7 @@ class AgentInfo:
         self.worktree = worktree
         self.quick_mode = quick_mode
         self.restore_session = restore_session
+        self.no_interaction_mode = no_interaction_mode
         self.status = "running"
         self.node_id = node_id
         self.created_at = datetime.now().isoformat()
@@ -71,6 +73,7 @@ class AgentInfo:
             "worktree": self.worktree,
             "quick_mode": self.quick_mode,
             "restore_session": self.restore_session,
+            "no_interaction_mode": self.no_interaction_mode,
             "node_id": self.node_id,
             "created_at": self.created_at,
         }
@@ -125,6 +128,7 @@ class AgentManager:
         node_id: str = "master",
         quick_mode: bool = False,
         restore_session: bool = False,
+        no_interaction_mode: bool = False,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -140,6 +144,8 @@ class AgentManager:
             auth_token: 认证 Token，将通过环境变量传递给 Agent
             worktree: 是否为 codeagent 启用 git worktree 模式
             quick_mode: 是否启用极速模式
+            restore_session: 是否启动时恢复会话
+            no_interaction_mode: 是否启用无交互模式（启用时必须提供 task）
 
         Returns:
             Agent 信息字典
@@ -170,6 +176,10 @@ class AgentManager:
         if port is None:
             raise RuntimeError("No available port")
 
+        # 验证无交互模式：必须提供 task
+        if no_interaction_mode and not task:
+            raise ValueError("no_interaction_mode is enabled but task is not provided")
+
         # 构建命令行参数
         cmd = self._build_command(
             agent_type=agent_type,
@@ -182,6 +192,7 @@ class AgentManager:
             worktree=worktree,
             quick_mode=quick_mode,
             restore_session=restore_session,
+            no_interaction_mode=no_interaction_mode,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -213,6 +224,7 @@ class AgentManager:
             node_id=node_id,
             quick_mode=quick_mode,
             restore_session=restore_session,
+            no_interaction_mode=no_interaction_mode,
         )
 
         # 保存到内存
@@ -499,6 +511,7 @@ class AgentManager:
         worktree: bool = False,
         quick_mode: bool = False,
         restore_session: bool = False,
+        no_interaction_mode: bool = False,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -513,6 +526,7 @@ class AgentManager:
             worktree: 是否为 codeagent 启用 git worktree 模式
             quick_mode: 是否启用极速模式
             restore_session: 是否启用恢复会话
+            no_interaction_mode: 是否启用无交互模式
 
         Returns:
             命令列表
@@ -545,6 +559,10 @@ class AgentManager:
         # 添加恢复会话参数
         if restore_session:
             cmd.append("-r")
+
+        # 添加无交互模式参数
+        if no_interaction_mode:
+            cmd.append("--no-interaction")
 
         # 添加额外参数
         if additional_args:
