@@ -560,9 +560,9 @@ class AgentManager:
         if restore_session:
             cmd.append("-r")
 
-        # 添加无交互模式参数
+        # 添加非交互模式参数
         if no_interaction_mode:
-            cmd.append("--no-interaction")
+            cmd.append("--non-interactive")
 
         # 添加额外参数
         if additional_args:
