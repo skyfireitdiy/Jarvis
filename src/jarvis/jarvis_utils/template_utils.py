@@ -43,8 +43,8 @@ def render_rule_template(
         "current_dir": Path.cwd().as_posix(),
         "script_dir": Path(__file__).parent.as_posix(),  # 当前脚本所在目录
         "jarvis_data_dir": _get_jarvis_data_dir(),
-        "jarvis_src_dir": _get_jarvis_src_dir(),
-        "git_root_dir": _get_git_root(),
+        "jarvis_src_dir": get_jarvis_src_dir(),
+        "git_root_dir": get_git_root(),
         "rule_file_dir": rule_file_dir,  # 当前规则文件所在目录
     }
 
@@ -71,7 +71,7 @@ def render_rule_template(
         return rule_content.strip()
 
 
-def _get_git_root() -> str:
+def get_git_root() -> str:
     """获取git根目录
 
     如果当前目录不在git仓库中，将返回当前工作目录作为回退值。
@@ -94,7 +94,7 @@ def _get_git_root() -> str:
     return os.getcwd()
 
 
-def _get_jarvis_src_dir() -> str:
+def get_jarvis_src_dir() -> str:
     """获取jarvis源码目录
 
     返回:
@@ -145,7 +145,7 @@ def _get_builtin_dir() -> Path | None:
 
     # 方法3: 尝试从项目根目录查找（通过 git 或向上遍历）
     try:
-        git_root = _get_git_root()
+        git_root = get_git_root()
         if git_root:
             builtin_dir = Path(git_root) / "builtin"
             if builtin_dir.exists() and builtin_dir.is_dir():
