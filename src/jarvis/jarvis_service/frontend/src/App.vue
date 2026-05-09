@@ -528,6 +528,7 @@
       :socket="socket"
       :isRestartingGateway="isRestartingGateway"
       :isSyncingConfig="isSyncingConfig"
+      :isUpdatingCode="isUpdatingCode"
       @update:visible="showSettingsModal = $event"
       @update:connectionLockEnabled="connectionLockEnabled = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
@@ -537,6 +538,7 @@
       @confirmRestartGateway="handleRestartGateway"
       @disconnectAll="disconnectAll"
       @syncConfig="handleSyncConfig"
+      @updateCodeToMain="handleUpdateCodeToMain"
     />
 
     <!-- Session 选择对话框 -->
@@ -793,6 +795,7 @@ const syncConfigSourceNode = ref('') // 配置同步的源节点ID
 const syncConfigTargetNodes = ref([]) // 配置同步的目标节点ID数组
 const syncConfigSections = ref(['llms', 'llm_groups']) // 要同步的配置类型数组（llms, llm_groups）
 const isSyncingConfig = ref(false) // 是否正在同步配置
+const isUpdatingCode = ref(false) // 是否正在更新代码
 
 // 登录函数：使用密码获取 Token
 async function loginWithPassword(password) {
@@ -2791,6 +2794,11 @@ function handleSyncConfig({ sourceNodeId }) {
   syncConfig()
 }
 
+// 处理 SettingsModal 组件的更新代码事件
+function handleUpdateCodeToMain() {
+  updateCodeToMain()
+}
+
 function confirmRestartGateway() {
   if (isRestartingGateway.value) {
     return
@@ -2914,6 +2922,45 @@ async function syncConfig() {
     showToast(error.message || '配置同步失败', 'error')
   } finally {
     isSyncingConfig.value = false
+  }
+}
+
+async function updateCodeToMain() {
+  if (isUpdatingCode.value) {
+    return
+  }
+
+  try {
+    isUpdatingCode.value = true
+    const { host, port } = getGatewayAddress()
+
+    // 发送更新代码请求
+    const response = await fetchWithAuth(buildHttpUrl(host, port, 'code/update-to-main'), {
+      method: 'POST',
+      body: JSON.stringify({})
+    })
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || '代码更新失败')
+    }
+
+    const successCount = result.data?.success_count || 0
+    const totalCount = result.data?.total_nodes || 0
+    const failedCount = result.data?.failed_count || 0
+
+    if (successCount === totalCount) {
+      showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
+    } else if (successCount > 0) {
+      showToast(`代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`, 'warning')
+    } else {
+      showToast('代码更新失败，没有节点更新成功', 'error')
+    }
+  } catch (error) {
+    console.error('[SETTINGS] Failed to update code:', error)
+    showToast(error.message || '代码更新失败', 'error')
+  } finally {
+    isUpdatingCode.value = false
   }
 }
 

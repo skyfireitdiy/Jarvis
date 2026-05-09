@@ -73,6 +73,15 @@
         </button>
       </div>
 
+      <!-- 代码更新 -->
+      <div class="form-group">
+        <label>代码更新</label>
+        <span class="form-help">将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码</span>
+        <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
+          {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
+        </button>
+      </div>
+
       <!-- 连接管理 -->
       <div class="form-group">
         <label>连接管理</label>
@@ -143,6 +152,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  isUpdatingCode: {
+    type: Boolean,
+    default: false
+  },
   autoLoginEnabled: {
     type: Boolean,
     default: false
@@ -158,7 +171,8 @@ const emit = defineEmits([
   'disconnectAll',
   'syncConfig',
   'update:autoLoginEnabled',
-  'saveAutoLoginSetting'
+  'saveAutoLoginSetting',
+  'updateCodeToMain'
 ])
 
 // 本地状态
@@ -224,6 +238,11 @@ function syncConfig() {
   emit('syncConfig', {
     sourceNodeId: localSyncConfigSourceNode.value
   })
+}
+
+// 更新代码到 main 分支
+function updateCodeToMain() {
+  emit('updateCodeToMain')
 }
 </script>
 

@@ -52,6 +52,8 @@ from .node_protocol import (
     SERVICE_RESTART_RESPONSE,
     CONFIG_SYNC_REQUEST,
     CONFIG_SYNC_RESPONSE,
+    CODE_UPDATE_TO_MAIN_REQUEST,
+    CODE_UPDATE_TO_MAIN_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -1296,6 +1298,10 @@ class ChildNodeClient:
                     response = await self._handle_service_restart_request(next_message)
                     await self._ws.send(json.dumps(response))
                     continue
+                if message_type == CODE_UPDATE_TO_MAIN_REQUEST:
+                    response = await self._handle_code_update_to_main_request(next_message)
+                    await self._ws.send(json.dumps(response))
+                    continue
                 logger.warning(
                     "[NODE] child unhandled message type=%s request_id=%s",
                     message_type,
@@ -1557,6 +1563,96 @@ class ChildNodeClient:
             )
             return build_node_message(
                 SERVICE_RESTART_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_code_update_to_main_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理切换到 main 分支并更新代码的请求。"""
+        request_id = message.get("request_id")
+        logger.info(
+            "[NODE CODE_UPDATE] handling code update to main request_id=%s",
+            request_id,
+        )
+        try:
+            from jarvis.jarvis_utils.template_utils import (
+                checkout_jarvis_branch,
+                pull_jarvis_code,
+                get_jarvis_src_dir,
+            )
+
+            jarvis_src_dir = get_jarvis_src_dir()
+            if not jarvis_src_dir:
+                return build_node_message(
+                    CODE_UPDATE_TO_MAIN_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_PATH",
+                            "message": "无法获取 Jarvis 源码路径",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            # 切换到 main 分支
+            checkout_success = checkout_jarvis_branch("main")
+            if not checkout_success:
+                return build_node_message(
+                    CODE_UPDATE_TO_MAIN_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "CHECKOUT_FAILED",
+                            "message": "切换到 main 分支失败",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            # 拉取最新代码
+            pull_success = pull_jarvis_code()
+            if not pull_success:
+                return build_node_message(
+                    CODE_UPDATE_TO_MAIN_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "PULL_FAILED",
+                            "message": "拉取最新代码失败",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            logger.info(
+                "[NODE CODE_UPDATE] code updated successfully request_id=%s",
+                request_id,
+            )
+            return build_node_message(
+                CODE_UPDATE_TO_MAIN_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "message": "已成功切换到 main 分支并拉取最新代码",
+                        "jarvis_src_dir": jarvis_src_dir,
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE CODE_UPDATE] code update failed request_id=%s error=%s",
+                request_id,
+                exc,
+            )
+            return build_node_message(
+                CODE_UPDATE_TO_MAIN_RESPONSE,
                 {
                     "success": False,
                     "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
