@@ -61,6 +61,7 @@ interface AgentListItem {
   worktree: boolean;
   nodeId: string;
   quickMode?: boolean;
+  restoreSession?: boolean;
 }
 
 interface GatewayAddress {
@@ -173,6 +174,8 @@ interface CreateAgentFormState {
   useWorktree: boolean;
   quickMode: boolean;
   restoreSession: boolean;
+  noInteractionMode: boolean;
+  taskDescription: string;
   isSubmitting: boolean;
   errorMessage: string;
 }
@@ -206,6 +209,9 @@ interface AgentListViewMessage {
   nodeId?: string;
   useWorktree?: boolean;
   quickMode?: boolean;
+  restoreSession?: boolean;
+  noInteractionMode?: boolean;
+  taskDescription?: string;
   enabled?: boolean;
   path?: string;
   searchText?: string;
@@ -360,12 +366,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     isVisible: false,
     agentType: "codeagent",
     workingDir: "~",
-    name: "通用Agent",
+    name: "通用 Agent",
     llmGroup: "default",
     nodeId: "",
     useWorktree: false,
     quickMode: false,
     restoreSession: false,
+    noInteractionMode: false,
+    taskDescription: "",
     isSubmitting: false,
     errorMessage: "",
   };
@@ -753,6 +761,14 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       <input id="useRestoreSession" type="checkbox" ${restoreSessionChecked} />
       <span>启动时恢复会话</span>
     </label>
+    <label class="checkbox-row">
+      <input id="useNoInteractionMode" type="checkbox" ${this.createAgentFormState.noInteractionMode ? "checked" : ""} />
+      <span>无交互模式（必须提供任务描述）</span>
+    </label>
+    <div class="form-group" style="${this.createAgentFormState.noInteractionMode ? "" : "display:none;"}" id="taskDescriptionGroup">
+      <label for="taskDescription">任务描述 <span style="color: var(--vscode-errorForeground);">*</span></label>
+      <textarea id="taskDescription" rows="3" placeholder="请输入任务描述...">${escapeHtml(this.createAgentFormState.taskDescription)}</textarea>
+    </div>
     ${createAgentErrorMarkup}
     <div class="form-actions">
       <button id="cancelCreateAgentButton" type="button" ${createButtonDisabled}>取消</button>
@@ -779,7 +795,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         ${checkboxMarkup}
         <div class="agent-main">
           <div class="agent-title-row">
-            <div class="agent-name">${agentItem.agentType === "agent" ? "🤖" : agentItem.agentType === "codeagent" ? "👨‍💻" : "🤖"} ${escapeHtml(agentItem.displayName || agentItem.name)}</div>
+            <div class="agent-name">${agentItem.agentType === "agent" ? "🤖" : agentItem.agentType === "codeagent" ? "👨‍💻" : "🤖"} ${escapeHtml(agentItem.displayName || agentItem.name || "")}</div>
             <div class="agent-status-dot ${agentItem.statusClass}" title="${escapeHtml(agentItem.statusText)}"></div>
             ${agentItem.llmGroup ? `<div class="agent-llm-group" title="模型组">🔹 ${escapeHtml(agentItem.llmGroup)}</div>` : ""}
             ${agentItem.nodeId ? `<div class="agent-llm-group" title="节点">🧭 ${escapeHtml(agentItem.nodeId)}</div>` : ""}
@@ -1167,6 +1183,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'changeAgentType', agentType: agentTypeSelect.value });
       });
     }
+    const useNoInteractionMode = document.getElementById('useNoInteractionMode');
+    if (useNoInteractionMode) {
+      useNoInteractionMode.addEventListener('change', () => {
+        const taskDescriptionGroup = document.getElementById('taskDescriptionGroup');
+        if (taskDescriptionGroup) {
+          taskDescriptionGroup.style.display = useNoInteractionMode.checked ? 'block' : 'none';
+        }
+      });
+    }
     const submitCreateAgentButton = document.getElementById('submitCreateAgentButton');
     if (submitCreateAgentButton) {
       submitCreateAgentButton.addEventListener('click', () => {
@@ -1178,6 +1203,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         const useWorktree = document.getElementById('useWorktree');
         const useQuickMode = document.getElementById('useQuickMode');
         const useRestoreSession = document.getElementById('useRestoreSession');
+        const useNoInteractionMode = document.getElementById('useNoInteractionMode');
+        const taskDescription = document.getElementById('taskDescription');
+        // 无交互模式下必须提供任务描述
+        const isNoInteractionMode = Boolean(useNoInteractionMode && useNoInteractionMode.checked);
+        const taskDescValue = taskDescription ? taskDescription.value.trim() : '';
+        if (isNoInteractionMode && !taskDescValue) {
+          vscode.postMessage({ type: 'showErrorMessage', message: '无交互模式下必须提供任务描述' });
+          return;
+        }
         vscode.postMessage({
           type: 'createAgent',
           agentType: agentType ? agentType.value : 'agent',
@@ -1187,7 +1221,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           nodeId: nodeId ? nodeId.value : '',
           useWorktree: Boolean(useWorktree && useWorktree.checked),
           quickMode: Boolean(useQuickMode && useQuickMode.checked),
-          restoreSession: Boolean(useRestoreSession && useRestoreSession.checked)
+          restoreSession: Boolean(useRestoreSession && useRestoreSession.checked),
+          noInteractionMode: isNoInteractionMode,
+          taskDescription: taskDescValue
         });
       });
     }
@@ -4382,6 +4418,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       requestedAgentType === "codeagent" ? Boolean(message.useWorktree) : false;
     const quickMode = Boolean(message.quickMode);
     const restoreSession = Boolean(message.restoreSession);
+    const noInteractionMode = Boolean(message.noInteractionMode);
+    const taskDescription = String(message.taskDescription || "").trim();
 
     this.updateCreateAgentDefaults(requestedAgentType);
     this.createAgentFormState.workingDir = workingDir;
@@ -4392,6 +4430,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.useWorktree = useWorktree;
     this.createAgentFormState.quickMode = quickMode;
     this.createAgentFormState.restoreSession = restoreSession;
+    this.createAgentFormState.noInteractionMode = noInteractionMode;
+    this.createAgentFormState.taskDescription = taskDescription;
     this.createAgentFormState.isVisible = true;
 
     if (!workingDir) {
@@ -4425,6 +4465,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             worktree: useWorktree,
             quick_mode: quickMode,
             restore_session: restoreSession,
+            no_interaction_mode: noInteractionMode,
+            task:
+              noInteractionMode && taskDescription
+                ? taskDescription
+                : undefined,
           }),
         },
       );

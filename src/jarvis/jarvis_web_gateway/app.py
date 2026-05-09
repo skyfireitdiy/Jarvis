@@ -1930,6 +1930,7 @@ def create_app(
             worktree = bool(request.get("worktree", False))
             quick_mode = bool(request.get("quick_mode", False))
             restore_session = bool(request.get("restore_session", False))
+            no_interaction_mode = bool(request.get("no_interaction_mode", False))
             target_node_id = str(request.get("node_id") or "").strip()
 
             if not agent_type:
@@ -1946,6 +1947,16 @@ def create_app(
                     "error": {
                         "code": "MISSING_WORKING_DIR",
                         "message": "working_dir is required",
+                    },
+                }
+
+            # 验证无交互模式：必须提供 task
+            if no_interaction_mode and not task:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "MISSING_TASK",
+                        "message": "task is required when no_interaction_mode is enabled",
                     },
                 }
 
@@ -1983,6 +1994,8 @@ def create_app(
                         "additional_args": additional_args,
                         "worktree": worktree,
                         "quick_mode": quick_mode,
+                        "restore_session": restore_session,
+                        "no_interaction_mode": no_interaction_mode,
                     },
                 )
                 payload = response.get("payload") or {}
@@ -2026,6 +2039,7 @@ def create_app(
                 node_id=node_runtime.local_node_id,
                 quick_mode=quick_mode,
                 restore_session=restore_session,
+                no_interaction_mode=no_interaction_mode,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(

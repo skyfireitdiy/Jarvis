@@ -470,6 +470,10 @@
       @update:quickMode="newAgentQuickMode = $event"
       :restoreSession="newAgentRestoreSession"
       @update:restoreSession="newAgentRestoreSession = $event"
+      :noInteractionMode="newAgentNoInteractionMode"
+      @update:noInteractionMode="newAgentNoInteractionMode = $event"
+      :taskDescription="newAgentTaskDescription"
+      @update:taskDescription="newAgentTaskDescription = $event"
       :formatNodeLabel="formatNodeOptionLabel"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
@@ -2340,6 +2344,8 @@ const newAgentModelGroup = ref('default') // 新 Agent 模型组（默认为 def
 const newCodeAgentWorktree = ref(false) // 新代码 Agent 是否启用 worktree
 const newAgentQuickMode = ref(false) // 新 Agent 是否启用极速模式
 const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
+const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互模式
+const newAgentTaskDescription = ref('') // 新 Agent 任务描述
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
@@ -3663,6 +3669,11 @@ function getCurrentAgentNodeId() {
 
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
+  // 无交互模式下必须提供任务描述
+  if (newAgentNoInteractionMode.value && !newAgentTaskDescription.value.trim()) {
+    alert('无交互模式下必须提供任务描述')
+    return
+  }
   try {
     const { host, port } = getGatewayAddress()
     const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
@@ -3676,6 +3687,8 @@ async function createAgent() {
         worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false,
         quick_mode: newAgentQuickMode.value,
         restore_session: newAgentRestoreSession.value,
+        no_interaction_mode: newAgentNoInteractionMode.value,
+        task: newAgentNoInteractionMode.value && newAgentTaskDescription.value.trim() ? newAgentTaskDescription.value.trim() : undefined,
         node_id: targetNodeId,
       })
     })
@@ -3700,9 +3713,11 @@ async function createAgent() {
       newCodeAgentWorktree.value = false
       newAgentQuickMode.value = false
       newAgentRestoreSession.value = false
+      newAgentNoInteractionMode.value = false
+      newAgentTaskDescription.value = ''
       newAgentNodeId.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
-      newAgentName.value = newAgentType.value === 'agent' ? '通用Agent' : '代码Agent'
+      newAgentName.value = newAgentType.value === 'agent' ? '通用 Agent' : '代码 Agent'
       // 立即切换到新创建的 agent
       await switchAgent(agent)
       // 刷新列表
