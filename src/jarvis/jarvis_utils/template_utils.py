@@ -14,7 +14,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import jinja2
 from jinja2 import TemplateError, TemplateSyntaxError
@@ -90,8 +90,107 @@ def get_git_root() -> str:
             return result.stdout.strip()
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
-    # 不在git仓库中，返回当前工作目录
+    # 不在 git 仓库中，返回当前工作目录
     return os.getcwd()
+
+
+def is_jarvis_git_repo() -> bool:
+    """判断当前 Jarvis 源码是否是 Git 仓库
+
+    返回:
+        bool: 如果是 Git 仓库返回 True，否则返回 False
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
+
+
+def get_jarvis_branch() -> Optional[str]:
+    """获取 Jarvis 源码当前 Git 分支名称
+
+    返回:
+        Optional[str]: 当前分支名称，如果不在 Git 仓库中则返回 None
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+
+
+def checkout_jarvis_branch(branch_name: str) -> bool:
+    """切换 Jarvis 源码到指定的分支或 Tag
+
+    参数:
+        branch_name: 分支名称或 Tag 名称
+
+    返回:
+        bool: 切换成功返回 True，失败返回 False
+    """
+    try:
+        # 获取 Jarvis 源码目录
+        src_dir = get_jarvis_src_dir()
+
+        # 执行 git checkout 命令
+        result = subprocess.run(
+            ["git", "checkout", branch_name],
+            cwd=src_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            return True
+        return False
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
+
+
+def pull_jarvis_code() -> bool:
+    """拉取 Jarvis 源码的最新更新
+
+    返回:
+        bool: 拉取成功返回 True，失败返回 False
+    """
+    try:
+        # 获取 Jarvis 源码目录
+        src_dir = get_jarvis_src_dir()
+
+        PrettyOutput.auto_print("🔄 正在拉取 Jarvis 源码更新...")
+
+        # 执行 git pull 命令
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=src_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            PrettyOutput.auto_print("✅ Jarvis 源码拉取成功")
+            return True
+        else:
+            PrettyOutput.auto_print(f"❌ Jarvis 源码拉取失败：{result.stderr.strip()}")
+            return False
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        PrettyOutput.auto_print(f"❌ Jarvis 源码拉取失败：{str(e)}")
+        return False
 
 
 def get_jarvis_src_dir() -> str:
