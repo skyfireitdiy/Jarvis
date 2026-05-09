@@ -62,6 +62,8 @@ interface AgentListItem {
   nodeId: string;
   quickMode?: boolean;
   restoreSession?: boolean;
+  noInteractionMode?: boolean;
+  taskDescription?: string;
 }
 
 interface GatewayAddress {
@@ -2182,6 +2184,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             llmGroup: agent.llm_group || "",
             worktree: Boolean(agent.worktree),
             quickMode: Boolean(agent.quick_mode),
+            restoreSession: Boolean(agent.restore_session),
+            noInteractionMode: Boolean(agent.no_interaction_mode),
+            taskDescription: agent.task || "",
             nodeId: String(agent.node_id || "").trim() || "master",
           };
         });
@@ -4150,6 +4155,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.restoreSession = Boolean(
       sourceAgent.restoreSession,
     );
+    this.createAgentFormState.noInteractionMode = Boolean(
+      sourceAgent.noInteractionMode,
+    );
+    this.createAgentFormState.taskDescription =
+      sourceAgent.taskDescription || "";
     this.createAgentFormState.errorMessage = "";
 
     // 加载模型组列表
@@ -5713,6 +5723,9 @@ interface AgentListResponse {
     llm_group?: string;
     worktree?: boolean;
     quick_mode?: boolean;
+    restore_session?: boolean;
+    no_interaction_mode?: boolean;
+    task?: string;
     node_id?: string;
   }>;
   error?: {
