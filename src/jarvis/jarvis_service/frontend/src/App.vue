@@ -4413,16 +4413,27 @@ async function toggleNodeExpand(agentId, node) {
 // 切换当前工作的 Agent
 async function switchAgent(agent) {
   console.log('[AGENT] switchAgent called with:', agent)
-  
-  // 移动端：切换agent后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
+
+  // 移动端：切换 agent 后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
   if (windowWidth.value <= 768) {
     console.log('[AGENT] Mobile mode: hiding sidebar')
     showAgentSidebar.value = false
   }
-  
+
+  // 如果 Agent 已停止，不触发任何网络活动（不查询状态、不连接 WebSocket）
+  if (agent.status === 'stopped') {
+    console.log('[AGENT] Agent is stopped, skipping all network activities')
+    // 只更新当前 agent ID，让用户可以看到该 agent 的本地历史记录
+    currentAgentId.value = agent.agent_id
+    historyOffset.value = 0
+    hasMoreHistory.value = true
+    // 从本地存储加载历史消息（不涉及网络请求）
+    loadHistoryMessages(false)
+    return
+  }
+
   if (agent.agent_id === currentAgentId.value) {
     console.log('[AGENT] Already on this agent, checking connection...')
-    // 检查 WebSocket 连接是否存在
     const ws = sockets.value.get(agent.agent_id)
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       console.log('[AGENT] WebSocket not connected, reconnecting...')
