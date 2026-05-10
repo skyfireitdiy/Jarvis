@@ -305,8 +305,8 @@ async function fetchNodeSecret() {
       headers: {
         'Authorization': `Bearer ${token}`
       }
+    })
 
-    
     const result = await response.json()
     
     if (result.success && result.data?.node_secret) {
