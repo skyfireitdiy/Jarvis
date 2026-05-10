@@ -1837,7 +1837,6 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    @app.post("/api/code/update-to-main", dependencies=[Depends(verify_token)])
     async def update_code_to_main(request: Dict[str, Any]) -> Dict[str, Any]:
         """通知所有节点将 Jarvis 代码切换到 main 分支并更新。
 

@@ -1132,7 +1132,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           updateCodeToMainButton.disabled = true;
           updateCodeToMainButton.textContent = '更新中...';
           const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-          const url = `http://${gatewayAddress.host}:${gatewayAddress.port}/api/code/update-to-main`;
+          const url = `http://${gatewayAddress.host}:${gatewayAddress.port}/api/node/master/code/update-to-main`;
           const response = await fetch(url, {
             method: 'POST',
             headers: {
