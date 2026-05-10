@@ -1682,6 +1682,39 @@ def create_app(
             },
         }
 
+    @app.get("/api/node/secret", dependencies=[Depends(verify_token)])
+    async def get_node_secret() -> Dict[str, Any]:
+        """获取节点连接私钥（仅 master 模式）。
+
+        Returns:
+            包含 node_secret 的响应，如果不是 master 模式或未配置则返回错误
+        """
+        if not node_config.is_master:
+            return {
+                "success": False,
+                "error": {
+                    "code": "NOT_MASTER_MODE",
+                    "message": "Node secret is only available in master mode",
+                },
+            }
+
+        node_secret = os.environ.get("JARVIS_NODE_SECRET")
+        if not node_secret:
+            return {
+                "success": False,
+                "error": {
+                    "code": "SECRET_NOT_CONFIGURED",
+                    "message": "Node secret is not configured",
+                },
+            }
+
+        return {
+            "success": True,
+            "data": {
+                "node_secret": node_secret,
+            },
+        }
+
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
     async def restart_service(request: Dict[str, Any]) -> Dict[str, Any]:
         """请求 jarvis-service 通过 SIGUSR1/SIGUSR2 重启服务。

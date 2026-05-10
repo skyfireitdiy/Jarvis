@@ -37,6 +37,10 @@
       {
         "command": "jarvis.restartNodeService",
         "title": "Jarvis: 重启节点服务"
+      },
+      {
+        "command": "jarvis.getNodeSecret",
+        "title": "Jarvis: 获取节点连接私钥"
       }
     ],
     "viewsContainers": {
