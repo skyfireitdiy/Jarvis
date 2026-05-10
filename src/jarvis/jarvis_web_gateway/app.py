@@ -751,6 +751,11 @@ class WebSocketConnectionManager:
                             "terminal_id": terminal_id,
                             "interpreter": interpreter,
                             "working_dir": working_dir,
+                            "node_id": str(
+                                _node_runtime.local_node_id
+                                if _node_runtime
+                                else "master"
+                            ),
                         },
                     }
                     self._router.publish(message, session_id=session_id)
