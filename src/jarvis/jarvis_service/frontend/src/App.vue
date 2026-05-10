@@ -530,6 +530,7 @@
       :isSyncingConfig="isSyncingConfig"
       :isUpdatingCode="isUpdatingCode"
       :getToken="getAuthToken"
+      :gatewayUrl="gatewayUrl"
       @update:visible="showSettingsModal = $event"
       @update:connectionLockEnabled="connectionLockEnabled = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"

@@ -189,6 +189,10 @@ const props = defineProps({
   getToken: {
     type: Function,
     required: true
+  },
+  gatewayUrl: {
+    type: String,
+    default: '127.0.0.1:8000'
   }
 })
 
@@ -288,21 +292,20 @@ function updateCodeToMain() {
 async function fetchNodeSecret() {
   if (isLoadingSecret.value) return
   
-  isLoadingSecret.value = true
-  nodeSecret.value = ''
-  showSecret.value = false
-  
   try {
     // 通过父组件传递的 getToken 函数获取 Token（优先内存，其次 localStorage）
     const token = props.getToken()
     if (!token) {
       throw new Error('请先登录')
     }
-    const response = await fetch('/api/node/secret', {
+    // 构建完整的后端 API URL
+    const apiProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const apiUrl = `${apiProtocol}://${props.gatewayUrl}/api/node/secret`
+    const response = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
-    })
+
     
     const result = await response.json()
     
