@@ -334,22 +334,36 @@ function toggleSecretMask() {
  * 复制私钥到剪贴板
  */
 async function copyNodeSecret() {
-  if (!nodeSecret.value) return
-  
+  if (!nodeSecret.value) {
+    console.warn('复制失败：私钥内容为空')
+    alert('私钥内容为空，请先获取私钥')
+    return
+  }
+
   try {
     await navigator.clipboard.writeText(nodeSecret.value)
-    // 显示复制成功提示
-    const btn = document.querySelector('.copy-btn')
-    if (btn) {
-      const originalTitle = btn.getAttribute('title')
-      btn.setAttribute('title', '已复制！')
-      setTimeout(() => {
-        btn.setAttribute('title', originalTitle || '复制私钥')
-      }, 2000)
-    }
+    console.log('复制成功')
+    showToast('已复制到剪贴板', 'success')
   } catch (error) {
-    console.error('复制失败:', error)
-    alert('复制失败，请手动复制')
+    console.error('复制失败，尝试降级方案:', error)
+    // 降级方案：使用 execCommand
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = nodeSecret.value
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      console.log('降级方案复制成功')
+      showToast('已复制到剪贴板', 'success')
+    } catch (fallbackErr) {
+      console.error('降级方案也失败:', fallbackErr)
+      alert('复制失败，请手动复制')
+    }
+  }
+}
   }
 }
 
