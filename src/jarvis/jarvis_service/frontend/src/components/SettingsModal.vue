@@ -185,6 +185,10 @@ const props = defineProps({
   autoLoginEnabled: {
     type: Boolean,
     default: false
+  },
+  getToken: {
+    type: Function,
+    required: true
   }
 })
 
@@ -289,7 +293,11 @@ async function fetchNodeSecret() {
   showSecret.value = false
   
   try {
-    const token = localStorage.getItem('jarvis_auth_token')
+    // 通过父组件传递的 getToken 函数获取 Token（优先内存，其次 localStorage）
+    const token = props.getToken()
+    if (!token) {
+      throw new Error('请先登录')
+    }
     const response = await fetch('/api/node/secret', {
       headers: {
         'Authorization': `Bearer ${token}`
