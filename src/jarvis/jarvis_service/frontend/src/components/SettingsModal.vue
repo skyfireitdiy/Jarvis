@@ -82,6 +82,32 @@
         </button>
       </div>
 
+      <!-- 节点认证 -->
+      <div class="form-group">
+        <label>节点连接私钥</label>
+        <div class="node-secret-section">
+          <div class="secret-display">
+            <code class="secret-code" v-if="nodeSecret" :title="nodeSecret">{{ maskedNodeSecret }}</code>
+            <span class="secret-placeholder" v-else>点击"获取私钥"加载</span>
+            <button class="copy-btn" @click="copyNodeSecret" :disabled="!nodeSecret" title="复制私钥">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="secret-actions">
+            <button class="ghost-btn" @click="fetchNodeSecret" :disabled="isLoadingSecret">
+              {{ isLoadingSecret ? '加载中...' : '获取私钥' }}
+            </button>
+            <button class="ghost-btn" @click="toggleSecretMask" :disabled="!nodeSecret" title="显示/隐藏">
+              {{ showSecret ? '隐藏' : '显示' }}
+            </button>
+          </div>
+          <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
+        </div>
+      </div>
+
       <!-- 连接管理 -->
       <div class="form-group">
         <label>连接管理</label>
@@ -89,7 +115,7 @@
           <button class="danger-btn" @click="disconnectAll" :disabled="!socket">
             断开连接
           </button>
-          <span class="form-help">断开所有WebSocket连接并刷新页面</span>
+          <span class="form-help">断开所有 WebSocket 连接并刷新页面</span>
         </div>
       </div>
 
@@ -121,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 const props = defineProps({
   visible: {
@@ -181,6 +207,11 @@ const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
 const localSyncConfigSourceNode = ref('')
+
+// 私钥相关状态
+const nodeSecret = ref('')
+const isLoadingSecret = ref(false)
+const showSecret = ref(false)
 
 // 监听props变化
 watch(() => props.connectionLockEnabled, (newVal) => {
@@ -244,6 +275,86 @@ function syncConfig() {
 function updateCodeToMain() {
   emit('updateCodeToMain')
 }
+
+// ========== 私钥管理函数 ==========
+
+/**
+ * 获取节点私钥
+ */
+async function fetchNodeSecret() {
+  if (isLoadingSecret.value) return
+  
+  isLoadingSecret.value = true
+  nodeSecret.value = ''
+  showSecret.value = false
+  
+  try {
+    const token = localStorage.getItem('jarvis_token')
+    const response = await fetch('/api/node/secret', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (result.success && result.data?.node_secret) {
+      nodeSecret.value = result.data.node_secret
+    } else {
+      console.error('获取私钥失败:', result.error?.message || '未知错误')
+      alert(`获取私钥失败：${result.error?.message || '未知错误'}`)
+    }
+  } catch (error) {
+    console.error('获取私钥异常:', error)
+    alert(`获取私钥异常：${error.message}`)
+  } finally {
+    isLoadingSecret.value = false
+  }
+}
+
+/**
+ * 切换私钥显示/隐藏状态
+ */
+function toggleSecretMask() {
+  showSecret.value = !showSecret.value
+}
+
+/**
+ * 复制私钥到剪贴板
+ */
+async function copyNodeSecret() {
+  if (!nodeSecret.value) return
+  
+  try {
+    await navigator.clipboard.writeText(nodeSecret.value)
+    // 显示复制成功提示
+    const btn = document.querySelector('.copy-btn')
+    if (btn) {
+      const originalTitle = btn.getAttribute('title')
+      btn.setAttribute('title', '已复制！')
+      setTimeout(() => {
+        btn.setAttribute('title', originalTitle || '复制私钥')
+      }, 2000)
+    }
+  } catch (error) {
+    console.error('复制失败:', error)
+    alert('复制失败，请手动复制')
+  }
+}
+
+/**
+ * 掩码显示的私钥（仅显示首尾部分）
+ */
+const maskedNodeSecret = computed(() => {
+  if (!nodeSecret.value) return ''
+  if (showSecret.value) return nodeSecret.value
+  
+  const secret = nodeSecret.value
+  if (secret.length <= 16) {
+    return '*'.repeat(secret.length)
+  }
+  return `${secret.slice(0, 8)}${'*'.repeat(secret.length - 16)}${secret.slice(-8)}`
+})
 </script>
 
 <style scoped>
@@ -686,5 +797,77 @@ function updateCodeToMain() {
   height: 16px;
   cursor: pointer;
   accent-color: var(--color-accent);
+}
+
+/* ========== 私钥显示区域样式 ========== */
+.node-secret-section {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.secret-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--color-bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.secret-code {
+  flex: 1;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  word-break: break-all;
+  min-width: 0;
+}
+
+.secret-placeholder {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: var(--color-bg-tertiary);
+  border: 0.5px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.copy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.secret-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.secret-actions .ghost-btn {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 13px;
 }
 </style>

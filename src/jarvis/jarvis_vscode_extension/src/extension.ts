@@ -6000,6 +6000,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  // 注册获取节点私钥命令
+  context.subscriptions.push(
+    vscode.commands.registerCommand("jarvis.getNodeSecret", async () => {
+      await provider.getNodeSecret();
+    }),
+  );
+
   // 监听文件保存事件，同步远端文件
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (document) => {
