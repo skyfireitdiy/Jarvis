@@ -4831,10 +4831,16 @@ function handleMessage(message, agentId = null) {
     console.log('[ws] terminal_created', payload)
     isCreatingTerminalSession.value = false
     const terminalId = payload?.terminal_id
+    const nodeId = payload?.node_id
+    if (!nodeId) {
+      console.error('[ws] terminal_created missing node_id:', payload)
+      ElMessage.error('创建终端失败：后端未返回 node_id')
+      return
+    }
     if (terminalId) {
       terminalSessions.value.push({
         terminal_id: terminalId,
-        node_id: payload?.node_id || getCurrentAgentNodeId() || '',
+        node_id: nodeId,
         interpreter: payload?.interpreter || 'bash',
         working_dir: payload?.working_dir || '.',
         terminal: null,
