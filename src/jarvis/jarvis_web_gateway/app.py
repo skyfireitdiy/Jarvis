@@ -101,7 +101,7 @@ _global_agent_manager: Optional[AgentManager] = None
 
 # Unix Domain Socket 服务器（用于提供 node_secret 给子节点）
 _node_secret_socket_server: Optional[asyncio.Server] = None
-_NODE_SECRET_SOCKET_PATH = os.path.expanduser("~/.jarvis/gateway")
+_NODE_SECRET_SOCKET_PATH = os.path.expanduser("~/.jarvis/gateway/node_secret.sock")
 
 # 状态更新回调函数
 _status_update_callback: Optional[Callable[[str], None]] = None
