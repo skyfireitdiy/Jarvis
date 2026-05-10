@@ -2930,37 +2930,61 @@ async function updateCodeToMain() {
     return
   }
 
+  // 调试日志
+  console.debug('[SETTINGS] updateCodeToMain called, hasAuthToken:', hasAuthToken(), 'token:', auth.value.token ? 'exists' : 'missing')
+
   try {
     isUpdatingCode.value = true
     const { host, port } = getGatewayAddress()
+    const url = buildHttpUrl(host, port, 'code/update-to-main')
 
-    // 发送更新代码请求
-    const response = await fetchWithAuth(buildHttpUrl(host, port, 'code/update-to-main'), {
-      method: 'POST',
-      body: JSON.stringify({})
-    })
-    const result = await response.json()
+    console.debug('[SETTINGS] Sending update code request to:', url)
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.error?.message || '代码更新失败')
-    }
+    // 创建AbortController用于超时控制
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 90000) // 90秒超时（后端处理节点更新需要较长时间）
 
-    const successCount = result.data?.success_count || 0
-    const totalCount = result.data?.total_nodes || 0
-    const failedCount = result.data?.failed_count || 0
+    try {
+      // 发送更新代码请求
+      const response = await fetchWithAuth(url, {
+        method: 'POST',
+        body: JSON.stringify({}),
+        signal: controller.signal
+      })
 
-    if (successCount === totalCount) {
-      showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
-    } else if (successCount > 0) {
-      showToast(`代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`, 'warning')
-    } else {
-      showToast('代码更新失败，没有节点更新成功', 'error')
+      clearTimeout(timeoutId)
+      const result = await response.json()
+
+      console.debug('[SETTINGS] Update code response:', result)
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || '代码更新失败')
+      }
+
+      const successCount = result.data?.success_count || 0
+      const totalCount = result.data?.total_nodes || 0
+      const failedCount = result.data?.failed_count || 0
+
+      if (successCount === totalCount) {
+        showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
+      } else if (successCount > 0) {
+        showToast(`代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`, 'warning')
+      } else {
+        showToast('代码更新失败，没有节点更新成功', 'error')
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        throw new Error('请求超时，请检查网络连接')
+      }
+      throw fetchError
     }
   } catch (error) {
     console.error('[SETTINGS] Failed to update code:', error)
     showToast(error.message || '代码更新失败', 'error')
   } finally {
     isUpdatingCode.value = false
+    console.debug('[SETTINGS] updateCodeToMain finished, isUpdatingCode reset to false')
   }
 }
 
