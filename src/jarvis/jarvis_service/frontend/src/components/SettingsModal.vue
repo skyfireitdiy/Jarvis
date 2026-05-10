@@ -289,7 +289,7 @@ async function fetchNodeSecret() {
   showSecret.value = false
   
   try {
-    const token = localStorage.getItem('jarvis_token')
+    const token = localStorage.getItem('jarvis_auth_token')
     const response = await fetch('/api/node/secret', {
       headers: {
         'Authorization': `Bearer ${token}`
