@@ -2806,9 +2806,13 @@ function confirmRestartGateway() {
 
   showSettingsModal.value = false
   const targetNodeId = restartNodeId.value
-  
-  // 检查是否有运行中的agent
-  const runningAgents = agentList.value.filter(agent => agent.status === 'running')
+  const normalizedTargetNodeId = targetNodeId || 'master'
+
+  // 检查是否有运行中的 agent（只检查目标节点）
+  const runningAgents = agentList.value.filter(agent => {
+    const agentNodeId = agent.node_id || 'master'
+    return agent.status === 'running' && agentNodeId === normalizedTargetNodeId
+  })
   if (runningAgents.length > 0) {
     const agentNames = runningAgents.map(agent => agent.name || agent.agent_id).join(', ')
     showToast(`检测到 ${runningAgents.length} 个运行中的 Agent：${agentNames}\n\n请先手动停止或完成这些 Agent 后再重启节点服务`, 'warning')
