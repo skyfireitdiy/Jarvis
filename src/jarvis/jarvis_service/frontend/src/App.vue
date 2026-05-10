@@ -2942,7 +2942,7 @@ async function updateCodeToMain() {
 
     // 创建AbortController用于超时控制
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 90000) // 90秒超时（后端处理节点更新需要较长时间）
 
     try {
       // 发送更新代码请求
