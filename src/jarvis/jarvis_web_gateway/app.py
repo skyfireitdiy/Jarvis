@@ -19,7 +19,7 @@ import uuid
 
 import yaml  # type: ignore[import-untyped]
 from datetime import datetime
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, Tuple, cast
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple, cast
 from urllib.parse import parse_qsl
 from urllib.parse import unquote
 from urllib.parse import urlencode
@@ -99,8 +99,115 @@ from jarvis.jarvis_utils.config import (
 # 全局 AgentManager，用于状态变更回调
 _global_agent_manager: Optional[AgentManager] = None
 
+# Unix Domain Socket 服务器（用于提供 node_secret 给子节点）
+_node_secret_socket_server: Optional[asyncio.Server] = None
+_NODE_SECRET_SOCKET_PATH = os.path.expanduser("~/.jarvis/gateway")
+
 # 状态更新回调函数
 _status_update_callback: Optional[Callable[[str], None]] = None
+
+
+async def _handle_node_secret_client(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
+    """处理 Unix Domain Socket 客户端请求，返回 node_secret。
+
+    协议格式：
+    - 客户端发送："GET_NODE_SECRET\n"
+    - 服务器返回："{\"node_secret\": \"<secret>\"}\n" 或 "{\"error\": \"<message>\"}\n"
+    """
+    try:
+        # 读取请求
+        data = await reader.readline()
+        request = data.decode("utf-8").strip()
+
+        if request != "GET_NODE_SECRET":
+            response = json.dumps({"error": "Invalid request. Use: GET_NODE_SECRET"})
+        else:
+            # 从环境变量获取 node_secret
+            node_secret = os.environ.get("JARVIS_NODE_SECRET")
+            if not node_secret:
+                response = json.dumps({"error": "Node secret not configured"})
+            else:
+                response = json.dumps({"node_secret": node_secret})
+
+        writer.write(response.encode("utf-8") + b"\n")
+        await writer.drain()
+    except Exception as e:
+        logger.error(f"Error handling node secret client: {e}")
+        try:
+            error_response = json.dumps({"error": str(e)})
+            writer.write(error_response.encode("utf-8") + b"\n")
+            await writer.drain()
+        except Exception:
+            pass
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+
+async def _start_node_secret_socket_server(node_config: NodeRuntimeConfig) -> None:
+    """启动 Unix Domain Socket 服务器（仅在 master 模式下）。
+
+    Args:
+        node_config: Node 运行时配置
+    """
+    global _node_secret_socket_server
+
+    # 仅在 master 模式下启动
+    if not node_config.is_master:
+        return
+
+    # 确保目录存在
+    socket_dir = os.path.dirname(_NODE_SECRET_SOCKET_PATH)
+    os.makedirs(socket_dir, exist_ok=True)
+
+    # 删除旧的 socket 文件（如果存在）
+    if os.path.exists(_NODE_SECRET_SOCKET_PATH):
+        try:
+            os.unlink(_NODE_SECRET_SOCKET_PATH)
+            logger.info(f"Removed old socket file: {_NODE_SECRET_SOCKET_PATH}")
+        except Exception as e:
+            logger.warning(f"Failed to remove old socket file: {e}")
+
+    # 启动 Unix Domain Socket 服务器
+    try:
+        _node_secret_socket_server = await asyncio.start_unix_server(
+            _handle_node_secret_client, path=_NODE_SECRET_SOCKET_PATH
+        )
+
+        # 设置严格的文件权限（仅当前用户可读写）
+        os.chmod(_NODE_SECRET_SOCKET_PATH, 0o600)
+
+        logger.info(
+            f"Node secret socket server started at {_NODE_SECRET_SOCKET_PATH} (mode: 0600)"
+        )
+    except Exception as e:
+        logger.error(f"Failed to start node secret socket server: {e}")
+        raise
+
+
+async def _stop_node_secret_socket_server() -> None:
+    """停止 Unix Domain Socket 服务器并清理 socket 文件。"""
+    global _node_secret_socket_server
+
+    if _node_secret_socket_server is not None:
+        _node_secret_socket_server.close()
+        await _node_secret_socket_server.wait_closed()
+        _node_secret_socket_server = None
+        logger.info("Node secret socket server stopped")
+
+    # 清理 socket 文件
+    if os.path.exists(_NODE_SECRET_SOCKET_PATH):
+        try:
+            os.unlink(_NODE_SECRET_SOCKET_PATH)
+            logger.info(f"Removed socket file: {_NODE_SECRET_SOCKET_PATH}")
+        except Exception as e:
+            logger.warning(f"Failed to remove socket file: {e}")
+
 
 # 全局当前执行状态（用于 /status 接口）
 _current_execution_status: str = "running"
@@ -700,6 +807,10 @@ def create_app(
     gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", generate_gateway_token())
     # 统一设置到环境变量，供子进程（Agent）使用
     os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
+
+    # 设置 node_secret 到环境变量（供 Unix Domain Socket 服务使用）
+    if node_config.node_secret:
+        os.environ["JARVIS_NODE_SECRET"] = node_config.node_secret
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
 
@@ -768,6 +879,8 @@ def create_app(
         await agent_manager.start_monitoring_for_running_agents()
         if node_config.is_master:
             node_runtime.mark_ready()
+            # 启动 Unix Domain Socket 服务器（提供 node_secret 给子节点）
+            await _start_node_secret_socket_server(node_config)
         else:
             node_runtime.mark_degraded()
             if child_node_client is not None:
@@ -781,6 +894,8 @@ def create_app(
             await child_node_client.stop()
         timer_manager.shutdown()
         set_current_gateway(None)
+        # 停止 Unix Domain Socket 服务器
+        await _stop_node_secret_socket_server()
 
     # 使用自定义 app 或创建新 app
     if custom_app is not None:
@@ -1699,21 +1814,21 @@ def create_app(
         """
         try:
             target_node_ids = request.get("target_node_ids", [])
-            
+
             # 获取所有在线节点
             all_nodes = node_runtime.node_registry.list_all()
             online_nodes = [
-                node for node in all_nodes 
-                if node.get("status") == "online"
+                node for node in all_nodes if node.get("status") == "online"
             ]
-            
+
             # 如果指定了目标节点，只更新这些节点
             if target_node_ids:
                 online_nodes = [
-                    node for node in online_nodes 
+                    node
+                    for node in online_nodes
                     if node.get("node_id") in target_node_ids
                 ]
-            
+
             if not online_nodes:
                 return {
                     "success": False,
@@ -1722,7 +1837,7 @@ def create_app(
                         "message": "没有在线节点可更新",
                     },
                 }
-            
+
             results = []
             for node_info in online_nodes:
                 node_id = node_info.get("node_id")
@@ -1737,7 +1852,7 @@ def create_app(
                         {},
                         timeout=60.0,
                     )
-                    
+
                     payload = response.get("payload") or {}
                     results.append(
                         {
@@ -1754,10 +1869,10 @@ def create_app(
                             "message": f"请求失败：{str(e)}",
                         }
                     )
-            
+
             success_count = sum(1 for r in results if r["success"])
             total_count = len(results)
-            
+
             return {
                 "success": True,
                 "data": {
