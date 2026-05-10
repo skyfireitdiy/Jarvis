@@ -529,6 +529,7 @@
       :isRestartingGateway="isRestartingGateway"
       :isSyncingConfig="isSyncingConfig"
       :isUpdatingCode="isUpdatingCode"
+      :getToken="getAuthToken"
       @update:visible="showSettingsModal = $event"
       @update:connectionLockEnabled="connectionLockEnabled = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
@@ -835,6 +836,21 @@ async function loginWithPassword(password) {
 // 通用的带认证的 fetch 函数
 function hasAuthToken() {
   return Boolean(auth.value.token)
+}
+
+// 获取当前有效的 Token（优先返回内存中的，其次返回 localStorage 的）
+function getAuthToken() {
+  // 优先返回内存中的 Token
+  if (auth.value.token) {
+    return auth.value.token
+  }
+  // 其次尝试从 localStorage 获取
+  const savedToken = localStorage.getItem('jarvis_auth_token')
+  if (savedToken) {
+    auth.value.token = savedToken
+    return savedToken
+  }
+  return null
 }
 
 // 尝试从 localStorage 加载已保存的 token
