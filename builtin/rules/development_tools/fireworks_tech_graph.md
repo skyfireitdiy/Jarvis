@@ -299,3 +299,60 @@ lines.append('</svg>')
 with open('/path/to/output.svg', 'w') as f:
     f.write('\n'.join(lines))
 print("SVG generated successfully")
+
+
+## SVG生成与错误预防
+
+**强制：Python List方法**（始终使用）：
+
+```python
+python3 << 'EOF'
+lines = []
+lines.append('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">')
+lines.append('  <defs>')
+# ... 每行单独
+lines.append('</svg>')
+with open('/path/to/output.svg', 'w') as f:
+    f.write('\n'.join(lines))
+print("SVG generated successfully")
+EOF
+```
+
+**预调用清单**（关键 - 每次使用）：
+1. ✅ 我能立即写出完整的命令/内容吗？
+2. ✅ 我准备好所有必需参数了吗？
+3. ✅ 我检查过准备内容的语法错误了吗？
+
+**错误恢复协议**：
+- 第一次错误：分析根本原因，应用针对性修复
+- 第二次错误：完全切换方法（Python列表 → 分块生成）
+- 第三次错误：停止并报告用户 — 不要无限循环
+
+**验证**（生成后运行）：
+```bash
+rsvg-convert file.svg -o /tmp/test.png 2>&1 && echo "✓ Valid" && rm /tmp/test.png
+```
+
+## 样式
+
+| # | 名称 | 背景 | 最佳用途 |
+|---|------|------|----------|
+| 1 | **扁平图标**（默认） | 白色 | 博客、文档、演示 |
+| 2 | **深色终端** | #0f0f1a | GitHub、开发文章 |
+| 3 | **蓝图** | #0a1628 | 架构文档 |
+| 4 | **Notion简洁** | 白色、极简 | Notion |
+| 5 | **玻璃态** | 深色渐变 | 产品网站、主题演讲 |
+| 6 | **Claude官方** | 暖奶油#f8f6f3 | Anthropic风格图表 |
+| 7 | **OpenAI官方** | 纯白#ffffff | OpenAI风格图表 |
+
+## 常见模式
+
+这些模式经常出现 — 内化它们：
+
+- **RAG管道**：Query → Embed → VectorSearch → Retrieve → Augment → LLM → Response
+- **Agentic RAG**：在Query和LLM之间添加Agent循环和工具使用
+- **Agentic Search**：Query → Planner → [Search Tool / Calculator / Code] → Synthesizer → Response
+- **Mem0 / 记忆层**：Input → Memory Manager → [Write: VectorDB + GraphDB] / [Read: Retrieve+Rank] → Context
+- **Agent记忆类型**：Sensory（原始输入） → Working（上下文窗口） → Episodic（过去交互） → Semantic（事实） → Procedural（技能）
+- **Multi-Agent**：Orchestrator → [SubAgent A / SubAgent B / SubAgent C] → Aggregator → Output
+- **工具调用流**：LLM → Tool Selector → Tool Execution → Result Parser → LLM（循环）
