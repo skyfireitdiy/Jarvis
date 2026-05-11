@@ -299,22 +299,6 @@ lines.append('</svg>')
 with open('/path/to/output.svg', 'w') as f:
     f.write('\n'.join(lines))
 print("SVG generated successfully")
-
-
-## SVG生成与错误预防
-
-**强制：Python List方法**（始终使用）：
-
-```python
-python3 << 'EOF'
-lines = []
-lines.append('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">')
-lines.append('  <defs>')
-# ... 每行单独
-lines.append('</svg>')
-with open('/path/to/output.svg', 'w') as f:
-    f.write('\n'.join(lines))
-print("SVG generated successfully")
 EOF
 ```
 
