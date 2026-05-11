@@ -33,7 +33,11 @@ class TestRulesManager:
         manager = RulesManager("/tmp/test")
         result = manager.get_named_rule("global:test_rule")
 
-        assert result == "Global test rule content"
+        # 规则内容包含路径注释
+        assert (
+            f"<!-- 规则文件路径: {rules_dir}/test_rule -->\nGlobal test rule content"
+            == result
+        )
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_from_project_dir(self, mock_get_data_dir, tmp_path):
@@ -50,7 +54,11 @@ class TestRulesManager:
         manager = RulesManager(str(project_root))
         result = manager.get_named_rule("project:test_rule")
 
-        assert result == "Project test rule content"
+        # 规则内容包含路径注释
+        assert (
+            f"<!-- 规则文件路径: {project_rules_dir}/test_rule -->\nProject test rule content"
+            == result
+        )
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_project_overrides_global(self, mock_get_data_dir, tmp_path):
@@ -73,11 +81,19 @@ class TestRulesManager:
 
         # 项目规则应该被优先加载
         result_project = manager.get_named_rule("project:test_rule")
-        assert result_project == "Project rule content"
+        # 规则内容包含路径注释
+        assert (
+            f"<!-- 规则文件路径: {project_rules_dir}/test_rule -->\nProject rule content"
+            == result_project
+        )
 
         # 全局规则也应该可以访问
         result_global = manager.get_named_rule("global:test_rule")
-        assert result_global == "Global rule content"
+        # 规则内容包含路径注释
+        assert (
+            f"<!-- 规则文件路径: {global_rules_dir}/test_rule -->\nGlobal rule content"
+            == result_global
+        )
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_md_files(self, mock_get_data_dir, tmp_path):
