@@ -5973,12 +5973,6 @@ function confirmClearHistory() {
   )
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div')
-  div.innerText = text
-  return div.innerHTML
-}
-
 function getTerminalBufferContent(terminal, trimTrailingWhitespace = false) {
   const buffer = terminal?.buffer?.active
   if (!buffer) return ''
