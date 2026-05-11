@@ -406,8 +406,8 @@ class WebGateway(BaseGateway):
         # 保存确认请求，用于重连后恢复
         self._input_registry.save_confirm_request(session_id, message)
 
-        # 更新状态为等待单行输入（确认）
-        _update_status("waiting_single")
+        # 更新状态为等待确认
+        _update_status("waiting_confirm")
 
         session = self._input_registry.get_or_create_confirm_session(session_id)
         confirmed = session.wait_for_confirm()
@@ -1639,7 +1639,33 @@ def create_app(
                 )
 
         try:
-            return await agent_proxy_manager.proxy_http_request(request, agent_id, path)
+            response = await agent_proxy_manager.proxy_http_request(
+                request, agent_id, path
+            )
+            # 如果是 /status 请求且状态为 waiting_confirm，添加 pending_confirm 信息
+            if path == "status" and request.method == "GET":
+                try:
+                    import json as json_module
+
+                    body_bytes = bytes(response.body)
+                    body = json_module.loads(body_bytes.decode("utf-8"))
+                    if body.get("execution_status") == "waiting_confirm":
+                        session_id = "default"
+                        pending_confirm = input_registry.get_confirm_request(session_id)
+                        if pending_confirm:
+                            body["pending_confirm"] = pending_confirm
+                            from starlette.responses import JSONResponse
+
+                            return JSONResponse(
+                                content=body,
+                                status_code=response.status_code,
+                                headers=dict(response.headers),
+                            )
+                except Exception as e:
+                    logger.warning(
+                        f"[HTTP PROXY] Failed to add pending_confirm to status: {e}"
+                    )
+            return response
         except AgentNotFoundError:
             logger.error(f"[HTTP PROXY] Agent not found: {agent_id}")
             return Response(

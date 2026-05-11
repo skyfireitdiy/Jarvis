@@ -3445,6 +3445,24 @@ async function fetchAgentStatus(agent) {
         nextTick(() => {
           multilineInput.value?.focus()
         })
+      } else if (executionStatus === 'waiting_confirm') {
+        // 从 status 响应中获取 pending_confirm 并显示对话框
+        const pendingConfirm = result.pending_confirm
+        if (pendingConfirm && pendingConfirm.payload) {
+          const payload = pendingConfirm.payload
+          pendingConfirmAgentId.value = agent.agent_id
+          showConfirm(
+            payload.message || '请确认',
+            () => {
+              sendConfirmResult(true, agent.agent_id)
+            },
+            () => {
+              sendConfirmResult(false, agent.agent_id)
+            },
+            payload.default !== undefined ? payload.default : true
+          )
+        }
+        inputMode.value = 'multi'
       } else {
         inputMode.value = 'multi'
       }
