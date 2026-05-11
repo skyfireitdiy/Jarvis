@@ -41,6 +41,25 @@ class RulesManager:
         self._active_rules: Set[str] = set()  # 已激活的规则名称集合
         self._merged_rules: str = ""  # 合并后的规则字符串（激活的规则内容）
 
+    def _add_path_comment(self, rule_name: str, rule_content: str) -> str:
+        """在规则内容前添加路径注释
+
+        参数:
+            rule_name: 规则名称
+            rule_content: 规则内容
+
+        返回:
+            str: 添加路径注释后的规则内容
+        """
+        if not rule_content:
+            return rule_content
+
+        rule_file_path = self.get_rule_file_path(rule_name)
+        if rule_file_path and rule_file_path != "--":
+            path_comment = f"<!-- 规则文件路径: {rule_file_path} -->\n"
+            return path_comment + rule_content
+        return rule_content
+
     def _init_rules_dirs(self) -> None:
         """初始化规则目录列表，包括配置的目录和中心库"""
         # 基础目录：全局数据目录下的 rules 目录
@@ -508,7 +527,11 @@ class RulesManager:
                                 rule_content = self._read_rule_from_dir(
                                     str(builtin_rules_dir), actual_name
                                 )
-                                return rule_content
+                                if rule_content:
+                                    return self._add_path_comment(
+                                        rule_name, rule_content
+                                    )
+                                return None
                     except Exception:
                         pass
                     return None
@@ -519,7 +542,11 @@ class RulesManager:
                     if os.path.exists(project_rules_dir) and os.path.isdir(
                         project_rules_dir
                     ):
-                        return self._read_rule_from_dir(project_rules_dir, actual_name)
+                        rule_content = self._read_rule_from_dir(
+                            project_rules_dir, actual_name
+                        )
+                        if rule_content:
+                            return self._add_path_comment(rule_name, rule_content)
                     return None
 
                 # 处理 global 前缀
@@ -528,7 +555,11 @@ class RulesManager:
                     if os.path.exists(global_rules_dir) and os.path.isdir(
                         global_rules_dir
                     ):
-                        return self._read_rule_from_dir(global_rules_dir, actual_name)
+                        rule_content = self._read_rule_from_dir(
+                            global_rules_dir, actual_name
+                        )
+                        if rule_content:
+                            return self._add_path_comment(rule_name, rule_content)
                     return None
 
                 # 处理 central 和 config 前缀
@@ -547,7 +578,11 @@ class RulesManager:
                     if 0 <= target_idx < len(all_rules_dirs):
                         rules_dir = all_rules_dirs[target_idx]
                         if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
-                            return self._read_rule_from_dir(rules_dir, actual_name)
+                            rule_content = self._read_rule_from_dir(
+                                rules_dir, actual_name
+                            )
+                            if rule_content:
+                                return self._add_path_comment(rule_name, rule_content)
                     return None
 
                 # 未知前缀
@@ -557,12 +592,12 @@ class RulesManager:
             # 优先级 1: 从 rule.md 索引文件中查找
             indexed_rule = self._get_rule_from_builtin_index(rule_name)
             if indexed_rule:
-                return indexed_rule
+                return self._add_path_comment(rule_name, indexed_rule)
 
             # 优先级 2: 从内置规则中查找
             builtin_rule = get_builtin_rule(rule_name)
             if builtin_rule:
-                return builtin_rule
+                return self._add_path_comment(rule_name, builtin_rule)
 
             return None
         except Exception as e:

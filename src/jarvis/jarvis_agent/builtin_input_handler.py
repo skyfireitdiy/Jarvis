@@ -75,17 +75,7 @@ def _get_rule_content(rule_name: str) -> str | None:
 
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())
-        rule_content = rules_manager.get_named_rule(rule_name)
-
-        if rule_content:
-            # 尝试查找规则文件路径
-            rule_file_path = _find_rule_file_path(rules_manager, rule_name)
-            if rule_file_path:
-                # 在规则内容前添加路径注释
-                path_comment = f"<!-- 规则文件路径: {rule_file_path} -->\n"
-                return path_comment + rule_content
-
-        return rule_content
+        return rules_manager.get_named_rule(rule_name)
     except ImportError:
         return None
 
