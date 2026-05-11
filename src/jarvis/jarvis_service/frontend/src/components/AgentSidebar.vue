@@ -42,6 +42,7 @@
               </div>
               <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
               <div class="agent-actions">
+                <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">📝</button>
                 <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
@@ -72,6 +73,7 @@
             </div>
             <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
             <div class="agent-actions">
+              <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">📝</button>
               <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
@@ -148,7 +150,8 @@ const emit = defineEmits([
   'toggleSelectAll',
   'batchCopy',
   'batchDelete',
-  'startResize'
+  'startResize',
+  'viewDiff'
 ])
 </script>
 
