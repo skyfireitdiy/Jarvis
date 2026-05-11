@@ -3403,19 +3403,19 @@ function getStatusText(agent) {
 // 获取状态 CSS 类名
 function getStatusClass(agent) {
   const statusData = agentStatuses.value.get(agent.agent_id)
-  
-  // 如果 Agent 已停止
+
+  // 优先使用 agentStatuses 中的实时状态
+  if (statusData && statusData.execution_status) {
+    return statusData.execution_status
+  }
+
+  // 回退：如果 Agent 已停止
   if (agent.status === 'stopped') {
     return 'stopped'
   }
-  
-  // 如果没有运行状态数据，默认 running
-  if (!statusData) {
-    return 'running'
-  }
-  
-  // 返回运行状态的类名
-  return statusData.execution_status || 'running'
+
+  // 默认 running
+  return 'running'
 }
 
 // 查询 Agent 状态（通过网关代理）
