@@ -27,3 +27,45 @@ https://www.npmjs.com/package/@yizhiyanhua-ai/fireworks-tech-graph
 ```bash
 npx skills add yizhiyanhua-ai/fireworks-tech-graph --force -g -y
 ```
+
+## 辅助脚本（推荐）
+
+`scripts/`目录中的四个辅助脚本提供稳定的SVG生成和验证：
+
+### 1. generate-diagram.sh - 验证SVG + 导出PNG
+
+```bash
+./scripts/generate-diagram.sh -t architecture -s 1 -o ./output/arch.svg
+```
+
+### 2. generate-from-template.py - 从模板创建SVG
+
+```bash
+python3 ./scripts/generate-from-template.py architecture ./output/arch.svg '{"title":"My Diagram","nodes":[],"arrows":[]}'
+```
+
+### 3. validate-svg.sh - 验证SVG语法
+
+```bash
+./scripts/validate-svg.sh <svg-file>
+```
+
+### 4. test-all-styles.sh - 批量测试所有样式
+
+```bash
+./scripts/test-all-styles.sh
+```
+
+## 工作流程（始终遵循此顺序）
+
+1. **分类**图表类型
+2. **提取结构** — 从用户描述中识别层、节点、边、流和语义组
+3. **规划布局** — 应用图表类型的布局规则
+4. **加载样式参考** — 默认加载style-1-flat-icon
+5. **将节点映射到形状** — 使用形状词汇表
+6. **检查图标需求**
+7. **编写SVG** — 使用Python List方法（强制）
+8. **验证**：运行`rsvg-convert file.svg -o /dev/null 2>&1`
+9. **导出PNG**：`rsvg-convert -w 1920 file.svg -o file.png`
+10. **报告**生成的文件路径
+11. **（可选）视觉自查**
