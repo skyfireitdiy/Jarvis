@@ -206,7 +206,8 @@ const emit = defineEmits([
   'syncConfig',
   'update:autoLoginEnabled',
   'saveAutoLoginSetting',
-  'updateCodeToMain'
+  'updateCodeToMain',
+  'confirmUpdateCodeToMain'
 ])
 
 // 本地状态
@@ -281,7 +282,7 @@ function syncConfig() {
 
 // 更新代码到 main 分支
 function updateCodeToMain() {
-  emit('updateCodeToMain')
+  emit('confirmUpdateCodeToMain')
 }
 
 // ========== 私钥管理函数 ==========
@@ -362,8 +363,6 @@ async function copyNodeSecret() {
       console.error('降级方案也失败:', fallbackErr)
       alert('复制失败，请手动复制')
     }
-  }
-}
   }
 }
 

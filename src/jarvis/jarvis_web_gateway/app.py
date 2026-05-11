@@ -1883,7 +1883,7 @@ def create_app(
                     response = await node_connection_manager.send_request_to_node(
                         node_id,
                         {
-                            "type": "CODE_UPDATE_TO_MAIN_REQUEST",
+                            "type": "code_update_to_main_request",
                             "version": 1,
                         },
                         {},
