@@ -244,3 +244,58 @@ python3 ./scripts/generate-from-template.py architecture ./output/arch.svg '{"ti
 | 反馈/循环 | 紫色#7c3aed | 1.5px曲线 | 无 | 迭代推理循环 |
 
 当使用2种以上箭头类型时，始终包含图例。
+
+## 布局规则与验证
+
+**间距**：
+- 同层节点：80px水平，120px垂直层间
+- 画布边距：最小40px，节点边缘间60px
+- 对齐到8px网格：水平120px间隔，垂直120px间隔
+
+**箭头标签**（关键）：
+- 必须有背景rect：`<rect fill="canvas_bg" opacity="0.95"/>`，水平4px、垂直2px内边距
+- 放在箭头中点，≤3个词，多个箭头汇聚时错开15-20px
+- 与节点保持10px安全距离
+
+**箭头路由**：
+- 优先正交（L形）路径以最小化交叉
+- 在组件边缘锚定箭头，而非几何中心
+- 绕过密集节点集群，平行箭头使用不同y偏移
+- 不可避免的交叉使用跳弧（5px半径）
+
+**线重叠预防**（关键 - 最常见bug）：
+- 两条箭头必须交叉时，始终使用跳弧防止视觉重叠
+- 交叉水平箭头：添加小半圆弧（半径5px）跳过另一条线
+- 多个交叉：错开弧半径（5px、7px、9px）
+
+**验证清单**（完成前运行）：
+1. **箭头-组件碰撞**：箭头不得穿过组件内部
+2. **文本溢出**：所有文本必须在8px内边距内
+3. **箭头-文本对齐**：箭头端点必须连接到形状边缘
+4. **容器规则**：优先通过组件间的开放间隙进出
+
+## SVG技术规则
+
+- ViewBox：`0 0 960 600`默认；`0 0 960 800`高；`0 0 1200 600`宽
+- 字体：通过`<style>font-family: ...</style>`嵌入 — 不使用外部`@import`
+- `<defs>`：箭头标记、渐变、滤镜、剪切路径
+- 文本：最小12px，推荐13-14px标签，11px子标签，16-18px标题
+- 所有箭头：`<marker>`带`markerEnd`，尺寸`markerWidth="10" markerHeight="7"`
+- 投影：`<feDropShadow>`在`<filter>`中，谨慎使用（仅关键节点）
+- 曲线路径：使用`M x1,y1 C cx1,cy1 cx2,cy2 x2,y2`三次贝塞尔
+- 剪切内容：文本可能溢出节点框时使用`<clipPath>`
+
+## SVG生成与错误预防
+
+**强制：Python List方法**（始终使用）：
+
+```python
+python3 << 'EOF'
+lines = []
+lines.append('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700">')
+lines.append('  <defs>')
+# ... 每行单独
+lines.append('</svg>')
+with open('/path/to/output.svg', 'w') as f:
+    f.write('\n'.join(lines))
+print("SVG generated successfully")
