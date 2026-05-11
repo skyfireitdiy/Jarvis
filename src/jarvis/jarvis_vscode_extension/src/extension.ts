@@ -364,11 +364,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private remoteFileHeartbeatTimer: NodeJS.Timeout | undefined;
   // 远端文件只读状态栏
   private readOnlyStatusBarItem: vscode.StatusBarItem | undefined;
+  // 生成 Agent 名称：Agent类型-创建时间（如：代码Agent-20261213-140013）
+  private generateAgentName(agentType: string): string {
+    const typeName = agentType === 'agent' ? '通用Agent' : '代码Agent';
+    const now = new Date();
+    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    return `${typeName}-${date}-${time}`;
+  }
+
   private readonly createAgentFormState: CreateAgentFormState = {
     isVisible: false,
     agentType: "codeagent",
     workingDir: "~",
-    name: "通用 Agent",
+    name: this.generateAgentName("codeagent"),
     llmGroup: "default",
     nodeId: "",
     useWorktree: false,
@@ -4169,8 +4178,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private updateCreateAgentDefaults(agentType: "agent" | "codeagent"): void {
     this.createAgentFormState.agentType = agentType;
-    this.createAgentFormState.name =
-      agentType === "codeagent" ? "代码Agent" : "通用Agent";
+    this.createAgentFormState.name = this.generateAgentName(agentType);
     if (agentType !== "codeagent") {
       this.createAgentFormState.useWorktree = false;
     }
@@ -4190,9 +4198,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     // 填充创建表单
     this.createAgentFormState.agentType = sourceAgent.agentType || "codeagent";
     this.createAgentFormState.workingDir = sourceAgent.workingDir || "~";
-    this.createAgentFormState.name = sourceAgent.name
-      ? `${sourceAgent.name} (副本)`
-      : "";
+    this.createAgentFormState.name = this.generateAgentName(sourceAgent.agentType || "codeagent");
     this.createAgentFormState.llmGroup =
       sourceAgent.llmGroup || this.defaultLlmGroup || "";
     this.createAgentFormState.nodeId = String(sourceAgent.nodeId || "").trim();
@@ -4343,7 +4349,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             body: JSON.stringify({
               agent_type: sourceAgent.agentType,
               working_dir: sourceAgent.workingDir,
-              name: sourceAgent.name || undefined,
+              name: this.generateAgentName(sourceAgent.agentType || "codeagent"),
               llm_group:
                 sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
               node_id: normalizedNodeId,
