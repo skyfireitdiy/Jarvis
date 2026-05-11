@@ -573,6 +573,7 @@ import 'highlight.js/styles/github-dark.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
+import './diff.css'
 import plantumlEncoder from 'plantuml-encoder'
 import historyStorage from './historyStorage.js'
 import ConnectModal from './components/ConnectModal.vue'
@@ -585,6 +586,7 @@ import TerminalPanel from './components/TerminalPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
+import { renderSideBySideDiff } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -5003,98 +5005,6 @@ function handleMessage(message, agentId = null) {
   }
 }
 
-function renderSideBySideDiff(diffData) {
-  if (!diffData || !diffData.rows) {
-    return '<div class="diff-error">No diff data</div>'
-  }
-  
-  const { file_path, additions, deletions, rows } = diffData
-  
-  // 推断语言类型用于语法高亮
-  const language = getLanguageFromFilename(file_path)
-  
-  let html = '<div class="diff-side-by-side">'
-  
-  // 标题
-  html += '<div class="diff-header">'
-  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || 'Unknown')}</span>`
-  html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`
-  html += '</div>'
-  
-  // 表格
-  html += '<table class="diff-table">'
-  
-  rows.forEach(row => {
-    const { type, old_line_num, old_line, new_line_num, new_line } = row
-    
-    // 行背景色类
-    let rowClass = 'diff-row diff-row-' + type
-    
-    // 旧代码列
-    if (type === 'equal' || type === 'delete' || type === 'replace') {
-      html += `<td class="diff-line-num diff-old-num">${escapeHtml(String(old_line_num || ''))}</td>`
-      
-      // 统计并保留缩进
-      let oldContent = ''
-      if (old_line) {
-        const leadingSpaces = old_line.match(/^(\s*)/)[0]
-        let highlighted
-        try {
-          highlighted = hljs.highlight(old_line, { language }).value
-          // 在高亮结果前添加显式的 &nbsp; 来保留缩进
-          oldContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
-        } catch (e) {
-          // 如果语法高亮不支持该语言，降级为纯文本显示
-          console.warn('[highlight.js] Language not supported:', language, e)
-          oldContent = '&nbsp;'.repeat(leadingSpaces.length) + escapeHtml(old_line)
-        }
-      }
-      
-      // 对于 replace 和 delete，添加删除背景色到 td
-      const oldClass = (type === 'replace' || type === 'delete') ? 'diff-deleted' : ''
-      html += `<td class="diff-content diff-old-content ${oldClass}"><code>${oldContent}</code></td>`
-    } else {
-      html += '<td class="diff-line-num diff-old-num"></td>'
-      html += '<td class="diff-content diff-old-content"></td>'
-    }
-    
-    // 新代码列
-    if (type === 'equal' || type === 'insert' || type === 'replace') {
-      html += `<td class="diff-line-num diff-new-num">${escapeHtml(String(new_line_num || ''))}</td>`
-      
-      // 统计并保留缩进
-      let newContent = ''
-      if (new_line) {
-        const leadingSpaces = new_line.match(/^(\s*)/)[0]
-        let highlighted
-        try {
-          highlighted = hljs.highlight(new_line, { language }).value
-          // 在高亮结果前添加显式的 &nbsp; 来保留缩进
-          newContent = '&nbsp;'.repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, '')
-        } catch (e) {
-          // 如果语法高亮不支持该语言，降级为纯文本显示
-          console.warn('[highlight.js] Language not supported:', language, e)
-          newContent = '&nbsp;'.repeat(leadingSpaces.length) + escapeHtml(new_line)
-        }
-      }
-      
-      // 对于 replace 和 insert，添加新增背景色到 td
-      const newClass = (type === 'replace' || type === 'insert') ? 'diff-added' : ''
-      html += `<td class="diff-content diff-new-content ${newClass}"><code>${newContent}</code></td>`
-    } else {
-      html += '<td class="diff-line-num diff-new-num"></td>'
-      html += '<td class="diff-content diff-new-content"></td>'
-    }
-    
-    html += '</tr>'
-  })
-  
-  html += '</table>'
-  html += '</div>'
-  
-  return html
-}
-
 // 统一的消息HTML渲染函数（用于新消息和历史消息）
 function renderMessageHtml(payload) {
   if (payload?.output_type === 'DIFF') {
@@ -7140,151 +7050,7 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-/* Side by side Diff 样式 */
-.diff-side-by-side {
-  background: var(--color-bg-tertiary);
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 8px 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
 
-.diff-header {
-  background: var(--color-accent-subtle);
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.diff-file-path {
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.diff-stats {
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-}
-
-.diff-additions {
-  color: var(--color-success);
-  font-weight: 600;
-}
-
-.diff-deletions {
-  color: var(--color-error);
-  font-weight: 600;
-}
-
-.diff-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
-}
-
-.diff-row {
-}
-
-.diff-row:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.diff-row-equal {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-row-delete {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-row-insert {
-  /* 背景色移到 td 级别 */
-}
-
-.diff-line-num {
-  color: var(--color-text-secondary);
-  padding: 2px 6px;
-  text-align: right;
-  width: 50px;
-  user-select: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  vertical-align: top;
-}
-
-.diff-content {
-  padding: 2px 6px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  width: 50%;
-  max-width: 50%;
-  vertical-align: top;
-  box-sizing: border-box;
-}
-
-.diff-content code {
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.2;
-  background: transparent;
-  padding: 0;
-  white-space: inherit;
-  word-break: inherit;
-  overflow-wrap: inherit;
-}
-
-.diff-deleted {
-  background: rgba(255, 71, 87, 0.7);
-  color: #fff;
-}
-
-.diff-deleted code {
-  background: inherit;
-}
-
-.diff-added {
-  background: rgba(0, 255, 136, 0.7);
-  color: #fff;
-}
-
-.diff-added code {
-  background: inherit;
-}
-
-.diff-error {
-  color: var(--color-error);
-  padding: 8px 12px;
-  font-weight: 600;
-}
-
-/* 移动端 Diff 适配 */
-@media (max-width: 768px) {
-  .diff-header {
-    padding: 6px 10px;
-  }
-  
-  .diff-file-path {
-    font-size: 13px;
-  }
-  
-  .diff-content {
-    font-size: 11px;
-    padding: 2px 4px;
-  }
-  
-  .diff-line-num {
-    width: 40px;
-    font-size: 10px;
-  }
-}
 </style>
 
 <style scoped>
