@@ -541,6 +541,7 @@
       @disconnectAll="disconnectAll"
       @syncConfig="handleSyncConfig"
       @updateCodeToMain="handleUpdateCodeToMain"
+      @confirmUpdateCodeToMain="confirmUpdateCodeToMain"
     />
 
     <!-- Session 选择对话框 -->
@@ -2814,6 +2815,19 @@ function handleSyncConfig({ sourceNodeId }) {
 // 处理 SettingsModal 组件的更新代码事件
 function handleUpdateCodeToMain() {
   updateCodeToMain()
+}
+
+// 确认更新代码到 main 分支
+function confirmUpdateCodeToMain() {
+  showSettingsModal.value = false
+  showConfirm(
+    '确定要更新所有节点的代码到 main 分支吗？\n\n此操作将：\n1. 切换所有节点到 main 分支\n2. 拉取最新代码\n3. 可能需要重启服务',
+    () => {
+      updateCodeToMain()
+    },
+    () => {},
+    false
+  )
 }
 
 function confirmRestartGateway() {
