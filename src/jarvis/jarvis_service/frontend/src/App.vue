@@ -2371,6 +2371,15 @@ const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
 
+// 生成 Agent 名称：Agent类型-创建时间（如：代码Agent-20261213-140013）
+function generateAgentName(agentType) {
+  const typeName = agentType === 'agent' ? '通用Agent' : '代码Agent'
+  const now = new Date()
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+  const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+  return `${typeName}-${date}-${time}`
+}
+
 // 复制 Agent 时跳过 watch 中的名称设置
 let skipNameWatch = false
 
@@ -2378,10 +2387,10 @@ let skipNameWatch = false
 watch(newAgentType, (newType) => {
   if (skipNameWatch) return
   if (newType === 'agent') {
-    newAgentName.value = '通用Agent'
+    newAgentName.value = generateAgentName('agent')
     newCodeAgentWorktree.value = false
   } else if (newType === 'codeagent') {
-    newAgentName.value = '代码Agent'
+    newAgentName.value = generateAgentName('codeagent')
   }
 }, { immediate: true, flush: 'sync' })
 
@@ -3841,7 +3850,7 @@ async function createAgent() {
       newAgentTaskDescription.value = ''
       newAgentNodeId.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
-      newAgentName.value = newAgentType.value === 'agent' ? '通用 Agent' : '代码 Agent'
+      newAgentName.value = generateAgentName(newAgentType.value)
       // 立即切换到新创建的 agent
       await switchAgent(agent)
       // 刷新列表
@@ -4116,8 +4125,8 @@ async function copyAgent(agent) {
   // 先设置 node_id（会触发 watch 重置目录），再设置正确的目录
   newAgentNodeId.value = String(agent?.node_id || '').trim()
   newAgentDir.value = agent.working_dir || '~'
-  // 设置正确的名称
-  newAgentName.value = agent.name ? `${agent.name} (副本)` : ''
+  // 设置正确的名称（Agent类型-创建时间格式）
+  newAgentName.value = generateAgentName(agent.agent_type || 'codeagent')
 
   // 重置目录选择状态
   resetDirectorySelectionState()
@@ -4149,7 +4158,7 @@ async function batchCopyAgents() {
         const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
           method: 'POST',
           body: JSON.stringify(
-            buildCopiedAgentPayload(agent, agent.name ? `${agent.name}_copy` : undefined, targetNodeId)
+            buildCopiedAgentPayload(agent, generateAgentName(agent.agent_type || 'codeagent'), targetNodeId)
           )
         })
         if (response.ok) {
