@@ -1621,6 +1621,31 @@ def cli(
                     "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
                 }
 
+            @custom_app.get("/diff")
+            async def get_diff_api() -> dict:
+                """获取从 start_commit 到当前代码的 diff。
+
+                返回:
+                    dict: 包含 diff 内容的字典
+                """
+                from jarvis.jarvis_utils.globals import (
+                    global_agents,
+                    running_agent_stack,
+                )
+
+                # 获取根agent（running_agent_stack中第一个，即最早启动的agent）
+                if running_agent_stack:
+                    root_agent_name = running_agent_stack[0]
+                    root_agent = global_agents.get(root_agent_name)
+                    if (
+                        root_agent
+                        and hasattr(root_agent, "start_commit")
+                        and root_agent.start_commit
+                    ):
+                        diff_content = get_diff_between_commits(root_agent.start_commit)
+                        return {"diff": diff_content}
+                return {"diff": ""}
+
             config = uvicorn.Config(
                 create_app(custom_app=custom_app),
                 host="127.0.0.1",

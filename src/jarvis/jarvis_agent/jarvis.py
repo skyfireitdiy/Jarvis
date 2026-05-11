@@ -1202,6 +1202,11 @@ def run_cli(
                     "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
                 }
 
+            @custom_app.get("/diff")
+            async def get_diff_api() -> dict:
+                """获取 diff（通用 Agent 返回空内容）。"""
+                return {"diff": ""}
+
             @custom_app.get("/sessions")
             async def list_sessions():
                 """获取可恢复的 session 列表。"""
