@@ -10,31 +10,44 @@ license: MIT
 
 ## 辅助脚本（推荐）
 
-`scripts/`目录中的四个辅助脚本提供稳定的SVG生成和验证：
+本规则包含辅助脚本和样式参考文件，位于规则文件同级目录：
+
+- `fireworks-tech-graph/scripts/` - 辅助脚本
+- `fireworks-tech-graph/references/` - 样式参考文件
 
 ### 1. generate-diagram.sh - 验证SVG + 导出PNG
 
 ```bash
-./scripts/generate-diagram.sh -t architecture -s 1 -o ./output/arch.svg
+# 假设当前目录在 fireworks-tech-graph 同级
+./fireworks-tech-graph/scripts/generate-diagram.sh -t architecture -s 1 -o ./output/arch.svg
 ```
 
 ### 2. generate-from-template.py - 从模板创建SVG
 
 ```bash
-python3 ./scripts/generate-from-template.py architecture ./output/arch.svg '{"title":"My Diagram","nodes":[],"arrows":[]}'
+python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./output/arch.svg '{"title":"My Diagram","nodes":[],"arrows":[]}'
 ```
 
 ### 3. validate-svg.sh - 验证SVG语法
 
 ```bash
-./scripts/validate-svg.sh <svg-file>
+./fireworks-tech-graph/scripts/validate-svg.sh <svg-file>
 ```
 
-### 4. test-all-styles.sh - 批量测试所有样式
+### 4. 样式参考文件
 
-```bash
-./scripts/test-all-styles.sh
-```
+`references/`目录包含7种视觉样式参考：
+
+- style-1-flat-icon.md - 扁平图标（默认）
+- style-2-dark-terminal.md - 深色终端
+- style-3-blueprint.md - 蓝图
+- style-4-notion-clean.md - Notion简洁
+- style-5-glassmorphism.md - 玻璃态
+- style-6-claude-official.md - Claude官方
+- style-7-openai.md - OpenAI官方
+- icons.md - 图标参考
+- style-diagram-matrix.md - 样式-图表类型适配矩阵
+- svg-layout-best-practices.md - SVG布局最佳实践
 
 ## 工作流程（始终遵循此顺序）
 
