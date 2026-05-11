@@ -3883,15 +3883,14 @@ def create_app(
             items = []
             try:
                 for entry in target_path.iterdir():
-                    if not entry.name.startswith("."):
-                        entry_type = "directory" if entry.is_dir() else "file"
-                        items.append(
-                            {
-                                "name": entry.name,
-                                "path": str(entry),
-                                "type": entry_type,
-                            }
-                        )
+                    entry_type = "directory" if entry.is_dir() else "file"
+                    items.append(
+                        {
+                            "name": entry.name,
+                            "path": str(entry),
+                            "type": entry_type,
+                        }
+                    )
                 items.sort(key=lambda x: (x["type"] != "directory", x["name"]))
             except PermissionError:
                 pass
