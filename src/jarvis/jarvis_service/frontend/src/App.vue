@@ -32,6 +32,7 @@
       @batchCopy="batchCopyAgents"
       @batchDelete="batchDeleteAgents"
       @startResize="startAgentSidebarResize"
+      @viewDiff="viewDiff"
     />
 
     <!-- 主内容区 -->
@@ -553,7 +554,21 @@
       @restore="restoreSession"
       @cancel="cancelSessionDialog"
     />
-    
+
+    <!-- Diff 浮动窗口 -->
+    <div v-if="showDiffModal" class="diff-modal-overlay" @click.self="showDiffModal = false">
+      <div class="diff-modal">
+        <div class="diff-modal-header">
+          <h3>代码变更</h3>
+          <button class="icon-btn" @click="showDiffModal = false" title="关闭">✕</button>
+        </div>
+        <div class="diff-modal-content">
+          <div v-if="diffLoading" class="diff-loading">加载中...</div>
+          <div v-else v-html="diffContent"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -586,7 +601,7 @@ import TerminalPanel from './components/TerminalPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
-import { renderSideBySideDiff } from './diffRenderer.js'
+import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -1019,6 +1034,11 @@ const showTerminalPanel = ref(false)  // 终端面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
 const showMobileMenu = ref(false)     // 移动端菜单
 const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
+
+// Diff 浮动窗口状态
+const showDiffModal = ref(false)      // 显示diff浮动窗口
+const diffContent = ref('')           // diff内容
+const diffLoading = ref(false)        // 加载状态
 
 // 窗口z-index常量
 const BASE_Z_INDEX = 1000
@@ -4187,6 +4207,146 @@ async function batchCopyAgents() {
     showToast('批量复制失败', 'error')
   }
 }
+
+// 解析 diff 文本为结构化数据
+function parseDiffToStructuredData(diffText) {
+  if (!diffText) return null
+
+  const lines = diffText.split('\n')
+  let file_path = ''
+  let additions = 0
+  let deletions = 0
+  const rows = []
+
+  let old_line_num = 0
+  let new_line_num = 0
+  let in_hunk = false
+
+  for (const line of lines) {
+    if (line.startsWith('diff --git') || line.startsWith('index')) {
+      continue
+    } else if (line.startsWith('---')) {
+      const path = line.substring(4).trim()
+      if (path !== '/dev/null') {
+        file_path = path.replace(/^[ab]\//, '')
+      }
+    } else if (line.startsWith('+++')) {
+      const path = line.substring(4).trim()
+      if (path !== '/dev/null') {
+        file_path = path.replace(/^[ab]\//, '')
+      }
+    } else if (line.startsWith('@@')) {
+      in_hunk = true
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+      if (match) {
+        new_line_num = parseInt(match[1], 10)
+        old_line_num = parseInt(line.match(/@@ -(\d+)/)?.[1] || '0', 10)
+      }
+    } else if (in_hunk) {
+      if (line.startsWith('-')) {
+        deletions++
+        rows.push({
+          type: 'delete',
+          old_line_num: old_line_num++,
+          old_line: line.substring(1),
+          new_line_num: null,
+          new_line: null
+        })
+      } else if (line.startsWith('+')) {
+        additions++
+        rows.push({
+          type: 'insert',
+          old_line_num: null,
+          old_line: null,
+          new_line_num: new_line_num++,
+          new_line: line.substring(1)
+        })
+      } else if (line.startsWith(' ')) {
+        rows.push({
+          type: 'equal',
+          old_line_num: old_line_num++,
+          old_line: line.substring(1),
+          new_line_num: new_line_num++,
+          new_line: line.substring(1)
+        })
+      } else if (line === '\\ No newline at end of file') {
+        // 忽略这个特殊行
+      }
+    }
+  }
+
+  // 如果没有找到文件路径，尝试从diff文本中提取
+  if (!file_path) {
+    for (const line of lines) {
+      if (line.startsWith('+++')) {
+        const path = line.substring(4).trim()
+        if (path !== '/dev/null') {
+          file_path = path.replace(/^[ab]\//, '')
+          break
+        }
+      }
+    }
+  }
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  return {
+    file_path: file_path || 'Unknown',
+    additions,
+    deletions,
+    rows
+  }
+}
+
+// 查看 Agent 的 Diff
+async function viewDiff(agent) {
+  if (!agent || !agent.agent_id) {
+    console.warn('[DIFF] Invalid agent:', agent)
+    return
+  }
+
+  diffLoading.value = true
+  showDiffModal.value = true
+  diffContent.value = ''
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/diff`))
+
+    if (!response.ok) {
+      console.warn(`[DIFF] Failed to fetch diff for agent ${agent.agent_id}:`, response.status)
+      diffContent.value = '<div class="diff-error">获取 diff 失败</div>'
+      return
+    }
+
+    const result = await response.json()
+    const diffText = result.diff || ''
+
+    if (!diffText) {
+      diffContent.value = '<div class="diff-empty">暂无变更</div>'
+      return
+    }
+
+    // 解析 diff 并渲染为 side-by-side 格式
+    const diffData = parseDiffToStructuredData(diffText)
+    if (diffData) {
+      diffContent.value = renderSideBySideDiff(diffData)
+    } else {
+      // 如果解析失败，回退到原始 diff 显示
+      diffContent.value = `<pre class="diff-raw">${escapeHtml(diffText)}</pre>`
+    }
+  } catch (error) {
+    console.error('[DIFF] Error fetching diff:', error)
+    diffContent.value = '<div class="diff-error">获取 diff 失败: ' + escapeHtml(error.message) + '</div>'
+  } finally {
+    diffLoading.value = false
+  }
+}
+
+
 
 // 重命名 Agent
 function renameAgent(agent) {
@@ -10498,4 +10658,93 @@ body::-webkit-scrollbar {
 }
 
 /* ========== Toggle Switch 样式结束 ========== */
+
+/* ========== Diff 浮动窗口样式 ========== */
+.diff-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.diff-modal {
+  background: rgba(22, 27, 34, 0.95);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(22, 27, 34, 0.98);
+}
+
+.diff-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.diff-modal-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: rgba(13, 17, 23, 0.8);
+}
+
+.diff-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #8b949e;
+  font-size: 14px;
+}
+
+.diff-error {
+  color: #f85149;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-empty {
+  color: #8b949e;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-raw {
+  margin: 0;
+  padding: 16px;
+  background: rgba(13, 17, 23, 0.8);
+  border-radius: 8px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+
+/* ========== Diff 浮动窗口样式结束 ========== */
 </style>
