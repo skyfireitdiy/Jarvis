@@ -7,7 +7,6 @@
       :sidebarStyle="agentSidebarStyle"
       :isBatchMode="isBatchMode"
       :displayGroups="agentDisplayGroups"
-      :showStopped="showStoppedAgents"
       :currentAgentId="currentAgentId"
       :selectedCount="selectedAgents.size"
       :agentList="agentList"
@@ -22,7 +21,6 @@
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
       @agentClick="handleAgentItemClick"
-      @toggleStoppedAgents="showStoppedAgents = !showStoppedAgents"
       @toggleSelectAgent="toggleSelectAgent"
       @createTerminal="createTerminalForAgent"
       @renameAgent="renameAgent"
@@ -2241,8 +2239,6 @@ watch(showSettingsModal, (newVal) => {
 const agentList = ref([])        // Agent 列表
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
-const showStoppedAgents = ref(false)
-
 function isStoppedAgent(agent) {
   if (!agent) return false
   return getStatusClass(agent) === 'stopped'
@@ -2254,31 +2250,45 @@ const activeAgents = computed(() => {
 const stoppedAgents = computed(() => {
   return agentList.value.filter(agent => isStoppedAgent(agent))
 })
+// 按节点分组的已停止 Agent
+const stoppedAgentsByNode = computed(() => {
+  const grouped = {}
+  stoppedAgents.value.forEach(agent => {
+    const nodeId = getAgentNodeLabel(agent)
+    if (!grouped[nodeId]) {
+      grouped[nodeId] = []
+    }
+    grouped[nodeId].push(agent)
+  })
+  return grouped
+})
 const agentDisplayGroups = computed(() => {
-  return [
+  const groups = [
     {
       key: 'active',
       title: '运行中 Agent',
       agents: activeAgents.value,
       isCollapsible: false,
-    },
-    {
-      key: 'stopped',
-      title: '已停止 Agent',
-      agents: stoppedAgents.value,
-      isCollapsible: true,
     }
   ]
+  
+  // 为每个节点创建一个已停止分组
+  Object.keys(stoppedAgentsByNode.value).sort().forEach(nodeId => {
+    groups.push({
+      key: `stopped-${nodeId}`,
+      title: nodeId,
+      agents: stoppedAgentsByNode.value[nodeId],
+      isCollapsible: true,
+    })
+  })
+  
+  return groups
 })
 const currentAgent = computed(() => {
   return agentList.value.find(agent => agent.agent_id === currentAgentId.value) || null
 })
 
-watch([currentAgentId, agentList], () => {
-  if (currentAgent.value && isStoppedAgent(currentAgent.value)) {
-    showStoppedAgents.value = true
-  }
-}, { deep: true })
+// 注意：已停止Agent的折叠状态现在由AgentSidebar组件内部管理
 
 watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
   if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {

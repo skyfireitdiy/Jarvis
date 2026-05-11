@@ -15,12 +15,12 @@
     <div class="agent-list">
       <template v-for="agentGroup in displayGroups" :key="agentGroup.key">
         <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
-          <button class="agent-collapsed-toggle" @click="$emit('toggleStoppedAgents')">
-            <span class="agent-collapsed-arrow">{{ showStopped ? '▼' : '▶' }}</span>
+          <button class="agent-collapsed-toggle" @click="toggleGroupCollapse(agentGroup.key)">
+            <span class="agent-collapsed-arrow">{{ isGroupCollapsed(agentGroup.key) ? '▶' : '▼' }}</span>
             <span class="agent-collapsed-title">{{ agentGroup.title }}</span>
             <span class="agent-collapsed-count">{{ agentGroup.agents.length }}</span>
           </button>
-          <div v-if="showStopped">
+          <div v-if="!isGroupCollapsed(agentGroup.key)">
             <div
               v-for="agent in agentGroup.agents"
               :key="agent.agent_id"
@@ -115,7 +115,24 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { ref, watch, defineProps, defineEmits } from 'vue'
+
+// 分组折叠状态管理
+const collapsedGroups = ref(new Set())
+
+function isGroupCollapsed(groupKey) {
+  return collapsedGroups.value.has(groupKey)
+}
+
+function toggleGroupCollapse(groupKey) {
+  if (collapsedGroups.value.has(groupKey)) {
+    collapsedGroups.value.delete(groupKey)
+  } else {
+    collapsedGroups.value.add(groupKey)
+  }
+  // 触发响应式更新
+  collapsedGroups.value = new Set(collapsedGroups.value)
+}
 
 const props = defineProps({
   visible: Boolean,
@@ -123,7 +140,6 @@ const props = defineProps({
   sidebarStyle: Object,
   isBatchMode: Boolean,
   displayGroups: Array,
-  showStopped: Boolean,
   currentAgentId: String,
   selectedCount: Number,
   agentList: Array,
@@ -141,7 +157,6 @@ const emit = defineEmits([
   'toggleBatchMode',
   'createAgent',
   'agentClick',
-  'toggleStoppedAgents',
   'toggleSelectAgent',
   'createTerminal',
   'renameAgent',
@@ -153,6 +168,28 @@ const emit = defineEmits([
   'startResize',
   'viewDiff'
 ])
+
+// 监听currentAgentId变化，自动展开对应节点分组
+watch(() => props.currentAgentId, (newAgentId) => {
+  if (!newAgentId || !props.agentList) return
+  
+  const agent = props.agentList.find(a => a.agent_id === newAgentId)
+  if (!agent) return
+  
+  // 检查是否是已停止的Agent
+  const statusClass = props.getStatusClass(agent)
+  if (statusClass !== 'stopped') return
+  
+  // 获取节点标签
+  const nodeLabel = props.getNodeLabel(agent)
+  const groupKey = `stopped-${nodeLabel}`
+  
+  // 如果该分组是折叠的，则展开它
+  if (collapsedGroups.value.has(groupKey)) {
+    collapsedGroups.value.delete(groupKey)
+    collapsedGroups.value = new Set(collapsedGroups.value)
+  }
+})
 </script>
 
 <style scoped>
