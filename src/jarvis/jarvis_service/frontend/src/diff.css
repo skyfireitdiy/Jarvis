@@ -1,0 +1,145 @@
+/* Side by side Diff 样式 */
+.diff-side-by-side {
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.diff-header {
+  background: var(--color-accent-subtle);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.diff-file-path {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.diff-stats {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+}
+
+.diff-additions {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.diff-deletions {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.diff-row {
+}
+
+.diff-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.diff-row-equal {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-row-delete {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-row-insert {
+  /* 背景色移到 td 级别 */
+}
+
+.diff-line-num {
+  color: var(--color-text-secondary);
+  padding: 2px 6px;
+  text-align: right;
+  width: 50px;
+  user-select: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  vertical-align: top;
+}
+
+.diff-content {
+  padding: 2px 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  width: 50%;
+  max-width: 50%;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.diff-content code {
+  font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  background: transparent;
+  padding: 0;
+  white-space: inherit;
+  word-break: inherit;
+  overflow-wrap: inherit;
+}
+
+.diff-deleted {
+  background: rgba(255, 71, 87, 0.7);
+  color: #fff;
+}
+
+.diff-deleted code {
+  background: inherit;
+}
+
+.diff-added {
+  background: rgba(0, 255, 136, 0.7);
+  color: #fff;
+}
+
+.diff-added code {
+  background: inherit;
+}
+
+.diff-error {
+  color: var(--color-error);
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+/* 移动端 Diff 适配 */
+@media (max-width: 768px) {
+  .diff-header {
+    padding: 6px 10px;
+  }
+
+  .diff-file-path {
+    font-size: 13px;
+  }
+
+  .diff-content {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+
+  .diff-line-num {
+    width: 40px;
+    font-size: 10px;
+  }
+}
