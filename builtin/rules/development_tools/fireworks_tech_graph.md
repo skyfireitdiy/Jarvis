@@ -8,26 +8,6 @@ license: MIT
 
 生成高质量SVG技术图表并通过`rsvg-convert`导出PNG。
 
-## 安装源
-
-从GitHub安装此技能：
-
-```bash
-npx skills add yizhiyanhua-ai/fireworks-tech-graph
-```
-
-公共包页面：
-
-```text
-https://www.npmjs.com/package/@yizhiyanhua-ai/fireworks-tech-graph
-```
-
-更新命令：
-
-```bash
-npx skills add yizhiyanhua-ai/fireworks-tech-graph --force -g -y
-```
-
 ## 辅助脚本（推荐）
 
 `scripts/`目录中的四个辅助脚本提供稳定的SVG生成和验证：
