@@ -35,7 +35,6 @@
                 <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-                <span class="agent-node" v-if="getNodeLabel(agent)" :title="`节点: ${getNodeLabel(agent)}`">🧭 {{ getNodeLabel(agent) }}</span>
                 <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
                 <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
                 <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
@@ -66,7 +65,6 @@
               <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-              <span class="agent-node" v-if="getNodeLabel(agent)" :title="`节点: ${getNodeLabel(agent)}`">🧭 {{ getNodeLabel(agent) }}</span>
               <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
               <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
               <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
