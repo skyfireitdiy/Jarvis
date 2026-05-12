@@ -1212,42 +1212,16 @@ def run_cli(
             @custom_app.get("/rules")
             async def get_rules_api() -> dict:
                 """获取规则信息（总体的和已加载的）。"""
-                try:
-                    agent = get_current_agent()
-                    if agent and hasattr(agent, "rules_manager"):
-                        rules_manager = agent.rules_manager
-                        rules_info = rules_manager.get_all_rules_with_status()
-                        rules_list = [
-                            {
-                                "name": name,
-                                "preview": preview,
-                                "is_loaded": is_loaded,
-                                "file_path": file_path,
-                            }
-                            for name, preview, is_loaded, file_path in rules_info
-                        ]
-                        return {"rules": rules_list}
-                    return {"rules": []}
-                except Exception as e:
-                    return {"rules": [], "error": str(e)}
+                from jarvis.jarvis_web_gateway.common_endpoints import get_rules_info
+
+                return get_rules_info()
 
             @custom_app.get("/tools")
             async def get_tools_api() -> dict:
                 """获取工具信息（全量工具和允许使用的工具）。"""
-                try:
-                    agent = get_current_agent()
-                    if agent:
-                        tool_registry = agent.get_tool_registry()
-                        if tool_registry:
-                            all_tools = tool_registry.get_all_tools()
-                            allowed_tools = getattr(agent, "use_tools", None)
-                            return {
-                                "all_tools": all_tools,
-                                "allowed_tools": allowed_tools,
-                            }
-                    return {"all_tools": [], "allowed_tools": None}
-                except Exception as e:
-                    return {"all_tools": [], "allowed_tools": None, "error": str(e)}
+                from jarvis.jarvis_web_gateway.common_endpoints import get_tools_info
+
+                return get_tools_info()
 
             @custom_app.get("/sessions")
             async def list_sessions():
