@@ -163,18 +163,17 @@ const props = defineProps({
   isSelected: Function
 })
 
-// 监听 displayGroups 变化，更新折叠状态
+// 监听 displayGroups 变化，只添加新分组，不覆盖已有折叠状态
 watch(() => props.displayGroups, (newGroups) => {
   if (!newGroups) return
-  
-  // 添加新分组到折叠状态
+
+  // 只添加新分组到折叠状态，保留用户已设置的折叠/展开状态
   newGroups.forEach(group => {
     if (group.isCollapsible && !collapsedGroups.value.has(group.key)) {
       collapsedGroups.value.add(group.key)
     }
   })
-  collapsedGroups.value = new Set(collapsedGroups.value)
-}, { deep: true })
+}, { immediate: false })
 
 const emit = defineEmits([
   'close',
