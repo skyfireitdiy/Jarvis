@@ -117,7 +117,6 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
-const collapsedGroupsVersion = ref(0)
 
 // 初始化时折叠所有分组
 onMounted(() => {
@@ -128,7 +127,6 @@ onMounted(() => {
         collapsedGroupsMap.value[group.key] = true
       }
     })
-    collapsedGroupsVersion.value++
   }
 })
 
@@ -142,8 +140,6 @@ function toggleGroupCollapse(groupKey) {
   } else {
     collapsedGroupsMap.value[groupKey] = true
   }
-  // 触发响应式更新
-  collapsedGroupsVersion.value++
 }
 
 const props = defineProps({
@@ -164,22 +160,7 @@ const props = defineProps({
   isSelected: Function
 })
 
-// 监听 displayGroups 变化，只添加新分组，不覆盖已有折叠状态
-watch(() => props.displayGroups, (newGroups) => {
-  if (!newGroups) return
-
-  // 只添加新分组到折叠状态，保留用户已设置的折叠/展开状态
-  let hasNewGroup = false
-  newGroups.forEach(group => {
-    if (group.isCollapsible && !collapsedGroupsMap.value[group.key]) {
-      collapsedGroupsMap.value[group.key] = true
-      hasNewGroup = true
-    }
-  })
-  if (hasNewGroup) {
-    collapsedGroupsVersion.value++
-  }
-}, { immediate: false })
+// 无需监听 displayGroups 变化，避免覆盖用户的折叠/展开操作
 
 const emit = defineEmits([
   'close',
