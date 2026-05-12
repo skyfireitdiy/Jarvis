@@ -10871,7 +10871,7 @@ body::-webkit-scrollbar {
 
 /* ========== Rules 浮动窗口样式 ========== */
 .rules-modal {
-  max-width: 800px;
+  max-width: 90vw;
 }
 
 .rules-table {
