@@ -3450,7 +3450,8 @@ function getStatusText(agent) {
   const labels = {
     'running': '运行中',
     'waiting_multi': '等待多行输入',
-    'waiting_single': '等待确认'
+    'waiting_single': '等待确认',
+    'waiting_confirm': '等待确认'
   }
   const executionStatusText = labels[executionStatus] || '运行中'
   
@@ -3462,18 +3463,14 @@ function getStatusText(agent) {
 function getStatusClass(agent) {
   const statusData = agentStatuses.value.get(agent.agent_id)
 
-  // 优先使用 agentStatuses 中的实时状态
-  if (statusData && statusData.execution_status) {
-    // 将 'finished' 映射为 'stopped'，确保图标显示正确
-    if (statusData.execution_status === 'finished') {
-      return 'stopped'
-    }
-    return statusData.execution_status
-  }
-
-  // 回退：如果 Agent 已停止
+  // 优先使用 agent 状态：如果 agent 已停止，直接显示 stopped
   if (agent.status === 'stopped') {
     return 'stopped'
+  }
+
+  // 非 stopped 状态：使用 execution_status
+  if (statusData && statusData.execution_status) {
+    return statusData.execution_status
   }
 
   // 默认 running
@@ -8269,8 +8266,13 @@ body::-webkit-scrollbar {
 }
 
 .agent-status-dot.waiting_single {
-  background: #f85149;
-  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
+  background: #d29922;
+  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+}
+
+.agent-status-dot.waiting_confirm {
+  background: #d29922;
+  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
 .agent-llm-group {

@@ -63,11 +63,13 @@ class AgentStatus(Enum):
     - RUNNING: agent 正在运行中（包括执行任务、空闲等待命令）- 默认状态
     - WAITING_MULTI: agent 需要多行输入（如代码）
     - WAITING_SINGLE: agent 需要单行确认（如是否继续）
+    - WAITING_CONFIRM: agent 等待用户确认（如是否继续）
     """
 
     RUNNING = "running"  # 运行中（默认状态）
     WAITING_MULTI = "waiting_multi"  # 等待多行输入
     WAITING_SINGLE = "waiting_single"  # 等待单行确认
+    WAITING_CONFIRM = "waiting_confirm"  # 等待确认
 
 
 class AgentStateManager:
