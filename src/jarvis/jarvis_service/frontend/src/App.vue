@@ -589,7 +589,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="rule in rulesContent" :key="rule.name">
+              <tr v-for="rule in rulesContent" :key="rule.name" :title="rule.preview">
                 <td>{{ rule.name }}</td>
                 <td>
                   <span :class="rule.is_loaded ? 'rule-loaded' : 'rule-not-loaded'">
@@ -640,7 +640,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="tool in toolsContent.all_tools" :key="tool.name">
+                <tr v-for="tool in toolsContent.all_tools" :key="tool.name" :title="tool.description">
                   <td>{{ tool.name }}</td>
                   <td class="rule-preview">{{ tool.description }}</td>
                 </tr>
@@ -4530,9 +4530,24 @@ async function viewTools(agent) {
     }
 
     const result = await response.json()
+    const allTools = result.all_tools || []
+    const allowedTools = result.allowed_tools
+    
+    // 如果有allowed_tools，将允许的工具排到顶部
+    if (allowedTools && allowedTools.length > 0) {
+      const allowedSet = new Set(allowedTools)
+      allTools.sort((a, b) => {
+        const aAllowed = allowedSet.has(a.name)
+        const bAllowed = allowedSet.has(b.name)
+        if (aAllowed && !bAllowed) return -1
+        if (!aAllowed && bAllowed) return 1
+        return 0
+      })
+    }
+    
     toolsContent.value = {
-      all_tools: result.all_tools || [],
-      allowed_tools: result.allowed_tools
+      all_tools: allTools,
+      allowed_tools: allowedTools
     }
   } catch (error) {
     console.error('[TOOLS] Error fetching tools:', error)
