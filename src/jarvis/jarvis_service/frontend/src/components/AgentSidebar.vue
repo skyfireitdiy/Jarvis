@@ -115,8 +115,9 @@
 <script setup>
 import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 
-// 分组折叠状态管理
-const collapsedGroups = ref(new Set())
+// 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
+const collapsedGroupsMap = ref({})
+const collapsedGroupsVersion = ref(0)
 
 // 初始化时折叠所有分组
 onMounted(() => {
@@ -124,25 +125,25 @@ onMounted(() => {
   if (props.displayGroups) {
     props.displayGroups.forEach(group => {
       if (group.isCollapsible) {
-        collapsedGroups.value.add(group.key)
+        collapsedGroupsMap.value[group.key] = true
       }
     })
-    collapsedGroups.value = new Set(collapsedGroups.value)
+    collapsedGroupsVersion.value++
   }
 })
 
 function isGroupCollapsed(groupKey) {
-  return collapsedGroups.value.has(groupKey)
+  return !!collapsedGroupsMap.value[groupKey]
 }
 
 function toggleGroupCollapse(groupKey) {
-  if (collapsedGroups.value.has(groupKey)) {
-    collapsedGroups.value.delete(groupKey)
+  if (collapsedGroupsMap.value[groupKey]) {
+    delete collapsedGroupsMap.value[groupKey]
   } else {
-    collapsedGroups.value.add(groupKey)
+    collapsedGroupsMap.value[groupKey] = true
   }
   // 触发响应式更新
-  collapsedGroups.value = new Set(collapsedGroups.value)
+  collapsedGroupsVersion.value++
 }
 
 const props = defineProps({
@@ -168,11 +169,16 @@ watch(() => props.displayGroups, (newGroups) => {
   if (!newGroups) return
 
   // 只添加新分组到折叠状态，保留用户已设置的折叠/展开状态
+  let hasNewGroup = false
   newGroups.forEach(group => {
-    if (group.isCollapsible && !collapsedGroups.value.has(group.key)) {
-      collapsedGroups.value.add(group.key)
+    if (group.isCollapsible && !collapsedGroupsMap.value[group.key]) {
+      collapsedGroupsMap.value[group.key] = true
+      hasNewGroup = true
     }
   })
+  if (hasNewGroup) {
+    collapsedGroupsVersion.value++
+  }
 }, { immediate: false })
 
 const emit = defineEmits([
