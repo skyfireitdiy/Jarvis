@@ -18,7 +18,7 @@
           <button class="agent-collapsed-toggle" @click="toggleGroupCollapse(agentGroup.key)">
             <span class="agent-collapsed-arrow">{{ isGroupCollapsed(agentGroup.key) ? '▶' : '▼' }}</span>
             <span class="agent-collapsed-title">{{ agentGroup.title }}</span>
-            <span class="agent-collapsed-count">{{ agentGroup.agents.length }}</span>
+            <span class="agent-collapsed-count">({{ agentGroup.agents.filter(a => getStatusClass(a) !== 'stopped').length }}/{{ agentGroup.agents.length }})</span>
           </button>
           <div v-if="!isGroupCollapsed(agentGroup.key)">
             <div
@@ -113,10 +113,23 @@
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits } from 'vue'
+import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 
 // 分组折叠状态管理
 const collapsedGroups = ref(new Set())
+
+// 初始化时折叠所有分组
+onMounted(() => {
+  // 等待 displayGroups 加载后初始化折叠状态
+  if (props.displayGroups) {
+    props.displayGroups.forEach(group => {
+      if (group.isCollapsible) {
+        collapsedGroups.value.add(group.key)
+      }
+    })
+    collapsedGroups.value = new Set(collapsedGroups.value)
+  }
+})
 
 function isGroupCollapsed(groupKey) {
   return collapsedGroups.value.has(groupKey)
@@ -149,6 +162,19 @@ const props = defineProps({
   getNodeLabel: Function,
   isSelected: Function
 })
+
+// 监听 displayGroups 变化，更新折叠状态
+watch(() => props.displayGroups, (newGroups) => {
+  if (!newGroups) return
+  
+  // 添加新分组到折叠状态
+  newGroups.forEach(group => {
+    if (group.isCollapsible && !collapsedGroups.value.has(group.key)) {
+      collapsedGroups.value.add(group.key)
+    }
+  })
+  collapsedGroups.value = new Set(collapsedGroups.value)
+}, { deep: true })
 
 const emit = defineEmits([
   'close',
