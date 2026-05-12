@@ -5189,6 +5189,19 @@ function handleMessage(message, agentId = null) {
     if (payload?.execution_status) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
       console.log('[ws] Agent execution status updated:', payload.execution_status, 'for agent:', targetAgentId)
+
+      // 同步更新 agentList 中对应 agent 的状态，确保界面能及时响应
+      const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
+      if (agentInList) {
+        // 如果 execution_status 表示停止（如 'stopped' 或 'finished'），更新 agent.status
+        if (['stopped', 'finished'].includes(payload.execution_status)) {
+          agentInList.status = 'stopped'
+        } else if (payload.execution_status === 'running') {
+          agentInList.status = 'running'
+        }
+        console.log('[ws] Synced agent status in agentList for agent:', targetAgentId, 'status:', agentInList.status)
+      }
+
       // 当当前 Agent 开始思考时，自动滚动到底部
       if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId)) {
         nextTick(() => {
