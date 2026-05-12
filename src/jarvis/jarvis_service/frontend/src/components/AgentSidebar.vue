@@ -513,6 +513,11 @@ watch(() => props.currentAgentId, (newAgentId) => {
   box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
+.agent-status-dot.waiting_confirm {
+  background: #d29922;
+  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+}
+
 .agent-llm-group {
   font-size: 10px;
   color: #666;
