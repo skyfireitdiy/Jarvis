@@ -32,6 +32,7 @@
       @startResize="startAgentSidebarResize"
       @viewDiff="viewDiff"
       @viewRules="viewRules"
+      @viewTools="viewTools"
     />
 
     <!-- 主内容区 -->
@@ -599,6 +600,53 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tools 浮动窗口 -->
+    <div v-if="showToolsModal" class="diff-modal-overlay" @click.self="showToolsModal = false">
+      <div class="diff-modal rules-modal">
+        <div class="diff-modal-header">
+          <h3>工具信息</h3>
+          <button class="icon-btn" @click="showToolsModal = false" title="关闭">✕</button>
+        </div>
+        <div class="diff-modal-content">
+          <div v-if="toolsLoading" class="diff-loading">加载中...</div>
+          <div v-else>
+            <h4 class="tools-section-title">允许使用的工具</h4>
+            <div v-if="!toolsContent.allowed_tools" class="diff-empty">使用全部工具</div>
+            <table v-else-if="toolsContent.allowed_tools.length > 0" class="rules-table">
+              <thead>
+                <tr>
+                  <th>工具名称</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tool in toolsContent.allowed_tools" :key="tool">
+                  <td>{{ tool }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="diff-empty">无允许的工具</div>
+
+            <h4 class="tools-section-title">全量工具 ({{ toolsContent.all_tools.length }})</h4>
+            <div v-if="toolsContent.all_tools.length === 0" class="diff-empty">暂无工具</div>
+            <table v-else class="rules-table">
+              <thead>
+                <tr>
+                  <th>工具名称</th>
+                  <th>描述</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tool in toolsContent.all_tools" :key="tool.name">
+                  <td>{{ tool.name }}</td>
+                  <td class="rule-preview">{{ tool.description }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -4452,6 +4500,45 @@ async function viewRules(agent) {
     rulesContent.value = []
   } finally {
     rulesLoading.value = false
+  }
+}
+
+// 查看工具
+const showToolsModal = ref(false)
+const toolsContent = ref({ all_tools: [], allowed_tools: null })
+const toolsLoading = ref(false)
+
+async function viewTools(agent) {
+  if (!agent || !agent.agent_id) {
+    console.warn('[TOOLS] Invalid agent:', agent)
+    return
+  }
+
+  toolsLoading.value = true
+  showToolsModal.value = true
+  toolsContent.value = { all_tools: [], allowed_tools: null }
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/tools`))
+
+    if (!response.ok) {
+      console.warn(`[TOOLS] Failed to fetch tools for agent ${agent.agent_id}:`, response.status)
+      toolsContent.value = { all_tools: [], allowed_tools: null }
+      return
+    }
+
+    const result = await response.json()
+    toolsContent.value = {
+      all_tools: result.all_tools || [],
+      allowed_tools: result.allowed_tools
+    }
+  } catch (error) {
+    console.error('[TOOLS] Error fetching tools:', error)
+    toolsContent.value = { all_tools: [], allowed_tools: null }
+  } finally {
+    toolsLoading.value = false
   }
 }
 
@@ -10920,6 +11007,18 @@ body::-webkit-scrollbar {
   white-space: nowrap;
   color: #8b949e;
   font-size: 12px;
+}
+
+.tools-section-title {
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  padding: 0 12px;
+}
+
+.tools-section-title:first-child {
+  margin-top: 0;
 }
 
 /* ========== Rules 浮动窗口样式结束 ========== */
