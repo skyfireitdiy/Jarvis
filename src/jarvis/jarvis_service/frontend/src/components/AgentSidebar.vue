@@ -118,17 +118,15 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
 
-// 初始化时折叠所有分组
-onMounted(() => {
-  // 等待 displayGroups 加载后初始化折叠状态
-  if (props.displayGroups) {
-    props.displayGroups.forEach(group => {
-      if (group.isCollapsible) {
-        collapsedGroupsMap.value[group.key] = true
-      }
-    })
-  }
-})
+// 初始化时折叠所有分组 - 使用 watch once 确保数据加载后只执行一次
+watch(() => props.displayGroups, (newGroups) => {
+  if (!newGroups) return
+  newGroups.forEach(group => {
+    if (group.isCollapsible) {
+      collapsedGroupsMap.value[group.key] = true
+    }
+  })
+}, { immediate: true, once: true })
 
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
