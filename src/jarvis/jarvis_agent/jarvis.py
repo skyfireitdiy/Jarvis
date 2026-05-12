@@ -1231,6 +1231,24 @@ def run_cli(
                 except Exception as e:
                     return {"rules": [], "error": str(e)}
 
+            @custom_app.get("/tools")
+            async def get_tools_api() -> dict:
+                """获取工具信息（全量工具和允许使用的工具）。"""
+                try:
+                    agent = get_current_agent()
+                    if agent:
+                        tool_registry = agent.get_tool_registry()
+                        if tool_registry:
+                            all_tools = tool_registry.get_all_tools()
+                            allowed_tools = getattr(agent, "use_tools", None)
+                            return {
+                                "all_tools": all_tools,
+                                "allowed_tools": allowed_tools,
+                            }
+                    return {"all_tools": [], "allowed_tools": None}
+                except Exception as e:
+                    return {"all_tools": [], "allowed_tools": None, "error": str(e)}
+
             @custom_app.get("/sessions")
             async def list_sessions():
                 """获取可恢复的 session 列表。"""
