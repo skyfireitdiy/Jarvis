@@ -10914,7 +10914,7 @@ body::-webkit-scrollbar {
   flex: 1;
   overflow: auto;
   padding: 20px;
-  background: rgba(13, 17, 23, 0.8);
+  background: var(--color-bg-tertiary);
 }
 
 .diff-loading {
