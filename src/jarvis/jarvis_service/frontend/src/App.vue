@@ -2250,7 +2250,7 @@ const activeAgents = computed(() => {
 const stoppedAgents = computed(() => {
   return agentList.value.filter(agent => isStoppedAgent(agent))
 })
-// 按节点分组的已停止 Agent
+// 按节点分组的已停止 Agent（保留用于其他可能的引用）
 const stoppedAgentsByNode = computed(() => {
   const grouped = {}
   stoppedAgents.value.forEach(agent => {
@@ -2262,26 +2262,52 @@ const stoppedAgentsByNode = computed(() => {
   })
   return grouped
 })
-const agentDisplayGroups = computed(() => {
-  const groups = [
-    {
-      key: 'active',
-      title: '运行中 Agent',
-      agents: activeAgents.value,
-      isCollapsible: false,
-    }
-  ]
-  
-  // 为每个节点创建一个已停止分组
-  Object.keys(stoppedAgentsByNode.value).sort().forEach(nodeId => {
-    groups.push({
-      key: `stopped-${nodeId}`,
-      title: nodeId,
-      agents: stoppedAgentsByNode.value[nodeId],
-      isCollapsible: true,
-    })
+// 按节点分组所有 Agent，每个节点组内非停止 Agent 置顶
+const agentsByNode = computed(() => {
+  const grouped = {}
+  // 创建 agent_id 到索引的映射，用于保持时间倒序
+  const agentIndexMap = new Map()
+  agentList.value.forEach((agent, index) => {
+    agentIndexMap.set(agent.agent_id, index)
   })
   
+  agentList.value.forEach(agent => {
+    const nodeId = getAgentNodeLabel(agent)
+    if (!grouped[nodeId]) {
+      grouped[nodeId] = { active: [], stopped: [] }
+    }
+    if (isStoppedAgent(agent)) {
+      grouped[nodeId].stopped.push(agent)
+    } else {
+      grouped[nodeId].active.push(agent)
+    }
+  })
+  
+  // 对每个分组的 agent 按照在 agentList 中的索引排序（保持时间倒序，最新的在顶部）
+  Object.keys(grouped).forEach(nodeId => {
+    grouped[nodeId].active.sort((a, b) => agentIndexMap.get(a.agent_id) - agentIndexMap.get(b.agent_id))
+    grouped[nodeId].stopped.sort((a, b) => agentIndexMap.get(a.agent_id) - agentIndexMap.get(b.agent_id))
+  })
+  
+  return grouped
+})
+const agentDisplayGroups = computed(() => {
+  const groups = []
+
+  // 为每个节点创建分组，非停止 Agent 在前，已停止 Agent 在后
+  Object.keys(agentsByNode.value).sort().forEach(nodeId => {
+    const nodeAgents = agentsByNode.value[nodeId]
+    const allAgents = [...nodeAgents.active, ...nodeAgents.stopped]
+    if (allAgents.length > 0) {
+      groups.push({
+        key: `node-${nodeId}`,
+        title: nodeId,
+        agents: allAgents,
+        isCollapsible: true,
+      })
+    }
+  })
+
   return groups
 })
 const currentAgent = computed(() => {
