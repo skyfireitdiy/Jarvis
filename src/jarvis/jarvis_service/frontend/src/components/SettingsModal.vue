@@ -193,6 +193,10 @@ const props = defineProps({
   gatewayUrl: {
     type: String,
     default: '127.0.0.1:8000'
+  },
+  showToast: {
+    type: Function,
+    default: () => {}
   }
 })
 
@@ -344,7 +348,7 @@ async function copyNodeSecret() {
   try {
     await navigator.clipboard.writeText(nodeSecret.value)
     console.log('复制成功')
-    showToast('已复制到剪贴板', 'success')
+    props.showToast('已复制到剪贴板', 'success')
   } catch (error) {
     console.error('复制失败，尝试降级方案:', error)
     // 降级方案：使用 execCommand
@@ -358,7 +362,7 @@ async function copyNodeSecret() {
       document.execCommand('copy')
       document.body.removeChild(textArea)
       console.log('降级方案复制成功')
-      showToast('已复制到剪贴板', 'success')
+      props.showToast('已复制到剪贴板', 'success')
     } catch (fallbackErr) {
       console.error('降级方案也失败:', fallbackErr)
       alert('复制失败，请手动复制')

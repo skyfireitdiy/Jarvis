@@ -530,6 +530,7 @@
       :isUpdatingCode="isUpdatingCode"
       :getToken="getAuthToken"
       :gatewayUrl="gatewayUrl"
+      :showToast="showToast"
       @update:visible="showSettingsModal = $event"
       @update:connectionLockEnabled="connectionLockEnabled = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
