@@ -1209,6 +1209,28 @@ def run_cli(
                 """获取 diff（通用 Agent 返回空内容）。"""
                 return {"diff": ""}
 
+            @custom_app.get("/rules")
+            async def get_rules_api() -> dict:
+                """获取规则信息（总体的和已加载的）。"""
+                try:
+                    agent = get_current_agent()
+                    if agent and hasattr(agent, "rules_manager"):
+                        rules_manager = agent.rules_manager
+                        rules_info = rules_manager.get_all_rules_with_status()
+                        rules_list = [
+                            {
+                                "name": name,
+                                "preview": preview,
+                                "is_loaded": is_loaded,
+                                "file_path": file_path,
+                            }
+                            for name, preview, is_loaded, file_path in rules_info
+                        ]
+                        return {"rules": rules_list}
+                    return {"rules": []}
+                except Exception as e:
+                    return {"rules": [], "error": str(e)}
+
             @custom_app.get("/sessions")
             async def list_sessions():
                 """获取可恢复的 session 列表。"""

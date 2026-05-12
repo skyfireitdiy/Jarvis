@@ -31,6 +31,7 @@
       @batchDelete="batchDeleteAgents"
       @startResize="startAgentSidebarResize"
       @viewDiff="viewDiff"
+      @viewRules="viewRules"
     />
 
     <!-- 主内容区 -->
@@ -568,6 +569,40 @@
       </div>
     </div>
 
+    <!-- Rules 浮动窗口 -->
+    <div v-if="showRulesModal" class="diff-modal-overlay" @click.self="showRulesModal = false">
+      <div class="diff-modal rules-modal">
+        <div class="diff-modal-header">
+          <h3>规则信息</h3>
+          <button class="icon-btn" @click="showRulesModal = false" title="关闭">✕</button>
+        </div>
+        <div class="diff-modal-content">
+          <div v-if="rulesLoading" class="diff-loading">加载中...</div>
+          <div v-else-if="rulesContent.length === 0" class="diff-empty">暂无规则</div>
+          <table v-else class="rules-table">
+            <thead>
+              <tr>
+                <th>规则名称</th>
+                <th>状态</th>
+                <th>预览</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="rule in rulesContent" :key="rule.name">
+                <td>{{ rule.name }}</td>
+                <td>
+                  <span :class="rule.is_loaded ? 'rule-loaded' : 'rule-not-loaded'">
+                    {{ rule.is_loaded ? '已加载' : '未加载' }}
+                  </span>
+                </td>
+                <td class="rule-preview">{{ rule.preview }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -1038,6 +1073,11 @@ const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'edito
 const showDiffModal = ref(false)      // 显示diff浮动窗口
 const diffContent = ref('')           // diff内容
 const diffLoading = ref(false)        // 加载状态
+
+// Rules 浮动窗口状态
+const showRulesModal = ref(false)     // 显示rules浮动窗口
+const rulesContent = ref([])          // rules内容（规则列表）
+const rulesLoading = ref(false)       // 加载状态
 
 // 窗口z-index常量
 const BASE_Z_INDEX = 1000
@@ -4381,6 +4421,38 @@ async function viewDiff(agent) {
     diffContent.value = '<div class="diff-error">获取 diff 失败: ' + escapeHtml(error.message) + '</div>'
   } finally {
     diffLoading.value = false
+  }
+}
+
+// 查看规则
+async function viewRules(agent) {
+  if (!agent || !agent.agent_id) {
+    console.warn('[RULES] Invalid agent:', agent)
+    return
+  }
+
+  rulesLoading.value = true
+  showRulesModal.value = true
+  rulesContent.value = []
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/rules`))
+
+    if (!response.ok) {
+      console.warn(`[RULES] Failed to fetch rules for agent ${agent.agent_id}:`, response.status)
+      rulesContent.value = []
+      return
+    }
+
+    const result = await response.json()
+    rulesContent.value = result.rules || []
+  } catch (error) {
+    console.error('[RULES] Error fetching rules:', error)
+    rulesContent.value = []
+  } finally {
+    rulesLoading.value = false
   }
 }
 
@@ -10797,4 +10869,59 @@ body::-webkit-scrollbar {
 }
 
 /* ========== Diff 浮动窗口样式结束 ========== */
+
+/* ========== Rules 浮动窗口样式 ========== */
+.rules-modal {
+  max-width: 800px;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rules-table th,
+.rules-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.rules-table th {
+  background: rgba(22, 27, 34, 0.98);
+  color: #8b949e;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-table td {
+  color: #e6edf3;
+}
+
+.rules-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rule-loaded {
+  color: #3fb950;
+  font-weight: 500;
+}
+
+.rule-not-loaded {
+  color: #8b949e;
+}
+
+.rule-preview {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+/* ========== Rules 浮动窗口样式结束 ========== */
 </style>
