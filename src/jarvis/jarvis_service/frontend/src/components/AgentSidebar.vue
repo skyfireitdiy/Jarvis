@@ -172,18 +172,14 @@ const emit = defineEmits([
 // 监听currentAgentId变化，自动展开对应节点分组
 watch(() => props.currentAgentId, (newAgentId) => {
   if (!newAgentId || !props.agentList) return
-  
+
   const agent = props.agentList.find(a => a.agent_id === newAgentId)
   if (!agent) return
-  
-  // 检查是否是已停止的Agent
-  const statusClass = props.getStatusClass(agent)
-  if (statusClass !== 'stopped') return
-  
+
   // 获取节点标签
   const nodeLabel = props.getNodeLabel(agent)
-  const groupKey = `stopped-${nodeLabel}`
-  
+  const groupKey = `node-${nodeLabel}`
+
   // 如果该分组是折叠的，则展开它
   if (collapsedGroups.value.has(groupKey)) {
     collapsedGroups.value.delete(groupKey)
