@@ -3464,6 +3464,10 @@ function getStatusClass(agent) {
 
   // 优先使用 agentStatuses 中的实时状态
   if (statusData && statusData.execution_status) {
+    // 将 'finished' 映射为 'stopped'，确保图标显示正确
+    if (statusData.execution_status === 'finished') {
+      return 'stopped'
+    }
     return statusData.execution_status
   }
 
