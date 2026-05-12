@@ -4291,27 +4291,39 @@ function parseDiffToStructuredData(diffText) {
   if (!diffText) return null
 
   const lines = diffText.split('\n')
-  let file_path = ''
-  let additions = 0
-  let deletions = 0
-  const rows = []
-
+  const files = []
+  let currentFile = null
   let old_line_num = 0
   let new_line_num = 0
   let in_hunk = false
 
+  function startNewFile() {
+    if (currentFile && currentFile.rows.length > 0) {
+      files.push(currentFile)
+    }
+    currentFile = {
+      file_path: '',
+      additions: 0,
+      deletions: 0,
+      rows: []
+    }
+    in_hunk = false
+  }
+
   for (const line of lines) {
-    if (line.startsWith('diff --git') || line.startsWith('index')) {
-      continue
+    if (line.startsWith('diff --git')) {
+      startNewFile()
     } else if (line.startsWith('---')) {
+      if (!currentFile) startNewFile()
       const path = line.substring(4).trim()
       if (path !== '/dev/null') {
-        file_path = path.replace(/^[ab]\//, '')
+        currentFile.file_path = path.replace(/^[ab]\//, '')
       }
     } else if (line.startsWith('+++')) {
+      if (!currentFile) startNewFile()
       const path = line.substring(4).trim()
       if (path !== '/dev/null') {
-        file_path = path.replace(/^[ab]\//, '')
+        currentFile.file_path = path.replace(/^[ab]\//, '')
       }
     } else if (line.startsWith('@@')) {
       in_hunk = true
@@ -4320,10 +4332,10 @@ function parseDiffToStructuredData(diffText) {
         new_line_num = parseInt(match[1], 10)
         old_line_num = parseInt(line.match(/@@ -(\d+)/)?.[1] || '0', 10)
       }
-    } else if (in_hunk) {
+    } else if (in_hunk && currentFile) {
       if (line.startsWith('-')) {
-        deletions++
-        rows.push({
+        currentFile.deletions++
+        currentFile.rows.push({
           type: 'delete',
           old_line_num: old_line_num++,
           old_line: line.substring(1),
@@ -4331,8 +4343,8 @@ function parseDiffToStructuredData(diffText) {
           new_line: null
         })
       } else if (line.startsWith('+')) {
-        additions++
-        rows.push({
+        currentFile.additions++
+        currentFile.rows.push({
           type: 'insert',
           old_line_num: null,
           old_line: null,
@@ -4340,7 +4352,7 @@ function parseDiffToStructuredData(diffText) {
           new_line: line.substring(1)
         })
       } else if (line.startsWith(' ')) {
-        rows.push({
+        currentFile.rows.push({
           type: 'equal',
           old_line_num: old_line_num++,
           old_line: line.substring(1),
@@ -4353,29 +4365,16 @@ function parseDiffToStructuredData(diffText) {
     }
   }
 
-  // 如果没有找到文件路径，尝试从diff文本中提取
-  if (!file_path) {
-    for (const line of lines) {
-      if (line.startsWith('+++')) {
-        const path = line.substring(4).trim()
-        if (path !== '/dev/null') {
-          file_path = path.replace(/^[ab]\//, '')
-          break
-        }
-      }
-    }
+  // 添加最后一个文件
+  if (currentFile && currentFile.rows.length > 0) {
+    files.push(currentFile)
   }
 
-  if (rows.length === 0) {
+  if (files.length === 0) {
     return null
   }
 
-  return {
-    file_path: file_path || 'Unknown',
-    additions,
-    deletions,
-    rows
-  }
+  return { files }
 }
 
 // 查看 Agent 的 Diff
@@ -4410,8 +4409,8 @@ async function viewDiff(agent) {
 
     // 解析 diff 并渲染为 side-by-side 格式
     const diffData = parseDiffToStructuredData(diffText)
-    if (diffData) {
-      diffContent.value = renderSideBySideDiff(diffData)
+    if (diffData && diffData.files) {
+      diffContent.value = diffData.files.map(f => renderSideBySideDiff(f)).join('')
     } else {
       // 如果解析失败，回退到原始 diff 显示
       diffContent.value = `<pre class="diff-raw">${escapeHtml(diffText)}</pre>`
