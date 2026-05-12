@@ -42,7 +42,7 @@
               </div>
               <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
               <div class="agent-actions">
-                <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">📝</button>
+                <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
                 <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
@@ -73,7 +73,7 @@
             </div>
             <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
             <div class="agent-actions">
-              <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">📝</button>
+              <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
               <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
@@ -351,10 +351,10 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-item {
-  padding: 8px;
+  padding: 6px;
   background: var(--color-bg-tertiary);
   border: 0.5px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   position: relative;
 }
@@ -438,8 +438,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
 .agent-info {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
+  gap: 4px;
+  margin-bottom: 2px;
 }
 
 .agent-type {
@@ -466,10 +466,10 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 .agent-status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  margin-left: 8px;
+  margin-left: 4px;
   flex-shrink: 0;
 }
 
@@ -494,11 +494,11 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-llm-group {
-  font-size: 11px;
+  font-size: 10px;
   color: #666;
   background: rgba(108, 117, 125, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 .agent-port {
@@ -508,38 +508,38 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-type-icon {
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
 .agent-name {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-primary);
   flex-shrink: 0;
 }
 
 .agent-dir {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-text-secondary);
   word-break: break-all;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .agent-actions {
   display: flex;
-  gap: 4px;
-  margin-top: 6px;
+  gap: 3px;
+  margin-top: 4px;
   justify-content: flex-end;
 }
 
 .icon-btn-small {
   background: var(--color-bg-tertiary);
   border: 0.5px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 4px;
+  font-size: 12px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 6px;
   color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }
