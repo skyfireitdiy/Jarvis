@@ -118,16 +118,6 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
 
-// 初始化时折叠所有分组 - 使用 watch once 确保数据加载后只执行一次
-watch(() => props.displayGroups, (newGroups) => {
-  if (!newGroups) return
-  newGroups.forEach(group => {
-    if (group.isCollapsible) {
-      collapsedGroupsMap.value[group.key] = true
-    }
-  })
-}, { immediate: true, once: true })
-
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
 }
@@ -158,7 +148,18 @@ const props = defineProps({
   isSelected: Function
 })
 
-// 无需监听 displayGroups 变化，避免覆盖用户的折叠/展开操作
+// 初始化时折叠所有分组 - 只在首次初始化时设置，避免后续数据更新覆盖用户操作
+watch(() => props.displayGroups, (newGroups) => {
+  if (!newGroups || newGroups.length === 0) return
+  // 只在 collapsedGroupsMap 为空时初始化折叠状态
+  if (Object.keys(collapsedGroupsMap.value).length === 0) {
+    newGroups.forEach(group => {
+      if (group.isCollapsible) {
+        collapsedGroupsMap.value[group.key] = true
+      }
+    })
+  }
+}, { immediate: true })
 
 const emit = defineEmits([
   'close',
@@ -189,9 +190,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
   const groupKey = `node-${nodeLabel}`
 
   // 如果该分组是折叠的，则展开它
-  if (collapsedGroups.value.has(groupKey)) {
-    collapsedGroups.value.delete(groupKey)
-    collapsedGroups.value = new Set(collapsedGroups.value)
+  if (collapsedGroupsMap.value[groupKey]) {
+    delete collapsedGroupsMap.value[groupKey]
   }
 })
 </script>
