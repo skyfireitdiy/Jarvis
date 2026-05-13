@@ -4853,7 +4853,15 @@ async function loadFileTreeNode(agentId, node) {
     const { host, port } = getGatewayAddress()
     // 使用当前Agent的node_id，而不是编辑器会话的node_id
     const agent = agentList.value.find(a => a.agent_id === agentId)
-    const targetNodeId = String(agent?.node_id || 'master').trim() || 'master'
+    if (!agent) {
+      console.error('[FILETREE] 找不到Agent:', agentId)
+      return
+    }
+    if (!agent.node_id) {
+      console.error('[FILETREE] Agent没有node_id:', agent)
+      return
+    }
+    const targetNodeId = String(agent.node_id).trim()
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `directories?path=${encodeURIComponent(node.path)}`))
     
     if (!response.ok) {
