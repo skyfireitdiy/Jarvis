@@ -245,7 +245,7 @@
                 暂无 Agent，请先创建 Agent
               </div>
             </div>
-            <div v-else class="editor-sidebar-content editor-sidebar-placeholder">
+            <div v-if="agentList.length > 0" class="editor-sidebar-content editor-sidebar-placeholder">
               <div class="editor-sidebar-placeholder-icon">📁</div>
               <div class="editor-sidebar-placeholder-text">请先选择一个 Agent 以查看工作目录树。</div>
             </div>
