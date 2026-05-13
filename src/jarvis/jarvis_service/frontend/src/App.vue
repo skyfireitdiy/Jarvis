@@ -1822,9 +1822,22 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   monacoEditor.focus()
 }
 
-async function fetchFileContent(path) {
+async function fetchFileContent(path, agentId = null) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
+  let targetNodeId
+  if (agentId) {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (!agent) {
+      throw new Error(`找不到Agent: ${agentId}`)
+    }
+    if (!agent.node_id) {
+      throw new Error(`Agent没有node_id: ${agentId}`)
+    }
+    targetNodeId = String(agent.node_id).trim()
+  } else {
+    targetNodeId = getEditorTargetNodeId()
+  }
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-content'), {
     method: 'POST',
     body: JSON.stringify({ path, node_id: targetNodeId })
