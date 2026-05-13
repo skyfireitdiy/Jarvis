@@ -629,7 +629,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
