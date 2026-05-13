@@ -45,6 +45,7 @@
                 <button class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
                 <button class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
                 <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+                <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
                 <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
@@ -74,8 +75,8 @@
             <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
             <div class="agent-actions">
               <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-              <button class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
               <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+              <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
               <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
@@ -180,7 +181,8 @@ const emit = defineEmits([
   'startResize',
   'viewDiff',
   'viewRules',
-  'viewTools'
+  'viewTools',
+  'openEditor'
 ])
 
 // 监听currentAgentId变化，自动展开对应节点分组
