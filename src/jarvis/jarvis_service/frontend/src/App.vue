@@ -4544,7 +4544,12 @@ async function viewRules(agent) {
     }
 
     const result = await response.json()
-    rulesContent.value = result.rules || []
+    const rules = result.rules || []
+    // 已加载的规则置顶
+    rulesContent.value = rules.sort((a, b) => {
+      if (a.is_loaded === b.is_loaded) return 0
+      return a.is_loaded ? -1 : 1
+    })
   } catch (error) {
     console.error('[RULES] Error fetching rules:', error)
     rulesContent.value = []
