@@ -21,34 +21,76 @@
             <span class="agent-collapsed-count">({{ agentGroup.agents.filter(a => getStatusClass(a) !== 'stopped').length }}/{{ agentGroup.agents.length }})</span>
           </button>
           <div v-if="!isGroupCollapsed(agentGroup.key)">
-            <div
-              v-for="agent in agentGroup.agents"
-              :key="agent.agent_id"
-              class="agent-item"
-              :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id) }"
-              @click="$emit('agentClick', agent, $event)"
-            >
-              <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
-                <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
+            <!-- 活跃agent列表 -->
+            <template v-for="agent in agentGroup.agents.filter(a => getStatusClass(a) !== 'stopped')" :key="agent.agent_id">
+              <div
+                class="agent-item"
+                :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id) }"
+                @click="$emit('agentClick', agent, $event)"
+              >
+                <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
+                  <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
+                </div>
+                <div class="agent-info">
+                  <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨
+                  <span class="agent-name">{{ agent.name }}</span>
+                  <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
+                  <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
+                  <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
+                  <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
+                </div>
+                <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
+                <div class="agent-actions">
+                  <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
+                  <button class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
+                  <button class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
+                  <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+                  <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
+                  <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
+                  <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
+                  <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
+                </div>
               </div>
-              <div class="agent-info">
-                <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
-                <span class="agent-name">{{ agent.name }}</span>
-                <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-                <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
-                <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
-                <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
-              </div>
-              <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
-              <div class="agent-actions">
-                <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-                <button class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-                <button class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-                <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-                <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-                <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
-                <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
-                <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
+            </template>
+            
+            <!-- 已停止agent的折叠分组 -->
+            <div v-if="agentGroup.agents.filter(a => getStatusClass(a) === 'stopped').length > 0" class="agent-stopped-section">
+              <button class="agent-stopped-toggle" @click="toggleStoppedCollapse(agentGroup.key)">
+                <span class="agent-stopped-arrow">{{ isStoppedCollapsed(agentGroup.key) ? '▶' : '▼' }}</span>
+                <span class="agent-stopped-title">已停止</span>
+                <span class="agent-stopped-count">({{ agentGroup.agents.filter(a => getStatusClass(a) === 'stopped').length }})</span>
+              </button>
+              <div v-if="!isStoppedCollapsed(agentGroup.key)">
+                <template v-for="agent in agentGroup.agents.filter(a => getStatusClass(a) === 'stopped')" :key="agent.agent_id">
+                  <div
+                    class="agent-item"
+                    :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id) }"
+                    @click="$emit('agentClick', agent, $event)"
+                  >
+                    <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
+                      <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
+                    </div>
+                    <div class="agent-info">
+                      <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨
+                      <span class="agent-name">{{ agent.name }}</span>
+                      <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
+                      <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
+                      <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
+                      <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
+                    </div>
+                    <div class="agent-dir">{{ agent.working_dir || '未提供工作目录' }}</div>
+                    <div class="agent-actions">
+                      <button class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
+                      <button class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
+                      <button class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
+                      <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+                      <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
+                      <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
+                      <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
+                      <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -121,6 +163,7 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
+const stoppedCollapsedMap = ref({})
 
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
@@ -131,6 +174,18 @@ function toggleGroupCollapse(groupKey) {
     delete collapsedGroupsMap.value[groupKey]
   } else {
     collapsedGroupsMap.value[groupKey] = true
+  }
+}
+
+function isStoppedCollapsed(groupKey) {
+  return !!stoppedCollapsedMap.value[groupKey]
+}
+
+function toggleStoppedCollapse(groupKey) {
+  if (stoppedCollapsedMap.value[groupKey]) {
+    delete stoppedCollapsedMap.value[groupKey]
+  } else {
+    stoppedCollapsedMap.value[groupKey] = true
   }
 }
 
@@ -358,6 +413,49 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 .agent-collapsed-count {
   font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.agent-stopped-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.agent-stopped-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--color-bg-secondary);
+  border: 0.5px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+}
+
+.agent-stopped-toggle:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.agent-stopped-arrow {
+  width: 12px;
+  color: var(--color-text-muted);
+}
+
+.agent-stopped-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.agent-stopped-count {
+  font-size: 11px;
   color: var(--color-text-muted);
 }
 
