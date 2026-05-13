@@ -48,9 +48,6 @@
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
-          <button class="icon-btn" @click="showEditorPanel = !showEditorPanel" :disabled="!socket" title="编辑器">
-            📝
-          </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
             👤
           </button>
@@ -81,9 +78,6 @@
         <div class="header-actions desktop-only">
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
-          </button>
-          <button class="icon-btn" @click="showEditorPanel = !showEditorPanel" :disabled="!socket" title="编辑器">
-            📝
           </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
             👤
@@ -186,40 +180,69 @@
             <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
           </div>
           <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
-            <div v-if="currentAgent" class="editor-file-tree-panel">
-              <div class="editor-file-tree-root" @click.stop="ensureEditorSidebarFileTree(currentAgent)">
-                {{ currentAgent.working_dir }}
-              </div>
-              <div v-if="!hasEditorSidebarFileTree" class="editor-file-tree-empty">
-                当前工作目录下暂无可显示内容
-              </div>
-              <div v-else class="editor-file-tree-list">
+            <div class="editor-file-tree-panel">
+              <!-- Agent 节点列表 -->
+              <div
+                v-for="agent in agentList"
+                :key="agent.agent_id"
+                class="editor-agent-node"
+              >
                 <div
-                  v-for="visibleNode in getVisibleFileTreeNodes(currentAgent.agent_id)"
-                  :key="visibleNode.node.path"
-                  class="tree-node editor-tree-node"
+                  class="tree-node-content agent-node-content"
+                  @click.stop="toggleAgentExpanded(agent.agent_id)"
                 >
+                  <span
+                    class="tree-node-icon expand-arrow"
+                    :class="{ expanded: expandedAgents.has(agent.agent_id) }"
+                  >▶</span>
+                  <span class="tree-node-icon agent-icon">🤖</span>
+                  <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
+                  <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                </div>
+                <!-- Agent 的文件树 -->
+                <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                   <div
-                    class="tree-node-content"
-                    :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                    @click.stop="handleFileTreeNodeClick(currentAgent.agent_id, visibleNode.node)"
+                    class="editor-file-tree-root"
+                    @click.stop="ensureEditorSidebarFileTree(agent)"
                   >
-                    <span
-                      v-if="visibleNode.node.type === 'directory'"
-                      class="tree-node-icon expand-arrow"
-                      :class="{ expanded: visibleNode.node.expanded }"
-                    >▶</span>
-                    <span v-else class="tree-node-icon"></span>
-                    <span
-                      class="tree-node-icon"
-                      :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
-                    >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
-                    <span
-                      class="tree-node-text"
-                      :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
-                    >{{ visibleNode.node.name }}</span>
+                    {{ agent.working_dir }}
+                  </div>
+                  <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                    当前工作目录下暂无可显示内容
+                  </div>
+                  <div v-else class="editor-file-tree-list">
+                    <div
+                      v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
+                      :key="visibleNode.node.path"
+                      class="tree-node editor-tree-node"
+                    >
+                      <div
+                        class="tree-node-content"
+                        :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                        @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                      >
+                        <span
+                          v-if="visibleNode.node.type === 'directory'"
+                          class="tree-node-icon expand-arrow"
+                          :class="{ expanded: visibleNode.node.expanded }"
+                        >▶</span>
+                        <span v-else class="tree-node-icon"></span>
+                        <span
+                          class="tree-node-icon"
+                          :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                        >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                        <span
+                          class="tree-node-text"
+                          :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                        >{{ visibleNode.node.name }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </div>
+              <!-- 无 Agent 提示 -->
+              <div v-if="agentList.length === 0" class="editor-file-tree-empty">
+                暂无 Agent，请先创建 Agent
               </div>
             </div>
             <div v-else class="editor-sidebar-content editor-sidebar-placeholder">
@@ -1236,6 +1259,23 @@ const renameInput = ref(null)               // 重命名输入框引用
 const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
 const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：agent_id -> Set(expandedPaths)
 const fileTreeLoading = ref(new Map())      // 每个 Agent 的加载状态：agent_id -> Set(loadingPaths)
+const expandedAgents = ref(new Set())       // 编辑器目录树中展开的 Agent 集合
+
+// 切换 Agent 在目录树中的展开状态
+function toggleAgentExpanded(agentId) {
+  if (expandedAgents.value.has(agentId)) {
+    expandedAgents.value.delete(agentId)
+  } else {
+    expandedAgents.value.add(agentId)
+    // 展开时确保该 Agent 的文件树已初始化
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (agent && !fileTreeState.value.has(agentId)) {
+      initFileTree(agentId, agent.working_dir)
+    }
+  }
+  // 触发响应式更新
+  expandedAgents.value = new Set(expandedAgents.value)
+}
 
 // 过滤后的目录列表（支持模糊搜索）
 const filteredDirList = computed(() => {
@@ -1636,7 +1676,7 @@ function resolveAgentRelativePath(relativePath) {
 
 async function fetchGlobalSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+  const targetNodeId = getEditorTargetNodeId()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `global-search/${agentId}`), {
     method: 'POST',
     body: JSON.stringify({
@@ -1652,12 +1692,12 @@ async function fetchGlobalSearchResults(agentId, payload) {
 }
 
 const hasEditorSidebarFileTree = computed(() => {
-  const agentId = currentAgentId.value
+  const agentId = activeEditorSessionId.value
   if (!agentId) return false
   return getVisibleFileTreeNodes(agentId).length > 0
 })
 
-async function ensureEditorSidebarFileTree(agent = currentAgent.value) {
+async function ensureEditorSidebarFileTree(agent = activeEditorSession.value?.agent) {
   if (!agent?.agent_id || !agent.working_dir) return
   const treeNodes = fileTreeState.value.get(agent.agent_id) || []
   if (treeNodes.length === 0) {
@@ -1776,7 +1816,7 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
 
 async function fetchFileContent(path) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+  const targetNodeId = getEditorTargetNodeId()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-content'), {
     method: 'POST',
     body: JSON.stringify({ path, node_id: targetNodeId })
@@ -1791,7 +1831,7 @@ async function fetchFileContent(path) {
 
 async function fetchFileStat(path) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+  const targetNodeId = getEditorTargetNodeId()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-stat'), {
     method: 'POST',
     body: JSON.stringify({ path, node_id: targetNodeId })
@@ -1948,7 +1988,7 @@ async function saveEditorTab(path) {
   const content = model ? model.getValue() : tab.content
 
   const { host, port } = getGatewayAddress()
-  const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+  const targetNodeId = getEditorTargetNodeId()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-write'), {
     method: 'POST',
     body: JSON.stringify({ path, content, node_id: targetNodeId })
@@ -3998,6 +4038,12 @@ function getCurrentAgentNodeId() {
   return String(currentAgent.value?.node_id || '').trim()
 }
 
+// 获取编辑器目标节点ID（优先使用编辑器对应agent的节点ID）
+function getEditorTargetNodeId() {
+  const editorAgentNodeId = activeEditorSession.value?.agent?.node_id
+  return String(editorAgentNodeId || getCurrentAgentNodeId() || 'master').trim() || 'master'
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
   // 无交互模式下必须提供任务描述
@@ -4805,7 +4851,7 @@ async function loadFileTreeNode(agentId, node) {
   
   try {
     const { host, port } = getGatewayAddress()
-    const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    const targetNodeId = getEditorTargetNodeId()
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `directories?path=${encodeURIComponent(node.path)}`))
     
     if (!response.ok) {
@@ -7821,6 +7867,56 @@ body::-webkit-scrollbar {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.editor-file-tree-empty {
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Agent 节点样式 */
+.editor-agent-node {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.agent-node-content {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  font-weight: 500;
+  gap: 6px;
+}
+
+.agent-node-content:hover {
+  background: var(--color-bg-hover);
+}
+
+.agent-icon {
+  font-size: 14px;
+}
+
+.agent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-node-id {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.agent-file-tree {
+  border-left: 2px solid var(--color-border);
+  margin-left: 12px;
 }
 
 .editor-sidebar-placeholder {
