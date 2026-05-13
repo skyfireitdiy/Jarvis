@@ -1226,8 +1226,19 @@ const editorPanelInteraction = ref({
   startHeight: 0,
 })
 const editorContainerRef = ref(null)
-const editorTabs = ref([])
-const activeEditorTabPath = ref(null)
+// 编辑器多实例管理（类似 terminalSessions）
+const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), monacoEditor: null }]
+const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
+
+// 保持向后兼容的计算属性
+const editorTabs = computed(() => {
+  const session = editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value)
+  return session ? session.tabs : []
+})
+const activeEditorTabPath = computed(() => {
+  const session = editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value)
+  return session ? session.activeTabPath : null
+})
 const editorModels = new Map()
 let monacoEditor = null
 let editorFileHeartbeatTimer = null
