@@ -623,6 +623,7 @@
               <tr>
                 <th>规则名称</th>
                 <th>状态</th>
+                <th>文件路径</th>
                 <th>预览</th>
               </tr>
             </thead>
@@ -634,10 +635,16 @@
                     {{ rule.is_loaded ? '已加载' : '未加载' }}
                   </span>
                 </td>
+                <td class="rule-file-path">{{ rule.file_path || '--' }}</td>
                 <td class="rule-preview">{{ rule.preview }}</td>
               </tr>
             </tbody>
           </table>
+          <!-- 已加载规则内容 -->
+          <div v-if="rulesLoadedContent" class="rules-loaded-content-section">
+            <h4 class="rules-section-title">已加载规则内容</h4>
+            <pre class="rules-loaded-content">{{ rulesLoadedContent }}</pre>
+          </div>
         </div>
       </div>
     </div>
@@ -1165,6 +1172,7 @@ const diffLoading = ref(false)        // 加载状态
 const showRulesModal = ref(false)     // 显示rules浮动窗口
 const rulesContent = ref([])          // rules内容（规则列表）
 const rulesLoading = ref(false)       // 加载状态
+const rulesLoadedContent = ref('')    // 已加载规则的具体内容
 
 // 窗口z-index常量
 const BASE_Z_INDEX = 1000
@@ -4704,6 +4712,7 @@ async function viewRules(agent) {
   rulesLoading.value = true
   showRulesModal.value = true
   rulesContent.value = []
+  rulesLoadedContent.value = ''
 
   try {
     const { host, port } = getGatewayAddress()
@@ -4713,6 +4722,7 @@ async function viewRules(agent) {
     if (!response.ok) {
       console.warn(`[RULES] Failed to fetch rules for agent ${agent.agent_id}:`, response.status)
       rulesContent.value = []
+      rulesLoadedContent.value = ''
       return
     }
 
@@ -4723,9 +4733,11 @@ async function viewRules(agent) {
       if (a.is_loaded === b.is_loaded) return 0
       return a.is_loaded ? -1 : 1
     })
+    rulesLoadedContent.value = result.loaded_rules_content || ''
   } catch (error) {
     console.error('[RULES] Error fetching rules:', error)
     rulesContent.value = []
+    rulesLoadedContent.value = ''
   } finally {
     rulesLoading.value = false
   }
@@ -11357,6 +11369,41 @@ body::-webkit-scrollbar {
 
 .rule-loaded {
   color: #3fb950;
+}
+
+.rule-not-loaded {
+  color: #8b949e;
+}
+
+.rules-loaded-content-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rules-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-loaded-content {
+  background: rgba(22, 27, 34, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
   font-weight: 500;
 }
 
