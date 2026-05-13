@@ -33,6 +33,7 @@
       @viewDiff="viewDiff"
       @viewRules="viewRules"
       @viewTools="viewTools"
+      @openEditor="createEditorForAgent"
     />
 
     <!-- 主内容区 -->
@@ -153,75 +154,32 @@
     />
 
     <!-- 浮动编辑器面板 -->
-    <aside
-      v-show="showEditorPanel"
-      class="editor-panel"
-      :class="{ 'editor-panel-dragging': editorPanelInteraction.active }"
-      :style="editorPanelStyle"
-      @mousedown="focusWindow('editor')"
+    <EditorPanel
+      ref="editorPanelRef"
+      :visible="showEditorPanel"
+      :interaction="editorPanelInteraction"
+      :panelStyle="editorPanelStyle"
+      :agentName="activeEditorSession?.agent_name"
+      :activeTab="activeEditorTab"
+      :activeTabPath="activeEditorTabPath"
+      :tabs="editorTabs"
+      :isMaximized="isEditorMaximized"
+      :isEditable="isEditorEditable"
+      :showSidebar="showEditorSidebar"
+      :sidebarView="editorSidebarView"
+      :resizeDirections="editorResizeDirections"
+      @focus="focusWindow('editor')"
+      @startMove="startEditorPanelMove"
+      @toggleMaximize="toggleEditorMaximize"
+      @save="saveActiveEditorTab"
+      @close="closeEditorPanel"
+      @activateTab="activateEditorTab"
+      @closeTab="closeEditorTab"
+      @toggleEditable="toggleEditorEditable"
+      @setSidebarView="setEditorSidebarView"
+      @startResize="startEditorPanelResize"
     >
-      <div
-        class="editor-panel-header"
-        @mousedown="startEditorPanelMove"
-        @dblclick.stop="toggleEditorMaximize"
-      >
-        <div class="editor-panel-title-group">
-          <h3>编辑器</h3>
-          <span v-if="activeEditorTab" class="editor-panel-subtitle">{{ activeEditorTab.path }}</span>
-        </div>
-        <div class="editor-panel-actions">
-          <button class="icon-btn" @click.stop="saveActiveEditorTab" :disabled="!activeEditorTab || activeEditorTab.loading" title="保存文件">💾</button>
-          <button class="icon-btn maximize-btn" @click="toggleEditorMaximize" :title="isEditorMaximized ? '还原' : '最大化'">
-            {{ isEditorMaximized ? '🗗' : '🗖' }}
-          </button>
-          <button class="icon-btn" @click="closeEditorPanel" title="关闭编辑器">✕</button>
-        </div>
-      </div>
-      <div class="editor-tabs" v-if="editorTabs.length > 0">
-        <div
-          v-for="tab in editorTabs"
-          :key="tab.path"
-          class="editor-tab"
-          :class="{ active: activeEditorTabPath === tab.path }"
-          @click="activateEditorTab(tab.path)"
-        >
-          <span class="editor-tab-name">{{ tab.name }}</span>
-          <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
-          <button class="editor-tab-close" @click.stop="closeEditorTab(tab.path)">✕</button>
-        </div>
-      </div>
-      <div class="editor-panel-toolbar">
-        <span class="editor-toolbar-status" v-if="activeEditorTab?.loading">加载中...</span>
-        <span class="editor-toolbar-status error" v-else-if="activeEditorTab?.error">{{ activeEditorTab.error }}</span>
-        <span class="editor-toolbar-status" v-else-if="activeEditorTab">{{ activeEditorTab.isDirty ? '未保存修改' : '已保存' }}</span>
-        <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
-        <div class="editor-toolbar-spacer"></div>
-        <button
-          v-if="editorTabs.length > 0"
-          class="editor-edit-toggle"
-          :class="{ 'editable': isEditorEditable }"
-          @click="toggleEditorEditable"
-          :title="isEditorEditable ? '切换到只读模式' : '切换到编辑模式'"
-        >
-          <span class="editor-edit-toggle-icon">{{ isEditorEditable ? '🔓' : '🔒' }}</span>
-          <span class="editor-edit-toggle-text">{{ isEditorEditable ? '可编辑' : '只读' }}</span>
-        </button>
-      </div>
-      <div class="editor-workspace">
-        <div class="editor-activity-bar">
-          <button
-            class="editor-activity-button"
-            :class="{ active: showEditorSidebar && editorSidebarView === 'files' }"
-            @click="setEditorSidebarView('files')"
-            title="目录树"
-          >📁</button>
-          <button
-            class="editor-activity-button"
-            :class="{ active: showEditorSidebar && editorSidebarView === 'search' }"
-            @click="setEditorSidebarView('search')"
-            title="全局搜索"
-          >🔎</button>
-        </div>
+      <template #sidebar>
         <aside v-if="showEditorSidebar" class="editor-sidebar">
           <div class="editor-sidebar-header">
             <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
@@ -332,22 +290,8 @@
             </div>
           </div>
         </aside>
-        <div class="editor-panel-content editor-panel-content-main">
-          <div v-if="editorTabs.length === 0" class="editor-placeholder">
-            <div class="editor-placeholder-icon">📝</div>
-            <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
-            <div class="editor-placeholder-text">支持 Monaco 语法高亮、代码折叠、多标签切换与保存。</div>
-          </div>
-          <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
-        </div>
-      </div>
-      <div
-        v-for="direction in editorResizeDirections"
-        :key="direction"
-        :class="['editor-resize-handle', `editor-resize-${direction}`]"
-        @mousedown="startEditorPanelResize($event, direction)"
-      ></div>
-    </aside>
+      </template>
+    </EditorPanel>
 
     <!-- 底部输入区 -->
     <footer class="input-area">
@@ -680,6 +624,7 @@ import SessionDialog from './components/SessionDialog.vue'
 import AgentSidebar from './components/AgentSidebar.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
+import EditorPanel from './components/EditorPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
@@ -1225,7 +1170,8 @@ const editorPanelInteraction = ref({
   startWidth: 0,
   startHeight: 0,
 })
-const editorContainerRef = ref(null)
+const editorPanelRef = ref(null)
+const editorContainerRef = computed(() => editorPanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
 const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), monacoEditor: null }]
 const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
@@ -1238,6 +1184,9 @@ const editorTabs = computed(() => {
 const activeEditorTabPath = computed(() => {
   const session = editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value)
   return session ? session.activeTabPath : null
+})
+const activeEditorSession = computed(() => {
+  return editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value) || null
 })
 const editorModels = new Map()
 let monacoEditor = null
