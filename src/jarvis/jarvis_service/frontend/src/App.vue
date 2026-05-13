@@ -1934,7 +1934,7 @@ function startEditorFileHeartbeat() {
   }, EDITOR_FILE_HEARTBEAT_INTERVAL)
 }
 
-async function openEditorFile(path) {
+async function openEditorFile(path, agentId = null) {
   if (!path) return
 
   showEditorPanel.value = true
@@ -1963,8 +1963,8 @@ async function openEditorFile(path) {
 
   try {
     const [content, fileStat] = await Promise.all([
-      fetchFileContent(path),
-      fetchFileStat(path),
+      fetchFileContent(path, agentId),
+      fetchFileStat(path, agentId),
     ])
     tab.content = content
     tab.originalContent = content
