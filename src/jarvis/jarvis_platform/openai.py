@@ -275,6 +275,7 @@ class OpenAIModel(BasePlatform):
             response = self.client.chat.completions.create(**api_params)
 
             full_response = ""
+            full_reasoning = ""
 
             if use_streaming:
                 # 流式模式：迭代 chunk 增量输出
@@ -294,7 +295,7 @@ class OpenAIModel(BasePlatform):
                                 and choice.delta.reasoning_content
                             ):
                                 text = choice.delta.reasoning_content
-                                # full_response += text  # 不加到 full_response，只流式打印
+                                full_reasoning += text
                                 yield ("reason", text)
                             # 处理 content（正文内容）
                             if choice.delta.content:
@@ -304,9 +305,10 @@ class OpenAIModel(BasePlatform):
                 if full_response:
                     # 曾经成功过，说明流式请求是可以的
                     self._streaming_disabled = False
-                    self.messages.append(
-                        {"role": "assistant", "content": full_response}
-                    )
+                    assistant_message = {"role": "assistant", "content": full_response}
+                    if full_reasoning:
+                        assistant_message["reasoning_content"] = full_reasoning
+                    self.messages.append(assistant_message)
                 else:
                     # 未设置的状态才设置为True
                     if self._streaming_disabled is None:
@@ -318,15 +320,21 @@ class OpenAIModel(BasePlatform):
                     )
                     if fallback_response.choices and len(fallback_response.choices) > 0:
                         fallback_message = fallback_response.choices[0].message
-                        # fallback_reasoning = (
-                        #     getattr(fallback_message, "reasoning_content", None) or ""
-                        # )  # 不使用 reasoning
+                        fallback_reasoning = (
+                            getattr(fallback_message, "reasoning_content", None) or ""
+                        )
                         fallback_text = fallback_message.content or ""
                         fallback_content = fallback_text
                         if fallback_content:
-                            self.messages.append(
-                                {"role": "assistant", "content": fallback_content}
-                            )
+                            assistant_message = {
+                                "role": "assistant",
+                                "content": fallback_content,
+                            }
+                            if fallback_reasoning:
+                                assistant_message["reasoning_content"] = (
+                                    fallback_reasoning
+                                )
+                            self.messages.append(assistant_message)
                             yield ("content", fallback_content)
                             return
                     raise Exception("No response from model")
@@ -335,13 +343,17 @@ class OpenAIModel(BasePlatform):
                 if response.choices and len(response.choices) > 0:
                     response_message = response.choices[0].message
                     # 处理 reasoning_content（推理过程，如 GLM 模型）
-                    # reasoning = getattr(response_message, "reasoning_content", None) or ""  # 不使用 reasoning
+                    reasoning = (
+                        getattr(response_message, "reasoning_content", None) or ""
+                    )
                     content = response_message.content or ""
                     full_response = content
+                    full_reasoning = reasoning
                 if full_response:
-                    self.messages.append(
-                        {"role": "assistant", "content": full_response}
-                    )
+                    assistant_message = {"role": "assistant", "content": full_response}
+                    if full_reasoning:
+                        assistant_message["reasoning_content"] = full_reasoning
+                    self.messages.append(assistant_message)
                     yield ("content", full_response)
                 else:
                     raise Exception("No response from model")
