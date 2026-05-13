@@ -1273,8 +1273,8 @@ function toggleAgentExpanded(agentId) {
       initFileTree(agentId, agent.working_dir)
     }
   }
-  // 触发响应式更新
-  expandedAgents.value = new Set(expandedAgents.value)
+  // 手动触发响应式更新
+  triggerRef(expandedAgents)
 }
 
 // 过滤后的目录列表（支持模糊搜索）
