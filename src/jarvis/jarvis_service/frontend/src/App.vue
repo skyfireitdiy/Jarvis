@@ -181,9 +181,9 @@
           </div>
           <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
             <div class="editor-file-tree-panel">
-              <!-- Agent 节点列表 -->
+              <!-- 活跃 Agent 节点列表 -->
               <div
-                v-for="agent in sortedAgentList"
+                v-for="agent in activeAgents"
                 :key="agent.agent_id"
                 class="editor-agent-node"
                 :class="{ 'selected': selectedAgentId === agent.agent_id }"
@@ -237,6 +237,78 @@
                           class="tree-node-text"
                           :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
                         >{{ visibleNode.node.name }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 已停止 Agent 分组 -->
+              <div v-if="stoppedAgents.length > 0" class="stopped-agents-group">
+                <div 
+                  class="stopped-agents-header"
+                  @click="showStoppedAgents = !showStoppedAgents"
+                >
+                  <span class="expand-arrow" :class="{ expanded: showStoppedAgents }">▶</span>
+                  <span class="stopped-agents-title">已停止的 Agent ({{ stoppedAgents.length }})</span>
+                </div>
+                <div v-if="showStoppedAgents" class="stopped-agents-list">
+                  <div
+                    v-for="agent in stoppedAgents"
+                    :key="agent.agent_id"
+                    class="editor-agent-node stopped"
+                    :class="{ 'selected': selectedAgentId === agent.agent_id }"
+                  >
+                    <div
+                      class="tree-node-content agent-node-content"
+                      @click.stop="toggleAgentExpanded(agent.agent_id)"
+                    >
+                      <span
+                        class="tree-node-icon expand-arrow"
+                        :class="{ expanded: expandedAgents.has(agent.agent_id) }"
+                      >▶</span>
+                      <span class="tree-node-icon agent-icon">🤖</span>
+                      <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
+                      <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
+                      <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                    </div>
+                    <!-- Agent 的文件树 -->
+                    <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
+                      <div
+                        class="editor-file-tree-root"
+                        @click.stop="ensureEditorSidebarFileTree(agent)"
+                      >
+                        {{ agent.working_dir }}
+                      </div>
+                      <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                        当前工作目录下暂无可显示内容
+                      </div>
+                      <div v-else class="editor-file-tree-list">
+                        <div
+                          v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
+                          :key="visibleNode.node.path"
+                          class="tree-node editor-tree-node"
+                        >
+                          <div
+                            class="tree-node-content"
+                            :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                            @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                          >
+                            <span
+                              v-if="visibleNode.node.type === 'directory'"
+                              class="tree-node-icon expand-arrow"
+                              :class="{ expanded: visibleNode.node.expanded }"
+                            >▶</span>
+                            <span v-else class="tree-node-icon"></span>
+                            <span
+                              class="tree-node-icon"
+                              :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                            >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                            <span
+                              class="tree-node-text"
+                              :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                            >{{ visibleNode.node.name }}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1260,6 +1332,7 @@ const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：ag
 const fileTreeLoading = ref(new Map())      // 每个 Agent 的加载状态：agent_id -> Set(loadingPaths)
 const expandedAgents = ref(new Set())       // 编辑器目录树中展开的 Agent 集合
 const selectedAgentId = ref(null)         // 编辑器目录树中选中的 Agent ID
+const showStoppedAgents = ref(false)      // 是否显示已停止的 Agent
 
 // 切换 Agent 在目录树中的展开状态
 function toggleAgentExpanded(agentId) {
@@ -7940,6 +8013,38 @@ body::-webkit-scrollbar {
 
 .editor-agent-node.selected .agent-node-content {
   background: var(--color-bg-tertiary);
+}
+
+.stopped-agents-group {
+  border-top: 1px solid var(--color-border);
+}
+
+.stopped-agents-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  font-weight: 500;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.stopped-agents-header:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.stopped-agents-title {
+  flex: 1;
+}
+
+.stopped-agents-list {
+  border-top: 1px solid var(--color-border);
+}
+
+.editor-agent-node.stopped {
+  opacity: 0.7;
 }
 
 .agent-node-content {
