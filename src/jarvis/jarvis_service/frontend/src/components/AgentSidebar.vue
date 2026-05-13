@@ -180,7 +180,8 @@ const emit = defineEmits([
   'startResize',
   'viewDiff',
   'viewRules',
-  'viewTools'
+  'viewTools',
+  'openEditor'
 ])
 
 // 监听currentAgentId变化，自动展开对应节点分组
