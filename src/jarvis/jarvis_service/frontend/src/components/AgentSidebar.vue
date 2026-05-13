@@ -129,7 +129,7 @@ function isGroupCollapsed(groupKey) {
 
 function toggleGroupCollapse(groupKey) {
   if (collapsedGroupsMap.value[groupKey]) {
-    delete collapsedGroupsMap.value[groupKey]
+    collapsedGroupsMap.value[groupKey] = false
   } else {
     collapsedGroupsMap.value[groupKey] = true
   }
@@ -199,7 +199,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
   // 如果该分组是折叠的，则展开它
   if (collapsedGroupsMap.value[groupKey]) {
-    delete collapsedGroupsMap.value[groupKey]
+    collapsedGroupsMap.value[groupKey] = false
   }
 })
 </script>
