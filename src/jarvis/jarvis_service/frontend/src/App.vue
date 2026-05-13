@@ -245,10 +245,7 @@
                 暂无 Agent，请先创建 Agent
               </div>
             </div>
-            <div v-if="agentList.length > 0" class="editor-sidebar-content editor-sidebar-placeholder">
-              <div class="editor-sidebar-placeholder-icon">📁</div>
-              <div class="editor-sidebar-placeholder-text">请先选择一个 Agent 以查看工作目录树。</div>
-            </div>
+
           </div>
           <div v-else class="editor-sidebar-content">
             <div class="editor-global-search-panel">
@@ -629,7 +626,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
@@ -1273,8 +1270,8 @@ function toggleAgentExpanded(agentId) {
       initFileTree(agentId, agent.working_dir)
     }
   }
-  // 触发响应式更新
-  expandedAgents.value = new Set(expandedAgents.value)
+  // 手动触发响应式更新
+  triggerRef(expandedAgents)
 }
 
 // 过滤后的目录列表（支持模糊搜索）
@@ -1676,7 +1673,15 @@ function resolveAgentRelativePath(relativePath) {
 
 async function fetchGlobalSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  // 使用传入的agentId对应的node_id
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `global-search/${agentId}`), {
     method: 'POST',
     body: JSON.stringify({
@@ -1793,7 +1798,8 @@ async function runGlobalSearch() {
 
 async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
   const absolutePath = resolveAgentRelativePath(filePath)
-  await openEditorFile(absolutePath)
+  // 使用当前Agent的agentId
+  await openEditorFile(absolutePath, currentAgentId.value)
   await nextTick()
   const model = editorModels.get(absolutePath)
   if (!monacoEditor || !model) {
@@ -1814,9 +1820,22 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   monacoEditor.focus()
 }
 
-async function fetchFileContent(path) {
+async function fetchFileContent(path, agentId = null) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
+  let targetNodeId
+  if (agentId) {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (!agent) {
+      throw new Error(`找不到Agent: ${agentId}`)
+    }
+    if (!agent.node_id) {
+      throw new Error(`Agent没有node_id: ${agentId}`)
+    }
+    targetNodeId = String(agent.node_id).trim()
+  } else {
+    targetNodeId = getEditorTargetNodeId()
+  }
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-content'), {
     method: 'POST',
     body: JSON.stringify({ path, node_id: targetNodeId })
@@ -1829,9 +1848,22 @@ async function fetchFileContent(path) {
   return result.data.content || ''
 }
 
-async function fetchFileStat(path) {
+async function fetchFileStat(path, agentId = null) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
+  let targetNodeId
+  if (agentId) {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (!agent) {
+      throw new Error(`找不到Agent: ${agentId}`)
+    }
+    if (!agent.node_id) {
+      throw new Error(`Agent没有node_id: ${agentId}`)
+    }
+    targetNodeId = String(agent.node_id).trim()
+  } else {
+    targetNodeId = getEditorTargetNodeId()
+  }
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-stat'), {
     method: 'POST',
     body: JSON.stringify({ path, node_id: targetNodeId })
@@ -1926,7 +1958,7 @@ function startEditorFileHeartbeat() {
   }, EDITOR_FILE_HEARTBEAT_INTERVAL)
 }
 
-async function openEditorFile(path) {
+async function openEditorFile(path, agentId = null) {
   if (!path) return
 
   showEditorPanel.value = true
@@ -1955,8 +1987,8 @@ async function openEditorFile(path) {
 
   try {
     const [content, fileStat] = await Promise.all([
-      fetchFileContent(path),
-      fetchFileStat(path),
+      fetchFileContent(path, agentId),
+      fetchFileStat(path, agentId),
     ])
     tab.content = content
     tab.originalContent = content
@@ -2196,7 +2228,7 @@ async function handleFileTreeNodeClick(agentId, node) {
     return
   }
 
-  await openEditorFile(node.path)
+  await openEditorFile(node.path, agentId)
 }
 
 // 消息和终端
@@ -4851,7 +4883,17 @@ async function loadFileTreeNode(agentId, node) {
   
   try {
     const { host, port } = getGatewayAddress()
-    const targetNodeId = getEditorTargetNodeId()
+    // 使用当前Agent的node_id，而不是编辑器会话的node_id
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (!agent) {
+      console.error('[FILETREE] 找不到Agent:', agentId)
+      return
+    }
+    if (!agent.node_id) {
+      console.error('[FILETREE] Agent没有node_id:', agent)
+      return
+    }
+    const targetNodeId = String(agent.node_id).trim()
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `directories?path=${encodeURIComponent(node.path)}`))
     
     if (!response.ok) {
@@ -7861,6 +7903,7 @@ body::-webkit-scrollbar {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .editor-file-tree-list {
