@@ -2230,7 +2230,7 @@ async function handleFileTreeNodeClick(agentId, node) {
     return
   }
 
-  await openEditorFile(node.path)
+  await openEditorFile(node.path, agentId)
 }
 
 // 消息和终端
