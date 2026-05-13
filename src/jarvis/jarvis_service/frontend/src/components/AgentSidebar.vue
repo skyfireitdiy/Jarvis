@@ -35,6 +35,7 @@
                 <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
+                <span class="agent-node-label" :title="agent.node_id || 'master'">{{ getNodeLabel(agent) }}</span>
                 <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
                 <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
                 <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
@@ -587,5 +588,15 @@ watch(() => props.currentAgentId, (newAgentId) => {
   color: var(--color-text-secondary);
   font-size: 14px;
   padding: 20px;
+}
+
+.agent-node-label {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  margin-left: 4px;
 }
 </style>
