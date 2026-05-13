@@ -1801,7 +1801,8 @@ async function runGlobalSearch() {
 
 async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
   const absolutePath = resolveAgentRelativePath(filePath)
-  await openEditorFile(absolutePath)
+  // 使用当前Agent的agentId
+  await openEditorFile(absolutePath, currentAgentId.value)
   await nextTick()
   const model = editorModels.get(absolutePath)
   if (!monacoEditor || !model) {
