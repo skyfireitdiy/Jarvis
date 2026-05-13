@@ -196,7 +196,7 @@
                     class="tree-node-icon expand-arrow"
                     :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                   >▶</span>
-                  <span class="tree-node-icon agent-icon">🤖</span>
+                  <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
                   <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                   <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
                   <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
@@ -266,7 +266,7 @@
                         class="tree-node-icon expand-arrow"
                         :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                       >▶</span>
-                      <span class="tree-node-icon agent-icon">🤖</span>
+                      <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
                       <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                       <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
                       <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
