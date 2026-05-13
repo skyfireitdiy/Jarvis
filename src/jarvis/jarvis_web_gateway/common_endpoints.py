@@ -35,10 +35,15 @@ def get_rules_info() -> Dict[str, Any]:
                     }
                     for name, preview, is_loaded, file_path in rules_info
                 ]
-                return {"rules": rules_list}
-        return {"rules": []}
+                # 新增：返回已激活规则的具体内容
+                loaded_rules_content = rules_manager.get_active_rules_content()
+                return {
+                    "rules": rules_list,
+                    "loaded_rules_content": loaded_rules_content,
+                }
+        return {"rules": [], "loaded_rules_content": ""}
     except Exception as e:
-        return {"rules": [], "error": str(e)}
+        return {"rules": [], "loaded_rules_content": "", "error": str(e)}
 
 
 def get_tools_info() -> Dict[str, Any]:
