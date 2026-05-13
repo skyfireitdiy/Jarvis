@@ -2065,6 +2065,96 @@ async function closeEditorPanel() {
   showEditorPanel.value = false
 }
 
+// 为 Agent 创建/打开编辑器会话
+function createEditorForAgent(agent) {
+  if (!socket.value) {
+    console.warn('[editor-session] No socket connection')
+    return
+  }
+
+  const agentId = agent.agent_id
+  const agentName = agent.name || agent.agent_type
+
+  // 检查是否已存在该 Agent 的编辑器会话
+  let session = editorSessions.value.find(s => s.agent_id === agentId)
+  if (!session) {
+    // 创建新的编辑器会话
+    session = {
+      agent_id: agentId,
+      agent_name: agentName,
+      agent: agent,
+      tabs: [],
+      activeTabPath: null,
+      editorModels: new Map(),
+      monacoEditor: null,
+      isEditable: false,
+      showSidebar: true,
+      sidebarView: 'files'
+    }
+    editorSessions.value.push(session)
+  }
+
+  // 切换到该会话
+  activeEditorSessionId.value = agentId
+  showEditorPanel.value = true
+
+  console.log('[editor-session] Created/activated editor session for agent:', agentName)
+}
+
+// 关闭编辑器会话
+async function closeEditorSession(agentId) {
+  const sessionIndex = editorSessions.value.findIndex(s => s.agent_id === agentId)
+  if (sessionIndex === -1) return
+
+  const session = editorSessions.value[sessionIndex]
+
+  // 检查是否有未保存的标签
+  const hasDirty = session.tabs.some(tab => tab.isDirty)
+  if (hasDirty) {
+    const confirmed = await new Promise((resolve) => {
+      showConfirm(
+        `${session.agent_name} 的编辑器存在未保存修改，确定关闭吗？`,
+        () => resolve(true),
+        () => resolve(false),
+        false
+      )
+    })
+    if (!confirmed) return
+  }
+
+  // 清理 Monaco 模型
+  session.editorModels.forEach(model => model.dispose())
+  session.editorModels.clear()
+
+  // 清理 Monaco 编辑器
+  if (session.monacoEditor) {
+    session.monacoEditor.dispose()
+    session.monacoEditor = null
+  }
+
+  // 从数组中移除
+  editorSessions.value.splice(sessionIndex, 1)
+
+  // 如果关闭的是当前激活的会话，切换到另一个
+  if (activeEditorSessionId.value === agentId) {
+    activeEditorSessionId.value = editorSessions.value.length > 0 ? editorSessions.value[0].agent_id : null
+    if (!activeEditorSessionId.value) {
+      showEditorPanel.value = false
+    }
+  }
+
+  console.log('[editor-session] Closed editor session for agent:', session.agent_name)
+}
+
+// 切换编辑器会话
+function switchEditorSession(agentId) {
+  const session = editorSessions.value.find(s => s.agent_id === agentId)
+  if (!session) return
+
+  activeEditorSessionId.value = agentId
+  showEditorPanel.value = true
+}
+
 function confirmCloseDirtyEditorTab(path) {
   return new Promise((resolve) => {
     showConfirm(
