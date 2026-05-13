@@ -2587,20 +2587,32 @@ const agentsByNode = computed(() => {
 })
 const agentDisplayGroups = computed(() => {
   const groups = []
+  const allStoppedAgents = []
 
-  // 为每个节点创建分组，非停止 Agent 在前，已停止 Agent 在后
+  // 为每个节点创建分组，只包含活跃的 Agent
   Object.keys(agentsByNode.value).sort().forEach(nodeId => {
     const nodeAgents = agentsByNode.value[nodeId]
-    const allAgents = [...nodeAgents.active, ...nodeAgents.stopped]
-    if (allAgents.length > 0) {
+    if (nodeAgents.active.length > 0) {
       groups.push({
         key: `node-${nodeId}`,
         title: nodeId,
-        agents: allAgents,
+        agents: nodeAgents.active,
         isCollapsible: true,
       })
     }
+    // 收集所有已停止的 Agent
+    allStoppedAgents.push(...nodeAgents.stopped)
   })
+
+  // 添加已停止 Agent 分组（如果有）
+  if (allStoppedAgents.length > 0) {
+    groups.push({
+      key: 'stopped-agents',
+      title: '已停止的 Agent',
+      agents: allStoppedAgents,
+      isCollapsible: true,
+    })
+  }
 
   return groups
 })
@@ -8037,6 +8049,15 @@ body::-webkit-scrollbar {
 
 .stopped-agents-title {
   flex: 1;
+}
+
+.expand-arrow {
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.expand-arrow.expanded {
+  transform: rotate(90deg);
 }
 
 .stopped-agents-list {
