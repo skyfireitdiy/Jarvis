@@ -1676,7 +1676,15 @@ function resolveAgentRelativePath(relativePath) {
 
 async function fetchGlobalSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  // 使用传入的agentId对应的node_id
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `global-search/${agentId}`), {
     method: 'POST',
     body: JSON.stringify({
