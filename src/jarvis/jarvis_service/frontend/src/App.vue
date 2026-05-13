@@ -4851,7 +4851,9 @@ async function loadFileTreeNode(agentId, node) {
   
   try {
     const { host, port } = getGatewayAddress()
-    const targetNodeId = getEditorTargetNodeId()
+    // 使用当前Agent的node_id，而不是编辑器会话的node_id
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    const targetNodeId = String(agent?.node_id || 'master').trim() || 'master'
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `directories?path=${encodeURIComponent(node.path)}`))
     
     if (!response.ok) {
