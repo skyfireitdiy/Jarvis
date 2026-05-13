@@ -11404,8 +11404,6 @@ body::-webkit-scrollbar {
   max-height: 400px;
   overflow-y: auto;
 }
-  font-weight: 500;
-}
 
 .rule-not-loaded {
   color: #8b949e;
