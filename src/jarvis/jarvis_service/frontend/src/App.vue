@@ -5874,6 +5874,11 @@ function appendExecution(payload, agentId = null) {
   
   // 处理执行结束事件
   if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
+    // 如果termInfo.terminal不存在，说明是重连后收到的消息，不应该结束execution
+    if (!termInfo.terminal) {
+      console.log(`[terminal] Execution ${executionId} received tool_stream_end but terminal not initialized, ignoring (reconnect scenario)`)
+      return
+    }
     console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
     termInfo.active = false
     termInfo.ended = true
@@ -6611,9 +6616,15 @@ function setTerminalRef(executionId, el, agentId = null) {
         item => item.output_type === 'execution' && item.execution_id === executionId
       )
       
+      // 检查是否已经finished，但如果是重连后收到的消息（没有terminal_content），应该重新创建终端
       if (executionMessage?.is_finished) {
-        console.log(`[terminal] Execution ${executionSessionKey} already finished, skipping terminal creation`)
-        return
+        // 如果有terminal_content，说明是真正结束的execution，跳过创建
+        if (executionMessage.terminal_content) {
+          console.log(`[terminal] Execution ${executionSessionKey} already finished with content, skipping terminal creation`)
+          return
+        }
+        // 如果没有terminal_content，可能是重连后收到的消息，需要重新创建终端
+        console.log(`[terminal] Execution ${executionSessionKey} marked as finished but no content, recreating terminal (reconnect scenario)`)
       }
       
       // termInfo不存在，创建新的终端记录
