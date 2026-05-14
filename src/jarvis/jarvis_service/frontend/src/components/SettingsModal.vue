@@ -62,6 +62,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import '../styles/settings-modal.css'
 import ConnectionSettings from './settings/ConnectionSettings.vue'
 import NodeSecretSettings from './settings/NodeSecretSettings.vue'
 import HistorySettings from './settings/HistorySettings.vue'
