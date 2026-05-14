@@ -135,10 +135,7 @@ const emit = defineEmits([
   'confirmUpdateCodeToMain'
 ])
 
-// 本地状态
-const localRestartNodeId = ref('')
-const localRestartFrontendService = ref(false)
-const localSyncConfigSourceNode = ref('')
+// 本地状态（已移至子组件）
 
 // 关闭弹窗
 function close() {
