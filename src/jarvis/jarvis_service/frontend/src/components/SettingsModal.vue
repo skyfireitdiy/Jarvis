@@ -21,29 +21,12 @@
         :history-storage="historyStorage"
         @confirm-clear-history="emit('confirmClearHistory')"
       />
-      <div class="form-group" v-if="availableNodeOptions.length > 0">
-        <label>重启节点服务</label>
-        <select v-model="localRestartNodeId" class="node-select">
-          <option value="">本节点 (master)</option>
-          <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-            {{ formatNodeOptionLabel(node) }}
-          </option>
-        </select>
-        <span class="form-help">选择要重启服务的节点，默认为本节点</span>
-      </div>
-
-      <div class="form-group" v-if="!localRestartNodeId || localRestartNodeId === 'master'">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="localRestartFrontendService" />
-          <span>同时重启前端服务</span>
-        </label>
-        <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
-      </div>
-      <div class="form-group">
-        <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
-          {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
-        </button>
-      </div>
+      <!-- 节点重启服务组件 -->
+      <NodeRestartSettings
+        :available-node-options="availableNodeOptions"
+        :is-restarting-gateway="isRestartingGateway"
+        @confirm-restart-gateway="confirmRestartGateway"
+      />
 
       <!-- 代码更新 -->
       <div class="form-group">
