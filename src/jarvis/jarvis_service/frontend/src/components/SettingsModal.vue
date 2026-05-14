@@ -201,8 +201,6 @@ const emit = defineEmits([
 ])
 
 // 本地状态
-const localConnectionLockEnabled = ref(props.connectionLockEnabled)
-const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
 const localSyncConfigSourceNode = ref('')
