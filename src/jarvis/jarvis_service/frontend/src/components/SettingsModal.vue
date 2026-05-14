@@ -28,14 +28,11 @@
         @confirm-restart-gateway="confirmRestartGateway"
       />
 
-      <!-- 代码更新 -->
-      <div class="form-group">
-        <label>代码更新</label>
-        <span class="form-help">将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码</span>
-        <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
-          {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
-        </button>
-      </div>
+      <!-- 代码更新组件 -->
+      <CodeUpdateSettings
+        :is-updating-code="isUpdatingCode"
+        @confirm-update-code-to-main="emit('confirmUpdateCodeToMain')"
+      />
 
       <!-- 节点认证组件 -->
       <NodeSecretSettings
