@@ -47,26 +47,12 @@
         @disconnect-all="emit('disconnectAll')"
       />
 
-      <!-- 配置同步 -->
-      <div class="form-group" v-if="availableNodeOptions.length > 0">
-        <label>配置同步</label>
-        <div class="config-sync-section">
-          <div class="config-sync-row">
-            <span class="config-sync-label">源节点:</span>
-            <select v-model="localSyncConfigSourceNode" class="node-select">
-              <option value="">本节点 (master)</option>
-              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                {{ formatNodeOptionLabel(node) }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
-              {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- 配置同步组件 -->
+      <ConfigSyncSettings
+        :available-node-options="availableNodeOptions"
+        :is-syncing-config="isSyncingConfig"
+        @sync-config="syncConfig"
+      />
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
       </div>
