@@ -187,11 +187,6 @@ const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
 const localSyncConfigSourceNode = ref('')
 
-// 私钥相关状态
-const nodeSecret = ref('')
-const isLoadingSecret = ref(false)
-const showSecret = ref(false)
-
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
