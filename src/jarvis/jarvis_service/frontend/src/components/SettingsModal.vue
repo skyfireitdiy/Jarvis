@@ -67,31 +67,12 @@
         </button>
       </div>
 
-      <!-- 节点认证 -->
-      <div class="form-group">
-        <label>节点连接私钥</label>
-        <div class="node-secret-section">
-          <div class="secret-display">
-            <code class="secret-code" v-if="nodeSecret" :title="nodeSecret">{{ maskedNodeSecret }}</code>
-            <span class="secret-placeholder" v-else>点击"获取私钥"加载</span>
-            <button class="copy-btn" @click="copyNodeSecret" :disabled="!nodeSecret" title="复制私钥">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="secret-actions">
-            <button class="ghost-btn" @click="fetchNodeSecret" :disabled="isLoadingSecret">
-              {{ isLoadingSecret ? '加载中...' : '获取私钥' }}
-            </button>
-            <button class="ghost-btn" @click="toggleSecretMask" :disabled="!nodeSecret" title="显示/隐藏">
-              {{ showSecret ? '隐藏' : '显示' }}
-            </button>
-          </div>
-          <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
-        </div>
-      </div>
+      <!-- 节点认证组件 -->
+      <NodeSecretSettings
+        :get-token="getToken"
+        :gateway-url="gatewayUrl"
+        :show-toast="showToast"
+      />
 
       <!-- 连接管理 -->
       <div class="form-group">
