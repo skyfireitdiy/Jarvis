@@ -142,12 +142,7 @@ function close() {
   emit('update:visible', false)
 }
 
-// 格式化节点选项标签
-function formatNodeOptionLabel(node) {
-  const nodeId = String(node?.node_id || '').trim()
-  const status = String(node?.status || node?.runtime_status || '').trim()
-  return status ? `${nodeId} (${status})` : nodeId
-}
+// 格式化节点选项标签（已移至子组件）
 
 // 确认清除历史
 function confirmClearHistory() {
