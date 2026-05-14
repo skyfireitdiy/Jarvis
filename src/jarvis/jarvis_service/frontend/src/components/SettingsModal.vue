@@ -16,24 +16,11 @@
         @save-auto-login-setting="emit('saveAutoLoginSetting')"
       />
 
-      <!-- 历史消息管理 -->
-      <div class="form-group">
-        <div class="history-info">
-          <div class="history-stat">
-            <span class="history-stat-label">历史消息数量:</span>
-            <span class="history-stat-value">{{ historyStorage.getTotalCount() }}</span>
-          </div>
-          <div class="history-stat">
-            <span class="history-stat-label">存储空间:</span>
-            <span class="history-stat-value">{{ historyStorage.getStorageInfo().totalSizeFormatted }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <button class="danger-btn" @click="confirmClearHistory" :disabled="historyStorage.getTotalCount() === 0">
-          清除历史记录
-        </button>
-      </div>
+      <!-- 历史消息管理组件 -->
+      <HistorySettings
+        :history-storage="historyStorage"
+        @confirm-clear-history="emit('confirmClearHistory')"
+      />
       <div class="form-group" v-if="availableNodeOptions.length > 0">
         <label>重启节点服务</label>
         <select v-model="localRestartNodeId" class="node-select">
