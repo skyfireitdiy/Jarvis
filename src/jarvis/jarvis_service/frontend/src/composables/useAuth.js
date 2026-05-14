@@ -19,13 +19,13 @@ export function useAuth() {
   /**
    * 使用密码登录获取Token
    * @param {string} password - 登录密码
+   * @param {string} apiBaseUrl - API基础URL（可选，默认为'/api/auth/login'）
    * @returns {Promise<boolean>} - 登录是否成功
    */
-  async function loginWithPassword(password) {
+  async function loginWithPassword(password, apiBaseUrl = "/api/auth/login") {
     try {
-      // 这里需要调用实际的API，暂时使用模拟实现
-      // 实际实现需要从App.vue中导入getGatewayAddress和getHttpProtocol
-      const response = await fetch("/api/auth/login", {
+      // 使用传入的apiBaseUrl参数构建请求URL
+      const response = await fetch(apiBaseUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -99,9 +99,10 @@ export function useAuth() {
    * 带认证的fetch函数
    * @param {string} url - 请求URL
    * @param {object} options - fetch选项
+   * @param {Function} onAuthError - 401错误时的回调函数（可选）
    * @returns {Promise<Response>} - fetch响应
    */
-  async function fetchWithAuth(url, options = {}) {
+  async function fetchWithAuth(url, options = {}, onAuthError = null) {
     if (!hasAuthToken()) {
       throw new Error("尚未登录，已阻止向后端发送请求");
     }
@@ -129,7 +130,10 @@ export function useAuth() {
     if (response.status === 401) {
       console.log("[AUTH] Received 401 Unauthorized, showing login modal");
       auth.value.token = "";
-      // 这里需要触发显示登录模态框，暂时只清除Token
+      // 调用回调函数处理401错误（如显示登录模态框）
+      if (typeof onAuthError === "function") {
+        onAuthError("登录已过期，请重新登录");
+      }
     }
 
     return response;
