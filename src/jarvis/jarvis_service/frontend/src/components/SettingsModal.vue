@@ -159,21 +159,7 @@ function confirmClearHistory() {
 </script>
 
 <style scoped>
-
-/* 模态框遮罩层 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
+/* 样式已移至 settings-modal.css */
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
