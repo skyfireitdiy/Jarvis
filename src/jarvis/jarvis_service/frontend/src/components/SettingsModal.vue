@@ -6,30 +6,15 @@
         <h2>设置</h2>
         <button class="close-btn" @click="close">×</button>
       </div>
-      <div class="form-group">
-        <div class="toggle-wrapper">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="localConnectionLockEnabled" @change="handleConnectionLockChange" class="toggle-input" />
-            <span class="toggle-slider"></span>
-          </label>
-          <div class="toggle-info">
-            <span class="toggle-label-text">锁定连接（拒绝新连接）</span>
-            <span class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="toggle-wrapper">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="localAutoLoginEnabled" @change="handleAutoLoginChange" class="toggle-input" />
-            <span class="toggle-slider"></span>
-          </label>
-          <div class="toggle-info">
-            <span class="toggle-label-text">免登录（记住Token）</span>
-            <span class="form-help">启用后，登录成功时将Token保存在浏览器本地，下次打开时自动尝试连接。</span>
-          </div>
-        </div>
-      </div>
+      <!-- 连接设置组件 -->
+      <ConnectionSettings
+        :connection-lock-enabled="connectionLockEnabled"
+        :auto-login-enabled="autoLoginEnabled"
+        @update:connection-lock-enabled="val => emit('update:connectionLockEnabled', val)"
+        @save-connection-lock-setting="emit('saveConnectionLockSetting')"
+        @update:auto-login-enabled="val => emit('update:autoLoginEnabled', val)"
+        @save-auto-login-setting="emit('saveAutoLoginSetting')"
+      />
 
       <!-- 历史消息管理 -->
       <div class="form-group">
