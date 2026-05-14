@@ -6,49 +6,21 @@
         <h2>设置</h2>
         <button class="close-btn" @click="close">×</button>
       </div>
-      <div class="form-group">
-        <div class="toggle-wrapper">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="localConnectionLockEnabled" @change="handleConnectionLockChange" class="toggle-input" />
-            <span class="toggle-slider"></span>
-          </label>
-          <div class="toggle-info">
-            <span class="toggle-label-text">锁定连接（拒绝新连接）</span>
-            <span class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="toggle-wrapper">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="localAutoLoginEnabled" @change="handleAutoLoginChange" class="toggle-input" />
-            <span class="toggle-slider"></span>
-          </label>
-          <div class="toggle-info">
-            <span class="toggle-label-text">免登录（记住Token）</span>
-            <span class="form-help">启用后，登录成功时将Token保存在浏览器本地，下次打开时自动尝试连接。</span>
-          </div>
-        </div>
-      </div>
+      <!-- 连接设置组件 -->
+      <ConnectionSettings
+        :connection-lock-enabled="connectionLockEnabled"
+        :auto-login-enabled="autoLoginEnabled"
+        @update:connection-lock-enabled="val => emit('update:connectionLockEnabled', val)"
+        @save-connection-lock-setting="emit('saveConnectionLockSetting')"
+        @update:auto-login-enabled="val => emit('update:autoLoginEnabled', val)"
+        @save-auto-login-setting="emit('saveAutoLoginSetting')"
+      />
 
-      <!-- 历史消息管理 -->
-      <div class="form-group">
-        <div class="history-info">
-          <div class="history-stat">
-            <span class="history-stat-label">历史消息数量:</span>
-            <span class="history-stat-value">{{ historyStorage.getTotalCount() }}</span>
-          </div>
-          <div class="history-stat">
-            <span class="history-stat-label">存储空间:</span>
-            <span class="history-stat-value">{{ historyStorage.getStorageInfo().totalSizeFormatted }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <button class="danger-btn" @click="confirmClearHistory" :disabled="historyStorage.getTotalCount() === 0">
-          清除历史记录
-        </button>
-      </div>
+      <!-- 历史消息管理组件 -->
+      <HistorySettings
+        :history-storage="historyStorage"
+        @confirm-clear-history="emit('confirmClearHistory')"
+      />
       <div class="form-group" v-if="availableNodeOptions.length > 0">
         <label>重启节点服务</label>
         <select v-model="localRestartNodeId" class="node-select">
@@ -82,31 +54,12 @@
         </button>
       </div>
 
-      <!-- 节点认证 -->
-      <div class="form-group">
-        <label>节点连接私钥</label>
-        <div class="node-secret-section">
-          <div class="secret-display">
-            <code class="secret-code" v-if="nodeSecret" :title="nodeSecret">{{ maskedNodeSecret }}</code>
-            <span class="secret-placeholder" v-else>点击"获取私钥"加载</span>
-            <button class="copy-btn" @click="copyNodeSecret" :disabled="!nodeSecret" title="复制私钥">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="secret-actions">
-            <button class="ghost-btn" @click="fetchNodeSecret" :disabled="isLoadingSecret">
-              {{ isLoadingSecret ? '加载中...' : '获取私钥' }}
-            </button>
-            <button class="ghost-btn" @click="toggleSecretMask" :disabled="!nodeSecret" title="显示/隐藏">
-              {{ showSecret ? '隐藏' : '显示' }}
-            </button>
-          </div>
-          <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
-        </div>
-      </div>
+      <!-- 节点认证组件 -->
+      <NodeSecretSettings
+        :get-token="getToken"
+        :gateway-url="gatewayUrl"
+        :show-toast="showToast"
+      />
 
       <!-- 连接管理 -->
       <div class="form-group">
@@ -148,6 +101,9 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import ConnectionSettings from './settings/ConnectionSettings.vue'
+import NodeSecretSettings from './settings/NodeSecretSettings.vue'
+import HistorySettings from './settings/HistorySettings.vue'
 
 const props = defineProps({
   visible: {
@@ -215,41 +171,13 @@ const emit = defineEmits([
 ])
 
 // 本地状态
-const localConnectionLockEnabled = ref(props.connectionLockEnabled)
-const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
 const localSyncConfigSourceNode = ref('')
 
-// 私钥相关状态
-const nodeSecret = ref('')
-const isLoadingSecret = ref(false)
-const showSecret = ref(false)
-
-// 监听props变化
-watch(() => props.connectionLockEnabled, (newVal) => {
-  localConnectionLockEnabled.value = newVal
-})
-
-watch(() => props.autoLoginEnabled, (newVal) => {
-  localAutoLoginEnabled.value = newVal
-})
-
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
-}
-
-// 处理连接锁定设置变更
-function handleConnectionLockChange() {
-  emit('update:connectionLockEnabled', localConnectionLockEnabled.value)
-  emit('saveConnectionLockSetting')
-}
-
-// 处理免登录设置变更
-function handleAutoLoginChange() {
-  emit('update:autoLoginEnabled', localAutoLoginEnabled.value)
-  emit('saveAutoLoginSetting')
 }
 
 // 格式化节点选项标签
@@ -289,100 +217,7 @@ function updateCodeToMain() {
   emit('confirmUpdateCodeToMain')
 }
 
-// ========== 私钥管理函数 ==========
 
-/**
- * 获取节点私钥
- */
-async function fetchNodeSecret() {
-  if (isLoadingSecret.value) return
-  
-  try {
-    // 通过父组件传递的 getToken 函数获取 Token（优先内存，其次 localStorage）
-    const token = props.getToken()
-    if (!token) {
-      throw new Error('请先登录')
-    }
-    // 构建完整的后端 API URL
-    const apiProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
-    const apiUrl = `${apiProtocol}://${props.gatewayUrl}/api/node/secret`
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    const result = await response.json()
-    
-    if (result.success && result.data?.node_secret) {
-      nodeSecret.value = result.data.node_secret
-    } else {
-      console.error('获取私钥失败:', result.error?.message || '未知错误')
-      alert(`获取私钥失败：${result.error?.message || '未知错误'}`)
-    }
-  } catch (error) {
-    console.error('获取私钥异常:', error)
-    alert(`获取私钥异常：${error.message}`)
-  } finally {
-    isLoadingSecret.value = false
-  }
-}
-
-/**
- * 切换私钥显示/隐藏状态
- */
-function toggleSecretMask() {
-  showSecret.value = !showSecret.value
-}
-
-/**
- * 复制私钥到剪贴板
- */
-async function copyNodeSecret() {
-  if (!nodeSecret.value) {
-    console.warn('复制失败：私钥内容为空')
-    alert('私钥内容为空，请先获取私钥')
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(nodeSecret.value)
-    console.log('复制成功')
-    props.showToast('已复制到剪贴板', 'success')
-  } catch (error) {
-    console.error('复制失败，尝试降级方案:', error)
-    // 降级方案：使用 execCommand
-    try {
-      const textArea = document.createElement('textarea')
-      textArea.value = nodeSecret.value
-      textArea.style.position = 'fixed'
-      textArea.style.opacity = '0'
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      console.log('降级方案复制成功')
-      props.showToast('已复制到剪贴板', 'success')
-    } catch (fallbackErr) {
-      console.error('降级方案也失败:', fallbackErr)
-      alert('复制失败，请手动复制')
-    }
-  }
-}
-
-/**
- * 掩码显示的私钥（仅显示首尾部分）
- */
-const maskedNodeSecret = computed(() => {
-  if (!nodeSecret.value) return ''
-  if (showSecret.value) return nodeSecret.value
-  
-  const secret = nodeSecret.value
-  if (secret.length <= 16) {
-    return '*'.repeat(secret.length)
-  }
-  return `${secret.slice(0, 8)}${'*'.repeat(secret.length - 16)}${secret.slice(-8)}`
-})
 </script>
 
 <style scoped>
