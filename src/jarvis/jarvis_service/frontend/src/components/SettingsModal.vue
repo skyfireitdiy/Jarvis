@@ -149,30 +149,10 @@ function confirmClearHistory() {
   emit('confirmClearHistory')
 }
 
-// 确认重启网关
-function confirmRestartGateway() {
-  emit('confirmRestartGateway', {
-    nodeId: localRestartNodeId.value,
-    restartFrontend: localRestartFrontendService.value
-  })
-}
-
-// 断开所有连接
-function disconnectAll() {
-  emit('disconnectAll')
-}
-
-// 同步配置
-function syncConfig() {
-  emit('syncConfig', {
-    sourceNodeId: localSyncConfigSourceNode.value
-  })
-}
-
-// 更新代码到 main 分支
-function updateCodeToMain() {
-  emit('confirmUpdateCodeToMain')
-}
+// 确认重启网关（已移至子组件）
+// 断开所有连接（已移至子组件）
+// 同步配置（已移至子组件）
+// 更新代码到 main 分支（已移至子组件）
 
 
 </script>
