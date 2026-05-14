@@ -215,18 +215,6 @@ function close() {
   emit('update:visible', false)
 }
 
-// 处理连接锁定设置变更
-function handleConnectionLockChange() {
-  emit('update:connectionLockEnabled', localConnectionLockEnabled.value)
-  emit('saveConnectionLockSetting')
-}
-
-// 处理免登录设置变更
-function handleAutoLoginChange() {
-  emit('update:autoLoginEnabled', localAutoLoginEnabled.value)
-  emit('saveAutoLoginSetting')
-}
-
 // 格式化节点选项标签
 function formatNodeOptionLabel(node) {
   const nodeId = String(node?.node_id || '').trim()
