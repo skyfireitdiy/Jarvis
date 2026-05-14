@@ -210,15 +210,6 @@ const nodeSecret = ref('')
 const isLoadingSecret = ref(false)
 const showSecret = ref(false)
 
-// 监听props变化
-watch(() => props.connectionLockEnabled, (newVal) => {
-  localConnectionLockEnabled.value = newVal
-})
-
-watch(() => props.autoLoginEnabled, (newVal) => {
-  localAutoLoginEnabled.value = newVal
-})
-
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
