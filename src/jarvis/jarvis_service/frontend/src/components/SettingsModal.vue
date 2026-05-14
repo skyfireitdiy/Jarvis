@@ -41,16 +41,11 @@
         :show-toast="showToast"
       />
 
-      <!-- 连接管理 -->
-      <div class="form-group">
-        <label>连接管理</label>
-        <div class="connection-management-section">
-          <button class="danger-btn" @click="disconnectAll" :disabled="!socket">
-            断开连接
-          </button>
-          <span class="form-help">断开所有 WebSocket 连接并刷新页面</span>
-        </div>
-      </div>
+      <!-- 连接管理组件 -->
+      <ConnectionManagementSettings
+        :socket="socket"
+        @disconnect-all="emit('disconnectAll')"
+      />
 
       <!-- 配置同步 -->
       <div class="form-group" v-if="availableNodeOptions.length > 0">
