@@ -133,6 +133,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import ConnectionSettings from './settings/ConnectionSettings.vue'
 
 const props = defineProps({
   visible: {
