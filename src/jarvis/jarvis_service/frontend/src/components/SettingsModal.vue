@@ -116,6 +116,7 @@
 import { ref, watch, computed } from 'vue'
 import ConnectionSettings from './settings/ConnectionSettings.vue'
 import NodeSecretSettings from './settings/NodeSecretSettings.vue'
+import HistorySettings from './settings/HistorySettings.vue'
 
 const props = defineProps({
   visible: {
