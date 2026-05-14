@@ -134,6 +134,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import ConnectionSettings from './settings/ConnectionSettings.vue'
+import NodeSecretSettings from './settings/NodeSecretSettings.vue'
 
 const props = defineProps({
   visible: {
