@@ -104,6 +104,10 @@ import { ref, watch, computed } from 'vue'
 import ConnectionSettings from './settings/ConnectionSettings.vue'
 import NodeSecretSettings from './settings/NodeSecretSettings.vue'
 import HistorySettings from './settings/HistorySettings.vue'
+import NodeRestartSettings from './settings/NodeRestartSettings.vue'
+import CodeUpdateSettings from './settings/CodeUpdateSettings.vue'
+import ConnectionManagementSettings from './settings/ConnectionManagementSettings.vue'
+import ConfigSyncSettings from './settings/ConfigSyncSettings.vue'
 
 const props = defineProps({
   visible: {
