@@ -805,6 +805,7 @@ markedRenderer.code = function(code, language, isEscaped) {
 // 配置 marked 使用 highlight.js 进行语法高亮
 marked.setOptions({
   renderer: markedRenderer,
+  breaks: true, // 将单个换行符转换为 <br> 标签
   highlight: function(code, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
