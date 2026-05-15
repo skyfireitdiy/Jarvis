@@ -62,7 +62,7 @@ export function useWebSocket(context = {}) {
    */
   function startHeartbeat() {
     stopHeartbeat(); // 先停止现有心跳
-
+    
     if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -78,7 +78,7 @@ export function useWebSocket(context = {}) {
 
       // 检查是否超时
       const now = Date.now();
-      if (lastPongTime.value && now - lastPongTime.value > pongTimeout) {
+      if (lastPongTime.value && (now - lastPongTime.value) > pongTimeout) {
         console.warn("[ws] Heartbeat timeout, closing connection");
         socket.value.close();
         return;
@@ -130,15 +130,15 @@ export function useWebSocket(context = {}) {
       console.warn("[ws] message parse failed", event.data);
       return;
     }
-
+    
     console.log("[ws] message", message);
-
+    
     // 处理pong消息
     if (message.type === "pong") {
       handlePongMessage(message);
       return;
     }
-
+    
     // 处理其他消息
     if (handleMessage) {
       handleMessage(message);
@@ -155,7 +155,7 @@ export function useWebSocket(context = {}) {
       wasClean: event?.wasClean,
       readyState: socket.value?.readyState,
     });
-
+    
     socket.value = null;
     connecting.value = false;
     stopHeartbeat(); // 停止心跳
@@ -175,7 +175,9 @@ export function useWebSocket(context = {}) {
 
       // 设置重连定时器（固定5秒间隔）
       reconnectTimer.value = setTimeout(() => {
-        console.log(`[ws] Reconnecting... attempt ${reconnectAttempts.value}`);
+        console.log(
+          `[ws] Reconnecting... attempt ${reconnectAttempts.value}`,
+        );
         connect();
       }, reconnectInterval);
     } else {
@@ -278,8 +280,7 @@ export function useWebSocket(context = {}) {
       if (fetchModelGroups) fetchModelGroups();
       if (fetchNodeStatus) fetchNodeStatus();
 
-      const currentOutputs =
-        allOutputs?.value?.get(currentAgentId?.value) || [];
+      const currentOutputs = allOutputs?.value?.get(currentAgentId?.value) || [];
       if (currentOutputs.length === 0) {
         console.log("[HISTORY] Loading history on first connect");
         if (loadHistoryMessages) loadHistoryMessages(false);
