@@ -733,6 +733,7 @@ import { escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import { useUrlBuilder } from './composables/useUrlBuilder.js'
 import { useMarkdown } from './composables/useMarkdown.js'
+import { useDrag } from './composables/useDrag.js'
 
 // 初始化URL构建工具
 const {
@@ -759,6 +760,32 @@ const {
   renderMessageHtml,
   marked
 } = useMarkdown()
+
+// 初始化拖拽功能
+const {
+  sidebarPosition: dragSidebarPosition,
+  isDraggingSidebar: dragIsDraggingSidebar,
+  startDragSidebar,
+  stopDragSidebar,
+  agentSidebarResizeState: dragAgentSidebarResizeState,
+  startAgentSidebarResize: dragStartAgentSidebarResize,
+  onAgentSidebarResize: dragOnAgentSidebarResize,
+  stopAgentSidebarResize: dragStopAgentSidebarResize,
+  editorPanelInteraction: dragEditorPanelInteraction,
+  getEditorPanelBounds: dragGetEditorPanelBounds,
+  ensureEditorPanelInViewport: dragEnsureEditorPanelInViewport,
+  startEditorPanelMove: dragStartEditorPanelMove,
+  startEditorPanelResize: dragStartEditorPanelResize,
+  onEditorPanelPointerMove: dragOnEditorPanelPointerMove,
+  stopEditorPanelInteraction: dragStopEditorPanelInteraction,
+  terminalPanelInteraction: dragTerminalPanelInteraction,
+  getTerminalPanelBounds: dragGetTerminalPanelBounds,
+  ensureTerminalPanelInViewport: dragEnsureTerminalPanelInViewport,
+  startTerminalPanelMove: dragStartTerminalPanelMove,
+  startTerminalPanelResize: dragStartTerminalPanelResize,
+  onTerminalPanelPointerMove: dragOnTerminalPanelPointerMove,
+  stopTerminalPanelInteraction: dragStopTerminalPanelInteraction,
+} = useDrag()
 
 
 // 计算终端历史显示样式（高度自适应）
@@ -791,30 +818,7 @@ function getTerminalStyle(terminalContent) {
   }
 }
 
-// 拖拽相关函数
-function startDragSidebar(event) {
-  isDraggingSidebar.value = true
-  dragOffset.value = {
-    x: event.clientX - sidebarPosition.value.x,
-    y: event.clientY - sidebarPosition.value.y
-  }
-  document.addEventListener('mousemove', onDragSidebar)
-  document.addEventListener('mouseup', stopDragSidebar)
-}
-
-function onDragSidebar(event) {
-  if (!isDraggingSidebar.value) return
-  sidebarPosition.value = {
-    x: event.clientX - dragOffset.value.x,
-    y: event.clientY - dragOffset.value.y
-  }
-}
-
-function stopDragSidebar() {
-  isDraggingSidebar.value = false
-  document.removeEventListener('mousemove', onDragSidebar)
-  document.removeEventListener('mouseup', stopDragSidebar)
-}
+// 拖拽相关函数（使用useDrag composable）
 
 // 根据文件扩展名推断语言
 function getLanguageFromFilename(filename) {
@@ -1043,11 +1047,7 @@ function saveAgentSidebarWidth() {
 }
 
 const agentSidebarWidth = ref(loadAgentSidebarWidth())
-const agentSidebarResizeState = ref({
-  active: false,
-  startX: 0,
-  startWidth: AGENT_SIDEBAR_DEFAULT_WIDTH,
-})
+const agentSidebarResizeState = dragAgentSidebarResizeState
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
 const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
@@ -1098,17 +1098,7 @@ function saveEditorPanelRect() {
 }
 
 const editorPanelRect = ref(loadEditorPanelRect())
-const editorPanelInteraction = ref({
-  active: false,
-  mode: null,
-  direction: null,
-  startX: 0,
-  startY: 0,
-  startTop: 0,
-  startLeft: 0,
-  startWidth: 0,
-  startHeight: 0,
-})
+const editorPanelInteraction = dragEditorPanelInteraction
 const editorPanelRef = ref(null)
 const editorContainerRef = computed(() => editorPanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
@@ -1223,10 +1213,9 @@ const filteredDirList = computed(() => {
   )
 })
 
-// 浮动窗口位置
-const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
-const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
-const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
+// 浮动窗口位置（使用useDrag composable）
+const sidebarPosition = dragSidebarPosition
+const isDraggingSidebar = dragIsDraggingSidebar
 
 const agentSidebarStyle = computed(() => {
   if (!showAgentSidebar.value) {
@@ -1273,45 +1262,18 @@ function ensureAgentSidebarWidthInBounds() {
   agentSidebarWidth.value = normalizeAgentSidebarWidth(agentSidebarWidth.value)
 }
 
+// Agent侧边栏调整大小（使用useDrag composable）
 function startAgentSidebarResize(event) {
   if (windowWidth.value <= 768 || !showAgentSidebar.value) return
-
-  agentSidebarResizeState.value = {
-    active: true,
-    startX: event.clientX,
-    startWidth: agentSidebarWidth.value,
-  }
-
-  document.addEventListener('mousemove', onAgentSidebarResize)
-  document.addEventListener('mouseup', stopAgentSidebarResize)
-  event.preventDefault()
-  event.stopPropagation()
+  dragStartAgentSidebarResize(event, agentSidebarWidth.value)
 }
 
 function onAgentSidebarResize(event) {
-  if (!agentSidebarResizeState.value.active) return
-
-  const deltaX = event.clientX - agentSidebarResizeState.value.startX
-  const nextWidth = agentSidebarResizeState.value.startWidth + deltaX
-  agentSidebarWidth.value = normalizeAgentSidebarWidth(nextWidth)
+  agentSidebarWidth.value = normalizeAgentSidebarWidth(dragOnAgentSidebarResize(event, normalizeAgentSidebarWidth))
 }
 
 function stopAgentSidebarResize() {
-  if (!agentSidebarResizeState.value.active) {
-    document.removeEventListener('mousemove', onAgentSidebarResize)
-    document.removeEventListener('mouseup', stopAgentSidebarResize)
-    return
-  }
-
-  agentSidebarResizeState.value = {
-    active: false,
-    startX: 0,
-    startWidth: agentSidebarWidth.value,
-  }
-
-  document.removeEventListener('mousemove', onAgentSidebarResize)
-  document.removeEventListener('mouseup', stopAgentSidebarResize)
-  saveAgentSidebarWidth()
+  dragStopAgentSidebarResize(saveAgentSidebarWidth)
 }
 
 // 设置焦点窗口
@@ -1364,169 +1326,35 @@ function toggleTerminalMaximize() {
   }
 }
 
+// 编辑器面板交互功能（使用useDrag composable）
 function getEditorPanelBounds() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
-  return {
-    minTop: KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出，但保留底部100px
-    minLeft: KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出，但保留右侧100px
-    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
-    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
-    maxWidth: window.innerWidth,
-    maxHeight: window.innerHeight,
-  }
+  return dragGetEditorPanelBounds(editorPanelRect.value)
 }
 
 function ensureEditorPanelInViewport() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
-  const maxWidth = Math.max(window.innerWidth, EDITOR_PANEL_MIN_WIDTH)
-  const maxHeight = Math.max(window.innerHeight, EDITOR_PANEL_MIN_HEIGHT)
-
-  editorPanelRect.value.width = clamp(editorPanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
-  editorPanelRect.value.height = clamp(editorPanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
-
-  // 允许部分拖出屏幕，但保留至少100px可见区域
-  editorPanelRect.value.left = clamp(
-    editorPanelRect.value.left,
-    KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出
-    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
-  )
-  editorPanelRect.value.top = clamp(
-    editorPanelRect.value.top,
-    KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出
-    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
-  )
+  const newRect = dragEnsureEditorPanelInViewport(editorPanelRect.value)
+  editorPanelRect.value = newRect
 }
 
 function startEditorPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.editor-panel-actions')) return
-
   focusWindow('editor')
-
-  editorPanelInteraction.value = {
-    active: false,
-    mode: 'move',
-    direction: null,
-    startX: event.clientX,
-    startY: event.clientY,
-    startTop: editorPanelRect.value.top,
-    startLeft: editorPanelRect.value.left,
-    startWidth: editorPanelRect.value.width,
-    startHeight: editorPanelRect.value.height,
-  }
-
-  document.addEventListener('mousemove', onEditorPanelPointerMove)
-  document.addEventListener('mouseup', stopEditorPanelInteraction)
+  dragStartEditorPanelMove(event, editorPanelRect.value, focusWindow)
 }
 
 function startEditorPanelResize(event, direction) {
   if (windowWidth.value <= 768) return
-
-  editorPanelInteraction.value = {
-    active: true,
-    mode: 'resize',
-    direction,
-    startX: event.clientX,
-    startY: event.clientY,
-    startTop: editorPanelRect.value.top,
-    startLeft: editorPanelRect.value.left,
-    startWidth: editorPanelRect.value.width,
-    startHeight: editorPanelRect.value.height,
-  }
-
-  document.addEventListener('mousemove', onEditorPanelPointerMove)
-  document.addEventListener('mouseup', stopEditorPanelInteraction)
-  event.preventDefault()
-  event.stopPropagation()
+  dragStartEditorPanelResize(event, direction, editorPanelRect.value)
 }
 
 function onEditorPanelPointerMove(event) {
-  const deltaX = event.clientX - editorPanelInteraction.value.startX
-  const deltaY = event.clientY - editorPanelInteraction.value.startY
-
-  if (editorPanelInteraction.value.mode === 'move' && !editorPanelInteraction.value.active) {
-    const dragDistance = Math.hypot(deltaX, deltaY)
-    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
-      return
-    }
-
-    editorPanelInteraction.value = {
-      ...editorPanelInteraction.value,
-      active: true,
-    }
-    event.preventDefault()
-  }
-
-  if (!editorPanelInteraction.value.active) return
-
-  if (editorPanelInteraction.value.mode === 'move') {
-    const bounds = getEditorPanelBounds()
-    editorPanelRect.value.left = clamp(editorPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
-    editorPanelRect.value.top = clamp(editorPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
-    return
-  }
-
-  const direction = editorPanelInteraction.value.direction || ''
-  const startLeft = editorPanelInteraction.value.startLeft
-  const startTop = editorPanelInteraction.value.startTop
-  const startWidth = editorPanelInteraction.value.startWidth
-  const startHeight = editorPanelInteraction.value.startHeight
-
-  let nextLeft = startLeft
-  let nextTop = startTop
-  let nextWidth = startWidth
-  let nextHeight = startHeight
-
-  if (direction.includes('e')) {
-    nextWidth = clamp(startWidth + deltaX, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, EDITOR_PANEL_MIN_WIDTH))
-  }
-
-  if (direction.includes('s')) {
-    nextHeight = clamp(startHeight + deltaY, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, EDITOR_PANEL_MIN_HEIGHT))
-  }
-
-  if (direction.includes('w')) {
-    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - EDITOR_PANEL_MIN_WIDTH)
-    nextLeft = desiredLeft
-    nextWidth = startWidth - (desiredLeft - startLeft)
-  }
-
-  if (direction.includes('n')) {
-    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - EDITOR_PANEL_MIN_HEIGHT)
-    nextTop = desiredTop
-    nextHeight = startHeight - (desiredTop - startTop)
-  }
-
-  if (nextLeft + nextWidth > window.innerWidth) {
-    nextWidth = Math.max(EDITOR_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
-  }
-
-  if (nextTop + nextHeight > window.innerHeight) {
-    nextHeight = Math.max(EDITOR_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
-  }
-
-  editorPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
-  editorPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
-  editorPanelRect.value.width = clamp(nextWidth, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - editorPanelRect.value.left, EDITOR_PANEL_MIN_WIDTH))
-  editorPanelRect.value.height = clamp(nextHeight, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - editorPanelRect.value.top, EDITOR_PANEL_MIN_HEIGHT))
+  const newRect = dragOnEditorPanelPointerMove(event, editorPanelRect.value)
+  editorPanelRect.value = newRect
 }
 
 function stopEditorPanelInteraction() {
-  editorPanelInteraction.value = {
-    active: false,
-    mode: null,
-    direction: null,
-    startX: 0,
-    startY: 0,
-    startTop: 0,
-    startLeft: 0,
-    startWidth: 0,
-    startHeight: 0,
-  }
-
-  document.removeEventListener('mousemove', onEditorPanelPointerMove)
-  document.removeEventListener('mouseup', stopEditorPanelInteraction)
-  saveEditorPanelRect()
+  dragStopEditorPanelInteraction(saveEditorPanelRect, editorPanelRect.value)
 }
 
 function getEditorTabByPath(path) {
@@ -6820,17 +6648,7 @@ function saveTerminalPanelRect() {
 }
 
 const terminalPanelRect = ref(loadTerminalPanelRect())
-const terminalPanelInteraction = ref({
-  active: false,
-  mode: null,
-  direction: null,
-  startX: 0,
-  startY: 0,
-  startTop: 0,
-  startLeft: 0,
-  startWidth: 0,
-  startHeight: 0,
-})
+const terminalPanelInteraction = dragTerminalPanelInteraction
 
 const terminalPanelStyle = computed(() => ({
   top: `${terminalPanelRect.value.top}px`,
@@ -6840,167 +6658,35 @@ const terminalPanelStyle = computed(() => ({
   zIndex: activeWindow.value === 'terminal' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
 }))
 
+// 终端面板交互功能（使用useDrag composable）
 function getTerminalPanelBounds() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
-  return {
-    minTop: KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出，但保留底部100px
-    minLeft: KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出，但保留右侧100px
-    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
-    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
-  }
+  return dragGetTerminalPanelBounds(terminalPanelRect.value)
 }
 
 function ensureTerminalPanelInViewport() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
-  const maxWidth = Math.max(window.innerWidth, TERMINAL_PANEL_MIN_WIDTH)
-  const maxHeight = Math.max(window.innerHeight, TERMINAL_PANEL_MIN_HEIGHT)
-
-  terminalPanelRect.value.width = clamp(terminalPanelRect.value.width, TERMINAL_PANEL_MIN_WIDTH, maxWidth)
-  terminalPanelRect.value.height = clamp(terminalPanelRect.value.height, TERMINAL_PANEL_MIN_HEIGHT, maxHeight)
-
-  // 允许部分拖出屏幕，但保留至少100px可见区域
-  terminalPanelRect.value.left = clamp(
-    terminalPanelRect.value.left,
-    KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出
-    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
-  )
-  terminalPanelRect.value.top = clamp(
-    terminalPanelRect.value.top,
-    KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出
-    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
-  )
+  const newRect = dragEnsureTerminalPanelInViewport(terminalPanelRect.value)
+  terminalPanelRect.value = newRect
 }
 
 function startTerminalPanelMove(event) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.terminal-panel-actions')) return
-
   focusWindow('terminal')
-
-  terminalPanelInteraction.value = {
-    active: false,
-    mode: 'move',
-    direction: null,
-    startX: event.clientX,
-    startY: event.clientY,
-    startTop: terminalPanelRect.value.top,
-    startLeft: terminalPanelRect.value.left,
-    startWidth: terminalPanelRect.value.width,
-    startHeight: terminalPanelRect.value.height,
-  }
-
-  document.addEventListener('mousemove', onTerminalPanelPointerMove)
-  document.addEventListener('mouseup', stopTerminalPanelInteraction)
+  dragStartTerminalPanelMove(event, terminalPanelRect.value, focusWindow)
 }
 
 function startTerminalPanelResize(event, direction) {
   if (windowWidth.value <= 768) return
-
-  terminalPanelInteraction.value = {
-    active: true,
-    mode: 'resize',
-    direction,
-    startX: event.clientX,
-    startY: event.clientY,
-    startTop: terminalPanelRect.value.top,
-    startLeft: terminalPanelRect.value.left,
-    startWidth: terminalPanelRect.value.width,
-    startHeight: terminalPanelRect.value.height,
-  }
-
-  document.addEventListener('mousemove', onTerminalPanelPointerMove)
-  document.addEventListener('mouseup', stopTerminalPanelInteraction)
-  event.preventDefault()
-  event.stopPropagation()
+  dragStartTerminalPanelResize(event, direction, terminalPanelRect.value)
 }
 
 function onTerminalPanelPointerMove(event) {
-  const deltaX = event.clientX - terminalPanelInteraction.value.startX
-  const deltaY = event.clientY - terminalPanelInteraction.value.startY
-
-  if (terminalPanelInteraction.value.mode === 'move' && !terminalPanelInteraction.value.active) {
-    const dragDistance = Math.hypot(deltaX, deltaY)
-    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
-      return
-    }
-
-    terminalPanelInteraction.value = {
-      ...terminalPanelInteraction.value,
-      active: true,
-    }
-    event.preventDefault()
-  }
-
-  if (!terminalPanelInteraction.value.active) return
-
-  if (terminalPanelInteraction.value.mode === 'move') {
-    const bounds = getTerminalPanelBounds()
-    terminalPanelRect.value.left = clamp(terminalPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
-    terminalPanelRect.value.top = clamp(terminalPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
-    return
-  }
-
-  const direction = terminalPanelInteraction.value.direction || ''
-  const startLeft = terminalPanelInteraction.value.startLeft
-  const startTop = terminalPanelInteraction.value.startTop
-  const startWidth = terminalPanelInteraction.value.startWidth
-  const startHeight = terminalPanelInteraction.value.startHeight
-
-  let nextLeft = startLeft
-  let nextTop = startTop
-  let nextWidth = startWidth
-  let nextHeight = startHeight
-
-  if (direction.includes('e')) {
-    nextWidth = clamp(startWidth + deltaX, TERMINAL_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, TERMINAL_PANEL_MIN_WIDTH))
-  }
-
-  if (direction.includes('s')) {
-    nextHeight = clamp(startHeight + deltaY, TERMINAL_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, TERMINAL_PANEL_MIN_HEIGHT))
-  }
-
-  if (direction.includes('w')) {
-    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - TERMINAL_PANEL_MIN_WIDTH)
-    nextLeft = desiredLeft
-    nextWidth = startWidth - (desiredLeft - startLeft)
-  }
-
-  if (direction.includes('n')) {
-    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - TERMINAL_PANEL_MIN_HEIGHT)
-    nextTop = desiredTop
-    nextHeight = startHeight - (desiredTop - startTop)
-  }
-
-  if (nextLeft + nextWidth > window.innerWidth) {
-    nextWidth = Math.max(TERMINAL_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
-  }
-
-  if (nextTop + nextHeight > window.innerHeight) {
-    nextHeight = Math.max(TERMINAL_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
-  }
-
-  terminalPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
-  terminalPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
-  terminalPanelRect.value.width = clamp(nextWidth, TERMINAL_PANEL_MIN_WIDTH, Math.max(window.innerWidth - terminalPanelRect.value.left, TERMINAL_PANEL_MIN_WIDTH))
-  terminalPanelRect.value.height = clamp(nextHeight, TERMINAL_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - terminalPanelRect.value.top, TERMINAL_PANEL_MIN_HEIGHT))
+  const newRect = dragOnTerminalPanelPointerMove(event, terminalPanelRect.value)
+  terminalPanelRect.value = newRect
 }
 
 function stopTerminalPanelInteraction() {
-  terminalPanelInteraction.value = {
-    active: false,
-    mode: null,
-    direction: null,
-    startX: 0,
-    startY: 0,
-    startTop: 0,
-    startLeft: 0,
-    startWidth: 0,
-    startHeight: 0,
-  }
-
-  document.removeEventListener('mousemove', onTerminalPanelPointerMove)
-  document.removeEventListener('mouseup', stopTerminalPanelInteraction)
-  saveTerminalPanelRect()
+  dragStopTerminalPanelInteraction(saveTerminalPanelRect, terminalPanelRect.value)
 }
 
 // 监听面板显示状态
