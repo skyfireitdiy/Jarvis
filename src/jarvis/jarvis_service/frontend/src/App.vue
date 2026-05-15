@@ -734,6 +734,8 @@ import RenameAgentModal from './components/RenameAgentModal.vue'
 import { useUrlBuilder } from './composables/useUrlBuilder.js'
 import { useMarkdown } from './composables/useMarkdown.js'
 import { useDrag } from './composables/useDrag.js'
+import { useAuth } from './composables/useAuth.js'
+import { useWebSocket } from './composables/useWebSocket.js'
 
 // 初始化URL构建工具
 const {
@@ -786,6 +788,67 @@ const {
   onTerminalPanelPointerMove: dragOnTerminalPanelPointerMove,
   stopTerminalPanelInteraction: dragStopTerminalPanelInteraction,
 } = useDrag()
+
+// 初始化认证工具
+const {
+  auth,
+  autoLoginEnabled,
+  loginWithPassword,
+  hasAuthToken,
+  getAuthToken,
+  loadSavedToken,
+  fetchWithAuth,
+  saveAutoLoginSetting,
+  buildWebSocketProtocols: authBuildWebSocketProtocols
+} = useAuth({
+  buildLoginUrl: () => {
+    const { host, port } = getGatewayAddress(gatewayUrl.value)
+    return `${getHttpProtocol()}://${host}:${port}/api/auth/login`
+  },
+  onAuthError: (message) => {
+    showConnectModal.value = true
+    connectErrorMessage.value = message
+  }
+})
+
+// 初始化WebSocket工具
+const {
+  socket: wsSocket,
+  sockets: wsSockets,
+  connecting: wsConnecting,
+  agentConnecting: wsAgentConnecting,
+  connectErrorMessage: wsConnectErrorMessage,
+  reconnecting: wsReconnecting,
+  reconnectAttempts: wsReconnectAttempts,
+  reconnectTimer: wsReconnectTimer,
+  reconnectInterval: wsReconnectInterval,
+  userDisconnected: wsUserDisconnected,
+  connect,
+  disconnect,
+  reconnect,
+  disconnectAll,
+  connectToAgent: wsConnectToAgent,
+  startHeartbeat,
+  stopHeartbeat
+} = useWebSocket({
+  gatewayUrl,
+  authToken: computed(() => auth.value.token),
+  hasAuthToken,
+  loginWithPassword,
+  connectionLockEnabled,
+  showConnectModal,
+  startAgentListRefresh,
+  fetchModelGroups,
+  fetchNodeStatus,
+  loadHistoryMessages,
+  allOutputs,
+  currentAgentId,
+  isAutoConnecting,
+  handleMessage,
+  showSettingsModal,
+  agentList,
+  agentStatuses
+})
 
 
 // 计算终端历史显示样式（高度自适应）
@@ -865,28 +928,11 @@ function getLanguageFromFilename(filename) {
 }
 
 // 认证和连接配置
-const auth = ref({ 
-  password: '',
-  token: ''
-})
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
-const socket = ref(null) // Gateway 连接
-const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
-const connecting = ref(false)
-const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
-const connectErrorMessage = ref('')  // 连接错误信息
 const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
-const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
 const restartFrontendService = ref(false) // 是否同时重启前端服务
-
-// WebSocket重连相关状态
-const reconnecting = ref(false) // 是否正在重连
-const reconnectAttempts = ref(0) // 当前重连尝试次数
-const reconnectTimer = ref(null) // 重连定时器
-const reconnectInterval = 5000 // 固定重连间隔（毫秒）
-const userDisconnected = ref(false) // 用户主动断开连接标志
 
 // 配置同步相关状态
 const syncConfigSourceNode = ref('') // 配置同步的源节点ID
@@ -895,103 +941,7 @@ const syncConfigSections = ref(['llms', 'llm_groups']) // 要同步的配置类�
 const isSyncingConfig = ref(false) // 是否正在同步配置
 const isUpdatingCode = ref(false) // 是否正在更新代码
 
-// 登录函数：使用密码获取 Token
-async function loginWithPassword(password) {
-  try {
-    const { host, port } = getGatewayAddress(gatewayUrl.value)
-    const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
-    })
-    
-    const result = await response.json()
-    if (!response.ok || !result.success || !result.data?.token) {
-      throw new Error(result.error?.message || '登录失败')
-    }
-    
-    // 保存 Token（仅在内存中保存，页面刷新后会失效，需要重新登录）
-    auth.value.token = result.data.token
 
-    // 如果免登录开启，将 Token 保存到 localStorage
-    if (autoLoginEnabled.value) {
-      localStorage.setItem('jarvis_auth_token', result.data.token)
-      console.log('[AUTH] Token saved to localStorage (auto login enabled)')
-    }
-    
-    // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
-    auth.value.password = ''
-    
-    console.log('[AUTH] Login successful, token saved, password cleared')
-    return true
-  } catch (error) {
-    console.error('[AUTH] Login failed:', error)
-    throw error
-  }
-}
-
-// 通用的带认证的 fetch 函数
-function hasAuthToken() {
-  return Boolean(auth.value.token)
-}
-
-// 获取当前有效的 Token（优先返回内存中的，其次返回 localStorage 的）
-function getAuthToken() {
-  // 优先返回内存中的 Token
-  if (auth.value.token) {
-    return auth.value.token
-  }
-  // 其次尝试从 localStorage 获取
-  const savedToken = localStorage.getItem('jarvis_auth_token')
-  if (savedToken) {
-    auth.value.token = savedToken
-    return savedToken
-  }
-  return null
-}
-
-// 尝试从 localStorage 加载已保存的 token
-function loadSavedToken() {
-  const savedToken = localStorage.getItem('jarvis_auth_token')
-  if (savedToken) {
-    auth.value.token = savedToken
-    console.log('[AUTH] Loaded saved token from localStorage')
-    return true
-  }
-  return false
-}
-
-async function fetchWithAuth(url, options = {}) {
-  if (!hasAuthToken()) {
-    throw new Error('尚未登录，已阻止向后端发送请求')
-  }
-
-  // 复制 options 避免修改原始对象
-  const fetchOptions = {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Content-Type': 'Content-Type' in (options.headers || {}) ? options.headers['Content-Type'] : 'application/json'
-    }
-  }
-  
-  // 如果有 Token，添加到 Authorization Header
-  if (auth.value.token) {
-    fetchOptions.headers['Authorization'] = `Bearer ${auth.value.token}`
-  }
-  
-  const response = await fetch(url, fetchOptions)
-  
-  // 检查401未授权错误
-  if (response.status === 401) {
-    console.log('[AUTH] Received 401 Unauthorized, showing login modal')
-    auth.value.token = ''
-    showConnectModal.value = true
-    connectErrorMessage.value = '登录已过期，请重新登录'
-  }
-  
-  return response
-}
 
 
 
@@ -2684,175 +2634,9 @@ function saveAutoLoginSetting() {
   }
 }
 
-// 连接到 Gateway
-async function connect() {
-  console.log('[ws] connect() called', {
-    hasSocket: !!socket.value,
-    socketState: socket.value?.readyState,
-    connecting: connecting.value,
-    gatewayUrl: gatewayUrl.value,
-  })
-  // 清空之前的错误信息
-  connectErrorMessage.value = ''
-  if (socket.value) return
-  
-  // 解析网关地址
-  const parsed = parseGatewayAddress(gatewayUrl.value)
-  if (!parsed) {
-    connectErrorMessage.value = '无效的网关地址格式'
-    return
-  }
-  
-  const password = String(auth.value.password || '').trim()
 
-  // 如果已有 token（从 localStorage 加载的），跳过密码登录
-  if (!hasAuthToken()) {
-    try {
-      await loginWithPassword(password)
-    } catch (error) {
-      connectErrorMessage.value = error.message || '登录失败'
-      return
-    }
-  } else {
-    console.log('[AUTH] Using existing token, skipping password login')
-  }
-  
-  if (!hasAuthToken()) {
-    connectErrorMessage.value = '登录失败，请重试'
-    return
-  }
-  
-  const host = parsed.host || window.location.hostname || '127.0.0.1'
-  const port = parsed.port || '8000'
-  const url = buildWebSocketUrl(host, port, parsed.protocol)
-  connecting.value = true
-  const ws = new WebSocket(url, buildWebSocketProtocols(auth.value?.token))
-  console.log('[ws] new WebSocket created', { url, readyState: ws.readyState })
-  ws.onopen = () => {
-    console.log('[ws] open', { url, readyState: ws.readyState })
-    connecting.value = false
-    socket.value = ws
-    showConnectModal.value = false
-    
-    // 重置重连状态
-    reconnecting.value = false
-    reconnectAttempts.value = 0
-    userDisconnected.value = false
-    if (reconnectTimer.value) {
-      clearTimeout(reconnectTimer.value)
-      reconnectTimer.value = null
-    }
-    console.log('[ws] Reconnect state reset')
 
-    // 保存连接信息到 localStorage
-    localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
-    console.log('[ws] Connection info saved:', gatewayUrl.value)
-    startAgentListRefresh()
-    // 获取模型组列表
-    fetchModelGroups()
-    fetchNodeStatus()
-    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
-    if (currentOutputs.length === 0) {
-      console.log('[HISTORY] Loading history on first connect')
-      loadHistoryMessages(false)
-    } else {
-      console.log('[HISTORY] Skip loading history, messages already exist')
-    }
-    // 发送连接锁定设置
-    ws.send(JSON.stringify({
-      type: 'connection_lock',
-      payload: { enabled: connectionLockEnabled.value }
-    }))
-    console.log('[ws] connection_lock sent', connectionLockEnabled.value)
-  }
-  ws.onmessage = (event) => {
-    let message = null
-    try {
-      message = JSON.parse(event.data)
-    } catch (error) {
-      console.warn('[ws] message parse failed', event.data)
-      return
-    }
-    console.log('[ws] message', message)
-    handleMessage(message)
-  }
-  ws.onclose = (event) => {
-    console.log('[ws] close', {
-      code: event?.code,
-      reason: event?.reason,
-      wasClean: event?.wasClean,
-      readyState: ws.readyState,
-      currentSocketMatched: socket.value === ws,
-    })
-    socket.value = null
-    connecting.value = false
-    // 连接断开，销毁所有独立终端
-    console.log('[ws] Closing all independent terminals due to connection close')
-    const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
-    allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
-    
-    // 判断是否需要自动重连（token存在时才重连）
-    const shouldReconnect = !userDisconnected.value && !isAutoConnecting.value && hasAuthToken()
 
-    if (shouldReconnect) {
-      // 启动自动重连（固定间隔，无上限）
-      reconnecting.value = true
-      reconnectAttempts.value++
-
-      console.log(`[ws] Connection closed, attempting to reconnect (attempt ${reconnectAttempts.value}) in ${reconnectInterval}ms`)
-
-      // 设置重连定时器（固定5秒间隔）
-      reconnectTimer.value = setTimeout(() => {
-        console.log(`[ws] Reconnecting... attempt ${reconnectAttempts.value}`)
-        connect()
-      }, reconnectInterval)
-    } else {
-      // 不需要重连
-      reconnecting.value = false
-
-      if (isAutoConnecting.value) {
-        // 自动连接阶段失败，显示登录弹窗
-        console.log('[ws] Auto connection failed, showing login modal')
-        isAutoConnecting.value = false
-        showConnectModal.value = true
-        // 清除失效的 token
-        localStorage.removeItem('jarvis_auth_token')
-        auth.value.token = ''
-        connectErrorMessage.value = '自动登录失败，请重新登录'
-      } else if (userDisconnected.value) {
-        // 用户主动断开，不重连
-        console.log('[ws] User disconnected, not reconnecting')
-        userDisconnected.value = false // 重置标志
-      }
-    }
-    // 不清空连接错误信息，保留错误提示
-  }
-  ws.onerror = (event) => {
-    console.error('[ws] error', {
-      event,
-      readyState: ws.readyState,
-      currentSocketMatched: socket.value === ws,
-    })
-    connecting.value = false
-  }
-}
-
-function disconnect() {
-  // 设置用户主动断开标志，防止自动重连
-  userDisconnected.value = true
-  
-  // 清理重连定时器
-  if (reconnectTimer.value) {
-    clearTimeout(reconnectTimer.value)
-    reconnectTimer.value = null
-  }
-  reconnecting.value = false
-  reconnectAttempts.value = 0
-  
-  if (socket.value) {
-    socket.value.close()
-  }
-}
 
 // 处理 SettingsModal 组件的重启事件
 function handleRestartGateway({ nodeId, restartFrontend }) {
@@ -3078,59 +2862,10 @@ async function updateCodeToMain() {
   }
 }
 
-function reconnect() {
-  // 断开现有连接
-  if (socket.value) {
-    socket.value.close()
-  }
-  // 关闭设置弹窗
-  showSettingsModal.value = false
-  // 重新连接
-  connect()
+
 }
 
-function disconnectAll() {
-  if (!confirm('确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。')) {
-    return
-  }
-  console.log('[WS] Disconnecting all WebSocket connections')
-  
-  // 关闭设置弹窗
-  showSettingsModal.value = false
-  
-  // 关闭所有Agent WebSocket连接
-  sockets.value.forEach((ws, agentId) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log(`[WS] Closing WebSocket connection for agent ${agentId}`)
-      ws.close()
-    }
-  })
-  sockets.value.clear()
-  
-  // 关闭主Gateway连接
-  if (socket.value) {
-    console.log('[WS] Closing main Gateway WebSocket connection')
-    socket.value.close()
-    socket.value = null
-  }
-  
-  // 清空连接状态
-  currentAgentId.value = null
-  agentList.value = []
-  agentStatuses.value.clear()
-  
-  // 清除保存的 token 和免登录状态
-  localStorage.removeItem('jarvis_auth_token')
-  localStorage.removeItem('jarvis_auto_login')
-  auth.value.token = ''
-  autoLoginEnabled.value = false
-  console.log('[WS] Cleared saved token and auto login setting')
-  // 强制刷新页面确保状态重置
-  console.log('[WS] Forcing page refresh after disconnection')
-  setTimeout(() => {
-    window.location.reload()
-  }, 500)
-}
+
 
 // ========== Agent 管理方法 ==========
 
@@ -3158,256 +2893,7 @@ function sendMessageToAgent(message) {
 }
 
 // 连接到指定的 Agent（建立独立的 WebSocket 连接）
-async function connectToAgent(agent, retryCount = 0) {
-  const agentId = agent.agent_id
-  const maxRetries = 12  // 最多重试12次
-  const retryDelay = 2000 // 2秒重试间隔
-  const connectionTimeout = 10000 // 10秒连接超时（适应Agent启动时间）
-  
-  // 检查是否已有连接
-  if (sockets.value.has(agentId)) {
-    const existingWs = sockets.value.get(agentId)
-    // 检查现有连接是否仍然有效
-    if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-      console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
-      // 已连接，发送 get_status 请求以同步当前状态
-      console.log(`[AGENT] Requesting status update for ${agent.name || agentId}`)
-      existingWs.send(JSON.stringify({ type: 'get_status', payload: {} }))
-      return
-    }
-    // 连接已断开或正在关闭，确保完全关闭后再清理
-    console.log(`[AGENT] Previous connection to ${agent.name || agentId} was not OPEN, cleaning up...`)
-    
-    // 等待旧连接完全关闭（避免与后端连接冲突）
-    if (existingWs && existingWs.readyState !== WebSocket.CLOSED) {
-      console.log(`[AGENT] Waiting for old connection to close (state: ${existingWs.readyState})`)
-      existingWs.close()
-      // 等待最多 1 秒让连接完全关闭
-      await new Promise((resolve) => {
-        if (existingWs.readyState === WebSocket.CLOSED) {
-          resolve()
-          return
-        }
-        const checkInterval = setInterval(() => {
-          if (existingWs.readyState === WebSocket.CLOSED) {
-            clearInterval(checkInterval)
-            resolve()
-          }
-        }, 50)
-        // 最多等待 1 秒
-        setTimeout(() => {
-          clearInterval(checkInterval)
-          resolve()
-        }, 1000)
-      })
-    }
-    
-    // 清理旧连接
-    sockets.value.delete(agentId)
-    console.log(`[AGENT] Old connection cleaned up`)
-  }
-  
-  console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
-  
-  const { host, port } = getGatewayAddress(gatewayUrl.value)
-  const url = buildAgentWebSocketUrl(host, agentId, null, port, String(agent?.node_id || 'master').trim())
-  
-  agentConnecting.value = true
-  
-  // 返回 Promise，等待连接真正建立
-  return new Promise((resolve, reject) => {
-    try {
-      const ws = new WebSocket(url, buildWebSocketProtocols(auth.value?.token))
-      let connectionHandled = false // 防止重复处理连接结果
-      
-      // 设置连接超时
-      const timeoutId = setTimeout(() => {
-        if (connectionHandled) return
-        connectionHandled = true
-        
-        console.error(`[AGENT ${agentId}] Connection timeout after ${connectionTimeout}ms`)
-        ws.close()
-        
-        // 等待连接关闭后再重试
-        const retryWithCleanup = async () => {
-          // 清理可能存在的旧连接
-          const oldWs = sockets.value.get(agentId)
-          if (oldWs && oldWs !== ws && oldWs.readyState !== WebSocket.CLOSED) {
-            console.log(`[AGENT ${agentId}] Cleaning up old connection before retry`)
-            oldWs.close()
-            await new Promise(resolve => {
-              const check = setInterval(() => {
-                if (oldWs.readyState === WebSocket.CLOSED) {
-                  clearInterval(check)
-                  resolve()
-                }
-              }, 50)
-              setTimeout(() => {
-                clearInterval(check)
-                resolve()
-              }, 500)
-            })
-            sockets.value.delete(agentId)
-          }
-          
-          if (retryCount < maxRetries) {
-            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
-            agentConnecting.value = false
-            setTimeout(() => {
-              connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-            }, retryDelay)
-          } else {
-            agentConnecting.value = false
-            const error = new Error(`Connection failed after ${maxRetries} retries`)
-            console.error(`[AGENT ${agentId}]`, error.message)
-            reject(error)
-          }
-        }
-        
-        retryWithCleanup()
-      }, connectionTimeout) // 结束 setTimeout
-      
-      // 绑定消息处理
-      ws.onmessage = (event) => {
-        let message = null
-        try {
-          message = JSON.parse(event.data)
-        } catch (error) {
-          console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
-          return
-        }
-        console.log(`[AGENT ${agentId}] message`, message)
-        handleMessage(message, agentId)
-      }
-      
-      ws.onopen = () => {
-        if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onopen`)
-          return
-        }
-        connectionHandled = true
-        
-        clearTimeout(timeoutId)
-        console.log(`[AGENT ${agentId}] Connected to ${url}`)
-        agentConnecting.value = false
-        
-        // 保存连接
-        sockets.value.set(agentId, ws)
-        
-        // 初始化消息记录
-        if (!allOutputs.value.has(agentId)) {
-          allOutputs.value.set(agentId, [])
-        }
-        
-        
-        // 标记连接已完成（在onclose中用于判断是否需要重试）
-        ws._connectionCompleted = true
-        
-        // 连接成功，resolve Promise
-        resolve(ws)
-      }
-      
-      ws.onclose = (event) => {
-        if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onclose`)
-          return
-        }
-        connectionHandled = true
-        
-        clearTimeout(timeoutId)
-        console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason}`)
-        sockets.value.delete(agentId)
-        if (agentConnecting.value) agentConnecting.value = false
-        
-        // 如果连接未完成就关闭，视为失败，触发重试
-        if (!ws._connectionCompleted && retryCount < maxRetries) {
-          console.log(`[AGENT ${agentId}] Connection closed before completion, retrying... (${retryCount + 1}/${maxRetries})`)
-          
-          // 等待当前连接完全关闭后再重试（避免与后端连接冲突）
-          const retryAfterClose = async () => {
-            if (ws.readyState !== WebSocket.CLOSED) {
-              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
-              await new Promise(resolve => {
-                const check = setInterval(() => {
-                  if (ws.readyState === WebSocket.CLOSED) {
-                    clearInterval(check)
-                    resolve()
-                  }
-                }, 50)
-                setTimeout(() => {
-                  clearInterval(check)
-                  resolve()
-                }, 500)
-              })
-            }
-            
-            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
-            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-          }
-          
-          setTimeout(retryAfterClose, retryDelay)
-        }
-      }
-      
-      ws.onerror = (error) => {
-        if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onerror`)
-          return
-        }
-        connectionHandled = true
-        
-        clearTimeout(timeoutId)
-        console.error(`[AGENT ${agentId}] Connection error:`, error)
-        if (agentConnecting.value) agentConnecting.value = false
-        
-        // 触发重试
-        if (retryCount < maxRetries) {
-          console.log(`[AGENT ${agentId}] Error occurred, retrying... (${retryCount + 1}/${maxRetries})`)
-          
-          // 关闭并等待连接完全关闭后再重试
-          const retryAfterError = async () => {
-            ws.close()
-            if (ws.readyState !== WebSocket.CLOSED) {
-              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
-              await new Promise(resolve => {
-                const check = setInterval(() => {
-                  if (ws.readyState === WebSocket.CLOSED) {
-                    clearInterval(check)
-                    resolve()
-                  }
-                }, 50)
-                setTimeout(() => {
-                  clearInterval(check)
-                  resolve()
-                }, 500)
-              })
-            }
-            
-            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-          }
-          
-          setTimeout(retryAfterError, retryDelay)
-        } else {
-          const err = new Error(`Connection failed after ${maxRetries} retries`)
-          reject(err)
-        }
-      }
-      
-    } catch (error) {
-      console.error(`[AGENT ${agentId}] Failed to connect:`, error)
-      agentConnecting.value = false
-      
-      if (retryCount < maxRetries) {
-        console.log(`[AGENT ${agentId}] Exception occurred, retrying... (${retryCount + 1}/${maxRetries})`)
-        setTimeout(() => {
-          connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-        }, retryDelay)
-      } else {
-        reject(error)
-      }
-    }
-  })
-}
+
 
 // 获取状态文本（组合显示）
 function getStatusText(agent) {
