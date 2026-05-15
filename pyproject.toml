@@ -21,7 +21,7 @@ keywords = ["jarvis", "ai", "assistant", "tools", "automation"]
 dependencies = [
     "requests==2.32.3",
     "charset-normalizer>=3.0.0",
-    "playwright==1.48.0",
+    "playwright==1.48.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
     "colorama==0.4.6",
     "prompt_toolkit==3.0.50",
     "pygments==2.19.2",
@@ -90,7 +90,7 @@ dependencies = [
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
-    browser = ["playwright==1.48.0"]
+    browser = ["playwright==1.48.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
     clang18 = ["clang==18.*"]
