@@ -134,3 +134,268 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
 }
+
+/* 编辑器面板 */
+.editor-panel {
+  position: fixed;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.editor-panel-dragging {
+  transition: none;
+}
+
+.editor-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  cursor: move;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.editor-panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-panel-subtitle {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.editor-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 4px 0;
+  background: var(--color-bg-primary);
+  overflow-x: auto;
+}
+
+.editor-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.editor-tab.active {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.editor-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tab-dirty {
+  color: #f2cc60;
+  font-size: 10px;
+}
+
+.editor-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+}
+
+.editor-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.editor-toolbar-status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.editor-toolbar-status.error {
+  color: var(--color-error);
+}
+
+.editor-toolbar-spacer {
+  flex: 1;
+}
+
+.editor-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  backdrop-filter: blur(20px);
+}
+
+.editor-edit-toggle:hover {
+  background: var(--color-bg-hover);
+}
+
+.editor-edit-toggle:active {
+  transform: scale(0.96);
+}
+
+.editor-edit-toggle.editable {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--color-success);
+}
+
+.editor-edit-toggle.editable:hover {
+  background: rgba(0, 255, 136, 0.25);
+}
+
+.editor-edit-toggle-icon {
+  font-size: 12px;
+}
+
+.editor-edit-toggle-text {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.editor-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--color-bg-primary);
+}
+
+.editor-activity-bar {
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.editor-activity-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.editor-activity-button:hover,
+.editor-activity-button.active {
+  color: var(--color-text-primary);
+  background: var(--color-accent-subtle);
+  border-color: var(--color-border-active);
+}
+
+.editor-sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.editor-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.editor-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.editor-sidebar-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-file-tree-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.editor-file-tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.editor-file-tree-empty {
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
