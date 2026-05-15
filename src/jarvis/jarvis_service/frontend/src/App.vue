@@ -6623,6 +6623,9 @@ onUnmounted(() => {
 </script>
 
 <style>
+/* 导入公共样式 */
+@import './styles/app.css';
+
 /* 全局样式 */
 * {
   margin: 0;
