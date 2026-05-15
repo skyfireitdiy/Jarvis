@@ -733,6 +733,21 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
+import { useUrlBuilder } from './composables/useUrlBuilder.js'
+
+// 初始化URL构建工具
+const {
+  getHttpProtocol,
+  getWebSocketProtocol,
+  parseGatewayAddress,
+  getGatewayAddress,
+  buildNodeHttpUrl,
+  buildNodeWebSocketUrl,
+  buildWebSocketUrl,
+  buildAgentWebSocketUrl,
+  buildHttpUrl,
+  buildWebSocketProtocols
+} = useUrlBuilder()
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -1045,116 +1060,7 @@ async function fetchWithAuth(url, options = {}) {
   return response
 }
 
-// URL 解析辅助函数：支持 HTTPS 协议和域名
 
-// 获取当前页面的 HTTP 协议（http:// 或 https://）
-function getHttpProtocol() {
-  return window.location.protocol === 'https:' ? 'https' : 'http'
-}
-
-// 获取当前页面的 WebSocket 协议（ws:// 或 wss://）
-function getWebSocketProtocol() {
-  return window.location.protocol === 'https:' ? 'wss' : 'ws'
-}
-
-// 解析网关地址，支持完整URL格式（如 ws://example.com:8080/ws 或 example.com:8080）
-function parseGatewayAddress(address) {
-  // 移除首尾空格
-  address = address.trim()
-  
-  // 如果是完整URL（包含协议）
-  if (address.includes('://')) {
-    try {
-      const url = new URL(address)
-      return {
-        protocol: url.protocol.replace(':', ''),  // 'ws', 'wss', 'http', 'https'
-        host: url.hostname,
-        port: url.port || (url.protocol === 'https:' || url.protocol === 'wss:' ? '443' : '80'),
-        path: url.pathname
-      }
-    } catch (e) {
-      console.error('[URL] Failed to parse address:', address, e)
-      return null
-    }
-  }
-  
-  // 如果是 host:port 格式
-  if (address.includes(':')) {
-    const parts = address.split(':')
-    if (parts.length === 2) {
-      return {
-        protocol: null,  // 使用默认协议
-        host: parts[0],
-        port: parts[1],
-        path: ''
-      }
-    }
-  }
-  
-  // 如果只有主机名（使用默认端口）
-  return {
-    protocol: null,
-    host: address,
-    port: '8000',
-    path: ''
-  }
-}
-
-// 构建节点 HTTP 基础路径
-function buildNodeHttpUrl(host, port, nodeId = 'master', path = '', protocol = null) {
-  const httpProtocol = protocol || getHttpProtocol()
-  const normalizedNodeId = String(nodeId || 'master').trim() || 'master'
-  const normalizedPath = `/${String(path || '').replace(/^\/+/, '')}`
-  return `${httpProtocol}://${host}:${port}/api/node/${encodeURIComponent(normalizedNodeId)}${normalizedPath}`
-}
-
-// 构建节点 WebSocket 基础路径
-function buildNodeWebSocketUrl(host, port, nodeId = 'master', path = '', protocol = null) {
-  const wsProtocol = protocol || getWebSocketProtocol()
-  const normalizedNodeId = String(nodeId || 'master').trim() || 'master'
-  const normalizedPath = `/${String(path || '').replace(/^\/+/, '')}`
-  return `${wsProtocol}://${host}:${port}/api/node/${encodeURIComponent(normalizedNodeId)}${normalizedPath}`
-}
-
-// 构建 WebSocket URL（用于网关连接）
-function buildWebSocketUrl(host, port, protocol = null) {
-  return buildNodeWebSocketUrl(host, port, 'master', 'ws', protocol)
-}
-
-// 构建 Agent WebSocket URL（通过统一节点代理）
-function buildAgentWebSocketUrl(host, agentId, protocol = null, port = null, nodeId = '') {
-  const normalizedNodeId = String(nodeId || 'master').trim() || 'master'
-  return buildNodeWebSocketUrl(host, port, normalizedNodeId, `agent/${agentId}/ws`, protocol)
-}
-
-// 构建 HTTP URL
-function buildHttpUrl(host, port, path, protocol = null) {
-  const normalizedPath = String(path || '').replace(/^\/+/, '')
-  return buildNodeHttpUrl(host, port, 'master', normalizedPath, protocol)
-}
-
-function buildWebSocketProtocols() {
-  const token = String(auth.value?.token || '').trim()
-  if (!token) {
-    return ['jarvis-ws']
-  }
-  return ['jarvis-ws', `jarvis-token.${encodeURIComponent(token)}`]
-}
-
-// 获取网关地址（host和port）
-function getGatewayAddress() {
-  const parsed = parseGatewayAddress(gatewayUrl.value)
-  if (!parsed) {
-    return {
-      host: '127.0.0.1',
-      port: '8000'
-    }
-  }
-  return {
-    host: parsed.host || '127.0.0.1',
-    port: parsed.port || '8000'
-  }
-}
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
