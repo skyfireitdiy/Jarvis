@@ -8999,71 +8999,7 @@ onUnmounted(() => {
 
 
 
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group.inline {
-  display: flex;
-  gap: 12px;
-}
-
-.form-group.inline .form-item {
-  flex: 1;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #8b949e;
-  letter-spacing: 0.01em;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 9px;
-  color: #e6edf3;
-  font-size: 14px;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background: rgba(13, 17, 23, 0.9);
-}
-
-.form-group select {
-  width: 100%;
-  padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 9px;
-  color: #e6edf3;
-  font-size: 14px;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 36px;
-}
-
-.form-group select:focus {
-  outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
-  background-color: rgba(13, 17, 23, 0.9);
-}
-
-.form-group select option {
-  background: #161b22;
-  color: #e6edf3;
-  padding: 8px;
-}
+/* 表单组样式已移至 app.css */
 
 
 .modal-header {
