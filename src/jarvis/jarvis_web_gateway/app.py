@@ -2119,6 +2119,129 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.post("/api/nodes/{node_id}/code-update", dependencies=[Depends(verify_token)])
+    async def node_code_update(node_id: str) -> Dict[str, Any]:
+        """更新指定节点的代码到 main 分支。
+
+        Args:
+            node_id: 节点ID
+
+        Returns:
+            更新结果的响应
+        """
+        try:
+            # 检查是否是本地节点
+            if node_id in (node_runtime.local_node_id, "master"):
+                # 本地节点直接执行更新
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["git", "pull", "origin", "main"],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if result.returncode == 0:
+                        return {
+                            "success": True,
+                            "data": {
+                                "node_id": node_id,
+                                "message": "代码更新成功",
+                                "output": result.stdout,
+                            },
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "UPDATE_FAILED",
+                                "message": result.stderr or "代码更新失败",
+                            },
+                        }
+                except subprocess.TimeoutExpired:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "TIMEOUT",
+                            "message": "代码更新超时",
+                        },
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "UPDATE_FAILED",
+                            "message": str(e),
+                        },
+                    }
+
+            # 检查远程节点状态
+            node_info = node_runtime.node_registry.get(node_id)
+            if node_info is None:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_NOT_FOUND",
+                        "message": f"Node not found: {node_id}",
+                    },
+                }
+
+            if node_info.status != "online":
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_OFFLINE",
+                        "message": f"Node is offline: {node_id}",
+                    },
+                }
+
+            # 发送更新请求到远程节点
+            response = await node_connection_manager.send_request_to_node(
+                node_id,
+                CODE_UPDATE_TO_MAIN_REQUEST,
+                {},
+                timeout=60.0,
+            )
+
+            payload = response.get("payload") or {}
+            if payload.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "message": "代码更新成功",
+                        "output": payload.get("message", ""),
+                    },
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "UPDATE_FAILED",
+                        "message": payload.get("message", "代码更新失败"),
+                    },
+                }
+        except Exception as e:
+            error_message = str(e).strip()
+            if not error_message:
+                if isinstance(e, TimeoutError):
+                    error_message = f"Code update timed out for node: {node_id}"
+                else:
+                    error_message = f"Code update failed for node: {node_id}"
+            logger.error(
+                "[CODE UPDATE] failed node_id=%s error=%s",
+                node_id,
+                error_message,
+                exc_info=True,
+            )
+            return {
+                "success": False,
+                "error": {
+                    "code": "UPDATE_FAILED",
+                    "message": error_message,
+                },
+            }
+
     async def update_code_to_main(request: Dict[str, Any]) -> Dict[str, Any]:
         """通知所有节点将 Jarvis 代码切换到 main 分支并更新。
 
