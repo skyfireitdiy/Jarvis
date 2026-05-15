@@ -2623,16 +2623,7 @@ function saveConnectionLockSetting() {
   }
 }
 
-// 保存免登录设置
-function saveAutoLoginSetting() {
-  localStorage.setItem('jarvis_auto_login', autoLoginEnabled.value)
-  console.log('[SETTINGS] Auto login setting saved:', autoLoginEnabled.value)
-  // 如果关闭免登录，清除已保存的 token
-  if (!autoLoginEnabled.value) {
-    localStorage.removeItem('jarvis_auth_token')
-    console.log('[SETTINGS] Saved token cleared (auto login disabled)')
-  }
-}
+
 
 
 
