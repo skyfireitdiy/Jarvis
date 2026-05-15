@@ -70,7 +70,8 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     DIRECTORY_LIST_REQUEST,
     NODE_TERMINAL_REQUEST,
     SERVICE_RESTART_REQUEST,
-    CONFIG_SYNC_REQUEST,
+    CONFIG_GET_REQUEST,
+    CONFIG_SET_REQUEST,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
@@ -79,6 +80,10 @@ from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
+from jarvis.jarvis_utils.config import (
+    GLOBAL_CONFIG_DATA,
+    get_gateway_auth_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +93,6 @@ try:
 except ImportError:
     # 如果 jarvis_agent 不可用，使用 None
     get_agent_status_manager = None  # type: ignore
-
-# 导入配置相关函数
-from jarvis.jarvis_utils.config import (
-    GLOBAL_CONFIG_DATA,
-    get_gateway_auth_config,
-)
 
 
 # 全局 AgentManager，用于状态变更回调
@@ -1746,6 +1745,258 @@ def create_app(
             },
         }
 
+    @app.get("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
+    async def get_node_config(node_id: str) -> Dict[str, Any]:
+        """获取指定节点的配置。
+
+        Args:
+            node_id: 节点ID
+
+        Returns:
+            包含节点配置的响应
+        """
+        try:
+            # 检查是否是本地节点
+            if node_id in (node_runtime.local_node_id, "master"):
+                # 读取本地配置
+                config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+                if not config_file.exists():
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "CONFIG_NOT_FOUND",
+                            "message": "Config file not found",
+                        },
+                    }
+
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "config": config_data,
+                    },
+                }
+
+            # 检查远程节点状态
+            node_info = node_runtime.node_registry.get(node_id)
+            if node_info is None:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_NOT_FOUND",
+                        "message": f"Node not found: {node_id}",
+                    },
+                }
+
+            if node_info.status != "online":
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_OFFLINE",
+                        "message": f"Node is offline: {node_id}",
+                    },
+                }
+
+            # 从远程节点获取配置
+            response = await node_connection_manager.send_request_to_node(
+                node_id,
+                CONFIG_GET_REQUEST,
+                {},
+                timeout=30.0,
+            )
+
+            payload = response.get("payload") or {}
+            if payload.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "config": payload.get("config", {}),
+                    },
+                }
+            else:
+                error = payload.get("error") or {}
+                return {
+                    "success": False,
+                    "error": error,
+                }
+        except Exception as e:
+            error_message = str(e).strip()
+            if not error_message:
+                if isinstance(e, TimeoutError):
+                    error_message = f"Get config timed out for node: {node_id}"
+                else:
+                    error_message = f"Get config failed for node: {node_id}"
+            logger.error(
+                "[CONFIG GET] failed node_id=%s error=%s",
+                node_id,
+                error_message,
+                exc_info=True,
+            )
+            return {
+                "success": False,
+                "error": {
+                    "code": "GET_CONFIG_FAILED",
+                    "message": error_message,
+                },
+            }
+
+    @app.post("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
+    async def set_node_config(node_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+        """设置指定节点的配置。
+
+        Args:
+            node_id: 节点ID
+            request: 请求体，包含以下字段：
+                - config_sections: 要设置的配置类型列表（llms, llm_groups）
+                - config_data: 配置数据
+
+        Returns:
+            设置结果的响应
+        """
+        try:
+            config_sections = request.get("config_sections", [])
+            config_data = request.get("config_data", {})
+
+            if not config_sections:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "config_sections is required",
+                    },
+                }
+
+            if not config_data:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "config_data is required",
+                    },
+                }
+
+            # 检查是否是本地节点
+            if node_id in (node_runtime.local_node_id, "master"):
+                # 本地节点直接应用配置
+                try:
+                    config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+
+                    # 备份原配置文件
+                    backup_file = config_file.with_suffix(".yaml.bak")
+                    if config_file.exists():
+                        shutil.copy2(config_file, backup_file)
+
+                    # 读取现有配置
+                    existing_config: Dict[str, Any] = {}
+                    if config_file.exists():
+                        with open(config_file, "r", encoding="utf-8") as f:
+                            existing_config = yaml.safe_load(f) or {}
+
+                    # 更新配置
+                    updated_config = existing_config.copy()
+                    for section in config_sections:
+                        if section in config_data:
+                            updated_config[section] = config_data[section]
+
+                    # 保存配置
+                    config_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        yaml.safe_dump(
+                            updated_config,
+                            f,
+                            allow_unicode=True,
+                            default_flow_style=False,
+                        )
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "node_id": node_id,
+                            "message": "配置设置成功",
+                            "backup_file": str(backup_file),
+                        },
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "CONFIG_SET_ERROR",
+                            "message": str(e),
+                        },
+                    }
+
+            # 检查远程节点状态
+            node_info = node_runtime.node_registry.get(node_id)
+            if node_info is None:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_NOT_FOUND",
+                        "message": f"Node not found: {node_id}",
+                    },
+                }
+
+            if node_info.status != "online":
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_OFFLINE",
+                        "message": f"Node is offline: {node_id}",
+                    },
+                }
+
+            # 发送配置设置请求到远程节点
+            response = await node_connection_manager.send_request_to_node(
+                node_id,
+                CONFIG_SET_REQUEST,
+                {
+                    "config_sections": config_sections,
+                    "config_data": config_data,
+                },
+                timeout=30.0,
+            )
+
+            payload = response.get("payload") or {}
+            if payload.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "message": "配置设置成功",
+                        "data": payload.get("data", {}),
+                    },
+                }
+            else:
+                error = payload.get("error") or {}
+                return {
+                    "success": False,
+                    "error": error,
+                }
+        except Exception as e:
+            error_message = str(e).strip()
+            if not error_message:
+                if isinstance(e, TimeoutError):
+                    error_message = f"Set config timed out for node: {node_id}"
+                else:
+                    error_message = f"Set config failed for node: {node_id}"
+            logger.error(
+                "[CONFIG SET] failed node_id=%s error=%s",
+                node_id,
+                error_message,
+                exc_info=True,
+            )
+            return {
+                "success": False,
+                "error": {
+                    "code": "SET_CONFIG_FAILED",
+                    "message": error_message,
+                },
+            }
+
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
     async def restart_service(request: Dict[str, Any]) -> Dict[str, Any]:
         """请求 jarvis-service 通过 SIGUSR1/SIGUSR2 重启服务。
@@ -1942,231 +2193,6 @@ def create_app(
                     "total_nodes": total_count,
                     "success_count": success_count,
                     "failed_count": total_count - success_count,
-                    "results": results,
-                },
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
-            }
-
-    @app.post("/api/config/sync", dependencies=[Depends(verify_token)])
-    async def sync_config(request: Dict[str, Any]) -> Dict[str, Any]:
-        """同步配置到其他节点。
-
-        Args:
-            request: 请求体，包含以下字段：
-                - source_node_id: 源节点ID（可选，默认为本节点）
-                - target_node_ids: 目标节点ID列表
-                - config_sections: 要同步的配置类型列表（llms, llm_groups）
-        """
-        try:
-            source_node_id = (
-                str(request.get("source_node_id") or "").strip()
-                or node_runtime.local_node_id
-            )
-            target_node_ids = request.get("target_node_ids", [])
-            config_sections = request.get("config_sections", [])
-
-            if not target_node_ids:
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "INVALID_REQUEST",
-                        "message": "target_node_ids is required",
-                    },
-                }
-
-            if not config_sections:
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "INVALID_REQUEST",
-                        "message": "config_sections is required",
-                    },
-                }
-
-            # 读取源节点配置
-            config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
-            if not config_file.exists():
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "CONFIG_NOT_FOUND",
-                        "message": "Config file not found",
-                    },
-                }
-
-            with open(config_file, "r", encoding="utf-8") as f:
-                source_config = yaml.safe_load(f) or {}
-
-            # 提取要同步的配置
-            config_data = {}
-            for section in config_sections:
-                if section in source_config:
-                    config_data[section] = source_config[section]
-
-            if not config_data:
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "NO_CONFIG_TO_SYNC",
-                        "message": "No config data to sync",
-                    },
-                }
-
-            # 同步到目标节点
-            results = []
-            for target_node_id in target_node_ids:
-                try:
-                    # 检查是否是本地节点
-                    if target_node_id in (node_runtime.local_node_id, "master"):
-                        # 本地节点直接应用配置
-                        try:
-                            # 备份原配置文件
-                            backup_file = config_file.with_suffix(".yaml.bak")
-                            if config_file.exists():
-                                shutil.copy2(config_file, backup_file)
-
-                            # 读取现有配置
-                            existing_config: Dict[str, Any] = {}
-                            if config_file.exists():
-                                with open(config_file, "r", encoding="utf-8") as f:
-                                    existing_config = yaml.safe_load(f) or {}
-
-                            # 更新配置
-                            updated_config = existing_config.copy()
-                            for section in config_sections:
-                                if section in config_data:
-                                    updated_config[section] = config_data[section]
-
-                            # 保存配置
-                            config_file.parent.mkdir(parents=True, exist_ok=True)
-                            with open(config_file, "w", encoding="utf-8") as f:
-                                yaml.safe_dump(
-                                    updated_config,
-                                    f,
-                                    allow_unicode=True,
-                                    default_flow_style=False,
-                                )
-
-                            results.append(
-                                {
-                                    "node_id": target_node_id,
-                                    "success": True,
-                                    "data": {
-                                        "message": "配置同步成功",
-                                        "backup_file": str(backup_file),
-                                    },
-                                }
-                            )
-                        except Exception as e:
-                            results.append(
-                                {
-                                    "node_id": target_node_id,
-                                    "success": False,
-                                    "error": {
-                                        "code": "CONFIG_SYNC_ERROR",
-                                        "message": str(e),
-                                    },
-                                }
-                            )
-                        continue
-
-                    # 检查远程节点状态
-                    node_info = node_runtime.node_registry.get(target_node_id)
-                    if node_info is None:
-                        results.append(
-                            {
-                                "node_id": target_node_id,
-                                "success": False,
-                                "error": {
-                                    "code": "NODE_NOT_FOUND",
-                                    "message": f"Node not found: {target_node_id}",
-                                },
-                            }
-                        )
-                        continue
-
-                    if node_info.status != "online":
-                        results.append(
-                            {
-                                "node_id": target_node_id,
-                                "success": False,
-                                "error": {
-                                    "code": "NODE_OFFLINE",
-                                    "message": f"Node is offline: {target_node_id}",
-                                },
-                            }
-                        )
-                        continue
-
-                    # 发送配置同步请求到远程节点
-                    response = await node_connection_manager.send_request_to_node(
-                        target_node_id,
-                        CONFIG_SYNC_REQUEST,
-                        {
-                            "config_sections": config_sections,
-                            "config_data": config_data,
-                        },
-                        timeout=30.0,
-                    )
-
-                    payload = response.get("payload") or {}
-                    if payload.get("success"):
-                        results.append(
-                            {
-                                "node_id": target_node_id,
-                                "success": True,
-                                "data": payload.get("data", {}),
-                            }
-                        )
-                    else:
-                        error = payload.get("error") or {}
-                        results.append(
-                            {
-                                "node_id": target_node_id,
-                                "success": False,
-                                "error": error,
-                            }
-                        )
-                except Exception as e:
-                    error_message = str(e).strip()
-                    if not error_message:
-                        if isinstance(e, TimeoutError):
-                            error_message = (
-                                f"Config sync timed out for node: {target_node_id}"
-                            )
-                        else:
-                            error_message = (
-                                f"Config sync failed for node: {target_node_id}"
-                            )
-                    logger.error(
-                        "[CONFIG SYNC] sync failed target_node_id=%s error=%s",
-                        target_node_id,
-                        error_message,
-                        exc_info=True,
-                    )
-                    results.append(
-                        {
-                            "node_id": target_node_id,
-                            "success": False,
-                            "error": {
-                                "code": "SYNC_FAILED",
-                                "message": error_message,
-                            },
-                        }
-                    )
-
-            # 统计成功数量
-            success_count = sum(1 for r in results if r.get("success"))
-
-            return {
-                "success": True,
-                "data": {
-                    "source_node_id": source_node_id,
-                    "success_count": success_count,
                     "results": results,
                 },
             }
@@ -3965,8 +3991,6 @@ def create_app(
             result = await get_node_status()
         elif normalized_method == "POST" and normalized_path == "/service/restart":
             result = await restart_service(payload)
-        elif normalized_method == "POST" and normalized_path == "/config/sync":
-            result = await sync_config(payload)
         elif normalized_method == "POST" and normalized_path == "/code/update-to-main":
             result = await update_code_to_main(payload)
         elif normalized_method == "GET" and normalized_path == "/agents":
