@@ -3415,48 +3415,61 @@ async function updateCodeToMain() {
   try {
     isUpdatingCode.value = true
     const { host, port } = getGatewayAddress()
-    const url = buildHttpUrl(host, port, 'code/update-to-main')
 
-    console.debug('[SETTINGS] Sending update code request to:', url)
+    // 获取所有在线节点
+    const nodeOptions = availableNodeOptions.value || []
+    if (nodeOptions.length === 0) {
+      showToast('没有在线节点可更新', 'warning')
+      return
+    }
 
-    // 创建AbortController用于超时控制
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 90000) // 90秒超时（后端处理节点更新需要较长时间）
+    // 对每个节点执行更新
+    let successCount = 0
+    const totalCount = nodeOptions.length
+    const results = []
 
-    try {
-      // 发送更新代码请求
-      const response = await fetchWithAuth(url, {
-        method: 'POST',
-        body: JSON.stringify({}),
-        signal: controller.signal
-      })
+    for (const node of nodeOptions) {
+      const nodeId = node.nodeId
+      try {
+        console.debug('[SETTINGS] Updating code for node:', nodeId)
+        const response = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${nodeId}/code-update`), {
+          method: 'POST'
+        })
+        const result = await response.json()
 
-      clearTimeout(timeoutId)
-      const result = await response.json()
-
-      console.debug('[SETTINGS] Update code response:', result)
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error?.message || '代码更新失败')
+        if (response.ok && result.success) {
+          successCount++
+          results.push({
+            node_id: nodeId,
+            success: true,
+            message: result.data?.message || '更新成功'
+          })
+        } else {
+          results.push({
+            node_id: nodeId,
+            success: false,
+            message: result.error?.message || '更新失败'
+          })
+        }
+      } catch (error) {
+        console.error(`[SETTINGS] Failed to update code for node ${nodeId}:`, error)
+        results.push({
+          node_id: nodeId,
+          success: false,
+          message: error.message || '更新失败'
+        })
       }
+    }
 
-      const successCount = result.data?.success_count || 0
-      const totalCount = result.data?.total_nodes || 0
-      const failedCount = result.data?.failed_count || 0
+    // 显示结果
+    console.debug('[SETTINGS] Update code results:', results)
 
-      if (successCount === totalCount) {
-        showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
-      } else if (successCount > 0) {
-        showToast(`代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`, 'warning')
-      } else {
-        showToast('代码更新失败，没有节点更新成功', 'error')
-      }
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      if (fetchError.name === 'AbortError') {
-        throw new Error('请求超时，请检查网络连接')
-      }
-      throw fetchError
+    if (successCount === totalCount) {
+      showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
+    } else if (successCount > 0) {
+      showToast(`代码更新部分成功，成功 ${successCount}/${totalCount} 个节点`, 'warning')
+    } else {
+      showToast('代码更新失败，没有节点更新成功', 'error')
     }
   } catch (error) {
     console.error('[SETTINGS] Failed to update code:', error)
