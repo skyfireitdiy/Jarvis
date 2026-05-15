@@ -67,7 +67,7 @@ setup(
         "tree-sitter-bash==0.25.1; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
         "tree-sitter-ruby==0.23.1; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
         "tree-sitter-php==0.24.1; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
-        "tree-sitter-sql==0.3.11; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf",
+        "tree-sitter-sql==0.3.11; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
         "pywinauto>=0.6.9; sys_platform == 'win32'",
         "pywinpty>=2.0.0; sys_platform == 'win32'",
         "pytest",
