@@ -8987,29 +8987,7 @@ onUnmounted(() => {
   background: #da3633;
 }
 
-/* 模态框 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal {
-  background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 28px;
-  width: 100%;
-  max-width: 420px;
-}
+/* 模态框样式已移至 app.css */
 
 .connect-modal h2 {
   margin: 0 0 24px 0;
