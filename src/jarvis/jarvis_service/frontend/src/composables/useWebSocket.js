@@ -56,3 +56,65 @@ export function useWebSocket(context = {}) {
   const lastPongTime = ref(null); // 最后一次收到pong的时间
   const heartbeatInterval = 30000; // 心跳间隔（毫秒）
   const pongTimeout = 10000; // pong超时时间（毫秒）
+
+  /**
+   * 启动心跳机制
+   */
+  function startHeartbeat() {
+    stopHeartbeat(); // 先停止现有心跳
+    
+    if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    console.log("[ws] Starting heartbeat mechanism");
+    lastPongTime.value = Date.now();
+
+    heartbeatTimer.value = setInterval(() => {
+      if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+        stopHeartbeat();
+        return;
+      }
+
+      // 检查是否超时
+      const now = Date.now();
+      if (lastPongTime.value && (now - lastPongTime.value) > pongTimeout) {
+        console.warn("[ws] Heartbeat timeout, closing connection");
+        socket.value.close();
+        return;
+      }
+
+      // 发送ping消息
+      try {
+        const pingMessage = {
+          type: "ping",
+          timestamp: now,
+        };
+        socket.value.send(JSON.stringify(pingMessage));
+        console.log("[ws] Sent ping message");
+      } catch (error) {
+        console.error("[ws] Failed to send ping:", error);
+      }
+    }, heartbeatInterval);
+  }
+
+  /**
+   * 停止心跳机制
+   */
+  function stopHeartbeat() {
+    if (heartbeatTimer.value) {
+      clearInterval(heartbeatTimer.value);
+      heartbeatTimer.value = null;
+    }
+    lastPongTime.value = null;
+  }
+
+  /**
+   * 处理pong消息
+   */
+  function handlePongMessage(message) {
+    if (message.type === "pong") {
+      lastPongTime.value = Date.now();
+      console.log("[ws] Received pong message");
+    }
+  }
