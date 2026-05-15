@@ -3321,29 +3321,81 @@ async function syncConfig() {
       showToast('没有其他节点可以同步', 'warning')
       return
     }
-    
-    const response = await fetchWithAuth(buildHttpUrl(host, port, 'config/sync'), {
-      method: 'POST',
-      body: JSON.stringify({
-        source_node_id: sourceNodeId,
-        target_node_ids: targetNodeIds,
-        config_sections: syncConfigSections.value
-      })
-    })
-    const result = await response.json()
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.error?.message || '配置同步失败')
+    // 1. 从源节点获取配置
+    const getResponse = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${sourceNodeId}/config`), {
+      method: 'GET'
+    })
+    const getResult = await getResponse.json()
+
+    if (!getResponse.ok || !getResult.success) {
+      throw new Error(getResult.error?.message || '获取源节点配置失败')
     }
 
-    const successCount = result.data?.success_count || 0
-    const totalCount = targetNodeIds.length
+    const sourceConfig = getResult.data?.config || {}
     
+    // 提取要同步的配置
+    const configData = {}
+    for (const section of syncConfigSections.value) {
+      if (sourceConfig[section]) {
+        configData[section] = sourceConfig[section]
+      }
+    }
+
+    if (Object.keys(configData).length === 0) {
+      showToast('没有可同步的配置数据', 'warning')
+      return
+    }
+
+    // 2. 对每个目标节点设置配置
+    let successCount = 0
+    const totalCount = targetNodeIds.length
+    const results = []
+
+    for (const targetNodeId of targetNodeIds) {
+      try {
+        const setResponse = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${targetNodeId}/config`), {
+          method: 'POST',
+          body: JSON.stringify({
+            config_sections: syncConfigSections.value,
+            config_data: configData
+          })
+        })
+        const setResult = await setResponse.json()
+
+        if (setResponse.ok && setResult.success) {
+          successCount++
+          results.push({
+            node_id: targetNodeId,
+            success: true,
+            data: setResult.data
+          })
+        } else {
+          results.push({
+            node_id: targetNodeId,
+            success: false,
+            error: setResult.error || { message: '设置配置失败' }
+          })
+        }
+      } catch (error) {
+        console.error(`[SETTINGS] Failed to set config for node ${targetNodeId}:`, error)
+        results.push({
+          node_id: targetNodeId,
+          success: false,
+          error: { message: error.message || '设置配置失败' }
+        })
+      }
+    }
+
+    // 3. 显示结果
     if (successCount === totalCount) {
       showToast(`配置同步成功，已同步到 ${successCount} 个节点`, 'success')
     } else {
       showToast(`配置同步部分成功，成功 ${successCount}/${totalCount} 个节点`, 'warning')
     }
+
+    // 记录详细结果
+    console.log('[SETTINGS] Config sync results:', results)
   } catch (error) {
     console.error('[SETTINGS] Failed to sync config:', error)
     showToast(error.message || '配置同步失败', 'error')
