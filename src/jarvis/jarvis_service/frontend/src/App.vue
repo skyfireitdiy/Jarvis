@@ -711,14 +711,12 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
 import * as monaco from 'monaco-editor'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
 import './diff.css'
-import plantumlEncoder from 'plantuml-encoder'
+
 import historyStorage from './historyStorage.js'
 import ConnectModal from './components/ConnectModal.vue'
 import BufferPanel from './components/BufferPanel.vue'
@@ -731,9 +729,10 @@ import EditorPanel from './components/EditorPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
-import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
+import { escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import { useUrlBuilder } from './composables/useUrlBuilder.js'
+import { useMarkdown } from './composables/useMarkdown.js'
 
 // 初始化URL构建工具
 const {
@@ -749,88 +748,18 @@ const {
   buildWebSocketProtocols
 } = useUrlBuilder()
 
-const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
-const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
+// 初始化Markdown渲染工具
+const {
+  PLANTUML_SERVER_URL,
+  PLANTUML_BLOCK_LANGUAGE,
+  encodePlantUmlText,
+  isPlantUmlLanguage,
+  isPlantUmlComplete,
+  renderPlantUmlBlock,
+  renderMessageHtml,
+  marked
+} = useMarkdown()
 
-function encodePlantUmlText(plantUmlSource) {
-  return plantumlEncoder.encode(String(plantUmlSource || '').trim())
-}
-
-function isPlantUmlLanguage(language) {
-  return String(language || '').trim().toLowerCase() === PLANTUML_BLOCK_LANGUAGE
-}
-
-/**
- * 检查 PlantUML 代码是否完整（包含 @startuml 和 @enduml 标记）
- * @param {string} source - PlantUML 源码
- * @returns {boolean} - 返回 true 表示完整
- */
-function isPlantUmlComplete(source) {
-  const trimmedSource = String(source || '').trim()
-  const lowerSource = trimmedSource.toLowerCase()
-  return lowerSource.includes('@startuml') && lowerSource.includes('@enduml')
-}
-
-function renderPlantUmlBlock(plantUmlSource) {
-  const trimmedSource = String(plantUmlSource || '').trim()
-  if (!trimmedSource) {
-    return '<pre><code class="language-plantuml"></code></pre>'
-  }
-
-  // 检查 PlantUML 代码是否完整，不完整时不请求远端渲染
-  if (!isPlantUmlComplete(trimmedSource)) {
-    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`
-  }
-
-  try {
-    const escapedSource = escapeHtml(trimmedSource)
-    const encodedSource = encodePlantUmlText(trimmedSource)
-    const plantUmlUrl = `${PLANTUML_SERVER_URL}${encodedSource}`
-
-    return [
-      '<div class="plantuml-block">',
-      '  <div class="plantuml-notice">',
-      '    当前前端使用 PlantUML 在线服务渲染，若图片加载失败可展开查看源码。',
-      '  </div>',
-      `  <a class="plantuml-link" href="${plantUmlUrl}" target="_blank" rel="noopener noreferrer">`,
-      `    <img class="plantuml-image" src="${plantUmlUrl}" alt="PlantUML diagram" loading="lazy" />`,
-      '  </a>',
-      '  <details class="plantuml-source">',
-      '    <summary>查看 PlantUML 源码</summary>',
-      `    <pre><code class="language-plantuml">${escapedSource}</code></pre>`,
-      '  </details>',
-      '</div>'
-    ].join('\n')
-  } catch (error) {
-    console.error('[PlantUML] Failed to render PlantUML block:', error)
-    return `<pre><code class="language-plantuml">${escapeHtml(trimmedSource)}</code></pre>`
-  }
-}
-
-const markedRenderer = new marked.Renderer()
-const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer)
-
-markedRenderer.code = function(code, language, isEscaped) {
-  if (isPlantUmlLanguage(language)) {
-    return renderPlantUmlBlock(code)
-  }
-  return defaultCodeRenderer(code, language, isEscaped)
-}
-
-// 配置 marked 使用 highlight.js 进行语法高亮
-marked.setOptions({
-  renderer: markedRenderer,
-  highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang }).value
-      } catch (e) {
-        console.error('[highlight.js] Error highlighting code:', e)
-      }
-    }
-    return hljs.highlightAuto(code).value
-  }
-})
 
 // 计算终端历史显示样式（高度自适应）
 function getTerminalStyle(terminalContent) {
@@ -5557,28 +5486,7 @@ function handleMessage(message, agentId = null) {
 }
 
 // 统一的消息HTML渲染函数（用于新消息和历史消息）
-function renderMessageHtml(payload) {
-  if (payload?.output_type === 'DIFF') {
-    // 专门的 DIFF 类型：解析 side by side diff 数据
-    try {
-      const diffData = JSON.parse(payload.text || '{}')
-      if (diffData.diff_type === 'side_by_side') {
-        return renderSideBySideDiff(diffData)
-      }
-    } catch (e) {
-      console.error('[DIFF] Failed to parse side by side diff:', e)
-      return escapeHtml(payload.text || '')
-    }
-  }
-  if (payload?.lang === 'markdown') {
-    return marked.parse(payload.text || '')
-  } else if (payload?.lang === 'diff') {
-    // 将 diff 包装在 markdown 代码块中，以便语法高亮
-    return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
-  } else {
-    return escapeHtml(payload.text || '')
-  }
-}
+
 
 function appendOutput(payload, agentId = null) {
   const html = renderMessageHtml(payload)
