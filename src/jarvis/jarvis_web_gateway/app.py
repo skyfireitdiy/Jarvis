@@ -72,6 +72,7 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     SERVICE_RESTART_REQUEST,
     CONFIG_GET_REQUEST,
     CONFIG_SET_REQUEST,
+    CODE_UPDATE_TO_MAIN_REQUEST,
 )
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
