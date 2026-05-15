@@ -118,3 +118,85 @@ export function useWebSocket(context = {}) {
       console.log("[ws] Received pong message");
     }
   }
+
+  /**
+   * 处理WebSocket消息
+   */
+  function handleWebSocketMessage(event) {
+    let message = null;
+    try {
+      message = JSON.parse(event.data);
+    } catch (error) {
+      console.warn("[ws] message parse failed", event.data);
+      return;
+    }
+    
+    console.log("[ws] message", message);
+    
+    // 处理pong消息
+    if (message.type === "pong") {
+      handlePongMessage(message);
+      return;
+    }
+    
+    // 处理其他消息
+    if (handleMessage) {
+      handleMessage(message);
+    }
+  }
+
+  /**
+   * 处理WebSocket连接关闭
+   */
+  function handleWebSocketClose(event) {
+    console.log("[ws] close", {
+      code: event?.code,
+      reason: event?.reason,
+      wasClean: event?.wasClean,
+      readyState: socket.value?.readyState,
+    });
+    
+    socket.value = null;
+    connecting.value = false;
+    stopHeartbeat(); // 停止心跳
+
+    // 判断是否需要自动重连（token存在时才重连）
+    const shouldReconnect =
+      !userDisconnected.value && !isAutoConnecting?.value && hasAuthToken?.();
+
+    if (shouldReconnect) {
+      // 启动自动重连（固定间隔，无上限）
+      reconnecting.value = true;
+      reconnectAttempts.value++;
+
+      console.log(
+        `[ws] Connection closed, attempting to reconnect (attempt ${reconnectAttempts.value}) in ${reconnectInterval}ms`,
+      );
+
+      // 设置重连定时器（固定5秒间隔）
+      reconnectTimer.value = setTimeout(() => {
+        console.log(
+          `[ws] Reconnecting... attempt ${reconnectAttempts.value}`,
+        );
+        connect();
+      }, reconnectInterval);
+    } else {
+      // 不需要重连
+      reconnecting.value = false;
+
+      if (isAutoConnecting?.value) {
+        // 自动连接阶段失败，显示登录弹窗
+        console.log("[ws] Auto connection failed, showing login modal");
+        isAutoConnecting.value = false;
+        if (showConnectModal) showConnectModal.value = true;
+        // 清除失效的token
+        localStorage.removeItem("jarvis_auth_token");
+        connectErrorMessage.value = "自动登录失败，请重新登录";
+      } else if (userDisconnected.value) {
+        // 用户主动断开，不重连
+        console.log("[ws] User disconnected, not reconnecting");
+        userDisconnected.value = false; // 重置标志
+      }
+    }
+    // 不清空连接错误信息，保留错误提示
+  }
