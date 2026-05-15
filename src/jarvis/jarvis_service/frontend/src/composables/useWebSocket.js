@@ -200,3 +200,119 @@ export function useWebSocket(context = {}) {
     }
     // 不清空连接错误信息，保留错误提示
   }
+
+  /**
+   * 连接到Gateway（无参数接口）
+   */
+  async function connect() {
+    console.log("[ws] connect() called", {
+      hasSocket: !!socket.value,
+      socketState: socket.value?.readyState,
+      connecting: connecting.value,
+      gatewayUrl: gatewayUrl?.value,
+    });
+
+    // 清空之前的错误信息
+    connectErrorMessage.value = "";
+    if (socket.value) return;
+
+    // 解析网关地址
+    const gatewayUrlValue = gatewayUrl?.value || "";
+    const parsed = parseGatewayAddress(gatewayUrlValue);
+    if (!parsed) {
+      connectErrorMessage.value = "无效的网关地址格式";
+      return;
+    }
+
+    // 如果已有token（从localStorage加载的），跳过密码登录
+    if (hasAuthToken && !hasAuthToken()) {
+      try {
+        if (loginWithPassword) {
+          await loginWithPassword();
+        }
+      } catch (error) {
+        connectErrorMessage.value = error.message || "登录失败";
+        return;
+      }
+    } else {
+      console.log("[AUTH] Using existing token, skipping password login");
+    }
+
+    if (hasAuthToken && !hasAuthToken()) {
+      connectErrorMessage.value = "登录失败，请重试";
+      return;
+    }
+
+    const host = parsed.host || window.location.hostname || "127.0.0.1";
+    const port = parsed.port || "8000";
+    const url = buildWebSocketUrl(host, port, parsed.protocol);
+    connecting.value = true;
+
+    const authTokenValue = authToken?.value || "";
+    const ws = new WebSocket(url, buildWebSocketProtocols(authTokenValue));
+    console.log("[ws] new WebSocket created", {
+      url,
+      readyState: ws.readyState,
+    });
+
+    ws.onopen = () => {
+      console.log("[ws] open", { url, readyState: ws.readyState });
+      connecting.value = false;
+      socket.value = ws;
+      if (showConnectModal) showConnectModal.value = false;
+
+      // 重置重连状态
+      reconnecting.value = false;
+      reconnectAttempts.value = 0;
+      userDisconnected.value = false;
+      if (reconnectTimer.value) {
+        clearTimeout(reconnectTimer.value);
+        reconnectTimer.value = null;
+      }
+      console.log("[ws] Reconnect state reset");
+
+      // 保存连接信息到localStorage
+      localStorage.setItem("jarvis_gateway_url", gatewayUrlValue);
+      console.log("[ws] Connection info saved:", gatewayUrlValue);
+
+      if (startAgentListRefresh) startAgentListRefresh();
+      // 获取模型组列表
+      if (fetchModelGroups) fetchModelGroups();
+      if (fetchNodeStatus) fetchNodeStatus();
+
+      const currentOutputs = allOutputs?.value?.get(currentAgentId?.value) || [];
+      if (currentOutputs.length === 0) {
+        console.log("[HISTORY] Loading history on first connect");
+        if (loadHistoryMessages) loadHistoryMessages(false);
+      } else {
+        console.log("[HISTORY] Skip loading history, messages already exist");
+      }
+
+      // 发送连接锁定设置
+      if (connectionLockEnabled) {
+        ws.send(
+          JSON.stringify({
+            type: "connection_lock",
+            payload: { enabled: connectionLockEnabled.value },
+          }),
+        );
+        console.log("[ws] connection_lock sent", connectionLockEnabled.value);
+      }
+
+      // 启动心跳机制
+      startHeartbeat();
+    };
+
+    ws.onmessage = handleWebSocketMessage;
+
+    ws.onclose = handleWebSocketClose;
+
+    ws.onerror = (event) => {
+      console.error("[ws] error", {
+        event,
+        readyState: ws.readyState,
+        currentSocketMatched: socket.value === ws,
+      });
+      connecting.value = false;
+    };
+  }
