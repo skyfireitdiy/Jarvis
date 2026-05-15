@@ -316,3 +316,136 @@ export function useWebSocket(context = {}) {
       connecting.value = false;
     };
   }
+
+  /**
+   * 断开连接（无参数接口）
+   */
+  function disconnect() {
+    // 设置用户主动断开标志，防止自动重连
+    userDisconnected.value = true;
+
+    // 清理重连定时器
+    if (reconnectTimer.value) {
+      clearTimeout(reconnectTimer.value);
+      reconnectTimer.value = null;
+    }
+    reconnecting.value = false;
+    reconnectAttempts.value = 0;
+
+    // 停止心跳
+    stopHeartbeat();
+
+    if (socket.value) {
+      socket.value.close();
+    }
+  }
+
+  /**
+   * 重新连接（无参数接口）
+   */
+  function reconnect() {
+    // 断开现有连接
+    if (socket.value) {
+      socket.value.close();
+    }
+    // 重新连接
+    connect();
+  }
+
+  /**
+   * 断开所有连接（无参数接口）
+   */
+  function disconnectAll() {
+    if (
+      !confirm(
+        "确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。",
+      )
+    ) {
+      return;
+    }
+    console.log("[WS] Disconnecting all WebSocket connections");
+
+    // 关闭设置弹窗
+    if (showSettingsModal) {
+      showSettingsModal.value = false;
+    }
+
+    // 关闭所有Agent WebSocket连接
+    sockets.value.forEach((ws, agentId) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log(`[WS] Closing WebSocket connection for agent ${agentId}`);
+        ws.close();
+      }
+    });
+    sockets.value.clear();
+
+    // 关闭主Gateway连接
+    if (socket.value) {
+      console.log("[WS] Closing main Gateway WebSocket connection");
+      socket.value.close();
+      socket.value = null;
+    }
+
+    // 停止心跳
+    stopHeartbeat();
+
+    // 清空连接状态
+    if (currentAgentId) {
+      currentAgentId.value = null;
+    }
+    if (agentList) {
+      agentList.value = [];
+    }
+    if (agentStatuses) {
+      agentStatuses.value.clear();
+    }
+
+    // 清除保存的token和免登录状态
+    localStorage.removeItem("jarvis_auth_token");
+    localStorage.removeItem("jarvis_auto_login");
+    console.log("[WS] Cleared saved token and auto login setting");
+
+    // 强制刷新页面确保状态重置
+    console.log("[WS] Forcing page refresh after disconnection");
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  }
+
+  return {
+    // 状态
+    socket,
+    sockets,
+    connecting,
+    agentConnecting,
+    connectErrorMessage,
+    reconnecting,
+    reconnectAttempts,
+    reconnectTimer,
+    reconnectInterval,
+    userDisconnected,
+    // 心跳相关状态
+    heartbeatTimer,
+    lastPongTime,
+    heartbeatInterval,
+    pongTimeout,
+
+    // 方法
+    getWebSocketProtocol,
+    parseGatewayAddress,
+    buildNodeWebSocketUrl,
+    buildWebSocketUrl,
+    buildAgentWebSocketUrl,
+    buildWebSocketProtocols,
+    getGatewayAddress,
+    connect,
+    disconnect,
+    reconnect,
+    disconnectAll,
+    connectToAgent,
+    // 心跳相关方法
+    startHeartbeat,
+    stopHeartbeat,
+    handlePongMessage,
+  };
+}
