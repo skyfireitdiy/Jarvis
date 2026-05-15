@@ -3,8 +3,12 @@ import { ref } from "vue";
 /**
  * 认证相关逻辑 Composable
  * 包含登录、Token管理、认证检查等功能
+ * @param {Object} options - 配置选项
+ * @param {Function} options.buildLoginUrl - 构建登录URL的函数
+ * @param {Function} options.onAuthError - 401错误时的回调函数
  */
-export function useAuth() {
+export function useAuth(options = {}) {
+  const { buildLoginUrl, onAuthError } = options;
   // 认证状态
   const auth = ref({
     password: "",
@@ -19,13 +23,16 @@ export function useAuth() {
   /**
    * 使用密码登录获取Token
    * @param {string} password - 登录密码
-   * @param {string} apiBaseUrl - API基础URL（可选，默认为'/api/auth/login'）
    * @returns {Promise<boolean>} - 登录是否成功
    */
-  async function loginWithPassword(password, apiBaseUrl = "/api/auth/login") {
+  async function loginWithPassword(password) {
     try {
-      // 使用传入的apiBaseUrl参数构建请求URL
-      const response = await fetch(apiBaseUrl, {
+      // 使用buildLoginUrl回调构建登录URL，如果没有提供则使用默认URL
+      const loginUrl =
+        typeof buildLoginUrl === "function"
+          ? buildLoginUrl()
+          : "/api/auth/login";
+      const response = await fetch(loginUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -99,10 +106,9 @@ export function useAuth() {
    * 带认证的fetch函数
    * @param {string} url - 请求URL
    * @param {object} options - fetch选项
-   * @param {Function} onAuthError - 401错误时的回调函数（可选）
    * @returns {Promise<Response>} - fetch响应
    */
-  async function fetchWithAuth(url, options = {}, onAuthError = null) {
+  async function fetchWithAuth(url, options = {}) {
     if (!hasAuthToken()) {
       throw new Error("尚未登录，已阻止向后端发送请求");
     }
@@ -130,7 +136,7 @@ export function useAuth() {
     if (response.status === 401) {
       console.log("[AUTH] Received 401 Unauthorized, showing login modal");
       auth.value.token = "";
-      // 调用回调函数处理401错误（如显示登录模态框）
+      // 调用onAuthError回调函数处理401错误（如显示登录模态框）
       if (typeof onAuthError === "function") {
         onAuthError("登录已过期，请重新登录");
       }
