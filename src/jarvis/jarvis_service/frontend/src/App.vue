@@ -5731,7 +5731,7 @@ function renderMessageHtml(payload) {
     }
   }
   if (payload?.lang === 'markdown') {
-    return marked.parse(payload.text || '')
+    return marked.parse(payload.text || '', { breaks: true })
   } else if (payload?.lang === 'diff') {
     // 将 diff 包装在 markdown 代码块中，以便语法高亮
     return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
