@@ -1364,3 +1364,258 @@ body::-webkit-scrollbar {
     border-radius: 0;
   }
 }
+
+/* ========== Diff 浮动窗口样式 ========== */
+.diff-modal {
+  max-width: 90vw;
+}
+
+.diff-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diff-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.diff-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.diff-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diff-additions {
+  color: var(--color-success);
+}
+
+.diff-deletions {
+  color: var(--color-error);
+}
+
+.diff-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-file {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.diff-file-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+}
+
+.diff-file-header:hover {
+  background: var(--color-bg-hover);
+}
+
+.diff-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.diff-file-stats {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.diff-file-content {
+  background: var(--color-bg-primary);
+  font-family: "Fira Code", "Consolas", "Monaco", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.diff-line {
+  display: flex;
+  padding: 0 12px;
+}
+
+.diff-line-number {
+  min-width: 40px;
+  padding-right: 12px;
+  text-align: right;
+  color: var(--color-text-tertiary);
+  user-select: none;
+}
+
+.diff-line-content {
+  flex: 1;
+  white-space: pre;
+}
+
+.diff-line-add {
+  background: rgba(63, 185, 80, 0.15);
+}
+
+.diff-line-add .diff-line-content {
+  color: var(--color-success);
+}
+
+.diff-line-delete {
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.diff-line-delete .diff-line-content {
+  color: var(--color-error);
+}
+
+.diff-line-context {
+  color: var(--color-text-secondary);
+}
+
+.diff-error {
+  color: var(--color-error);
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-empty {
+  color: var(--color-text-secondary);
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-raw {
+  margin: 0;
+  padding: 16px;
+  background: rgba(13, 17, 23, 0.8);
+  border-radius: 8px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+
+/* ========== Diff 浮动窗口样式结束 ========== */
+
+/* ========== Rules 浮动窗口样式 ========== */
+.rules-modal {
+  max-width: 90vw;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rules-table th,
+.rules-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.rules-table th {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-table td {
+  color: var(--color-text-primary);
+}
+
+.rules-table tr:hover td {
+  background: var(--color-bg-hover);
+}
+
+.rule-loaded {
+  color: var(--color-success);
+}
+
+.rule-not-loaded {
+  color: var(--color-text-secondary);
+}
+
+.rules-loaded-content-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.rules-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-loaded-content {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: "Fira Code", "Consolas", "Monaco", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rule-preview {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.tools-section-title {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  padding: 0 12px;
+}
+
+.tools-section-title:first-child {
+  margin-top: 0;
+}
+
+/* ========== Rules 浮动窗口样式结束 ========== */
