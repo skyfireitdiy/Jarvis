@@ -22,7 +22,7 @@ setup(
     },
     install_requires=[
         "requests==2.32.3",
-        "playwright==1.48.0",
+        "playwright==1.48.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
         "colorama==0.4.6",
         "prompt_toolkit==3.0.50",
         "pygments==2.19.2",
