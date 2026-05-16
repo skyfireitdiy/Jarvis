@@ -138,7 +138,7 @@
               </option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="config-sync-button">
             <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
               {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
             </button>
@@ -928,5 +928,10 @@ const maskedNodeSecret = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ========== 配置同步按钮样式 ========== */
+.config-sync-button {
+  margin-top: 16px;
 }
 </style>
