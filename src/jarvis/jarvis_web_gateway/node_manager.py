@@ -52,6 +52,10 @@ from .node_protocol import (
     SERVICE_RESTART_RESPONSE,
     CONFIG_SYNC_REQUEST,
     CONFIG_SYNC_RESPONSE,
+    CONFIG_GET_REQUEST,
+    CONFIG_GET_RESPONSE,
+    CONFIG_SET_REQUEST,
+    CONFIG_SET_RESPONSE,
     CODE_UPDATE_TO_MAIN_REQUEST,
     CODE_UPDATE_TO_MAIN_RESPONSE,
     NODE_AUTH,
@@ -1011,6 +1015,147 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
+    async def _handle_config_get_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理配置获取请求（child 端）。"""
+        request_id = message.get("request_id")
+        payload = message.get("payload") or {}
+        config_sections = payload.get("config_sections", [])
+
+        logger.info(
+            "[NODE CONFIG GET] child handling config get request_id=%s sections=%s",
+            request_id,
+            config_sections,
+        )
+
+        try:
+            # 获取配置文件路径
+            config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+
+            # 读取配置
+            config_data: Dict[str, Any] = {}
+            if config_file.exists():
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+
+            # 如果指定了sections，则只返回指定的sections
+            if config_sections:
+                filtered_data = {}
+                for section in config_sections:
+                    if section in config_data:
+                        filtered_data[section] = config_data[section]
+                config_data = filtered_data
+
+            logger.info(
+                "[NODE CONFIG GET] child config get completed request_id=%s",
+                request_id,
+            )
+            return build_node_message(
+                CONFIG_GET_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "config_data": config_data,
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE CONFIG GET] child config get failed request_id=%s error=%s",
+                request_id,
+                exc,
+            )
+            return build_node_message(
+                CONFIG_GET_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "CONFIG_GET_ERROR", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_config_set_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理配置设置请求（child 端）。"""
+        request_id = message.get("request_id")
+        payload = message.get("payload") or {}
+        config_data = payload.get("config_data", {})
+
+        logger.info(
+            "[NODE CONFIG SET] child handling config set request_id=%s",
+            request_id,
+        )
+
+        try:
+            # 获取配置文件路径
+            config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
+
+            # 备份原配置文件
+            backup_file = config_file.with_suffix(".yaml.bak")
+            if config_file.exists():
+                shutil.copy2(config_file, backup_file)
+                logger.info("[NODE CONFIG SET] backed up config to %s", backup_file)
+
+            # 读取现有配置
+            existing_config: Dict[str, Any] = {}
+            if config_file.exists():
+                with open(config_file, "r", encoding="utf-8") as f:
+                    existing_config = yaml.safe_load(f) or {}
+
+            # 更新配置
+            updated_config = existing_config.copy()
+            updated_config.update(config_data)
+
+            # 保存配置
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file, "w", encoding="utf-8") as f:
+                yaml.safe_dump(
+                    updated_config, f, allow_unicode=True, default_flow_style=False
+                )
+
+            logger.info(
+                "[NODE CONFIG SET] child config set completed request_id=%s",
+                request_id,
+            )
+            return build_node_message(
+                CONFIG_SET_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "message": "配置设置成功",
+                        "backup_file": str(backup_file),
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE CONFIG SET] child config set failed request_id=%s error=%s",
+                request_id,
+                exc,
+            )
+            # 尝试恢复备份
+            try:
+                if backup_file.exists():
+                    shutil.copy2(backup_file, config_file)
+                    logger.info("[NODE CONFIG SET] restored config from backup")
+            except Exception as restore_exc:
+                logger.error(
+                    "[NODE CONFIG SET] failed to restore backup: %s", restore_exc
+                )
+
+            return build_node_message(
+                CONFIG_SET_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "CONFIG_SET_ERROR", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
 
 class NodeTerminalOutputProxy:
     """代理 Publisher，将 child 端终端输出通过 NODE_TERMINAL_OUTPUT 推送给 master。
@@ -1290,6 +1435,22 @@ class ChildNodeClient:
                     )
                     await self._ws.send(json.dumps(response))
                     continue
+                if message_type == CONFIG_GET_REQUEST:
+                    response = (
+                        await self._node_connection_manager._handle_config_get_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == CONFIG_SET_REQUEST:
+                    response = (
+                        await self._node_connection_manager._handle_config_set_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
                 if message_type == NODE_TERMINAL_REQUEST:
                     response = await self._handle_node_terminal_request(next_message)
                     await self._ws.send(json.dumps(response))
@@ -1299,7 +1460,9 @@ class ChildNodeClient:
                     await self._ws.send(json.dumps(response))
                     continue
                 if message_type == CODE_UPDATE_TO_MAIN_REQUEST:
-                    response = await self._handle_code_update_to_main_request(next_message)
+                    response = await self._handle_code_update_to_main_request(
+                        next_message
+                    )
                     await self._ws.send(json.dumps(response))
                     continue
                 logger.warning(
