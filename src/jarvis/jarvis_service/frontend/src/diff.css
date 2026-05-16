@@ -48,6 +48,22 @@
   font-size: 12px;
 }
 
+.diff-table colgroup col:nth-child(1) {
+  width: 50px;
+}
+
+.diff-table colgroup col:nth-child(2) {
+  width: calc(50% - 50px);
+}
+
+.diff-table colgroup col:nth-child(3) {
+  width: 50px;
+}
+
+.diff-table colgroup col:nth-child(4) {
+  width: calc(50% - 50px);
+}
+
 .diff-row {
 }
 
@@ -82,8 +98,6 @@
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
-  width: 50%;
-  max-width: 50%;
   vertical-align: top;
   box-sizing: border-box;
 }
