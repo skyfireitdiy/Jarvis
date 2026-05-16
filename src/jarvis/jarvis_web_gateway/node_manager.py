@@ -178,34 +178,12 @@ class NodeConnectionManager:
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
                     continue
-                if (
-                    message_type
-                    in (
-                        AGENT_CREATE_RESPONSE,
-                        AGENT_HTTP_RESPONSE,
-                        NODE_HTTP_PROXY_RESPONSE,
-                        AGENT_LIST_RESPONSE,
-                        AGENT_STOP_RESPONSE,
-                        AGENT_DELETE_RESPONSE,
-                        AGENT_WS_RESPONSE,
-                        AGENT_WS_OPEN_RESPONSE,
-                        AGENT_WS_SEND_RESPONSE,
-                        AGENT_WS_RECV_RESPONSE,
-                        AGENT_WS_CLOSE_RESPONSE,
-                        DIRECTORY_LIST_RESPONSE,
-                        NODE_TERMINAL_RESPONSE,
-                        SERVICE_RESTART_RESPONSE,
-                        CONFIG_GET_RESPONSE,
-                        CONFIG_SET_RESPONSE,
-                        CONFIG_SYNC_RESPONSE,
-                        CODE_UPDATE_TO_MAIN_RESPONSE,
-                    )
-                    and request_id
-                ):
+                # 响应消息处理：如果有request_id，尝试匹配pending请求
+                if request_id:
                     future = self._pending_requests.pop(request_id, None)
                     if future is not None and not future.done():
                         future.set_result(next_message)
-                    continue
+                        continue
                 if message_type == NODE_TERMINAL_OUTPUT:
                     # child 端推送的终端输出，转发给前端
                     terminal_payload = next_message.get("payload") or {}
