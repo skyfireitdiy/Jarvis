@@ -2627,9 +2627,9 @@ const agentDisplayGroups = computed(() => {
     if (nodeAgents.stopped.length > 0) {
       groups.push({
         key: `stopped-${nodeId}`,
-        title: `${nodeId}已停止的Agent`,
+        title: `${nodeId}已停止的 Agent`,
         agents: nodeAgents.stopped,
-        isCollapsible: true,
+        isCollapsible: false,
       })
     }
   })
@@ -4643,15 +4643,13 @@ async function batchCopyAgents() {
 }
 
 // 解析 diff 文本为结构化数据
+// 解析 diff 并转换为结构化数据（与后端 _parse_diff_to_lines 和 visualize_side_by_side_summary 一致）
 function parseDiffToStructuredData(diffText) {
   if (!diffText) return null
 
   const lines = diffText.split('\n')
   const files = []
   let currentFile = null
-  let old_line_num = 0
-  let new_line_num = 0
-  let in_hunk = false
 
   function startNewFile() {
     if (currentFile && currentFile.rows.length > 0) {
@@ -4663,11 +4661,27 @@ function parseDiffToStructuredData(diffText) {
       deletions: 0,
       rows: []
     }
-    in_hunk = false
   }
+
+  // 解析每个文件
+  let fileOldLines = []
+  let fileNewLines = []
+  let fileOldMap = []
+  let fileNewMap = []
+  let old_line_num = 0
+  let new_line_num = 0
 
   for (const line of lines) {
     if (line.startsWith('diff --git')) {
+      // 处理上一个文件
+      if (fileOldLines.length > 0 && currentFile) {
+        processFileDiff(currentFile, fileOldLines, fileNewLines, fileOldMap, fileNewMap)
+        files.push(currentFile)
+        fileOldLines = []
+        fileNewLines = []
+        fileOldMap = []
+        fileNewMap = []
+      }
       startNewFile()
     } else if (line.startsWith('---')) {
       if (!currentFile) startNewFile()
@@ -4682,47 +4696,41 @@ function parseDiffToStructuredData(diffText) {
         currentFile.file_path = path.replace(/^[ab]\//, '')
       }
     } else if (line.startsWith('@@')) {
-      in_hunk = true
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+      // 解析 hunk 头获取起始行号（与后端一致）
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
       if (match) {
-        new_line_num = parseInt(match[1], 10)
-        old_line_num = parseInt(line.match(/@@ -(\d+)/)?.[1] || '0', 10)
+        old_line_num = parseInt(match[1], 10)
+        new_line_num = parseInt(match[2], 10)
       }
-    } else if (in_hunk && currentFile) {
+    } else if (currentFile) {
       if (line.startsWith('-')) {
-        currentFile.deletions++
-        currentFile.rows.push({
-          type: 'delete',
-          old_line_num: old_line_num++,
-          old_line: line.substring(1),
-          new_line_num: null,
-          new_line: null
-        })
+        fileOldLines.push(line.substring(1))
+        fileNewLines.push(null)
+        fileOldMap.push(old_line_num)
+        fileNewMap.push(0)
+        ++old_line_num
       } else if (line.startsWith('+')) {
-        currentFile.additions++
-        currentFile.rows.push({
-          type: 'insert',
-          old_line_num: null,
-          old_line: null,
-          new_line_num: new_line_num++,
-          new_line: line.substring(1)
-        })
+        fileOldLines.push(null)
+        fileNewLines.push(line.substring(1))
+        fileOldMap.push(0)
+        fileNewMap.push(new_line_num)
+        ++new_line_num
       } else if (line.startsWith(' ')) {
-        currentFile.rows.push({
-          type: 'equal',
-          old_line_num: old_line_num++,
-          old_line: line.substring(1),
-          new_line_num: new_line_num++,
-          new_line: line.substring(1)
-        })
+        fileOldLines.push(line.substring(1))
+        fileNewLines.push(line.substring(1))
+        fileOldMap.push(old_line_num)
+        fileNewMap.push(new_line_num)
+        ++old_line_num
+        ++new_line_num
       } else if (line === '\\ No newline at end of file') {
         // 忽略这个特殊行
       }
     }
   }
 
-  // 添加最后一个文件
-  if (currentFile && currentFile.rows.length > 0) {
+  // 处理最后一个文件
+  if (currentFile && fileOldLines.length > 0) {
+    processFileDiff(currentFile, fileOldLines, fileNewLines, fileOldMap, fileNewMap)
     files.push(currentFile)
   }
 
@@ -4731,6 +4739,137 @@ function parseDiffToStructuredData(diffText) {
   }
 
   return { files }
+}
+
+// 处理单个文件的 diff（与后端 visualize_side_by_side_summary 一致）
+function processFileDiff(currentFile, oldLines, newLines, oldLineMap, newLineMap) {
+  // 过滤掉 null 占位行，获取实际内容用于匹配
+  const actualOld = []
+  const actualNew = []
+  const actualOldMap = []
+  const actualNewMap = []
+  const oldIdxToActual = []  // 原始索引到实际索引的映射
+  const newIdxToActual = []
+
+  for (let i = 0; i < oldLines.length; i++) {
+    if (oldLines[i] !== null) {
+      oldIdxToActual[i] = actualOld.length
+      actualOld.push(oldLines[i])
+      actualOldMap.push(oldLineMap[i])
+    } else {
+      oldIdxToActual[i] = -1
+    }
+  }
+
+  for (let j = 0; j < newLines.length; j++) {
+    if (newLines[j] !== null) {
+      newIdxToActual[j] = actualNew.length
+      actualNew.push(newLines[j])
+      actualNewMap.push(newLineMap[j])
+    } else {
+      newIdxToActual[j] = -1
+    }
+  }
+
+  // 使用 LCS 计算 diff（与后端一致）
+  const m = actualOld.length
+  const n = actualNew.length
+
+  // 构建 DP 表
+  const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0))
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (actualOld[i - 1] === actualNew[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+      }
+    }
+  }
+
+  // 回溯获取 opcodes
+  const opcodes = []
+  let i = m, j = n
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && actualOld[i - 1] === actualNew[j - 1]) {
+      opcodes.unshift(['equal', i - 1, i, j - 1, j])
+      i--
+      j--
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      opcodes.unshift(['insert', i, i, j - 1, j])
+      j--
+    } else if (i > 0) {
+      opcodes.unshift(['delete', i - 1, i, j, j])
+      i--
+    }
+  }
+
+  // 合并连续的 delete+insert 为 replace
+  const merged = []
+  let k = 0
+  while (k < opcodes.length) {
+    const [tag, i1, i2, j1, j2] = opcodes[k]
+    if (tag === 'delete' && k + 1 < opcodes.length) {
+      const [nextTag, nextI1, nextI2, nextJ1, nextJ2] = opcodes[k + 1]
+      if (nextTag === 'insert') {
+        merged.push(['replace', i1, i2, j1, j2])
+        k += 2
+        continue
+      }
+    }
+    merged.push(opcodes[k])
+    k++
+  }
+
+  // 根据 opcodes 生成 rows（与后端一致）
+  for (const [tag, i1, i2, j1, j2] of merged) {
+    if (tag === 'equal') {
+      for (let idx = i1; idx < i2; idx++) {
+        currentFile.rows.push({
+          type: 'equal',
+          old_line_num: actualOldMap[idx],
+          old_line: actualOld[idx],
+          new_line_num: actualNewMap[j1 + (idx - i1)],
+          new_line: actualNew[j1 + (idx - i1)]
+        })
+      }
+    } else if (tag === 'delete') {
+      currentFile.deletions += (i2 - i1)
+      for (let idx = i1; idx < i2; idx++) {
+        currentFile.rows.push({
+          type: 'delete',
+          old_line_num: actualOldMap[idx],
+          old_line: actualOld[idx],
+          new_line_num: null,
+          new_line: null
+        })
+      }
+    } else if (tag === 'insert') {
+      currentFile.additions += (j2 - j1)
+      for (let idx = j1; idx < j2; idx++) {
+        currentFile.rows.push({
+          type: 'insert',
+          old_line_num: null,
+          old_line: null,
+          new_line_num: actualNewMap[idx],
+          new_line: actualNew[idx]
+        })
+      }
+    } else if (tag === 'replace') {
+      currentFile.deletions += (i2 - i1)
+      currentFile.additions += (j2 - j1)
+      // replace 行：左右都显示（旧行显示在左，新行显示在右）
+      for (let o = i1, n = j1; o < i2 || n < j2; o++, n++) {
+        currentFile.rows.push({
+          type: 'replace',
+          old_line_num: o < i2 ? actualOldMap[o] : null,
+          old_line: o < i2 ? actualOld[o] : null,
+          new_line_num: n < j2 ? actualNewMap[n] : null,
+          new_line: n < j2 ? actualNew[n] : null
+        })
+      }
+    }
+  }
 }
 
 // 查看 Agent 的 Diff
