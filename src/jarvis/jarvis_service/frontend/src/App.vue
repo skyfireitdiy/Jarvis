@@ -2629,7 +2629,7 @@ const agentDisplayGroups = computed(() => {
         key: `stopped-${nodeId}`,
         title: `${nodeId}已停止的 Agent`,
         agents: nodeAgents.stopped,
-        isCollapsible: false,
+        isCollapsible: true,
       })
     }
   })
