@@ -198,6 +198,7 @@ class NodeConnectionManager:
                         CONFIG_GET_RESPONSE,
                         CONFIG_SET_RESPONSE,
                         CONFIG_SYNC_RESPONSE,
+                        CODE_UPDATE_TO_MAIN_RESPONSE,
                     )
                     and request_id
                 ):
