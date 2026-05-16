@@ -3324,7 +3324,7 @@ async function syncConfig() {
     }
 
     // 1. 从源节点获取配置
-    const getResponse = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${sourceNodeId}/config`), {
+    const getResponse = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/nodes/${sourceNodeId}/config`, {
       method: 'GET'
     })
     const getResult = await getResponse.json()
@@ -3355,7 +3355,7 @@ async function syncConfig() {
 
     for (const targetNodeId of targetNodeIds) {
       try {
-        const setResponse = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${targetNodeId}/config`), {
+        const setResponse = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/nodes/${targetNodeId}/config`, {
           method: 'POST',
           body: JSON.stringify({
             config_sections: syncConfigSections.value,
@@ -3433,7 +3433,7 @@ async function updateCodeToMain() {
       const nodeId = node.nodeId
       try {
         console.debug('[SETTINGS] Updating code for node:', nodeId)
-        const response = await fetchWithAuth(buildHttpUrl(host, port, `nodes/${nodeId}/code-update`), {
+        const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/nodes/${nodeId}/code-update`, {
           method: 'POST'
         })
         const result = await response.json()
