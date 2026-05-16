@@ -85,12 +85,16 @@ export function renderSideBySideDiff(diffData) {
 
   // 表格
   html += '<table class="diff-table">';
+  html += "<colgroup><col><col><col><col></colgroup>";
 
   rows.forEach((row) => {
     const { type, old_line_num, old_line, new_line_num, new_line } = row;
 
     // 行背景色类
     let rowClass = "diff-row diff-row-" + type;
+
+    // 开始表格行
+    html += `<tr class="${rowClass}">`;
 
     // 旧代码列
     if (type === "equal" || type === "delete" || type === "replace") {
