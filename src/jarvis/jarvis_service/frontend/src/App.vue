@@ -3430,7 +3430,7 @@ async function updateCodeToMain() {
     const results = []
 
     for (const node of nodeOptions) {
-      const nodeId = node.nodeId
+      const nodeId = node.node_id
       try {
         console.debug('[SETTINGS] Updating code for node:', nodeId)
         const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/nodes/${nodeId}/code-update`, {
