@@ -366,10 +366,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   private readOnlyStatusBarItem: vscode.StatusBarItem | undefined;
   // 生成 Agent 名称：Agent类型-创建时间（如：代码Agent-20261213-140013）
   private generateAgentName(agentType: string): string {
-    const typeName = agentType === 'agent' ? '通用Agent' : '代码Agent';
+    const typeName = agentType === "agent" ? "通用Agent" : "代码Agent";
     const now = new Date();
-    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-    const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
     return `${typeName}-${date}-${time}`;
   }
 
@@ -1141,12 +1141,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           updateCodeToMainButton.disabled = true;
           updateCodeToMainButton.textContent = '更新中...';
           const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-          const url = `http://${gatewayAddress.host}:${gatewayAddress.port}/api/node/master/code/update-to-main`;
+          const url = 'http://' + gatewayAddress.host + ':' + gatewayAddress.port + '/api/node/master/code/update-to-main';
           const response = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.panelState.token}`,
+              'Authorization': 'Bearer ' + this.panelState.token,
             },
             body: JSON.stringify({}),
           });
@@ -1159,9 +1159,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           const failedCount = result.data?.failed_count || 0;
           let message = '';
           if (successCount === totalCount) {
-            message = `✓ 代码更新成功，已更新 ${successCount}/${totalCount} 个节点`;
+            message = '✓ 代码更新成功，已更新 ' + successCount + '/' + totalCount + ' 个节点';
           } else if (successCount > 0) {
-            message = `⚠ 代码更新部分成功，成功 ${successCount}/${totalCount} 个节点，失败 ${failedCount} 个节点`;
+            message = '⚠ 代码更新部分成功，成功 ' + successCount + '/' + totalCount + ' 个节点，失败 ' + failedCount + ' 个节点';
           } else {
             message = '✗ 代码更新失败，没有节点更新成功';
           }
@@ -4198,7 +4198,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     // 填充创建表单
     this.createAgentFormState.agentType = sourceAgent.agentType || "codeagent";
     this.createAgentFormState.workingDir = sourceAgent.workingDir || "~";
-    this.createAgentFormState.name = this.generateAgentName(sourceAgent.agentType || "codeagent");
+    this.createAgentFormState.name = this.generateAgentName(
+      sourceAgent.agentType || "codeagent",
+    );
     this.createAgentFormState.llmGroup =
       sourceAgent.llmGroup || this.defaultLlmGroup || "";
     this.createAgentFormState.nodeId = String(sourceAgent.nodeId || "").trim();
@@ -4349,7 +4351,9 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             body: JSON.stringify({
               agent_type: sourceAgent.agentType,
               working_dir: sourceAgent.workingDir,
-              name: this.generateAgentName(sourceAgent.agentType || "codeagent"),
+              name: this.generateAgentName(
+                sourceAgent.agentType || "codeagent",
+              ),
               llm_group:
                 sourceAgent.llmGroup || this.defaultLlmGroup || undefined,
               node_id: normalizedNodeId,
