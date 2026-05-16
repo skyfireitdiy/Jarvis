@@ -1815,7 +1815,7 @@ def create_app(
                     "success": True,
                     "data": {
                         "node_id": node_id,
-                        "config": payload.get("config", {}),
+                        "config": payload.get("config_data", {}),
                     },
                 }
             else:
