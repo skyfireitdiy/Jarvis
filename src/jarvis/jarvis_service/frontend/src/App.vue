@@ -250,7 +250,7 @@
                     @click="toggleStoppedNodeCollapse(nodeId)"
                   >
                     <span class="expand-arrow" :class="{ expanded: !isStoppedNodeCollapsed(nodeId) }">▶</span>
-                    <span class="stopped-agents-title">{{ nodeId }} (已停止) ({{ agents.length }})</span>
+                    <span class="stopped-agents-title">{{ nodeId }}已停止的Agent ({{ agents.length }})</span>
                   </div>
                   <div v-if="!isStoppedNodeCollapsed(nodeId)" class="stopped-agents-list">
                     <div
@@ -2627,7 +2627,7 @@ const agentDisplayGroups = computed(() => {
     if (nodeAgents.stopped.length > 0) {
       groups.push({
         key: `stopped-${nodeId}`,
-        title: `${nodeId} (已停止)`,
+        title: `${nodeId}已停止的Agent`,
         agents: nodeAgents.stopped,
         isCollapsible: true,
       })
