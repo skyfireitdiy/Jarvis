@@ -49,28 +49,34 @@
           清除历史记录
         </button>
       </div>
+      <!-- 重启节点服务 -->
       <div class="form-group" v-if="availableNodeOptions.length > 0">
         <label>重启节点服务</label>
-        <select v-model="localRestartNodeId" class="node-select">
-          <option value="">本节点 (master)</option>
-          <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-            {{ formatNodeOptionLabel(node) }}
-          </option>
-        </select>
-        <span class="form-help">选择要重启服务的节点，默认为本节点</span>
-      </div>
+        <div class="restart-service-section">
+          <div class="restart-service-row">
+            <select v-model="localRestartNodeId" class="node-select">
+              <option value="">本节点 (master)</option>
+              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                {{ formatNodeOptionLabel(node) }}
+              </option>
+            </select>
+            <span class="form-help">选择要重启服务的节点，默认为本节点</span>
+          </div>
 
-      <div class="form-group" v-if="!localRestartNodeId || localRestartNodeId === 'master'">
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="localRestartFrontendService" />
-          <span>同时重启前端服务</span>
-        </label>
-        <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
-      </div>
-      <div class="form-group">
-        <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
-          {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
-        </button>
+          <div class="restart-service-row" v-if="!localRestartNodeId || localRestartNodeId === 'master'">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="localRestartFrontendService" />
+              <span>同时重启前端服务</span>
+            </label>
+            <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
+          </div>
+
+          <div class="restart-service-row">
+            <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
+              {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- 代码更新 -->
@@ -421,6 +427,11 @@ const maskedNodeSecret = computed(() => {
 /* ========== Form Group 样式（从 App.vue 全局样式迁移） ========== */
 .form-group {
   margin-bottom: 16px;
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--color-shadow);
 }
 
 .form-group.inline {
@@ -492,14 +503,13 @@ const maskedNodeSecret = computed(() => {
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: var(--color-bg-secondary);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid var(--color-border);
-  outline: 1px solid var(--color-border);
-  outline-offset: -1px;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px var(--color-shadow), inset 0 1px 0 var(--color-border);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  outline: none;
+  border-radius: 0;
+  box-shadow: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -725,8 +735,8 @@ const maskedNodeSecret = computed(() => {
   gap: 12px;
   padding: 16px;
   background: var(--color-bg-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 10px;
+  border: none;
+  border-radius: 8px;
 }
 
 .history-stat {
@@ -768,9 +778,9 @@ const maskedNodeSecret = computed(() => {
 .config-sync-section {
   margin-top: 16px;
   padding: 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border-radius: 8px;
+  border: none;
 }
 
 .config-sync-row {
@@ -839,9 +849,9 @@ const maskedNodeSecret = computed(() => {
 .node-secret-section {
   margin-top: 12px;
   padding: 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border-radius: 8px;
+  border: none;
 }
 
 .secret-display {
@@ -905,5 +915,18 @@ const maskedNodeSecret = computed(() => {
   flex: 1;
   padding: 8px 16px;
   font-size: 13px;
+}
+
+/* ========== 重启节点服务区域样式 ========== */
+.restart-service-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.restart-service-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 </style>
