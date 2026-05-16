@@ -195,6 +195,8 @@ class NodeConnectionManager:
                         DIRECTORY_LIST_RESPONSE,
                         NODE_TERMINAL_RESPONSE,
                         SERVICE_RESTART_RESPONSE,
+                        CONFIG_GET_RESPONSE,
+                        CONFIG_SET_RESPONSE,
                         CONFIG_SYNC_RESPONSE,
                     )
                     and request_id
