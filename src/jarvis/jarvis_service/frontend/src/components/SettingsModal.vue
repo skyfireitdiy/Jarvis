@@ -256,6 +256,14 @@ function handleAutoLoginChange() {
 function formatNodeOptionLabel(node) {
   const nodeId = String(node?.node_id || '').trim()
   const status = String(node?.status || node?.runtime_status || '').trim()
+  const label = String(node?.label || node?.agent_label || '').trim()
+  
+  // 非停止状态且有标签时，显示标签
+  const isStopped = !status || status === 'stopped' || status === 'stop' || status === 'terminated'
+  if (!isStopped && label) {
+    return `${nodeId} (${status}) - ${label}`
+  }
+  
   return status ? `${nodeId} (${status})` : nodeId
 }
 
