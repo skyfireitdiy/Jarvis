@@ -6160,16 +6160,11 @@ function appendExecution(payload, agentId = null) {
       console.error(`[terminal] Failed to save terminal content:`, error)
     }
 
-    // 从terminals数组中移除已完成的termInfo，避免切换回来时重建xterm
-    const termIndex = terminals.value.findIndex(t => t.sessionKey === termInfo.sessionKey)
-    if (termIndex !== -1) {
-      console.log(`[terminal] Removing completed terminal from terminals array: ${termInfo.sessionKey}`)
-      terminals.value.splice(termIndex, 1)
-    }
-    // 清理terminalHosts映射
+    // 保留 termInfo 记录 (保持 ended=true)，避免切换回来时重建终端
+    // 只清理 terminalHosts 映射和 terminal 实例，termInfo 保留用于状态判断
     const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     terminalHosts.value.delete(executionSessionKey)
-    console.log(`[terminal] Cleaned up terminal resources for completed execution: ${executionId}`)
+    console.log(`[terminal] Cleaned up terminalHost for completed execution: ${executionId}, keeping termInfo record (ended=true)`)
   }
   
   // 输出到终端
