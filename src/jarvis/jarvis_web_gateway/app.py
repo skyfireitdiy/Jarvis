@@ -2212,7 +2212,7 @@ def create_app(
                     "data": {
                         "node_id": node_id,
                         "message": "代码更新成功",
-                        "output": payload.get("message", ""),
+                        "output": payload.get("data", {}).get("message", ""),
                     },
                 }
             else:
@@ -2220,7 +2220,9 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": "UPDATE_FAILED",
-                        "message": payload.get("message", "代码更新失败"),
+                        "message": payload.get("error", {}).get(
+                            "message", "代码更新失败"
+                        ),
                     },
                 }
         except Exception as e:
