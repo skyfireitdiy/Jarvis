@@ -1,7 +1,7 @@
 """Query builder for symbol dependency database operations."""
 
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from .data_types import Edge, EdgeKind, FileRecord, Node, SymbolKind
 
