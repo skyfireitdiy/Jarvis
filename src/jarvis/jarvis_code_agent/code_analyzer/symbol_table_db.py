@@ -28,7 +28,8 @@ class SymbolTableDB:
             else:
                 self._db = DatabaseConnection.initialize(db_path)
             self._queries = self._db.get_queries()
-        return self._queries  # type: ignore[return-value]
+        assert self._queries is not None
+        return self._queries
 
     @property
     def queries(self) -> QueryBuilder:
