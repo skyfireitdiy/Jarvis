@@ -372,12 +372,33 @@ class ImpactAnalyzer:
         # 找出在编辑范围内的符号
         affected_symbols = []
         for symbol in symbols:
+            # 处理Node和Symbol两种类型
+            line_start = getattr(symbol, 'start_line', None) or getattr(symbol, 'line_start', None)
+            line_end = getattr(symbol, 'end_line', None) or getattr(symbol, 'line_end', None)
+            
+            if line_start is None or line_end is None:
+                continue
+                
             # 检查符号是否与编辑区域重叠
             if (
-                symbol.line_start <= edit.line_end
-                and symbol.line_end >= edit.line_start
+                line_start <= edit.line_end
+                and line_end >= edit.line_start
             ):
-                affected_symbols.append(symbol)
+                # 转换为Symbol类型
+                if isinstance(symbol, Symbol):
+                    affected_symbols.append(symbol)
+                else:
+                    # 将Node转换为Symbol
+                    affected_symbols.append(Symbol(
+                        name=symbol.name,
+                        kind=symbol.kind.value if hasattr(symbol.kind, 'value') else str(symbol.kind),
+                        file_path=symbol.file_path,
+                        line_start=symbol.start_line,
+                        line_end=symbol.end_line,
+                        signature=getattr(symbol, 'signature', None),
+                        docstring=getattr(symbol, 'docstring', None),
+                        parent=getattr(symbol, 'parent_id', None),
+                    ))
 
         return affected_symbols
 
