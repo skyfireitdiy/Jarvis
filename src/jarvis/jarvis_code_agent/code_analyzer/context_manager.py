@@ -16,6 +16,7 @@ from .language_support import get_dependency_analyzer
 from .language_support import get_symbol_extractor
 from .symbol_extractor import Symbol
 from .symbol_extractor import SymbolTable
+from .symbol_table_db import SymbolTableDB
 
 
 @dataclass
@@ -45,11 +46,17 @@ class Reference:
 class ContextManager:
     """Manages the symbol table and dependency graph to provide code context."""
 
-    def __init__(self, project_root: str):
+    def __init__(self, project_root: str, use_db: bool = True):
         self.project_root = project_root
         # Create cache directory path relative to project root
         cache_dir = os.path.join(project_root, ".jarvis", "symbol_cache")
-        self.symbol_table = SymbolTable(cache_dir)
+
+        # Use SQLite-backed symbol table if enabled
+        if use_db:
+            self.symbol_table = SymbolTableDB(cache_dir)
+        else:
+            self.symbol_table = SymbolTable(cache_dir)
+
         self.dependency_graph = DependencyGraph()
         self._file_cache: dict[str, str] = {}  # Cache file contents
 
