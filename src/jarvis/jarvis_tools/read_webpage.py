@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+import os
 import subprocess
 import sys
+from datetime import datetime
 from typing import Any, Dict, Optional, Callable
 from typing import TYPE_CHECKING
 
@@ -25,7 +27,7 @@ try:
 except ImportError:
     REQUESTS_AVAILABLE = False
 
-from jarvis.jarvis_utils.config import calculate_content_token_limit
+from jarvis.jarvis_utils.config import calculate_content_token_limit, get_data_dir
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -73,11 +75,29 @@ class WebpageTool:
     def _ensure_playwright_ready(prompt_user: bool = False) -> bool:
         global sync_playwright
 
+        # 检查用户是否之前拒绝过安装
+        declined_flag = os.path.join(get_data_dir(), "playwright_install_declined.flag")
+        if os.path.exists(declined_flag):
+            return False
+
         if sync_playwright is None:
             PrettyOutput.auto_print("⚠️ Playwright Python包未安装")
             if prompt_user and not user_confirm(
                 "是否现在自动安装 playwright 和 chromium？", default=True
             ):
+                # 创建标记文件，记录用户拒绝安装
+                try:
+                    # 使用已导入的get_data_dir
+                    declined_flag = os.path.join(
+                        get_data_dir(), "playwright_install_declined.flag"
+                    )
+                    os.makedirs(os.path.dirname(declined_flag), exist_ok=True)
+                    with open(declined_flag, "w") as f:
+                        f.write(
+                            f"User declined playwright installation at {datetime.now().isoformat()}\n"
+                        )
+                except Exception:
+                    pass  # 忽略创建标记文件的错误
                 return False
             if not WebpageTool._install_playwright_package():
                 return False
