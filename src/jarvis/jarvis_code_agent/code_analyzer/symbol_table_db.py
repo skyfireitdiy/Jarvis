@@ -36,6 +36,11 @@ class SymbolTableDB:
         """Get the query builder."""
         return self._ensure_db()
 
+    def get_traverser(self) -> GraphTraverser:
+        """Get the graph traverser."""
+        queries = self._ensure_db()
+        return GraphTraverser(queries)
+
     def close(self) -> None:
         """Close the database connection."""
         if self._db:
