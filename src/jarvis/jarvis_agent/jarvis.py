@@ -870,6 +870,11 @@ def run_cli(
         "--disable-methodology-analysis",
         help="禁用方法论和任务分析（覆盖配置文件设置）",
     ),
+    print_prompt: bool = typer.Option(
+        False,
+        "--print-prompt",
+        help="打印提示信息（覆盖配置文件设置）",
+    ),
     backup_data: Optional[str] = typer.Option(
         None,
         "--backup-data",
@@ -1034,6 +1039,8 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
+        if print_prompt:
+            set_config("print_prompt", True)
         # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
         # 静默忽略同步异常，不影响主流程
@@ -1326,6 +1333,8 @@ def run_cli(
         if disable_methodology_analysis:
             set_config("use_methodology", False)
             set_config("use_analysis", False)
+        if print_prompt:
+            set_config("print_prompt", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

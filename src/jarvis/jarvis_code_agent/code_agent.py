@@ -1490,6 +1490,11 @@ def cli(
         "--quick",
         help="极速模式：取消任务分类、规则自动加载、上下文推荐、方法论加载",
     ),
+    print_prompt: bool = typer.Option(
+        False,
+        "--print-prompt",
+        help="打印提示信息（覆盖配置文件设置）",
+    ),
     web_gateway_port: int = typer.Option(
         8000,
         "--web-gateway-port",
@@ -1700,6 +1705,8 @@ def cli(
             set_config("tool_group", str(tool_group))
         if restore_session or is_auto_resume_session():
             set_config("restore_session", True)
+        if print_prompt:
+            set_config("print_prompt", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
