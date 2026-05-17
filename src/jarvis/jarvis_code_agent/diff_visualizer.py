@@ -1089,13 +1089,165 @@ def _parse_diff_to_lines(diff_text: str) -> tuple:
             old_line_num += 1
             new_line_num += 1
         else:
-            # 其他行（如空行）
-            old_lines.append(line)
-            new_lines.append(line)
-            old_line_map.append(old_line_num if old_line_num > 0 else 0)
-            new_line_map.append(new_line_num if new_line_num > 0 else 0)
+            # 跳过无法识别的行（如 '\ No newline at end of file'、空行等）
+            # 这些行不属于 diff 内容，应该被忽略
+            pass
 
     return old_lines, new_lines, old_line_map, new_line_map
+
+
+def parse_diff_to_structured_data(
+    diff_text: str,
+    file_path: str = "",
+) -> List[dict]:
+    """将 git diff 文本解析为结构化数据（公共函数）
+
+    参数:
+        diff_text: git diff 输出的文本
+        file_path: 文件路径（用于显示）
+
+    返回:
+        List[dict]: 结构化数据列表，每个元素包含:
+            - file_path: 文件路径
+            - additions: 新增行数
+            - deletions: 删除行数
+            - rows: 行数据列表，每行包含:
+                - type: 行类型 (equal/insert/delete/replace)
+                - old_line_num: 旧文件行号
+                - old_line: 旧文件行内容
+                - new_line_num: 新文件行号
+                - new_line: 新文件行内容
+    """
+    import difflib
+
+    # 分割多个文件的 diff
+    file_diffs = _split_diff_by_files(diff_text)
+    result = []
+
+    for single_file_path, single_file_diff in file_diffs:
+        # 解析 diff 为行列表
+        old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
+            single_file_diff
+        )
+
+        # 使用 SequenceMatcher 进行匹配
+        matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+        opcodes = matcher.get_opcodes()
+
+        # 生成行数据
+        diff_rows = []
+        additions = 0
+        deletions = 0
+
+        for tag, i1, i2, j1, j2 in opcodes:
+            if tag == "equal":
+                for k in range(i2 - i1):
+                    old_idx = i1 + k
+                    new_idx = j1 + k
+                    diff_rows.append(
+                        {
+                            "type": "equal",
+                            "old_line_num": old_line_map[old_idx]
+                            if old_idx < len(old_line_map)
+                            else None,
+                            "old_line": old_lines[old_idx]
+                            if old_idx < len(old_lines)
+                            else None,
+                            "new_line_num": new_line_map[new_idx]
+                            if new_idx < len(new_line_map)
+                            else None,
+                            "new_line": new_lines[new_idx]
+                            if new_idx < len(new_lines)
+                            else None,
+                        }
+                    )
+            elif tag == "delete":
+                deletions += i2 - i1
+                for k in range(i2 - i1):
+                    old_idx = i1 + k
+                    diff_rows.append(
+                        {
+                            "type": "delete",
+                            "old_line_num": old_line_map[old_idx]
+                            if old_idx < len(old_line_map)
+                            else None,
+                            "old_line": old_lines[old_idx]
+                            if old_idx < len(old_lines)
+                            else None,
+                            "new_line_num": None,
+                            "new_line": None,
+                        }
+                    )
+            elif tag == "insert":
+                additions += j2 - j1
+                for k in range(j2 - j1):
+                    new_idx = j1 + k
+                    diff_rows.append(
+                        {
+                            "type": "insert",
+                            "old_line_num": None,
+                            "old_line": None,
+                            "new_line_num": new_line_map[new_idx]
+                            if new_idx < len(new_line_map)
+                            else None,
+                            "new_line": new_lines[new_idx]
+                            if new_idx < len(new_lines)
+                            else None,
+                        }
+                    )
+            elif tag == "replace":
+                old_len = i2 - i1
+                new_len = j2 - j1
+                deletions += old_len
+                additions += new_len
+                max_len = max(old_len, new_len)
+                for k in range(max_len):
+                    old_idx = i1 + k if k < old_len else None
+                    new_idx = j1 + k if k < new_len else None
+                    diff_rows.append(
+                        {
+                            "type": "replace",
+                            "old_line_num": old_line_map[old_idx]
+                            if old_idx is not None and old_idx < len(old_line_map)
+                            else None,
+                            "old_line": old_lines[old_idx]
+                            if old_idx is not None and old_idx < len(old_lines)
+                            else None,
+                            "new_line_num": new_line_map[new_idx]
+                            if new_idx is not None and new_idx < len(new_line_map)
+                            else None,
+                            "new_line": new_lines[new_idx]
+                            if new_idx is not None and new_idx < len(new_lines)
+                            else None,
+                        }
+                    )
+
+        # 验证并规范化 rows 数据
+        validated_rows = []
+        for row in diff_rows:
+            # 确保每行都有必要的字段
+            validated_row = {
+                "type": row.get("type", "equal"),
+                "old_line_num": row.get("old_line_num"),
+                "old_line": row.get("old_line"),
+                "new_line_num": row.get("new_line_num"),
+                "new_line": row.get("new_line"),
+            }
+            # 验证 type 字段
+            if validated_row["type"] not in ("equal", "insert", "delete", "replace"):
+                validated_row["type"] = "equal"
+            validated_rows.append(validated_row)
+
+        result.append(
+            {
+                "file_path": single_file_path if single_file_path else file_path,
+                "additions": additions,
+                "deletions": deletions,
+                "rows": validated_rows,
+            }
+        )
+
+    return result
 
 
 def visualize_diff_enhanced(

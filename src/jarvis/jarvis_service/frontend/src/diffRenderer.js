@@ -134,7 +134,8 @@ export function renderSideBySideDiff(diffData) {
 
       // 统计并保留缩进
       let newContent = "";
-      if (new_line) {
+      if (new_line !== null && new_line !== undefined) {
+        // 即使是空字符串也要处理，确保显示占位符
         const leadingSpaces = new_line.match(/^(\s*)/)[0];
         let highlighted;
         try {
@@ -149,6 +150,13 @@ export function renderSideBySideDiff(diffData) {
           newContent =
             "&nbsp;".repeat(leadingSpaces.length) + escapeHtml(new_line);
         }
+        // 如果内容为空，添加一个空格占位符
+        if (!newContent) {
+          newContent = "&nbsp;";
+        }
+      } else {
+        // new_line 为 null 或 undefined 时，显示空占位符
+        newContent = "";
       }
 
       // 对于 replace 和 insert，添加新增背景色到 td
