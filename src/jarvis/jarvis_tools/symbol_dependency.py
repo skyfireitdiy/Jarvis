@@ -107,9 +107,9 @@ class SymbolDependencyTool:
         """获取或创建SymbolTableDB实例"""
         project_path = os.path.abspath(project_path)
         if project_path not in self._db_cache:
-            db_path = os.path.join(project_path, ".jarvis", "symbol_table.db")
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            self._db_cache[project_path] = SymbolTableDB(db_path)
+            cache_dir = os.path.join(project_path, ".jarvis", "symbol_cache")
+            os.makedirs(cache_dir, exist_ok=True)
+            self._db_cache[project_path] = SymbolTableDB(cache_dir)
         return self._db_cache[project_path]
 
     def _node_to_dict(self, node: Node) -> Dict[str, Any]:
