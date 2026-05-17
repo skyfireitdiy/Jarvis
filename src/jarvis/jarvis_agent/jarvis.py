@@ -1207,7 +1207,7 @@ def run_cli(
             @custom_app.get("/diff")
             async def get_diff_api() -> dict:
                 """获取 diff（通用 Agent 返回空内容）。"""
-                return {"diff": ""}
+                return {"diff": "", "files": []}
 
             @custom_app.get("/rules")
             async def get_rules_api() -> dict:

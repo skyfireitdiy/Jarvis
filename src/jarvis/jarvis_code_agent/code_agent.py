@@ -1623,14 +1623,19 @@ def cli(
 
             @custom_app.get("/diff")
             async def get_diff_api() -> dict:
-                """获取从 start_commit 到当前代码的 diff。
+                """获取从 start_commit 到当前代码的 diff（结构化数据）。
 
                 返回:
-                    dict: 包含 diff 内容的字典
+                    dict: 包含结构化 diff 数据的字典
+                        - diff: 原始 diff 文本（兼容旧接口）
+                        - files: 结构化数据列表
                 """
                 from jarvis.jarvis_utils.globals import (
                     global_agents,
                     running_agent_stack,
+                )
+                from jarvis.jarvis_code_agent.diff_visualizer import (
+                    parse_diff_to_structured_data,
                 )
 
                 # 获取根agent（running_agent_stack中第一个，即最早启动的agent）
@@ -1643,8 +1648,10 @@ def cli(
                         and root_agent.start_commit
                     ):
                         diff_content = get_diff_between_commits(root_agent.start_commit)
-                        return {"diff": diff_content}
-                return {"diff": ""}
+                        # 解析为结构化数据
+                        structured_data = parse_diff_to_structured_data(diff_content)
+                        return {"diff": diff_content, "files": structured_data}
+                return {"diff": "", "files": []}
 
             @custom_app.get("/rules")
             async def get_rules_api() -> dict:
