@@ -281,6 +281,11 @@ class ImpactAnalyzer:
         self.context_manager = context_manager
         self.project_root = context_manager.project_root
         self.test_discoverer = TestDiscoverer(self.project_root)
+        
+        # 使用图遍历器（如果symbol_table是SymbolTableDB）
+        self._traverser: Optional[GraphTraverser] = None
+        if isinstance(context_manager.symbol_table, SymbolTableDB):
+            self._traverser = context_manager.symbol_table.get_traverser()
 
     def analyze_edit_impact(self, file_path: str, edits: List[Edit]) -> ImpactReport:
         """分析编辑的影响范围
