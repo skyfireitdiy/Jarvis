@@ -49,6 +49,20 @@ class TestResolveSymbolsJsonlPath:
         expected = Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
         assert result == expected
 
+    def test_jarvis_c2rust_directory(self, tmp_path):
+        """测试已经是 .jarvis/c2rust 目录的情况"""
+        # 创建 .jarvis/c2rust 目录
+        c2rust_dir = tmp_path / ".jarvis" / "c2rust"
+        c2rust_dir.mkdir(parents=True)
+        # 创建 symbols.jsonl 文件
+        symbols_file = c2rust_dir / "symbols.jsonl"
+        symbols_file.write_text("test")
+
+        # 测试传入 .jarvis/c2rust 目录
+        result = resolve_symbols_jsonl_path(c2rust_dir)
+        expected = c2rust_dir / "symbols.jsonl"
+        assert result == expected
+
 
 class TestSetupOutputPaths:
     """测试 setup_output_paths 函数"""
