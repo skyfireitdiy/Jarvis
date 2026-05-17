@@ -75,6 +75,9 @@
             <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
               {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
             </button>
+            <button class="ghost-btn" @click="confirmRestartAllNodes" :disabled="isRestartingGateway">
+              一键重启所有节点
+            </button>
           </div>
         </div>
       </div>
@@ -212,6 +215,7 @@ const emit = defineEmits([
   'saveConnectionLockSetting',
   'confirmClearHistory',
   'confirmRestartGateway',
+  'confirmRestartAllNodes',
   'disconnectAll',
   'syncConfig',
   'update:autoLoginEnabled',
@@ -284,6 +288,11 @@ function confirmRestartGateway() {
     nodeId: localRestartNodeId.value,
     restartFrontend: localRestartFrontendService.value
   })
+}
+
+// 确认重启所有节点
+function confirmRestartAllNodes() {
+  emit('confirmRestartAllNodes')
 }
 
 // 断开所有连接

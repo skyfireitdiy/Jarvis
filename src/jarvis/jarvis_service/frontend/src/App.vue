@@ -580,6 +580,7 @@
       @saveAutoLoginSetting="saveAutoLoginSetting"
       @confirmClearHistory="confirmClearHistory"
       @confirmRestartGateway="handleRestartGateway"
+      @confirmRestartAllNodes="confirmRestartAllNodes"
       @disconnectAll="disconnectAll"
       @syncConfig="handleSyncConfig"
       @updateCodeToMain="handleUpdateCodeToMain"
@@ -3254,6 +3255,97 @@ function confirmRestartGateway() {
     () => {},
     false
   )
+}
+
+// 确认重启所有节点（先检查 agent 状态，再依次重启子节点，最后 master）
+async function confirmRestartAllNodes() {
+  // 第一步：检查所有节点是否有运行中的 agent
+  const runningAgents = agentList.value.filter(agent => agent.status === 'running')
+  if (runningAgents.length > 0) {
+    const agentDetails = runningAgents.map(agent => {
+      const nodeId = agent.node_id || 'master'
+      return `- ${agent.name || agent.agent_id} (节点：${nodeId})`
+    }).join('\n')
+    showToast(`检测到 ${runningAgents.length} 个运行中的 Agent：\n${agentDetails}\n\n请先手动停止或完成这些 Agent 后再重启节点服务`, 'warning')
+    return
+  }
+
+  showSettingsModal.value = false
+  showConfirm(
+    '确认要一键重启所有节点吗？\n\n操作顺序：\n1. 依次重启所有子节点\n2. 最后重启 master 节点\n\n这将短暂中断所有节点的连接。',
+    () => {
+      restartAllNodes()
+    },
+    () => {},
+    false
+  )
+}
+
+async function restartAllNodes() {
+  try {
+    isRestartingGateway.value = true
+    const { host, port } = getGatewayAddress()
+
+    // 获取所有节点列表（排除 master）
+    const childNodes = availableNodeOptions.filter(node => node.value !== 'master')
+    const allNodes = [...childNodes, { value: 'master', label: 'Master' }]
+
+    for (const node of allNodes) {
+      const nodeId = node.value
+      const normalizedNodeId = nodeId || 'master'
+
+      // 再次检查该节点是否有运行中的 agent（双重保险）
+      const nodeRunningAgents = agentList.value.filter(agent => {
+        const agentNodeId = agent.node_id || 'master'
+        return agent.status === 'running' && agentNodeId === normalizedNodeId
+      })
+
+      if (nodeRunningAgents.length > 0) {
+        const agentNames = nodeRunningAgents.map(agent => agent.name || agent.agent_id).join(', ')
+        showToast(`节点 "${normalizedNodeId}" 仍有运行中的 Agent：${agentNames}，跳过该节点`, 'warning')
+        continue
+      }
+
+      try {
+        // 发送重启请求
+        const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
+          method: 'POST',
+          body: JSON.stringify({
+            node_id: normalizedNodeId,
+            restart_frontend: restartFrontendService.value
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}))
+          if (data.success === false) {
+            showToast(`节点 "${normalizedNodeId}" 重启失败：${data.error?.message || '未知错误'}`, 'error')
+          } else {
+            showToast(`已向节点 "${normalizedNodeId}" 发送重启请求`, 'success')
+          }
+        } else {
+          showToast(`节点 "${normalizedNodeId}" 重启失败：HTTP ${response.status}`, 'error')
+        }
+      } catch (error) {
+        console.error(`[SETTINGS] Failed to restart node ${normalizedNodeId}:`, error)
+        showToast(`节点 "${normalizedNodeId}" 重启失败：${error.message || '未知错误'}`, 'error')
+      }
+
+      // 每个节点之间间隔 1 秒，避免请求过于密集
+      if (node.value !== 'master') {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+    }
+
+    showToast('所有节点重启命令已发送完成', 'success')
+  } catch (error) {
+    console.error('[SETTINGS] Failed to restart all nodes:', error)
+    showToast(error.message || '重启所有节点失败', 'error')
+  } finally {
+    setTimeout(() => {
+      isRestartingGateway.value = false
+    }, 3000)
+  }
 }
 
 async function restartGateway() {
