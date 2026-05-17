@@ -799,11 +799,11 @@ license: MIT # 可选
 
 **示例：**
 
-\`\`\`python
+```python
 # 示例代码
 def example():
     pass
-\`\`\`
+```
 
 ## 你必须执行的操作
 
