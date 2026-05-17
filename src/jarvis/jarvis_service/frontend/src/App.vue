@@ -3287,11 +3287,11 @@ async function restartAllNodes() {
     const { host, port } = getGatewayAddress()
 
     // 获取所有节点列表（排除 master）
-    const childNodes = (availableNodeOptions.value || []).filter(node => node.value !== 'master')
-    const allNodes = [...childNodes, { value: 'master', label: 'Master' }]
+    const childNodes = (availableNodeOptions.value || []).filter(node => node.node_id !== 'master')
+    const allNodes = [...childNodes, { node_id: 'master', label: 'Master' }]
 
     for (const node of allNodes) {
-      const nodeId = node.value
+      const nodeId = node.node_id
       const normalizedNodeId = nodeId || 'master'
 
       // 再次检查该节点是否有运行中的 agent（双重保险）
@@ -3332,7 +3332,7 @@ async function restartAllNodes() {
       }
 
       // 每个节点之间间隔 1 秒，避免请求过于密集
-      if (node.value !== 'master') {
+      if (node.node_id !== 'master') {
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
