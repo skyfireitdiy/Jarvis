@@ -20,7 +20,7 @@ from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.utils import decode_output
 
 from .context_manager import ContextManager
-from .db import EdgeKind, GraphTraverser, SymbolKind
+from .db import GraphTraverser
 from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
 from .symbol_table_db import SymbolTableDB
