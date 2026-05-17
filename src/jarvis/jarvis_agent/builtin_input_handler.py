@@ -547,6 +547,44 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
             continue
+        elif tag == "Diff":
+            # 处理Diff命令，显示从start_commit到当前的变更
+            from jarvis.jarvis_utils.git_utils import (
+                get_diff_between_commits,
+                get_latest_commit_hash,
+            )
+            from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
+
+            # 检查agent是否有start_commit属性
+            if not hasattr(agent, "start_commit"):
+                PrettyOutput.auto_print("⚠️ 当前Agent没有start_commit属性，无法显示变更")
+                return "", True
+
+            start_commit = agent.start_commit
+            if not start_commit:
+                PrettyOutput.auto_print("⚠️ start_commit为空，无法显示变更")
+                return "", True
+
+            # 获取当前commit
+            end_commit = get_latest_commit_hash()
+            if not end_commit:
+                PrettyOutput.auto_print("⚠️ 无法获取当前commit")
+                return "", True
+
+            # 获取diff
+            PrettyOutput.auto_print(
+                f"📊 正在获取从 {start_commit[:8]} 到 {end_commit[:8]} 的变更..."
+            )
+            diff_text = get_diff_between_commits(start_commit, end_commit)
+
+            if not diff_text:
+                PrettyOutput.auto_print("✅ 没有变更")
+                return "", True
+
+            # 显示diff
+            PrettyOutput.auto_print("📝 变更内容:")
+            visualize_diff_enhanced(diff_text, mode="unified")
+            return "", True
 
         # 处理普通替换标记
         if tag in replace_map:

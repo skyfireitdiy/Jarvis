@@ -183,6 +183,7 @@ BUILTIN_COMMANDS = [
     ("Btw", "临时聊天"),
     ("PrintConfig", "打印全局配置"),
     ("SetConfig", "修改全局配置"),
+    ("Diff", "显示从start_commit到当前的变更"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
@@ -901,7 +902,7 @@ class FileCompleter(Completer):
         return all_rules
 
     def get_completions(
-        self, document: Document, _: CompleteEvent
+        self, document: Document, complete_event: CompleteEvent
     ) -> Iterable[Completion]:
         text = document.text_before_cursor
         cursor_pos = document.cursor_position
