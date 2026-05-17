@@ -1,11 +1,11 @@
 """Tests for database-backed symbol table."""
 
-import os
 import tempfile
+
 import pytest
 
+from jarvis.jarvis_code_agent.code_analyzer.db import EdgeKind, SymbolKind
 from jarvis.jarvis_code_agent.code_analyzer.symbol_table_db import SymbolTableDB
-from jarvis.jarvis_code_agent.code_analyzer.db import Node, Edge, SymbolKind, EdgeKind
 
 
 @pytest.fixture
