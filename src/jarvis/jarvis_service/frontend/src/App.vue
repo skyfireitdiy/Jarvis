@@ -3287,7 +3287,7 @@ async function restartAllNodes() {
     const { host, port } = getGatewayAddress()
 
     // 获取所有节点列表（排除 master）
-    const childNodes = availableNodeOptions.filter(node => node.value !== 'master')
+    const childNodes = (availableNodeOptions || []).filter(node => node.value !== 'master')
     const allNodes = [...childNodes, { value: 'master', label: 'Master' }]
 
     for (const node of allNodes) {
