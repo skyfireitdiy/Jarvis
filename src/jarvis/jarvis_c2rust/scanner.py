@@ -996,8 +996,12 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> Path:
         # 允许直接传入 .jsonl 文件
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
+
         # 仅支持目录下的标准路径：<dir>/.jarvis/c2rust/symbols.jsonl
         if p.is_dir():
+            # 检查是否已经是 .jarvis/c2rust 目录
+            if p.name == "c2rust" and p.parent.name == ".jarvis":
+                return p / "symbols.jsonl"
             prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
             return prefer
         # 默认：项目 <cwd>/.jarvis/c2rust/symbols.jsonl
@@ -1101,6 +1105,9 @@ def find_root_function_ids(db_path: Path) -> List[int]:
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
+            # 检查是否已经是 .jarvis/c2rust 目录
+            if p.name == "c2rust" and p.parent.name == ".jarvis":
+                return p / "symbols.jsonl"
             prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
             return prefer
         # 默认：项目 .jarvis/c2rust/symbols.jsonl
@@ -1174,6 +1181,9 @@ def compute_translation_order_jsonl(
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
+            # 检查是否已经是 .jarvis/c2rust 目录
+            if p.name == "c2rust" and p.parent.name == ".jarvis":
+                return p / "symbols.jsonl"
             prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
             return prefer
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
@@ -1493,6 +1503,9 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
         if p.is_file() and p.suffix.lower() == ".jsonl":
             return p
         if p.is_dir():
+            # 检查是否已经是 .jarvis/c2rust 目录
+            if p.name == "c2rust" and p.parent.name == ".jarvis":
+                return p / "symbols.jsonl"
             prefer = p / ".jarvis" / "c2rust" / "symbols.jsonl"
             return prefer
         return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
