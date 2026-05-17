@@ -5,6 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 from typing import List
 from typing import Optional
 
@@ -23,6 +24,9 @@ def resolve_symbols_jsonl_path(hint: Path) -> Path:
     if p.is_file() and p.suffix.lower() == ".jsonl":
         return p
     if p.is_dir():
+        # 检查是否已经是 .jarvis/c2rust 目录
+        if p.name == "c2rust" and p.parent.name == ".jarvis":
+            return p / "symbols.jsonl"
         return p / ".jarvis" / "c2rust" / "symbols.jsonl"
     return Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
@@ -112,7 +116,7 @@ def load_additional_notes(data_dir: Path) -> str:
     return ""
 
 
-def normalize_list(items: Optional[List[str]]) -> List[str]:
+def normalize_list(items: Any) -> List[str]:
     """规范化列表，去重并排序"""
     if not isinstance(items, list):
         return []
