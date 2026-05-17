@@ -446,10 +446,24 @@ class ImpactAnalyzer:
             symbol.file_path
         )
 
+        # 获取当前符号的行号范围
+        symbol_line_start = getattr(symbol, 'start_line', None) or getattr(symbol, 'line_start', None)
+        symbol_line_end = getattr(symbol, 'end_line', None) or getattr(symbol, 'line_end', None)
+        
+        if symbol_line_start is None or symbol_line_end is None:
+            return dependents
+
         # 查找在符号定义之后的符号（可能使用该符号）
         for other_symbol in file_symbols:
+            # 处理Node和Symbol两种类型
+            other_line_start = getattr(other_symbol, 'start_line', None) or getattr(other_symbol, 'line_start', None)
+            other_line_end = getattr(other_symbol, 'end_line', None) or getattr(other_symbol, 'line_end', None)
+            
+            if other_line_start is None or other_line_end is None:
+                continue
+                
             if (
-                other_symbol.line_start > symbol.line_end
+                other_line_start > symbol_line_end
                 and other_symbol.name != symbol.name
             ):
                 # 简单检查：如果符号名出现在其他符号的范围内，可能依赖
@@ -458,14 +472,27 @@ class ImpactAnalyzer:
                 if content:
                     # 提取其他符号的代码区域
                     lines = content.split("\n")
-                    if other_symbol.line_start <= len(
+                    if other_line_start <= len(
                         lines
-                    ) and other_symbol.line_end <= len(lines):
+                    ) and other_line_end <= len(lines):
                         region = "\n".join(
-                            lines[other_symbol.line_start - 1 : other_symbol.line_end]
+                            lines[other_line_start - 1 : other_line_end]
                         )
                         if symbol.name in region:
-                            dependents.append(other_symbol)
+                            # 转换为Symbol类型
+                            if isinstance(other_symbol, Symbol):
+                                dependents.append(other_symbol)
+                            else:
+                                dependents.append(Symbol(
+                                    name=other_symbol.name,
+                                    kind=other_symbol.kind.value if hasattr(other_symbol.kind, 'value') else str(other_symbol.kind),
+                                    file_path=other_symbol.file_path,
+                                    line_start=other_symbol.start_line,
+                                    line_end=other_symbol.end_line,
+                                    signature=getattr(other_symbol, 'signature', None),
+                                    docstring=getattr(other_symbol, 'docstring', None),
+                                    parent=getattr(other_symbol, 'parent_id', None),
+                                ))
 
         return dependents
 
