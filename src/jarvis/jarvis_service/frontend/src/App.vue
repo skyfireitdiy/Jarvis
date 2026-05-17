@@ -3537,12 +3537,14 @@ async function updateCodeToMain() {
             success: true,
             message: result.data?.message || '更新成功'
           })
+          showToast(`已向节点 "${nodeId}" 发送更新请求`, 'success')
         } else {
           results.push({
             node_id: nodeId,
             success: false,
             message: result.error?.message || '更新失败'
           })
+          showToast(`节点 "${nodeId}" 更新失败：${result.error?.message || '未知错误'}`, 'error')
         }
       } catch (error) {
         console.error(`[SETTINGS] Failed to update code for node ${nodeId}:`, error)
@@ -3551,6 +3553,7 @@ async function updateCodeToMain() {
           success: false,
           message: error.message || '更新失败'
         })
+        showToast(`节点 "${nodeId}" 更新失败：${error.message || '未知错误'}`, 'error')
       }
     }
 
