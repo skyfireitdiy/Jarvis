@@ -20,8 +20,10 @@ from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.utils import decode_output
 
 from .context_manager import ContextManager
+from .db import GraphTraverser
 from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
+from .symbol_table_db import SymbolTableDB
 
 
 class ImpactType(Enum):
@@ -280,6 +282,11 @@ class ImpactAnalyzer:
         self.project_root = context_manager.project_root
         self.test_discoverer = TestDiscoverer(self.project_root)
 
+        # 使用图遍历器（如果symbol_table是SymbolTableDB）
+        self._traverser: Optional[GraphTraverser] = None
+        if isinstance(context_manager.symbol_table, SymbolTableDB):
+            self._traverser = context_manager.symbol_table.get_traverser()
+
     def analyze_edit_impact(self, file_path: str, edits: List[Edit]) -> ImpactReport:
         """分析编辑的影响范围
 
@@ -365,12 +372,38 @@ class ImpactAnalyzer:
         # 找出在编辑范围内的符号
         affected_symbols = []
         for symbol in symbols:
+            # 处理Node和Symbol两种类型
+            line_start = getattr(symbol, "start_line", None) or getattr(
+                symbol, "line_start", None
+            )
+            line_end = getattr(symbol, "end_line", None) or getattr(
+                symbol, "line_end", None
+            )
+
+            if line_start is None or line_end is None:
+                continue
+
             # 检查符号是否与编辑区域重叠
-            if (
-                symbol.line_start <= edit.line_end
-                and symbol.line_end >= edit.line_start
-            ):
-                affected_symbols.append(symbol)
+            if line_start <= edit.line_end and line_end >= edit.line_start:
+                # 转换为Symbol类型
+                if isinstance(symbol, Symbol):
+                    affected_symbols.append(symbol)
+                else:
+                    # 将Node转换为Symbol
+                    affected_symbols.append(
+                        Symbol(
+                            name=symbol.name,
+                            kind=symbol.kind.value
+                            if hasattr(symbol.kind, "value")
+                            else str(symbol.kind),
+                            file_path=symbol.file_path,
+                            line_start=symbol.start_line,
+                            line_end=symbol.end_line,
+                            signature=getattr(symbol, "signature", None),
+                            docstring=getattr(symbol, "docstring", None),
+                            parent=getattr(symbol, "parent_id", None),
+                        )
+                    )
 
         return affected_symbols
 
@@ -418,26 +451,62 @@ class ImpactAnalyzer:
             symbol.file_path
         )
 
+        # 获取当前符号的行号范围
+        symbol_line_start = getattr(symbol, "start_line", None) or getattr(
+            symbol, "line_start", None
+        )
+        symbol_line_end = getattr(symbol, "end_line", None) or getattr(
+            symbol, "line_end", None
+        )
+
+        if symbol_line_start is None or symbol_line_end is None:
+            return dependents
+
         # 查找在符号定义之后的符号（可能使用该符号）
         for other_symbol in file_symbols:
-            if (
-                other_symbol.line_start > symbol.line_end
-                and other_symbol.name != symbol.name
-            ):
+            # 处理Node和Symbol两种类型
+            other_line_start = getattr(other_symbol, "start_line", None) or getattr(
+                other_symbol, "line_start", None
+            )
+            other_line_end = getattr(other_symbol, "end_line", None) or getattr(
+                other_symbol, "line_end", None
+            )
+
+            if other_line_start is None or other_line_end is None:
+                continue
+
+            if other_line_start > symbol_line_end and other_symbol.name != symbol.name:
                 # 简单检查：如果符号名出现在其他符号的范围内，可能依赖
                 # 这里使用简单的启发式方法
                 content = self.context_manager._get_file_content(symbol.file_path)
                 if content:
                     # 提取其他符号的代码区域
                     lines = content.split("\n")
-                    if other_symbol.line_start <= len(
-                        lines
-                    ) and other_symbol.line_end <= len(lines):
-                        region = "\n".join(
-                            lines[other_symbol.line_start - 1 : other_symbol.line_end]
-                        )
+                    if other_line_start <= len(lines) and other_line_end <= len(lines):
+                        region = "\n".join(lines[other_line_start - 1 : other_line_end])
                         if symbol.name in region:
-                            dependents.append(other_symbol)
+                            # 转换为Symbol类型
+                            if isinstance(other_symbol, Symbol):
+                                dependents.append(other_symbol)
+                            else:
+                                dependents.append(
+                                    Symbol(
+                                        name=other_symbol.name,
+                                        kind=other_symbol.kind.value
+                                        if hasattr(other_symbol.kind, "value")
+                                        else str(other_symbol.kind),
+                                        file_path=other_symbol.file_path,
+                                        line_start=other_symbol.start_line,
+                                        line_end=other_symbol.end_line,
+                                        signature=getattr(
+                                            other_symbol, "signature", None
+                                        ),
+                                        docstring=getattr(
+                                            other_symbol, "docstring", None
+                                        ),
+                                        parent=getattr(other_symbol, "parent_id", None),
+                                    )
+                                )
 
         return dependents
 
