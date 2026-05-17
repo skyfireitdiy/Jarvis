@@ -3308,7 +3308,7 @@ async function restartAllNodes() {
 
       try {
         // 发送重启请求
-        const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
+        const response = await fetchWithAuth(buildNodeHttpUrl(host, port, normalizedNodeId, 'service/restart'), {
           method: 'POST',
           body: JSON.stringify({
             node_id: normalizedNodeId,
@@ -3360,7 +3360,7 @@ async function restartGateway() {
     const { host, port } = getGatewayAddress()
     
     // 发送重启请求，等待响应结果
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'service/restart'), {
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'service/restart'), {
       method: 'POST',
       body: JSON.stringify({
         node_id: targetNodeId,
