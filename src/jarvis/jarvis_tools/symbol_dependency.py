@@ -33,7 +33,6 @@ import os
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_code_agent.code_analyzer.symbol_table_db import SymbolTableDB
-from jarvis.jarvis_code_agent.code_analyzer.db import SymbolKind
 from jarvis.jarvis_code_agent.code_analyzer.db.data_types import Node
 
 
@@ -118,21 +117,21 @@ class SymbolDependencyTool:
         return {
             "id": node.id,
             "name": node.name,
+            "qualified_name": node.qualified_name,
             "kind": node.kind.value if hasattr(node.kind, "value") else str(node.kind),
             "file_path": node.file_path,
+            "language": node.language,
             "start_line": node.start_line,
             "end_line": node.end_line,
+            "start_column": node.start_column,
+            "end_column": node.end_column,
             "signature": node.signature,
             "docstring": node.docstring,
             "parent_id": node.parent_id,
-            "language": node.language,
+            "visibility": node.visibility,
             "is_exported": node.is_exported,
             "is_async": node.is_async,
             "is_static": node.is_static,
-            "is_abstract": node.is_abstract,
-            "visibility": node.visibility,
-            "decorators": node.decorators,
-            "metadata": node.metadata,
         }
 
     def _find_symbol(
@@ -145,28 +144,16 @@ class SymbolDependencyTool:
         """查找符号"""
         results = []
 
-        if file_path:
-            # 在指定文件中查找
-            symbols = db.get_file_symbols(file_path)
-            for sym in symbols:
-                if sym.name == symbol_name:
-                    if (
-                        kind is None
-                        or (hasattr(sym.kind, "value") and sym.kind.value == kind)
-                        or str(sym.kind) == kind
-                    ):
-                        results.append(self._node_to_dict(sym))
-        else:
-            # 全局查找
-            symbol_kind = None
-            if kind:
-                try:
-                    symbol_kind = SymbolKind(kind)
-                except ValueError:
-                    pass
+        # 使用find_symbol方法，第二个参数是file_path
+        nodes = db.find_symbol(symbol_name, file_path)
 
-            nodes = db.find_symbol(symbol_name, symbol_kind)
-            for node in nodes:
+        for node in nodes:
+            # 按kind过滤
+            if (
+                kind is None
+                or (hasattr(node.kind, "value") and node.kind.value == kind)
+                or str(node.kind) == kind
+            ):
                 results.append(self._node_to_dict(node))
 
         return results
@@ -200,15 +187,15 @@ class SymbolDependencyTool:
         results = []
         for sym_info in symbols:
             node_id = sym_info["id"]
-            # 查找引用该符号的边
-            edges = db.get_edges(node_id, direction="incoming")
+            # 查找引用该符号的边（incoming edges）
+            edges = db.queries.get_incoming_edges(node_id)
             for edge in edges:
                 # 获取引用者的详细信息
-                ref_nodes = db.get_node_by_id(edge.source_id)
-                if ref_nodes:
+                ref_node = db.queries.get_node_by_id(edge.source)
+                if ref_node:
                     results.append(
                         {
-                            "reference": self._node_to_dict(ref_nodes),
+                            "reference": self._node_to_dict(ref_node),
                             "edge_kind": edge.kind.value
                             if hasattr(edge.kind, "value")
                             else str(edge.kind),
@@ -230,15 +217,15 @@ class SymbolDependencyTool:
         results = []
         for sym_info in symbols:
             node_id = sym_info["id"]
-            # 查找该符号依赖的边
-            edges = db.get_edges(node_id, direction="outgoing")
+            # 查找该符号依赖的边（outgoing edges）
+            edges = db.queries.get_outgoing_edges(node_id)
             for edge in edges:
                 # 获取被依赖者的详细信息
-                dep_nodes = db.get_node_by_id(edge.target_id)
-                if dep_nodes:
+                dep_node = db.queries.get_node_by_id(edge.target)
+                if dep_node:
                     results.append(
                         {
-                            "dependency": self._node_to_dict(dep_nodes),
+                            "dependency": self._node_to_dict(dep_node),
                             "edge_kind": edge.kind.value
                             if hasattr(edge.kind, "value")
                             else str(edge.kind),
@@ -265,17 +252,18 @@ class SymbolDependencyTool:
         traverser = db.get_traverser()
         start_node_id = symbols[0]["id"]
 
-        if direction == "forward":
-            subgraph = traverser.bfs(start_node_id, max_depth=max_depth)
-        else:
-            subgraph = traverser.reverse_bfs(start_node_id, max_depth=max_depth)
+        # direction: forward=正向遍历(outgoing), backward=反向遍历(incoming)
+        traverse_direction = "outgoing" if direction == "forward" else "incoming"
+        subgraph = traverser.traverse_bfs(
+            start_node_id, max_depth=max_depth, direction=traverse_direction
+        )
 
         # 转换结果
         nodes = [self._node_to_dict(node) for node in subgraph.nodes]
         edges = [
             {
-                "source_id": edge.source_id,
-                "target_id": edge.target_id,
+                "source": edge.source,
+                "target": edge.target,
                 "kind": edge.kind.value
                 if hasattr(edge.kind, "value")
                 else str(edge.kind),
