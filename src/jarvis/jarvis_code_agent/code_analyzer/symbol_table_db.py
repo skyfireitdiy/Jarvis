@@ -4,7 +4,7 @@ import os
 import time
 from typing import Dict, List, Optional
 
-from .db import DatabaseConnection, Edge, EdgeKind, Node, QueryBuilder, SymbolKind
+from .db import DatabaseConnection, Edge, EdgeKind, GraphTraverser, Node, QueryBuilder, SymbolKind
 
 
 class SymbolTableDB:
