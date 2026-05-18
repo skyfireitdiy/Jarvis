@@ -31,15 +31,14 @@ class RulesManager:
         self.root_dir = root_dir
         # 初始化规则目录列表
         self._init_rules_dirs()
-        # 跟踪已加载的规则名称（向后兼容）
+        # 跟踪已加载的规则名称
         self.loaded_rules: Set[str] = set()
 
         # 私有属性：状态管理
         self._loaded_rules: Dict[
             str, str
         ] = {}  # {rule_name: rule_content} - 已加载的规则内容缓存
-        self._active_rules: Set[str] = set()  # 已激活的规则名称集合
-        self._merged_rules: str = ""  # 合并后的规则字符串（激活的规则内容）
+        self._merged_rules: str = ""  # 合并后的规则字符串（已加载的规则内容）
 
     def _add_path_comment(self, rule_name: str, rule_content: str) -> str:
         """在规则内容前添加路径注释
@@ -682,31 +681,31 @@ class RulesManager:
         """
         loaded_rule_names: Set[str] = set()
 
-        # 如果指定了 rule_names，激活这些规则
+        # 如果指定了 rule_names，加载这些规则
         if rule_names:
             rule_list = [name.strip() for name in rule_names.split(",") if name.strip()]
             for rule_name in rule_list:
-                if self.activate_rule(rule_name):
+                if self.load_rule(rule_name):
                     loaded_rule_names.add(rule_name)
 
         # 获取合并后的规则内容
-        merged_rules = self.get_active_rules_content()
+        merged_rules = self.get_loaded_rules_content()
 
         if merged_rules:
             return merged_rules, loaded_rule_names
         return "", set()
 
-    def activate_rule(self, name: str) -> bool:
-        """激活指定名称的规则
+    def load_rule(self, name: str) -> bool:
+        """加载指定名称的规则
 
         参数:
             name: 规则名称
 
         返回:
-            bool: 是否成功激活
+            bool: 是否成功加载
         """
-        # 如果规则已经激活，直接返回True
-        if name in self._active_rules:
+        # 如果规则已经加载，直接返回True
+        if name in self.loaded_rules:
             return True
 
         # 尝试获取规则内容
@@ -716,40 +715,38 @@ class RulesManager:
 
         # 加载规则到缓存
         self._loaded_rules[name] = rule_content
-        # 激活规则
-        self._active_rules.add(name)
-        # 更新向后兼容的 loaded_rules
+        # 标记规则为已加载
         self.loaded_rules.add(name)
-        # 重新合并激活的规则
-        self._merge_active_rules()
+        # 重新合并已加载的规则
+        self._merge_loaded_rules()
 
         return True
 
-    def deactivate_rule(self, name: str) -> bool:
-        """停用指定名称的规则
+    def unload_rule(self, name: str) -> bool:
+        """卸载指定名称的规则
 
         参数:
             name: 规则名称
 
         返回:
-            bool: 是否成功停用
+            bool: 是否成功卸载
         """
-        # 如果规则未激活，返回False
-        if name not in self._active_rules:
+        # 如果规则未加载，返回False
+        if name not in self.loaded_rules:
             return False
 
-        # 停用规则
-        self._active_rules.remove(name)
-        # 从向后兼容的 loaded_rules 中移除
-        if name in self.loaded_rules:
-            self.loaded_rules.remove(name)
-        # 重新合并激活的规则
-        self._merge_active_rules()
+        # 卸载规则
+        self.loaded_rules.remove(name)
+        # 同时从规则内容缓存中移除
+        if name in self._loaded_rules:
+            del self._loaded_rules[name]
+        # 重新合并已加载的规则
+        self._merge_loaded_rules()
 
         return True
 
-    def get_active_rules_content(self) -> str:
-        """获取所有激活规则的合并内容
+    def get_loaded_rules_content(self) -> str:
+        """获取所有已加载规则的合并内容
 
         返回:
             str: 合并后的规则内容
@@ -763,23 +760,22 @@ class RulesManager:
             name: 规则名称
 
         返回:
-            str: 规则状态（"active", "loaded", "not_loaded"）
+            str: 规则状态（"loaded", "not_loaded"）
         """
-        if name in self._active_rules:
-            return "active"
-        elif name in self._loaded_rules:
+        if name in self.loaded_rules or name in self._loaded_rules:
             return "loaded"
         else:
             return "not_loaded"
 
-    def _merge_active_rules(self) -> None:
-        """合并所有激活的规则内容"""
-        if not self._active_rules:
+    def _merge_loaded_rules(self) -> None:
+        """合并所有已加载的规则内容"""
+        if not self.loaded_rules:
             self._merged_rules = ""
             return
 
         combined_parts = []
-        for rule_name in sorted(self._active_rules):
+        # 遍历所有已加载的规则
+        for rule_name in sorted(self.loaded_rules):
             if rule_name in self._loaded_rules:
                 # 获取规则文件路径
                 rule_path = self.get_rule_file_path(rule_name)
@@ -914,17 +910,10 @@ class RulesManager:
                     preview = "--"
             except Exception:
                 preview = "--"
-            # 检查状态：只有明确激活的规则才显示为已激活
+            # 检查状态：只有明确加载的规则才显示为已加载
             # 同时检查带前缀和不带前缀的名称，向后兼容
             is_loaded = (
-                rule_name in self._active_rules
-                or actual_rule_name in self._active_rules
-            )
-            # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = (
-                is_loaded
-                or rule_name in self.loaded_rules
-                or actual_rule_name in self.loaded_rules
+                rule_name in self.loaded_rules or actual_rule_name in self.loaded_rules
             )
             # 获取内置规则的实际文件路径
             try:
@@ -939,10 +928,8 @@ class RulesManager:
         for rule_name in available_rules.get("files", []):
             preview = self.get_rule_preview(rule_name)
             file_path = self.get_rule_file_path(rule_name)
-            # 检查状态：只有明确激活的规则才显示为已激活
-            is_loaded = rule_name in self._active_rules
-            # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = is_loaded or rule_name in self.loaded_rules
+            # 检查状态：只有明确加载的规则才显示为已加载
+            is_loaded = rule_name in self.loaded_rules
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理内置规则索引文件 builtin/rules/rule.md
@@ -955,9 +942,7 @@ class RulesManager:
                 if builtin_rule_path.exists() and builtin_rule_path.is_file():
                     preview = self.get_rule_preview("builtin_rules")
                     # 检查状态：使用新的状态管理机制
-                    is_loaded = "builtin_rules" in self._active_rules
-                    # 向后兼容：也检查旧的 loaded_rules
-                    is_loaded = is_loaded or "builtin_rules" in self.loaded_rules
+                    is_loaded = "builtin_rules" in self.loaded_rules
                     rules_info.append(
                         ("builtin_rules", preview, is_loaded, str(builtin_rule_path))
                     )
@@ -984,8 +969,8 @@ class RulesManager:
                         file_path = path_part
                 rules_info.append((rule_name, preview, is_loaded, file_path))
 
-        # 排序：已激活的规则放在最底部，未激活的规则按目录排序
-        # 使用 (is_loaded, rule_name) 作为排序键，确保 False(未激活) 在前，True(已激活) 在后
+        # 排序：已加载的规则放在最底部，未加载的规则按目录排序
+        # 使用 (is_loaded, rule_name) 作为排序键，确保 False(未加载) 在前，True(已加载) 在后
         rules_info.sort(key=lambda x: (x[2], x[0]))
 
         return rules_info

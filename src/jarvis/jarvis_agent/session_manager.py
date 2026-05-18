@@ -1415,12 +1415,12 @@ class SessionManager:
                     # loaded_rules = rules_manager_state.get("loaded_rules", [])  # 未使用，保留以供将来参考
                     active_rules = rules_manager_state.get("active_rules", [])
 
-                    # 重新激活规则
+                    # 重新加载规则
                     reactivated_count = 0
                     for rule_name in active_rules:
                         try:
-                            if hasattr(self.agent.rules_manager, "activate_rule"):
-                                self.agent.rules_manager.activate_rule(rule_name)
+                            if hasattr(self.agent.rules_manager, "load_rule"):
+                                self.agent.rules_manager.load_rule(rule_name)
                                 reactivated_count += 1
                         except Exception:
                             pass  # 规则可能已不存在，静默失败

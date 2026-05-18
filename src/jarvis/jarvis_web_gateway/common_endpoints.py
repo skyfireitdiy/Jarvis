@@ -35,8 +35,8 @@ def get_rules_info() -> Dict[str, Any]:
                     }
                     for name, preview, is_loaded, file_path in rules_info
                 ]
-                # 新增：返回已激活规则的具体内容
-                loaded_rules_content = rules_manager.get_active_rules_content()
+                # 新增：返回已加载规则的具体内容
+                loaded_rules_content = rules_manager.get_loaded_rules_content()
                 return {
                     "rules": rules_list,
                     "loaded_rules_content": loaded_rules_content,

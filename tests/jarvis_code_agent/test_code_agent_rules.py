@@ -156,8 +156,8 @@ class TestRulesManager:
         assert "Actual rule content here" in result
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
-    def test_activate_and_deactivate_rule(self, mock_get_data_dir, tmp_path):
-        """测试激活和停用规则"""
+    def test_load_and_unload_rule(self, mock_get_data_dir, tmp_path):
+        """测试加载和卸载规则"""
         data_dir = str(tmp_path)
         mock_get_data_dir.return_value = data_dir
         rules_dir = Path(data_dir) / "rules"
@@ -167,15 +167,15 @@ class TestRulesManager:
 
         manager = RulesManager("/tmp/test")
 
-        # 激活规则
-        assert manager.activate_rule("global:test_rule") is True
-        assert manager.get_rule_status("global:test_rule") == "active"
-        assert "Test rule content" in manager.get_active_rules_content()
-
-        # 停用规则
-        assert manager.deactivate_rule("global:test_rule") is True
+        # 加载规则
+        assert manager.load_rule("global:test_rule") is True
         assert manager.get_rule_status("global:test_rule") == "loaded"
-        assert manager.get_active_rules_content() == ""
+        assert "Test rule content" in manager.get_loaded_rules_content()
+
+        # 卸载规则
+        assert manager.unload_rule("global:test_rule") is True
+        assert manager.get_rule_status("global:test_rule") == "not_loaded"
+        assert manager.get_loaded_rules_content() == ""
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_rule_file_path(self, mock_get_data_dir, tmp_path):

@@ -1858,22 +1858,22 @@ class Agent:
         # 获取任务列表信息
         task_list_info = self._get_task_list_info()
 
-        # 获取激活的规则信息（文件路径和描述）
+        # 获取已加载的规则信息（文件路径和描述）
         rules_section = ""
-        active_rule_infos = []
-        for rule_name in sorted(self.rules_manager._active_rules):
+        loaded_rule_infos = []
+        for rule_name in sorted(self.rules_manager.loaded_rules):
             rule_path = self.rules_manager.get_rule_file_path(rule_name)
             description = self.rules_manager._extract_rule_description(rule_path)
             if description:
-                active_rule_infos.append(
+                loaded_rule_infos.append(
                     f"- {rule_name}: {description} (路径: {rule_path})"
                 )
             else:
-                active_rule_infos.append(f"- {rule_name} (路径: {rule_path})")
+                loaded_rule_infos.append(f"- {rule_name} (路径: {rule_path})")
 
-        if active_rule_infos:
-            rules_info = "\n".join(active_rule_infos)
-            rules_section = f"\n\n\n**📋 当前激活的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详细内容，请使用 `load_rule` 工具加载对应的规则文件。\n\n"
+        if loaded_rule_infos:
+            rules_info = "\n".join(loaded_rule_infos)
+            rules_section = f"\n\n\n**📋 当前已加载的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详细内容，请使用 `load_rule` 工具加载对应的规则文件。\n\n"
 
         # 获取会话文件路径信息
         session_file_info = ""
@@ -2227,8 +2227,8 @@ class Agent:
                         "⚡ 极速模式已启用：跳过任务分类、规则加载、上下文推荐"
                     )
 
-            # 将已激活的规则内容添加到用户输入的最前面
-            active_rules_content = self.rules_manager.get_active_rules_content()
+            # 将已加载的规则内容添加到用户输入的最前面
+            active_rules_content = self.rules_manager.get_loaded_rules_content()
             if active_rules_content:
                 enhanced_input = (
                     f"<rules>\n{active_rules_content}\n</rules>\n\n{enhanced_input}"
@@ -2500,8 +2500,8 @@ class Agent:
             if selected_rules:
                 # 遍历规则列表并激活
                 for rule_name in selected_rules:
-                    # 使用 activate_rule 方法激活规则（内部会检查重复并自动合并）
-                    if self.rules_manager.activate_rule(rule_name):
+                    # 使用 load_rule 方法加载规则（内部会检查重复并自动合并）
+                    if self.rules_manager.load_rule(rule_name):
                         PrettyOutput.auto_print(
                             f"✅ 已根据任务自动选择规则: {rule_name}"
                         )
