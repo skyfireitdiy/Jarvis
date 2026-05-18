@@ -964,6 +964,26 @@ class RulesManager:
         except Exception:
             pass
 
+        # 处理动态加载的规则（通过 load_rule 工具加载的规则）
+        # 这些规则可能不在 available_rules 中，但需要显示在侧边栏
+        existing_rule_names = {info[0] for info in rules_info}
+        for rule_name, rule_content in self._loaded_rules.items():
+            if rule_name not in existing_rule_names:
+                # 生成预览
+                preview = rule_content.replace("\n", " ").strip()
+                preview = preview[:100] + "..." if len(preview) > 100 else preview
+                # 检查状态：动态加载的规则默认为已加载
+                is_loaded = True
+                # 尝试从规则内容中提取文件路径
+                file_path = "动态加载"
+                if rule_content.startswith("## 规则文件路径:"):
+                    # 从规则内容中提取文件路径
+                    first_line = rule_content.split("\n")[0]
+                    path_part = first_line.replace("## 规则文件路径:", "").strip()
+                    if path_part:
+                        file_path = path_part
+                rules_info.append((rule_name, preview, is_loaded, file_path))
+
         # 排序：已激活的规则放在最底部，未激活的规则按目录排序
         # 使用 (is_loaded, rule_name) 作为排序键，确保 False(未激活) 在前，True(已激活) 在后
         rules_info.sort(key=lambda x: (x[2], x[0]))
