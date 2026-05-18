@@ -604,29 +604,28 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             # 处理 rule:xxx 格式的规则标记
             if tag not in processed_tag:
                 rule_name = tag[5:]  # 去掉 "rule:" 前缀
-
-                # 获取规则内容
-                rule_content = _get_rule_content(rule_name)
                 processed_tag.add(tag)
 
-                if rule_content:
-                    # 加载规则：调用 RulesManager.load_rule()
-                    # 使用 Agent 已有的 rules_manager 实例，而不是创建新的
-                    # Agent 一定存在 rules_manager 属性，直接使用
-                    rules_manager = agent.rules_manager
-                    loaded = rules_manager.load_rule(rule_name)
+                # 加载规则：调用 RulesManager.load_rule()
+                # 使用 Agent 已有的 rules_manager 实例，而不是创建新的
+                # Agent 一定存在 rules_manager 属性，直接使用
+                rules_manager = agent.rules_manager
+                loaded = rules_manager.load_rule(rule_name)
 
+                if loaded:
                     # 将加载的规则添加到 agent.loaded_rule_names
-                    if loaded:
-                        if not hasattr(agent, "loaded_rule_names"):
-                            agent.loaded_rule_names = set()
-                        agent.loaded_rule_names.add(rule_name)
-                        PrettyOutput.auto_print(f"🟢 已加载规则: {rule_name}")
+                    if not hasattr(agent, "loaded_rule_names"):
+                        agent.loaded_rule_names = set()
+                    agent.loaded_rule_names.add(rule_name)
+                    PrettyOutput.auto_print(f"🟢 已加载规则: {rule_name}")
 
-                    separator = "\n" + "=" * 50 + "\n"
-                    modified_input = modified_input.replace(
-                        f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
-                    )
+                    # 从已加载的规则缓存中获取内容
+                    rule_content = rules_manager._loaded_rules.get(rule_name)
+                    if rule_content:
+                        separator = "\n" + "=" * 50 + "\n"
+                        modified_input = modified_input.replace(
+                            f"'<{tag}'", f"<rule>\n{rule_content}\n</rule>{separator}"
+                        )
 
     # 设置附加提示词并返回处理后的内容
     agent.set_addon_prompt(add_on_prompt)
