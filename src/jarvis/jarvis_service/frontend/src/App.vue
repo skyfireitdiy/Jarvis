@@ -4366,6 +4366,7 @@ async function createAgent() {
     const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
     const normalizedDir = newAgentDir.value.trim()
     const conflictingAgent = agentList.value.find(agent => {
+      if (isStoppedAgent(agent)) return false  // 已停止的 agent 不冲突
       if (agent.agent_type !== 'codeagent') return false
       if (agent.worktree) return false  // 启用了 worktree 的不冲突
       const agentNodeId = String(agent.node_id || '').trim() || 'master'
