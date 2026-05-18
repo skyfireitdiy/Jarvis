@@ -107,6 +107,7 @@
           </div>
         </div>
       </div>
+      <div v-if="createError" class="error-message">{{ createError }}</div>
       <div class="modal-actions">
         <button class="btn secondary" @click="$emit('cancel')">取消</button>
         <button class="btn primary" @click="$emit('create')" :disabled="!workDir.trim()">创建</button>
@@ -130,7 +131,8 @@ const props = defineProps({
   restoreSession: { type: Boolean, default: false },
   noInteractionMode: { type: Boolean, default: false },
   taskDescription: { type: String, default: '' },
-  formatNodeLabel: { type: Function, default: (node) => node.node_id }
+  formatNodeLabel: { type: Function, default: (node) => node.node_id },
+  createError: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -292,6 +294,19 @@ const emit = defineEmits([
   opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
+}
+
+/* 错误消息样式 */
+.error-message {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid var(--color-error);
+  border-radius: 8px;
+  color: var(--color-error);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-line;
 }
 
 /* 单选框组样式 */
