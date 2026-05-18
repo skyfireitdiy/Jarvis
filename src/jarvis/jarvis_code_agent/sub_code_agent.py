@@ -68,12 +68,24 @@ class SubCodeAgentTool:
                 f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
             )
 
-            # 读取子Agent名称（可选）
+            # 读取子 Agent 名称（可选）
             agent_name: str = str(args.get("name", "")).strip()
 
-            # 继承父Agent的模型组与工具使用集（用于覆盖默认值）
+            # 继承父 Agent 的模型组与工具使用集（用于覆盖默认值）
             parent_agent = args.get("agent")
-            # 如未注入父Agent，尝试从全局获取当前或任一已注册Agent
+            # 获取父 Agent 的对话历史（在创建 CodeAgent 之前）
+            parent_messages = None
+            if parent_agent and hasattr(parent_agent, "model"):
+                try:
+                    all_messages = parent_agent.model.get_messages()
+                    # 过滤掉系统消息，只保留对话历史（user/assistant/tool 消息）
+                    parent_messages = [
+                        msg for msg in all_messages if msg.get("role") != "system"
+                    ]
+                except Exception:
+                    # 获取失败不影响主流程
+                    pass
+            # 如未注入父 Agent，尝试从全局获取当前或任一已注册 Agent
             if parent_agent is None:
                 try:
                     from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
@@ -88,11 +100,6 @@ class SubCodeAgentTool:
                             parent_agent = None
                 except Exception:
                     parent_agent = None
-            (
-                getattr(parent_agent, "non_interactive", None)
-                if parent_agent is not None
-                else None
-            )
 
             use_tools: List[str] = []
             try:
@@ -170,20 +177,51 @@ class SubCodeAgentTool:
                     "stderr": f"初始化 CodeAgent 失败（可能未配置 git 或当前非 git 仓库）: {se}",
                 }
 
-            # 子Agent需要自动完成
+            # 子 Agent 需要自动完成
             try:
-                # 同步父Agent工具使用集（如可用），但禁用 sub_agent 和 sub_code_agent 避免无限递归
+                # 同步父 Agent 工具使用集（如可用），但禁用 sub_agent 和 sub_code_agent 避免无限递归
                 if use_tools:
                     forbidden_tools = {"sub_agent", "sub_code_agent"}
                     filtered_tools = [t for t in use_tools if t not in forbidden_tools]
                     if filtered_tools:
                         code_agent.set_use_tools(filtered_tools)
-                # 不再从父Agent获取模型名，使用系统默认配置（符合"不依赖父 Agent"的约定）
+                # 不再从父 Agent 获取模型名，使用系统默认配置（符合"不依赖父 Agent"的约定）
             except Exception:
                 pass
 
+            # 在系统提示词中添加角色切换说明（如果继承了对话历史）
+            if parent_messages and hasattr(code_agent, "system_prompt"):
+                try:
+                    original_prompt = code_agent.system_prompt
+                    code_agent.system_prompt = f"""【角色切换说明】
+你现在是 SubCodeAgent，已继承父 Agent 的完整对话历史。
+你了解之前的分析过程和发现的问题。
+
+重要说明：
+- 任务列表已清空，你不继承父 Agent 的任务列表
+- 专注于完成以下子任务，无需重复已完成的步骤
+
+{original_prompt}
+"""
+                    # 同步更新到模型层
+                    if hasattr(code_agent, "model") and hasattr(
+                        code_agent.model, "set_system_prompt"
+                    ):
+                        code_agent.model.set_system_prompt(code_agent.system_prompt)
+                except Exception:
+                    # 设置失败不影响主流程
+                    pass
+
+            # 设置继承的对话历史到 CodeAgent（在 CodeAgent 创建后）
+            if parent_messages and hasattr(code_agent, "model"):
+                try:
+                    code_agent.model.set_messages(parent_messages)
+                except Exception:
+                    # 设置失败不影响主流程
+                    pass
+
             # 执行子任务（无提交信息前后缀）
-            ret = code_agent.run(enhanced_task, prefix="", suffix="")
+            ret = code_agent.run(enhanced_task)
 
             # 合并子 agent 的记忆标签到父 agent
             if parent_agent and hasattr(parent_agent, "add_memory_tags"):
