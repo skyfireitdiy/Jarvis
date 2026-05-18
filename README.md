@@ -87,7 +87,26 @@ jarvis-service --gateway-password your_password
 
 启动后在浏览器访问 `http://localhost:8000` 即可使用。
 
-支持分布式部署，详见 [分布式网关部署方法](docs/用户手册/04_web_界面与网关/分布式网关部署方法.md)。
+#### 分布式部署
+
+**Master 节点**（主节点，提供统一入口）：
+
+```bash
+jarvis-service --node-mode master --gateway-host 0.0.0.0 --gateway-port 8000 --gateway-password your_password
+```
+
+**Child 节点**（子节点，运行 Agent）：
+
+```bash
+jarvis-service --node-mode child \
+    --node-id worker-01 \
+    --master-url ws://master-host:8000 \
+    --node-secret your_secret_key
+```
+
+> 💡 **获取节点密钥**：启动 Master 节点后，可通过前端管理页面的"设置"→"节点连接私钥"获取。Child 节点启动时需要使用相同的密钥。
+
+详细部署说明见 [分布式网关部署方法](docs/用户手册/04_web_界面与网关/分布式网关部署方法.md)。
 
 ### VSCode 插件
 
