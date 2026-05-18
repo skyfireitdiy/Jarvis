@@ -610,18 +610,18 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 processed_tag.add(tag)
 
                 if rule_content:
-                    # 激活规则：调用 RulesManager.activate_rule()
+                    # 加载规则：调用 RulesManager.load_rule()
                     # 使用 Agent 已有的 rules_manager 实例，而不是创建新的
                     # Agent 一定存在 rules_manager 属性，直接使用
                     rules_manager = agent.rules_manager
-                    activated = rules_manager.activate_rule(rule_name)
+                    loaded = rules_manager.load_rule(rule_name)
 
-                    # 将激活的规则添加到 agent.loaded_rule_names
-                    if activated:
+                    # 将加载的规则添加到 agent.loaded_rule_names
+                    if loaded:
                         if not hasattr(agent, "loaded_rule_names"):
                             agent.loaded_rule_names = set()
                         agent.loaded_rule_names.add(rule_name)
-                        PrettyOutput.auto_print(f"🟢 已激活规则: {rule_name}")
+                        PrettyOutput.auto_print(f"🟢 已加载规则: {rule_name}")
 
                     separator = "\n" + "=" * 50 + "\n"
                     modified_input = modified_input.replace(
