@@ -1242,6 +1242,10 @@ class SessionManager:
                 "active_rules": list(
                     getattr(self.agent.rules_manager, "_active_rules", set())
                 ),
+                # 新增：保存动态加载的规则内容
+                "loaded_rules_content": getattr(
+                    self.agent.rules_manager, "_loaded_rules", {}
+                ),
             }
 
         # 导入SafeEncoder（避免循环导入）
@@ -1396,6 +1400,18 @@ class SessionManager:
             if hasattr(self.agent, "rules_manager") and self.agent.rules_manager:
                 rules_manager_state = state_data.get("rules_manager", {})
                 if rules_manager_state:
+                    # 恢复动态加载的规则内容
+                    loaded_rules_content = rules_manager_state.get(
+                        "loaded_rules_content", {}
+                    )
+                    if loaded_rules_content:
+                        self.agent.rules_manager._loaded_rules.update(
+                            loaded_rules_content
+                        )
+                        PrettyOutput.auto_print(
+                            f"✅ 已恢复 {len(loaded_rules_content)} 条动态加载的规则内容"
+                        )
+
                     # loaded_rules = rules_manager_state.get("loaded_rules", [])  # 未使用，保留以供将来参考
                     active_rules = rules_manager_state.get("active_rules", [])
 
