@@ -1558,7 +1558,7 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "Ctrl+X"),
                 ("class:bt.label", " 退出程序 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+C/D"),
+                ("class:bt.key", "Ctrl+C"),
                 ("class:bt.label", " 取消 "),
             ]
         )

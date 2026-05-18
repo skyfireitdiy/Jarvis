@@ -344,15 +344,15 @@
           "items": {
             "type": "string"
           },
-          "default": ["c-j", "c-]"]
+          "default": ["c-j", "c-]", "c-d"]
         },
         {
           "type": "string",
           "description": "多行输入提交快捷键（字符串格式，逗号分隔）",
-          "default": "c-j,c-]"
+          "default": "c-j,c-],c-d"
         }
       ],
-      "description": "多行输入提交快捷键。支持数组格式（如 [\"c-j\", \"c-]\"]）或字符串格式（如 \"c-j,c-]\"）。默认值为 Ctrl+J 和 Ctrl+]。常用快捷键：c-j (Ctrl+J), c-] (Ctrl+]), c-enter (Ctrl+Enter)"
+      "description": "多行输入提交快捷键。支持数组格式（如 [\"c-j\", \"c-]\", \"c-d\"]）或字符串格式（如 \"c-j,c-],c-d\"）。默认值为 Ctrl+J、Ctrl+] 和 Ctrl+D。常用快捷键：c-j (Ctrl+J), c-] (Ctrl+]), c-d (Ctrl+D), c-enter (Ctrl+Enter)"
     },
     "replace_map": {
       "type": "object",
