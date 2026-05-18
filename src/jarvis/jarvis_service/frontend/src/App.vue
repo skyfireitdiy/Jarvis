@@ -516,6 +516,7 @@
       :taskDescription="newAgentTaskDescription"
       @update:taskDescription="newAgentTaskDescription = $event"
       :formatNodeLabel="formatNodeOptionLabel"
+      :createError="newAgentCreateError"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -2752,6 +2753,7 @@ const newAgentQuickMode = ref(false) // 新 Agent 是否启用极速模式
 const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
 const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互模式
 const newAgentTaskDescription = ref('') // 新 Agent 任务描述
+const newAgentCreateError = ref('') // 创建 Agent 时的错误信息
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
@@ -4253,6 +4255,7 @@ async function openCreateAgentModal() {
   ])
   newAgentNodeId.value = ''
   newAgentDir.value = '~'
+  newAgentCreateError.value = ''
   resetDirectorySelectionState()
   showCreateAgentModal.value = true
 }
@@ -4358,6 +4361,24 @@ async function createAgent() {
     alert('无交互模式下必须提供任务描述')
     return
   }
+  // 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 codeagent
+  if (newAgentType.value === 'codeagent' && !newCodeAgentWorktree.value) {
+    const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
+    const normalizedDir = newAgentDir.value.trim()
+    const conflictingAgent = agentList.value.find(agent => {
+      if (agent.agent_type !== 'codeagent') return false
+      if (agent.worktree) return false  // 启用了 worktree 的不冲突
+      const agentNodeId = String(agent.node_id || '').trim() || 'master'
+      if (agentNodeId !== targetNodeId) return false
+      if (agent.working_dir?.trim() !== normalizedDir) return false
+      return true
+    })
+    if (conflictingAgent) {
+      const conflictName = conflictingAgent.name || conflictingAgent.agent_id || '未命名'
+      newAgentCreateError.value = `工作目录冲突：节点 ${targetNodeId} 下已存在未启用 worktree 的代码 Agent「${conflictName}」。\n同一工作目录下只能有一个未启用 worktree 的代码 Agent。\n请启用 worktree 或选择其他工作目录。`
+      return
+    }
+  }
   try {
     const { host, port } = getGatewayAddress()
     const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
@@ -4394,6 +4415,7 @@ async function createAgent() {
       // 关闭创建弹窗
       showCreateAgentModal.value = false
       newAgentDir.value = '~' // 重置为默认值
+      newAgentCreateError.value = '' // 重置错误信息
       newCodeAgentWorktree.value = false
       newAgentQuickMode.value = false
       newAgentRestoreSession.value = false
@@ -4681,6 +4703,7 @@ async function copyAgent(agent) {
 
   // 重置目录选择状态
   resetDirectorySelectionState()
+  newAgentCreateError.value = ''
 
   // 打开创建弹窗
   showCreateAgentModal.value = true
