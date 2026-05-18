@@ -138,6 +138,16 @@ class NodeConnectionManager:
             await websocket.close(code=4401)
             return
 
+        # 检查是否已存在同名节点
+        if node_id in self._connections:
+            await websocket.send_json(
+                build_error_message(
+                    "NODE_ALREADY_CONNECTED", f"node {node_id} is already connected"
+                )
+            )
+            await websocket.close(code=4403)
+            return
+
         self._connections[node_id] = websocket
         self._connection_to_node[connection_id] = node_id
         self._node_runtime.node_registry.upsert(
