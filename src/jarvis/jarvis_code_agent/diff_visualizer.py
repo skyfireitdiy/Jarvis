@@ -1283,8 +1283,8 @@ def visualize_diff_enhanced(
         # 检查是否有多个文件
         file_diffs = _split_diff_by_files(diff_text)
 
-        if len(file_diffs) > 1:
-            # 多个文件，为每个文件显示独立的 table
+        if len(file_diffs) >= 1:
+            # 处理所有文件（包括单个文件的情况）
             for single_file_path, single_file_diff in file_diffs:
                 old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
                     single_file_diff
@@ -1298,7 +1298,7 @@ def visualize_diff_enhanced(
                     new_line_map=new_line_map,
                 )
         else:
-            # 单个文件，使用原有逻辑
+            # 没有解析出文件，使用原有逻辑
             old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
                 diff_text
             )

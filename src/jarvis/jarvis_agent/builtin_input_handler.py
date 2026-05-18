@@ -1,27 +1,40 @@
 # -*- coding: utf-8 -*-
 import io
+import os
 import re
+from datetime import datetime
 from typing import Any
 from typing import List
 from typing import Optional
 from typing import Tuple
 
-from jarvis.jarvis_utils.config import get_replace_map
-from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.input import add_additional_completion_dir
-from jarvis.jarvis_utils.input import get_single_line_input
-from rich.table import Table
+import yaml
 from rich.console import Console
+from rich.table import Table
 
-# 模型组切换相关导入
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_llm_group
-from jarvis.jarvis_utils.config import set_llm_group
-from jarvis.jarvis_utils.config import get_global_config_data
-from jarvis.jarvis_utils.embedding import get_context_token_count
-
-# btw 命令相关导入
 from jarvis.jarvis_platform_manager.main import chat_with_model
+from jarvis.jarvis_utils.config import (
+    get_replace_map,
+    get_llm_group,
+    set_llm_group,
+    get_global_config_data,
+)
+from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.input import (
+    add_additional_completion_dir,
+    get_single_line_input,
+)
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import load_config
+
+from jarvis.jarvis_agent.rules_manager import RulesManager
+from jarvis.jarvis_agent.utils import build_fix_prompt
+from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
+from jarvis.jarvis_utils.git_utils import (
+    get_latest_commit_hash,
+    get_diff_between_commits,
+)
 
 
 def _print_table_for_terminal_or_frontend(table: Table) -> None:
@@ -71,14 +84,13 @@ def _get_rule_content(rule_name: str) -> str | None:
     try:
         import os
 
-        from jarvis.jarvis_agent.rules_manager import RulesManager
-
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())
         return rules_manager.get_named_rule(rule_name)
     except ImportError:
         return None
-        
+
+
 def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
@@ -149,14 +161,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             agent.set_addon_prompt(agent.get_tool_usage_prompt())
             continue
         elif tag == "ReloadConfig":
-            from jarvis.jarvis_utils.utils import load_config
-
             load_config()
             return "", True
         elif tag == "PrintConfig":
-            import yaml
-            from jarvis.jarvis_utils.config import get_global_config_data
-
             config = get_global_config_data()
             PrettyOutput.auto_print("\n=== 全局配置 (YAML 格式) ===")
             try:
@@ -174,9 +181,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"\n降级输出（字符串格式）:\n{config}")
             return "", True
         elif tag == "SetConfig":
-            import yaml
-            from jarvis.jarvis_utils.config import get_global_config_data
-
             tag_marker = "'<SetConfig>'"
             tag_index = modified_input.find(tag_marker)
             if tag_index == -1:
@@ -321,7 +325,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "ListSessions":
             # 列出所有已保存的会话文件
-            import os
 
             sessions = agent.session._parse_session_files()
 
@@ -343,8 +346,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     if timestamp:
                         # 时间戳格式：YYYYMMDD_HHMMSS
                         try:
-                            from datetime import datetime
-
                             dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
                             time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
                         except ValueError:
@@ -378,7 +379,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             error_msg = "用户请求手动修复工具调用"
 
             # 导入提示词构造函数
-            from jarvis.jarvis_agent.utils import build_fix_prompt
 
             # 获取工具使用说明
             tool_usage = agent.get_tool_usage_prompt()
@@ -414,8 +414,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             if not hasattr(agent, "git_manager"):
                 PrettyOutput.auto_print("⚠️ Commit 命令仅在 code agent 中可用。")
                 return "", True
-
-            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
             PrettyOutput.auto_print("📝 正在提交代码...")
 
@@ -453,11 +451,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             continue
         elif tag == "Diff":
             # 处理Diff命令，显示从start_commit到当前的变更
-            from jarvis.jarvis_utils.git_utils import (
-                get_diff_between_commits,
-                get_latest_commit_hash,
-            )
-            from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
 
             # 检查agent是否有start_commit属性
             if not hasattr(agent, "start_commit"):
@@ -487,7 +480,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
             # 显示diff
             PrettyOutput.auto_print("📝 变更内容:")
-            visualize_diff_enhanced(diff_text, mode="unified")
+            visualize_diff_enhanced(diff_text, mode="side_by_side")
             return "", True
 
         # 处理普通替换标记
@@ -786,7 +779,6 @@ def _safe_parse_value(value_str: str):
     Returns:
         解析后的值（可能是任何 YAML 兼容类型）
     """
-    import yaml
 
     value_str = value_str.strip()
 
