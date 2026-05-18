@@ -1324,7 +1324,7 @@ def get_submit_keys() -> List[str]:
     获取多行输入的提交快捷键列表。
 
     返回:
-        List[str]: 提交快捷键列表，默认为 ["c-j", "c-]"]（Ctrl+J 和 Ctrl+]）
+        List[str]: 提交快捷键列表，默认为 ["c-j", "c-]", "c-d"]（Ctrl+J、Ctrl+] 和 Ctrl+D）
     """
     value = GLOBAL_CONFIG_DATA.get("submit_keys")
     # 如果配置是列表，直接返回
@@ -1334,4 +1334,4 @@ def get_submit_keys() -> List[str]:
     if isinstance(value, str) and value.strip():
         return [key.strip() for key in value.split(",") if key.strip()]
     # 默认值
-    return ["c-j", "c-]"]
+    return ["c-j", "c-]", "c-d"]
