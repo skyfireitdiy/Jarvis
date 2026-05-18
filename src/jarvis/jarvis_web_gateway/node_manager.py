@@ -574,7 +574,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,
+                subprotocols=subprotocols,  # type: ignore[arg-type]
             ) as agent_ws:
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
@@ -644,7 +644,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,
+                subprotocols=subprotocols,  # type: ignore[arg-type]
             )
             self._agent_ws_sessions[session_id] = agent_ws
             logger.info(
