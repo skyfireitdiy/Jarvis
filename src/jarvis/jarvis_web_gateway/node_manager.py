@@ -18,6 +18,7 @@ import yaml  # type: ignore[import-untyped]
 import websockets
 from fastapi import WebSocket
 from websockets.asyncio.connection import State
+from websockets import Subprotocol
 
 from .agent_manager import AgentManager
 from .node_protocol import (
@@ -567,14 +568,14 @@ class NodeConnectionManager:
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
-            subprotocols = ["jarvis-ws"]
+            subprotocols: list[Subprotocol] = ["jarvis-ws"]
             if auth_token:
                 subprotocols.append(f"jarvis-token.{auth_token}")
             async with websockets.connect(
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,  # type: ignore[arg-type]
+                subprotocols=subprotocols,
             ) as agent_ws:
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
@@ -630,7 +631,7 @@ class NodeConnectionManager:
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
-            subprotocols = ["jarvis-ws"]
+            subprotocols: list[Subprotocol] = ["jarvis-ws"]
             if auth_token:
                 subprotocols.append(f"jarvis-token.{auth_token}")
             logger.info(
@@ -644,7 +645,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,  # type: ignore[arg-type]
+                subprotocols=subprotocols,
             )
             self._agent_ws_sessions[session_id] = agent_ws
             logger.info(
