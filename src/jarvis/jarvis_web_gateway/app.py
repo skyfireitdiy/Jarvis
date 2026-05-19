@@ -83,6 +83,7 @@ from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionMa
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt
+import jarvis.jarvis_utils.globals as jglobals
 from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 from jarvis.jarvis_utils.config import (
     GLOBAL_CONFIG_DATA,
@@ -798,6 +799,7 @@ class WebSocketConnectionManager:
 def create_app(
     custom_app: Optional[FastAPI] = None,
     node_config: Optional[NodeRuntimeConfig] = None,
+    port: int = 8000,
 ) -> FastAPI:
     """创建 FastAPI 应用。
 
@@ -819,6 +821,18 @@ def create_app(
     # 设置 node_secret 到环境变量（供 Unix Domain Socket 服务使用）
     if node_config.node_secret:
         os.environ["JARVIS_NODE_SECRET"] = node_config.node_secret
+
+    # 根据节点模式设置 master_url 全局变量
+    if node_config.is_child:
+        # Child 节点：将传入的 master_url 转为 HTTP 协议
+        if node_config.master_url:
+            jglobals.master_url = node_config.master_url.replace(
+                "ws://", "http://"
+            ).replace("wss://", "https://")
+    elif node_config.is_master:
+        # Master 节点：拼接本地 gateway URL
+        jglobals.master_url = f"http://127.0.0.1:{port}"
+
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
 
@@ -4505,7 +4519,7 @@ def run(
         GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
         GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
-    uvicorn.run(create_app(node_config=node_config), host=host, port=port)
+    uvicorn.run(create_app(node_config=node_config, port=port), host=host, port=port)
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
