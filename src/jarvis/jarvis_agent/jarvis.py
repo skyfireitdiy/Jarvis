@@ -978,6 +978,11 @@ def run_cli(
         "--proxy-node",
         help="HTTP 代理请求转发到的目标节点 ID",
     ),
+    master_url: Optional[str] = typer.Option(
+        None,
+        "--master-url",
+        help="Master 节点 URL，用于 HTTP 代理请求转发",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1049,6 +1054,8 @@ def run_cli(
             set_config("print_prompt", True)
         if proxy_node:
             jglobals.proxy_node = proxy_node
+        if master_url:
+            jglobals.master_url = master_url
         # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
         # 静默忽略同步异常，不影响主流程
