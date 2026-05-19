@@ -62,6 +62,7 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
+import jarvis.jarvis_utils.globals as jglobals
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -1505,6 +1506,11 @@ def cli(
         "--gateway-password",
         help="Web Gateway 密码（如未设置将禁用密码认证）",
     ),
+    proxy_node: Optional[str] = typer.Option(
+        None,
+        "--proxy-node",
+        help="HTTP 代理请求转发到的目标节点 ID",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理任务描述：优先从文件读取
@@ -1584,6 +1590,10 @@ def cli(
         config_file=config_file,
         llm_group=llm_group,
     )
+
+    # 设置代理节点
+    if proxy_node:
+        jglobals.proxy_node = proxy_node
 
     if web_gateway:
         try:
