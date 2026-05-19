@@ -45,7 +45,12 @@
           </div>
           <div class="form-group">
             <label>代理节点（可选）</label>
-            <input :value="proxyNode" @input="$emit('update:proxyNode', $event.target.value)" type="text" class="form-control" placeholder="留空表示无代理，或输入代理节点 ID" />
+            <select :value="proxyNode" @change="$emit('update:proxyNode', $event.target.value)" class="form-control">
+              <option value="">无代理（直接调用）</option>
+              <option v-for="node in nodeOptions" :key="node.node_id" :value="node.node_id">
+                {{ formatNodeLabel(node) }}
+              </option>
+            </select>
             <div class="form-help">指定后将通过代理节点转发 LLM 请求，留空则直接调用。</div>
           </div>
 
