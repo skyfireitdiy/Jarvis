@@ -39,6 +39,7 @@ from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
 from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
+import jarvis.jarvis_utils.globals as jglobals
 
 # 导入quick_config模块用于--quick-config参数
 from jarvis.jarvis_utils import quick_config as qc
@@ -972,6 +973,11 @@ def run_cli(
         "--gateway-password",
         help="Web Gateway 密码（如未设置将禁用密码认证）",
     ),
+    proxy_node: Optional[str] = typer.Option(
+        None,
+        "--proxy-node",
+        help="HTTP 代理请求转发到的目标节点 ID",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1041,6 +1047,8 @@ def run_cli(
             set_config("use_analysis", False)
         if print_prompt:
             set_config("print_prompt", True)
+        if proxy_node:
+            jglobals.proxy_node = proxy_node
         # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
         # 静默忽略同步异常，不影响主流程
