@@ -1511,6 +1511,11 @@ def cli(
         "--proxy-node",
         help="HTTP 代理请求转发到的目标节点 ID",
     ),
+    master_url: Optional[str] = typer.Option(
+        None,
+        "--master-url",
+        help="Master 节点 URL，用于 HTTP 代理请求转发",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理任务描述：优先从文件读取
@@ -1594,6 +1599,8 @@ def cli(
     # 设置代理节点
     if proxy_node:
         jglobals.proxy_node = proxy_node
+    if master_url:
+        jglobals.master_url = master_url
 
     if web_gateway:
         try:
