@@ -133,6 +133,7 @@ class AgentManager:
         quick_mode: bool = False,
         restore_session: bool = False,
         no_interaction_mode: bool = False,
+        proxy_node: Optional[str] = None,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -197,6 +198,7 @@ class AgentManager:
             quick_mode=quick_mode,
             restore_session=restore_session,
             no_interaction_mode=no_interaction_mode,
+            proxy_node=proxy_node,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -229,6 +231,7 @@ class AgentManager:
             quick_mode=quick_mode,
             restore_session=restore_session,
             no_interaction_mode=no_interaction_mode,
+            proxy_node=proxy_node,
         )
 
         # 保存到内存
@@ -282,6 +285,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]] = None,
         auth_token: Optional[str] = None,
         worktree: bool = False,
+        proxy_node: Optional[str] = None,
     ) -> Dict[str, Any]:
         """在线程环境中安全地创建 Agent。"""
         if self._event_loop is None:
@@ -299,6 +303,7 @@ class AgentManager:
                 additional_args=additional_args,
                 auth_token=auth_token,
                 worktree=worktree,
+                proxy_node=proxy_node,
             ),
             self._event_loop,
         )
@@ -316,6 +321,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]] = None,
         auth_token: Optional[str] = None,
         worktree: bool = False,
+        proxy_node: Optional[str] = None,
     ) -> Dict[str, Any]:
         """在事件循环上下文中创建 Agent。"""
         return self.create_agent(
@@ -329,6 +335,7 @@ class AgentManager:
             additional_args=additional_args,
             auth_token=auth_token,
             worktree=worktree,
+            proxy_node=proxy_node,
         )
 
     def stop_agent(self, agent_id: str) -> Dict[str, Any]:
@@ -516,6 +523,7 @@ class AgentManager:
         quick_mode: bool = False,
         restore_session: bool = False,
         no_interaction_mode: bool = False,
+        proxy_node: Optional[str] = None,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -571,6 +579,10 @@ class AgentManager:
         # 添加 master URL 参数（如果全局变量中设置了）
         if jglobals.master_url:
             cmd.extend(["--master-url", jglobals.master_url])
+
+        # 添加代理节点参数（如果指定了）
+        if proxy_node:
+            cmd.extend(["--proxy-node", proxy_node])
 
         # 添加额外参数
         if additional_args:

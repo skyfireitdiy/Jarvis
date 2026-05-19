@@ -2452,6 +2452,7 @@ def create_app(
             quick_mode = bool(request.get("quick_mode", False))
             restore_session = bool(request.get("restore_session", False))
             no_interaction_mode = bool(request.get("no_interaction_mode", False))
+            proxy_node = request.get("proxy_node")
             target_node_id = str(request.get("node_id") or "").strip()
 
             if not agent_type:
@@ -2517,6 +2518,7 @@ def create_app(
                         "quick_mode": quick_mode,
                         "restore_session": restore_session,
                         "no_interaction_mode": no_interaction_mode,
+                        "proxy_node": proxy_node,
                     },
                 )
                 payload = response.get("payload") or {}
@@ -2561,6 +2563,7 @@ def create_app(
                 quick_mode=quick_mode,
                 restore_session=restore_session,
                 no_interaction_mode=no_interaction_mode,
+                proxy_node=proxy_node,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
@@ -3698,6 +3701,7 @@ def create_app(
 
         def _create_agent_callback() -> None:
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            proxy_node = action_params.get("proxy_node")
             agent_manager.create_agent_threadsafe(
                 auth_token=auth_token,
                 agent_type=agent_type,
@@ -3709,6 +3713,7 @@ def create_app(
                 task=task,
                 additional_args=additional_args,
                 worktree=worktree,
+                proxy_node=proxy_node,
             )
 
         return _create_agent_callback, metadata
