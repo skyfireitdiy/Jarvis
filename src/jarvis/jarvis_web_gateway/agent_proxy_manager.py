@@ -11,11 +11,12 @@ import json
 import logging
 import os
 from collections import defaultdict
-from typing import Any
+from typing import Any, AsyncIterator
 
 import httpx
 import websockets
-from fastapi import Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response, StreamingResponse
 
 from jarvis.jarvis_web_gateway.agent_manager import AgentManager
 
@@ -123,7 +124,7 @@ class AgentProxyManager:
             path: 目标路径
 
         Returns:
-            FastAPI Response 对象
+            FastAPI Response 对象（流式或普通响应）
 
         Raises:
             AgentProxyError: 代理失败
@@ -147,43 +148,95 @@ class AgentProxyManager:
         )
         headers["X-Forwarded-Proto"] = request.url.scheme
 
+        # 判断是否需要流式响应
+        accept_header = headers.get("accept", "")
+        want_stream = "text/event-stream" in accept_header
+        logger.debug(
+            f"[PROXY MANAGER] Accept header: {accept_header}, want_stream: {want_stream}"
+        )
+
         # 读取请求体
         body = await request.body()
 
         try:
-            # 发送代理请求
-            response = await self._http_client.request(
-                method=request.method,
-                url=agent_url,
-                headers=headers,
-                content=body,
-                params=request.query_params,
-            )
+            if want_stream:
+                # 流式模式：支持 SSE
+                async def stream_response() -> AsyncIterator[bytes]:
+                    async with self._http_client.stream(
+                        method=request.method,
+                        url=agent_url,
+                        headers=headers,
+                        content=body,
+                        params=request.query_params,
+                    ) as response:
+                        # 构建响应头（允许流式传输的头部）
+                        excluded_headers = {
+                            "content-encoding",
+                            "content-length",
+                        }
+                        response_headers = {
+                            k: v
+                            for k, v in response.headers.items()
+                            if k.lower() not in excluded_headers
+                        }
 
-            logger.debug(
-                f"[PROXY MANAGER] Agent response: {response.status_code} "
-                f"(headers: {len(response.headers)} bytes, body: {len(response.content)} bytes)"
-            )
+                        logger.debug(
+                            f"[PROXY MANAGER] Agent streaming response: {response.status_code} "
+                            f"(headers: {len(response.headers)})",
+                        )
 
-            # 构建响应
-            excluded_headers = {
-                "content-encoding",
-                "content-length",
-                "transfer-encoding",
-                "connection",
-            }
-            response_headers = {
-                k: v
-                for k, v in response.headers.items()
-                if k.lower() not in excluded_headers
-            }
+                        async for chunk in response.aiter_bytes():
+                            if chunk:
+                                yield chunk
 
-            return Response(
-                content=response.content,
-                status_code=response.status_code,
-                headers=response_headers,
-                media_type=response.headers.get("content-type"),
-            )
+                        logger.debug(
+                            f"[PROXY MANAGER] Streaming completed, "
+                            f"content_type={response_headers.get('content-type')}"
+                        )
+
+                return StreamingResponse(
+                    stream_response(),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+                    },
+                )
+            else:
+                # 非流式模式：一次性读取完整响应
+                response = await self._http_client.request(
+                    method=request.method,
+                    url=agent_url,
+                    headers=headers,
+                    content=body,
+                    params=request.query_params,
+                )
+
+                logger.debug(
+                    f"[PROXY MANAGER] Agent response: {response.status_code} "
+                    f"(headers: {len(response.headers)} bytes, body: {len(response.content)} bytes)"
+                )
+
+                # 构建响应
+                excluded_headers = {
+                    "content-encoding",
+                    "content-length",
+                    "transfer-encoding",
+                    "connection",
+                }
+                response_headers = {
+                    k: v
+                    for k, v in response.headers.items()
+                    if k.lower() not in excluded_headers
+                }
+
+                return Response(
+                    content=response.content,
+                    status_code=response.status_code,
+                    headers=response_headers,
+                    media_type=response.headers.get("content-type"),
+                )
 
         except httpx.TimeoutException:
             logger.error(f"[PROXY MANAGER] HTTP proxy timeout: {agent_url}")
