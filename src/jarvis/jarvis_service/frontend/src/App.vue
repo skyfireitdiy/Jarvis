@@ -2754,6 +2754,7 @@ const newAgentRestoreSession = ref(false) // 新 Agent 是否启用恢复会话
 const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互模式
 const newAgentTaskDescription = ref('') // 新 Agent 任务描述
 const newAgentCreateError = ref('') // 创建 Agent 时的错误信息
+const newAgentProxyNode = ref('') // 新 Agent 代理节点
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
