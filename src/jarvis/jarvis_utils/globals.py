@@ -42,6 +42,8 @@ global_agents: Dict[str, Any] = {}
 
 # 代理节点：用于 HTTP 代理请求转发到的目标节点 ID，默认为空（本地处理）
 proxy_node: Optional[str] = None
+# Master 节点 URL：用于 HTTP 代理请求转发到 master 节点
+master_url: Optional[str] = None
 # 使用栈结构跟踪嵌套的agent运行状态，支持agent调用其他agent的场景
 running_agent_stack: List[str] = []  # 正在运行的agent栈（最顶层是当前正在运行的agent）
 # 表示与大模型交互的深度(>0表示正在交互)
