@@ -12,6 +12,7 @@ from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import PrettyOutput
+import jarvis.jarvis_utils.globals as jglobals
 
 
 class ClaudeModel(BasePlatform):
@@ -55,6 +56,11 @@ class ClaudeModel(BasePlatform):
             # 没有传入 llm_config，从环境变量读取（向后兼容）
             self.api_key = os.getenv("ANTHROPIC_API_KEY")
             self.base_url = os.getenv("ANTHROPIC_BASE_URL")
+
+        # 如果设置了代理节点，将 base_url 转为 Gateway 代理 URL
+        if jglobals.proxy_node and jglobals.master_url and self.base_url:
+            # 将原始 base_url 作为目标 URL，拼接为代理格式
+            self.base_url = f"{jglobals.master_url}/http_proxy/{self.base_url}"
 
         # 只有当 llm_config 不为空但其中没有 anthropic_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
