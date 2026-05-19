@@ -44,6 +44,12 @@
             </select>
           </div>
           <div class="form-group">
+            <label>代理节点（可选）</label>
+            <input :value="proxyNode" @input="$emit('update:proxyNode', $event.target.value)" type="text" class="form-control" placeholder="留空表示无代理，或输入代理节点 ID" />
+            <div class="form-help">指定后将通过代理节点转发 LLM 请求，留空则直接调用。</div>
+          </div>
+
+          <div class="form-group">
             <label>工作目录</label>
             <div class="input-with-button">
               <input :value="workDir" @input="$emit('update:workDir', $event.target.value)" type="text" class="form-control" placeholder="/path/to/workspace" />
@@ -125,6 +131,7 @@ const props = defineProps({
   agentName: { type: String, default: '' },
   modelGroups: { type: Array, default: () => [] },
   modelGroup: { type: String, default: 'default' },
+  proxyNode: { type: String, default: '' },
   workDir: { type: String, default: '~' },
   codeAgentWorktree: { type: Boolean, default: false },
   quickMode: { type: Boolean, default: false },
@@ -140,6 +147,7 @@ const emit = defineEmits([
   'update:agentType',
   'update:agentName',
   'update:modelGroup',
+  'update:proxyNode',
   'update:workDir',
   'update:codeAgentWorktree',
   'update:quickMode',
