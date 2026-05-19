@@ -27,6 +27,9 @@ from urllib.parse import urlencode
 from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+
+import httpx
 
 from jarvis.jarvis_gateway.events import GatewayConfirmRequest
 from jarvis.jarvis_gateway.events import GatewayConfirmResult
@@ -1510,6 +1513,178 @@ def create_app(
                         error = payload.get("error") or {}
                         return Response(
                             content=f'{{"error": "{error.get("message", "Remote agent HTTP proxy failed")}"}}',
+                            status_code=502,
+                            media_type="application/json",
+                        )
+                    return Response(
+                        content=payload.get("body", ""),
+                        status_code=int(payload.get("status_code", 200)),
+                        headers=payload.get("headers") or {},
+                        media_type=(payload.get("headers") or {}).get("content-type"),
+                    )
+
+            # --- HTTP 代理：透传到外部 URL ---
+            if normalized_path.startswith("http_proxy/"):
+                target_url = normalized_path[len("http_proxy/") :]
+                if normalized_node_id in (node_runtime.local_node_id, "master"):
+                    # 本地 HTTP 代理
+
+                    # 构建目标 URL
+                    full_url = target_url
+                    if request.query_params:
+                        full_url = f"{full_url}?{request.query_params}"
+
+                    # 验证 URL
+                    if not full_url.startswith(("http://", "https://")):
+                        return Response(
+                            content='{"error": "URL must start with http:// or https://"}',
+                            status_code=400,
+                            media_type="application/json",
+                        )
+
+                    # 准备请求头
+                    headers = dict(request.headers)
+                    headers.pop("host", None)
+
+                    # 判断是否需要流式响应
+                    accept_header = headers.get("accept", "")
+                    want_stream = "text/event-stream" in accept_header
+
+                    # 读取请求体
+                    body = await request.body()
+
+                    try:
+                        if want_stream:
+
+                            async def stream_response() -> AsyncGenerator[bytes, None]:
+                                async with httpx.AsyncClient(
+                                    timeout=httpx.Timeout(60.0)
+                                ).stream(
+                                    method=request.method,
+                                    url=full_url,
+                                    headers=headers,
+                                    content=body,
+                                ) as response:
+                                    logger.debug(
+                                        f"[NODE HTTP PROXY] Streaming response: {response.status_code}"
+                                    )
+                                    async for chunk in response.aiter_bytes():
+                                        if chunk:
+                                            yield chunk
+
+                            return StreamingResponse(
+                                stream_response(),
+                                media_type="text/event-stream",
+                                headers={
+                                    "Cache-Control": "no-cache",
+                                    "Connection": "keep-alive",
+                                    "X-Accel-Buffering": "no",
+                                },
+                            )
+                        else:
+                            response = await httpx.AsyncClient(
+                                timeout=httpx.Timeout(60.0)
+                            ).request(
+                                method=request.method,
+                                url=full_url,
+                                headers=headers,
+                                content=body,
+                            )
+
+                            excluded_headers = {
+                                "content-encoding",
+                                "content-length",
+                                "transfer-encoding",
+                                "connection",
+                            }
+                            response_headers = {
+                                k: v
+                                for k, v in response.headers.items()
+                                if k.lower() not in excluded_headers
+                            }
+
+                            return Response(
+                                content=response.content,
+                                status_code=response.status_code,
+                                headers=response_headers,
+                                media_type=response.headers.get("content-type"),
+                            )
+                    except httpx.TimeoutException:
+                        return Response(
+                            content='{"error": "Request timeout"}',
+                            status_code=504,
+                            media_type="application/json",
+                        )
+                    except httpx.RequestError as e:
+                        logger.error(f"[NODE HTTP PROXY] Request error: {e}")
+                        return Response(
+                            content=f'{{"error": "Request failed: {str(e)}"}}',
+                            status_code=502,
+                            media_type="application/json",
+                        )
+                else:
+                    # 远端 HTTP 代理
+                    accept_header = dict(request.headers).get("accept", "")
+                    want_stream = "text/event-stream" in accept_header
+
+                    if want_stream:
+                        # 流式模式：使用 streaming 方法
+                        async def stream_from_node() -> AsyncGenerator[bytes, None]:
+                            async for (
+                                msg
+                            ) in node_connection_manager.send_request_to_node_streaming(
+                                normalized_node_id,
+                                NODE_HTTP_PROXY_REQUEST,
+                                {
+                                    "method": request.method,
+                                    "path": f"http_proxy/{target_url}",
+                                    "query": str(request.query_params),
+                                    "headers": dict(request.headers),
+                                    "body": body,
+                                    "streaming": True,
+                                },
+                            ):
+                                chunk = msg.get("payload", {}).get("chunk", b"")
+                                if isinstance(chunk, str):
+                                    chunk = chunk.encode()
+                                if chunk:
+                                    yield chunk
+
+                        return StreamingResponse(
+                            stream_from_node(),
+                            media_type="text/event-stream",
+                            headers={
+                                "Cache-Control": "no-cache",
+                                "Connection": "keep-alive",
+                                "X-Accel-Buffering": "no",
+                            },
+                        )
+                    else:
+                        response = await node_connection_manager.send_request_to_node(
+                            normalized_node_id,
+                            NODE_HTTP_PROXY_REQUEST,
+                            {
+                                "method": request.method,
+                                "path": f"http_proxy/{target_url}",
+                                "query": str(request.query_params),
+                                "headers": dict(request.headers),
+                                "body": body,
+                            },
+                        )
+                    payload = response.get("payload") or {}
+                    if "body" in payload:
+                        return Response(
+                            content=payload.get("body", ""),
+                            status_code=int(payload.get("status_code", 200)),
+                            headers=payload.get("headers") or {},
+                            media_type=(payload.get("headers") or {}).get(
+                                "content-type"
+                            ),
+                        )
+                    if not payload.get("success"):
+                        error = payload.get("error") or {}
+                        return Response(
+                            content=f'{{"error": "{error.get("message", "Remote HTTP proxy failed")}"}}',
                             status_code=502,
                             media_type="application/json",
                         )

@@ -11,7 +11,7 @@ import pathlib
 import random
 import shutil
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, Optional
 
 import yaml  # type: ignore[import-untyped]
 
@@ -335,6 +335,73 @@ class NodeConnectionManager:
             return response
         finally:
             self._pending_requests.pop(request_id, None)
+
+    async def send_request_to_node_streaming(
+        self,
+        node_id: str,
+        message_type: str,
+        payload: Dict[str, Any],
+        timeout: float = 300.0,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """流式请求到节点，yield 每个收到的消息。
+
+        Args:
+            node_id: 节点 ID
+            message_type: 消息类型
+            payload: 负载
+            timeout: 超时时间（秒）
+
+        Yields:
+            每个收到的消息
+        """
+        websocket = self._connections.get(node_id)
+        if websocket is None:
+            raise RuntimeError(f"node connection not found: {node_id}")
+        request_id = str(uuid.uuid4())
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future = loop.create_future()
+        self._pending_requests[request_id] = future
+        try:
+            logger.info(
+                "[NODE] send streaming request node_id=%s type=%s request_id=%s",
+                node_id,
+                message_type,
+                request_id,
+            )
+            await websocket.send_json(
+                build_node_message(message_type, payload, request_id=request_id)
+            )
+
+            # 等待并逐个 yield 响应消息
+            while True:
+                try:
+                    response = await asyncio.wait_for(future, timeout=timeout)
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"[NODE] streaming request timeout: node_id={node_id}, request_id={request_id}"
+                    )
+                    break
+
+                if not isinstance(response, dict):
+                    logger.warning(
+                        f"[NODE] invalid streaming response: node_id={node_id}, request_id={request_id}"
+                    )
+                    break
+
+                # 创建新的 future 等待下一条消息
+                self._pending_requests[request_id] = loop.create_future()
+                yield response
+
+                # 检查是否完成（通过 meta 中的 done 标记）
+                meta = response.get("meta", {})
+                if meta.get("done"):
+                    break
+
+        finally:
+            self._pending_requests.pop(request_id, None)
+            logger.info(
+                f"[NODE] streaming request completed: node_id={node_id}, request_id={request_id}"
+            )
 
     def _handle_agent_create_request(
         self, message: Dict[str, Any], source_node_id: str
