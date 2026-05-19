@@ -42,6 +42,7 @@ class AgentInfo:
         quick_mode: bool = False,
         restore_session: bool = False,
         no_interaction_mode: bool = False,
+        proxy_node: Optional[str] = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -55,6 +56,7 @@ class AgentInfo:
         self.quick_mode = quick_mode
         self.restore_session = restore_session
         self.no_interaction_mode = no_interaction_mode
+        self.proxy_node = proxy_node
         self.status = "running"
         self.node_id = node_id
         self.created_at = datetime.now().isoformat()
@@ -75,6 +77,7 @@ class AgentInfo:
             "quick_mode": self.quick_mode,
             "restore_session": self.restore_session,
             "no_interaction_mode": self.no_interaction_mode,
+            "proxy_node": self.proxy_node,
             "node_id": self.node_id,
             "created_at": self.created_at,
         }

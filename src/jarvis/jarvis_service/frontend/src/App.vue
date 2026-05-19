@@ -4673,8 +4673,12 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
     worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false,
     quick_mode: Boolean(agent.quick_mode),
     restore_session: Boolean(agent.restore_session),
+    no_interaction_mode: Boolean(agent.no_interaction_mode),
+    task: agent.task || '',
     node_id: targetNodeId || agent.node_id || undefined,
+    proxy_node: agent.proxy_node || undefined,
   }
+
 }
 
 // 复制 Agent - 弹出创建面板并预填充参数
@@ -4696,6 +4700,7 @@ async function copyAgent(agent) {
   newAgentRestoreSession.value = Boolean(agent.restore_session)
   newAgentNoInteractionMode.value = Boolean(agent.no_interaction_mode)
   newAgentTaskDescription.value = agent.task || ''
+  newAgentProxyNode.value = agent.proxy_node || ''
   // 先设置 node_id（会触发 watch 重置目录），再设置正确的目录
   newAgentNodeId.value = String(agent?.node_id || '').trim()
   newAgentDir.value = agent.working_dir || '~'
