@@ -21,6 +21,7 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.config import get_data_dir
+import jarvis.jarvis_utils.globals as jglobals
 
 
 class AgentInfo:
@@ -563,6 +564,10 @@ class AgentManager:
         # 添加非交互模式参数
         if no_interaction_mode:
             cmd.append("--non-interactive")
+
+        # 添加 master URL 参数（如果全局变量中设置了）
+        if jglobals.master_url:
+            cmd.extend(["--master-url", jglobals.master_url])
 
         # 添加额外参数
         if additional_args:
