@@ -69,15 +69,16 @@ class OpenAIModel(BasePlatform):
         # 如果设置了代理节点，将 base_url 转为 Gateway 代理 URL
         if jglobals.proxy_node and jglobals.master_url:
             # 将原始 base_url 作为目标 URL，拼接为代理格式
+            # 注意：需要添加 /api/node/{node_id}/ 前缀以匹配 FastAPI 路由
             original_base_url = self.base_url
-            self.base_url = f"{jglobals.master_url}/http_proxy/{self.base_url}"
+            self.base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{self.base_url}"
             logger.debug(
                 f"[PROXY] 代理模式启用：proxy_node={jglobals.proxy_node}, master_url={jglobals.master_url}"
             )
             logger.debug(
                 f"[PROXY] base_url 转换：{original_base_url} -> {self.base_url}"
             )
-            
+
             # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
             # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
             jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
