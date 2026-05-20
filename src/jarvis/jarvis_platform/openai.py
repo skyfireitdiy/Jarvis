@@ -83,13 +83,17 @@ class OpenAIModel(BasePlatform):
             # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
             # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
             jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
-            if jarvis_token:
-                self.extra_headers["X-Jarvis-Token"] = jarvis_token
-                PrettyOutput.auto_print(
-                    "[PROXY] 已添加 X-Jarvis-Token 头用于 Gateway 认证"
-                )
-            else:
-                PrettyOutput.auto_print("⚠️ [PROXY] 警告：JARVIS_AUTH_TOKEN 未设置")
+            try:
+                if jarvis_token:
+                    self.extra_headers["X-Jarvis-Token"] = jarvis_token
+                    PrettyOutput.auto_print(
+                        "[PROXY] 已添加 X-Jarvis-Token 头用于 Gateway 认证"
+                    )
+                else:
+                    PrettyOutput.auto_print("⚠️ [PROXY] 警告：JARVIS_AUTH_TOKEN 未设置")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ [PROXY] 添加认证头失败：{e}")
+                raise
 
         # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
