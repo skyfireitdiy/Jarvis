@@ -193,13 +193,25 @@ class NodeConnectionManager:
                 # 响应消息处理：如果有request_id，尝试匹配pending请求
                 if request_id:
                     future = self._pending_requests.get(request_id)
+                    payload = next_message.get("payload") or {}
+                    is_done = payload.get("done")
+                    has_chunk = "chunk" in payload
                     print(
-                        f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} pending_keys={list(self._pending_requests.keys())}",
+                        f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} is_done={is_done} has_chunk={has_chunk} pending_keys={list(self._pending_requests.keys())}",
                         flush=True,
                     )
                     if future is not None:
                         if not future.done():
                             future.set_result(next_message)
+                            print(
+                                f"[NODE] set_result done request_id={request_id}",
+                                flush=True,
+                            )
+                        else:
+                            print(
+                                f"[NODE] future already done, skipping request_id={request_id}",
+                                flush=True,
+                            )
                         continue
                 if message_type == NODE_TERMINAL_OUTPUT:
                     terminal_payload = next_message.get("payload") or {}
