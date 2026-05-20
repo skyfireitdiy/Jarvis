@@ -945,6 +945,10 @@ def create_app(
     def verify_token(request: Request) -> None:
         """验证 HTTP 请求的 Token。
 
+        支持两种认证方式（任一通过即可）：
+        1. Authorization: Bearer <token> - 兼容现有服务
+        2. X-Jarvis-Token: <token> - 用于 LLM 代理场景，避免与 LLM API Key 冲突
+
         Args:
             request: FastAPI Request 对象
 
@@ -954,14 +958,24 @@ def create_app(
         from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
         from fastapi import HTTPException
 
-        # 从 Authorization Header 提取 Token
+        # 尝试从 X-Jarvis-Token 头提取 Token（优先）
+        jarvis_token = request.headers.get("X-Jarvis-Token")
+        if jarvis_token:
+            if not validate_gateway_token(jarvis_token):
+                raise HTTPException(
+                    status_code=401,
+                    detail={"code": "INVALID_TOKEN", "message": "Invalid or expired X-Jarvis-Token"},
+                )
+            return  # X-Jarvis-Token 验证通过
+
+        # 尝试从 Authorization Header 提取 Token（兼容模式）
         authorization = request.headers.get("Authorization")
         if not authorization:
             raise HTTPException(
                 status_code=401,
                 detail={
                     "code": "MISSING_TOKEN",
-                    "message": "Authorization header is required",
+                    "message": "Authorization or X-Jarvis-Token header is required",
                 },
             )
 
