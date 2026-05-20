@@ -212,7 +212,8 @@ class NodeConnectionManager:
                     response = await self._handle_node_http_proxy_request(
                         websocket, next_message
                     )
-                    await websocket.send_json(response)
+                    if response is not None:
+                        await websocket.send_json(response)
                     continue
                 if message_type == AGENT_LIST_REQUEST:
                     response = self._handle_agent_list_request(next_message)
