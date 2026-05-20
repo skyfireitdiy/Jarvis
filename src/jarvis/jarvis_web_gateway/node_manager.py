@@ -192,7 +192,7 @@ class NodeConnectionManager:
                     continue
                 # 响应消息处理：如果有request_id，尝试匹配pending请求
                 if request_id:
-                    future = self._pending_requests.pop(request_id, None)
+                    future = self._pending_requests.get(request_id)
                     print(
                         f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} pending_keys={list(self._pending_requests.keys())}",
                         flush=True,
