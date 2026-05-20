@@ -4312,6 +4312,7 @@ def create_app(
                 }
         elif normalized_path.startswith("/http_proxy/"):
             # 远程节点 HTTP 代理：转发请求到外部 API
+            # 路径格式：/http_proxy/{target_url}
             target_url = normalized_path[len("/http_proxy/") :]
             if not target_url.startswith(("http://", "https://")):
                 return {
