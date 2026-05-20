@@ -481,7 +481,7 @@ class NodeConnectionManager:
 
     async def _handle_node_http_proxy_request(
         self,
-        websocket: WebSocket,
+        websocket: Any,
         message: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         """处理节点 HTTP 代理请求。
@@ -546,7 +546,7 @@ class NodeConnectionManager:
 
     async def _handle_streaming_http_proxy(
         self,
-        websocket: WebSocket,
+        websocket: Any,
         request_id: Optional[str],
         payload: Dict[str, Any],
     ) -> None:
@@ -562,17 +562,19 @@ class NodeConnectionManager:
             target_url = f"{target_url}?{query}"
 
         if not target_url.startswith(("http://", "https://")):
-            await websocket.send_json(
-                build_node_message(
-                    NODE_HTTP_PROXY_RESPONSE,
-                    {
-                        "success": False,
-                        "error": {
-                            "code": "INVALID_URL",
-                            "message": "URL must start with http:// or https://",
+            await websocket.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_HTTP_PROXY_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "INVALID_URL",
+                                "message": "URL must start with http:// or https://",
+                            },
                         },
-                    },
-                    request_id=request_id,
+                        request_id=request_id,
+                    )
                 )
             )
             return
@@ -606,64 +608,74 @@ class NodeConnectionManager:
                         f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}"
                     )
                     async for chunk in response.aiter_bytes(chunk_size=1024):
-                        await websocket.send_json(
-                            build_node_message(
-                                NODE_HTTP_PROXY_RESPONSE,
-                                {"chunk": chunk.decode("utf-8", errors="replace")},
-                                request_id=request_id,
+                        await websocket.send(
+                            json.dumps(
+                                build_node_message(
+                                    NODE_HTTP_PROXY_RESPONSE,
+                                    {"chunk": chunk.decode("utf-8", errors="replace")},
+                                    request_id=request_id,
+                                )
                             )
                         )
                     logger.info(
                         f"[STREAMING HTTP PROXY] 流式传输完成：request_id={request_id}"
                     )
 
-            await websocket.send_json(
-                build_node_message(
-                    NODE_HTTP_PROXY_RESPONSE,
-                    {"done": True},
-                    request_id=request_id,
+            await websocket.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_HTTP_PROXY_RESPONSE,
+                        {"done": True},
+                        request_id=request_id,
+                    )
                 )
             )
         except httpx.TimeoutException:
             logger.error("[STREAMING HTTP PROXY] Request timeout")
-            await websocket.send_json(
-                build_node_message(
-                    NODE_HTTP_PROXY_RESPONSE,
-                    {
-                        "success": False,
-                        "error": {"code": "TIMEOUT", "message": "Request timeout"},
-                        "done": True,
-                    },
-                    request_id=request_id,
+            await websocket.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_HTTP_PROXY_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {"code": "TIMEOUT", "message": "Request timeout"},
+                            "done": True,
+                        },
+                        request_id=request_id,
+                    )
                 )
             )
         except httpx.RequestError as e:
             logger.exception(f"[STREAMING HTTP PROXY] Request error: {e}")
-            await websocket.send_json(
-                build_node_message(
-                    NODE_HTTP_PROXY_RESPONSE,
-                    {
-                        "success": False,
-                        "error": {
-                            "code": "REQUEST_ERROR",
-                            "message": f"Request failed: {str(e)}",
+            await websocket.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_HTTP_PROXY_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "REQUEST_ERROR",
+                                "message": f"Request failed: {str(e)}",
+                            },
+                            "done": True,
                         },
-                        "done": True,
-                    },
-                    request_id=request_id,
+                        request_id=request_id,
+                    )
                 )
             )
         except Exception as e:
             logger.exception(f"[STREAMING HTTP PROXY] Unexpected error: {e}")
-            await websocket.send_json(
-                build_node_message(
-                    NODE_HTTP_PROXY_RESPONSE,
-                    {
-                        "success": False,
-                        "error": {"code": "INTERNAL_ERROR", "message": str(e)},
-                        "done": True,
-                    },
-                    request_id=request_id,
+            await websocket.send(
+                json.dumps(
+                    build_node_message(
+                        NODE_HTTP_PROXY_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+                            "done": True,
+                        },
+                        request_id=request_id,
+                    )
                 )
             )
 
