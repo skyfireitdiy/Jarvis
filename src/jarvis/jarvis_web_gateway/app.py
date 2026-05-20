@@ -4314,7 +4314,11 @@ def create_app(
             # 远程节点 HTTP 代理：转发请求到外部 API
             # 路径格式：/http_proxy/{target_url}
             target_url = normalized_path[len("/http_proxy/") :]
+            logger.info(
+                f"[REMOTE HTTP PROXY] 收到代理请求：target_url={target_url}, method={normalized_method}, query={query}"
+            )
             if not target_url.startswith(("http://", "https://")):
+                logger.error(f"[REMOTE HTTP PROXY] URL 格式错误：{target_url}")
                 return {
                     "success": False,
                     "status_code": 400,
@@ -4325,6 +4329,7 @@ def create_app(
                 }
             if query:
                 target_url = f"{target_url}?{query}"
+            logger.info(f"[REMOTE HTTP PROXY] 发起请求：{target_url}")
             try:
                 proxy_headers = {
                     k: str(v) for k, v in headers.items() if k.lower() != "host"
