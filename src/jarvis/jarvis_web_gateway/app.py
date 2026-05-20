@@ -822,16 +822,17 @@ def create_app(
     if node_config.node_secret:
         os.environ["JARVIS_NODE_SECRET"] = node_config.node_secret
 
-    # 根据节点模式设置 master_url 全局变量
-    if node_config.is_child:
-        # Child 节点：将传入的 master_url 转为 HTTP 协议
-        if node_config.master_url:
-            jglobals.master_url = node_config.master_url.replace(
-                "ws://", "http://"
-            ).replace("wss://", "https://")
-    elif node_config.is_master:
-        # Master 节点：拼接本地 gateway URL
-        jglobals.master_url = f"http://127.0.0.1:{port}"
+    # 根据节点模式设置 master_url 全局变量（仅在未设置时才设置，避免覆盖 Agent 已有的值）
+    if jglobals.master_url is None:
+        if node_config.is_child:
+            # Child 节点：将传入的 master_url 转为 HTTP 协议
+            if node_config.master_url:
+                jglobals.master_url = node_config.master_url.replace(
+                    "ws://", "http://"
+                ).replace("wss://", "https://")
+        elif node_config.is_master:
+            # Master 节点：拼接本地 gateway URL
+            jglobals.master_url = f"http://127.0.0.1:{port}"
     print(f"[GATEWAY] master_url={jglobals.master_url}")
 
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
