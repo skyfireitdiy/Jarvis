@@ -430,6 +430,7 @@ class NodeConnectionManager:
                 if not is_done:
                     new_future = loop.create_future()
                     self._pending_requests[request_id] = new_future
+                    future = new_future
                     print(
                         f"[NODE] streaming new future created node_id={node_id} request_id={request_id} future_id={id(new_future)} pending_keys={list(self._pending_requests.keys())}",
                         flush=True,
