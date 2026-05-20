@@ -181,11 +181,9 @@ class NodeConnectionManager:
                     continue
                 message_type = next_message.get("type")
                 request_id = next_message.get("request_id")
-                logger.info(
-                    "[NODE] recv message node_id=%s type=%s request_id=%s",
-                    node_id,
-                    message_type,
-                    request_id,
+                print(
+                    f"[NODE] recv message node_id={node_id} type={message_type} request_id={request_id}",
+                    flush=True,
                 )
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
