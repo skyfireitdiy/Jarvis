@@ -2616,8 +2616,10 @@ const agentsByNode = computed(() => {
 const agentDisplayGroups = computed(() => {
   const groups = []
 
-  // 为每个节点创建分组，只包含活跃的 Agent
-  Object.keys(agentsByNode.value).sort().forEach(nodeId => {
+  const sortedNodeIds = Object.keys(agentsByNode.value).sort()
+
+  // 第一轮：所有节点的活跃 Agent
+  sortedNodeIds.forEach(nodeId => {
     const nodeAgents = agentsByNode.value[nodeId]
     if (nodeAgents.active.length > 0) {
       groups.push({
@@ -2627,7 +2629,11 @@ const agentDisplayGroups = computed(() => {
         isCollapsible: false,
       })
     }
-    // 为每个节点创建已停止 Agent 分组（如果有）
+  })
+
+  // 第二轮：所有节点的已停止 Agent
+  sortedNodeIds.forEach(nodeId => {
+    const nodeAgents = agentsByNode.value[nodeId]
     if (nodeAgents.stopped.length > 0) {
       groups.push({
         key: `stopped-${nodeId}`,
