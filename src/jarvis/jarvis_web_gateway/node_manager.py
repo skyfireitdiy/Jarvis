@@ -392,13 +392,17 @@ class NodeConnectionManager:
                     )
                     break
 
-                # 创建新的 future 等待下一条消息
-                self._pending_requests[request_id] = loop.create_future()
-                yield response
-
                 # 检查是否完成（通过 meta 中的 done 标记）
                 meta = response.get("meta", {})
-                if meta.get("done"):
+                is_done = meta.get("done")
+
+                # 在 yield 之前创建新的 future 等待下一条消息（除非已完成）
+                if not is_done:
+                    self._pending_requests[request_id] = loop.create_future()
+
+                yield response
+
+                if is_done:
                     break
 
         finally:
