@@ -1601,9 +1601,6 @@ def cli(
         jglobals.proxy_node = proxy_node
     if master_url:
         jglobals.master_url = master_url
-    print(
-        f"[CODE_AGENT] master_url={jglobals.master_url}, proxy_node={jglobals.proxy_node}"
-    )
 
     if web_gateway:
         try:
