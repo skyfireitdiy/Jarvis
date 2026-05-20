@@ -576,6 +576,7 @@ class NodeConnectionManager:
                                 "code": "INVALID_URL",
                                 "message": "URL must start with http:// or https://",
                             },
+                            "done": True,
                         },
                         request_id=request_id,
                     )
