@@ -1560,6 +1560,13 @@ def create_app(
                 logger.info(
                     f"[HTTP PROXY] 收到代理请求：node_id={normalized_node_id}, target_url={target_url}"
                 )
+
+                # 调试：记录请求头和请求体
+                debug_headers = dict(request.headers)
+                logger.info(
+                    f"[HTTP PROXY DEBUG] Headers: Accept={debug_headers.get('accept', 'N/A')}, Content-Type={debug_headers.get('content-type', 'N/A')}"
+                )
+
                 if normalized_node_id in (node_runtime.local_node_id, "master"):
                     # 本地 HTTP 代理
 
@@ -1581,12 +1588,28 @@ def create_app(
                     headers = dict(request.headers)
                     headers.pop("host", None)
 
-                    # 判断是否需要流式响应
+                    # 读取请求体
+                    body = await request.body()
+
+                    # 判断是否需要流式响应：检查 Accept 头或请求体中的 stream 参数
                     accept_header = headers.get("accept", "")
                     want_stream = "text/event-stream" in accept_header
 
-                    # 读取请求体
-                    body = await request.body()
+                    # 如果 Accept 头未指定，检查请求体中的 stream 字段（OpenAI SDK 格式）
+                    if not want_stream and body:
+                        try:
+                            body_json = json.loads(body)
+                            if body_json.get("stream") is True:
+                                want_stream = True
+                                logger.info(
+                                    "[HTTP PROXY] 从请求体检测到 stream=true，启用流式模式"
+                                )
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+
+                    logger.info(
+                        f"[HTTP PROXY] 流式检测：Accept={accept_header}, want_stream={want_stream}"
+                    )
 
                     try:
                         if want_stream:
