@@ -412,6 +412,10 @@ class NodeConnectionManager:
                 additional_args=payload.get("additional_args"),
                 worktree=bool(payload.get("worktree", False)),
                 node_id=self._node_runtime.local_node_id,
+                quick_mode=bool(payload.get("quick_mode", False)),
+                restore_session=bool(payload.get("restore_session", False)),
+                no_interaction_mode=bool(payload.get("no_interaction_mode", False)),
+                proxy_node=payload.get("proxy_node"),
             )
             self._node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
