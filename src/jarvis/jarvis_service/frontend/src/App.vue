@@ -515,6 +515,8 @@
       @update:noInteractionMode="newAgentNoInteractionMode = $event"
       :taskDescription="newAgentTaskDescription"
       @update:taskDescription="newAgentTaskDescription = $event"
+      :proxyNode="newAgentProxyNode"
+      @update:proxyNode="newAgentProxyNode = $event"
       :formatNodeLabel="formatNodeOptionLabel"
       :createError="newAgentCreateError"
       @cancel="showCreateAgentModal = false"
