@@ -61,6 +61,14 @@ class ClaudeModel(BasePlatform):
         if jglobals.proxy_node and jglobals.master_url and self.base_url:
             # 将原始 base_url 作为目标 URL，拼接为代理格式
             self.base_url = f"{jglobals.master_url}/http_proxy/{self.base_url}"
+            
+            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
+            # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
+            jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
+            if jarvis_token:
+                # Anthropic SDK 支持通过 http_client 或额外参数传递自定义头
+                # 这里保存到实例变量，在请求时使用
+                self._jarvis_token = jarvis_token
 
         # 只有当 llm_config 不为空但其中没有 anthropic_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
@@ -72,10 +80,23 @@ class ClaudeModel(BasePlatform):
         # 初始化 Anthropic 客户端
         self.client = None
         try:
+            # 准备默认请求头
+            default_headers = {}
+            
+            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
+            if hasattr(self, '_jarvis_token') and self._jarvis_token:
+                default_headers["X-Jarvis-Token"] = self._jarvis_token
+            
             if self.base_url:
-                self.client = Anthropic(api_key=self.api_key, base_url=self.base_url)
+                if default_headers:
+                    self.client = Anthropic(api_key=self.api_key, base_url=self.base_url, default_headers=default_headers)
+                else:
+                    self.client = Anthropic(api_key=self.api_key, base_url=self.base_url)
             else:
-                self.client = Anthropic(api_key=self.api_key)
+                if default_headers:
+                    self.client = Anthropic(api_key=self.api_key, default_headers=default_headers)
+                else:
+                    self.client = Anthropic(api_key=self.api_key)
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 初始化 Anthropic 客户端失败: {e}")
 

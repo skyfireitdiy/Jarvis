@@ -77,6 +77,13 @@ class OpenAIModel(BasePlatform):
             logger.debug(
                 f"[PROXY] base_url 转换：{original_base_url} -> {self.base_url}"
             )
+            
+            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
+            # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
+            jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
+            if jarvis_token:
+                self.extra_headers["X-Jarvis-Token"] = jarvis_token
+                logger.debug("[PROXY] 已添加 X-Jarvis-Token 头用于 Gateway 认证")
 
         # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
