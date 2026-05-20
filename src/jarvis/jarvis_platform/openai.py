@@ -114,7 +114,8 @@ class OpenAIModel(BasePlatform):
                 else json.dumps(headers_value)
             )
 
-        self.extra_headers: Dict[str, str] = {}
+        # 注意：不要重新初始化 self.extra_headers，保留之前代理模式下设置的头
+        # self.extra_headers: Dict[str, str] = {}  # 已移除这行
         if headers_str:
             try:
                 parsed = (
