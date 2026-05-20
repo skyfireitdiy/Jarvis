@@ -832,6 +832,7 @@ def create_app(
     elif node_config.is_master:
         # Master 节点：拼接本地 gateway URL
         jglobals.master_url = f"http://127.0.0.1:{port}"
+    print(f"[GATEWAY] master_url={jglobals.master_url}")
 
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
