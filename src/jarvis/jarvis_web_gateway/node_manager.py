@@ -392,9 +392,9 @@ class NodeConnectionManager:
                     )
                     break
 
-                # 检查是否完成（通过 meta 中的 done 标记）
-                meta = response.get("meta", {})
-                is_done = meta.get("done")
+                # 检查是否完成（通过 payload 中的 done 标记）
+                payload = response.get("payload", {})
+                is_done = payload.get("done")
 
                 # 在 yield 之前创建新的 future 等待下一条消息（除非已完成）
                 if not is_done:
