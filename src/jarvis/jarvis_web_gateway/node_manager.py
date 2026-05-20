@@ -193,11 +193,14 @@ class NodeConnectionManager:
                 # 响应消息处理：如果有request_id，尝试匹配pending请求
                 if request_id:
                     future = self._pending_requests.pop(request_id, None)
+                    print(
+                        f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} pending_keys={list(self._pending_requests.keys())}",
+                        flush=True,
+                    )
                     if future is not None and not future.done():
                         future.set_result(next_message)
                         continue
                 if message_type == NODE_TERMINAL_OUTPUT:
-                    # child 端推送的终端输出，转发给前端
                     terminal_payload = next_message.get("payload") or {}
                     output_session_id = terminal_payload.get("session_id") or "default"
                     output_message = terminal_payload.get("message")
@@ -366,11 +369,13 @@ class NodeConnectionManager:
         future: asyncio.Future = loop.create_future()
         self._pending_requests[request_id] = future
         try:
-            logger.info(
-                "[NODE] send streaming request node_id=%s type=%s request_id=%s",
-                node_id,
-                message_type,
-                request_id,
+            print(
+                f"[NODE] send streaming request node_id={node_id} type={message_type} request_id={request_id}",
+                flush=True,
+            )
+            print(
+                f"[NODE] streaming request pending_keys={list(self._pending_requests.keys())} request_id={request_id}",
+                flush=True,
             )
             await websocket.send_json(
                 build_node_message(message_type, payload, request_id=request_id)
@@ -380,15 +385,21 @@ class NodeConnectionManager:
             while True:
                 try:
                     response = await asyncio.wait_for(future, timeout=timeout)
+                    print(
+                        f"[NODE] streaming response received node_id={node_id} request_id={request_id} response_type={response.get('type') if isinstance(response, dict) else type(response)}",
+                        flush=True,
+                    )
                 except asyncio.TimeoutError:
-                    logger.warning(
-                        f"[NODE] streaming request timeout: node_id={node_id}, request_id={request_id}"
+                    print(
+                        f"[NODE] streaming request timeout: node_id={node_id}, request_id={request_id}",
+                        flush=True,
                     )
                     break
 
                 if not isinstance(response, dict):
-                    logger.warning(
-                        f"[NODE] invalid streaming response: node_id={node_id}, request_id={request_id}"
+                    print(
+                        f"[NODE] invalid streaming response: node_id={node_id}, request_id={request_id}",
+                        flush=True,
                     )
                     break
 
@@ -399,6 +410,10 @@ class NodeConnectionManager:
                 # 在 yield 之前创建新的 future 等待下一条消息（除非已完成）
                 if not is_done:
                     self._pending_requests[request_id] = loop.create_future()
+                    print(
+                        f"[NODE] streaming new future created node_id={node_id} request_id={request_id} pending_keys={list(self._pending_requests.keys())}",
+                        flush=True,
+                    )
 
                 yield response
 
@@ -407,8 +422,9 @@ class NodeConnectionManager:
 
         finally:
             self._pending_requests.pop(request_id, None)
-            logger.info(
-                f"[NODE] streaming request completed: node_id={node_id}, request_id={request_id}"
+            print(
+                f"[NODE] streaming request completed: node_id={node_id}, request_id={request_id}",
+                flush=True,
             )
 
     def _handle_agent_create_request(
@@ -587,6 +603,7 @@ class NodeConnectionManager:
         logger.info(
             f"[STREAMING HTTP PROXY] 开始流式代理：target_url={target_url}, request_id={request_id}"
         )
+        chunk_count = 0
 
         proxy_headers = {
             k: str(v)
@@ -609,23 +626,31 @@ class NodeConnectionManager:
                     headers=proxy_headers,
                     content=body,
                 ) as response:
-                    logger.info(
-                        f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}"
+                    print(
+                        f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}",
+                        flush=True,
                     )
                     async for chunk in response.aiter_text():
-                        await websocket.send(
-                            json.dumps(
-                                build_node_message(
-                                    NODE_HTTP_PROXY_RESPONSE,
-                                    {"chunk": chunk},
-                                    request_id=request_id,
-                                )
-                            )
+                        chunk_count += 1
+                        msg = build_node_message(
+                            NODE_HTTP_PROXY_RESPONSE,
+                            {"chunk": chunk},
+                            request_id=request_id,
                         )
-                    logger.info(
-                        f"[STREAMING HTTP PROXY] 流式传输完成：request_id={request_id}"
+                        print(
+                            f"[STREAMING HTTP PROXY] sending chunk request_id={request_id} chunk_len={len(chunk)} chunk_num={chunk_count}",
+                            flush=True,
+                        )
+                        await websocket.send(json.dumps(msg))
+                    print(
+                        f"[STREAMING HTTP PROXY] 流式传输完成：request_id={request_id}",
+                        flush=True,
                     )
 
+            print(
+                f"[STREAMING HTTP PROXY] sending done request_id={request_id} total_chunks={chunk_count}",
+                flush=True,
+            )
             await websocket.send(
                 json.dumps(
                     build_node_message(
@@ -636,7 +661,7 @@ class NodeConnectionManager:
                 )
             )
         except httpx.TimeoutException:
-            logger.error("[STREAMING HTTP PROXY] Request timeout")
+            print("[STREAMING HTTP PROXY] Request timeout", flush=True)
             await websocket.send(
                 json.dumps(
                     build_node_message(
