@@ -13,6 +13,8 @@ import shutil
 import uuid
 from typing import Any, AsyncGenerator, Dict, Optional
 
+import httpx
+
 import yaml  # type: ignore[import-untyped]
 
 import websockets
@@ -213,7 +215,9 @@ class NodeConnectionManager:
                     await websocket.send_json(response)
                     continue
                 if message_type == NODE_HTTP_PROXY_REQUEST:
-                    response = await self._handle_node_http_proxy_request(next_message)
+                    response = await self._handle_node_http_proxy_request(
+                        websocket, next_message
+                    )
                     await websocket.send_json(response)
                     continue
                 if message_type == AGENT_LIST_REQUEST:
@@ -476,27 +480,61 @@ class NodeConnectionManager:
             )
 
     async def _handle_node_http_proxy_request(
-        self, message: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self,
+        websocket: WebSocket,
+        message: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """处理节点 HTTP 代理请求。
+
+        如果是流式请求，会通过 WebSocket 多次发送数据块，最后返回 None。
+        如果是非流式请求，返回单条响应消息。
+        """
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         try:
             if self._node_http_dispatcher is None:
                 raise RuntimeError("node http dispatcher is not configured")
 
-            result = await self._node_http_dispatcher(
-                method=str(payload.get("method") or "GET"),
-                path=str(payload.get("path") or ""),
-                query=str(payload.get("query") or ""),
-                headers=payload.get("headers") or {},
-                body=str(payload.get("body") or ""),
-            )
-            return build_node_message(
-                NODE_HTTP_PROXY_RESPONSE,
-                result,
-                request_id=request_id,
-            )
+            # 检测是否为流式请求
+            is_streaming = payload.get("streaming", False)
+            if not is_streaming:
+                headers = payload.get("headers") or {}
+                accept_header = headers.get("accept", "")
+                if "text/event-stream" in accept_header:
+                    is_streaming = True
+                elif not is_streaming and payload.get("body"):
+                    try:
+                        body_str = payload.get("body")
+                        if not body_str:
+                            body_json = None
+                        else:
+                            body_json = json.loads(str(body_str))
+                        if (
+                            isinstance(body_json, dict)
+                            and body_json.get("stream") is True
+                        ):
+                            is_streaming = True
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+
+            if is_streaming:
+                await self._handle_streaming_http_proxy(websocket, request_id, payload)
+                return None
+            else:
+                result = await self._node_http_dispatcher(
+                    method=str(payload.get("method") or "GET"),
+                    path=str(payload.get("path") or ""),
+                    query=str(payload.get("query") or ""),
+                    headers=payload.get("headers") or {},
+                    body=str(payload.get("body") or ""),
+                )
+                return build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    result,
+                    request_id=request_id,
+                )
         except Exception as exc:
+            logger.exception(f"[NODE HTTP PROXY] error: {exc}")
             return build_node_message(
                 NODE_HTTP_PROXY_RESPONSE,
                 {
@@ -504,6 +542,129 @@ class NodeConnectionManager:
                     "error": {"code": "NODE_HTTP_PROXY_FAILED", "message": str(exc)},
                 },
                 request_id=request_id,
+            )
+
+    async def _handle_streaming_http_proxy(
+        self,
+        websocket: WebSocket,
+        request_id: Optional[str],
+        payload: Dict[str, Any],
+    ) -> None:
+        """处理流式 HTTP 代理请求，通过 WebSocket 逐块发送响应数据。"""
+        target_url = str(payload.get("path") or "")
+        if target_url.startswith("http_proxy/"):
+            target_url = target_url[len("http_proxy/") :]
+        elif target_url.startswith("/http_proxy/"):
+            target_url = target_url[len("/http_proxy/") :]
+
+        query = str(payload.get("query") or "")
+        if query:
+            target_url = f"{target_url}?{query}"
+
+        if not target_url.startswith(("http://", "https://")):
+            await websocket.send_json(
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_URL",
+                            "message": "URL must start with http:// or https://",
+                        },
+                    },
+                    request_id=request_id,
+                )
+            )
+            return
+
+        logger.info(
+            f"[STREAMING HTTP PROXY] 开始流式代理：target_url={target_url}, request_id={request_id}"
+        )
+
+        proxy_headers = {
+            k: str(v)
+            for k, v in (payload.get("headers") or {}).items()
+            if k.lower() != "host"
+        }
+        if (
+            "accept" not in proxy_headers
+            or "text/event-stream" not in proxy_headers.get("accept", "")
+        ):
+            proxy_headers["accept"] = "text/event-stream"
+
+        body = str(payload.get("body") or "")
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+                async with client.stream(
+                    method=str(payload.get("method") or "POST"),
+                    url=target_url,
+                    headers=proxy_headers,
+                    content=body,
+                ) as response:
+                    logger.info(
+                        f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}"
+                    )
+                    async for chunk in response.aiter_bytes(chunk_size=1024):
+                        await websocket.send_json(
+                            build_node_message(
+                                NODE_HTTP_PROXY_RESPONSE,
+                                {"chunk": chunk.decode("utf-8", errors="replace")},
+                                request_id=request_id,
+                            )
+                        )
+                    logger.info(
+                        f"[STREAMING HTTP PROXY] 流式传输完成：request_id={request_id}"
+                    )
+
+            await websocket.send_json(
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {"done": True},
+                    request_id=request_id,
+                )
+            )
+        except httpx.TimeoutException:
+            logger.error("[STREAMING HTTP PROXY] Request timeout")
+            await websocket.send_json(
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {"code": "TIMEOUT", "message": "Request timeout"},
+                        "done": True,
+                    },
+                    request_id=request_id,
+                )
+            )
+        except httpx.RequestError as e:
+            logger.exception(f"[STREAMING HTTP PROXY] Request error: {e}")
+            await websocket.send_json(
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "REQUEST_ERROR",
+                            "message": f"Request failed: {str(e)}",
+                        },
+                        "done": True,
+                    },
+                    request_id=request_id,
+                )
+            )
+        except Exception as e:
+            logger.exception(f"[STREAMING HTTP PROXY] Unexpected error: {e}")
+            await websocket.send_json(
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+                        "done": True,
+                    },
+                    request_id=request_id,
+                )
             )
 
     def _handle_agent_stop_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -1421,7 +1582,7 @@ class ChildNodeClient:
                     continue
                 if message_type == NODE_HTTP_PROXY_REQUEST:
                     response = await self._node_connection_manager._handle_node_http_proxy_request(
-                        next_message
+                        self._ws, next_message
                     )
                     await self._ws.send(json.dumps(response))
                     continue
