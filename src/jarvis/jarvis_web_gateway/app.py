@@ -1685,6 +1685,22 @@ def create_app(
                     accept_header = dict(request.headers).get("accept", "")
                     want_stream = "text/event-stream" in accept_header
 
+                    # 如果 Accept 头未指定，检查请求体中的 stream 字段（OpenAI SDK 格式）
+                    if not want_stream and body:
+                        try:
+                            body_json = json.loads(body)
+                            if body_json.get("stream") is True:
+                                want_stream = True
+                                logger.info(
+                                    "[HTTP PROXY] 远端代理从请求体检测到 stream=true，启用流式模式"
+                                )
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+
+                    logger.info(
+                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}"
+                    )
+
                     if want_stream:
                         # 流式模式：使用 streaming 方法
                         async def stream_from_node() -> AsyncGenerator[bytes, None]:
