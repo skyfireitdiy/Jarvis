@@ -1056,6 +1056,13 @@ def run_cli(
             jglobals.proxy_node = proxy_node
         if master_url:
             jglobals.master_url = master_url
+        # 打印代理配置信息（调试用）
+        if jglobals.proxy_node or jglobals.master_url:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(
+                f"[AGENT] 代理配置：proxy_node={jglobals.proxy_node}, master_url={jglobals.master_url}"
+            )
         # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
         # 静默忽略同步异常，不影响主流程
