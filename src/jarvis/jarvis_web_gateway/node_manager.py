@@ -197,8 +197,9 @@ class NodeConnectionManager:
                         f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} pending_keys={list(self._pending_requests.keys())}",
                         flush=True,
                     )
-                    if future is not None and not future.done():
-                        future.set_result(next_message)
+                    if future is not None:
+                        if not future.done():
+                            future.set_result(next_message)
                         continue
                 if message_type == NODE_TERMINAL_OUTPUT:
                     terminal_payload = next_message.get("payload") or {}
