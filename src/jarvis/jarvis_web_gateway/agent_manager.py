@@ -706,6 +706,13 @@ class AgentManager:
                             "llm_group", "default"
                         ),  # 向后兼容，旧数据使用默认值
                         worktree=agent_data.get("worktree", False),
+                        node_id=agent_data.get("node_id", "master"),
+                        quick_mode=agent_data.get("quick_mode", False),
+                        restore_session=agent_data.get("restore_session", False),
+                        no_interaction_mode=agent_data.get(
+                            "no_interaction_mode", False
+                        ),
+                        proxy_node=agent_data.get("proxy_node"),
                     )
 
                     # 检查进程是否还在运行
