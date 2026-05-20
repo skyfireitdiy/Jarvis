@@ -181,35 +181,15 @@ class NodeConnectionManager:
                     continue
                 message_type = next_message.get("type")
                 request_id = next_message.get("request_id")
-                print(
-                    f"[NODE] recv message node_id={node_id} type={message_type} request_id={request_id}",
-                    flush=True,
-                )
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
                     continue
                 # 响应消息处理：如果有request_id，尝试匹配pending请求
                 if request_id:
                     future = self._pending_requests.get(request_id)
-                    payload = next_message.get("payload") or {}
-                    is_done = payload.get("done")
-                    has_chunk = "chunk" in payload
-                    print(
-                        f"[NODE] match request_id={request_id} future_found={future is not None} future_done={future.done() if future else None} is_done={is_done} has_chunk={has_chunk} pending_keys={list(self._pending_requests.keys())}",
-                        flush=True,
-                    )
                     if future is not None:
                         if not future.done():
                             future.set_result(next_message)
-                            print(
-                                f"[NODE] set_result done request_id={request_id}",
-                                flush=True,
-                            )
-                        else:
-                            print(
-                                f"[NODE] future already done, skipping request_id={request_id}",
-                                flush=True,
-                            )
                         continue
                 if message_type == NODE_TERMINAL_OUTPUT:
                     terminal_payload = next_message.get("payload") or {}
@@ -380,14 +360,6 @@ class NodeConnectionManager:
         future: asyncio.Future = loop.create_future()
         self._pending_requests[request_id] = future
         try:
-            print(
-                f"[NODE] send streaming request node_id={node_id} type={message_type} request_id={request_id}",
-                flush=True,
-            )
-            print(
-                f"[NODE] streaming request pending_keys={list(self._pending_requests.keys())} request_id={request_id}",
-                flush=True,
-            )
             await websocket.send_json(
                 build_node_message(message_type, payload, request_id=request_id)
             )
@@ -395,31 +367,11 @@ class NodeConnectionManager:
             # 等待并逐个 yield 响应消息
             while True:
                 try:
-                    print(
-                        f"[NODE] streaming waiting future_id={id(future)} done={future.done()} request_id={request_id}",
-                        flush=True,
-                    )
                     response = await asyncio.wait_for(future, timeout=timeout)
-                    print(
-                        f"[NODE] streaming got response future_id={id(future)} request_id={request_id}",
-                        flush=True,
-                    )
-                    print(
-                        f"[NODE] streaming response received node_id={node_id} request_id={request_id} response_type={response.get('type') if isinstance(response, dict) else type(response)}",
-                        flush=True,
-                    )
                 except asyncio.TimeoutError:
-                    print(
-                        f"[NODE] streaming request timeout: node_id={node_id}, request_id={request_id}",
-                        flush=True,
-                    )
                     break
 
                 if not isinstance(response, dict):
-                    print(
-                        f"[NODE] invalid streaming response: node_id={node_id}, request_id={request_id}",
-                        flush=True,
-                    )
                     break
 
                 # 检查是否完成（通过 payload 中的 done 标记）
@@ -431,10 +383,6 @@ class NodeConnectionManager:
                     new_future = loop.create_future()
                     self._pending_requests[request_id] = new_future
                     future = new_future
-                    print(
-                        f"[NODE] streaming new future created node_id={node_id} request_id={request_id} future_id={id(new_future)} pending_keys={list(self._pending_requests.keys())}",
-                        flush=True,
-                    )
 
                 yield response
 
@@ -443,10 +391,6 @@ class NodeConnectionManager:
 
         finally:
             self._pending_requests.pop(request_id, None)
-            print(
-                f"[NODE] streaming request completed: node_id={node_id}, request_id={request_id}",
-                flush=True,
-            )
 
     def _handle_agent_create_request(
         self, message: Dict[str, Any], source_node_id: str
@@ -647,10 +591,6 @@ class NodeConnectionManager:
                     headers=proxy_headers,
                     content=body,
                 ) as response:
-                    print(
-                        f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}",
-                        flush=True,
-                    )
                     async for chunk in response.aiter_text():
                         chunk_count += 1
                         msg = build_node_message(
@@ -658,20 +598,8 @@ class NodeConnectionManager:
                             {"chunk": chunk},
                             request_id=request_id,
                         )
-                        print(
-                            f"[STREAMING HTTP PROXY] sending chunk request_id={request_id} chunk_len={len(chunk)} chunk_num={chunk_count}",
-                            flush=True,
-                        )
                         await websocket.send(json.dumps(msg))
-                    print(
-                        f"[STREAMING HTTP PROXY] 流式传输完成：request_id={request_id}",
-                        flush=True,
-                    )
 
-            print(
-                f"[STREAMING HTTP PROXY] sending done request_id={request_id} total_chunks={chunk_count}",
-                flush=True,
-            )
             await websocket.send(
                 json.dumps(
                     build_node_message(
@@ -682,7 +610,6 @@ class NodeConnectionManager:
                 )
             )
         except httpx.TimeoutException:
-            print("[STREAMING HTTP PROXY] Request timeout", flush=True)
             await websocket.send(
                 json.dumps(
                     build_node_message(
