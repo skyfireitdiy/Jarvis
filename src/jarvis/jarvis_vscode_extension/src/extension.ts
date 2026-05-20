@@ -64,6 +64,7 @@ interface AgentListItem {
   restoreSession?: boolean;
   noInteractionMode?: boolean;
   taskDescription?: string;
+  proxyNode?: string;
 }
 
 interface GatewayAddress {
@@ -178,6 +179,7 @@ interface CreateAgentFormState {
   restoreSession: boolean;
   noInteractionMode: boolean;
   taskDescription: string;
+  proxyNode: string;
   isSubmitting: boolean;
   errorMessage: string;
 }
@@ -214,6 +216,7 @@ interface AgentListViewMessage {
   restoreSession?: boolean;
   noInteractionMode?: boolean;
   taskDescription?: string;
+  proxyNode?: string;
   enabled?: boolean;
   path?: string;
   searchText?: string;
@@ -385,6 +388,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     restoreSession: false,
     noInteractionMode: false,
     taskDescription: "",
+    proxyNode: "",
     isSubmitting: false,
     errorMessage: "",
   };
@@ -779,6 +783,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     <div class="form-group" style="${this.createAgentFormState.noInteractionMode ? "" : "display:none;"}" id="taskDescriptionGroup">
       <label for="taskDescription">任务描述 <span style="color: var(--vscode-errorForeground);">*</span></label>
       <textarea id="taskDescription" rows="3" placeholder="请输入任务描述...">${escapeHtml(this.createAgentFormState.taskDescription)}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="proxyNode">代理节点</label>
+      <input id="proxyNode" value="${escapeHtml(this.createAgentFormState.proxyNode)}" placeholder="留空表示不使用代理节点" />
     </div>
     ${createAgentErrorMarkup}
     <div class="form-actions">
@@ -1283,7 +1291,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           quickMode: Boolean(useQuickMode && useQuickMode.checked),
           restoreSession: Boolean(useRestoreSession && useRestoreSession.checked),
           noInteractionMode: isNoInteractionMode,
-          taskDescription: taskDescValue
+          taskDescription: taskDescValue,
+          proxyNode: document.getElementById('proxyNode') ? document.getElementById('proxyNode').value.trim() : ''
         });
       });
     }
@@ -2245,6 +2254,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
             restoreSession: Boolean(agent.restore_session),
             noInteractionMode: Boolean(agent.no_interaction_mode),
             taskDescription: agent.task || "",
+            proxyNode: agent.proxy_node || "",
             nodeId: String(agent.node_id || "").trim() || "master",
           };
         });
@@ -4217,6 +4227,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     );
     this.createAgentFormState.taskDescription =
       sourceAgent.taskDescription || "";
+    this.createAgentFormState.proxyNode = sourceAgent.proxyNode || "";
     this.createAgentFormState.errorMessage = "";
 
     // 加载模型组列表
@@ -4363,6 +4374,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
                   : false,
               quick_mode: Boolean(sourceAgent.quickMode),
               restore_session: Boolean(sourceAgent.restoreSession),
+              no_interaction_mode: Boolean(sourceAgent.noInteractionMode),
+              proxy_node: sourceAgent.proxyNode || undefined,
             }),
           },
         );
@@ -4489,6 +4502,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     const restoreSession = Boolean(message.restoreSession);
     const noInteractionMode = Boolean(message.noInteractionMode);
     const taskDescription = String(message.taskDescription || "").trim();
+    const proxyNode = String(message.proxyNode || "").trim();
 
     this.updateCreateAgentDefaults(requestedAgentType);
     this.createAgentFormState.workingDir = workingDir;
@@ -4501,6 +4515,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     this.createAgentFormState.restoreSession = restoreSession;
     this.createAgentFormState.noInteractionMode = noInteractionMode;
     this.createAgentFormState.taskDescription = taskDescription;
+    this.createAgentFormState.proxyNode = proxyNode;
     this.createAgentFormState.isVisible = true;
 
     if (!workingDir) {
@@ -4539,6 +4554,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
               noInteractionMode && taskDescription
                 ? taskDescription
                 : undefined,
+            proxy_node: proxyNode || undefined,
           }),
         },
       );
