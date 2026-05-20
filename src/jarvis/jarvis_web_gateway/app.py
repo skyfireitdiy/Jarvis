@@ -1540,6 +1540,9 @@ def create_app(
             # --- HTTP 代理：透传到外部 URL ---
             if normalized_path.startswith("http_proxy/"):
                 target_url = normalized_path[len("http_proxy/") :]
+                logger.info(
+                    f"[HTTP PROXY] 收到代理请求：node_id={normalized_node_id}, target_url={target_url}"
+                )
                 if normalized_node_id in (node_runtime.local_node_id, "master"):
                     # 本地 HTTP 代理
 
@@ -1547,6 +1550,7 @@ def create_app(
                     full_url = target_url
                     if request.query_params:
                         full_url = f"{full_url}?{request.query_params}"
+                    logger.debug(f"[HTTP PROXY] 完整目标 URL: {full_url}")
 
                     # 验证 URL
                     if not full_url.startswith(("http://", "https://")):
