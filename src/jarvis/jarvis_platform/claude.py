@@ -60,8 +60,9 @@ class ClaudeModel(BasePlatform):
         # 如果设置了代理节点，将 base_url 转为 Gateway 代理 URL
         if jglobals.proxy_node and jglobals.master_url and self.base_url:
             # 将原始 base_url 作为目标 URL，拼接为代理格式
-            self.base_url = f"{jglobals.master_url}/http_proxy/{self.base_url}"
-            
+            # 注意：需要添加 /api/node/{node_id}/ 前缀以匹配 FastAPI 路由
+            self.base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{self.base_url}"
+
             # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
             # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
             jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
@@ -82,19 +83,27 @@ class ClaudeModel(BasePlatform):
         try:
             # 准备默认请求头
             default_headers = {}
-            
+
             # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
-            if hasattr(self, '_jarvis_token') and self._jarvis_token:
+            if hasattr(self, "_jarvis_token") and self._jarvis_token:
                 default_headers["X-Jarvis-Token"] = self._jarvis_token
-            
+
             if self.base_url:
                 if default_headers:
-                    self.client = Anthropic(api_key=self.api_key, base_url=self.base_url, default_headers=default_headers)
+                    self.client = Anthropic(
+                        api_key=self.api_key,
+                        base_url=self.base_url,
+                        default_headers=default_headers,
+                    )
                 else:
-                    self.client = Anthropic(api_key=self.api_key, base_url=self.base_url)
+                    self.client = Anthropic(
+                        api_key=self.api_key, base_url=self.base_url
+                    )
             else:
                 if default_headers:
-                    self.client = Anthropic(api_key=self.api_key, default_headers=default_headers)
+                    self.client = Anthropic(
+                        api_key=self.api_key, default_headers=default_headers
+                    )
                 else:
                     self.client = Anthropic(api_key=self.api_key)
         except Exception as e:
