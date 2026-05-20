@@ -607,12 +607,12 @@ class NodeConnectionManager:
                     logger.info(
                         f"[STREAMING HTTP PROXY] 响应状态码：{response.status_code}"
                     )
-                    async for chunk in response.aiter_bytes(chunk_size=1024):
+                    async for chunk in response.aiter_text():
                         await websocket.send(
                             json.dumps(
                                 build_node_message(
                                     NODE_HTTP_PROXY_RESPONSE,
-                                    {"chunk": chunk.decode("utf-8", errors="replace")},
+                                    {"chunk": chunk},
                                     request_id=request_id,
                                 )
                             )
