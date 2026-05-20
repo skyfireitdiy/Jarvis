@@ -151,8 +151,8 @@ class AgentProxyManager:
         # 判断是否需要流式响应
         accept_header = headers.get("accept", "")
         want_stream = "text/event-stream" in accept_header
-        logger.debug(
-            f"[PROXY MANAGER] Accept header: {accept_header}, want_stream: {want_stream}"
+        logger.info(
+            f"[PROXY MANAGER] 流式检测：Accept={accept_header}, want_stream={want_stream}, agent_id={agent_id}, path={path}"
         )
 
         # 读取请求体

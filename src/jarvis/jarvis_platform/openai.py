@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -16,6 +17,9 @@ from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
 import jarvis.jarvis_utils.globals as jglobals
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 
 class OpenAIModel(BasePlatform):
@@ -65,7 +69,14 @@ class OpenAIModel(BasePlatform):
         # 如果设置了代理节点，将 base_url 转为 Gateway 代理 URL
         if jglobals.proxy_node and jglobals.master_url:
             # 将原始 base_url 作为目标 URL，拼接为代理格式
+            original_base_url = self.base_url
             self.base_url = f"{jglobals.master_url}/http_proxy/{self.base_url}"
+            logger.debug(
+                f"[PROXY] 代理模式启用：proxy_node={jglobals.proxy_node}, master_url={jglobals.master_url}"
+            )
+            logger.debug(
+                f"[PROXY] base_url 转换：{original_base_url} -> {self.base_url}"
+            )
 
         # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
@@ -300,13 +311,13 @@ class OpenAIModel(BasePlatform):
                                 hasattr(choice.delta, "reasoning_content")
                                 and choice.delta.reasoning_content
                             ):
-                                text = choice.delta.reasoning_content
-                                full_reasoning += text
+                                text: str = str(choice.delta.reasoning_content)
+                                full_reasoning = full_reasoning + text
                                 yield ("reason", text)
                             # 处理 content（正文内容）
                             if choice.delta.content:
-                                text = choice.delta.content
-                                full_response += text
+                                text: str = str(choice.delta.content)
+                                full_response = full_response + text
                                 yield ("content", text)
                 if full_response:
                     # 曾经成功过，说明流式请求是可以的
