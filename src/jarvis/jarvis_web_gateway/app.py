@@ -964,7 +964,10 @@ def create_app(
             if not validate_gateway_token(jarvis_token):
                 raise HTTPException(
                     status_code=401,
-                    detail={"code": "INVALID_TOKEN", "message": "Invalid or expired X-Jarvis-Token"},
+                    detail={
+                        "code": "INVALID_TOKEN",
+                        "message": "Invalid or expired X-Jarvis-Token",
+                    },
                 )
             return  # X-Jarvis-Token 验证通过
 
@@ -4306,6 +4309,63 @@ def create_app(
                         "code": "METHOD_NOT_ALLOWED",
                         "message": "Unsupported method",
                     },
+                }
+        elif normalized_path.startswith("/http_proxy/"):
+            # 远程节点 HTTP 代理：转发请求到外部 API
+            target_url = normalized_path[len("/http_proxy/") :]
+            if not target_url.startswith(("http://", "https://")):
+                return {
+                    "success": False,
+                    "status_code": 400,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps(
+                        {"error": "URL must start with http:// or https://"}
+                    ),
+                }
+            if query:
+                target_url = f"{target_url}?{query}"
+            try:
+                proxy_headers = {
+                    k: str(v) for k, v in headers.items() if k.lower() != "host"
+                }
+                async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+                    response = await client.request(
+                        method=normalized_method,
+                        url=target_url,
+                        headers=proxy_headers,
+                        content=body,
+                    )
+                excluded_headers = {
+                    "content-encoding",
+                    "content-length",
+                    "transfer-encoding",
+                    "connection",
+                }
+                response_headers = {
+                    k: v
+                    for k, v in response.headers.items()
+                    if k.lower() not in excluded_headers
+                }
+                result = {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "headers": response_headers,
+                    "body": response.text,
+                }
+            except httpx.TimeoutException:
+                result = {
+                    "success": False,
+                    "status_code": 504,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps({"error": "Request timeout"}),
+                }
+            except httpx.RequestError as e:
+                logger.error(f"[REMOTE HTTP PROXY] Request error: {e}")
+                result = {
+                    "success": False,
+                    "status_code": 502,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps({"error": f"Request failed: {str(e)}"}),
                 }
         elif (
             normalized_path.startswith("/agents/")

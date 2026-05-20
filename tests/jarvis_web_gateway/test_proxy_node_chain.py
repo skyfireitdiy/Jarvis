@@ -50,19 +50,21 @@ def test_base_url_conversion():
     # 原始 base_url
     original_base_url = "https://api.openai.com/v1"
 
-    # 模拟转换逻辑
+    # 模拟转换逻辑（包含 /api/node/{node_id}/ 前缀）
     jglobals = MockGlobals()
     if jglobals.proxy_node and jglobals.master_url:
-        converted_base_url = f"{jglobals.master_url}/http_proxy/{original_base_url}"
+        converted_base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{original_base_url}"
     else:
         converted_base_url = original_base_url
 
     # 验证转换结果
-    expected_url = "http://127.0.0.1:8000/http_proxy/https://api.openai.com/v1"
-    assert converted_base_url == expected_url, f"base_url 应该转换为 {expected_url}"
-    assert converted_base_url.startswith("http://127.0.0.1:8000/http_proxy/"), (
-        "转换后的 URL 应该以代理前缀开头"
+    expected_url = (
+        "http://127.0.0.1:8000/api/node/node-1/http_proxy/https://api.openai.com/v1"
     )
+    assert converted_base_url == expected_url, f"base_url 应该转换为 {expected_url}"
+    assert converted_base_url.startswith(
+        "http://127.0.0.1:8000/api/node/node-1/http_proxy/"
+    ), "转换后的 URL 应该以 /api/node/{node_id}/http_proxy/ 前缀开头"
 
 
 # ======
