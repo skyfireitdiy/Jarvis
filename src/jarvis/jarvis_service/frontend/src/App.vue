@@ -4397,6 +4397,7 @@ async function createAgent() {
         no_interaction_mode: newAgentNoInteractionMode.value,
         task: newAgentNoInteractionMode.value && newAgentTaskDescription.value.trim() ? newAgentTaskDescription.value.trim() : undefined,
         node_id: targetNodeId,
+        proxy_node: newAgentProxyNode.value || undefined,
       })
     })
     if (!response.ok) {
