@@ -70,28 +70,28 @@ unresolved-import = "ignore"
 include = ["src/jarvis/jarvis_sec/**"]
 [overrides.rules]
 # Critical modules - stricter checking
-untyped-definition = "error"
+# untyped-definition = "error"  # Unknown rule, commented out
 
 [[overrides]]
 include = ["src/jarvis/jarvis_c2rust/**"]
 [overrides.rules]
 # Critical modules - stricter checking
-untyped-definition = "error"
+# untyped-definition = "error"  # Unknown rule, commented out
 
 [[overrides]]
 include = ["src/jarvis/jarvis_code_agent/**"]
 [overrides.rules]
 # Critical modules - stricter checking
-untyped-definition = "error"
+# untyped-definition = "error"  # Unknown rule, commented out
 
 [[overrides]]
 include = ["src/jarvis/jarvis_tools/**"]
 [overrides.rules]
 # Legacy code - allow gradual migration
-untyped-definition = "warn"
+# untyped-definition = "warn"  # Unknown rule, commented out
 
 [[overrides]]
 include = ["tests/**"]
 [overrides.rules]
 # Test files can be more permissive
-untyped-definition = "ignore"
+# untyped-definition = "ignore"  # Unknown rule, commented out
