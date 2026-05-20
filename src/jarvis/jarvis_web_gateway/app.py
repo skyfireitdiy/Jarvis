@@ -4341,6 +4341,13 @@ def create_app(
                         headers=proxy_headers,
                         content=body,
                     )
+                logger.info(f"[REMOTE HTTP PROXY] 响应状态码：{response.status_code}")
+                logger.info(f"[REMOTE HTTP PROXY] 响应头：{dict(response.headers)}")
+                # 记录响应体前 500 字符用于调试
+                response_text = response.text
+                logger.info(
+                    f"[REMOTE HTTP PROXY] 响应体 (前 500 字符): {response_text[:500] if response_text else '空'}"
+                )
                 excluded_headers = {
                     "content-encoding",
                     "content-length",
