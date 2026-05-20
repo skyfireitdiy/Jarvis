@@ -36,6 +36,7 @@ class OpenAIModel(BasePlatform):
         """
         super().__init__(platform_type=platform_type, agent=agent)
         self.system_message = ""
+        self.extra_headers: Dict[str, str] = {}  # 初始化额外请求头
         llm_config = self._llm_config or {}
 
         # 如果传入了 llm_config（非空字典），优先从 llm_config 读取，避免环境变量污染
