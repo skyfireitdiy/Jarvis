@@ -395,7 +395,15 @@ class NodeConnectionManager:
             # 等待并逐个 yield 响应消息
             while True:
                 try:
+                    print(
+                        f"[NODE] streaming waiting future_id={id(future)} done={future.done()} request_id={request_id}",
+                        flush=True,
+                    )
                     response = await asyncio.wait_for(future, timeout=timeout)
+                    print(
+                        f"[NODE] streaming got response future_id={id(future)} request_id={request_id}",
+                        flush=True,
+                    )
                     print(
                         f"[NODE] streaming response received node_id={node_id} request_id={request_id} response_type={response.get('type') if isinstance(response, dict) else type(response)}",
                         flush=True,
@@ -420,9 +428,10 @@ class NodeConnectionManager:
 
                 # 在 yield 之前创建新的 future 等待下一条消息（除非已完成）
                 if not is_done:
-                    self._pending_requests[request_id] = loop.create_future()
+                    new_future = loop.create_future()
+                    self._pending_requests[request_id] = new_future
                     print(
-                        f"[NODE] streaming new future created node_id={node_id} request_id={request_id} pending_keys={list(self._pending_requests.keys())}",
+                        f"[NODE] streaming new future created node_id={node_id} request_id={request_id} future_id={id(new_future)} pending_keys={list(self._pending_requests.keys())}",
                         flush=True,
                     )
 
