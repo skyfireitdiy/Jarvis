@@ -1599,16 +1599,35 @@ def create_app(
                     if not want_stream and body:
                         try:
                             body_json = json.loads(body)
-                            if body_json.get("stream") is True:
+                            # 检查stream字段的各种真值形式
+                            stream_value = body_json.get("stream")
+                            if (
+                                stream_value is True
+                                or stream_value == 1
+                                or stream_value == "true"
+                            ):
                                 want_stream = True
                                 logger.info(
                                     "[HTTP PROXY] 从请求体检测到 stream=true，启用流式模式"
                                 )
                         except (json.JSONDecodeError, ValueError):
-                            pass
+                            # 如果JSON解析失败，检查原始body中是否包含stream关键字
+                            body_str = (
+                                body.decode("utf-8", errors="replace")
+                                if isinstance(body, bytes)
+                                else str(body)
+                            )
+                            if (
+                                '"stream": true' in body_str
+                                or '"stream":true' in body_str
+                            ):
+                                want_stream = True
+                                logger.info(
+                                    "[HTTP PROXY] 从请求体原始内容检测到 stream=true，启用流式模式"
+                                )
 
                     logger.info(
-                        f"[HTTP PROXY] 流式检测：Accept={accept_header}, want_stream={want_stream}"
+                        f"[HTTP PROXY] 流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(body) if body else 0}"
                     )
 
                     try:
@@ -1689,16 +1708,35 @@ def create_app(
                     if not want_stream and body:
                         try:
                             body_json = json.loads(body)
-                            if body_json.get("stream") is True:
+                            # 检查stream字段的各种真值形式
+                            stream_value = body_json.get("stream")
+                            if (
+                                stream_value is True
+                                or stream_value == 1
+                                or stream_value == "true"
+                            ):
                                 want_stream = True
                                 logger.info(
                                     "[HTTP PROXY] 远端代理从请求体检测到 stream=true，启用流式模式"
                                 )
                         except (json.JSONDecodeError, ValueError):
-                            pass
+                            # 如果JSON解析失败，检查原始body中是否包含stream关键字
+                            body_str = (
+                                body.decode("utf-8", errors="replace")
+                                if isinstance(body, bytes)
+                                else str(body)
+                            )
+                            if (
+                                '"stream": true' in body_str
+                                or '"stream":true' in body_str
+                            ):
+                                want_stream = True
+                                logger.info(
+                                    "[HTTP PROXY] 远端代理从请求体原始内容检测到 stream=true，启用流式模式"
+                                )
 
                     logger.info(
-                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}"
+                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(body) if body else 0}"
                     )
 
                     if want_stream:
@@ -1770,6 +1808,9 @@ def create_app(
                     )
 
             # --- 节点级 API ---
+            logger.info(
+                f"[NODE HTTP PROXY] 开始处理请求: node_id={normalized_node_id}, method={request.method}, path={path}"
+            )
             if normalized_node_id in (node_runtime.local_node_id, "master"):
                 result = await _dispatch_node_http_request(
                     method=request.method,
@@ -1783,6 +1824,27 @@ def create_app(
                     status_code=int(result.get("status_code", 200)),
                     media_type="application/json",
                 )
+            # 检查节点是否在线
+            node_info = node_runtime.node_registry.get(normalized_node_id)
+            if node_info is None:
+                logger.error(
+                    f"[NODE HTTP PROXY] 节点不存在: node_id={normalized_node_id}"
+                )
+                return Response(
+                    content=f'{{"error": "Node {normalized_node_id} not found"}}',
+                    status_code=502,
+                    media_type="application/json",
+                )
+            if node_info.status != "online":
+                logger.error(
+                    f"[NODE HTTP PROXY] 节点不在线: node_id={normalized_node_id}, status={node_info.status}"
+                )
+                return Response(
+                    content=f'{{"error": "Node {normalized_node_id} is not online (status: {node_info.status})"}}',
+                    status_code=502,
+                    media_type="application/json",
+                )
+
             response = await node_connection_manager.send_request_to_node(
                 normalized_node_id,
                 NODE_HTTP_PROXY_REQUEST,
@@ -1799,6 +1861,9 @@ def create_app(
             # 直接返回其 status_code 和 body（即使业务级 success=False）。
             # 只有当 payload 中没有 body（真正的代理失败）时才返回 502。
             if "body" in payload:
+                logger.info(
+                    f"[NODE HTTP PROXY] 请求成功: node_id={normalized_node_id}, path={path}, status_code={payload.get('status_code', 200)}"
+                )
                 return Response(
                     content=payload.get("body", ""),
                     status_code=int(payload.get("status_code", 200)),
@@ -1807,8 +1872,13 @@ def create_app(
                 )
             if not payload.get("success"):
                 error = payload.get("error") or {}
+                error_message = error.get("message", "Node HTTP proxy failed")
+                error_code = error.get("code", "unknown")
+                logger.error(
+                    f"[NODE HTTP PROXY] 请求失败: node_id={normalized_node_id}, path={path}, error_code={error_code}, error_message={error_message}"
+                )
                 return Response(
-                    content=f'{{"error": "{error.get("message", "Node HTTP proxy failed")}"}}',
+                    content=f'{{"error": "{error_message}", "code": "{error_code}"}}',
                     status_code=502,
                     media_type="application/json",
                 )
