@@ -28,6 +28,7 @@ class OptimizeOptions:
     git_guard: bool = True
     cargo_test_timeout: int = 300  # cargo test 超时（秒）
     non_interactive: bool = True
+    quick_mode: bool = False  # 快速模式，关闭方法论、分析和规则加载
 
 
 @dataclass

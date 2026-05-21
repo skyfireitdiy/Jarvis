@@ -85,6 +85,7 @@ def run_verify(
     project_root: Path,
     max_iterations: int = 10,
     non_interactive: bool = True,
+    quick_mode: bool = False,
 ) -> None:
     """
     执行功能对齐验证。
@@ -93,6 +94,7 @@ def run_verify(
         project_root: 项目根目录
         max_iterations: 最大迭代次数
         non_interactive: 是否非交互模式
+        quick_mode: 快速模式，关闭方法论、规则加载等
     """
     from jarvis.jarvis_c2rust.utils import default_crate_dir
 
@@ -140,6 +142,7 @@ def run_verify(
             project_root=project_root,
             config=config,
             non_interactive=non_interactive,
+            quick_mode=quick_mode,
         )
 
         # Step 3: 检查是否需要迭代优化
@@ -173,6 +176,7 @@ def run_verify(
                 report=alignment_result.get("report", ""),
                 config=config,
                 non_interactive=non_interactive,
+                quick_mode=quick_mode,
             )
 
             # 重新验证
@@ -182,6 +186,7 @@ def run_verify(
                 project_root=project_root,
                 config=config,
                 non_interactive=non_interactive,
+                quick_mode=quick_mode,
             )
     finally:
         os.chdir(original_cwd)
@@ -192,6 +197,7 @@ def _run_alignment_analysis(
     project_root: Path,
     config: Dict[str, Any],
     non_interactive: bool,
+    quick_mode: bool = False,
 ) -> Dict[str, Any]:
     """
     运行功能对齐分析。
@@ -335,6 +341,7 @@ def _run_alignment_analysis(
         summary_prompt=summary_prompt,
         model_type="smart",
         enable_auto_rule_select=False,
+        quick_mode=quick_mode,
     )
 
     # 构建分析任务
@@ -586,6 +593,7 @@ def _run_optimization(
     report: str,
     config: Dict[str, Any],
     non_interactive: bool,
+    quick_mode: bool = False,
 ) -> None:
     """
     运行代码优化。
@@ -606,6 +614,7 @@ def _run_optimization(
         non_interactive=non_interactive,
         append_tools="read_symbols",  # 添加 read_symbols 工具用于读取 C 符号信息
         model_type="smart",
+        quick_mode=quick_mode,
     )
 
     optimization_task = f"""
