@@ -153,10 +153,21 @@
       </div>
     </div>
   </div>
+  
+  <!-- 同步配置确认对话框 -->
+  <ConfirmDialog
+    :visible="showSyncConfirm"
+    :message="`确定要同步配置到其他节点吗？此操作将覆盖目标节点的配置。`"
+    :defaultConfirm="false"
+    @confirm="handleSyncConfirm"
+    @cancel="showSyncConfirm = false"
+    @update:visible="showSyncConfirm = $event"
+  />
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 
 const props = defineProps({
   visible: {
@@ -300,10 +311,20 @@ function disconnectAll() {
   emit('disconnectAll')
 }
 
+// 同步配置确认状态
+const showSyncConfirm = ref(false)
+const pendingSyncSourceNode = ref('')
+
 // 同步配置
 function syncConfig() {
+  pendingSyncSourceNode.value = localSyncConfigSourceNode.value
+  showSyncConfirm.value = true
+}
+
+// 确认同步配置
+function handleSyncConfirm() {
   emit('syncConfig', {
-    sourceNodeId: localSyncConfigSourceNode.value
+    sourceNodeId: pendingSyncSourceNode.value
   })
 }
 
