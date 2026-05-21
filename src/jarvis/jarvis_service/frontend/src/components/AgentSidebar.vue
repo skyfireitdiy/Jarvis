@@ -36,6 +36,7 @@
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
                 <span class="agent-node-label" :title="agent.node_id || 'master'">{{ getNodeLabel(agent) }}</span>
+                <span class="agent-proxy-node-label" v-if="agent.proxy_node" :title="'代理: ' + agent.proxy_node">{{ getProxyNodeLabel(agent) }}</span>
                 <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
                 <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
                 <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
@@ -70,6 +71,7 @@
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               <span class="agent-node-label" :title="agent.node_id || 'master'">{{ getNodeLabel(agent) }}</span>
+              <span class="agent-proxy-node-label" v-if="agent.proxy_node" :title="'代理: ' + agent.proxy_node">{{ getProxyNodeLabel(agent) }}</span>
               <span class="agent-llm-group" v-if="agent.llm_group">🔹 {{ agent.llm_group }}</span>
               <span class="agent-worktree" v-if="agent.worktree" title="已启用 worktree">🌿</span>
               <span class="agent-quick-mode" v-if="agent.quick_mode" title="极速模式">⚡</span>
@@ -152,6 +154,7 @@ const props = defineProps({
   getStatusClass: Function,
   getStatusText: Function,
   getNodeLabel: Function,
+  getProxyNodeLabel: Function,
   isSelected: Function
 })
 
@@ -599,6 +602,16 @@ watch(() => props.currentAgentId, (newAgentId) => {
   background: var(--color-bg-hover);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border);
+  margin-left: 4px;
+}
+
+.agent-proxy-node-label {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(56, 132, 255, 0.1); /* 浅蓝色背景 */
+  color: #3884ff; /* 蓝色文字 */
+  border: 1px solid rgba(56, 132, 255, 0.2);
   margin-left: 4px;
 }
 </style>
