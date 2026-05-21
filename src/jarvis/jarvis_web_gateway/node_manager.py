@@ -94,6 +94,7 @@ class NodeConnectionManager:
         self._connections: Dict[str, WebSocket] = {}
         self._connection_to_node: Dict[str, str] = {}
         self._pending_requests: Dict[str, asyncio.Future] = {}
+        self._streaming_queues: Dict[str, asyncio.Queue] = {}
         self._agent_ws_sessions: Dict[str, Any] = {}
 
     async def handle_node_websocket(self, websocket: WebSocket) -> None:
@@ -184,8 +185,14 @@ class NodeConnectionManager:
                 if message_type == NODE_HEARTBEAT:
                     self._node_runtime.node_registry.mark_heartbeat(node_id)
                     continue
-                # 响应消息处理：如果有request_id，尝试匹配pending请求
+                # 响应消息处理：如果有request_id，尝试匹配pending请求或流式队列
                 if request_id:
+                    # 流式请求：将消息放入 Queue
+                    streaming_queue = self._streaming_queues.get(request_id)
+                    if streaming_queue is not None:
+                        await streaming_queue.put(next_message)
+                        continue
+                    # 非流式请求：通过 Future 传递
                     future = self._pending_requests.get(request_id)
                     if future is not None:
                         if not future.done():
@@ -344,6 +351,9 @@ class NodeConnectionManager:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """流式请求到节点，yield 每个收到的消息。
 
+        使用 asyncio.Queue 接收流式响应，避免 Future 只能设置一次结果
+        导致的竞态条件和消息丢失问题。
+
         Args:
             node_id: 节点 ID
             message_type: 消息类型
@@ -357,9 +367,8 @@ class NodeConnectionManager:
         if websocket is None:
             raise RuntimeError(f"node connection not found: {node_id}")
         request_id = str(uuid.uuid4())
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future = loop.create_future()
-        self._pending_requests[request_id] = future
+        queue: asyncio.Queue = asyncio.Queue()
+        self._streaming_queues[request_id] = queue
         try:
             await websocket.send_json(
                 build_node_message(message_type, payload, request_id=request_id)
@@ -368,7 +377,7 @@ class NodeConnectionManager:
             # 等待并逐个 yield 响应消息
             while True:
                 try:
-                    response = await asyncio.wait_for(future, timeout=timeout)
+                    response = await asyncio.wait_for(queue.get(), timeout=timeout)
                 except asyncio.TimeoutError:
                     break
 
@@ -376,14 +385,8 @@ class NodeConnectionManager:
                     break
 
                 # 检查是否完成（通过 payload 中的 done 标记）
-                payload = response.get("payload", {})
-                is_done = payload.get("done")
-
-                # 在 yield 之前创建新的 future 等待下一条消息（除非已完成）
-                if not is_done:
-                    new_future = loop.create_future()
-                    self._pending_requests[request_id] = new_future
-                    future = new_future
+                response_payload = response.get("payload", {})
+                is_done = response_payload.get("done")
 
                 yield response
 
@@ -391,7 +394,7 @@ class NodeConnectionManager:
                     break
 
         finally:
-            self._pending_requests.pop(request_id, None)
+            self._streaming_queues.pop(request_id, None)
 
     def _handle_agent_create_request(
         self, message: Dict[str, Any], source_node_id: str
