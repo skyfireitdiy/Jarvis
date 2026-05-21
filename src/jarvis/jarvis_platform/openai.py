@@ -137,6 +137,35 @@ class OpenAIModel(BasePlatform):
             reasoning_effort_value if reasoning_effort_value else None
         )
 
+        # Optional: Set extra_body for additional API parameters via llm_config
+        # Expected format: openai_extra_body='{"key": "value"}' or dict
+        extra_body_value = llm_config.get("openai_extra_body")
+        if extra_body_value is None:
+            extra_body_str = os.getenv("OPENAI_EXTRA_BODY")
+        else:
+            extra_body_str = (
+                extra_body_value
+                if isinstance(extra_body_value, str)
+                else json.dumps(extra_body_value)
+            )
+
+        self.extra_body: Optional[Dict[str, Any]] = None
+        if extra_body_str:
+            try:
+                parsed = (
+                    json.loads(extra_body_str)
+                    if isinstance(extra_body_str, str)
+                    else extra_body_str
+                )
+                if isinstance(parsed, dict):
+                    self.extra_body = parsed
+                else:
+                    PrettyOutput.auto_print(
+                        "⚠️ openai_extra_body must be a JSON object, ignoring."
+                    )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ Failed to parse openai_extra_body: {e}")
+
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
             if self.extra_headers:
@@ -282,9 +311,13 @@ class OpenAIModel(BasePlatform):
                 "temperature": 0.1,
                 "top_p": 0.3,
             }
-            # 只有在配置了 reasoning_effort 时才添加 extra_body 参数
+            # 只有在配置了 reasoning_effort 时才添加 reasoning_effort 参数
             if self.reasoning_effort:
                 api_params["reasoning_effort"] = self.reasoning_effort
+
+            # 只有在配置了 extra_body 时才添加 extra_body 参数
+            if self.extra_body:
+                api_params["extra_body"] = self.extra_body
 
             # 如果没有指定 max_tokens，设置为 1M 确保有足够空间处理 reasoning_content
             if "max_tokens" not in api_params:
