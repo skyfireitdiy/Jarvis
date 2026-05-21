@@ -507,6 +507,11 @@ def run(
         "--reset",
         help="重置状态，从头开始执行所有阶段",
     ),
+    quick_mode: bool = typer.Option(
+        False,
+        "--quick-mode",
+        help="快速模式，关闭方法论、规则加载等",
+    ),
 ) -> None:
     """
     依次执行流水线：scan -> lib-replace -> prepare -> transpile -> optimize
@@ -665,6 +670,7 @@ def run(
                 root_symbols=None,  # 从配置文件恢复
                 non_interactive=not interactive,
                 enable_ffi_export_validation=enable_ffi_export_validation,
+                quick_mode=quick_mode,
             )
             PrettyOutput.auto_print("✅ [c2rust-run] transpile: 完成")
             # 保存状态（因为直接调用 _run_transpile 函数，需要手动保存状态）
@@ -691,6 +697,7 @@ def run(
                     project_root=project_root,
                     crate_dir=crate_dir,
                     non_interactive=not interactive,
+                    quick_mode=quick_mode,
                 )
                 summary = (
                     f"[c2rust-run] optimize: 结果摘要:\n"
@@ -746,6 +753,11 @@ def verify(
         "--interactive",
         help="启用交互模式（默认非交互模式）",
     ),
+    quick_mode: bool = typer.Option(
+        False,
+        "--quick-mode",
+        help="快速模式，关闭方法论、规则加载等",
+    ),
 ) -> None:
     """
     验证转译后的 Rust 代码与原 C 代码的功能对齐性，并支持迭代优化。
@@ -784,6 +796,7 @@ def verify(
             project_root=Path("."),
             max_iterations=max_iterations,
             non_interactive=not interactive,
+            quick_mode=quick_mode,
         )
     except Exception as e:
         PrettyOutput.auto_print(f"❌ [c2rust-verify] 错误: {e}")

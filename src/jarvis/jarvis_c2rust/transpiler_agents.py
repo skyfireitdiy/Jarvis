@@ -34,6 +34,7 @@ class AgentManager:
         fn_index_by_id: Dict[int, FnRecord],
         get_crate_commit_hash_func: Callable[[], str],
         agent_before_commits: Dict[str, Optional[str]],
+        quick_mode: bool = False,
     ) -> None:
         self.crate_dir = crate_dir
         self.project_root = project_root
@@ -42,6 +43,7 @@ class AgentManager:
         self.fn_index_by_id = fn_index_by_id
         self.get_crate_commit_hash = get_crate_commit_hash_func
         self.agent_before_commits = agent_before_commits
+        self.quick_mode = quick_mode
         self._current_function_id: Optional[int] = None
         self._current_context_full_header: str = ""
         self._current_context_compact_header: str = ""
@@ -76,6 +78,7 @@ class AgentManager:
             use_analysis=True,
             enable_task_list_manager=False,
             disable_review=True,
+            quick_mode=self.quick_mode,
         )
         # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
         agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)
@@ -144,6 +147,7 @@ class AgentManager:
             use_methodology=True,
             use_analysis=True,
             disable_review=True,
+            quick_mode=self.quick_mode,
         )
         # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
         agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)
@@ -197,6 +201,7 @@ class AgentManager:
             use_analysis=True,
             enable_task_list_manager=False,
             disable_review=True,
+            quick_mode=self.quick_mode,
         )
         # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
         agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)
