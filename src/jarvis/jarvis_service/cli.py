@@ -19,6 +19,31 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
+
+def validate_node_id(node_id: str) -> None:
+    """验证 node_id 是否只包含 URL 安全字符（白名单方式）。
+
+    使用白名单验证：只允许字母、数字、下划线、连字符和点号。
+    空字符串视为无效输入。
+
+    Args:
+        node_id: 要验证的节点 ID
+
+    Raises:
+        ValueError: 当 node_id 为空或包含非法字符时
+    """
+    if not node_id:
+        raise ValueError("node-id 不能为空")
+
+    # 白名单：只允许字母、数字、下划线、连字符和点号
+    import re
+
+    if not re.match(r"^[a-zA-Z0-9_.\-]+$", node_id):
+        raise ValueError(
+            "node-id 包含非法字符。只允许字母、数字、下划线、连字符和点号。示例：node-001、worker.node_1"
+        )
+
+
 DEFAULT_GATEWAY_HOST = "127.0.0.1"
 DEFAULT_GATEWAY_PORT = 8000
 DEFAULT_FRONTEND_HOST = "127.0.0.1"
@@ -384,6 +409,9 @@ def build_service_config(
     )
     resolved_node_mode = node_mode or os.getenv("JARVIS_NODE_MODE", "master")
     resolved_node_id = node_id or os.getenv("JARVIS_NODE_ID") or None
+    # 验证 node_id 是否包含 URL 不安全字符
+    if resolved_node_id:
+        validate_node_id(resolved_node_id)
     resolved_master_url = master_url or os.getenv("JARVIS_MASTER_URL") or None
     resolved_node_secret = node_secret or os.getenv("JARVIS_NODE_SECRET") or None
     resolved_dev_mode = dev_mode or os.getenv("JARVIS_DEV_MODE", "false").lower() in (
