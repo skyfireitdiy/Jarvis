@@ -16,6 +16,7 @@
       :getStatusClass="getStatusClass"
       :getStatusText="getStatusText"
       :getNodeLabel="getAgentNodeLabel"
+      :getProxyNodeLabel="getAgentProxyNodeLabel"
       :isSelected="isAgentSelected"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
@@ -4351,6 +4352,10 @@ watch(availableNodeOptions, (nodes) => {
 
 function getAgentNodeLabel(agent) {
   return String(agent?.node_id || '').trim() || 'master'
+}
+
+function getAgentProxyNodeLabel(agent) {
+  return String(agent?.proxy_node || '').trim()
 }
 
 function getCurrentAgentNodeId() {
