@@ -9,9 +9,9 @@
   "theme_color": "#0d1117",
   "icons": [
     {
-      "src": "/icons/robot.svg",
+      "src": "/icons/jarvis-logo.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
