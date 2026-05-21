@@ -62,15 +62,15 @@ LINT_AUTO_FIX_COMMANDS: Dict[str, List[str]] = {
 # - {config}: 配置文件路径（可选）
 LINT_COMMAND_TEMPLATES_BY_FILE: Dict[str, List[str]] = {
     # C/C++
-    ".c": ["clang-tidy {file_path}"],
-    ".cpp": ["clang-tidy {file_path}"],
-    ".cc": ["clang-tidy {file_path}"],
-    ".cxx": ["clang-tidy {file_path}"],
-    ".h": ["clang-tidy {file_path}"],
-    ".hpp": ["clang-tidy {file_path}"],
-    ".hxx": ["clang-tidy {file_path}"],
-    ".inl": ["clang-tidy {file_path}"],
-    ".ipp": ["clang-tidy {file_path}"],
+    ".c": ["clang-tidy --checks=* {file_path}"],
+    ".cpp": ["clang-tidy --checks=* {file_path}"],
+    ".cc": ["clang-tidy --checks=* {file_path}"],
+    ".cxx": ["clang-tidy --checks=* {file_path}"],
+    ".h": ["clang-tidy --checks=* {file_path}"],
+    ".hpp": ["clang-tidy --checks=* {file_path}"],
+    ".hxx": ["clang-tidy --checks=* {file_path}"],
+    ".inl": ["clang-tidy --checks=* {file_path}"],
+    ".ipp": ["clang-tidy --checks=* {file_path}"],
     # Go
     ".go": ["go vet {file_path}"],
     # Python
