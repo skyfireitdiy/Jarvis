@@ -653,6 +653,7 @@ class ReviewManager:
                 use_methodology=False,
                 use_analysis=False,
                 model_type="smart",
+                quick_mode=True,
             )
             # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
             review_agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)

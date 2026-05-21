@@ -78,6 +78,7 @@ class Transpiler:
         ] = None,  # 根符号列表（这些符号对应的接口实现时要求对外暴露，main除外）
         non_interactive: bool = True,
         enable_ffi_export_validation: bool = False,  # 启用 FFI 导出验证
+        quick_mode: bool = False,
     ) -> None:
         self.project_root = Path(project_root).resolve()
         self.data_dir = self.project_root / C2RUST_DIRNAME
@@ -108,6 +109,7 @@ class Transpiler:
         self.review_max_iterations = review_max_iterations
         self.non_interactive = non_interactive
         self.enable_ffi_export_validation = enable_ffi_export_validation
+        self.quick_mode = quick_mode
 
         self.crate_dir = (
             Path(crate_dir) if crate_dir else default_crate_dir(self.project_root)
@@ -173,6 +175,7 @@ class Transpiler:
             self.fn_index_by_id,
             self._get_crate_commit_hash,
             self._agent_before_commits,
+            quick_mode=self.quick_mode,
         )
         self.agent_manager.set_reset_to_commit_func(self._reset_to_commit)
 
@@ -892,6 +895,7 @@ def run_transpile(
     root_symbols: Optional[List[str]] = None,  # None 表示从配置文件恢复
     non_interactive: bool = True,
     enable_ffi_export_validation: bool = False,  # 启用 FFI 导出验证
+    quick_mode: bool = False,
 ) -> None:
     """
     入口函数：执行转译流程
@@ -913,5 +917,6 @@ def run_transpile(
         root_symbols=root_symbols,
         non_interactive=non_interactive,
         enable_ffi_export_validation=enable_ffi_export_validation,
+        quick_mode=quick_mode,
     )
     t.transpile()

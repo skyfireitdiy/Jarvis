@@ -322,6 +322,7 @@ def optimize_project(
     git_guard: bool = True,
     cargo_test_timeout: int = 300,
     non_interactive: bool = True,
+    quick_mode: bool = False,
 ) -> Dict:
     """
     对指定 crate 执行优化。返回结果摘要 dict。
@@ -362,6 +363,7 @@ def optimize_project(
         git_guard=git_guard,
         cargo_test_timeout=cargo_test_timeout,
         non_interactive=non_interactive,
+        quick_mode=quick_mode,
     )
     optimizer = Optimizer(crate, opts, project_root=project_root)
     stats = optimizer.run()
