@@ -1,0 +1,12 @@
+{
+  "id": "20260518_152809_965451",
+  "type": "project_long_term",
+  "tags": [
+    "主网关",
+    "功能架构",
+    "Web Gateway"
+  ],
+  "content": "## Jarvis 主网关（Web Gateway）核心功能\n\n### 1. 网关类型\n- **CLI Gateway** (`jarvis_gateway`): 命令行交互网关，提供基础输入/输出/确认功能\n- **Web Gateway** (`jarvis_web_gateway`): FastAPI 实现的 Web 服务网关，提供完整的分布式架构支持\n\n### 2. 核心功能模块\n\n#### 认证与安全\n- Token 认证机制（`token_manager.py`）\n- 密码认证回退（用于 CLI Gateway）\n- 节点间通信密钥验证\n\n#### Agent 管理\n- 创建/删除/停止 Agent (`POST/DELETE /api/agents`)\n- 获取 Agent 列表 (`GET /api/agents`)\n- Agent 会话管理 (`GET/POST /api/agents/{agent_id}/sessions`)\n- Agent 状态跟踪与回调\n\n#### 节点管理（分布式架构）\n- 主节点/子节点模式 (`--node-mode master/child`)\n- 节点注册与状态上报\n- 节点配置管理 (`GET/POST /api/nodes/{node_id}/config`)\n- 节点代码更新通知 (`POST /api/nodes/{node_id}/code-update`)\n- 节点间 WebSocket 长连接通信\n\n#### WebSocket 通信\n- 主 WebSocket 端点 (`/ws`): 客户端连接\n- 节点 WebSocket (`/ws/node`, `/api/node/master/ws`): 节点间通信\n- Agent 代理 WebSocket (`/api/agent/{agent_id}/ws`): 转发到特定 Agent\n- 分布式 WebSocket (`/api/node/{node_id}/agent/{agent_id}/ws`): 跨节点转发\n\n#### HTTP API 代理\n- 节点 HTTP 代理 (`/api/node/{node_id}/proxy/*`)\n- Agent HTTP 代理 (`/api/agent/{agent_id}/proxy/*`)\n- 自动路由转发到目标节点\n\n#### 文件操作\n- 读取文件内容 (`POST /api/file-content`)\n- 写入文件 (`POST /api/file-write`)\n- 获取文件统计信息 (`POST /api/file-stat`)\n- 目录浏览 (`GET /api/directories`)\n\n#### 终端管理\n- 创建虚拟终端 (`POST /api/terminals`)\n- 获取终端列表 (`GET /api/terminals`)\n- 删除终端 (`DELETE /api/terminals/{terminal_id}`)\n- 终端尺寸变更回调\n\n#### 定时器管理\n- 创建/获取/删除定时器 (`POST/GET/DELETE /api/timers`)\n- 定时器状态跟踪\n\n#### 模型与补全\n- 获取模型组列表 (`GET /api/model-groups`)\n- 获取补全记录 (`GET /api/completions/{agent_id}`)\n- 补全搜索 (`GET /api/completions/{agent_id}/search`)\n- 全局搜索 (`POST /api/global-search/{agent_id}`)\n\n#### 服务控制\n- 重启服务 (`POST /api/service/restart`)\n- 执行状态查询 (`GET /api/node/status`)\n- 获取节点密钥 (`GET /api/node/secret`)\n\n### 3. 架构特点\n- **统一入口**: 客户端只需连接主节点，自动路由到对应子节点\n- **负载分担**: 支持多节点部署，Agent 可分配到不同节点运行\n- **环境隔离**: 不同节点可配置独立环境和工具集\n- **人机协作**: 支持用户介入审查、确认高风险操作\n- **事件驱动**: 基于 WebSocket 的实时事件推送机制\n\n### 4. 关键文件\n- `src/jarvis/jarvis_gateway/gateway.py`: 网关接口定义\n- `src/jarvis/jarvis_gateway/cli_gateway.py`: CLI 网关实现\n- `src/jarvis/jarvis_web_gateway/app.py`: Web Gateway 主应用（4383 行）\n- `src/jarvis/jarvis_web_gateway/node_manager.py`: 节点管理\n- `src/jarvis/jarvis_web_gateway/agent_manager.py`: Agent 管理\n- `src/jarvis/jarvis_web_gateway/token_manager.py`: Token 认证",
+  "created_at": "2026-05-18T15:28:09.965480",
+  "updated_at": "2026-05-18T15:28:09.965484"
+}

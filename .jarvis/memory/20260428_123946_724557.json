@@ -1,0 +1,14 @@
+{
+  "id": "20260428_123946_724557",
+  "type": "project_long_term",
+  "tags": [
+    "编码检测",
+    "charset_normalizer",
+    "文件工具",
+    "一致性",
+    "经验教训"
+  ],
+  "content": "## 编码检测优化任务关键发现\n\n### 1. charset_normalizer 库使用经验\n- **from_path 方法局限性**：对 GBK 文件检测不准确，会误判为 `utf_16_be` 编码\n- **from_bytes 方法更稳定**：使用样本数据检测，结果更可靠\n- **性能考虑**：`from_path` 读取整个文件，对大文件可能有性能影响；`from_bytes` 只读取样本数据（默认16KB）\n\n### 2. 编码处理一致性修复\n- **问题**：`read_code.py` 编码处理与 `edit_file.py` 不一致，缺少 `detect_file_encoding` 回退机制\n- **解决方案**：在 `read_code.py` 的 `_read_text_with_preferred_encoding` 方法中添加 `detect_file_encoding` 作为回退\n- **验证结果**：修复后 `read_code` 和 `edit_file` 对 GBK 文件读取内容一致\n\n### 3. 规范遵循\n- 遵循 `file_encoding_detection_spec.md` 和 `file_tool_encoding_consistency_spec.md` 规范\n- 保持 `edit_file` 与 `read_code` 编码处理策略一致\n- 不使用 `errors=\"ignore\"` 作为主读取路径\n\n### 4. 技术决策\n- 保留 `from_bytes` 方法而非 `from_path`，确保编码检测准确性\n- 移除 UTF-16 检测结果的额外 GBK 验证，避免误判\n- 更新函数注释说明使用 `from_bytes` 方法",
+  "created_at": "2026-04-28T12:39:46.724583",
+  "updated_at": "2026-04-28T12:39:46.724588"
+}

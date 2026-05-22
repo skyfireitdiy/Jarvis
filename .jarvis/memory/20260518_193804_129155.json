@@ -1,0 +1,12 @@
+{
+  "id": "20260518_193804_129155",
+  "type": "project_long_term",
+  "tags": [
+    "前端开发",
+    "Vue",
+    "图标"
+  ],
+  "content": "修改 Vue 组件时注意检查多处相似的代码块（如 v-for 循环），确保修改一致。AgentSidebar.vue 中有两处 agent-item 渲染模板，第35行和第69行的 agent-type-icon 需要保持一致。",
+  "created_at": "2026-05-18T19:38:04.129179",
+  "updated_at": "2026-05-18T19:38:04.129182"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260511_112457_643062",
+  "type": "project_long_term",
+  "tags": [
+    "前端开发",
+    "确认框",
+    "Vue",
+    "开发规范"
+  ],
+  "content": "项目确认框规范：使用自定义 ConfirmDialog 组件和 showConfirm() 函数，不要使用浏览器原生 confirm()。showConfirm(message, confirmCallback, cancelCallback, defaultConfirm) 用法：在父组件中定义确认逻辑，子组件通过 emit 事件触发。",
+  "created_at": "2026-05-11T11:24:57.643086",
+  "updated_at": "2026-05-11T11:24:57.643101"
+}
