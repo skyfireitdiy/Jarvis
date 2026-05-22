@@ -4529,6 +4529,39 @@ def create_app(
         """写入指定绝对路径文本文件的内容。"""
         return await _handle_file_write_request(request)
 
+    @app.post("/api/data/{key}", dependencies=[Depends(verify_token)])
+    async def save_data_api(key: str, request: Dict[str, Any]) -> Dict[str, Any]:
+        """保存数据到存储。"""
+        from jarvis.jarvis_web_gateway.data_storage import save_data
+
+        success, error = save_data(key, request)
+        if success:
+            return {"success": True, "message": "Data saved successfully"}
+        else:
+            return {"success": False, "error": error}
+
+    @app.get("/api/data/{key}", dependencies=[Depends(verify_token)])
+    async def load_data_api(key: str) -> Dict[str, Any]:
+        """从存储中读取数据。"""
+        from jarvis.jarvis_web_gateway.data_storage import load_data
+
+        success, data, error = load_data(key)
+        if success:
+            return {"success": True, "data": data}
+        else:
+            return {"success": False, "error": error}
+
+    @app.delete("/api/data/{key}", dependencies=[Depends(verify_token)])
+    async def delete_data_api(key: str) -> Dict[str, Any]:
+        """从存储中删除数据。"""
+        from jarvis.jarvis_web_gateway.data_storage import delete_data
+
+        success, error = delete_data(key)
+        if success:
+            return {"success": True, "message": "Data deleted successfully"}
+        else:
+            return {"success": False, "error": error}
+
     @app.get("/api/directories", dependencies=[Depends(verify_token)])
     async def list_directories(path: str = "", node_id: str = "") -> Dict[str, Any]:
         """获取指定路径下的目录列表。"""
