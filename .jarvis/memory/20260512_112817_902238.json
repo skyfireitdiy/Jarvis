@@ -1,0 +1,14 @@
+{
+  "id": "20260512_112817_902238",
+  "type": "project_long_term",
+  "tags": [
+    "bug 修复经验",
+    "状态管理",
+    "Vue",
+    "WebSocket",
+    "前端开发"
+  ],
+  "content": "Vue 前端状态同步 Bug 修复经验：当 WebSocket 推送状态更新时，必须同时更新两处数据才能触发界面响应式更新：1) agentStatuses.value（用于 getStatusClass 读取）；2) agentList 中对应 agent 对象的 status 属性（某些场景的回退值）。只更新 agentStatuses 不够，因为 agentList 的变化也能触发界面更新。修改位置：App.vue handleMessage() 中 type === 'status_update' 的处理逻辑。",
+  "created_at": "2026-05-12T11:28:17.902263",
+  "updated_at": "2026-05-12T11:28:17.902267"
+}

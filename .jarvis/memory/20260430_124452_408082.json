@@ -1,0 +1,13 @@
+{
+  "id": "20260430_124452_408082",
+  "type": "project_long_term",
+  "tags": [
+    "bug修复",
+    "会话恢复",
+    "WebSocket认证",
+    "时序问题"
+  ],
+  "content": "## 修复：会话恢复时request_input因token missing失败\n\n### 问题根因\n会话恢复时，`request_input` 被调用时WebSocket连接尚未建立，`_auth_store` 中没有认证信息，导致 `_check_auth` 返回 `False, \"token missing\"`，`request_input` 直接返回空字符串跳过会话恢复。\n\n### 时序问题\n1. Agent启动，开始会话恢复流程\n2. 调用 `request_input` 发送会话列表到前端\n3. 此时WebSocket连接尚未建立，`_auth_store[\"default\"]` 为空\n4. `_check_auth` 返回 `token missing`\n5. `request_input` 返回空字符串，会话恢复被跳过\n6. 之后WebSocket连接才建立，设置 `_auth_store[\"default\"]`\n\n### 解决方案\n在 `request_input` 方法中添加等待逻辑，最多等待30秒让WebSocket连接建立：\n- 循环检查认证状态\n- 如果认证通过，跳出循环继续执行\n- 如果超时，返回错误\n\n### 修改文件\n- `src/jarvis/jarvis_web_gateway/app.py` - `request_input` 方法\n\n### 验证方法\n1. 重启服务\n2. 观察日志中是否出现 `[REQUEST_INPUT] waiting for WebSocket connection` 等待日志\n3. 确认会话恢复正常工作，前端能接收到会话列表",
+  "created_at": "2026-04-30T12:44:52.408105",
+  "updated_at": "2026-04-30T12:44:52.408110"
+}

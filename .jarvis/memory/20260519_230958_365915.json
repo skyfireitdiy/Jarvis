@@ -1,0 +1,13 @@
+{
+  "id": "20260519_230958_365915",
+  "type": "project_long_term",
+  "tags": [
+    "proxy_node",
+    "Web Gateway",
+    "LLM 代理",
+    "架构设计"
+  ],
+  "content": "## Agent 代理节点 (proxy_node) 全链路实现\n\n### 核心流程\n1. 前端创建 Agent 时选择 proxy_node（下拉框，来自 nodeOptions）\n2. app.py:create_agent 读取 request.get(\"proxy_node\") 并传递给 agent_manager.create_agent()\n3. agent_manager._build_command() 添加 --proxy-node 和 --master-url 命令行参数\n4. Agent 进程启动时解析参数，设置 jglobals.proxy_node 和 jglobals.master_url\n5. LLM 平台（openai.py/claude.py）检查全局变量，转换 base_url 为代理格式：\n   - 原始：https://api.openai.com/v1\n   - 代理：http://127.0.0.1:8000/http_proxy/https://api.openai.com/v1\n6. Web Gateway 的 node_http_proxy 处理 /http_proxy/ 路径，流式转发到外部 LLM API\n\n### 关键文件\n- agent_manager.py: create_agent, _build_command (第 579-585 行)\n- app.py: create_agent API (第 2455, 2521, 2566 行)\n- openai.py/claude.py: base_url 转换逻辑 (第 66-68 行)\n- CreateAgentModal.vue: 代理节点下拉框 (第 46-55 行)\n- App.vue: newAgentProxyNode 变量 (第 2757 行)\n\n### 架构决策\n- HTTP 代理逻辑分别在 app.py（外部 API）和 agent_proxy_manager.py（内部 Agent）实现，职责分离，暂不合并\n- 流式检测基于 Accept: text/event-stream 头\n- 远程节点创建 Agent 时也传递 proxy_node，需确保所有节点代码同步",
+  "created_at": "2026-05-19T23:09:58.365940",
+  "updated_at": "2026-05-19T23:09:58.365945"
+}

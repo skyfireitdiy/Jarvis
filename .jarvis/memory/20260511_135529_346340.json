@@ -1,0 +1,13 @@
+{
+  "id": "20260511_135529_346340",
+  "type": "project_long_term",
+  "tags": [
+    "架构",
+    "状态管理",
+    "confirm",
+    "agent切换"
+  ],
+  "content": "# Agent 状态管理架构\n\n## 核心组件\n- **InputSessionRegistry** (`src/jarvis/jarvis_gateway/input_bridge.py`): 管理 pending confirm 请求\n  - `save_confirm_request()`: 保存 confirm 请求\n  - `get_confirm_request()`: 获取并移除 confirm 请求\n\n## 状态流转\n1. 后端 `request_confirm()` 函数：\n   - 发送 confirm 消息到前端\n   - 保存到 `input_registry`\n   - 更新状态为 `waiting_confirm`\n\n2. 前端 `fetchAgentStatus()` 函数：\n   - 获取 agent 状态\n   - 如果状态为 `waiting_confirm`，从响应中获取 `pending_confirm`\n   - 调用 `showConfirm()` 显示对话框\n\n## 设计决策\n- 将 `pending_confirm` 作为 status 的一部分返回，避免额外的 API 调用\n- 后端在 `agent_http_proxy` 函数中代理 `/status` 请求时添加 `pending_confirm` 字段\n- 前端复用现有的 `showConfirm()` 和 `sendConfirmResult()` 函数",
+  "created_at": "2026-05-11T13:55:29.346364",
+  "updated_at": "2026-05-11T13:55:29.346368"
+}

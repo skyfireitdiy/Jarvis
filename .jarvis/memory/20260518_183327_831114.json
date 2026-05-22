@@ -1,0 +1,13 @@
+{
+  "id": "20260518_183327_831114",
+  "type": "project_long_term",
+  "tags": [
+    "远程部署",
+    "jarvis-service",
+    "SSH部署",
+    "systemd"
+  ],
+  "content": "远程部署Jarvis Rule设计要点：\n- 参考 scripts/install.sh 的部署流程\n- 使用 sshpass 进行远程SSH命令执行\n- jarvis-service CLI: jarvis-service install/start\n- node-mode: master (需要npm) / child (需要--master-url --node-secret)\n- Rule文件位置: builtin/rules/deployment/\n- Rule格式: YAML头部(name/description) + Markdown内容",
+  "created_at": "2026-05-18T18:33:27.831142",
+  "updated_at": "2026-05-18T18:33:27.831147"
+}

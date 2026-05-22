@@ -1,0 +1,13 @@
+{
+  "id": "20260510_225708_419866",
+  "type": "project_long_term",
+  "tags": [
+    "前端开发",
+    "认证机制",
+    "Token 存储",
+    "bug 修复经验"
+  ],
+  "content": "Jarvis 前端项目中，认证 Token 在 localStorage 中的存储键名必须统一使用 `jarvis_auth_token`。\n\n关键位置：\n- 存储位置：src/jarvis/jarvis_service/frontend/src/App.vue:820 - `localStorage.setItem('jarvis_auth_token', token)`\n- 读取位置：src/jarvis/jarvis_service/frontend/src/App.vue:842 - `localStorage.getItem('jarvis_auth_token')`\n- 错误示例：src/jarvis/jarvis_service/frontend/src/components/SettingsModal.vue:292（已修复）- 曾错误使用 `jarvis_token`\n\n开发规范：任何新增的前端代码需要读取认证 Token 时，必须使用 `jarvis_auth_token` 键名，否则会导致认证失败（401 HTML 错误页），前端解析 JSON 时报错 `Unexpected token '<'`。",
+  "created_at": "2026-05-10T22:57:08.419887",
+  "updated_at": "2026-05-10T22:57:08.419891"
+}

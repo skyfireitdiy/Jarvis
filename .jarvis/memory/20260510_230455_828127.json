@@ -1,0 +1,12 @@
+{
+  "id": "20260510_230455_828127",
+  "type": "project_long_term",
+  "tags": [
+    "前端开发",
+    "认证机制",
+    "最佳实践"
+  ],
+  "content": "Jarvis 前端项目中，子组件需要获取认证 Token 时的最佳实践：\n\n**问题场景**：\n- Token 可能保存在内存中（auth.value.token），也可能保存在 localStorage 中（取决于是否开启免登录）\n- 子组件如果直接从 localStorage 读取，当用户未开启免登录时会得到 null，导致认证失败\n\n**正确做法**：\n1. 在 App.vue 中定义统一的 getToken 函数：\n   ```javascript\n   function getAuthToken() {\n     // 优先返回内存中的 Token\n     if (auth.value.token) return auth.value.token\n     // 其次尝试从 localStorage 获取\n     const savedToken = localStorage.getItem('jarvis_auth_token')\n     if (savedToken) {\n       auth.value.token = savedToken\n       return savedToken\n     }\n     return null\n   }\n   ```\n2. 通过 props 将 getToken 函数传递给子组件：`:getToken=\"getAuthToken\"`\n3. 子组件通过 `props.getToken()` 获取 Token，而不是直接访问 localStorage\n\n**优势**：\n- 统一 Token 获取逻辑，避免多处重复代码\n- 支持内存和 localStorage 两种来源\n- 子组件无需关心 Token 存储细节\n- 便于后续扩展（如添加 Token 刷新逻辑）",
+  "created_at": "2026-05-10T23:04:55.828150",
+  "updated_at": "2026-05-10T23:04:55.828155"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260509_094427_225402",
+  "type": "project_long_term",
+  "tags": [
+    "功能开发",
+    "无交互模式",
+    "Agent 创建",
+    "全栈开发"
+  ],
+  "content": "## 无交互模式功能实现要点\n\n**功能描述**: 创建 Agent 时支持无交互模式，此模式下必须提供任务描述参数，Agent 将自动执行任务而不等待用户确认。\n\n**技术实现**:\n1. **后端** (`jarvis_web_gateway`):\n   - `AgentInfo` 类添加 `no_interaction_mode: bool` 字段\n   - `AgentManager.create_agent()` 方法添加参数并验证：无交互模式下必须有 `task` 参数\n   - API 接口 (`app.py`) 解析 `no_interaction_mode` 和 `task` 参数\n\n2. **前端 Vue** (`jarvis_service/frontend`):\n   - `CreateAgentModal.vue`: 添加无交互模式开关和任务描述输入框（条件渲染）\n   - `App.vue`: 添加响应式变量 `newAgentNoInteractionMode` 和 `newAgentTaskDescription`\n   - 提交校验：无交互模式开启时，任务描述不能为空\n   - API 请求包含 `no_interaction_mode` 和 `task` 参数\n\n3. **VSCode 扩展** (`jarvis_vscode_extension`):\n   - `AgentListItem` 接口添加 `restoreSession` 字段\n   - `AgentListViewMessage` 接口添加 `noInteractionMode` 和 `taskDescription` 字段\n   - HTML 表单添加 checkbox 和 textarea，支持切换显示/隐藏\n   - 提交逻辑中添加校验和参数传递\n   - TypeScript 类型修复：确保 `escapeHtml` 参数始终为字符串\n\n**三层验证体系**:\n1. UI 层：实时显示错误提示\n2. 提交层：阻止空任务描述提交\n3. 后端层：最终验证保证数据完整性\n\n**相关文件**:\n- `src/jarvis/jarvis_web_gateway/agent_manager.py`\n- `src/jarvis/jarvis_web_gateway/app.py`\n- `src/jarvis/jarvis_service/frontend/src/components/CreateAgentModal.vue`\n- `src/jarvis/jarvis_service/frontend/src/App.vue`\n- `src/jarvis/jarvis_vscode_extension/src/extension.ts`",
+  "created_at": "2026-05-09T09:44:27.225429",
+  "updated_at": "2026-05-09T09:44:27.225433"
+}

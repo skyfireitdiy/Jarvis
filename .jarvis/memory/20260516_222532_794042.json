@@ -1,0 +1,13 @@
+{
+  "id": "20260516_222532_794042",
+  "type": "project_long_term",
+  "tags": [
+    "Vue",
+    "终端管理",
+    "bug 修复经验",
+    "状态管理"
+  ],
+  "content": "## Vue 终端生命周期管理 - 避免已完成终端意外重建\n\n**问题场景**：命令执行结束后，切换 agent 再切回时，已完成的终端会意外重建。\n\n**根因**：\n- 命令结束时从 terminals 数组完全删除 termInfo 记录，导致 ended=true 状态丢失\n- 切换回来时找不到原有 termInfo，创建新记录（默认 ended=false）\n- 新记录满足初始化条件 (!terminal && !ended)，触发重建\n\n**正确做法**：\n- 保留 termInfo 记录（保持 ended=true），仅清理 terminalHosts 映射和 terminal 实例\n- 切换回来时检查 ended 状态，为 true 则跳过初始化\n\n**关键代码位置**：\n- 清理逻辑：src/jarvis/jarvis_service/frontend/src/App.vue:6163-6172 (appendExecution 函数)\n- 判断逻辑：src/jarvis/jarvis_service/frontend/src/App.vue:6886-6887 (setTerminalRef 函数)\n\n**设计原则**：\n- 状态对象应保留关键状态标识，不应完全删除\n- 清理资源时区分\"状态记录\"和\"资源实例\"\n- 状态记录用于后续判断，资源实例可释放",
+  "created_at": "2026-05-16T22:25:32.794064",
+  "updated_at": "2026-05-16T22:25:32.794068"
+}
