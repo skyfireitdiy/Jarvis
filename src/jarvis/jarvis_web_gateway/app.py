@@ -4356,6 +4356,34 @@ def create_app(
             result = await _handle_file_stat_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-write":
             result = await _handle_file_write_request(payload)
+        elif normalized_path.startswith("/data/"):
+            from jarvis.jarvis_web_gateway.data_storage import (
+                save_data,
+                load_data,
+                delete_data,
+            )
+
+            key = normalized_path[len("/data/") :]
+            if normalized_method == "POST":
+                success, error = save_data(key, payload)
+                if success:
+                    result = {"success": True, "message": "Data saved successfully"}
+                else:
+                    result = {"success": False, "error": error}
+            elif normalized_method == "GET":
+                success, data, error = load_data(key)
+                if success:
+                    result = {"success": True, "data": data}
+                else:
+                    result = {"success": False, "error": error}
+            elif normalized_method == "DELETE":
+                success, error = delete_data(key)
+                if success:
+                    result = {"success": True, "message": "Data deleted successfully"}
+                else:
+                    result = {"success": False, "error": error}
+            else:
+                result = {"success": False, "error": "Method not allowed"}
         elif normalized_method == "GET" and normalized_path == "/node/status":
             result = await get_node_status()
         elif normalized_method == "POST" and normalized_path == "/service/restart":
