@@ -7,11 +7,12 @@
 """
 
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import jieba
 
 from jarvis.jarvis_utils.config import get_data_dir
 
@@ -163,16 +164,37 @@ class SmartRetriever:
             semantic_query.expanded_tags, memory_types
         )
 
-        # 4. 计算相关性得分并排序
+        # 4. 加载所有记忆以构建语料库
+        all_memories = self._load_all_memories(memory_types)
+        corpus = [memory.content for memory in all_memories]
+
+        # 5. 计算相关性得分并排序
         scored_memories = []
         for memory in candidates:
-            score = self._calculate_relevance_score(memory, semantic_query)
-            scored_memories.append((memory, score.total))
+            # 使用BM25计算内容相似度
+            content_similarity = self._calculate_bm25_score(
+                query, memory.content, corpus
+            )
 
-        # 5. 按得分排序
+            # 计算其他维度的得分
+            tag_match = self._calculate_tag_match(memory, semantic_query)
+            time_freshness = self._calculate_time_freshness(memory.created_at)
+            usage_frequency = self._calculate_usage_frequency(memory.id)
+
+            # 综合得分（权重：内容40%，标签30%，时间15%，使用频率15%）
+            total_score = (
+                content_similarity * 0.4
+                + tag_match * 0.3
+                + time_freshness * 0.15
+                + usage_frequency * 0.15
+            )
+
+            scored_memories.append((memory, total_score))
+
+        # 6. 按得分排序
         scored_memories.sort(key=lambda x: x[1], reverse=True)
 
-        # 6. 返回前N个结果
+        # 7. 返回前N个结果
         result = [m for m, _ in scored_memories[:limit]]
 
         # 更新使用统计
@@ -256,7 +278,7 @@ class SmartRetriever:
             tag_overlap = len(set(target_memory.tags) & set(memory.tags))
 
             # 计算内容相似度
-            content_similarity = self._calculate_content_similarity(
+            content_similarity = self._calculate_bm25_score(
                 target_memory.content, memory.content
             )
 
@@ -296,14 +318,9 @@ class SmartRetriever:
 
     def _extract_keywords(self, text: str) -> List[str]:
         """从文本中提取关键词"""
+        # 使用jieba进行分词
+        words = jieba.cut(text)
         keywords = []
-
-        # 使用简单的分词和关键词提取
-        # 移除标点符号
-        clean_text = re.sub(r"[^\w\s]", " ", text)
-
-        # 分词
-        words = clean_text.split()
 
         # 过滤停用词和短词
         stop_words = {
@@ -520,6 +537,16 @@ class SmartRetriever:
 
         return None
 
+    def _calculate_tag_match(self, memory: Memory, query: SemanticQuery) -> float:
+        """计算标签匹配度（0-100）"""
+        if not query.expanded_tags:
+            return 0.0
+
+        memory_tags_lower = [t.lower() for t in memory.tags]
+        query_tags_lower = [t.lower() for t in query.expanded_tags]
+        matched_tags = sum(1 for tag in query_tags_lower if tag in memory_tags_lower)
+        return min(100.0, matched_tags * 20.0)  # 每个匹配标签20分
+
     def _calculate_relevance_score(
         self, memory: Memory, query: SemanticQuery
     ) -> RelevanceScore:
@@ -527,17 +554,11 @@ class SmartRetriever:
         score = RelevanceScore()
 
         # 1. 标签匹配度（0-100）
-        if query.expanded_tags:
-            memory_tags_lower = [t.lower() for t in memory.tags]
-            query_tags_lower = [t.lower() for t in query.expanded_tags]
-            matched_tags = sum(
-                1 for tag in query_tags_lower if tag in memory_tags_lower
-            )
-            score.tag_match = min(100, matched_tags * 20)  # 每个匹配标签20分
+        score.tag_match = self._calculate_tag_match(memory, query)
 
         # 2. 内容语义相似度（0-100）
         score.content_similarity = (
-            self._calculate_content_similarity(query.query_text, memory.content) * 100
+            self._calculate_bm25_score(query.query_text, memory.content) * 100
         )
 
         # 3. 时间新鲜度（0-100）
@@ -548,23 +569,72 @@ class SmartRetriever:
 
         return score
 
-    def _calculate_content_similarity(self, text1: str, text2: str) -> float:
-        """计算内容相似度（简单的词重叠方法）"""
+    def _calculate_bm25_score(
+        self, text1: str, text2: str, corpus: Optional[List[str]] = None
+    ) -> float:
+        """计算内容相似度（使用BM25算法）"""
         if not text1 or not text2:
             return 0.0
 
+        # 如果文本完全相同，直接返回1.0
+        if text1 == text2:
+            return 1.0
+
         # 提取关键词
-        keywords1 = set(self._extract_keywords(text1))
-        keywords2 = set(self._extract_keywords(text2))
+        keywords1 = self._extract_keywords(text1)
+        keywords2 = self._extract_keywords(text2)
 
         if not keywords1 or not keywords2:
             return 0.0
 
-        # 计算Jaccard相似度
-        intersection = len(keywords1 & keywords2)
-        union = len(keywords1 | keywords2)
+        # 计算词频 (TF)
+        tf1 = {}
+        tf2 = {}
+        for word in keywords1:
+            tf1[word] = tf1.get(word, 0) + 1
+        for word in keywords2:
+            tf2[word] = tf2.get(word, 0) + 1
 
-        return intersection / union if union > 0 else 0.0
+        # BM25参数
+        k1 = 1.5
+        b = 0.75
+
+        # 计算平均文档长度
+        avgdl = (len(keywords1) + len(keywords2)) / 2
+
+        # 计算BM25分数
+        score = 0.0
+
+        # 遍历查询文档(text1)中的所有词
+        for word in set(keywords1):
+            if word in tf2:
+                # 词频
+                tf = tf2[word]
+                # 文档长度
+                dl = len(keywords2)
+
+                # BM25的TF分量
+                tf_component = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl / avgdl))
+
+                # 简化的IDF（假设只有两个文档）
+                # 如果词在两个文档中都出现，IDF较低
+                # 如果词只在一个文档中出现，IDF较高
+                if word in tf1:
+                    idf = 0.5  # 两个文档都出现
+                else:
+                    idf = 1.0  # 只在一个文档出现
+
+                score += idf * tf_component
+
+        # 归一化到0-1范围
+        # 使用最大可能分数进行归一化
+        max_possible_score = len(set(keywords1)) * 1.0 * (k1 + 1) / (k1 * (1 - b))
+        if max_possible_score > 0:
+            normalized_score = score / max_possible_score
+        else:
+            normalized_score = 0.0
+
+        return min(1.0, max(0.0, normalized_score))
 
     def _calculate_time_freshness(self, created_at: str) -> float:
         """计算时间新鲜度（0-100）"""
@@ -644,9 +714,7 @@ class SmartRetriever:
 
         # 2. 内容相似度（40%）
         combined_text = f"{context.task_description} {context.current_step}"
-        content_score = (
-            self._calculate_content_similarity(combined_text, memory.content) * 100
-        )
+        content_score = self._calculate_bm25_score(combined_text, memory.content) * 100
 
         # 3. 时间新鲜度（15%）
         time_score = self._calculate_time_freshness(memory.created_at)
