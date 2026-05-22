@@ -35,6 +35,9 @@
       @viewRules="viewRules"
       @viewTools="viewTools"
       @openEditor="createEditorForAgent"
+      @saveHistory="handleSaveHistory"
+      @restoreHistory="handleRestoreHistory"
+      @deleteHistory="handleDeleteHistory"
     />
 
     <!-- 主内容区 -->
@@ -5034,6 +5037,113 @@ async function deleteAgent(agentId) {
       } catch (error) {
         console.error('[AGENT] Delete failed:', error)
         alert(`删除失败: ${error.message}`)
+      }
+    }
+  )
+}
+
+// 保存 Agent 历史
+async function handleSaveHistory(agent) {
+  if (!agent || !agent.agent_id) {
+    showToast('无效的 Agent', 'error')
+    return
+  }
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const key = `agent_history_${agent.agent_id}`
+    // 这里假设 historyStorage 有方法获取当前 Agent 的历史记录
+    // 如果没有，需要根据实际情况调整
+    const historyData = historyStorage.getHistoryForAgent(agent.agent_id)
+    
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', `data/${key}`), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(historyData)
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      showToast('历史保存成功', 'success')
+    } else {
+      showToast(`保存失败: ${result.error || '未知错误'}`, 'error')
+    }
+  } catch (error) {
+    console.error('[HISTORY] Save failed:', error)
+    showToast(`保存失败: ${error.message}`, 'error')
+  }
+}
+
+// 恢复 Agent 历史
+async function handleRestoreHistory(agent) {
+  if (!agent || !agent.agent_id) {
+    showToast('无效的 Agent', 'error')
+    return
+  }
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const key = `agent_history_${agent.agent_id}`
+    
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', `data/${key}`), {
+      method: 'GET'
+    })
+
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      if (result.data) {
+        // 恢复历史数据
+        historyStorage.setHistoryForAgent(agent.agent_id, result.data)
+        showToast('历史恢复成功', 'success')
+        // 如果当前正在查看该 Agent，刷新显示
+        if (currentAgentId.value === agent.agent_id) {
+          // 重新加载历史记录
+          loadHistoryForCurrentAgent()
+        }
+      } else {
+        showToast('没有找到保存的历史记录', 'info')
+      }
+    } else {
+      showToast(`恢复失败: ${result.error || '未知错误'}`, 'error')
+    }
+  } catch (error) {
+    console.error('[HISTORY] Restore failed:', error)
+    showToast(`恢复失败: ${error.message}`, 'error')
+  }
+}
+
+// 删除 Agent 历史
+async function handleDeleteHistory(agent) {
+  if (!agent || !agent.agent_id) {
+    showToast('无效的 Agent', 'error')
+    return
+  }
+
+  showConfirm(
+    '确认删除该 Agent 的保存历史？此操作不可恢复。',
+    async () => {
+      try {
+        const { host, port } = getGatewayAddress()
+        const key = `agent_history_${agent.agent_id}`
+        
+        const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', `data/${key}`), {
+          method: 'DELETE'
+        })
+
+        const result = await response.json()
+
+        if (response.ok && result.success) {
+          showToast('历史删除成功', 'success')
+        } else {
+          showToast(`删除失败: ${result.error || '未知错误'}`, 'error')
+        }
+      } catch (error) {
+        console.error('[HISTORY] Delete failed:', error)
+        showToast(`删除失败: ${error.message}`, 'error')
       }
     }
   )
