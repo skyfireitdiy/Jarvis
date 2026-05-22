@@ -1,0 +1,13 @@
+{
+  "id": "20260515_002345_312880",
+  "type": "project_long_term",
+  "tags": [
+    "WebSocket",
+    "Composable",
+    "Vue重构",
+    "代码架构"
+  ],
+  "content": "## WebSocket Composables架构\n\n### 文件结构\n- `useWebSocket.js`（313行）：核心WebSocket连接管理，包含状态（socket, sockets, connecting等）和方法（connect, disconnect, reconnect, disconnectAll）\n- `useWebSocketUrls.js`（91行）：URL构建工具函数，包含getWebSocketProtocol, parseGatewayAddress, buildNodeWebSocketUrl, buildWebSocketUrl, buildAgentWebSocketUrl, buildWebSocketProtocols, getGatewayAddress\n- `useAgentConnection.js`（267行）：Agent WebSocket连接管理，包含connectToAgent函数，支持重试机制（最多12次，2秒间隔）\n\n### 设计决策\n1. 按职责分离：URL构建、连接管理、Agent连接分别独立\n2. 保持接口兼容：导出接口与原有App.vue中的WebSocket逻辑兼容\n3. 符合AI友好型规范：所有文件≤500行，函数≤50行\n\n### 依赖关系\n- useWebSocket.js 导入 useWebSocketUrls.js 和 useAgentConnection.js\n- App.vue 将导入 useWebSocket.js 使用",
+  "created_at": "2026-05-15T00:23:45.312934",
+  "updated_at": "2026-05-15T00:23:45.312940"
+}

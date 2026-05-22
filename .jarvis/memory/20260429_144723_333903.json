@@ -1,0 +1,13 @@
+{
+  "id": "20260429_144723_333903",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "App.vue拆分",
+    "ConfirmDialog",
+    "已完成"
+  ],
+  "content": "## ConfirmDialog 拆分完成\n\n### 完成时间\n2024年\n\n### 变更统计\n- App.vue: 10877行 → 10631行（减少246行）\n- ConfirmDialog.vue: 新增140行独立组件\n\n### 提交记录\n- 902f586: ConfirmDialog.vue 创建\n- dc299e3: App.vue 导入 ConfirmDialog\n- 7e9d865: App.vue 模板替换\n- 7206e8d: 删除 ref定义\n- 1b483a5: 修改 showConfirm 函数、删除 handleConfirmKeydown 和 watch\n- 5fe5772: 删除确认对话框样式\n\n### 待办事项\n- [P1] 删除 App.vue 中不再使用的变量和函数\n- [P2] 拆分其他大组件（编辑器等）- 用户要求后面再说",
+  "created_at": "2026-04-29T14:47:23.333944",
+  "updated_at": "2026-04-29T14:47:23.333950"
+}

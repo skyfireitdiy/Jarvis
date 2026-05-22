@@ -1,0 +1,13 @@
+{
+  "id": "20260515_020626_978374",
+  "type": "project_long_term",
+  "tags": [
+    "Vue重构",
+    "Composable",
+    "最佳实践",
+    "代码架构"
+  ],
+  "content": "成功将URL构建工具从App.vue提取到useUrlBuilder.js Composable。关键实践：1) 保持原有函数接口不变，2) 使用Vue 3 Composition API，3) 文件不超过300行，4) 添加JSDoc注释，5) 更新所有调用点传递必要参数（如getGatewayAddress需要gatewayUrl.value参数）。",
+  "created_at": "2026-05-15T02:06:26.978421",
+  "updated_at": "2026-05-15T02:06:26.978428"
+}

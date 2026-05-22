@@ -1,0 +1,13 @@
+{
+  "id": "20260427_160836_756806",
+  "type": "project_long_term",
+  "tags": [
+    "agent_comparison",
+    "analysis",
+    "optimization",
+    "architecture"
+  ],
+  "content": "Jarvis vs claude-code agent实现对比分析关键发现：\n1. 架构差异：Jarvis采用模块化单体架构（Python + Typer + Rich），claude-code采用面向对象+函数式混合架构（TypeScript + Bun + React/Ink）。\n2. 类型系统：claude-code的TypeScript+Zod提供更强的类型安全，Jarvis的Python动态类型存在不足。\n3. 工具系统：Jarvis的MCP协议支持更完善（支持SSE、Stdio、Streamable多种传输方式），claude-code的工具接口更丰富（支持别名、搜索提示、进度回调）。\n4. 状态管理：claude-code使用不可变状态+函数式更新，更安全；Jarvis使用可变状态+全局单例，可能存在线程安全问题。\n5. 权限系统：claude-code有细粒度权限控制（ToolPermissionContext），Jarvis只有布尔标志控制确认。\n6. 优化建议：Jarvis应增强类型安全、完善权限系统、增加工具接口特性；claude-code应增强MCP协议支持、增加自动修复机制。\n7. 性能优化：两者都有上下文压缩机制，但claude-code有文件状态缓存（FileStateCache LRU缓存）。\n8. 扩展性：Jarvis通过MCP协议和角色系统扩展，claude-code通过条件导入和技能系统扩展。",
+  "created_at": "2026-04-27T16:08:36.756848",
+  "updated_at": "2026-04-27T16:08:36.756854"
+}

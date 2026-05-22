@@ -1,0 +1,13 @@
+{
+  "id": "20260515_010210_061639",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "Composable",
+    "Vue3",
+    "最佳实践"
+  ],
+  "content": "URL构建工具重构案例：成功从App.vue中提取10个URL构建函数到useUrlBuilder.js composable。提取的函数包括：getHttpProtocol、getWebSocketProtocol、parseGatewayAddress、getGatewayAddress、buildNodeHttpUrl、buildNodeWebSocketUrl、buildWebSocketUrl、buildAgentWebSocketUrl、buildHttpUrl、buildWebSocketProtocols。重构步骤：1) 创建composable文件 2) 在原文件中添加import和composable调用 3) 删除原有函数定义 4) 验证功能一致性。文件从11460行减少到11351行，减少109行。",
+  "created_at": "2026-05-15T01:02:10.061677",
+  "updated_at": "2026-05-15T01:02:10.061683"
+}

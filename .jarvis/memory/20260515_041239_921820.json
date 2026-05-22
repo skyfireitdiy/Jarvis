@@ -1,0 +1,13 @@
+{
+  "id": "20260515_041239_921820",
+  "type": "project_long_term",
+  "tags": [
+    "App.vue",
+    "代码行数",
+    "重构目标",
+    "AI友好型代码"
+  ],
+  "content": "## App.vue重构进度\n\n### 当前状态\n- App.vue原始行数：11259行\n- 重构后行数：10945行\n- 减少行数：314行\n- 目标行数：2000行（理想目标）\n\n### 已提取的composable\n1. useUrlBuilder.js - URL构建工具\n2. useMarkdown.js - Markdown渲染工具\n3. useDrag.js - 拖拽功能（本次完成）\n\n### 待提取的功能\n- 终端管理相关逻辑\n- 编辑器管理相关逻辑\n- WebSocket通信逻辑\n- 其他可复用逻辑",
+  "created_at": "2026-05-15T04:12:39.921843",
+  "updated_at": "2026-05-15T04:12:39.921848"
+}

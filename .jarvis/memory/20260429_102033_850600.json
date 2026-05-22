@@ -1,0 +1,13 @@
+{
+  "id": "20260429_102033_850600",
+  "type": "project_long_term",
+  "tags": [
+    "EditorPanel",
+    "Monaco修复",
+    "组件拆分",
+    "完成"
+  ],
+  "content": "## EditorPanel Monaco 编辑器修复完成\n\n**完成时间**: 当前会话\n**Commit**: f72781b\n\n### 问题描述\nEditorPanel 拆分为独立组件后，Monaco 编辑器内容不显示。\n\n### 根本原因\n1. `ensureMonacoEditor` 函数使用 `editorPanelRef.value?.containerRef` 访问容器元素\n2. 拆分后，`containerRef` 在子组件内部，父组件无法直接访问\n\n### 解决方案\n1. 在 EditorPanel 组件中添加 `containerRef` prop，使用 `:ref=\"containerRef\"` 绑定容器 div\n2. 在 App.vue 中创建 `editorContainerRef` ref，传递给 EditorPanel 组件\n3. 修改 `ensureMonacoEditor` 函数，直接使用 `editorContainerRef.value` 获取容器元素\n4. 移除 `openEditorFile` 函数中等待 containerEl 的循环\n\n### 修改文件\n- `src/jarvis/jarvis_service/frontend/src/App.vue`\n  - 修改 `ensureMonacoEditor` 函数（移除 async、重试循环、调试日志）\n  - 修改 `openEditorFile` 函数（移除等待 containerEl 的循环）\n\n### 验证结果\n- ✅ 构建通过 (1m 45s)\n- ✅ 代码已自动提交",
+  "created_at": "2026-04-29T10:20:33.850656",
+  "updated_at": "2026-04-29T10:20:33.850664"
+}

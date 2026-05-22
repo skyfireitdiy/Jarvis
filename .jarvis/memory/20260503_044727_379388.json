@@ -1,0 +1,13 @@
+{
+  "id": "20260503_044727_379388",
+  "type": "project_long_term",
+  "tags": [
+    "xterm",
+    "terminal",
+    "vue",
+    "architecture"
+  ],
+  "content": "## xterm终端管理架构\n\n### 核心状态字段\n- `termInfo.terminal`: xterm实例对象，切换agent后可能为null\n- `termInfo.ended`: 终端是否已结束的标志\n- `is_finished`: 消息是否完成的标志，决定模板渲染（交互式终端 vs 历史内容）\n- `terminal_content`: 终端历史内容，用于已完成的execution显示\n\n### 关键函数\n- `setTerminalRef` (App.vue:5901-5976): 动态绑定终端DOM元素\n- `initExecutionTerminal` (App.vue:5820-5870): 初始化xterm终端\n- `appendExecution` (App.vue:5066-5280): 处理终端执行事件\n- `tool_stream_end`处理 (App.vue:5172-5247): 终端结束处理逻辑\n\n### 模板渲染逻辑 (App.vue:113-117)\n```vue\n<!-- 未完成的execution显示交互式终端 -->\n<div v-if=\"item.output_type === 'execution' && item.execution_id && !item.is_finished\">\n<!-- 已完成的execution显示历史内容 -->\n<div v-if=\"item.output_type === 'execution' && item.is_finished && item.terminal_content\">\n```\n\n### Bug修复经验 (2024)\n- 问题：切换agent后终端结束，`termInfo.terminal`为null，`is_finished`不被设置\n- 解决：将`is_finished`设置逻辑移到`if (termInfo.terminal)`外部，使用条件赋值获取terminalContent",
+  "created_at": "2026-05-03T04:47:27.379426",
+  "updated_at": "2026-05-03T04:47:27.379436"
+}

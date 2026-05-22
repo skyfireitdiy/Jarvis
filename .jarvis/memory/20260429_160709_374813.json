@@ -1,0 +1,13 @@
+{
+  "id": "20260429_160709_374813",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "组件拆分",
+    "样式修复",
+    "经验教训"
+  ],
+  "content": "## 组件拆分样式迁移经验教训\n\n### 问题总结\n组件拆分后使用 `<style scoped>` 会导致父组件的全局样式无法穿透，需要将所有依赖的样式迁移到子组件中。\n\n### 常见遗漏样式\n1. **模态框基础样式**：`.modal-overlay` 和 `.modal`\n2. **表单相关样式**：`.form-group`, `.form-group label`, `.form-help`\n3. **输入框带按钮**：`.input-with-button`, `.select-dir-btn`\n4. **Toggle 开关**：`.toggle-wrapper`, `.toggle-switch`, `.toggle-slider`, `.toggle-info`, `.toggle-label-text`\n5. **按钮样式**：`.btn`, `.modal-actions`\n\n### 注意事项\n1. **不要添加冲突样式**：如果模板使用 `class=\"form-control\"`，不需要添加 `.form-group input` 样式\n2. **样式特异性**：`.create-agent-modal .form-control` (0,2,0) > `.form-group input` (0,1,1)\n3. **宽度问题**：`.modal-overlay .modal` 不要添加 `width: 100%`，会覆盖组件特定宽度\n\n### 修复文件\n- CreateAgentModal.vue: 添加 .form-help, .form-group, .input-with-button, .toggle-* 样式\n- RenameAgentModal.vue: 添加 .form-group, .form-group label 样式\n- SettingsModal.vue: 已有完整样式",
+  "created_at": "2026-04-29T16:07:09.374847",
+  "updated_at": "2026-04-29T16:07:09.374852"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260515_004520_952824",
+  "type": "project_long_term",
+  "tags": [
+    "Vue",
+    "重构",
+    "composable",
+    "WebSocket",
+    "代码提取"
+  ],
+  "content": "成功从App.vue中提取WebSocket相关逻辑到useWebSocket.js composable。关键步骤：1. 创建useWebSocket.js文件在src/composables/目录下；2. 提取WebSocket连接、重连、消息处理、心跳机制等功能；3. 保持原有函数接口不变；4. 使用Vue 3 Composition API的ref创建响应式状态；5. 文件行数控制在300行以内；6. 添加适当的JSDoc注释说明职责。同时创建了辅助文件：useWebSocketUrls.js（URL构建工具）和useAgentConnection.js（Agent连接管理）。",
+  "created_at": "2026-05-15T00:45:20.952863",
+  "updated_at": "2026-05-15T00:45:20.952868"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260515_000329_975196",
+  "type": "project_long_term",
+  "tags": [
+    "Vue3",
+    "Composition API",
+    "composable",
+    "重构",
+    "认证逻辑"
+  ],
+  "content": "成功从App.vue中提取认证相关逻辑到useAuth.js composable。包含登录、Token管理、认证检查等功能。文件181行，符合AI友好型代码结构规范。函数接口通过增加可选参数保持向后兼容。",
+  "created_at": "2026-05-15T00:03:29.975251",
+  "updated_at": "2026-05-15T00:03:29.975261"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260515_000652_591775",
+  "type": "project_long_term",
+  "tags": [
+    "useAuth",
+    "接口修复",
+    "认证逻辑",
+    "重构"
+  ],
+  "content": "修复useAuth.js函数接口问题：\n1. loginWithPassword函数移除apiBaseUrl参数，改为通过options.buildLoginUrl回调构建URL\n2. fetchWithAuth函数移除onAuthError参数，改为通过options.onAuthError回调处理401错误\n3. 函数接口现在与原有App.vue实现完全一致：loginWithPassword(password)和fetchWithAuth(url, options = {})\n4. 通过options参数注入依赖，保持composable的独立性和可测试性",
+  "created_at": "2026-05-15T00:06:52.591828",
+  "updated_at": "2026-05-15T00:06:52.591835"
+}

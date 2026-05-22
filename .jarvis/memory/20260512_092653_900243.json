@@ -1,0 +1,13 @@
+{
+  "id": "20260512_092653_900243",
+  "type": "project_long_term",
+  "tags": [
+    "Vue",
+    "frontend",
+    "经验教训",
+    "agent-sidebar"
+  ],
+  "content": "Vue 3 `<script setup>` 中 watch 引用 props 的时序问题：\n1. watch 如果使用 `immediate: true` 并引用 `props.xxx`，必须在 `defineProps` 之后定义，否则执行时 props 为 undefined\n2. 折叠状态管理最佳实践：只在首次初始化时设置默认折叠状态（检查状态对象是否为空），后续数据更新不应覆盖用户操作\n3. 错误示例：watch 定义在 defineProps 之前，导致 `props.displayGroups` 访问失败\n4. 正确做法：先 defineProps，再定义 watch",
+  "created_at": "2026-05-12T09:26:53.900282",
+  "updated_at": "2026-05-12T09:26:53.900289"
+}

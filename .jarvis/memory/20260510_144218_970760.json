@@ -1,0 +1,13 @@
+{
+  "id": "20260510_144218_970760",
+  "type": "project_long_term",
+  "tags": [
+    "超时配置",
+    "API调用",
+    "前后端协调",
+    "Jarvis项目"
+  ],
+  "content": "# Jarvis 前后端超时配置\n\n## 关键发现\n- 后端 `send_request_to_node` 默认超时：60 秒（node_manager.py:305）\n- 前端 API 调用建议超时：>= 90 秒\n- 前端使用 AbortController 实现超时控制\n\n## API 调用模式\n- 前端：`fetchWithAuth` + `buildHttpUrl` 构建请求\n- URL 格式：`/api/node/{node_id}/{path}`\n- 认证：Bearer Token 在 Authorization header\n\n## 相关文件\n- 前端：src/jarvis/jarvis_service/frontend/src/App.vue\n- 后端：src/jarvis/jarvis_web_gateway/app.py, node_manager.py",
+  "created_at": "2026-05-10T14:42:18.970822",
+  "updated_at": "2026-05-10T14:42:18.970828"
+}

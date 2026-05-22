@@ -1,0 +1,14 @@
+{
+  "id": "20260513_131912_793672",
+  "type": "project_long_term",
+  "tags": [
+    "WebSocket",
+    "xterm",
+    "重连",
+    "前端",
+    "bug修复"
+  ],
+  "content": "# WebSocket重连后xterm终端创建问题\n\n## 问题描述\n当WebSocket没有连接时，等连接上的时候，shell会将缓存的消息都发过来，但是如果正在执行shell命令，发现并没有创建出来xterm终端。\n\n## 问题根因\n1. WebSocket重连后，后端发送`_pending_outputs`中缓存的所有消息，包括`tool_stream_end`消息\n2. 前端收到`tool_stream_end`消息后设置`is_finished = true`\n3. `setTerminalRef`函数检查`is_finished`为true时跳过终端创建\n\n## 解决方案\n### 1. appendExecution函数（App.vue第5876-5881行）\n当收到`tool_stream_end`消息时，检查`termInfo.terminal`是否存在：\n- 如果不存在，说明是重连后收到的消息，忽略该消息\n- 防止重连后收到的`tool_stream_end`消息错误结束execution\n\n### 2. setTerminalRef函数（App.vue第6619-6628行）\n检查`executionMessage?.is_finished`：\n- 如果有`terminal_content`，说明是真正结束的execution，跳过创建\n- 如果没有`terminal_content`，说明是重连场景，重新创建终端\n\n## 关键文件\n- 前端：`src/jarvis/jarvis_service/frontend/src/App.vue`\n- 后端：`src/jarvis/jarvis_web_gateway/app.py`\n\n## 验证方法\n1. 启动后端服务\n2. 启动前端开发服务器：`cd src/jarvis/jarvis_service/frontend && npm run dev`\n3. 执行shell命令\n4. 模拟WebSocket断开\n5. 等待WebSocket自动重连\n6. 检查xterm终端是否正确创建并显示输出",
+  "created_at": "2026-05-13T13:19:12.793721",
+  "updated_at": "2026-05-13T13:19:12.793729"
+}

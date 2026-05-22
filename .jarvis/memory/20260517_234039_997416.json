@@ -1,0 +1,13 @@
+{
+  "id": "20260517_234039_997416",
+  "type": "project_long_term",
+  "tags": [
+    "规则显示",
+    "load_rule",
+    "rules_manager",
+    "bug修复"
+  ],
+  "content": "问题：Agent使用load_rule工具加载的规则没有显示在侧边栏规则列表中。\n\n根本原因：\n1. load_rule工具只是读取并渲染规则文件内容，但没有将规则添加到rules_manager中\n2. rules_manager.get_all_rules_with_status()方法只从get_all_available_rule_names()获取规则列表\n3. get_all_available_rule_names()只从内置规则和规则目录中的文件规则获取，不包含动态加载的规则\n\n解决方案：\n修改rules_manager.get_all_rules_with_status()方法，添加处理_loaded_rules的逻辑。在方法末尾遍历_loaded_rules中的所有规则，对于不在available_rules中的规则，添加到rules_info列表中。\n\n修改文件：src/jarvis/jarvis_agent/rules_manager.py\n修改方法：get_all_rules_with_status()（第967-986行）\n\n修改内容：\n1. 遍历_loaded_rules中的所有规则\n2. 对于每个规则，检查它是否已经在rules_info中（避免重复）\n3. 如果不在，添加到rules_info中，包括：规则名称、预览、是否已加载、文件路径\n4. 动态加载的规则默认为已加载状态\n5. 从规则内容中提取文件路径（如果规则内容以'## 规则文件路径:'开头）\n\n测试结果：所有相关测试通过",
+  "created_at": "2026-05-17T23:40:39.997458",
+  "updated_at": "2026-05-17T23:40:39.997464"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260521_091336_410254",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "quick_mode",
+    "架构决策"
+  ],
+  "content": "jarvis_c2rust quick_mode 功能架构：\n\n1. 核心逻辑在 agent_factory.py：create_agent/create_code_agent 增加 quick_mode: bool = False 参数，当 quick_mode=True 时强制覆盖 _use_methodology=False, _use_analysis=False, _rule_names=None\n\n2. 参数传递链路：\n   - CLI入口(cli.py --quick-mode) → run_transpile/run_verify/run → Transpiler/verify._run_alignment_analysis → AgentManager → create_code_agent/create_agent\n   - CLI入口(cli.py --quick-mode) → optimize_project → OptimizeOptions → optimizer_*.py → create_code_agent\n\n3. 涉及13个文件：agent_factory.py, transpiler_agents.py, optimizer_options.py, optimizer_clippy.py, optimizer_visibility.py, optimizer_build_fix.py, optimizer_unsafe.py, optimizer_docs.py, optimizer.py, verify.py, transpiler_review.py, transpiler.py, cli.py\n\n4. transpiler_review.py 中 review_agent 已显式设置 use_methodology=False 和 use_analysis=False，quick_mode=True 是冗余但一致的标记\n\n5. 所有参数默认 False，不影响现有行为",
+  "created_at": "2026-05-21T09:13:36.410300",
+  "updated_at": "2026-05-21T09:13:36.410315"
+}

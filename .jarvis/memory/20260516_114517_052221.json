@@ -1,0 +1,13 @@
+{
+  "id": "20260516_114517_052221",
+  "type": "project_long_term",
+  "tags": [
+    "websocket",
+    "设计模式",
+    "优化",
+    "响应处理"
+  ],
+  "content": "## WebSocket响应处理优化：基于request_id的透明转发\n\n### 优化背景\n之前WebSocket消息处理需要维护一个响应类型白名单，每次新增请求/响应类型都需要修改这个列表，容易遗漏导致超时问题。\n\n### 优化方案\n移除响应类型白名单检查，改为基于request_id的透明转发：\n\n```python\n# 优化前：检查消息类型是否在白名单中\nif message_type in (RESPONSE_TYPE_1, RESPONSE_TYPE_2, ...) and request_id:\n    future = self._pending_requests.pop(request_id, None)\n    ...\n\n# 优化后：只检查request_id是否存在\nif request_id:\n    future = self._pending_requests.pop(request_id, None)\n    if future is not None and not future.done():\n        future.set_result(next_message)\n        continue\n```\n\n### 优势\n1. 不再需要维护响应类型列表\n2. 新增请求/响应类型无需修改此代码\n3. 代码更简洁，从30+行减少到5行\n4. 更不容易出错（不会遗漏响应类型）\n\n### 相关文件\n- `src/jarvis/jarvis_web_gateway/node_manager.py` - handle_node_websocket函数\n\n### 设计原则\n**基于request_id的响应匹配**：只要消息包含request_id，就尝试匹配pending请求，无需关心消息类型。这是一种更灵活、更不易出错的设计模式。",
+  "created_at": "2026-05-16T11:45:17.052254",
+  "updated_at": "2026-05-16T11:45:17.052260"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260516_071701_140176",
+  "type": "project_long_term",
+  "tags": [
+    "node_config_sync",
+    "websocket",
+    "bug_fix"
+  ],
+  "content": "修复节点配置同步超时问题：\n1. 问题原因：子节点的recv_loop函数没有处理CONFIG_GET_REQUEST和CONFIG_SET_REQUEST消息类型\n2. 解决方案：\n   - 在node_manager.py导入部分添加CONFIG_GET_REQUEST、CONFIG_GET_RESPONSE、CONFIG_SET_REQUEST、CONFIG_SET_RESPONSE常量\n   - 创建_handle_config_get_request函数处理配置获取请求\n   - 创建_handle_config_set_request函数处理配置设置请求\n   - 在recv_loop函数中添加对CONFIG_GET_REQUEST和CONFIG_SET_REQUEST消息的处理\n3. 相关文件：src/jarvis/jarvis_web_gateway/node_manager.py",
+  "created_at": "2026-05-16T07:17:01.140234",
+  "updated_at": "2026-05-16T07:17:01.140244"
+}

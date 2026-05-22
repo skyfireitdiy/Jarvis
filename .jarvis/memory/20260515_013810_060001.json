@@ -1,0 +1,13 @@
+{
+  "id": "20260515_013810_060001",
+  "type": "project_long_term",
+  "tags": [
+    "Vue重构",
+    "Composable设计",
+    "接口一致性",
+    "代码提取"
+  ],
+  "content": "在Vue 3 Composition API中提取composable时，如果原函数依赖组件内的响应式状态（如gatewayUrl.value, auth.value），需要考虑如何传递这些状态。有两种主要策略：1) 将状态作为参数传入函数；2) 在composable中接收ref对象。保持函数接口一致性很重要，重构时需要保持原有函数签名或提供兼容层，避免破坏现有调用代码。",
+  "created_at": "2026-05-15T01:38:10.060051",
+  "updated_at": "2026-05-15T01:38:10.060057"
+}

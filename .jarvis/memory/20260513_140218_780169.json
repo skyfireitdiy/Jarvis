@@ -1,0 +1,14 @@
+{
+  "id": "20260513_140218_780169",
+  "type": "project_long_term",
+  "tags": [
+    "Agent类型",
+    "图标区分",
+    "前端",
+    "Vue",
+    "Jarvis项目"
+  ],
+  "content": "Jarvis项目中Agent类型区分：agent_type='agent'为通用Agent，显示🤖图标；agent_type='codeagent'为代码Agent，显示👨‍💻图标。在编辑器侧边栏目录树中需要根据agent_type动态显示不同图标。",
+  "created_at": "2026-05-13T14:02:18.780203",
+  "updated_at": "2026-05-13T14:02:18.780209"
+}

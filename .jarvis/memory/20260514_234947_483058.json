@@ -1,0 +1,13 @@
+{
+  "id": "20260514_234947_483058",
+  "type": "project_long_term",
+  "tags": [
+    "Vue重构",
+    "Composable",
+    "代码提取",
+    "认证逻辑"
+  ],
+  "content": "成功案例：从App.vue中提取认证逻辑到useAuth.js Composable\n\n重构模式：\n1. 分析源文件中的相关逻辑（状态、函数、依赖）\n2. 创建独立的Composable文件，使用Vue 3 Composition API\n3. 提取相关状态（ref/reactive）和函数\n4. 保持原有接口不变，确保功能兼容性\n5. 添加适当的JSDoc注释说明职责\n\n关键点：\n- 文件路径：src/jarvis/jarvis_service/frontend/src/composables/useAuth.js\n- 包含功能：auth状态、autoLoginEnabled、loginWithPassword、hasAuthToken、getAuthToken、loadSavedToken、fetchWithAuth、saveAutoLoginSetting、buildWebSocketProtocols\n- 文件大小：172行（符合AI友好型规范）\n- 已自动提交：Commit ID e36cb7c\n\n适用场景：\n- 大型Vue组件需要拆分\n- 逻辑复用需求\n- 代码结构优化\n- 符合AI友好型代码规范",
+  "created_at": "2026-05-14T23:49:47.483088",
+  "updated_at": "2026-05-14T23:49:47.483094"
+}

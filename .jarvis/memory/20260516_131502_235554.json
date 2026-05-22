@@ -1,0 +1,14 @@
+{
+  "id": "20260516_131502_235554",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "ui-refactor",
+    "css",
+    "vue",
+    "diff-rendering"
+  ],
+  "content": "前端UI重构经验：\n1. SettingsModal.vue重构：为.form-group添加统一边框样式（padding:16px, border:1px solid, border-radius:12px, box-shadow），移除内部容器组件边框（.toggle-wrapper, .history-info, .config-sync-section, .node-secret-section），合并相关功能区域（重启节点服务相关组件）\n2. diff渲染修复：在diffRenderer.js中添加缺失的<tr>标签，添加<colgroup>元素，调整CSS列宽设置（旧行号50px，旧内容calc(50%-50px)，新行号50px，新内容calc(50%-50px)），移除.diff-content的width:50%设置\n3. 关键原则：避免双重边框，使用colgroup控制表格列宽，确保表格结构完整",
+  "created_at": "2026-05-16T13:15:02.235600",
+  "updated_at": "2026-05-16T13:15:02.235606"
+}

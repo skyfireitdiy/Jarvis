@@ -1,0 +1,12 @@
+{
+  "id": "20260427_160253_281621",
+  "type": "project_long_term",
+  "tags": [
+    "架构对比",
+    "agent实现",
+    "优化建议"
+  ],
+  "content": "## Jarvis vs claude-code Agent实现对比分析关键发现\n\n### 架构差异\n- Jarvis：Python + Typer + Rich，模块化单体架构\n- claude-code：TypeScript + Bun + React/Ink，面向对象+异步生成器\n\n### 核心功能差异\n1. **工具系统**：Jarvis动态注册(MCP支持完善)，claude-code静态类型(Tool泛型接口)\n2. **权限控制**：Jarvis简单布尔标志(execute_tool_confirm)，claude-code细粒度控制(ToolPermissionContext)\n3. **状态管理**：Jarvis可变状态(AgentStateManager单例)，claude-code函数式(AppState不可变)\n4. **执行流程**：Jarvis同步循环(run_loop.py)，claude-code异步流(QueryEngine异步生成器)\n\n### Jarvis优势\n- MCP协议支持完善(SSE/Stdio/Streamable)\n- 自动修复机制(连续无工具调用时LLM修复)\n- Git仓库自动检测\n- Tmux集成\n\n### claude-code优势\n- 类型安全(TypeScript+Zod)\n- 权限系统完善\n- 工具接口丰富(别名、进度回调)\n- 函数式状态管理\n\n### 高优先级优化建议\n1. Jarvis增强类型安全(引入TypeHint和Protocol)\n2. Jarvis完善权限系统(细粒度控制)\n3. claude-code增强MCP协议支持\n\n### 报告位置\n- 完整报告：/home/skyfire/code/Jarvis/docs/technical/implementation/agent_comparison_analysis.md (510行)",
+  "created_at": "2026-04-27T16:02:53.281658",
+  "updated_at": "2026-04-27T16:02:53.281665"
+}

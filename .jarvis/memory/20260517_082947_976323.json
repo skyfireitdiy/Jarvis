@@ -1,0 +1,13 @@
+{
+  "id": "20260517_082947_976323",
+  "type": "project_long_term",
+  "tags": [
+    "symbol_dependency",
+    "tool",
+    "code_agent",
+    "whitelist"
+  ],
+  "content": "symbol_dependency工具已添加到CodeAgent白名单：\n\n1. 工具文件：src/jarvis/jarvis_tools/symbol_dependency.py\n2. 白名单位置：src/jarvis/jarvis_code_agent/code_agent.py (_build_code_agent_tool_list方法)\n\n工具功能：\n- find_symbol: 查找符号\n- get_file_symbols: 获取文件的符号列表\n- find_references: 查找符号引用\n- find_dependencies: 查找符号依赖\n- traverse: 图遍历(BFS)",
+  "created_at": "2026-05-17T08:29:47.976358",
+  "updated_at": "2026-05-17T08:29:47.976364"
+}

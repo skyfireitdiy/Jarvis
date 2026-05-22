@@ -1,0 +1,14 @@
+{
+  "id": "20260515_170947_966405",
+  "type": "project_long_term",
+  "tags": [
+    "依赖管理",
+    "Python",
+    "pyproject.toml",
+    "setup.py",
+    "清理"
+  ],
+  "content": "Python项目依赖清理方法：\n1. 分析实际导入：使用rg搜索Python文件中的import/from语句，提取第三方包名\n2. 包名映射：注意导入名与包名的差异（如bs4->beautifulsoup4, yaml->pyyaml, tree_sitter->tree-sitter）\n3. 区分依赖类型：区分运行时依赖、开发依赖、测试依赖、文档依赖\n4. 间接依赖处理：某些包是其他包的依赖（如starlette是fastapi的依赖），不需要单独声明\n5. tree-sitter语言包：检查languages目录下的*_language.py文件，确认哪些语言包被实际导入\n6. 安全移除：先备份，再移除，最后验证\n7. 清理临时文件：开发过程中产生的临时脚本必须在提交前删除",
+  "created_at": "2026-05-15T17:09:47.966448",
+  "updated_at": "2026-05-15T17:09:47.966455"
+}

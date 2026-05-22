@@ -1,0 +1,13 @@
+{
+  "id": "20260514_233426_572248",
+  "type": "project_long_term",
+  "tags": [
+    "Vue",
+    "重构",
+    "组件提取",
+    "AI友好型代码"
+  ],
+  "content": "成功案例：从SettingsModal.vue提取ConnectionSettings.vue组件。关键步骤：1) 创建独立组件文件 2) 提取相关模板和逻辑 3) 保持原有props和emit接口 4) 使用Vue 3 Composition API和<script setup>语法 5) 确保组件不超过300行，函数不超过50行。验证标准：功能一致性、接口保持、代码结构清晰。",
+  "created_at": "2026-05-14T23:34:26.572282",
+  "updated_at": "2026-05-14T23:34:26.572288"
+}

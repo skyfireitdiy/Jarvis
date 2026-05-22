@@ -1,0 +1,13 @@
+{
+  "id": "20260518_000359_762877",
+  "type": "project_long_term",
+  "tags": [
+    "rules_manager",
+    "session_manager",
+    "bug_fix",
+    "load_rule"
+  ],
+  "content": "## 问题修复：Agent使用load_rule工具加载的规则没有显示在侧边栏规则列表中\n\n### 根本原因\n1. load_rule工具只是读取并渲染规则文件内容，但没有将规则添加到rules_manager中\n2. rules_manager.get_all_rules_with_status()方法只从get_all_available_rule_names()获取规则列表\n3. get_all_available_rule_names()只从内置规则和规则目录中的文件规则获取，不包含动态加载的规则\n\n### 解决方案\n1. 修改rules_manager.get_all_rules_with_status()方法，添加处理_loaded_rules的逻辑\n2. 修改session_manager._save_agent_state方法，保存动态加载的规则内容到loaded_rules_content字段\n3. 修改session_manager._restore_agent_state方法，从loaded_rules_content恢复动态加载的规则内容\n\n### 修改文件\n- src/jarvis/jarvis_agent/rules_manager.py: get_all_rules_with_status()方法\n- src/jarvis/jarvis_agent/session_manager.py: _save_agent_state()和_restore_agent_state()方法\n\n### 关键代码位置\n- rules_manager.py: _loaded_rules字典存储动态加载的规则内容\n- session_manager.py: 第1236-1247行保存规则内容，第1401-1405行恢复规则内容\n\n### 测试结果\n所有相关测试通过（8 items collected, 8 passed）",
+  "created_at": "2026-05-18T00:03:59.762945",
+  "updated_at": "2026-05-18T00:03:59.762951"
+}
