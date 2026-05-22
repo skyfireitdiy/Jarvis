@@ -5101,6 +5101,11 @@ async function handleRestoreHistory(agent) {
         showToast('历史恢复成功', 'success')
         // 如果当前正在查看该 Agent，刷新显示
         if (currentAgentId.value === agent.agent_id) {
+          // 重置历史加载状态，然后重新加载
+          historyOffset.value = 0
+          hasMoreHistory.value = true
+          // 清空当前 Agent 的输出列表
+          allOutputs.value.set(currentAgentId.value, [])
           // 重新加载历史记录
           loadHistoryMessages(false)
         }
