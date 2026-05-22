@@ -5061,7 +5061,7 @@ async function handleSaveHistory(agent) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(historyData)
+      body: JSON.stringify({ data: historyData })
     })
 
     const result = await response.json()
