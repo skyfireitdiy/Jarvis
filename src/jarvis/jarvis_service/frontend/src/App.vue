@@ -3218,7 +3218,16 @@ function handleRestartGateway({ nodeId, restartFrontend }) {
 // 处理 SettingsModal 组件的同步配置事件
 function handleSyncConfig({ sourceNodeId }) {
   syncConfigSourceNode.value = sourceNodeId || ''
-  syncConfig()
+  
+  // 显示确认框
+  showConfirm(
+    '确定要同步配置到其他节点吗？此操作将覆盖目标节点的配置。',
+    () => {
+      syncConfig()
+    },
+    () => {},
+    false
+  )
 }
 
 // 处理 SettingsModal 组件的更新代码事件
