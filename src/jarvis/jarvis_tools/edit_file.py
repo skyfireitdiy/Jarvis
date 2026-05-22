@@ -42,7 +42,7 @@ class EditFileNormalTool:
         "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
         "- 如果某个 search 在文件中找不到精确匹配（search非空时），该 diff 会失败，但已成功的修改会保留\n"
         "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配\n"
-        "- 行号范围编辑模式：当指定 start_line 和 end_line 时，将忽略 search 参数，直接替换指定行范围（从1开始，左闭右开区间 [start_line, end_line)，即包含 start_line 到 end_line-1 行）"
+        "- 行号范围编辑模式：当指定 start_line 和 end_line 时，将忽略 search 参数，直接替换指定行范围（从1开始，闭区间 [start_line, end_line]，即包含 start_line 到 end_line 行）"
     )
 
     parameters = {
@@ -80,7 +80,7 @@ class EditFileNormalTool:
                                     },
                                     "end_line": {
                                         "type": "integer",
-                                        "description": "结束行号（不包含此行，左闭右开区间 [start_line, end_line)，与 start_line 配合使用可按行号范围替换内容。",
+                                        "description": "结束行号（包含此行，闭区间 [start_line, end_line]，与 start_line 配合使用可按行号范围替换内容。",
                                     },
                                 },
                             },
@@ -600,13 +600,13 @@ class EditFileNormalTool:
                     continue
 
                 # 构建新内容：保留 start_line 之前的行 + 替换内容 + 保留 end_line 之后的行
-                # 左闭右开区间 [start_line, end_line)，即包含 start_line 到 end_line-1 行
+                # 闭区间 [start_line, end_line]，即包含 start_line 到 end_line 行
                 before_lines = lines[
                     : start_line - 1
                 ]  # start_line 之前的行（0-indexed）
                 after_lines = (
-                    lines[end_line - 1 :] if end_line - 1 < total_lines else []
-                )  # end_line 开始的行（0-indexed，左闭右开）
+                    lines[end_line:] if end_line < total_lines else []
+                )  # end_line 之后的行（0-indexed，闭区间）
 
                 # 确保替换内容以换行符结尾（如果后面还有行）
                 replace_content = replace
