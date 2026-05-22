@@ -62,6 +62,15 @@ import typer
 
 from jarvis.jarvis_c2rust.constants import SOURCE_EXTS, TYPE_KINDS
 
+# tree-sitter for macro analysis
+import importlib.util
+
+TREE_SITTER_AVAILABLE = (
+    importlib.util.find_spec("tree_sitter") is not None
+    and importlib.util.find_spec("tree_sitter_c") is not None
+    and importlib.util.find_spec("tree_sitter_cpp") is not None
+)
+
 
 # ---------------------------
 # libclang loader
@@ -463,6 +472,151 @@ def collect_calls(cursor: Any) -> List[str]:
     return calls
 
 
+def collect_macro_calls(
+    file_path: Path,
+) -> tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+    """
+    Use tree-sitter to analyze macro definitions and macro calls.
+
+    Returns:
+        macro_to_calls: Dict mapping macro name -> list of functions called within macro
+        func_to_macros: Dict mapping function name -> list of macros called within function
+    """
+    if not TREE_SITTER_AVAILABLE:
+        return {}, {}
+
+    import tree_sitter
+    import tree_sitter_c as tsc
+    import tree_sitter_cpp as tscpp
+
+    # Determine language based on file extension
+    ext = file_path.suffix.lower()
+    if ext in (".c", ".h"):
+        language = tree_sitter.Language(tsc.language())
+    elif ext in (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"):
+        language = tree_sitter.Language(tscpp.language())
+    else:
+        return {}, {}
+
+    parser = tree_sitter.Parser(language)
+
+    try:
+        source_code = file_path.read_bytes()
+    except Exception:
+        return {}, {}
+
+    tree = parser.parse(source_code)
+
+    macro_to_calls: Dict[str, List[str]] = {}
+    func_to_macros: Dict[str, List[str]] = {}
+
+    def get_text(node: Any) -> str:
+        return source_code[node.start_byte : node.end_byte].decode(
+            "utf-8", errors="ignore"
+        )
+
+    def extract_calls_from_node(node: Any, is_preproc_arg: bool = False) -> List[str]:
+        """Extract all function calls from a node."""
+        calls = []
+
+        # If this is a preproc_arg, we need to re-parse it as code
+        if node.type == "preproc_arg":
+            arg_text = get_text(node)
+            # Use regex to find function calls in the macro definition
+            # Pattern: identifier followed by parentheses
+            import re
+
+            # This pattern matches function calls like: func_name(args)
+            # It avoids matching keywords like if, while, for, etc.
+            pattern = r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\("
+            matches = re.findall(pattern, arg_text)
+            # Filter out C keywords that might look like function calls
+            keywords = {"if", "while", "for", "switch", "return", "sizeof", "typeof"}
+            for match in matches:
+                if match not in keywords:
+                    calls.append(match)
+            return calls
+
+        if node.type == "call_expression":
+            func_node = node.child_by_field_name("function")
+            if func_node:
+                calls.append(get_text(func_node))
+        for child in node.children:
+            calls.extend(extract_calls_from_node(child))
+        return calls
+
+    def find_function_at_line(line: int) -> Optional[str]:
+        """Find function name containing the given line."""
+
+        def search_node(node: Any) -> Optional[str]:
+            if node.type == "function_definition":
+                declarator = node.child_by_field_name("declarator")
+                if (
+                    declarator
+                    and declarator.start_point[0] <= line <= declarator.end_point[0]
+                ):
+                    # Get function name
+                    if declarator.type == "function_declarator":
+                        name_node = declarator.child_by_field_name("declarator")
+                        if name_node:
+                            return get_text(name_node)
+            for child in node.children:
+                result = search_node(child)
+                if result:
+                    return result
+            return None
+
+        return search_node(tree.root_node)
+
+    def walk_tree(node: Any, current_func: Optional[str] = None) -> None:
+        """Walk the AST to collect macro and function call information."""
+        # Check for macro definition
+        if node.type in ("preproc_function_def", "preproc_def"):
+            # Get macro name
+            name_node = None
+            for child in node.children:
+                if child.type == "identifier":
+                    name_node = child
+                    break
+            if name_node:
+                macro_name = get_text(name_node)
+                # Find calls within macro definition
+                # For preproc_function_def, the body is in preproc_arg
+                calls = []
+                for child in node.children:
+                    if child.type == "preproc_arg":
+                        calls.extend(extract_calls_from_node(child))
+                if calls:
+                    macro_to_calls[macro_name] = calls
+
+        # Check for function definition
+        if node.type == "function_definition":
+            declarator = node.child_by_field_name("declarator")
+            if declarator and declarator.type == "function_declarator":
+                name_node = declarator.child_by_field_name("declarator")
+                if name_node:
+                    current_func = get_text(name_node)
+
+        # Check for macro invocation (call_expression with macro name)
+        if node.type == "call_expression" and current_func:
+            func_node = node.child_by_field_name("function")
+            if func_node:
+                func_name = get_text(func_node)
+                # Check if this is a macro call (heuristic: all caps or known macros)
+                if func_name.isupper() or func_name in macro_to_calls:
+                    if current_func not in func_to_macros:
+                        func_to_macros[current_func] = []
+                    if func_name not in func_to_macros[current_func]:
+                        func_to_macros[current_func].append(func_name)
+
+        # Recurse to children
+        for child in node.children:
+            walk_tree(child, current_func)
+
+    walk_tree(tree.root_node)
+    return macro_to_calls, func_to_macros
+
+
 def is_function_like(cursor: Any) -> bool:
     return cursor.kind.name in {
         "FUNCTION_DECL",
@@ -548,6 +702,23 @@ def scan_file(cindex: Any, file_path: Path, args: List[str]) -> List[FunctionInf
             visit(ch)
 
     visit(tu.cursor)
+
+    # Collect macro calls using tree-sitter
+    macro_to_calls, func_to_macros = collect_macro_calls(file_path)
+
+    # If we have macro information, enhance the call relationships
+    if macro_to_calls or func_to_macros:
+        # For each function, check if it calls any macros
+        for fi in functions:
+            if fi.name in func_to_macros:
+                macros_called = func_to_macros[fi.name]
+                for macro_name in macros_called:
+                    # If the macro calls other functions, add those to the function's calls
+                    if macro_name in macro_to_calls:
+                        for called_func in macro_to_calls[macro_name]:
+                            if called_func not in fi.calls:
+                                fi.calls.append(called_func)
+
     return functions
 
 
