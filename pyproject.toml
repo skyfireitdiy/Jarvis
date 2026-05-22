@@ -79,6 +79,7 @@ dependencies = [
     "pymdown-extensions",
     "websockets",
     "httpx",
+    "jieba",
     ]
     requires-python = "==3.12.*"
 
