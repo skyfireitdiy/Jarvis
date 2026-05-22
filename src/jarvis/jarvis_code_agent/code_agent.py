@@ -1690,6 +1690,39 @@ def cli(
 
                 return get_tools_info()
 
+            @custom_app.post("/data/{key}")
+            async def save_data_api(key: str, request: dict):
+                """保存数据到存储。"""
+                from jarvis.jarvis_web_gateway.data_storage import save_data
+
+                success, error = save_data(key, request)
+                if success:
+                    return {"success": True, "message": "Data saved successfully"}
+                else:
+                    return {"success": False, "error": error}
+
+            @custom_app.get("/data/{key}")
+            async def load_data_api(key: str):
+                """从存储中读取数据。"""
+                from jarvis.jarvis_web_gateway.data_storage import load_data
+
+                success, data, error = load_data(key)
+                if success:
+                    return {"success": True, "data": data}
+                else:
+                    return {"success": False, "error": error}
+
+            @custom_app.delete("/data/{key}")
+            async def delete_data_api(key: str):
+                """从存储中删除数据。"""
+                from jarvis.jarvis_web_gateway.data_storage import delete_data
+
+                success, error = delete_data(key)
+                if success:
+                    return {"success": True, "message": "Data deleted successfully"}
+                else:
+                    return {"success": False, "error": error}
+
             config = uvicorn.Config(
                 create_app(custom_app=custom_app),
                 host="127.0.0.1",
