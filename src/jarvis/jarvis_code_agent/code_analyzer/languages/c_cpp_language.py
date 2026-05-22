@@ -2,6 +2,9 @@
 
 import os
 import re
+from pathlib import Path
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Set
@@ -204,7 +207,7 @@ class CppSymbolExtractor(TreeSitterExtractor):
 
 
 class CDependencyAnalyzer(DependencyAnalyzer):
-    """Analyzes C include dependencies."""
+    """Analyzes C include dependencies and macro calls."""
 
     def analyze_imports(self, file_path: str, content: str) -> List[Dependency]:
         """Analyzes C #include statements."""
@@ -232,16 +235,31 @@ class CDependencyAnalyzer(DependencyAnalyzer):
     def build_dependency_graph(self, project_root: str) -> DependencyGraph:
         """Builds a dependency graph for a C project."""
         graph = DependencyGraph()
-        extensions = {".c", ".h"}
 
+        # First pass: Collect all macro definitions
+        macro_definitions: Dict[str, str] = {}  # macro_name -> file_path
+
+        for root, dirs, files in os.walk(project_root):
+            dirs[:] = filter_walk_dirs(dirs)
+            for file in files:
+                file_path = os.path.join(root, file)
+                if not self._is_source_file(file_path):
+                    continue
+                try:
+                    # Extract macro definitions using tree-sitter
+                    self._extract_macro_definitions(file_path, macro_definitions)
+                except Exception:
+                    continue
+
+        # Second pass: Analyze dependencies
         for root, dirs, files in os.walk(project_root):
             dirs[:] = filter_walk_dirs(dirs)
 
             for file in files:
-                if not any(file.endswith(ext) for ext in extensions):
+                file_path = os.path.join(root, file)
+                if not self._is_source_file(file_path):
                     continue
 
-                file_path = os.path.join(root, file)
                 try:
                     content = read_text_file(file_path, errors="replace")
                     dependencies = self.analyze_imports(file_path, content)
@@ -251,10 +269,125 @@ class CDependencyAnalyzer(DependencyAnalyzer):
                         )
                         if dep_path and dep_path != file_path:
                             graph.add_dependency(file_path, dep_path)
+
+                    # Analyze macro calls
+                    func_to_macros = self._extract_macro_calls(file_path)
+                    for func, macros in func_to_macros.items():
+                        for macro in macros:
+                            if macro in macro_definitions:
+                                dep_path = macro_definitions[macro]
+                                if dep_path != file_path:
+                                    graph.add_dependency(file_path, dep_path)
                 except Exception:
                     continue
 
         return graph
+
+    def _extract_macro_definitions(
+        self, file_path: str, macro_definitions: Dict[str, str]
+    ) -> None:
+        """Extract macro definitions from a file using tree-sitter."""
+        try:
+            import tree_sitter
+            import tree_sitter_c as tsc
+            import tree_sitter_cpp as tscpp
+        except ImportError:
+            return
+
+        ext = Path(file_path).suffix.lower()
+        if ext in (".c", ".h"):
+            language = tree_sitter.Language(tsc.language())
+        elif ext in (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"):
+            language = tree_sitter.Language(tscpp.language())
+        else:
+            return
+
+        parser = tree_sitter.Parser(language)
+        try:
+            with open(file_path, "rb") as f:
+                source_code = f.read()
+        except Exception:
+            return
+
+        tree = parser.parse(source_code)
+
+        def get_text(node: Any) -> str:
+            return source_code[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="ignore"
+            )
+
+        def walk_tree(node: Any) -> None:
+            if node.type in ("preproc_def", "preproc_function_def"):
+                for child in node.children:
+                    if child.type == "identifier":
+                        macro_name = get_text(child)
+                        if macro_name:
+                            macro_definitions[macro_name] = file_path
+                        break
+
+            for child in node.children:
+                walk_tree(child)
+
+        walk_tree(tree.root_node)
+
+    def _extract_macro_calls(self, file_path: str) -> Dict[str, List[str]]:
+        """Extract macro calls from a file using tree-sitter."""
+        try:
+            import tree_sitter
+            import tree_sitter_c as tsc
+            import tree_sitter_cpp as tscpp
+        except ImportError:
+            return {}
+
+        ext = Path(file_path).suffix.lower()
+        if ext in (".c", ".h"):
+            language = tree_sitter.Language(tsc.language())
+        elif ext in (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"):
+            language = tree_sitter.Language(tscpp.language())
+        else:
+            return {}
+
+        parser = tree_sitter.Parser(language)
+        try:
+            with open(file_path, "rb") as f:
+                source_code = f.read()
+        except Exception:
+            return {}
+
+        tree = parser.parse(source_code)
+        func_to_macros: Dict[str, List[str]] = {}
+
+        def get_text(node: Any) -> str:
+            return source_code[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="ignore"
+            )
+
+        def walk_tree(node: Any, current_func: Optional[str] = None) -> None:
+            # Check for function definition
+            if node.type == "function_definition":
+                declarator = node.child_by_field_name("declarator")
+                if declarator and declarator.type == "function_declarator":
+                    name_node = declarator.child_by_field_name("declarator")
+                    if name_node:
+                        current_func = get_text(name_node)
+
+            # Check for macro invocation
+            if node.type == "call_expression" and current_func:
+                func_node = node.child_by_field_name("function")
+                if func_node:
+                    func_name = get_text(func_node)
+                    # Heuristic: Macros are usually uppercase
+                    if func_name.isupper():
+                        if current_func not in func_to_macros:
+                            func_to_macros[current_func] = []
+                        if func_name not in func_to_macros[current_func]:
+                            func_to_macros[current_func].append(func_name)
+
+            for child in node.children:
+                walk_tree(child, current_func)
+
+        walk_tree(tree.root_node)
+        return func_to_macros
 
     def _resolve_header_path(
         self, project_root: str, header_name: str, from_file: str
