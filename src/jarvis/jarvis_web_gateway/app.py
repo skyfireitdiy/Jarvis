@@ -4365,7 +4365,9 @@ def create_app(
 
             key = normalized_path[len("/data/") :]
             if normalized_method == "POST":
-                success, error = save_data(key, payload)
+                # 如果 payload 包含 data 字段，则提取 data 字段的值进行存储
+                data_to_save = payload.get("data", payload)
+                success, error = save_data(key, data_to_save)
                 if success:
                     result = {"success": True, "message": "Data saved successfully"}
                 else:

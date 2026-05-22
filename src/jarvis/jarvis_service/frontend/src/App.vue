@@ -5102,7 +5102,7 @@ async function handleRestoreHistory(agent) {
         // 如果当前正在查看该 Agent，刷新显示
         if (currentAgentId.value === agent.agent_id) {
           // 重新加载历史记录
-          loadHistoryForCurrentAgent()
+          loadHistoryMessages(false)
         }
       } else {
         showToast('没有找到保存的历史记录', 'info')
