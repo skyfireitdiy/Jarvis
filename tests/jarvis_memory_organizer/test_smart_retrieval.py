@@ -302,30 +302,28 @@ class TestSmartRetriever:
         assert len(query.expanded_tags) > 0
         assert query.intent == "how_to"
 
-    def test_calculate_content_similarity(self):
-        """测试内容相似度计算"""
+    def test_calculate_bm25_score(self):
+        """测试BM25相似度计算"""
         retriever = SmartRetriever()
 
         # 相同文本
-        similarity = retriever._calculate_content_similarity(
+        similarity = retriever._calculate_bm25_score(
             "Python code test", "Python code test"
         )
         assert similarity == 1.0
 
         # 部分相似（使用英文以便正确分词）
-        similarity = retriever._calculate_content_similarity(
+        similarity = retriever._calculate_bm25_score(
             "Python code test", "Python code write"
         )
         assert 0 < similarity < 1
 
         # 完全不同
-        similarity = retriever._calculate_content_similarity(
-            "Python code", "Java architecture"
-        )
+        similarity = retriever._calculate_bm25_score("Python code", "Java architecture")
         assert similarity < 1.0
 
         # 空文本
-        similarity = retriever._calculate_content_similarity("", "test")
+        similarity = retriever._calculate_bm25_score("", "test")
         assert similarity == 0.0
 
     def test_calculate_time_freshness(self):
