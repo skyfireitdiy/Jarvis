@@ -1,0 +1,14 @@
+{
+  "id": "20260515_002823_673704",
+  "type": "project_long_term",
+  "tags": [
+    "Vue重构",
+    "Composable",
+    "WebSocket",
+    "接口设计",
+    "代码规范"
+  ],
+  "content": "重构WebSocket逻辑到useWebSocket.js的经验：1. 函数接口需要调整：从无参数函数变为需要传入依赖的options参数，这是composable设计的常见模式；2. 文件行数控制：提取后的composable需要严格控制行数（≤300行），可能需要进一步拆分；3. 功能完整性：需要确保所有相关功能（包括心跳机制）都被提取，避免功能缺失；4. 依赖管理：composable需要通过options参数接收外部依赖，而不是直接访问组件状态。",
+  "created_at": "2026-05-15T00:28:23.673751",
+  "updated_at": "2026-05-15T00:28:23.673757"
+}

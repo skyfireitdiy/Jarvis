@@ -1,0 +1,13 @@
+{
+  "id": "20260517_041302_589833",
+  "type": "project_long_term",
+  "tags": [
+    "节点管理",
+    "重启问题",
+    "bug修复",
+    "前端"
+  ],
+  "content": "修复了节点重启功能的发送目标问题：\n1. 问题：restartAllNodes和restartGateway函数中buildNodeHttpUrl调用硬编码使用'master'，导致所有重启请求都发送给master节点\n2. 解决方案：将URL路径参数从'master'改为对应的节点ID变量（normalizedNodeId/targetNodeId）\n3. 影响文件：src/jarvis/jarvis_service/frontend/src/App.vue\n4. 关键代码位置：第3311行（restartAllNodes函数）、第3363行（restartGateway函数）\n5. 验证：保持原有顺序逻辑不变，确保重启请求发送到正确的节点",
+  "created_at": "2026-05-17T04:13:02.589868",
+  "updated_at": "2026-05-17T04:13:02.589875"
+}

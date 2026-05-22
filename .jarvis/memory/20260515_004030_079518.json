@@ -1,0 +1,15 @@
+{
+  "id": "20260515_004030_079518",
+  "type": "project_long_term",
+  "tags": [
+    "WebSocket",
+    "Composable",
+    "Vue重构",
+    "代码重构",
+    "心跳机制",
+    "接口修复"
+  ],
+  "content": "useWebSocket.js重构完成：\n1. 文件行数：268行（符合≤300行要求）\n2. 接口修复：connect、reconnect、disconnectAll改为无参数接口\n3. 心跳机制：实现startHeartbeat、stopHeartbeat、handlePongMessage\n4. connect函数在ws.onopen中调用startHeartbeat()\n5. 所有函数符合≤50行要求\n6. 使用Vue 3 Composition API\n7. 保持原有功能逻辑不变",
+  "created_at": "2026-05-15T00:40:30.079562",
+  "updated_at": "2026-05-15T00:40:30.079576"
+}

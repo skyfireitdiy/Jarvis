@@ -1,0 +1,12 @@
+{
+  "id": "20260506_031638_344592",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_help",
+    "规则文件",
+    "开发规范"
+  ],
+  "content": "Jarvis 帮助规则文件位置：builtin/rules/development_tools/jarvis_help.md。该规则指导如何回答用户关于 Jarvis 系统的问题，要求必须查阅源码和文档，以代码实现为准。",
+  "created_at": "2026-05-06T03:16:38.344626",
+  "updated_at": "2026-05-06T03:16:38.344632"
+}

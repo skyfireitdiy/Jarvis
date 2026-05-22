@@ -1,0 +1,13 @@
+{
+  "id": "20260518_001441_323991",
+  "type": "project_long_term",
+  "tags": [
+    "refactor",
+    "rules_manager",
+    "load_rule",
+    "session_manager"
+  ],
+  "content": "重构规则管理概念：区分read rule和load rule，废弃active rule。具体重命名：activate_rule → load_rule, deactivate_rule → unload_rule, get_active_rules_content → get_loaded_rules_content, _merge_active_rules → _merge_loaded_rules。属性合并：_active_rules逻辑应合并到loaded_rules，但实际实现中两者并存，loaded_rules作为向后兼容属性。文件路径：src/jarvis/jarvis_agent/rules_manager.py。约束条件：保持方法签名、返回值格式、内部逻辑不变。验证标准：代码语法正确、内部调用一致、方法功能不变。",
+  "created_at": "2026-05-18T00:14:41.324075",
+  "updated_at": "2026-05-18T00:14:41.324088"
+}

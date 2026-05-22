@@ -1,0 +1,13 @@
+{
+  "id": "20260516_112413_990605",
+  "type": "project_long_term",
+  "tags": [
+    "前端",
+    "节点",
+    "属性名",
+    "一致性"
+  ],
+  "content": "## 前端节点对象属性名规范\n\n### 问题背景\n前端`availableNodeOptions`中的节点对象使用`node_id`属性（下划线命名），但部分代码错误地使用了`nodeId`（驼峰命名），导致获取到`undefined`。\n\n### 规范\n- 节点对象统一使用`node_id`（下划线命名）\n- 与后端API返回的数据格式保持一致\n\n### 相关代码位置\n- `src/jarvis/jarvis_service/frontend/src/App.vue`\n  - 第4210-4213行：节点对象定义使用`node_id`\n  - 第3433行：updateCodeToMain函数应使用`node.node_id`\n\n### 检查清单\n当使用节点对象时，确保使用正确的属性名：\n- ✅ `node.node_id`\n- ❌ `node.nodeId`",
+  "created_at": "2026-05-16T11:24:13.990631",
+  "updated_at": "2026-05-16T11:24:13.990636"
+}

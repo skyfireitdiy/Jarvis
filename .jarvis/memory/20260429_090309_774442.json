@@ -1,0 +1,12 @@
+{
+  "id": "20260429_090309_774442",
+  "type": "project_long_term",
+  "tags": [
+    "EditorPanel",
+    "组件拆分",
+    "完成"
+  ],
+  "content": "## EditorPanel 组件拆分完成\n\n**完成时间**: 当前会话\n**Commit**: e3192b8\n\n### 完成内容\n1. 创建 `src/jarvis/jarvis_service/frontend/src/components/EditorPanel.vue` (845行)\n   - 包含完整模板（编辑器头部、标签栏、工具栏、工作区、侧边栏、全局搜索）\n   - 定义 props: visible, interaction, panelStyle, activeTab, activeTabPath, tabs, isMaximized, isEditable, showSidebar, sidebarView, currentAgent, currentAgentId, hasFileTree, getVisibleNodes, resolvePath, 搜索相关props, resizeDirections\n   - 定义 emits: focus, startMove, toggleMaximize, save, close, activateTab, closeTab, toggleEditable, setSidebarView, closeSidebar, ensureFileTree, fileNodeClick, 搜索相关emits, startResize\n   - 暴露 containerRef 供 Monaco 编辑器使用\n   - 包含完整 scoped 样式\n\n2. 修改 App.vue:\n   - 添加 import EditorPanel from './components/EditorPanel.vue'\n   - 将196行内联模板替换为49行组件引用\n   - 所有 props 和 events 正确映射\n\n### 验证结果\n- ✅ 构建通过 (1m 37s)\n- ✅ 代码已自动提交\n\n### 已完成的组件拆分列表\n1. ConnectModal ✅\n2. SessionDialog ✅\n3. BufferPanel ✅\n4. DirectoryDialog ✅\n5. CompletionsModal ✅\n6. TerminalPanel ✅\n7. AgentSidebar ✅\n8. EditorPanel ✅",
+  "created_at": "2026-04-29T09:03:09.774552",
+  "updated_at": "2026-04-29T09:03:09.774564"
+}

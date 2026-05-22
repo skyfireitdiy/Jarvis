@@ -1,0 +1,14 @@
+{
+  "id": "20260519_045502_149207",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "模型代理",
+    "SSE",
+    "流式响应",
+    "StreamingResponse"
+  ],
+  "content": "模型请求代理SSE流式响应设计方案（简化版）：\n\n1. 核心思路：使用HTTP反向代理 + FastAPI StreamingResponse\n   - 不通过WebSocket协议\n   - 节点网关直接作为HTTP反向代理\n   - 使用StreamingResponse实时转发SSE流\n\n2. 架构：\n   Agent --HTTP--> Main Gateway --HTTP--> Node Gateway --HTTP--> External API\n\n3. 关键实现：\n   - 节点网关添加 /model_proxy/{target_url:path} 端点\n   - 使用 httpx.AsyncClient.stream() 处理流式请求\n   - 返回 StreamingResponse(media_type=\"text/event-stream\")\n\n4. 优势：\n   - 简单直接，复用标准HTTP协议\n   - 与现有模型API客户端完全兼容\n   - 实时传输，不等待响应完成\n   - 改动最小，只需添加一个端点",
+  "created_at": "2026-05-19T04:55:02.149293",
+  "updated_at": "2026-05-19T04:55:02.149303"
+}

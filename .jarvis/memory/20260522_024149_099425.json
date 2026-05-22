@@ -1,0 +1,13 @@
+{
+  "id": "20260522_024149_099425",
+  "type": "project_long_term",
+  "tags": [
+    "数据存储",
+    "架构",
+    "api",
+    "网关"
+  ],
+  "content": "## Jarvis 数据存储架构\n\n### 数据存储模块位置\n- 公共模块：`src/jarvis/jarvis_web_gateway/data_storage.py`\n- 提供 `save_data`, `load_data`, `delete_data` 三个核心函数\n\n### API 接口\n- 路径：`/api/data/{key}`\n- 方法：POST（保存）、GET（读取）、DELETE（删除）\n- 认证：需要 Token 认证（`dependencies=[Depends(verify_token)]`）\n- 位置：`src/jarvis/jarvis_web_gateway/app.py`\n\n### 数据存储位置\n- 根目录：`~/.jarvis/data_store/`\n- 文件格式：`{key}.json`\n- Key 格式：仅允许字母、数字、下划线、短横线（1-64字符）\n\n### 前端使用\n- Key 格式：`agent_history_{agent_id}`\n- 文件：`src/jarvis/jarvis_service/frontend/src/App.vue`\n- 函数：`handleSaveHistory`, `handleRestoreHistory`, `handleDeleteHistory`\n\n### 设计决策\n1. 数据存储功能由网关统一提供，不再分散在各个 Agent 中\n2. 所有 Agent（jarvis.py, code_agent.py）共享同一套数据存储接口\n3. 使用原子写入确保数据完整性",
+  "created_at": "2026-05-22T02:41:49.099456",
+  "updated_at": "2026-05-22T02:41:49.099462"
+}

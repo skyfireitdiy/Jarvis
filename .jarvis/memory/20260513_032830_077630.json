@@ -1,0 +1,12 @@
+{
+  "id": "20260513_032830_077630",
+  "type": "project_long_term",
+  "tags": [
+    "openai",
+    "reasoning_content",
+    "消息历史"
+  ],
+  "content": "在openai.py的chat方法中，已成功将reasoning_content添加到assistant消息历史中。修改覆盖了流式模式主路径、流式fallback路径和非流式模式三个代码路径。实现方式：使用getattr安全获取reasoning_content，仅当内容非空时才添加到消息字典中。代码修改已完成并通过审查。",
+  "created_at": "2026-05-13T03:28:30.077691",
+  "updated_at": "2026-05-13T03:28:30.077701"
+}

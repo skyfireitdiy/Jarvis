@@ -1,0 +1,13 @@
+{
+  "id": "20260514_235347_602966",
+  "type": "project_long_term",
+  "tags": [
+    "Jarvis",
+    "前端",
+    "重构",
+    "规范"
+  ],
+  "content": "Jarvis项目重构规范：1) 文件不超过500行，函数不超过50行；2) 使用Vue 3 Composition API；3) composables放在src/composables/目录；4) 保持原有props和emit接口；5) 添加适当的注释说明职责。",
+  "created_at": "2026-05-14T23:53:47.602983",
+  "updated_at": "2026-05-14T23:53:47.602988"
+}

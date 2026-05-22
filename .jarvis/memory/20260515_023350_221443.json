@@ -1,0 +1,15 @@
+{
+  "id": "20260515_023350_221443",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "Vue3",
+    "Composable",
+    "Markdown",
+    "PlantUML",
+    "AI友好型代码"
+  ],
+  "content": "成功完成Markdown/PlantUML渲染逻辑提取到useMarkdown.js composable的重构任务。重构结果：1. 创建了src/jarvis/jarvis_service/frontend/src/composables/useMarkdown.js文件（160行），包含所有Markdown和PlantUML渲染逻辑；2. 从App.vue中移除了约92行重复代码；3. App.vue从11351行减少到11259行；4. 所有函数符合AI友好型代码结构规范（函数不超过50行，文件不超过300行）；5. 保持了原有功能不变，所有渲染逻辑通过useMarkdown composable提供。",
+  "created_at": "2026-05-15T02:33:50.221498",
+  "updated_at": "2026-05-15T02:33:50.221505"
+}

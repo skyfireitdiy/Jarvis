@@ -1,0 +1,14 @@
+{
+  "id": "20260515_050412_547434",
+  "type": "project_long_term",
+  "tags": [
+    "Vue3",
+    "Composition API",
+    "重构",
+    "Composable",
+    "代码架构"
+  ],
+  "content": "Vue 3 Composition API重构模式总结：\n1. 提取composables的原则：按功能职责划分（认证、WebSocket、URL构建、渲染、拖拽等）\n2. 接口保持策略：通过options参数注入依赖，保持composable独立性\n3. 重构验证方法：检查导入语句、删除重复函数、统计行数减少\n4. 实际案例：App.vue从10945行减少到10431行，提取了5个composables\n5. 关键成功因素：保持原有功能逻辑不变，使用Vue 3 Composition API，添加适当注释",
+  "created_at": "2026-05-15T05:04:12.547472",
+  "updated_at": "2026-05-15T05:04:12.547480"
+}

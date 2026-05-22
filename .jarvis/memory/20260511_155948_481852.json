@@ -1,0 +1,12 @@
+{
+  "id": "20260511_155948_481852",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "agent-sidebar",
+    "architecture"
+  ],
+  "content": "## AgentSidebar组件架构（2024年更新）\n\nAgentSidebar.vue 组件的已停止Agent列表现在按节点分组显示：\n\n1. **数据来源**：App.vue 中的 `agentDisplayGroups` 计算属性\n2. **分组逻辑**：`stoppedAgentsByNode` 按 `node_id` 分组\n3. **折叠状态**：由 AgentSidebar 内部管理（`collapsedGroups` ref）\n4. **自动展开**：选择已停止Agent时自动展开对应节点分组\n\n关键实现：\n- 分组 key 格式：`stopped-${nodeId}`\n- 节点标签通过 `getAgentNodeLabel(agent)` 获取，默认为 'master'",
+  "created_at": "2026-05-11T15:59:48.481899",
+  "updated_at": "2026-05-11T15:59:48.481907"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260430_155124_914344",
+  "type": "project_long_term",
+  "tags": [
+    "前端主题",
+    "蓝色科技风",
+    "CSS变量",
+    "完成"
+  ],
+  "content": "## 前端蓝色科技风主题改造完成\n\n### 完成时间\n2024年\n\n### 改造内容\n1. **全局样式变量** (style.css): 定义了蓝色系CSS变量\n2. **布局紧凑化**: 减小了padding/gap约30%\n3. **Logo显示**: 在Header中添加了Jarvis logo和品牌名称\n4. **组件颜色统一**: 将所有12个组件的硬编码颜色改为CSS变量\n\n### 修改的组件列表\n- App.vue\n- AgentSidebar.vue\n- ConfirmDialog.vue\n- TerminalPanel.vue\n- SettingsModal.vue\n- CreateAgentModal.vue\n- RenameAgentModal.vue\n- ConnectModal.vue\n- DirectoryDialog.vue\n- SessionDialog.vue\n- BufferPanel.vue\n- CompletionsModal.vue\n\n### 颜色变量映射\n- #0d1117 → var(--color-bg-primary) (#050a18)\n- #161b22 → var(--color-bg-secondary) (#0a1228)\n- #21262d → var(--color-bg-tertiary) (#0f1a38)\n- #e6edf3 → var(--color-text-primary) (#e8f0ff)\n- #8b949e → var(--color-text-secondary) (#8ba4d0)\n- #58a6ff/#007AFF → var(--color-accent) (#00d4ff)\n- rgba(255,255,255,0.08) → var(--color-border)\n- #3fb950 → var(--color-success) (#00ff88)\n- #f85149 → var(--color-error) (#ff4757)\n- rgba(0,0,0,0.6) → var(--color-overlay)\n\n### 验证状态\n- 所有组件构建通过\n- 颜色一致性良好\n- 无硬编码颜色残留",
+  "created_at": "2026-04-30T15:51:24.914384",
+  "updated_at": "2026-04-30T15:51:24.914390"
+}

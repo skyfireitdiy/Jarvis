@@ -1,0 +1,13 @@
+{
+  "id": "20260522_112419_491958",
+  "type": "project_long_term",
+  "tags": [
+    "code_analyzer",
+    "macro",
+    "dependency",
+    "completed"
+  ],
+  "content": "已成功在 `code_analyzer` 中集成宏依赖分析功能。修改了 `CDependencyAnalyzer` 类，添加了宏定义和宏调用提取方法，并更新了 `build_dependency_graph` 方法以包含宏依赖。测试用例已通过。",
+  "created_at": "2026-05-22T11:24:19.491994",
+  "updated_at": "2026-05-22T11:24:19.492000"
+}

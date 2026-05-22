@@ -1,0 +1,13 @@
+{
+  "id": "20260516_112413_988976",
+  "type": "project_long_term",
+  "tags": [
+    "websocket",
+    "api",
+    "数据格式",
+    "调试"
+  ],
+  "content": "## WebSocket消息响应数据格式规范\n\n### 问题背景\n主节点通过WebSocket向远程节点发送请求时，远程节点返回的消息格式是嵌套的：\n```python\n{\n    \"type\": \"xxx_response\",\n    \"payload\": {\n        \"success\": True/False,\n        \"data\": {...},  # 成功时的数据\n        \"error\": {...}  # 失败时的错误\n    },\n    \"request_id\": \"...\"\n}\n```\n\n### 正确的数据获取方式\n- 成功数据：`payload.get(\"data\", {}).get(\"字段名\", 默认值)`\n- 错误信息：`payload.get(\"error\", {}).get(\"message\", \"默认错误消息\")`\n\n### 错误示例\n- ❌ `payload.get(\"config_data\", {})`\n- ❌ `payload.get(\"message\", \"\")`\n\n### 正确示例\n- ✅ `payload.get(\"data\", {}).get(\"config_data\", {})`\n- ✅ `payload.get(\"data\", {}).get(\"message\", \"\")`\n- ✅ `payload.get(\"error\", {}).get(\"message\", \"错误\")`\n\n### 相关文件\n- `src/jarvis/jarvis_web_gateway/app.py` - get_node_config, node_code_update, set_node_config\n- `src/jarvis/jarvis_web_gateway/node_manager.py` - _handle_config_get_request, _handle_config_set_request, _handle_code_update_to_main_request",
+  "created_at": "2026-05-16T11:24:13.989012",
+  "updated_at": "2026-05-16T11:24:13.989018"
+}

@@ -6,7 +6,6 @@ run.sh
 temp_scripts
 dist
 *egg-info
-.jarvis/
 # .jarvis
 !.jarvis/rules
 jarvis_ai_assistant.egg-info
@@ -171,3 +170,4 @@ site
 .jarvis/sessions
 
 src/jarvis/jarvis_vscode_extension/media/chatPanel.js
+.jarvis/symbol_table.db

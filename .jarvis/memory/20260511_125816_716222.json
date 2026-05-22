@@ -1,0 +1,13 @@
+{
+  "id": "20260511_125816_716222",
+  "type": "project_long_term",
+  "tags": [
+    "项目结构",
+    "前端",
+    "Vue",
+    "diff渲染"
+  ],
+  "content": "## Jarvis前端项目结构\n\n- 前端入口：`src/jarvis/jarvis_service/frontend/src/`\n- 主组件：`App.vue`（约10000+行）\n- 组件目录：`src/components/`\n- 工具模块：直接放在src/下（如diffRenderer.js）\n- 样式文件：独立CSS文件（如diff.css）\n\n## Diff渲染功能模块化结构\n\n- 渲染逻辑：`diffRenderer.js`（157行）\n  - `renderSideBySideDiff(diffData)` - 主渲染函数\n  - `getLanguageFromFilename(filename)` - 文件语言识别\n  - `escapeHtml(text)` - HTML转义\n- 样式文件：`diff.css`（144行）\n  - 包含所有diff相关CSS样式\n  - 包含移动端响应式适配\n- App.vue中通过import导入使用",
+  "created_at": "2026-05-11T12:58:16.716261",
+  "updated_at": "2026-05-11T12:58:16.716268"
+}

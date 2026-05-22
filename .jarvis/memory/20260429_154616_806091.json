@@ -1,0 +1,13 @@
+{
+  "id": "20260429_154616_806091",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "组件拆分",
+    "样式修复",
+    "已完成"
+  ],
+  "content": "## 弹窗透明问题修复完成\n\n### 问题原因\n组件拆分后使用 `<style scoped>`，导致父组件 App.vue 中的 `.modal-overlay` 和 `.modal` 基础样式无法穿透应用到子组件。\n\n### 修复方案\n在每个模态框组件的 `<style scoped>` 中添加基础样式：\n```css\n.modal-overlay {\n  position: fixed;\n  top: 0; left: 0; right: 0; bottom: 0;\n  background: rgba(0, 0, 0, 0.6);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 1000;\n  padding: 20px;\n}\n.modal-overlay .modal {\n  background: rgba(22, 27, 34, 0.95);\n  border: 0.5px solid rgba(255, 255, 255, 0.1);\n  border-radius: 14px;\n  padding: 28px;\n  width: 100%;\n}\n```\n\n### 修复文件\n- CreateAgentModal.vue (commit: 50c7a9d)\n- RenameAgentModal.vue (commit: f81862a)\n- SettingsModal.vue (commit: 8dfd1d9)\n\n### 未修复文件\n- ConfirmDialog.vue - 使用 `article.message` 结构，非模态框，无需修复",
+  "created_at": "2026-04-29T15:46:16.806136",
+  "updated_at": "2026-04-29T15:46:16.806147"
+}

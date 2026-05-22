@@ -1,0 +1,13 @@
+{
+  "id": "20260519_045246_022686",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "模型代理",
+    "SSE",
+    "流式响应"
+  ],
+  "content": "模型请求代理SSE流式响应设计方案：\n\n1. 问题：现有_dispatch_node_http_request返回Dict[str, Any]，不支持流式响应\n\n2. 推荐方案：方案A + 方案B组合\n   - 非流式请求：使用现有协议，返回完整响应\n   - 流式请求：使用WebSocket进行实时传输\n\n3. 关键实现：\n   - 节点端：使用httpx.AsyncClient.stream()处理流式请求\n   - 传输：通过WebSocket发送MODEL_STREAM_CHUNK和MODEL_STREAM_END消息\n   - Agent端：返回流式迭代器供调用方使用\n\n4. 协议扩展：\n   - 请求：添加stream字段标识是否为流式请求\n   - 响应：添加stream_id字段标识流式响应ID",
+  "created_at": "2026-05-19T04:52:46.022730",
+  "updated_at": "2026-05-19T04:52:46.022737"
+}

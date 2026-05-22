@@ -1,0 +1,12 @@
+{
+  "id": "20260512_125548_343637",
+  "type": "project_long_term",
+  "tags": [
+    "前端架构",
+    "弹窗系统",
+    "实现模式"
+  ],
+  "content": "## Jarvis前端弹窗系统实现模式\n\n### 后端接口模式\n- 路径：`/api/agent/{agent_id}/{resource}`\n- 已有端点：diff, rules, tools\n- 返回格式：JSON对象，包含资源列表\n\n### 前端实现步骤\n1. **响应式变量**：`showXxxModal`, `xxxContent`, `xxxLoading`\n2. **事件绑定**：AgentSidebar emit → App.vue 处理\n3. **API调用**：`fetchWithAuth(buildNodeHttpUrl(...))`\n4. **弹窗HTML**：复用 `diff-modal` 和 `rules-modal` 样式类\n5. **样式**：使用CSS变量（--color-bg-tertiary等）保持一致性\n\n### 关键文件\n- `src/jarvis/jarvis_service/frontend/src/App.vue` - 主要弹窗实现\n- `src/jarvis/jarvis_service/frontend/src/components/AgentSidebar.vue` - 侧边栏按钮\n- `src/jarvis/jarvis_agent/jarvis.py` - 后端接口\n- `src/jarvis/jarvis_code_agent/code_agent.py` - code_agent接口\n\n### 样式规范\n- 弹窗背景：`var(--color-bg-tertiary)`\n- 表格样式：`.rules-table` 类\n- 悬浮提示：使用 `:title` 属性",
+  "created_at": "2026-05-12T12:55:48.343682",
+  "updated_at": "2026-05-12T12:55:48.343689"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260506_031638_342962",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_help",
+    "规则",
+    "代码优先",
+    "帮助系统"
+  ],
+  "content": "Jarvis 帮助系统核心原则：代码优先，文档辅助。当用户询问 Jarvis 相关问题时，必须查阅源码实现（{{jarvis_src_dir}}/src/jarvis/），文档（{{jarvis_src_dir}}/docs/jarvis_book/）仅作为辅助参考。当文档与代码实现不一致时，以代码实现为准，因为文档可能滞后于代码更新，源码才是系统的真实行为。",
+  "created_at": "2026-05-06T03:16:38.343014",
+  "updated_at": "2026-05-06T03:16:38.343021"
+}

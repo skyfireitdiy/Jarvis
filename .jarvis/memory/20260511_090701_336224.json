@@ -1,0 +1,12 @@
+{
+  "id": "20260511_090701_336224",
+  "type": "project_long_term",
+  "tags": [
+    "fireworks-tech-graph",
+    "builtin-rules",
+    "diagram-generation"
+  ],
+  "content": "fireworks-tech-graph规则已集成到Jarvis builtin规则系统。规则文件位置：builtin/rules/development_tools/fireworks_tech_graph.md。辅助文件目录：builtin/rules/development_tools/fireworks-tech-graph/（包含scripts/和references/子目录）。规则支持14种图表类型和7种视觉样式，触发关键词包括：画图、帮我画、生成图、架构图、流程图、可视化等。",
+  "created_at": "2026-05-11T09:07:01.336288",
+  "updated_at": "2026-05-11T09:07:01.336296"
+}

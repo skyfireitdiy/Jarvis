@@ -1,0 +1,12 @@
+{
+  "id": "20260519_043111_234067",
+  "type": "project_long_term",
+  "tags": [
+    "架构设计",
+    "模型代理",
+    "简化方案"
+  ],
+  "content": "模型请求代理功能简化方案：1. 核心思路：Agent配置代理节点ID，请求时自动转换URL路径，节点处理函数代理实际请求 2. Agent配置：增加model_proxy_node字段，默认为空 3. 路径转换：原始URL转换为/node/{node_id}/model_proxy/{original_url}格式 4. 节点处理：增加handle_model_proxy_request函数，解析URL并代理请求 5. 优势：简单直接，利用现有节点代理能力，改动小 6. Spec文件：.jarvis/rules/spec/model_request_proxy_spec.md，已更新为简化方案。",
+  "created_at": "2026-05-19T04:31:11.234123",
+  "updated_at": "2026-05-19T04:31:11.234130"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260429_121949_913128",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "App.vue拆分",
+    "SettingsModal",
+    "已完成"
+  ],
+  "content": "## SettingsModal 拆分完成\n\n### 完成时间\n2024年\n\n### 变更统计\n- App.vue: 10877行 → 10663行（减少214行）\n- SettingsModal.vue: 新增400行独立组件\n\n### 提交记录\n- e2ce83c: CreateAgentModal.vue 创建\n- 8b1906b: RenameAgentModal.vue 创建\n- d1d2756: SettingsModal.vue 创建\n- 16a0fea: App.vue 导入 SettingsModal\n- c051bc3: App.vue 替换设置弹窗模板\n- ee49a6b: App.vue 删除79行残留代码\n- 6a0e9df: App.vue 添加事件处理函数\n- fa6c887: 删除 .settings-modal 样式\n- aa6f54f: 删除 .history-info 样式\n- fa6645c: 删除 .config-sync-section 样式\n- 954c8bb: 删除 .checkbox-label 样式\n\n### 待办事项\n- [P1] 删除 App.vue 中不再使用的变量和函数\n- [P2] 拆分其他大组件（编辑器等）- 用户要求后面再说",
+  "created_at": "2026-04-29T12:19:49.913163",
+  "updated_at": "2026-04-29T12:19:49.913169"
+}
