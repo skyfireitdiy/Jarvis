@@ -399,14 +399,18 @@ class BasePlatform(ABC):
                             messages.append({"role": "assistant", "content": response})
                         else:
                             # 最后一条不是用户消息，需要添加用户消息和助手响应
-                            messages.append({"role": "user", "content": message})
+                            # 将多模态消息转换为字符串表示形式
+                            user_content = message if isinstance(message, str) else "[多模态消息]"
+                            messages.append({"role": "user", "content": user_content})
                             messages.append({"role": "assistant", "content": response})
                         # 更新消息列表
                         self.set_messages(messages)
                 else:
                     # messages 为空，直接添加用户消息和助手响应
+                    # 将多模态消息转换为字符串表示形式
+                    user_content = message if isinstance(message, str) else "[多模态消息]"
                     messages = [
-                        {"role": "user", "content": message},
+                        {"role": "user", "content": user_content},
                         {"role": "assistant", "content": response},
                     ]
                     self.set_messages(messages)
