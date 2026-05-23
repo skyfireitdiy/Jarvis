@@ -1269,7 +1269,6 @@ def process_image_command(image_path: str) -> Union[dict, None]:
     try:
         # 导入必要的模块
         from jarvis.jarvis_platform.content_types import ImageURLContent
-        from jarvis.jarvis_platform.content_processor import ContentProcessor
         
         # 规范化路径
         image_path = os.path.abspath(os.path.expanduser(image_path))
