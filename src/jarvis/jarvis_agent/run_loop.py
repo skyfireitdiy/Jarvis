@@ -222,15 +222,21 @@ class AgentRunLoop:
                         )
 
                         # 截断策略：保留前后20%
-                        content_length = len(current_prompt)
-                        keep_start = int(content_length * 0.2)
-                        keep_end = max(1, int(content_length * 0.2))
+                        # 注意：current_prompt 可能是字符串或多模态列表
+                        if isinstance(current_prompt, str):
+                            content_length = len(current_prompt)
+                            keep_start = int(content_length * 0.2)
+                            keep_end = max(1, int(content_length * 0.2))
 
-                        truncated_prompt = (
-                            current_prompt[:keep_start]
-                            + "\n...[中间部分已省略]...\n"
-                            + current_prompt[-keep_end:]
-                        )
+                            truncated_prompt = (
+                                current_prompt[:keep_start]
+                                + "\n...[中间部分已省略]...\n"
+                                + current_prompt[-keep_end:]
+                            )
+                        else:
+                            # 对于多模态内容，暂时跳过截断
+                            # TODO: 实现多模态内容的截断逻辑
+                            truncated_prompt = current_prompt
 
                         # 更新prompt并重新计算token
                         self.agent.session.prompt = truncated_prompt
