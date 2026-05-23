@@ -25,6 +25,10 @@ from typing import List
 from typing import Any
 from typing import Optional
 from typing import Tuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_platform.content_types import ImageURLContent
 
 import wcwidth
 from colorama import Fore
