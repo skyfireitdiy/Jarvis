@@ -413,11 +413,11 @@ class BasePlatform(ABC):
 
         return response
 
-    def chat_until_success(self, message: str, max_output: int = 0) -> str:
+    def chat_until_success(self, message: Union[str, List[ContentBlock]], max_output: int = 0) -> str:
         """与模型对话直到成功响应。
 
         参数:
-            message: 用户消息
+            message: 用户消息，支持纯文本(str)或多模态内容(List[ContentBlock])
             max_output: 最大输出长度，0表示无限制
 
         返回:
@@ -430,12 +430,20 @@ class BasePlatform(ABC):
             set_interrupt(False)
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
-                PrettyOutput.auto_print(f"👤 {message}")  # 保留用于语法高亮
+                # 只打印纯文本消息，多模态消息只打印提示
+                if isinstance(message, str):
+                    PrettyOutput.auto_print(f"👤 {message}")  # 保留用于语法高亮
+                else:
+                    PrettyOutput.auto_print("👤 [多模态消息]")
 
             # 记录用户输入（模型输入）
             from jarvis.jarvis_utils.dialogue_recorder import record_user_message
 
-            record_user_message(message)
+            # 只记录纯文本消息，多模态消息记录提示
+            if isinstance(message, str):
+                record_user_message(message)
+            else:
+                record_user_message("[多模态消息]")
 
             result: str = ""
             result = while_true(
