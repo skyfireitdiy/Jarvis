@@ -622,6 +622,15 @@ class DiffVisualizer:
                                 "",
                                 "",
                             )
+                            # 添加分界线（动态适配终端宽度）
+                            # 减去一些边距以适应表格边框和内边距
+                            separator_width = max(20, self.console.width - 20)
+                            table.add_row(
+                                "",
+                                f"[dim]{'─' * separator_width}[/dim]",
+                                "",
+                                "",
+                            )
                         # 显示结尾的 context_lines 行
                         for k in range(max(0, equal_len - context_lines), equal_len):
                             old_line_num = (

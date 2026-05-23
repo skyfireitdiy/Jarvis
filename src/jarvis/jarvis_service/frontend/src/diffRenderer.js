@@ -87,8 +87,30 @@ export function renderSideBySideDiff(diffData) {
   html += '<table class="diff-table">';
   html += "<colgroup><col><col><col><col></colgroup>";
 
-  rows.forEach((row) => {
+  let lastOldLineNum = 0;
+  let lastNewLineNum = 0;
+
+  rows.forEach((row, index) => {
     const { type, old_line_num, old_line, new_line_num, new_line } = row;
+
+    // 检查是否需要插入分界线（行号不连续）
+    // 注意：第一行不检查，且只在行号有效时检查
+    if (index > 0) {
+      const isOldLineGap =
+        old_line_num && lastOldLineNum && old_line_num - lastOldLineNum > 1;
+      const isNewLineGap =
+        new_line_num && lastNewLineNum && new_line_num - lastNewLineNum > 1;
+
+      // 如果任一侧出现跳跃，且该侧有行号，则插入分界线
+      // 或者如果两侧都有行号，但只有一侧跳跃（例如只改了一侧），也插入分界线
+      if (isOldLineGap || isNewLineGap) {
+        html += '<tr class="diff-separator"><td colspan="4"></td></tr>';
+      }
+    }
+
+    // 更新上一次的行号
+    if (old_line_num) lastOldLineNum = old_line_num;
+    if (new_line_num) lastNewLineNum = new_line_num;
 
     // 行背景色类
     let rowClass = "diff-row diff-row-" + type;
