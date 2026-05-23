@@ -78,6 +78,7 @@ from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.globals import make_agent_name
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_current_agent
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
@@ -624,7 +625,7 @@ class Agent:
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
         self.pin_content: str = ""  # 记录固定的内容
-        self.original_user_input: str = ""  # 记录原始用户输入
+        self.original_user_input: Union[str, List[ContentBlock]] = ""  # 记录原始用户输入
         self.recent_memories: List[str] = []  # 最近10条记忆内容
         self.MAX_RECENT_MEMORIES = 10  # 最大记忆数量
         self.return_control_on_auto_complete = False  # 自动完成后将控制权交还用户
@@ -2156,11 +2157,11 @@ class Agent:
 
         return addon_prompt
 
-    def run(self, user_input: str) -> Any:
+    def run(self, user_input: Union[str, List[ContentBlock]]) -> Any:
         """处理用户输入并执行任务
 
         参数:
-            user_input: 任务描述或请求
+            user_input: 任务描述或请求，支持纯文本或多模态内容
 
         返回:
             str|Dict: 任务总结报告或要发送的消息
