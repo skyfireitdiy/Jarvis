@@ -127,9 +127,9 @@ class ContentProcessor:
                 base64_data = ContentProcessor._encode_file_to_base64(image_url, "image")
                 if base64_data:
                     # 创建新的内容块，避免修改原始数据
-                    new_block = dict(block)
+                    new_block: dict = dict(block)
                     new_block["image_url"] = base64_data
-                    return new_block
+                    return new_block  # type: ignore
 
         # 处理音频文件路径
         if content_type == "audio":
@@ -137,9 +137,9 @@ class ContentProcessor:
             if isinstance(audio_url, str) and os.path.exists(audio_url):
                 base64_data = ContentProcessor._encode_file_to_base64(audio_url, "audio")
                 if base64_data:
-                    new_block = dict(block)
+                    new_block: dict = dict(block)
                     new_block["audio_url"] = base64_data
-                    return new_block
+                    return new_block  # type: ignore
 
         # 处理视频文件路径
         if content_type == "video":
@@ -147,9 +147,9 @@ class ContentProcessor:
             if isinstance(video_url, str) and os.path.exists(video_url):
                 base64_data = ContentProcessor._encode_file_to_base64(video_url, "video")
                 if base64_data:
-                    new_block = dict(block)
+                    new_block: dict = dict(block)
                     new_block["video_url"] = base64_data
-                    return new_block
+                    return new_block  # type: ignore
 
         return block
 
