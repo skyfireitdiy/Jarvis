@@ -232,6 +232,12 @@ class ClaudeModel(BasePlatform):
         messages_before_user = len(self.messages)
 
         try:
+            # 检查多模态支持
+            if not isinstance(message, str) and not self.supports_multimodal():
+                raise ValueError(
+                    "当前模型不支持多模态输入，请在 llm_config 中设置 supports_multimodal: true"
+                )
+
             # 转换消息格式为 Anthropic 格式，同时提取系统消息
             anthropic_messages: List[MessageParam] = []
             system_content = None

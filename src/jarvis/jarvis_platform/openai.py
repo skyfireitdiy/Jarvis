@@ -303,6 +303,12 @@ class OpenAIModel(BasePlatform):
         messages_before_user = len(self.messages)
 
         try:
+            # 检查多模态支持
+            if not isinstance(message, str) and not self.supports_multimodal():
+                raise ValueError(
+                    "当前模型不支持多模态输入，请在 llm_config 中设置 supports_multimodal: true"
+                )
+
             # 处理多模态消息
             if isinstance(message, str):
                 user_message_content = message

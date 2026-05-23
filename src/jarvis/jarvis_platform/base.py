@@ -77,6 +77,13 @@ class BasePlatform(ABC):
         # 获取 llm_config 供子类使用
         self._llm_config = get_llm_config(platform_type)
 
+        # 检查是否支持多模态
+        self._supports_multimodal = self._llm_config.get("supports_multimodal", False)
+
+    def supports_multimodal(self) -> bool:
+        """检查是否支持多模态输入"""
+        return self._supports_multimodal
+
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
         return len(self.get_messages()) // 2

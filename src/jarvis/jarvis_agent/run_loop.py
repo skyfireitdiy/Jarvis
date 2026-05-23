@@ -241,9 +241,15 @@ class AgentRunLoop:
 
                         # 更新prompt并重新计算token
                         self.agent.session.prompt = truncated_prompt
-                        current_message_tokens = get_context_token_count(
-                            truncated_prompt
-                        )
+                        # 注意：truncated_prompt 可能是字符串或多模态列表
+                        if isinstance(truncated_prompt, str):
+                            current_message_tokens = get_context_token_count(
+                                truncated_prompt
+                            )
+                        else:
+                            # 对于多模态内容，暂时设为0
+                            # TODO: 实现更精确的多模态token计算
+                            current_message_tokens = 0
 
                         # 重新计算剩余token并判断是否还需要压缩
                         remaining_tokens = model_instance.get_remaining_token_count()
@@ -292,8 +298,10 @@ class AgentRunLoop:
 
                         if summary_text:
                             # 将摘要加入addon_prompt，维持上下文连续性
-                            self.agent.session.addon_prompt = join_prompts(
-                                [self.agent.session.addon_prompt, summary_text]
+                            self.agent.session.addon_prompt = ensure_str(
+                                join_prompts(
+                                    [self.agent.session.addon_prompt, summary_text]
+                                )
                             )
 
                         PrettyOutput.auto_print("✅ 完整摘要压缩完成，对话上下文已更新")
@@ -336,8 +344,8 @@ class AgentRunLoop:
         summary_text = ag._summarize_and_clear_history(trigger_reason="手动触发")
         if summary_text:
             # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
-            ag.session.addon_prompt = join_prompts(
-                [ag.session.addon_prompt, summary_text]
+            ag.session.addon_prompt = ensure_str(
+                join_prompts([ag.session.addon_prompt, summary_text])
             )
         # 如果响应中还有其他内容，继续处理；否则继续下一轮
         if not current_response:
@@ -373,8 +381,8 @@ class AgentRunLoop:
             # 获取用户补充信息并继续执行
             addon_info = self._handle_interrupt_with_input()
             if addon_info:
-                ag.session.addon_prompt = join_prompts(
-                    [ag.session.addon_prompt, addon_info]
+                ag.session.addon_prompt = ensure_str(
+                    join_prompts([ag.session.addon_prompt, addon_info])
                 )
             # 在中断后，设置标志以在下一轮执行input handler
             ag.run_input_handlers_next_turn = True
@@ -622,8 +630,8 @@ class AgentRunLoop:
             except KeyboardInterrupt:
                 addon_info = self._handle_interrupt_with_input()
                 if addon_info:
-                    ag.session.addon_prompt = join_prompts(
-                        [ag.session.addon_prompt, addon_info]
+                    ag.session.addon_prompt = ensure_str(
+                        join_prompts([ag.session.addon_prompt, addon_info])
                     )
                 ag.run_input_handlers_next_turn = True
                 return True, None
@@ -658,11 +666,13 @@ class AgentRunLoop:
             try:
                 current_round = self.agent.model.get_conversation_turn()
                 if current_round % self.tool_reminder_rounds == 0:
-                    self.agent.session.addon_prompt = join_prompts(
-                        [
-                            self.agent.session.addon_prompt,
-                            self.agent.get_tool_usage_prompt(),
-                        ]
+                    self.agent.session.addon_prompt = ensure_str(
+                        join_prompts(
+                            [
+                                self.agent.session.addon_prompt,
+                                self.agent.get_tool_usage_prompt(),
+                            ]
+                        )
                     )
 
                 ag = self.agent
@@ -718,8 +728,8 @@ class AgentRunLoop:
                     # 获取用户补充信息并继续下一轮
                     addon_info = self._handle_interrupt_with_input()
                     if addon_info:
-                        ag.session.addon_prompt = join_prompts(
-                            [ag.session.addon_prompt, addon_info]
+                        ag.session.addon_prompt = ensure_str(
+                            join_prompts([ag.session.addon_prompt, addon_info])
                         )
                     # 在中断后，设置标志以在下一轮执行input handler
                     ag.run_input_handlers_next_turn = True
@@ -797,8 +807,8 @@ class AgentRunLoop:
                     # 获取用户补充信息并继续下一轮
                     addon_info = self._handle_interrupt_with_input()
                     if addon_info:
-                        ag.session.addon_prompt = join_prompts(
-                            [ag.session.addon_prompt, addon_info]
+                        ag.session.addon_prompt = ensure_str(
+                            join_prompts([ag.session.addon_prompt, addon_info])
                         )
                     # 在中断后，设置标志以在下一轮执行input handler
                     ag.run_input_handlers_next_turn = True
@@ -814,8 +824,8 @@ class AgentRunLoop:
                 # 获取用户补充信息并继续执行
                 addon_info = self._handle_interrupt_with_input()
                 if addon_info:
-                    ag.session.addon_prompt = join_prompts(
-                        [ag.session.addon_prompt, addon_info]
+                    ag.session.addon_prompt = ensure_str(
+                        join_prompts([ag.session.addon_prompt, addon_info])
                     )
                 # 在中断后，设置标志以在下一轮执行input handler
                 ag.run_input_handlers_next_turn = True
