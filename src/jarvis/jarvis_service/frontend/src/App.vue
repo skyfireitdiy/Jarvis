@@ -6382,6 +6382,11 @@ async function uploadImageToNode(file) {
     
     // 发送上传请求
     if (ws && ws.readyState === WebSocket.OPEN) {
+      // 创建 Promise 等待响应
+      const uploadPromise = new Promise((resolve) => {
+        pendingFileUploads.set(messageId, resolve)
+      })
+      
       ws.send(JSON.stringify({
         type: 'file_upload',
         message_id: messageId,
@@ -6393,12 +6398,11 @@ async function uploadImageToNode(file) {
         }
       }))
       
-      // 等待响应 (这里简化处理，实际应该监听响应)
-      // 在实际实现中，应该维护一个 pendingRequests Map
-      // 这里为了简化，我们假设上传成功并生成一个临时路径
-      // 实际逻辑应该在 websocket onmessage 中处理
-      const fakePath = `/tmp/${Date.now()}_${file.name}`
-      insertTextAtCursor(`<image> ${fakePath}`)
+      // 等待服务器响应
+      const filePath = await uploadPromise
+      if (filePath) {
+        insertTextAtCursor(`<image> ${filePath}`)
+      }
     } else {
       alert('未连接到服务器')
     }
