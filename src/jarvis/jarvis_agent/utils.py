@@ -2,36 +2,60 @@
 """
 工具函数（jarvis_agent.utils）
 
-- join_prompts: 统一的提示拼接策略（仅拼接非空段落，使用双换行）
+- join_prompts: 统一的提示拼接策略（支持纯文本和多模态内容）
 - is_auto_complete: 统一的自动完成标记检测
 - fix_tool_call_with_llm: 使用大模型修复工具调用格式
 """
 
 from enum import Enum
-from typing import Any
+from typing import Any, List
 from typing import Iterable
-from typing import Optional
+from typing import Optional, Union
 from typing import cast
 
 
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 
 
-def join_prompts(parts: Iterable[str]) -> str:
+def join_prompts(
+    parts: Iterable[Union[str, List[ContentBlock]]],
+) -> Union[str, List[ContentBlock]]:
     """
     将多个提示片段按统一规则拼接：
-    - 过滤掉空字符串
-    - 使用两个换行分隔
-    - 不进行额外 strip，保持调用方原样语义
+    - 支持纯文本和多模态内容
+    - 如果所有部分都是字符串，返回拼接后的字符串
+    - 如果任何部分是多模态内容，返回合并后的内容块列表
     """
     try:
-        non_empty: list[str] = [p for p in parts if isinstance(p, str) and p]
+        all_parts = list(parts)
     except Exception:
         # 防御性处理：若 parts 不可迭代或出现异常，直接返回空字符串
         return ""
-    return "\n\n".join(non_empty)
+
+    # 检查是否有多模态内容
+    has_multimodal = any(isinstance(p, list) for p in all_parts)
+
+    if not has_multimodal:
+        # 所有部分都是字符串，使用原有逻辑
+        non_empty: list[str] = [p for p in all_parts if isinstance(p, str) and p]
+        return "\n\n".join(non_empty)
+
+    # 有多模态内容，需要合并
+    result_blocks: List[ContentBlock] = []
+
+    for part in all_parts:
+        if isinstance(part, str):
+            if part.strip():
+                # 将非空字符串转换为文本内容块
+                result_blocks.append({"type": "text", "text": part})
+        elif isinstance(part, list):
+            # 直接添加内容块列表
+            result_blocks.extend(part)
+
+    return result_blocks
 
 
 def is_auto_complete(response: str) -> bool:
