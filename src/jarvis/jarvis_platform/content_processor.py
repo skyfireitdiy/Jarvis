@@ -170,6 +170,9 @@ class ContentProcessor:
             file_size = os.path.getsize(file_path)
             max_size_key = f"max_{file_type}_size"
             max_size = CONTENT_CONFIG.get(max_size_key, 50 * 1024 * 1024)  # 默认50MB
+            # 确保max_size是整数
+            if not isinstance(max_size, int):
+                max_size = 50 * 1024 * 1024
 
             if file_size > max_size:
                 PrettyOutput.auto_print(f"⚠️ 文件 {file_path} 大小超过限制 ({file_size} > {max_size})")
