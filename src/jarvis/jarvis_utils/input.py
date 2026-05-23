@@ -25,6 +25,10 @@ from typing import List
 from typing import Any
 from typing import Optional
 from typing import Tuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_platform.content_types import ImageURLContent
 
 import wcwidth
 from colorama import Fore
@@ -184,6 +188,7 @@ BUILTIN_COMMANDS = [
     ("PrintConfig", "打印全局配置"),
     ("SetConfig", "修改全局配置"),
     ("Diff", "显示从start_commit到当前的变更"),
+    ("Image", "添加图片到下一条消息"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
@@ -1252,6 +1257,61 @@ def _get_non_interactive_response(auto_complete: bool) -> str:
         return base_msg + hint
     else:
         return "当前是非交互模式，所有的事情你都自我决策" + hint
+
+
+def process_image_command(image_path: str) -> Optional["ImageURLContent"]:
+    """
+    处理 /image 命令，将图片路径转换为 ContentBlock
+
+    Args:
+        image_path: 图片文件路径
+
+    Returns:
+        Union[dict, None]: ImageURLContent 类型的 ContentBlock，失败返回 None
+    """
+    try:
+        # 导入必要的模块
+        from jarvis.jarvis_platform.content_types import ImageURLContent
+
+        # 规范化路径
+        image_path = os.path.abspath(os.path.expanduser(image_path))
+
+        # 检查文件是否存在
+        if not os.path.exists(image_path):
+            PrettyOutput.auto_print(f"⚠️  图片文件不存在: {image_path}")
+            return None
+
+        # 检查文件大小
+        file_size = os.path.getsize(image_path)
+        max_size = 20 * 1024 * 1024  # 20MB
+        if file_size > max_size:
+            PrettyOutput.auto_print(
+                f"⚠️  图片文件过大: {file_size / 1024 / 1024:.1f}MB (最大 20MB)"
+            )
+            return None
+
+        # 检查文件格式
+        ext = os.path.splitext(image_path)[1].lower().lstrip(".")
+        supported_formats = ["jpg", "jpeg", "png", "gif", "webp"]
+        if ext not in supported_formats:
+            PrettyOutput.auto_print(
+                f"⚠️  不支持的图片格式: {ext} (支持: {', '.join(supported_formats)})"
+            )
+            return None
+
+        # 创建 ImageURLContent
+        image_content: ImageURLContent = {
+            "type": "image_url",
+            "image_url": image_path,
+            "detail": "auto",
+        }
+
+        PrettyOutput.auto_print(f"✅ 已添加图片: {os.path.basename(image_path)}")
+        return image_content
+
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️  处理图片失败: {e}")
+        return None
 
 
 def user_confirm(tip: str, default: bool = True) -> bool:

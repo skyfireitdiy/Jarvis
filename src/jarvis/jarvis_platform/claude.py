@@ -269,7 +269,6 @@ class ClaudeModel(BasePlatform):
                             # 如果是数据 URL (data:image/jpeg;base64,...)
                             if image_url_data.startswith("data:image"):
                                 # 解析数据 URL
-                                import base64
 
                                 header, data = image_url_data.split(",", 1)
                                 media_type = header.split(":")[1].split(";")[0]
