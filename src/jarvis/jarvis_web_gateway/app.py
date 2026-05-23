@@ -794,6 +794,85 @@ class WebSocketConnectionManager:
                     return
                 _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
             return
+        if message_type == "file_upload":
+            # 处理文件上传请求
+            message_id = message.get("message_id")
+            agent_id = payload.get("agent_id")
+            file_name = payload.get("file_name")
+            file_data = payload.get("file_data")
+            target_dir = payload.get("target_dir", "/tmp")
+            
+            if not all([message_id, file_name, file_data]):
+                error_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": {
+                        "success": False,
+                        "error": "Missing required fields"
+                    }
+                }
+                self._router.publish(error_msg, session_id=session_id)
+                return
+                
+            # 检查是否需要转发到远程节点
+            node_id = str(payload.get("node_id") or "").strip()
+            if node_id and node_id not in (
+                _node_runtime.local_node_id if _node_runtime else "master",
+                "master",
+                "",
+            ):
+                # 转发到远端节点
+                if _node_connection_manager is None:
+                    logger.error(
+                        "[WS MESSAGE] Node connection manager is not available"
+                    )
+                    return
+                try:
+                    response = await _node_connection_manager.send_request_to_node(
+                        node_id,
+                        NODE_TERMINAL_REQUEST,
+                        {
+                            "action": "file_upload",
+                            "payload": payload,
+                            "session_id": session_id,
+                        },
+                    )
+                    # 转发远端节点的响应给前端
+                    self._router.publish(response, session_id=session_id)
+                except Exception as e:
+                    logger.error(f"[WS MESSAGE] Failed to forward file upload to node {node_id}: {e}")
+                    error_msg = {
+                        "type": "file_upload_response",
+                        "message_id": message_id,
+                        "payload": {
+                            "success": False,
+                            "error": f"Failed to forward to node: {str(e)}"
+                        }
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                return
+                
+            # 本地处理文件上传
+            try:
+                result = await _handle_file_upload(payload)
+                response_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": result
+                }
+                self._router.publish(response_msg, session_id=session_id)
+            except Exception as e:
+                logger.error(f"[WS MESSAGE] Error handling file upload: {e}", exc_info=True)
+                error_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": {
+                        "success": False,
+                        "error": str(e)
+                    }
+                }
+                self._router.publish(error_msg, session_id=session_id)
+            return
 
 
 def create_app(
