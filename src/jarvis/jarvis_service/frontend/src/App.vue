@@ -5898,6 +5898,9 @@ function handleMessage(message, agentId = null) {
         })
       }
     }
+  } else if (type === 'file_upload_response') {
+    console.log('[ws] file_upload_response', payload)
+    handleFileUploadResponse(payload)
   }
 }
 
