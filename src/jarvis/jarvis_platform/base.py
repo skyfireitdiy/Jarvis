@@ -212,7 +212,7 @@ class BasePlatform(ABC):
             return 0.0, "green", ""
 
     def _chat_with_pretty_output(
-        self, message: str, start_time: float, max_output: int = 0
+        self, message: Union[str, List[ContentBlock]], start_time: float, max_output: int = 0
     ) -> Tuple[str, str, float]:
         """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
         return PrettyOutput.stream_chat_with_panel(
@@ -232,7 +232,7 @@ class BasePlatform(ABC):
         )
 
     def _chat_with_simple_output(
-        self, message: str, start_time: float, max_output: int = 0
+        self, message: Union[str, List[ContentBlock]], start_time: float, max_output: int = 0
     ) -> Tuple[str, str, float]:
         """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
         response, reasoning_content, first_token_time = PrettyOutput.stream_chat_simple(
@@ -248,7 +248,7 @@ class BasePlatform(ABC):
         return response, reasoning_content, first_token_time
 
     def _chat_with_suppressed_output(
-        self, message: str, max_output: int = 0
+        self, message: Union[str, List[ContentBlock]], max_output: int = 0
     ) -> Tuple[str, str]:
         """使用无人值守模式进行聊天
 
