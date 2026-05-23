@@ -6,11 +6,13 @@ from typing import Optional
 from typing import Generator
 from typing import List
 from typing import Tuple
+from typing import Union
 
 from anthropic import Anthropic
 from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 import jarvis.jarvis_utils.globals as jglobals
 
@@ -205,12 +207,14 @@ class ClaudeModel(BasePlatform):
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
-    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
+    def chat(
+        self, message: Union[str, List[ContentBlock]]
+    ) -> Generator[Tuple[str, str], None, None]:
         """
         执行对话并返回生成器
 
         参数:
-            message: 用户输入的消息内容
+            message: 用户输入的消息内容，支持纯文本(str)或多模态内容(List[ContentBlock])
 
         返回:
             Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
@@ -244,7 +248,74 @@ class ClaudeModel(BasePlatform):
                     anthropic_messages.append({"role": "assistant", "content": content})
 
             # 添加当前用户消息
-            anthropic_messages.append({"role": "user", "content": message})
+            # 处理多模态消息
+            if isinstance(message, str):
+                user_message_content = message
+            else:
+                # 将 List[ContentBlock] 转换为 Claude API 期望的格式
+                user_message_content = []
+                for block in message:
+                    if block["type"] == "text":
+                        user_message_content.append(
+                            {"type": "text", "text": block["text"]}
+                        )
+                    elif block["type"] == "image_url":
+                        # Claude API 期望 image 类型，并且需要 source 字段
+                        # 这里假设 image_url 是 base64 编码的数据 URL 或普通 URL
+                        # 如果是普通 URL，可能需要先下载并转换为 base64
+                        # 这里简化处理，假设是 base64 数据 URL
+                        image_url_data = block["image_url"]
+                        if isinstance(image_url_data, str):
+                            # 如果是数据 URL (data:image/jpeg;base64,...)
+                            if image_url_data.startswith("data:image"):
+                                # 解析数据 URL
+                                import base64
+
+                                header, data = image_url_data.split(",", 1)
+                                media_type = header.split(":")[1].split(";")[0]
+                                user_message_content.append(
+                                    {
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": media_type,
+                                            "data": data,
+                                        },
+                                    }
+                                )
+                            else:
+                                # 如果是普通 URL，暂时转换为文本描述
+                                # 实际实现可能需要下载图片并转换为 base64
+                                user_message_content.append(
+                                    {
+                                        "type": "text",
+                                        "text": f"[Image URL: {image_url_data}]",
+                                    }
+                                )
+                        elif isinstance(image_url_data, dict):
+                            # 如果已经是 dict 格式，假设符合 Claude API 格式
+                            user_message_content.append(image_url_data)
+                    elif block["type"] == "audio":
+                        # Claude API 目前不支持 audio 类型，暂时转换为文本描述
+                        user_message_content.append(
+                            {
+                                "type": "text",
+                                "text": f"[Audio: {block.get('audio_url', 'N/A')}]",
+                            }
+                        )
+                    elif block["type"] == "video":
+                        # Claude API 目前不支持 video 类型，暂时转换为文本描述
+                        user_message_content.append(
+                            {
+                                "type": "text",
+                                "text": f"[Video: {block.get('video_url', 'N/A')}]",
+                            }
+                        )
+                    else:
+                        # 未知类型，忽略或报错
+                        pass
+
+            anthropic_messages.append({"role": "user", "content": user_message_content})
 
             # 累计完整响应
             accumulated_response = ""
@@ -284,7 +355,9 @@ class ClaudeModel(BasePlatform):
 
             # 将响应添加到消息历史
             if accumulated_response:
-                self.messages.append({"role": "user", "content": message})
+                # 将多模态消息转换为字符串表示形式存储在历史中
+                user_content = message if isinstance(message, str) else "[多模态消息]"
+                self.messages.append({"role": "user", "content": user_content})
                 self.messages.append(
                     {"role": "assistant", "content": accumulated_response}
                 )

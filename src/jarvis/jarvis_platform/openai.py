@@ -9,11 +9,13 @@ from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 from typing import cast
 
 from openai import OpenAI
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
 import jarvis.jarvis_utils.globals as jglobals
@@ -183,11 +185,11 @@ class OpenAIModel(BasePlatform):
                 PrettyOutput.auto_print(
                     "⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头"
                 )
-        self.messages: List[Dict[str, str]] = []
+        self.messages: List[Dict[str, Any]] = []
         self.system_message = ""
         self._streaming_disabled: Optional[bool] = None
 
-    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+    def set_messages(self, messages: List[Dict[str, Any]]) -> None:
         """替换对话历史
 
         参数:
@@ -211,11 +213,11 @@ class OpenAIModel(BasePlatform):
             1 for msg in non_system_messages if msg.get("role") == "user"
         )
 
-    def get_messages(self) -> List[Dict[str, str]]:
+    def get_messages(self) -> List[Dict[str, Any]]:
         """获取对话历史
 
         返回:
-            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
+            List[Dict[str, Any]]: 对话历史列表，每个元素包含 role 和 content
         """
         return self.messages
 
@@ -282,15 +284,17 @@ class OpenAIModel(BasePlatform):
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
-    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
+    def chat(
+        self, message: Union[str, List[ContentBlock]]
+    ) -> Generator[Tuple[str, str], None, None]:
         """
         执行对话并返回生成器
 
         参数:
-            message: 用户输入的消息内容
+            message: 用户输入的消息内容，支持纯文本(str)或多模态内容(List[ContentBlock])
 
         返回:
-            Generator[str, None, None]: 生成器，逐块返回AI响应内容
+            Generator[Tuple[str, str], None, None]: 生成器，逐块返回AI响应内容
 
         异常:
             当API调用失败时会抛出异常并打印错误信息
@@ -299,7 +303,48 @@ class OpenAIModel(BasePlatform):
         messages_before_user = len(self.messages)
 
         try:
-            self.messages.append({"role": "user", "content": message})
+            # 处理多模态消息
+            if isinstance(message, str):
+                user_message_content = message
+            else:
+                # 将 List[ContentBlock] 转换为 OpenAI API 期望的格式
+                user_message_content = []
+                for block in message:
+                    if block["type"] == "text":
+                        user_message_content.append(
+                            {"type": "text", "text": block["text"]}
+                        )
+                    elif block["type"] == "image_url":
+                        # OpenAI API 期望 image_url 是一个对象，包含 url 字段
+                        image_url_data = block["image_url"]
+                        if isinstance(image_url_data, str):
+                            image_url_data = {"url": image_url_data}
+                        user_message_content.append(
+                            {"type": "image_url", "image_url": image_url_data}
+                        )
+                    elif block["type"] == "audio":
+                        # OpenAI API 目前可能不直接支持 audio 类型，这里暂时按 text 处理或忽略
+                        # 实际实现可能需要根据 OpenAI 的具体支持情况进行调整
+                        # 暂时将其转换为文本描述
+                        user_message_content.append(
+                            {
+                                "type": "text",
+                                "text": f"[Audio: {block.get('audio_url', 'N/A')}]",
+                            }
+                        )
+                    elif block["type"] == "video":
+                        # OpenAI API 目前可能不直接支持 video 类型，这里暂时按 text 处理或忽略
+                        user_message_content.append(
+                            {
+                                "type": "text",
+                                "text": f"[Video: {block.get('video_url', 'N/A')}]",
+                            }
+                        )
+                    else:
+                        # 未知类型，忽略或报错
+                        pass
+
+            self.messages.append({"role": "user", "content": user_message_content})
 
             # 循环处理，直到不是因为长度限制而结束
             # 构造 API 调用参数

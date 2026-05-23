@@ -1,0 +1,8 @@
+{
+  "id": "20260523_060108_971266",
+  "type": "project_long_term",
+  "tags": ["platform", "multimodal", "analysis"],
+  "content": "## Platform模块多模态支持分析\n\n### 当前状态\n1. **消息结构**：当前所有消息都是纯文本格式 `{'role': 'user/assistant/system', 'content': '文本内容'}`\n2. **实现类**：OpenAIModel和ClaudeModel都基于BasePlatform实现\n3. **处理方式**：chat方法接收字符串message参数，返回生成器\n\n### 多模态支持需求\n1. **支持内容类型**：图片、音频、视频、文件等\n2. **混合内容**：支持文本+图片等组合内容\n3. **兼容性**：保持向后兼容，支持纯文本消息\n\n### 需要调整的地方\n1. **BasePlatform基类**：\n   - 修改chat方法签名，支持多模态输入\n   - 添加多模态内容处理方法\n   - 定义多模态内容数据结构\n\n2. **消息格式**：\n   - 支持content为列表格式，包含不同类型的内容块\n   - 定义内容块类型：text、image_url、audio_url等\n\n3. **实现类调整**：\n   - OpenAIModel：支持OpenAI的多模态API格式\n   - ClaudeModel：支持Anthropic的多模态API格式\n\n### 技术约束\n1. 保持向后兼容性\n2. 支持主流LLM提供商的多模态API\n3. 考虑性能影响（大文件处理）",
+  "created_at": "2026-05-23T06:01:08.971301",
+  "updated_at": "2026-05-23T06:01:08.971307"
+}

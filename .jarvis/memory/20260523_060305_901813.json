@@ -1,0 +1,8 @@
+{
+  "id": "20260523_060305_901813",
+  "type": "project_long_term",
+  "tags": ["platform", "multimodal", "design", "part4"],
+  "content": "# Platform模块多模态支持详细设计文档 - Part 4\n\n## 11. 实施计划\n\n### 11.1 开发阶段\n\n| 阶段 | 任务 | 预计工期 | 依赖 |\n|------|------|----------|------|\n| 阶段1 | 创建content_types.py | 1天 | 无 |\n| 阶段2 | 创建content_processor.py | 2天 | 阶段1 |\n| 阶段3 | 修改base.py | 2天 | 阶段1,2 |\n| 阶段4 | 修改openai.py | 2天 | 阶段3 |\n| 阶段5 | 修改claude.py | 2天 | 阶段3 |\n| 阶段6 | 编写测试 | 3天 | 阶段4,5 |\n\n### 11.2 里程碑\n\n- **里程碑1**：类型定义完成 - 第1天\n- **里程碑2**：基类修改完成 - 第5天\n- **里程碑3**：实现类修改完成 - 第9天\n- **里程碑4**：测试通过 - 第12天\n\n## 12. 风险评估\n\n| 风险 | 影响 | 概率 | 风险等级 | 应对措施 |\n|------|------|------|----------|----------|\n| API格式不兼容 | 高 | 中 | 高 | 提前调研API文档，预留适配层 |\n| 性能问题 | 中 | 中 | 中 | 性能测试，优化编码逻辑 |\n| 安全漏洞 | 高 | 低 | 中 | 安全审查，渗透测试 |\n| 向后兼容性问题 | 高 | 低 | 中 | 充分的回归测试 |\n\n## 13. 附录\n\n### 13.1 术语表\n\n| 术语 | 定义 |\n|------|------|\n| ContentBlock | 多模态内容的基本单元，包含类型和数据 |\n| 多模态 | 支持文本、图片、音频、视频等多种内容形式 |\n| Base64 | 二进制到文本的编码方式，用于传输二进制数据 |\n\n### 13.2 参考文档\n\n- OpenAI Vision API: https://platform.openai.com/docs/guides/vision\n- Anthropic Claude Vision: https://docs.anthropic.com/claude/docs/vision\n- Python TypedDict: https://docs.python.org/3/library/typing.html#typing.TypedDict",
+  "created_at": "2026-05-23T06:03:05.901852",
+  "updated_at": "2026-05-23T06:03:05.901860"
+}
