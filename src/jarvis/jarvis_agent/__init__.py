@@ -1285,7 +1285,7 @@ class Agent:
             pass
         return message
 
-    def _invoke_model(self, message: str) -> str:
+    def _invoke_model(self, message: Union[str, List[ContentBlock]]) -> str:
         """实际调用模型获取响应"""
         if not self.model:
             raise RuntimeError("Model not initialized")
