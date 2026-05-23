@@ -1215,7 +1215,7 @@ class Agent:
         self._last_handler_returned = False
         return message
 
-    def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
+    def _add_addon_prompt(self, message: Union[str, List[ContentBlock]], need_complete: bool) -> Union[str, List[ContentBlock]]:
         """添加附加提示到消息
 
         规则：
@@ -1247,7 +1247,9 @@ class Agent:
         else:
             threshold = get_addon_prompt_threshold()
             # 条件1：消息长度超过阈值
-            if len(message) > threshold:
+            # 对于多模态内容，检查文本部分的长度
+            message_len = len(message) if isinstance(message, str) else sum(len(b.get('text', '')) if b.get('type') == 'text' else 0 for b in message)
+            if message_len > threshold:
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
                 should_add = True
