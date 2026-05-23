@@ -421,11 +421,11 @@ class Agent:
         # 只有在记录启动时才停止记录
         pass
 
-    def get_user_origin_input(self) -> str:
+    def get_user_origin_input(self) -> Union[str, List[ContentBlock]]:
         """获取原始用户输入
 
         返回:
-            str: 原始用户输入（未经任何增强处理）
+            Union[str, List[ContentBlock]]: 原始用户输入（未经任何增强处理）
         """
         return self.original_user_input
 
