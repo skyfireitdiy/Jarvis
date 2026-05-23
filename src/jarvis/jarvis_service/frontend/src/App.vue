@@ -410,6 +410,7 @@
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
           :disabled="isInputDisabled"
           @keydown="handleTextareaKeydown"
+          @paste="handlePaste"
           ref="multilineInput"
         ></textarea>
         
