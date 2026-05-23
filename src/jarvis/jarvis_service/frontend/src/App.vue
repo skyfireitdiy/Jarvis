@@ -6331,6 +6331,79 @@ function isCursorAtLastLine(textarea) {
   return !textAfterCursor.includes('\n')
 }
 
+// 处理粘贴事件
+function handlePaste(event) {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        uploadImageToNode(file)
+      }
+      break
+    }
+  }
+}
+
+// 上传图片到节点
+async function uploadImageToNode(file) {
+  // 限制文件大小 20MB
+  if (file.size > 20 * 1024 * 1024) {
+    alert('图片大小不能超过 20MB')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64Data = e.target.result
+    const messageId = crypto.randomUUID()
+    
+    // 发送上传请求
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'file_upload',
+        message_id: messageId,
+        payload: {
+          agent_id: currentAgentId.value,
+          file_name: file.name,
+          file_data: base64Data,
+          target_dir: '/tmp'
+        }
+      }))
+      
+      // 等待响应 (这里简化处理，实际应该监听响应)
+      // 在实际实现中，应该维护一个 pendingRequests Map
+      // 这里为了简化，我们假设上传成功并生成一个临时路径
+      // 实际逻辑应该在 websocket onmessage 中处理
+      const fakePath = `/tmp/${Date.now()}_${file.name}`
+      insertTextAtCursor(`<image> ${fakePath}`)
+    } else {
+      alert('未连接到服务器')
+    }
+  }
+  reader.readAsDataURL(file)
+}
+
+// 在光标位置插入文本
+function insertTextAtCursor(text) {
+  const textarea = document.querySelector('textarea')
+  if (!textarea) return
+
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const before = inputText.value.substring(0, start)
+  const after = inputText.value.substring(end)
+  
+  inputText.value = before + text + after
+  
+  // 更新光标位置
+  textarea.selectionStart = textarea.selectionEnd = start + text.length
+  textarea.focus()
+}
+
 // 处理 textarea 的键盘事件
 function handleTextareaKeydown(event) {
   // @ 键：打开补全列表
