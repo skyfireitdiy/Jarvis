@@ -1173,12 +1173,12 @@ class Agent:
         return self.event_bus
 
     def _call_model(
-        self, message: str, need_complete: bool = False, run_input_handlers: bool = True
+        self, message: Union[str, List[ContentBlock]], need_complete: bool = False, run_input_handlers: bool = True
     ) -> str:
         """调用AI模型并实现重试逻辑
 
         参数:
-            message: 输入给模型的消息
+            message: 输入给模型的消息，支持纯文本或多模态内容
             need_complete: 是否需要完成任务标记
             run_input_handlers: 是否运行输入处理器
 
