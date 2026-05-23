@@ -6331,6 +6331,25 @@ function isCursorAtLastLine(textarea) {
   return !textAfterCursor.includes('\n')
 }
 
+// 存储等待文件上传响应的 Promise resolve 函数
+const pendingFileUploads = new Map()
+
+// 处理文件上传响应
+function handleFileUploadResponse(payload) {
+  const { message_id, success, file_path, error } = payload
+  const resolve = pendingFileUploads.get(message_id)
+  if (resolve) {
+    pendingFileUploads.delete(message_id)
+    if (success) {
+      resolve(file_path)
+    } else {
+      console.error('File upload failed:', error)
+      alert(`图片上传失败: ${error}`)
+      resolve(null)
+    }
+  }
+}
+
 // 处理粘贴事件
 function handlePaste(event) {
   const items = event.clipboardData?.items
