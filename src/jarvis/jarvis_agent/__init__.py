@@ -1351,7 +1351,13 @@ class Agent:
 
             if for_token_limit:
                 # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
-                prompt_to_use = self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
+                # 对于多模态内容，只提取文本部分进行总结
+                if isinstance(self.session.prompt, list):
+                    text_parts = [b.get('text', '') for b in self.session.prompt if b.get('type') == 'text']
+                    prompt_text = "\n".join(text_parts)
+                else:
+                    prompt_text = self.session.prompt
+                prompt_to_use = prompt_text + "\n" + SUMMARY_REQUEST_PROMPT
             else:
                 # 任务完成时的summary：使用用户传入的summary_prompt或DEFAULT_SUMMARY_PROMPT
                 safe_summary_prompt = self.summary_prompt or ""
