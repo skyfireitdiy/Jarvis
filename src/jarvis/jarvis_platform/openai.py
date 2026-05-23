@@ -185,11 +185,11 @@ class OpenAIModel(BasePlatform):
                 PrettyOutput.auto_print(
                     "⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头"
                 )
-        self.messages: List[Dict[str, str]] = []
+        self.messages: List[Dict[str, Any]] = []
         self.system_message = ""
         self._streaming_disabled: Optional[bool] = None
 
-    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+    def set_messages(self, messages: List[Dict[str, Any]]) -> None:
         """替换对话历史
 
         参数:
@@ -213,11 +213,11 @@ class OpenAIModel(BasePlatform):
             1 for msg in non_system_messages if msg.get("role") == "user"
         )
 
-    def get_messages(self) -> List[Dict[str, str]]:
+    def get_messages(self) -> List[Dict[str, Any]]:
         """获取对话历史
 
         返回:
-            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
+            List[Dict[str, Any]]: 对话历史列表，每个元素包含 role 和 content
         """
         return self.messages
 
