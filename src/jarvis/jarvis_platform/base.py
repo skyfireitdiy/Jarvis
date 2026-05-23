@@ -599,7 +599,7 @@ class BasePlatform(ABC):
         else:
             return get_max_input_token_count()
 
-    def _append_session_history(self, user_input: str, model_output: str) -> None:
+    def _append_session_history(self, user_input: Union[str, List[ContentBlock]], model_output: str) -> None:
         """
         Append the user input and model output to a session history file if enabled.
         The file name is generated on first save and reused until reset.
@@ -641,7 +641,9 @@ class BasePlatform(ABC):
                 ts_line = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 f.write(f"===== {ts_line} =====\n")
                 f.write("USER:\n")
-                f.write(f"{user_input}\n")
+                # 将多模态消息转换为字符串表示形式
+                user_content = user_input if isinstance(user_input, str) else "[多模态消息]"
+                f.write(f"{user_content}\n")
                 f.write("\nASSISTANT:\n")
                 f.write(f"{model_output}\n\n")
         except Exception:
