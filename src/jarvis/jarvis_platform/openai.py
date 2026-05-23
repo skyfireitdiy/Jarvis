@@ -9,11 +9,13 @@ from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 from typing import cast
 
 from openai import OpenAI
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
 import jarvis.jarvis_utils.globals as jglobals
