@@ -3891,7 +3891,6 @@ def create_app(
         return _run_shell_command_callback, metadata
 
     def _build_timer_action(request: Dict[str, Any]):
-def _build_timer_action(request: Dict[str, Any]):
         action = request.get("action")
         if not isinstance(action, dict):
             raise ValueError("action must be an object")
