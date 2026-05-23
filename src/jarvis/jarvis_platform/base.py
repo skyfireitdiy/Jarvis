@@ -214,6 +214,8 @@ class BasePlatform(ABC):
         self, message: Union[str, List[ContentBlock]], start_time: float, max_output: int = 0
     ) -> Tuple[str, str, float]:
         """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
+        # 对于多模态消息，只传递提示字符串给PrettyOutput
+        display_message = message if isinstance(message, str) else "[多模态消息]"
         return PrettyOutput.stream_chat_with_panel(
             chat_iterator=self.chat(message),
             title=self.name(),
@@ -224,7 +226,7 @@ class BasePlatform(ABC):
             get_context_token_count=get_context_token_count,
             append_session_history=self._append_session_history,
             start_time=start_time,
-            message=message,
+            message=display_message,
             max_output=max_output,
             check_interrupt=lambda: bool(get_interrupt()),
             panel_lock=self._panel_lock,
@@ -234,11 +236,13 @@ class BasePlatform(ABC):
         self, message: Union[str, List[ContentBlock]], start_time: float, max_output: int = 0
     ) -> Tuple[str, str, float]:
         """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
+        # 对于多模态消息，只传递提示字符串给PrettyOutput
+        display_message = message if isinstance(message, str) else "[多模态消息]"
         response, reasoning_content, first_token_time = PrettyOutput.stream_chat_simple(
             chat_iterator=self.chat(message),
             prefix=f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
             start_time=start_time,
-            message=message,
+            message=display_message,
             max_output=max_output,
             check_interrupt=lambda: bool(is_immediate_abort() and get_interrupt()),
             append_session_history=self._append_session_history,
