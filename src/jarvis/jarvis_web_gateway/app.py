@@ -4855,7 +4855,6 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
     import os
     
     try:
-        agent_id = payload.get('agent_id')
         file_name = payload.get('file_name')
         file_data = payload.get('file_data')
         target_dir = payload.get('target_dir', '/tmp')
