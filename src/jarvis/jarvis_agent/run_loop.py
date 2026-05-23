@@ -21,11 +21,24 @@ from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import get_context_token_count
+
+
+def ensure_str(content: Union[str, List[ContentBlock]]) -> str:
+    """确保内容为字符串，如果是多模态列表则提取文本部分"""
+    if isinstance(content, str):
+        return content
+    # 提取文本部分
+    text_parts = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text_parts.append(block.get("text", ""))
+    return "\n".join(text_parts)
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
