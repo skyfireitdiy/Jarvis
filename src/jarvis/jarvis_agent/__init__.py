@@ -78,6 +78,7 @@ from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.globals import make_agent_name
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_current_agent
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
@@ -420,11 +421,11 @@ class Agent:
         # 只有在记录启动时才停止记录
         pass
 
-    def get_user_origin_input(self) -> str:
+    def get_user_origin_input(self) -> Union[str, List[ContentBlock]]:
         """获取原始用户输入
 
         返回:
-            str: 原始用户输入（未经任何增强处理）
+            Union[str, List[ContentBlock]]: 原始用户输入（未经任何增强处理）
         """
         return self.original_user_input
 
@@ -624,7 +625,9 @@ class Agent:
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
         self.pin_content: str = ""  # 记录固定的内容
-        self.original_user_input: str = ""  # 记录原始用户输入
+        self.original_user_input: Union[str, List[ContentBlock]] = (
+            ""  # 记录原始用户输入
+        )
         self.recent_memories: List[str] = []  # 最近10条记忆内容
         self.MAX_RECENT_MEMORIES = 10  # 最大记忆数量
         self.return_control_on_auto_complete = False  # 自动完成后将控制权交还用户
@@ -1172,12 +1175,15 @@ class Agent:
         return self.event_bus
 
     def _call_model(
-        self, message: str, need_complete: bool = False, run_input_handlers: bool = True
+        self,
+        message: Union[str, List[ContentBlock]],
+        need_complete: bool = False,
+        run_input_handlers: bool = True,
     ) -> str:
         """调用AI模型并实现重试逻辑
 
         参数:
-            message: 输入给模型的消息
+            message: 输入给模型的消息，支持纯文本或多模态内容
             need_complete: 是否需要完成任务标记
             run_input_handlers: 是否运行输入处理器
 
@@ -1204,8 +1210,17 @@ class Agent:
 
         return response
 
-    def _process_input(self, message: str) -> str:
-        """处理输入消息"""
+    def _process_input(
+        self, message: Union[str, List[ContentBlock]]
+    ) -> Union[str, List[ContentBlock]]:
+        """处理输入消息
+
+        注意：输入处理器目前仅支持文本消息。如果是多模态消息，将跳过输入处理器。
+        """
+        if isinstance(message, list):
+            self._last_handler_returned = False
+            return message
+
         for handler in self.input_handler:
             message, need_return = handler(message, self)
             if need_return:
@@ -1214,7 +1229,9 @@ class Agent:
         self._last_handler_returned = False
         return message
 
-    def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
+    def _add_addon_prompt(
+        self, message: Union[str, List[ContentBlock]], need_complete: bool
+    ) -> Union[str, List[ContentBlock]]:
         """添加附加提示到消息
 
         规则：
@@ -1246,7 +1263,16 @@ class Agent:
         else:
             threshold = get_addon_prompt_threshold()
             # 条件1：消息长度超过阈值
-            if len(message) > threshold:
+            # 对于多模态内容，检查文本部分的长度
+            message_len = (
+                len(message)
+                if isinstance(message, str)
+                else sum(
+                    len(b.get("text", "")) if b.get("type") == "text" else 0
+                    for b in message
+                )
+            )
+            if message_len > threshold:
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
                 should_add = True
@@ -1275,7 +1301,7 @@ class Agent:
             pass
         return message
 
-    def _invoke_model(self, message: str) -> str:
+    def _invoke_model(self, message: Union[str, List[ContentBlock]]) -> str:
         """实际调用模型获取响应"""
         if not self.model:
             raise RuntimeError("Model not initialized")
@@ -1341,7 +1367,17 @@ class Agent:
 
             if for_token_limit:
                 # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
-                prompt_to_use = self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
+                # 对于多模态内容，只提取文本部分进行总结
+                if isinstance(self.session.prompt, list):
+                    text_parts = [
+                        b.get("text", "")
+                        for b in self.session.prompt
+                        if b.get("type") == "text"
+                    ]
+                    prompt_text = "\n".join(text_parts)
+                else:
+                    prompt_text = self.session.prompt
+                prompt_to_use = prompt_text + "\n" + SUMMARY_REQUEST_PROMPT
             else:
                 # 任务完成时的summary：使用用户传入的summary_prompt或DEFAULT_SUMMARY_PROMPT
                 safe_summary_prompt = self.summary_prompt or ""
@@ -1554,7 +1590,16 @@ class Agent:
         # 优先添加原始任务目标（确保长期运行时不丢失）
         original_task = ""
         if hasattr(self, "original_user_input") and self.original_user_input:
-            original_task = self.original_user_input.strip()
+            if isinstance(self.original_user_input, str):
+                original_task = self.original_user_input.strip()
+            else:
+                # 对于多模态内容，提取文本部分
+                text_parts = [
+                    b.get("text", "")
+                    for b in self.original_user_input
+                    if b.get("type") == "text"
+                ]
+                original_task = "\n".join(text_parts).strip()
 
         if original_task:
             user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
@@ -2156,11 +2201,11 @@ class Agent:
 
         return addon_prompt
 
-    def run(self, user_input: str) -> Any:
+    def run(self, user_input: Union[str, List[ContentBlock]]) -> Any:
         """处理用户输入并执行任务
 
         参数:
-            user_input: 任务描述或请求
+            user_input: 任务描述或请求，支持纯文本或多模态内容
 
         返回:
             str|Dict: 任务总结报告或要发送的消息
@@ -2176,8 +2221,25 @@ class Agent:
             self._optimize_system_prompt_on_first_run
             and not self._system_prompt_optimized
         ):
-            if user_input and user_input.strip():
-                self.optimize_system_prompt(user_input.strip())
+            # 检查 user_input 是否有内容
+            has_content = False
+            text_input = ""
+            if user_input:
+                if isinstance(user_input, str):
+                    if user_input.strip():
+                        has_content = True
+                        text_input = user_input.strip()
+                else:
+                    # 多模态内容
+                    text_parts = [
+                        b.get("text", "") for b in user_input if b.get("type") == "text"
+                    ]
+                    text_input = "\n".join(text_parts).strip()
+                    if text_input:
+                        has_content = True
+
+            if has_content:
+                self.optimize_system_prompt(text_input)
                 self._system_prompt_optimized = True
 
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
@@ -2209,7 +2271,16 @@ class Agent:
                 # 非交互模式下不再自动设置pin_content
 
             # 将非交互模式说明添加到用户输入中
-            enhanced_input = user_input + non_interactive_note
+            if non_interactive_note:
+                if isinstance(user_input, str):
+                    enhanced_input = user_input + non_interactive_note
+                else:
+                    # 对于多模态内容，将说明作为文本块添加到末尾
+                    enhanced_input = user_input + [
+                        {"type": "text", "text": non_interactive_note}
+                    ]
+            else:
+                enhanced_input = user_input
 
             # 先设置 session.prompt，确保 _first_run() 中可以访问到用户输入
             # 注意：此时还没有添加已激活的规则内容，规则内容会在之后追加

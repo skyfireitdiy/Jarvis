@@ -13,7 +13,9 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import List
 from typing import Optional
+from typing import Union
 
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
@@ -21,11 +23,25 @@ from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import get_context_token_count
+
+
+def ensure_str(content: Union[str, List[ContentBlock]]) -> str:
+    """确保内容为字符串，如果是多模态列表则提取文本部分"""
+    if isinstance(content, str):
+        return content
+    # 提取文本部分
+    text_parts = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text_parts.append(block.get("text", ""))
+    return "\n".join(text_parts)
+
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -207,15 +223,21 @@ class AgentRunLoop:
                         )
 
                         # 截断策略：保留前后20%
-                        content_length = len(current_prompt)
-                        keep_start = int(content_length * 0.2)
-                        keep_end = max(1, int(content_length * 0.2))
+                        # 注意：current_prompt 可能是字符串或多模态列表
+                        if isinstance(current_prompt, str):
+                            content_length = len(current_prompt)
+                            keep_start = int(content_length * 0.2)
+                            keep_end = max(1, int(content_length * 0.2))
 
-                        truncated_prompt = (
-                            current_prompt[:keep_start]
-                            + "\n...[中间部分已省略]...\n"
-                            + current_prompt[-keep_end:]
-                        )
+                            truncated_prompt = (
+                                current_prompt[:keep_start]
+                                + "\n...[中间部分已省略]...\n"
+                                + current_prompt[-keep_end:]
+                            )
+                        else:
+                            # 对于多模态内容，暂时跳过截断
+                            # TODO: 实现多模态内容的截断逻辑
+                            truncated_prompt = current_prompt
 
                         # 更新prompt并重新计算token
                         self.agent.session.prompt = truncated_prompt
@@ -652,11 +674,17 @@ class AgentRunLoop:
 
                 # 在调用模型前检查并执行压缩
                 # 计算当前消息的token数
-                current_message_tokens = (
-                    get_context_token_count(ag.session.prompt)
-                    if ag.session.prompt
-                    else 0
-                )
+                # 注意：ag.session.prompt 可能是字符串或多模态列表
+                if isinstance(ag.session.prompt, str):
+                    current_message_tokens = (
+                        get_context_token_count(ag.session.prompt)
+                        if ag.session.prompt
+                        else 0
+                    )
+                else:
+                    # 对于多模态内容，暂时简单估算或设为0
+                    # TODO: 实现更精确的多模态token计算
+                    current_message_tokens = 0
                 self.check_and_compress_context(
                     model_instance=ag.model,
                     current_message_tokens=current_message_tokens,
@@ -668,9 +696,18 @@ class AgentRunLoop:
                 buffered_messages = get_input_buffer()
                 if buffered_messages:
                     user_supplement = "\n".join(buffered_messages)
-                    ag.session.prompt = (
-                        ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
-                    )
+                    if isinstance(ag.session.prompt, str):
+                        ag.session.prompt = (
+                            ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
+                        )
+                    else:
+                        # 对于多模态内容，将补充信息作为文本块添加
+                        ag.session.prompt = ag.session.prompt + [
+                            {
+                                "type": "text",
+                                "text": "\n\n[用户补充]\n" + user_supplement,
+                            }
+                        ]
 
                 # 调用模型获取响应
                 try:

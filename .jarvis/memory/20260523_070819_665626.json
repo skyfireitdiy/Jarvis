@@ -1,0 +1,8 @@
+{
+  "id": "20260523_070819_665626",
+  "type": "project_long_term",
+  "tags": ["设计方案", "多模态", "Platform", "Agent"],
+  "content": "## Platform模块多模态支持设计思路\n\n### 核心问题\n如何在保持向后兼容性的前提下，支持多模态输入（文本、图片、音频、视频）？\n\n### 设计方案\n1. **修改 BasePlatform.chat 方法签名**：支持 `Union[str, List[ContentBlock]]` 类型的消息\n2. **修改 Agent.run 方法签名**：支持 `Union[str, List[ContentBlock]]` 类型的输入\n3. **修改 SessionManager.prompt 类型**：从 `str` 改为 `Union[str, List[ContentBlock]]`\n4. **修改 join_prompts 函数**：支持多模态内容的拼接\n5. **修改 AgentRunLoop 中的字符串操作**：适配多模态内容\n\n### 关键挑战\n1. **向后兼容性**：现有代码可能依赖于 `prompt` 是字符串\n2. **字符串操作**：很多地方使用字符串拼接、截断等操作\n3. **Token 计算**：需要计算多模态内容的 token 数\n4. **历史记录**：需要支持多模态内容的存储和恢复\n\n### 实施计划\n1. 定义 ContentBlock 类型（已完成）\n2. 修改 BasePlatform.chat 方法（已完成）\n3. 修改 Agent.run 方法\n4. 修改 SessionManager.prompt 类型\n5. 修改 join_prompts 函数\n6. 修改 AgentRunLoop 中的字符串操作\n7. 修改 Token 计算逻辑\n8. 修改历史记录存储逻辑\n\n### 风险评估\n- **高风险**：修改 SessionManager 和 AgentRunLoop，影响范围大\n- **中风险**：修改 join_prompts 和 Token 计算逻辑\n- **低风险**：修改 BasePlatform 和 Agent.run 方法签名",
+  "created_at": "2026-05-23T07:08:19.665681",
+  "updated_at": "2026-05-23T07:08:19.665689"
+}

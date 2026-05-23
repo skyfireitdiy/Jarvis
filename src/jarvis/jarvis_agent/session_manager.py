@@ -10,8 +10,10 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 from typing import cast
 
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.input import get_single_line_input
 
@@ -32,7 +34,7 @@ class SessionManager:
         self.model = model
         self.agent_name = agent_name
         self.agent = agent  # 添加agent引用
-        self.prompt: str = ""
+        self.prompt: Union[str, List[ContentBlock]] = ""
         self.user_data: Dict[str, Any] = {}
         self.addon_prompt: str = ""
         self.conversation_length: int = 0
