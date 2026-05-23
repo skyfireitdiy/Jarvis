@@ -797,10 +797,8 @@ class WebSocketConnectionManager:
         if message_type == "file_upload":
             # 处理文件上传请求
             message_id = message.get("message_id")
-            agent_id = payload.get("agent_id")
             file_name = payload.get("file_name")
             file_data = payload.get("file_data")
-            target_dir = payload.get("target_dir", "/tmp")
             
             if not all([message_id, file_name, file_data]):
                 error_msg = {
