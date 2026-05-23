@@ -14,6 +14,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 from typing import Type
+from typing import Union
 
 from typing_extensions import Self
 
@@ -40,6 +41,7 @@ from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import while_success
 from jarvis.jarvis_utils.utils import while_true
+from jarvis.jarvis_platform.content_types import ContentBlock
 
 
 class BasePlatform(ABC):
@@ -114,8 +116,13 @@ class BasePlatform(ABC):
         self._session_history_file = None
 
     @abstractmethod
-    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
+    def chat(
+        self, message: Union[str, List[ContentBlock]]
+    ) -> Generator[Tuple[str, str], None, None]:
         """执行对话
+
+        参数:
+            message: 用户输入的消息，支持纯文本(str)或多模态内容(List[ContentBlock])
 
         返回:
             Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
@@ -123,14 +130,14 @@ class BasePlatform(ABC):
         """
         raise NotImplementedError("chat is not implemented")
 
-    def complete(self, prompt: str, **kwargs: Any) -> str:
+    def complete(self, prompt: Union[str, List[ContentBlock]], **kwargs: Any) -> str:
         """无状态补全方法
 
         每次调用前自动重置对话状态，确保多次调用之间不会累积上下文。
         适用于：情绪分析、歧义检测、代码分析等一次性推理任务。
 
         参数:
-            prompt: 提示词
+            prompt: 提示词，支持纯文本(str)或多模态内容(List[ContentBlock])
             **kwargs: 额外参数（预留）
 
         返回:
@@ -206,9 +213,14 @@ class BasePlatform(ABC):
             return 0.0, "green", ""
 
     def _chat_with_pretty_output(
-        self, message: str, start_time: float, max_output: int = 0
+        self,
+        message: Union[str, List[ContentBlock]],
+        start_time: float,
+        max_output: int = 0,
     ) -> Tuple[str, str, float]:
         """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
+        # 对于多模态消息，只传递提示字符串给PrettyOutput
+        display_message = message if isinstance(message, str) else "[多模态消息]"
         return PrettyOutput.stream_chat_with_panel(
             chat_iterator=self.chat(message),
             title=self.name(),
@@ -219,21 +231,26 @@ class BasePlatform(ABC):
             get_context_token_count=get_context_token_count,
             append_session_history=self._append_session_history,
             start_time=start_time,
-            message=message,
+            message=display_message,
             max_output=max_output,
             check_interrupt=lambda: bool(get_interrupt()),
             panel_lock=self._panel_lock,
         )
 
     def _chat_with_simple_output(
-        self, message: str, start_time: float, max_output: int = 0
+        self,
+        message: Union[str, List[ContentBlock]],
+        start_time: float,
+        max_output: int = 0,
     ) -> Tuple[str, str, float]:
         """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
+        # 对于多模态消息，只传递提示字符串给PrettyOutput
+        display_message = message if isinstance(message, str) else "[多模态消息]"
         response, reasoning_content, first_token_time = PrettyOutput.stream_chat_simple(
             chat_iterator=self.chat(message),
             prefix=f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
             start_time=start_time,
-            message=message,
+            message=display_message,
             max_output=max_output,
             check_interrupt=lambda: bool(is_immediate_abort() and get_interrupt()),
             append_session_history=self._append_session_history,
@@ -242,7 +259,7 @@ class BasePlatform(ABC):
         return response, reasoning_content, first_token_time
 
     def _chat_with_suppressed_output(
-        self, message: str, max_output: int = 0
+        self, message: Union[str, List[ContentBlock]], max_output: int = 0
     ) -> Tuple[str, str]:
         """使用无人值守模式进行聊天
 
@@ -294,18 +311,20 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _chat(self, message: str, max_output: int = 0):
+    def _chat(self, message: Union[str, List[ContentBlock]], max_output: int = 0):
         import time
 
         start_time = time.time()
 
         # 当输入为空白字符串时，打印警告并直接返回空字符串
-        if message.strip() == "":
-            PrettyOutput.auto_print("⚠️ 输入为空白字符串，已忽略本次请求")
+        if isinstance(message, str) and message.strip() == "":
+            PrettyOutput.auto_print("⚠️ 输入消息为空白字符串，已忽略")
             return ""
 
         # 检查并截断消息以避免超出剩余token限制
-        message = self._truncate_message_if_needed(message)
+        # 注意：多模态消息暂不支持截断，只处理纯文本
+        if isinstance(message, str):
+            message = self._truncate_message_if_needed(message)
 
         # 根据输出模式选择不同的处理方式
         first_token_time = 0.0
@@ -388,14 +407,22 @@ class BasePlatform(ABC):
                             messages.append({"role": "assistant", "content": response})
                         else:
                             # 最后一条不是用户消息，需要添加用户消息和助手响应
-                            messages.append({"role": "user", "content": message})
+                            # 将多模态消息转换为字符串表示形式
+                            user_content = (
+                                message if isinstance(message, str) else "[多模态消息]"
+                            )
+                            messages.append({"role": "user", "content": user_content})
                             messages.append({"role": "assistant", "content": response})
                         # 更新消息列表
                         self.set_messages(messages)
                 else:
                     # messages 为空，直接添加用户消息和助手响应
+                    # 将多模态消息转换为字符串表示形式
+                    user_content = (
+                        message if isinstance(message, str) else "[多模态消息]"
+                    )
                     messages = [
-                        {"role": "user", "content": message},
+                        {"role": "user", "content": user_content},
                         {"role": "assistant", "content": response},
                     ]
                     self.set_messages(messages)
@@ -405,11 +432,13 @@ class BasePlatform(ABC):
 
         return response
 
-    def chat_until_success(self, message: str, max_output: int = 0) -> str:
+    def chat_until_success(
+        self, message: Union[str, List[ContentBlock]], max_output: int = 0
+    ) -> str:
         """与模型对话直到成功响应。
 
         参数:
-            message: 用户消息
+            message: 用户消息，支持纯文本(str)或多模态内容(List[ContentBlock])
             max_output: 最大输出长度，0表示无限制
 
         返回:
@@ -422,12 +451,20 @@ class BasePlatform(ABC):
             set_interrupt(False)
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
-                PrettyOutput.auto_print(f"👤 {message}")  # 保留用于语法高亮
+                # 只打印纯文本消息，多模态消息只打印提示
+                if isinstance(message, str):
+                    PrettyOutput.auto_print(f"👤 {message}")  # 保留用于语法高亮
+                else:
+                    PrettyOutput.auto_print("👤 [多模态消息]")
 
             # 记录用户输入（模型输入）
             from jarvis.jarvis_utils.dialogue_recorder import record_user_message
 
-            record_user_message(message)
+            # 只记录纯文本消息，多模态消息记录提示
+            if isinstance(message, str):
+                record_user_message(message)
+            else:
+                record_user_message("[多模态消息]")
 
             result: str = ""
             result = while_true(
@@ -580,7 +617,9 @@ class BasePlatform(ABC):
         else:
             return get_max_input_token_count()
 
-    def _append_session_history(self, user_input: str, model_output: str) -> None:
+    def _append_session_history(
+        self, user_input: Union[str, List[ContentBlock]], model_output: str
+    ) -> None:
         """
         Append the user input and model output to a session history file if enabled.
         The file name is generated on first save and reused until reset.
@@ -622,7 +661,11 @@ class BasePlatform(ABC):
                 ts_line = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 f.write(f"===== {ts_line} =====\n")
                 f.write("USER:\n")
-                f.write(f"{user_input}\n")
+                # 将多模态消息转换为字符串表示形式
+                user_content = (
+                    user_input if isinstance(user_input, str) else "[多模态消息]"
+                )
+                f.write(f"{user_content}\n")
                 f.write("\nASSISTANT:\n")
                 f.write(f"{model_output}\n\n")
         except Exception:
