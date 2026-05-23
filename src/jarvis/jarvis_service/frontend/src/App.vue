@@ -1539,35 +1539,37 @@ function toggleTerminalMaximize() {
 }
 
 function getEditorPanelBounds() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
+  const HEADER_HEIGHT = 32 // 标题栏高度
+  const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   return {
-    minTop: KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出，但保留底部100px
-    minLeft: KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出，但保留右侧100px
-    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
-    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
+    minTop: 0, // 标题栏不能拖到窗口顶部之外
+    minLeft: 0, // 标题栏不能拖到窗口左侧之外
+    maxLeft: window.innerWidth - MIN_VISIBLE_WIDTH, // 保留至少100px面板宽度可见
+    maxTop: window.innerHeight - HEADER_HEIGHT, // 保留标题栏高度可见
     maxWidth: window.innerWidth,
     maxHeight: window.innerHeight,
   }
 }
 
 function ensureEditorPanelInViewport() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
+  const HEADER_HEIGHT = 32 // 标题栏高度
+  const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   const maxWidth = Math.max(window.innerWidth, EDITOR_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, EDITOR_PANEL_MIN_HEIGHT)
 
   editorPanelRect.value.width = clamp(editorPanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
   editorPanelRect.value.height = clamp(editorPanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
 
-  // 允许部分拖出屏幕，但保留至少100px可见区域
+  // 标题栏不能移出窗口
   editorPanelRect.value.left = clamp(
     editorPanelRect.value.left,
-    KEEP_VISIBLE - editorPanelRect.value.width, // 允许向左拖出
-    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
+    0, // 标题栏不能拖到窗口左侧之外
+    window.innerWidth - MIN_VISIBLE_WIDTH // 保留至少100px面板宽度可见
   )
   editorPanelRect.value.top = clamp(
     editorPanelRect.value.top,
-    KEEP_VISIBLE - editorPanelRect.value.height, // 允许向上拖出
-    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
+    0, // 标题栏不能拖到窗口顶部之外
+    window.innerHeight - HEADER_HEIGHT // 保留标题栏高度可见
   )
 }
 
@@ -7300,33 +7302,35 @@ const terminalPanelStyle = computed(() => ({
 }))
 
 function getTerminalPanelBounds() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
+  const HEADER_HEIGHT = 32 // 标题栏高度
+  const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   return {
-    minTop: KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出，但保留底部100px
-    minLeft: KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出，但保留右侧100px
-    maxLeft: window.innerWidth - KEEP_VISIBLE, // 允许向右拖出，但保留左侧100px
-    maxTop: window.innerHeight - KEEP_VISIBLE, // 允许向下拖出，但保留顶部100px
+    minTop: 0, // 标题栏不能拖到窗口顶部之外
+    minLeft: 0, // 标题栏不能拖到窗口左侧之外
+    maxLeft: window.innerWidth - MIN_VISIBLE_WIDTH, // 保留至少100px面板宽度可见
+    maxTop: window.innerHeight - HEADER_HEIGHT, // 保留标题栏高度可见
   }
 }
 
 function ensureTerminalPanelInViewport() {
-  const KEEP_VISIBLE = 100 // 至少保留100px可见区域
+  const HEADER_HEIGHT = 32 // 标题栏高度
+  const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   const maxWidth = Math.max(window.innerWidth, TERMINAL_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, TERMINAL_PANEL_MIN_HEIGHT)
 
   terminalPanelRect.value.width = clamp(terminalPanelRect.value.width, TERMINAL_PANEL_MIN_WIDTH, maxWidth)
   terminalPanelRect.value.height = clamp(terminalPanelRect.value.height, TERMINAL_PANEL_MIN_HEIGHT, maxHeight)
 
-  // 允许部分拖出屏幕，但保留至少100px可见区域
+  // 标题栏不能移出窗口
   terminalPanelRect.value.left = clamp(
     terminalPanelRect.value.left,
-    KEEP_VISIBLE - terminalPanelRect.value.width, // 允许向左拖出
-    window.innerWidth - KEEP_VISIBLE // 允许向右拖出
+    0, // 标题栏不能拖到窗口左侧之外
+    window.innerWidth - MIN_VISIBLE_WIDTH // 保留至少100px面板宽度可见
   )
   terminalPanelRect.value.top = clamp(
     terminalPanelRect.value.top,
-    KEEP_VISIBLE - terminalPanelRect.value.height, // 允许向上拖出
-    window.innerHeight - KEEP_VISIBLE // 允许向下拖出
+    0, // 标题栏不能拖到窗口顶部之外
+    window.innerHeight - HEADER_HEIGHT // 保留标题栏高度可见
   )
 }
 
