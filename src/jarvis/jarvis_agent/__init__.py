@@ -2245,7 +2245,14 @@ class Agent:
                 # 非交互模式下不再自动设置pin_content
 
             # 将非交互模式说明添加到用户输入中
-            enhanced_input = user_input + non_interactive_note
+            if non_interactive_note:
+                if isinstance(user_input, str):
+                    enhanced_input = user_input + non_interactive_note
+                else:
+                    # 对于多模态内容，将说明作为文本块添加到末尾
+                    enhanced_input = user_input + [{"type": "text", "text": non_interactive_note}]
+            else:
+                enhanced_input = user_input
 
             # 先设置 session.prompt，确保 _first_run() 中可以访问到用户输入
             # 注意：此时还没有添加已激活的规则内容，规则内容会在之后追加
