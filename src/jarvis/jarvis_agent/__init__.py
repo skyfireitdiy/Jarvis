@@ -1205,8 +1205,15 @@ class Agent:
 
         return response
 
-    def _process_input(self, message: str) -> str:
-        """处理输入消息"""
+    def _process_input(self, message: Union[str, List[ContentBlock]]) -> Union[str, List[ContentBlock]]:
+        """处理输入消息
+        
+        注意：输入处理器目前仅支持文本消息。如果是多模态消息，将跳过输入处理器。
+        """
+        if isinstance(message, list):
+            self._last_handler_returned = False
+            return message
+            
         for handler in self.input_handler:
             message, need_return = handler(message, self)
             if need_return:
