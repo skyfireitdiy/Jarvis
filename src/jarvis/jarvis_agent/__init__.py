@@ -2197,8 +2197,23 @@ class Agent:
             self._optimize_system_prompt_on_first_run
             and not self._system_prompt_optimized
         ):
-            if user_input and user_input.strip():
-                self.optimize_system_prompt(user_input.strip())
+            # 检查 user_input 是否有内容
+            has_content = False
+            text_input = ""
+            if user_input:
+                if isinstance(user_input, str):
+                    if user_input.strip():
+                        has_content = True
+                        text_input = user_input.strip()
+                else:
+                    # 多模态内容
+                    text_parts = [b.get('text', '') for b in user_input if b.get('type') == 'text']
+                    text_input = "\n".join(text_parts).strip()
+                    if text_input:
+                        has_content = True
+            
+            if has_content:
+                self.optimize_system_prompt(text_input)
                 self._system_prompt_optimized = True
 
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
