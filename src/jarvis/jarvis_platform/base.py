@@ -126,6 +126,9 @@ class BasePlatform(ABC):
         返回:
             Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
             类型: "reason" 表示推理过程，"content" 表示正文内容
+        """
+        raise NotImplementedError("chat is not implemented")
+
     def complete(self, prompt: Union[str, List[ContentBlock]], **kwargs: Any) -> str:
         """无状态补全方法
 
@@ -148,12 +151,6 @@ class BasePlatform(ABC):
         self.delete_chat()
 
         # 调用 chat 方法并收集所有响应（只收集 content 类型）
-        response = ""
-        for chunk_type, chunk_content in self.chat(prompt):
-            if chunk_type == "content":
-                response += chunk_content
-
-        return response
         response = ""
         for chunk_type, chunk_content in self.chat(prompt):
             if chunk_type == "content":
