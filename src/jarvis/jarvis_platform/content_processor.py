@@ -79,27 +79,28 @@ class ContentProcessor:
 
         # 验证文本内容
         if content_type == "text":
-            if "text" not in content:
+            text_value = content.get("text")
+            if text_value is None:
                 raise ValueError("文本内容块必须包含 'text' 字段")
-            if not isinstance(content["text"], str):
+            if not isinstance(text_value, str):
                 raise ValueError("text 字段必须是字符串类型")
             return True
 
         # 验证图片内容
         if content_type == "image_url":
-            if "image_url" not in content:
+            if content.get("image_url") is None:
                 raise ValueError("图片内容块必须包含 'image_url' 字段")
             return True
 
         # 验证音频内容
         if content_type == "audio":
-            if "audio_url" not in content:
+            if content.get("audio_url") is None:
                 raise ValueError("音频内容块必须包含 'audio_url' 字段")
             return True
 
         # 验证视频内容
         if content_type == "video":
-            if "video_url" not in content:
+            if content.get("video_url") is None:
                 raise ValueError("视频内容块必须包含 'video_url' 字段")
             return True
 
