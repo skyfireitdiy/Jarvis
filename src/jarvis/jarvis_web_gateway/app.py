@@ -4907,7 +4907,7 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {'success': False, 'error': str(e)}
 
 
-async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
+
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
     error_msg = {"type": "error", "payload": {"code": code, "message": message}}
     await websocket.send_json(error_msg)
