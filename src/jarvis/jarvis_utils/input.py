@@ -1256,7 +1256,7 @@ def _get_non_interactive_response(auto_complete: bool) -> str:
         return "当前是非交互模式，所有的事情你都自我决策" + hint
 
 
-def process_image_command(image_path: str) -> Union[dict, None]:
+def process_image_command(image_path: str) -> Optional['ImageURLContent']:
     """
     处理 /image 命令，将图片路径转换为 ContentBlock
     
