@@ -652,11 +652,17 @@ class AgentRunLoop:
 
                 # 在调用模型前检查并执行压缩
                 # 计算当前消息的token数
-                current_message_tokens = (
-                    get_context_token_count(ag.session.prompt)
-                    if ag.session.prompt
-                    else 0
-                )
+                # 注意：ag.session.prompt 可能是字符串或多模态列表
+                if isinstance(ag.session.prompt, str):
+                    current_message_tokens = (
+                        get_context_token_count(ag.session.prompt)
+                        if ag.session.prompt
+                        else 0
+                    )
+                else:
+                    # 对于多模态内容，暂时简单估算或设为0
+                    # TODO: 实现更精确的多模态token计算
+                    current_message_tokens = 0
                 self.check_and_compress_context(
                     model_instance=ag.model,
                     current_message_tokens=current_message_tokens,
@@ -668,9 +674,15 @@ class AgentRunLoop:
                 buffered_messages = get_input_buffer()
                 if buffered_messages:
                     user_supplement = "\n".join(buffered_messages)
-                    ag.session.prompt = (
-                        ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
-                    )
+                    if isinstance(ag.session.prompt, str):
+                        ag.session.prompt = (
+                            ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
+                        )
+                    else:
+                        # 对于多模态内容，将补充信息作为文本块添加
+                        ag.session.prompt = ag.session.prompt + [
+                            {"type": "text", "text": "\n\n[用户补充]\n" + user_supplement}
+                        ]
 
                 # 调用模型获取响应
                 try:
