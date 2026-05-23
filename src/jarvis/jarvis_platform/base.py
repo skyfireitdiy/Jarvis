@@ -300,18 +300,20 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _chat(self, message: str, max_output: int = 0):
+    def _chat(self, message: Union[str, List[ContentBlock]], max_output: int = 0):
         import time
 
         start_time = time.time()
 
         # 当输入为空白字符串时，打印警告并直接返回空字符串
-        if message.strip() == "":
-            PrettyOutput.auto_print("⚠️ 输入为空白字符串，已忽略本次请求")
+        if isinstance(message, str) and message.strip() == "":
+            PrettyOutput.auto_print("⚠️ 输入消息为空白字符串，已忽略")
             return ""
 
         # 检查并截断消息以避免超出剩余token限制
-        message = self._truncate_message_if_needed(message)
+        # 注意：多模态消息暂不支持截断，只处理纯文本
+        if isinstance(message, str):
+            message = self._truncate_message_if_needed(message)
 
         # 根据输出模式选择不同的处理方式
         first_token_time = 0.0
