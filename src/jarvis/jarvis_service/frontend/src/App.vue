@@ -6787,6 +6787,21 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
       background: '#0b1220',
     },
     fontSize: 12,
+    allowProposedApi: true,
+  })
+
+  // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
+  termInfo.terminal.onKey(({ domEvent }) => {
+    // Ctrl+Shift+C: 允许终端处理（复制），阻止浏览器打开开发者工具
+    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'C') {
+      domEvent.preventDefault()
+      domEvent.stopPropagation()
+    }
+    // Ctrl+Shift+V: 允许终端处理（粘贴），阻止浏览器默认行为
+    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'V') {
+      domEvent.preventDefault()
+      domEvent.stopPropagation()
+    }
   })
   termInfo.terminal.open(el)
 
@@ -7025,6 +7040,21 @@ function initIndependentTerminal(terminalId, el) {
     fontSize: 12,
     cols: 80,
     rows: 24,
+    allowProposedApi: true,
+  })
+
+  // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
+  session.terminal.onKey(({ domEvent }) => {
+    // Ctrl+Shift+C: 允许终端处理（复制），阻止浏览器打开开发者工具
+    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'C') {
+      domEvent.preventDefault()
+      domEvent.stopPropagation()
+    }
+    // Ctrl+Shift+V: 允许终端处理（粘贴），阻止浏览器默认行为
+    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'V') {
+      domEvent.preventDefault()
+      domEvent.stopPropagation()
+    }
   })
   session.terminal.open(el)
   
@@ -9802,6 +9832,7 @@ body::-webkit-scrollbar {
   flex: 1;
   min-height: 400px;
   overflow: hidden;
+  user-select: text;
 }
 
 .terminal-history {
@@ -10958,6 +10989,7 @@ body::-webkit-scrollbar {
 .terminal-host {
   width: 100%;
   height: 100%;
+  user-select: text;
 }
 
 /* 终端调整大小手柄 */
