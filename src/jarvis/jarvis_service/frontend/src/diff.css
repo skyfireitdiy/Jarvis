@@ -131,6 +131,14 @@
   background: inherit;
 }
 
+.diff-separator td {
+  height: 8px;
+  background: var(--color-bg-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0;
+}
+
 .diff-error {
   color: var(--color-error);
   padding: 8px 12px;
