@@ -184,6 +184,7 @@ BUILTIN_COMMANDS = [
     ("PrintConfig", "打印全局配置"),
     ("SetConfig", "修改全局配置"),
     ("Diff", "显示从start_commit到当前的变更"),
+    ("Image", "添加图片到下一条消息"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
