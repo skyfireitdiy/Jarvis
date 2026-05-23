@@ -13,7 +13,9 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import List
 from typing import Optional
+from typing import Union
 
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
