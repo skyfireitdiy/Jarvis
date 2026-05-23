@@ -117,8 +117,11 @@ class BasePlatform(ABC):
         self._session_history_file = None
 
     @abstractmethod
-    def chat(self, message: str) -> Generator[Tuple[str, str], None, None]:
+    def chat(self, message: Union[str, List[ContentBlock]]) -> Generator[Tuple[str, str], None, None]:
         """执行对话
+
+        参数:
+            message: 用户输入的消息，支持纯文本(str)或多模态内容(List[ContentBlock])
 
         返回:
             Generator[Tuple[str, str], None, None]: 生成器，逐块返回 (类型, 内容) 元组
