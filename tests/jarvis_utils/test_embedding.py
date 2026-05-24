@@ -157,8 +157,8 @@ class TestGetMultimodalTokenCount:
         ]
         result = get_multimodal_token_count(content_list)
         text_tokens = get_context_token_count("Listen to this audio:")
-        # 音频默认 50 tokens
-        expected = text_tokens + 50
+        # 音频默认 100 tokens
+        expected = text_tokens + 100
         assert result == expected
 
     def test_video_content(self):
@@ -169,8 +169,8 @@ class TestGetMultimodalTokenCount:
         ]
         result = get_multimodal_token_count(content_list)
         text_tokens = get_context_token_count("Watch this video:")
-        # 视频默认 100 tokens
-        expected = text_tokens + 100
+        # 视频默认 500 tokens
+        expected = text_tokens + 500
         assert result == expected
 
     def test_mixed_content(self):
@@ -186,7 +186,7 @@ class TestGetMultimodalTokenCount:
         # _estimate_image_tokens 期望 dict 类型，传递正确的格式
         image_tokens = _estimate_image_tokens({"image_url": "https://example.com/image.jpg"})
         text2_tokens = get_context_token_count("And listen to this audio:")
-        audio_tokens = 50
+        audio_tokens = 100
         expected = text1_tokens + image_tokens + text2_tokens + audio_tokens
         assert result == expected
 
@@ -195,9 +195,9 @@ class TestGetMultimodalTokenCount:
         content_list = [
             {"type": "invalid", "data": "test"},
         ]
-        # 应该返回 0，因为无法识别的类型
+        # 未知类型返回 50 tokens
         result = get_multimodal_token_count(content_list)
-        assert result == 0
+        assert result == 50
 
 
 class TestEstimateImageTokens:
