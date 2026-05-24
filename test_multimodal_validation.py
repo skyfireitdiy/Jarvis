@@ -12,7 +12,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "src"))
 
-from jarvis.jarvis_platform.registry import get_platform_instance  # noqa: E402
+from jarvis.jarvis_platform.registry import PlatformRegistry  # noqa: E402
 from jarvis.jarvis_platform.content_types import TextContent, ImageURLContent, ContentBlock  # noqa: E402
 from jarvis.jarvis_utils.embedding import get_multimodal_token_count, _estimate_image_tokens  # noqa: E402
 
@@ -23,13 +23,14 @@ def test_config_loading():
     
     try:
         # 获取 mimo_v2_5 平台实例
-        platform = get_platform_instance("openai_mimo_v2_5")
+        registry = PlatformRegistry.get_global_platform_registry()
+        platform = registry.create_platform("openai_mimo_v2_5", silent=True)
         print(f"✅ 成功加载平台: {platform.name()}")
         print(f"   平台类型: {platform.platform_name()}")
         print(f"   支持多模态: {platform.supports_multimodal()}")
         
         # 获取 mimo_v2_pro 平台实例
-        platform_pro = get_platform_instance("openai_mimo_v2_pro")
+        platform_pro = registry.create_platform("openai_mimo_v2_pro", silent=True)
         print(f"✅ 成功加载平台: {platform_pro.name()}")
         print(f"   平台类型: {platform_pro.platform_name()}")
         print(f"   支持多模态: {platform_pro.supports_multimodal()}")
@@ -70,7 +71,8 @@ def test_multimodal_support():
     
     try:
         # 获取支持多模态的平台
-        platform = get_platform_instance("openai_mimo_v2_5")
+        registry = PlatformRegistry.get_global_platform_registry()
+        platform = registry.create_platform("openai_mimo_v2_5", silent=True)
         
         if not platform.supports_multimodal():
             print("❌ 平台不支持多模态")
@@ -108,7 +110,8 @@ def test_backward_compatibility():
     
     try:
         # 获取不支持多模态的平台
-        platform = get_platform_instance("openai_mimo_v2_pro")
+        registry = PlatformRegistry.get_global_platform_registry()
+        platform = registry.create_platform("openai_mimo_v2_pro", silent=True)
         
         if platform.supports_multimodal():
             print("❌ 平台应该不支持多模态")
