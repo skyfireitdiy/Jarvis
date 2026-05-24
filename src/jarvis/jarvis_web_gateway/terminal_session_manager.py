@@ -194,6 +194,8 @@ class TerminalSessionManager:
 
                 # 启动子进程
                 env = os.environ.copy()
+                # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
+                env["TERM"] = "xterm-256color"
                 if interpreter in ("python", "python2", "python3"):
                     env["PYTHONIOENCODING"] = "utf-8"
 
