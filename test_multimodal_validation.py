@@ -24,18 +24,27 @@ def test_config_loading():
     try:
         # 获取 mimo_v2_5 平台实例
         registry = PlatformRegistry.get_global_platform_registry()
-        platform = registry.create_platform("openai_mimo_v2_5", silent=True)
+        platform = registry.create_platform("openai_mimo_v2_5", silent=False)
         if platform is None:
-            print("❌ 无法加载 openai_mimo_v2_5 平台")
+            print("❌ 无法加载 openai_mimo_v2_5 平台 (create_platform 返回 None)")
+            # 即使创建失败，我们也尝试检查注册表中是否有该平台
+            if "openai_mimo_v2_5" in registry.get_available_platforms():
+                print("   但平台 'openai_mimo_v2_5' 已注册")
+            else:
+                print("   平台 'openai_mimo_v2_5' 未注册")
             return False
         print(f"✅ 成功加载平台: {platform.name()}")
         print(f"   平台类型: {platform.platform_name()}")
         print(f"   支持多模态: {platform.supports_multimodal()}")
         
         # 获取 mimo_v2_pro 平台实例
-        platform_pro = registry.create_platform("openai_mimo_v2_pro", silent=True)
+        platform_pro = registry.create_platform("openai_mimo_v2_pro", silent=False)
         if platform_pro is None:
-            print("❌ 无法加载 openai_mimo_v2_pro 平台")
+            print("❌ 无法加载 openai_mimo_v2_pro 平台 (create_platform 返回 None)")
+            if "openai_mimo_v2_pro" in registry.get_available_platforms():
+                print("   但平台 'openai_mimo_v2_pro' 已注册")
+            else:
+                print("   平台 'openai_mimo_v2_pro' 未注册")
             return False
         print(f"✅ 成功加载平台: {platform_pro.name()}")
         print(f"   平台类型: {platform_pro.platform_name()}")
@@ -78,7 +87,7 @@ def test_multimodal_support():
     try:
         # 获取支持多模态的平台
         registry = PlatformRegistry.get_global_platform_registry()
-        platform = registry.create_platform("openai_mimo_v2_5", silent=True)
+        platform = registry.create_platform("openai_mimo_v2_5", silent=False)
         if platform is None:
             print("❌ 无法加载 openai_mimo_v2_5 平台")
             return False
@@ -120,7 +129,7 @@ def test_backward_compatibility():
     try:
         # 获取不支持多模态的平台
         registry = PlatformRegistry.get_global_platform_registry()
-        platform = registry.create_platform("openai_mimo_v2_pro", silent=True)
+        platform = registry.create_platform("openai_mimo_v2_pro", silent=False)
         if platform is None:
             print("❌ 无法加载 openai_mimo_v2_pro 平台")
             return False
