@@ -410,6 +410,7 @@
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
           :disabled="isInputDisabled"
           @keydown="handleTextareaKeydown"
+          @paste="handlePaste"
           ref="multilineInput"
         ></textarea>
         
@@ -5897,6 +5898,9 @@ function handleMessage(message, agentId = null) {
         })
       }
     }
+  } else if (type === 'file_upload_response') {
+    console.log('[ws] file_upload_response', payload)
+    handleFileUploadResponse(payload)
   }
 }
 
@@ -6328,6 +6332,102 @@ function isCursorAtLastLine(textarea) {
   const cursorPosition = textarea.selectionEnd
   const textAfterCursor = textarea.value.substring(cursorPosition)
   return !textAfterCursor.includes('\n')
+}
+
+// 存储等待文件上传响应的 Promise resolve 函数
+const pendingFileUploads = new Map()
+
+// 处理文件上传响应
+function handleFileUploadResponse(payload) {
+  const { message_id, success, file_path, error } = payload
+  const resolve = pendingFileUploads.get(message_id)
+  if (resolve) {
+    pendingFileUploads.delete(message_id)
+    if (success) {
+      resolve(file_path)
+    } else {
+      console.error('File upload failed:', error)
+      alert(`图片上传失败: ${error}`)
+      resolve(null)
+    }
+  }
+}
+
+// 处理粘贴事件
+function handlePaste(event) {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        uploadImageToNode(file)
+      }
+      break
+    }
+  }
+}
+
+// 上传图片到节点
+async function uploadImageToNode(file) {
+  // 限制文件大小 20MB
+  if (file.size > 20 * 1024 * 1024) {
+    alert('图片大小不能超过 20MB')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64Data = e.target.result
+    const messageId = crypto.randomUUID()
+    
+    // 发送上传请求
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      // 创建 Promise 等待响应
+      const uploadPromise = new Promise((resolve) => {
+        pendingFileUploads.set(messageId, resolve)
+      })
+      
+      ws.send(JSON.stringify({
+        type: 'file_upload',
+        message_id: messageId,
+        payload: {
+          agent_id: currentAgentId.value,
+          file_name: file.name,
+          file_data: base64Data,
+          target_dir: '/tmp'
+        }
+      }))
+      
+      // 等待服务器响应
+      const filePath = await uploadPromise
+      if (filePath) {
+        insertTextAtCursor(`<image> ${filePath}`)
+      }
+    } else {
+      alert('未连接到服务器')
+    }
+  }
+  reader.readAsDataURL(file)
+}
+
+// 在光标位置插入文本
+function insertTextAtCursor(text) {
+  const textarea = document.querySelector('textarea')
+  if (!textarea) return
+
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const before = inputText.value.substring(0, start)
+  const after = inputText.value.substring(end)
+  
+  inputText.value = before + text + after
+  
+  // 更新光标位置
+  textarea.selectionStart = textarea.selectionEnd = start + text.length
+  textarea.focus()
 }
 
 // 处理 textarea 的键盘事件

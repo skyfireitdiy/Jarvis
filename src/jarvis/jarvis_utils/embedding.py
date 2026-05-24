@@ -86,3 +86,90 @@ def split_text_into_chunks(
         PrettyOutput.auto_print(f"⚠️ 文本分割失败: {str(e)}")
         # 发生错误时回退到简单的字符分割
         return [text[i : i + max_length] for i in range(0, len(text), max_length)]
+
+
+def get_multimodal_token_count(content) -> int:
+    """
+    计算多模态内容的 token 数量
+
+    Args:
+        content: 可以是字符串或多模态内容列表
+
+    Returns:
+        int: token 数量
+    """
+    if isinstance(content, str):
+        return get_context_token_count(content)
+
+    if not isinstance(content, list):
+        return 0
+
+    total_tokens = 0
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+
+        block_type = block.get("type")
+
+        if block_type == "text":
+            # 文本内容：使用 tiktoken 计算
+            text = block.get("text", "")
+            total_tokens += get_context_token_count(text)
+
+        elif block_type == "image_url":
+            # 图片内容：根据分辨率估算 token
+            total_tokens += _estimate_image_tokens(block)
+
+        elif block_type == "audio":
+            # 音频内容：固定 token 估算
+            total_tokens += 100  # 音频通常需要较少 token
+
+        elif block_type == "video":
+            # 视频内容：固定 token 估算
+            total_tokens += 500  # 视频通常需要较多 token
+
+        else:
+            # 未知类型：基础 token 估算
+            total_tokens += 50
+
+    return total_tokens
+
+
+def _estimate_image_tokens(image_block: dict) -> int:
+    """
+    估算图片的 token 数量
+
+    基于 OpenAI 和 Claude 的图片 token 计算规则：
+    - OpenAI: 基于分片系统，512x512 分片约 170 tokens + 基础 85 tokens
+    - Claude: 基于分辨率，约 1,380 tokens/百万像素
+
+    Args:
+        image_block: 图片内容块
+
+    Returns:
+        int: 估算的 token 数量
+    """
+    # 默认 token 估算（无法获取分辨率时）
+    default_tokens = 85  # OpenAI 基础 token
+
+    try:
+        # 尝试从 base64 数据获取图片信息
+        image_url = image_block.get("image_url", {})
+        if isinstance(image_url, dict):
+            url = image_url.get("url", "")
+        else:
+            url = str(image_url)
+
+        # 如果是 base64 数据，尝试解析图片头信息
+        if url.startswith("data:image/"):
+            # 从 data URL 中提取 base64 数据
+            header, data = url.split(",", 1)
+            # 这里可以进一步解析图片尺寸，但需要 PIL 等库
+            # 暂时返回默认值
+            return default_tokens
+
+        # 如果是 URL，无法直接获取尺寸，返回默认值
+        return default_tokens
+
+    except Exception:
+        return default_tokens
