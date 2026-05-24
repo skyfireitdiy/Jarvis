@@ -429,6 +429,38 @@ class Agent:
         """
         return self.original_user_input
 
+    def add_multimodal_content(self, content: List[ContentBlock]) -> None:
+        """添加多模态内容到当前对话上下文
+
+        Args:
+            content: 多模态内容列表
+        """
+        if not content:
+            return
+
+        # 获取当前的 prompt
+        current_prompt = self.session.prompt
+
+        # 如果当前 prompt 是字符串，则转换为列表
+        if isinstance(current_prompt, str):
+            if current_prompt.strip():
+                new_prompt: List[ContentBlock] = [
+                    {"type": "text", "text": current_prompt}
+                ]
+            else:
+                new_prompt = []
+        else:
+            new_prompt = current_prompt.copy() if current_prompt else []
+
+        # 添加新的内容
+        new_prompt.extend(content)
+
+        # 更新 session.prompt
+        self.session.prompt = new_prompt
+
+        # 记录日志
+        PrettyOutput.auto_print(f"✅ 已添加 {len(content)} 个多模态内容块到对话上下文")
+
     def get_tool_usage_prompt(self) -> str:
         """获取工具使用提示"""
         return build_action_prompt(self.output_handler)

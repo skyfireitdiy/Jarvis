@@ -12,11 +12,12 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import typer
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_platform.content_types import ContentBlock, TextContent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_code_agent.code_agent_build import BuildValidationManager
@@ -119,13 +120,46 @@ class CodeAgent(Agent):
         # 父类初始化后的设置
         self._setup_code_agent_after_parent_init()
 
-    def get_user_origin_input(self) -> str:
+    def get_user_origin_input(self) -> Union[str, List[ContentBlock]]:
         """获取原始用户输入（CodeAgent重写）
 
         返回:
-            str: 原始用户输入（未经CodeAgent增强处理）
+            Union[str, List[ContentBlock]]: 原始用户输入（未经CodeAgent增强处理）
         """
         return self._raw_user_input
+
+    def _convert_to_string(self, user_input: Union[str, List[ContentBlock]]) -> str:
+        """将用户输入转换为字符串
+
+        参数:
+            user_input: 用户输入（纯文本或多模态内容）
+
+        返回:
+            str: 字符串表示形式
+        """
+        if isinstance(user_input, str):
+            return user_input
+
+        # 如果是多模态内容，提取文本部分
+        text_parts = []
+        for block in user_input:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+
+        return "\n".join(text_parts) if text_parts else "[多模态内容]"
+
+    def _append_to_session_prompt(self, content: str) -> None:
+        """安全地追加内容到 session.prompt
+
+        参数:
+            content: 要追加的字符串内容
+        """
+        if isinstance(self.session.prompt, str):
+            self.session.prompt += content
+        else:
+            # 如果 session.prompt 是 List[ContentBlock]，将 content 转换为 TextContent 并追加
+            text_block: TextContent = {"type": "text", "text": content}
+            self.session.prompt.append(text_block)
 
     def _init_code_agent_base_attributes(
         self,
@@ -157,7 +191,7 @@ class CodeAgent(Agent):
         self.suffix: str = ""
 
         # 保存原始用户输入（用于会话名称生成）
-        self._raw_user_input: str = ""
+        self._raw_user_input: Union[str, List[ContentBlock]] = ""
 
     def _init_code_agent_context_managers(self) -> None:
         """初始化 CodeAgent 上下文管理相关组件"""
@@ -213,6 +247,7 @@ class CodeAgent(Agent):
             "goal_manager",  # 当前会话目标管理工具
             "methodology",  # 方法论工具
             "symbol_dependency",  # 符号依赖查询工具
+            "add_images",  # 添加图片到对话上下文工具
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
@@ -345,7 +380,12 @@ class CodeAgent(Agent):
         self.model.set_suppress_output(False)
         self.model.agent = self
 
-    def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
+    def run(
+        self,
+        user_input: Union[str, List[ContentBlock]],
+        prefix: str = "",
+        suffix: str = "",
+    ) -> Optional[str]:
         """使用给定的用户输入运行代码代理.
 
         参数:
@@ -371,28 +411,36 @@ class CodeAgent(Agent):
             # 如果当前输入已被处理，则继续等待用户输入，不进入需求分类流程
             processed_input = ""
             while True:
-                processed_input, is_handled = builtin_input_handler(user_input, self)
-                if is_handled:
-                    # 内置命令已处理完成，继续等待用户输入
-                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
-                    if not user_input:
-                        # 用户取消输入，不保存会话
-                        _should_save_session = False
-                        return None
-                    continue
+                # 只有当 user_input 是字符串时才处理内置命令和 shell 命令
+                if isinstance(user_input, str):
+                    processed_input, is_handled = builtin_input_handler(
+                        user_input, self
+                    )
+                    if is_handled:
+                        # 内置命令已处理完成，继续等待用户输入
+                        user_input = get_multiline_input(
+                            "请输入你的需求（Ctrl+C 退出）"
+                        )
+                        if not user_input:
+                            # 用户取消输入，不保存会话
+                            _should_save_session = False
+                            return None
+                        continue
 
-                processed_input, is_handled = shell_input_handler(user_input, self)
-                if is_handled:
-                    # Shell 输入已处理完成，继续等待用户输入
-                    user_input = get_multiline_input("请输入你的需求（Ctrl+C 退出）")
-                    if not user_input:
-                        # 用户取消输入，不保存会话
-                        _should_save_session = False
-                        return None
-                    continue
+                    processed_input, is_handled = shell_input_handler(user_input, self)
+                    if is_handled:
+                        # Shell 输入已处理完成，继续等待用户输入
+                        user_input = get_multiline_input(
+                            "请输入你的需求（Ctrl+C 退出）"
+                        )
+                        if not user_input:
+                            # 用户取消输入，不保存会话
+                            _should_save_session = False
+                            return None
+                        continue
 
-                if processed_input:
-                    user_input = processed_input
+                    if processed_input:
+                        user_input = processed_input
                 break
 
             prev_dir = os.getcwd()
@@ -427,7 +475,8 @@ git reset --hard {start_commit}
                         )
 
                     # 极速模式下直接使用用户输入
-                    enhanced_input = user_input
+                    user_input_str = self._convert_to_string(user_input)
+                    enhanced_input = user_input_str
                 else:
                     # 正常模式：执行所有阶段
                     # === 阶段1: 需求分类（仅在启用时执行） ===
@@ -496,6 +545,8 @@ git reset --hard {start_commit}
             """
 
                     # === 阶段6: 构建增强输入 ===
+                    # 将 user_input 转换为字符串
+                    user_input_str = self._convert_to_string(user_input)
                     if project_overview:
                         enhanced_input = (
                             project_overview
@@ -503,19 +554,20 @@ git reset --hard {start_commit}
                             + first_tip
                             + non_interactive_note
                             + "\n\n任务描述：\n"
-                            + user_input
+                            + user_input_str
                         )
                     else:
                         enhanced_input = (
                             first_tip
                             + non_interactive_note
                             + "\n\n任务描述：\n"
-                            + user_input
+                            + user_input_str
                         )
 
             else:
                 # 会话恢复时，直接使用用户输入（上下文已从会话中恢复）
-                enhanced_input = user_input
+                user_input_str = self._convert_to_string(user_input)
+                enhanced_input = user_input_str
 
             try:
                 if self.model:
@@ -536,7 +588,7 @@ git reset --hard {start_commit}
             # 如果启用了 review，执行 review 和修复循环
             if not self.disable_review:
                 self._review_and_fix(
-                    user_input=user_input,
+                    user_input=user_input_str,
                     enhanced_input=enhanced_input,
                     prefix=prefix,
                     suffix=suffix,
@@ -672,7 +724,7 @@ git reset --hard {start_commit}
                     )
                     final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
                     PrettyOutput.auto_print(final_ret, lang="markdown")  # 保留语法高亮
-                    self.session.prompt += final_ret
+                    self._append_to_session_prompt(final_ret)
                     return
 
             commited = handle_commit_workflow(start_hash)
@@ -822,19 +874,19 @@ git reset --hard {start_commit}
             return
         # 用户确认最终结果
         if commited:
-            self.session.prompt += final_ret
+            self._append_to_session_prompt(final_ret)
             return
         PrettyOutput.auto_print(final_ret, lang="markdown")  # 保留语法高亮
         if not is_confirm_before_apply_patch() or user_confirm(
             "是否使用此回复？", default=True
         ):
-            self.session.prompt += final_ret
+            self._append_to_session_prompt(final_ret)
             return
         # 用户未确认，允许输入自定义回复作为附加提示
         custom_reply = get_multiline_input("请输入自定义回复")
         if custom_reply.strip():  # 如果自定义回复为空，不设置附加提示
             self.set_addon_prompt(custom_reply)
-        self.session.prompt += final_ret
+        self._append_to_session_prompt(final_ret)
         return
 
     def ask_llm_about_large_deletion(
