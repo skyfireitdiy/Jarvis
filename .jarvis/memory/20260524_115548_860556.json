@@ -1,0 +1,8 @@
+{
+  "id": "20260524_115548_860556",
+  "type": "project_long_term",
+  "tags": ["编辑器", "Monaco", "bug修复", "前端"],
+  "content": "编辑器标签页管理修复：关闭所有标签页后 monacoEditor 被销毁，再次打开文件时需要等待 DOM 更新后才能重新创建编辑器实例。修复位置：src/jarvis/jarvis_service/frontend/src/App.vue 的 openEditorFile 函数。关键代码：在 nextTick() 后添加 while 循环等待 editorContainerRef.value 存在。",
+  "created_at": "2026-05-24T11:55:48.860583",
+  "updated_at": "2026-05-24T11:55:48.860588"
+}

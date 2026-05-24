@@ -2118,6 +2118,12 @@ async function openEditorFile(path, agentId = null) {
     model.setValue(content)
 
     await nextTick()
+    // 确保编辑器容器存在（当从无标签状态打开时需要等待DOM更新）
+    let retryCount = 0
+    while (!editorContainerRef.value && retryCount < 10) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      retryCount++
+    }
     ensureMonacoEditor()
     activateEditorTab(path)
   } catch (error) {
