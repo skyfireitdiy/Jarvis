@@ -76,8 +76,9 @@ class ClaudeModel(BasePlatform):
         # 只有当 llm_config 不为空但其中没有 anthropic_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
         if not self.api_key and llm_config:
-            PrettyOutput.auto_print("⚠️ ANTHROPIC_API_KEY 未设置")
-
+            PrettyOutput.auto_print(
+                "⚠️ 未找到 Anthropic API Key，请在 llm_config 中设置 anthropic_api_key 或设置 ANTHROPIC_API_KEY 环境变量"
+            )
         # model_name 已在基类 BasePlatform.__init__ 中根据 platform_type 设置
 
         # 初始化 Anthropic 客户端
@@ -109,8 +110,7 @@ class ClaudeModel(BasePlatform):
                 else:
                     self.client = Anthropic(api_key=self.api_key)
         except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 初始化 Anthropic 客户端失败: {e}")
-
+            PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
         # 消息历史
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
@@ -174,7 +174,7 @@ class ClaudeModel(BasePlatform):
                 PrettyOutput.auto_print("✅ 成功从API获取模型列表")
                 return models
             else:
-                PrettyOutput.auto_print("⚠️ API响应中没有模型数据")
+                PrettyOutput.auto_print("⚠️ 未从API获取到模型列表")
                 return []
         except AttributeError:
             # models API 不存在或不支持
@@ -419,7 +419,7 @@ class ClaudeModel(BasePlatform):
 
         # 如果非system消息少于等于10条，无法裁剪
         if len(non_system_messages) <= 10:
-            PrettyOutput.auto_print("⚠️ 警告：非system消息不足10条，无法裁剪")
+            PrettyOutput.auto_print("⚠️ 非系统消息数量不足，无法裁剪")
             return False
 
         # 丢弃开头的10条非system消息
@@ -437,9 +437,7 @@ class ClaudeModel(BasePlatform):
             )
             return True
         else:
-            PrettyOutput.auto_print(
-                f"⚠️ 警告：已裁剪{trimmed_count}条消息，但仍无剩余token"
-            )
+            PrettyOutput.auto_print(f"⚠️ 裁剪失败：剩余token {remaining_tokens} 不足")
             return False
 
     @classmethod
