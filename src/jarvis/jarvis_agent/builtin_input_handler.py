@@ -189,10 +189,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("❌ Image 命令格式错误")
                 continue
 
-            # 提取标签后的参数部分（图片路径），去除单引号包裹
-            image_path = (
-                modified_input[tag_index + len(tag_marker) :].strip().strip("'")
-            )
+            # 提取标签后的参数部分（图片路径），支持单引号包裹的路径
+            remaining = modified_input[tag_index + len(tag_marker) :].strip()
+            # 用正则提取单引号包裹的路径，或取第一个空格前的裸路径
+            quoted_match = re.match(r"'([^']*)'", remaining)
+            if quoted_match:
+                image_path = quoted_match.group(1)
+            else:
+                image_path = remaining.split()[0] if remaining.split() else remaining
             if not image_path:
                 PrettyOutput.auto_print("❌ 用法：'<Image>' /path/to/image.png")
                 continue
@@ -204,6 +208,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 agent.add_multimodal_content([image_content])
             else:
                 PrettyOutput.auto_print(f"❌ 图片处理失败: {image_path}")
+
+            # 从输入文本中移除Image标签和路径，避免Agent重复处理
+            if quoted_match:
+                remove_str = tag_marker + " '" + image_path + "'"
+            else:
+                remove_str = tag_marker + " " + image_path
+            modified_input = modified_input.replace(remove_str, "", 1)
             continue
         elif tag == "SetConfig":
             tag_marker = "'<SetConfig>'"
