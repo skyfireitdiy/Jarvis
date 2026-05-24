@@ -5020,17 +5020,31 @@ async function deleteAgent(agentId) {
         const { host, port } = getGatewayAddress()
         const agent = agentList.value.find(item => item.agent_id === agentId)
         const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+
+        // 先删除服务端的 Agent 历史数据
+        try {
+          const historyKey = `agent_history_${agentId}`
+          await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `data/${historyKey}`), {
+            method: 'DELETE'
+          })
+          console.log('[HISTORY] Deleted server history for:', agentId)
+        } catch (historyError) {
+          console.warn('[HISTORY] Failed to delete server history for', agentId, ':', historyError.message)
+          // 历史删除失败不影响后续 agent 删除流程
+        }
+
+        // 删除 Agent
         const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${agentId}`), {
           method: 'DELETE'
         })
-        
+
         const result = await response.json()
-        
+
         if (!response.ok || !result.success) {
-          alert(`删除失败: ${result.error?.message || '未知错误'}`)
+          alert(`删除失败：${result.error?.message || '未知错误'}`)
           return
         }
-        
+
         console.log('[AGENT] Deleted:', agentId)
         
         // 清除该 Agent 的历史记录
@@ -5192,6 +5206,20 @@ async function batchDeleteAgents() {
             const { host, port } = getGatewayAddress()
             const agent = agentList.value.find(item => item.agent_id === agentId)
             const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+
+            // 先删除服务端的 Agent 历史数据
+            try {
+              const historyKey = `agent_history_${agentId}`
+              await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `data/${historyKey}`), {
+                method: 'DELETE'
+              })
+              console.log('[HISTORY] Deleted server history for:', agentId)
+            } catch (historyError) {
+              console.warn('[HISTORY] Failed to delete server history for', agentId, ':', historyError.message)
+              // 历史删除失败不影响后续 agent 删除流程
+            }
+
+            // 删除 Agent
             const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${agentId}`), {
               method: 'DELETE'
             })
@@ -5219,6 +5247,7 @@ async function batchDeleteAgents() {
             failCount++
           }
         }
+
         // 刷新列表
         await fetchAgentList()
         // 清空选中状态并退出批量模式
