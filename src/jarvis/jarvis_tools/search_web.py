@@ -190,7 +190,9 @@ class SearchWebTool:
 
         try:
             # 构建搜索 URL
-            search_url = f"https://www.bing.com/search?q={quote(query)}"
+            search_url = (
+                f"https://cn.bing.com/search?q={quote(query)}&FORM=BESBTB&ensearch=1"
+            )
             if site:
                 search_url += f"+site%3A{quote(site)}"
 
