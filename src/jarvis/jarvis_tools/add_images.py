@@ -154,6 +154,19 @@ class AddImagesTool:
             Dict[str, Any]: 执行结果
         """
         try:
+            # 检查是否支持多模态
+            agent = args.get("agent")
+            if agent and hasattr(agent, "platform"):
+                if not agent.platform.supports_multimodal():
+                    warning_msg = "⚠️ 当前模型不支持多模态输入，已跳过图片添加。如需使用多模态功能，请在 llm_config 中设置 supports_multimodal: true"
+                    PrettyOutput.auto_print(warning_msg)
+                    return {
+                        "success": True,
+                        "stdout": warning_msg,
+                        "stderr": "",
+                        "skipped": True,
+                    }
+
             images = args.get("images", [])
             prompt = args.get("prompt", "请分析以下图片内容：")
 

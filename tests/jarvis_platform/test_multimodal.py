@@ -363,7 +363,7 @@ class TestMultimodalConfig:
             assert platform.supports_multimodal() is True
 
     def test_openai_rejects_multimodal_if_not_supported(self):
-        """测试 OpenAIModel 在不支持多模态时拒绝多模态输入"""
+        """测试 OpenAIModel 在不支持多模态时静默降级为纯文本"""
         from jarvis.jarvis_platform.openai import OpenAIModel
         from jarvis.jarvis_platform.content_types import (
             TextContent,
@@ -379,6 +379,12 @@ class TestMultimodalConfig:
         ):
             # 模拟 OpenAI client
             mock_client = MagicMock()
+            # 模拟 API 响应
+            mock_response = MagicMock()
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "This is a test response"
+            mock_client.chat.completions.create.return_value = mock_response
+
             with patch(
                 "jarvis.jarvis_platform.openai.OpenAI", return_value=mock_client
             ):
@@ -395,14 +401,29 @@ class TestMultimodalConfig:
                 }
                 multimodal_message: List[ContentBlock] = [text_content, image_content]
 
-                # 验证抛出 Exception
-                with pytest.raises(Exception, match="当前模型不支持多模态输入"):
-                    # 触发 chat 方法，因为是生成器，需要迭代
-                    for _ in platform.chat(multimodal_message):
-                        pass
+                # 验证不抛出异常，而是静默降级
+                # 触发 chat 方法，因为是生成器，需要迭代
+                responses = list(platform.chat(multimodal_message))
+
+                # 验证有响应内容
+                assert len(responses) > 0
+                # 验证 API 被调用（可能调用多次，因为有流式降级逻辑）
+                assert mock_client.chat.completions.create.call_count >= 1
+                # 获取最后一次调用的参数
+                call_args = mock_client.chat.completions.create.call_args
+                messages = call_args.kwargs.get(
+                    "messages", call_args[1].get("messages", [])
+                )
+                # 验证用户消息是纯文本格式
+                user_msg = (
+                    messages[-2] if len(messages) >= 2 else messages[-1]
+                )  # 倒数第二条是用户消息
+                assert user_msg["role"] == "user"
+                assert isinstance(user_msg["content"], str)
+                assert "What is in this image?" in user_msg["content"]
 
     def test_claude_rejects_multimodal_if_not_supported(self):
-        """测试 ClaudeModel 在不支持多模态时拒绝多模态输入"""
+        """测试 ClaudeModel 在不支持多模态时静默降级为纯文本"""
         from jarvis.jarvis_platform.claude import ClaudeModel
         from jarvis.jarvis_platform.content_types import (
             TextContent,
@@ -418,6 +439,13 @@ class TestMultimodalConfig:
         ):
             # 模拟 Anthropic client
             mock_client = MagicMock()
+            # 模拟 stream 上下文管理器
+            mock_stream = MagicMock()
+            mock_stream.text_stream = ["This is a test response"]
+            mock_stream.__enter__ = MagicMock(return_value=mock_stream)
+            mock_stream.__exit__ = MagicMock(return_value=False)
+            mock_client.messages.stream.return_value = mock_stream
+
             with patch(
                 "jarvis.jarvis_platform.claude.Anthropic", return_value=mock_client
             ):
@@ -434,10 +462,22 @@ class TestMultimodalConfig:
                 }
                 multimodal_message: List[ContentBlock] = [text_content, image_content]
 
-                # 验证抛出 Exception
-                with pytest.raises(Exception, match="当前模型不支持多模态输入"):
-                    for _ in platform.chat(multimodal_message):
-                        pass
+                # 验证不抛出异常，而是静默降级
+                responses = list(platform.chat(multimodal_message))
+
+                # 验证有响应内容
+                assert len(responses) > 0
+                # 验证 API 被调用
+                mock_client.messages.stream.assert_called_once()
+                call_args = mock_client.messages.stream.call_args
+                messages = call_args.kwargs.get(
+                    "messages", call_args[1].get("messages", [])
+                )
+                # 验证用户消息是纯文本格式
+                user_msg = messages[-1]
+                assert user_msg["role"] == "user"
+                assert isinstance(user_msg["content"], str)
+                assert "What is in this image?" in user_msg["content"]
 
 
 if __name__ == "__main__":

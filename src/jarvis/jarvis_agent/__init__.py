@@ -438,6 +438,12 @@ class Agent:
         if not content:
             return
 
+        # 检查是否支持多模态
+        if hasattr(self, "platform") and not self.platform.supports_multimodal():
+            warning_msg = "⚠️ 当前模型不支持多模态输入，已跳过多模态内容添加。如需使用多模态功能，请在 llm_config 中设置 supports_multimodal: true"
+            PrettyOutput.auto_print(warning_msg)
+            return
+
         # 获取当前的 prompt
         current_prompt = self.session.prompt
 

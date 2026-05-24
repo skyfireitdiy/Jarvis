@@ -303,31 +303,40 @@ class OpenAIModel(BasePlatform):
         messages_before_user = len(self.messages)
 
         try:
-            # 检查多模态支持
-            if not isinstance(message, str) and not self.supports_multimodal():
-                raise ValueError(
-                    "当前模型不支持多模态输入，请在 llm_config 中设置 supports_multimodal: true"
-                )
-
             # 处理多模态消息
             if isinstance(message, str):
                 user_message_content = message
             else:
-                # 将 List[ContentBlock] 转换为 OpenAI API 期望的格式
-                user_message_content = []
-                for block in message:
-                    if block["type"] == "text":
-                        user_message_content.append(
-                            {"type": "text", "text": block["text"]}
-                        )
-                    elif block["type"] == "image_url":
-                        # OpenAI API 期望 image_url 是一个对象，包含 url 字段
-                        image_url_data = block["image_url"]
-                        if isinstance(image_url_data, str):
-                            image_url_data = {"url": image_url_data}
-                        user_message_content.append(
-                            {"type": "image_url", "image_url": image_url_data}
-                        )
+                # 检查多模态支持，如果不支持则降级为纯文本
+                if not self.supports_multimodal():
+                    from jarvis.jarvis_utils.output import PrettyOutput
+
+                    PrettyOutput.auto_print(
+                        "⚠️ 当前模型不支持多模态输入，已自动降级为纯文本模式"
+                    )
+                    # 只保留文本内容
+                    text_parts = [
+                        block["text"] for block in message if block["type"] == "text"
+                    ]
+                    user_message_content = (
+                        "\n".join(text_parts) if text_parts else "[多模态内容已跳过]"
+                    )
+                else:
+                    # 将 List[ContentBlock] 转换为 OpenAI API 期望的格式
+                    user_message_content = []
+                    for block in message:
+                        if block["type"] == "text":
+                            user_message_content.append(
+                                {"type": "text", "text": block["text"]}
+                            )
+                        elif block["type"] == "image_url":
+                            # OpenAI API 期望 image_url 是一个对象，包含 url 字段
+                            image_url_data = block["image_url"]
+                            if isinstance(image_url_data, str):
+                                image_url_data = {"url": image_url_data}
+                            user_message_content.append(
+                                {"type": "image_url", "image_url": image_url_data}
+                            )
                     else:
                         # 未知类型，忽略或报错
                         pass
