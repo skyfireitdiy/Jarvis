@@ -794,6 +794,81 @@ class WebSocketConnectionManager:
                     return
                 _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
             return
+        if message_type == "file_upload":
+            # 处理文件上传请求
+            message_id = message.get("message_id")
+            file_name = payload.get("file_name")
+            file_data = payload.get("file_data")
+
+            if not all([message_id, file_name, file_data]):
+                error_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": {"success": False, "error": "Missing required fields"},
+                }
+                self._router.publish(error_msg, session_id=session_id)
+                return
+
+            # 检查是否需要转发到远程节点
+            node_id = str(payload.get("node_id") or "").strip()
+            if node_id and node_id not in (
+                _node_runtime.local_node_id if _node_runtime else "master",
+                "master",
+                "",
+            ):
+                # 转发到远端节点
+                if _node_connection_manager is None:
+                    logger.error(
+                        "[WS MESSAGE] Node connection manager is not available"
+                    )
+                    return
+                try:
+                    response = await _node_connection_manager.send_request_to_node(
+                        node_id,
+                        NODE_TERMINAL_REQUEST,
+                        {
+                            "action": "file_upload",
+                            "payload": payload,
+                            "session_id": session_id,
+                        },
+                    )
+                    # 转发远端节点的响应给前端
+                    self._router.publish(response, session_id=session_id)
+                except Exception as e:
+                    logger.error(
+                        f"[WS MESSAGE] Failed to forward file upload to node {node_id}: {e}"
+                    )
+                    error_msg = {
+                        "type": "file_upload_response",
+                        "message_id": message_id,
+                        "payload": {
+                            "success": False,
+                            "error": f"Failed to forward to node: {str(e)}",
+                        },
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                return
+
+            # 本地处理文件上传
+            try:
+                result = await _handle_file_upload(payload)
+                response_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": result,
+                }
+                self._router.publish(response_msg, session_id=session_id)
+            except Exception as e:
+                logger.error(
+                    f"[WS MESSAGE] Error handling file upload: {e}", exc_info=True
+                )
+                error_msg = {
+                    "type": "file_upload_response",
+                    "message_id": message_id,
+                    "payload": {"success": False, "error": str(e)},
+                }
+                self._router.publish(error_msg, session_id=session_id)
+            return
 
 
 def create_app(
@@ -4834,6 +4909,71 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
             pass
 
     return _sender
+
+
+async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """处理文件上传请求。
+
+    Args:
+        payload: 包含文件数据的字典
+            - agent_id: Agent ID
+            - file_name: 文件名
+            - file_data: Base64 编码的文件数据
+            - target_dir: 目标目录 (默认 /tmp)
+
+    Returns:
+        处理结果字典
+    """
+    import base64
+    import uuid
+    import os
+
+    try:
+        file_name = payload.get("file_name")
+        file_data = payload.get("file_data")
+        target_dir = payload.get("target_dir", "/tmp")
+
+        if not file_data:
+            return {"success": False, "error": "Missing file data"}
+
+        # 解析 Base64 数据
+        if "," in file_data:
+            header, data = file_data.split(",", 1)
+            # 尝试从 header 提取扩展名
+            try:
+                mime_type = header.split(":")[1].split(";")[0]
+                ext = mime_type.split("/")[1]
+            except Exception:
+                ext = "png"
+        else:
+            data = file_data
+            ext = "png"
+
+        # 解码
+        try:
+            file_bytes = base64.b64decode(data)
+        except Exception as e:
+            return {"success": False, "error": f"Invalid base64 data: {str(e)}"}
+
+        # 验证文件大小 (限制 20MB)
+        if len(file_bytes) > 20 * 1024 * 1024:
+            return {"success": False, "error": "File too large (>20MB)"}
+
+        # 生成唯一文件名
+        unique_name = f"{uuid.uuid4().hex[:8]}_{file_name or 'image'}.{ext}"
+        file_path = os.path.join(target_dir, unique_name)
+
+        # 确保目录存在
+        os.makedirs(target_dir, exist_ok=True)
+
+        # 写入文件
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+
+        return {"success": True, "file_path": file_path, "file_size": len(file_bytes)}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:

@@ -1,0 +1,8 @@
+{
+  "id": "20260523_142920_555068",
+  "type": "project_long_term",
+  "tags": ["设计方案", "前端", "多模态", "图片上传", "WebSocket"],
+  "content": "# 前端粘贴图片功能设计方案\n\n## 需求\n在前端多行输入框中，当用户按下 Ctrl+V 粘贴时，如果剪贴板中有图片数据，自动将其上传到 Agent 所在节点的 /tmp 目录，并在输入框中插入 `<image> /tmp/xxx.png` 这样的路径标记。\n\n## 技术方案\n采用 Base64 编码通过 WebSocket 传输图片数据。\n\n## 消息协议\n\n### 请求\n```json\n{\n  \"type\": \"file_upload\",\n  \"message_id\": \"uuid\",\n  \"payload\": {\n    \"agent_id\": \"agent-123\",\n    \"file_name\": \"screenshot.png\",\n    \"file_data\": \"data:image/png;base64,...\",\n    \"target_dir\": \"/tmp\"\n  }\n}\n```\n\n### 响应\n```json\n{\n  \"type\": \"file_upload_response\",\n  \"message_id\": \"uuid\",\n  \"payload\": {\n    \"success\": true,\n    \"file_path\": \"/tmp/a1b2c3d4_screenshot.png\",\n    \"file_size\": 123456\n  }\n}\n```\n\n## 实现要点\n\n### 前端 (App.vue)\n1. 在 textarea 添加 `@paste=\"handlePaste\"` 事件\n2. 检测剪贴板中的图片类型 (`item.type.startsWith('image/')`)\n3. 使用 FileReader 读取为 base64\n4. 通过 WebSocket 发送 `file_upload` 消息\n5. 收到响应后在光标位置插入 `<image> {file_path}`\n\n### 后端 (app.py)\n1. 添加 `handle_file_upload` 函数处理上传请求\n2. 解析 base64 数据并保存到目标目录\n3. 支持远程节点转发\n4. 返回文件路径\n\n## 文件修改\n- `src/jarvis/jarvis_service/frontend/src/App.vue`\n- `src/jarvis/jarvis_web_gateway/app.py`",
+  "created_at": "2026-05-23T14:29:20.555122",
+  "updated_at": "2026-05-23T14:29:20.555130"
+}
