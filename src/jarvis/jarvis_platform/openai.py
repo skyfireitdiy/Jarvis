@@ -83,8 +83,9 @@ class OpenAIModel(BasePlatform):
         # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
         if not self.api_key and llm_config:
-            PrettyOutput.auto_print("⚠️ OPENAI_API_KEY 未设置")
-
+            PrettyOutput.auto_print(
+                "⚠️ 未找到 OpenAI API Key，请在 llm_config 中设置 openai_api_key 或设置 OPENAI_API_KEY 环境变量"
+            )
         # model_name 已在基类 BasePlatform.__init__ 中根据 platform_type 设置
 
         # Optional: Inject extra HTTP headers via llm_config or environment variable
@@ -113,11 +114,10 @@ class OpenAIModel(BasePlatform):
                     self.extra_headers = {str(k): str(v) for k, v in parsed.items()}
                 else:
                     PrettyOutput.auto_print(
-                        "⚠️ openai_extra_headers 应为 JSON 对象，如 {'X-Source':'jarvis'}"
+                        "⚠️ openai_extra_headers 格式错误，应为 JSON 字符串"
                     )
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 解析 openai_extra_headers 失败: {e}")
-
         # 默认添加浏览器 User-Agent，避免被某些 API 网关拦截
         if "User-Agent" not in self.extra_headers:
             # 检测是否为 Kimi API，如果是则使用特定的 User-Agent
@@ -162,12 +162,9 @@ class OpenAIModel(BasePlatform):
                 if isinstance(parsed, dict):
                     self.extra_body = parsed
                 else:
-                    PrettyOutput.auto_print(
-                        "⚠️ openai_extra_body must be a JSON object, ignoring."
-                    )
+                    PrettyOutput.auto_print("⚠️ openai_proxy 格式错误，应为字符串")
             except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ Failed to parse openai_extra_body: {e}")
-
+                PrettyOutput.auto_print(f"⚠️ 设置 OpenAI 代理失败: {e}")
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
             if self.extra_headers:
@@ -183,7 +180,7 @@ class OpenAIModel(BasePlatform):
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             if self.extra_headers:
                 PrettyOutput.auto_print(
-                    "⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头"
+                    "⚠️ 当前 OpenAI SDK 版本不支持 default_headers，已忽略 extra_headers"
                 )
         self.messages: List[Dict[str, Any]] = []
         self.system_message = ""
@@ -510,7 +507,7 @@ class OpenAIModel(BasePlatform):
 
         # 如果非system消息少于等于10条，无法裁剪
         if len(non_system_messages) <= 10:
-            PrettyOutput.auto_print("⚠️ 警告：非system消息不足10条，无法裁剪")
+            PrettyOutput.auto_print("⚠️ 非系统消息数量不足，无法裁剪")
             return False
 
         # 丢弃开头的10条非system消息
@@ -528,9 +525,7 @@ class OpenAIModel(BasePlatform):
             )
             return True
         else:
-            PrettyOutput.auto_print(
-                f"⚠️ 警告：已裁剪{trimmed_count}条消息，但仍无剩余token"
-            )
+            PrettyOutput.auto_print(f"⚠️ 裁剪失败：剩余token {remaining_tokens} 不足")
             return False
 
     @classmethod

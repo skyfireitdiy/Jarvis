@@ -1,0 +1,8 @@
+{
+  "id": "20260524_050529_883557",
+  "type": "project_long_term",
+  "tags": ["多模态", "降级策略", "审查报告"],
+  "content": "# 多模态降级策略审查报告\n\n## 审查时间\n2025-01-15\n\n## 审查结论\n✅ 通过\n\n## 已验证的功能\n\n### 1. add_images.py 工具层检查\n- 位置：`src/jarvis/jarvis_tools/add_images.py`\n- 功能：在执行前检查 `agent.platform.supports_multimodal()`\n- 降级行为：返回警告信息，不添加图片\n\n### 2. Agent.add_multimodal_content 检查\n- 位置：`src/jarvis/jarvis_agent/__init__.py`\n- 功能：在添加多模态内容前检查支持状态\n- 降级行为：打印警告并返回\n\n### 3. OpenAIModel.chat 降级处理\n- 位置：`src/jarvis/jarvis_platform/openai.py`\n- 功能：当不支持多模态时，提取文本内容\n- 降级行为：静默降级为纯文本模式\n\n### 4. ClaudeModel.chat 降级处理\n- 位置：`src/jarvis/jarvis_platform/claude.py`\n- 功能：当不支持多模态时，提取文本内容\n- 降级行为：静默降级为纯文本模式\n\n### 5. join_prompts 多模态拼接\n- 位置：`src/jarvis/jarvis_agent/utils.py`\n- 功能：支持纯文本和多模态内容的统一拼接\n- 行为：自动检测内容类型并正确合并\n\n## 关键设计决策\n\n1. **静默降级**：当模型不支持多模态时，自动跳过图片并保留文本\n2. **多层检查**：在工具层、Agent层、Platform层都添加检查\n3. **用户友好**：降级时输出警告信息，提示如何启用多模态\n\n## 向后兼容性\n- ✅ 纯文本消息正常处理\n- ✅ 配置项默认值为 False\n- ✅ 现有代码无需修改\n\n## 测试状态\n- 所有 18 个多模态测试用例全部通过\n- 静默降级功能正常工作",
+  "created_at": "2026-05-24T05:05:29.883592",
+  "updated_at": "2026-05-24T05:05:29.883598"
+}
