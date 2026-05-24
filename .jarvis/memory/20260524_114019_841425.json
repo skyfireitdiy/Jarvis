@@ -1,0 +1,8 @@
+{
+  "id": "20260524_114019_841425",
+  "type": "project_long_term",
+  "tags": ["bug修复", "规则系统", "builtin_input_handler"],
+  "content": "## 规则标记渲染Bug修复\n\n**问题**：`'<rule:builtin:xxx>'` 格式的规则标记无法正确渲染\n\n**原因**：`builtin_input_handler.py` 第524行的替换字符串 `f\"'<{tag}'\"` 缺少右侧的 `>'`，导致字符串不匹配，替换失败\n\n**修复**：将 `f\"'<{tag}'\"` 改为 `f\"'<{tag}>'\"`\n\n**关键代码位置**：`src/jarvis/jarvis_agent/builtin_input_handler.py:524`\n\n**正则匹配逻辑**：`re.findall(r\"'<([^>]+)>'\", user_input)` 要求标记被 `'<` 和 `>'` 包裹\n\n**Commit ID**: 3fb70a7",
+  "created_at": "2026-05-24T11:40:19.841475",
+  "updated_at": "2026-05-24T11:40:19.841481"
+}
