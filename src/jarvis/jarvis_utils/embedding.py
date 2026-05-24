@@ -98,8 +98,6 @@ def get_multimodal_token_count(content) -> int:
     Returns:
         int: token 数量
     """
-    from typing import List, Dict, Any, Union
-    
     if isinstance(content, str):
         return get_context_token_count(content)
     
@@ -137,7 +135,7 @@ def get_multimodal_token_count(content) -> int:
     return total_tokens
 
 
-def _estimate_image_tokens(image_block: Dict[str, Any]) -> int:
+def _estimate_image_tokens(image_block: dict) -> int:
     """
     估算图片的 token 数量
     
