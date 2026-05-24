@@ -64,10 +64,7 @@ dependencies = [
     "pywinauto>=0.6.9; sys_platform == 'win32'",
     "pywinpty>=2.0.0; sys_platform == 'win32'",
     "pytest",
-    "pytest-cov",
-    "coverage",
     "pytest-xdist",
-    "pytest-benchmark",
     "pytest-asyncio",
     "ruff",
     "ty",
@@ -137,7 +134,7 @@ dependencies = [
 
     [tool.pytest.ini_options]
     minversion = "3.0.44"
-    addopts = "-ra -q --strict-markers --cov=src --cov-report=html --cov-report=term --cov-report=xml"
+    addopts = "-ra -q --strict-markers"
     testpaths = ["tests"]
     python_files = ["test_*.py", "*_test.py"]
     python_classes = ["Test*"]
@@ -148,7 +145,6 @@ dependencies = [
         "unit: marks tests as unit tests",
         "smoke: marks tests as smoke tests",
         "security: marks tests as security tests",
-        "performance: marks tests as performance tests",
         "regression: marks tests as regression tests",
         "monitoring: marks tests as monitoring tests",
     ]
