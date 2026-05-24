@@ -232,12 +232,6 @@ class ClaudeModel(BasePlatform):
         messages_before_user = len(self.messages)
 
         try:
-            # 检查多模态支持
-            if not isinstance(message, str) and not self.supports_multimodal():
-                raise ValueError(
-                    "当前模型不支持多模态输入，请在 llm_config 中设置 supports_multimodal: true"
-                )
-
             # 转换消息格式为 Anthropic 格式，同时提取系统消息
             anthropic_messages: List[MessageParam] = []
             system_content = None
@@ -258,48 +252,60 @@ class ClaudeModel(BasePlatform):
             if isinstance(message, str):
                 user_message_content = message
             else:
-                # 将 List[ContentBlock] 转换为 Claude API 期望的格式
-                user_message_content = []
-                for block in message:
-                    if block["type"] == "text":
-                        user_message_content.append(
-                            {"type": "text", "text": block["text"]}
-                        )
-                    elif block["type"] == "image_url":
-                        # Claude API 期望 image 类型，并且需要 source 字段
-                        # 这里假设 image_url 是 base64 编码的数据 URL 或普通 URL
-                        # 如果是普通 URL，可能需要先下载并转换为 base64
-                        # 这里简化处理，假设是 base64 数据 URL
-                        image_url_data = block["image_url"]
-                        if isinstance(image_url_data, str):
-                            # 如果是数据 URL (data:image/jpeg;base64,...)
-                            if image_url_data.startswith("data:image"):
-                                # 解析数据 URL
-
-                                header, data = image_url_data.split(",", 1)
-                                media_type = header.split(":")[1].split(";")[0]
-                                user_message_content.append(
-                                    {
-                                        "type": "image",
-                                        "source": {
-                                            "type": "base64",
-                                            "media_type": media_type,
-                                            "data": data,
-                                        },
-                                    }
-                                )
-                            else:
-                                # 如果是普通 URL，暂时转换为文本描述
-                                # 实际实现可能需要下载图片并转换为 base64
-                                user_message_content.append(
-                                    {
-                                        "type": "text",
-                                        "text": f"[Image URL: {image_url_data}]",
-                                    }
-                                )
-                        elif isinstance(image_url_data, dict):
-                            # 如果已经是 dict 格式，假设符合 Claude API 格式
-                            user_message_content.append(image_url_data)
+                # 检查多模态支持，如果不支持则降级为纯文本
+                if not self.supports_multimodal():
+                    PrettyOutput.auto_print(
+                        "⚠️ 当前模型不支持多模态输入，已自动降级为纯文本模式"
+                    )
+                    # 只保留文本内容
+                    text_parts = [
+                        block["text"] for block in message if block["type"] == "text"
+                    ]
+                    user_message_content = (
+                        "\n".join(text_parts) if text_parts else "[多模态内容已跳过]"
+                    )
+                else:
+                    # 将 List[ContentBlock] 转换为 Claude API 期望的格式
+                    user_message_content = []
+                    for block in message:
+                        if block["type"] == "text":
+                            user_message_content.append(
+                                {"type": "text", "text": block["text"]}
+                            )
+                        elif block["type"] == "image_url":
+                            # Claude API 期望 image 类型，并且需要 source 字段
+                            # 这里假设 image_url 是 base64 编码的数据 URL 或普通 URL
+                            # 如果是普通 URL，可能需要先下载并转换为 base64
+                            # 这里简化处理，假设是 base64 数据 URL
+                            image_url_data = block["image_url"]
+                            if isinstance(image_url_data, str):
+                                # 如果是数据 URL (data:image/jpeg;base64,...)
+                                if image_url_data.startswith("data:image"):
+                                    # 解析数据 URL
+                                    header, data = image_url_data.split(",", 1)
+                                    media_type = header.split(":")[1].split(";")[0]
+                                    user_message_content.append(
+                                        {
+                                            "type": "image",
+                                            "source": {
+                                                "type": "base64",
+                                                "media_type": media_type,
+                                                "data": data,
+                                            },
+                                        }
+                                    )
+                                else:
+                                    # 如果是普通 URL，暂时转换为文本描述
+                                    # 实际实现可能需要下载图片并转换为 base64
+                                    user_message_content.append(
+                                        {
+                                            "type": "text",
+                                            "text": f"[Image URL: {image_url_data}]",
+                                        }
+                                    )
+                            elif isinstance(image_url_data, dict):
+                                # 如果已经是 dict 格式，假设符合 Claude API 格式
+                                user_message_content.append(image_url_data)
                     else:
                         # 未知类型，忽略或报错
                         pass
