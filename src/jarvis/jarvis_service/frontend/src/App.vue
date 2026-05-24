@@ -6397,8 +6397,7 @@ async function uploadImageToNode(file) {
         body: JSON.stringify({
           agent_id: currentAgentId.value,
           file_name: file.name,
-          file_data: base64Data,
-          target_dir: '/tmp'
+          file_data: base64Data
         })
       })
 

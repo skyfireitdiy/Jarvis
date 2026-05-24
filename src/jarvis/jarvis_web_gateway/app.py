@@ -4921,7 +4921,7 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
             - agent_id: Agent ID
             - file_name: 文件名
             - file_data: Base64 编码的文件数据
-            - target_dir: 目标目录 (默认 /tmp)
+            - target_dir: 目标目录 (默认为 Jarvis 数据目录下的 uploads 子目录)
 
     Returns:
         处理结果字典
@@ -4931,9 +4931,15 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
     import os
 
     try:
+        from jarvis.jarvis_utils.config import get_data_dir
+
         file_name = payload.get("file_name")
         file_data = payload.get("file_data")
-        target_dir = payload.get("target_dir", "/tmp")
+        target_dir = payload.get("target_dir", "")
+
+        # 如果 target_dir 为空或未指定，使用 Jarvis 数据目录下的 uploads 子目录
+        if not target_dir:
+            target_dir = os.path.join(get_data_dir(), "uploads")
 
         if not file_data:
             return {"success": False, "error": "Missing file data"}
@@ -4963,7 +4969,7 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         # 生成唯一文件名
         # 如果 file_name 已有扩展名，则移除它，避免重复
-        base_name = os.path.splitext(file_name or 'image')[0] if file_name else 'image'
+        base_name = os.path.splitext(file_name or "image")[0] if file_name else "image"
         unique_name = f"{uuid.uuid4().hex[:8]}_{base_name}.{ext}"
         file_path = os.path.join(target_dir, unique_name)
 
@@ -4974,7 +4980,10 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        return {"success": True, "data": {"file_path": file_path, "file_size": len(file_bytes)}}
+        return {
+            "success": True,
+            "data": {"file_path": file_path, "file_size": len(file_bytes)},
+        }
 
     except Exception as e:
         return {"success": False, "error": str(e)}
