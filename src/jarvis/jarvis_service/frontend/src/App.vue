@@ -5623,6 +5623,8 @@ function handleMessage(message, agentId = null) {
       })
     }
   } else if (type === 'output') {
+    // 非 execution 消息，清空终端缓存
+    clearTerminalCache(targetAgentId)
     const outputType = payload?.output_type
     
     // 处理流式输出
@@ -5681,6 +5683,8 @@ function handleMessage(message, agentId = null) {
       appendOutput(payload, targetAgentId)
     }
   } else if (type === 'input_request') {
+    // 非 execution 消息，清空终端缓存
+    clearTerminalCache(targetAgentId)
     console.log('[ws] input_request', payload)
     const requestAgentId = targetAgentId
     pendingInputAgentId.value = requestAgentId
@@ -5751,6 +5755,8 @@ function handleMessage(message, agentId = null) {
       }
     })
   } else if (type === 'confirm') {
+    // 非 execution 消息，清空终端缓存
+    clearTerminalCache(targetAgentId)
     console.log('[ws] confirm', payload)
     pendingConfirmAgentId.value = targetAgentId
     showConfirm(
@@ -6257,6 +6263,15 @@ function appendExecution(payload, agentId = null) {
   } else if (!termInfo.terminal && data) {
     console.log(`[terminal] Terminal not ready, skipping output for eventType=${eventType}`)
   }
+}
+
+// 清空指定 agent 的终端缓存
+function clearTerminalCache(agentId) {
+  if (!agentId) return
+  const beforeCount = terminals.value.length
+  terminals.value = terminals.value.filter(t => t.agentId !== agentId)
+  const afterCount = terminals.value.length
+  console.log(`[TERMINAL_CACHE] Cleared ${beforeCount - afterCount} terminal caches for agent: ${agentId}`)
 }
 
 // ============ 历史输入记录管理 ============
