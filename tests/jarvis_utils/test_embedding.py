@@ -151,47 +151,25 @@ class TestGetMultimodalTokenCount:
         expected = text_tokens + image_tokens
         assert result == expected
 
-    def test_audio_content(self):
-        """测试音频内容"""
-        content_list = [
-            {"type": "text", "text": "Listen to this audio:"},
-            {"type": "audio", "audio_url": "https://example.com/audio.mp3"},
-        ]
-        result = get_multimodal_token_count(content_list)
-        text_tokens = get_context_token_count("Listen to this audio:")
-        # 音频默认 100 tokens
-        expected = text_tokens + 100
-        assert result == expected
-
-    def test_video_content(self):
-        """测试视频内容"""
-        content_list = [
-            {"type": "text", "text": "Watch this video:"},
-            {"type": "video", "video_url": "https://example.com/video.mp4"},
-        ]
-        result = get_multimodal_token_count(content_list)
-        text_tokens = get_context_token_count("Watch this video:")
-        # 视频默认 500 tokens
-        expected = text_tokens + 500
-        assert result == expected
-
     def test_mixed_content(self):
         """测试混合内容"""
         content_list = [
             {"type": "text", "text": "Look at this image:"},
             {"type": "image_url", "image_url": "https://example.com/image.jpg"},
-            {"type": "text", "text": "And listen to this audio:"},
-            {"type": "audio", "audio_url": "https://example.com/audio.mp3"},
+            {"type": "text", "text": "And look at this image again:"},
+            {"type": "image_url", "image_url": "https://example.com/image2.jpg"},
         ]
         result = get_multimodal_token_count(content_list)
         text1_tokens = get_context_token_count("Look at this image:")
         # _estimate_image_tokens 期望 dict 类型，传递正确的格式
-        image_tokens = _estimate_image_tokens(
+        image1_tokens = _estimate_image_tokens(
             {"image_url": "https://example.com/image.jpg"}
         )
-        text2_tokens = get_context_token_count("And listen to this audio:")
-        audio_tokens = 100
-        expected = text1_tokens + image_tokens + text2_tokens + audio_tokens
+        text2_tokens = get_context_token_count("And look at this image again:")
+        image2_tokens = _estimate_image_tokens(
+            {"image_url": "https://example.com/image2.jpg"}
+        )
+        expected = text1_tokens + image1_tokens + text2_tokens + image2_tokens
         assert result == expected
 
     def test_invalid_content_type(self):

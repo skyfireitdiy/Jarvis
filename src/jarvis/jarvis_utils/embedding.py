@@ -120,14 +120,6 @@ def get_multimodal_token_count(content) -> int:
             # 图片内容：根据分辨率估算 token
             total_tokens += _estimate_image_tokens(block)
 
-        elif block_type == "audio":
-            # 音频内容：固定 token 估算
-            total_tokens += 100  # 音频通常需要较少 token
-
-        elif block_type == "video":
-            # 视频内容：固定 token 估算
-            total_tokens += 500  # 视频通常需要较多 token
-
         else:
             # 未知类型：基础 token 估算
             total_tokens += 50

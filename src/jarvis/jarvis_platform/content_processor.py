@@ -88,20 +88,25 @@ class ContentProcessor:
 
         # 验证图片内容
         if content_type == "image_url":
-            if content.get("image_url") is None:
+            image_url = content.get("image_url")
+            if image_url is None:
                 raise ValueError("图片内容块必须包含 'image_url' 字段")
-            return True
 
-        # 验证音频内容
-        if content_type == "audio":
-            if content.get("audio_url") is None:
-                raise ValueError("音频内容块必须包含 'audio_url' 字段")
-            return True
+            # 增强验证：检查 image_url 类型
+            if isinstance(image_url, str):
+                # 检查是否为有效的 URL 或 base64 数据
+                if not (
+                    image_url.startswith("http") or image_url.startswith("data:image")
+                ):
+                    # 如果不是 URL 或 base64，可能是文件路径，允许通过（后续会处理）
+                    pass
+            elif isinstance(image_url, dict):
+                # 如果是字典，检查是否包含 url 字段
+                if "url" not in image_url:
+                    raise ValueError("图片内容块字典必须包含 'url' 字段")
+            else:
+                raise ValueError("image_url 字段必须是字符串或字典类型")
 
-        # 验证视频内容
-        if content_type == "video":
-            if content.get("video_url") is None:
-                raise ValueError("视频内容块必须包含 'video_url' 字段")
             return True
 
         raise ValueError(f"不支持的内容类型: {content_type}")
@@ -133,30 +138,6 @@ class ContentProcessor:
                     new_block["image_url"] = base64_data
                     return new_block  # type: ignore
 
-        # 处理音频文件路径
-        if content_type == "audio":
-            audio_url = block.get("audio_url")
-            if isinstance(audio_url, str) and os.path.exists(audio_url):
-                base64_data = ContentProcessor._encode_file_to_base64(
-                    audio_url, "audio"
-                )
-                if base64_data:
-                    new_block: dict = dict(block)
-                    new_block["audio_url"] = base64_data
-                    return new_block  # type: ignore
-
-        # 处理视频文件路径
-        if content_type == "video":
-            video_url = block.get("video_url")
-            if isinstance(video_url, str) and os.path.exists(video_url):
-                base64_data = ContentProcessor._encode_file_to_base64(
-                    video_url, "video"
-                )
-                if base64_data:
-                    new_block: dict = dict(block)
-                    new_block["video_url"] = base64_data
-                    return new_block  # type: ignore
-
         return block
 
     @staticmethod
@@ -166,7 +147,7 @@ class ContentProcessor:
 
         Args:
             file_path: 文件路径
-            file_type: 文件类型 (image/audio/video)
+            file_type: 文件类型 (image)
 
         Returns:
             Union[str, None]: base64编码字符串，失败返回None
@@ -181,9 +162,7 @@ class ContentProcessor:
                 max_size = 50 * 1024 * 1024
 
             if file_size > max_size:
-                PrettyOutput.auto_print(
-                    f"⚠️ 文件 {file_path} 大小超过限制 ({file_size} > {max_size})"
-                )
+                PrettyOutput.auto_print(f"⚠️ 文件过大: {file_path} ({file_size} bytes)")
                 return None
 
             # 读取文件并编码
@@ -196,7 +175,7 @@ class ContentProcessor:
                 return f"data:{mime_type};base64,{base64_data}"
 
         except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 文件编码失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 文件编码失败: {file_path} - {e}")
             return None
 
     @staticmethod
@@ -220,19 +199,7 @@ class ContentProcessor:
                 "png": "image/png",
                 "gif": "image/gif",
                 "webp": "image/webp",
-            },
-            "audio": {
-                "mp3": "audio/mpeg",
-                "wav": "audio/wav",
-                "ogg": "audio/ogg",
-                "m4a": "audio/mp4",
-            },
-            "video": {
-                "mp4": "video/mp4",
-                "avi": "video/x-msvideo",
-                "mov": "video/quicktime",
-                "webm": "video/webm",
-            },
+            }
         }
 
         return mime_map.get(file_type, {}).get(ext, "application/octet-stream")

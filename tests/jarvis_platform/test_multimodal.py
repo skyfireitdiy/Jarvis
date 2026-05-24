@@ -11,8 +11,6 @@ from typing import Dict, List, Tuple, Union
 from jarvis.jarvis_platform.content_types import (
     TextContent,
     ImageURLContent,
-    AudioContent,
-    VideoContent,
     ContentBlock,
 )
 from jarvis.jarvis_platform.content_processor import ContentProcessor
@@ -38,28 +36,6 @@ class TestContentTypes:
         assert content["type"] == "image_url"
         assert content["image_url"] == "https://example.com/image.jpg"
         assert content["detail"] == "high"
-
-    def test_audio_content(self):
-        """测试音频内容类型"""
-        content: AudioContent = {
-            "type": "audio",
-            "audio_url": "https://example.com/audio.mp3",
-            "format": "mp3",
-        }
-        assert content["type"] == "audio"
-        assert content["audio_url"] == "https://example.com/audio.mp3"
-        assert content["format"] == "mp3"
-
-    def test_video_content(self):
-        """测试视频内容类型"""
-        content: VideoContent = {
-            "type": "video",
-            "video_url": "https://example.com/video.mp4",
-            "format": "mp4",
-        }
-        assert content["type"] == "video"
-        assert content["video_url"] == "https://example.com/video.mp4"
-        assert content["format"] == "mp4"
 
 
 class TestContentProcessor:
@@ -228,11 +204,10 @@ class TestMultimodalIntegration:
                 "image_url": "https://example.com/image.jpg",
                 "detail": "high",
             },
-            {"type": "text", "text": "And listen to this audio:"},
+            {"type": "text", "text": "And look at this image again:"},
             {
-                "type": "audio",
-                "audio_url": "https://example.com/audio.mp3",
-                "format": "mp3",
+                "type": "image_url",
+                "image_url": "https://example.com/image2.jpg",
             },
         ]
 
@@ -246,9 +221,9 @@ class TestMultimodalIntegration:
         assert result[1]["type"] == "image_url"
         assert result[1]["image_url"] == "https://example.com/image.jpg"
         assert result[2]["type"] == "text"
-        assert result[2]["text"] == "And listen to this audio:"
-        assert result[3]["type"] == "audio"
-        assert result[3]["audio_url"] == "https://example.com/audio.mp3"
+        assert result[2]["text"] == "And look at this image again:"
+        assert result[3]["type"] == "image_url"
+        assert result[3]["image_url"] == "https://example.com/image2.jpg"
 
     def test_backward_compatibility(self):
         """测试向后兼容性"""
@@ -274,8 +249,6 @@ class TestMultimodalIntegration:
         valid_contents = [
             {"type": "text", "text": "Hello"},
             {"type": "image_url", "image_url": "https://example.com/image.jpg"},
-            {"type": "audio", "audio_url": "https://example.com/audio.mp3"},
-            {"type": "video", "video_url": "https://example.com/video.mp4"},
         ]
 
         for content in valid_contents:
