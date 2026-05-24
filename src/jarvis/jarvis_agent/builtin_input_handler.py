@@ -189,8 +189,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("❌ Image 命令格式错误")
                 continue
 
-            # 提取标签后的参数部分（图片路径）
-            image_path = modified_input[tag_index + len(tag_marker) :].strip()
+            # 提取标签后的参数部分（图片路径），去除单引号包裹
+            image_path = (
+                modified_input[tag_index + len(tag_marker) :].strip().strip("'")
+            )
             if not image_path:
                 PrettyOutput.auto_print("❌ 用法：'<Image>' /path/to/image.png")
                 continue

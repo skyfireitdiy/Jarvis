@@ -6404,7 +6404,7 @@ async function uploadImageToNode(file) {
 
       const result = await response.json()
       if (result.success && result.data?.file_path) {
-        insertTextAtCursor(`<image> ${result.data.file_path}`)
+        insertTextAtCursor(`'<Image>' '${result.data.file_path}' `)
       } else {
         alert('上传失败: ' + (result.error || '未知错误'))
       }
