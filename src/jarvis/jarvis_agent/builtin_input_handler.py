@@ -24,6 +24,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import (
     add_additional_completion_dir,
     get_single_line_input,
+    process_image_command,
 )
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import load_config
@@ -180,6 +181,28 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"⚠️  YAML 序列化失败：{e}")
                 PrettyOutput.auto_print(f"\n降级输出（字符串格式）:\n{config}")
             return "", True
+        elif tag == "Image":
+            # 处理 <Image> 标签，将图片添加到 agent 的消息上下文中
+            tag_marker = "'<Image>'"
+            tag_index = modified_input.find(tag_marker)
+            if tag_index == -1:
+                PrettyOutput.auto_print("❌ Image 命令格式错误")
+                continue
+
+            # 提取标签后的参数部分（图片路径）
+            image_path = modified_input[tag_index + len(tag_marker) :].strip()
+            if not image_path:
+                PrettyOutput.auto_print("❌ 用法：'<Image>' /path/to/image.png")
+                continue
+
+            # 处理图片命令
+            image_content = process_image_command(image_path)
+            if image_content:
+                # 使用 agent 的 add_multimodal_content 方法添加图片到消息上下文
+                agent.add_multimodal_content([image_content])
+            else:
+                PrettyOutput.auto_print(f"❌ 图片处理失败: {image_path}")
+            continue
         elif tag == "SetConfig":
             tag_marker = "'<SetConfig>'"
             tag_index = modified_input.find(tag_marker)
