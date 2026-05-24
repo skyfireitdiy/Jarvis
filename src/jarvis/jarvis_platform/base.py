@@ -685,6 +685,8 @@ class BasePlatform(ABC):
         返回:
             int: 当前对话历史使用的token数量
         """
+        from jarvis.jarvis_utils.embedding import get_multimodal_token_count
+
         history = self.get_messages()
         if not history:
             return 0
@@ -693,7 +695,7 @@ class BasePlatform(ABC):
         for message in history:
             content = message.get("content", "")
             if content:
-                total_tokens += get_context_token_count(content)
+                total_tokens += get_multimodal_token_count(content)
 
         return total_tokens
 
