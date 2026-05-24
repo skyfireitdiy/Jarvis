@@ -25,12 +25,18 @@ def test_config_loading():
         # 获取 mimo_v2_5 平台实例
         registry = PlatformRegistry.get_global_platform_registry()
         platform = registry.create_platform("openai_mimo_v2_5", silent=True)
+        if platform is None:
+            print("❌ 无法加载 openai_mimo_v2_5 平台")
+            return False
         print(f"✅ 成功加载平台: {platform.name()}")
         print(f"   平台类型: {platform.platform_name()}")
         print(f"   支持多模态: {platform.supports_multimodal()}")
         
         # 获取 mimo_v2_pro 平台实例
         platform_pro = registry.create_platform("openai_mimo_v2_pro", silent=True)
+        if platform_pro is None:
+            print("❌ 无法加载 openai_mimo_v2_pro 平台")
+            return False
         print(f"✅ 成功加载平台: {platform_pro.name()}")
         print(f"   平台类型: {platform_pro.platform_name()}")
         print(f"   支持多模态: {platform_pro.supports_multimodal()}")
@@ -73,6 +79,9 @@ def test_multimodal_support():
         # 获取支持多模态的平台
         registry = PlatformRegistry.get_global_platform_registry()
         platform = registry.create_platform("openai_mimo_v2_5", silent=True)
+        if platform is None:
+            print("❌ 无法加载 openai_mimo_v2_5 平台")
+            return False
         
         if not platform.supports_multimodal():
             print("❌ 平台不支持多模态")
@@ -112,6 +121,9 @@ def test_backward_compatibility():
         # 获取不支持多模态的平台
         registry = PlatformRegistry.get_global_platform_registry()
         platform = registry.create_platform("openai_mimo_v2_pro", silent=True)
+        if platform is None:
+            print("❌ 无法加载 openai_mimo_v2_pro 平台")
+            return False
         
         if platform.supports_multimodal():
             print("❌ 平台应该不支持多模态")
