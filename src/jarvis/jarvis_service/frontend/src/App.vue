@@ -6885,6 +6885,7 @@ function disposeExecutionTerminal(termInfo) {
   termInfo.fitAddon = null
   termInfo.terminal = null
   termInfo.hostEl = null
+  termInfo.ended = true
 }
 
 function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
