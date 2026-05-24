@@ -2,11 +2,12 @@
 """CodeAgent 系统提示词模块"""
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Union
 
 import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -118,15 +119,22 @@ def _get_scenario_types() -> Dict[str, str]:
 SCENARIO_TYPES = _get_scenario_types()
 
 
-def classify_user_request(user_input: str) -> str:
+def classify_user_request(user_input: Union[str, List[ContentBlock]]) -> str:
     """使用 normal_llm 对用户需求进行分类
 
     参数:
-        user_input: 用户输入的需求描述
+        user_input: 用户输入的需求描述（支持纯文本或多模态内容）
 
     返回:
         str: 场景类型（performance/bug_fix/warning/refactor/feature/default）
     """
+    # 如果 user_input 是多模态内容，提取其中的文本
+    if isinstance(user_input, list):
+        text_parts = []
+        for block in user_input:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+        user_input = "\n".join(text_parts) if text_parts else "[多模态内容]"
     try:
         # 获取 normal_llm 平台
         platform = PlatformRegistry().get_normal_platform()
