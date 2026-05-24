@@ -4431,6 +4431,8 @@ def create_app(
             result = await _handle_file_stat_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-write":
             result = await _handle_file_write_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/upload":
+            result = await _handle_file_upload(payload)
         elif normalized_path.startswith("/data/"):
             from jarvis.jarvis_web_gateway.data_storage import (
                 save_data,
@@ -4960,7 +4962,9 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": False, "error": "File too large (>20MB)"}
 
         # 生成唯一文件名
-        unique_name = f"{uuid.uuid4().hex[:8]}_{file_name or 'image'}.{ext}"
+        # 如果 file_name 已有扩展名，则移除它，避免重复
+        base_name = os.path.splitext(file_name or 'image')[0] if file_name else 'image'
+        unique_name = f"{uuid.uuid4().hex[:8]}_{base_name}.{ext}"
         file_path = os.path.join(target_dir, unique_name)
 
         # 确保目录存在
@@ -4970,7 +4974,7 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        return {"success": True, "file_path": file_path, "file_size": len(file_bytes)}
+        return {"success": True, "data": {"file_path": file_path, "file_size": len(file_bytes)}}
 
     except Exception as e:
         return {"success": False, "error": str(e)}

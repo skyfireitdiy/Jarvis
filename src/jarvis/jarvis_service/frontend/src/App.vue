@@ -6387,33 +6387,30 @@ async function uploadImageToNode(file) {
   const reader = new FileReader()
   reader.onload = async (e) => {
     const base64Data = e.target.result
-    const messageId = crypto.randomUUID()
-    
-    // 发送上传请求
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      // 创建 Promise 等待响应
-      const uploadPromise = new Promise((resolve) => {
-        pendingFileUploads.set(messageId, resolve)
-      })
-      
-      ws.send(JSON.stringify({
-        type: 'file_upload',
-        message_id: messageId,
-        payload: {
+    const { host, port } = getGatewayAddress()
+    const nodeId = getCurrentAgentNodeId() || 'master'
+    const url = buildNodeHttpUrl(host, port, nodeId, 'upload')
+
+    try {
+      const response = await fetchWithAuth(url, {
+        method: 'POST',
+        body: JSON.stringify({
           agent_id: currentAgentId.value,
           file_name: file.name,
           file_data: base64Data,
           target_dir: '/tmp'
-        }
-      }))
-      
-      // 等待服务器响应
-      const filePath = await uploadPromise
-      if (filePath) {
-        insertTextAtCursor(`<image> ${filePath}`)
+        })
+      })
+
+      const result = await response.json()
+      if (result.success && result.data?.file_path) {
+        insertTextAtCursor(`<image> ${result.data.file_path}`)
+      } else {
+        alert('上传失败: ' + (result.error || '未知错误'))
       }
-    } else {
-      alert('未连接到服务器')
+    } catch (error) {
+      console.error('上传图片失败:', error)
+      alert('上传图片失败: ' + error.message)
     }
   }
   reader.readAsDataURL(file)
