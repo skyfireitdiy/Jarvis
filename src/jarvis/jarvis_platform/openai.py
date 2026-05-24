@@ -328,24 +328,6 @@ class OpenAIModel(BasePlatform):
                         user_message_content.append(
                             {"type": "image_url", "image_url": image_url_data}
                         )
-                    elif block["type"] == "audio":
-                        # OpenAI API 目前可能不直接支持 audio 类型，这里暂时按 text 处理或忽略
-                        # 实际实现可能需要根据 OpenAI 的具体支持情况进行调整
-                        # 暂时将其转换为文本描述
-                        user_message_content.append(
-                            {
-                                "type": "text",
-                                "text": f"[Audio: {block.get('audio_url', 'N/A')}]",
-                            }
-                        )
-                    elif block["type"] == "video":
-                        # OpenAI API 目前可能不直接支持 video 类型，这里暂时按 text 处理或忽略
-                        user_message_content.append(
-                            {
-                                "type": "text",
-                                "text": f"[Video: {block.get('video_url', 'N/A')}]",
-                            }
-                        )
                     else:
                         # 未知类型，忽略或报错
                         pass

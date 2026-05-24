@@ -300,22 +300,6 @@ class ClaudeModel(BasePlatform):
                         elif isinstance(image_url_data, dict):
                             # 如果已经是 dict 格式，假设符合 Claude API 格式
                             user_message_content.append(image_url_data)
-                    elif block["type"] == "audio":
-                        # Claude API 目前不支持 audio 类型，暂时转换为文本描述
-                        user_message_content.append(
-                            {
-                                "type": "text",
-                                "text": f"[Audio: {block.get('audio_url', 'N/A')}]",
-                            }
-                        )
-                    elif block["type"] == "video":
-                        # Claude API 目前不支持 video 类型，暂时转换为文本描述
-                        user_message_content.append(
-                            {
-                                "type": "text",
-                                "text": f"[Video: {block.get('video_url', 'N/A')}]",
-                            }
-                        )
                     else:
                         # 未知类型，忽略或报错
                         pass
