@@ -521,7 +521,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     if rule_content:
                         separator = "\n" + "=" * 50 + "\n"
                         modified_input = modified_input.replace(
-                            f"'<{tag}'", f"<rule>\n{rule_content}\n</rule>{separator}"
+                            f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
                         )
 
     # 设置附加提示词并返回处理后的内容
