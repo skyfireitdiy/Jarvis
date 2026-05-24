@@ -12,9 +12,9 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "src"))
 
-from jarvis.jarvis_platform.registry import get_platform_instance
-from jarvis.jarvis_platform.content_types import TextContent, ImageURLContent, ContentBlock
-from jarvis.jarvis_utils.embedding import get_multimodal_token_count, _estimate_image_tokens
+from jarvis.jarvis_platform.registry import get_platform_instance  # noqa: E402
+from jarvis.jarvis_platform.content_types import TextContent, ImageURLContent, ContentBlock  # noqa: E402
+from jarvis.jarvis_utils.embedding import get_multimodal_token_count, _estimate_image_tokens  # noqa: E402
 
 
 def test_config_loading():
@@ -121,12 +121,12 @@ def test_backward_compatibility():
         print(f"✅ 纯文本消息: '{text_message}'")
         
         # 测试多模态消息应该被拒绝
-        multimodal_message = [
+        _multimodal_message = [
             {"type": "text", "text": "What is in this image?"},
             {"type": "image_url", "image_url": "https://example.com/test.jpg"},
         ]
         
-        print("✅ 多模态消息应该被拒绝（平台不支持）")
+        print(f"✅ 多模态消息应该被拒绝（平台不支持）: {len(_multimodal_message)} 个内容块")
         
         return True
         
