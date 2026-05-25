@@ -1376,6 +1376,55 @@ class Agent:
 
         return response
 
+    def _validate_summary(self, summary: str) -> tuple[bool, list[str]]:
+        """验证总结内容是否包含关键标题
+
+        参数:
+            summary: 生成的总结内容
+
+        返回:
+            tuple[bool, list[str]]: (是否通过验证，缺失的标题列表)
+        """
+        if not summary:
+            return False, ["总结内容为空"]
+
+        # 定义关键标题（基于 SUMMARY_REQUEST_PROMPT 的结构）
+        # 使用宽松的匹配规则，匹配标题的核心关键词
+        key_sections = [
+            ("目标层次结构", ["整体目标", "阶段目标"]),
+            ("任务状态矩阵", ["已完成", "进行中", "待完成"]),
+            ("关键信息导航系统", ["关键信息位置", "关键文件路径"]),
+            (
+                "代码开发专项信息",
+                ["代码变更", "错误与调试", "测试与验证", "技术决策", "未完成工作"],
+            ),
+            ("上下文完整性检查", ["检查清单", "完整性检查"]),
+        ]
+
+        missing_sections = []
+        matched_count = 0
+
+        for section_name, keywords in key_sections:
+            # 检查该章节是否有任何一个关键词出现在总结中
+            section_matched = False
+            for keyword in keywords:
+                if keyword in summary:
+                    section_matched = True
+                    break
+
+            if section_matched:
+                matched_count += 1
+            else:
+                missing_sections.append(section_name)
+
+        # 计算通过率（超过一半即通过）
+        total_sections = len(key_sections)
+        threshold = total_sections / 2
+
+        is_valid = matched_count > threshold
+
+        return is_valid, missing_sections
+
     def generate_summary(self, for_token_limit: bool = False) -> str:
         """生成对话历史摘要
 
@@ -1427,17 +1476,36 @@ class Agent:
                 else:
                     prompt_to_use = DEFAULT_SUMMARY_PROMPT
 
-            summary = self.model.chat_until_success(prompt_to_use)
-            # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
-            if not summary:
-                try:
-                    PrettyOutput.auto_print(
-                        "⚠️ 总结模型返回空响应，已使用空字符串回退。"
-                    )
-                except Exception:
-                    pass
-                summary = ""
-            else:
+            # 生成总结，最多重试 2 次
+            max_retries = 2
+            retry_count = 0
+            summary = ""
+
+            while retry_count <= max_retries:
+                summary = self.model.chat_until_success(prompt_to_use)
+                # 防御：可能返回空响应 (None 或空字符串)，统一为空字符串并告警
+                if not summary:
+                    try:
+                        PrettyOutput.auto_print("⚠️  模型返回空响应")
+                    except Exception:
+                        pass
+                    summary = ""
+                    break  # 空响应不重试
+
+                # 仅在 token 限制触发的总结时进行验证
+                if for_token_limit and retry_count < max_retries:
+                    is_valid, missing_sections = self._validate_summary(summary)
+                    if not is_valid:
+                        retry_count += 1
+                        PrettyOutput.auto_print(
+                            f"⚠️  总结验证失败 (第{retry_count}次重试): 缺失关键标题：{', '.join(missing_sections)}"
+                        )
+                        continue  # 重新生成
+
+                # 验证通过或达到最大重试次数，退出循环
+                break
+
+            if summary:
                 # 使用 Rich Panel 打印总结内容
                 try:
                     import jarvis.jarvis_utils.globals as G
@@ -1446,15 +1514,15 @@ class Agent:
                     PrettyOutput.print_markdown(
                         summary, title=title, border_style="cyan"
                     )
-                except Exception as e:
+                except Exception:
                     # 如果 Rich Panel 打印失败，使用普通方式打印总结
                     try:
                         PrettyOutput.auto_print(f"📋 对话总结:\n{summary}")
                     except Exception:
                         # 如果普通打印也失败，至少打印一个提示
-                        PrettyOutput.auto_print(f"⚠️ 总结已生成但打印失败: {str(e)}")
+                        PrettyOutput.auto_print("⚠️  总结内容打印失败")
                         PrettyOutput.auto_print(
-                            f"📋 总结内容（前500字符）: {summary[:500]}..."
+                            f"📋 总结内容（前 500 字符）: {summary[:500]}..."
                         )
             return summary
         except Exception:
