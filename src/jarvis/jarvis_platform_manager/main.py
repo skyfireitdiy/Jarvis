@@ -176,10 +176,21 @@ def llm_show(
         f"  最大token数: {llm_config.get('max_input_token_count', 'N/A')}"
     )
 
+    # 显示多模态支持状态
+    supports_multimodal = llm_config.get("llm_config", {}).get(
+        "supports_multimodal", False
+    )
+    PrettyOutput.auto_print(
+        f"  多模态支持：{'✅ 是' if supports_multimodal else '❌ 否'}"
+    )
+
     llm_config_dict = llm_config.get("llm_config", {})
     if llm_config_dict:
         PrettyOutput.auto_print("  其他配置:")
         for key, value in llm_config_dict.items():
+            # 跳过已经在上面显示的字段
+            if key == "supports_multimodal":
+                continue
             PrettyOutput.auto_print(f"    {key}: {value}")
 
 
@@ -415,6 +426,12 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             except ValueError:
                 PrettyOutput.auto_print("❌ 请输入有效的正整数")
 
+    # 6.5. 询问用户是否启用多模态支持（批量模式只问一次）
+    supports_multimodal = user_confirm(
+        "是否启用多模态支持（支持图片输入）？",
+        default=False,
+    )
+
     # 7. 为每个选中的模型创建配置
     added_count = 0
     for model in selected_models:
@@ -426,7 +443,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             if not user_confirm(
                 f"配置 '{model_config_name}' 已存在，是否覆盖？", default=True
             ):
-                PrettyOutput.auto_print(f"⏭️ 跳过模型: {model}")
+                PrettyOutput.auto_print(f"⏭  跳过配置：{model_config_name}")
                 continue
 
         # 根据平台类型生成配置字典
@@ -434,19 +451,22 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             llm_config_dict_new = {
                 "openai_api_key": api_key,
                 "openai_api_base": base_url,
+                "supports_multimodal": supports_multimodal,
             }
         elif platform == "claude":
             llm_config_dict_new = {
                 "anthropic_api_key": api_key,
                 "anthropic_base_url": base_url,
+                "supports_multimodal": supports_multimodal,
             }
         else:
             llm_config_dict_new = {
                 f"{platform}_api_key": api_key,
                 f"{platform}_base_url": base_url,
+                "supports_multimodal": supports_multimodal,
             }
 
-        # 创建LLM配置
+        # 创建 LLM 配置
         llm_config_new: Dict[str, Any] = {
             "platform": platform,
             "model": model,
@@ -456,7 +476,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
 
         config["llms"][model_config_name] = llm_config_new
         added_count += 1
-        PrettyOutput.auto_print(f"✅ 已添加配置: {model_config_name} -> {model}")
+        PrettyOutput.auto_print(f"✅ 已添加配置：{model_config_name} -> {model}")
 
     # 7. 保存配置
     if added_count > 0:
@@ -466,7 +486,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             PrettyOutput.auto_print("❌ 保存配置失败")
             raise typer.Exit(code=1)
     else:
-        PrettyOutput.auto_print("ℹ️ 没有添加任何新配置")
+        PrettyOutput.auto_print("ℹ ️  没有添加任何配置")
 
 
 @llm_app.command("add")
@@ -558,20 +578,29 @@ def llm_add() -> None:
         PrettyOutput.auto_print("❌ API密钥不能为空")
         raise typer.Exit(code=1)
 
+    # 询问用户是否启用多模态支持
+    supports_multimodal = user_confirm(
+        "是否启用多模态支持（支持图片输入）？",
+        default=False,
+    )
+
     if platform == "openai":
         llm_config_dict = {
             "openai_api_key": api_key,
             "openai_api_base": base_url,
+            "supports_multimodal": supports_multimodal,
         }
     elif platform == "claude":
         llm_config_dict = {
             "anthropic_api_key": api_key,
             "anthropic_base_url": base_url,
+            "supports_multimodal": supports_multimodal,
         }
     else:
         llm_config_dict = {
             f"{platform}_api_key": api_key,
             f"{platform}_base_url": base_url,
+            "supports_multimodal": supports_multimodal,
         }
 
     llm_config: Dict[str, Any] = {
@@ -698,6 +727,22 @@ def llm_update(
                 llm_config["llm_config"][f"{updated_platform}_base_url"] = base_url
             if api_key:
                 llm_config["llm_config"][f"{updated_platform}_api_key"] = api_key
+
+    # 更新多模态支持设置
+    current_multimodal = llm_config.get("llm_config", {}).get(
+        "supports_multimodal", False
+    )
+    multimodal_input = (
+        get_single_line_input(
+            f"是否启用多模态支持 (当前: {'是' if current_multimodal else '否'}, 输入 y/n 修改，留空不变): "
+        )
+        .strip()
+        .lower()
+    )
+    if multimodal_input in ("y", "yes"):
+        llm_config.setdefault("llm_config", {})["supports_multimodal"] = True
+    elif multimodal_input in ("n", "no"):
+        llm_config.setdefault("llm_config", {})["supports_multimodal"] = False
 
     # 保存配置
     if _save_config(config):
