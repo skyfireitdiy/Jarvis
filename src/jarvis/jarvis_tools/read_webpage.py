@@ -137,21 +137,42 @@ class WebpageTool:
 
     @staticmethod
     def _process_html_for_text_mode(html: str) -> str:
-        """使用BeautifulSoup处理HTML，解包链接标签，只保留文本。
+        """使用BeautifulSoup处理HTML，移除非文本内容，只保留纯文本结构。
 
         Args:
             html: 原始HTML内容
 
         Returns:
-            处理后的HTML，<a>标签被解包，<link>标签被移除
+            处理后的HTML，移除了CSS、JavaScript等非文本内容
         """
         soup = BeautifulSoup(html, "lxml")
+
+        # 移除所有非文本内容标签
+        non_text_tags = ["style", "script", "noscript", "link", "meta", "head"]
+        for tag_name in non_text_tags:
+            for tag in soup.find_all(tag_name):
+                tag.decompose()
+
+        # 移除所有元素的样式相关属性
+        for tag in soup.find_all(True):  # 查找所有标签
+            # 移除style属性（内联CSS）
+            if tag.has_attr("style"):
+                del tag["style"]
+            # 移除class属性（CSS类名）
+            if tag.has_attr("class"):
+                del tag["class"]
+            # 移除id属性（CSS ID选择器）
+            if tag.has_attr("id"):
+                del tag["id"]
+            # 移除data-*属性（数据属性）
+            attrs_to_remove = [attr for attr in tag.attrs if attr.startswith("data-")]
+            for attr in attrs_to_remove:
+                del tag[attr]
+
         # 解包所有 <a> 标签，保留文字内容
         for a_tag in soup.find_all("a"):
             a_tag.unwrap()
-        # 移除 <link> 标签
-        for link_tag in soup.find_all("link"):
-            link_tag.decompose()
+
         return str(soup)
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
