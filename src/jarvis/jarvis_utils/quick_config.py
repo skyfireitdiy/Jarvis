@@ -316,6 +316,12 @@ def quick_config():
 
     model_config_names = {}
 
+    # 询问用户是否启用多模态支持
+    supports_multimodal = user_confirm(
+        "是否启用多模态支持（支持图片输入）？",
+        default=False,
+    )
+
     # 为每个实际使用的模型创建配置
     for model in unique_role_models:
         existing_config_name = None
@@ -336,16 +342,19 @@ def quick_config():
                 existing_model_config["llm_config"] = {
                     "openai_api_key": api_key,
                     "openai_api_base": base_url,
+                    "supports_multimodal": supports_multimodal,
                 }
             elif platform == "claude":
                 existing_model_config["llm_config"] = {
                     "anthropic_api_key": api_key,
                     "anthropic_base_url": base_url,
+                    "supports_multimodal": supports_multimodal,
                 }
             else:
                 existing_model_config["llm_config"] = {
                     f"{platform}_api_key": api_key,
                     f"{platform}_base_url": base_url,
+                    "supports_multimodal": supports_multimodal,
                 }
             PrettyOutput.auto_print(
                 f"✅ 已更新模型配置: {existing_config_name} -> {model}"
@@ -360,16 +369,19 @@ def quick_config():
             llm_config_dict = {
                 "openai_api_key": api_key,
                 "openai_api_base": base_url,
+                "supports_multimodal": supports_multimodal,
             }
         elif platform == "claude":
             llm_config_dict = {
                 "anthropic_api_key": api_key,
                 "anthropic_base_url": base_url,
+                "supports_multimodal": supports_multimodal,
             }
         else:
             llm_config_dict = {
                 f"{platform}_api_key": api_key,
                 f"{platform}_base_url": base_url,
+                "supports_multimodal": supports_multimodal,
             }
 
         llm_config = {
