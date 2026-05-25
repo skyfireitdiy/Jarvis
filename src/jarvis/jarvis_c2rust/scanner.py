@@ -708,6 +708,7 @@ def scan_file(cindex: Any, file_path: Path, args: List[str]) -> List[FunctionInf
 
     # If we have macro information, enhance the call relationships
     if macro_to_calls or func_to_macros:
+        enhanced_count = 0
         # For each function, check if it calls any macros
         for fi in functions:
             if fi.name in func_to_macros:
@@ -718,6 +719,12 @@ def scan_file(cindex: Any, file_path: Path, args: List[str]) -> List[FunctionInf
                         for called_func in macro_to_calls[macro_name]:
                             if called_func not in fi.calls:
                                 fi.calls.append(called_func)
+                                enhanced_count += 1
+        # 输出宏分析结果
+        if enhanced_count > 0:
+            PrettyOutput.auto_print(
+                f"🔍 [c2rust-scanner] 文件 {file_path} 通过 tree-sitter 补全 {enhanced_count} 条宏调用依赖"
+            )
 
     return functions
 
