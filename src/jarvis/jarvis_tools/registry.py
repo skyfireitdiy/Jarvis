@@ -754,6 +754,37 @@ class ToolRegistry(OutputHandlerProtocol):
         return None, len(text)
 
     @staticmethod
+    def _fuzzy_extract_tool_json(content: str) -> List[str]:
+        """宽泛提取：从全文中搜索JSON对象，检查是否包含name和arguments字段
+
+        兼容不按规范输出标签的模型（如GLM输出<TOOL_CALL>前缀而非标准JSON）
+
+        参数:
+            content: 要搜索的文本内容
+
+        返回:
+            List[str]: 提取到的有效工具调用JSON字符串列表
+        """
+        results = []
+        for i, ch in enumerate(content):
+            if ch == "{":
+                json_str, end_pos = ToolRegistry._extract_json_from_text(content, i)
+                if json_str is None:
+                    continue
+                try:
+                    json_str = ToolRegistry._clean_extra_markers(json_str)
+                    parsed = json_loads(json_str)
+                    if (
+                        isinstance(parsed, dict)
+                        and "name" in parsed
+                        and "arguments" in parsed
+                    ):
+                        results.append(json_str)
+                except Exception:
+                    continue
+        return results
+
+    @staticmethod
     def _clean_extra_markers(text: str) -> str:
         """清理文本中的额外标记（如 <|tool_call_end|> 等）
 
@@ -962,25 +993,10 @@ class ToolRegistry(OutputHandlerProtocol):
             # 宽泛提取fallback：直接从全文中搜索JSON对象，检查是否包含name和arguments字段
             # 兼容不按规范输出标签的模型（如GLM输出<TOOL_CALL>前缀而非标准JSON）
             if not data:
-                for i, ch in enumerate(content):
-                    if ch == "{":
-                        json_str, end_pos = ToolRegistry._extract_json_from_text(
-                            content, i
-                        )
-                        if json_str is None:
-                            continue
-                        try:
-                            json_str = ToolRegistry._clean_extra_markers(json_str)
-                            parsed = json_loads(json_str)
-                            if (
-                                isinstance(parsed, dict)
-                                and "name" in parsed
-                                and "arguments" in parsed
-                            ):
-                                data.append(json_str)
-                                auto_completed = True
-                        except Exception:
-                            continue
+                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
+                if fuzzy_results:
+                    data = fuzzy_results
+                    auto_completed = True
 
             # 如果仍然没有数据，尝试使用大模型修复
             if not data:
@@ -1069,7 +1085,24 @@ class ToolRegistry(OutputHandlerProtocol):
                             retry_fixed_content, None
                         )
 
-                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
+                # 如果大模型修复失败或未提供agent或long_hint不为空，尝试宽泛提取
+                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
+                if fuzzy_results:
+                    # 宽泛提取成功，解析提取到的JSON并加入结果
+                    for fuzzy_item in fuzzy_results:
+                        try:
+                            fuzzy_msg = json_loads(fuzzy_item)
+                            if (
+                                isinstance(fuzzy_msg, dict)
+                                and "name" in fuzzy_msg
+                                and "arguments" in fuzzy_msg
+                            ):
+                                ret.append(fuzzy_msg)
+                                auto_completed = True
+                        except Exception:
+                            pass
+                    if ret:
+                        break
                 return (
                     {},
                     error_msg,
@@ -1093,7 +1126,24 @@ class ToolRegistry(OutputHandlerProtocol):
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content_3, None)
 
-                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
+                # 如果大模型修复失败或未提供agent或long_hint不为空，尝试宽泛提取
+                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
+                if fuzzy_results:
+                    # 宽泛提取成功，解析提取到的JSON并加入结果
+                    for fuzzy_item in fuzzy_results:
+                        try:
+                            fuzzy_msg = json_loads(fuzzy_item)
+                            if (
+                                isinstance(fuzzy_msg, dict)
+                                and "name" in fuzzy_msg
+                                and "arguments" in fuzzy_msg
+                            ):
+                                ret.append(fuzzy_msg)
+                                auto_completed = True
+                        except Exception:
+                            pass
+                    if ret:
+                        break
                 return (
                     {},
                     error_msg,
