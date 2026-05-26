@@ -103,7 +103,28 @@ class ToolRegistry(OutputHandlerProtocol):
         has_tool_call = (
             re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", response) is not None
         )
-        return has_tool_call
+        if has_tool_call:
+            return True
+
+        # 宽泛检测：如果文本中包含带 name 和 arguments 字段的JSON对象，也认为可以处理
+        # 兼容不按规范输出标签的模型（如GLM）
+        # 扫描全文中所有 { 位置，尝试提取JSON并验证关键字段
+        for i, ch in enumerate(response):
+            if ch == "{":
+                json_str, _ = ToolRegistry._extract_json_from_text(response, i)
+                if json_str:
+                    try:
+                        parsed = json_loads(json_str)
+                        if (
+                            isinstance(parsed, dict)
+                            and "name" in parsed
+                            and "arguments" in parsed
+                        ):
+                            return True
+                    except Exception:
+                        continue
+
+        return False
 
     def prompt(self) -> str:
         """加载工具"""
@@ -937,6 +958,29 @@ class ToolRegistry(OutputHandlerProtocol):
                         # JSON提取失败：没有找到有效的JSON对象
                         # 不立即返回错误，继续尝试其他方法（如大模型修复）
                         pass
+
+            # 宽泛提取fallback：直接从全文中搜索JSON对象，检查是否包含name和arguments字段
+            # 兼容不按规范输出标签的模型（如GLM输出<TOOL_CALL>前缀而非标准JSON）
+            if not data:
+                for i, ch in enumerate(content):
+                    if ch == "{":
+                        json_str, end_pos = ToolRegistry._extract_json_from_text(
+                            content, i
+                        )
+                        if json_str is None:
+                            continue
+                        try:
+                            json_str = ToolRegistry._clean_extra_markers(json_str)
+                            parsed = json_loads(json_str)
+                            if (
+                                isinstance(parsed, dict)
+                                and "name" in parsed
+                                and "arguments" in parsed
+                            ):
+                                data.append(json_str)
+                                auto_completed = True
+                        except Exception:
+                            continue
 
             # 如果仍然没有数据，尝试使用大模型修复
             if not data:
