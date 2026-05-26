@@ -417,6 +417,12 @@ class CodeAgent(Agent):
                         user_input, self
                     )
                     if is_handled:
+                        # 如果有返回的提示信息，追加到 addon_prompt
+                        if processed_input:
+                            current_addon = self.session.addon_prompt or ""
+                            self.set_addon_prompt(
+                                f"{current_addon}\n{processed_input}".strip()
+                            )
                         # 内置命令已处理完成，继续等待用户输入
                         user_input = get_multiline_input(
                             "请输入你的需求（Ctrl+C 退出）"
