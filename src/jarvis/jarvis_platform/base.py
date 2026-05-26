@@ -103,12 +103,12 @@ class BasePlatform(ABC):
             self.delete_chat()
 
     @abstractmethod
-    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+    def set_messages(self, messages: List[Dict[str, Any]]) -> None:
         """设置对话历史"""
         raise NotImplementedError("set_messages is not implemented")
 
     @abstractmethod
-    def get_messages(self) -> List[Dict[str, str]]:
+    def get_messages(self) -> List[Dict[str, Any]]:
         """获取对话历史"""
         raise NotImplementedError("get_messages is not implemented")
 
