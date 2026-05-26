@@ -63,6 +63,9 @@ def create_agent(
     _use_analysis = False if quick_mode else use_analysis
     _rule_names = None if quick_mode else rule_names
 
+    # 自动去重：从 kwargs 中弹出 enable_auto_rule_select（如果存在），避免重复传递
+    _enable_auto_rule_select = kwargs.pop("enable_auto_rule_select", False)
+
     return Agent(  # type: ignore[return-value]
         system_prompt=system_prompt,
         name=name,
@@ -71,7 +74,7 @@ def create_agent(
         use_analysis=_use_analysis,
         need_summary=need_summary,
         rule_names=_rule_names,
-        enable_auto_rule_select=False,
+        enable_auto_rule_select=_enable_auto_rule_select,
         model_type=model_type,
         **kwargs,
     )
@@ -132,6 +135,9 @@ def create_code_agent(
     _use_analysis = False if quick_mode else use_analysis
     _rule_names = None if quick_mode else rule_names
 
+    # 自动去重：从 kwargs 中弹出 enable_auto_rule_select（如果存在），避免重复传递
+    _enable_auto_rule_select = kwargs.pop("enable_auto_rule_select", False)
+
     return CodeAgent(  # type: ignore[return-value]
         name=name,
         non_interactive=non_interactive,
@@ -145,6 +151,6 @@ def create_code_agent(
         force_save_memory=force_save_memory,
         tool_group=tool_group,
         rule_names=_rule_names,
-        enable_auto_rule_select=False,
+        enable_auto_rule_select=_enable_auto_rule_select,
         **kwargs,
     )
