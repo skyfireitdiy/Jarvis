@@ -445,7 +445,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 else:
                     PrettyOutput.auto_print("❌ 保存会话失败。")
 
-            return "", True
+            # 返回提示信息，将追加到 addon_prompt
+            return (
+                "\n\n**🔖 代码已提交**：之前的任务目标已完成，代码已成功提交。\n\n**⚠️ 重要提示**：\n- 之前的目标已经完成，不用再关注\n- 代码走查时不用走查之前的修改\n- 请根据用户的新需求开始新的任务目标\n",
+                True,
+            )
 
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
