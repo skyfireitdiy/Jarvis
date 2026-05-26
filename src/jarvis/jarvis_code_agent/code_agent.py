@@ -1060,9 +1060,107 @@ git reset --hard {start_commit}
             PrettyOutput.auto_print(f"⚠️ 生成修复总结失败: {e}")
             return ""
 
+    def _generate_review_target(self, max_retries: int = 3) -> str:
+        """生成代码审查的目标和验收准则
+
+        通过创建新的模型实例，基于历史对话消息，
+        总结出本次代码审查应关注的任务目标和验收准则。
+
+        参数:
+            max_retries: 最大重试次数（关键字校验失败时重试）
+
+        返回:
+            str: 总结后的审查目标文本（模型完整输出），
+                 如果所有重试都失败，回退到用户原始需求
+        """
+        from jarvis.jarvis_platform.registry import PlatformRegistry
+
+        # 确保模型实例存在
+        if self.model is None:
+            PrettyOutput.auto_print("⚠ 模型实例不存在，无法生成审查目标")
+            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
+
+        # 获取当前模型的历史消息
+        messages = self.model.get_messages()
+        if not messages:
+            PrettyOutput.auto_print("⚠ 无历史消息，无法生成审查目标")
+            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
+
+        # 创建新的模型实例（同类型模型）
+        try:
+            new_model = PlatformRegistry().get_smart_platform()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠ 创建模型实例失败: {e}")
+            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
+
+        # 设置历史消息到新模型
+        new_model.set_messages(messages)
+
+        # 构建总结prompt
+        prompt = """请根据以上对话历史，总结本次代码审查应关注的任务目标和验收准则。
+
+请确保输出包含以下三个关键部分（必须包含这些关键字）：
+1. 任务目标 - 说明本次代码修改应该完成什么
+2. 验收准则 - 具体的、可验证的准则，用于判断代码修改是否正确完成
+3. 关变更点 - 本次修改涉及的关键变更点
+
+请直接输出总结内容，不需要输出JSON格式。"""
+
+        # 必须包含的关键字
+        required_keywords = ["任务目标", "验收准则", "关键变更点"]
+
+        for retry in range(max_retries):
+            try:
+                if retry == 0:
+                    PrettyOutput.auto_print("🎯 正在生成代码审查目标...")
+                else:
+                    PrettyOutput.auto_print(
+                        f"🔧 第 {retry + 1}/{max_retries} 次重试生成审查目标..."
+                    )
+
+                response = new_model.chat_until_success(prompt)
+                if not response:
+                    continue
+
+                response_str = str(response)
+
+                # 校验关键字完整性
+                missing_keywords = [
+                    kw for kw in required_keywords if kw not in response_str
+                ]
+                if missing_keywords:
+                    PrettyOutput.auto_print(
+                        f"⚠ 审查目标缺少关键字: {', '.join(missing_keywords)}"
+                    )
+                    prompt += f"\n\n注意：上次输出缺少以下关键字: {', '.join(missing_keywords)}，请确保所有关键字都出现。"
+                    continue
+
+                # 直接返回模型完整输出，不解析不重组
+                PrettyOutput.auto_print("✅ 审查目标生成成功")
+                return response_str
+
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠ 生成审查目标时出错: {e}")
+                continue
+
+        # 所有重试都失败，回退到用户原始需求
+        # 从历史消息中提取用户原始输入作为回退
+        user_input = ""
+        for msg in messages:
+            if msg.get("role") == "user" and msg.get("content"):
+                user_input = msg["content"]
+                break
+
+        if user_input:
+            PrettyOutput.auto_print("⚠ 所有重试失败，回退到用户原始需求")
+            return f"任务目标: {user_input}\n验收准则: 代码修改应正确完成用户需求"
+        else:
+            PrettyOutput.auto_print("⚠ 所有重试失败，使用默认审查目标")
+            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
+
     def _build_review_prompts(
         self,
-        user_input: str,
+        review_target: str,
         git_diff: str,
         modification_history: Optional[str] = None,
         start_commit: Optional[str] = None,
@@ -1070,7 +1168,7 @@ git reset --hard {start_commit}
         """构建 review Agent 的 prompts
 
         参数:
-            user_input: 用户原始需求
+            review_target: 审查目标（包含任务目标、验收准则和关键变更点）
             git_diff: 代码修改的 git diff（会自动进行 token 限制处理）
 
         返回:
@@ -1096,8 +1194,8 @@ git reset --hard {start_commit}
         commit_info = f"【起始 Commit】\n{start_commit}\n\n" if start_commit else ""
         user_prompt = f"""请审查以下代码修改是否正确完成了用户需求。
 
-【用户需求】
-{user_input}
+【任务目标与验收准则】
+{review_target}
 
 {commit_info}【完整的修改历史】
 {modification_history if modification_history else "无修改历史（如为空，说明主 Agent 未生成总结或未进行修复）"}
@@ -1357,9 +1455,15 @@ git reset --hard {start_commit}
             if truncated_git_diff != git_diff:
                 PrettyOutput.auto_print("⚠️ Git diff 内容过大，已截断以适应 token 限制")
 
+            # 生成审查目标（基于历史对话消息的总结）
+            review_target = self._generate_review_target()
+
             # 构建 review prompts
             sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
-                user_input, truncated_git_diff, modification_history, self.start_commit
+                review_target,
+                truncated_git_diff,
+                modification_history,
+                self.start_commit,
             )
 
             review_agent = Agent(
