@@ -112,10 +112,10 @@ class ClaudeModel(BasePlatform):
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
         # 消息历史
-        self.messages: List[Dict[str, str]] = []
+        self.messages: List[Dict[str, Any]] = []
         self.system_message = ""
 
-    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+    def set_messages(self, messages: List[Dict[str, Any]]) -> None:
         """替换对话历史
 
         参数:
@@ -130,7 +130,17 @@ class ClaudeModel(BasePlatform):
         # 如果消息列表包含系统消息，更新 system_message 属性
         for msg in messages:
             if msg.get("role") == "system":
-                self.system_message = msg.get("content", "")
+                content = msg.get("content", "")
+                # 多模态消息的 content 可能是 list，提取文本部分
+                if isinstance(content, list):
+                    text_parts = [
+                        block.get("text", "")
+                        for block in content
+                        if isinstance(block, dict) and block.get("type") == "text"
+                    ]
+                    self.system_message = " ".join(text_parts)
+                else:
+                    self.system_message = content
                 break
 
         # 计算 conversation_turn：统计非 system 消息中的 user 消息数量
@@ -139,11 +149,11 @@ class ClaudeModel(BasePlatform):
             1 for msg in non_system_messages if msg.get("role") == "user"
         )
 
-    def get_messages(self) -> List[Dict[str, str]]:
+    def get_messages(self) -> List[Dict[str, Any]]:
         """获取对话历史
 
         返回:
-            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
+            List[Dict[str, Any]]: 对话历史列表，每个元素包含 role 和 content
         """
         return self.messages
 
