@@ -571,10 +571,19 @@ task_list_manager(
                 parsed: Dict[str, Any] = json.loads(result)
                 return parsed
             except json.JSONDecodeError:
-                pass
-        # 默认返回
+                # 尝试从文本中提取JSON对象（处理markdown代码块包裹等情况）
+                from jarvis.jarvis_utils.utils import extract_json_from_text
+
+                json_str, _ = extract_json_from_text(result)
+                if json_str:
+                    try:
+                        parsed = json.loads(json_str)
+                        return parsed
+                    except json.JSONDecodeError:
+                        pass
+        # 默认返回（解析失败视为未对齐，触发优化）
         return {
-            "is_aligned": True,
+            "is_aligned": False,
             "summary": "验证完成（无法解析详细结果）",
             "report_path": str(report_file),
         }
