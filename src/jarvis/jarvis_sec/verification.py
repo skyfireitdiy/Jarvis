@@ -359,11 +359,11 @@ def process_verification_batch(
         if batch_gids_all_sorted:
             gids_str = str(batch_gids_all_sorted)
             PrettyOutput.auto_print(
-                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' gids={gids_str}"
+                f"[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' gids={gids_str}"
             )
         else:
             PrettyOutput.auto_print(
-                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)"
+                f"[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)"
             )
     except Exception:
         pass

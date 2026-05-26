@@ -159,7 +159,7 @@ class AgentRunLoop:
                 return f"[用户中断] 补充信息：{user_input.strip()}"
         except (KeyboardInterrupt, EOFError):
             # 用户再次中断，询问是否要完全退出
-            PrettyOutput.auto_print("\n🔄 再次检测到中断，请选择操作：")
+            PrettyOutput.auto_print("🔄 再次检测到中断，请选择操作：")
             PrettyOutput.auto_print("  1. 跳过补充信息，继续执行")
             PrettyOutput.auto_print("  2. 完全退出程序")
             try:

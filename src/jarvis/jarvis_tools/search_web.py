@@ -121,10 +121,10 @@ class SearchWebTool:
                 return self._search_with_playwright(query=query, agent=agent, site=site)
 
             # 先打印搜索结果
-            PrettyOutput.auto_print("\n🔍 网络搜索结果")
+            PrettyOutput.auto_print("🔍 网络搜索结果")
             PrettyOutput.auto_print(f"📝 查询关键词: {query}")
             PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
-            PrettyOutput.auto_print("\n📄 搜索摘要:")
+            PrettyOutput.auto_print("📄 搜索摘要:")
 
             # 收集搜索结果并格式化输出
             results_text = ""
@@ -257,12 +257,12 @@ class SearchWebTool:
                 }
 
             # 格式化输出（与 ddgr 保持一致）
-            PrettyOutput.auto_print("\n🔍 网络搜索结果（降级方案: Playwright + Bing）")
+            PrettyOutput.auto_print("🔍 网络搜索结果（降级方案: Playwright + Bing）")
             PrettyOutput.auto_print(f"📝 查询关键词: {query}")
             if site:
                 PrettyOutput.auto_print(f"🌐 站点过滤: {site}")
             PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
-            PrettyOutput.auto_print("\n📄 搜索摘要:")
+            PrettyOutput.auto_print("📄 搜索摘要:")
 
             results_text = ""
             visited_urls = []

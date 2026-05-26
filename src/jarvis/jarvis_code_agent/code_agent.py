@@ -1436,20 +1436,20 @@ git reset --hard {start_commit}
             # 每轮审查开始前显示清晰的提示信息
             if is_infinite:
                 PrettyOutput.auto_print(
-                    f"\n🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
+                    f"🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
                 )
             else:
                 PrettyOutput.auto_print(
-                    f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
+                    f"🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
                 )
 
             if is_infinite:
                 PrettyOutput.auto_print(
-                    f"\n🔍 开始第 {iteration} 轮代码审查...（无限模式）"
+                    f"🔍 开始第 {iteration} 轮代码审查...（无限模式）"
                 )
             else:
                 PrettyOutput.auto_print(
-                    f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
+                    f"🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
                 )
 
             # 对 git diff 进行 token 限制处理（review 需要更多上下文，使用 40% 的 token 比例）
@@ -1499,7 +1499,7 @@ git reset --hard {start_commit}
             # 检查是否需要重新review（JSON格式错误3次修复失败）
             if result.get("need_re_review", False):
                 PrettyOutput.auto_print(
-                    f"\n🔄 JSON格式修复失败，重新进行代码审查（第 {iteration} 轮）"
+                    f"🔄 JSON格式修复失败，重新进行代码审查（第 {iteration} 轮）"
                 )
                 # 跳过当前迭代，重新开始review流程
                 continue
@@ -1524,7 +1524,7 @@ git reset --hard {start_commit}
             # 只有在非无限模式下才检查是否达到最大迭代次数
             if not is_infinite and iteration >= max_iterations:
                 PrettyOutput.auto_print(
-                    f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查"
+                    f"⚠️ 已达到最大审查次数 ({max_iterations})，停止审查"
                 )
                 # 达到最大迭代次数，直接返回
                 return

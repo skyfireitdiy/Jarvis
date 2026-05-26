@@ -805,7 +805,7 @@ def _check_jarvis_updates() -> bool:
         # 检查是否有待处理的大版本更新
         pending_version = _has_major_update_pending()
         if pending_version:
-            PrettyOutput.auto_print(f"\n🎉 检测到等待的主版本升级: {pending_version}")
+            PrettyOutput.auto_print(f"🎉 检测到等待的主版本升级: {pending_version}")
 
             PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
             # 清除标记，执行实际更新
@@ -1035,16 +1035,14 @@ def init_env(
             # 检查是否有等待重启的更新标记（小版本更新已完成）
             if _has_update_reboot_flag():
                 PrettyOutput.auto_print(
-                    "\n✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
+                    "✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
                 )
                 _clear_update_reboot_flag()
                 should_restart = True
             # 检查是否有待处理的大版本更新
             pending_version = _has_major_update_pending()
             if pending_version:
-                PrettyOutput.auto_print(
-                    f"\n🎉 检测到等待的主版本升级: {pending_version}"
-                )
+                PrettyOutput.auto_print(f"🎉 检测到等待的主版本升级: {pending_version}")
                 from jarvis.jarvis_utils.input import user_confirm
 
                 PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
@@ -1067,16 +1065,14 @@ def init_env(
             # 检查是否有等待重启的更新标记（小版本更新已完成）
             if _has_update_reboot_flag():
                 PrettyOutput.auto_print(
-                    "\n✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
+                    "✅ 检测到Jarvis已完成更新，正在重启以应用新版本..."
                 )
                 _clear_update_reboot_flag()
                 should_restart = True
             # 检查是否有待处理的大版本更新
             pending_version = _has_major_update_pending()
             if pending_version:
-                PrettyOutput.auto_print(
-                    f"\n🎉 检测到等待的主版本升级: {pending_version}"
-                )
+                PrettyOutput.auto_print(f"🎉 检测到等待的主版本升级: {pending_version}")
                 PrettyOutput.auto_print("ℹ️ 正在执行主版本升级...")
                 # 清除标记，执行实际更新
                 _clear_major_update_flag()
