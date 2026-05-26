@@ -279,7 +279,7 @@ class MemoryOrganizer:
             if 2 in overlap_groups:
                 groups = overlap_groups[2]
                 PrettyOutput.auto_print(
-                    f"\nℹ️ 发现 {len(groups)} 个具有 2 个重叠标签的记忆组"
+                    f"ℹ️ 发现 {len(groups)} 个具有 2 个重叠标签的记忆组"
                 )
 
                 for group in groups:

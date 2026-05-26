@@ -304,7 +304,7 @@ class SessionManager:
         if not matching_sessions:
             return None
 
-        PrettyOutput.auto_print("\n🔍 检测到与当前commit一致的历史会话：")
+        PrettyOutput.auto_print("🔍 检测到与当前commit一致的历史会话：")
         for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
             matching_sessions, 1
         ):
@@ -343,7 +343,7 @@ class SessionManager:
                 return matching_sessions[choice_idx][0]
 
         except (EOFError, KeyboardInterrupt):
-            PrettyOutput.auto_print("\n⚠️  已取消会话恢复。")
+            PrettyOutput.auto_print("⚠️  已取消会话恢复。")
             return None
 
     def save_session(self) -> bool:

@@ -327,7 +327,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
 
     # 4. 选择要添加的模型
     if len(models) > 1:
-        PrettyOutput.auto_print("\n[bold]可用模型列表:[/]")
+        PrettyOutput.auto_print("[bold]可用模型列表:[/]")
         for i, model in enumerate(models, 1):
             PrettyOutput.auto_print(f"  {i}. {model}")
         manual_input_option = len(models) + 1
@@ -481,7 +481,7 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     # 7. 保存配置
     if added_count > 0:
         if _save_config(config):
-            PrettyOutput.auto_print(f"\n✅ 成功添加 {added_count} 个模型配置")
+            PrettyOutput.auto_print(f"✅ 成功添加 {added_count} 个模型配置")
         else:
             PrettyOutput.auto_print("❌ 保存配置失败")
             raise typer.Exit(code=1)
@@ -511,7 +511,7 @@ def llm_add() -> None:
 
     if use_batch_mode:
         # 让用户选择基础配置
-        PrettyOutput.auto_print("\n📋 可用的LLM配置:")
+        PrettyOutput.auto_print("📋 可用的LLM配置:")
         for i, llm_name in enumerate(existing_llms, 1):
             llm_info = config["llms"].get(llm_name, {})
             platform = llm_info.get("platform", "未知")

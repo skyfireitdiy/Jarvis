@@ -647,9 +647,7 @@ def analyze_from_json(
                 )
 
                 # 询问用户是否重试
-                PrettyOutput.auto_print(
-                    "\n🤔 [jarvis-sec] 格式转换失败，是否继续重试？"
-                )
+                PrettyOutput.auto_print("🤔 [jarvis-sec] 格式转换失败，是否继续重试？")
                 user_input = get_single_line_input(
                     "请输入 'y' 继续重试，或其他键取消: "
                 )

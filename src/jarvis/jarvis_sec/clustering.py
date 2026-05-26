@@ -1406,7 +1406,7 @@ def execute_clustering_for_files(
         )
     for _file_idx, (_file, _items) in enumerate(file_groups.items(), start=1):
         PrettyOutput.auto_print(
-            f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}",
+            f"[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}",
         )
         # 更新当前文件进度
         status_mgr.update_clustering(

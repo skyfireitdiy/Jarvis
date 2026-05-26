@@ -167,7 +167,7 @@ class Optimizer:
             下一个步骤编号，如果失败则返回 None
         """
         PrettyOutput.auto_print(
-            f"\n🔧 [c2rust-optimizer] 第 {step_num} 步：{step_display_name}",
+            f"🔧 [c2rust-optimizer] 第 {step_num} 步：{step_display_name}",
         )
         self.progress_manager.snapshot_commit()
         if not self.options.dry_run:
