@@ -1954,3 +1954,64 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
             last_check_file.write_text(str(time.time()))
         except IOError as e:
             PrettyOutput.auto_print(f"⚠️ 无法写入git更新检查时间戳: {e}")
+
+
+def extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str], int]:
+    """从文本中提取完整的JSON对象（通过括号匹配）
+
+    参数:
+        text: 要提取的文本
+        start_pos: 开始搜索的位置
+
+    返回:
+        Tuple[Optional[str], int]:
+            - 第一个元素是提取的JSON字符串（如果找到），否则为None
+            - 第二个元素是JSON结束后的位置
+    """
+    # 跳过空白字符
+    pos = start_pos
+    while pos < len(text) and text[pos] in (" ", "\t", "\n", "\r"):
+        pos += 1
+
+    if pos >= len(text):
+        return None, pos
+
+    # 检查是否以 { 开头
+    if text[pos] != "{":
+        return None, pos
+
+    # 使用括号匹配找到完整的JSON对象
+    brace_count = 0
+    in_string = False
+    escape_next = False
+    string_char = None
+
+    json_start = pos
+    for i in range(pos, len(text)):
+        char = text[i]
+
+        if escape_next:
+            escape_next = False
+            continue
+
+        if char == "\\":
+            escape_next = True
+            continue
+
+        if not in_string:
+            if char in ('"', "'"):
+                in_string = True
+                string_char = char
+            elif char == "{":
+                brace_count += 1
+            elif char == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    # 找到完整的JSON对象
+                    return text[json_start : i + 1], i + 1
+        else:
+            if char == string_char:
+                in_string = False
+                string_char = None
+
+    return None, len(text)

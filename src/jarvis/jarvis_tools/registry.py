@@ -34,6 +34,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import daily_check_git_updates
+from jarvis.jarvis_utils.utils import extract_json_from_text
 from jarvis.jarvis_utils.utils import is_context_overflow
 
 
@@ -111,7 +112,7 @@ class ToolRegistry(OutputHandlerProtocol):
         # 扫描全文中所有 { 位置，尝试提取JSON并验证关键字段
         for i, ch in enumerate(response):
             if ch == "{":
-                json_str, _ = ToolRegistry._extract_json_from_text(response, i)
+                json_str, _ = extract_json_from_text(response, i)
                 if json_str:
                     try:
                         parsed = json_loads(json_str)
@@ -768,7 +769,7 @@ class ToolRegistry(OutputHandlerProtocol):
         results = []
         for i, ch in enumerate(content):
             if ch == "{":
-                json_str, end_pos = ToolRegistry._extract_json_from_text(content, i)
+                json_str, end_pos = extract_json_from_text(content, i)
                 if json_str is None:
                     continue
                 try:
@@ -957,9 +958,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 if open_tag_match:
                     # 从开始标签后提取JSON
                     start_pos = open_tag_match.end()
-                    json_str, end_pos = ToolRegistry._extract_json_from_text(
-                        content, start_pos
-                    )
+                    json_str, end_pos = extract_json_from_text(content, start_pos)
 
                     if json_str:
                         # 清理JSON字符串中的额外标记
