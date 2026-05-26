@@ -1134,7 +1134,8 @@ git reset --hard {start_commit}
                     PrettyOutput.auto_print(
                         f"⚠ 审查目标缺少关键字: {', '.join(missing_keywords)}"
                     )
-                    prompt += f"\n\n注意：上次输出缺少以下关键字: {', '.join(missing_keywords)}，请确保所有关键字都出现。"
+                    # 将模型上次的输出反馈给模型，让它基于上次输出继续补充
+                    prompt += f"\n\n你上次的输出如下：\n```\n{response_str}\n```\n\n注意：上次输出缺少以下关键字: {', '.join(missing_keywords)}，请基于上次输出补充完整，确保所有关键字都出现。"
                     continue
 
                 # 直接返回模型完整输出，不解析不重组
