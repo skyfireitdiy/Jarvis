@@ -165,7 +165,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "PrintConfig":
             config = get_global_config_data()
-            PrettyOutput.auto_print("\n=== 全局配置 (YAML 格式) ===")
+            PrettyOutput.auto_print("=== 全局配置 (YAML 格式) ===")
             try:
                 # 转换为普通字典以便 YAML 序列化
                 config_dict = dict(config)
@@ -178,7 +178,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(yaml_output)
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️  YAML 序列化失败：{e}")
-                PrettyOutput.auto_print(f"\n降级输出（字符串格式）:\n{config}")
+                PrettyOutput.auto_print(f"降级输出（字符串格式）:\n{config}")
             return "", True
 
         elif tag == "SetConfig":

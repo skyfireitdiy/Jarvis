@@ -667,7 +667,7 @@ class ClippyOptimizer:
 
         # 有告警，需要修复
         PrettyOutput.auto_print(
-            "\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）",
+            "[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）",
         )
         self.progress_manager.snapshot_commit()
 

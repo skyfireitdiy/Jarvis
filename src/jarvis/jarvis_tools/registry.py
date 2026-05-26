@@ -1550,7 +1550,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
         for idx, (tool_key, tool_call) in enumerate(tool_calls.items(), 1):
             name = tool_call.get("name", tool_key)
-            PrettyOutput.auto_print(f"\n[{idx}/{total_count}] 执行工具: {name}")
+            PrettyOutput.auto_print(f"[{idx}/{total_count}] 执行工具: {name}")
 
             try:
                 result = self.handle_tool_calls(tool_call, agent)
@@ -1568,6 +1568,6 @@ class ToolRegistry(OutputHandlerProtocol):
         separator = "\n\n" + "=" * 80 + "\n\n"
         combined_result = separator.join(results)
 
-        PrettyOutput.auto_print(f"\n✅ 完成 {total_count} 个工具调用")
+        PrettyOutput.auto_print(f"✅ 完成 {total_count} 个工具调用")
 
         return combined_result

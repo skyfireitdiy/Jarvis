@@ -736,7 +736,7 @@ WantedBy=default.target
 
         if not linger_enabled:
             PrettyOutput.auto_print(
-                "\n🔧 正在启用 linger 模式（使服务在用户注销后继续运行）..."
+                "🔧 正在启用 linger 模式（使服务在用户注销后继续运行）..."
             )
             enable_result = subprocess.run(
                 ["loginctl", "enable-linger", username],
@@ -762,7 +762,7 @@ WantedBy=default.target
         PrettyOutput.auto_print(f"⚠️  检查/启用 linger 时出错: {e}")
         PrettyOutput.auto_print("💡 服务可能需要在用户登录时运行，或手动启用 linger")
 
-    PrettyOutput.auto_print("\n📋 服务管理命令:")
+    PrettyOutput.auto_print("📋 服务管理命令:")
     PrettyOutput.auto_print("  systemctl --user daemon-reload")
     PrettyOutput.auto_print("  systemctl --user enable jarvis-service.service")
     PrettyOutput.auto_print("  systemctl --user start jarvis-service.service")

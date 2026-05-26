@@ -71,14 +71,14 @@ def _install_missing_tools(results: list) -> None:
 
     # 询问用户是否自动安装
     PrettyOutput.auto_print(
-        f"\n⚠️  检测到 {len(missing_tools)} 个工具未安装: {tool_names_str}"
+        f"⚠️  检测到 {len(missing_tools)} 个工具未安装: {tool_names_str}"
     )
     if not confirm("是否需要自动安装这些工具？", default=True):
         PrettyOutput.auto_print("ℹ️  跳过自动安装")
         return
 
     # 批量安装工具
-    PrettyOutput.auto_print("\n🚀 开始自动安装工具...")
+    PrettyOutput.auto_print("🚀 开始自动安装工具...")
 
     # 构建包含完整工具配置的描述
 
@@ -117,7 +117,7 @@ def _install_missing_tools(results: list) -> None:
         # 其他异常
         PrettyOutput.auto_print(f"❌ 批量安装时出错: {e}")
 
-    PrettyOutput.auto_print("\n🔍 正在重新检查工具安装状态...")
+    PrettyOutput.auto_print("🔍 正在重新检查工具安装状态...")
 
 
 def _print_results(results: list, summary: dict) -> None:
@@ -151,10 +151,10 @@ def _print_results(results: list, summary: dict) -> None:
     # 总结
     if missing > 0:
         PrettyOutput.auto_print(
-            f"\n⚠️  发现 {missing} 个工具未安装，建议安装以获得更好的用户体验"
+            f"⚠️  发现 {missing} 个工具未安装，建议安装以获得更好的用户体验"
         )
     else:
-        PrettyOutput.auto_print("\n✨ 所有工具都已安装！")
+        PrettyOutput.auto_print("✨ 所有工具都已安装！")
 
 
 def _perform_check(
