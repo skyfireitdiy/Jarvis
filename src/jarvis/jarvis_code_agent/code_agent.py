@@ -1095,6 +1095,8 @@ git reset --hard {start_commit}
 
         # 设置历史消息到新模型
         new_model.set_messages(messages)
+        # 关闭输出抑制，允许模型输出显示
+        new_model.set_suppress_output(False)
 
         # 构建总结prompt
         prompt = """请根据以上对话历史，总结本次代码审查应关注的任务目标和验收准则。
@@ -1104,7 +1106,7 @@ git reset --hard {start_commit}
 2. 验收准则 - 具体的、可验证的准则，用于判断代码修改是否正确完成
 3. 关变更点 - 本次修改涉及的关键变更点
 
-请直接输出总结内容，不需要输出JSON格式。"""
+请不要抑制模型的输出，尽可能详细和完整地总结。不需要输出JSON格式。"""
 
         # 必须包含的关键字
         required_keywords = ["任务目标", "验收准则", "关键变更点"]
@@ -1137,6 +1139,7 @@ git reset --hard {start_commit}
 
                 # 直接返回模型完整输出，不解析不重组
                 PrettyOutput.auto_print("✅ 审查目标生成成功")
+                PrettyOutput.print_markdown(response_str, title="📋 代码审查目标")
                 return response_str
 
             except Exception as e:
