@@ -728,6 +728,8 @@ import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
 import './diff.css'
 import plantumlEncoder from 'plantuml-encoder'
+import mermaid from 'mermaid'
+import { graphviz } from 'd3-graphviz'
 import historyStorage from './historyStorage.js'
 import ConnectModal from './components/ConnectModal.vue'
 import BufferPanel from './components/BufferPanel.vue'
@@ -745,6 +747,21 @@ import RenameAgentModal from './components/RenameAgentModal.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
+const MERMAID_BLOCK_LANGUAGE = 'mermaid'
+const DOT_BLOCK_LANGUAGES = ['dot', 'graphviz']
+
+// Mermaid 渲染计数器，用于生成唯一 ID
+let mermaidRenderCounter = 0
+// Dot 渲染计数器，用于生成唯一 ID
+let dotRenderCounter = 0
+
+// 初始化 Mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'loose',
+  fontFamily: 'inherit'
+})
 
 function encodePlantUmlText(plantUmlSource) {
   return plantumlEncoder.encode(String(plantUmlSource || '').trim())
@@ -801,12 +818,137 @@ function renderPlantUmlBlock(plantUmlSource) {
   }
 }
 
+function isDotLanguage(language) {
+  return DOT_BLOCK_LANGUAGES.includes(String(language || '').trim().toLowerCase())
+}
+
+function isMermaidLanguage(language) {
+  return String(language || '').trim().toLowerCase() === MERMAID_BLOCK_LANGUAGE
+}
+
+/**
+ * 渲染 dot/Graphviz 代码块
+ * 使用 d3-graphviz 在浏览器端渲染
+ */
+function renderDotBlock(dotSource) {
+  const trimmedSource = String(dotSource || '').trim()
+  if (!trimmedSource) {
+    return '<pre><code class="language-dot"></code></pre>'
+  }
+
+  const id = `dot-diagram-${++dotRenderCounter}`
+  const escapedSource = escapeHtml(trimmedSource)
+
+  // 返回占位 HTML，后续由 renderDotDiagrams 函数在 DOM 插入后异步渲染
+  return [
+    '<div class="diagram-block">',
+    '  <div class="diagram-notice">',
+    '    Graphviz 图形（浏览器端渲染）。',
+    '  </div>',
+    `  <div class="dot-container" data-dot-id="${id}" data-dot-source="${encodeURIComponent(trimmedSource)}">`,
+    '    <div class="dot-loading">渲染中...</div>',
+    '  </div>',
+    '  <details class="diagram-source">',
+    '    <summary>查看 dot 源码</summary>',
+    `    <pre><code class="language-dot">${escapedSource}</code></pre>`,
+    '  </details>',
+    '</div>'
+  ].join('\n')
+}
+
+/**
+ * 渲染 Mermaid 代码块
+ * 使用 mermaid 库在浏览器端渲染
+ */
+function renderMermaidBlock(mermaidSource) {
+  const trimmedSource = String(mermaidSource || '').trim()
+  if (!trimmedSource) {
+    return '<pre><code class="language-mermaid"></code></pre>'
+  }
+
+  const id = `mermaid-diagram-${++mermaidRenderCounter}`
+  const escapedSource = escapeHtml(trimmedSource)
+
+  // 返回占位 HTML，后续由 renderMermaidDiagrams 函数在 DOM 插入后异步渲染
+  return [
+    '<div class="diagram-block">',
+    '  <div class="diagram-notice">',
+    '    Mermaid 流程图（浏览器端渲染）。',
+    '  </div>',
+    `  <div class="mermaid-container" data-mermaid-id="${id}" data-mermaid-source="${encodeURIComponent(trimmedSource)}">`,
+    '    <div class="mermaid-loading">渲染中...</div>',
+    '  </div>',
+    '  <details class="diagram-source">',
+    '    <summary>查看 Mermaid 源码</summary>',
+    `    <pre><code class="language-mermaid">${escapedSource}</code></pre>`,
+    '  </details>',
+    '</div>'
+  ].join('\n')
+}
+
+/**
+ * 异步渲染页面中所有未渲染的 Mermaid 图形
+ * 在消息内容更新后调用
+ */
+async function renderMermaidDiagrams(containerEl) {
+  if (!containerEl) return
+  const elements = containerEl.querySelectorAll('.mermaid-container[data-mermaid-source]')
+  for (const el of elements) {
+    const source = decodeURIComponent(el.getAttribute('data-mermaid-source') || '')
+    const id = el.getAttribute('data-mermaid-id') || 'mermaid-diagram'
+    if (!source) continue
+
+    try {
+      const { svg } = await mermaid.render(id, source)
+      el.innerHTML = svg
+      el.removeAttribute('data-mermaid-source')
+    } catch (error) {
+      console.error('[Mermaid] Failed to render diagram:', error)
+      el.innerHTML = `<pre><code class="language-mermaid">${escapeHtml(source)}</code></pre>`
+      el.removeAttribute('data-mermaid-source')
+    }
+  }
+}
+
+/**
+ * 异步渲染页面中所有未渲染的 dot/Graphviz 图形
+ * 在消息内容更新后调用
+ */
+async function renderDotDiagrams(containerEl) {
+  if (!containerEl) return
+  const elements = containerEl.querySelectorAll('.dot-container[data-dot-source]')
+  for (const el of elements) {
+    const source = decodeURIComponent(el.getAttribute('data-dot-source') || '')
+    if (!source) continue
+
+    try {
+      await new Promise((resolve, reject) => {
+        graphviz(el, { useWorker: false })
+          .renderDot(source)
+          .on('end', resolve)
+          .on('error', reject)
+      })
+      el.removeAttribute('data-dot-source')
+    } catch (error) {
+      console.error('[Dot] Failed to render diagram:', error)
+      el.innerHTML = `<pre><code class="language-dot">${escapeHtml(source)}</code></pre>`
+      el.removeAttribute('data-dot-source')
+    }
+  }
+}
+
 const markedRenderer = new marked.Renderer()
 const defaultCodeRenderer = markedRenderer.code.bind(markedRenderer)
 
 markedRenderer.code = function(code, language, isEscaped) {
   if (isPlantUmlLanguage(language)) {
     return renderPlantUmlBlock(code)
+  }
+  if (isDotLanguage(language)) {
+    return renderDotBlock(code)
+  }
+  if (isMermaidLanguage(language)) {
+    return renderMermaidBlock(code)
   }
   return defaultCodeRenderer(code, language, isEscaped)
 }
@@ -1333,6 +1475,7 @@ const showDirDialog = ref(false)           // 目录选择对话框
 let handleResize = null
 let handlePopState = null
 let visualViewportResizeHandler = null
+let diagramObserver = null
 
 function updateViewportHeight() {
   const viewportHeight = window.visualViewport?.height || window.innerHeight
@@ -6038,17 +6181,14 @@ function appendOutput(payload, agentId = null) {
     // 不影响正常显示，静默失败
   }
   
-  // DOM更新后，仅当前 Agent 的消息自动滚动到底部
-  // 使用双 nextTick + requestAnimationFrame 确保布局完全计算后再滚动
+  // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发）
   nextTick(() => {
-    nextTick(() => {
-      requestAnimationFrame(() => {
-        if (shouldAutoScroll && outputList.value) {
-          const scrollHeight = outputList.value.scrollHeight
-          outputList.value.scrollTop = scrollHeight
-          console.log('[SCROLL] Auto-scrolled to bottom')
-        }
-      })
+    requestAnimationFrame(() => {
+      if (shouldAutoScroll && outputList.value) {
+        const scrollHeight = outputList.value.scrollHeight
+        outputList.value.scrollTop = scrollHeight
+        console.log('[SCROLL] Auto-scrolled to bottom')
+      }
     })
   })
 }
@@ -8037,6 +8177,23 @@ onMounted(() => {
   }
   window.addEventListener('popstate', handlePopState)
   console.log('[app] Popstate listener added')
+
+  // MutationObserver: 监听 outputList DOM 变化，自动渲染 mermaid/dot 图表
+  if (outputList.value) {
+    let diagramRenderTimer = null
+    diagramObserver = new MutationObserver(() => {
+      // 防抖：避免流式更新时频繁触发
+      if (diagramRenderTimer) clearTimeout(diagramRenderTimer)
+      diagramRenderTimer = setTimeout(async () => {
+        const hasMermaid = outputList.value?.querySelector('.mermaid-container[data-mermaid-source]')
+        const hasDot = outputList.value?.querySelector('.dot-container[data-dot-source]')
+        if (hasMermaid) await renderMermaidDiagrams(outputList.value)
+        if (hasDot) await renderDotDiagrams(outputList.value)
+      }, 50)
+    })
+    diagramObserver.observe(outputList.value, { childList: true, subtree: true })
+    console.log('[app] Diagram MutationObserver started')
+  }
 })
 
 onUnmounted(() => {
@@ -8072,6 +8229,13 @@ onUnmounted(() => {
   // 移除返回键监听
   window.removeEventListener('popstate', handlePopState)
   console.log('[app] Popstate listener removed')
+
+  // 断开图表渲染 MutationObserver
+  if (diagramObserver) {
+    diagramObserver.disconnect()
+    diagramObserver = null
+    console.log('[app] Diagram MutationObserver disconnected')
+  }
 })
 </script>
 
@@ -9955,6 +10119,86 @@ body::-webkit-scrollbar {
 .message-body.markdown-content :deep(.plantuml-source summary) {
   cursor: pointer;
   color: #8b949e;
+}
+
+/* 通用图表样式（dot/graphviz） */
+.message-body.markdown-content :deep(.diagram-block) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgba(139, 148, 158, 0.25);
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.35);
+}
+
+.message-body.markdown-content :deep(.diagram-notice) {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.message-body.markdown-content :deep(.diagram-link) {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  color: #58a6ff;
+  text-decoration: none;
+}
+
+.message-body.markdown-content :deep(.diagram-link:hover) {
+  text-decoration: underline;
+}
+
+.message-body.markdown-content :deep(.diagram-image) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #ffffff;
+  border-radius: 6px;
+}
+
+.message-body.markdown-content :deep(.diagram-source summary) {
+  cursor: pointer;
+  color: #8b949e;
+}
+
+/* Dot/Graphviz 图表样式 */
+.message-body.markdown-content :deep(.dot-container) {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-body.markdown-content :deep(.dot-container svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.message-body.markdown-content :deep(.dot-loading) {
+  color: #8b949e;
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* Mermaid 图表样式 */
+.message-body.markdown-content :deep(.mermaid-container) {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-body.markdown-content :deep(.mermaid-container svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.message-body.markdown-content :deep(.mermaid-loading) {
+  color: #8b949e;
+  font-size: 13px;
+  padding: 8px 0;
 }
 
 /* 表格样式 - 排除 diff-table */
