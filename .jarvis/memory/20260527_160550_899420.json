@@ -1,0 +1,8 @@
+{
+  "id": "20260527_160550_899420",
+  "type": "project_long_term",
+  "tags": ["frontend", "diagram", "architecture"],
+  "content": "Jarvis前端图表渲染架构：dot 使用 d3-graphviz 浏览器端渲染（useWorker: false），mermaid 使用 mermaid.render() 异步渲染。两者均采用占位HTML + MutationObserver 异步渲染模式。占位HTML存储在 data-*-source 属性中，渲染后替换为SVG。关键文件：App.vue，CSS约10166行，渲染函数约833-938行，MutationObserver约8185-8201行。",
+  "created_at": "2026-05-27T16:05:50.899455",
+  "updated_at": "2026-05-27T16:05:50.899462"
+}
