@@ -401,7 +401,7 @@ def get_task_analysis_prompt(
 可用的工具/方法论：[列出工具名称或方法论名称]
 使用方法：[简要说明如何使用]
 2. 工具创建（如果需要创建新工具）:
-```
+```json
 {
   "want": "创建新工具来解决XXX问题",
   "name": "meta_agent",
@@ -417,7 +417,7 @@ def get_task_analysis_prompt(
 - 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
 - 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
 
-```
+```json
 {
   "want": "添加/更新xxxx的方法论",
   "name": "methodology",
@@ -446,7 +446,7 @@ def get_task_analysis_prompt(
 - 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
 - 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
 
-```
+```json
 {
   "want": "添加/更新xxxx的方法论",
   "name": "methodology",

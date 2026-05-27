@@ -38,9 +38,8 @@ from jarvis.jarvis_utils.utils import is_context_overflow
 tool_call_help = """
 ## 工具调用指南（Markdown）
 
-**工具调用格式（Jsonnet）**
-直接输出纯 JSON 对象，无需任何标签包裹：
-```
+**工具调用格式（Json）**
+```json
 {
   "want": "想要从执行结果中获取到的信息",
   "name": "工具名称",
@@ -51,7 +50,7 @@ tool_call_help = """
 }
 ```
 
-**Jsonnet格式特性**
+**Json格式特性**
 - 字符串引号：可使用双引号或单引号
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
@@ -62,10 +61,10 @@ tool_call_help = """
 
 **多个工具调用**
 - 支持一次调用多个工具，每个工具调用是一个独立的 JSON 对象：
-  ```
+  ```json
   {"name": "tool1", "arguments": {...}}
   ```
-  ```
+  ```json
   {"name": "tool2", "arguments": {...}}
   ```
 - **重要限制**：多个工具调用之间必须**没有相互依赖关系**
@@ -77,7 +76,7 @@ tool_call_help = """
 **常见错误**
 - 同时调用多个有依赖关系的工具（违反无依赖要求）
 - 假设工具结果
-- Jsonnet格式错误
+- Json格式错误
 - JSON对象缺少 name 或 arguments 字段
 """
 

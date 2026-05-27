@@ -975,8 +975,7 @@ class task_list_manager:
 
 **使用示例**
 创建任务列表：
-```
-```
+```json
 {
     "name": "task_list_manager",
     "arguments": {
@@ -1002,11 +1001,9 @@ class task_list_manager:
     }
 }
 ```
-```
 
 执行任务：
-```
-```
+```json
 {
     "name": "task_list_manager",
     "arguments": {
@@ -1016,11 +1013,9 @@ class task_list_manager:
     }
 }
 ```
-```
 
 更新任务状态：
-```
-```
+```json
 {
     "name": "task_list_manager",
     "arguments": {
@@ -1032,7 +1027,6 @@ class task_list_manager:
         }
     }
 }
-```
 ```
 
 
