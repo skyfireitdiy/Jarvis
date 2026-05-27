@@ -10166,9 +10166,7 @@ body::-webkit-scrollbar {
 /* Dot/Graphviz 图表样式 */
 .message-body.markdown-content :deep(.dot-container) {
   min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
 .message-body.markdown-content :deep(.dot-container svg) {
@@ -10185,9 +10183,7 @@ body::-webkit-scrollbar {
 /* Mermaid 图表样式 */
 .message-body.markdown-content :deep(.mermaid-container) {
   min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 
 .message-body.markdown-content :deep(.mermaid-container svg) {
