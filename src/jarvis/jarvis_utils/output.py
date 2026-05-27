@@ -939,6 +939,8 @@ class PrettyOutput:
             border_style: 边框样式（默认"bright_blue"）
             theme: markdown高亮主题（默认"monokai"）
         """
+        if not content.strip():
+            return
         from rich import box
         from rich.markdown import Markdown, Heading
         from rich.panel import Panel
