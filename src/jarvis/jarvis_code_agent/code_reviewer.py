@@ -425,6 +425,7 @@ class CodeReviewer:
             need_summary=True,
             summary_prompt=summary_prompt,
             use_methodology=False,
+            use_analysis=False,
         )
 
         PrettyOutput.auto_print("🔍 正在执行代码审查...")
