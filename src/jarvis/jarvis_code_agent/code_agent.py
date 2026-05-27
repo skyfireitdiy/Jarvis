@@ -60,7 +60,6 @@ from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
 import jarvis.jarvis_utils.globals as jglobals
@@ -961,96 +960,20 @@ git reset --hard {start_commit}
             PrettyOutput.auto_print(f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理")
             return False
 
+    def _get_code_reviewer(self) -> "CodeReviewer":
+        """获取 CodeReviewer 实例。"""
+        from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
+
+        return CodeReviewer(
+            model=self.model,
+            start_commit=self.start_commit,
+            non_interactive=self.non_interactive,
+            quick_mode=self.quick_mode,
+        )
+
     def _truncate_diff_for_review(self, git_diff: str, token_ratio: float = 0.4) -> str:
-        """截断 git diff 以适应 token 限制（用于 review）
-
-        参数:
-            git_diff: 原始的 git diff 内容
-            token_ratio: token 使用比例（默认 0.4，即 40%，review 需要更多上下文）
-
-        返回:
-            str: 截断后的 git diff（如果超出限制则截断并添加提示、文件列表和起始 commit）
-        """
-        if not git_diff or not git_diff.strip():
-            return git_diff
-
-        from jarvis.jarvis_utils.embedding import get_context_token_count
-        from jarvis.jarvis_utils.config import get_max_input_token_count
-
-        # 获取最大输入 token 数量
-        max_input_tokens = get_max_input_token_count()
-
-        # 使用指定比例作为 diff 的 token 限制
-        max_diff_tokens = int(max_input_tokens * token_ratio)
-
-        # 计算 diff 的 token 数量
-        diff_token_count = get_context_token_count(git_diff)
-
-        if diff_token_count <= max_diff_tokens:
-            return git_diff
-
-        # 如果 diff 内容太大，进行截断
-        # 先提取修改的文件列表和起始 commit
-        import re
-
-        files = set()
-        # 匹配 "diff --git a/path b/path" 格式
-        pattern = r"^diff --git a/([^\s]+) b/([^\s]+)$"
-        for line in git_diff.split("\n"):
-            match = re.match(pattern, line)
-            if match:
-                file_a = match.group(1)
-                file_b = match.group(2)
-                files.add(file_b)
-                if file_a != file_b:
-                    files.add(file_a)
-        modified_files = sorted(list(files))
-
-        # 获取起始 commit id
-        start_commit = self.start_commit if hasattr(self, "start_commit") else None
-
-        lines = git_diff.split("\n")
-        truncated_lines = []
-        current_tokens = 0
-
-        for line in lines:
-            line_tokens = get_context_token_count(line)
-            if current_tokens + line_tokens > max_diff_tokens:
-                # 添加截断提示
-                truncated_lines.append("")
-                truncated_lines.append(
-                    "# ⚠️ diff内容过大，已截断显示（review 需要更多上下文）"
-                )
-                truncated_lines.append(
-                    f"# 原始diff共 {len(lines)} 行，{diff_token_count} tokens"
-                )
-                truncated_lines.append(
-                    f"# 显示前 {len(truncated_lines) - 3} 行，约 {current_tokens} tokens"
-                )
-                truncated_lines.append(
-                    f"# 限制: {max_diff_tokens} tokens (输入窗口的 {token_ratio * 100:.0f}%)"
-                )
-
-                # 添加起始 commit id
-                if start_commit:
-                    truncated_lines.append("")
-                    truncated_lines.append(f"# 起始 Commit ID: {start_commit}")
-
-                # 添加完整修改文件列表
-                if modified_files:
-                    truncated_lines.append("")
-                    truncated_lines.append(
-                        f"# 完整修改文件列表（共 {len(modified_files)} 个文件）："
-                    )
-                    for file_path in modified_files:
-                        truncated_lines.append(f"#   - {file_path}")
-
-                break
-
-            truncated_lines.append(line)
-            current_tokens += line_tokens
-
-        return "\n".join(truncated_lines)
+        """截断 git diff 以适应 token 限制（委托给 CodeReviewer）。"""
+        return self._get_code_reviewer().truncate_diff_for_review(git_diff, token_ratio)
 
     def _generate_fix_summary(self) -> str:
         """生成修复阶段的总结
@@ -1067,106 +990,8 @@ git reset --hard {start_commit}
             return ""
 
     def _generate_review_target(self, max_retries: int = 3) -> str:
-        """生成代码审查的目标和验收准则
-
-        通过创建新的模型实例，基于历史对话消息，
-        总结出本次代码审查应关注的任务目标和验收准则。
-
-        参数:
-            max_retries: 最大重试次数（关键字校验失败时重试）
-
-        返回:
-            str: 总结后的审查目标文本（模型完整输出），
-                 如果所有重试都失败，回退到用户原始需求
-        """
-        from jarvis.jarvis_platform.registry import PlatformRegistry
-
-        # 确保模型实例存在
-        if self.model is None:
-            PrettyOutput.auto_print("⚠ 模型实例不存在，无法生成审查目标")
-            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
-
-        # 获取当前模型的历史消息
-        messages = self.model.get_messages()
-        if not messages:
-            PrettyOutput.auto_print("⚠ 无历史消息，无法生成审查目标")
-            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
-
-        # 创建新的模型实例（同类型模型）
-        try:
-            new_model = PlatformRegistry().get_smart_platform()
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠ 创建模型实例失败: {e}")
-            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
-
-        # 设置历史消息到新模型
-        new_model.set_messages(messages)
-        # 关闭输出抑制，允许模型输出显示
-        new_model.set_suppress_output(False)
-
-        # 构建总结prompt
-        prompt = """请根据以上对话历史，总结本次代码审查应关注的任务目标和验收准则。
-
-请确保输出包含以下三个关键部分（必须包含这些关键字）：
-1. 任务目标 - 说明本次代码修改应该完成什么
-2. 验收准则 - 具体的、可验证的准则，用于判断代码修改是否正确完成
-3. 关变更点 - 本次修改涉及的关键变更点
-
-请不要抑制模型的输出，尽可能详细和完整地总结。不需要输出JSON格式。"""
-
-        # 必须包含的关键字
-        required_keywords = ["任务目标", "验收准则", "关键变更点"]
-
-        for retry in range(max_retries):
-            try:
-                if retry == 0:
-                    PrettyOutput.auto_print("🎯 正在生成代码审查目标...")
-                else:
-                    PrettyOutput.auto_print(
-                        f"🔧 第 {retry + 1}/{max_retries} 次重试生成审查目标..."
-                    )
-
-                response = new_model.chat_until_success(prompt)
-                if not response:
-                    continue
-
-                response_str = str(response)
-
-                # 校验关键字完整性
-                missing_keywords = [
-                    kw for kw in required_keywords if kw not in response_str
-                ]
-                if missing_keywords:
-                    PrettyOutput.auto_print(
-                        f"⚠ 审查目标缺少关键字: {', '.join(missing_keywords)}"
-                    )
-                    # 将模型上次的输出反馈给模型，让它基于上次输出继续补充
-                    prompt += f"\n\n你上次的输出如下：\n```\n{response_str}\n```\n\n注意：上次输出缺少以下关键字: {', '.join(missing_keywords)}，请基于上次输出补充完整，确保所有关键字都出现。"
-                    continue
-
-                # 直接返回模型完整输出，不解析不重组
-                PrettyOutput.auto_print("✅ 审查目标生成成功")
-                PrettyOutput.print_markdown(response_str, title="📋 代码审查目标")
-                return response_str
-
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠ 生成审查目标时出错: {e}")
-                continue
-
-        # 所有重试都失败，回退到用户原始需求
-        # 从历史消息中提取用户原始输入作为回退
-        user_input = ""
-        for msg in messages:
-            if msg.get("role") == "user" and msg.get("content"):
-                user_input = msg["content"]
-                break
-
-        if user_input:
-            PrettyOutput.auto_print("⚠ 所有重试失败，回退到用户原始需求")
-            return f"任务目标: {user_input}\n验收准则: 代码修改应正确完成用户需求"
-        else:
-            PrettyOutput.auto_print("⚠ 所有重试失败，使用默认审查目标")
-            return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
+        """生成代码审查的目标和验收准则（委托给 CodeReviewer）。"""
+        return self._get_code_reviewer().generate_review_target(max_retries)
 
     def _build_review_prompts(
         self,
@@ -1175,81 +1000,13 @@ git reset --hard {start_commit}
         modification_history: Optional[str] = None,
         start_commit: Optional[str] = None,
     ) -> tuple:
-        """构建 review Agent 的 prompts
-
-        参数:
-            review_target: 审查目标（包含任务目标、验收准则和关键变更点）
-            git_diff: 代码修改的 git diff（会自动进行 token 限制处理）
-
-        返回:
-            tuple: (system_prompt, user_prompt, summary_prompt)
-        """
-        system_prompt = """你是代码审查专家。你的任务是审查代码修改是否正确完成了用户需求。
-
-审查标准：
-1. 功能完整性：代码修改是否完整实现了用户需求的所有功能点？
-2. 代码正确性：修改的代码逻辑是否正确，有无明显的 bug 或错误？
-3. 代码质量：代码是否符合最佳实践，有无明显的代码异味？
-4. 潜在风险：修改是否可能引入新的问题或破坏现有功能？
-
-审查要求：
-- 仔细阅读用户需求、代码生成总结（summary）和代码修改（git diff）
-- **对代码生成总结中的关键信息进行充分验证**：不能盲目信任总结，必须结合 git diff 和实际代码逐条核对
-- 如需了解更多上下文，必须使用 read_code 工具读取相关文件以验证总结中提到的行为/位置/文件是否真实存在并符合描述
-- 基于实际代码进行审查，不要凭空假设
-- 如果代码生成总结与实际代码不一致，应以实际代码为准，并将不一致情况作为问题记录
-- 只关注本次修改相关的问题，不要审查无关代码
-- **尊重用户原始需求**：如果用户在需求中明确支持某个方案或实现方式，不应将其判定为风险或问题，除非该方案存在明显的错误或违反安全原则"""
-
-        commit_info = f"【起始 Commit】\n{start_commit}\n\n" if start_commit else ""
-        user_prompt = f"""请审查以下代码修改是否正确完成了用户需求。
-
-【任务目标与验收准则】
-{review_target}
-
-{commit_info}【完整的修改历史】
-{modification_history if modification_history else "无修改历史（如为空，说明主 Agent 未生成总结或未进行修复）"}
-
-【代码修改（Git Diff）】
-```diff
-{git_diff}
-
-```
-
-请仔细审查代码修改，并特别注意：
-- 修改历史包含了初始生成和所有修复阶段的总结
-- 不要直接相信总结中的描述，而是将其视为“待核实的说明”
-- 对总结中提到的每一个关键修改点（如函数/文件/行为变化），都应在 git diff 或实际代码中找到对应依据
-- 如发现总结与实际代码不一致，必须在审查结果中指出
-
-如需要可使用 read_code 工具查看更多上下文。
-
-如果审查完毕，直接输出 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。
-"""
-
-        summary_prompt = """请输出 JSON 格式的审查结果，格式如下：
-
-```json
-{
-  "ok": true/false,  // 审查是否通过
-  "issues": [        // 发现的问题列表（如果 ok 为 true，可以为空数组）
-    {
-      "type": "问题类型",  // 如：功能缺失、逻辑错误、代码质量、潜在风险
-      "description": "问题描述",
-      "location": "问题位置（文件:行号）",
-      "suggestion": "修复建议"
-    }
-  ],
-  "summary": "审查总结"  // 简要说明审查结论
-}
-```
-
-注意：
-- 如果代码修改完全满足用户需求且无明显问题，设置 ok 为 true
-- 如果存在需要修复的问题，设置 ok 为 false，并在 issues 中列出所有问题
-- 每个问题都要提供具体的修复建议"""
-
-        return system_prompt, user_prompt, summary_prompt
+        """构建 review Agent 的 prompts（委托给 CodeReviewer）。"""
+        return self._get_code_reviewer().build_review_prompts(
+            review_target=review_target,
+            git_diff=git_diff,
+            modification_history=modification_history,
+            start_commit=start_commit,
+        )
 
     def _parse_review_result(
         self, summary: str, review_agent: Optional[Any] = None, max_retries: int = 3
@@ -1371,22 +1128,8 @@ git reset --hard {start_commit}
         }
 
     def _check_and_get_git_diff(self) -> Optional[str]:
-        """检查并获取 git diff，如果没有变更则返回 None
-
-        返回:
-            git_diff 字符串，如果没有变更则返回 None
-        """
-        current_commit = get_latest_commit_hash()
-        if self.start_commit is None or current_commit == self.start_commit:
-            git_diff = get_diff()  # 获取未提交的更改
-        else:
-            git_diff = get_diff_between_commits(self.start_commit, current_commit)
-
-        if not git_diff or not git_diff.strip():
-            PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
-            return None
-
-        return git_diff
+        """检查并获取 git diff（委托给 CodeReviewer）。"""
+        return self._get_code_reviewer().check_and_get_git_diff()
 
     def _review_and_fix(
         self,
