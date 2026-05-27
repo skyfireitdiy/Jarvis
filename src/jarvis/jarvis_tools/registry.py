@@ -14,7 +14,6 @@ from typing import Optional
 from typing import Protocol
 from typing import Tuple
 from typing import Set
-from typing import cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -31,27 +30,26 @@ from jarvis.jarvis_utils.config import get_tool_load_dirs
 # -*- coding: utf-8 -*-
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.tag import ct
-from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_utils.utils import extract_json_from_text
 from jarvis.jarvis_utils.utils import is_context_overflow
 
 
-tool_call_help = f"""
+tool_call_help = """
 ## 工具调用指南（Markdown）
 
 **工具调用格式（Jsonnet）**
-{ot("TOOL_CALL")}
-{{
+直接输出纯 JSON 对象，无需任何标签包裹：
+```
+{
   "want": "想要从执行结果中获取到的信息",
   "name": "工具名称",
-  "arguments": {{
+  "arguments": {
     "param1": "值1",
     "param2": "值2"
-  }}
-}}
-{ct("TOOL_CALL")}
+  }
+}
+```
 
 **Jsonnet格式特性**
 - 字符串引号：可使用双引号或单引号
@@ -63,14 +61,13 @@ tool_call_help = f"""
 2. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
 **多个工具调用**
-- 支持一次调用多个工具，格式如下：
-  {ot("TOOL_CALL")}
-  {{"name": "tool1", "arguments": {{...}}}}
-  {ct("TOOL_CALL")}
-  
-  {ot("TOOL_CALL")}
-  {{"name": "tool2", "arguments": {{...}}}}
-  {ct("TOOL_CALL")}
+- 支持一次调用多个工具，每个工具调用是一个独立的 JSON 对象：
+  ```
+  {"name": "tool1", "arguments": {...}}
+  ```
+  ```
+  {"name": "tool2", "arguments": {...}}
+  ```
 - **重要限制**：多个工具调用之间必须**没有相互依赖关系**
   - 工具A的执行结果不能作为工具B的输入参数
   - 工具B不能依赖工具A产生的副作用（如文件创建、状态修改等）
@@ -81,7 +78,7 @@ tool_call_help = f"""
 - 同时调用多个有依赖关系的工具（违反无依赖要求）
 - 假设工具结果
 - Jsonnet格式错误
-- 缺少行首的开始/结束标签
+- JSON对象缺少 name 或 arguments 字段
 """
 
 
@@ -100,15 +97,7 @@ class ToolRegistry(OutputHandlerProtocol):
         return "TOOL_CALL"
 
     def can_handle(self, response: str) -> bool:
-        # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理（忽略大小写）
-        has_tool_call = (
-            re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", response) is not None
-        )
-        if has_tool_call:
-            return True
-
-        # 宽泛检测：如果文本中包含带 name 和 arguments 字段的JSON对象，也认为可以处理
-        # 兼容不按规范输出标签的模型（如GLM）
+        # 检测：如果文本中包含带 name 和 arguments 字段的JSON对象，认为可以处理
         # 扫描全文中所有 { 位置，尝试提取JSON并验证关键字段
         for i, ch in enumerate(response):
             if ch == "{":
@@ -228,9 +217,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 # 非字典格式，直接调用 handle_tool_calls
                 result = self.handle_tool_calls(tool_calls, agent_)
 
-            if auto_completed:
-                # 如果自动补全了结束标签，在结果中添加说明信息
-                result = f"检测到工具调用缺少结束标签，已自动补全{ct('TOOL_CALL')}。请确保后续工具调用包含完整的开始和结束标签。\n\n{result}"
+            # auto_completed 逻辑已移除（不再需要自动补全标签）
             return False, result
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 工具调用处理失败: {str(e)}")
@@ -667,11 +654,8 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
-        """从内容中提取工具调用块（仅匹配行首标签，忽略大小写）"""
-        pattern = (
-            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
-        )
-        return re.search(pattern, content) is not None
+        """检查内容中是否包含工具调用 JSON"""
+        return '"name"' in content and '"arguments"' in content
 
     @staticmethod
     def _get_long_response_hint(content: str) -> str:
@@ -862,293 +846,79 @@ class ToolRegistry(OutputHandlerProtocol):
         返回:
             Tuple[Dict[str, Dict[str, Any]], str, bool]:
                 - 第一个元素是提取的工具调用字典
-                - 第二个元素是错误消息字符串(成功时为"")
-                - 第三个元素是是否自动补全了结束标签
+                - 第二个元素是错误消息字符串（成功时为""）
+                - 第三个元素保留为False（不再需要自动补全标签）
 
         异常:
             Exception: 如果工具调用缺少必要字段
         """
-        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复（忽略大小写）
-        close_tag = ct("TOOL_CALL")
-        # 使用正则表达式查找结束标签（忽略大小写），以获取实际位置和原始大小写
-        close_tag_pattern = re.escape(close_tag)
-        match = re.search(rf"{close_tag_pattern}$", content.rstrip(), re.IGNORECASE)
-        if match:
-            pos = match.start()
-            if pos > 0 and content[pos - 1] not in ("\n", "\r"):
-                content = content[:pos] + "\n" + content[pos:]
-
-        # 首先尝试标准的提取方式（忽略大小写）
-        pattern = (
-            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
-        )
-        data = re.findall(pattern, content)
         auto_completed = False
+        ret: list = []
 
-        # 如果检测到多个工具调用块，先检查是否是多个独立的工具调用
-        if len(data) > 1:
-            (
-                error_msg,
-                has_multiple,
-            ) = ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
-            if has_multiple:
-                return (
-                    cast(Dict[str, Dict[str, Any]], {}),
-                    error_msg if error_msg else "",
-                    False,
-                )
-            # 如果解析失败，可能是多个工具调用被当作一个 JSON 来解析了
-            # 继续执行后续的宽松提取逻辑
+        # 直接从全文中扫描所有 { 位置，尝试提取JSON并验证关键字段
+        used_ranges: list = []  # 记录已使用的JSON范围，避免重复
+        for i, ch in enumerate(content):
+            if ch == "{":
+                # 检查是否已在已使用的范围内
+                in_used = False
+                for start, end in used_ranges:
+                    if start <= i <= end:
+                        in_used = True
+                        break
+                if in_used:
+                    continue
 
-        # 如果标准提取失败，尝试更宽松的提取方式
-        if not data:
-            # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
-            # 如果数据为空，则表示行首的 ct("TOOL_CALL") 可能丢失。
-            has_open_at_bol = (
-                re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", content) is not None
-            )
-            has_close_at_bol = (
-                re.search(rf"(?mi)^{re.escape(ct('TOOL_CALL'))}", content) is not None
-            )
-
-            if has_open_at_bol and not has_close_at_bol:
-                # 尝试通过附加结束标签来修复它（确保结束标签位于行首）
-                fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
-
-                # 再次提取，并检查JSON是否有效
-                temp_data = re.findall(
-                    pattern,
-                    fixed_content,
-                )
-
-                if temp_data:
+                json_str, end_pos = extract_json_from_text(content, i)
+                if json_str:
                     try:
-                        json_loads(temp_data[0])  # Check if valid JSON
-                        data = temp_data
-                        auto_completed = True
-                    except (Exception, EOFError, KeyboardInterrupt):
-                        # Even after fixing, it's not valid JSON, or user cancelled.
-                        # Fall through to try more lenient extraction.
+                        parsed = json_loads(json_str)
+                        if (
+                            isinstance(parsed, dict)
+                            and "name" in parsed
+                            and "arguments" in parsed
+                        ):
+                            ret.append(parsed)
+                            used_ranges.append((i, end_pos))
+                    except Exception:
+                        continue
+
+        # 如果标准提取失败，使用宽泛提取作为兜底
+        if not ret:
+            fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
+            if fuzzy_results:
+                for fuzzy_item in fuzzy_results:
+                    try:
+                        fuzzy_msg = json_loads(fuzzy_item)
+                        if (
+                            isinstance(fuzzy_msg, dict)
+                            and "name" in fuzzy_msg
+                            and "arguments" in fuzzy_msg
+                        ):
+                            ret.append(fuzzy_msg)
+                            auto_completed = True
+                    except Exception:
                         pass
 
-            # 如果仍然没有数据，尝试更宽松的提取：直接从开始标签后提取JSON
-            if not data:
-                # 先检查是否有多个工具调用块（可能被当作一个 JSON 来解析导致失败）
-                multiple_blocks = re.findall(
-                    rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
-                    content,
+        # 如果仍然没有数据，尝试使用大模型修复
+        if not ret:
+            long_hint = ToolRegistry._get_long_response_hint(content)
+            error_msg = f"工具调用格式错误：无法解析工具调用内容。请检查是否输出了包含name和arguments字段的JSON对象。\n{tool_call_help}{long_hint}"
+
+            # 如果提供了agent且long_hint为空，尝试使用大模型修复
+            if agent is not None and not long_hint:
+                llm_fixed_content: Optional[str] = ToolRegistry._try_llm_fix(
+                    content, agent, error_msg
                 )
-                (
-                    error_msg,
-                    has_multiple,
-                ) = ToolRegistry._check_and_handle_multiple_tool_calls(
-                    content, multiple_blocks
-                )
-                if has_multiple:
-                    return (
-                        cast(Dict[str, Dict[str, Any]], {}),
-                        error_msg if error_msg else "",
-                        False,
-                    )
+                if llm_fixed_content is not None:
+                    return ToolRegistry._extract_tool_calls(llm_fixed_content, None)
 
-                # 找到开始标签的位置
-                open_tag_match = re.search(
-                    rf"(?i){re.escape(ot('TOOL_CALL'))}", content
-                )
-                if open_tag_match:
-                    # 从开始标签后提取JSON
-                    start_pos = open_tag_match.end()
-                    json_str, end_pos = extract_json_from_text(content, start_pos)
+            return (
+                {},
+                error_msg,
+                False,
+            )
 
-                    if json_str:
-                        # 清理JSON字符串中的额外标记
-                        json_str = ToolRegistry._clean_extra_markers(json_str)
-
-                        # 尝试解析JSON
-                        try:
-                            parsed = json_loads(json_str)
-                            # 验证是否包含必要字段
-                            if "name" in parsed and "arguments" in parsed:
-                                data = [json_str]
-                                auto_completed = True
-                            else:
-                                # 记录缺少必要字段的错误
-                                missing_fields = []
-                                if "name" not in parsed:
-                                    missing_fields.append("name")
-                                if "arguments" not in parsed:
-                                    missing_fields.append("arguments")
-                                # 不立即返回错误，继续尝试其他方法，但记录信息用于后续错误提示
-                                pass
-                        except Exception:
-                            # JSON解析失败，记录错误信息用于后续错误提示
-                            # 不立即返回错误，继续尝试其他方法（如大模型修复）
-                            pass
-                    else:
-                        # JSON提取失败：没有找到有效的JSON对象
-                        # 不立即返回错误，继续尝试其他方法（如大模型修复）
-                        pass
-
-            # 宽泛提取fallback：直接从全文中搜索JSON对象，检查是否包含name和arguments字段
-            # 兼容不按规范输出标签的模型（如GLM输出<TOOL_CALL>前缀而非标准JSON）
-            if not data:
-                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
-                if fuzzy_results:
-                    data = fuzzy_results
-                    auto_completed = True
-
-            # 如果仍然没有数据，尝试使用大模型修复
-            if not data:
-                long_hint = ToolRegistry._get_long_response_hint(content)
-                # 检查是否有开始和结束标签，生成更准确的错误消息
-                has_open = (
-                    re.search(rf"(?i){re.escape(ot('TOOL_CALL'))}", content) is not None
-                )
-                has_close = (
-                    re.search(rf"(?i){re.escape(ct('TOOL_CALL'))}", content) is not None
-                )
-
-                if has_open and has_close:
-                    # 有开始和结束标签，但JSON解析失败
-                    error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}和{ct('TOOL_CALL')}标签，但JSON解析失败。请检查JSON格式是否正确，确保包含name和arguments字段。\n{tool_call_help}{long_hint}"
-                elif has_open and not has_close:
-                    # 只有开始标签，没有结束标签
-                    if len(content) > 1000:
-                        error_msg = f"工具调用的参数可能过长，建议拆分为多次调用。当前内容长度：{len(content)}字符，超过1000字符限制。\n{tool_call_help}"
-                    else:
-                        error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}标签，但未找到{ct('TOOL_CALL')}标签。请确保工具调用包含完整的开始和结束标签。\n{tool_call_help}{long_hint}"
-                else:
-                    # 其他情况
-                    error_msg = f"工具调用格式错误：无法解析工具调用内容。请检查工具调用格式。\n{tool_call_help}{long_hint}"
-
-                # 如果提供了agent且long_hint为空，尝试使用大模型修复
-                if agent is not None and not long_hint:
-                    llm_fixed_content: Optional[str] = ToolRegistry._try_llm_fix(
-                        content, agent, error_msg
-                    )
-                    if llm_fixed_content is not None:
-                        # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content, None)
-
-                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
-                return (
-                    {},
-                    error_msg,
-                    False,
-                )
-
-        ret = []
-        for item in data:
-            try:
-                # 清理可能存在的额外标记
-                cleaned_item = ToolRegistry._clean_extra_markers(item)
-                msg = json_loads(cleaned_item)
-            except Exception as e:
-                # 如果解析失败，先检查是否是因为有多个工具调用
-                # 检查错误信息中是否包含 "expected a comma" 或类似的多对象错误
-                error_str = str(e).lower()
-                if "expected a comma" in error_str or "multiple" in error_str:
-                    # 尝试检测是否有多个工具调用块
-                    multiple_blocks = re.findall(
-                        rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
-                        content,
-                    )
-                    (
-                        error_msg,
-                        has_multiple,
-                    ) = ToolRegistry._check_and_handle_multiple_tool_calls(
-                        content, multiple_blocks
-                    )
-                    if has_multiple:
-                        return (
-                            cast(Dict[str, Dict[str, Any]], {}),
-                            error_msg if error_msg else "",
-                            False,
-                        )
-
-                long_hint = ToolRegistry._get_long_response_hint(content)
-                error_msg = f"""Jsonnet 解析失败：{e}
-
-提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串直接换行即可，无需转义。
-
-{tool_call_help}{long_hint}"""
-
-                # 如果提供了agent且long_hint为空，尝试使用大模型修复
-                if agent is not None and not long_hint:
-                    retry_fixed_content: Optional[str] = ToolRegistry._try_llm_fix(
-                        content, agent, error_msg
-                    )
-                    if retry_fixed_content is not None:
-                        # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(
-                            retry_fixed_content, None
-                        )
-
-                # 如果大模型修复失败或未提供agent或long_hint不为空，尝试宽泛提取
-                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
-                if fuzzy_results:
-                    # 宽泛提取成功，解析提取到的JSON并加入结果
-                    for fuzzy_item in fuzzy_results:
-                        try:
-                            fuzzy_msg = json_loads(fuzzy_item)
-                            if (
-                                isinstance(fuzzy_msg, dict)
-                                and "name" in fuzzy_msg
-                                and "arguments" in fuzzy_msg
-                            ):
-                                ret.append(fuzzy_msg)
-                                auto_completed = True
-                        except Exception:
-                            pass
-                    if ret:
-                        break
-                return (
-                    {},
-                    error_msg,
-                    False,
-                )
-
-            if "name" in msg and "arguments" in msg:
-                ret.append(msg)
-            else:
-                long_hint = ToolRegistry._get_long_response_hint(content)
-                error_msg = f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments字段）。
-
-                {tool_call_help}{long_hint}"""
-
-                # 如果提供了agent且long_hint为空，尝试使用大模型修复
-                if agent is not None and not long_hint:
-                    fixed_content_3: Optional[str] = ToolRegistry._try_llm_fix(
-                        content, agent, error_msg
-                    )
-                    if fixed_content_3 is not None:
-                        # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content_3, None)
-
-                # 如果大模型修复失败或未提供agent或long_hint不为空，尝试宽泛提取
-                fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
-                if fuzzy_results:
-                    # 宽泛提取成功，解析提取到的JSON并加入结果
-                    for fuzzy_item in fuzzy_results:
-                        try:
-                            fuzzy_msg = json_loads(fuzzy_item)
-                            if (
-                                isinstance(fuzzy_msg, dict)
-                                and "name" in fuzzy_msg
-                                and "arguments" in fuzzy_msg
-                            ):
-                                ret.append(fuzzy_msg)
-                                auto_completed = True
-                        except Exception:
-                            pass
-                    if ret:
-                        break
-                return (
-                    {},
-                    error_msg,
-                    False,
-                )
-        # 支持多个工具调用：返回所有工具调用的字典
+        # 处理解析结果
         if len(ret) == 0:
             return {}, "", auto_completed
         elif len(ret) == 1:

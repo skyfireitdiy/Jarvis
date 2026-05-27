@@ -16,7 +16,6 @@ from typing import cast
 
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 
 
@@ -111,7 +110,7 @@ def build_fix_prompt(content: str, error_msg: str, tool_usage: str) -> str:
 {content}
 
 请修复上述工具调用内容，确保：
-1. 包含完整的 {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 标签
+1. 输出纯 JSON 对象，包含 name 和 arguments 字段
 2. JSON格式正确，包含 name、arguments、want 三个字段
 3. 如果使用多行字符串，直接换行即可
 
