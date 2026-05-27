@@ -1174,7 +1174,6 @@ class PrettyOutput:
         from rich.live import Live
         from rich.panel import Panel
         from rich.status import Status
-        from rich.text import Text
 
         from jarvis.jarvis_utils.config import get_conversation_turn_threshold
         from jarvis.jarvis_utils.config import is_immediate_abort
@@ -1281,9 +1280,10 @@ class PrettyOutput:
                 else:
                     pnl.subtitle = f"[yellow]{current_time_str} | ({get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
-        text_content = Text(overflow="fold")
+        from rich.markdown import Markdown
+
         panel = Panel(
-            text_content,
+            Markdown(""),
             title=f"[bold cyan]{title}[/bold cyan]",
             subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
             border_style="cyan",
@@ -1305,48 +1305,21 @@ class PrettyOutput:
                 update_subtitle: bool = False,
                 show_cursor: bool = True,
             ):
-                nonlocal \
-                    response, \
-                    last_subtitle_update_time, \
-                    update_count, \
-                    text_content, \
-                    panel
+                nonlocal response, last_subtitle_update_time, update_count, panel
 
-                # 使用 Text.append 支持不同样式
-                new_text_obj = Text(overflow="fold")
-                # 只在 text_content 不为空时才追加旧内容
-                if text_content.plain:
-                    plain_text = text_content.plain
-                    # 每次更新时移除末尾旧光标（避免光标累积）
-                    if plain_text.endswith("▌"):
-                        plain_text = plain_text[:-1]
-                    new_text_obj.append(plain_text, style=text_content.style)
-                new_text_obj.append(content, style=style)
-                # 添加动态光标效果
-                if show_cursor and content:
-                    new_text_obj.append("▌", style="bold cyan")
                 update_count += 1
 
-                max_text_height = console.height - 5
-                if max_text_height <= 0:
-                    max_text_height = 1
+                # 用 Markdown 渲染累积的 response 文本
+                display_text = response
+                # 添加动态光标效果
+                if show_cursor and content:
+                    display_text = response + " ▌"
 
-                lines = new_text_obj.wrap(
-                    console,
-                    console.width - 4 if console.width > 4 else 1,
-                )
-
-                final_text = new_text_obj
-                if len(lines) > max_text_height:
-                    final_text = Text(
-                        "\n".join([line.plain for line in lines[-max_text_height:]]),
-                        overflow="fold",
-                    )
+                md_content = Markdown(display_text)
 
                 with _lock:
-                    text_content = final_text
-                    # 直接更新panel的内部内容，避免重建整个Panel
-                    panel.renderable = text_content
+                    # 直接更新panel的内部内容
+                    panel.renderable = md_content
 
                     current_time = time.time()
                     should_update_subtitle = (
