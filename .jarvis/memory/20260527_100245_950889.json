@@ -1,0 +1,14 @@
+{
+  "id": "20260527_100245_950889",
+  "type": "project_long_term",
+  "tags": [
+    "xterm重建",
+    "agent切换",
+    "bug修复",
+    "终端管理",
+    "clearTerminalCache"
+  ],
+  "content": "修复了agent切换时多余重建xterm的问题。根因：clearTerminalCache函数在收到非execution消息（output/input_request/confirm）时，无条件清空该agent的所有terminals记录（包括正在执行中的）。当切换回该agent时，DOM重新渲染触发setTerminalRef，发现termInfo不存在，就会重新创建xterm。修复方案：修改clearTerminalCache的过滤条件，从`t.agentId !== agentId`改为`t.agentId !== agentId || !t.ended`，只清除已结束的终端缓存，保留正在执行中的。修改位置：App.vue的clearTerminalCache函数（约6298行）。",
+  "created_at": "2026-05-27T10:02:45.950941",
+  "updated_at": "2026-05-27T10:02:45.950948"
+}

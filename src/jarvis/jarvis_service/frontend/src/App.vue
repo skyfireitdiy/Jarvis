@@ -6298,7 +6298,8 @@ function appendExecution(payload, agentId = null) {
 function clearTerminalCache(agentId) {
   if (!agentId) return
   const beforeCount = terminals.value.length
-  terminals.value = terminals.value.filter(t => t.agentId !== agentId)
+  // 只清除已结束的终端缓存，保留正在执行中的（避免切换agent时多余重建xterm）
+  terminals.value = terminals.value.filter(t => t.agentId !== agentId || !t.ended)
   const afterCount = terminals.value.length
   console.log(`[TERMINAL_CACHE] Cleared ${beforeCount - afterCount} terminal caches for agent: ${agentId}`)
 }
