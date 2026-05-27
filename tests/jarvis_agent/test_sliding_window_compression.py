@@ -50,6 +50,12 @@ class TestSlidingWindowCompression:
         # Mock _format_compressed_summary方法
         ag._format_compressed_summary = Mock(side_effect=lambda x: f"[历史摘要] {x}")
 
+        # Mock _validate_summary方法，默认返回验证通过
+        ag._validate_summary = Mock(return_value=(True, []))
+
+        # Mock _print_compression_summary方法
+        ag._print_compression_summary = Mock()
+
         # 将实际的_sliding_window_compression方法绑定到mock对象
         from jarvis.jarvis_agent import Agent as RealAgent
 
