@@ -1,0 +1,8 @@
+{
+  "id": "20260527_162925_262204",
+  "type": "project_long_term",
+  "tags": ["frontend", "focus", "xterm", "App.vue"],
+  "content": "App.vue 焦点管理策略：xterm Terminal 创建时和输入框出现时不应自动 focus，避免抢占用户焦点。用户主动切换终端（switchTerminal）时的 focus 应保留，因为这是用户意图驱动的操作。相关代码位置：initExecutionTerminal（原7144行）、initIndependentTerminal（原7400行）、fetchAgentStatus（原4171/4176行）、handleMessage input_request处理（原5912/5914行）。",
+  "created_at": "2026-05-27T16:29:25.262246",
+  "updated_at": "2026-05-27T16:29:25.262251"
+}

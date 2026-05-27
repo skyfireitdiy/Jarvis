@@ -4167,14 +4167,8 @@ async function fetchAgentStatus(agent) {
     if (agent.agent_id === currentAgentId.value) {
       if (executionStatus === 'waiting_single') {
         inputMode.value = 'single'
-        nextTick(() => {
-          singlelineInput.value?.focus()
-        })
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
-        nextTick(() => {
-          multilineInput.value?.focus()
-        })
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
@@ -5907,12 +5901,6 @@ function handleMessage(message, agentId = null) {
     }
     
     nextTick(() => {
-      // 聚焦到输入框
-      if (inputMode.value === 'multi') {
-        multilineInput.value?.focus()
-      } else {
-        singlelineInput.value?.focus()
-      }
       
       // 输入框显示后，如果之前在底部且请求属于当前 Agent，就滚动到底部
       if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value) {
@@ -7140,11 +7128,6 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
 
   requestAnimationFrame(() => {
     syncTerminalSize(executionId, termInfo)
-    try {
-      termInfo.terminal.focus()
-    } catch (error) {
-      // ignore focus errors
-    }
   })
 
   setTimeout(() => {
@@ -7397,7 +7380,6 @@ function initIndependentTerminal(terminalId, el) {
     if (session.fitAddon && session.terminal) {
       session.fitAddon.fit()
       sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
-      session.terminal.focus()
       
       // 写入缓冲的输出
       if (session.pending_output && session.pending_output.length > 0) {
