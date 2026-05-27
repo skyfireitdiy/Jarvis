@@ -1229,10 +1229,9 @@ git reset --hard {start_commit}
                     "execute_script",
                     "read_code",
                     "memory",
-                    "methodology",
                 ],
                 non_interactive=self.non_interactive,
-                use_methodology=True,
+                use_methodology=False,
                 use_analysis=False,
                 quick_mode=self.quick_mode,
             )
