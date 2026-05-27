@@ -1,0 +1,8 @@
+{
+  "id": "20260527_160550_897623",
+  "type": "project_long_term",
+  "tags": ["frontend", "diagram", "css", "layout"],
+  "content": "Jarvis前端图表渲染布局：.dot-container 和 .mermaid-container 必须使用 display: block 而非 display: flex，否则 d3-graphviz/mermaid 渲染的 SVG 会与 <details class='diagram-source'> 源码折叠区并排显示。block 布局确保 SVG 独占一行，源码 details 在下方折叠显示。",
+  "created_at": "2026-05-27T16:05:50.897667",
+  "updated_at": "2026-05-27T16:05:50.897680"
+}
