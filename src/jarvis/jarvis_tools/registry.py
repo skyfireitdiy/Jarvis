@@ -96,8 +96,7 @@ class ToolRegistry(OutputHandlerProtocol):
         return "TOOL_CALL"
 
     def can_handle(self, response: str) -> bool:
-        # 检测：如果文本中包含带 name 和 arguments 字段的JSON对象，认为可以处理
-        # 扫描全文中所有 { 位置，尝试提取JSON并验证关键字段
+        # 第一层：严格JSON解析——如果文本中包含带 name 和 arguments 字段的JSON对象，认为可以处理
         for i, ch in enumerate(response):
             if ch == "{":
                 json_str, _ = extract_json_from_text(response, i)
@@ -112,6 +111,27 @@ class ToolRegistry(OutputHandlerProtocol):
                             return True
                     except Exception:
                         continue
+
+        # 第二层：组合条件检测疑似工具调用（单一信号不触发，必须组合出现）
+        has_json_brace = "{" in response
+
+        # 条件1：关键字组合——"name" + "arguments" 同时出现
+        if '"name"' in response and '"arguments"' in response:
+            return True
+
+        # 条件2：工具名 + JSON结构组合——已注册工具名出现在文本中且有JSON意图
+        if has_json_brace:
+            tool_names = self.tools.keys() if self.tools else []
+            for tool_name in tool_names:
+                if tool_name in response:
+                    return True
+
+        # 条件3：工具调用标记 + JSON结构组合——常见标记且有JSON意图
+        if has_json_brace:
+            tool_call_markers = ["<TOOL_CALL>", "tool_call", "```json"]
+            for marker in tool_call_markers:
+                if marker in response:
+                    return True
 
         return False
 
