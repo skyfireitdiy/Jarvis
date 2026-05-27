@@ -1619,13 +1619,43 @@ class Agent:
                 temp_model.set_messages(messages_to_set)
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
-                compressed_summary = temp_model.chat_until_success(
-                    SUMMARY_REQUEST_PROMPT
-                )
+                # 最多重试 2 次，验证压缩摘要格式
+                max_retries = 2
+                retry_count = 0
+                compressed_summary = ""
+                missing_sections = []
+                while retry_count <= max_retries:
+                    if retry_count == 0:
+                        compressed_summary = temp_model.chat_until_success(
+                            SUMMARY_REQUEST_PROMPT
+                        )
+                    else:
+                        # 重试时将缺失信息反馈给模型，要求补充
+                        retry_prompt = (
+                            f"你之前生成的摘要缺少以下关键章节：{', '.join(missing_sections)}。"
+                            f"请重新生成完整的摘要，确保包含所有缺失的章节。"
+                        )
+                        compressed_summary = temp_model.chat_until_success(retry_prompt)
 
-                if not compressed_summary or not compressed_summary.strip():
-                    PrettyOutput.auto_print("⚠️ 滑动窗口压缩：生成摘要失败，跳过压缩")
-                    return False
+                    if not compressed_summary or not compressed_summary.strip():
+                        PrettyOutput.auto_print("⚠滑动窗口压缩：生成摘要失败，跳过压缩")
+                        return False
+
+                    # 验证摘要格式（仅在未达到最大重试次数时验证）
+                    if retry_count < max_retries:
+                        summary_stripped = compressed_summary.strip()
+                        is_valid, missing_sections = self._validate_summary(
+                            summary_stripped
+                        )
+                        if not is_valid:
+                            retry_count += 1
+                            PrettyOutput.auto_print(
+                                f"⚠滑动窗口压缩：摘要格式验证失败，缺失章节: {', '.join(missing_sections)}，正在重试..."
+                            )
+                            continue
+
+                    # 验证通过或达到最大重试次数，退出循环
+                    break
 
                 # 打印压缩摘要
                 self._print_compression_summary(
