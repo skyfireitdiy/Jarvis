@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import re
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
@@ -137,14 +136,10 @@ def _parse_tool_call_info(
         Dict 或 List[Dict]: 单个工具调用时返回字典，多个工具调用时返回列表
     """
     try:
-        # 使用 ToolRegistry 的提取逻辑
-        from jarvis.jarvis_utils.tag import ct, ot
+        # 使用纯 JSON 扫描提取工具调用
+        from jarvis.jarvis_utils.utils import extract_json_from_text
 
-        # 尝试提取所有工具调用块
-        pattern = (
-            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
-        )
-        matches = re.findall(pattern, response)
+        matches = extract_json_from_text(response)
 
         if not matches:
             return {"name": handler_name}

@@ -92,46 +92,35 @@ class AgentRunLoop:
         返回:
             str: 过滤后的响应内容（不包含工具调用部分）
         """
-        from jarvis.jarvis_utils.tag import ct
+        from jarvis.jarvis_utils.utils import extract_json_from_text
+        from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
-        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复（忽略大小写）
-        close_tag = ct("TOOL_CALL")
-        close_tag_pattern = re.escape(close_tag)
-        match = re.search(rf"{close_tag_pattern}$", response.rstrip(), re.IGNORECASE)
-        if match:
-            pos = match.start()
-            if pos > 0 and response[pos - 1] not in ("\n", "\r"):
-                response = response[:pos] + "\n" + response[pos:]
-
-        # 如果有开始标签但没有结束标签，自动补全结束标签（与registry逻辑一致）
-        has_open = (
-            re.search(rf"(?mi)^{re.escape(ot('TOOL_CALL'))}", response) is not None
-        )
-        has_close = (
-            re.search(rf"(?mi)^{re.escape(ct('TOOL_CALL'))}", response) is not None
-        )
-        if has_open and not has_close:
-            response = response.strip() + f"\n{ct('TOOL_CALL')}"
-
-        # 使用正则表达式移除所有工具调用块
-        # 与registry.py的检测逻辑保持一致：
-        # 1. 先尝试标准模式：结束标签必须在行首（使用 ^ 锚点）
-        # 2. 再尝试宽松模式：结束标签不一定在行首
-        # 使用 (?msi) 标志：多行、DOTALL、忽略大小写
-        filtered = response
-
-        # 标准模式：结束标签必须在行首（与registry.py第855行的标准提取模式一致）
-        standard_pattern = (
-            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
-        )
-        filtered = re.sub(standard_pattern, "", filtered)
-
-        # 宽松模式：结束标签不一定在行首（与registry.py第910行的宽松提取模式一致）
-        # 用于匹配标准模式可能遗漏的情况
-        lenient_pattern = (
-            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}"
-        )
-        filtered = re.sub(lenient_pattern, "", filtered)
+        # 纯JSON协议：扫描并移除所有包含name和arguments字段的JSON对象
+        filtered = ""
+        last_end = 0
+        i = 0
+        while i < len(response):
+            if response[i] == "{":
+                json_str, end_pos = extract_json_from_text(response, i)
+                if json_str:
+                    try:
+                        parsed = json_loads(json_str)
+                        if (
+                            isinstance(parsed, dict)
+                            and "name" in parsed
+                            and "arguments" in parsed
+                        ):
+                            # 跳过这个工具调用JSON
+                            filtered += response[last_end:i]
+                            last_end = end_pos
+                            i = end_pos
+                            continue
+                    except Exception:
+                        pass
+                i += 1
+            else:
+                i += 1
+        filtered += response[last_end:]
 
         # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
         filtered = re.sub(r"\n{3,}", "\n\n", filtered)

@@ -5,21 +5,18 @@
 格式: {"标记名": {"template": "替换模板", "description": "描述信息"}}
 """
 
-from jarvis.jarvis_utils.tag import ct
-from jarvis.jarvis_utils.tag import ot
-
 BUILTIN_REPLACE_MAP = {
     "Web": {
         "append": True,
-        "template": f"""
+        "template": """
 请使用search_web工具进行网页搜索，必须严格遵守以下工具调用格式：
 
-{ot("TOOL_CALL")}
+```
 want: 想要从执行结果中获取到的信息
 name: search_web
 arguments:
     query: "xxx技术的最新发展是什么？"
-{ct("TOOL_CALL")}
+```
 
 可以使用的提问格式包括：
 1. xxx技术的最新发展是什么？

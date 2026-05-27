@@ -2351,12 +2351,12 @@ class Agent:
         addon_prompt = f"""
 <system_prompt>
     请判断是否已经完成任务，如果已经完成：
-    {complete_prompt if complete_prompt else f"- 直接输出完成原因，不需要再有新的操作，不要输出{ot('TOOL_CALL')}标签"}
+    {complete_prompt if complete_prompt else "- 直接输出完成原因，不需要再有新的操作"}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请请求用户操作
-    - 工具调用必须使用{ot("TOOL_CALL")}和{ct("TOOL_CALL")}标签
+    - 工具调用直接输出纯 JSON 对象，无需任何标签包裹
     - 操作列表：{action_handlers}{memory_prompts}
     
     注意：如果当前部分任务已完成，之前的上下文价值不大，可以输出{ot("!!!SUMMARY!!!")}标记来触发总结并清空历史，以便开始新的任务阶段。
