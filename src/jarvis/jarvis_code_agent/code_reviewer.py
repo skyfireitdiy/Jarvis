@@ -148,6 +148,16 @@ class CodeReviewer:
 
 请不要抑制模型的输出，尽可能详细和完整地总结。不需要输出JSON格式。"""
 
+        # 如果有start_commit，在prompt中追加提示，只走查该commit之后的代码
+        if self.start_commit:
+            prompt += (
+                f"\n\n<start_commit_context>\n"
+                f"本次任务的初始 Git Commit 是：`{self.start_commit}`\n"
+                f"请只走查该 commit 之后的代码变更，"
+                f"不需要审查该 commit 之前已有的代码。\n"
+                f"</start_commit_context>"
+            )
+
         required_keywords = ["任务目标", "验收准则", "关键变更点", "关键信息导航"]
 
         for retry in range(max_retries):

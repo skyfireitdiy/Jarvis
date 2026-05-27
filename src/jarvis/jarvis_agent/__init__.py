@@ -1495,6 +1495,17 @@ class Agent:
                 else:
                     prompt_to_use = DEFAULT_SUMMARY_PROMPT
 
+            # 如果是CodeAgent且有start_commit，在prompt中追加提示，只总结该commit之后的目标
+            if hasattr(self, "start_commit") and self.start_commit:
+                start_commit_hint = (
+                    f"\n\n<start_commit_context>\n"
+                    f"本次任务的初始 Git Commit 是：`{self.start_commit}`\n"
+                    f"请只总结该 commit 之后的任务目标、变更和进展，"
+                    f"不需要总结该 commit 之前的历史内容。\n"
+                    f"</start_commit_context>"
+                )
+                prompt_to_use += start_commit_hint
+
             # 生成总结，最多重试 2 次
             max_retries = 2
             retry_count = 0
