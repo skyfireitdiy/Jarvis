@@ -282,72 +282,194 @@ class CodeReviewer:
 
         return system_prompt, user_prompt, summary_prompt
 
-    def parse_review_result(self, review_result: str) -> dict:
-        """解析 review 结果，返回结构化的审查结果。"""
+    def _try_parse_json(self, content: str) -> tuple:
+        """尝试解析JSON，返回(成功, 结果, json字符串)"""
+        # 首先尝试匹配 ```json ... ``` 代码块
+        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        else:
+            # 尝试匹配裸 JSON 对象
+            json_match = re.search(r'\{[\s\S]*"ok"[\s\S]*\}', content)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                return False, None, None
+
+        try:
+            result = json.loads(json_str)
+            if isinstance(result, dict):
+                return True, result, json_str
+            else:
+                return False, None, json_str
+        except json.JSONDecodeError:
+            return False, None, json_str
+
+    def parse_review_result(
+        self,
+        review_result: str,
+        review_agent: Optional[Any] = None,
+        max_retries: int = 3,
+    ) -> dict:
+        """解析 review 结果，支持格式修复。
+
+        参数:
+            review_result: review Agent 的输出
+            review_agent: review Agent 实例，用于格式修复（可选）
+            max_retries: 最大重试次数
+
+        返回:
+            dict: 解析后的审查结果，包含 ok/issues/summary 字段
+        """
         default_result = {"ok": True, "issues": [], "summary": "审查完成"}
 
         if not review_result or not review_result.strip():
             return default_result
 
-        # 尝试从结果中提取 JSON
-        json_pattern = r"```json\s*\n([\s\S]*?)\n\s*```"
-        json_matches = re.findall(json_pattern, review_result)
-
-        if json_matches:
-            for json_str in reversed(json_matches):
-                try:
-                    result = json.loads(json_str.strip())
-                    if isinstance(result, dict) and "ok" in result:
-                        return result
-                except json.JSONDecodeError:
-                    continue
-
-        # 尝试直接解析整个结果
-        try:
-            result = json.loads(review_result.strip())
-            if isinstance(result, dict) and "ok" in result:
-                return result
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试查找花括号包围的 JSON
-        brace_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
-        brace_matches = re.findall(brace_pattern, review_result)
-        if brace_matches:
-            for match in reversed(brace_matches):
-                try:
-                    result = json.loads(match)
-                    if isinstance(result, dict) and "ok" in result:
-                        return result
-                except json.JSONDecodeError:
-                    continue
-
-        # 如果无法解析为 JSON，检查是否包含通过/失败的关键字
-        result_lower = review_result.lower()
-        if any(
-            kw in result_lower
-            for kw in ["通过", "pass", "ok", "no issue", "no problem", "没问题"]
-        ):
-            return default_result
-
-        if any(
-            kw in result_lower
-            for kw in ["问题", "issue", "bug", "error", "风险", "risk", "失败", "fail"]
-        ):
+        # 第一次尝试解析
+        success, result, json_str = self._try_parse_json(review_result)
+        if success and result is not None:
             return {
-                "ok": False,
-                "issues": [
-                    {
-                        "type": "未解析",
-                        "description": review_result,
-                        "location": "未知",
-                        "suggestion": "请手动检查",
-                    }
-                ],
-                "summary": "审查发现可能存在问题，但无法自动解析详细结果",
+                "ok": result.get("ok", True),
+                "issues": result.get("issues", []),
+                "summary": result.get("summary", ""),
             }
 
-        return default_result
+        # 如果没有提供review_agent，无法修复，回退到简单解析
+        if review_agent is None:
+            # 尝试从结果中提取 JSON（兼容旧逻辑）
+            json_pattern = r"```json\s*\n([\s\S]*?)\n\s*```"
+            json_matches = re.findall(json_pattern, review_result)
+
+            if json_matches:
+                for json_str in reversed(json_matches):
+                    try:
+                        result = json.loads(json_str.strip())
+                        if isinstance(result, dict) and "ok" in result:
+                            return result
+                    except json.JSONDecodeError:
+                        continue
+
+            # 尝试直接解析整个结果
+            try:
+                result = json.loads(review_result.strip())
+                if isinstance(result, dict) and "ok" in result:
+                    return result
+            except json.JSONDecodeError:
+                pass
+
+            # 尝试查找花括号包围的 JSON
+            brace_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
+            brace_matches = re.findall(brace_pattern, review_result)
+            if brace_matches:
+                for match in reversed(brace_matches):
+                    try:
+                        result = json.loads(match)
+                        if isinstance(result, dict) and "ok" in result:
+                            return result
+                    except json.JSONDecodeError:
+                        continue
+
+            # 如果无法解析为 JSON，检查是否包含通过/失败的关键字
+            result_lower = review_result.lower()
+            if any(
+                kw in result_lower
+                for kw in ["通过", "pass", "ok", "no issue", "no problem", "没问题"]
+            ):
+                return default_result
+
+            if any(
+                kw in result_lower
+                for kw in [
+                    "问题",
+                    "issue",
+                    "bug",
+                    "error",
+                    "风险",
+                    "risk",
+                    "失败",
+                    "fail",
+                ]
+            ):
+                return {
+                    "ok": False,
+                    "issues": [
+                        {
+                            "type": "未解析",
+                            "description": review_result,
+                            "location": "未知",
+                            "suggestion": "请手动检查",
+                        }
+                    ],
+                    "summary": "审查发现可能存在问题，但无法自动解析详细结果",
+                }
+
+            return default_result
+
+        # 尝试修复格式
+        summary = review_result
+        for retry in range(max_retries):
+            PrettyOutput.auto_print(
+                f"🔧 第 {retry + 1}/{max_retries} 次尝试修复 JSON 格式..."
+            )
+
+            fix_prompt = f"""
+之前的review回复格式不正确，无法解析为有效的JSON格式。
+
+原始回复内容：
+```
+{summary}
+```
+
+请严格按照以下JSON格式重新组织你的回复：
+
+```json
+{{
+    "ok": true/false,  // 表示代码是否通过审查
+    "summary": "总体评价和建议",  // 简短总结
+    "issues": [  // 问题列表，如果没有问题则为空数组
+        {{
+            "type": "问题类型",  // 如: bug, style, performance, security等
+            "description": "问题描述",
+            "location": "问题位置",  // 文件名和行号
+            "suggestion": "修复建议"
+        }}
+    ]
+}}
+```
+
+确保回复只包含上述JSON格式，不要包含其他解释或文本。"""
+
+            try:
+                # 使用review_agent的底层model进行修复，保持review_agent的专用配置和系统prompt
+                fixed_summary = review_agent.model.chat_until_success(fix_prompt)
+                if fixed_summary:
+                    success, result, _ = self._try_parse_json(str(fixed_summary))
+                    if success and result is not None:
+                        PrettyOutput.auto_print(
+                            f"✅ JSON格式修复成功（第 {retry + 1} 次）"
+                        )
+                        return {
+                            "ok": result.get("ok", True),
+                            "issues": result.get("issues", []),
+                            "summary": result.get("summary", ""),
+                        }
+                    else:
+                        PrettyOutput.auto_print("⚠ 修复后的JSON仍无法解析")
+                        summary = str(fixed_summary)  # 使用修复后的内容继续尝试
+                else:
+                    PrettyOutput.auto_print("⚠ 修复未返回结果")
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠ 修复JSON格式时出错: {e}")
+
+        # 3次修复都失败，标记需要重新review
+        PrettyOutput.auto_print("❌ JSON格式修复失败，需要重新进行review")
+        return {
+            "ok": False,
+            "issues": [],
+            "summary": "JSON_FORMAT_ERROR",
+            "need_re_review": True,
+        }
 
     def check_and_get_git_diff(self) -> Optional[str]:
         """检查并获取 git diff。"""
@@ -375,6 +497,9 @@ class CodeReviewer:
         self,
         review_target: Optional[str] = None,
         modification_history: Optional[str] = None,
+        use_tools: Optional[list] = None,
+        non_interactive: Optional[bool] = None,
+        quick_mode: Optional[bool] = None,
     ) -> dict:
         """执行单次代码审查（不走修复循环）。
 
@@ -383,6 +508,9 @@ class CodeReviewer:
         参数:
             review_target: 审查目标（如为None则自动生成）
             modification_history: 修改历史
+            use_tools: Agent使用的工具列表（默认为None，使用内置默认）
+            non_interactive: 是否非交互模式（默认使用初始化时的设置）
+            quick_mode: 是否极速模式（默认使用初始化时的设置）
 
         返回:
             dict: 审查结果，包含 ok/issues/summary 字段
@@ -418,15 +546,37 @@ class CodeReviewer:
             PrettyOutput.auto_print(f"⚠ 创建审查模型失败: {e}")
             return {"ok": True, "issues": [], "summary": f"审查模型创建失败: {e}"}
 
-        review_agent = Agent(
-            model=review_model,
-            system_prompt=system_prompt,
-            name="Code Reviewer",
-            need_summary=True,
-            summary_prompt=summary_prompt,
-            use_methodology=False,
-            use_analysis=False,
+        # 使用传入参数或初始化时的设置
+        effective_non_interactive = (
+            non_interactive if non_interactive is not None else self.non_interactive
         )
+        effective_quick_mode = quick_mode if quick_mode is not None else self.quick_mode
+
+        if use_tools is not None:
+            review_agent = Agent(
+                model=review_model,
+                system_prompt=system_prompt,
+                name="Code Reviewer",
+                need_summary=True,
+                summary_prompt=summary_prompt,
+                use_methodology=False,
+                use_analysis=False,
+                non_interactive=effective_non_interactive,
+                quick_mode=effective_quick_mode,
+                use_tools=use_tools,
+            )
+        else:
+            review_agent = Agent(
+                model=review_model,
+                system_prompt=system_prompt,
+                name="Code Reviewer",
+                need_summary=True,
+                summary_prompt=summary_prompt,
+                use_methodology=False,
+                use_analysis=False,
+                non_interactive=effective_non_interactive,
+                quick_mode=effective_quick_mode,
+            )
 
         PrettyOutput.auto_print("🔍 正在执行代码审查...")
         review_result = review_agent.run(user_prompt)
@@ -435,7 +585,9 @@ class CodeReviewer:
         if not review_result:
             return {"ok": True, "issues": [], "summary": "审查未返回结果"}
 
-        parsed_result = self.parse_review_result(str(review_result))
+        parsed_result = self.parse_review_result(
+            str(review_result), review_agent=review_agent
+        )
 
         # 7. 展示审查结果
         if parsed_result.get("ok", True):
@@ -496,3 +648,190 @@ class CodeReviewer:
 
 请根据上述问题进行修复，确保代码正确实现用户需求。"""
         return prompt
+
+    def run_review_with_fix(
+        self,
+        modification_history: str = "",
+        max_iterations: int = 3,
+        use_tools: Optional[list] = None,
+        non_interactive: Optional[bool] = None,
+        quick_mode: Optional[bool] = None,
+        on_fix: Optional[Any] = None,
+        on_generate_fix_summary: Optional[Any] = None,
+        on_handle_uncommitted_changes: Optional[Any] = None,
+    ) -> None:
+        """执行审查+修复循环。
+
+        每轮审查发现问题后，调用 on_fix 回调进行修复，然后继续下一轮审查，
+        直到审查通过或达到最大迭代次数。
+
+        参数:
+            modification_history: 初始修改历史
+            max_iterations: 最大审查轮数（0表示无限）
+            use_tools: Agent使用的工具列表
+            non_interactive: 是否非交互模式
+            quick_mode: 是否极速模式
+            on_fix: 修复回调函数，接收 fix_prompt 字符串，用于执行修复
+            on_generate_fix_summary: 生成修复总结的回调函数，返回字符串
+            on_handle_uncommitted_changes: 处理未提交更改的回调函数
+        """
+        from jarvis.jarvis_utils.input import user_confirm
+
+        iteration = 0
+        # 如果 max_iterations 为 0，表示无限 review
+        is_infinite = max_iterations == 0
+
+        while is_infinite or iteration < max_iterations:
+            iteration += 1
+
+            # 每轮review开始前询问用户
+            effective_non_interactive = (
+                non_interactive if non_interactive is not None else self.non_interactive
+            )
+            if not user_confirm(
+                f"是否进行第 {iteration} 轮代码审查？",
+                default=True if effective_non_interactive else False,
+            ):
+                PrettyOutput.auto_print(f"ℹ️ 用户跳过第 {iteration} 轮代码审查")
+                break
+
+            # 获取 git diff
+            git_diff = self.check_and_get_git_diff()
+            if git_diff is None:
+                return
+
+            # 每轮审查开始前显示清晰的提示信息
+            if is_infinite:
+                PrettyOutput.auto_print(
+                    f"🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
+                )
+            else:
+                PrettyOutput.auto_print(
+                    f"🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
+                )
+
+            if is_infinite:
+                PrettyOutput.auto_print(
+                    f"🔍 开始第 {iteration} 轮代码审查...（无限模式）"
+                )
+            else:
+                PrettyOutput.auto_print(
+                    f"🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
+                )
+
+            # 对 git diff 进行 token 限制处理
+            truncated_git_diff = self.truncate_diff_for_review(
+                git_diff, token_ratio=0.4
+            )
+            if truncated_git_diff != git_diff:
+                PrettyOutput.auto_print("⚠️ git diff 过长，已截断以适应 token 限制")
+
+            # 生成审查目标
+            review_target = self.generate_review_target()
+
+            # 构建 review prompts
+            sys_prompt, usr_prompt, sum_prompt = self.build_review_prompts(
+                review_target,
+                truncated_git_diff,
+                modification_history,
+                self.start_commit,
+            )
+
+            # 创建并运行 review agent
+            from jarvis.jarvis_agent import Agent
+
+            effective_quick_mode = (
+                quick_mode if quick_mode is not None else self.quick_mode
+            )
+
+            if use_tools is not None:
+                review_agent = Agent(
+                    system_prompt=sys_prompt,
+                    name=f"CodeReview-Agent-{iteration}",
+                    summary_prompt=sum_prompt,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=use_tools,
+                    non_interactive=effective_non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                    quick_mode=effective_quick_mode,
+                )
+            else:
+                review_agent = Agent(
+                    system_prompt=sys_prompt,
+                    name=f"CodeReview-Agent-{iteration}",
+                    summary_prompt=sum_prompt,
+                    need_summary=True,
+                    auto_complete=True,
+                    non_interactive=effective_non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                    quick_mode=effective_quick_mode,
+                )
+
+            # 运行 review
+            summary = review_agent.run(usr_prompt)
+
+            # 解析审查结果，支持格式修复和重新review
+            result = self.parse_review_result(
+                str(summary) if summary else "", review_agent=review_agent
+            )
+
+            # 检查是否需要重新review（JSON格式错误3次修复失败）
+            if result.get("need_re_review", False):
+                PrettyOutput.auto_print(
+                    f"🔄 JSON格式修复失败，重新进行代码审查（第 {iteration} 轮）"
+                )
+                # 跳过当前迭代，重新开始review流程
+                continue
+
+            if result["ok"]:
+                PrettyOutput.auto_print(f"✅ 代码审查通过（第 {iteration} 轮）")
+                if result.get("summary"):
+                    PrettyOutput.auto_print(f"   {result['summary']}")
+                return
+
+            # 审查未通过，需要修复
+            PrettyOutput.auto_print(f"⚠️ 代码审查发现问题（第 {iteration} 轮）")
+            for i, issue in enumerate(result.get("issues", []), 1):
+                issue_type = issue.get("type", "未知")
+                description = issue.get("description", "无描述")
+                location = issue.get("location", "未知位置")
+                suggestion = issue.get("suggestion", "无建议")
+                PrettyOutput.auto_print(f"   {i}. [{issue_type}] {description}")
+                PrettyOutput.auto_print(f"      位置: {location}")
+                PrettyOutput.auto_print(f"      建议: {suggestion}")
+
+            # 只有在非无限模式下才检查是否达到最大迭代次数
+            if not is_infinite and iteration >= max_iterations:
+                PrettyOutput.auto_print(
+                    f"⚠️ 已达到最大审查轮数（{max_iterations} 轮），停止审查"
+                )
+                return
+
+            # 构建修复 prompt
+            fix_prompt = self.build_review_fix_prompt(result)
+
+            PrettyOutput.auto_print("🔧 开始修复问题...")
+
+            # 调用修复回调
+            if on_fix:
+                try:
+                    on_fix(fix_prompt)
+                except RuntimeError as e:
+                    PrettyOutput.auto_print(f"⚠️ 修复过程中出错: {e}")
+                    return
+
+            # 处理未提交的更改
+            if on_handle_uncommitted_changes:
+                on_handle_uncommitted_changes()
+
+            # 生成修复总结并追加到修改历史
+            if on_generate_fix_summary:
+                fix_summary = on_generate_fix_summary()
+                PrettyOutput.auto_print(f"🔍 修复总结: {fix_summary}")
+                if fix_summary:
+                    modification_history += (
+                        f"\n\n【第 {iteration} 轮修复总结】\n{fix_summary}"
+                    )
