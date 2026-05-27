@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.tag import ct
-from jarvis.jarvis_utils.tag import ot
 
 DEFAULT_SUMMARY_PROMPT = """<report>
 请生成任务执行的上下文结构化总结报告，作为后续对话的"无关键信息缺失"上下文支撑：
@@ -396,46 +394,46 @@ def get_task_analysis_prompt(
 
     # 输出要求部分
     if has_generate_new_tool:
-        output_requirements = f"""<output_requirements>
+        output_requirements = """<output_requirements>
 根据分析结果，输出以下三种情况之一：
 1. 如果现有工具/方法论可以解决，直接输出说明：
 已有工具/方法论可以解决该问题，无需创建新内容。
 可用的工具/方法论：[列出工具名称或方法论名称]
 使用方法：[简要说明如何使用]
 2. 工具创建（如果需要创建新工具）:
-{ot("TOOL_CALL")}
-{{
+```
+{
   "want": "创建新工具来解决XXX问题",
   "name": "meta_agent",
-  "arguments": {{
+  "arguments": {
     "tool_name": "工具名称",
     "function_description": "工具的详细功能描述，说明工具要解决的具体问题和预期行为"
-  }}
-}}
-{ct("TOOL_CALL")}
+  }
+}
+```
 
 3. 方法论创建（如果需要创建新方法论）:
 判断标准：
 - 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
 - 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
 
-{ot("TOOL_CALL")}
-{{
+```
+{
   "want": "添加/更新xxxx的方法论",
   "name": "methodology",
-  "arguments": {{
+  "arguments": {
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
     "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
     "content": "方法论内容（支持普通字符串格式）"
-  }}
-}}
-{ct("TOOL_CALL")}
+  }
+}
+```
 
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     else:
-        output_requirements = f"""<output_requirements>
+        output_requirements = """<output_requirements>
 根据分析结果，输出以下三种情况之一：
 1. 如果现有工具/方法论可以解决，直接输出说明：
 已有工具/方法论可以解决该问题，无需创建新内容。
@@ -448,18 +446,18 @@ def get_task_analysis_prompt(
 - 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
 - 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
 
-{ot("TOOL_CALL")}
-{{
+```
+{
   "want": "添加/更新xxxx的方法论",
   "name": "methodology",
-  "arguments": {{
+  "arguments": {
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
     "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
     "content": "方法论内容（支持普通字符串格式）"
-  }}
-}}
-{ct("TOOL_CALL")}
+  }
+}
+```
 
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""

@@ -161,7 +161,7 @@ class PromptManager:
         addon_prompt = f"""
 <system_prompt>
     请判断是否已经完成任务，如果已经完成：
-    {complete_prompt if complete_prompt else f"- 直接输出完成原因，不需要再有新的操作，不要输出{ot('TOOL_CALL')}标签"}
+    {complete_prompt if complete_prompt else "- 直接输出完成原因，不需要再有新的操作"}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充

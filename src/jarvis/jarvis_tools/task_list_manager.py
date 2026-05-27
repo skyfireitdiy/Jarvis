@@ -23,7 +23,7 @@ from jarvis.jarvis_utils.config import (
     get_max_input_token_count,
     get_llm_group,
 )
-from jarvis.jarvis_utils.tag import ot, ct
+from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.git_utils import (
     get_latest_commit_hash,
     get_diff_between_commits,
@@ -941,7 +941,7 @@ class task_list_manager:
         Returns:
             str: 工具描述
         """
-        description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
+        description = """任务列表管理工具，供LLM管理复杂任务拆分和执行。
 
 **核心功能：**
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
@@ -976,63 +976,63 @@ class task_list_manager:
 **使用示例**
 创建任务列表：
 ```
-{ot("TOOL_CALL")}
-{{
+```
+{
     "name": "task_list_manager",
-    "arguments": {{
+    "arguments": {
         "action": "add_tasks",
         "main_goal": "创建任务列表",
         "background": "背景信息",
         "tasks_info": [
-            {{
+            {
                 "task_name": "任务1",
                 "task_desc": "任务1描述",
                 "expected_output": "任务1预期输出",
                 "agent_type": "main",
                 "dependencies": []
-            }}
-            {{
+            },
+            {
                 "task_name": "任务2",
                 "task_desc": "任务2描述",
                 "expected_output": "任务2预期输出",
                 "agent_type": "sub",
                 "dependencies": ["任务1"]
-            }}
+            }
         ]
-    }}
-}}
-{ct("TOOL_CALL")}
+    }
+}
+```
 ```
 
 执行任务：
 ```
-{ot("TOOL_CALL")}
-{{
+```
+{
     "name": "task_list_manager",
-    "arguments": {{
+    "arguments": {
         "action": "execute_task",
         "task_id": "任务ID",
         "additional_info": "任务详细信息"
-    }}
-}}
-{ct("TOOL_CALL")}
+    }
+}
+```
 ```
 
 更新任务状态：
 ```
-{ot("TOOL_CALL")}
-{{
+```
+{
     "name": "task_list_manager",
-    "arguments": {{
+    "arguments": {
         "action": "update_task",
         "task_id": "任务ID",
-        "task_update_info": {{
+        "task_update_info": {
             "status": "completed",
             "actual_output": "任务实际输出"
-        }}
-    }}
-}}
-{ct("TOOL_CALL")}
+        }
+    }
+}
+```
 ```
 
 
