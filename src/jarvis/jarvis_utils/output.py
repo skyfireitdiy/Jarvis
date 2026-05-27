@@ -1612,9 +1612,11 @@ class PrettyOutput:
         duration = end_time - start_time
         response_tokens = (
             get_context_token_count(response)
+            + get_context_token_count(reasoning_content)
             if get_context_token_count is not None
             else 0
         )
+
         generation_time = (
             duration - first_token_time if duration > first_token_time else duration
         )

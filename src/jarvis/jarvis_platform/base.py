@@ -351,7 +351,9 @@ class BasePlatform(ABC):
             duration = end_time - start_time
 
             # 计算性能指标
-            response_tokens = get_context_token_count(response)
+            response_tokens = get_context_token_count(
+                response
+            ) + get_context_token_count(reasoning_content)
             generation_time = max(
                 0.0,
                 duration - first_token_time
