@@ -6192,20 +6192,34 @@ function appendExecution(payload, agentId = null) {
   
   // 处理执行结束事件
   if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
-    // 如果termInfo.terminal不存在，说明是重连后收到的消息，不应该结束execution
+    // 如果termInfo.terminal不存在，可能是后台执行的命令（DOM未渲染导致terminal未初始化）
+    // 也可能是重连后收到的消息（allChunks为空，没有实际数据）
+    // 后台执行的场景需要正确标记execution为已完成，避免切回时多余重建xterm
     if (!termInfo.terminal) {
-      console.log(`[terminal] Execution ${executionId} received tool_stream_end but terminal not initialized, ignoring (reconnect scenario)`)
-      return
+      if (termInfo.allChunks && termInfo.allChunks.length > 0) {
+        // 后台执行场景：有数据但terminal未初始化，需要正确结束execution
+        console.log(`[terminal] Execution ${executionId} received tool_stream_end in background (terminal not initialized but has chunks), marking as finished`)
+      } else {
+        // 重连场景：没有数据，忽略tool_stream_end
+        console.log(`[terminal] Execution ${executionId} received tool_stream_end but terminal not initialized and no chunks, ignoring (reconnect scenario)`)
+        return
+      }
     }
     console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
     termInfo.active = false
     termInfo.ended = true
     isExecuting.value = false // 更新执行状态
+
+    // 保存终端内容到消息列表
+    // 优先从terminal buffer获取内容，否则从allChunks拼接（后台执行场景）
+    let terminalContent = ''
+    if (termInfo.terminal) {
+      terminalContent = getTerminalBufferContent(termInfo.terminal, true)
+    } else if (termInfo.allChunks && termInfo.allChunks.length > 0) {
+      terminalContent = termInfo.allChunks.join('')
+    }
     // 清理chunks，避免已完成的终端被恢复
     termInfo.allChunks = []
-    
-    // 保存终端内容到消息列表
-    const terminalContent = termInfo.terminal ? getTerminalBufferContent(termInfo.terminal, true) : ''
     // 获取终端内容并保存
     try {
       console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
