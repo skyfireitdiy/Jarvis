@@ -172,6 +172,7 @@ description: "无法明确归类到以上场景的其他开发任务"
 - 要创建文件，使用 edit_file（配合空 search 参数）而不是 cat with heredoc 或 echo 重定向
 - 要搜索文件，使用 rg 或 fd 而不是 find 或 ls
 - 要搜索文件内容，使用 rg 而不是 grep
+- **⚠️ rg 用法警告**：rg 的 `-r` 参数是替换（replace）功能，不是递归搜索！禁止使用 `rg -rn`，这会将所有匹配替换为字符 n。正确用法：`rg 'pattern' path/`（默认递归搜索，无需 -r）；显示行号用 `-n`：`rg -n 'pattern' path/`
 - **仅将 Bash 工具用于系统命令和需要 shell 执行的终端操作**。如果你不确定且有相关的专用工具，默认使用专用工具，只有在绝对必要时才回退使用 Bash 工具
 
 **并行工具调用**：
