@@ -1230,6 +1230,7 @@ class PrettyOutput:
         def _update_panel_subtitle(
             pnl: Panel,
             response: str,
+            reasoning_content: str,
             is_completed: bool = False,
             duration: float = 0.0,
             first_tok_time: float = 0.0,
@@ -1245,7 +1246,9 @@ class PrettyOutput:
                     response
                 )
                 if is_completed:
-                    response_tokens = get_context_token_count(response)
+                    response_tokens = get_context_token_count(
+                        response
+                    ) + get_context_token_count(reasoning_content)
                     generation_time = (
                         duration - first_tok_time
                         if duration > first_tok_time
@@ -1352,7 +1355,9 @@ class PrettyOutput:
                     )
 
                     if should_update_subtitle:
-                        _update_panel_subtitle(panel, response, is_completed=False)
+                        _update_panel_subtitle(
+                            panel, response, reasoning_content, is_completed=False
+                        )
                         last_subtitle_update_time = current_time
 
                     try:
@@ -1473,6 +1478,7 @@ class PrettyOutput:
                 _update_panel_subtitle(
                     panel,
                     response,
+                    reasoning_content,
                     is_completed=True,
                     duration=duration,
                     first_tok_time=first_token_time,
@@ -1482,6 +1488,7 @@ class PrettyOutput:
         # 发送流式结束事件
         response_tokens = (
             get_context_token_count(response)
+            + get_context_token_count(reasoning_content)
             if get_context_token_count is not None
             else 0
         )
