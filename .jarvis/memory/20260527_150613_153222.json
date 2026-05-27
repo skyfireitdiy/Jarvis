@@ -1,0 +1,8 @@
+{
+  "id": "20260527_150613_153222",
+  "type": "project_long_term",
+  "tags": ["architecture", "validate_summary", "refactoring", "keywords"],
+  "content": "_validate_summary方法已从层次化章节检查重构为扁平化关键字直接检测模式。关键字集合包含27个关键字覆盖7个章节（第8章为排除性指引无关键字），通过阈值为matched_count >= 5。返回值为tuple[bool, list[str]]，第二元素为未匹配关键字列表。调用方（约1497行和1647行）使用missing_sections变量名接收返回值，语义已从缺失章节名变为未匹配关键字，但功能兼容不受影响。",
+  "created_at": "2026-05-27T15:06:13.153268",
+  "updated_at": "2026-05-27T15:06:13.153273"
+}

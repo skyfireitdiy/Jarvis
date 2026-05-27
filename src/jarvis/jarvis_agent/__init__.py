@@ -1377,53 +1377,72 @@ class Agent:
         return response
 
     def _validate_summary(self, summary: str) -> tuple[bool, list[str]]:
-        """验证总结内容是否包含关键标题
+        """验证总结内容是否包含足够的关键词
+
+        直接检测关键字（扁平化），匹配5个以上关键字即通过。
+        关键字集合基于 SUMMARY_REQUEST_PROMPT 的8个章节结构。
 
         参数:
             summary: 生成的总结内容
 
         返回:
-            tuple[bool, list[str]]: (是否通过验证，缺失的标题列表)
+            tuple[bool, list[str]]: (是否通过验证，未匹配的关键字列表)
         """
         if not summary:
             return False, ["总结内容为空"]
 
-        # 定义关键标题（基于 SUMMARY_REQUEST_PROMPT 的结构）
-        # 使用宽松的匹配规则，匹配标题的核心关键词
-        key_sections = [
-            ("目标层次结构", ["整体目标", "阶段目标", "目标变化"]),
-            ("任务状态矩阵", ["已完成", "进行中", "待完成"]),
-            ("关键信息导航系统", ["关键信息位置", "关键文件路径"]),
-            (
-                "代码开发专项信息",
-                ["代码变更", "错误与调试", "测试与验证", "技术决策", "未完成工作"],
-            ),
-            ("上下文完整性检查", ["检查清单", "完整性检查"]),
+        # 基于 SUMMARY_REQUEST_PROMPT 的关键字集合（扁平化，直接检测）
+        keywords = [
+            # 1. 目标层次结构
+            "整体目标",
+            "阶段目标",
+            "目标变化",
+            # 2. 任务状态矩阵
+            "已完成",
+            "进行中",
+            "部分完成",
+            "待完成",
+            # 3. 关键信息导航系统
+            "关键信息位置",
+            "关键文件路径",
+            # 4. 代码开发专项信息
+            "代码变更",
+            "错误与调试",
+            "测试与验证",
+            "技术决策",
+            "未完成工作",
+            # 5. 上下文完整性检查
+            "完整性检查",
+            "检查清单",
+            # 6. 核心技术与业务信息
+            "技术栈",
+            "架构决策",
+            "配置参数",
+            "代码位置",
+            "调试信息",
+            "接口定义",
+            "数据模型",
+            "代码变更历史",
+            # 7. 我的偏好与约束
+            "偏好与约束",
+            "禁忌项",
+            "代码风格",
+            # 8. 可省略的冗余内容（无关键字，此章节为排除性指引）
         ]
 
-        missing_sections = []
+        unmatched_keywords = []
         matched_count = 0
 
-        for section_name, keywords in key_sections:
-            # 检查该章节是否有任何一个关键词出现在总结中
-            section_matched = False
-            for keyword in keywords:
-                if keyword in summary:
-                    section_matched = True
-                    break
-
-            if section_matched:
+        for keyword in keywords:
+            if keyword in summary:
                 matched_count += 1
             else:
-                missing_sections.append(section_name)
+                unmatched_keywords.append(keyword)
 
-        # 计算通过率（超过一半即通过）
-        total_sections = len(key_sections)
-        threshold = total_sections / 2
+        # 匹配5个以上关键字即通过
+        is_valid = matched_count >= 5
 
-        is_valid = matched_count > threshold
-
-        return is_valid, missing_sections
+        return is_valid, unmatched_keywords
 
     def generate_summary(self, for_token_limit: bool = False) -> str:
         """生成对话历史摘要
