@@ -488,6 +488,53 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             visualize_diff_enhanced(diff_text, mode="side_by_side")
             return "", True
 
+        elif tag == "Review":
+            # 处理Review命令，执行单次代码审查
+            # 检查是否为CodeAgent
+            agent_type = getattr(agent, "_agent_type", "normal")
+            if agent_type != "code_agent":
+                PrettyOutput.auto_print(
+                    "⚠ Review 命令仅支持 CodeAgent，当前 Agent 不支持代码审查"
+                )
+                return "", True
+
+            # 创建 CodeReviewer 并执行单次审查
+            from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
+
+            reviewer = CodeReviewer(
+                model=agent.model,
+                start_commit=agent.start_commit
+                if hasattr(agent, "start_commit")
+                else None,
+                non_interactive=agent.non_interactive
+                if hasattr(agent, "non_interactive")
+                else True,
+                quick_mode=agent.quick_mode if hasattr(agent, "quick_mode") else False,
+            )
+            result = reviewer.run_single_review()
+
+            # 审查通过，直接返回
+            if result.get("ok", True):
+                return "", True
+
+            # 审查有问题，询问用户是否将问题反馈到下一轮对话
+            issues = result.get("issues", [])
+            if not issues:
+                return "", True
+
+            from jarvis.jarvis_utils.input import user_confirm
+
+            if user_confirm(
+                "是否将审查发现的问题反馈到下一轮对话进行修复？",
+                default=False,
+            ):
+                # 使用CodeReviewer构建修复prompt
+                review_prompt = CodeReviewer.build_review_fix_prompt(result)
+                return review_prompt, False
+            else:
+                PrettyOutput.auto_print("ℹ️ 用户选择不反馈审查问题")
+                return "", True
+
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)

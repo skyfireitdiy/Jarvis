@@ -189,6 +189,7 @@ BUILTIN_COMMANDS = [
     ("SetConfig", "修改全局配置"),
     ("Diff", "显示从start_commit到当前的变更"),
     ("Image", "添加图片到下一条消息"),
+    ("Review", "代码审查"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
