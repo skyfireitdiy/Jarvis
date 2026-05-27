@@ -163,6 +163,7 @@ class AgentRunLoop:
                                     i += 1
                                 if i < len(response) and response[i : i + 3] == "```":
                                     i += 3
+                                last_end = i
                                 continue
                         except Exception:
                             pass
