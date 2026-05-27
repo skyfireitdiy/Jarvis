@@ -96,6 +96,7 @@ class AgentRunLoop:
         from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
         # 纯JSON协议：扫描并移除所有包含name和arguments字段的JSON对象
+        # 同时清理周围的 ```json 或 ``` 标记
         filtered = ""
         last_end = 0
         i = 0
@@ -118,16 +119,62 @@ class AgentRunLoop:
                     except Exception:
                         pass
                 i += 1
+            elif response[i : i + 3] == "```":
+                # 检测 ``` 或 ```json 标记，如果是工具调用JSON前后的标记则跳过
+                fence_end = i + 3
+                # 跳过可选的 "json" 关键字
+                if (
+                    fence_end < len(response)
+                    and response[fence_end : fence_end + 4].lower() == "json"
+                ):
+                    fence_end += 4
+                # 跳过 ``` 后的空白和换行
+                while fence_end < len(response) and response[fence_end] in (
+                    " ",
+                    "\t",
+                    "\n",
+                    "\r",
+                ):
+                    fence_end += 1
+                # 检查 ``` 之后是否紧跟一个工具调用JSON
+                if fence_end < len(response) and response[fence_end] == "{":
+                    json_str, json_end = extract_json_from_text(response, fence_end)
+                    if json_str:
+                        try:
+                            parsed = json_loads(json_str)
+                            if (
+                                isinstance(parsed, dict)
+                                and "name" in parsed
+                                and "arguments" in parsed
+                            ):
+                                # 跳过整个 ```json
+                                # {...}
+                                # ``` 块
+                                filtered += response[last_end:i]
+                                last_end = json_end
+                                i = json_end
+                                # 检查结尾是否有 ``` 标记
+                                while i < len(response) and response[i] in (
+                                    " ",
+                                    "\t",
+                                    "\n",
+                                    "\r",
+                                ):
+                                    i += 1
+                                if i < len(response) and response[i : i + 3] == "```":
+                                    i += 3
+                                continue
+                        except Exception:
+                            pass
+                i += 1
             else:
                 i += 1
         filtered += response[last_end:]
 
         # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
         filtered = re.sub(r"\n{3,}", "\n\n", filtered)
-
         # 过滤掉 [MODE:xxx] 模式标记
         filtered = re.sub(r"\[MODE:[^\]]+\]", "", filtered)
-
         return filtered.strip()
 
     def _handle_interrupt_with_input(self) -> Optional[str]:
