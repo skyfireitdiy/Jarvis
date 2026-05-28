@@ -1,0 +1,8 @@
+{
+  "id": "20260528_040923_388208",
+  "type": "project_long_term",
+  "tags": ["bug修复", "execution", "xterm", "is_finished", "前端"],
+  "content": "execution消息is_finished状态不一致导致xterm误重建的bug修复：\n\n问题：loadHistoryMessages加载历史时，当前allOutputs中is_finished为undefined的execution消息被当作'未完成'保留，导致模板重建xterm。即使命令已执行完毕，由于页面刷新/重连等原因is_finished未被正确设置。\n\n根因：创建execution消息时(5962行)未设置is_finished，默认为undefined。!undefined===true，被识别为未完成。\n\n修复：在保留未完成execution消息前，检查历史消息(processedMessages)中是否已有相同execution_id且is_finished=true的记录，如果有则跳过保留。\n\n关键代码位置：App.vue 3128-3140行 loadHistoryMessages函数\n模板判断：109行 v-if='!item.is_finished' 决定是否创建xterm",
+  "created_at": "2026-05-28T04:09:23.388249",
+  "updated_at": "2026-05-28T04:09:23.388255"
+}
