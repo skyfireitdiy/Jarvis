@@ -3957,7 +3957,6 @@ async function connectToAgent(agent, retryCount = 0) {
           console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
           return
         }
-        console.log(`[AGENT ${agentId}] message`, message)
         handleMessage(message, agentId)
       }
       
@@ -4834,7 +4833,7 @@ async function fetchAgentList() {
     if (!response.ok) return
     
     const result = await response.json()
-    console.log('[AGENT] List:', result)
+
     
     // 更新列表（后端返回格式: { success: true, data: agents }）
     if (result.success && result.data) {
@@ -6070,7 +6069,6 @@ function renderMessageHtml(payload) {
         return renderSideBySideDiff(diffData)
       }
     } catch (e) {
-      console.error('[DIFF] Failed to parse side by side diff:', e)
       return escapeHtml(payload.text || '')
     }
   }
@@ -6159,7 +6157,6 @@ function appendOutput(payload, agentId = null) {
       if (shouldAutoScroll && outputList.value) {
         const scrollHeight = outputList.value.scrollHeight
         outputList.value.scrollTop = scrollHeight
-        console.log('[SCROLL] Auto-scrolled to bottom')
       }
     })
   })
