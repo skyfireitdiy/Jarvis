@@ -210,7 +210,6 @@ EMOJI_TO_OUTPUT_TYPE = {
     "🎬": OutputType.STREAM_START,
     "▶️": OutputType.STREAM_CHUNK,
     "🏁": OutputType.STREAM_END,
-    "🔄": OutputType.DIFF,
 }
 
 
