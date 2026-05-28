@@ -67,9 +67,6 @@ function saveMessage(message) {
     if (messages.length > MAX_TOTAL_MESSAGES) {
       const removeCount = messages.length - MAX_TOTAL_MESSAGES;
       messages.splice(0, removeCount);
-      console.log(
-        `[historyStorage] Removed ${removeCount} old messages to stay within limit`,
-      );
     }
 
     saveAllMessages(messages);
@@ -104,9 +101,6 @@ function saveMessages(messages) {
     if (allMessages.length > MAX_TOTAL_MESSAGES) {
       const removeCount = allMessages.length - MAX_TOTAL_MESSAGES;
       allMessages.splice(0, removeCount);
-      console.log(
-        `[historyStorage] Removed ${removeCount} old messages to stay within limit`,
-      );
     }
 
     saveAllMessages(allMessages);
