@@ -95,7 +95,7 @@
     <!-- 消息列表 -->
     <main class="chat-container">
       <div class="messages" ref="outputList">
-        <article v-for="(item, index) in outputs" :key="index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
+        <article v-for="(item, index) in outputs" :key="item._stableId || index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
           <div class="message-content">
             <button class="icon-btn copy-message-btn" @click="copyToClipboard(item.text, index)" title="复制到剪贴板" v-if="item.text">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3102,12 +3102,17 @@ async function loadHistoryMessages(prepend = false) {
           msg.is_finished = true
         }
         const html = renderMessageHtml(msg)
+        // 生成稳定ID，避免v-for使用index作为key导致DOM重建
+        const stableId = msg.execution_id
+          ? `exec_${msg.execution_id}`
+          : msg._stableId || `msg_${msg.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`
         return {
           ...msg,
           html,
           timestamp: msg.timestamp || '',
           agent_name: msg.agent_name || '',
-          non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false
+          non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false,
+          _stableId: stableId,
         }
       })
     console.log(`🚨 [loadHistoryMessages] After filtering: ${processedMessages.length} messages`)
@@ -3279,7 +3284,7 @@ async function connect() {
       console.warn('[ws] message parse failed', event.data)
       return
     }
-    console.log('[ws] message', message)
+
     handleMessage(message)
   }
   ws.onclose = (event) => {
@@ -5771,12 +5776,12 @@ function handleMessage(message, agentId = null) {
   const { type, payload } = message
   
   // 调试：记录所有收到的消息类型
-  console.log(`[ws] Received message type: ${type}`, {execution_id: payload?.execution_id})
+
   
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
   if (type === 'ready') {
-    console.log('[ws] ready payload', payload)
+
     // 恢复之前的输入请求状态
     if (lastInputRequest.value) {
       console.log('[ws] Restoring input request from previous session')
@@ -5789,8 +5794,6 @@ function handleMessage(message, agentId = null) {
       })
     }
   } else if (type === 'output') {
-    // 非 execution 消息，清空终端缓存
-    clearTerminalCache(targetAgentId)
     const outputType = payload?.output_type
     
     // 处理流式输出
@@ -5849,9 +5852,7 @@ function handleMessage(message, agentId = null) {
       appendOutput(payload, targetAgentId)
     }
   } else if (type === 'input_request') {
-    // 非 execution 消息，清空终端缓存
-    clearTerminalCache(targetAgentId)
-    console.log('[ws] input_request', payload)
+
     const requestAgentId = targetAgentId
     pendingInputAgentId.value = requestAgentId
     
@@ -5915,9 +5916,7 @@ function handleMessage(message, agentId = null) {
       }
     })
   } else if (type === 'confirm') {
-    // 非 execution 消息，清空终端缓存
-    clearTerminalCache(targetAgentId)
-    console.log('[ws] confirm', payload)
+
     pendingConfirmAgentId.value = targetAgentId
     showConfirm(
       payload.message || '请确认',
@@ -5930,13 +5929,6 @@ function handleMessage(message, agentId = null) {
       payload.default !== undefined ? payload.default : true
     )
   } else if (type === 'execution') {
-    console.log('[ws] execution event received:', {
-      event_type: payload?.event_type,
-      execution_id: payload?.execution_id,
-      message_type: payload?.message_type,
-      has_data: 'data' in payload,
-      data_len: payload?.data?.length || 0,
-    })
     appendExecution(payload, targetAgentId)
     // 只在首次创建终端时创建输出项
     const executionId = payload?.execution_id || 'default'
@@ -5948,7 +5940,6 @@ function handleMessage(message, agentId = null) {
     // 独立终端（execution_id 以 'terminal_' 开头）不需要创建聊天消息
     // 因为它们的输出会直接写入终端面板，由 appendExecution 处理
     if (!existingItem && !executionId.startsWith('terminal_')) {
-      console.log(`[ws] Creating new output item for execution ${executionId}`)
       appendOutput({
         output_type: 'execution',
         text: '',
@@ -5956,22 +5947,10 @@ function handleMessage(message, agentId = null) {
         payload: payload, // 保存 payload 以便后续使用
         execution_id: executionId,
       }, targetAgentId)
-      // 等待 DOM 渲染完成后立即初始化终端
-      nextTick(() => {
-        console.log(`[ws] DOM rendered, initializing terminal ${executionId}`)
-        const hostEl = terminalHosts.value.get(executionSessionKey)
-        if (hostEl) {
-          setTerminalRef(executionId, hostEl, targetAgentId)
-        } else {
-          console.warn(`[ws] terminal-host element not found for execution ${executionSessionKey}`)
-        }
-      })
-    } else {
-      console.log('[ws] output item already exists for execution_id:', executionId)
+      // 终端初始化由模板 :ref 回调自动触发 setTerminalRef，无需手动调用
     }
   } else if (type === 'terminal_created') {
     // 独立终端创建成功
-    console.log('[ws] terminal_created', payload)
     isCreatingTerminalSession.value = false
     const terminalId = payload?.terminal_id
     const nodeId = payload?.node_id
@@ -6004,15 +5983,12 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'terminal_closed') {
     // 独立终端关闭
-    console.log('[ws] terminal_closed', payload)
     const terminalId = payload?.terminal_id
     if (terminalId) {
       // 检查终端是否还存在，避免重复关闭导致无限循环
       const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
       if (session) {
         closeTerminal(terminalId)
-      } else {
-        console.log(`[ws] terminal ${terminalId} already closed, ignoring`)
       }
     }
   } else if (type === 'error') {
@@ -6042,12 +6018,9 @@ function handleMessage(message, agentId = null) {
       lang: 'text',
     })
   } else if (type === 'status_update') {
-    console.log('[ws] status_update payload', payload)
-    console.log('[ws] status_update targetAgentId:', targetAgentId, 'currentAgentId:', currentAgentId.value)
     // 更新 Agent 执行状态
     if (payload?.execution_status) {
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
-      console.log('[ws] Agent execution status updated:', payload.execution_status, 'for agent:', targetAgentId)
 
       // 同步更新 agentList 中对应 agent 的状态，确保界面能及时响应
       const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
@@ -6058,7 +6031,6 @@ function handleMessage(message, agentId = null) {
         } else if (payload.execution_status === 'running') {
           agentInList.status = 'running'
         }
-        console.log('[ws] Synced agent status in agentList for agent:', targetAgentId, 'status:', agentInList.status)
       }
 
       // 当当前 Agent 开始思考时，自动滚动到底部
@@ -6071,7 +6043,6 @@ function handleMessage(message, agentId = null) {
       }
     }
   } else if (type === 'file_upload_response') {
-    console.log('[ws] file_upload_response', payload)
     handleFileUploadResponse(payload)
   }
 }
@@ -6113,6 +6084,11 @@ function appendOutput(payload, agentId = null) {
   const nonInteractive = payload?.non_interactive !== undefined ? payload?.non_interactive : (context.non_interactive || false)
   const resolvedAgentId = agentId || payload?.agent_id || context.agent_id || currentAgentId.value
   
+  // 生成稳定ID，避免v-for使用index作为key导致DOM重建
+  const stableId = payload?.execution_id
+    ? `exec_${payload.execution_id}`
+    : payload?._stableId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
   const outputItem = {
     ...payload,
     html,
@@ -6120,23 +6096,18 @@ function appendOutput(payload, agentId = null) {
     agent_name: agentName,
     non_interactive: nonInteractive,
     agent_id: resolvedAgentId,
+    _stableId: stableId,
   }
-  
-  console.log('[DEBUG] appendOutput outputItem:', outputItem)
-  console.log('[DEBUG] output_type:', outputItem.output_type)
-  console.log('[DEBUG] agent_name:', outputItem.agent_name)
-  console.log('[DEBUG] Generated class:', `message-${outputItem.output_type?.toLowerCase()}`)
-  
+
   // 确定目标 Agent ID：优先使用传入参数，其次使用消息自带 agent_id，最后回退到当前 Agent
   const targetAgentId = resolvedAgentId
   // 仅当前 Agent 的消息自动滚动到底部
   const shouldAutoScroll = isCurrentAgent(targetAgentId)
-  
+
   // 添加到目标 Agent 的消息列表
   const currentOutputs = allOutputs.value.get(targetAgentId) || []
   currentOutputs.push(outputItem)
-  console.log('[DEBUG] Pushed output, outputs.length:', currentOutputs.length, 'type:', outputItem.output_type)
-  
+
   // 保存消息到本地存储
   try {
     // 未完成的 execution 消息不保存，只在结束时保存一次
@@ -6159,10 +6130,10 @@ function appendOutput(payload, agentId = null) {
         is_finished: outputItem.is_finished,
         terminal_content: outputItem.terminal_content,
       }
-      console.log(`🚨 [appendOutput] Saving message: type=${outputItem.output_type}, execution_id=${outputItem.execution_id}, agent_id=${targetAgentId}`)
+
       historyStorage.saveMessage(messageToSave)
     } else {
-      console.log(`🚨 [appendOutput] Skipping unfinished execution: execution_id=${outputItem.execution_id}`)
+
     }
   } catch (error) {
     console.warn('[HISTORY] Failed to save message:', error)
@@ -6793,12 +6764,6 @@ function sendInputDirectly(text) {
   
   // 先将用户输入回显到聊天窗口（空消息或完成信号不显示）
   if (text && text !== '__CTRL_C_PRESSED__') {
-    console.log('[DEBUG] User input payload:', {
-      output_type: 'user_input',
-      agent_name: 'user',
-      text: text,
-      lang: 'text',
-    })
     appendOutput({
       output_type: 'user_input',
       agent_name: 'user',
@@ -6813,7 +6778,7 @@ function sendInputDirectly(text) {
       text: text,
     },
   }
-  console.log('[ws] send input_result', message)
+
   sendMessageToAgent(message)
   
   // 输入框现在是永久显示的，不需要隐藏
