@@ -1,0 +1,8 @@
+{
+  "id": "20260528_041820_796319",
+  "type": "project_long_term",
+  "tags": ["highlight.js", "vue", "diff渲染", "bug修复"],
+  "content": "highlight.js 不提供 vue 语言模块（Vue SFC 是组合语言 HTML+JS+CSS）。解决方案：在 highlight 函数中将 vue 降级为 xml 高亮：const effectiveLang = (lang === 'vue') ? 'xml' : lang。Vue SFC 本质是 XML 格式，xml 高亮效果合理。",
+  "created_at": "2026-05-28T04:18:20.796352",
+  "updated_at": "2026-05-28T04:18:20.796364"
+}
