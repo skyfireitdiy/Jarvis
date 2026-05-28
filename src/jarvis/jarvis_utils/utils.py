@@ -1952,6 +1952,96 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
             PrettyOutput.auto_print(f"⚠️ 无法写入git更新检查时间戳: {e}")
 
 
+def find_repeated_pattern(
+    text: str, min_pattern_len: int = 10, min_repeat_count: int = 2
+) -> Tuple[str, int, float]:
+    """查找字符串中的连续重复模式。
+
+    参数:
+        text: 要分析的字符串
+        min_pattern_len: 最小模式长度（默认10）
+        min_repeat_count: 最小重复次数（默认2）
+
+    返回:
+        Tuple[str, int, float]:
+            - 重复的字符串内容（找不到则返回空字符串）
+            - 重复次数（找不到则返回0）
+            - 重复内容占总内容的比例，0.0~1.0（找不到则返回0.0）
+    """
+    if not text or len(text) < min_pattern_len * min_repeat_count:
+        return "", 0, 0.0
+
+    best_pattern = ""
+    best_count = 0
+    best_ratio = 0.0
+    total_len = len(text)
+
+    max_pattern_len = min(total_len // min_repeat_count, total_len // 2)
+    for pattern_len in range(min_pattern_len, max_pattern_len + 1):
+        for start in range(total_len - pattern_len * min_repeat_count + 1):
+            candidate = text[start : start + pattern_len]
+            count = 0
+            pos = start
+            while pos + pattern_len <= total_len:
+                if text[pos : pos + pattern_len] == candidate:
+                    count += 1
+                    pos += pattern_len
+                else:
+                    break
+
+            if count >= min_repeat_count:
+                ratio = (count * pattern_len) / total_len
+                if ratio > best_ratio:
+                    best_pattern = candidate
+                    best_count = count
+                    best_ratio = ratio
+
+    return best_pattern, best_count, best_ratio
+
+
+def is_repeating_text(
+    text: str,
+    min_text_len: int = 1000,
+    min_total_repeat_len: int = 500,
+    min_repeat_count: int = 5,
+    min_ratio: float = 0.3,
+) -> Tuple[bool, str, int, float]:
+    """判断字符串是否开始异常重复。
+
+    判定标准:
+        - 字符串总长度 > min_text_len（默认1000）
+        - 重复内容总长度（模式长度×次数）> min_total_repeat_len（默认500）
+        - 重复次数 > min_repeat_count（默认5）
+        - 重复占比 > min_ratio（默认30%）
+
+    参数:
+        text: 要检测的字符串
+        min_text_len: 最小字符串总长度
+        min_total_repeat_len: 最小重复内容总长度（模式长度×次数）
+        min_repeat_count: 最小重复次数
+        min_ratio: 最小重复占比
+
+    返回:
+        Tuple[bool, str, int, float]:
+            - 是否判定为重复
+            - 重复的字符串内容
+            - 重复次数
+            - 重复占比
+    """
+    if len(text) <= min_text_len:
+        return False, "", 0, 0.0
+
+    pattern, count, ratio = find_repeated_pattern(
+        text, min_pattern_len=10, min_repeat_count=min_repeat_count
+    )
+
+    total_repeat_len = len(pattern) * count
+    if total_repeat_len > min_total_repeat_len and count > min_repeat_count and ratio > min_ratio:
+        return True, pattern, count, ratio
+
+    return False, pattern, count, ratio
+
+
 def extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str], int]:
     """从文本中提取完整的JSON对象（通过括号匹配）
 
