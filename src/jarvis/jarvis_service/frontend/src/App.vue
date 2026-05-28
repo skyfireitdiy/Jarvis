@@ -5829,7 +5829,6 @@ function handleMessage(message, agentId = null) {
       currentOutputs.push(streamingMessage)
       console.log('[STREAM] Created streaming message, total:', currentOutputs.length, 'agent:', targetAgentId)
     } else if (outputType === 'STREAM_CHUNK') {
-      console.log('[STREAM] Chunk event:', payload)
       // 追加到当前 Agent 的流式消息
       const streamingMessage = streamingMessages.value.get(targetAgentId)
       if (streamingMessage) {
