@@ -191,6 +191,8 @@ BUILTIN_COMMANDS = [
     ("Image", "添加图片到下一条消息"),
     ("Review", "代码审查"),
     ("InstallSkill", "安装Skill"),
+    ("SubAgent", "启动子Agent执行任务"),
+    ("SubCodeAgent", "启动子CodeAgent执行代码任务"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
