@@ -1,0 +1,8 @@
+{
+  "id": "20260528_012446_156590",
+  "type": "project_long_term",
+  "tags": ["Tool", "registry", "can_handle", "属性访问"],
+  "content": "Jarvis项目中Tool类（src/jarvis/jarvis_tools/base.py）使用属性访问（tool_info.parameters），不是dict，不能用.get()方法。兼容写法：tool_info.parameters if hasattr(tool_info, 'parameters') else tool_info.get('parameters', {})。Tool对象属性：name, description, parameters, func, protocol_version。",
+  "created_at": "2026-05-28T01:24:46.156637",
+  "updated_at": "2026-05-28T01:24:46.156644"
+}

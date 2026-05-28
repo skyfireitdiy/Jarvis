@@ -133,6 +133,23 @@ class ToolRegistry(OutputHandlerProtocol):
                 if marker in response:
                     return True
 
+        # 条件4：工具名和工具参数名同时出现在文本中——即使没有JSON结构也认为是工具调用意图
+        if self.tools:
+            for tool_name, tool_info in self.tools.items():
+                if tool_name in response:
+                    # 工具名出现，再检查其参数名是否也出现
+                    parameters = (
+                        tool_info.parameters
+                        if hasattr(tool_info, "parameters")
+                        else tool_info.get("parameters", {})
+                    )
+                    if isinstance(parameters, dict):
+                        properties = parameters.get("properties", {})
+                        if isinstance(properties, dict):
+                            for param_name in properties:
+                                if param_name in response:
+                                    return True
+
         return False
 
     def prompt(self) -> str:
