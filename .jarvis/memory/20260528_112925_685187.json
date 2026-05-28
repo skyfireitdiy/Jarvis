@@ -1,0 +1,8 @@
+{
+  "id": "20260528_112925_685187",
+  "type": "project_long_term",
+  "tags": ["WebSocket", "重连", "bug修复", "Agent", "onclose"],
+  "content": "WebSocket Agent连接空闲断开不重连的bug修复：\n根因：connectToAgent的onclose处理器中，connectionHandled标志在onopen时设为true，导致已建立连接断开时onclose直接return跳过所有重连逻辑。\n修复：将onclose中的判断从`if (connectionHandled) return`改为`if (connectionHandled && !ws._connectionCompleted) return`，区分两种情况：\n1. 连接未建立就断开（connectionHandled=true但_connectionCompleted=false）：忽略，由Promise reject处理\n2. 已建立连接断开（connectionHandled=true且_connectionCompleted=true）：执行重连逻辑\n当前Agent断开时自动延迟2秒后调用connectToAgent重连（retryCount=0），重连前检查是否已有新连接避免重复。后台Agent断开时保持原有静默重连逻辑。\n修改文件：src/jarvis/jarvis_service/frontend/src/App.vue 第4000-4055行",
+  "created_at": "2026-05-28T11:29:25.685218",
+  "updated_at": "2026-05-28T11:29:25.685223"
+}
