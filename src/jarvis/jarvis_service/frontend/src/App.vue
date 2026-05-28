@@ -960,9 +960,11 @@ marked.setOptions({
   renderer: markedRenderer,
   breaks: true, // 将单个换行符转换为 <br> 标签
   highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
+    // vue SFC 降级为 xml 高亮
+    const effectiveLang = (lang === 'vue') ? 'xml' : lang
+    if (effectiveLang && hljs.getLanguage(effectiveLang)) {
       try {
-        return hljs.highlight(code, { language: lang }).value
+        return hljs.highlight(code, { language: effectiveLang }).value
       } catch (e) {
         console.error('[highlight.js] Error highlighting code:', e)
       }
