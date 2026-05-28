@@ -1,0 +1,8 @@
+{
+  "id": "20260528_042055_783770",
+  "type": "project_long_term",
+  "tags": ["配置", "LLM", "API"],
+  "content": "Foxi API 配置信息：\n- API地址: https://foxi-api.cn/v1\n- API令牌: sk-szZY45Xdhbr12ma1vwntHxYyd5PxepVhU4ymHpVXTpKRv5qT\n- 可用模型: gpt-5.5, gpt-5.4\n- 分组倍率: 0.15\n- 免费额度: 100",
+  "created_at": "2026-05-28T04:20:55.783834",
+  "updated_at": "2026-05-28T04:20:55.783842"
+}
