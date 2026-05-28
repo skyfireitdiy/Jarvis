@@ -3023,8 +3023,8 @@ watch(completionSearch, async (newSearch) => {
   }
 })
 const completionSearchInput = ref(null) // 补全搜索输入框引用
-const completionsListRef = ref(null) // 补全列表容器引用
-const completionItemsRef = ref([]) // 补全条目元素引用数组
+const completionsModalRef = ref(null) // CompletionsModal组件引用
+const dirDialogRef = ref(null) // DirectoryDialog组件引用
 const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示未选中
 
 // 流式消息跟踪
@@ -4746,27 +4746,13 @@ function handleCompletionKeydown(event) {
 function scrollToSelected() {
   nextTick(() => {
     const modal = completionsModalRef.value
+    console.log('[SCROLL] completionsModalRef:', modal, 'selectedIndex:', selectedIndex.value)
     if (!modal) return
+    console.log('[SCROLL] itemRefs:', modal.itemRefs, 'length:', modal.itemRefs?.length)
     const selectedItem = modal.itemRefs?.[selectedIndex.value]
-    const listContainer = modal.listRef
-
-    if (selectedItem && listContainer) {
-      const containerRect = listContainer.getBoundingClientRect()
-
-      // 计算相对位置（考虑到可能的滚动偏移）
-      const itemTop = selectedItem.offsetTop
-      const itemBottom = itemTop + selectedItem.offsetHeight
-      const containerScrollTop = listContainer.scrollTop
-      const containerBottom = containerScrollTop + containerRect.height
-
-      // 如果选中条目在可视区域上方，滚动到显示它
-      if (itemTop < containerScrollTop) {
-        listContainer.scrollTop = itemTop
-      }
-      // 如果选中条目在可视区域下方，滚动到显示它
-      else if (itemBottom > containerBottom) {
-        listContainer.scrollTop = itemBottom - containerRect.height
-      }
+    console.log('[SCROLL] selectedItem:', selectedItem)
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
   })
 }
@@ -4775,25 +4761,19 @@ function scrollToSelected() {
 function scrollToDirSelected() {
   nextTick(() => {
     const dialog = dirDialogRef.value
+    console.log('[SCROLL-DIR] dirDialogRef:', dialog, 'selectedDirIndex:', selectedDirIndex.value)
     if (!dialog) return
     const listContainer = dialog.dirListRef
+    console.log('[SCROLL-DIR] listContainer:', listContainer)
     if (!listContainer) return
 
     // 找到选中项的DOM元素
     const items = listContainer.querySelectorAll('.dir-item')
+    console.log('[SCROLL-DIR] items count:', items.length, 'target index:', selectedDirIndex.value)
     const selectedItem = items[selectedDirIndex.value]
-    if (!selectedItem) return
-
-    const containerRect = listContainer.getBoundingClientRect()
-    const itemTop = selectedItem.offsetTop
-    const itemBottom = itemTop + selectedItem.offsetHeight
-    const containerScrollTop = listContainer.scrollTop
-    const containerBottom = containerScrollTop + containerRect.height
-
-    if (itemTop < containerScrollTop) {
-      listContainer.scrollTop = itemTop
-    } else if (itemBottom > containerBottom) {
-      listContainer.scrollTop = itemBottom - containerRect.height
+    console.log('[SCROLL-DIR] selectedItem:', selectedItem)
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
   })
 }
