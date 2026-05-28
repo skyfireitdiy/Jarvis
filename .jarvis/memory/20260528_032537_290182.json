@@ -1,0 +1,8 @@
+{
+  "id": "20260528_032537_290182",
+  "type": "project_long_term",
+  "tags": ["WebSocket", "Agent", "重连", "bug分析", "心跳机制"],
+  "content": "WebSocket Agent连接反复断开重连的根因分析：\n1. Agent WebSocket没有心跳/keepalive机制，空闲连接会被代理或后端超时断开\n2. connectToAgent的onclose处理器只在_connectionCompleted=false时重连，已建立的连接断开后不会自动重连\n3. selectAgent的while(!stableConnection)无限循环导致反复重试\n4. 后端AgentProxyManager的ws_timeout=60秒，空闲连接可能超时\n\n修复方案：\n1. 在Agent WebSocket添加心跳机制（每30秒发送ping消息）\n2. 在onclose中为已建立的连接添加自动重连逻辑\n3. 给selectAgent的稳定性循环添加最大重试次数限制\n4. 后端添加WebSocket ping/pong处理",
+  "created_at": "2026-05-28T03:25:37.290219",
+  "updated_at": "2026-05-28T03:25:37.290225"
+}

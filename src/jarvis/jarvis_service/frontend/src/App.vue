@@ -1091,6 +1091,7 @@ const restartFrontendService = ref(false) // 是否同时重启前端服务
 const reconnecting = ref(false) // 是否正在重连
 const reconnectAttempts = ref(0) // 当前重连尝试次数
 const reconnectTimer = ref(null) // 重连定时器
+const switchGeneration = ref(0) // 切换代数，用于取消旧的switchAgent操作
 const reconnectInterval = 5000 // 固定重连间隔（毫秒）
 const userDisconnected = ref(false) // 用户主动断开连接标志
 
@@ -3854,7 +3855,7 @@ async function connectToAgent(agent, retryCount = 0) {
       // 已连接，发送 get_status 请求以同步当前状态
       console.log(`[AGENT] Requesting status update for ${agent.name || agentId}`)
       existingWs.send(JSON.stringify({ type: 'get_status', payload: {} }))
-      return
+      return Promise.resolve(existingWs)
     }
     // 连接已断开或正在关闭，确保完全关闭后再清理
     console.log(`[AGENT] Previous connection to ${agent.name || agentId} was not OPEN, cleaning up...`)
@@ -3905,48 +3906,16 @@ async function connectToAgent(agent, retryCount = 0) {
       const timeoutId = setTimeout(() => {
         if (connectionHandled) return
         connectionHandled = true
-        
+
         console.error(`[AGENT ${agentId}] Connection timeout after ${connectionTimeout}ms`)
         ws.close()
-        
-        // 等待连接关闭后再重试
-        const retryWithCleanup = async () => {
-          // 清理可能存在的旧连接
-          const oldWs = sockets.value.get(agentId)
-          if (oldWs && oldWs !== ws && oldWs.readyState !== WebSocket.CLOSED) {
-            console.log(`[AGENT ${agentId}] Cleaning up old connection before retry`)
-            oldWs.close()
-            await new Promise(resolve => {
-              const check = setInterval(() => {
-                if (oldWs.readyState === WebSocket.CLOSED) {
-                  clearInterval(check)
-                  resolve()
-                }
-              }, 50)
-              setTimeout(() => {
-                clearInterval(check)
-                resolve()
-              }, 500)
-            })
-            sockets.value.delete(agentId)
-          }
-          
-          if (retryCount < maxRetries) {
-            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
-            agentConnecting.value = false
-            setTimeout(() => {
-              connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-            }, retryDelay)
-          } else {
-            agentConnecting.value = false
-            const error = new Error(`Connection failed after ${maxRetries} retries`)
-            console.error(`[AGENT ${agentId}]`, error.message)
-            reject(error)
-          }
-        }
-        
-        retryWithCleanup()
-      }, connectionTimeout) // 结束 setTimeout
+        sockets.value.delete(agentId)
+        if (agentConnecting.value) agentConnecting.value = false
+
+        // 只通知超时，不重连
+        // 重连由switchAgent的稳定性循环统一管理
+        reject(new Error(`Connection timeout after ${connectionTimeout}ms`))
+      }, connectionTimeout)
       
       // 绑定消息处理
       ws.onmessage = (event) => {
@@ -3955,6 +3924,11 @@ async function connectToAgent(agent, retryCount = 0) {
           message = JSON.parse(event.data)
         } catch (error) {
           console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
+          return
+        }
+        // 处理心跳pong响应
+        if (message.type === 'pong') {
+          ws._lastPongTime = Date.now()
           return
         }
         handleMessage(message, agentId)
@@ -3982,51 +3956,70 @@ async function connectToAgent(agent, retryCount = 0) {
         
         // 标记连接已完成（在onclose中用于判断是否需要重试）
         ws._connectionCompleted = true
-        
+
+        // 启动心跳机制
+        ws._lastPongTime = Date.now()
+        const heartbeatInterval = 30000 // 30秒发送一次心跳
+        const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
+        ws._heartbeatTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            // 检查是否超时未收到pong
+            if (ws._lastPongTime && (Date.now() - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
+              console.warn(`[AGENT ${agentId}] Heartbeat timeout, closing connection`)
+              clearInterval(ws._heartbeatTimer)
+              ws.close()
+              return
+            }
+            try {
+              ws.send(JSON.stringify({ type: 'ping' }))
+            } catch (e) {
+              console.warn(`[AGENT ${agentId}] Failed to send heartbeat`, e)
+              clearInterval(ws._heartbeatTimer)
+            }
+          } else {
+            clearInterval(ws._heartbeatTimer)
+          }
+        }, heartbeatInterval)
+
         // 连接成功，resolve Promise
         resolve(ws)
       }
       
       ws.onclose = (event) => {
+        // 清理心跳定时器
+        if (ws._heartbeatTimer) {
+          clearInterval(ws._heartbeatTimer)
+          ws._heartbeatTimer = null
+        }
+
         if (connectionHandled) {
           console.log(`[AGENT ${agentId}] Connection already handled, ignoring onclose`)
           return
         }
         connectionHandled = true
-        
+
         clearTimeout(timeoutId)
         console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason}`)
         sockets.value.delete(agentId)
         if (agentConnecting.value) agentConnecting.value = false
-        
-        // 如果连接未完成就关闭，视为失败，触发重试
-        if (!ws._connectionCompleted && retryCount < maxRetries) {
-          console.log(`[AGENT ${agentId}] Connection closed before completion, retrying... (${retryCount + 1}/${maxRetries})`)
-          
-          // 等待当前连接完全关闭后再重试（避免与后端连接冲突）
-          const retryAfterClose = async () => {
-            if (ws.readyState !== WebSocket.CLOSED) {
-              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
-              await new Promise(resolve => {
-                const check = setInterval(() => {
-                  if (ws.readyState === WebSocket.CLOSED) {
-                    clearInterval(check)
-                    resolve()
-                  }
-                }, 50)
-                setTimeout(() => {
-                  clearInterval(check)
-                  resolve()
-                }, 500)
-              })
-            }
-            
-            console.log(`[AGENT ${agentId}] Retrying... (${retryCount + 1}/${maxRetries})`)
-            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
+
+        // 如果断开的Agent不是当前活跃的Agent，静默重连（后台Agent需要保持消息接收）
+        if (agentId !== currentAgentId.value) {
+          console.log(`[AGENT ${agentId}] Background agent disconnected, silently reconnecting...`)
+          if (retryCount < maxRetries) {
+            setTimeout(() => {
+              connectToAgent({ agent_id: agentId, name: agentId, node_id: agent?.node_id }, retryCount + 1)
+                .catch(e => console.warn(`[AGENT ${agentId}] Background reconnect failed:`, e.message))
+            }, retryDelay)
           }
-          
-          setTimeout(retryAfterClose, retryDelay)
+          reject(new Error('Background agent disconnected'))
+          return
         }
+
+        // 当前Agent断开：只清理和通知，不重连
+        // 重连由switchAgent的稳定性循环统一管理，避免多个重连路径竞争
+        console.log(`[AGENT ${agentId}] Current agent disconnected, stability loop will handle reconnect`)
+        reject(new Error(`Connection closed: code=${event.code}, reason=${event.reason || 'unknown'}`))
       }
       
       ws.onerror = (error) => {
@@ -4035,42 +4028,16 @@ async function connectToAgent(agent, retryCount = 0) {
           return
         }
         connectionHandled = true
-        
+
         clearTimeout(timeoutId)
         console.error(`[AGENT ${agentId}] Connection error:`, error)
         if (agentConnecting.value) agentConnecting.value = false
-        
-        // 触发重试
-        if (retryCount < maxRetries) {
-          console.log(`[AGENT ${agentId}] Error occurred, retrying... (${retryCount + 1}/${maxRetries})`)
-          
-          // 关闭并等待连接完全关闭后再重试
-          const retryAfterError = async () => {
-            ws.close()
-            if (ws.readyState !== WebSocket.CLOSED) {
-              console.log(`[AGENT ${agentId}] Waiting for connection to fully close...`)
-              await new Promise(resolve => {
-                const check = setInterval(() => {
-                  if (ws.readyState === WebSocket.CLOSED) {
-                    clearInterval(check)
-                    resolve()
-                  }
-                }, 50)
-                setTimeout(() => {
-                  clearInterval(check)
-                  resolve()
-                }, 500)
-              })
-            }
-            
-            connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
-          }
-          
-          setTimeout(retryAfterError, retryDelay)
-        } else {
-          const err = new Error(`Connection failed after ${maxRetries} retries`)
-          reject(err)
-        }
+
+        // 只清理和通知，不重连
+        // 重连由switchAgent的稳定性循环统一管理
+        ws.close()
+        sockets.value.delete(agentId)
+        reject(new Error('Connection error'))
       }
       
     } catch (error) {
@@ -5573,7 +5540,9 @@ async function toggleNodeExpand(agentId, node) {
 
 // 切换当前工作的 Agent
 async function switchAgent(agent) {
-  console.log('[AGENT] switchAgent called with:', agent)
+  // 递增切换代数，使旧的switchAgent操作失效
+  const thisGeneration = ++switchGeneration.value
+  console.log(`[AGENT] switchAgent called with generation=${thisGeneration}:`, agent)
 
   // 移动端：切换 agent 后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
   if (windowWidth.value <= 768) {
@@ -5619,8 +5588,11 @@ async function switchAgent(agent) {
   console.log('[AGENT] Switching to:', agent)
   console.log('[AGENT] Current sockets before switch:', [...sockets.value.keys()])
   console.log('[AGENT] Current agent statuses:', [...agentStatuses.value.keys()])
-  // 清理当前agent的终端实例（切换离开时，保留termInfo以便切换回来时重建）
+  // 注意：不关闭旧Agent的WebSocket连接，保留以便切回时复用
+  // 旧连接断开时，onclose会检查currentAgentId，如果不是当前Agent则不重连
   const previousAgentId = currentAgentId.value
+
+  // 清理当前agent的终端实例（切换离开时，保留termInfo以便切换回来时重建）
   if (previousAgentId) {
     console.log(`[AGENT] Cleaning up terminal instances for previous agent: ${previousAgentId}`)
     let cleanedCount = 0
@@ -5680,36 +5652,71 @@ async function switchAgent(agent) {
       console.log('[AGENT DEBUG] windowWidth.value:', windowWidth.value, ', 768 threshold:', windowWidth.value <= 768)
       return
     }
-    // 等待连接稳定（Agent启动需要时间，持续重试直到成功）
+    // 等待连接稳定（Agent启动需要时间，有限重试）
     let stableConnection = false
     let retryCount = 0
-    // 移除重试次数限制，等待Agent完全启动
-    
-    while (!stableConnection) {
-      await connectToAgent(agent)
-      
-      // 验证连接是否真的成功，并等待一小段时间确保连接稳定
+    const maxStabilityRetries = 20 // 最大稳定性验证重试次数
+
+    while (!stableConnection && retryCount < maxStabilityRetries) {
+      // 检查是否有新的switchAgent调用
+      if (switchGeneration.value !== thisGeneration) {
+        console.log(`[AGENT] Generation mismatch, aborting old switch`)
+        return
+      }
+
+      // 只在连接不存在或已断开时才创建新连接
+      const existingWs = sockets.value.get(agent.agent_id)
+      if (!existingWs || existingWs.readyState !== WebSocket.OPEN) {
+        // 清理已断开的旧连接
+        if (existingWs && existingWs.readyState !== WebSocket.CLOSED) {
+          existingWs.close()
+        }
+        if (existingWs) {
+          sockets.value.delete(agent.agent_id)
+        }
+        try {
+          await connectToAgent(agent)
+        } catch (e) {
+          console.warn(`[AGENT] connectToAgent failed: ${e.message}`)
+        }
+
+        // 检查代数是否变化
+        if (switchGeneration.value !== thisGeneration) {
+          console.log(`[AGENT] Generation changed during connect, aborting old switch`)
+          return
+        }
+      }
+
+      // 验证连接是否稳定
       const ws = sockets.value.get(agent.agent_id)
       if (ws && ws.readyState === WebSocket.OPEN) {
-        // 等待2000ms，确保连接稳定（Agent启动需要更长时间）
+        // 等待2000ms，确保连接稳定
         await new Promise(resolve => setTimeout(resolve, 2000))
-        
+
+        // 检查代数是否变化
+        if (switchGeneration.value !== thisGeneration) {
+          console.log(`[AGENT] Generation changed during wait, aborting old switch`)
+          return
+        }
+
         // 再次检查连接是否仍然有效
         if (ws.readyState === WebSocket.OPEN) {
           console.log('[AGENT] Connection verified successfully')
           stableConnection = true
         } else {
           retryCount++
-          console.warn(`[AGENT] Connection closed after ${retryCount} tries, retrying...`)
-          // 等待2秒后继续重试
+          console.warn(`[AGENT] Connection not stable after ${retryCount} tries, retrying...`)
           await new Promise(resolve => setTimeout(resolve, 2000))
         }
       } else {
         retryCount++
-        console.warn(`[AGENT] Connection failed after ${retryCount} tries, retrying...`)
-        // 等待2秒后继续重试
+        console.warn(`[AGENT] Connection not established after ${retryCount} tries, retrying...`)
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
+    }
+
+    if (!stableConnection) {
+      console.warn(`[AGENT] Failed to establish stable connection after ${maxStabilityRetries} retries`)
     }
     
     console.log(`[AGENT] Stable connection established after ${retryCount} retries`)
