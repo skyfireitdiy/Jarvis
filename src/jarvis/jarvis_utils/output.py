@@ -19,6 +19,7 @@ from typing import Callable
 from typing import Dict
 from typing import Generator
 from typing import List
+from typing import Literal
 from typing import Optional
 from typing import Tuple
 from datetime import datetime
@@ -923,6 +924,28 @@ class PrettyOutput:
         )
 
     @staticmethod
+    def _left_aligned_heading_rich_console(
+        self: Any, rich_console: Any, options: Any
+    ) -> Any:
+        """自定义 Rich Markdown Heading 渲染，让标题左对齐。"""
+        from rich import box
+        from rich.panel import Panel
+        from rich.text import Text
+
+        text = self.text
+        text.justify = "left"
+        if self.tag == "h1":
+            yield Panel(
+                text,
+                box=box.HORIZONTALS,
+                style="markdown.h1.border",
+            )
+        else:
+            if self.tag == "h2":
+                yield Text("")
+            yield text
+
+    @staticmethod
     def print_markdown(
         content: str,
         title: Optional[str] = None,
@@ -943,28 +966,14 @@ class PrettyOutput:
         from rich import box
         from rich.markdown import Markdown, Heading
         from rich.panel import Panel
-        from rich.text import Text
 
         # 保存原始方法
         _original_rich_console = Heading.__rich_console__
 
-        def _left_aligned_heading_rich_console(self, console, options):
-            """自定义Heading渲染，让标题左对齐"""
-            text = self.text
-            text.justify = "left"  # 改为左对齐
-            if self.tag == "h1":
-                yield Panel(
-                    text,
-                    box=box.HORIZONTALS,
-                    style="markdown.h1.border",
-                )
-            else:
-                if self.tag == "h2":
-                    yield Text("")
-                yield text
-
         # 临时应用patch
-        Heading.__rich_console__ = _left_aligned_heading_rich_console  # type: ignore[method-assign]
+        setattr(
+            Heading, "__rich_console__", PrettyOutput._left_aligned_heading_rich_console
+        )
 
         try:
             # 创建Markdown渲染对象
@@ -983,7 +992,7 @@ class PrettyOutput:
             console.print(panel)
         finally:
             # 恢复原始方法
-            Heading.__rich_console__ = _original_rich_console  # type: ignore[method-assign]
+            setattr(Heading, "__rich_console__", _original_rich_console)
 
         # 通过事件系统输出到Gateway（用于Web界面）
         # 注意：只在 Gateway 模式下发送事件，避免 CLI 模式下重复打印
@@ -1005,7 +1014,7 @@ class PrettyOutput:
     def print_centered_panel(
         renderable: Any,
         title: Optional[str] = None,
-        title_align: str = "center",
+        title_align: Literal["left", "center", "right"] = "center",
         border_style: str = "blue",
         **kwargs: Any,
     ) -> None:
@@ -1026,7 +1035,7 @@ class PrettyOutput:
         panel = Panel(
             renderable,
             title=title,
-            title_align=title_align,  # type: ignore[arg-type]
+            title_align=title_align,
             border_style=border_style,
             box=box.HORIZONTALS,
             **kwargs,
@@ -1279,10 +1288,15 @@ class PrettyOutput:
                 else:
                     pnl.subtitle = f"[yellow]{current_time_str} | ({get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
-        from rich.markdown import Markdown
+        from rich.markdown import Markdown, Heading
+
+        _original_rich_console = Heading.__rich_console__
+        setattr(
+            Heading, "__rich_console__", PrettyOutput._left_aligned_heading_rich_console
+        )
 
         panel = Panel(
-            Markdown(""),
+            Markdown("", code_theme="monokai"),
             title=f"[bold cyan]{title}[/bold cyan]",
             subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
             border_style="cyan",
@@ -1314,7 +1328,7 @@ class PrettyOutput:
                 if show_cursor and content:
                     display_text = response + " ▌"
 
-                md_content = Markdown(display_text)
+                md_content = Markdown(display_text, code_theme="monokai")
 
                 with _lock:
                     # 直接更新panel的内部内容
@@ -1485,6 +1499,8 @@ class PrettyOutput:
                 },
             )
         )
+
+        setattr(Heading, "__rich_console__", _original_rich_console)
 
         return response, reasoning_content, first_token_time
 
