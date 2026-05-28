@@ -401,6 +401,136 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 PrettyOutput.auto_print("❌ 模型组切换失败或已取消。")
             return "", True
+        elif tag == "SubAgent":
+            # 启动子Agent执行任务，执行完毕后询问用户是否将结果反馈给当前Agent
+            try:
+                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+
+                tag_marker = "'<SubAgent>'"
+                tag_index = modified_input.find(tag_marker)
+                if tag_index == -1:
+                    PrettyOutput.auto_print("❌ Agent 命令格式错误")
+                    return "", True
+
+                # 提取标签后的任务描述
+                task_desc = modified_input[tag_index + len(tag_marker) :].strip()
+                if not task_desc:
+                    PrettyOutput.auto_print(
+                        "❌ 请提供任务描述，用法：@Agent <任务描述>"
+                    )
+                    return "", True
+
+                PrettyOutput.auto_print(f"🤖 启动子Agent执行任务: {task_desc[:50]}...")
+
+                # 使用 SubAgentTool 创建子Agent
+                sub_agent_tool = SubAgentTool()
+                result = sub_agent_tool.execute(
+                    {
+                        "task": task_desc,
+                        "name": "UserSubAgent",
+                        "system_prompt": "你是一个通用助手，负责完成用户指定的任务。请认真执行任务并返回结果。",
+                        "summary_prompt": "请总结你完成的任务和关键结果。",
+                        "background": f"用户通过 @Agent 命令启动子任务。当前工作目录: {os.getcwd()}",
+                        "agent": agent,
+                    }
+                )
+
+                if result.get("success"):
+                    stdout = result.get("stdout", "任务执行完成")
+                    PrettyOutput.auto_print("✅ 子Agent任务执行完成")
+                    PrettyOutput.auto_print(
+                        f"📋 执行结果:\n{stdout[:500]}"
+                        + ("..." if len(stdout) > 500 else "")
+                    )
+
+                    # 询问用户是否将结果反馈给当前Agent
+                    from jarvis.jarvis_utils.input import user_confirm
+
+                    if user_confirm(
+                        "是否将子Agent的结果反馈给当前Agent？",
+                        default=False,
+                    ):
+                        # 将结果作为提示词返回给当前Agent处理
+                        return (
+                            f"\n\n用户使用子Agent执行了任务：{task_desc}\n\n子Agent返回的结果是：\n{stdout}",
+                            False,
+                        )
+                    else:
+                        PrettyOutput.auto_print("ℹ️ 子Agent结果未反馈给当前Agent")
+                        return "", True
+                else:
+                    stderr = result.get("stderr", "未知错误")
+                    PrettyOutput.auto_print(f"❌ 子Agent执行失败: {stderr}")
+                    return "", True
+
+            except Exception as exc:
+                PrettyOutput.auto_print(f"❌ 启动子Agent失败: {str(exc)}")
+                return "", True
+        elif tag == "SubCodeAgent":
+            # 启动子CodeAgent执行代码任务，执行完毕后询问用户是否将结果反馈给当前Agent
+            try:
+                from jarvis.jarvis_code_agent.sub_code_agent import SubCodeAgentTool
+
+                tag_marker = "'<SubCodeAgent>'"
+                tag_index = modified_input.find(tag_marker)
+                if tag_index == -1:
+                    PrettyOutput.auto_print("❌ SubCodeAgent 命令格式错误")
+                    return "", True
+
+                # 提取标签后的任务描述
+                task_desc = modified_input[tag_index + len(tag_marker) :].strip()
+                if not task_desc:
+                    PrettyOutput.auto_print(
+                        "❌ 请提供任务描述，用法：@SubCodeAgent <任务描述>"
+                    )
+                    return "", True
+
+                PrettyOutput.auto_print(
+                    f"💻 启动子CodeAgent执行代码任务: {task_desc[:50]}..."
+                )
+
+                # 使用 SubCodeAgentTool 创建子CodeAgent
+                sub_code_agent_tool = SubCodeAgentTool()
+                result = sub_code_agent_tool.execute(
+                    {
+                        "task": task_desc,
+                        "name": "UserSubCodeAgent",
+                        "background": f"用户通过 @SubCodeAgent 命令启动子代码任务。当前工作目录: {os.getcwd()}",
+                        "agent": agent,
+                    }
+                )
+
+                if result.get("success"):
+                    stdout = result.get("stdout", "任务执行完成")
+                    PrettyOutput.auto_print("✅ 子CodeAgent任务执行完成")
+                    PrettyOutput.auto_print(
+                        f"📋 执行结果:\n{stdout[:500]}"
+                        + ("..." if len(stdout) > 500 else "")
+                    )
+
+                    # 询问用户是否将结果反馈给当前Agent
+                    from jarvis.jarvis_utils.input import user_confirm
+
+                    if user_confirm(
+                        "是否将子CodeAgent的结果反馈给当前Agent？",
+                        default=False,
+                    ):
+                        # 将结果作为提示词返回给当前Agent处理
+                        return (
+                            f"\n\n用户使用子CodeAgent执行了任务：{task_desc}\n\n子CodeAgent返回的结果是：\n{stdout}",
+                            False,
+                        )
+                    else:
+                        PrettyOutput.auto_print("ℹ️ 子CodeAgent结果未反馈给当前Agent")
+                        return "", True
+                else:
+                    stderr = result.get("stderr", "未知错误")
+                    PrettyOutput.auto_print(f"❌ 子CodeAgent执行失败: {stderr}")
+                    return "", True
+
+            except Exception as exc:
+                PrettyOutput.auto_print(f"❌ 启动子CodeAgent失败: {str(exc)}")
+                return "", True
         elif tag == "Btw":
             # 处理临时聊天命令，不干扰主 agent 上下文
             try:
@@ -490,6 +620,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
         elif tag == "InstallSkill":
             import subprocess
+
             tag_marker = "'<InstallSkill>'"
             tag_index = modified_input.find(tag_marker)
             inline_arg = ""
@@ -504,7 +635,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 return "", True
 
             skill_path = inline_arg.strip().strip('"').strip("'")
-            skills_dir = os.path.join(os.path.expanduser("~"), ".jarvis", "rules", "skills")
+            skills_dir = os.path.join(
+                os.path.expanduser("~"), ".jarvis", "rules", "skills"
+            )
             os.makedirs(skills_dir, exist_ok=True)
 
             # 判断是远程链接还是本地路径
@@ -521,7 +654,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     return "", True
 
                 try:
-                    PrettyOutput.auto_print(f"📦 正在从远程仓库安装 Skill: {skill_path}")
+                    PrettyOutput.auto_print(
+                        f"📦 正在从远程仓库安装 Skill: {skill_path}"
+                    )
                     result = subprocess.run(
                         ["git", "clone", skill_path, target_dir],
                         capture_output=True,
@@ -534,19 +669,28 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                         # clone 失败时清理目录
                         if os.path.exists(target_dir):
                             import shutil
+
                             shutil.rmtree(target_dir, ignore_errors=True)
-                        PrettyOutput.auto_print(f"❌ git clone 失败: {result.stderr.strip()}")
+                        PrettyOutput.auto_print(
+                            f"❌ git clone 失败: {result.stderr.strip()}"
+                        )
                 except subprocess.TimeoutExpired:
                     if os.path.exists(target_dir):
                         import shutil
+
                         shutil.rmtree(target_dir, ignore_errors=True)
                     PrettyOutput.auto_print("❌ git clone 超时（120秒）")
                 except Exception as e:
                     if os.path.exists(target_dir):
                         import shutil
+
                         shutil.rmtree(target_dir, ignore_errors=True)
                     PrettyOutput.auto_print(f"❌ 安装失败: {e}")
-            elif os.path.isabs(skill_path) or skill_path.startswith("./") or skill_path.startswith("../"):
+            elif (
+                os.path.isabs(skill_path)
+                or skill_path.startswith("./")
+                or skill_path.startswith("../")
+            ):
                 # 本地路径：创建软链接
                 if not os.path.exists(skill_path):
                     PrettyOutput.auto_print(f"❌ 本地路径不存在: {skill_path}")
@@ -563,7 +707,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 try:
                     abs_skill_path = os.path.abspath(skill_path)
                     os.symlink(abs_skill_path, link_path)
-                    PrettyOutput.auto_print(f"✅ Skill 软链接创建成功: {link_path} -> {abs_skill_path}")
+                    PrettyOutput.auto_print(
+                        f"✅ Skill 软链接创建成功: {link_path} -> {abs_skill_path}"
+                    )
                 except Exception as e:
                     PrettyOutput.auto_print(f"❌ 创建软链接失败: {e}")
             else:
