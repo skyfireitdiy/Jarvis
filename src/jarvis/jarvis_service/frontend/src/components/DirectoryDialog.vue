@@ -21,7 +21,7 @@
           @keydown="$emit('search-keydown', $event)"
         />
       </div>
-      <div class="dir-list" v-if="filteredDirs.length > 0">
+      <div class="dir-list" ref="dirListRef" v-if="filteredDirs.length > 0">
         <div
           v-for="dir in filteredDirs"
           :key="dir.path"
@@ -62,6 +62,7 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'update:searchText', 'cancel', 'confirm', 'refresh', 'go-parent', 'select', 'enter', 'search-keydown'])
 
 const searchInput = ref(null)
+const dirListRef = ref(null)
 
 watch(() => props.visible, (newVal) => {
   if (newVal) {
@@ -69,6 +70,12 @@ watch(() => props.visible, (newVal) => {
       searchInput.value?.focus()
     }, 100)
   }
+})
+
+// 暴露refs供父组件使用
+defineExpose({
+  searchInput,
+  dirListRef
 })
 </script>
 

@@ -485,6 +485,7 @@
 
     <!-- 补全列表弹窗 -->
     <CompletionsModal
+      ref="completionsModalRef"
       :visible="showCompletions"
       :searchText="completionSearch"
       :filteredCompletions="filteredCompletions"
@@ -540,6 +541,7 @@
 
     <!-- 目录选择对话框 -->
     <DirectoryDialog
+      ref="dirDialogRef"
       :visible="showDirDialog"
       :currentPath="currentDirPath"
       :selectedDir="selectedDir"
@@ -4338,10 +4340,12 @@ function handleDirSearchKeydown(event) {
     if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
       selectedDir.value = filteredDirList.value[selectedDirIndex.value].path
     }
+    // 滚动到选中项
+    scrollToDirSelected()
     event.preventDefault()
     return
   }
-  
+
   if (event.key === 'ArrowUp') {
     // 向上键：选择上一个目录
     if (selectedDirIndex.value > 0) {
@@ -4355,6 +4359,8 @@ function handleDirSearchKeydown(event) {
     if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
       selectedDir.value = filteredDirList.value[selectedDirIndex.value].path
     }
+    // 滚动到选中项
+    scrollToDirSelected()
     event.preventDefault()
     return
   }
@@ -4739,19 +4745,20 @@ function handleCompletionKeydown(event) {
 // 滚动到选中的条目
 function scrollToSelected() {
   nextTick(() => {
-    const selectedItem = completionItemsRef.value[selectedIndex.value]
-    const listContainer = completionsListRef.value
-    
+    const modal = completionsModalRef.value
+    if (!modal) return
+    const selectedItem = modal.itemRefs?.[selectedIndex.value]
+    const listContainer = modal.listRef
+
     if (selectedItem && listContainer) {
       const containerRect = listContainer.getBoundingClientRect()
-      const itemRect = selectedItem.getBoundingClientRect()
-      
+
       // 计算相对位置（考虑到可能的滚动偏移）
       const itemTop = selectedItem.offsetTop
       const itemBottom = itemTop + selectedItem.offsetHeight
       const containerScrollTop = listContainer.scrollTop
       const containerBottom = containerScrollTop + containerRect.height
-      
+
       // 如果选中条目在可视区域上方，滚动到显示它
       if (itemTop < containerScrollTop) {
         listContainer.scrollTop = itemTop
@@ -4760,6 +4767,33 @@ function scrollToSelected() {
       else if (itemBottom > containerBottom) {
         listContainer.scrollTop = itemBottom - containerRect.height
       }
+    }
+  })
+}
+
+// 滚动到选中的目录项
+function scrollToDirSelected() {
+  nextTick(() => {
+    const dialog = dirDialogRef.value
+    if (!dialog) return
+    const listContainer = dialog.dirListRef
+    if (!listContainer) return
+
+    // 找到选中项的DOM元素
+    const items = listContainer.querySelectorAll('.dir-item')
+    const selectedItem = items[selectedDirIndex.value]
+    if (!selectedItem) return
+
+    const containerRect = listContainer.getBoundingClientRect()
+    const itemTop = selectedItem.offsetTop
+    const itemBottom = itemTop + selectedItem.offsetHeight
+    const containerScrollTop = listContainer.scrollTop
+    const containerBottom = containerScrollTop + containerRect.height
+
+    if (itemTop < containerScrollTop) {
+      listContainer.scrollTop = itemTop
+    } else if (itemBottom > containerBottom) {
+      listContainer.scrollTop = itemBottom - containerRect.height
     }
   })
 }
