@@ -4004,14 +4004,19 @@ async function connectToAgent(agent, retryCount = 0) {
           ws._heartbeatTimer = null
         }
 
-        if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onclose`)
+        // 已建立的连接断开（connectionHandled=true 且 _connectionCompleted=true）
+        // 需要触发重连，而不是忽略
+        if (connectionHandled && !ws._connectionCompleted) {
+          console.log(`[AGENT ${agentId}] Connection already handled (not established), ignoring onclose`)
           return
         }
-        connectionHandled = true
 
-        clearTimeout(timeoutId)
-        console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason}`)
+        if (!connectionHandled) {
+          connectionHandled = true
+          clearTimeout(timeoutId)
+        }
+
+        console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason || 'unknown'}`)
         sockets.value.delete(agentId)
         if (agentConnecting.value) agentConnecting.value = false
 
@@ -4024,14 +4029,29 @@ async function connectToAgent(agent, retryCount = 0) {
                 .catch(e => console.warn(`[AGENT ${agentId}] Background reconnect failed:`, e.message))
             }, retryDelay)
           }
-          reject(new Error('Background agent disconnected'))
+          if (!ws._connectionCompleted) {
+            reject(new Error('Background agent disconnected'))
+          }
           return
         }
 
-        // 当前Agent断开：只清理和通知，不重连
-        // 重连由switchAgent的稳定性循环统一管理，避免多个重连路径竞争
-        console.log(`[AGENT ${agentId}] Current agent disconnected, stability loop will handle reconnect`)
-        reject(new Error(`Connection closed: code=${event.code}, reason=${event.reason || 'unknown'}`))
+        // 当前Agent断开：自动重连
+        console.log(`[AGENT ${agentId}] Current agent disconnected, auto-reconnecting in ${retryDelay}ms...`)
+        setTimeout(() => {
+          // 检查是否已有新连接，避免重复重连
+          const currentWs = sockets.value.get(agentId)
+          if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+            console.log(`[AGENT ${agentId}] Connection already re-established, skipping reconnect`)
+            return
+          }
+          connectToAgent({ agent_id: agentId, name: agentId, node_id: agent?.node_id }, 0)
+            .then(() => console.log(`[AGENT ${agentId}] Auto-reconnect succeeded`))
+            .catch(e => console.warn(`[AGENT ${agentId}] Auto-reconnect failed:`, e.message))
+        }, retryDelay)
+
+        if (!ws._connectionCompleted) {
+          reject(new Error(`Connection closed: code=${event.code}, reason=${event.reason || 'unknown'}`))
+        }
       }
       
       ws.onerror = (error) => {
