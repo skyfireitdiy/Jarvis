@@ -49,7 +49,7 @@ description: 当需要添加@触发的内置快捷命令时使用此规则——
 - 执行特定的系统功能
 - 格式为 `'<CommandName>'`
 
-**示例：** `'<Summary>'`、`'<Clear>'`、`'<FixToolCall>'`
+**示例：** `'<CommandName>'`（如具体的内置命令名）
 
 ## 你必须执行的操作
 
@@ -100,16 +100,7 @@ BUILTIN_REPLACE_MAP = {
 ```python
 # 内置命令标记列表（用于自动补全和 fzf）
 BUILTIN_COMMANDS = [
-    ("Summary", "总结"),
-    ("Pin", "固定/置顶内容"),
-    ("Clear", "清除历史"),
-    ("ToolUsage", "工具使用说明"),
-    ("ReloadConfig", "重新加载配置"),
-    ("SaveSession", "保存当前会话"),
-    ("RestoreSession", "恢复会话"),
-    ("ListSessions", "列出所有会话"),
-    ("Quiet", "无人值守模式"),
-    ("FixToolCall", "修复工具调用"),
+    # ("CommandName", "命令描述"),  # 按需添加，避免列出具体命令名触发额外行为
     ("YourCommand", "命令描述"),  # 添加新命令
 ]
 ```
