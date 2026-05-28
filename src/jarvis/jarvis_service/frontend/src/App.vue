@@ -3128,9 +3128,19 @@ async function loadHistoryMessages(prepend = false) {
     } else {
       // 保留未完成的execution消息（这些消息不会被保存到历史存储）
       const unfinishedExecutions = currentOutputs.filter(msg => msg.output_type === 'execution' && !msg.is_finished)
+      // 过滤掉历史中已存在的已完成execution（说明它实际已完成，只是当前消息状态未更新）
+      const trulyUnfinished = unfinishedExecutions.filter(msg => {
+        const historyFinished = processedMessages.some(h =>
+          h.output_type === 'execution' && h.execution_id === msg.execution_id && h.is_finished
+        )
+        if (historyFinished) {
+          console.log(`[HISTORY] Skipping execution ${msg.execution_id}: already finished in history`)
+        }
+        return !historyFinished
+      })
       // 只保留最新的一个未完成的execution消息（避免恢复多个xterm）
-      const latestUnfinishedExecution = unfinishedExecutions.length > 0 ? [unfinishedExecutions[unfinishedExecutions.length - 1]] : []
-      console.log(`[HISTORY] Preserving ${latestUnfinishedExecution.length} unfinished execution messages (was ${unfinishedExecutions.length})`)
+      const latestUnfinishedExecution = trulyUnfinished.length > 0 ? [trulyUnfinished[trulyUnfinished.length - 1]] : []
+      console.log(`[HISTORY] Preserving ${latestUnfinishedExecution.length} unfinished execution messages (was ${unfinishedExecutions.length}, filtered ${unfinishedExecutions.length - trulyUnfinished.length} already finished)`)
       // 合并历史消息和未完成的execution消息
       allOutputs.value.set(currentAgentId.value, [...processedMessages, ...latestUnfinishedExecution])
     }
