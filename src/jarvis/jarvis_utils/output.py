@@ -1185,6 +1185,7 @@ class PrettyOutput:
 
         from jarvis.jarvis_utils.config import get_conversation_turn_threshold
         from jarvis.jarvis_utils.config import is_immediate_abort
+        from jarvis.jarvis_utils.utils import is_repeating_text
 
         first_chunk = None
         first_token_time = 0.0
@@ -1309,6 +1310,8 @@ class PrettyOutput:
         last_subtitle_update_time = time.time()
         subtitle_update_interval = 1
         update_count = 0
+        last_repeating_check_len = 0
+        repeating_check_interval = 100
 
         with Live(panel, refresh_per_second=6, transient=True) as live:
 
@@ -1433,6 +1436,19 @@ class PrettyOutput:
                             )
                         )
 
+                    # 实时检测重复输出（包括推理内容）
+                    total_len = len(response) + len(reasoning_content)
+                    if total_len - last_repeating_check_len >= repeating_check_interval:
+                        last_repeating_check_len = total_len
+                        combined_text = reasoning_content + response
+                        is_repeating, _, _, _ = is_repeating_text(combined_text)
+                        if is_repeating:
+                            _flush_buffer()
+                            PrettyOutput.auto_print(
+                                "⚠ 检测到模型输出陷入重复，将自动重试"
+                            )
+                            return "", "", 0.0
+
                     if max_output > 0 and len(response) >= max_output:
                         _flush_buffer()
                         append_session_history(message, response)
@@ -1534,6 +1550,8 @@ class PrettyOutput:
         """
         import time
 
+        from jarvis.jarvis_utils.utils import is_repeating_text
+
         # 解析 prefix 获取 agent_name 和 model_name
         agent_name = ""
         model_name = ""
@@ -1548,6 +1566,8 @@ class PrettyOutput:
         response = ""
         reasoning_content = ""
         first_token_time = 0.0
+        last_repeating_check_len = 0
+        repeating_check_interval = 100
 
         # 发送流式开始事件
         emit_output(
@@ -1585,6 +1605,17 @@ class PrettyOutput:
                             timestamp=False,
                         )
                     )
+
+                # 实时检测重复输出（包括推理内容）
+                total_len = len(response) + len(reasoning_content)
+                if total_len - last_repeating_check_len >= repeating_check_interval:
+                    last_repeating_check_len = total_len
+                    combined_text = reasoning_content + response
+                    is_repeating, _, _, _ = is_repeating_text(combined_text)
+                    if is_repeating:
+                        PrettyOutput.auto_print("⚠ 检测到模型输出陷入重复，将自动重试")
+                        return "", "", 0.0
+
                 if max_output > 0 and len(response) >= max_output:
                     append_session_history(message, response)
                     return response, reasoning_content, first_token_time
