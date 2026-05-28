@@ -1955,7 +1955,10 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
 def find_repeated_pattern(
     text: str, min_pattern_len: int = 10, min_repeat_count: int = 2
 ) -> Tuple[str, int, float]:
-    """查找字符串中的连续重复模式。
+    """查找字符串末尾的连续重复模式。
+
+    利用重复模式出现在末尾的前提，从末尾反向构建 KMP 失配函数，
+    在 O(n) 时间内检测最小周期和重复次数。
 
     参数:
         text: 要分析的字符串
@@ -1971,30 +1974,55 @@ def find_repeated_pattern(
     if not text or len(text) < min_pattern_len * min_repeat_count:
         return "", 0, 0.0
 
+    total_len = len(text)
+
+    # 对反转文本构建 KMP 失配函数，O(n)
+    # 反转后，原来的"末尾重复"变成"开头重复"，KMP 可以直接检测
+    rev = text[::-1]
+    fail = [0] * total_len
+    j = 0
+    for i in range(1, total_len):
+        while j > 0 and rev[i] != rev[j]:
+            j = fail[j - 1]
+        if rev[i] == rev[j]:
+            j += 1
+        fail[i] = j
+
+    # 对反转文本的每个前缀（即原文本的后缀），求最小周期
+    # rev 的前缀 rev[0:i+1] 对应原文本的后缀 text[total_len-1-i:]
+    # 前缀长度 L = i + 1，周期 period = L - fail[i]（当 L % period == 0 时）
     best_pattern = ""
     best_count = 0
     best_ratio = 0.0
-    total_len = len(text)
+    checked_periods = set()
 
-    max_pattern_len = min(total_len // min_repeat_count, total_len // 2)
-    for pattern_len in range(min_pattern_len, max_pattern_len + 1):
-        for start in range(total_len - pattern_len * min_repeat_count + 1):
-            candidate = text[start : start + pattern_len]
-            count = 0
-            pos = start
-            while pos + pattern_len <= total_len:
-                if text[pos : pos + pattern_len] == candidate:
-                    count += 1
-                    pos += pattern_len
-                else:
-                    break
+    for i in range(min_pattern_len - 1, total_len):
+        L = i + 1  # 前缀长度（即后缀长度）
+        period = L - fail[i]
+        if L % period != 0:
+            continue
+        if period in checked_periods:
+            continue
+        checked_periods.add(period)
 
-            if count >= min_repeat_count:
-                ratio = (count * pattern_len) / total_len
-                if ratio > best_ratio:
-                    best_pattern = candidate
-                    best_count = count
-                    best_ratio = ratio
+        # 原文本中，末尾 L 个字符由 (L/period) 个周期为 period 的模式组成
+        # 但我们需要从末尾向前验证连续重复次数（可能超过 L/period）
+        # 因为重复可能延伸到前缀部分
+        pattern = text[total_len - period :]  # 原文本末尾的 period 长度
+        count = 0
+        pos = total_len
+        while pos >= period and text[pos - period : pos] == pattern:
+            count += 1
+            pos -= period
+
+        if count >= min_repeat_count:
+            ratio = (count * period) / total_len
+            if ratio > best_ratio:
+                best_pattern = pattern
+                best_count = count
+                best_ratio = ratio
+            if best_ratio > 0.9:
+                break
 
     return best_pattern, best_count, best_ratio
 
@@ -2036,7 +2064,11 @@ def is_repeating_text(
     )
 
     total_repeat_len = len(pattern) * count
-    if total_repeat_len > min_total_repeat_len and count > min_repeat_count and ratio > min_ratio:
+    if (
+        total_repeat_len > min_total_repeat_len
+        and count > min_repeat_count
+        and ratio > min_ratio
+    ):
         return True, pattern, count, ratio
 
     return False, pattern, count, ratio
