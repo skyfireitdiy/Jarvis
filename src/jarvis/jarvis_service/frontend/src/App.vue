@@ -407,7 +407,7 @@
         <textarea 
           v-if="inputMode === 'multi'"
           v-model="inputText" 
-          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter 发送)')"
+          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
           :disabled="isInputDisabled"
           @keydown="handleTextareaKeydown"
           @paste="handlePaste"
@@ -463,7 +463,7 @@
             @click="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? sendBufferedInput() : submitInput()" 
             :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'waiting_multi'))"
           >
-            {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter)' }}
+            {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter / Ctrl+D)' }}
           </button>
         </div>
       </div>
@@ -6629,8 +6629,8 @@ function handleTextareaKeydown(event) {
     return
   }
   
-  // Ctrl+Enter 提交输入
-  if (event.ctrlKey && event.key === 'Enter') {
+  // Ctrl+Enter / Ctrl+D 提交输入
+  if (event.ctrlKey && (event.key === 'Enter' || event.key.toLowerCase() === 'd')) {
     event.preventDefault()
     submitInput()
     return
