@@ -1,0 +1,8 @@
+{
+  "id": "20260527_234427_934609",
+  "type": "project_long_term",
+  "tags": ["xterm", "xterm重建", "terminal", "App.vue", "bug修复", "v-for key"],
+  "content": "xterm多余创建根因修复(2026-05-27)：\n1. 根因：v-for使用:index作为key，消息列表变化时Vue错误重建DOM，导致terminal-host div被销毁重建，触发setTerminalRef的needsRebuild路径\n2. 修复：改为使用item._stableId作为key，execution消息用exec_{execution_id}，其他消息用msg_{timestamp}_{random}\n3. 移除output/input_request/confirm消息中不必要的clearTerminalCache调用\n4. 移除nextTick中多余的setTerminalRef手动调用（模板:ref回调已自动触发）\n5. 修改文件：src/jarvis/jarvis_service/frontend/src/App.vue",
+  "created_at": "2026-05-27T23:44:27.934656",
+  "updated_at": "2026-05-27T23:44:27.934662"
+}

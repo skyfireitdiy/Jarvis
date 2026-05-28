@@ -488,6 +488,90 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             visualize_diff_enhanced(diff_text, mode="side_by_side")
             return "", True
 
+        elif tag == "InstallSkill":
+            import subprocess
+            tag_marker = "'<InstallSkill>'"
+            tag_index = modified_input.find(tag_marker)
+            inline_arg = ""
+            if tag_index != -1:
+                inline_arg = modified_input[tag_index + len(tag_marker) :].strip()
+            if not inline_arg:
+                PrettyOutput.auto_print(
+                    "❌ InstallSkill 需要参数，用法：\n"
+                    "  '<InstallSkill>' https://github.com/user/repo  # 从远程仓库安装\n"
+                    "  '<InstallSkill>' /path/to/local/skill        # 从本地路径安装（软链接）"
+                )
+                return "", True
+
+            skill_path = inline_arg.strip().strip('"').strip("'")
+            skills_dir = os.path.join(os.path.expanduser("~"), ".jarvis", "rules", "skills")
+            os.makedirs(skills_dir, exist_ok=True)
+
+            # 判断是远程链接还是本地路径
+            if skill_path.startswith(("http://", "https://", "git@", "ssh://")):
+                # 远程仓库：git clone
+                # 从URL提取仓库名作为目录名
+                repo_name = skill_path.rstrip("/").split("/")[-1]
+                if repo_name.endswith(".git"):
+                    repo_name = repo_name[:-4]
+                target_dir = os.path.join(skills_dir, repo_name)
+
+                if os.path.exists(target_dir):
+                    PrettyOutput.auto_print(f"❌ Skill 目录已存在: {target_dir}")
+                    return "", True
+
+                try:
+                    PrettyOutput.auto_print(f"📦 正在从远程仓库安装 Skill: {skill_path}")
+                    result = subprocess.run(
+                        ["git", "clone", skill_path, target_dir],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                    )
+                    if result.returncode == 0:
+                        PrettyOutput.auto_print(f"✅ Skill 安装成功: {target_dir}")
+                    else:
+                        # clone 失败时清理目录
+                        if os.path.exists(target_dir):
+                            import shutil
+                            shutil.rmtree(target_dir, ignore_errors=True)
+                        PrettyOutput.auto_print(f"❌ git clone 失败: {result.stderr.strip()}")
+                except subprocess.TimeoutExpired:
+                    if os.path.exists(target_dir):
+                        import shutil
+                        shutil.rmtree(target_dir, ignore_errors=True)
+                    PrettyOutput.auto_print("❌ git clone 超时（120秒）")
+                except Exception as e:
+                    if os.path.exists(target_dir):
+                        import shutil
+                        shutil.rmtree(target_dir, ignore_errors=True)
+                    PrettyOutput.auto_print(f"❌ 安装失败: {e}")
+            elif os.path.isabs(skill_path) or skill_path.startswith("./") or skill_path.startswith("../"):
+                # 本地路径：创建软链接
+                if not os.path.exists(skill_path):
+                    PrettyOutput.auto_print(f"❌ 本地路径不存在: {skill_path}")
+                    return "", True
+
+                # 获取链接名（使用路径最后一段目录名）
+                link_name = os.path.basename(os.path.normpath(skill_path))
+                link_path = os.path.join(skills_dir, link_name)
+
+                if os.path.exists(link_path) or os.path.islink(link_path):
+                    PrettyOutput.auto_print(f"❌ Skill 链接已存在: {link_path}")
+                    return "", True
+
+                try:
+                    abs_skill_path = os.path.abspath(skill_path)
+                    os.symlink(abs_skill_path, link_path)
+                    PrettyOutput.auto_print(f"✅ Skill 软链接创建成功: {link_path} -> {abs_skill_path}")
+                except Exception as e:
+                    PrettyOutput.auto_print(f"❌ 创建软链接失败: {e}")
+            else:
+                PrettyOutput.auto_print(
+                    "❌ 无效的参数，请提供远程仓库链接（http/https/ssh）或本地绝对路径"
+                )
+
+            return "", True
         elif tag == "Review":
             # 处理Review命令，执行单次代码审查
             # 检查是否为CodeAgent
