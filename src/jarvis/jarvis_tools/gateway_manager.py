@@ -20,6 +20,7 @@ class GatewayManagerTool:
     2. **list_agents**: 获取所有 Agent 列表
     3. **list_nodes**: 获取节点列表信息
     4. **list_model_groups**: 获取指定节点的模型组列表
+    5. **create_agent**: 创建新的 Agent
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -34,9 +35,10 @@ class GatewayManagerTool:
 2. **list_agents**: 获取所有 Agent 列表
 3. **list_nodes**: 获取节点列表信息，包括本节点配置、运行状态、已注册的子节点等
 4. **list_model_groups**: 获取指定节点的模型组列表，包括模型组名称、各档位模型配置等
+5. **create_agent**: 创建新的 Agent，支持指定类型、工作目录、模型组、任务等参数
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -49,8 +51,9 @@ class GatewayManagerTool:
                     "list_agents",
                     "list_nodes",
                     "list_model_groups",
+                    "create_agent",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -61,10 +64,59 @@ class GatewayManagerTool:
                 "type": "string",
                 "description": "要发送的消息内容（send_to_agent 操作必填）",
             },
-            # list_model_groups 操作的参数
+            # list_model_groups / create_agent 操作的参数
             "node_id": {
                 "type": "string",
-                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master）",
+                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点）",
+            },
+            # create_agent 操作的参数
+            "agent_type": {
+                "type": "string",
+                "description": "Agent 类型（create_agent 操作必填），如 code、chat 等",
+            },
+            "working_dir": {
+                "type": "string",
+                "description": "工作目录（create_agent 操作必填）",
+            },
+            "agent_name": {
+                "type": "string",
+                "description": "Agent 名称（create_agent 操作可选）",
+            },
+            "llm_group": {
+                "type": "string",
+                "description": "模型组名称（create_agent 操作可选，默认为 default）",
+            },
+            "tool_group": {
+                "type": "string",
+                "description": "工具组名称（create_agent 操作可选，默认为 default）",
+            },
+            "config_file": {
+                "type": "string",
+                "description": "配置文件路径（create_agent 操作可选）",
+            },
+            "task": {
+                "type": "string",
+                "description": "Agent 的初始任务描述（create_agent 操作可选，no_interaction_mode 时必填）",
+            },
+            "additional_args": {
+                "type": "string",
+                "description": "附加参数（create_agent 操作可选）",
+            },
+            "worktree": {
+                "type": "boolean",
+                "description": "是否使用 git worktree（create_agent 操作可选，默认为 false）",
+            },
+            "quick_mode": {
+                "type": "boolean",
+                "description": "是否启用快速模式（create_agent 操作可选，默认为 false）",
+            },
+            "restore_session": {
+                "type": "boolean",
+                "description": "是否恢复上一次会话（create_agent 操作可选，默认为 false）",
+            },
+            "no_interaction_mode": {
+                "type": "boolean",
+                "description": "是否启用无交互模式（create_agent 操作可选，默认为 false，启用时 task 必填）",
             },
         },
         "required": ["action"],
@@ -76,15 +128,39 @@ class GatewayManagerTool:
         agent_id: Optional[str] = None,
         message: str = "",
         node_id: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        working_dir: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        llm_group: Optional[str] = None,
+        tool_group: Optional[str] = None,
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[str] = None,
+        worktree: bool = False,
+        quick_mode: bool = False,
+        restore_session: bool = False,
+        no_interaction_mode: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
+            agent_type: Agent 类型（create_agent）
+            working_dir: 工作目录（create_agent）
+            agent_name: Agent 名称（create_agent）
+            llm_group: 模型组（create_agent）
+            tool_group: 工具组（create_agent）
+            config_file: 配置文件（create_agent）
+            task: 任务描述（create_agent）
+            additional_args: 附加参数（create_agent）
+            worktree: 是否使用 worktree（create_agent）
+            quick_mode: 快速模式（create_agent）
+            restore_session: 恢复会话（create_agent）
+            no_interaction_mode: 无交互模式（create_agent）
             **kwargs: 其他参数
 
         返回:
@@ -99,6 +175,22 @@ class GatewayManagerTool:
                 return self._list_nodes()
             elif action == "list_model_groups":
                 return self._list_model_groups(node_id)
+            elif action == "create_agent":
+                return self._create_agent(
+                    agent_type=agent_type,
+                    working_dir=working_dir,
+                    name=agent_name,
+                    llm_group=llm_group,
+                    tool_group=tool_group,
+                    config_file=config_file,
+                    task=task,
+                    additional_args=additional_args,
+                    worktree=worktree,
+                    quick_mode=quick_mode,
+                    restore_session=restore_session,
+                    no_interaction_mode=no_interaction_mode,
+                    node_id=node_id,
+                )
             else:
                 return {
                     "success": False,
@@ -367,6 +459,119 @@ class GatewayManagerTool:
             return {
                 "success": True,
                 "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _create_agent(
+        self,
+        agent_type: Optional[str] = None,
+        working_dir: Optional[str] = None,
+        name: Optional[str] = None,
+        llm_group: Optional[str] = None,
+        tool_group: Optional[str] = None,
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[str] = None,
+        worktree: bool = False,
+        quick_mode: bool = False,
+        restore_session: bool = False,
+        no_interaction_mode: bool = False,
+        node_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """创建新的 Agent。
+
+        通过 Web Gateway 的 POST /api/agents 接口创建 Agent，
+        支持跨节点创建（通过 node_id 参数指定目标节点）。
+
+        参数:
+            agent_type: Agent 类型（必填），如 code、chat 等
+            working_dir: 工作目录（必填）
+            name: Agent 名称
+            llm_group: 模型组名称
+            tool_group: 工具组名称
+            config_file: 配置文件路径
+            task: 初始任务描述
+            additional_args: 附加参数
+            worktree: 是否使用 git worktree
+            quick_mode: 是否启用快速模式
+            restore_session: 是否恢复上一次会话
+            no_interaction_mode: 是否启用无交互模式（启用时 task 必填）
+            node_id: 目标节点 ID
+
+        返回:
+            Dict[str, Any]: 创建结果
+        """
+        if not agent_type:
+            return {"success": False, "stdout": "", "stderr": "agent_type is required"}
+        if not working_dir:
+            return {"success": False, "stdout": "", "stderr": "working_dir is required"}
+        if no_interaction_mode and not task:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "task is required when no_interaction_mode is enabled",
+            }
+
+        err = self._get_master_url("create agent")
+        if err:
+            return err
+
+        # 构建请求体，只包含非空参数
+        body: Dict[str, Any] = {
+            "agent_type": agent_type,
+            "working_dir": working_dir,
+        }
+        if name:
+            body["name"] = name
+        if llm_group:
+            body["llm_group"] = llm_group
+        if tool_group:
+            body["tool_group"] = tool_group
+        if config_file:
+            body["config_file"] = config_file
+        if task:
+            body["task"] = task
+        if additional_args:
+            body["additional_args"] = additional_args
+        if worktree:
+            body["worktree"] = True
+        if quick_mode:
+            body["quick_mode"] = True
+        if restore_session:
+            body["restore_session"] = True
+        if no_interaction_mode:
+            body["no_interaction_mode"] = True
+        if node_id:
+            body["node_id"] = node_id
+
+        result = self._request_gateway(
+            method="POST",
+            path="/api/agents",
+            json_data=body,
+            error_prefix="Failed to create agent",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+
+            agent_info = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(agent_info, ensure_ascii=False, indent=2),
                 "stderr": "",
             }
         else:
