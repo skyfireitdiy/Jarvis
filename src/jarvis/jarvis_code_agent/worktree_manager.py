@@ -147,7 +147,7 @@ class WorktreeManager:
         2. 为运行时数据目录创建软链接（共享主仓库数据）
 
         这样设计的原因：
-        - .jarvis/rule和.jarvis/rules/需要独立，避免分支间修改冲突
+        - .jarvis/rule.md和.jarvis/rules/需要独立，避免分支间修改冲突
         - .jarvis/memory/等运行时数据需要共享，避免重复和混乱
 
         参数:
@@ -167,7 +167,7 @@ class WorktreeManager:
         # 定义需要独立复制的Git跟踪文件/目录
         # 这些文件在每个worktree中独立，避免分支间修改冲突
         git_tracked_items = [
-            "rule",  # .jarvis/rule
+            "rule.md",  # .jarvis/rule.md
             "rules",  # .jarvis/rules/
         ]
 

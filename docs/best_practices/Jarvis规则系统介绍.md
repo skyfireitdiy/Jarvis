@@ -80,7 +80,7 @@ Jarvis 规则系统是一套基于 Markdown 的规范化指令集合，用于指
 
 3. **分享**：选中的规则会被复制到中心规则仓库，保持原有的目录结构
 
-4. **索引更新**：共享的规则不会自动更新索引。如果需要更新全局规则的索引文件（`~/.jarvis/rule`），可以在交互式会话中请求 Jarvis 扫描规则目录并更新索引文件
+4. **索引更新**：共享的规则不会自动更新索引。如果需要更新全局规则的索引文件（`~/.jarvis/rule.md`），可以在交互式会话中请求 Jarvis 扫描规则目录并更新索引文件
 
 #### 规则加载目录优先级
 
@@ -98,13 +98,13 @@ Jarvis 规则系统支持以下类型的规则：
 
 #### 全局规则
 
-- **位置**：`~/.jarvis/rule`
+- **位置**：`~/.jarvis/rule.md`
 - **作用范围**：所有项目
 - **用途**：个人通用编码规范、全局最佳实践
 
 #### 项目规则
 
-- **位置**：`<项目根目录>/.jarvis/rule`
+- **位置**：`<项目根目录>/.jarvis/rule.md`
 - **作用范围**：当前项目
 - **用途**：项目特定的编码规范、业务逻辑约束
 
@@ -184,8 +184,8 @@ jca --rule-names clean_code,project:api_standard
 
 当指定多个规则来源时，系统按以下顺序合并规则：
 
-1. **全局规则文件**（`~/.jarvis/rule`）
-2. **项目规则文件**（`.jarvis/rule`）
+1. **全局规则文件**（`~/.jarvis/rule.md`）
+2. **项目规则文件**（`.jarvis/rule.md`）
 3. **通过 `--rule-names` 指定的规则**
 
 查找指定规则时（无前缀时），按以下顺序查找：
@@ -312,10 +312,10 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 ### 4.2 通过项目规则文件
 
-创建 `.jarvis/rule` 文件，内容将自动加载：
+创建 `.jarvis/rule.md` 文件，内容将自动加载：
 
 ```markdown
-# .jarvis/rule
+# .jarvis/rule.md
 
 # 这是一个全局规则，对所有任务生效
 
@@ -328,10 +328,10 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 ### 4.3 通过全局规则文件
 
-创建 `~/.jarvis/rule` 文件，对所有项目生效：
+创建 `~/.jarvis/rule.md` 文件，对所有项目生效：
 
 ```markdown
-# ~/.jarvis/rule
+# ~/.jarvis/rule.md
 
 # 全局默认规则
 

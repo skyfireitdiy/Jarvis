@@ -132,7 +132,7 @@ jarvis code --rule-names my_project_rule,clean_code
 
 #### 方式 2：通过项目规则文件
 
-创建 `.jarvis/rule` 文件，内容将自动加载：
+创建 `.jarvis/rule.md` 文件，内容将自动加载：
 
 ```markdown
 # .jarvis/rule
@@ -148,7 +148,7 @@ jarvis code --rule-names my_project_rule,clean_code
 
 #### 方式 3：通过全局规则文件
 
-创建 `~/.jarvis/rule` 文件，对所有项目生效：
+创建 `~/.jarvis/rule.md` 文件，对所有项目生效：
 
 ```markdown
 # ~/.jarvis/rule
@@ -252,8 +252,8 @@ jarvis code --rule-names python_best_practices
 
 当指定多个规则来源时，系统按以下顺序合并规则：
 
-1. **全局规则文件**（`~/.jarvis/rule`）
-2. **项目规则文件**（`.jarvis/rule`）
+1. **全局规则文件**（`~/.jarvis/rule.md`）
+2. **项目规则文件**（`.jarvis/rule.md`）
 3. **通过 `--rule-names` 指定的规则**
 
 查找指定规则时，按以下顺序查找：
