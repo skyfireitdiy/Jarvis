@@ -1,0 +1,8 @@
+{
+  "id": "20260529_035408_642283",
+  "type": "project_long_term",
+  "tags": ["output", "streaming", "scroll", "panel", "markdown"],
+  "content": "output.py中stream_chat_with_panel的滚动截断功能：在Markdown渲染模式下，流式输出时(show_cursor=True)通过max_text_height=console.height-5截断文本行数，只保留最后N行；输出完成后(show_cursor=False)不截断显示完整内容。此逻辑在_update_panel_content函数中，位于Markdown渲染之前对纯文本操作。提交e5481d771将Text渲染替换为Markdown时移除了旧截断逻辑，本次修改恢复了该功能。",
+  "created_at": "2026-05-29T03:54:08.642327",
+  "updated_at": "2026-05-29T03:54:08.642333"
+}
