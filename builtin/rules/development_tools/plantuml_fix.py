@@ -224,8 +224,9 @@ class PlantUMLWriter:
                 try:
                     with open(puml_file, "r", encoding="utf-8") as f:
                         puml_content = f.read()
-                    puml_content = re.sub(r"^@startuml\s*\n?", "", puml_content)
-                    puml_content = re.sub(r"\n?@enduml\s*$", "", puml_content)
+                    # 保留@startuml/@enduml，写回时需要完整内容
+                    # puml_content = re.sub(r"^@startuml[^\n]*\n?", "", puml_content)
+                    # puml_content = re.sub(r"\n?@enduml[^\n]*\n?$", "", puml_content)
                     puml_contents[index] = puml_content
                     self._log(f"读取: {puml_file.name}")
                 except Exception as e:
@@ -237,10 +238,14 @@ class PlantUMLWriter:
 
         for i, match in enumerate(pattern.finditer(content)):
             if i in puml_contents:
+                # 确保写回内容末尾有换行符，避免内容与```粘在一起
+                replacement = puml_contents[i]
+                if not replacement.endswith("\n"):
+                    replacement += "\n"
                 start = match.start(2) + offset
                 end = match.end(2) + offset
-                new_content = new_content[:start] + puml_contents[i] + new_content[end:]
-                offset += len(puml_contents[i]) - len(match.group(2))
+                new_content = new_content[:start] + replacement + new_content[end:]
+                offset += len(replacement) - len(match.group(2))
                 self._log(f"更新代码块 {i}")
 
         if backup:
