@@ -1331,16 +1331,41 @@ class PrettyOutput:
                 if show_cursor and content:
                     display_text = response + " ▌"
 
-                # 流式输出时截断文本，保持Panel在终端可视范围内
+                # 先创建 Markdown 对象
+                md_content = Markdown(display_text, code_theme="monokai")
+
+                # 流式输出时截断文本，保持 Panel 在终端可视范围内
+                # 基于 Markdown 渲染后的实际行数进行计算，而非原始文本行数
                 if show_cursor:
                     max_text_height = console.height - 5
                     if max_text_height <= 0:
                         max_text_height = 1
-                    lines = display_text.split("\n")
-                    if len(lines) > max_text_height:
-                        display_text = "\n".join(lines[-max_text_height:])
-
-                md_content = Markdown(display_text, code_theme="monokai")
+                    # 使用 console.render_lines() 获取渲染后的实际行数
+                    try:
+                        rendered_lines = console.render_lines(
+                            md_content, console.options
+                        )
+                        rendered_height = len(rendered_lines)
+                        if rendered_height > max_text_height:
+                            # 需要截断：从原始文本末尾向前截取，重新渲染
+                            # 使用启发式方法：按字符数比例估算需要保留的内容
+                            ratio = max_text_height / rendered_height
+                            estimated_chars = int(len(display_text) * ratio)
+                            # 从后向前截取，保留末尾内容
+                            truncated_text = display_text[-estimated_chars:]
+                            # 确保从完整的行开始（找到第一个换行符）
+                            newline_idx = truncated_text.find("\n")
+                            if newline_idx != -1:
+                                truncated_text = truncated_text[newline_idx + 1 :]
+                            # 重新创建 Markdown 对象
+                            md_content = Markdown(truncated_text, code_theme="monokai")
+                    except Exception:
+                        # 如果渲染失败，回退到原始的按行截断逻辑
+                        lines = display_text.split("\n")
+                        if len(lines) > max_text_height:
+                            display_text = "\n".join(lines[-max_text_height:])
+                        # 无论如何都重新创建 Markdown 对象，确保安全性
+                        md_content = Markdown(display_text, code_theme="monokai")
 
                 with _lock:
                     # 直接更新panel的内部内容
