@@ -2504,7 +2504,7 @@ const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> out
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
 const terminalHosts = ref(new Map()) // executionSessionKey -> hostEl
-const terminals = ref([]) // [{ sessionKey, agentId, executionId, terminal, active, hostEl, resizeObserver, lastSize, pendingChunks, ended }]
+const terminals = ref([]) // [{ sessionKey, agentId, executionId, terminal, active, hostEl, resizeObserver, lastSize, ended }]
 
 function getExecutionSessionKey(agentId, executionId) {
   const normalizedAgentId = String(agentId || '').trim() || 'unknown-agent'
@@ -3128,23 +3128,8 @@ async function loadHistoryMessages(prepend = false) {
       // 插入到消息列表开头
       allOutputs.value.set(currentAgentId.value, [...processedMessages, ...currentOutputs])
     } else {
-      // 保留未完成的execution消息（这些消息不会被保存到历史存储）
-      const unfinishedExecutions = currentOutputs.filter(msg => msg.output_type === 'execution' && !msg.is_finished)
-      // 过滤掉历史中已存在的已完成execution（说明它实际已完成，只是当前消息状态未更新）
-      const trulyUnfinished = unfinishedExecutions.filter(msg => {
-        const historyFinished = processedMessages.some(h =>
-          h.output_type === 'execution' && h.execution_id === msg.execution_id && h.is_finished
-        )
-        if (historyFinished) {
-          console.log(`[HISTORY] Skipping execution ${msg.execution_id}: already finished in history`)
-        }
-        return !historyFinished
-      })
-      // 只保留最新的一个未完成的execution消息（避免恢复多个xterm）
-      const latestUnfinishedExecution = trulyUnfinished.length > 0 ? [trulyUnfinished[trulyUnfinished.length - 1]] : []
-      console.log(`[HISTORY] Preserving ${latestUnfinishedExecution.length} unfinished execution messages (was ${unfinishedExecutions.length}, filtered ${unfinishedExecutions.length - trulyUnfinished.length} already finished)`)
-      // 合并历史消息和未完成的execution消息
-      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...latestUnfinishedExecution])
+      // execution 消息现在也保存到历史（含 execution_chunks），直接用历史消息替换
+      allOutputs.value.set(currentAgentId.value, [...processedMessages])
     }
     
     // 更新偏移量
@@ -5624,13 +5609,13 @@ async function switchAgent(agent) {
   // 旧连接断开时，onclose会检查currentAgentId，如果不是当前Agent则不重连
   const previousAgentId = currentAgentId.value
 
-  // 清理当前agent的终端实例（切换离开时，保留termInfo以便切换回来时重建）
+  // 清理当前agent的终端实例（切换离开时，从历史execution_chunks重建）
   if (previousAgentId) {
     console.log(`[AGENT] Cleaning up terminal instances for previous agent: ${previousAgentId}`)
     let cleanedCount = 0
     terminals.value.forEach((termInfo) => {
       if (termInfo.agentId === previousAgentId && termInfo.terminal) {
-        console.log(`[AGENT] Disposing terminal: ${termInfo.sessionKey}, allChunks=${termInfo.allChunks?.length || 0}`)
+        console.log(`[AGENT] Disposing terminal: ${termInfo.sessionKey}`)
         disposeExecutionTerminal(termInfo)
         cleanedCount++
       }
@@ -6160,34 +6145,41 @@ function appendOutput(payload, agentId = null) {
 
   // 保存消息到本地存储
   try {
-    // 未完成的 execution 消息不保存，只在结束时保存一次
-    const isUnfinishedExecution = outputItem.output_type === 'execution' && !outputItem.is_finished
-    
-    if (!isUnfinishedExecution) {
-      // 只保存必要的数据，避免存储过大的内容
-      // 使用 execution_id 作为 id，确保更新时能找到原始消息
+    // execution 消息也保存到历史（含 execution_chunks），用于切换 Agent 后重建 xterm
+    if (outputItem.output_type === 'execution') {
       const messageToSave = {
         id: outputItem.execution_id ? `execution_${outputItem.execution_id}` : undefined,
-        agent_id: targetAgentId, // 保存当前 Agent ID
+        agent_id: targetAgentId,
+        output_type: outputItem.output_type,
+        text: outputItem.text || '',
+        lang: outputItem.lang || 'text',
+        agent_name: outputItem.agent_name,
+        non_interactive: outputItem.non_interactive,
+        timestamp: outputItem.timestamp,
+        execution_id: outputItem.execution_id,
+        context: outputItem.context,
+        is_finished: outputItem.is_finished || false,
+        terminal_content: outputItem.terminal_content || '',
+        execution_chunks: outputItem.execution_chunks || [],
+      }
+      historyStorage.saveMessage(messageToSave)
+    } else {
+      // 非 execution 消息正常保存
+      const messageToSave = {
+        id: undefined,
+        agent_id: targetAgentId,
         output_type: outputItem.output_type,
         text: outputItem.text,
         lang: outputItem.lang,
         agent_name: outputItem.agent_name,
         non_interactive: outputItem.non_interactive,
         timestamp: outputItem.timestamp,
-        execution_id: outputItem.execution_id,
         context: outputItem.context,
-        is_finished: outputItem.is_finished,
-        terminal_content: outputItem.terminal_content,
       }
-
       historyStorage.saveMessage(messageToSave)
-    } else {
-
     }
   } catch (error) {
     console.warn('[HISTORY] Failed to save message:', error)
-    // 不影响正常显示，静默失败
   }
   
   // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发）
@@ -6230,6 +6222,26 @@ async function copyToClipboard(text, index) {
       alert('复制失败，请手动复制')
     }
   }
+}
+
+// execution_chunks历史更新的debounce（按executionId分组，500ms批量写入localStorage）
+const _execHistoryDebounceMap = new Map()
+function _debouncedSaveExecHistory(executionId, targetAgentId) {
+  const key = `${targetAgentId}:${executionId}`
+  if (_execHistoryDebounceMap.has(key)) return // 已有pending的debounce
+  _execHistoryDebounceMap.set(key, true)
+  setTimeout(() => {
+    _execHistoryDebounceMap.delete(key)
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    const msg = currentOutputs.find(item => item.output_type === 'execution' && item.execution_id === executionId)
+    if (msg) {
+      try {
+        historyStorage.saveMessage({ ...msg })
+      } catch (e) {
+        // 静默失败
+      }
+    }
+  }, 500)
 }
 
 function appendExecution(payload, agentId = null) {
@@ -6322,15 +6334,13 @@ function appendExecution(payload, agentId = null) {
       terminal: null,
       active: true,
       hostEl: null,
-      pendingChunks: [],
-      allChunks: [],
       ended: false,
     }
     terminals.value.push(termInfo)
     // 终端初始化移到 setTerminalRef 中，确保 DOM 元素准备好
   }
-  
-  console.log(`[terminal DEBUG] termInfo: terminal=${!!termInfo.terminal}, pendingChunks=${termInfo.pendingChunks?.length || 0}`)
+
+  console.log(`[terminal DEBUG] termInfo: terminal=${!!termInfo.terminal}, ended=${termInfo.ended}`)
   
   // 处理执行开始事件
   if (payload?.message_type === 'tool_stream_start' && !isExecuting.value) {
@@ -6341,10 +6351,14 @@ function appendExecution(payload, agentId = null) {
   // 处理执行结束事件
   if (payload?.message_type === 'tool_stream_end' && termInfo.active) {
     // 如果termInfo.terminal不存在，可能是后台执行的命令（DOM未渲染导致terminal未初始化）
-    // 也可能是重连后收到的消息（allChunks为空，没有实际数据）
     // 后台执行的场景需要正确标记execution为已完成，避免切回时多余重建xterm
     if (!termInfo.terminal) {
-      if (termInfo.allChunks && termInfo.allChunks.length > 0) {
+      // 检查消息的execution_chunks是否有数据，判断是后台执行还是重连场景
+      const currentOutputs = allOutputs.value.get(targetAgentId) || []
+      const execMsg = currentOutputs.find(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      if (execMsg?.execution_chunks?.length > 0) {
         // 后台执行场景：有数据但terminal未初始化，需要正确结束execution
         console.log(`[terminal] Execution ${executionId} received tool_stream_end in background (terminal not initialized but has chunks), marking as finished`)
       } else {
@@ -6359,15 +6373,20 @@ function appendExecution(payload, agentId = null) {
     isExecuting.value = false // 更新执行状态
 
     // 保存终端内容到消息列表
-    // 优先从terminal buffer获取内容，否则从allChunks拼接（后台执行场景）
+    // 优先从terminal buffer获取内容（后台执行场景从execution_chunks拼接）
     let terminalContent = ''
     if (termInfo.terminal) {
       terminalContent = getTerminalBufferContent(termInfo.terminal, true)
-    } else if (termInfo.allChunks && termInfo.allChunks.length > 0) {
-      terminalContent = termInfo.allChunks.join('')
+    } else {
+      // 后台执行场景：从消息的execution_chunks拼接
+      const currentOutputs = allOutputs.value.get(targetAgentId) || []
+      const execMsg = currentOutputs.find(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      if (execMsg?.execution_chunks?.length > 0) {
+        terminalContent = execMsg.execution_chunks.join('')
+      }
     }
-    // 清理chunks，避免已完成的终端被恢复
-    termInfo.allChunks = []
     // 获取终端内容并保存
     try {
       console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
@@ -6378,14 +6397,14 @@ function appendExecution(payload, agentId = null) {
         item => item.output_type === 'execution' && item.execution_id === executionId
       )
       if (execIndex !== -1) {
-        // 标记 execution 消息为已结束，并保存终端内容
+        // 标记 execution 消息为已结束，并保存终端内容（保留execution_chunks用于重建xterm）
         currentOutputs[execIndex].is_finished = true
         currentOutputs[execIndex].terminal_content = terminalContent
         currentOutputs[execIndex].timestamp = new Date().toISOString()
         console.log(`🚨 [terminal] Marked execution ${executionId} as finished, content length: ${terminalContent.length}`)
         // 触发响应式更新
         allOutputs.value.set(targetAgentId, [...currentOutputs])
-        // 保存到历史记录（更新原有的 execution 消息）
+        // 保存到历史记录（更新原有的 execution 消息，保留execution_chunks）
         try {
           const updatedMessage = {
             id: `execution_${executionId}`,
@@ -6393,14 +6412,17 @@ function appendExecution(payload, agentId = null) {
             output_type: 'execution',
             text: '',
             lang: 'text',
+            agent_name: currentOutputs[execIndex].agent_name,
             non_interactive: false,
             timestamp: currentOutputs[execIndex].timestamp,
             execution_id: executionId,
+            context: currentOutputs[execIndex].context,
             is_finished: true,
             terminal_content: terminalContent,
+            execution_chunks: currentOutputs[execIndex].execution_chunks || [],
           }
           historyStorage.saveMessage(updatedMessage)
-          console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}`)
+          console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}, chunks=${currentOutputs[execIndex].execution_chunks?.length || 0}`)
         } catch (error) {
           console.warn('[HISTORY] Failed to save terminal content:', error)
         }
@@ -6413,7 +6435,7 @@ function appendExecution(payload, agentId = null) {
     }
 
     // 保留 termInfo 记录 (保持 ended=true)，避免切换回来时重建终端
-    // 只清理 terminalHosts 映射和 terminal 实例，termInfo 保留用于状态判断
+    // 只清理 terminalHosts 映射，termInfo 保留用于状态判断
     const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     terminalHosts.value.delete(executionSessionKey)
     console.log(`[terminal] Cleaned up terminalHost for completed execution: ${executionId}, keeping termInfo record (ended=true)`)
@@ -6423,9 +6445,17 @@ function appendExecution(payload, agentId = null) {
   console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${data.length}`)
   if (eventType === 'stdout' || eventType === 'stderr') {
     if (data) {
-      // 保存所有原始消息以便切换回来时重放
-      if (!termInfo.allChunks) termInfo.allChunks = []
-      termInfo.allChunks.push(data)
+      // 追加到消息的 execution_chunks 并实时更新历史
+      const currentOutputs = allOutputs.value.get(targetAgentId) || []
+      const execIndex = currentOutputs.findIndex(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      if (execIndex !== -1) {
+        if (!currentOutputs[execIndex].execution_chunks) currentOutputs[execIndex].execution_chunks = []
+        currentOutputs[execIndex].execution_chunks.push(data)
+        // debounce更新历史记录（500ms批量写入，避免高频localStorage读写）
+        _debouncedSaveExecHistory(executionId, targetAgentId)
+      }
     }
     if (termInfo.terminal) {
       // 显示即将写入的数据（前100字符），用于调试
@@ -6438,18 +6468,25 @@ function appendExecution(payload, agentId = null) {
         console.error('[terminal] Write failed:', error)
       }
     } else if (data) {
-      termInfo.pendingChunks?.push(data)
-      console.log(`[terminal] Terminal not ready, buffered ${data.length} bytes, total pending=${termInfo.pendingChunks.length}`)
+      console.log(`[terminal] Terminal not ready, chunk saved to execution_chunks (${data.length} bytes)`)
     }
   } else if (eventType === 'status') {
     const statusLine = `\r\n[status] ${payload.data || ''}`
-    // 保存所有原始消息以便切换回来时重放
-    if (!termInfo.allChunks) termInfo.allChunks = []
-    termInfo.allChunks.push(statusLine)
+    // 追加到消息的 execution_chunks 并实时更新历史
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    const execIndex = currentOutputs.findIndex(
+      item => item.output_type === 'execution' && item.execution_id === executionId
+    )
+    if (execIndex !== -1) {
+      if (!currentOutputs[execIndex].execution_chunks) currentOutputs[execIndex].execution_chunks = []
+      currentOutputs[execIndex].execution_chunks.push(statusLine)
+      // debounce更新历史记录（500ms批量写入，避免高频localStorage读写）
+      _debouncedSaveExecHistory(executionId, targetAgentId)
+    }
     if (termInfo.terminal) {
       termInfo.terminal.writeln(statusLine)
     } else {
-      termInfo.pendingChunks?.push(statusLine)
+      console.log(`[terminal] Terminal not ready, status chunk saved to execution_chunks`)
     }
   } else if (!termInfo.terminal && data) {
     console.log(`[terminal] Terminal not ready, skipping output for eventType=${eventType}`)
@@ -6460,8 +6497,8 @@ function appendExecution(payload, agentId = null) {
 function clearTerminalCache(agentId) {
   if (!agentId) return
   const beforeCount = terminals.value.length
-  // 只清除已结束的终端缓存，保留正在执行中的（避免切换agent时多余重建xterm）
-  terminals.value = terminals.value.filter(t => t.agentId !== agentId || !t.ended)
+  // 清除该 agent 的所有终端缓存（已完成的终端从历史重建，无需保留termInfo）
+  terminals.value = terminals.value.filter(t => t.agentId !== agentId)
   const afterCount = terminals.value.length
   console.log(`[TERMINAL_CACHE] Cleared ${beforeCount - afterCount} terminal caches for agent: ${agentId}`)
 }
@@ -7148,28 +7185,23 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     syncTerminalSize(executionId, termInfo)
   }, 300)
 
-  // 重放所有保存的原始消息（切换回来时）
-  // 如果终端已结束（finished），不重放chunks，避免恢复已完成的终端
-  if (!termInfo.ended && termInfo.allChunks && termInfo.allChunks.length > 0) {
-    console.log(`[terminal] Replaying ${termInfo.allChunks.length} chunks`)
-    termInfo.allChunks.forEach((chunk, index) => {
-      try {
-        termInfo.terminal.write(chunk)
-      } catch (error) {
-        console.warn(`[terminal] Failed to replay chunk ${index}`, error)
-      }
-    })
-  }
-
-  if (termInfo.pendingChunks && termInfo.pendingChunks.length > 0) {
-    termInfo.pendingChunks.forEach(chunk => {
-      try {
-        termInfo.terminal.write(chunk)
-      } catch (error) {
-        console.warn('[terminal] flush chunk failed', error)
-      }
-    })
-    termInfo.pendingChunks = []
+  // 从消息的 execution_chunks 回放（切换回来时）
+  // 如果终端已结束（finished），不回放chunks，避免恢复已完成的终端
+  if (!termInfo.ended) {
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    const execMsg = currentOutputs.find(
+      item => item.output_type === 'execution' && item.execution_id === executionId
+    )
+    if (execMsg?.execution_chunks?.length > 0) {
+      console.log(`[terminal] Replaying ${execMsg.execution_chunks.length} chunks from execution_chunks`)
+      execMsg.execution_chunks.forEach((chunk, index) => {
+        try {
+          termInfo.terminal.write(chunk)
+        } catch (error) {
+          console.warn(`[terminal] Failed to replay chunk ${index}`, error)
+        }
+      })
+    }
   }
 
   if (termInfo.ended) {
@@ -7220,8 +7252,6 @@ function setTerminalRef(executionId, el, agentId = null) {
         hostEl: null,
         resizeObserver: null,
         lastSize: null,
-        pendingChunks: [],
-        allChunks: [],
         ended: false
       }
       terminals.value.push(termInfo)
