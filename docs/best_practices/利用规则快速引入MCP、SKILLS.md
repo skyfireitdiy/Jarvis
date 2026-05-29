@@ -172,7 +172,7 @@ Agent 会根据规则自动执行以下步骤：
    - 评估复杂度（简单技能直接读取，复杂技能使用 task_list_manager）
 
 5. **技能信息注册**
-   - 在 `~/.jarvis/rule` 中注册技能信息
+   - 在 `~/.jarvis/rule.md` 中注册技能信息
    - 使用统一格式记录技能名称、功能描述、位置、添加时间
 
 ### 3.3 SKILLS 添加示例
@@ -192,7 +192,7 @@ Agent 会自动执行：
 ```bash
 1. 克隆仓库到 ~/.jarvis/skills/my-skill
 2. 分析技能功能（读取 README.md）
-3. 在 ~/.jarvis/rule 中注册技能信息
+3. 在 ~/.jarvis/rule.md 中注册技能信息
 ```
 
 #### 示例 2：从本地路径添加技能
@@ -210,7 +210,7 @@ Agent 会自动执行：
 ```bash
 1. 验证路径存在性和可读性
 2. 分析技能功能
-3. 在 ~/.jarvis/rule 中注册技能信息
+3. 在 ~/.jarvis/rule.md 中注册技能信息
 ```
 
 #### 示例 3：批量添加技能
@@ -226,7 +226,7 @@ jca --rule-names skill-development "
 
 ### 3.4 技能信息注册格式
 
-Agent 会自动在 `~/.jarvis/rule` 中注册技能信息：
+Agent 会自动在 `~/.jarvis/rule.md` 中注册技能信息：
 
 ```markdown
 ## [技能名称]

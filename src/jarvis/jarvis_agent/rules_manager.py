@@ -40,16 +40,16 @@ class RulesManager:
         ] = {}  # {rule_name: rule_content} - 已加载的规则内容缓存
         self._merged_rules: str = ""  # 合并后的规则字符串（已加载的规则内容）
 
-        # 自动加载项目 .jarvis/rule 文件（项目综述）
+        # 自动加载项目 .jarvis/rule.md 文件（项目综述）
         self._load_project_rule_file()
 
     def _load_project_rule_file(self) -> None:
-        """自动加载项目 .jarvis/rule 文件（项目综述）
+        """自动加载项目 .jarvis/rule.md 文件（项目综述）
 
-        如果项目根目录下存在 .jarvis/rule 文件，将其内容作为
+        如果项目根目录下存在 .jarvis/rule.md 文件，将其内容作为
         特殊规则自动加载到规则系统中。
         """
-        rule_file_path = os.path.join(self.root_dir, ".jarvis", "rule")
+        rule_file_path = os.path.join(self.root_dir, ".jarvis", "rule.md")
         if not os.path.exists(rule_file_path) or not os.path.isfile(rule_file_path):
             return
 
