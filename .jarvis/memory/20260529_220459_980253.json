@@ -1,0 +1,8 @@
+{
+  "id": "20260529_220459_980253",
+  "type": "project_long_term",
+  "tags": ["gateway_manager", "工具重命名", "已完成"],
+  "content": "gateway_manager 工具重命名完成：\n- 文件：src/jarvis/jarvis_tools/gateway_manager.py（原 agent_manager.py）\n- 类名：GatewayManagerTool（原 AgentManagerTool）\n- name属性：gateway_manager（原 agent_manager）\n- action：send_to_agent（原 send_to）、list_agents、list_nodes\n- 方法名：_send_to_agent（原 _send_to）\n- 工具注册通过 registry.py 的 _load_builtin_tools 自动扫描 *.py 文件，无需手动注册\n- jarvis_web_gateway/agent_manager.py 中的 AgentManager 类是不同文件，不受影响",
+  "created_at": "2026-05-29T22:04:59.980287",
+  "updated_at": "2026-05-29T22:04:59.980291"
+}
