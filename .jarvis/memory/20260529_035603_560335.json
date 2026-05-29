@@ -1,0 +1,8 @@
+{
+  "id": "20260529_035603_560335",
+  "type": "project_long_term",
+  "tags": ["内置命令", "Init", "TestCase"],
+  "content": "已实现的内置命令：@Init(项目综述生成，规则builtin:development_workflow/init_project.md)和@TestCase(测试用例生成，规则builtin:development_workflow/generate_testcase.md)。两个命令均通过子Agent执行，规则文件位于builtin/rules/development_workflow/目录",
+  "created_at": "2026-05-29T03:56:03.560356",
+  "updated_at": "2026-05-29T03:56:03.560361"
+}
