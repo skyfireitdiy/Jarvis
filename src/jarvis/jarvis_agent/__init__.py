@@ -1753,28 +1753,9 @@ class Agent:
         # 添加用户固定的重要内容
         user_fixed_content = []
 
-        # 优先添加原始任务目标（确保长期运行时不丢失）
-        original_task = ""
-        if hasattr(self, "original_user_input") and self.original_user_input:
-            if isinstance(self.original_user_input, str):
-                original_task = self.original_user_input.strip()
-            else:
-                # 对于多模态内容，提取文本部分
-                text_parts = [
-                    b.get("text", "")
-                    for b in self.original_user_input
-                    if b.get("type") == "text"
-                ]
-                original_task = "\n".join(text_parts).strip()
-
-        if original_task:
-            user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
-
-        # 添加用户通过 <Pin> 标记固定的其他重要内容（如果与原始任务目标不同）
+        # 添加用户通过 <Pin> 标记固定的重要内容
         if self.pin_content.strip():
-            pin_content_stripped = self.pin_content.strip()
-            if not original_task or pin_content_stripped != original_task:
-                user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
+            user_fixed_content.append(f"**用户固定内容**：\n{self.pin_content.strip()}")
 
         # 添加最近的记忆
         if hasattr(self, "recent_memories") and self.recent_memories:
