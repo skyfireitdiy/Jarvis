@@ -1,0 +1,8 @@
+{
+  "id": "20260529_230029_810864",
+  "type": "project_long_term",
+  "tags": ["工具开发", "gateway_manager", "工具启用条件", "check方法"],
+  "content": "## Jarvis 工具启用条件机制\n\n### 工具 check() 方法\n工具类可定义 `@staticmethod check() -> bool` 方法，返回 False 时工具不会被注册。\n\n**注册逻辑位置**：`src/jarvis/jarvis_tools/registry.py` 第656-658行\n```python\nif hasattr(tool_class, 'check') and not tool_class.check():\n    continue  # 跳过注册\n```\n\n### gateway_manager 工具启用条件\n- 文件：`src/jarvis/jarvis_tools/gateway_manager.py`\n- 条件：`jglobals.agent_id is not None`\n- 含义：只有在 Agent 环境中（有 agent_id）才启用此工具\n\n### use_tools 静默跳过机制\n- 文件：`src/jarvis/jarvis_tools/registry.py` 第288-292行\n- 行为：工具不存在时静默跳过，不打印警告\n- 原因：工具可能因 check() 条件未满足而未注册，这是正常行为",
+  "created_at": "2026-05-29T23:00:29.810899",
+  "updated_at": "2026-05-29T23:00:29.810904"
+}

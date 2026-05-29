@@ -1,0 +1,8 @@
+{
+  "id": "20260529_230029_812351",
+  "type": "project_long_term",
+  "tags": ["gateway_manager", "工具接口", "Gateway API"],
+  "content": "## gateway_manager 工具接口定义\n\n### Actions\n1. `send_to_agent` - 发送消息给指定 Agent\n2. `list_agents` - 列出所有 Agent\n3. `list_nodes` - 列出所有节点\n4. `list_model_groups` - 列出模型组（支持跨节点查询）\n5. `create_agent` - 创建新 Agent\n\n### 返回格式\n统一返回：`{\"success\": bool, \"stdout\": str, \"stderr\": str}`\n\n### 认证方式\n通过 `JARVIS_AUTH_TOKEN` 环境变量获取 token，请求头：`Authorization: Bearer <token>`\n\n### 关键文件\n- 工具文件：`src/jarvis/jarvis_tools/gateway_manager.py`\n- Gateway 服务：`src/jarvis/jarvis_web_gateway/app.py`",
+  "created_at": "2026-05-29T23:00:29.812373",
+  "updated_at": "2026-05-29T23:00:29.812377"
+}
