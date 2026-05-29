@@ -1,0 +1,8 @@
+{
+  "id": "20260529_035408_644078",
+  "type": "project_long_term",
+  "tags": ["output", "architecture", "rendering"],
+  "content": "output.py渲染模式演进：最初使用Rich Text对象手动拼接+高度截断逻辑(scroll)，提交e5481d771改为Markdown直接渲染累积文本，移除了Text的wrap和截断逻辑。当前方案是在Markdown渲染前对纯文本做行数截断，保持Panel在终端可视范围内。",
+  "created_at": "2026-05-29T03:54:08.644114",
+  "updated_at": "2026-05-29T03:54:08.644120"
+}
