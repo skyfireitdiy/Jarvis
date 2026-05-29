@@ -3,6 +3,7 @@
 
 import json
 import logging
+import os
 from typing import Any, Dict, Optional
 
 import httpx
@@ -86,8 +87,94 @@ class AgentManagerTool:
                 "stderr": str(e),
             }
 
+    def _get_master_url(self, action_name: str = "") -> Optional[Dict[str, Any]]:
+        """获取 master_url，未设置时返回错误字典。
+
+        参数:
+            action_name: 操作名称，用于错误提示
+
+        返回:
+            None 表示 master_url 可用，否则返回错误字典
+        """
+        if not jglobals.master_url:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"master_url is not set, cannot {action_name}. "
+                "Please ensure the agent is started with --master-url option.",
+            }
+        return None
+
+    def _build_auth_headers(self) -> Dict[str, str]:
+        """构建带认证信息的请求头。
+
+        返回:
+            Dict[str, str]: 请求头字典
+        """
+        headers: Dict[str, str] = {}
+        auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+        return headers
+
+    def _request_gateway(
+        self,
+        method: str,
+        path: str,
+        json_data: Optional[Dict[str, Any]] = None,
+        error_prefix: str = "Request failed",
+    ) -> Dict[str, Any]:
+        """向 Gateway 发送 HTTP 请求。
+
+        参数:
+            method: HTTP 方法 (GET/POST)
+            path: 请求路径 (如 /api/agents)
+            json_data: POST 请求的 JSON 数据
+            error_prefix: 错误提示前缀
+
+        返回:
+            Dict[str, Any]: 请求结果，包含 success/status_code/data 字段
+        """
+        url = f"{jglobals.master_url}{path}"
+        headers = self._build_auth_headers()
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                if method.upper() == "POST":
+                    response = client.post(url, json=json_data, headers=headers)
+                else:
+                    response = client.get(url, headers=headers)
+
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "data": response.json(),
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "data": None,
+                    "error": f"{error_prefix}: HTTP {response.status_code} - {response.text}",
+                }
+        except httpx.ConnectError:
+            return {
+                "success": False,
+                "status_code": None,
+                "data": None,
+                "error": f"Cannot connect to gateway at {jglobals.master_url}. Please ensure the gateway is running.",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "status_code": None,
+                "data": None,
+                "error": f"{error_prefix}: {str(e)}",
+            }
+
     def _send_to(self, agent_id: Optional[str], message: str) -> Dict[str, Any]:
-        """向指定 Agent 发送消息
+        """向指定 Agent 发送消息。
 
         通过 Web Gateway 的 /api/agent/{agent_id}/message 接口发送消息，
         Gateway 会将请求代理到目标 Agent 的 /message 接口。
@@ -100,78 +187,37 @@ class AgentManagerTool:
             Dict[str, Any]: 发送结果
         """
         if not agent_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "agent_id is required",
-            }
+            return {"success": False, "stdout": "", "stderr": "agent_id is required"}
 
         if not message:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "message is required",
-            }
+            return {"success": False, "stdout": "", "stderr": "message is required"}
 
-        # 获取 master_url（Web Gateway 地址）
-        master_url = jglobals.master_url
-        if not master_url:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "master_url is not set, cannot send message to remote agent. "
-                "Please ensure the agent is started with --master-url option.",
-            }
+        err = self._get_master_url("send message to remote agent")
+        if err:
+            return err
 
-        # 构建请求 URL: POST /api/agent/{agent_id}/message
-        # Gateway 的 agent_http_proxy 会将请求代理到目标 Agent 的 /message 接口
-        url = f"{master_url}/api/agent/{agent_id}/message"
-
-        # 获取当前 Agent 的 ID 作为 sender_id
         sender_id = jglobals.agent_id
+        result = self._request_gateway(
+            method="POST",
+            path=f"/api/agent/{agent_id}/message",
+            json_data={"sender_id": sender_id, "content": message},
+            error_prefix=f"Failed to send message to agent {agent_id}",
+        )
 
-        # 发送 HTTP POST 请求
-        try:
-            with httpx.Client(timeout=10.0) as client:
-                response = client.post(
-                    url,
-                    json={
-                        "sender_id": sender_id,
-                        "content": message,
-                    },
-                )
-
-            if response.status_code == 200:
-                result = response.json()
-                output = {
-                    "agent_id": agent_id,
-                    "sender_id": sender_id,
-                    "message": message,
-                    "response": result,
-                }
-                return {
-                    "success": True,
-                    "stdout": json.dumps(output, ensure_ascii=False, indent=2),
-                    "stderr": "",
-                }
-            else:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"Failed to send message to agent {agent_id}: HTTP {response.status_code} - {response.text}",
-                }
-        except httpx.ConnectError:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Cannot connect to gateway at {master_url}. Please ensure the gateway is running.",
+        if result["success"]:
+            output = {
+                "agent_id": agent_id,
+                "sender_id": sender_id,
+                "message": message,
+                "response": result["data"],
             }
-        except Exception as e:
             return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Failed to send message: {str(e)}",
+                "success": True,
+                "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+                "stderr": "",
             }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
 
     def _list_agents(self) -> Dict[str, Any]:
         """获取所有存活状态的 Agent 列表。
@@ -182,56 +228,33 @@ class AgentManagerTool:
         返回:
             Dict[str, Any]: 存活 Agent 列表
         """
-        master_url = jglobals.master_url
-        if not master_url:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "master_url is not set, cannot list agents. "
-                "Please ensure the agent is started with --master-url option.",
-            }
+        err = self._get_master_url("list agents")
+        if err:
+            return err
 
-        url = f"{master_url}/api/agents"
+        result = self._request_gateway(
+            method="GET",
+            path="/api/agents",
+            error_prefix="Failed to list agents",
+        )
 
-        try:
-            with httpx.Client(timeout=10.0) as client:
-                response = client.get(url)
-
-            if response.status_code == 200:
-                result = response.json()
-                if not result.get("success"):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"Gateway returned error: {result.get('error', 'unknown error')}",
-                    }
-
-                agents = result.get("data", [])
-                # 过滤掉已停止的 Agent，只保留存活状态
-                alive_agents = [
-                    agent for agent in agents if agent.get("status") != "stopped"
-                ]
-
-                return {
-                    "success": True,
-                    "stdout": json.dumps(alive_agents, ensure_ascii=False, indent=2),
-                    "stderr": "",
-                }
-            else:
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"Failed to list agents: HTTP {response.status_code} - {response.text}",
+                    "stderr": f"Gateway returned error: {gateway_data.get('error', 'unknown error')}",
                 }
-        except httpx.ConnectError:
+
+            agents = gateway_data.get("data", [])
+            alive_agents = [
+                agent for agent in agents if agent.get("status") != "stopped"
+            ]
             return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Cannot connect to gateway at {master_url}. Please ensure the gateway is running.",
+                "success": True,
+                "stdout": json.dumps(alive_agents, ensure_ascii=False, indent=2),
+                "stderr": "",
             }
-        except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Failed to list agents: {str(e)}",
-            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
