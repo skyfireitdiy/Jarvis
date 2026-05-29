@@ -193,6 +193,7 @@ BUILTIN_COMMANDS = [
     ("InstallSkill", "安装Skill"),
     ("SubAgent", "启动子Agent执行任务"),
     ("SubCodeAgent", "启动子CodeAgent执行代码任务"),
+    ("Init", "初始化项目综述"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
