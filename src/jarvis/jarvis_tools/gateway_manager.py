@@ -28,6 +28,12 @@ class GatewayManagerTool:
     """
 
     name = "gateway_manager"
+
+    @staticmethod
+    def check() -> bool:
+        """检查工具是否可用，仅当 Gateway 存在时启用（通过 agent_id 是否设置判断）。"""
+        return jglobals.agent_id is not None
+
     description = """Agent 管理工具，用于管理 Agent 之间的通信和协作。
 
 支持的操作：
