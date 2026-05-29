@@ -826,7 +826,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
             if user_confirm(
                 "是否将审查发现的问题反馈到下一轮对话进行修复？",
-                default=False,
+                default=True,
             ):
                 # 使用CodeReviewer构建修复prompt
                 review_prompt = CodeReviewer.build_review_fix_prompt(result)
