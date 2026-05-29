@@ -285,11 +285,6 @@ class ToolRegistry(OutputHandlerProtocol):
         参数:
             name: 要使用的工具名称列表
         """
-        missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
-        if missing_tools:
-            PrettyOutput.auto_print(
-                f"⚠️ 工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}"
-            )
         self.tools = {
             tool_name: self.tools[tool_name]
             for tool_name in name
