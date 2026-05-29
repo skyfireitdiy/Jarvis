@@ -1342,6 +1342,45 @@ def cli(
 
                 return get_tools_info()
 
+            @custom_app.post("/message")
+            async def receive_message(request: dict):
+                """接收消息并添加到输入缓冲区。
+
+                参数:
+                    sender_id: 发送方 ID
+                    content: 消息内容
+
+                返回:
+                    dict: 操作结果
+                """
+                try:
+                    from jarvis.jarvis_utils.globals import add_input_buffer
+
+                    sender_id = request.get("sender_id")
+                    content = request.get("content")
+
+                    if not content:
+                        return {"success": False, "error": "content is required"}
+
+                    # 构建消息格式：Agent xxxx 发来消息：yyyyy
+                    if sender_id:
+                        message = f"Agent {sender_id} 发来消息：{content}"
+                    else:
+                        message = f"Agent 发来消息：{content}"
+
+                    # 添加到输入缓冲区
+                    add_input_buffer(message)
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "sender_id": sender_id,
+                            "content": content,
+                        },
+                    }
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
             config = uvicorn.Config(
                 create_app(custom_app=custom_app),
                 host="127.0.0.1",
