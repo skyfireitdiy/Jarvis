@@ -1331,6 +1331,15 @@ class PrettyOutput:
                 if show_cursor and content:
                     display_text = response + " ▌"
 
+                # 流式输出时截断文本，保持Panel在终端可视范围内
+                if show_cursor:
+                    max_text_height = console.height - 5
+                    if max_text_height <= 0:
+                        max_text_height = 1
+                    lines = display_text.split("\n")
+                    if len(lines) > max_text_height:
+                        display_text = "\n".join(lines[-max_text_height:])
+
                 md_content = Markdown(display_text, code_theme="monokai")
 
                 with _lock:
