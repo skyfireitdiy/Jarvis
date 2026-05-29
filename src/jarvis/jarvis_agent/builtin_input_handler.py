@@ -501,6 +501,41 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"❌ 启动项目综述Agent失败: {str(exc)}")
 
             return "", True
+        elif tag == "TestCase":
+            # 启动子Agent分析项目需求并生成文本化测试用例
+            try:
+                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+
+                PrettyOutput.auto_print("🚀 启动子Agent分析项目需求并生成测试用例...")
+
+                # 使用 SubAgentTool 创建子Agent
+                sub_agent_tool = SubAgentTool()
+                result = sub_agent_tool.execute(
+                    {
+                        "task": "分析当前项目的需求文档、Spec文件（.jarvis/rules/spec/目录下）、代码接口定义，生成一份文本化测试用例文件，用于指导后续集成测试开发。测试用例应覆盖：功能测试、边界条件测试、异常处理测试、接口兼容性测试。每个测试用例需包含：用例编号、用例名称、前置条件、测试步骤、预期结果、优先级。请使用 edit_file 工具将测试用例写入 .jarvis/rules/spec/test_cases.md 文件。",
+                        "name": "TestCaseAgent",
+                        "system_prompt": "你是一个测试用例设计专家。你的任务是深入分析当前项目的需求文档和代码接口，生成结构化的文本化测试用例，用于指导后续集成测试开发。请先浏览项目目录结构、读取 .jarvis/rules/spec/ 目录下的Spec文件、查看核心源码的接口定义，然后生成测试用例。测试用例格式应使用 Markdown，每个用例包含：用例编号、用例名称、前置条件、测试步骤、预期结果、优先级（P0/P1/P2）。按功能模块分组组织测试用例。",
+                        "summary_prompt": "请总结你生成的测试用例覆盖范围和数量。",
+                        "background": f"用户通过 @TestCase 命令启动测试用例生成。当前工作目录: {os.getcwd()}",
+                        "agent": agent,
+                    }
+                )
+
+                if result.get("success"):
+                    stdout = result.get("stdout", "测试用例生成完成")
+                    PrettyOutput.auto_print("✅ 测试用例生成完成")
+                    PrettyOutput.auto_print(
+                        f"📋 执行结果:\n{stdout[:500]}"
+                        + ("..." if len(stdout) > 500 else "")
+                    )
+                else:
+                    stderr = result.get("stderr", "未知错误")
+                    PrettyOutput.auto_print(f"❌ 测试用例生成失败: {stderr}")
+
+            except Exception as exc:
+                PrettyOutput.auto_print(f"❌ 启动测试用例Agent失败: {str(exc)}")
+
+            return "", True
         elif tag == "SubCodeAgent":
             # 启动子CodeAgent执行代码任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
