@@ -172,6 +172,26 @@ class GatewayManagerTool:
         返回:
             Dict[str, Any]: 执行结果
         """
+        # 兼容 v1.0 协议：registry 可能将整个参数字典作为 action 传入
+        if isinstance(action, dict):
+            args = action
+            action = args.get("action", "")
+            agent_id = args.get("agent_id")
+            message = args.get("message", "")
+            node_id = args.get("node_id")
+            agent_type = args.get("agent_type")
+            working_dir = args.get("working_dir")
+            agent_name = args.get("agent_name")
+            llm_group = args.get("llm_group")
+            tool_group = args.get("tool_group")
+            config_file = args.get("config_file")
+            task = args.get("task")
+            additional_args = args.get("additional_args")
+            worktree = args.get("worktree", False)
+            quick_mode = args.get("quick_mode", False)
+            restore_session = args.get("restore_session", False)
+            no_interaction_mode = args.get("no_interaction_mode", False)
+
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message)

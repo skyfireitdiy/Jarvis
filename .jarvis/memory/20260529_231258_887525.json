@@ -1,0 +1,8 @@
+{
+  "id": "20260529_231258_887525",
+  "type": "project_long_term",
+  "tags": ["工具开发", "协议兼容", "v1.0协议", "registry"],
+  "content": "## Jarvis 工具协议版本与 execute 方法调用方式\n\n### v1.0 协议（默认）\n- 调用方式：`tool.execute(args_to_call)` — 把整个参数字典作为**单个参数**传入\n- registry 会将 `agent` 对象注入到 `args_to_call` 字典中（`args_to_call[\"agent\"] = agent`）\n- **关键陷阱**：如果 execute 方法签名是 `execute(self, action, agent_id=None, ...)`，则 `action` 会接收到整个字典而不是字符串\n- **解决方案**：在 execute 方法开头检测 `isinstance(action, dict)`，从中提取参数\n\n### v2.0 协议\n- 调用方式：`tool.func(arguments, agent)` — arguments 和 agent 分开传递\n- 需要在工具类上设置 `protocol_version = \"2.0\"`\n- registry 会先尝试 `tool.func(arguments, agent)`，失败则回退到 `tool.func(arguments)`\n\n### 代码位置\n- 协议分发逻辑：`src/jarvis/jarvis_tools/registry.py` 第1048-1070行\n- 工具注册：`src/jarvis/jarvis_tools/registry.py` 第658-667行\n\n### 新工具开发建议\n- 如果 execute 方法使用具名参数（非单个 dict 参数），**必须**在开头添加 v1.0 兼容代码\n- 或者设置 `protocol_version = \"2.0\"` 并确保 func 签名兼容",
+  "created_at": "2026-05-29T23:12:58.887560",
+  "updated_at": "2026-05-29T23:12:58.887564"
+}
