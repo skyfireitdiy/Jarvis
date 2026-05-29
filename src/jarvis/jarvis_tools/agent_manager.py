@@ -38,20 +38,20 @@ class AgentManagerTool:
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["send_to"],
-                "description": "操作类型：send_to（向 Agent 发送消息）",
+                "enum": ["send_to", "list_agents"],
+                "description": "操作类型：send_to（向 Agent 发送消息）、list_agents（获取所有存活 Agent 列表）",
             },
             # send_to 操作的参数
             "agent_id": {
                 "type": "string",
-                "description": "目标 Agent 的 ID",
+                "description": "目标 Agent 的 ID（send_to 操作必填）",
             },
             "message": {
                 "type": "string",
-                "description": "要发送的消息内容",
+                "description": "要发送的消息内容（send_to 操作必填）",
             },
         },
-        "required": ["action", "agent_id", "message"],
+        "required": ["action"],
     }
 
     def execute(
@@ -71,6 +71,8 @@ class AgentManagerTool:
         try:
             if action == "send_to":
                 return self._send_to(agent_id, message)
+            elif action == "list_agents":
+                return self._list_agents()
             else:
                 return {
                     "success": False,
@@ -169,4 +171,67 @@ class AgentManagerTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"Failed to send message: {str(e)}",
+            }
+
+    def _list_agents(self) -> Dict[str, Any]:
+        """获取所有存活状态的 Agent 列表。
+
+        通过 Web Gateway 的 /api/agents 接口获取 Agent 列表，
+        过滤掉已停止的 Agent，返回存活 Agent 的基本信息。
+
+        返回:
+            Dict[str, Any]: 存活 Agent 列表
+        """
+        master_url = jglobals.master_url
+        if not master_url:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "master_url is not set, cannot list agents. "
+                "Please ensure the agent is started with --master-url option.",
+            }
+
+        url = f"{master_url}/api/agents"
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(url)
+
+            if response.status_code == 200:
+                result = response.json()
+                if not result.get("success"):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"Gateway returned error: {result.get('error', 'unknown error')}",
+                    }
+
+                agents = result.get("data", [])
+                # 过滤掉已停止的 Agent，只保留存活状态
+                alive_agents = [
+                    agent for agent in agents if agent.get("status") != "stopped"
+                ]
+
+                return {
+                    "success": True,
+                    "stdout": json.dumps(alive_agents, ensure_ascii=False, indent=2),
+                    "stderr": "",
+                }
+            else:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Failed to list agents: HTTP {response.status_code} - {response.text}",
+                }
+        except httpx.ConnectError:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Cannot connect to gateway at {master_url}. Please ensure the gateway is running.",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Failed to list agents: {str(e)}",
             }
