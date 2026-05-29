@@ -1168,6 +1168,11 @@ def cli(
         "--master-url",
         help="Master 节点 URL，用于 HTTP 代理请求转发",
     ),
+    agent_id: Optional[str] = typer.Option(
+        None,
+        "--agent-id",
+        help="Agent ID，由 Web Gateway 的 AgentManager 分配的唯一标识符",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理任务描述：优先从文件读取
@@ -1253,6 +1258,8 @@ def cli(
         jglobals.proxy_node = proxy_node
     if master_url:
         jglobals.master_url = master_url
+    if agent_id:
+        jglobals.agent_id = agent_id
 
     if web_gateway:
         try:

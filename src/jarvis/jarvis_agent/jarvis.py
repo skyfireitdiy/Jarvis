@@ -983,6 +983,11 @@ def run_cli(
         "--master-url",
         help="Master 节点 URL，用于 HTTP 代理请求转发",
     ),
+    agent_id: Optional[str] = typer.Option(
+        None,
+        "--agent-id",
+        help="Agent ID，由 Web Gateway 的 AgentManager 分配的唯一标识符",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1056,6 +1061,8 @@ def run_cli(
             jglobals.proxy_node = proxy_node
         if master_url:
             jglobals.master_url = master_url
+        if agent_id:
+            jglobals.agent_id = agent_id
 
         # 注意：auto_resume_session 的检测将在 init_env 之后进行，因为配置加载在 init_env 中完成
     except Exception:
