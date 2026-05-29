@@ -46,6 +46,9 @@ proxy_node: Optional[str] = None
 master_url: Optional[str] = None
 # Agent ID：由 Web Gateway 的 AgentManager 分配的唯一标识符，通过 --agent-id 参数传入
 agent_id: Optional[str] = None
+# 输入注入回调：当 Agent 正在等待输入时，可通过此回调直接注入消息到输入流
+# 设置为 Callable[[str], None]，接收消息文本；不在等待输入时为 None
+input_inject_callback: Optional[Any] = None
 # 使用栈结构跟踪嵌套的agent运行状态，支持agent调用其他agent的场景
 running_agent_stack: List[str] = []  # 正在运行的agent栈（最顶层是当前正在运行的agent）
 # 表示与大模型交互的深度(>0表示正在交互)
