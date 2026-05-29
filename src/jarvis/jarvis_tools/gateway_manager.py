@@ -21,6 +21,7 @@ class GatewayManagerTool:
     3. **list_nodes**: 获取节点列表信息
     4. **list_model_groups**: 获取指定节点的模型组列表
     5. **create_agent**: 创建新的 Agent
+    6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -42,9 +43,10 @@ class GatewayManagerTool:
 3. **list_nodes**: 获取节点列表信息，包括本节点配置、运行状态、已注册的子节点等
 4. **list_model_groups**: 获取指定节点的模型组列表，包括模型组名称、各档位模型配置等
 5. **create_agent**: 创建新的 Agent，支持指定类型、工作目录、模型组、任务等参数
+6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询（通过 node_id 指定目标节点）
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -58,8 +60,9 @@ class GatewayManagerTool:
                     "list_nodes",
                     "list_model_groups",
                     "create_agent",
+                    "list_directory",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -70,10 +73,15 @@ class GatewayManagerTool:
                 "type": "string",
                 "description": "要发送的消息内容（send_to_agent 操作必填）",
             },
-            # list_model_groups / create_agent 操作的参数
+            # list_model_groups / create_agent / list_directory 操作的参数
             "node_id": {
                 "type": "string",
-                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点）",
+                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点）",
+            },
+            # list_directory 操作的参数
+            "path": {
+                "type": "string",
+                "description": "目录路径（list_directory 操作可选，默认为空表示用户主目录）",
             },
             # create_agent 操作的参数
             "agent_type": {
@@ -134,6 +142,7 @@ class GatewayManagerTool:
         agent_id: Optional[str] = None,
         message: str = "",
         node_id: Optional[str] = None,
+        path: str = "",
         agent_type: Optional[str] = None,
         working_dir: Optional[str] = None,
         agent_name: Optional[str] = None,
@@ -151,10 +160,11 @@ class GatewayManagerTool:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
+            path: 目录路径（list_directory）
             agent_type: Agent 类型（create_agent）
             working_dir: 工作目录（create_agent）
             agent_name: Agent 名称（create_agent）
@@ -179,6 +189,7 @@ class GatewayManagerTool:
             agent_id = args.get("agent_id")
             message = args.get("message", "")
             node_id = args.get("node_id")
+            path = args.get("path", "")
             agent_type = args.get("agent_type")
             working_dir = args.get("working_dir")
             agent_name = args.get("agent_name")
@@ -217,6 +228,8 @@ class GatewayManagerTool:
                     no_interaction_mode=no_interaction_mode,
                     node_id=node_id,
                 )
+            elif action == "list_directory":
+                return self._list_directory(path=path, node_id=node_id)
             else:
                 return {
                     "success": False,
@@ -265,6 +278,7 @@ class GatewayManagerTool:
         method: str,
         path: str,
         json_data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, str]] = None,
         error_prefix: str = "Request failed",
     ) -> Dict[str, Any]:
         """向 Gateway 发送 HTTP 请求。
@@ -273,6 +287,7 @@ class GatewayManagerTool:
             method: HTTP 方法 (GET/POST)
             path: 请求路径 (如 /api/agents)
             json_data: POST 请求的 JSON 数据
+            params: GET 请求的 query 参数
             error_prefix: 错误提示前缀
 
         返回:
@@ -286,7 +301,7 @@ class GatewayManagerTool:
                 if method.upper() == "POST":
                     response = client.post(url, json=json_data, headers=headers)
                 else:
-                    response = client.get(url, headers=headers)
+                    response = client.get(url, headers=headers, params=params)
 
             if response.status_code == 200:
                 return {
@@ -598,6 +613,62 @@ class GatewayManagerTool:
             return {
                 "success": True,
                 "stdout": json.dumps(agent_info, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _list_directory(
+        self, path: str = "", node_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """获取指定路径下的文件/目录列表。
+
+        通过 Web Gateway 的 GET /api/directories 接口获取目录列表，
+        支持跨节点查询（通过 node_id 参数指定目标节点）。
+
+        参数:
+            path: 目录路径，默认为空（表示用户主目录）
+            node_id: 目标节点 ID，默认为空（表示本节点）
+
+        返回:
+            Dict[str, Any]: 目录列表
+        """
+        err = self._get_master_url("list directory")
+        if err:
+            return err
+
+        # 构建 query 参数
+        query_params: Dict[str, str] = {}
+        if path:
+            query_params["path"] = path
+        if node_id:
+            query_params["node_id"] = node_id
+
+        result = self._request_gateway(
+            method="GET",
+            path="/api/directories",
+            params=query_params if query_params else None,
+            error_prefix="Failed to list directory",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_detail = gateway_data.get("error", "unknown error")
+                if isinstance(error_detail, dict):
+                    error_msg = error_detail.get("message", str(error_detail))
+                else:
+                    error_msg = str(error_detail)
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+
+            data = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(data, ensure_ascii=False, indent=2),
                 "stderr": "",
             }
         else:
