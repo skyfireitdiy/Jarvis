@@ -119,11 +119,12 @@ class ToolRegistry(OutputHandlerProtocol):
         if '"name"' in response and '"arguments"' in response:
             return True
 
-        # 条件2：工具名 + JSON结构组合——已注册工具名出现在文本中且有JSON意图
+        # 条件2：工具名 + JSON结构组合——已注册工具名以引号包裹形式出现在文本中且有JSON意图
         if has_json_brace:
             tool_names = self.tools.keys() if self.tools else []
             for tool_name in tool_names:
-                if tool_name in response:
+                # 工具名必须被引号包裹（如 "memory" 或 'memory'），避免普通文本中的误匹配
+                if f'"{tool_name}"' in response or f"'{tool_name}'" in response:
                     return True
 
         # 条件3：工具调用标记 + JSON结构组合——常见标记且有JSON意图
@@ -133,11 +134,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 if marker in response:
                     return True
 
-        # 条件4：工具名和工具参数名同时出现在文本中——即使没有JSON结构也认为是工具调用意图
+        # 条件4：工具名以 "name": "tool_name" 格式出现，且其参数名也以引号包裹形式出现
         if self.tools:
             for tool_name, tool_info in self.tools.items():
-                if tool_name in response:
-                    # 工具名出现，再检查其参数名是否也出现
+                # 工具名必须以 "name": "tool_name" 格式出现，这是工具调用的标准格式
+                if '"name"' in response and f'"{tool_name}"' in response:
+                    # 工具名以标准格式出现，再检查其参数名是否也以引号包裹形式出现
                     parameters = (
                         tool_info.parameters
                         if hasattr(tool_info, "parameters")
@@ -147,7 +149,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         properties = parameters.get("properties", {})
                         if isinstance(properties, dict):
                             for param_name in properties:
-                                if param_name in response:
+                                if f'"{param_name}"' in response:
                                     return True
 
         return False
