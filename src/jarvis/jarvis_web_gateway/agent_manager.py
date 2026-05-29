@@ -199,6 +199,7 @@ class AgentManager:
             restore_session=restore_session,
             no_interaction_mode=no_interaction_mode,
             proxy_node=proxy_node,
+            agent_id=agent_id,
         )
 
         # 准备环境变量（包含认证 Token）
@@ -524,6 +525,7 @@ class AgentManager:
         restore_session: bool = False,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> List[str]:
         """构建 Agent 启动命令。
 
@@ -579,6 +581,10 @@ class AgentManager:
         # 添加 master URL 参数（如果全局变量中设置了）
         if jglobals.master_url:
             cmd.extend(["--master-url", jglobals.master_url])
+
+        # 添加 agent_id 参数（由 AgentManager 分配的唯一标识符）
+        if agent_id:
+            cmd.extend(["--agent-id", agent_id])
 
         # 添加代理节点参数（如果指定了）
         if proxy_node:
