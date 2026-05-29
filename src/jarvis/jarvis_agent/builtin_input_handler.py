@@ -466,6 +466,41 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             except Exception as exc:
                 PrettyOutput.auto_print(f"❌ 启动子Agent失败: {str(exc)}")
                 return "", True
+        elif tag == "Init":
+            # 启动子Agent分析项目并生成.jarvis/rule项目综述文件
+            try:
+                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+
+                PrettyOutput.auto_print("🚀 启动子Agent分析项目并生成项目综述...")
+
+                # 使用 SubAgentTool 创建子Agent
+                sub_agent_tool = SubAgentTool()
+                result = sub_agent_tool.execute(
+                    {
+                        "task": "分析当前项目的目录结构、技术栈、架构设计、核心模块、构建方式、测试方式等，生成一份项目综述文件，写入到 .jarvis/rule 文件中。综述应包含：项目概述、技术栈、目录结构说明、核心模块说明、构建与运行方式、测试方式、关键配置等。请使用 edit_file 工具将内容写入 .jarvis/rule 文件。",
+                        "name": "InitProjectAgent",
+                        "system_prompt": "你是一个项目分析专家。你的任务是深入分析当前项目，生成一份类似 CLAUDE.md 的项目综述文件，并使用 edit_file 工具将其写入 .jarvis/rule 文件。请先浏览项目目录结构、读取关键配置文件（如 pyproject.toml、setup.py、package.json、Makefile 等）、查看核心源码目录，然后生成综述。综述格式应使用 Markdown，包含：项目概述、技术栈、目录结构、核心模块、构建与运行、测试、关键配置等章节。",
+                        "summary_prompt": "请总结你生成的项目综述内容。",
+                        "background": f"用户通过 @Init 命令启动项目综述生成。当前工作目录: {os.getcwd()}",
+                        "agent": agent,
+                    }
+                )
+
+                if result.get("success"):
+                    stdout = result.get("stdout", "项目综述生成完成")
+                    PrettyOutput.auto_print("✅ 项目综述生成完成")
+                    PrettyOutput.auto_print(
+                        f"📋 执行结果:\n{stdout[:500]}"
+                        + ("..." if len(stdout) > 500 else "")
+                    )
+                else:
+                    stderr = result.get("stderr", "未知错误")
+                    PrettyOutput.auto_print(f"❌ 项目综述生成失败: {stderr}")
+
+            except Exception as exc:
+                PrettyOutput.auto_print(f"❌ 启动项目综述Agent失败: {str(exc)}")
+
+            return "", True
         elif tag == "SubCodeAgent":
             # 启动子CodeAgent执行代码任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
