@@ -381,7 +381,15 @@ class WebGateway(BaseGateway):
             _update_status("waiting_multi")
 
         session = self._input_registry.get_or_create(session_id)
-        text = session.wait_for_input()
+
+        # 设置输入注入回调，允许 /message 接口直接注入消息到输入流
+        jglobals.input_inject_callback = session.submit_input
+
+        try:
+            text = session.wait_for_input()
+        finally:
+            # 清除回调，避免后续误用
+            jglobals.input_inject_callback = None
 
         # 输入完成，恢复为运行状态
         _update_status("running")
