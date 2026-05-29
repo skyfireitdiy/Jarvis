@@ -1332,8 +1332,6 @@ def run_cli(
                     dict: 操作结果
                 """
                 try:
-                    from jarvis.jarvis_utils.globals import add_input_buffer
-
                     sender_id = request.get("sender_id")
                     content = request.get("content")
 
@@ -1346,14 +1344,21 @@ def run_cli(
                     else:
                         message = f"Agent 发来消息：{content}"
 
-                    # 添加到输入缓冲区
-                    add_input_buffer(message)
+                    # 如果 Agent 正在等待输入，直接注入到输入流实现即时送达
+                    if jglobals.input_inject_callback is not None:
+                        jglobals.input_inject_callback(message)
+                        delivered = "instant"
+                    else:
+                        # 否则存入缓冲区，等待下一轮循环消费
+                        jglobals.input_buffer.append(message)
+                        delivered = "buffered"
 
                     return {
                         "success": True,
                         "data": {
                             "sender_id": sender_id,
                             "content": content,
+                            "delivered": delivered,
                         },
                     }
                 except Exception as e:
