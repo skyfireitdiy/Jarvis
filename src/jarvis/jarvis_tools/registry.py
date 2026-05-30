@@ -112,26 +112,24 @@ class ToolRegistry(OutputHandlerProtocol):
                     except Exception:
                         continue
 
-        # 第二层：组合条件检测疑似工具调用（单一信号不触发，必须组合出现）
-        has_json_brace = "{" in response
+        # 第二层：严格格式检测——必须是标准的工具调用格式
+        # 条件 2：工具名必须以 "name": "tool_name" 标准格式出现，且包含 arguments 字段
+        if self.tools:
+            for tool_name in self.tools.keys():
+                # 必须同时满足："name": "tool_name" 和 "arguments" 字段
+                if (
+                    f'"name": "{tool_name}"' in response
+                    or f'"name":"{tool_name}"' in response
+                ):
+                    if '"arguments"' in response or '"arguments":' in response:
+                        return True
 
-        # 条件1：关键字组合——"name" + "arguments" 同时出现
-        if '"name"' in response and '"arguments"' in response:
-            return True
-
-        # 条件2：工具名 + JSON结构组合——已注册工具名以引号包裹形式出现在文本中且有JSON意图
-        if has_json_brace:
-            tool_names = self.tools.keys() if self.tools else []
-            for tool_name in tool_names:
-                # 工具名必须被引号包裹（如 "memory" 或 'memory'），避免普通文本中的误匹配
-                if f'"{tool_name}"' in response or f"'{tool_name}'" in response:
-                    return True
-
-        # 条件3：工具调用标记 + JSON结构组合——常见标记且有JSON意图
-        if has_json_brace:
-            tool_call_markers = ["<TOOL_CALL>", "tool_call", "```json"]
-            for marker in tool_call_markers:
-                if marker in response:
+        # 条件 3：工具调用标记 + 完整 JSON 结构——常见标记且包含 name 和 arguments 字段
+        tool_call_markers = ["<TOOL_CALL>", "tool_call", "```json"]
+        for marker in tool_call_markers:
+            if marker in response:
+                # 必须同时包含 name 和 arguments 关键字，且格式正确
+                if '"name"' in response and '"arguments"' in response:
                     return True
 
         # 条件4：工具名以 "name": "tool_name" 格式出现，且其参数名也以引号包裹形式出现
@@ -190,22 +188,22 @@ class ToolRegistry(OutputHandlerProtocol):
             return tools_prompt
         return ""
 
-    def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
+    def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         try:
-            # 传递agent给_extract_tool_calls，以便在解析失败时调用大模型修复
+            # 传递 agent 给_extract_tool_calls，以便在解析失败时调用大模型修复
             tool_calls, err_msg, auto_completed = self._extract_tool_calls(
-                response, agent_
+                response, agent
             )
             if err_msg:
                 # 只要工具解析错误，追加工具使用帮助信息（相当于一次 <ToolUsage>）
                 try:
                     from jarvis.jarvis_agent import Agent
 
-                    agent_obj: Agent = agent_
+                    agent_obj: Agent = agent
                     tool_usage = agent_obj.get_tool_usage_prompt()
                     return False, f"{err_msg}\n\n{tool_usage}"
                 except Exception:
-                    # 兼容处理：无法获取Agent或ToolUsage时，至少返回工具系统帮助信息
+                    # 兼容处理：无法获取 Agent 或 ToolUsage 时，至少返回工具系统帮助信息
                     return False, f"{err_msg}\n\n{tool_call_help}"
 
             # 处理多个工具调用
@@ -225,10 +223,10 @@ class ToolRegistry(OutputHandlerProtocol):
                         and "arguments" in first_value
                     ):
                         # 多个工具调用格式
-                        result = self.handle_multiple_tool_calls(tool_calls, agent_)
+                        result = self.handle_multiple_tool_calls(tool_calls, agent)
                     else:
                         # 可能是格式错误，尝试作为单个工具调用处理
-                        result = self.handle_tool_calls(tool_calls, agent_)
+                        result = self.handle_tool_calls(tool_calls, agent)
                 elif len(tool_calls) == 1:
                     # 单个键，检查值是否是工具调用信息字典
                     first_value = list(tool_calls.values())[0]
@@ -238,33 +236,33 @@ class ToolRegistry(OutputHandlerProtocol):
                         and "arguments" in first_value
                     ):
                         # 多个工具调用格式，但只有一个
-                        result = self.handle_tool_calls(first_value, agent_)
+                        result = self.handle_tool_calls(first_value, agent)
                     elif "name" in tool_calls and "arguments" in tool_calls:
                         # 单个工具调用格式（直接包含 name 和 arguments）
-                        result = self.handle_tool_calls(tool_calls, agent_)
+                        result = self.handle_tool_calls(tool_calls, agent)
                     else:
                         # 向后兼容：尝试作为单个工具调用处理
-                        result = self.handle_tool_calls(tool_calls, agent_)
+                        result = self.handle_tool_calls(tool_calls, agent)
                 elif "name" in tool_calls and "arguments" in tool_calls:
                     # 单个工具调用格式（直接包含 name 和 arguments，但 len == 0 的情况不应该发生）
-                    result = self.handle_tool_calls(tool_calls, agent_)
+                    result = self.handle_tool_calls(tool_calls, agent)
                 else:
                     # 空字典或格式错误
-                    result = self.handle_tool_calls(tool_calls, agent_)
+                    result = self.handle_tool_calls(tool_calls, agent)
             else:
                 # 非字典格式，直接调用 handle_tool_calls
-                result = self.handle_tool_calls(tool_calls, agent_)
+                result = self.handle_tool_calls(tool_calls, agent)
 
             # auto_completed 逻辑已移除（不再需要自动补全标签）
             return False, result
         except Exception as e:
-            PrettyOutput.auto_print(f"❌ 工具调用处理失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 工具调用处理失败：{str(e)}")
             from jarvis.jarvis_agent import Agent
 
-            agent_final: Agent = agent_
+            agent_final: Agent = agent
             return (
                 False,
-                f"工具调用处理失败: {str(e)}\n\n{agent_final.get_tool_usage_prompt()}",
+                f"工具调用处理失败：{str(e)}\n\n{agent_final.get_tool_usage_prompt()}",
             )
 
     def __init__(self) -> None:
@@ -1054,7 +1052,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 # v2.0: agent与参数分离传递
                 # 尝试使用agent作为第二个参数，如果不兼容则回退到旧方式
                 try:
-                    result = tool.func(arguments, agent)  # type: ignore[call-arg]
+                    result = tool.func(arguments, agent)  # type: ignore[arg-type,call-arg]
                 except TypeError:
                     # 兼容旧版v2.0工具，只传arguments
                     result = tool.func(arguments)
