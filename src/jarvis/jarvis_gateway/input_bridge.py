@@ -72,8 +72,12 @@ class RemoteInputSession:
         with self._state_lock:
             return self._is_waiting_for_input
 
-    def wait_for_input(self, timeout: Optional[float] = None) -> str:
-        print(f"[WAIT_INPUT_START] session_id={self.session_id}, timeout={timeout}")
+    def wait_for_input(
+        self, timeout: Optional[float] = None, use_global_buffer: bool = True
+    ) -> str:
+        print(
+            f"[WAIT_INPUT_START] session_id={self.session_id}, timeout={timeout}, use_global_buffer={use_global_buffer}"
+        )
         # 设置等待输入状态
         with self._state_lock:
             self._is_waiting_for_input = True
@@ -82,18 +86,19 @@ class RemoteInputSession:
             f"[WAIT_INPUT_START] initial_disconnect_reason={initial_disconnect_reason}"
         )
         try:
-            # 优先消费全局缓冲区中的消息
-            from jarvis.jarvis_utils.globals import get_input_buffer
+            # 优先消费全局缓冲区中的消息（仅多行输入使用）
+            if use_global_buffer:
+                from jarvis.jarvis_utils.globals import get_input_buffer
 
-            buffered_messages = get_input_buffer()
-            print(
-                f"[WAIT_INPUT] session_id={self.session_id}, buffered_messages={buffered_messages}"
-            )
-            if buffered_messages:
-                # 将所有缓冲消息合并返回
-                result = "\n".join(buffered_messages)
-                print(f"[WAIT_INPUT] Returning buffered messages: {result}")
-                return result
+                buffered_messages = get_input_buffer()
+                print(
+                    f"[WAIT_INPUT] session_id={self.session_id}, buffered_messages={buffered_messages}"
+                )
+                if buffered_messages:
+                    # 将所有缓冲消息合并返回
+                    result = "\n".join(buffered_messages)
+                    print(f"[WAIT_INPUT] Returning buffered messages: {result}")
+                    return result
 
             while True:
                 with self._state_lock:
