@@ -614,6 +614,10 @@ class WebSocketConnectionManager:
             return
         message_type = message.get("type")
         payload = message.get("payload") or {}
+        # 处理心跳 ping 消息，直接回复 pong
+        if message_type == "ping":
+            self._router.publish({"type": "pong"}, session_id=session_id)
+            return
         if message_type == "connection_lock":
             enabled = payload.get("enabled", False)
             self._connection_lock_enabled = enabled
