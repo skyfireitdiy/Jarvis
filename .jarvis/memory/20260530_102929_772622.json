@@ -1,0 +1,8 @@
+{
+  "id": "20260530_102929_772622",
+  "type": "project_long_term",
+  "tags": ["远程agent", "WebSocket代理", "重连问题", "分析结论"],
+  "content": "## 远程agent WebSocket代理重连问题分析结论（未修复）\n\n### 完整链路\n浏览器 → master `/api/agent/{agent_id}/ws` → `agent_websocket_proxy` → `node_connection_manager.send_request_to_node(AGENT_WS_OPEN_REQUEST)` → 子节点 `_handle_agent_ws_open_request` → 连接agent `ws://127.0.0.1:{port}/ws`\n\n### 已确认正确的机制\n1. 认证：子节点通过subprotocol传递token，agent端从header提取\n2. 路由：AgentRouteRegistry在agent创建时注册，删除时移除\n3. 连接清理：浏览器关闭→master finally块发CLOSE→子节点关闭agent_ws\n4. agent端session_id=\"default\"固定，新连接替换旧连接时不会清除新auth（connection_id检查保护）\n\n### 候选根因（按可能性排序）\n1. **子节点recv_loop串行处理**：RECV请求阻塞SEND请求，agent_ws.recv()最多阻塞1秒\n2. **agent端_build_sender静默丢弃消息**：WebSocket断开瞬间send_json()异常被except:pass忽略\n3. **agent端emit_output不缓存_router.publish失败的消息**：只在not authorized时缓存\n\n### 建议修复方案（未实施）\n- 方案B：将RECV timeout从1.0秒降低到0.1秒（最小改动）\n- 方案D：修复agent端消息缓存机制，确保断开瞬间消息不丢失\n- 方案A/C：将串行处理改为并发或持久WebSocket隧道（改动较大）",
+  "created_at": "2026-05-30T10:29:29.772668",
+  "updated_at": "2026-05-30T10:29:29.772677"
+}
