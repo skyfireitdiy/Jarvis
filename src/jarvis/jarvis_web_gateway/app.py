@@ -386,7 +386,8 @@ class WebGateway(BaseGateway):
         jglobals.input_inject_callback = session.submit_input
 
         try:
-            text = session.wait_for_input()
+            # 单行输入不使用全局缓冲区，只有多行输入才使用
+            text = session.wait_for_input(use_global_buffer=(request.mode != "single"))
         finally:
             # 清除回调，避免后续误用
             jglobals.input_inject_callback = None
