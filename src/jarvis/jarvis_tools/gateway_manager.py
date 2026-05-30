@@ -26,6 +26,10 @@ class GatewayManagerTool:
     8. **get_node_secret**: 获取网关的节点连接私钥
     9. **update_nodes_code**: 更新所有节点代码到 main 分支
     10. **restart_nodes**: 一键重启所有节点服务（跳过当前节点）
+    11. **create_timer**: 创建定时任务（支持指定节点）
+    12. **list_timers**: 查询所有节点的定时任务（汇总）
+    13. **get_timer**: 查询单个定时任务
+    14. **delete_timer**: 删除定时任务
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -52,9 +56,13 @@ class GatewayManagerTool:
 8. **get_node_secret**: 获取网关的节点连接私钥，用于子节点连接主网关时的身份认证
 9. **update_nodes_code**: 更新所有节点代码到 main 分支，将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码
 10. **restart_nodes**: 一键重启所有节点服务，跳过当前节点（因为当前节点有 Agent 在运行），依次重启子节点后最后重启 master 节点
+11. **create_timer**: 创建定时任务，支持指定节点，可定时创建 Agent 或执行 Shell 命令
+12. **list_timers**: 查询所有节点的定时任务并汇总
+13. **get_timer**: 查询单个定时任务详情
+14. **delete_timer**: 删除指定定时任务
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -73,8 +81,12 @@ class GatewayManagerTool:
                     "get_node_secret",
                     "update_nodes_code",
                     "restart_nodes",
+                    "create_timer",
+                    "list_timers",
+                    "get_timer",
+                    "delete_timer",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -144,6 +156,24 @@ class GatewayManagerTool:
                 "type": "boolean",
                 "description": "是否启用无交互模式（create_agent 操作可选，默认为 false，启用时 task 必填）",
             },
+            # timer 操作的参数
+            "timer_id": {
+                "type": "string",
+                "description": "定时任务 ID（get_timer、delete_timer 操作必填）",
+            },
+            "schedule": {
+                "type": "object",
+                "description": "定时任务调度配置（create_timer 操作必填），三选一：run_at（ISO 时间字符串）、delay_seconds（延迟秒数≥0）、interval_seconds（间隔秒数>0）",
+            },
+            "timer_action_type": {
+                "type": "string",
+                "enum": ["create_agent", "run_shell_command"],
+                "description": "定时任务动作类型（create_timer 操作必填）：create_agent 或 run_shell_command",
+            },
+            "timer_action_params": {
+                "type": "object",
+                "description": "定时任务动作参数（create_timer 操作必填）。create_agent 类型需：agent_type(必填)、working_dir(必填)、name、llm_group、tool_group、config_file、task、additional_args、worktree、proxy_node；run_shell_command 类型需：command(必填)、working_dir(必填)、interpreter",
+            },
         },
         "required": ["action"],
     }
@@ -167,12 +197,16 @@ class GatewayManagerTool:
         quick_mode: bool = False,
         restore_session: bool = False,
         no_interaction_mode: bool = False,
+        timer_id: Optional[str] = None,
+        schedule: Optional[Dict[str, Any]] = None,
+        timer_action_type: Optional[str] = None,
+        timer_action_params: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent, get_node_secret, update_nodes_code, restart_nodes)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent, get_node_secret, update_nodes_code, restart_nodes, create_timer, list_timers, get_timer, delete_timer)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
@@ -189,6 +223,10 @@ class GatewayManagerTool:
             quick_mode: 快速模式（create_agent）
             restore_session: 恢复会话（create_agent）
             no_interaction_mode: 无交互模式（create_agent）
+            timer_id: 定时任务 ID（get_timer、delete_timer）
+            schedule: 调度配置（create_timer）
+            timer_action_type: 定时任务动作类型（create_timer）
+            timer_action_params: 定时任务动作参数（create_timer）
             **kwargs: 其他参数
 
         返回:
@@ -214,6 +252,10 @@ class GatewayManagerTool:
             quick_mode = args.get("quick_mode", False)
             restore_session = args.get("restore_session", False)
             no_interaction_mode = args.get("no_interaction_mode", False)
+            timer_id = args.get("timer_id")
+            schedule = args.get("schedule")
+            timer_action_type = args.get("timer_action_type")
+            timer_action_params = args.get("timer_action_params")
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message)
@@ -249,6 +291,19 @@ class GatewayManagerTool:
                 return self._update_nodes_code()
             elif action == "restart_nodes":
                 return self._restart_nodes()
+            elif action == "create_timer":
+                return self._create_timer(
+                    node_id=node_id,
+                    schedule=schedule,
+                    timer_action_type=timer_action_type,
+                    timer_action_params=timer_action_params,
+                )
+            elif action == "list_timers":
+                return self._list_timers()
+            elif action == "get_timer":
+                return self._get_timer(timer_id=timer_id)
+            elif action == "delete_timer":
+                return self._delete_timer(timer_id=timer_id)
             else:
                 return {
                     "success": False,
@@ -1168,6 +1223,236 @@ class GatewayManagerTool:
             return {
                 "success": True,
                 "stdout": json.dumps(data, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _create_timer(
+        self,
+        node_id: Optional[str] = None,
+        schedule: Optional[Dict[str, Any]] = None,
+        timer_action_type: Optional[str] = None,
+        timer_action_params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """创建定时任务。
+
+        参数:
+            node_id: 目标节点 ID（可选，默认为 master）
+            schedule: 调度配置，三选一
+            timer_action_type: 动作类型（create_agent / run_shell_command）
+            timer_action_params: 动作参数
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not schedule:
+            return {"success": False, "stdout": "", "stderr": "schedule is required"}
+        if not timer_action_type:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "timer_action_type is required",
+            }
+        if not timer_action_params:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "timer_action_params is required",
+            }
+
+        # 构建请求体
+        body = {
+            "schedule": schedule,
+            "action": {
+                "type": timer_action_type,
+                "params": timer_action_params,
+            },
+        }
+
+        # 确定请求路径（支持跨节点）
+        path = "/api/timers"
+        if node_id and node_id != "master":
+            path = f"/api/node/{node_id}/timers"
+
+        result = self._request_gateway(
+            method="POST",
+            path=path,
+            json_data=body,
+            error_prefix="Failed to create timer",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+            data = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(data, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _list_timers(self) -> Dict[str, Any]:
+        """查询所有节点的定时任务并汇总。
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        nodes_result = self._list_nodes()
+        if not nodes_result.get("success"):
+            return nodes_result
+
+        try:
+            nodes_data = json.loads(nodes_result["stdout"])
+        except (json.JSONDecodeError, TypeError):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Failed to parse nodes data",
+            }
+
+        all_timers = []
+        errors = []
+
+        # 构建节点 ID 列表：master + 所有子节点
+        node_ids = ["master"]
+        for sub_node in nodes_data.get("nodes", []):
+            sub_node_id = sub_node.get("node_id", "")
+            if sub_node_id:
+                node_ids.append(sub_node_id)
+
+        # 遍历所有节点查询定时任务
+        for node_id in node_ids:
+            path = "/api/timers"
+            if node_id != "master":
+                path = f"/api/node/{node_id}/timers"
+
+            result = self._request_gateway(
+                method="GET",
+                path=path,
+                error_prefix=f"Failed to list timers on node {node_id}",
+            )
+
+            if result["success"]:
+                gateway_data = result["data"]
+                if gateway_data.get("success"):
+                    timers = gateway_data.get("data", [])
+                    for timer in timers:
+                        timer["node_id"] = node_id
+                    all_timers.extend(timers)
+                else:
+                    error_info = gateway_data.get("error", {})
+                    error_msg = (
+                        error_info.get("message", "unknown error")
+                        if isinstance(error_info, dict)
+                        else str(error_info)
+                    )
+                    errors.append(f"node {node_id}: {error_msg}")
+            else:
+                errors.append(f"node {node_id}: {result['error']}")
+
+        output = {
+            "timers": all_timers,
+            "total": len(all_timers),
+        }
+        if errors:
+            output["errors"] = errors
+
+        return {
+            "success": True,
+            "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+            "stderr": "",
+        }
+
+    def _get_timer(self, timer_id: Optional[str] = None) -> Dict[str, Any]:
+        """查询单个定时任务。
+
+        参数:
+            timer_id: 定时任务 ID
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not timer_id:
+            return {"success": False, "stdout": "", "stderr": "timer_id is required"}
+
+        result = self._request_gateway(
+            method="GET",
+            path=f"/api/timers/{timer_id}",
+            error_prefix=f"Failed to get timer {timer_id}",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+            data = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(data, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _delete_timer(self, timer_id: Optional[str] = None) -> Dict[str, Any]:
+        """删除定时任务。
+
+        参数:
+            timer_id: 定时任务 ID
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not timer_id:
+            return {"success": False, "stdout": "", "stderr": "timer_id is required"}
+
+        result = self._request_gateway(
+            method="DELETE",
+            path=f"/api/timers/{timer_id}",
+            error_prefix=f"Failed to delete timer {timer_id}",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+            return {
+                "success": True,
+                "stdout": json.dumps({"deleted": timer_id}, ensure_ascii=False),
                 "stderr": "",
             }
         else:
