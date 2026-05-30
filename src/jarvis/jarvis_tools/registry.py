@@ -190,6 +190,16 @@ class ToolRegistry(OutputHandlerProtocol):
                         except Exception:
                             continue
 
+        # 条件6：特征组合检测——工具调用标记 + 已注册工具名同时出现
+        # 当response中同时包含工具调用标记和具体工具名时，判定为工具调用意图
+        # 这能识别非标准格式的工具调用，如 "tool_call: read_code\npath: App.vue"
+        tool_call_markers = ["tool_call", "<TOOL_CALL>", "function_call", "action_call"]
+        has_tool_call_marker = any(marker in response for marker in tool_call_markers)
+        if has_tool_call_marker and self.tools:
+            for tool_name in self.tools.keys():
+                if tool_name in response:
+                    return True
+
         return False
 
     def prompt(self) -> str:
