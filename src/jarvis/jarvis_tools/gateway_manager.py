@@ -23,6 +23,8 @@ class GatewayManagerTool:
     5. **create_agent**: 创建新的 Agent
     6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询
     7. **delete_agent**: 删除指定的 Agent
+    8. **get_node_secret**: 获取网关的节点连接私钥
+    9. **update_nodes_code**: 更新所有节点代码到 main 分支
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -46,9 +48,11 @@ class GatewayManagerTool:
 5. **create_agent**: 创建新的 Agent，支持指定类型、工作目录、模型组、任务等参数
 6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询（通过 node_id 指定目标节点）
 7. **delete_agent**: 删除指定的 Agent，支持跨节点删除（通过 node_id 指定目标节点）
+8. **get_node_secret**: 获取网关的节点连接私钥，用于子节点连接主网关时的身份认证
+9. **update_nodes_code**: 更新所有节点代码到 main 分支，将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -64,8 +68,10 @@ class GatewayManagerTool:
                     "create_agent",
                     "list_directory",
                     "delete_agent",
+                    "get_node_secret",
+                    "update_nodes_code",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -234,6 +240,10 @@ class GatewayManagerTool:
                 return self._list_directory(path=path, node_id=node_id)
             elif action == "delete_agent":
                 return self._delete_agent(agent_id=agent_id, node_id=node_id)
+            elif action == "get_node_secret":
+                return self._get_node_secret()
+            elif action == "update_nodes_code":
+                return self._update_nodes_code()
             else:
                 return {
                     "success": False,
@@ -679,6 +689,169 @@ class GatewayManagerTool:
             }
         else:
             return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _get_node_secret(self) -> Dict[str, Any]:
+        """获取网关的节点连接私钥。
+
+        通过 Web Gateway 的 GET /api/node/secret 接口获取节点连接私钥，
+        此私钥用于子节点连接主网关时的身份认证。
+
+        返回:
+            Dict[str, Any]: 包含 node_secret 的结果
+        """
+        err = self._get_master_url("get node secret")
+        if err:
+            return err
+
+        result = self._request_gateway(
+            method="GET",
+            path="/api/node/secret",
+            error_prefix="Failed to get node secret",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+
+            data = gateway_data.get("data", {})
+            node_secret = data.get("node_secret", "")
+            return {
+                "success": True,
+                "stdout": json.dumps(
+                    {"node_secret": node_secret}, ensure_ascii=False, indent=2
+                ),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _update_nodes_code(self) -> Dict[str, Any]:
+        """更新所有节点代码到 main 分支。
+
+        通过 Web Gateway 的 POST /api/nodes/{node_id}/code-update 接口，
+        将所有在线节点的 Jarvis 代码切换到 main 分支并拉取最新代码。
+
+        返回:
+            Dict[str, Any]: 包含各节点更新结果的信息
+        """
+        err = self._get_master_url("update nodes code")
+        if err:
+            return err
+
+        # 先获取所有在线节点
+        nodes_result = self._request_gateway(
+            method="GET",
+            path="/api/nodes",
+            error_prefix="Failed to get nodes list",
+        )
+
+        if not nodes_result["success"]:
+            return {"success": False, "stdout": "", "stderr": nodes_result["error"]}
+
+        gateway_data = nodes_result["data"]
+        if not gateway_data.get("success"):
+            error_info = gateway_data.get("error", {})
+            error_msg = (
+                error_info.get("message", "unknown error")
+                if isinstance(error_info, dict)
+                else str(error_info)
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Gateway returned error: {error_msg}",
+            }
+
+        nodes_data = gateway_data.get("data", {})
+        nodes = nodes_data.get("nodes", [])
+        if not nodes:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "No online nodes available for code update",
+            }
+
+        # 对每个节点执行代码更新
+        results = []
+        success_count = 0
+        for node in nodes:
+            node_id = node.get("node_id", "")
+            if not node_id:
+                continue
+
+            update_result = self._request_gateway(
+                method="POST",
+                path=f"/api/nodes/{node_id}/code-update",
+                error_prefix=f"Failed to update code for node {node_id}",
+            )
+
+            if update_result["success"]:
+                update_data = update_result["data"]
+                if update_data.get("success"):
+                    success_count += 1
+                    data = update_data.get("data", {})
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": True,
+                            "message": data.get("message", "更新成功"),
+                        }
+                    )
+                else:
+                    error_info = update_data.get("error", {})
+                    error_msg = (
+                        error_info.get("message", "unknown error")
+                        if isinstance(error_info, dict)
+                        else str(error_info)
+                    )
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": False,
+                            "message": error_msg,
+                        }
+                    )
+            else:
+                results.append(
+                    {
+                        "node_id": node_id,
+                        "success": False,
+                        "message": update_result["error"],
+                    }
+                )
+
+        total_count = len(nodes)
+        if success_count == total_count:
+            message = f"代码更新成功，已更新 {success_count}/{total_count} 个节点"
+        elif success_count > 0:
+            message = f"代码更新部分成功，成功 {success_count}/{total_count} 个节点"
+        else:
+            message = "代码更新失败，没有节点更新成功"
+
+        summary: Dict[str, Any] = {
+            "total": total_count,
+            "success": success_count,
+            "failed": total_count - success_count,
+            "results": results,
+            "message": message,
+        }
+
+        return {
+            "success": success_count > 0,
+            "stdout": json.dumps(summary, ensure_ascii=False, indent=2),
+            "stderr": "" if success_count > 0 else "All nodes failed to update",
+        }
 
     def _delete_agent(
         self, agent_id: Optional[str] = None, node_id: Optional[str] = None
