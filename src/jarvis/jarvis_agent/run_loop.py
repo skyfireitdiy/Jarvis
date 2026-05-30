@@ -702,7 +702,7 @@ class AgentRunLoop:
             status_manager.set_running()
             try:
                 current_round = self.agent.model.get_conversation_turn()
-                if current_round % self.tool_reminder_rounds == 0:
+                if current_round <= 1 or current_round % self.tool_reminder_rounds == 0:
                     self.agent.session.addon_prompt = ensure_str(
                         join_prompts(
                             [
