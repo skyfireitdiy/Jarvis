@@ -106,7 +106,7 @@
             <div class="message-body markdown-content" v-html="item.html"></div>
           </div>
           <!-- 终端嵌入 -->
-          <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished" class="terminal-wrapper">
+          <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
@@ -7305,14 +7305,13 @@ function setTerminalRef(executionId, el, agentId = null) {
         item => item.output_type === 'execution' && item.execution_id === executionId
       )
       
-      // 检查是否已经finished，但如果是重连后收到的消息（没有terminal_content），应该重新创建终端
+      // 如果有terminal_content，说明执行结果已保存，不需要创建xterm（直接显示文本历史即可）
+      if (executionMessage?.terminal_content) {
+        console.log(`[terminal] Execution ${executionSessionKey} has terminal_content, skipping terminal creation`)
+        return
+      }
+      // 检查是否已经finished但没有terminal_content（重连场景），需要重新创建终端
       if (executionMessage?.is_finished) {
-        // 如果有terminal_content，说明是真正结束的execution，跳过创建
-        if (executionMessage.terminal_content) {
-          console.log(`[terminal] Execution ${executionSessionKey} already finished with content, skipping terminal creation`)
-          return
-        }
-        // 如果没有terminal_content，可能是重连后收到的消息，需要重新创建终端
         console.log(`[terminal] Execution ${executionSessionKey} marked as finished but no content, recreating terminal (reconnect scenario)`)
       }
       
@@ -7337,6 +7336,13 @@ function setTerminalRef(executionId, el, agentId = null) {
       // 检查该agent的最后一条消息是否是正在执行的命令，如果不是则不需要重建xterm
       const agentOutputs = allOutputs.value.get(targetAgentId) || []
       const lastMessage = agentOutputs[agentOutputs.length - 1]
+      // 如果有terminal_content，说明执行结果已保存，不需要重建xterm
+      if (lastMessage?.terminal_content) {
+        console.log(`[terminal] Last execution has terminal_content, skipping rebuild for ${executionSessionKey}`)
+        disposeExecutionTerminal(termInfo)
+        termInfo.ended = true
+        return
+      }
       const isLastMessageExecution = lastMessage?.output_type === 'execution' && !lastMessage?.is_finished
       if (!isLastMessageExecution) {
         console.log(`[terminal] Last message is not an active execution, skipping rebuild for ${executionSessionKey}`)
