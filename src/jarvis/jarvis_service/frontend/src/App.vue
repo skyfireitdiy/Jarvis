@@ -1096,6 +1096,7 @@ const reconnectTimer = ref(null) // 重连定时器
 const switchGeneration = ref(0) // 切换代数，用于取消旧的switchAgent操作
 const reconnectInterval = 5000 // 固定重连间隔（毫秒）
 const userDisconnected = ref(false) // 用户主动断开连接标志
+const isAutoConnecting = ref(false) // 自动连接（免登录）阶段标志
 
 // 配置同步相关状态
 const syncConfigSourceNode = ref('') // 配置同步的源节点ID
@@ -8138,6 +8139,7 @@ onMounted(() => {
   // 如果 token 加载成功，隐藏登录框并自动连接
   if (hasAuthToken()) {
     showConnectModal.value = false
+    isAutoConnecting.value = true
     console.log('[AUTH] Auto login: token loaded, connecting...')
     connect()
   }
