@@ -25,6 +25,7 @@ class GatewayManagerTool:
     7. **delete_agent**: 删除指定的 Agent
     8. **get_node_secret**: 获取网关的节点连接私钥
     9. **update_nodes_code**: 更新所有节点代码到 main 分支
+    10. **restart_nodes**: 一键重启所有节点服务（跳过当前节点）
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -50,9 +51,10 @@ class GatewayManagerTool:
 7. **delete_agent**: 删除指定的 Agent，支持跨节点删除（通过 node_id 指定目标节点）
 8. **get_node_secret**: 获取网关的节点连接私钥，用于子节点连接主网关时的身份认证
 9. **update_nodes_code**: 更新所有节点代码到 main 分支，将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码
+10. **restart_nodes**: 一键重启所有节点服务，跳过当前节点（因为当前节点有 Agent 在运行），依次重启子节点后最后重启 master 节点
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -70,8 +72,9 @@ class GatewayManagerTool:
                     "delete_agent",
                     "get_node_secret",
                     "update_nodes_code",
+                    "restart_nodes",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -169,7 +172,7 @@ class GatewayManagerTool:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent, get_node_secret, update_nodes_code, restart_nodes)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
@@ -577,33 +580,29 @@ class GatewayManagerTool:
         if err:
             return err
 
-        # 构建请求体，只包含非空参数
-        body: Dict[str, Any] = {
-            "agent_type": agent_type,
-            "working_dir": working_dir,
-        }
-        if name:
-            body["name"] = name
-        if llm_group:
-            body["llm_group"] = llm_group
-        if tool_group:
-            body["tool_group"] = tool_group
-        if config_file:
-            body["config_file"] = config_file
-        if task:
-            body["task"] = task
-        if additional_args:
-            body["additional_args"] = additional_args
-        if worktree:
-            body["worktree"] = True
-        if quick_mode:
-            body["quick_mode"] = True
-        if restore_session:
-            body["restore_session"] = True
-        if no_interaction_mode:
-            body["no_interaction_mode"] = True
-        if node_id:
-            body["node_id"] = node_id
+        # 校验 worktree 冲突
+        conflict = self._check_worktree_conflict(
+            agent_type, worktree, working_dir, node_id
+        )
+        if conflict:
+            return conflict
+
+        # 构建请求体并发送
+        body = self._build_create_agent_body(
+            agent_type=agent_type,
+            working_dir=working_dir,
+            name=name,
+            llm_group=llm_group,
+            tool_group=tool_group,
+            config_file=config_file,
+            task=task,
+            additional_args=additional_args,
+            worktree=worktree,
+            quick_mode=quick_mode,
+            restore_session=restore_session,
+            no_interaction_mode=no_interaction_mode,
+            node_id=node_id,
+        )
 
         result = self._request_gateway(
             method="POST",
@@ -635,6 +634,115 @@ class GatewayManagerTool:
             }
         else:
             return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _check_worktree_conflict(
+        self,
+        agent_type: Optional[str],
+        worktree: bool,
+        working_dir: Optional[str],
+        node_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """校验同一节点同一工作目录不允许同时有两个未启用 worktree 的 codeagent。
+
+        参数:
+            agent_type: Agent 类型
+            worktree: 是否启用 worktree
+            working_dir: 工作目录
+            node_id: 目标节点 ID
+
+        返回:
+            冲突时返回错误字典，无冲突返回 None
+        """
+        if agent_type != "codeagent" or worktree:
+            return None
+
+        target_node_id = (node_id or "master").strip() or "master"
+        normalized_dir = (working_dir or "").strip()
+
+        agents_result = self._request_gateway(
+            method="GET",
+            path="/api/agents",
+            error_prefix="Failed to get agents list for worktree check",
+        )
+
+        if not agents_result["success"]:
+            return None
+
+        agents_data = agents_result["data"]
+        if not agents_data.get("success"):
+            return None
+
+        agents_list = agents_data.get("data", {}).get("agents", [])
+        for agent in agents_list:
+            # 已停止的 agent 不冲突
+            if agent.get("status") in ("stopped", "completed", "failed", "abandoned"):
+                continue
+            if agent.get("agent_type") != "codeagent":
+                continue
+            if agent.get("worktree"):
+                continue
+            agent_node_id = (agent.get("node_id") or "").strip() or "master"
+            if agent_node_id != target_node_id:
+                continue
+            if (agent.get("working_dir") or "").strip() != normalized_dir:
+                continue
+            conflict_name = agent.get("name") or agent.get("agent_id") or "未命名"
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": (
+                    f"工作目录冲突：节点 {target_node_id} 下已存在未启用 worktree 的代码 Agent「{conflict_name}」。"
+                    f"同一工作目录下只能有一个未启用 worktree 的代码 Agent。"
+                    f"请启用 worktree 或选择其他工作目录。"
+                ),
+            }
+
+        return None
+
+    def _build_create_agent_body(
+        self,
+        agent_type: Optional[str] = None,
+        working_dir: Optional[str] = None,
+        name: Optional[str] = None,
+        llm_group: Optional[str] = None,
+        tool_group: Optional[str] = None,
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[str] = None,
+        worktree: bool = False,
+        quick_mode: bool = False,
+        restore_session: bool = False,
+        no_interaction_mode: bool = False,
+        node_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """构建创建 Agent 的请求体，只包含非空参数。"""
+        body: Dict[str, Any] = {
+            "agent_type": agent_type,
+            "working_dir": working_dir,
+        }
+        if name:
+            body["name"] = name
+        if llm_group:
+            body["llm_group"] = llm_group
+        if tool_group:
+            body["tool_group"] = tool_group
+        if config_file:
+            body["config_file"] = config_file
+        if task:
+            body["task"] = task
+        if additional_args:
+            body["additional_args"] = additional_args
+        if worktree:
+            body["worktree"] = True
+        if quick_mode:
+            body["quick_mode"] = True
+        if restore_session:
+            body["restore_session"] = True
+        if no_interaction_mode:
+            body["no_interaction_mode"] = True
+        if node_id:
+            body["node_id"] = node_id
+        return body
 
     def _list_directory(
         self, path: str = "", node_id: Optional[str] = None
