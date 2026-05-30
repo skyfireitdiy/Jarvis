@@ -132,11 +132,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 if '"name"' in response and '"arguments"' in response:
                     return True
 
-        # 条件4：工具名以 "name": "tool_name" 格式出现，且其参数名也以引号包裹形式出现
+        # 条件4：response 中同时包含 "name" 关键字和工具名（工具名不加引号），且其参数名以引号包裹形式出现
         if self.tools:
             for tool_name, tool_info in self.tools.items():
-                # 工具名必须以 "name": "tool_name" 格式出现，这是工具调用的标准格式
-                if '"name"' in response and f'"{tool_name}"' in response:
+                # "name" 和工具名分别独立出现在 response 中即可
+                if '"name"' in response and f"{tool_name}" in response:
                     # 工具名以标准格式出现，再检查其参数名是否也以引号包裹形式出现
                     parameters = (
                         tool_info.parameters
