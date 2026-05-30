@@ -1,0 +1,14 @@
+{
+  "id": "20260530_154900_370065",
+  "type": "project_long_term",
+  "tags": [
+    "前端",
+    "终端",
+    "xterm",
+    "历史恢复",
+    "Bug修复"
+  ],
+  "content": "前端终端历史恢复Bug修复：当execution消息有terminal_content时，不应创建xterm实例。修复点：1) 模板v-if增加!item.terminal_content条件；2) setTerminalRef新建检查中terminal_content检查提前到is_finished之前；3) needsRebuild重建检查中增加terminal_content判断。文件：src/jarvis/jarvis_service/frontend/src/App.vue",
+  "created_at": "2026-05-30T15:49:00.370101",
+  "updated_at": "2026-05-30T15:49:00.370107"
+}
