@@ -3100,11 +3100,20 @@ async function loadHistoryMessages(prepend = false) {
       console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))
     }
     // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
-    const processedMessages = historyMessages.map(msg => {
-        // 修复旧的execution消息：如果有terminal_content但没有is_finished，设置is_finished=true
-        if (msg.output_type === 'execution' && msg.terminal_content && !msg.is_finished) {
-          console.log(`[HISTORY] Fixing old execution message: ${msg.execution_id}, setting is_finished=true`)
-          msg.is_finished = true
+    // 修复execution消息的is_finished标记：终端执行是串行的，同一agent同一时间只有一个execution在运行
+    // 从后往前扫描：最后一条execution信任历史中的is_finished值；前面所有execution强制is_finished=true
+    const executionIndices = []
+    historyMessages.forEach((msg, idx) => {
+      if (msg.output_type === 'execution') executionIndices.push(idx)
+    })
+    const processedMessages = historyMessages.map((msg, idx) => {
+        if (msg.output_type === 'execution') {
+          const isLast = executionIndices.length > 0 && idx === executionIndices[executionIndices.length - 1]
+          if (!isLast && !msg.is_finished) {
+            // 非最后一条execution：强制标记为已完成（不管terminal_content是否为空）
+            console.log(`[HISTORY] Fixing non-last execution message: ${msg.execution_id}, setting is_finished=true`)
+            msg.is_finished = true
+          }
         }
         const html = renderMessageHtml(msg)
         // 生成稳定ID，避免v-for使用index作为key导致DOM重建
@@ -5824,7 +5833,7 @@ function handleMessage(message, agentId = null) {
       console.log('[ws] Restoring input request from previous session')
       inputTip.value = lastInputRequest.value.tip || ''
       inputMode.value = lastInputRequest.value.mode || 'multi'
-      inputText.value = lastInputRequest.value.preset || ''
+      inputText.value = inputText.value || lastInputRequest.value.preset || ''
       nextTick(() => {
         const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
         inputEl?.focus()
@@ -7131,6 +7140,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     },
     fontSize: 12,
     allowProposedApi: true,
+    focusOnClick: false,
   })
 
   // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
