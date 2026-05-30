@@ -3259,6 +3259,7 @@ async function connect() {
     reconnecting.value = false
     reconnectAttempts.value = 0
     userDisconnected.value = false
+    isAutoConnecting.value = false  // 连接成功，自动连接阶段结束
     if (reconnectTimer.value) {
       clearTimeout(reconnectTimer.value)
       reconnectTimer.value = null
@@ -3302,6 +3303,7 @@ async function connect() {
       try {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }))
+          console.log('[ws] Heartbeat ping sent')
         }
       } catch (e) {
         console.warn('[ws] Failed to send heartbeat', e)
@@ -3316,6 +3318,13 @@ async function connect() {
       message = JSON.parse(event.data)
     } catch (error) {
       console.warn('[ws] message parse failed', event.data)
+      return
+    }
+
+    // 处理心跳pong响应，更新时间戳防止超时
+    if (message.type === 'pong') {
+      ws._lastPongTime = Date.now()
+      console.log('[ws] Heartbeat pong received')
       return
     }
 
