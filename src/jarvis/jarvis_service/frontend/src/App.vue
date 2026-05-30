@@ -6472,10 +6472,15 @@ function appendExecution(payload, agentId = null) {
         } catch (error) {
           console.warn('[HISTORY] Failed to save terminal content:', error)
         }
+
+        // 执行结束后从当前消息列表中删除（类似流式消息STREAM_END的处理）
+        currentOutputs.splice(execIndex, 1)
+        allOutputs.value.set(targetAgentId, [...currentOutputs])
+        console.log(`[terminal] Removed execution message ${executionId} from outputs for agent: ${targetAgentId}`)
       } else {
         console.warn(`🚨 [terminal] execution message ${executionId} not found`)
       }
-      console.log(`[terminal] Terminal content saved to message list and history for agent: ${targetAgentId}`)
+      console.log(`[terminal] Terminal content saved to history for agent: ${targetAgentId}`)
     } catch (error) {
       console.error(`[terminal] Failed to save terminal content:`, error)
     }
