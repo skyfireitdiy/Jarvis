@@ -90,8 +90,11 @@ class GatewayManagerTool:
             },
             # send_to_agent 操作的参数
             "agent_id": {
-                "type": "string",
-                "description": "目标 Agent 的 ID（send_to_agent 操作必填；delete_agent 操作必填）",
+                "anyOf": [
+                    {"type": "string"},
+                    {"type": "array", "items": {"type": "string"}},
+                ],
+                "description": "目标 Agent 的 ID（send_to_agent 操作必填；delete_agent 操作必填）。支持单个 ID 字符串或 ID 数组。",
             },
             "message": {
                 "type": "string",
@@ -407,14 +410,14 @@ class GatewayManagerTool:
                 "error": f"{error_prefix}: {str(e)}",
             }
 
-    def _send_to_agent(self, agent_id: Optional[str], message: str) -> Dict[str, Any]:
-        """向指定 Agent 发送消息。
+    def _send_to_agent(self, agent_id: Any, message: str) -> Dict[str, Any]:
+        """向指定 Agent(s) 发送消息。
 
         通过 Web Gateway 的 /api/agent/{agent_id}/message 接口发送消息，
         Gateway 会将请求代理到目标 Agent 的 /message 接口。
 
         参数:
-            agent_id: 目标 Agent ID
+            agent_id: 目标 Agent ID (支持 str 或 List[str])
             message: 消息内容
 
         返回:
@@ -430,33 +433,69 @@ class GatewayManagerTool:
         if err:
             return err
 
+        # 标准化 agent_ids 为列表
+        target_ids = []
+        if isinstance(agent_id, str):
+            # 支持逗号分隔的字符串
+            target_ids = [aid.strip() for aid in agent_id.split(",") if aid.strip()]
+        elif isinstance(agent_id, list):
+            target_ids = [str(aid).strip() for aid in agent_id if str(aid).strip()]
+        else:
+            return {"success": False, "stdout": "", "stderr": "Invalid agent_id type"}
+
+        if not target_ids:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "No valid agent_id provided",
+            }
+
         sender_id = jglobals.agent_id
         # 在消息末尾添加回复提示
         enhanced_message = (
             f"{message}\n\n---\n如果要回复消息，请发送到 agent_id: {sender_id}"
         )
 
-        result = self._request_gateway(
-            method="POST",
-            path=f"/api/agent/{agent_id}/message",
-            json_data={"sender_id": sender_id, "content": enhanced_message},
-            error_prefix=f"Failed to send message to agent {agent_id}",
-        )
+        results = []
+        all_success = True
 
-        if result["success"]:
-            output = {
-                "agent_id": agent_id,
-                "sender_id": sender_id,
-                "message": message,
-                "response": result["data"],
-            }
-            return {
-                "success": True,
-                "stdout": json.dumps(output, ensure_ascii=False, indent=2),
-                "stderr": "",
-            }
-        else:
-            return {"success": False, "stdout": "", "stderr": result["error"]}
+        for target_id in target_ids:
+            result = self._request_gateway(
+                method="POST",
+                path=f"/api/agent/{target_id}/message",
+                json_data={"sender_id": sender_id, "content": enhanced_message},
+                error_prefix=f"Failed to send message to agent {target_id}",
+            )
+
+            if result["success"]:
+                results.append(
+                    {
+                        "agent_id": target_id,
+                        "status": "sent",
+                        "response": result["data"],
+                    }
+                )
+            else:
+                all_success = False
+                results.append(
+                    {
+                        "agent_id": target_id,
+                        "status": "failed",
+                        "error": result["error"],
+                    }
+                )
+
+        output = {
+            "sender_id": sender_id,
+            "message": message,
+            "results": results,
+        }
+
+        return {
+            "success": all_success,
+            "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+            "stderr": "" if all_success else "Some messages failed to send",
+        }
 
     def _list_agents(self) -> Dict[str, Any]:
         """获取所有 Agent 列表。
