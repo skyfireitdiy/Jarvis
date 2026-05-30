@@ -1,0 +1,14 @@
+{
+  "id": "20260530_163123_817288",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "vue",
+    "terminal",
+    "bug-fix",
+    "App.vue"
+  ],
+  "content": "## App.vue终端显示逻辑修复记录\n\n### 问题描述\n在`src/jarvis/jarvis_service/frontend/src/App.vue`中，存在既打印Terminal Output又创建xterm的情况。\n\n### 问题原因\n1. 模板条件判断不完善：当`is_finished`为true但`terminal_content`为空时，两个v-if条件都不满足\n2. JavaScript逻辑冲突：第7322-7325行尝试在finished但无content时重新创建终端\n\n### 修复方案\n1. 修改模板条件（第113行）：移除`item.terminal_content`条件，改为`v-if=\"item.output_type === 'execution' && item.is_finished\"`\n2. 修改JavaScript逻辑（第7322-7325行）：当finished但无content时，跳过创建终端并return\n\n### 关键代码位置\n- 模板条件：第109行（创建xterm）、第113行（显示历史记录）\n- JavaScript逻辑：第7317-7325行（setTerminalRef函数）\n- 状态设置：第6483-6484行（is_finished和terminal_content同时设置）",
+  "created_at": "2026-05-30T16:31:23.817332",
+  "updated_at": "2026-05-30T16:31:23.817338"
+}

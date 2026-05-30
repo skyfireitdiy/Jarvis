@@ -110,9 +110,9 @@
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
+          <div v-if="item.output_type === 'execution' && item.is_finished" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content">{{ item.terminal_content }}</pre>
+            <pre class="terminal-history-content">{{ item.terminal_content || '' }}</pre>
           </div>
         </article>
         <!-- 确认对话框 -->
@@ -7319,9 +7319,10 @@ function setTerminalRef(executionId, el, agentId = null) {
         console.log(`[terminal] Execution ${executionSessionKey} has terminal_content, skipping terminal creation`)
         return
       }
-      // 检查是否已经finished但没有terminal_content（重连场景），需要重新创建终端
+      // 检查是否已经finished但没有terminal_content（重连场景），不需要重新创建终端
       if (executionMessage?.is_finished) {
-        console.log(`[terminal] Execution ${executionSessionKey} marked as finished but no content, recreating terminal (reconnect scenario)`)
+        console.log(`[terminal] Execution ${executionSessionKey} marked as finished but no content, skipping terminal creation (will show empty history)`)
+        return
       }
       
       // termInfo不存在，创建新的终端记录
