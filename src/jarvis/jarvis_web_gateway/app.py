@@ -527,6 +527,15 @@ class WebSocketConnectionManager:
                 print(
                     "[WS CONNECTION] New connection replacing old one (connection lock disabled)"
                 )
+                # 先向旧连接发送 CONNECTION_LOCKED 错误，让前端清除 token 停止重连
+                try:
+                    await _send_error(
+                        old_websocket,
+                        "CONNECTION_LOCKED",
+                        "Your connection has been replaced by a new one",
+                    )
+                except Exception:
+                    pass
                 try:
                     await old_websocket.close()
                 except Exception:
