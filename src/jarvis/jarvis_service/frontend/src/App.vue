@@ -6009,16 +6009,23 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'confirm') {
 
     pendingConfirmAgentId.value = targetAgentId
-    showConfirm(
-      payload.message || '请确认',
-      () => {
-        sendConfirmResult(true, targetAgentId)
-      },
-      () => {
-        sendConfirmResult(false, targetAgentId)
-      },
-      payload.default !== undefined ? payload.default : true
-    )
+    // 更新 Agent 状态为 waiting_confirm
+    agentStatuses.value.set(targetAgentId, {execution_status: 'waiting_confirm'})
+
+    // 只有当前 Agent 才立即弹出确认对话框
+    // 非当前 Agent 的确认请求会在切换时通过 fetchAgentStatus 恢复
+    if (isCurrentAgent(targetAgentId)) {
+      showConfirm(
+        payload.message || '请确认',
+        () => {
+          sendConfirmResult(true, targetAgentId)
+        },
+        () => {
+          sendConfirmResult(false, targetAgentId)
+        },
+        payload.default !== undefined ? payload.default : true
+      )
+    }
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)
     // 只在首次创建终端时创建输出项
