@@ -3039,11 +3039,13 @@ const isExecuting = ref(false)
 
 const connectionStatus = computed(() => {
   if (connecting.value) return 'connecting'
+  if (reconnecting.value) return 'reconnecting'
   return socket.value ? 'online' : 'offline'
 })
 
 const connectionLabel = computed(() => {
   if (connecting.value) return '连接中'
+  if (reconnecting.value) return '重连中'
   return socket.value ? '已连接' : '未连接'
 })
 
@@ -3297,6 +3299,10 @@ async function connect() {
         console.warn('[ws] Heartbeat timeout, closing connection')
         clearInterval(ws._heartbeatTimer)
         ws._heartbeatTimer = null
+        // 立即清理socket状态，避免UI仍显示已连接
+        if (socket.value === ws) {
+          socket.value = null
+        }
         ws.close()
         return
       }
@@ -9249,6 +9255,17 @@ body::-webkit-scrollbar {
 .dot.connecting {
   background: #d29922;
   color: #d29922;
+}
+
+.dot.reconnecting {
+  background: #d29922;
+  color: #d29922;
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .dot.online {
