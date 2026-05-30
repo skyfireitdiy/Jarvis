@@ -3319,6 +3319,11 @@ async function connect() {
     }, heartbeatInterval)
   }
   ws.onmessage = (event) => {
+    // 忽略非当前连接的消息（重连时旧连接可能仍收到消息）
+    if (socket.value !== ws) {
+      console.log('[ws] Ignoring message from stale connection')
+      return
+    }
     let message = null
     try {
       message = JSON.parse(event.data)
