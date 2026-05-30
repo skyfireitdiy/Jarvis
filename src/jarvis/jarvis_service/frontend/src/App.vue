@@ -7316,6 +7316,16 @@ function setTerminalRef(executionId, el, agentId = null) {
 
     const needsRebuild = !!termInfo.terminal && termInfo.hostEl !== el
     if (needsRebuild) {
+      // 检查该agent的最后一条消息是否是正在执行的命令，如果不是则不需要重建xterm
+      const agentOutputs = allOutputs.value.get(targetAgentId) || []
+      const lastMessage = agentOutputs[agentOutputs.length - 1]
+      const isLastMessageExecution = lastMessage?.output_type === 'execution' && !lastMessage?.is_finished
+      if (!isLastMessageExecution) {
+        console.log(`[terminal] Last message is not an active execution, skipping rebuild for ${executionSessionKey}`)
+        disposeExecutionTerminal(termInfo)
+        termInfo.ended = true
+        return
+      }
       console.log(`[terminal] Rebuilding terminal for execution ${executionSessionKey} on new host element`)
       disposeExecutionTerminal(termInfo)
     }

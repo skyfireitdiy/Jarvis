@@ -131,7 +131,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "执行脚本并返回结果，支持任意解释器。Windows 默认使用 powershell，Unix 默认使用 bash。为了避免输出过多内容，建议使用 rg、grep、Select-String 等命令过滤和限制输出长度。\n\n示例用法（Unix/Linux）：\n• 查找日志中的错误：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 查看文件开头20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜索代码中的函数定义：interpreter='bash', script_content=\"rg '^def ' src/\"\n\n示例用法（Windows）：\n• 查找文件中的错误：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 查看目录列表：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执行 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
+    description = "执行脚本并返回结果，支持任意解释器。Windows 默认使用 powershell，Unix 默认使用 bash。为了避免输出过多内容，建议使用 grep、Select-String 等命令过滤和限制输出长度。\n\n示例用法（Unix/Linux）：\n• 查找日志中的错误：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 查看文件开头20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜索代码中的函数定义：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查找文件中的错误：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 查看目录列表：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执行 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
     parameters = {
         "type": "object",
         "properties": {
@@ -141,7 +141,7 @@ class ScriptTool:
             },
             "script_content": {
                 "type": "string",
-                "description": "要执行的脚本内容。为了避免输出过多，建议使用过滤命令：\n例如：\n• grep -i 'error' filename  # 查找包含'error'的行\n• rg 'pattern' filename     # 使用ripgrep查找模式\n• tail -n 50 filename       # 显示文件最后50行\n• head -n 20 filename       # 显示文件前20行\n• command | head -n 100     # 限制命令输出前100行",
+                "description": "要执行的脚本内容。为了避免输出过多，建议使用过滤命令：\n例如：\n• grep -i 'error' filename  # 查找包含'error'的行\n• grep -rn 'pattern' filename     # 搜索文件内容\n• tail -n 50 filename       # 显示文件最后50行\n• head -n 20 filename       # 显示文件前20行\n• command | head -n 100     # 限制命令输出前100行",
             },
         },
         "required": ["script_content"],
