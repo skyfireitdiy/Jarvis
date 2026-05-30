@@ -431,10 +431,15 @@ class GatewayManagerTool:
             return err
 
         sender_id = jglobals.agent_id
+        # 在消息末尾添加回复提示
+        enhanced_message = (
+            f"{message}\n\n---\n如果要回复消息，请发送到 agent_id: {sender_id}"
+        )
+
         result = self._request_gateway(
             method="POST",
             path=f"/api/agent/{agent_id}/message",
-            json_data={"sender_id": sender_id, "content": message},
+            json_data={"sender_id": sender_id, "content": enhanced_message},
             error_prefix=f"Failed to send message to agent {agent_id}",
         )
 
