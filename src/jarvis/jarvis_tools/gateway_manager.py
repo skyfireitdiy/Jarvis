@@ -244,6 +244,8 @@ class GatewayManagerTool:
                 return self._get_node_secret()
             elif action == "update_nodes_code":
                 return self._update_nodes_code()
+            elif action == "restart_nodes":
+                return self._restart_nodes()
             else:
                 return {
                     "success": False,
@@ -851,6 +853,158 @@ class GatewayManagerTool:
             "success": success_count > 0,
             "stdout": json.dumps(summary, ensure_ascii=False, indent=2),
             "stderr": "" if success_count > 0 else "All nodes failed to update",
+        }
+
+    def _restart_nodes(self) -> Dict[str, Any]:
+        """一键重启所有节点服务（跳过当前节点）。
+
+        通过 Web Gateway 的 POST /api/nodes/{node_id}/service/restart 接口，
+        依次重启所有子节点，最后重启 master 节点。
+        跳过当前节点（因为当前节点有 Agent 在运行）。
+
+        返回:
+            Dict[str, Any]: 包含各节点重启结果的信息
+        """
+        err = self._get_master_url("restart nodes")
+        if err:
+            return err
+
+        # 先获取所有在线节点
+        nodes_result = self._request_gateway(
+            method="GET",
+            path="/api/nodes",
+            error_prefix="Failed to get nodes list",
+        )
+
+        if not nodes_result["success"]:
+            return {"success": False, "stdout": "", "stderr": nodes_result["error"]}
+
+        gateway_data = nodes_result["data"]
+        if not gateway_data.get("success"):
+            error_info = gateway_data.get("error", {})
+            error_msg = (
+                error_info.get("message", "unknown error")
+                if isinstance(error_info, dict)
+                else str(error_info)
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Gateway returned error: {error_msg}",
+            }
+
+        nodes_data = gateway_data.get("data", {})
+        nodes = nodes_data.get("nodes", [])
+        if not nodes:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "No online nodes available for restart",
+            }
+
+        # 获取当前节点 ID，跳过当前节点
+        current_node_id = os.environ.get("NODE_ID", "master")
+
+        # 排序：子节点在前，master 在后
+        child_nodes = [n for n in nodes if n.get("node_id", "") != "master"]
+        master_node = [n for n in nodes if n.get("node_id", "") == "master"]
+        sorted_nodes = child_nodes + master_node
+
+        # 对每个节点执行重启
+        results = []
+        success_count = 0
+        skipped_count = 0
+        for node in sorted_nodes:
+            node_id = node.get("node_id", "")
+            if not node_id:
+                continue
+
+            # 跳过当前节点
+            if node_id == current_node_id:
+                skipped_count += 1
+                results.append(
+                    {
+                        "node_id": node_id,
+                        "success": True,
+                        "skipped": True,
+                        "message": f"跳过当前节点 {node_id}（有 Agent 正在运行）",
+                    }
+                )
+                continue
+
+            restart_result = self._request_gateway(
+                method="POST",
+                path=f"/api/nodes/{node_id}/service/restart",
+                json_data={"node_id": node_id, "restart_frontend": True},
+                error_prefix=f"Failed to restart node {node_id}",
+            )
+
+            if restart_result["success"]:
+                restart_data = restart_result["data"]
+                if restart_data.get("success"):
+                    success_count += 1
+                    data = restart_data.get("data", {})
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": True,
+                            "skipped": False,
+                            "message": data.get("message", "重启请求已发送"),
+                        }
+                    )
+                else:
+                    error_info = restart_data.get("error", {})
+                    error_msg = (
+                        error_info.get("message", "unknown error")
+                        if isinstance(error_info, dict)
+                        else str(error_info)
+                    )
+                    results.append(
+                        {
+                            "node_id": node_id,
+                            "success": False,
+                            "skipped": False,
+                            "message": error_msg,
+                        }
+                    )
+            else:
+                results.append(
+                    {
+                        "node_id": node_id,
+                        "success": False,
+                        "skipped": False,
+                        "message": restart_result["error"],
+                    }
+                )
+
+        total_count = len(sorted_nodes)
+        restarted_count = total_count - skipped_count
+        if success_count == restarted_count:
+            message = (
+                f"节点重启命令已发送完成，成功 {success_count}/{restarted_count} 个节点"
+                + (f"，跳过当前节点 {current_node_id}" if skipped_count > 0 else "")
+            )
+        elif success_count > 0:
+            message = (
+                f"节点重启部分成功，成功 {success_count}/{restarted_count} 个节点"
+                + (f"，跳过当前节点 {current_node_id}" if skipped_count > 0 else "")
+            )
+        else:
+            message = "节点重启失败，没有节点重启成功"
+
+        summary: Dict[str, Any] = {
+            "total": total_count,
+            "success": success_count,
+            "skipped": skipped_count,
+            "failed": restarted_count - success_count,
+            "results": results,
+            "message": message,
+        }
+
+        return {
+            "success": success_count > 0,
+            "stdout": json.dumps(summary, ensure_ascii=False, indent=2),
+            "stderr": "" if success_count > 0 else "All nodes failed to restart",
         }
 
     def _delete_agent(
