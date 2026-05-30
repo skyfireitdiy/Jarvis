@@ -3284,6 +3284,30 @@ async function connect() {
       payload: { enabled: connectionLockEnabled.value }
     }))
     console.log('[ws] connection_lock sent', connectionLockEnabled.value)
+
+    // 启动心跳机制，防止空闲连接被中间件/代理超时断开
+    ws._lastPongTime = Date.now()
+    const heartbeatInterval = 30000 // 30秒发送一次心跳
+    const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
+    ws._heartbeatTimer = setInterval(() => {
+      // 检查是否超时未收到pong
+      if (ws._lastPongTime && (Date.now() - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
+        console.warn('[ws] Heartbeat timeout, closing connection')
+        clearInterval(ws._heartbeatTimer)
+        ws._heartbeatTimer = null
+        ws.close()
+        return
+      }
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }))
+        }
+      } catch (e) {
+        console.warn('[ws] Failed to send heartbeat', e)
+        clearInterval(ws._heartbeatTimer)
+        ws._heartbeatTimer = null
+      }
+    }, heartbeatInterval)
   }
   ws.onmessage = (event) => {
     let message = null
@@ -3306,6 +3330,11 @@ async function connect() {
     })
     socket.value = null
     connecting.value = false
+    // 清理心跳定时器
+    if (ws._heartbeatTimer) {
+      clearInterval(ws._heartbeatTimer)
+      ws._heartbeatTimer = null
+    }
     // 连接断开，销毁所有独立终端
     console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
@@ -5826,6 +5855,13 @@ function handleMessage(message, agentId = null) {
   
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
+  // 处理心跳 pong 响应
+  if (type === 'pong') {
+    if (socket.value) {
+      socket.value._lastPongTime = Date.now()
+    }
+    return
+  }
   if (type === 'ready') {
 
     // 恢复之前的输入请求状态
