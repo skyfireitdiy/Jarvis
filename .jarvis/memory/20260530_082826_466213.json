@@ -1,0 +1,8 @@
+{
+  "id": "20260530_082826_466213",
+  "type": "project_long_term",
+  "tags": ["gateway", "input", "websocket", "reconnect", "bugfix"],
+  "content": "## input.py gateway 断连等待修复 - 已完成\n\n### 问题\ngateway 模式下 websocket 未连接时，get_single_line_input、user_confirm 捕获 InputProviderDisconnectedError 后直接返回默认值，不等待前端重连。\n\n### 修改\n- `get_single_line_input`（行645-663）：DisconnectedError 改为 while True 循环 + time.sleep(2) 等待重连\n- `user_confirm`（行1302-1319）：同样改为 while True 循环重试\n- `get_choice`：通过调用 get_single_line_input 间接修复\n- `get_multiline_input`：已有 continue 重连逻辑，无需修改\n\n### Commits\n- a3aa13a: get_single_line_input DisconnectedError 重试等待\n- 5c5079e→8c60ef2: user_confirm DisconnectedError 重试等待（修复残留代码）\n\n### 文件\n- src/jarvis/jarvis_utils/input.py",
+  "created_at": "2026-05-30T08:28:26.466244",
+  "updated_at": "2026-05-30T08:28:26.466249"
+}

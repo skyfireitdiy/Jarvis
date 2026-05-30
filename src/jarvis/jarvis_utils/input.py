@@ -643,21 +643,24 @@ def get_single_line_input(tip: str, default: str = "") -> str:
         gateway = None
 
     if gateway is not None and GatewayInputRequest is not None:
-        # Gateway 模式：发送输入请求到前端
-        try:
-            request = GatewayInputRequest(
-                tip=tip,
-                mode="single",
-                preset=default,
-            )
-            result = gateway.request_input(request)
-            return result.text.strip() if result is not None else default.strip()
-        except InputProviderTimeoutError:
-            PrettyOutput.auto_print("⚠️ 输入超时，使用默认值")
-            return default.strip()
-        except InputProviderDisconnectedError:
-            PrettyOutput.auto_print("⚠️ 输入提供者已断开，使用默认值")
-            return default.strip()
+        # Gateway 模式：发送输入请求到前端，断连时等待重连
+        import time
+
+        while True:
+            try:
+                request = GatewayInputRequest(
+                    tip=tip,
+                    mode="single",
+                    preset=default,
+                )
+                result = gateway.request_input(request)
+                return result.text.strip() if result is not None else default.strip()
+            except InputProviderTimeoutError:
+                PrettyOutput.auto_print("⚠ 输入超时，使用默认值\n")
+                return default.strip()
+            except InputProviderDisconnectedError:
+                PrettyOutput.auto_print("⚠ WebSocket 未连接，等待前端重连...\n")
+                time.sleep(2)
 
     # 非 Gateway 模式：使用命令行输入
     history_dir = get_data_dir()
@@ -1300,17 +1303,20 @@ def user_confirm(tip: str, default: bool = True) -> bool:
         message = f"{agent_name}{tip} {suffix}"
 
         if gateway is not None and GatewayConfirmRequest is not None:
-            # Gateway 模式：发送确认请求到前端
-            try:
-                request = GatewayConfirmRequest(message=message, default=default)
-                result = gateway.request_confirm(request)
-                return result.confirmed if result is not None else default
-            except InputProviderTimeoutError:
-                PrettyOutput.auto_print("⚠️ 确认请求超时，已使用默认值")
-                return default
-            except InputProviderDisconnectedError:
-                PrettyOutput.auto_print("⚠️ 远端连接已断开，已使用默认值")
-                return default
+            # Gateway 模式：发送确认请求到前端，断连时等待重连
+            import time
+
+            while True:
+                try:
+                    request = GatewayConfirmRequest(message=message, default=default)
+                    result = gateway.request_confirm(request)
+                    return result.confirmed if result is not None else default
+                except InputProviderTimeoutError:
+                    PrettyOutput.auto_print("⚠ 确认超时，使用默认值\n")
+                    return default
+                except InputProviderDisconnectedError:
+                    PrettyOutput.auto_print("⚠ WebSocket 未连接，等待前端重连...\n")
+                    time.sleep(2)
 
         # CLI 模式：本地输入
         ret = get_single_line_input(f"{agent_name}{tip} {suffix}: ")
