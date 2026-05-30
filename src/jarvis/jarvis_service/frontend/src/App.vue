@@ -6482,10 +6482,6 @@ function appendExecution(payload, agentId = null) {
           console.warn('[HISTORY] Failed to save terminal content:', error)
         }
 
-        // 执行结束后从当前消息列表中删除（类似流式消息STREAM_END的处理）
-        currentOutputs.splice(execIndex, 1)
-        allOutputs.value.set(targetAgentId, [...currentOutputs])
-        console.log(`[terminal] Removed execution message ${executionId} from outputs for agent: ${targetAgentId}`)
       } else {
         console.warn(`🚨 [terminal] execution message ${executionId} not found`)
       }
@@ -6494,11 +6490,11 @@ function appendExecution(payload, agentId = null) {
       console.error(`[terminal] Failed to save terminal content:`, error)
     }
 
-    // 保留 termInfo 记录 (保持 ended=true)，避免切换回来时重建终端
-    // 只清理 terminalHosts 映射，termInfo 保留用于状态判断
+    // 销毁 xterm 实例，释放资源（内容已保存到消息的 terminal_content 和 execution_chunks）
+    disposeExecutionTerminal(termInfo)
     const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     terminalHosts.value.delete(executionSessionKey)
-    console.log(`[terminal] Cleaned up terminalHost for completed execution: ${executionId}, keeping termInfo record (ended=true)`)
+    console.log(`[terminal] Disposed terminal and cleaned up terminalHost for completed execution: ${executionId}`)
   }
   
   // 输出到终端
