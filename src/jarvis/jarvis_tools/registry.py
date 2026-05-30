@@ -150,6 +150,46 @@ class ToolRegistry(OutputHandlerProtocol):
                                 if f'"{param_name}"' in response:
                                     return True
 
+        # 条件5：扁平格式工具调用——JSON中没有name字段，但顶层key与已注册工具的参数名匹配
+        # 例如：{"files": [...]} 匹配 read_code，{"interpreter": "bash", "script_content": "..."} 匹配 execute_script
+        if self.tools:
+            for i, ch in enumerate(response):
+                if ch == "{":
+                    json_str, _ = extract_json_from_text(response, i)
+                    if json_str:
+                        try:
+                            parsed = json_loads(json_str)
+                            if isinstance(parsed, dict) and "name" not in parsed:
+                                json_keys = set(parsed.keys())
+                                matched_tools = []
+                                for tool_name, tool_info in self.tools.items():
+                                    parameters = (
+                                        tool_info.parameters
+                                        if hasattr(tool_info, "parameters")
+                                        else tool_info.get("parameters", {})
+                                    )
+                                    if isinstance(parameters, dict):
+                                        properties = parameters.get("properties", {})
+                                        required = parameters.get("required", [])
+                                        if isinstance(properties, dict) and isinstance(
+                                            required, list
+                                        ):
+                                            param_keys = set(properties.keys())
+                                            # 所有required参数必须存在于JSON的key中，且JSON的key必须是工具参数的子集
+                                            if (
+                                                required
+                                                and all(
+                                                    r in json_keys for r in required
+                                                )
+                                                and json_keys.issubset(param_keys)
+                                            ):
+                                                matched_tools.append(tool_name)
+                                # 只有唯一匹配时才判定为工具调用，避免误判
+                                if len(matched_tools) == 1:
+                                    return True
+                        except Exception:
+                            continue
+
         return False
 
     def prompt(self) -> str:
