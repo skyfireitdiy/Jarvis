@@ -6105,20 +6105,29 @@ function handleMessage(message, agentId = null) {
     const errorMessage = payload?.message || '未知错误'
     const errorCode = payload?.code || ''
     
-    // 如果是认证失败、连接被拒绝或连接锁定，重新显示连接对话框
-    if (errorCode === 'AUTH_FAILED' || errorCode === 'CONNECTION_REJECTED' || errorCode === 'CONNECTION_LOCKED') {
+    // 如果是认证失败、连接被拒绝，重新显示连接对话框
+    if (errorCode === 'AUTH_FAILED' || errorCode === 'CONNECTION_REJECTED') {
       // 显示错误信息
       connectErrorMessage.value = errorMessage
       // 清空密码输入框
       auth.value.password = ''
-      // 如果是连接锁定，清除本地token避免反复横跳
-      if (errorCode === 'CONNECTION_LOCKED') {
-        localStorage.removeItem('jarvis_auth_token')
-        auth.value.token = ''
-        console.log('[ws] Connection locked, cleared local token to prevent reconnection loop')
-      }
       // 重新显示连接对话框
       showConnectModal.value = true
+    }
+    // CONNECTION_LOCKED 需要区分 Gateway 和 Agent 连接
+    if (errorCode === 'CONNECTION_LOCKED') {
+      if (!agentId) {
+        // Gateway 连接被抢占：清除token，防止自动登录循环
+        console.log('[ws] Gateway connection locked, clearing token')
+        localStorage.removeItem('jarvis_auth_token')
+        auth.value.token = ''
+        connectErrorMessage.value = errorMessage
+        auth.value.password = ''
+        showConnectModal.value = true
+      } else {
+        // Agent 连接被抢占：这是正常的切换行为，只记录日志
+        console.log(`[ws] Agent ${agentId} connection locked (normal switch behavior)`)
+      }
     }
     
     appendOutput({
