@@ -22,6 +22,7 @@ class GatewayManagerTool:
     4. **list_model_groups**: 获取指定节点的模型组列表
     5. **create_agent**: 创建新的 Agent
     6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询
+    7. **delete_agent**: 删除指定的 Agent
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -44,9 +45,10 @@ class GatewayManagerTool:
 4. **list_model_groups**: 获取指定节点的模型组列表，包括模型组名称、各档位模型配置等
 5. **create_agent**: 创建新的 Agent，支持指定类型、工作目录、模型组、任务等参数
 6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询（通过 node_id 指定目标节点）
+7. **delete_agent**: 删除指定的 Agent，支持跨节点删除（通过 node_id 指定目标节点）
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -61,13 +63,14 @@ class GatewayManagerTool:
                     "list_model_groups",
                     "create_agent",
                     "list_directory",
+                    "delete_agent",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
                 "type": "string",
-                "description": "目标 Agent 的 ID（send_to_agent 操作必填）",
+                "description": "目标 Agent 的 ID（send_to_agent 操作必填；delete_agent 操作必填）",
             },
             "message": {
                 "type": "string",
@@ -76,7 +79,7 @@ class GatewayManagerTool:
             # list_model_groups / create_agent / list_directory 操作的参数
             "node_id": {
                 "type": "string",
-                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点）",
+                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点；delete_agent 操作可选，默认为本节点）",
             },
             # list_directory 操作的参数
             "path": {
@@ -160,7 +163,7 @@ class GatewayManagerTool:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
@@ -202,7 +205,6 @@ class GatewayManagerTool:
             quick_mode = args.get("quick_mode", False)
             restore_session = args.get("restore_session", False)
             no_interaction_mode = args.get("no_interaction_mode", False)
-
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message)
@@ -230,6 +232,8 @@ class GatewayManagerTool:
                 )
             elif action == "list_directory":
                 return self._list_directory(path=path, node_id=node_id)
+            elif action == "delete_agent":
+                return self._delete_agent(agent_id=agent_id, node_id=node_id)
             else:
                 return {
                     "success": False,
@@ -284,10 +288,10 @@ class GatewayManagerTool:
         """向 Gateway 发送 HTTP 请求。
 
         参数:
-            method: HTTP 方法 (GET/POST)
+            method: HTTP 方法 (GET/POST/DELETE)
             path: 请求路径 (如 /api/agents)
             json_data: POST 请求的 JSON 数据
-            params: GET 请求的 query 参数
+            params: GET/DELETE 请求的 query 参数
             error_prefix: 错误提示前缀
 
         返回:
@@ -300,6 +304,8 @@ class GatewayManagerTool:
             with httpx.Client(timeout=10.0) as client:
                 if method.upper() == "POST":
                     response = client.post(url, json=json_data, headers=headers)
+                elif method.upper() == "DELETE":
+                    response = client.delete(url, headers=headers, params=params)
                 else:
                     response = client.get(url, headers=headers, params=params)
 
@@ -659,6 +665,64 @@ class GatewayManagerTool:
                     error_msg = error_detail.get("message", str(error_detail))
                 else:
                     error_msg = str(error_detail)
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+
+            data = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(data, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _delete_agent(
+        self, agent_id: Optional[str] = None, node_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """删除指定的 Agent。
+
+        通过 Web Gateway 的 DELETE /api/agents/{agent_id} 接口删除 Agent，
+        支持跨节点删除（通过 node_id 参数指定目标节点）。
+
+        参数:
+            agent_id: 要删除的 Agent ID（必填）
+            node_id: 目标节点 ID，默认为空（表示本节点）
+
+        返回:
+            Dict[str, Any]: 删除结果
+        """
+        if not agent_id:
+            return {"success": False, "stdout": "", "stderr": "agent_id is required"}
+
+        err = self._get_master_url("delete agent")
+        if err:
+            return err
+
+        # 构建 query 参数
+        query_params: Dict[str, str] = {}
+        if node_id:
+            query_params["node_id"] = node_id
+
+        result = self._request_gateway(
+            method="DELETE",
+            path=f"/api/agents/{agent_id}",
+            params=query_params if query_params else None,
+            error_prefix=f"Failed to delete agent {agent_id}",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
                 return {
                     "success": False,
                     "stdout": "",
