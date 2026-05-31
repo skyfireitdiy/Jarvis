@@ -130,6 +130,7 @@ class SubCodeAgentTool:
                     "execute_script",
                     "read_code",
                     "edit_file",
+                    "switch_mode",  # ARCHER 工作流模式切换工具
                 ]
                 if use_tools:
                     # 过滤掉基础工具和禁止的工具
