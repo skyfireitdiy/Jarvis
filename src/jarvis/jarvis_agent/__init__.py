@@ -1641,8 +1641,9 @@ class Agent:
 
             # 压缩更早的消息
             try:
-                # 创建临时模型（不传入系统提示词，因为会通过 set_messages 设置）
-                temp_model = self._create_temp_model()
+                # 创建临时模型，强制使用 cheap 模型以优化成本
+                # （不传入系统提示词，因为会通过 set_messages 设置）
+                temp_model = self._create_temp_model(force_model_type="cheap")
 
                 # 使用 set_messages 设置对话历史，包含系统消息和需要压缩的旧消息
                 messages_to_set = system_messages + old_messages
@@ -2657,18 +2658,33 @@ class Agent:
 
         self.first = False
 
-    def _create_temp_model(self, system_prompt: str = "") -> BasePlatform:
+    def _create_temp_model(
+        self, system_prompt: str = "", force_model_type: Optional[str] = None
+    ) -> BasePlatform:
         """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。
 
-        使用与调用方相同的模型配置。
+        默认使用与调用方相同的模型配置，也可以强制指定模型类型。
 
         参数:
             system_prompt: 系统提示词，可选。如果调用方会通过 set_messages 设置包含系统消息的对话历史，
                           则无需传入此参数（set_messages 会覆盖此处设置的系统提示词）。
+            force_model_type: 强制使用的模型类型（smart/normal/cheap），可选。
+                            如果指定，将使用该类型的模型而不是当前模型类型。
         """
-        # 使用与调用方相同的模型配置
+        # 确定要使用的模型类型
+        if force_model_type:
+            # 使用强制指定的模型类型
+            platform_registry = PlatformRegistry()
+            if force_model_type == "smart":
+                temp_model = platform_registry.get_smart_platform()
+            elif force_model_type == "cheap":
+                temp_model = platform_registry.get_cheap_platform()
+            else:  # normal
+                temp_model = platform_registry.get_normal_platform()
+        else:
+            # 使用与调用方相同的模型配置
+            temp_model = PlatformRegistry().create_platform(self.model.platform_type)
 
-        temp_model = PlatformRegistry().create_platform(self.model.platform_type)
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 
