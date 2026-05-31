@@ -7,9 +7,14 @@ description: "新增功能、实现新需求、扩展现有功能等"
 
 ## 元指令
 
-**IMPORTANT**: 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
+**IMPORTANT**: 使用 `switch_mode` 工具切换 ARCHER 工作流模式。完成当前阶段后，调用 `switch_mode(mode="下一阶段", reason="切换原因")` 切换到下一阶段。工具会自动切换到对应的模型并继续执行。
 
-- 模式切换信号：ENTER ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW。
+**模式切换示例**：
+
+- 分析完成后：`switch_mode(mode="COLLECT", reason="需要收集代码信息")`
+- 收集完成后：`switch_mode(mode="HYPOTHESIZE", reason="准备设计方案")`
+- 方案确认后：`switch_mode(mode="EXECUTE", reason="开始执行修改")`
+- 执行完成后：`switch_mode(mode="REVIEW", reason="验证修改结果")`
 - 简单任务直接执行；复杂任务才用 task_list_manager，避免过度拆分。
 - **ARCHER 工作流灵活性说明（功能开发场景）**：
   - **准备阶段（A→R→C）灵活执行**：ANALYZE、RULE、COLLECT 三个阶段可根据任务复杂度灵活调整顺序或省略
@@ -85,7 +90,6 @@ description: "新增功能、实现新需求、扩展现有功能等"
 **输出格式示例：**
 
 ```text
-[MODE: HYPOTHESIZE]
 
 ## 任务理解
 [对功能需求的理解和设计方案]

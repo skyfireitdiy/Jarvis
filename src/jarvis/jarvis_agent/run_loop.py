@@ -86,107 +86,6 @@ class AgentRunLoop:
         """
         return response
 
-    def _auto_switch_model_by_mode(self, response: str) -> None:
-        """根据响应中的 [MODE: xxx] 标签自动切换模型
-
-        ARCHER 工作流模式与模型映射：
-        - ANALYZE, EXECUTE: normal 模型
-        - RULE, COLLECT: cheap 模型
-        - HYPOTHESIZE, REVIEW: smart 模型
-
-        参数:
-            response: LLM 响应内容
-        """
-        # 检测响应中的 [MODE: xxx] 标签
-        mode_match = re.search(r"\[MODE:\s*(\w+)\]", response)
-        if not mode_match:
-            return
-
-        mode = mode_match.group(1).upper()
-
-        # 如果 MODE 没有变化，无需切换
-        if mode == self._current_mode:
-            return
-
-        # 定义模式到模型类型的映射
-        mode_to_model_type = {
-            "ANALYZE": "normal",
-            "RULE": "cheap",  # 规则加载，使用cheap模型
-            "COLLECT": "cheap",  # 信息收集，使用cheap模型
-            "HYPOTHESIZE": "smart",
-            "EXECUTE": "normal",
-            "REVIEW": "smart",
-        }
-
-        target_model_type = mode_to_model_type.get(mode)
-        if not target_model_type:
-            # 未知模式，不切换
-            return
-
-        # 获取当前模型类型
-        from jarvis.jarvis_agent.builtin_input_handler import (
-            get_platform_type_from_agent,
-        )
-
-        current_model_type = get_platform_type_from_agent(self.agent)
-
-        # 如果当前模型类型与目标模型类型相同，无需切换
-        if current_model_type == target_model_type:
-            return
-
-        # 执行模型切换
-        try:
-            from jarvis.jarvis_platform import PlatformRegistry
-            from jarvis.jarvis_agent.builtin_input_handler import (
-                _check_context_and_compress_if_needed,
-            )
-
-            # 检查上下文限制，必要时触发压缩
-            if not _check_context_and_compress_if_needed(self.agent, target_model_type):
-                # 上下文检查失败，保持原模型
-                return
-
-            # 保存旧模型的消息
-            old_messages = self.agent.model.get_messages()
-
-            # 重新创建模型
-            platform_registry = PlatformRegistry()
-            if target_model_type == "smart":
-                self.agent.model = platform_registry.get_smart_platform()
-                self.agent._agent_type = "code_agent"
-            elif target_model_type == "cheap":
-                self.agent.model = platform_registry.get_cheap_platform()
-                self.agent._agent_type = "normal"
-            else:  # normal
-                self.agent.model = platform_registry.get_normal_platform()
-                self.agent._agent_type = "normal"
-
-            self.agent.model.set_suppress_output(False)
-            self.agent.model.agent = self.agent
-
-            # 将旧消息设置到新模型
-            if old_messages:
-                self.agent.model.set_messages(old_messages)
-
-            # 将新模型设置到现有的 session 中
-            self.agent.session.model = self.agent.model
-
-            # 更新当前 MODE 状态
-            self._current_mode = mode
-
-            # 打印切换提示信息
-            model_type_display = {
-                "smart": "Smart",
-                "normal": "Normal",
-                "cheap": "Cheap",
-            }.get(target_model_type, target_model_type)
-            PrettyOutput.auto_print(
-                f"🔄 [ARCHER] 检测到 MODE: {mode}，已自动切换到 {model_type_display} 模型"
-            )
-        except Exception:
-            # 切换失败，保持原模型继续运行
-            pass
-
     def _filter_tool_calls_from_response(self, response: str) -> str:
         """从响应中过滤掉工具调用内容
 
@@ -377,7 +276,6 @@ class AgentRunLoop:
                             )
                         else:
                             # 对于多模态内容，暂时跳过截断
-                            # TODO: 实现多模态内容的截断逻辑
                             truncated_prompt = current_prompt
 
                         # 更新prompt并重新计算token
@@ -885,9 +783,6 @@ class AgentRunLoop:
 
                 ag.session.prompt = ""
                 run_input_handlers = False
-
-                # 根据 [MODE: xxx] 标签自动切换模型（在过滤之前）
-                self._auto_switch_model_by_mode(current_response)
 
                 # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
                 if current_response and current_response.strip():
