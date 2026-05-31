@@ -1,0 +1,8 @@
+{
+  "id": "20260531_013425_080313",
+  "type": "project_long_term",
+  "tags": ["architecture", "code_agent", "auto_complete", "review"],
+  "content": "【架构决策】AutoComplete 流程增强：在 `run_loop.py` 的 `_execute_auto_complete` 方法中，于控制权转移或任务结束前，自动调用 Code Agent 的 `_review_and_fix` 方法。这确保了代码在自动提交或交付前经过自动审查。实现方式为通过 `hasattr` 检查 Agent 能力，并在 `try` 块中调用。",
+  "created_at": "2026-05-31T01:34:25.080356",
+  "updated_at": "2026-05-31T01:34:25.080368"
+}
