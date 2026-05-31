@@ -177,8 +177,6 @@ class AgentRunLoop:
 
         # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
         filtered = re.sub(r"\n{3,}", "\n\n", filtered)
-        # 过滤掉 [MODE:xxx] 模式标记
-        filtered = re.sub(r"\[MODE:[^\]]+\]", "", filtered)
         return filtered.strip()
 
     def _handle_interrupt_with_input(self) -> Optional[str]:
