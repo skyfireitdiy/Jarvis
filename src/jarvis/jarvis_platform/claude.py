@@ -66,10 +66,8 @@ class ClaudeModel(BasePlatform):
             self.base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{self.base_url}"
 
             # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
-            # 从文件获取 Jarvis Token
-            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
-
-            jarvis_token = load_token_from_file()
+            # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
+            jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
             if jarvis_token:
                 # Anthropic SDK 支持通过 http_client 或额外参数传递自定义头
                 # 这里保存到实例变量，在请求时使用

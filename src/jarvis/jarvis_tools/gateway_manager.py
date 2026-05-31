@@ -399,9 +399,7 @@ class GatewayManagerTool:
             Dict[str, str]: 请求头字典
         """
         headers: Dict[str, str] = {}
-        from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
-
-        auth_token = load_token_from_file()
+        auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
         return headers

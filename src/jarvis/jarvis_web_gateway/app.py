@@ -938,11 +938,9 @@ def create_app(
     node_runtime = NodeRuntime(node_config)
 
     # 生成并设置 Gateway Token（启动时生成一次，永久使用）
-    from jarvis.jarvis_web_gateway.token_manager import save_token_to_file
-
-    gateway_token = generate_gateway_token()
-    # 写入文件，所有进程统一从文件读取 token
-    save_token_to_file(gateway_token)
+    gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", generate_gateway_token())
+    # 统一设置到环境变量，供子进程（Agent）使用
+    os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
 
     # 设置 node_secret 到环境变量（供 Unix Domain Socket 服务使用）
     if node_config.node_secret:
@@ -1205,10 +1203,8 @@ def create_app(
                 }
 
             logger.info("[AUTH] Password verification passed")
-            # 如果没有配置密码或密码验证通过，返回预生成的 Token（从文件读取）
-            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
-
-            token = load_token_from_file()
+            # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
+            token = os.environ.get("JARVIS_AUTH_TOKEN")
 
             if not token:
                 logger.error("[AUTH] Login failed: Token not generated")
@@ -2804,10 +2800,8 @@ def create_app(
                 )
                 return {"success": True, "data": agent_info}
 
-            # 从文件获取当前 Token 并传递给 Agent
-            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
-
-            auth_token = load_token_from_file()
+            # 从环境变量获取当前 Token 并传递给 Agent
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
 
             agent_info = agent_manager.create_agent(
                 auth_token=auth_token,
@@ -3961,9 +3955,7 @@ def create_app(
         }
 
         def _create_agent_callback() -> None:
-            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
-
-            auth_token = load_token_from_file()
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             proxy_node = action_params.get("proxy_node")
             agent_manager.create_agent_threadsafe(
                 auth_token=auth_token,
