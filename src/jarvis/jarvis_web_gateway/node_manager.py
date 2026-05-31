@@ -22,7 +22,6 @@ from fastapi import WebSocket
 from websockets.asyncio.connection import State
 
 from .agent_manager import AgentManager
-from .token_manager import load_token_from_file
 from .node_protocol import (
     AGENT_CREATE_REQUEST,
     AGENT_CREATE_RESPONSE,
@@ -169,7 +168,7 @@ class NodeConnectionManager:
                 {
                     "success": True,
                     "node_id": node_id,
-                    "token": load_token_from_file(),
+                    "token": os.environ.get("JARVIS_AUTH_TOKEN"),
                     "heartbeat_interval": 10,
                 },
                 request_id=message.get("request_id"),
@@ -403,7 +402,7 @@ class NodeConnectionManager:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         try:
-            auth_token = load_token_from_file()
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             agent_info = self._agent_manager.create_agent(
                 auth_token=auth_token,
                 agent_type=str(payload.get("agent_type", "default")),
@@ -793,7 +792,7 @@ class NodeConnectionManager:
             ws_path = str(payload.get("path") or "ws")
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
-            auth_token = load_token_from_file()
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             subprotocols: list[str] = ["jarvis-ws"]
             if auth_token:
                 subprotocols.append(f"jarvis-token.{auth_token}")
@@ -856,7 +855,7 @@ class NodeConnectionManager:
                 raise ValueError("agent_id is required")
             port = await self._agent_proxy_manager.get_agent_port(agent_id)
             agent_url = f"ws://127.0.0.1:{port}/ws"
-            auth_token = load_token_from_file()
+            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             subprotocols: list[str] = ["jarvis-ws"]
             if auth_token:
                 subprotocols.append(f"jarvis-token.{auth_token}")
@@ -1525,10 +1524,7 @@ class ChildNodeClient:
         if not token:
             raise RuntimeError("missing token from master")
 
-        # 写入文件，所有进程统一从文件读取 token
-        from jarvis.jarvis_web_gateway.token_manager import save_token_to_file
-
-        save_token_to_file(token)
+        os.environ["JARVIS_AUTH_TOKEN"] = token
         self._node_runtime.token_sync_state.mark_success("master")
         self._node_runtime.mark_ready()
         logger.info(
