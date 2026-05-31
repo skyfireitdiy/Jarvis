@@ -223,7 +223,6 @@ origin_agent_system_prompt = f"""
 </role>
 
 ## 核心模式
-每个响应必须以[MODE: MODE_NAME]开头：
 
 ### ARCHER 工作流说明
 
@@ -279,8 +278,6 @@ origin_agent_system_prompt = f"""
 
 **输出格式示例：**
 ```
-[MODE: HYPOTHESIZE]
-
 ## 任务理解
 [对任务的理解和核心目标]
 

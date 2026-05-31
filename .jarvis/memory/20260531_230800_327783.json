@@ -1,0 +1,8 @@
+{
+  "id": "20260531_230800_327783",
+  "type": "project_long_term",
+  "tags": ["ARCHER", "switch_mode", "模式切换", "代码重构"],
+  "content": "移除 [MODE: xxx] 标签检测机制完成：\n\n**完成内容**：\n1. 12个系统提示词文件（builtin/prompts/code_agent_system/*.md）已移除 MODE 标签声明要求，添加 switch_mode 工具说明\n2. run_loop.py 已移除 _auto_switch_model_by_mode 方法及 [MODE:xxx] 正则过滤逻辑\n3. src/jarvis/jarvis_agent/__init__.py 已移除系统提示词模板中的 [MODE: MODE_NAME] 强制要求\n4. switch_mode 工具已集成到 code_agent 和 sub_code_agent\n\n**验证**：rg -rn '\\[MODE:' src/jarvis builtin/prompts 返回空结果，确认无残留\n\n**Git Commits**：\n- d677622: 移除 run_loop.py 中 [MODE:xxx] 正则过滤（本次会话）\n- 之前会话已完成其他所有修改",
+  "created_at": "2026-05-31T23:08:00.327813",
+  "updated_at": "2026-05-31T23:08:00.327816"
+}
