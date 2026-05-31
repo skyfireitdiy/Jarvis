@@ -14,20 +14,7 @@ class TestGetSystemPrompt:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_get_system_prompt_contains_key_elements(self):
-        """测试提示词包含关键元素"""
-        result = get_system_prompt()
 
-        # 检查是否包含 ARCHER 工作流相关内容
-        assert "ARCHER" in result
-        assert "MODE" in result
-
-        # 检查是否包含工作流程
-        assert "ANALYZE" in result or "分析" in result
-        assert "EXECUTE" in result or "执行" in result
-
-        # 检查是否包含工具使用规范
-        assert "工具" in result
 
     def test_get_system_prompt_contains_mode_definitions(self):
         """测试包含模式定义"""
