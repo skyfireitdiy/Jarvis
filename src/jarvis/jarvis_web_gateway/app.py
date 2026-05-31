@@ -318,29 +318,6 @@ class WebGateway(BaseGateway):
         self._terminal_input_registry = terminal_input_registry
         self._pending_outputs: List[Dict[str, Any]] = []  # 缓存WebSocket连接前的输出
 
-    def _check_auth(self, auth: Optional[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
-        """检查认证信息是否有效。
-
-        Args:
-            auth: 认证信息字典，包含 token 字段
-
-        Returns:
-            (是否认证通过, 失败原因)
-        """
-        from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
-
-        if not auth:
-            return False, "No auth payload"
-
-        token = auth.get("token")
-        if not token:
-            return False, "No token in auth payload"
-
-        if not validate_gateway_token(token):
-            return False, "Invalid token"
-
-        return True, None
-
     def emit_output(self, event: GatewayOutputEvent) -> None:
         # 单连接模式，固定使用 default session_id
         session_id = "default"
