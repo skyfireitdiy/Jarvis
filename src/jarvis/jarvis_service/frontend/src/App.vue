@@ -3291,11 +3291,19 @@ async function connect() {
 
     // 启动心跳机制，防止空闲连接被中间件/代理超时断开
     ws._lastPongTime = Date.now()
+    ws._lastPingTime = Date.now()
     const heartbeatInterval = 30000 // 30秒发送一次心跳
     const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
     ws._heartbeatTimer = setInterval(() => {
+      const now = Date.now()
+      // 检测浏览器休眠恢复：如果距上次ping时间远超心跳间隔，说明浏览器被挂起了
+      // 此时不应判定超时，而是重置心跳状态并重新发送ping
+      if (ws._lastPingTime && (now - ws._lastPingTime) > heartbeatInterval * 2) {
+        console.log('[ws] Browser may have been suspended, resetting heartbeat state')
+        ws._lastPongTime = now
+      }
       // 检查是否超时未收到pong
-      if (ws._lastPongTime && (Date.now() - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
+      if (ws._lastPongTime && (now - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
         console.warn('[ws] Heartbeat timeout, closing connection')
         clearInterval(ws._heartbeatTimer)
         ws._heartbeatTimer = null
@@ -3308,6 +3316,7 @@ async function connect() {
       }
       try {
         if (ws.readyState === WebSocket.OPEN) {
+          ws._lastPingTime = Date.now()
           ws.send(JSON.stringify({ type: 'ping' }))
           console.log('[ws] Heartbeat ping sent')
         }
@@ -4015,18 +4024,27 @@ async function connectToAgent(agent, retryCount = 0) {
 
         // 启动心跳机制
         ws._lastPongTime = Date.now()
+        ws._lastPingTime = Date.now()
         const heartbeatInterval = 30000 // 30秒发送一次心跳
         const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
         ws._heartbeatTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
+            const now = Date.now()
+            // 检测浏览器休眠恢复：如果距上次ping时间远超心跳间隔，说明浏览器被挂起了
+            // 此时不应判定超时，而是重置心跳状态并重新发送ping
+            if (ws._lastPingTime && (now - ws._lastPingTime) > heartbeatInterval * 2) {
+              console.log(`[AGENT ${agentId}] Browser may have been suspended, resetting heartbeat state`)
+              ws._lastPongTime = now
+            }
             // 检查是否超时未收到pong
-            if (ws._lastPongTime && (Date.now() - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
+            if (ws._lastPongTime && (now - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
               console.warn(`[AGENT ${agentId}] Heartbeat timeout, closing connection`)
               clearInterval(ws._heartbeatTimer)
               ws.close()
               return
             }
             try {
+              ws._lastPingTime = Date.now()
               ws.send(JSON.stringify({ type: 'ping' }))
             } catch (e) {
               console.warn(`[AGENT ${agentId}] Failed to send heartbeat`, e)
