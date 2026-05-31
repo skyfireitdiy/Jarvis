@@ -1235,7 +1235,7 @@ class GatewayManagerTool:
 
             restart_result = self._request_gateway(
                 method="POST",
-                path=f"/api/nodes/{node_id}/service/restart",
+                path=f"/api/node/{node_id}/service/restart",
                 json_data={"node_id": node_id, "restart_frontend": True},
                 error_prefix=f"Failed to restart node {node_id}",
             )
