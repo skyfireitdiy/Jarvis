@@ -92,6 +92,10 @@ from jarvis.jarvis_utils.config import (
 
 logger = logging.getLogger(__name__)
 
+# 群组存储（内存存储，服务重启后丢失）
+# Key: group_id, Value: {"name": str, "members": set()}
+groups: Dict[str, Dict[str, Any]] = {}
+
 # 导入 agent 状态管理器（用于处理 get_status 消息）
 try:
     from jarvis.jarvis_agent.jarvis import get_agent_status_manager
@@ -4852,6 +4856,275 @@ def create_app(
                     "error": {"code": "NOT_FOUND", "message": "终端不存在"},
                 }
             return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # ==================== 群组管理 API ====================
+
+    # HTTP API：创建群组
+    @app.post("/api/groups", dependencies=[Depends(verify_token)])
+    async def create_group(request: Request) -> Dict[str, Any]:
+        """创建群组。
+
+        Args:
+            request: 请求体，包含 name（群组名称）
+
+        Returns:
+            {"success": True, "data": {"group_id": str, "name": str, "members": list}}
+        """
+        try:
+            body = await request.json()
+            name = body.get("name")
+            if not name:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PARAMS", "message": "name is required"},
+                }
+
+            # 生成群组 ID
+            group_id = str(uuid.uuid4())[:8]
+
+            # 创建群组
+            groups[group_id] = {
+                "name": name,
+                "members": set(),
+            }
+
+            return {
+                "success": True,
+                "data": {
+                    "group_id": group_id,
+                    "name": name,
+                    "members": [],
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：查询所有群组
+    @app.get("/api/groups", dependencies=[Depends(verify_token)])
+    async def list_groups() -> Dict[str, Any]:
+        """查询所有群组。
+
+        Returns:
+            {"success": True, "data": [{"group_id": str, "name": str, "members": list}]}
+        """
+        try:
+            group_list = [
+                {
+                    "group_id": group_id,
+                    "name": info["name"],
+                    "members": list(info["members"]),
+                }
+                for group_id, info in groups.items()
+            ]
+            return {"success": True, "data": group_list}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：查询群组详情
+    @app.get("/api/groups/{group_id}", dependencies=[Depends(verify_token)])
+    async def get_group(group_id: str) -> Dict[str, Any]:
+        """查询群组详情。
+
+        Args:
+            group_id: 群组 ID
+
+        Returns:
+            {"success": True, "data": {"group_id": str, "name": str, "members": list}}
+        """
+        try:
+            if group_id not in groups:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Group not found"},
+                }
+
+            info = groups[group_id]
+            return {
+                "success": True,
+                "data": {
+                    "group_id": group_id,
+                    "name": info["name"],
+                    "members": list(info["members"]),
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：加入群组
+    @app.post("/api/groups/{group_id}/join", dependencies=[Depends(verify_token)])
+    async def join_group(group_id: str, request: Request) -> Dict[str, Any]:
+        """加入群组。
+
+        Args:
+            group_id: 群组 ID
+            request: 请求体，包含 agent_id
+
+        Returns:
+            {"success": True}
+        """
+        try:
+            if group_id not in groups:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Group not found"},
+                }
+
+            body = await request.json()
+            agent_id = body.get("agent_id")
+            if not agent_id:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PARAMS",
+                        "message": "agent_id is required",
+                    },
+                }
+
+            groups[group_id]["members"].add(agent_id)
+            return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：退出群组
+    @app.post("/api/groups/{group_id}/leave", dependencies=[Depends(verify_token)])
+    async def leave_group(group_id: str, request: Request) -> Dict[str, Any]:
+        """退出群组。
+
+        Args:
+            group_id: 群组 ID
+            request: 请求体，包含 agent_id
+
+        Returns:
+            {"success": True}
+        """
+        try:
+            if group_id not in groups:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Group not found"},
+                }
+
+            body = await request.json()
+            agent_id = body.get("agent_id")
+            if not agent_id:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PARAMS",
+                        "message": "agent_id is required",
+                    },
+                }
+
+            groups[group_id]["members"].discard(agent_id)
+            return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：发送群组消息
+    @app.post("/api/groups/{group_id}/message", dependencies=[Depends(verify_token)])
+    async def send_group_message(group_id: str, request: Request) -> Dict[str, Any]:
+        """发送群组消息。
+
+        向群组所有成员发送消息（不包括发送者）。
+
+        Args:
+            group_id: 群组 ID
+            request: 请求体，包含 sender_id 和 content
+
+        Returns:
+            {"success": True, "data": {"sent_to": list, "failed": list}}
+        """
+        try:
+            if group_id not in groups:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "Group not found"},
+                }
+
+            body = await request.json()
+            sender_id = body.get("sender_id")
+            content = body.get("content")
+            if not sender_id or not content:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PARAMS",
+                        "message": "sender_id and content are required",
+                    },
+                }
+
+            # 获取群组成员（不包括发送者）
+            members = groups[group_id]["members"]
+            recipients = [m for m in members if m != sender_id]
+
+            if not recipients:
+                return {
+                    "success": True,
+                    "data": {"sent_to": [], "failed": [], "message": "No recipients"},
+                }
+
+            # 向每个成员发送消息
+            sent_to = []
+            failed = []
+            for agent_id in recipients:
+                try:
+                    # 调用 agent 的 /message 接口
+                    agent_info = agent_manager.get_agent(agent_id)
+                    if not agent_info or not agent_info.port:
+                        failed.append(
+                            {"agent_id": agent_id, "error": "Agent not found"}
+                        )
+                        continue
+
+                    port = agent_info.port
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            f"http://127.0.0.1:{port}/message",
+                            json={
+                                "sender_id": sender_id,
+                                "content": content,
+                                "group_id": group_id,
+                                "group_name": groups[group_id]["name"],
+                                "message_type": "group_message",
+                            },
+                            timeout=5.0,
+                        )
+                        if resp.status_code == 200:
+                            sent_to.append(agent_id)
+                        else:
+                            failed.append(
+                                {
+                                    "agent_id": agent_id,
+                                    "error": f"HTTP {resp.status_code}",
+                                }
+                            )
+                except Exception as e:
+                    failed.append({"agent_id": agent_id, "error": str(e)})
+
+            return {
+                "success": True,
+                "data": {"sent_to": sent_to, "failed": failed},
+            }
         except Exception as e:
             return {
                 "success": False,
