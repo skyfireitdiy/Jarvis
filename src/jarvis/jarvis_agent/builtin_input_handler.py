@@ -390,7 +390,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             )
 
             return fix_prompt, False
-        elif tag == "SwitchModel":
+        elif tag == "SwitchModelGroup":
             # 处理切换模型组命令（仅在主 agent 中可用）
             if not getattr(agent, "allow_savesession", False):
                 PrettyOutput.auto_print("⚠️ SwitchModel 命令仅在 jvs/jca 主程序中可用。")
@@ -400,6 +400,17 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("✅ 模型组切换成功。")
             else:
                 PrettyOutput.auto_print("❌ 模型组切换失败或已取消。")
+            return "", True
+        elif tag == "SwitchModel":
+            # 处理切换模型命令（在当前模型组的三个模型之间切换）
+            if not getattr(agent, "allow_savesession", False):
+                PrettyOutput.auto_print("⚠️ SwitchModel 命令仅在 jvs/jca 主程序中可用。")
+                return "", True
+
+            if switch_model(agent):
+                PrettyOutput.auto_print("✅ 模型切换成功。")
+            else:
+                PrettyOutput.auto_print("❌ 模型切换失败或已取消。")
             return "", True
         elif tag == "SubAgent":
             # 启动子Agent执行任务，执行完毕后询问用户是否将结果反馈给当前Agent
@@ -1107,6 +1118,139 @@ def switch_model_group(agent: Any) -> bool:
             return False
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换失败: {e}")
+        return False
+
+
+def switch_model(agent: Any) -> bool:
+    """在当前模型组的三个模型（smart/normal/cheap）之间切换
+
+    参数:
+        agent: Agent 实例
+
+    返回:
+        bool: 是否切换成功
+    """
+    # 获取当前模型组
+    current_group = get_llm_group()
+    if not current_group:
+        PrettyOutput.auto_print("❌ 未设置模型组")
+        return False
+
+    PrettyOutput.auto_print(f"📌 当前模型组: {current_group}")
+
+    # 获取当前模型组的配置
+    model_groups = _get_global_config().get("llm_groups", {})
+    if not isinstance(model_groups, dict):
+        PrettyOutput.auto_print("❌ 模型组配置不存在")
+        return False
+
+    group_config = model_groups.get(current_group)
+    if not isinstance(group_config, dict):
+        PrettyOutput.auto_print(f"❌ 模型组 '{current_group}' 配置不存在")
+        return False
+
+    # 获取三个模型
+    smart_model = group_config.get("smart_llm", "")
+    normal_model = group_config.get("normal_llm", "")
+    cheap_model = group_config.get("cheap_llm", "")
+
+    # 构建可用模型列表
+    available_models = []
+    if smart_model:
+        available_models.append(("smart", "Smart", smart_model))
+    if normal_model:
+        available_models.append(("normal", "Normal", normal_model))
+    if cheap_model:
+        available_models.append(("cheap", "Cheap", cheap_model))
+
+    if not available_models:
+        PrettyOutput.auto_print("❌ 当前模型组没有可用的模型")
+        return False
+
+    # 获取当前使用的模型类型
+    current_platform_type = get_platform_type_from_agent(agent)
+    PrettyOutput.auto_print(f"📌 当前模型类型: {current_platform_type}")
+
+    # 显示模型列表
+    table = Table(
+        title=f"📋 模型组 '{current_group}' 的可用模型",
+        show_header=True,
+        header_style="bold magenta",
+        expand=True,
+    )
+    table.add_column("编号", style="cyan", justify="center")
+    table.add_column("类型", style="green")
+    table.add_column("模型名称", style="magenta")
+    table.add_column("状态", style="yellow", justify="center")
+
+    for idx, (model_type, type_name, model_name) in enumerate(available_models, 1):
+        status = "✓ 当前" if model_type == current_platform_type else ""
+        table.add_row(str(idx), type_name, model_name, status)
+
+    _print_table_for_terminal_or_frontend(table)
+
+    # 用户选择（循环直到输入有效）
+    PrettyOutput.auto_print("")
+    while True:
+        choice = get_single_line_input("请输入模型编号 (0 取消): ").strip()
+
+        if choice == "0":
+            PrettyOutput.auto_print("🚫 已取消切换")
+            return False
+
+        try:
+            choice_idx = int(choice) - 1
+            if choice_idx < 0 or choice_idx >= len(available_models):
+                PrettyOutput.auto_print(f"❌ 无效的编号: {choice}，请重新输入")
+                continue
+
+            selected_type, type_name, model_name = available_models[choice_idx]
+            break
+        except ValueError:
+            PrettyOutput.auto_print(f"❌ 无效的输入: {choice}，请输入数字")
+            continue
+
+    # 检查是否与当前模型相同
+    if selected_type == current_platform_type:
+        PrettyOutput.auto_print("⚠️ 已经在使用该模型")
+        return False
+
+    # 执行切换逻辑
+    try:
+        PrettyOutput.auto_print(f"🔄 正在切换到 {type_name} 模型 '{model_name}'...")
+
+        # 保存旧模型的消息
+        old_messages = agent.model.get_messages()
+
+        # 重新创建模型
+        platform_registry = PlatformRegistry()
+        if selected_type == "smart":
+            agent.model = platform_registry.get_smart_platform()
+        elif selected_type == "cheap":
+            agent.model = platform_registry.get_cheap_platform()
+        else:  # normal
+            agent.model = platform_registry.get_normal_platform()
+
+        agent.model.set_suppress_output(False)
+        agent.model.agent = agent
+
+        # 将旧消息设置到新模型
+        if old_messages:
+            agent.model.set_messages(old_messages)
+
+        # 将新模型设置到现有的 session 中
+        agent.session.model = agent.model
+
+        # 更新 agent 的类型标记（如果需要）
+        if selected_type == "smart":
+            agent._agent_type = "code_agent"
+        else:
+            agent._agent_type = "normal"
+
+        PrettyOutput.auto_print(f"✅ 已成功切换到 {type_name} 模型 '{model_name}'")
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 切换模型失败: {e}")
         return False
 
 
