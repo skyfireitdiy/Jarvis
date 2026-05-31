@@ -1121,6 +1121,68 @@ def switch_model_group(agent: Any) -> bool:
         return False
 
 
+def _check_context_and_compress_if_needed(
+    agent: Any, target_platform_type: str
+) -> bool:
+    """检查切换到目标模型时是否会超出上下文限制，如果会则触发压缩
+
+    参数:
+        agent: Agent 实例
+        target_platform_type: 目标模型类型（smart/normal/cheap）
+
+    返回:
+        bool: 如果上下文检查通过（或压缩成功）返回True，否则返回False
+    """
+    try:
+        from jarvis.jarvis_utils.config import (
+            get_max_input_token_count,
+            get_smart_max_input_token_count,
+            get_cheap_max_input_token_count,
+        )
+
+        # 获取目标模型的上下文限制
+        if target_platform_type == "smart":
+            target_max_tokens = get_smart_max_input_token_count()
+        elif target_platform_type == "cheap":
+            target_max_tokens = get_cheap_max_input_token_count()
+        else:  # normal
+            target_max_tokens = get_max_input_token_count()
+
+        # 获取当前使用的 token 数
+        current_used_tokens = agent.model.get_used_token_count()
+
+        # 如果当前使用的 token 数超过目标模型的限制，触发压缩
+        if current_used_tokens > target_max_tokens:
+            PrettyOutput.auto_print(
+                f"⚠️ 当前上下文 ({current_used_tokens} tokens) 超出目标模型限制 ({target_max_tokens} tokens)"
+            )
+            PrettyOutput.auto_print("🔄 正在触发上下文压缩...")
+
+            # 触发压缩
+            compression_success = agent._adaptive_compression()
+            if not compression_success:
+                PrettyOutput.auto_print("❌ 上下文压缩失败，无法切换到目标模型")
+                return False
+
+            # 压缩后重新检查
+            new_used_tokens = agent.model.get_used_token_count()
+            if new_used_tokens > target_max_tokens:
+                PrettyOutput.auto_print(
+                    f"❌ 压缩后上下文 ({new_used_tokens} tokens) 仍超出目标模型限制 ({target_max_tokens} tokens)"
+                )
+                return False
+
+            PrettyOutput.auto_print(
+                f"✅ 压缩成功，当前上下文: {new_used_tokens} tokens"
+            )
+
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 上下文检查失败: {e}")
+        # 检查失败时允许继续切换（保持原有行为）
+        return True
+
+
 def switch_model(agent: Any) -> bool:
     """在当前模型组的三个模型（smart/normal/cheap）之间切换
 
@@ -1217,6 +1279,11 @@ def switch_model(agent: Any) -> bool:
 
     # 执行切换逻辑
     try:
+        # 检查上下文限制，必要时触发压缩
+        if not _check_context_and_compress_if_needed(agent, selected_type):
+            PrettyOutput.auto_print("❌ 上下文检查失败，无法切换模型")
+            return False
+
         PrettyOutput.auto_print(f"🔄 正在切换到 {type_name} 模型 '{model_name}'...")
 
         # 保存旧模型的消息
