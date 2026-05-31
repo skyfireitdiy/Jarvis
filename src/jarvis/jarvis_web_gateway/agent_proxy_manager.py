@@ -378,18 +378,7 @@ class AgentProxyManager:
                 # FastAPI WebSocket
                 while True:
                     data = await source_ws.receive_text()
-                    # 处理心跳ping消息，直接回复pong，不转发给Agent
-                    if direction == "client->agent":
-                        try:
-                            msg = json.loads(data)
-                            if msg.get("type") == "ping":
-                                await source_ws.send_text(json.dumps({"type": "pong"}))
-                                logger.debug(
-                                    f"[PROXY MANAGER] Responded to ping from client for agent {agent_id}"
-                                )
-                                continue
-                        except (json.JSONDecodeError, AttributeError):
-                            pass  # 非JSON消息，正常转发
+                    # ping消息转发给agent，由agent回复pong，实现端到端心跳检测
                     logger.debug(
                         f"[PROXY MANAGER] Forwarding {direction}: {len(data)} bytes"
                     )
