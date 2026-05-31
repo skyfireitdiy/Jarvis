@@ -30,6 +30,12 @@ class GatewayManagerTool:
     12. **list_timers**: 查询所有节点的定时任务（汇总）
     13. **get_timer**: 查询单个定时任务
     14. **delete_timer**: 删除定时任务
+    15. **create_group**: 创建群组
+    16. **list_groups**: 查询所有群组
+    17. **get_group**: 查询群组详情
+    18. **join_group**: 加入群组
+    19. **leave_group**: 退出群组
+    20. **send_group_message**: 发送群组消息
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -60,9 +66,15 @@ class GatewayManagerTool:
 12. **list_timers**: 查询所有节点的定时任务并汇总
 13. **get_timer**: 查询单个定时任务详情
 14. **delete_timer**: 删除指定定时任务
+15. **create_group**: 创建群组
+16. **list_groups**: 查询所有群组
+17. **get_group**: 查询群组详情
+18. **join_group**: 加入群组
+19. **leave_group**: 退出群组
+20. **send_group_message**: 发送群组消息
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -85,8 +97,14 @@ class GatewayManagerTool:
                     "list_timers",
                     "get_timer",
                     "delete_timer",
+                    "create_group",
+                    "list_groups",
+                    "get_group",
+                    "join_group",
+                    "leave_group",
+                    "send_group_message",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -177,6 +195,19 @@ class GatewayManagerTool:
                 "type": "object",
                 "description": "定时任务动作参数（create_timer 操作必填）。create_agent 类型需：agent_type(必填)、working_dir(必填)、name、llm_group、tool_group、config_file、task、additional_args、worktree、proxy_node；run_shell_command 类型需：command(必填)、working_dir(必填)、interpreter",
             },
+            # 群组操作的参数
+            "group_id": {
+                "type": "string",
+                "description": "群组 ID（get_group、join_group、leave_group、send_group_message 操作必填）",
+            },
+            "group_name": {
+                "type": "string",
+                "description": "群组名称（create_group 操作必填）",
+            },
+            "group_description": {
+                "type": "string",
+                "description": "群组描述（create_group 操作可选）",
+            },
         },
         "required": ["action"],
     }
@@ -204,12 +235,15 @@ class GatewayManagerTool:
         schedule: Optional[Dict[str, Any]] = None,
         timer_action_type: Optional[str] = None,
         timer_action_params: Optional[Dict[str, Any]] = None,
+        group_id: Optional[str] = None,
+        group_name: Optional[str] = None,
+        group_description: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """执行 Gateway 管理操作
 
         参数:
-            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent, get_node_secret, update_nodes_code, restart_nodes, create_timer, list_timers, get_timer, delete_timer)
+            action: 操作类型 (send_to_agent, list_agents, list_nodes, list_model_groups, create_agent, list_directory, delete_agent, get_node_secret, update_nodes_code, restart_nodes, create_timer, list_timers, get_timer, delete_timer, create_group, list_groups, get_group, join_group, leave_group, send_group_message)
             agent_id: 目标 Agent ID
             message: 消息内容
             node_id: 目标节点 ID
@@ -230,6 +264,9 @@ class GatewayManagerTool:
             schedule: 调度配置（create_timer）
             timer_action_type: 定时任务动作类型（create_timer）
             timer_action_params: 定时任务动作参数（create_timer）
+            group_id: 群组 ID（get_group、join_group、leave_group、send_group_message）
+            group_name: 群组名称（create_group）
+            group_description: 群组描述（create_group）
             **kwargs: 其他参数
 
         返回:
@@ -259,6 +296,9 @@ class GatewayManagerTool:
             schedule = args.get("schedule")
             timer_action_type = args.get("timer_action_type")
             timer_action_params = args.get("timer_action_params")
+            group_id = args.get("group_id")
+            group_name = args.get("group_name")
+            group_description = args.get("group_description")
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message)
@@ -307,6 +347,20 @@ class GatewayManagerTool:
                 return self._get_timer(timer_id=timer_id)
             elif action == "delete_timer":
                 return self._delete_timer(timer_id=timer_id)
+            elif action == "create_group":
+                return self._create_group(
+                    group_name=group_name, group_description=group_description
+                )
+            elif action == "list_groups":
+                return self._list_groups()
+            elif action == "get_group":
+                return self._get_group(group_id=group_id)
+            elif action == "join_group":
+                return self._join_group(group_id=group_id)
+            elif action == "leave_group":
+                return self._leave_group(group_id=group_id)
+            elif action == "send_group_message":
+                return self._send_group_message(group_id=group_id, message=message)
             else:
                 return {
                     "success": False,
@@ -410,6 +464,43 @@ class GatewayManagerTool:
                 "error": f"{error_prefix}: {str(e)}",
             }
 
+    def _handle_gateway_response(
+        self, result: Dict[str, Any], success_data_key: str = "data"
+    ) -> Dict[str, Any]:
+        """处理 Gateway 响应的通用逻辑。
+
+        参数:
+            result: _request_gateway 的返回结果
+            success_data_key: 成功时提取数据的键名
+
+        返回:
+            Dict[str, Any]: 标准化的执行结果
+        """
+        if not result["success"]:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+        gateway_data = result["data"]
+        if not gateway_data.get("success"):
+            error_info = gateway_data.get("error", {})
+            error_msg = (
+                error_info.get("message", "unknown error")
+                if isinstance(error_info, dict)
+                else str(error_info)
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Gateway returned error: {error_msg}",
+            }
+
+        return {
+            "success": True,
+            "stdout": json.dumps(
+                gateway_data.get(success_data_key, {}), ensure_ascii=False
+            ),
+            "stderr": "",
+        }
+
     def _send_to_agent(self, agent_id: Any, message: str) -> Dict[str, Any]:
         """向指定 Agent(s) 发送消息。
 
@@ -452,9 +543,7 @@ class GatewayManagerTool:
 
         sender_id = jglobals.agent_id
         # 在消息末尾添加回复提示
-        enhanced_message = (
-            f"{message}\n\n---\n如果要回复消息，请发送到 agent_id: {sender_id}"
-        )
+        enhanced_message = f"{message}\n\n---\n回复此消息请使用: gateway_manager action=send_to_agent agent_id={sender_id} message=<你的回复>"
 
         results = []
         all_success = True
@@ -491,9 +580,13 @@ class GatewayManagerTool:
             "results": results,
         }
 
+        stdout_str = json.dumps(output, ensure_ascii=False, indent=2)
+        if all_success:
+            stdout_str += "\n\nIf you want to wait for a response, output <Wait>."
+
         return {
             "success": all_success,
-            "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+            "stdout": stdout_str,
             "stderr": "" if all_success else "Some messages failed to send",
         }
 
@@ -1497,6 +1590,164 @@ class GatewayManagerTool:
             return {
                 "success": True,
                 "stdout": json.dumps({"deleted": timer_id}, ensure_ascii=False),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _create_group(
+        self, group_name: Optional[str] = None, group_description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """创建群组。
+
+        参数:
+            group_name: 群组名称
+            group_description: 群组描述
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not group_name:
+            return {"success": False, "stdout": "", "stderr": "group_name is required"}
+
+        result = self._request_gateway(
+            method="POST",
+            path="/api/groups",
+            json_data={"name": group_name, "description": group_description},
+            error_prefix="Failed to create group",
+        )
+
+        return self._handle_gateway_response(result)
+
+    def _list_groups(self) -> Dict[str, Any]:
+        """查询所有群组。
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        result = self._request_gateway(
+            method="GET",
+            path="/api/groups",
+            error_prefix="Failed to list groups",
+        )
+
+        return self._handle_gateway_response(result)
+
+    def _get_group(self, group_id: Optional[str] = None) -> Dict[str, Any]:
+        """查询群组详情。
+
+        参数:
+            group_id: 群组 ID
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not group_id:
+            return {"success": False, "stdout": "", "stderr": "group_id is required"}
+
+        result = self._request_gateway(
+            method="GET",
+            path=f"/api/groups/{group_id}",
+            error_prefix=f"Failed to get group {group_id}",
+        )
+
+        return self._handle_gateway_response(result)
+
+    def _join_group(self, group_id: Optional[str] = None) -> Dict[str, Any]:
+        """加入群组。
+
+        参数:
+            group_id: 群组 ID
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not group_id:
+            return {"success": False, "stdout": "", "stderr": "group_id is required"}
+
+        result = self._request_gateway(
+            method="POST",
+            path=f"/api/groups/{group_id}/join",
+            error_prefix=f"Failed to join group {group_id}",
+        )
+
+        return self._handle_gateway_response(result)
+
+    def _leave_group(self, group_id: Optional[str] = None) -> Dict[str, Any]:
+        """退出群组。
+
+        参数:
+            group_id: 群组 ID
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not group_id:
+            return {"success": False, "stdout": "", "stderr": "group_id is required"}
+
+        result = self._request_gateway(
+            method="POST",
+            path=f"/api/groups/{group_id}/leave",
+            error_prefix=f"Failed to leave group {group_id}",
+        )
+
+        return self._handle_gateway_response(result)
+
+    def _send_group_message(
+        self, group_id: Optional[str] = None, message: str = ""
+    ) -> Dict[str, Any]:
+        """发送群组消息。
+
+        参数:
+            group_id: 群组 ID
+            message: 消息内容
+
+        返回:
+            Dict[str, Any]: 执行结果
+        """
+        if not group_id:
+            return {"success": False, "stdout": "", "stderr": "group_id is required"}
+        if not message:
+            return {"success": False, "stdout": "", "stderr": "message is required"}
+
+        # 获取当前 Agent ID 作为发送者
+        sender_id = jglobals.agent_id
+        if not sender_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Current agent_id is not set",
+            }
+
+        # 在消息末尾添加回复提示
+        enhanced_message = f"{message}\n\n---\n回复此群组消息请使用: gateway_manager action=send_group_message group_id={group_id} message=<你的回复>"
+
+        result = self._request_gateway(
+            method="POST",
+            path=f"/api/groups/{group_id}/message",
+            json_data={"sender_id": sender_id, "content": enhanced_message},
+            error_prefix=f"Failed to send message to group {group_id}",
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+            stdout_str = json.dumps(gateway_data.get("data", {}), ensure_ascii=False)
+            stdout_str += "\n\nIf you want to wait for a response, output <Wait>."
+            return {
+                "success": True,
+                "stdout": stdout_str,
                 "stderr": "",
             }
         else:
