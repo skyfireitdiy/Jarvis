@@ -775,3 +775,42 @@ class TaskListManager:
                 ],
             }
             return summary
+
+    def delete_task_list(self, task_list_id: str, is_main_agent: bool) -> Tuple[bool, Optional[str]]:
+        """删除任务列表。
+
+        参数:
+            task_list_id: 任务列表 ID
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            Tuple[bool, Optional[str]]: (是否成功, 错误信息)
+        """
+        if not is_main_agent:
+            return False, "只有主 Agent 可以删除任务列表"
+
+        with self._lock:
+            if task_list_id not in self.task_lists:
+                return False, f"任务列表 {task_list_id} 不存在"
+
+            # 获取被删除任务列表中的所有 task_id
+            task_list = self.task_lists[task_list_id]
+            deleted_task_ids = set(task_list.tasks.keys())
+
+            # 删除任务列表
+            del self.task_lists[task_list_id]
+
+            # 清理 agent_task_mapping 中的相关条目
+            # 遍历 agent_task_mapping，移除被删除任务的映射
+            for agent_id_key in list(self.agent_task_mapping.keys()):
+                task_ids = self.agent_task_mapping[agent_id_key]
+                # 移除被删除的任务 ID
+                new_task_ids = task_ids - deleted_task_ids
+
+                if new_task_ids:
+                    self.agent_task_mapping[agent_id_key] = new_task_ids
+                else:
+                    # 如果映射为空，删除该 key
+                    del self.agent_task_mapping[agent_id_key]
+
+            return True, None
