@@ -1909,19 +1909,6 @@ class task_list_manager:
 
                             sub_general_agent_tool = SubAgentTool()
 
-                            # 构建系统提示词和总结提示词
-                            system_prompt = f"""你是一个专业的任务执行助手。
-
-当前任务: {task.task_name}
-
-任务描述: {task.task_desc}
-
-预期输出: {task.expected_output}
-
-请专注于完成这个任务，完成后提供清晰的输出结果。
-"""
-                            summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
-
                             # 构建子Agent名称：使用任务名称和ID，便于识别
                             agent_name = f"{task.task_name} (task_{task_id})"
 
@@ -1943,8 +1930,6 @@ class task_list_manager:
                                     "task": enhanced_task_content,
                                     "background": background,
                                     "name": agent_name,
-                                    "system_prompt": system_prompt,
-                                    "summary_prompt": summary_prompt,
                                     "agent": parent_agent,
                                     "quick_mode": getattr(
                                         parent_agent, "quick_mode", False

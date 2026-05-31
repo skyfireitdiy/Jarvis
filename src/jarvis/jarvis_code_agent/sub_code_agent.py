@@ -189,33 +189,33 @@ class SubCodeAgentTool:
             except Exception:
                 pass
 
-            # 在系统提示词中添加角色切换说明（如果继承了对话历史）
-            if parent_messages and hasattr(code_agent, "system_prompt"):
-                try:
-                    original_prompt = code_agent.system_prompt
-                    code_agent.system_prompt = f"""【角色切换说明】
-你现在是 SubCodeAgent，已继承父 Agent 的完整对话历史。
-你了解之前的分析过程和发现的问题。
-
-重要说明：
-- 任务列表已清空，你不继承父 Agent 的任务列表
-- 专注于完成以下子任务，无需重复已完成的步骤
-
-{original_prompt}
-"""
-                    # 同步更新到模型层
-                    if hasattr(code_agent, "model") and hasattr(
-                        code_agent.model, "set_system_prompt"
-                    ):
-                        code_agent.model.set_system_prompt(code_agent.system_prompt)
-                except Exception:
-                    # 设置失败不影响主流程
-                    pass
-
             # 设置继承的对话历史到 CodeAgent（在 CodeAgent 创建后）
             if parent_messages and hasattr(code_agent, "model"):
                 try:
-                    code_agent.model.set_messages(parent_messages)
+                    # 在第一个用户消息前插入角色切换说明
+                    role_switch_note = """【角色切换说明】
+你现在是SubCodeAgent，已继承父Agent的完整对话历史。
+你了解之前的分析过程和发现的问题。
+
+重要说明：
+- 任务列表已清空，你不继承父Agent的任务列表
+- 专注于完成以下子任务，无需重复已完成的步骤
+"""
+                    # 找到第一个用户消息，在内容前插入角色切换说明
+                    modified_messages = []
+                    first_user_inserted = False
+                    for msg in parent_messages:
+                        if msg.get("role") == "user" and not first_user_inserted:
+                            # 第一个用户消息，在内容前插入说明
+                            new_msg = msg.copy()
+                            new_msg["content"] = (
+                                role_switch_note + "\n" + msg.get("content", "")
+                            )
+                            modified_messages.append(new_msg)
+                            first_user_inserted = True
+                        else:
+                            modified_messages.append(msg)
+                    code_agent.model.set_messages(modified_messages)
                 except Exception:
                     # 设置失败不影响主流程
                     pass
