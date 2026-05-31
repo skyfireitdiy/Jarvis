@@ -1051,10 +1051,10 @@ class GatewayManagerTool:
         if err:
             return err
 
-        # 先获取所有在线节点
+        # 先获取所有在线节点（通过 /api/node/status 接口）
         nodes_result = self._request_gateway(
             method="GET",
-            path="/api/nodes",
+            path="/api/node/status",
             error_prefix="Failed to get nodes list",
         )
 
@@ -1075,6 +1075,7 @@ class GatewayManagerTool:
                 "stderr": f"Gateway returned error: {error_msg}",
             }
 
+        # /api/node/status 返回结构: {"success": True, "data": {"nodes": [...]}}
         nodes_data = gateway_data.get("data", {})
         nodes = nodes_data.get("nodes", [])
         if not nodes:
@@ -1168,11 +1169,10 @@ class GatewayManagerTool:
         err = self._get_master_url("restart nodes")
         if err:
             return err
-
-        # 先获取所有在线节点
+        # 先获取所有在线节点（通过 /api/node/status 接口）
         nodes_result = self._request_gateway(
             method="GET",
-            path="/api/nodes",
+            path="/api/node/status",
             error_prefix="Failed to get nodes list",
         )
 
@@ -1193,6 +1193,7 @@ class GatewayManagerTool:
                 "stderr": f"Gateway returned error: {error_msg}",
             }
 
+        # /api/node/status 返回结构: {"success": True, "data": {"nodes": [...]}}
         nodes_data = gateway_data.get("data", {})
         nodes = nodes_data.get("nodes", [])
         if not nodes:
