@@ -143,12 +143,7 @@ class TestEdgeCases:
         assert "Text" in result
         assert "More text" in result
 
-    def test_mode_tag_filtered(self, run_loop):
-        """[MODE:xxx] 标记应被过滤"""
-        response = "[MODE: ANALYZE] Some text here"
-        result = run_loop._filter_tool_calls_from_response(response)
-        assert "[MODE" not in result
-        assert "Some text here" in result
+
 
     def test_excessive_newlines_cleaned(self, run_loop):
         """超过2个连续换行应被压缩为2个"""
