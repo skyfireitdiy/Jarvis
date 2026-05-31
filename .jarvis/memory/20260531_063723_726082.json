@@ -1,0 +1,8 @@
+{
+  "id": "20260531_063723_726082",
+  "type": "project_long_term",
+  "tags": ["架构决策", "功能增强", "ARCHER工作流"],
+  "content": "【功能增强】ARCHER 工作流记忆检索指引：已在 builtin/prompts/code_agent_system/ 目录下的所有 12 个场景文件中添加了记忆检索指引。\n\n修改内容：\n1. ANALYZE 阶段：添加了使用 memory 工具（action=retrieve）检索相关历史任务记忆的指引\n2. COLLECT 阶段：添加了检索项目长期记忆（memory_types=[\"project_long_term\"]）获取架构决策、历史经验和最佳实践的指引\n3. HYPOTHESIZE 阶段：添加了检索类似方案的记忆（tags=[\"执行方案\", \"架构设计\"]）避免重复造轮子的指引\n\n修改的文件列表：\n- default.md\n- feature.md\n- bug_fix.md\n- code_analysis.md\n- config_modification.md\n- deployment.md\n- performance.md\n- refactor.md\n- research.md\n- troubleshooting.md\n- warning.md\n- detailed_design.md（ACDR 工作流，仅修改 ANALYZE 和 COLLECT 阶段）\n\n目的：提升 Agent 的上下文感知能力和经验复用，确保在各阶段都能利用历史记忆辅助决策。",
+  "created_at": "2026-05-31T06:37:23.726121",
+  "updated_at": "2026-05-31T06:37:23.726128"
+}
