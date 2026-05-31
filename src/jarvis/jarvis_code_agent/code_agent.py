@@ -594,8 +594,6 @@ git reset --hard {start_commit}
             # 如果启用了 review，执行 review 和修复循环
             if not self.disable_review:
                 self._review_and_fix(
-                    user_input=user_input_str,
-                    enhanced_input=enhanced_input,
                     prefix=prefix,
                     suffix=suffix,
                     code_generation_summary=result_str,
@@ -1015,8 +1013,6 @@ git reset --hard {start_commit}
 
     def _review_and_fix(
         self,
-        user_input: str,
-        enhanced_input: str,
         prefix: str = "",
         suffix: str = "",
         code_generation_summary: Optional[str] = None,
@@ -1024,10 +1020,9 @@ git reset --hard {start_commit}
         """执行 review 和修复循环（委托给 CodeReviewer.run_review_with_fix）。
 
         参数:
-            user_input: 用户原始需求
-            enhanced_input: 增强后的用户输入（用于修复）
             prefix: 前缀
             suffix: 后缀
+            code_generation_summary: 代码生成总结
         """
         # 获取从开始到当前的 git diff（提前检测是否有代码修改）
         git_diff = self._check_and_get_git_diff()
