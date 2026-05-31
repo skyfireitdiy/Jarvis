@@ -1,0 +1,8 @@
+{
+  "id": "20260531_222934_926727",
+  "type": "project_long_term",
+  "tags": ["上下文压缩", "模型优化", "成本优化"],
+  "content": "上下文压缩模型优化：\n\n**优化内容**：\n- 修改 _create_temp_model 方法，添加 force_model_type 参数\n- _sliding_window_compression 强制使用 cheap 模型进行压缩\n- 其他调用 _create_temp_model 的地方保持默认行为不变\n\n**实现位置**：\n- src/jarvis/jarvis_agent/__init__.py (_create_temp_model, 第2661行)\n- src/jarvis/jarvis_agent/__init__.py (_sliding_window_compression, 第1646行)\n\n**优化效果**：\n- 上下文压缩始终使用 cheap 模型，降低成本\n- 压缩任务相对简单，cheap 模型足够胜任\n- 不影响其他使用 _create_temp_model 的功能\n\n**Git Commits**：\n- e547b88: 修改 _create_temp_model 添加 force_model_type 参数\n- 5daad23: 修改 _sliding_window_compression 使用 cheap 模型",
+  "created_at": "2026-05-31T22:29:34.926748",
+  "updated_at": "2026-05-31T22:29:34.926751"
+}

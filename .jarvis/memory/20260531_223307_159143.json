@@ -1,0 +1,8 @@
+{
+  "id": "20260531_223307_159143",
+  "type": "project_long_term",
+  "tags": ["ARCHER工作流", "模型切换", "状态跟踪"],
+  "content": "ARCHER 工作流自动模型切换优化：\n\n**改进内容**：\n1. 添加 _current_mode 属性记录当前 MODE 状态\n2. 只有当检测到新的 MODE 且与当前 MODE 不同时才切换模型\n3. 切换成功后打印提示信息告知用户\n4. 支持 cheap 模型切换（RULE/COLLECT 模式）\n\n**实现位置**：\n- src/jarvis/jarvis_agent/run_loop.py (AgentRunLoop.__init__, 第64行)\n- src/jarvis/jarvis_agent/run_loop.py (_auto_switch_model_by_mode, 第89-188行)\n\n**模式映射**：\n- ANALYZE, EXECUTE → normal 模型\n- RULE, COLLECT → cheap 模型\n- HYPOTHESIZE, REVIEW → smart 模型\n\n**用户体验改进**：\n- 避免重复切换：相同 MODE 不会重复切换模型\n- 切换提示：显示 \"🔄 [ARCHER] 检测到 MODE: xxx，已自动切换到 xxx 模型\"\n- 状态持久化：_current_mode 记录当前状态\n\n**Git Commits**：\n- 79cf5de: 添加 _current_mode 属性\n- d276d7d: 添加 MODE 状态检查，避免重复切换\n- 5362331: 添加切换提示信息和 cheap 模型支持",
+  "created_at": "2026-05-31T22:33:07.159176",
+  "updated_at": "2026-05-31T22:33:07.159181"
+}

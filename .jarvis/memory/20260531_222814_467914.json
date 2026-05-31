@@ -1,0 +1,8 @@
+{
+  "id": "20260531_222814_467914",
+  "type": "project_long_term",
+  "tags": ["模型切换", "上下文检查", "架构决策"],
+  "content": "模型切换上下文检查机制：\n\n**实现位置**：\n- 辅助函数：src/jarvis/jarvis_agent/builtin_input_handler.py (_check_context_and_compress_if_needed)\n- 手动切换：src/jarvis/jarvis_agent/builtin_input_handler.py (switch_model)\n- 自动切换：src/jarvis/jarvis_agent/run_loop.py (_auto_switch_model_by_mode)\n\n**检查逻辑**：\n1. 获取目标模型的上下文限制（get_*_max_input_token_count）\n2. 获取当前使用的 token 数（agent.model.get_used_token_count）\n3. 如果超限，触发压缩（agent._adaptive_compression）\n4. 压缩后重新检查，仍超限则拒绝切换\n\n**关键API**：\n- get_smart_max_input_token_count(): smart 模型上下文限制\n- get_cheap_max_input_token_count(): cheap 模型上下文限制\n- get_max_input_token_count(): normal 模型上下文限制\n- agent.model.get_used_token_count(): 当前使用的 token 数\n- agent._adaptive_compression(): 触发上下文压缩\n\n**Git Commits**：\n- ceae50e: 新增 _check_context_and_compress_if_needed 函数\n- 07bd3eb: 修改 switch_model 添加上下文检查\n- 2942602: 修改 _auto_switch_model_by_mode 添加上下文检查",
+  "created_at": "2026-05-31T22:28:14.467942",
+  "updated_at": "2026-05-31T22:28:14.467946"
+}
