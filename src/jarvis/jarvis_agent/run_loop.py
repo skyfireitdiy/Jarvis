@@ -549,6 +549,13 @@ class AgentRunLoop:
                 - 如果需要继续下一轮，返回 (True, None)
                 - 如果需要返回结果，返回 (False, result)
         """
+        # 在自动完成前执行代码审查（如果支持）
+        if hasattr(ag, "_review_and_fix"):
+            try:
+                ag._review_and_fix()
+            except Exception:
+                pass
+
         if ag.return_control_on_auto_complete:
             ag.return_control_on_auto_complete = False
             if ag.non_interactive:
