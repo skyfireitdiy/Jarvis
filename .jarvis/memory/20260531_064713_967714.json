@@ -1,0 +1,12 @@
+{
+  "id": "20260531_064713_967714",
+  "type": "project_long_term",
+  "tags": [
+    "功能开发",
+    "task_list_manager",
+    "工具增强"
+  ],
+  "content": "【功能增强】task_list_manager 工具添加 clear_tasks 操作：\n1. 在 TaskListManager 类中添加 delete_task_list 方法（src/jarvis/jarvis_agent/task_list.py）\n2. 在 task_list_manager 工具中添加 clear_tasks 操作（src/jarvis/jarvis_tools/task_list_manager.py）\n3. 功能：清除当前 Agent 的所有任务列表，清理相关状态\n4. 权限控制：只有主 Agent 可以删除任务列表\n5. 状态清理：删除任务列表时同时清理 task_list_id、running_task_id 和事件订阅\n\n修改文件：\n- src/jarvis/jarvis_agent/task_list.py（新增 delete_task_list 方法）\n- src/jarvis/jarvis_tools/task_list_manager.py（新增 _handle_clear_tasks 方法，更新参数和描述）",
+  "created_at": "2026-05-31T06:47:13.967751",
+  "updated_at": "2026-05-31T06:47:13.967757"
+}
