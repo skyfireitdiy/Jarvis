@@ -1189,10 +1189,12 @@ def run_cli(
             from jarvis.jarvis_web_gateway.app import set_status_update_callback
 
             # 检测认证方式：Token 认证（新）或密码认证（旧）
-            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
+
+            auth_token = load_token_from_file()
             if auth_token:
-                # Token 认证：validate_gateway_token() 会直接从环境变量读取
-                print("[AGENT] Using JARVIS_AUTH_TOKEN for authentication")
+                # Token 认证：validate_gateway_token() 会从文件读取
+                print("[AGENT] Using token file for authentication")
             elif gateway_password:
                 # 旧密码认证（兼容模式）
                 from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA

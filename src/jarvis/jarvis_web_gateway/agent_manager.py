@@ -202,10 +202,8 @@ class AgentManager:
             agent_id=agent_id,
         )
 
-        # 准备环境变量（包含认证 Token）
+        # 准备环境变量（不再传递认证 Token，统一从文件读取）
         env = os.environ.copy()
-        if auth_token:
-            env["JARVIS_AUTH_TOKEN"] = auth_token
 
         # 启动子进程（不重定向 stdin/stdout/stderr，允许 TTY 环境）
         try:
