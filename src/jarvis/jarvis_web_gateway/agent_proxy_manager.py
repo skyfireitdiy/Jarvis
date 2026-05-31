@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from collections import defaultdict
 from typing import Any, AsyncIterator
 
@@ -275,7 +274,9 @@ class AgentProxyManager:
         logger.info(f"[PROXY MANAGER] Proxying WebSocket to {agent_url}")
 
         # 准备子协议（Agent Gateway要求）
-        auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+        from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
+
+        auth_token = load_token_from_file()
         subprotocols = ["jarvis-ws"]
         if auth_token:
             subprotocols.append(f"jarvis-token.{auth_token}")
@@ -298,7 +299,9 @@ class AgentProxyManager:
         try:
             # 发送认证消息给 Agent Gateway
             # Agent Gateway 要求首条消息必须是认证消息
-            auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
+            from jarvis.jarvis_web_gateway.token_manager import load_token_from_file
+
+            auth_token = load_token_from_file()
             if auth_token:
                 auth_message = json.dumps(
                     {"type": "auth", "payload": {"token": auth_token}}
