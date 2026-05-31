@@ -947,6 +947,7 @@ class task_list_manager:
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
 - `execute_task`: 执行任务（自动创建子Agent）
 - `get_task_list_summary`: 查看任务状态
+- `clear_tasks`: 清除当前任务列表（删除所有任务）
 
 **任务类型选择：**
 - `main`: 简单任务（1-3步、单文件）由主Agent直接执行
@@ -1029,6 +1030,16 @@ class task_list_manager:
 }
 ```
 
+清除所有任务：
+```json
+{
+    "name": "task_list_manager",
+    "arguments": {
+        "action": "clear_tasks"
+    }
+}
+```
+
 
 """
 
@@ -1055,6 +1066,7 @@ class task_list_manager:
             "get_task_list_summary",
             "execute_task",
             "update_task",
+            "clear_tasks",
         ]
 
         return {
@@ -1063,7 +1075,7 @@ class task_list_manager:
                 "action": {
                     "type": "string",
                     "enum": action_enum,
-                    "description": "要执行的操作",
+                    "description": "要执行的操作：add_tasks（添加任务）、get_task_detail（获取任务详情）、get_task_list_summary（获取任务列表摘要）、execute_task（执行任务）、update_task（更新任务）、clear_tasks（清除所有任务）",
                 },
                 "main_goal": {
                     "type": "string",
@@ -1244,6 +1256,12 @@ class task_list_manager:
 
             elif action == "update_task":
                 result = self._handle_update_task(
+                    args, task_list_manager, agent_id, is_main_agent, agent
+                )
+                task_list_id_for_status = self._get_task_list_id(agent)
+
+            elif action == "clear_tasks":
+                result = self._handle_clear_tasks(
                     args, task_list_manager, agent_id, is_main_agent, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
@@ -2576,4 +2594,51 @@ class task_list_manager:
                 "success": False,
                 "stdout": "",
                 "stderr": f"更新任务失败: {str(e)}",
+            }
+
+    def _handle_clear_tasks(
+        self,
+        args: Dict[str, Any],
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        agent: Any,
+    ) -> Dict[str, Any]:
+        """处理清除所有任务"""
+        task_list_id = self._get_task_list_id(agent)
+        if not task_list_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Agent 还没有任务列表",
+            }
+
+        try:
+            success, error_msg = task_list_manager.delete_task_list(
+                task_list_id, is_main_agent
+            )
+            if not success:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": error_msg or "删除任务列表失败",
+                }
+
+            # 清除 Agent 的 task_list_id
+            self._set_task_list_id(agent, "")
+            # 清除 running_task_id
+            self._set_running_task_id(agent, None)
+            # 取消事件订阅
+            self._unsubscribe_model_call_event(agent)
+
+            return {
+                "success": True,
+                "stdout": "任务列表已清除",
+                "stderr": "",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"清除任务列表失败: {str(e)}",
             }
