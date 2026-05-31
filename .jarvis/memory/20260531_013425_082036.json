@@ -1,0 +1,8 @@
+{
+  "id": "20260531_013425_082036",
+  "type": "project_long_term",
+  "tags": ["refactor", "code_agent", "interface"],
+  "content": "【接口变更】`CodeAgent._review_and_fix` 方法接口简化：移除了未使用的 `user_input` 和 `enhanced_input` 参数。现在该方法主要依赖 `prefix`, `suffix` 和 `code_generation_summary` 参数。调用方需注意更新调用方式。",
+  "created_at": "2026-05-31T01:34:25.082072",
+  "updated_at": "2026-05-31T01:34:25.082079"
+}
