@@ -142,6 +142,33 @@ class PromptManager:
             "", tool_registry if isinstance(tool_registry, ToolRegistry) else None
         )
 
+        # 获取当前模型类型和模式提示
+        mode_hint = ""
+        try:
+            from jarvis.jarvis_agent.builtin_input_handler import (
+                get_platform_type_from_agent,
+            )
+
+            current_model_type = get_platform_type_from_agent(self.agent)
+            model_type_display = {
+                "smart": "Smart",
+                "normal": "Normal",
+                "cheap": "Cheap",
+            }.get(current_model_type, current_model_type)
+
+            # 根据模型类型推断可能的模式
+            model_to_modes = {
+                "smart": "HYPOTHESIZE 或 REVIEW",
+                "normal": "ANALYZE 或 EXECUTE",
+                "cheap": "RULE 或 COLLECT",
+            }
+            possible_modes = model_to_modes.get(current_model_type, "未知")
+
+            mode_hint = f"\n    - 当前使用 {model_type_display} 模型（适用于 {possible_modes} 模式）\n    - 如需切换 ARCHER 工作流模式，请调用 switch_mode 工具"
+        except Exception:
+            # 如果获取失败，不添加模式提示
+            pass
+
         addon_prompt = f"""
 <system_prompt>
     请判断是否已经完成任务，如果已经完成：
@@ -150,7 +177,7 @@ class PromptManager:
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请请求用户操作
-    - 操作列表：{action_handlers}{memory_prompts}
+    - 操作列表：{action_handlers}{memory_prompts}{mode_hint}
 </system_prompt>
 
 请继续。
