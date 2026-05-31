@@ -488,7 +488,7 @@ class Agent:
 
     def __init__(
         self,
-        system_prompt: str,
+        system_prompt: Optional[str] = None,
         name: str = "Jarvis",
         description: str = "",
         summary_prompt: Optional[str] = None,
@@ -602,7 +602,7 @@ class Agent:
         self,
         name: str,
         description: str,
-        system_prompt: str,
+        system_prompt: Optional[str],
         auto_complete: bool,
         need_summary: bool,
         use_methodology: Optional[bool],
@@ -639,7 +639,7 @@ class Agent:
         # 标识与描述
         self.name = make_agent_name(name)
         self.description = description
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt or ""
 
         # 行为控制开关（原始入参值，后续会根据配置进行解析和覆盖）
         self.auto_complete = bool(auto_complete)

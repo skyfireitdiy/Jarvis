@@ -3,8 +3,9 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 必填参数：task, name, system_prompt, summary_prompt
-- 可选参数：background
+- 必填参数：task, name, background
+- 可选参数：summary_prompt
+- 子Agent继承父Agent的对话历史，无需指定system_prompt
 - 工具集：默认使用系统工具集（无需传入 use_tools）
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive、use_methodology、use_analysis；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
@@ -43,15 +44,11 @@ class SubAgentTool:
             },
             "background": {
                 "type": "string",
-                "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
-            },
-            "system_prompt": {
-                "type": "string",
-                "description": "覆盖子Agent的系统提示词（必填）",
+                "description": "任务背景与已知信息（必填，将与任务一并提供给子Agent）",
             },
             "summary_prompt": {
                 "type": "string",
-                "description": "覆盖子Agent的总结提示词（必填）",
+                "description": "覆盖子Agent的总结提示词（可选，不传则使用默认总结提示词）",
             },
             "non_interactive": {
                 "type": "boolean",
@@ -61,8 +58,6 @@ class SubAgentTool:
         "required": [
             "task",
             "name",
-            "system_prompt",
-            "summary_prompt",
         ],
     }
 
@@ -92,16 +87,11 @@ class SubAgentTool:
             # 不继承父Agent，所有关键参数必须由调用方显式提供
             need_summary = True
 
-            # 读取并校验必填参数
-            system_prompt = str(args.get("system_prompt", "")).strip()
-            summary_prompt = str(args.get("summary_prompt", "")).strip()
+            # 读取并校验必填参数（system_prompt 已移除，子Agent继承父Agent历史）
+            summary_prompt = str(args.get("summary_prompt", "")).strip() or None
             agent_name = str(args.get("name", "")).strip()
 
             errors = []
-            if not system_prompt:
-                errors.append("system_prompt 不能为空")
-            if not summary_prompt:
-                errors.append("summary_prompt 不能为空")
             if not agent_name:
                 errors.append("name 不能为空")
             if not background:
@@ -150,21 +140,7 @@ class SubAgentTool:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
 
-            # 在系统提示词中添加角色切换说明（如果继承了对话历史）
-            if parent_messages:
-                system_prompt = f"""【角色切换说明】
-你现在是 SubAgent，已继承父 Agent 的完整对话历史。
-你了解之前的分析过程和发现的问题。
-
-重要说明：
-- 任务列表已清空，你不继承父 Agent 的任务列表
-- 专注于完成以下子任务，无需重复已完成的步骤
-
-{system_prompt}
-"""
-
             agent = Agent(
-                system_prompt=system_prompt,
                 name=agent_name,
                 description="Temporary sub agent for executing a subtask",
                 summary_prompt=summary_prompt,
@@ -183,7 +159,30 @@ class SubAgentTool:
             # 设置继承的对话历史到子 Agent（在 Agent 创建后）
             if parent_messages and hasattr(agent, "model"):
                 try:
-                    agent.model.set_messages(parent_messages)
+                    # 在第一个用户消息前插入角色切换说明
+                    role_switch_note = """【角色切换说明】
+你现在是子Agent，已继承父Agent的完整对话历史。
+你了解之前的分析过程和发现的问题。
+
+重要说明：
+- 任务列表已清空，你不继承父Agent的任务列表
+- 专注于完成以下子任务，无需重复已完成的步骤
+"""
+                    # 找到第一个用户消息，在内容前插入角色切换说明
+                    modified_messages = []
+                    first_user_inserted = False
+                    for msg in parent_messages:
+                        if msg.get("role") == "user" and not first_user_inserted:
+                            # 第一个用户消息，在内容前插入说明
+                            new_msg = msg.copy()
+                            new_msg["content"] = (
+                                role_switch_note + "\n" + msg.get("content", "")
+                            )
+                            modified_messages.append(new_msg)
+                            first_user_inserted = True
+                        else:
+                            modified_messages.append(msg)
+                    agent.model.set_messages(modified_messages)
                 except Exception:
                     # 设置失败不影响主流程
                     pass
