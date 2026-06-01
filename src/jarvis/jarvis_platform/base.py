@@ -58,7 +58,7 @@ class BasePlatform(ABC):
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
             agent: Agent实例，用于回调触发总结等功能
         """
-        self.suppress_output = True  # 添加输出控制标志
+        self.suppress_output = False  # 添加输出控制标志
         self._saved = False
         self._panel_lock = threading.RLock()  # 用于保护 panel 更新的线程锁
 
