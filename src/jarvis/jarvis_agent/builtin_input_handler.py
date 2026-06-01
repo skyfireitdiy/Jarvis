@@ -887,16 +887,15 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
 
 def get_platform_type_from_agent(agent: Any) -> str:
-    """根据 Agent 类型返回平台类型
+    """根据 Agent 的 _model_type 属性返回平台类型
 
     参数:
         agent: Agent 实例
 
     返回:
-        str: 平台类型，'normal' 或 'smart'
+        str: 平台类型，'smart'、'normal' 或 'cheap'
     """
-    agent_type = getattr(agent, "_agent_type", "normal")
-    return "smart" if agent_type == "code_agent" else "normal"
+    return getattr(agent, "_model_type", "normal")
 
 
 def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
@@ -1048,7 +1047,10 @@ def perform_switch(
         set_llm_group(new_model_group)
 
         # 使用通用的平台类型切换函数
-        return switch_platform_type(agent, platform_type, preserve_model_group=False)
+        result = switch_platform_type(agent, platform_type, preserve_model_group=False)
+        if result:
+            agent._model_type = platform_type
+        return result
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换模型组失败: {e}")
         return False
@@ -1315,47 +1317,20 @@ def switch_model(agent: Any) -> bool:
         PrettyOutput.auto_print("⚠️ 已经在使用该模型")
         return False
 
-    # 执行切换逻辑
-    try:
-        # 检查上下文限制，必要时触发压缩
-        if not _check_context_and_compress_if_needed(agent, selected_type):
-            PrettyOutput.auto_print("❌ 上下文检查失败，无法切换模型")
-            return False
+    # 检查上下文限制，必要时触发压缩
+    if not _check_context_and_compress_if_needed(agent, selected_type):
+        PrettyOutput.auto_print("❌ 上下文检查失败，无法切换模型")
+        return False
 
-        PrettyOutput.auto_print(f"🔄 正在切换到 {type_name} 模型 '{model_name}'...")
+    PrettyOutput.auto_print(f"🔄 正在切换到 {type_name} 模型 '{model_name}'...")
 
-        # 保存旧模型的消息
-        old_messages = agent.model.get_messages()
-
-        # 重新创建模型
-        platform_registry = PlatformRegistry()
-        if selected_type == "smart":
-            agent.model = platform_registry.get_smart_platform()
-        elif selected_type == "cheap":
-            agent.model = platform_registry.get_cheap_platform()
-        else:  # normal
-            agent.model = platform_registry.get_normal_platform()
-
-        agent.model.set_suppress_output(False)
-        agent.model.agent = agent
-
-        # 将旧消息设置到新模型
-        if old_messages:
-            agent.model.set_messages(old_messages)
-
-        # 将新模型设置到现有的 session 中
-        agent.session.model = agent.model
-
-        # 更新 agent 的类型标记（如果需要）
-        if selected_type == "smart":
-            agent._agent_type = "code_agent"
-        else:
-            agent._agent_type = "normal"
-
+    # 使用通用的平台类型切换函数
+    if switch_platform_type(agent, selected_type):
+        agent._model_type = selected_type
         PrettyOutput.auto_print(f"✅ 已成功切换到 {type_name} 模型 '{model_name}'")
         return True
-    except Exception as e:
-        PrettyOutput.auto_print(f"❌ 切换模型失败: {e}")
+    else:
+        PrettyOutput.auto_print("❌ 切换模型失败")
         return False
 
 
