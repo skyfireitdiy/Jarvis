@@ -1,0 +1,12 @@
+{
+  "id": "20260120_144027_426055",
+  "type": "project_long_term",
+  "tags": [
+    "上下文压缩",
+    "token限制",
+    "prompt处理"
+  ],
+  "content": "根据代码分析，当由于token原因触发上下文压缩成功后：\n\n1. **压缩策略**：压缩方法（如滑动窗口压缩、重要性评分压缩等）会修改模型的对话历史（`self.model.messages`），将早期的消息压缩为摘要，保留最近的关键消息。\n\n2. **当前prompt处理**：在run_loop.py的流程中，压缩完成后，代码继续执行到`ag._call_model(ag.session.prompt, True, run_input_handlers)`，即使用当前的session.prompt调用模型。\n\n3. **执行流程**：压缩操作修改的是模型的对话历史（上下文），但不会影响当前的prompt。当前的prompt（存储在`ag.session.prompt`中）会继续被用于调用模型。\n\n4. **结果**：当前的prompt会继续执行，因为压缩只是减少了对话历史的大小以节省token，但保留了当前待处理的任务或请求。这意味着在压缩后，模型仍然会处理当前的prompt，只是基于一个经过压缩的、更紧凑的上下文。\n\n简而言之，压缩成功后，当前的prompt会继续执行，而压缩操作为模型提供更多token空间来处理当前的prompt和生成回应。",
+  "created_at": "2026-01-20T14:40:27.426085",
+  "updated_at": "2026-01-20T14:40:27.426088"
+}

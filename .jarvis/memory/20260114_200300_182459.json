@@ -1,0 +1,8 @@
+{
+  "id": "20260114_200300_182459",
+  "type": "project_long_term",
+  "tags": ["jcad", "tmux", "panel", "shell_fallback", "bug_fix", "auto-exit"],
+  "content": "修复 jcad 运行完成后 tmux panel 自动退出的问题（2026-01-14）：\n问题原因：dispatch_command_to_panel 函数在创建新 session 时（没有现有 session 的情况），没有处理 shell_fallback 参数，导致命令执行完后 pane 自动退出。\n解决方案：在 tmux_wrapper.py 的 dispatch_command_to_panel 函数中，第 1173-1180 行添加了 shell_fallback 逻辑处理。当 stay_in_session_after_exit=True 且 shell_fallback=True 时，在命令字符串中追加 exec {user_shell}。\n影响范围：仅影响 dispatch_command_to_panel 函数创建新 session 的分支，不影响使用现有 session 的分支。\n提交记录：0e02430",
+  "created_at": "2026-01-14T20:03:00.182506",
+  "updated_at": "2026-01-14T20:03:00.182510"
+}

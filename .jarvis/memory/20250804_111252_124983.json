@@ -1,0 +1,11 @@
+{
+  "id": "20250804_111252_124983",
+  "type": "project_long_term",
+  "tags": [
+    "make_book_script",
+    "script_creation"
+  ],
+  "content": "创建了 make_book.sh 脚本，该脚本用于合并/home/wangmaobin/code/Jarvis/docs/jarvis_book/下的所有Markdown文件，并放在/tmp/combined_book.md，然后调用build_pdf.sh生成名为Jarvis_Book.pdf的PDF文件。",
+  "created_at": "2025-08-04T11:12:52.125009",
+  "updated_at": "2025-08-04T11:12:52.125013"
+}

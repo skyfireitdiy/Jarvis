@@ -1,0 +1,12 @@
+{
+  "id": "20260110_123608_024707",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "platform_removal",
+    "documentation"
+  ],
+  "content": "在审查删除文档中非openai和claude平台内容的修改时，发现虽然主要修改了ENV环境变量说明（从YUANBAO_COOKIES改为OPENAI_API_KEY），但附录中的配置示例仍保留了通义千问(tongyi)的配置内容，这些内容也应被删除以符合用户需求。审查时需要特别注意配置示例和文档中的所有平台相关引用。",
+  "created_at": "2026-01-10T12:36:08.024736",
+  "updated_at": "2026-01-10T12:36:08.024740"
+}

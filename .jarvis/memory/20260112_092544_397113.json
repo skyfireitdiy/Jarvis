@@ -1,0 +1,13 @@
+{
+  "id": "20260112_092544_397113",
+  "type": "project_long_term",
+  "tags": [
+    "save_memory",
+    "pin_content",
+    "agent",
+    "tool_improvement"
+  ],
+  "content": "SaveMemoryTool改进：在保存记忆时自动将内容添加到agent的pin_content属性中。这样保存的重要信息会在后续对话中持续提示给大模型，帮助保持上下文。",
+  "created_at": "2026-01-12T09:25:44.397137",
+  "updated_at": "2026-01-12T09:25:44.397141"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260406_102937_042240",
+  "type": "project_long_term",
+  "tags": [
+    "jqc",
+    "jpm",
+    "config",
+    "bug_fix",
+    "覆盖配置"
+  ],
+  "content": "jqc和jpm命令模型配置覆盖Bug修复\n\n问题描述：\n1. jqc命令：重新配置已存在的模型时，只更新max_input_token_count，不更新api_key、base_url、platform等核心配置\n2. jpm manage llm add：同名配置直接报错退出，不允许覆盖\n3. jpm manage group add：同名配置直接报错退出，不允许覆盖\n\n修复方案：\n1. src/jarvis/jarvis_utils/quick_config.py：在已有模型配置分支中增加platform、model、llm_config（含api_key和base_url）的覆盖更新逻辑\n2. src/jarvis/jarvis_platform_manager/main.py llm_add函数：同名配置时询问用户是否覆盖\n3. src/jarvis/jarvis_platform_manager/main.py group_add函数：同名配置时询问用户是否覆盖\n\n提交：accc44d",
+  "created_at": "2026-04-06T10:29:37.042261",
+  "updated_at": "2026-04-06T10:29:37.042265"
+}

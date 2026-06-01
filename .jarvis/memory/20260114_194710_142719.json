@@ -1,0 +1,8 @@
+{
+  "id": "20260114_194710_142719",
+  "type": "project_long_term",
+  "tags": ["builtin_rules", "rule-structure", "rule-list"],
+  "content": "Jarvis内置规则列表位于 builtin/rules/builtin_rules.md，包含9个分类：architecture_design（5个）、code_quality（3个）、deployment（1个）、development_tools（2个）、development_workflow（4个）、performance（2个）、security（2个）、testing（8个）、tool_config（2个）、ui_design（2个）。规则列表使用模板变量{{rule_file_dir}}引用实际文件路径。",
+  "created_at": "2026-01-14T19:47:10.142735",
+  "updated_at": "2026-01-14T19:47:10.142737"
+}

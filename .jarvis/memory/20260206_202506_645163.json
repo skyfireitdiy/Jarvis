@@ -1,0 +1,8 @@
+{
+  "id": "20260206_202506_645163",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "会话恢复", "重构", "已完成"],
+  "content": "## CodeAgent 会话恢复时机重构 - 已完成\n\n### 问题\n循环模式下，会话恢复发生在用户输入第一条需求之后，不符合用户直觉。\n\n### 解决方案\n将会话恢复逻辑从 while True 循环内提取到循环之前，创建临时 agent 实例用于触发会话选择对话框。\n\n### 修改内容\n**文件**: src/jarvis/jarvis_code_agent/code_agent.py\n**范围**: cli 函数 (第1538-1589行)\n**Commit**: 344ca41\n\n### 关键改动\n1. 在循环前创建 temp_agent 用于会话恢复\n2. 恢复后设置 restore_session = False 避免重复恢复\n3. 移除循环内的 is_first_iteration 检查逻辑\n\n### 验证结果\n- ✅ 循环模式 + --restore-session: 会话选择提前到输入之前\n- ✅ 循环模式（无 --restore-session）: 无影响\n- ✅ 单次任务模式（--task）: 无影响\n- ✅ 非交互模式（--non-interactive）: 无影响",
+  "created_at": "2026-02-06T20:25:06.645183",
+  "updated_at": "2026-02-06T20:25:06.645219"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260115_174644_261248",
+  "type": "project_long_term",
+  "tags": [
+    "base.py",
+    "token",
+    "get_remaining_token_count",
+    "分析",
+    "trim_messages"
+  ],
+  "content": "剩余token为0的完整分析：\n1. 这是长对话过程中的正常现象，不是bug\n2. 当对话历史累积token数达到最大限制时，剩余token变为0\n3. 系统已有处理机制：trim_messages()裁剪历史消息（需>=10条）_truncate_message_if_needed()截断当前消息（使用max_tokens的5%）\n4. 10/7倍调整可能高估token使用量\n5. 改进建议：增强日志输出、优化token计算、改进trim_messages策略",
+  "created_at": "2026-01-15T17:46:44.261297",
+  "updated_at": "2026-01-15T17:46:44.261301"
+}

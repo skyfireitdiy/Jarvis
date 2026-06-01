@@ -1,0 +1,13 @@
+{
+  "id": "20260108_112546_454671",
+  "type": "project_long_term",
+  "tags": [
+    "worktree",
+    "git",
+    "HEAD reference",
+    "bug_fix"
+  ],
+  "content": "在git worktree模式中，如果仓库没有初始提交，直接调用git rev-parse --abbrev-ref HEAD会失败，因为HEAD引用不明确（'fatal: ambiguous argument HEAD'）。解决方案是在创建worktree之后再获取当前分支，因为create_worktree方法会自动检测并创建初始提交（如果需要）。",
+  "created_at": "2026-01-08T11:25:46.454708",
+  "updated_at": "2026-01-08T11:25:46.454713"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260215_001541_534649",
+  "type": "project_long_term",
+  "tags": ["typer", "CLI开发", "代码重构", "最佳实践"],
+  "content": "## typer命令迁移最佳实践\n\n### 核心原则\n1. 函数命名冲突解决：typer命令函数名与browser操作函数重名时，使用`@app.command(name=\"xxx\")`装饰器指定命令名，函数命名为`{command}_cmd`\n2. Python内置类型冲突：避免使用Python内置类型名（如list、type、str等）作为函数名\n3. 静态检查要求：代码必须通过mypy和ruff静态检查\n4. 编译验证：代码必须能够成功编译，无编译错误\n\n### 典型问题及解决方案\n- **函数名冲突**：navigate, click, screenshot, hover, drag等命令与browser操作函数重名\n  - 解决：使用`@app.command(name=\"navigate\")` + `def navigate_cmd()`\n- **内置类型冲突**：list函数与Python内置list类型冲突\n  - 解决：使用`@app.command(name=\"list\")` + `def list_cmd()`，内部调用`list_browsers()`\n\n### 验收标准\n- mypy检查通过：`Success: no issues found in 1 source file`\n- ruff检查通过：`All checks passed!`\n- CLI工具可以正常执行：`--help`命令显示所有命令\n\n### 参考实现\n- 参考文件：`src/jarvis/jarvis_lsp/cli.py`\n- 目标文件：`src/jarvis/jarvis_browser/cli.py`",
+  "created_at": "2026-02-15T00:15:41.534671",
+  "updated_at": "2026-02-15T00:15:41.534675"
+}

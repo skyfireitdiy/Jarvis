@@ -1,0 +1,25 @@
+{
+  "content": "Jarvis C2Rust 系统实施进展：测试框架生成、函数收集与转译子命令设计\n\n【Step 1：测试框架生成完成（2025-11-12）】\n\n【功能目标】\n为 C/C++ 项目生成测试框架的 Agent，负责为已有的 C/C++ 代码创建测试框架，最终在 .jarvis/c2rust/test.sh 生成可执行测试脚本，运行该脚本可执行当前 C 项目的所有测试。\n\n【实现状态】\n- CLI 命令：python -m jarvis.jarvis_c2rust.cli --root .\n- 生成文件：测试脚本 .jarvis/c2rust/test.sh、进度文件 .jarvis/c2rust/progress.json\n\n【检测结果】\n- build_system: unknown（未检测到CMake/Meson/Autotools/Make/Bazel）\n- tests_found: false（无显式测试，已搭建smoke test）\n\n【test.sh 逻辑设计】\n- 构建阶段：若无法识别构建系统则跳过，仅输出提示\n- 测试阶段：无显式测试时执行smoke检查（构建成功即通过）\n- 扩展性：为后续添加具体测试用例预留接口\n\n【进度管理】\n- 断点续跑：进度写入 .jarvis/c2rust/progress.json（step=1, status=prepared）\n- 版本控制：当前源码改动已存在或与HEAD一致，git未检测到差异\n\n【函数收集子命令设计（2025-10-25）】\n\n【模块架构】\n- 新增模块：src/jarvis/jarvis_c2rust/collector.py\n- 提供函数：collect_function_names(files: List[Path], out_path: Path, compile_commands_root: Optional[Path] = None) -> Path\n\n【核心功能】\n- 复用 scanner 中的 _try_import_libclang、scan_file、find_compile_commands、load_compile_commands\n- 对每个输入文件调用 scan_file，提取 FunctionInfo\n- 输出唯一的函数名（优先 qualified_name，回退 name）到指定 out_path，每行一个\n- 采用 compile_commands.json（若存在）增强解析；否则默认使用 -I <file.parent>\n\n【CLI 集成】\n- 在 src/jarvis/jarvis_c2rust/cli.py 增加子命令 collect\n- 形参：files (Argument: 1..N Path)，out (Option: --out/-o Path)\n- 调用 collector.collect_function_names 并输出结果路径\n\n【转译子命令架构设计（2025-10-24）】\n\n【位置与命名】\n- 在 src/jarvis/jarvis_c2rust 下新增模块 transpiler.py，在 cli.py 中新增子命令 transpile，与现有 scan/plan 并列\n\n【数据输入】\n- 依赖 scanner 产物：<root>/.jarvis/c2rust/functions.jsonl（含函数位置信息、调用关系、拓扑顺序）与 types.jsonl（如有）\n- 源码根目录：默认当前工作目录或从扫描记录推断\n\n【转译流程（按 scanner 生成的函数顺序）】\n1) 为每个待转函数创建一个 LLM Agent（模块选择与签名生成Agent）：\n   - 输入：原C函数源码片段、位置信息、被调用函数清单、当前 crate 目录结构\n   - 产出：建议落盘目标Rust模块路径、函数签名，写入进度JSON\n\n2) 生成实现：\n   - 创建 CodeAgent 作为执行体，包含目标模块、函数签名、C源码片段、依赖函数信息、crate结构、放置位置建议\n   - 生成/更新对应Rust文件中的函数实现\n\n3) 构建与修复：\n   - 调用 cargo build（或项目构建命令）尝试编译\n   - 失败时收集错误、创建 CodeAgent 进行修复，迭代直到构建通过\n\n4) 代码审查与优化：\n   - 创建审查Agent进行代码审查；若summary指出问题，则再次创建 CodeAgent 优化\n\n5) 标记与映射：\n   - 将该函数标记为\"已转换\"，记录C符号到Rust符号/模块路径的映射到 symbol_map.json\n\n【产物与状态记录】\n- 进度文件：<root>/.jarvis/c2rust/progress.json\n- 映射文件：<root>/.jarvis/c2rust/symbol_map.json\n\n【系统集成】\n- Step 1：测试框架生成，建立基础验证能力\n- 收集阶段：函数名提取与分析准备\n- 转译阶段：AI驱动的代码转换与验证\n- 共享状态管理：统一的进度文件与产物格式\n- 渐进流程：从基础测试到完整转译的平滑过渡\n\n【设计原则】\n- 最小侵入：不修改现有构建配置，仅生成独立测试脚本\n- 渐进增强：从smoke test开始，逐步完善具体测试用例\n- 兼容性优先：优先适配主流构建系统\n- 可扩展性：为复杂测试场景预留扩展点\n- AI增强：结合静态分析与LLM能力\n- 状态一致：统一的进度管理与产物格式\n\n【预期效果】\n- 建立完整的C2Rust工具链基础\n- 提供从测试框架到代码转译的全流程支持\n- 支持渐进式、可中断的迁移流程\n- 确保功能等价性验证与质量控制\n- 建立可持续的C2Rust迁移能力",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "test_script",
+    "collector",
+    "transpile",
+    "cli",
+    "subcommand",
+    "build_integration",
+    "migration_toolchain",
+    "progressive_transformation",
+    "ai_driven_migration",
+    "automated_verification"
+  ],
+  "type": "project_long_term",
+  "merged_from": [
+    "merged_38cd2c91",
+    "20251024_004920_607524",
+    "20251025_234959_366282"
+  ],
+  "id": "merged_a915d750",
+  "created_at": "2025-11-12T23:49:44.854640"
+}

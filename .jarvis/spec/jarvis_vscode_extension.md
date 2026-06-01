@@ -1,0 +1,466 @@
+# jarvis_vscode_extension
+
+## 1. 功能概述
+
+### 1.1 目标
+
+为 Jarvis 项目新增一个 VS Code 插件，参考现有 `src/jarvis/jarvis_service/frontend/src/App.vue` 的交互模式，提供以下核心能力：
+
+- 在 VS Code 活动栏显示 Jarvis 图标入口
+- 在左侧边栏显示 Agent 列表
+- 在右侧区域显示对话信息
+- 在右侧区域提供前端终端能力
+- 支持连接 Jarvis 网关、登录、收发消息、展示终端输出
+
+### 1.2 使用场景
+
+作为 VS Code 用户，我希望在编辑器内直接使用 Jarvis，而不必单独打开浏览器页面，以便在开发环境中完成 Agent 选择、对话交流和终端观察。
+
+### 1.3 范围
+
+本 Spec 仅定义首个可用版本（MVP）：
+
+**范围内：**
+
+- VS Code 扩展脚手架
+- 活动栏图标与 View Container
+- 左侧 Agent 列表视图
+- 左侧边栏中的 Agent 创建入口与最小创建表单
+- 左侧 Agent 列表中的最小管理操作（复制、删除）
+- 右侧聊天/终端 WebviewPanel
+- 网关地址配置与密码登录
+- 聊天消息展示与输入发送
+- 终端区域展示与基础交互
+
+**范围外：**
+
+- 完整迁移 `App.vue` 的全部能力
+- Monaco 编辑器面板
+- 文件树与全局搜索
+- Agent 重命名
+- 会话恢复、多弹窗管理、复杂拖拽布局的完整还原
+
+## 2. 界面结构定义
+
+### 2.1 活动栏入口
+
+扩展必须在 VS Code Activity Bar 中注册一个 Jarvis 图标入口。
+
+**要求：**
+
+- 图标可见且可点击
+- 点击后显示 Jarvis 左侧边栏视图容器
+
+### 2.2 左侧边栏视图
+
+左侧边栏采用双态视图：未登录时显示登录表单，登录成功后显示 Agent 列表与 Agent 管理区。
+
+**内容要求：**
+
+- 未登录时显示：
+  - 当前连接状态
+  - 网关地址输入框
+  - 密码输入框
+  - 连接按钮
+  - 连接失败错误提示（如有）
+- 登录成功后：
+  - 隐藏登录表单
+  - 显示当前连接状态
+  - 显示 Agent 基本列表
+  - 每个 Agent 至少展示：
+    - agent_id 或可读名称
+    - 状态（如可获得）
+  - 每个 Agent 提供最小操作按钮：复制、删除
+  - 允许用户点击某个 Agent
+  - 点击 Agent 后，打开或刷新右侧聊天面板为当前 Agent 上下文
+
+### 2.3 左侧创建 Agent 区域
+
+左侧边栏必须提供创建 Agent 的入口，并以内嵌表单方式提供最小创建能力。
+
+**内容要求：**
+
+- 提供“创建 Agent”按钮
+- 点击后展开创建表单
+- 表单至少包含以下字段：
+  - `agent_type`
+  - `working_dir`（通过 VS Code 原生目录选择器选择）
+  - `name`
+  - `llm_group`
+  - `worktree`（仅 `codeagent` 时生效）
+- 提供取消与创建按钮
+- 提供“选择目录”按钮以选择 `working_dir`
+- 创建成功后自动刷新左侧 Agent 列表
+- 创建成功后可自动选中新建 Agent
+
+### 2.4 右侧聊天面板
+
+右侧区域使用 WebviewPanel 承载对话、状态与执行消息标识，不再承载真实 tty 终端交互。
+
+**内容要求：**
+
+- 显示当前连接状态
+- 显示当前选中的 Agent
+- 显示当前 Agent 执行状态（如：运行中、等待单行输入、等待多行输入）
+- 显示当前输入模式与输入提示
+- 显示聊天消息列表
+- 提供消息输入框与发送按钮
+- 提供单行/多行输入的最小适配能力
+- 在消息列表中显示 `execution` 执行标识与状态摘要
+- 不再作为主登录入口
+
+### 2.5 终端区域
+
+真实终端交互必须采用 VS Code 原生 `Pseudoterminal` 实现，而不是在 Webview 中依赖前端渲染终端承担完整 tty 能力。
+
+**首版要求：**
+
+- 每个 `execution` 创建一个独立的 VS Code Terminal
+- Terminal 与 `execution_id` 一一对应，不复用历史 execution 的 terminal 会话
+- Terminal 必须支持完整 tty 输入、输出与 resize 映射
+- Terminal 启动后应展示该 execution 的终端输出
+- Terminal 结束后应自动退出/关闭，不要求保留为长期标签
+- 右侧聊天面板只负责展示执行消息标识、状态摘要与非终端类消息
+- 已知限制：在当前 VS Code `Pseudoterminal` + 远端完整 tty 流桥接模型下，输入字符可能出现显示层双回显（例如输入 `a` 显示为 `aa`），该问题当前视为显示限制而非功能错误
+
+## 3. 接口定义
+
+### 3.1 扩展命令
+
+扩展必须至少提供以下命令：
+
+1. `jarvis.openPanel`
+   - 功能：打开右侧 Jarvis 聊天面板
+2. `jarvis.refreshAgents`
+   - 功能：刷新左侧 Agent 列表
+
+### 3.2 扩展内部视图接口
+
+#### 左侧视图到右侧面板
+
+当用户在左侧点击 Agent 时，扩展层必须向右侧面板传递当前选中的 Agent 信息。
+
+**输入：**
+
+- `agentId: string`
+- `agentName?: string`
+
+**输出：**
+
+- 右侧面板切换到对应 Agent 上下文
+- 右侧面板切换时，消息列表、终端输出、输入模式、输入提示、执行状态必须切换到目标 Agent 的独立上下文
+
+### 3.3 网关登录接口
+
+左侧边栏登录视图必须支持调用 Jarvis 网关登录接口。
+
+**HTTP 请求：**
+
+- 方法：`POST`
+- 路径：`/api/auth/login`
+- 请求体：
+
+```json
+{
+  "password": "string"
+}
+```
+
+**成功响应要求：**
+
+- 返回 token
+- 前端将 token 保存在当前扩展会话内存中
+
+**失败处理：**
+
+- 显示错误信息
+- 不得伪造成功状态
+
+### 3.4 WebSocket 接口
+
+右侧面板必须支持构建并使用以下连接：
+
+1. 网关主 WebSocket：`/ws`
+2. Agent 代理 WebSocket：`/api/agent/{agentId}/ws`
+
+**认证与初始化要求：**
+
+- 主 WebSocket 建立后，应发送 `auth` 消息，并携带登录得到的 token
+- Agent WebSocket 建立后，应发送 `auth` 消息，并携带登录得到的 token
+- 主 WebSocket 建立后，应发送 `connection_lock` 初始化消息，首版可固定为 `enabled: false`
+- 切换 Agent 时，若目标 Agent 对应 WebSocket 已可用，应优先复用该连接并发送 `get_status` 主动同步状态；否则应仅为目标 Agent 新建连接
+- 切换 Agent 时不得主动断开其他 Agent 已建立且仍可复用的 WebSocket 连接
+
+**用途：**
+
+- 接收输出消息
+- 接收状态更新
+- 向当前 Agent 发送输入
+- 接收终端相关输出
+- 接收输入请求与确认请求
+
+## 4. 输入输出说明
+
+### 4.1 用户输入
+
+#### 连接输入
+
+- `gatewayUrl: string`
+  - 允许格式：
+    - `127.0.0.1:8000`
+    - `ws://host:port/ws`
+    - `http://host:port`
+- `password: string`
+  - 可为空
+  - 登录后不得长期持久化明文密码
+
+#### 创建 Agent 输入
+
+- `agent_type: string`
+  - 首版至少支持：`agent`、`codeagent`
+- `working_dir: string`
+  - 必填
+  - 通过 VS Code 原生目录选择器选择
+  - 仅空白字符视为无效输入
+- `name?: string`
+  - 可选
+- `llm_group: string`
+  - 应优先使用后端返回的真实默认模型组或用户当前选择值
+- `worktree: boolean`
+  - 仅在 `agent_type=codeagent` 时有意义
+
+#### 聊天输入
+
+- `messageText: string`
+  - 多行模式下：空字符串默认不可发送，且仅空白字符视为无效输入
+  - 单行模式下：应允许发送空字符串，以兼容确认/回车类输入请求
+- `inputMode: 'single' | 'multi'`
+  - 由后端 `input_request` 动态驱动
+- `inputTip?: string`
+  - 用于展示当前输入请求提示文案
+
+#### Agent 选择输入
+
+- `agentId: string`
+  - 必须来自 Agent 列表
+
+### 4.2 输出内容
+
+#### 左侧边栏输出
+
+- 登录表单或 Agent 列表（二选一）
+- 当前连接状态
+- 登录失败提示
+- Agent 当前选中状态
+- Agent 基础状态信息（如可获取）
+- 创建 Agent 表单展示状态
+- 创建成功或失败提示
+
+#### 右侧面板输出
+
+- 当前连接状态
+- 当前 Agent 执行状态
+- 当前输入模式与提示
+- 错误提示
+- 聊天消息列表
+- 终端输出内容
+- 当前选中的 Agent 标识
+- 系统消息、普通输出、错误消息的最小分类展示
+
+## 5. 功能行为
+
+### 5.1 启动行为
+
+- 安装并启动扩展后，活动栏应出现 Jarvis 图标
+- 用户点击图标后，应看到左侧 Jarvis 视图
+- 未登录时左侧默认显示登录表单
+- 登录成功后左侧自动切换为 Agent 列表视图
+- 用户可通过命令或 Agent 点击行为打开右侧面板
+
+### 5.2 左侧登录与 Agent 列表行为
+
+- 未登录时左侧仅显示登录区，不显示 Agent 列表与创建区
+- 登录成功后左侧隐藏登录区，并显示 Agent 列表与创建区
+- 左侧边栏应能加载 Agent 列表
+- 若当前未连接或未登录，不得展示可操作的 Agent 管理区
+- 每个 Agent 应至少支持：打开、复制、删除
+- 点击 Agent 后：
+  1. 右侧面板若未打开，则打开
+  2. 右侧面板切换到当前 Agent 上下文
+  3. 后续消息收发优先针对当前 Agent
+  4. 若目标 Agent 已存在独立消息、终端、输入状态，应恢复该上下文；若不存在，则显示空状态而不是沿用上一 Agent 内容
+  5. 若目标 Agent 已存在可复用 WebSocket，应直接复用；否则仅为该 Agent 建立新连接
+
+### 5.3 创建与复制 Agent 行为
+
+- 左侧边栏应提供创建 Agent 入口
+- `working_dir` 应通过 VS Code 原生目录选择器选择，而不是依赖手工输入
+- 用户提交表单前必须校验 `working_dir` 非空
+- 若用户未连接或未登录，不得发起创建请求
+- 创建成功后：
+  1. 刷新左侧 Agent 列表
+  2. 新建 Agent 应在列表中可见
+  3. 扩展应自动选中新建 Agent，或至少在刷新后保持可立即点击进入
+- 复制 Agent 应复用创建接口 `POST /api/agents`
+- 复制时应尽量沿用源 Agent 的 `agent_type`、`working_dir`、`name`、`llm_group`、`worktree`
+- 复制成功后应刷新左侧 Agent 列表，并可自动选中新复制的 Agent
+- 创建失败时应显示明确错误信息
+- 首版不要求实现复杂目录浏览器与高级参数配置
+
+### 5.4 聊天行为
+
+- 用户输入消息并发送后，消息应进入当前 Agent 对话上下文
+- 后端返回消息后，应显示在对应 Agent 的消息列表中
+- 不同 Agent 的消息上下文必须彼此隔离，切换 Agent 时不得展示其他 Agent 的历史消息
+- 消息列表应按接收顺序展示
+- 若连接断开，应提示当前不可发送
+- 当收到 `input_request` 时：
+  1. 右侧输入区应切换到对应输入模式（`single` 或 `multi`）
+  2. 应展示 `tip` 作为输入提示
+  3. 多行模式下继续禁止发送空白输入；单行模式下允许发送空字符串
+- 当收到 `confirm` 时：
+  1. 扩展应使用 VS Code 原生确认交互
+  2. 将确认结果通过当前 Agent WebSocket 回传给后端
+- 当收到 `status_update` 时：
+  1. 应更新当前 Agent 执行状态
+  2. 右侧状态栏应反映最新状态
+- 当收到 `output` 时：
+  1. 普通输出应追加到消息列表
+  2. `STREAM_START/STREAM_CHUNK/STREAM_END` 应在首版中以最小聚合方式展示，避免将每个 chunk 作为独立消息刷屏
+
+### 5.5 终端行为
+
+- 当收到 `tool_stream_start` 或等价 execution 启动事件时，扩展必须为该 `execution_id` 创建一个独立的 VS Code 原生 Terminal
+- Terminal 会话必须与 `agentId + execution_id` 绑定，不同 Agent、不同 execution 间不得串用
+- 当收到执行类输出或终端输出时，扩展必须将数据写入对应 execution 的原生 Terminal
+- 右侧聊天面板中的 `execution` 消息仅作为执行标识与状态摘要，不承担真实 tty 交互
+- 用户在原生 Terminal 中的输入必须通过当前 execution 对应的桥接逻辑回传后端
+- Terminal resize 必须映射为对应 execution 的终端尺寸更新
+- 当收到 `tool_stream_end` 或等价 execution 结束事件时，对应 Terminal 应自动退出/关闭
+- 已知限制：若 VS Code `Pseudoterminal` 本地输入显示与远端 tty 回显同时生效，界面上可能出现字符重复显示；只要实际发送到后端的数据正确且 execution 行为不受影响，可暂按显示层已知限制处理
+- 不要求首版实现 execution terminal 复用、多标签管理或跨 execution 历史恢复
+
+### 5.6 错误处理
+
+#### 登录失败
+
+- 在左侧登录区显示明确错误信息
+- 保持未连接状态
+- 不得切换到 Agent 列表视图
+
+#### 删除 Agent
+
+- 删除前必须进行明确确认
+- 删除失败时应显示错误提示
+- 删除当前选中的 Agent 后，不得保留失效选中状态
+
+#### WebSocket 连接失败
+
+- 显示连接失败提示
+- 不得显示为已连接
+
+#### Agent 不存在或未运行
+
+- 在右侧面板提示 Agent 不可用
+- 不得崩溃
+
+#### 空数据场景
+
+- 无 Agent 时显示空状态
+- 无消息时显示占位提示
+- 无终端输出时显示空终端提示
+
+#### 创建失败
+
+- 显示明确错误信息
+- 保留用户输入，便于修正后重试
+- 不得伪造创建成功状态
+
+## 6. 边界条件
+
+1. **未配置网关地址**
+   - 使用默认值或提示用户输入
+2. **密码为空**
+   - 允许发起登录，由后端决定是否允许
+3. **左侧没有 Agent**
+   - 显示空列表状态
+4. **用户未选择 Agent**
+   - 右侧面板允许显示连接状态，但发送消息前需提示选择 Agent
+5. **创建时工作目录为空**
+   - 不得提交请求，必须提示用户填写
+6. **模型组列表未加载成功**
+   - 允许使用默认值 `default` 继续创建
+7. **终端暂无内容**
+   - 显示“暂无终端输出”之类的空状态
+8. **右侧面板已打开**
+   - 再次点击 Agent 时应切换上下文而非重复创建大量面板
+
+## 7. 实现约束
+
+1. 必须采用独立 VS Code 扩展目录，避免直接污染现有 Web 前端工程
+2. 扩展目录路径固定为 `src/jarvis/jarvis_vscode_extension/`
+3. 尽量复用 `App.vue` 中已验证的连接逻辑与协议理解，但不得直接复制整个 1 万行文件
+4. 首版实现遵循 MVP 原则，只实现对话与终端必需能力
+5. 创建 Agent 能力必须优先复用现有 Web 前端与后端已验证的接口协议，不重复发明新协议
+6. 允许保留 Webview 中的最小展示逻辑，但真实 tty 必须优先基于 VS Code `Pseudoterminal` 实现；如需构建脚本，优先使用独立最小 TypeScript 配置
+7. 不得破坏现有 Web 前端和 Python 后端主要功能
+8. 所有新增文件命名应清晰可维护
+
+## 8. 验收标准
+
+### 8.0 发布构建验收
+
+1. 仓库中存在发布构建脚本：`scripts/build_vscode_extension_release.sh`
+2. 发布构建脚本应在仓库根目录执行，并自动进入 `src/jarvis/jarvis_vscode_extension/`
+3. 发布构建脚本应先执行 TypeScript 编译，生成 `src/jarvis/jarvis_vscode_extension/dist/extension.js`
+4. 发布构建脚本应继续打包生成 `.vsix` 文件，产物位于 `src/jarvis/jarvis_vscode_extension/` 目录下
+5. 发布构建脚本应在依赖缺失时给出明确错误信息，并在成功后输出产物路径
+
+### 8.1 功能验收
+
+1. 仓库中存在 Spec 文件：`.jarvis/spec/jarvis_vscode_extension.md`
+2. VS Code 中可以识别该扩展
+3. 活动栏中出现 Jarvis 图标
+4. 点击图标后，左侧边栏先出现登录区域
+5. 用户可在左侧输入网关地址和密码并尝试连接
+6. 登录成功后左侧登录区隐藏，并切换显示 Agent 列表
+7. 点击 Agent 后，可以打开右侧聊天面板
+8. 左侧边栏存在创建 Agent 入口
+9. 用户可以在左侧填写最小创建表单并提交
+10. 创建成功后左侧 Agent 列表会刷新
+11. 创建成功后新 Agent 在列表中可见，并可被自动选中或立即进入
+12. 右侧面板可以展示聊天消息
+13. 右侧面板可以发送消息到当前 Agent
+14. 当触发 execution 时，可创建对应的 VS Code 原生 Terminal，并展示终端输出
+
+### 8.2 工程验收
+
+1. 插件源码可通过基础语法检查或构建检查
+2. 不产生无关临时文件
+3. 不修改无关模块
+4. 文档内容与实现范围一致
+
+### 8.3 MVP 通过标准
+
+满足以下全部条件视为 MVP 完成：
+
+- 有活动栏图标
+- 有左侧 Agent 列表
+- 有右侧聊天面板
+- 可连接 Jarvis
+- 可进行基础对话
+- 可创建并使用 execution 对应的原生 Terminal
+
+## 9. 验证方法
+
+1. 检查 Spec 文件路径与命名是否符合 SDD 规范
+2. 启动 VS Code 扩展开发模式，确认活动栏图标出现
+3. 点击图标，确认左侧边栏显示 Jarvis 视图
+4. 选择 Agent，确认右侧打开聊天面板
+5. 输入网关地址与密码，执行连接
+6. 验证消息发送与消息展示
+7. 触发 execution，验证创建对应的 VS Code 原生 Terminal，并检查终端输出、输入与 resize 映射
+8. 运行构建或类型检查，确认无基础错误
+9. 在仓库根目录执行 `bash scripts/build_vscode_extension_release.sh`
+10. 确认生成 `src/jarvis/jarvis_vscode_extension/dist/extension.js`
+11. 确认生成 `src/jarvis/jarvis_vscode_extension/*.vsix`

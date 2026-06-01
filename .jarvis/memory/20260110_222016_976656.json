@@ -1,0 +1,8 @@
+{
+  "id": "20260110_222016_976656",
+  "type": "project_long_term",
+  "tags": ["run_loop", "tool_call", "output_filter", "llm_response"],
+  "content": "已完成run_loop.py的修改，实现了隐藏工具调用内容的LLM响应打印功能：1）添加了_filter_tool_calls_from_response()方法，使用正则表达式移除<TOOL_CALL>...</TOOL_CALL>标签及其内容；2）修改了打印逻辑，无论是否有工具调用都会打印LLM响应（过滤后）；3）正则表达式使用re.DOTALL|re.MULTILINE标志，支持多行匹配；4）过滤后会清理多余的空行。修改文件：src/jarvis/jarvis_agent/run_loop.py",
+  "created_at": "2026-01-10T22:20:16.976672",
+  "updated_at": "2026-01-10T22:20:16.976674"
+}

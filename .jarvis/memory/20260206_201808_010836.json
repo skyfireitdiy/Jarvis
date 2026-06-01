@@ -1,0 +1,8 @@
+{
+  "id": "20260206_201808_010836",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "save_session", "功能修改", "finally块"],
+  "content": "在 CodeAgent.run() 方法的 finally 块中添加了自动保存会话功能。修改位置：src/jarvis/jarvis_code_agent/code_agent.py 第487-495行。实现方式：在 clear_current_agent() 之前调用 self.save_session()，并使用 try-except 包裹以确保保存失败不影响其他清理操作。这样无论 agent 正常退出还是异常退出，都会自动保存会话状态到 .jarvis/sessions/ 目录。",
+  "created_at": "2026-02-06T20:18:08.010865",
+  "updated_at": "2026-02-06T20:18:08.010870"
+}

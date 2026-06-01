@@ -1,0 +1,8 @@
+{
+  "id": "20260113_232028_154022",
+  "type": "project_long_term",
+  "tags": ["load_rule", "agent_prompt", "rule_usage_guide", "prompt_manager"],
+  "content": "在Agent系统提示词中添加Rule使用指南：在prompt_manager.py的build_system_prompt方法中，添加检查load_rule工具是否可用的逻辑。如果工具可用，则添加<rule_usage_guide>标签包裹的规则使用指南，包括适用场景（编码规范、标准化流程、项目规则）、工具介绍（名称、功能、参数）、支持的内置变量（current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir）、使用建议和JSON示例。位置在task_list_manager_note之后、system_tools_info之前，与task_list_manager_guide风格一致。",
+  "created_at": "2026-01-13T23:20:28.154046",
+  "updated_at": "2026-01-13T23:20:28.154049"
+}

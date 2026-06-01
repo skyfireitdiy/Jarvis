@@ -1,0 +1,13 @@
+{
+  "id": "20260113_153514_429316",
+  "type": "project_long_term",
+  "tags": [
+    "rule_file_dir",
+    "path_reference",
+    "builtin_rules",
+    "directory_structure"
+  ],
+  "content": "在builtin/rules目录结构整理过程中，需要更新规则文件中的相对路径引用。当前使用{{ rule_file_dir }}变量的路径引用需要根据新的目录结构进行更新。主要涉及三个文件：\n\n1. builtin/rules/builtin_rules.md - 包含所有规则的索引，引用各个子目录中的规则文件\n2. builtin/rules/development_workflow/c2rust_transpiler.md - 引用同目录或其他目录的规则文件\n3. builtin/rules/tool_config/add_rule.md - 引用其他规则文件作为示例\n\n路径引用更新原则：\n- {{ rule_file_dir }} 变量指向当前规则文件所在的目录\n- 需要根据文件的实际位置计算正确的相对路径\n- 保持Jinja2变量格式不变（{{ rule_file_dir }}）",
+  "created_at": "2026-01-13T15:35:14.429344",
+  "updated_at": "2026-01-13T15:35:14.429348"
+}

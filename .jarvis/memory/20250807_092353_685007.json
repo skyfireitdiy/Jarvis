@@ -1,0 +1,13 @@
+{
+  "id": "20250807_092353_685007",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "memory_organizer",
+    "self_maintenance",
+    "architecture"
+  ],
+  "content": "Jarvis Agent在任务完成流程（_complete_task）中增加了一项自我维护功能。该功能会检查项目记忆和全局记忆，当记忆数量超过200条且存在3个以上标签重叠时，会提示用户运行MemoryOrganizer进行整理。此检查通过在`.jarvis/`和数据目录下创建`.last_memory_organizer_check`时间戳文件来控制，确保每天只执行一次。\n",
+  "created_at": "2025-08-07T09:23:53.685031",
+  "updated_at": "2025-08-07T09:23:53.685035"
+}

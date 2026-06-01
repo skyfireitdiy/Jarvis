@@ -1,0 +1,8 @@
+{
+  "id": "20260304_010629_475044",
+  "type": "project_long_term",
+  "tags": ["重构", "rules_manager", "代码优化", "去重"],
+  "content": "## rules_manager.py 重构：统一使用 get_rule_file_path 方法\n\n**重构目标**：\n- 删除重复的规则路径获取逻辑\n- 提取公共方法，提高代码复用性\n\n**执行内容**：\n1. 将 `_get_rule_file_path_for_merge` 重命名为公共方法 `get_rule_file_path`（第937行）\n2. 删除 `get_all_rules_with_status` 方法中的嵌套函数 `get_rule_file_path`（~32行代码）\n3. 修改 `_merge_active_rules` 方法调用新的公共方法（第924行）\n4. 修复 get_builtin_rule_path 返回值类型问题（处理 None 情况）\n\n**方法特性**：\n- 支持所有规则前缀：builtin、project、global、central、config、yaml 等\n- 返回规则文件的绝对路径，无法获取时返回 \"--\"\n- 可被多处代码复用，避免重复实现\n\n**验证结果**：\n- ✅ 静态检查通过（ruff format + auto-fix）\n- ✅ 无编译错误\n- ✅ 代码结构更清晰，消除了重复代码\n- ✅ Git commits: 87f1064, 0732508, 984bec9",
+  "created_at": "2026-03-04T01:06:29.475069",
+  "updated_at": "2026-03-04T01:06:29.475071"
+}

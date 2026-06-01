@@ -1,0 +1,12 @@
+{
+  "id": "20260319_103208_219204",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "agent_connection",
+    "frontend"
+  ],
+  "content": "创建Agent后持续重连机制修复\n\n问题：Agent启动需要时间（几秒到十几秒），前端重试3次后放弃，导致连接失败\n\n用户需求：\n- 前端应该不停重试，直到连接成功\n- 断开后也要一直重试连接\n\n根本原因：\n1. 前端重试次数限制（最多3次）不够，Agent启动需要更长时间\n2. WebSocket连接成功后立即被后端关闭，但未标记为已完成，导致onclose不触发重试\n\n解决方案：\n1. 移除switchAgent中的重试次数限制，持续重试直到连接稳定\n2. 连接后等待时间从1000ms增加到2000ms\n3. 在connectToAgent的onopen中标记ws._connectionCompleted = true\n4. 每次重试间隔2秒，适应Agent启动时间\n\n修改文件：frontend/src/App.vue\n- switchAgent函数：移除maxStableRetries限制，无限重试\n- connectToAgent函数：在onopen中设置ws._connectionCompleted = true\n\nGit Commit:\n- 57aef47: 移除重试次数限制，持续重试直到连接成功\n- cdba843: 在onopen中标记连接已完成\n\n效果：前端会持续重试连接Agent，直到Agent完全启动并建立稳定连接，不再因为重试次数限制而失败",
+  "created_at": "2026-03-19T10:32:08.219225",
+  "updated_at": "2026-03-19T10:32:08.219228"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260201_225051_959017",
+  "type": "project_long_term",
+  "tags": [
+    "jcad",
+    "jvsd",
+    "tmux",
+    "enable_tmux",
+    "实现方案"
+  ],
+  "content": "功能：jcad/jvsd 启动时自动忽略 tmux 被禁用的配置\n\n实现方案：\n1. 在 dispatch_command_to_panel() 中设置环境变量 JARVIS_DISPATCHER_CALL=1\n2. 在 dispatch_to_tmux_window() 和 check_and_launch_tmux() 中检查该环境变量\n3. 如果环境变量存在，则忽略 enable_tmux 配置\n\n修改文件：src/jarvis/jarvis_utils/tmux_wrapper.py\n\n验收标准：\n- 设置 enable_tmux: false 后，jcad/jvsd 仍能正常创建 tmux panel\n- 直接调用 jca/jvs 仍受 enable_tmux 配置控制",
+  "created_at": "2026-02-01T22:50:51.959057",
+  "updated_at": "2026-02-01T22:50:51.959062"
+}

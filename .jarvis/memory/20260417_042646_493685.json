@@ -1,0 +1,8 @@
+{
+  "id": "20260417_042646_493685",
+  "type": "project_long_term",
+  "tags": ["sdd", "spec_consistency", "development规范", "jarvis_tui"],
+  "content": "## SDD规范一致性原则在Jarvis TUI项目中的应用\n\n### 背景\n在Jarvis TUI项目开发中，发现Spec文档与代码实现存在多处不一致，违反了SDD规范一致性原则。\n\n### 修复案例\n1. **ChatManager缺少send_message方法**：Spec定义了`async def send_message(self, message: str, agent_id: Optional[str] = None) -> None`，但实现中缺失。修复：在`src/jarvis/jarvis_tui/chat.py`中添加该方法实现。\n\n2. **AgentManager方法签名不一致**：Spec定义为async方法，但实际实现为同步方法。修复：更新Spec文档，将接口定义与实际实现对齐（同步方法）。\n\n3. **AuthManager.login返回类型不一致**：Spec定义返回`bool`，但实际实现返回`str`（token）。修复：更新Spec文档，将返回类型改为`str`。\n\n4. **ConnectionManager接口不一致**：Spec定义了`disconnect()`方法，但实际实现为`disconnect_gateway()`、`disconnect_agent(agent_id)`和`disconnect_all()`三个方法。修复：更新Spec文档，补充完整接口定义。\n\n### 关键原则\n- **必须**：代码实现必须与Spec保持一致\n- **必须**：发现不一致时，立即停止实现并更新Spec\n- **禁止**：Spec与代码不一致\n- **禁止**：实现超出Spec范围的功能（除非更新Spec）\n\n### 验证方式\n- 所有修改通过ruff检查（All checks passed!）\n- Spec文档修改成功，与代码实现完全对齐\n\n### 文件位置\n- Spec文档：`.jarvis/rules/spec/jarvis_tui_spec.md`\n- 相关代码：`src/jarvis/jarvis_tui/chat.py`、`src/jarvis/jarvis_tui/agents.py`、`src/jarvis/jarvis_tui/auth.py`、`src/jarvis/jarvis_tui/connection.py`",
+  "created_at": "2026-04-17T04:26:46.493719",
+  "updated_at": "2026-04-17T04:26:46.493725"
+}

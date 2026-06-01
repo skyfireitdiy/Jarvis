@@ -1,0 +1,13 @@
+{
+  "id": "20260120_144244_547443",
+  "type": "project_long_term",
+  "tags": [
+    "auto_compression",
+    "run_loop",
+    "base_platform",
+    "token_limit"
+  ],
+  "content": "分析了src/jarvis/jarvis_agent/run_loop.py和src/jarvis/jarvis_platform/base.py两个文件中的自动压缩逻辑：\n\n1. run_loop.py中的压缩逻辑：\n- 在__init__方法中设置summary_remaining_token_threshold为最大输入token的25%\n- 在run方法中，当剩余token低于阈值时，会触发多种压缩策略：自适应压缩、滑动窗口压缩、重要性评分压缩等\n- 这些压缩方法通过调用Agent实例的方法实现\n\n2. base.py中的压缩逻辑：\n- 在_truncate_message_if_needed方法中，当剩余token为0或负数时，会调用self.trim_messages()方法\n- 存在抽象方法trim_messages，子类需要实现具体的裁剪逻辑\n- 在_chat方法中，还会基于token限制和对话轮次触发自动总结\n\n两个文件中的压缩逻辑功能有所重叠，但应用场景略有不同：run_loop.py的压缩是在token低于阈值时主动检查并提前压缩；base.py的压缩是在token耗尽时被动处理，并且包含基于对话轮次的总结机制。",
+  "created_at": "2026-01-20T14:42:44.547469",
+  "updated_at": "2026-01-20T14:42:44.547473"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260116_003205_990992",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "auto_summary",
+    "token_limit",
+    "bug",
+    "diagnosis"
+  ],
+  "content": "自动总结未触发问题诊断结论：\n\n问题：token显示达到90%以上，但自动总结未触发。\n\n代码逻辑分析：\n1. _get_token_usage_info 显示：历史记录 + 当前响应 = 93%\n2. get_remaining_token_count() 在第459行调用时，当前响应还未添加到messages\n3. 触发条件：remaining_tokens <= 25% (第464-467行)\n4. 按理说：100000 - 78000 = 22000 (22%) <= 25000 → 应该触发\n\n可能原因（按优先级排序）：\n1. self.agent 为 None：Platform初始化时未传入agent参数，导致第456行if self.agent is not None判断失败\n2. 发生异常：第513-515行有异常捕获，可能默默失败了\n3. 非Agent场景：直接使用Platform而非通过Agent，没有设置agent引用\n\n诊断步骤：\n1. 检查Platform初始化时是否传入了agent参数\n2. 查看日志中是否有\"⚠️ 自动总结失败\"的输出\n3. 确认是否在Agent场景下使用（还是直接调用Platform）\n\n建议修改：\n- 考虑在 get_remaining_token_count() 中也计算当前响应的token\n- 或者在判断触发条件时，使用与显示一致的算法（包括当前响应）",
+  "created_at": "2026-01-16T00:32:05.991027",
+  "updated_at": "2026-01-16T00:32:05.991030"
+}

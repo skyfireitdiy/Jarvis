@@ -1,0 +1,14 @@
+{
+  "id": "20260314_115054_264551",
+  "type": "project_long_term",
+  "tags": [
+    "gateway",
+    "agent-manager",
+    "persistence",
+    "bugfix",
+    "task-completed"
+  ],
+  "content": "## Agent 列表恢复修复\n\n### 问题描述\n重新启动 Gateway 后，Agent 列表没有恢复。\n\n### 问题原因\n1. 原实现只恢复**还在运行中**的 Agent（通过检查 PID）\n2. 已停止的 Agent 不会被恢复，导致用户看不到历史记录\n3. 在同步的 `__init__` 方法中调用 `asyncio.create_task()` 可能导致错误\n\n### 解决方案\n1. **恢复所有 Agent**：包括运行中和已停止的 Agent\n2. **根据进程状态更新状态**：进程存在则恢复为 `running`，否则恢复为 `stopped`\n3. **延迟创建监控任务**：不在同步上下文中创建异步任务，而是在 FastAPI startup 事件中创建\n\n### 实现修改\n\n**`_load_agents()` 方法**：\n- 恢复所有 Agent 的基本信息\n- 检查进程状态，更新 Agent 状态\n- 不直接创建监控任务，设为 `None`\n\n**`start_monitoring_for_running_agents()` 方法（新增）**：\n- 遍历所有 Agent\n- 为状态为 `running` 且监控任务为 `None` 的 Agent 创建监控任务\n- 在异步上下文中调用\n\n**FastAPI startup 事件（新增）**：\n- 应用启动时调用 `start_monitoring_for_running_agents()`\n- 确保在异步上下文中创建监控任务\n\n### 修改的文件\n- `src/jarvis/jarvis_web_gateway/agent_manager.py`\n- `src/jarvis/jarvis_web_gateway/app.py`\n\n### 验收结果\n- ✅ 编译通过\n- ✅ 重启后能恢复所有 Agent（包括已停止的）\n\n### Git Commits\n- 841945c: 修改 _load_agents 恢复所有 Agent\n- 5eb5696: 添加 start_monitoring_for_running_agents 方法\n- eca4490: 添加 FastAPI startup 事件处理",
+  "created_at": "2026-03-14T11:50:54.264574",
+  "updated_at": "2026-03-14T11:50:54.264578"
+}

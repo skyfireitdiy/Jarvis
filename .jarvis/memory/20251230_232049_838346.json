@@ -1,0 +1,8 @@
+{
+  "id": "20251230_232049_838346",
+  "type": "project_long_term",
+  "tags": ["testing", "verification", "jarvis_config", "pytest"],
+  "content": "代码验证流程：1) 使用 read_code 读取测试文件检查存在性和内容结构；2) 运行 pytest 测试确保所有测试通过；3) 运行 ruff check 检查代码风格符合 PEP 8；4) 对于测试文件，验证所有必须的 API 端点是否被覆盖",
+  "created_at": "2025-12-30T23:20:49.838365",
+  "updated_at": "2025-12-30T23:20:49.838367"
+}

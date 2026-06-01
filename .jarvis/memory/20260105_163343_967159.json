@@ -1,0 +1,13 @@
+{
+  "id": "20260105_163343_967159",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis.py",
+    "print_commands_overview",
+    "命令列表",
+    "初始化流程"
+  ],
+  "content": "在jarvis.py文件中，第693-694行的修改注释掉了print_commands_overview()调用，以满足用户需求：在初始化流程中不再打印命令列表（jca、jvs等）。print_commands_overview函数定义在第70-120行，使用rich库输出命令与快捷方式总览表，包含jarvis、jarvis-agent、jarvis-code-agent、jarvis-code-review、jarvis-git-commit、jarvis-git-squash、jarvis-platform-manager、jarvis-multi-agent、jarvis-tool、jarvis-methodology、jarvis-rag、jarvis-smart-shell、jarvis-stats、jarvis-memory-organizer等多个命令及其快捷方式和功能描述。修改仅影响初始化流程的输出显示，不改变任何功能逻辑。",
+  "created_at": "2026-01-05T16:33:43.967197",
+  "updated_at": "2026-01-05T16:33:43.967202"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260109_183937_206668",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "platform_interfaces",
+    "code_cleanup",
+    "git_commiter"
+  ],
+  "content": "在src/jarvis/jarvis_git_utils/git_commiter.py文件中已成功删除对support_upload_files和upload_files接口的调用。相关条件判断代码已被移除，文件语法正确，静态检查通过。这是删除platform base中7个接口(support_web、upload_files、set_web、get_env_config_guide、get_env_defaults、get_required_env_keys、support_upload_files)及其调用方任务的一部分。",
+  "created_at": "2026-01-09T18:39:37.206695",
+  "updated_at": "2026-01-09T18:39:37.206698"
+}

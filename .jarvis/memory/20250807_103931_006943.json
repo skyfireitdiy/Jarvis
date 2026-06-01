@@ -1,0 +1,14 @@
+{
+  "id": "20250807_103931_006943",
+  "type": "project_long_term",
+  "tags": [
+    "bug",
+    "investigation",
+    "tool_registry",
+    "jarvis_tools",
+    "statistics"
+  ],
+  "content": "系统存在一个关于工具数量统计的Bug。\n- **现象**: `show_agent_startup_stats` 函数显示的工具总数（例如31）与通过 `ToolRegistry().get_all_tools()` 实际获取并计数的工具数量（例如24）不一致。\n- **根本原因**: 计数逻辑存在缺陷，可能重复计数或包含了非工具项。\n- **相关文件**: `src/jarvis/jarvis_tools/registry.py` 中的 `ToolRegistry` 类是问题根源，需要进一步审查其 `get_all_tools` 方法和初始化逻辑。\n",
+  "created_at": "2025-08-07T10:39:31.006969",
+  "updated_at": "2025-08-07T10:39:31.006974"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260110_224804_954740",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "memory_organizer",
+    "function_parameters",
+    "code_refactoring"
+  ],
+  "content": "在jarvis项目中，memory_organizer.py文件的_find_overlapping_memories函数参数名从overlap_threshold更改为min_overlap。这一修改需要同时更新所有调用该函数的地方，以确保代码的一致性和正确性。特别注意在jarvis_agent/__init__.py文件中也需相应更新参数名。",
+  "created_at": "2026-01-10T22:48:04.954768",
+  "updated_at": "2026-01-10T22:48:04.954771"
+}

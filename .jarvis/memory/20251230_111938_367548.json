@@ -1,0 +1,13 @@
+{
+  "id": "20251230_111938_367548",
+  "type": "project_long_term",
+  "tags": [
+    "configure_by_tui",
+    "utils.py",
+    "_interactive_config_setup",
+    "verification"
+  ],
+  "content": "验证任务：修改 _interactive_config_setup 函数集成 TUI\n\n修改位置：src/jarvis/jarvis_utils/utils.py\n关键修改点：\n1. 第 1255-1261 行：在步骤 6（生成 LLM 配置名称）之后调用 _run_tui_config_form\n2. 第 1263-1283 行：实现降级方案，当 TUI 失败或用户取消时回退到命令行交互模式\n3. 第 1293-1294 行：修改步骤 8 的判断逻辑，只有当 config_data 是基础配置时（len(config_data) <= 5）才调用 _collect_optional_config_interactively\n\n保留的逻辑：\n- 步骤 1-6：平台选择、模型选择（第 1186-1208 行）\n- 步骤 4：测试连接逻辑（第 1210-1230 行）\n- 步骤 7：配置保存逻辑（第 1297-1299 行）\n\n依赖函数：\n- _run_tui_config_form：之前已创建的 TUI 辅助函数，位于第 1039 行左右",
+  "created_at": "2025-12-30T11:19:38.367584",
+  "updated_at": "2025-12-30T11:19:38.367588"
+}

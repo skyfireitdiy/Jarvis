@@ -1,0 +1,13 @@
+{
+  "id": "20260131_162132_135432",
+  "type": "project_long_term",
+  "tags": [
+    "依赖注入",
+    "代码重构",
+    "任务完成",
+    "jarvis_auto_fix"
+  ],
+  "content": "## 依赖注入改造功能已完成\n\n### 实现内容\n1. **DependencyInjectionAnalyzer** - 识别硬编码依赖\n   - analyze_file(): 分析文件中的依赖\n   - 支持检测带参数和不带参数的依赖\n   - 支持多类多依赖检测\n\n2. **DependencyInjectionRefactorer** - 执行重构\n   - refactor_to_constructor_injection(): 构造函数注入\n   - _modify_constructor(): 修改构造函数\n   - _generate_dependency_container(): 生成依赖容器\n   - 完整的错误处理和FixHistory集成\n\n### 测试结果\n- 测试文件: tests/jarvis_auto_fix/test_dependency_injection.py\n- 测试用例: 20个\n- 测试结果: 20 passed, 0 failed\n- 测试覆盖率: 90%\n- 静态扫描: 通过（ruff + mypy）\n\n### 核心功能\n- 识别硬编码依赖（self.db = Database()）\n- 构造函数注入（支持keep_defaults参数）\n- 生成依赖容器类（lazy loading + factory method）\n- 完整的错误处理\n- FixHistory集成\n\n### 文件位置\n- 实现: src/jarvis/jarvis_auto_fix/refactoring/dependency_injection.py (562行)\n- 测试: tests/jarvis_auto_fix/test_dependency_injection.py (363行)",
+  "created_at": "2026-01-31T16:21:32.135454",
+  "updated_at": "2026-01-31T16:21:32.135458"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260209_142819_187349",
+  "type": "project_long_term",
+  "tags": ["builtin规则", "规则名称", "规则路径", "ListRule"],
+  "content": "## builtin 规则名称和路径显示优化\n\n**修改时间**: 2025-02-09\n\n**需求**: \n1. 规则名称从 `builtin:clean_code` 改为 `builtin:architecture_design:clean_code.md`\n2. 显示实际文件路径而非“内置规则”\n\n**实现**:\n1. 修改 `_load_rules_from_directory()` 函数：使用相对路径作为规则名称，将 `/` 替换为 `:`\n2. 修改 `get_builtin_rule_path()` 函数：将 `:` 替换回 `/` 来查找文件路径\n3. 修改 `get_all_rules_with_status()`：直接使用 `get_builtin_rule()` 获取规则内容预览\n\n**效果**:\n- 规则名称：`builtin:architecture_design:clean_code.md`\n- 文件路径：`/home/wangmaobin/code/Jarvis/builtin/rules/architecture_design/clean_code.md`\n- 所有46个内置规则都能正确显示名称和路径\n\n**相关提交**: a3bf6ba, b13d5ce, b735885, b71d9da",
+  "created_at": "2026-02-09T14:28:19.187380",
+  "updated_at": "2026-02-09T14:28:19.187385"
+}

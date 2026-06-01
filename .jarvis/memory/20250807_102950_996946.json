@@ -1,0 +1,16 @@
+{
+  "id": "20250807_102950_996946",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "startup",
+    "statistics",
+    "visualization",
+    "rich",
+    "ui_convention",
+    "utils.py"
+  ],
+  "content": "Jarvis Agent在启动时会显示一个美化的资源概览面板。\n- **功能**: 展示本地方法论、可用工具、全局记忆和项目记忆的数量。\n- **实现**: 该功能由 `jarvis.jarvis_utils.utils.show_agent_startup_stats` 函数提供。\n- **技术**: 使用 `rich.panel.Panel` 创建带蓝色边框和居中标题的面板，作为项目内信息展示的UI约定。\n- **调用位置**: 在 `jarvis.jarvis_agent.Agent.__init__` 方法中被调用。\n",
+  "created_at": "2025-08-07T10:29:50.996993",
+  "updated_at": "2025-08-07T10:29:50.997001"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260314_105926_007763",
+  "type": "project_long_term",
+  "tags": [
+    "gateway",
+    "agent-manager",
+    "persistence",
+    "task-completed"
+  ],
+  "content": "## Agent 列表持久化功能已完成\n\n### 实现功能\n1. **持久化存储**：Agent 列表保存到 `.jarvis_agents.json` 文件\n2. **启动恢复**：Gateway 启动时自动恢复运行中的 Agent（通过 PID 检查进程是否存在）\n3. **自动保存**：创建/停止 Agent 时自动保存到持久化文件\n\n### 技术实现\n- 文件：`src/jarvis/jarvis_web_gateway/agent_manager.py`\n- 持久化文件：`.jarvis_agents.json`\n- 恢复策略：仅恢复运行中的 Agent（进程存在）\n- 类型安全：`process` 参数类型改为 `Optional[subprocess.Popen]`\n\n### 验收结果\n- ✅ 静态检查通过（ruff + mypy）\n- ✅ 编译验证通过\n- ✅ 所有类型错误已修复\n- ✅ 所有 f-string 错误已修复\n\n### Git Commits\n- 0c90a8d: 添加持久化框架\n- 07b9459: 修改 AgentInfo 类型\n- cc06347: 添加持久化方法\n- 39a9674: 修复 f-string\n- 27c1abe: 修复 stop_agent\n- 2614ad5: 修复 _monitor_agent\n- 26e657a: create_agent 添加保存\n- fd224ad: stop_agent 添加保存",
+  "created_at": "2026-03-14T10:59:26.007788",
+  "updated_at": "2026-03-14T10:59:26.007793"
+}

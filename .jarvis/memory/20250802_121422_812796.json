@@ -1,0 +1,13 @@
+{
+  "id": "20250802_121422_812796",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "memory_system",
+    "documentation",
+    "architecture"
+  ],
+  "content": "Jarvis项目记忆系统文档已完成：\n\n1. 核心概念文档位置：/home/wangmaobin/code/Jarvis/docs/jarvis_book/3.核心概念与架构.md\n\n2. 记忆系统概念（3.1.6节）包含：\n   - 记忆系统定义：实现\"知识积累\"和\"经验复用\"的重要机制\n   - 三种记忆类型：短期记忆、项目长期记忆、全局长期记忆\n   - 三个核心工具：save_memory、retrieve_memory、clear_memory\n   - 存储位置说明\n\n3. 架构图（3.2.1节）已包含Memory System组件：\n   - Memory Manager作为Agent的一部分\n   - Memory Tools通过ToolRegistry加载\n   - 三层记忆存储结构的展示\n   - 与其他系统组件的关系\n\n4. 记忆系统实现文件：\n   - /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_tools/save_memory.py\n   - /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_tools/retrieve_memory.py\n   - /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_tools/clear_memory.py\n\n5. Agent集成（jarvis_agent/__init__.py）：\n   - 第478-491行：自动添加记忆工具相关提示\n   - 第612-637行：启动时加载并显示已有记忆标签\n",
+  "created_at": "2025-08-02T12:14:22.812837",
+  "updated_at": "2025-08-02T12:14:22.812842"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260108_125628_446753",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "dispatch",
+    "jarvis",
+    "panel_management"
+  ],
+  "content": "在jarvis项目中新增了dispatch_command_to_panel函数，用于智能调度命令到tmux panel中执行。该函数会：\n1. 检查tmux是否安装\n2. 查找或创建以用户名-jarvis-开头的session\n3. 获取session的所有window\n4. 查找panel数量<4的window进行复用\n5. 如果没有合适的window，则创建新window\n6. 在目标window中创建panel执行shell命令\n7. 设置tiled布局",
+  "created_at": "2026-01-08T12:56:28.446779",
+  "updated_at": "2026-01-08T12:56:28.446782"
+}

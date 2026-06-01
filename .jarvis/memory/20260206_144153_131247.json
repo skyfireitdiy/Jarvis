@@ -1,0 +1,14 @@
+{
+  "id": "20260206_144153_131247",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "SaveSession",
+    "会话保存",
+    "功能修改",
+    "builtin_input_handler"
+  ],
+  "content": "## Bug修复: SaveSession后不退出程序\n\n### 问题描述\nSaveSession命令执行成功后会自动退出程序（sys.exit(0)），但用户期望保存会话后程序继续运行。\n\n### 根本原因\n在 `src/jarvis/jarvis_agent/builtin_input_handler.py` 第264行，SaveSession成功后执行了 `sys.exit(0)`。\n\n### 修复方案\n1. 删除 `sys.exit(0)` 调用\n2. 修改提示信息：'✅ 会话已成功保存。正在退出...' → '✅ 会话已成功保存。'\n3. 移除未使用的 `sys` 模块导入\n\n### 影响范围\n- 修改文件：src/jarvis/jarvis_agent/builtin_input_handler.py\n- 影响功能：SaveSession命令的后续行为（从退出改为继续运行）\n\n### 验收标准\n- SaveSession执行成功后，程序不退出，继续等待用户输入\n- 提示信息清晰明确\n- 代码语法正确，无静态检查错误\n\n### 修复日期\n2026-02-06",
+  "created_at": "2026-02-06T14:41:53.131270",
+  "updated_at": "2026-02-06T14:41:53.131274"
+}

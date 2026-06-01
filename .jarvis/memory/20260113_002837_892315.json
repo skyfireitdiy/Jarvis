@@ -1,0 +1,14 @@
+{
+  "id": "20260113_002837_892315",
+  "type": "project_long_term",
+  "tags": [
+    "dependency",
+    "call-chain",
+    "builtin_input_handler",
+    "RulesManager",
+    "render_rule_template"
+  ],
+  "content": "规则加载调用链：builtin_input_handler → _get_rule_content → RulesManager.get_named_rule → render_rule_template。builtin_input_handler 处理 '<rule:xxx>' 标记时，通过 RulesManager.get_named_rule 获取规则内容，该方法内部会调用 render_rule_template 进行模板渲染。所有这些调用都已正确更新为使用新的公共模块 jarvis_utils.template_utils。",
+  "created_at": "2026-01-13T00:28:37.892351",
+  "updated_at": "2026-01-13T00:28:37.892356"
+}

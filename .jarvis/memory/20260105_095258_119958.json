@@ -1,0 +1,12 @@
+{
+  "id": "20260105_095258_119958",
+  "type": "project_long_term",
+  "tags": [
+    "oneof_component",
+    "mcp_config",
+    "form_generator"
+  ],
+  "content": "OneOfComponent.vue实现细节:\n- 支持oneOf类型字段的动态切换\n- 根据type字段自动识别当前选项\n- 类型切换时保留相同字段值，重置不兼容字段\n- 支持必需字段的自动初始化\n- 适用于MCP配置中的多种协议类型切换",
+  "created_at": "2026-01-05T09:52:58.119982",
+  "updated_at": "2026-01-05T09:52:58.119985"
+}

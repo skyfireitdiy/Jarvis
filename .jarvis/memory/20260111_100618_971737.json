@@ -1,0 +1,8 @@
+{
+  "id": "20260111_100618_971737",
+  "type": "project_long_term",
+  "tags": ["code_agent", "methodology", "jarvis_code_agent"],
+  "content": "CodeAgent已启用方法论功能：修改了 src/jarvis/jarvis_code_agent/code_agent.py，将 use_methodology 和 use_analysis 参数的默认值从 False 改为 None。现在 CodeAgent 会从配置文件读取默认值（默认为 True），与 Jarvi sAgent 的默认行为保持一致。用户可以通过 --disable-methodology-analysis 选项来禁用方法论和分析功能。",
+  "created_at": "2026-01-11T10:06:18.971759",
+  "updated_at": "2026-01-11T10:06:18.971761"
+}

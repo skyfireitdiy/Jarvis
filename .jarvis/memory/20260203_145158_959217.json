@@ -1,0 +1,8 @@
+{
+  "id": "20260203_145158_959217",
+  "type": "project_long_term",
+  "tags": ["ListRule", "内置命令", "规则管理", "rich.Table"],
+  "content": "已完成 ListRule 内置命令开发\n\n功能：\n- 用户输入 <ListRule> 可查看所有可用规则的表格\n- 表格包含：规则名称、内容预览（前50字）、加载状态\n- 使用 rich.Table 实现美观的表格输出\n\n修改文件：\n1. src/jarvis/jarvis_utils/input.py - 添加 ListRule 到 BUILTIN_COMMANDS\n2. src/jarvis/jarvis_agent/rules_manager.py - 添加加载跟踪和规则预览功能\n3. src/jarvis/jarvis_agent/builtin_input_handler.py - 添加 ListRule 处理逻辑\n\n新增方法：\n- RulesManager.loaded_rules: Set[str] - 跟踪已加载的规则\n- RulesManager.get_rule_preview(rule_name) -> str - 获取规则内容预览\n- RulesManager.get_all_rules_with_status() -> List[Tuple[str, str, bool]] - 获取所有规则及状态\n\n验收标准：\n✅ 语法检查通过\n✅ 导入测试通过\n✅ 功能测试通过（56个规则成功显示）\n✅ 表格格式美观（使用 rich.Table）",
+  "created_at": "2026-02-03T14:51:58.959238",
+  "updated_at": "2026-02-03T14:51:58.959243"
+}

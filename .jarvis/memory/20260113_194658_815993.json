@@ -1,0 +1,14 @@
+{
+  "id": "20260113_194658_815993",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "task_analyzer",
+    "non_interactive",
+    "分析流程",
+    "修改记录"
+  ],
+  "content": "任务分析流程只在非交互模式下运行：在 _complete_task 方法中，对 task_analyzer._on_before_summary() 和 task_analyzer._on_task_completed() 的调用添加了 non_interactive 条件判断。交互模式下跳过任务分析流程（包括满意度收集等用户交互），非交互模式下正常运行。修改文件：src/jarvis/jarvis_agent/__init__.py，修改日期：2026-01-XX。",
+  "created_at": "2026-01-13T19:46:58.816018",
+  "updated_at": "2026-01-13T19:46:58.816022"
+}

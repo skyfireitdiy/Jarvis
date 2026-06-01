@@ -1,0 +1,16 @@
+{
+  "id": "20260201_132543_295611",
+  "type": "project_long_term",
+  "tags": [
+    "run_loop",
+    "LLM集成",
+    "cheap平台",
+    "智能增强",
+    "EmotionRecognizer",
+    "AmbiguityResolver",
+    "ProactiveAssistant"
+  ],
+  "content": "## 智能增强组件LLM集成完成\n\n### 修改时间\n2026-02-01\n\n### 修改文件\n- `src/jarvis/jarvis_agent/run_loop.py`\n\n### 集成内容\n为智能增强组件注入了cheap平台的LLM客户端，使其可以使用真正的LLM模型进行推理：\n\n**集成的组件**：\n1. EmotionRecognizer（情绪识别器）\n2. NeedPredictor（需求预测器）\n3. PersonalityAdapter（个性化适配器）\n4. ProactiveAssistant（主动助手）\n5. AmbiguityResolver（歧义解决器）\n\n**LLM客户端来源**：\n```python\nfrom jarvis.jarvis_platform.registry import PlatformRegistry\nregistry = PlatformRegistry.get_global_platform_registry()\nllm_client = registry.get_cheap_platform()  # 使用cheap平台降低成本\n```\n\n**优势**：\n- ✅ 真正的LLM推理，不再只是规则匹配\n- ✅ 使用cheap平台，成本优化\n- ✅ 保持双轨制架构：规则快路径 + LLM慢路径\n- ✅ LLM加载失败时自动回退到规则模式\n\n**数字孪生组件**：\n以下组件主要基于规则和模式匹配，未集成LLM：\n- NeedInferrer（需求推理器）\n- TimingJudge（时机判断器）\n- PreferenceLearner（偏好学习器）\n- ContinuousLearningManager（持续学习管理器）\n\n### 验证结果\n- 所有65个agent测试通过\n- LLM客户端加载成功时会打印提示\n- LLM加载失败时优雅降级到规则模式\n\n### 配置要求\n需要在配置文件中设置cheap平台的有效API密钥才能启用LLM推理功能。",
+  "created_at": "2026-02-01T13:25:43.295653",
+  "updated_at": "2026-02-01T13:25:43.295657"
+}

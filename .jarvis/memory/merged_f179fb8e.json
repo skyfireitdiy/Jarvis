@@ -1,0 +1,22 @@
+{
+  "content": "Jarvis C2Rust 渐进式迁移系统设计：断点恢复与库替代禁用机制\n\n【总体目标】\n在 src/jarvis 下创建 jarvis_c2rust 模块，采用\"workflow + agent\"模式实现 C/C++ -> Rust 渐进式迁移多智能体流程，支持中断后依赖仓库内文件状态断点续转，确保长流程LLM评估的可恢复性，最小侵入改造，通过文件状态管理实现进度追踪与恢复。\n\n【核心架构】\n采用\"workflow + agent\"模式，参考规范文件：builtin/multi_agent/c2rust_migration.yaml\n\n【关键状态文件与目录】\n位于目标工程根目录的结构化状态管理：\n- c2rust_migration/{00_project_info.md, 01_build_script.sh, 02_test_script.sh, 03_rust_bridge_initialized, 04_unit_queue.json, 05_progress.md, patches/, diagnostics/}\n- scripts/{build.sh, test.sh, run_tests_with_rust.sh}\n- rust_bridge/{Cargo.toml, src/lib.rs, ...}\n\n【迁移代理体系】\n- MigrationCoordinator：整体流程协调与状态管理\n- BuildSystemDetector：构建系统识别与适配\n- TestHarnessEngineer：测试框架生成与维护\n- RustBridgeEngineer：Rust桥接层设计与实现\n- UnitSelector：迁移单元选择与优先级排序\n- TestAuthor：测试用例生成与验证\n- RustImplementer：Rust代码生成与移植\n- SafetyRefiner：安全性检查与优化\n- MigrationAuditor：质量审计与进度验证\n\n【断点恢复机制设计】\n为 jarvis_c2rust.library_replacer.apply_library_replacement 增加断点恢复能力：\n\n【新增参数（向后兼容）】\n- resume: bool = True（默认启用恢复）\n- checkpoint_path: Optional[Path]（默认使用 .jarvis/c2rust/library_replacer_checkpoint.json）\n- checkpoint_interval: int = 1（每处理N个节点保存一次进度）\n- clear_checkpoint_on_done: bool = True（完成后清理checkpoint）\n\n【Checkpoint内容】\n- key: { sjsonl绝对路径, library_name, llm_group, candidates(排序去重), disabled_libraries(归一化), max_funcs }\n- eval_counter, processed_roots(list[int]), pruned_dynamic(list[int]), selected_roots([{fid,res}])\n\n【恢复逻辑】\n- 如果 resume 且 checkpoint 存在且 key 匹配，则加载上述集合，跳过已处理节点，沿用已剪枝与已选根\n\n【保存策略】\n- 每次评估节点后，若达到 checkpoint_interval 则保存，使用临时文件+原子替换\n- 完成后根据 clear_checkpoint_on_done 清理checkpoint文件\n\n【库替代禁用机制】\n需求：为 c2rust 的库替代评估增加一个参数，表示禁用的开源库列表；在 LLM 评估提示词中明确指出禁止使用这些库。\n\n【实施计划】\n1) 在 library_replacer.apply_library_replacement 增加参数 disabled_libraries: Optional[List[str]]，并在评估提示词中注入禁止库信息；同时如果 LLM 返回使用禁用库，标记为不可替代并给出警告\n2) 在 CLI 命令 jarvis-c2rust lib-replace 增加 --disabled-libs 选项，支持逗号分隔或文件输入，传递到 apply_library_replacement\n3) 保持最小变更，确保默认行为不受影响（未提供禁用列表时不改变现有逻辑）\n\n【设计原则】\n- 一次只调用一个工具：确保操作的原子性和可追踪性\n- 产出必须先落盘：使用 REWRITE/PATCH 后再交接，保证状态一致性\n- 最小侵入改造：不破坏现有代码结构和构建系统\n- 文件即状态：通过文件存在性与内容判断阶段推进\n- 环境变量控制：通过 USE_RUST_BRIDGE 环境变量实现回退与切换\n\n【阶段推进机制】\n- 阶段推进依赖上述文件存在性与内容判断\n- 每个阶段完成后生成相应的状态文件\n- 支持从任意阶段断点续跑，无需从头开始\n\n【影响范围】\n- 仅修改 library_replacer.py 内部逻辑，接口向后兼容，不影响现有调用方\n- 整体架构在 jarvis_c2rust 模块内实现，与现有系统隔离\n\n【预期效果】\n- 支持长时间C2Rust迁移任务的中断与恢复\n- 提供清晰的进度追踪与状态管理\n- 确保迁移过程的可重复性和可验证性\n- 减少重复计算和资源浪费\n- 建立完整的迁移审计轨迹\n- 避免使用禁用库的替代方案，确保架构合规",
+  "tags": [
+    "jarvis_c2rust",
+    "checkpoint",
+    "resume",
+    "library_replacer",
+    "disabled_libraries",
+    "multi_agent",
+    "workflow",
+    "state_management",
+    "incremental_migration",
+    "file_state",
+    "migration_system",
+    "compliance_control",
+    "progressive_transformation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251026_001645_616886", "merged_d0ac258b"],
+  "id": "merged_f179fb8e",
+  "created_at": "2025-11-12T23:45:08.051352"
+}

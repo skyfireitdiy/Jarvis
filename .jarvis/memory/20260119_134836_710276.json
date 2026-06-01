@@ -1,0 +1,12 @@
+{
+  "id": "20260119_134836_710276",
+  "type": "project_long_term",
+  "tags": [
+    "BUILTIN_COMMANDS",
+    "refactor",
+    "code_quality"
+  ],
+  "content": "重构 input.py：将内置命令标记数据来源统一。在文件顶部定义 BUILTIN_COMMANDS 常量（第68-80行），包含10个内置命令及其描述。get_completions 和 _get_fzf_completion_items 两个函数现在都引用这个统一的数据源，消除了代码重复，以后只需要在一处修改即可同步更新。",
+  "created_at": "2026-01-19T13:48:36.710323",
+  "updated_at": "2026-01-19T13:48:36.710328"
+}

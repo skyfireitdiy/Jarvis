@@ -1,0 +1,21 @@
+{
+  "content": "Jarvis项目report.md文档更新与jc2r架构图重排优化\n\n【核心目标】\n- 修复 /home/skyfire/code/Jarvis/report.md 中图表（PlantUML diagrams）与描述内容的不匹配问题\n- 同步更新transpiler模块新增能力与近期架构变更\n- 通过最小化修改实现内容重排与文档增强\n\n【图表重排策略】\n- 保持现有章节结构与锚点链接，避免大规模重写\n- 对每个jc2r阶段（collect, scan, lib-replace, prepare, transpile, optimize），将PlantUML图立即置于\"时序（简要）\"描述后、详细列表前，确保图文紧密关联\n- 将架构相关图表（Agent 模块关系图、运行循环与工具协议、Agent 中断处理时序、模型调用链时序）直接定位到对应子章节下方，避免与解释性要点分离\n- 确保快速导航锚点持续有效并反映任何标题移动\n- 维持编号体系（3.1–3.6），采用PATCH方式实现最小差异更新\n- 保留近期更新（jc2r 全流程与时序图）同时改善局部连贯性\n\n【transpiler模块新增能力】\n1) 规划阶段增强：\n   - 增加重试上限与兜底方案：当 <SUMMARY><yaml> 校验连续失败时，回退到 src/ffi.rs 并生成启发式签名提示\n   - 本地严格校验 module 位于 crate/src 且非 main.rs\n\n2) 构建修复循环改进：\n   - 采用\"先 cargo check 再 cargo test\"两阶段循环\n   - 失败时按类别打标签：missing_import/type_mismatch/visibility/borrow_checker/dependency_missing/module_not_found\n   - 触发最小修复策略\n   - progress.json 记录 build_attempts 与 last_build_error\n\n3) Agent复用与上下文拼接：\n   - 在单个函数生命周期内复用 Repair/Review Agent\n   - 首次拼接\"全量上下文头部\"，后续拼接\"精简头部\"，降低Token消耗并提升一致性\n\n4) 测试生成保障：\n   - 确保最小单元测试生成：为目标函数在同文件追加 #[cfg(test)] smoke 测试（占位入参，避免 panic!/todo!/unimplemented!）\n\n5) 模块可见性管理：\n   - 自动在 src/lib.rs 确保顶层 pub mod\n   - 向上补齐各级 mod.rs 的 pub mod 声明链\n\n6) 映射存储细化：\n   - symbol_map.jsonl 按 JSONL 一行一条记录\n   - 字段：c_file/start_line/end_line/module/rust_symbol/updated_at\n   - 支持同名多映射（重载），按源位置去重判断已转换\n\n7) 占位符自动消解：\n   - todo!(\"符号\")/unimplemented!(\"符号\") 自动消解机制\n   - 当被调符号完成转译后，扫描 src/**/*.rs 将占位替换为真实调用（优先使用 crate::<path>::fn）\n\n【报告更新要点】\n1) \"转译器主流程\"小节：\n   - 将\"cargo test 循环修复\"更新为\"check -> test\"两阶段循环\n   - 补充\"规划重试上限+兜底\"和\"Agent 复用与上下文拼接\"说明\n\n2) \"记录映射 JSONL（symbol_map.jsonl）\"位置：\n   - 补充记录字段与位置去重说明\n\n3) 其他近期变更同步：\n   - CodeAgent 加锁范围由全局改为\"按仓库维度\"互斥，避免跨仓库冲突\n   - TaskPlanner：子任务步数上限为4，并增加一次重试（提升稳健性）\n   - 配置：JARVIS_PLAN_MAX_DEPTH 默认值由3调整为2\n\n【设计原则】\n- 最小变更优先：保持现有结构稳定，仅进行必要重排\n- 图文一致性：确保每个图表与其描述内容紧密关联\n- 渐进增强：每次更新保持向后兼容性\n- 可追溯性：通过progress.json等机制记录变更历史\n\n【预期效果】\n- 提升文档的可读性与导航效率\n- 确保技术描述与架构图表的一致性\n- 完整反映transpiler模块的最新能力增强\n- 建立可持续的文档维护机制",
+  "tags": [
+    "documentation_update",
+    "jc2r",
+    "transpiler",
+    "report",
+    "architecture",
+    "diagrams",
+    "agent_reuse",
+    "symbol_map",
+    "build_loop",
+    "planning",
+    "minimal_change",
+    "technical_documentation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251031_230430_596164", "20251031_221333_811045"],
+  "id": "merged_7cc7ce79",
+  "created_at": "2025-11-12T23:41:56.975008"
+}

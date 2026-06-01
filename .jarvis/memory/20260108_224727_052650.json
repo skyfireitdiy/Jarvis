@@ -1,0 +1,8 @@
+{
+  "id": "20260108_224727_052650",
+  "type": "project_long_term",
+  "tags": ["tmux", "shell_fallback", "jvsd", "jcad", "jarvis-architecture"],
+  "content": "tmux_wrapper.py 中的 shell_fallback 参数设计：\n1. 新增 shell_fallback 参数（默认 True）控制命令执行结束后是否启动 shell\n2. 涉及函数：create_panel、dispatch_command_to_panel、dispatch_to_tmux_window、check_and_launch_tmux、_dispatch_to_existing_jarvis_session\n3. 逻辑：if stay_in_session_after_exit and shell_fallback 时才追加 exec shell 命令\n4. jvsd/jcad 通过传递 shell_fallback=False 实现直接以进程为入口，不创建 shell panel",
+  "created_at": "2026-01-08T22:47:27.052666",
+  "updated_at": "2026-01-08T22:47:27.052669"
+}

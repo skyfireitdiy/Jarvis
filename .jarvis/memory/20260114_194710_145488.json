@@ -1,0 +1,8 @@
+{
+  "id": "20260114_194710_145488",
+  "type": "project_long_term",
+  "tags": ["jarvis-rules", "project-rules", "rule-verification"],
+  "content": "项目级规则存放于 .jarvis/rules/ 目录，如 .jarvis/rules/deployment/version_release.md。验证规则列表一致性的方法：1) 使用 find builtin/rules -type f -name '*.md' 获取实际文件列表；2) 读取 builtin_rules.md 对比确认所有文件都已正确列出。",
+  "created_at": "2026-01-14T19:47:10.145506",
+  "updated_at": "2026-01-14T19:47:10.145508"
+}

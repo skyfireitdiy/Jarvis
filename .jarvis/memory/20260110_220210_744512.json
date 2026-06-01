@@ -1,0 +1,8 @@
+{
+  "id": "20260110_220210_744512",
+  "type": "project_long_term",
+  "tags": ["memory", "tag_retrieval", "optimization"],
+  "content": "记忆标签返回优化：当标签数量超过200时，采用混合策略：约100个标签从最近的记忆中提取（按created_at排序），其余约100个标签从剩余记忆中随机提取，合并后返回前200个标签。修改文件：src/jarvis/jarvis_utils/globals.py的get_all_memory_tags()函数。",
+  "created_at": "2026-01-10T22:02:10.744530",
+  "updated_at": "2026-01-10T22:02:10.744532"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260213_130318_778596",
+  "type": "project_long_term",
+  "tags": [
+    "CodeAgent",
+    "input_handler",
+    "summary",
+    "原始用户输入",
+    "input processing"
+  ],
+  "content": "通过分析src/jarvis/jarvis_code_agent/code_agent.py代码，发现CodeAgent在run方法中保存原始输入到_raw_user_input属性，并有专门的get_user_origin_input()方法来获取原始输入。CodeAgent同样会使用builtin_input_handler处理输入，当触发Summary时，会使用原始输入（即_raw_user_input）而非处理后的输入。",
+  "created_at": "2026-02-13T13:03:18.778618",
+  "updated_at": "2026-02-13T13:03:18.778624"
+}

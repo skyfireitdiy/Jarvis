@@ -1,0 +1,14 @@
+{
+  "id": "20260114_130937_989316",
+  "type": "project_long_term",
+  "tags": [
+    "meta_agent",
+    "ARCHER",
+    "workflow",
+    "task_complexity",
+    "simplified_flow"
+  ],
+  "content": "在 src/jarvis/jarvis_tools/meta_agent.py 中优化了 ARCHER 工作流说明，添加了任务复杂度判断和简化流程提示。具体修改：1) 在 Agent 职责说明中添加了任务复杂度判断：'根据任务规模和复杂度，灵活应用工作流，简单任务可适当简化'；2) 添加了简化流程提示：'对于简单任务（1-3步、单文件），可跳过 HYPOTHESIZE 或直接进入 EXECUTE，但需说明原因'。修改保持了原有格式和简洁性，未修改任何代码逻辑。",
+  "created_at": "2026-01-14T13:09:37.989346",
+  "updated_at": "2026-01-14T13:09:37.989350"
+}

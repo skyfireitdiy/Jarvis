@@ -1,0 +1,8 @@
+{
+  "id": "20260102_113758_844198",
+  "type": "project_long_term",
+  "tags": ["jarvis", "config", "llm_config", "configuration_management"],
+  "content": "Jarvis系统的LLM配置管理规范：\n1. llms配置项：定义可复用的LLM配置，包含platform、model、max_input_token_count、llm_config等参数\n2. llm_groups配置项：预定义的LLM配置组，必须通过normal_llm、cheap_llm、smart_llm、web_llm引用llms中定义的配置，不再支持直接定义platform、model等参数\n3. 这种引用方式确保了配置的一致性和可维护性，避免在多个地方重复定义相同的LLM配置\n4. config.py、config_schema.json、9.附录.md三个文件中的配置项需要保持同步",
+  "created_at": "2026-01-02T11:37:58.844218",
+  "updated_at": "2026-01-02T11:37:58.844221"
+}

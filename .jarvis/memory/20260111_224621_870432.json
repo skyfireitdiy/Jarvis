@@ -1,0 +1,14 @@
+{
+  "id": "20260111_224621_870432",
+  "type": "project_long_term",
+  "tags": [
+    "task_list_manager",
+    "display_logic",
+    "sorting",
+    "priority",
+    "task-1"
+  ],
+  "content": "任务列表显示和排序的关键设计点：\n1. 排序和显示应分离：排序逻辑决定任务顺序，显示逻辑决定列内容\n2. 排序策略：\n   - 按任务序号：sorted(tasks, key=lambda t: self._extract_task_number(t.task_id))\n   - 按优先级：sorted(tasks, key=lambda t: (-t.priority, t.create_time))\n3. 显示逻辑：str(task.priority) 显示真实优先级值\n4. 关键位置：src/jarvis/jarvis_tools/task_list_manager.py 的 _print_task_list_status 方法（第733行排序，第761行显示）",
+  "created_at": "2026-01-11T22:46:21.870510",
+  "updated_at": "2026-01-11T22:46:21.870515"
+}

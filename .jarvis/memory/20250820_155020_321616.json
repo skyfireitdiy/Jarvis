@@ -1,0 +1,14 @@
+{
+  "id": "20250820_155020_321616",
+  "type": "project_long_term",
+  "tags": [
+    "verbosity_reduction",
+    "ui_convention",
+    "jarvis",
+    "output",
+    "best_practices"
+  ],
+  "content": "项目约定建议：默认输出保持简洁，详细信息通过verbose/debug模式或日志输出；尽量集中到PrettyOutput统一管理；统计和耗时信息仅在用户明确需要时显示或简化为单行摘要。\n",
+  "created_at": "2025-08-20T15:50:20.321659",
+  "updated_at": "2025-08-20T15:50:20.321665"
+}

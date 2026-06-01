@@ -1,0 +1,8 @@
+{
+  "id": "20260101_191708_811056",
+  "type": "project_long_term",
+  "tags": ["encoding", "decode_output", "windows-compatibility", "subprocess"],
+  "content": "项目编码兼容性策略：为防止 Windows 系统运行失败，所有读取命令输出的位置需要添加编码兼容性。采用 UTF-8 优先，失败后回退到 GBK 的策略。decode_output 函数位于 src/jarvis/jarvis_utils/utils.py，已在 scripts/publish.py 中导入并使用（第 16 行导入，第 78 行在异常处理中使用 decode_output(e.stderr)）",
+  "created_at": "2026-01-01T19:17:08.811070",
+  "updated_at": "2026-01-01T19:17:08.811073"
+}

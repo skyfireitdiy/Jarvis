@@ -1,0 +1,8 @@
+{
+  "id": "20260110_223231_661607",
+  "type": "project_long_term",
+  "tags": ["mypy", "type_checking", "maintenance"],
+  "content": "mypy警告修复记录（2026-01-10）：\n1. 修复了jarvis_agent/__init__.py中min_overlap参数错误（应为overlap_threshold）\n2. 移除了organize_memories调用中已废弃的min_overlap参数\n3. 为local.py的embed_query方法添加了类型转换cast(List[float], ...)\n4. 为6个使用requests库的文件添加了# type: ignore注释：\n   - src/jarvis/jarvis_utils/http.py\n   - src/jarvis/jarvis_utils/quick_config.py\n   - src/jarvis/jarvis_tools/read_webpage.py\n   - src/jarvis/jarvis_rag/rerankers/jina.py\n   - src/jarvis/jarvis_rag/rerankers/edgefn.py\n   - src/jarvis/jarvis_rag/embeddings/edgefn.py\n5. 在pyproject.toml的dev依赖中添加了types-requests和types-tabulate\n6. 在mypy.ini中为相关模块添加了ignore_missing_imports配置",
+  "created_at": "2026-01-10T22:32:31.661627",
+  "updated_at": "2026-01-10T22:32:31.661630"
+}

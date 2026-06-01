@@ -1,0 +1,8 @@
+{
+  "id": "20260125_201439_938578",
+  "type": "project_long_term",
+  "tags": ["PrettyOutput", "output.py", "单元测试", "测试覆盖率"],
+  "content": "PrettyOutput类单元测试已完成，覆盖所有公开方法：print, section, auto_print, print_gradient_text, print_markdown, _detect_language, _format, add_sink, clear_sinks, get_sinks。测试文件：tests/jarvis_utils/test_output.py，共55个测试用例。关键经验：1) 使用unittest.mock隔离外部依赖（console, get_agent_list等）；2) print_gradient_text需要至少2行文本避免除零错误；3) pygments语言检测可能不准确，建议使用宽松断言；4) 每个测试方法只测试一个功能点",
+  "created_at": "2026-01-25T20:14:39.938604",
+  "updated_at": "2026-01-25T20:14:39.938608"
+}

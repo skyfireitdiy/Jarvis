@@ -1,0 +1,14 @@
+{
+  "id": "20251024_075903_607173",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "llm_module_agent.py",
+    "refactoring",
+    "duplicate_code",
+    "pre_cleanup"
+  ],
+  "content": "在 src/jarvis/jarvis_c2rust/llm_module_agent.py 中存在明确的重复代码：\n1) 预清理逻辑重复：\n   - plan_crate_yaml_text 内 482-547 行\n   - plan_crate_yaml_llm 内 569-612 行\n   两段逻辑功能相同（确认并删除 crate 目录、工作区 Cargo.toml、.jarvis/c2rust 下 progress.json 与 symbol_map.jsonl），但实现存在轻微差异：\n   - plan_crate_yaml_text 还构造了 workspace_candidates 并提示可能删除 project_root 下 Cargo.toml，但实际只删除 cwd 下的 Cargo.toml，存在提示与行为不一致。\n   重构建议：抽取公共函数 _perform_pre_cleanup_for_planner(project_root) 统一行为，避免误导提示，仅删除工作区根（当前目录）Cargo.toml。\n2) created_dir 解析逻辑重复：\n   - 预清理中用于确定 created_dir（cwd.name-rs 或指定 root）\n   - execute_llm_plan 1029-1044 行再次实现类似解析\n   后续可抽取 helper 统一。\n3) LLM 调用与 YAML 提取流程重复：\n   - plan_crate_yaml_with_project 与 plan_crate_yaml_text 组装 prompts 和 Agent 的过程几乎一致，仅返回值不同。后续可抽取公共核心函数返回 YAML 文本，再由不同入口决定是否解析。\n4) mod 声明升级逻辑重复：\n   - _apply_entries_with_mods 中对 src/lib.rs 与 非 src 目录下 mod.rs 的 mod 声明升级代码高度相似。后续可提取私有函数封装“确保/升级 pub mod 声明”。\n\n第一阶段改造计划（最小变更、影响小）：\n- 新增 _perform_pre_cleanup_for_planner(project_root) 私有函数；\n- 将 plan_crate_yaml_text 和 plan_crate_yaml_llm 中的预清理代码分别替换为调用该函数；\n- 同步修复 plan_crate_yaml_text 中误导性的 workspace_candidates 提示（与行为保持一致）。\n\n后续阶段（可选）：\n- 提取 created_dir 解析 helper；\n- 提取 LLM 调用公共核心；\n- 提取 mod 声明升级 helper。\n",
+  "created_at": "2025-10-24T07:59:03.607201",
+  "updated_at": "2025-10-24T07:59:03.607205"
+}

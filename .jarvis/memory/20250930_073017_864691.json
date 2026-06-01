@@ -1,0 +1,14 @@
+{
+  "id": "20250930_073017_864691",
+  "type": "project_long_term",
+  "tags": [
+    "cosight",
+    "jarvis",
+    "diff",
+    "recommendation",
+    "architecture"
+  ],
+  "content": "Co-Sight vs Jarvis 关键差异与适用场景总结：\n- 触发模式：Co-Sight 采用 OpenAI function calling（tool_choice=\"auto\"）自动选工具并支持并发；Jarvis 采用严格 TOOL_CALL 协议、一次一操作。\n- 并发与可控：Co-Sight 并发多工具，吞吐高但副作用治理难；Jarvis 单步串行，风险低、审计强，但吞吐较低。\n- 参数健壮性：Co-Sight 具 JSON 修复与键名归一化；Jarvis 以格式约束与用户确认控制风险。\n- 会话与摘要：Co-Sight 依赖 Plan/Step 与前端管理复杂性；Jarvis 有 _summarize_and_clear_history，长会话更稳。\n- 可观测性：Co-Sight 前端事件上报，含 processed_result 与验证信息；Jarvis 事件总线+统计与回调，利于治理。\n- MCP：双方均支持，Co-Sight 以 Engine 管理生命周期；Jarvis 统一到 ToolRegistry。\n- 选择建议：高吞吐/前端协作选 Co-Sight；强治理/低风险选 Jarvis；企业建议融合“受控+高效+可视”。",
+  "created_at": "2025-09-30T07:30:17.864746",
+  "updated_at": "2025-09-30T07:30:17.864751"
+}

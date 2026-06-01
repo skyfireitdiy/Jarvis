@@ -1,0 +1,8 @@
+{
+  "id": "20260208_230546_099923",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "记忆标签", "子agent"],
+  "content": "【task_list_manager记忆标签传递功能】\n更新时间：2025-01-19\n\n修改内容：\n1. 修改 `_build_task_content` 方法，添加 `parent_agent` 参数\n2. 在任务描述中添加父 agent 的记忆标签信息\n3. 更新所有调用 `_build_task_content` 的地方，传入 parent_agent 参数\n\n修改位置：\n- src/jarvis/jarvis_tools/task_list_manager.py\n  - 第414行：`_build_task_content` 方法签名\n  - 第1591行：`_handle_execute_task` 中的调用\n  - 第2171行：`_handle_update_task` 中的调用\n\n目的：使子 agent 能够通过记忆标签召回父 agent 的相关信息，提升上下文传递效率。",
+  "created_at": "2026-02-08T23:05:46.099947",
+  "updated_at": "2026-02-08T23:05:46.099952"
+}

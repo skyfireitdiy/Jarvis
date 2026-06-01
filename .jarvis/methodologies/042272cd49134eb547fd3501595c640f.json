@@ -1,0 +1,5 @@
+{
+  "problem_type": "Rich样式配置修改",
+  "content": "问题重述：\n当需要修改Jarvis项目中PrettyOutput的输出样式（如颜色、闪烁、加粗等）时，如何准确找到并修改相关配置。\n\n可复用解决流程：\n1. 定位文件：PrettyOutput相关代码位于 src/jarvis/jarvis_utils/output.py\n2. 查找配置位置：该文件中存在多个样式配置字典：\n   - style_config（约186-305行）：用于section输出的样式配置\n   - text_colors（约322-342行）：文字颜色映射\n   - styles（约345-365行）：背景色映射\n   - header_styles（约367-427行）：用于普通内容输出的头部样式配置\n3. 确认OutputType：查找目标输出类型对应的枚举值（如ERROR、WARNING、INFO等）\n4. 修改样式属性：在对应的RichStyle配置中修改属性（如color、bold、blink、blink2等）\n5. 多处一致性检查：如果修改某个OutputType的样式，需要同步更新所有配置字典中的对应项\n6. 验证效果：读取修改后的代码确认配置正确\n\n注意事项：\n- style_config 和 header_styles 是两个独立的配置字典，修改时需要同时更新两处\n- blink 和 blink2 是不同的闪烁效果：blink为标准闪烁，blink2为快速闪烁\n- 某些终端可能不支持闪烁效果，这是终端特性限制\n- 修改后需要保持代码风格一致（缩进、引号等）\n\n常用样式属性参考：\n- 颜色：color（前景色）、bgcolor（背景色）\n- 字体：bold（加粗）、dim（暗淡）\n- 效果：blink（闪烁）、blink2（快速闪烁）、strike（删除线）、conceal（隐藏）\n- 框架：frame（边框）、encircle（圆圈）",
+  "scope": "project"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20250807_103931_032053",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "tool_registry",
+    "api",
+    "data_structure",
+    "implementation_detail"
+  ],
+  "content": "`ToolRegistry.get_all_tools()` 方法返回的是一个字典（`dict`）列表，而不是工具对象实例的列表。\n\n每个字典代表一个工具，并包含一个 `'name'` 键来存储工具的名称。\n\n因此，在处理这个列表时，需要使用字典的访问方式（如 `tool['name']`），而不是对象的属性访问方式（如 `tool.name`）。\n",
+  "created_at": "2025-08-07T10:39:31.032080",
+  "updated_at": "2025-08-07T10:39:31.032085"
+}

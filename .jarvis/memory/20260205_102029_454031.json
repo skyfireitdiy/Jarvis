@@ -1,0 +1,8 @@
+{
+  "id": "20260205_102029_454031",
+  "type": "project_long_term",
+  "tags": ["jsec", "cli", "refactor", "completed"],
+  "content": "jsec 工具改造已完成：\n\n1. **新增 config 子命令**：\n   - 支持设置扫描范围（--scope-type, --target）\n   - 支持语言过滤（--languages）\n   - 支持排除目录（--exclude-dirs）\n   - 支持输出配置（--output-format, --output-file）\n   - 支持分析参数（--cluster-limit, --enable-verification, --force-save-memory）\n   - 支持运行时配置（--llm-group）\n   - 支持查看配置（--show）和清空配置（--clear）\n\n2. **新增 scan 子命令**：\n   - 不接受任何参数，完全从配置文件读取\n   - 配置不存在时给出友好提示\n   - 支持三种扫描模式（directory/files/project，目前仅实现 directory）\n\n3. **配置文件**：\n   - 路径：.jarvis/jsec/config.json\n   - 格式：JSON\n   - 包含默认值和完整的配置结构\n\n4. **向后兼容性**：\n   - 保留 agent 命令，添加废弃提示\n\n参考实现：jarvis_c2rust/cli.py",
+  "created_at": "2026-02-05T10:20:29.454070",
+  "updated_at": "2026-02-05T10:20:29.454077"
+}

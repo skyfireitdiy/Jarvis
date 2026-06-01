@@ -1,0 +1,14 @@
+{
+  "id": "20250811_145058_218169",
+  "type": "project_long_term",
+  "tags": [
+    "web_search_config",
+    "configuration",
+    "search_web",
+    "config.py",
+    "implementation"
+  ],
+  "content": "Web搜索配置实现：\n\n1. 在 config.py 中添加了两个新配置函数：\n   - get_web_search_platform_name() - 获取Web搜索使用的平台名称\n   - get_web_search_model_name() - 获取Web搜索使用的模型名称\n\n2. 在 config_schema.json 中添加了对应的 schema 定义：\n   - JARVIS_WEB_SEARCH_PLATFORM - Web搜索使用的平台名称，默认为空\n   - JARVIS_WEB_SEARCH_MODEL - Web搜索使用的模型名称，默认为空\n\n3. 在文档中添加了配置说明（9.附录.md）\n\n4. 在 search_web.py 中实现了配置使用逻辑：\n   - 导入了新的配置函数\n   - 在 __call__ 方法中优先检查 Web 搜索专用配置\n   - 如果配置了专用平台和模型，优先使用它们\n   - 如果未配置或配置不完整，则使用原有的模型选择流程\n\n配置逻辑：只有当 JARVIS_WEB_SEARCH_PLATFORM 和 JARVIS_WEB_SEARCH_MODEL \n都配置了值时，才会使用配置的模型；否则使用现有的模型选择流程。\n",
+  "created_at": "2025-08-11T14:50:58.218202",
+  "updated_at": "2025-08-11T14:50:58.218207"
+}

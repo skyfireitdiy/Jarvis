@@ -1,0 +1,15 @@
+{
+  "id": "20251019_092731_064438",
+  "type": "project_long_term",
+  "tags": [
+    "data_contract",
+    "schema",
+    "reports",
+    "patches",
+    "coverage",
+    "benchmark"
+  ],
+  "content": "数据契约类别（需JSON Schema draft-07）：\n- vulnreport@v1、riskscore@v1、rewrite@v1、coverage@v1 等\n- 产物命名规范：{component}/{stage}/{timestamp}_{name}.{json|patch|txt}\n- 目录结构：.jarvis/artifacts/{graphs,reports,patches,tests,coverage,benchmark,compatibility}\n",
+  "created_at": "2025-10-19T09:27:31.064451",
+  "updated_at": "2025-10-19T09:27:31.064453"
+}

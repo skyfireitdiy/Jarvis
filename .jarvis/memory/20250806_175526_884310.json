@@ -1,0 +1,12 @@
+{
+  "id": "20250806_175526_884310",
+  "type": "project_long_term",
+  "tags": [
+    "configuration",
+    "llm_group",
+    "config.yaml"
+  ],
+  "content": "Jarvis项目中的LLM配置组在`~/.jarvis/config.yaml`中通过 `JARVIS_LLM_GROUPS` 键进行定义。它是一个YAML列表，列表中的每一项都是一个以组名为键的字典。例如：\nJARVIS_LLM_GROUPS:\n  - kimi:\n      JARVIS_PLATFORM: kimi\n      JARVIS_MODEL: k1.5\n  - gemini:\n      JARVIS_PLATFORM: ai8\n      JARVIS_MODEL: gemini-2.5-pro\n",
+  "created_at": "2025-08-06T17:55:26.884332",
+  "updated_at": "2025-08-06T17:55:26.884336"
+}

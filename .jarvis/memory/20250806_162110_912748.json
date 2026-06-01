@@ -1,0 +1,14 @@
+{
+  "id": "20250806_162110_912748",
+  "type": "project_long_term",
+  "tags": [
+    "cli_parameter",
+    "llm_parameter",
+    "code_review",
+    "git_commiter",
+    "parameter_implementation"
+  ],
+  "content": "# CLI 工具 LLM 参数实现规范\n\n## 参数标准\n在 Jarvis 项目中，CLI 工具支持 LLM 相关参数的标准实现方式：\n\n1. **llm_type 参数**\n   ```python\n   llm_type: str = typer.Option(\n       \"normal\",\n       \"-t\", \"--llm_type\",\n       help=\"使用的LLM类型，可选值：'normal'（普通）或 'thinking'（思考模式）\",\n   )\n   ```\n\n2. **model_group 参数**\n   ```python\n   model_group: Optional[str] = typer.Option(\n       None, \"-g\", \"--llm_group\", help=\"使用的模型组，覆盖配置文件中的设置\"\n   )\n   ```\n\n## 实现模式\n\n### 1. CLI 函数修改\n在 @app.command() 装饰的函数中添加上述参数，并传递给工具的 execute 方法。\n\n### 2. Execute 方法处理\n```python\n# 获取参数\nllm_type = args.get(\"llm_type\", \"normal\")\nmodel_group = args.get(\"model_group\")\n\n# 导入配置函数\nfrom jarvis.jarvis_utils.config import (\n    get_normal_platform_name,\n    get_normal_model_name,\n    get_thinking_platform_name,\n    get_thinking_model_name,\n)\n\n# 根据类型选择平台\nif llm_type == \"thinking\":\n    platform_name = get_thinking_platform_name(model_group)\n    model_name = get_thinking_model_name(model_group)\nelse:\n    platform_name = get_normal_platform_name(model_group)\n    model_name = get_normal_model_name(model_group)\n\n# 创建平台实例\nif platform_name:\n    platform = PlatformRegistry().create_platform(platform_name)\n    if platform and model_name:\n        platform.set_model_name(model_name)\n        if model_group:\n            platform.model_group = model_group\n```\n\n### 3. 已实现的工具\n- jarvis-code-review (所有子命令: commit, current, range, file)\n- jarvis-git-commit\n\n### 4. 文档更新\n在使用指南中为每个支持这些参数的工具添加参数说明表格。\n",
+  "created_at": "2025-08-06T16:21:10.912787",
+  "updated_at": "2025-08-06T16:21:10.912792"
+}

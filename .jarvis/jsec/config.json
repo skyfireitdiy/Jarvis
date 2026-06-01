@@ -1,0 +1,67 @@
+{
+  "scan_scope": {
+    "type": "directory",
+    "target": "./src"
+  },
+  "languages": ["c", "cpp", "h", "hpp", "rs"],
+  "exclude_dirs": [
+    ".git",
+    "build",
+    "out",
+    "target",
+    "dist",
+    "bin",
+    "obj",
+    "third_party",
+    "vendor",
+    "deps",
+    "dependencies",
+    "libs",
+    "libraries",
+    "external",
+    "node_modules",
+    "test",
+    "tests",
+    "__tests__",
+    "spec",
+    "testsuite",
+    "testdata",
+    "benchmark",
+    "benchmarks",
+    "perf",
+    "performance",
+    "bench",
+    "benches",
+    "profiling",
+    "profiler",
+    "example",
+    "examples",
+    "tmp",
+    "temp",
+    "cache",
+    ".cache",
+    "docs",
+    "doc",
+    "documentation",
+    "generated",
+    "gen",
+    "mocks",
+    "fixtures",
+    "samples",
+    "sample",
+    "playground",
+    "sandbox"
+  ],
+  "output": {
+    "format": "csv",
+    "file": "report.md"
+  },
+  "analysis": {
+    "cluster_limit": 50,
+    "enable_verification": true,
+    "force_save_memory": false
+  },
+  "runtime": {
+    "llm_group": null
+  }
+}

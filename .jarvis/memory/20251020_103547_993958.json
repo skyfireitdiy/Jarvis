@@ -1,0 +1,14 @@
+{
+  "id": "20251020_103547_993958",
+  "type": "project_long_term",
+  "tags": [
+    "agent",
+    "plan",
+    "multi_agent",
+    "design_decision",
+    "workflow"
+  ],
+  "content": "需求：为 Agent 增加 plan 参数（默认 False）。当 plan=True 时：\n1) 先调用大模型评估是否需要任务拆分；\n2) 若需要，输出结构化 <SUB_TASK> ... </SUB_TASK> 列表格式（每行以“- ”开头的一条子任务），否则返回 <DONT_NEED/>；\n3) 对每个子任务，创建一个子Agent（in_multi_agent=True, non_interactive=True, auto_complete=True, 复用父Agent的 model_group），调用 child.run(sub_task) 完成；\n4) 汇总所有子任务结果，生成聚合内容注入到父Agent会话中，再交由父Agent继续处理主任务。\n\n建议的规划输出格式：\n- 需要拆分：\n  <SUB_TASK>\n  - 子任务1描述\n  - 子任务2描述\n  - ...\n  </SUB_TASK>\n- 不需要拆分：\n  <DONT_NEED/>\n\n实现思路：\n- Agent.__init__ 新增参数 plan: bool=False，并保存到 self.plan\n- 在 Agent.run() 中，在进入主循环前增加 _maybe_plan_and_dispatch(self.session.prompt)：\n  * 使用 _create_temp_model 创建临时模型，给出规划提示词，要求返回上述结构化格式\n  * 解析规划输出；若 <DONT_NEED/> 则直接进入主循环\n  * 若 <SUB_TASK> 存在，解析子任务列表，依次创建子Agent执行\n  * 汇总子任务结果为结构化块，例如：\n    <SUB_TASK_RESULTS>\n    - 子任务1: 执行结果摘要/输出\n    - 子任务2: 执行结果摘要/输出\n    </SUB_TASK_RESULTS>\n  * 将聚合结果与原始用户需求拼接到 self.session.prompt，提示“基于上述子任务结果继续整合输出最终结果”，然后进入主循环\n- 子Agent使用 origin_agent_system_prompt 作为 system_prompt，name 使用 {parent}-child-{i}\n\n边界处理：\n- 规划输出格式非严格时尝试回退解析：优先匹配标签；无标签时回退解析行首“- ”\n- 任一子任务失败不阻塞其他子任务，汇总时标注失败信息\n- 子Agent启用 auto_complete 保证非交互直至完成\n",
+  "created_at": "2025-10-20T10:35:47.993979",
+  "updated_at": "2025-10-20T10:35:47.993983"
+}

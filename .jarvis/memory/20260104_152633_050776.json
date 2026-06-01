@@ -1,0 +1,14 @@
+{
+  "id": "20260104_152633_050776",
+  "type": "project_long_term",
+  "tags": [
+    "configuration",
+    "RAG",
+    "bm25",
+    "rerank",
+    "config_migration"
+  ],
+  "content": "项目中已将顶层的rag、bm25、rerank配置项移除，只保留group级别的配置，以实现配置结构统一和避免全局配置冲突。此修改需要确保RAG功能正常工作，配置系统正确处理，以及所有依赖关系正常。",
+  "created_at": "2026-01-04T15:26:33.050818",
+  "updated_at": "2026-01-04T15:26:33.050823"
+}

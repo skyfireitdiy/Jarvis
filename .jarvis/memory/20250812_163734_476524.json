@@ -1,0 +1,13 @@
+{
+  "id": "20250812_163734_476524",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "summary",
+    "bug_fix",
+    "session_management"
+  ],
+  "content": "Summary功能修复要点：\n\n1. 问题描述：原实现中Summary标签处理后，设置的session.prompt会被立即清空，导致总结内容无法作为新会话的初始输入。\n\n2. 修复方案：\n   - 在_handle_history_with_summary方法中添加session.clear_history()调用，确保会话完全重置\n   - 在builtin_input_handler中处理没有摘要的情况，确保至少设置memory_tags_prompt\n   - 在_main_loop中添加条件判断，仅当输入处理器没有指示提前返回时才清空session.prompt\n\n3. 修复后的流程：\n   - 用户输入'<Summary>'标签\n   - 调用_summarize_and_clear_history()生成摘要并重置会话\n   - 将摘要和记忆标签设置为session.prompt\n   - 返回空字符串和True，表示需要提前返回\n   - _main_loop检测到_last_handler_returned为True，不清空session.prompt\n   - 下一轮循环时，session.prompt中的总结内容会作为新会话的初始输入\n\n4. 关键代码位置：\n   - src/jarvis/jarvis_agent/builtin_input_handler.py: 第34-42行\n   - src/jarvis/jarvis_agent/__init__.py: 第559-573行（_handle_history_with_summary）\n   - src/jarvis/jarvis_agent/__init__.py: 第709-718行（_main_loop中的prompt处理）\n",
+  "created_at": "2025-08-12T16:37:34.476577",
+  "updated_at": "2025-08-12T16:37:34.476584"
+}

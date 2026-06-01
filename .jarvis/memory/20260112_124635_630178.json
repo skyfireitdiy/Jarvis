@@ -1,0 +1,12 @@
+{
+  "id": "20260112_124635_630178",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "rules_list",
+    "documentation"
+  ],
+  "content": "builtin/rules 目录下有15个规则文件：clean_architecture.md, clean_code.md, code_review.md, documentation.md, generate_rules.md, ignore_all_alerts.md, ios-dark-theme.md, ios-light-theme.md, performance.md, refactoring.md, rust_performance.md, sdd.md, security.md, solid.md, tdd.md。已创建 builtin_rules.md 作为规则入口文件，使用 Jinja2 模板语法和 {{ rule_file_dir }} 变量动态生成路径。",
+  "created_at": "2026-01-12T12:46:35.630204",
+  "updated_at": "2026-01-12T12:46:35.630208"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20251230_223528_004202",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "schema_parser", "json_schema", "validation"],
+  "content": "jarvis_config 模块位置：src/jarvis/jarvis_config/\n核心文件：schema_parser.py\n实现功能：\n- SchemaParser 类：解析 JSON Schema Draft-07 规范\n- 支持基本类型：string, number, integer, boolean, array, object\n- 支持约束：enum, default, minimum, maximum, minLength, maxLength, pattern, required\n- 支持嵌套结构：oneOf, anyOf\n- 提供 load_schema(path) 静态方法\n- 提供 validate_config(config, schema) 验证方法\n- 提供获取属性、类型、描述等辅助方法\n验证命令：\n1. python -c \"from jarvis.jarvis_config.schema_parser import SchemaParser; parser = SchemaParser('src/jarvis/jarvis_data/config_schema.json'); print(parser.get_title())\"\n2. python -c \"from jarvis.jarvis_config.schema_parser import SchemaParser; parser = SchemaParser('src/jarvis/jarvis_data/config_schema.json'); print(len(parser.get_properties()))\"\n3. ruff check src/jarvis/jarvis_config/schema_parser.py\n4. mypy src/jarvis/jarvis_config/schema_parser.py",
+  "created_at": "2025-12-30T22:35:28.004269",
+  "updated_at": "2025-12-30T22:35:28.004278"
+}

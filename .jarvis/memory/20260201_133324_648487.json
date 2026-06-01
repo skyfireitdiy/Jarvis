@@ -1,0 +1,8 @@
+{
+  "id": "20260201_133324_648487",
+  "type": "project_long_term",
+  "tags": ["run_loop", "LLM隔离", "智能增强", "上下文管理", "架构设计"],
+  "content": "## 智能增强组件LLM实例隔离问题解决\n\n### 问题背景\n2026-02-01发现：智能增强组件（情绪识别、歧义检测等）使用的LLM客户端与主对话共享同一个实例，会导致：\n1. **上下文污染**：分析性prompt会混入主对话的messages历史\n2. **Token浪费**：每次分析都增加主对话的token计数\n3. **隐私泄露**：用户可能看到系统内部的分析prompt\n4. **无法清理**：这些临时prompt无法被自动清理\n\n### 解决方案\n**确认 `registry.get_cheap_platform()` 每次调用都创建新实例**\n\n查看 `src/jarvis/jarvis_platform/registry.py` 第259行：\n```python\nplatform = self.platforms[name](platform_type=platform_type)\n```\n\n每次调用都会执行 `self.platforms[name](platform_type=platform_type)`，即创建一个新的平台实例。因此：\n- 主对话的LLM实例：`registry.get_cheap_platform()` → 实例A\n- 智能增强的LLM实例：`registry.get_cheap_platform()` → 实例B\n\n两个实例完全独立，各自维护自己的 `messages` 上下文，互不影响。\n\n### 验证结果\n- ✅ 所有65个agent测试通过\n- ✅ 智能增强组件使用独立的LLM实例\n- ✅ 主对话上下文不会被污染\n\n### 架构设计原则\n**LLM实例的生命周期管理**：\n1. 有状态对话（主对话）：使用独立的LLM实例，维护messages历史\n2. 无状态分析（智能增强）：使用独立的LLM实例，每次分析都是独立的\n3. 通过 `registry.get_cheap_platform()` 创建新实例，保证隔离性\n\n### 相关文件\n- `src/jarvis/jarvis_agent/run_loop.py`：智能增强组件初始化\n- `src/jarvis/jarvis_platform/registry.py`：LLM实例创建逻辑",
+  "created_at": "2026-02-01T13:33:24.648505",
+  "updated_at": "2026-02-01T13:33:24.648508"
+}

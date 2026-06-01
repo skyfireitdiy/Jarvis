@@ -1,0 +1,12 @@
+{
+  "id": "20251230_125027_131520",
+  "type": "project_long_term",
+  "tags": [
+    "static_verification",
+    "code_analysis",
+    "testing"
+  ],
+  "content": "TUI 功能静态验证方法：\n1. 读取目标函数代码（使用 read_code 工具）\n2. 检查数据提取逻辑是否完整（平台、模型、环境变量等）\n3. 检查 TUI 调用是否正确，默认值是否传递\n4. 检查配置保存逻辑是否完整（schema 头保留、配置精简）\n5. 执行 Python 语法检查（python3 -m py_compile）\n6. 生成验证报告，标注每个验证点的状态",
+  "created_at": "2025-12-30T12:50:27.131538",
+  "updated_at": "2025-12-30T12:50:27.131541"
+}

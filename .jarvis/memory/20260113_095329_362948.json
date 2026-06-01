@@ -1,0 +1,12 @@
+{
+  "id": "20260113_095329_362948",
+  "type": "project_long_term",
+  "tags": [
+    "install.sh",
+    "jarvis",
+    "installation-script"
+  ],
+  "content": "Jarvis项目安装脚本位置：/home/wangmaobin/code/Jarvis/scripts/install.sh。该脚本支持两种安装方式：直接安装和克隆安装。包含uv工具自动安装、Gitee/GitHub镜像切换、RAG功能可选安装等功能。",
+  "created_at": "2026-01-13T09:53:29.362979",
+  "updated_at": "2026-01-13T09:53:29.362982"
+}

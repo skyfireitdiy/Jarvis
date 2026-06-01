@@ -1,0 +1,8 @@
+{
+  "id": "20260205_164920_746471",
+  "type": "project_long_term",
+  "tags": ["gitignore", "简化", "逻辑优化"],
+  "content": "## .gitignore 检查逻辑简化\n         \n### 修改内容\n将默认模板的检查逻辑从检查多个模式简化为只检查 `.jarvis` 字符串\n         \n### 修改前\n检查常见模式列表：\n- __pycache__\n- target\n- node_modules\n- .jarvis\n         \n### 修改后\n只检查 `.jarvis` 字符串是否存在\n         \n### 原因\n1. 与 code_agent_git.py 的 update_gitignore 方法保持一致\n2. 简化逻辑，提高性能\n3. `.jarvis` 是 Jarvis 项目的核心标识，存在它通常意味着用户已经配置过 .gitignore\n         \n### 提交记录\n- Commit: bf8a421 - 简化检查逻辑，只检查 .jarvis 字符串\n",
+  "created_at": "2026-02-05T16:49:20.746500",
+  "updated_at": "2026-02-05T16:49:20.746505"
+}

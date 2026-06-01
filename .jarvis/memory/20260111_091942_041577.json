@@ -1,0 +1,14 @@
+{
+  "id": "20260111_091942_041577",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "analysis_prompt",
+    "customization",
+    "agent_configuration",
+    "task_analyzer"
+  ],
+  "content": "Agent自定义分析提示词功能实现（2026-01-11）\n\n【功能概述】\n允许用户通过Agent构造参数传入自定义任务分析提示词，实现对任务分析行为的灵活定制。\n\n【核心变更】\n1. Agent.__init__ 新增参数：analysis_prompt: Optional[str] = None\n2. TaskAnalyzer.__init__ 新增参数：analysis_prompt: Optional[str] = None\n3. TaskAnalyzer._prepare_analysis_prompt 方法优先使用自定义提示词\n4. Agent初始化TaskAnalyzer时传递analysis_prompt参数\n\n【使用方式】\nagent = Agent(\n    system_prompt=\"...\",\n    analysis_prompt=\"自定义的分析提示词...\"  # 可选，不传则使用默认\n)\n\n【实现逻辑】\n- 如果传入analysis_prompt：TaskAnalyzer使用自定义提示词\n- 如果不传analysis_prompt（None）：TaskAnalyzer调用get_task_analysis_prompt()生成默认提示词\n- 向后兼容：不传参数时行为与之前完全一致\n\n【修改文件】\n- src/jarvis/jarvis_agent/__init__.py（3处修改）\n- src/jarvis/jarvis_agent/task_analyzer.py（3处修改）\n\n【设计原则】\n- 最小改动：仅在参数传递层面修改，不破坏现有架构\n- 向后兼容：参数默认值为None，不传参数时行为不变\n- 用户友好：一行代码即可自定义分析提示词\n- 灵活性高：支持完全自定义分析行为",
+  "created_at": "2026-01-11T09:19:42.041592",
+  "updated_at": "2026-01-11T09:19:42.041594"
+}

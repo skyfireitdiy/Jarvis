@@ -1,0 +1,12 @@
+{
+  "id": "20260109_152613_866416",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "check_and_launch_tmux",
+    "function_behavior"
+  ],
+  "content": "check_and_launch_tmux函数行为变更：当在tmux环境中运行且找到jarvis session时，会创建新的panel执行命令，而不是直接返回。实现逻辑包括：1)检查TMUX环境变量 2)使用_find_jarvis_session查找jarvis会话 3)使用get_session_current_window获取当前窗口 4)调用create_panel创建新panel 5)成功后使用sys.exit(0)退出当前进程",
+  "created_at": "2026-01-09T15:26:13.866440",
+  "updated_at": "2026-01-09T15:26:13.866443"
+}

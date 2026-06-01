@@ -1,0 +1,14 @@
+{
+  "id": "20260106_144301_698805",
+  "type": "project_long_term",
+  "tags": [
+    "mypy",
+    "type_checking",
+    "code_quality",
+    "static_analysis",
+    "python_static_analysis"
+  ],
+  "content": "在jarvis项目中，mypy配置通过mypy.ini文件进行管理。关键配置包括：\n1. ignore_missing_imports = True：全局忽略第三方库的类型缺失\n2. warn_unused_ignores = True：警告未使用的type: ignore注释\n3. warn_redundant_casts = True：警告冗余的类型转换\n4. mypy_path = src：指定源码路径\n5. 项目特定模块（jarvis.*）设置为不忽略缺失导入以加强类型检查\n\n项目中的类型检查问题主要包括：\n- 冗余的类型转换：如cast(List[float], result) 当返回类型已经匹配时\n- 过时的type: ignore注释：对于已经存在的第三方库导入",
+  "created_at": "2026-01-06T14:43:01.698852",
+  "updated_at": "2026-01-06T14:43:01.698858"
+}

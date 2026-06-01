@@ -1,0 +1,8 @@
+{
+  "id": "20260102_103728_650341",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "parallel_execution", "dependency_management"],
+  "content": "并行执行机制的约束条件：\n- 必须在tmux环境中运行\n- 必须使用jvs命令启动新进程\n- 必须确保并行执行不破坏任务状态管理\n- 必须创建tmux窗格来执行任务\n- 必须使用jvs命令执行子任务\n- 必须等待所有并行任务完成\n- 禁止在非tmux环境下尝试创建窗格\n- 禁止破坏现有的任务状态管理\n- 禁止影响现有的执行流程",
+  "created_at": "2026-01-02T10:37:28.650355",
+  "updated_at": "2026-01-02T10:37:28.650357"
+}

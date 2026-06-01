@@ -1,0 +1,20 @@
+{
+  "content": "项目Git发布工作流最佳实践与jgc命令使用规范\n\n【总体流程】\n1. Pre-release Checklist:\n   - 检查是否有未提交代码：使用 git status --porcelain\n   - 如果有未提交代码，使用 jgc 命令提交（无参数）\n   - 获取最新tag：git describe --tags --abbrev=0\n   - 获取当前时间：date命令\n   - 检查从最新tag到HEAD的变更：git diff <tag>..HEAD | cat -\n\n2. Release Note Generation:\n   - 基于git diff输出分析变更类型\n   - 按照标准格式生成Release Note：\n     * 新功能 (Features)\n     * 修复 (Fixes) \n     * 优化与重构 (Refactors & Improvements)\n     * 文档更新 (Documentation)\n     * 其他 (Miscellaneous)\n   - 生成多种风格的推广文案\n\n3. 版本发布完整流程：\n   - 检查未提交代码：git status --porcelain\n   - 提交未提交代码：jgc\n   - 获取最新tag：git describe --tags $(git rev-list --tags --max-count=1)\n   - 获取当前时间：date +\"%Y-%m-%d\"\n   - 获取代码变更：git diff <tag>..HEAD | cat -\n   - 基于变更生成Release Note和推广文案\n\n【jgc命令特性】\n- 使用格式：直接执行\"jgc\"命令，无需参数\n- 功能特点：\n  * 自动检测未提交更改\n  * 如果没有更改会显示\"没有未提交的更改\"\n  * 如果有更改会自动提交并生成提交信息\n  * 自动检测变更类型、模块名称和变更描述\n- 在版本发布流程中的作用：先使用jgc提交所有未提交代码，再进行后续操作\n\n【关键Git命令】\n- jgc: 提交未提交的代码\n- git describe --tags --abbrev=0: 获取最新tag\n- git diff <tag>..HEAD | cat -: 获取变更详情\n- git log --oneline $(git describe --tags --abbrev=0)..HEAD: 查看提交历史\n- git status --porcelain: 检查未提交代码\n- date '+%Y-%m-%d': 格式化当前日期\n\n【决策逻辑】\n- 如果从最新tag到HEAD无变更，则无需生成Release Note\n- 如果有变更，基于变更内容生成相应的Release Note\n\n【工作原则】\n- 自动化优先：使用jgc命令自动化提交流程\n- 规范化输出：确保提交信息和Release Note符合标准格式\n- 变更追踪：基于tag对比确保不遗漏任何变更\n- 质量保证：在发布前确保所有代码都已提交并记录\n\n【预期效果】\n- 提高发布流程的标准化和自动化程度\n- 减少人为遗漏和错误\n- 确保Release Note的完整性和准确性\n- 提供清晰的版本变更历史记录",
+  "tags": [
+    "git-workflow",
+    "release-process",
+    "jgc-command",
+    "version-control",
+    "automated-workflow",
+    "release-management"
+  ],
+  "type": "project_long_term",
+  "merged_from": [
+    "20251110_233620_340510",
+    "20251110_234932_654177",
+    "20251110_233127_076611",
+    "20251110_233055_344119"
+  ],
+  "id": "merged_5f578773",
+  "created_at": "2025-11-12T00:12:47.649132"
+}

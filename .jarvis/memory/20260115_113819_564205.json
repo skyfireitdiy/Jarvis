@@ -1,0 +1,13 @@
+{
+  "id": "20260115_113819_564205",
+  "type": "project_long_term",
+  "tags": [
+    "script-generation",
+    "rule-refactor",
+    "builtin-rules",
+    "documentation"
+  ],
+  "content": "脚本生成规则重构完成：将script-generation.md从角色定义格式成功重构为规则文档格式，包含五个核心章节（原则、工作流程、具体要求、实践指导、检查清单），使用必须/禁止规范性语言，保持脚本生成功能完整性。重构后文件路径：builtin/rules/development_tools/script-generation.md",
+  "created_at": "2026-01-15T11:38:19.564245",
+  "updated_at": "2026-01-15T11:38:19.564251"
+}

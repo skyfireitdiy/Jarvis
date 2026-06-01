@@ -1,0 +1,13 @@
+{
+  "id": "20260105_093859_568691",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "vue-project",
+    "directory-structure",
+    "jarvis-config-frontend"
+  ],
+  "content": "Jarvis配置工具前端项目结构：\n- 目录结构：frontend/public, frontend/src, frontend/src/api, frontend/src/components, frontend/src/assets, frontend/src/styles, frontend/src/types, frontend/src/utils\n- 主要依赖：Vue 3, Vite, TypeScript, Element Plus, Axios\n- 构建配置：vite.config.ts 包含API代理配置，代理到 http://localhost:8080\n- 入口文件：index.html, src/main.ts, src/App.vue\n- 组件使用：App.vue 中引入了 ConfigForm 组件\n- 项目配置：package.json 包含开发和构建脚本",
+  "created_at": "2026-01-05T09:38:59.568713",
+  "updated_at": "2026-01-05T09:38:59.568717"
+}

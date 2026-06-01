@@ -1,0 +1,14 @@
+{
+  "id": "20250914_134932_850151",
+  "type": "project_long_term",
+  "tags": [
+    "docs",
+    "config",
+    "defaults",
+    "convention",
+    "sync"
+  ],
+  "content": "Project convention: When changing any config default in code (e.g., JARVIS_PRETTY_OUTPUT, JARVIS_FORCE_SAVE_MEMORY), immediately update the canonical documentation table in docs/jarvis_book/9.附录.md to keep code and docs in sync. Use ripgrep to locate occurrences and ensure platform-specific notes (e.g., Windows forced False) are reflected.",
+  "created_at": "2025-09-14T13:49:32.850210",
+  "updated_at": "2025-09-14T13:49:32.850217"
+}

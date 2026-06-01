@@ -1,0 +1,13 @@
+{
+  "id": "20260119_101235_115511",
+  "type": "project_long_term",
+  "tags": [
+    "rule-loading",
+    "bug-fix",
+    "rules_manager",
+    "recursive-directory"
+  ],
+  "content": "修复了规则加载器不支持递归遍历子目录的问题。\n\n问题根源：`get_all_available_rule_names()` 方法使用 `os.listdir()` 只能列出直接文件，无法发现子目录中的规则文件。\n\n解决方案：\n1. 将 `os.listdir()` 改为 `os.walk()` 实现递归遍历\n2. 规则名称使用相对路径（如 `deployment/version_release.md`）而非仅文件名\n3. 更新 `_read_rule_from_dir()` 方法支持带路径的规则名称\n4. 修正模板渲染上下文，使用规则文件所在目录而非根规则目录\n\n影响文件：`src/jarvis/jarvis_agent/rules_manager.py`",
+  "created_at": "2026-01-19T10:12:35.115547",
+  "updated_at": "2026-01-19T10:12:35.115551"
+}

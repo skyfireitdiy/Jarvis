@@ -1,0 +1,8 @@
+{
+  "id": "20260117_221603_477376",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "refactoring", "spec", "SDD", "architecture"],
+  "content": "Task List Manager模块重构Spec文档完成，包含以下关键信息：\n\n1. 模块拆分方案：\n- TaskListManager：任务列表的CRUD操作 (~400行)\n- DependencyValidator：依赖关系验证 (~300行)\n- TaskExecutor：任务执行协调 (~500行)\n- TaskVerifier：任务完成验证 (~300行)\n- TmuxExecutor：tmux环境下的并行执行 (~400行)\n- AgentFactory：Agent创建和管理 (~200行)\n- OutputProcessor：输出处理和格式化 (~200行)\n- TokenCalculator：Token长度计算 (~150行)\n- TaskListManagerTool：工具接口适配器 (~400行)\n\n2. 验收标准：\n- 所有现有功能在重构后必须保持不变\n- 每个模块代码行数<1000行\n- 单元测试覆盖率≥80%\n- 任务列表创建时间<100ms等性能要求\n\n3. 文档位置：.jarvis/spec/task_list_manager_spec.md\n4. 文档包含功能概述、接口定义、输入输出说明、边界条件、异常处理、验收标准等完整章节",
+  "created_at": "2026-01-17T22:16:03.477399",
+  "updated_at": "2026-01-17T22:16:03.477401"
+}

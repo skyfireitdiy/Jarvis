@@ -1,0 +1,13 @@
+{
+  "id": "20260115_113537_064232",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "提示词优化",
+    "用户体验",
+    "工具安装"
+  ],
+  "content": "jck命令批量安装工具时的提示词已从生硬格式优化为更自然的格式：\n- 旧格式: '在当前环境安装xxx，在当前环境安装yyy'\n- 新格式: '在当前的环境安装以下工具：xxx、yyy'\n- 实现方式: 修改src/jarvis/jarvis_jck/cli.py中的_install_missing_tools函数，移除了对jvs命令返回值的检查，直接运行subprocess.run(cmd)后退出",
+  "created_at": "2026-01-15T11:35:37.064275",
+  "updated_at": "2026-01-15T11:35:37.064280"
+}

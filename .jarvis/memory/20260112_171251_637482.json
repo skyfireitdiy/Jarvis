@@ -1,0 +1,14 @@
+{
+  "id": "20260112_171251_637482",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "jarvis-check",
+    "cli",
+    "tool-checker",
+    "module"
+  ],
+  "content": "jck（jarvis-check）模块已创建完成，用于检查系统工具的安装情况。模块位置：src/jarvis/jarvis_jck/。支持检查的工具：git, ripgrep, fd-find, fzf, rustup, cargo。CLI命令：jck 和 jarvis-check。功能特点：\n1. 使用shutil.which()进行跨平台工具检测\n2. 支持获取工具版本信息\n3. 友好的彩色输出（✅已安装，❌未安装）\n4. 提供安装建议\n5. 支持JSON格式输出（--json/-j）\n6. 支持检查所有工具或单个工具\n\n核心文件：\n- __init__.py: 模块初始化\n- config.py: 工具配置定义\n- core.py: ToolChecker类，实现检测逻辑\n- cli.py: CLI命令接口，使用typer构建\n\n在pyproject.toml中注册为独立命令。",
+  "created_at": "2026-01-12T17:12:51.637517",
+  "updated_at": "2026-01-12T17:12:51.637521"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "20251019_092731_065663",
+  "type": "project_long_term",
+  "tags": [
+    "environment",
+    "toolchain",
+    "ubuntu",
+    "rust",
+    "clang",
+    "gcc",
+    "docker"
+  ],
+  "content": "环境统一：Ubuntu 20.04+、Rust 1.70+、GCC9+/Clang10+、Docker统一容器；云端推理API可选；要求在CI中固定版本，确保可复现。\n",
+  "created_at": "2025-10-19T09:27:31.065675",
+  "updated_at": "2025-10-19T09:27:31.065677"
+}

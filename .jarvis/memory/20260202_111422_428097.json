@@ -1,0 +1,8 @@
+{
+  "id": "20260202_111422_428097",
+  "type": "project_long_term",
+  "tags": ["code_agent", "目录树截断", "上下文优化", "LLM上下文限制"],
+  "content": "## CodeAgent 目录树截断优化\n\n**问题**: 当工程特别复杂（子目录特别多）时，CodeAgent 初始化时的上下文包含完整的目录树结构，导致超出 LLM 上下文大小限制。\n\n**解决方案**: 在 `src/jarvis/jarvis_code_agent/utils.py` 的 `get_git_tracked_files_info` 函数中添加 `max_tree_lines` 参数（默认值200），限制目录树的最大行数。\n\n**修改内容**:\n1. 函数签名添加 `max_tree_lines: int = 200` 参数\n2. `format_tree` 内部函数添加 `current_lines` 参数跟踪当前行数\n3. 在递归生成目录树时检查行数限制，超过则截断\n4. 截断时添加提示信息：\"... (目录结构已截断，使用工具查看完整结构)\"\n\n**效果**: 即使面对数千个子目录的复杂工程，目录树输出也能控制在合理范围内（默认200行），避免超出 LLM 上下文限制。\n\n**文件位置**: src/jarvis/jarvis_code_agent/utils.py, 函数: get_git_tracked_files_info",
+  "created_at": "2026-02-02T11:14:22.428130",
+  "updated_at": "2026-02-02T11:14:22.428135"
+}

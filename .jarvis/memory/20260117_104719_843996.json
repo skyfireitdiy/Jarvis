@@ -1,0 +1,15 @@
+{
+  "id": "20260117_104719_843996",
+  "type": "project_long_term",
+  "tags": [
+    "rich_tag",
+    "panel",
+    "generate_summary",
+    "ui",
+    "output",
+    "jarvis_agent"
+  ],
+  "content": "在Jarvis的generate_summary函数中添加Rich Panel显示对话总结的实现方式：\n\n1. 导入模块：\n   - import jarvis.jarvis_utils.globals as G\n   - from jarvis.jarvis_utils.globals import console\n   - from rich.panel import Panel\n   - from rich import box\n\n2. Panel配置：\n   - 标题格式：f\"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]\"\n   - border_style: \"cyan\"\n   - box: box.ROUNDED\n   - 内容：summary文本\n\n3. 最佳实践：\n   - 将Panel打印代码包装在try-except块中，避免打印错误影响主逻辑\n   - 只在summary不为空时才显示Panel\n   - 使用统一的样式规范，与run_loop.py中的实现保持一致",
+  "created_at": "2026-01-17T10:47:19.844020",
+  "updated_at": "2026-01-17T10:47:19.844024"
+}

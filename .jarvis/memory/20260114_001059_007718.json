@@ -1,0 +1,8 @@
+{
+  "id": "20260114_001059_007718",
+  "type": "project_long_term",
+  "tags": ["code_agent", "load_rule", "tool_integration", "base_tools"],
+  "content": "在CodeAgent的base_tools列表中添加了load_rule工具，位于edit_file之后，virtual_tty之前，按字母顺序正确排列。load_rule工具用于加载和渲染规则文件中的jinja2模板，支持的内置变量包括current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir。该工具已在src/jarvis/jarvis_tools/load_rule.py中实现，并在prompt_manager.py中添加了使用指南。",
+  "created_at": "2026-01-14T00:10:59.007749",
+  "updated_at": "2026-01-14T00:10:59.007752"
+}

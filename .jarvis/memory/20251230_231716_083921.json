@@ -1,0 +1,8 @@
+{
+  "id": "20251230_231716_083921",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "testing", "fixtures", "schema_parser"],
+  "content": "jarvis_config 测试框架结构：\n- 测试文件位置：tests/jarvis_config/\n- fixtures 定义位置：tests/jarvis_config/conftest.py\n- 主要 fixtures：sample_schema_file（包含多种类型和约束的测试Schema）、parser_with_schema（预加载的SchemaParser实例）、valid_config_data、invalid_config_data\n- Schema 包含类型：string, number, integer, boolean, array, object\n- Schema 约束：required, default, enum, minimum, maximum, minLength, maxLength, minItems, maxItems\n- 测试使用 pytest 框架，测试类命名 TestSchemaParser，测试方法前缀 test_\n- 测试覆盖：初始化、元数据获取、默认值、验证（类型、约束、枚举、嵌套、数组）、错误处理",
+  "created_at": "2025-12-30T23:17:16.083940",
+  "updated_at": "2025-12-30T23:17:16.083943"
+}

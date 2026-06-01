@@ -1,0 +1,8 @@
+{
+  "id": "20260114_001059_009001",
+  "type": "project_long_term",
+  "tags": ["rule_loading", "load_rule", "template_rendering", "jinja2"],
+  "content": "load_rule工具实现功能：读取规则文件内容并使用jinja2渲染模板变量。支持的内置变量包括：current_dir(当前工作目录), git_root_dir(Git根目录), jarvis_src_dir(Jarvis源码目录), jarvis_data_dir(Jarvis数据目录), rule_file_dir(规则文件所在目录)。该工具可用来加载项目中的规则文件，如架构设计、开发流程、代码质量等各类规则。",
+  "created_at": "2026-01-14T00:10:59.009014",
+  "updated_at": "2026-01-14T00:10:59.009016"
+}

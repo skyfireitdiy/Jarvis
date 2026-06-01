@@ -1,0 +1,15 @@
+{
+  "id": "20250923_030605_280332",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "jarvis_agent",
+    "jarvis_native",
+    "rust",
+    "migration",
+    "function_location"
+  ],
+  "content": "迁移状态（jarvis_agent -> rust/jarvis_native）\n1) Rust已导出函数（lib.rs + file_utils.rs + toolcall.rs + stats.rs）：\n   - 文件/IO：atomic_write_text, atomic_write_json_str, atomic_write_bytes, get_file_md5, get_file_line_count, list_files_with_ext, move_file, copy_file, read_methodology_fields\n   - Git：list_git_files, list_files_excluding_git, git_recent_commits_with_files, git_get_commits_between, git_get_latest_commit_hash, git_has_uncommitted_changes, git_is_file_in_repo, git_get_diff_file_list, git_list_untracked_files, git_find_root, git_clone_repo, git_ls_remote_heads, git_status_porcelain, git_checkout_all, git_pull_repo, git_add_all, git_commit, git_push_repo, git_push_set_upstream\n   - 编辑/解析：apply_patches, extract_tool_call_blocks, parse_edit_patches, extract_special_tags, parse_selection\n   - RAG：rag_detect_changes, rag_update_manifest\n   - 统计：stats_get_metrics, stats_get_metric_total, stats_aggregate_metrics, stats_list_metrics, git_modified_line_ranges, find_overlapping_groups\n2) Python调用点（jarvis_agent目录）：\n   - edit_file_handler.py: parse_edit_patches, apply_patches（均已走Rust）\n   - share_manager.py: git_* 与 atomic_write_text（已走Rust）\n   - methodology_share_manager.py: list_files_with_ext, read_methodology_fields, copy_file（已走Rust）\n   - tool_share_manager.py: list_files_with_ext, move_file（已走Rust）\n   - builtin_input_handler.py: extract_special_tags（已走Rust）\n   - jarvis.py: atomic_write_text, git_find_root（已走Rust）\n   - __init__.py: atomic_write_text（已走Rust）\n3) 结论：目前在 src/jarvis/jarvis_agent 下，未检测到与上述Rust函数重名的Python实现（无重复逻辑可直接删除）。现有Python代码多为业务编排/交互层，对Rust原语进行编排调用，需保留。\n4) 下一步候选迁移/精简点（需要进一步评估）：\n   - share_manager.py 中 .gitignore 内容检查/写入可考虑下沉至Rust提供 ensure_gitignore_has_pycache(path)（尚未存在）\n   - file_methodology_manager.py 的本地方法论加载/拼接文案保持Python层，暂无Rust迁移必要\n   - EditFileHandler 中 _parse_patches 包装层可后续内联为直接调用 _jarvis_native.parse_edit_patches（低优先级）\n5) 操作指引：\n   - 后续如发现 jarvis_agent 内存在 Python 版 git/文件/正则/RAG 实现，应优先删除并改为调用 _jarvis_native\n   - 继续以“搜索 -> 确认 -> 最小变更”的方式迭代迁移",
+  "created_at": "2025-09-23T03:06:05.280427",
+  "updated_at": "2025-09-23T03:06:05.280433"
+}

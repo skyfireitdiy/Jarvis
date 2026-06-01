@@ -1,0 +1,8 @@
+{
+  "id": "20260209_135337_905020",
+  "type": "project_long_term",
+  "tags": ["ListRule", "规则管理", "内置规则", "builtin前缀"],
+  "content": "## ListRule 内置规则添加 builtin: 前缀\n\n**需求**：内置规则使用 `builtin:` 作为前缀，类似 `project:` 和 `global:`。\n\n**实现**：\n\n1. **修改 `get_all_available_rule_names()` 方法**：\n   - 将内置规则名称添加 `builtin:` 前缀\n   - 修改：`\"builtin\": list_builtin_rules()` → `\"builtin\": [f\"builtin:{rule}\" for rule in list_builtin_rules()]`\n\n2. **修改 `get_all_rules_with_status()` 方法**：\n   - 处理带 `builtin:` 前缀的规则名称\n   - 从带前缀的名称中提取实际规则名称（去掉 `builtin:` 前缀）\n   - 同时检查带前缀和不带前缀的名称，确保向后兼容\n   - 调用 `get_rule_preview()` 和 `get_builtin_rule_path()` 时使用不带前缀的名称\n\n**效果**：\n- 内置规则显示为 `builtin:solid`、`builtin:tdd` 等格式\n- 与 `project:` 和 `global:` 前缀保持一致\n- 向后兼容：用户仍可使用 `solid` 或 `builtin:solid` 两种方式引用规则\n\n**Commit**: 14fb68e",
+  "created_at": "2026-02-09T13:53:37.905061",
+  "updated_at": "2026-02-09T13:53:37.905066"
+}

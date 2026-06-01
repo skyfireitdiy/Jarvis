@@ -1,0 +1,30 @@
+{
+  "content": "Jarvis C2Rust 系统功能增强：测试框架生成、库替代禁用机制与函数收集器\n\n【Jarvis C2Rust 测试框架生成 Agent】\n- 功能目标：为 C/C++ 项目生成测试框架的 Agent，负责为已有的 C/C++ 代码创建测试框架\n- 最终在 .jarvis/c2rust/test.sh 生成可执行测试脚本，运行该脚本可执行当前 C 项目的所有测试\n- 优先适配通用构建/测试入口：make test/check, ctest, meson test 等；若不存在则提供可扩展的占位实现\n- 最小变更、与现有 CLI 风格一致\n\n【实现位置】\n- 在 src/jarvis/jarvis_c2rust/cli.py 中定义测试框架生成 Agent\n\n【Step 1 完成状态】\n- CLI 命令：python -m jarvis.jarvis_c2rust.cli --root .\n- 生成文件：\n  * 测试脚本: .jarvis/c2rust/test.sh\n  * 进度文件: .jarvis/c2rust/progress.json\n\n【检测结果】\n- build_system: unknown（未检测到CMake/Meson/Autotools/Make/Bazel）\n- tests_found: false（无显式测试，已搭建smoke test）\n\n【test.sh 逻辑设计】\n- 构建阶段：若无法识别构建系统则跳过，仅输出提示\n- 测试阶段：无显式测试时执行smoke检查（构建成功即通过）\n- 扩展性：为后续添加具体测试用例预留接口\n\n【进度管理】\n- 断点续跑：进度写入 .jarvis/c2rust/progress.json（step=1, status=prepared）\n- 版本控制：当前源码改动已存在或与HEAD一致，git未检测到差异；后续步骤产生变更时统一按 [JARVIS-C2RUST] 规范提交\n\n【设计原则】\n- 兼容性优先：优先适配主流构建系统（CMake/Meson/Autotools/Make/Bazel）\n- 渐进增强：从smoke test开始，逐步完善具体测试用例\n- 最小侵入：不修改现有构建配置，仅生成独立测试脚本\n- 可扩展性：为复杂测试场景预留扩展点\n\n【库替代禁用机制】\n- 需求：为 c2rust 的库替代评估增加一个参数，表示禁用的开源库列表；在 LLM 评估提示词中明确指出禁止使用这些库\n\n【实施计划】\n1) 在 library_replacer.apply_library_replacement 增加参数 disabled_libraries: Optional[List[str]]，并在评估提示词中注入禁止库信息；同时如果 LLM 返回使用禁用库，标记为不可替代并给出警告\n2) 在 CLI 命令 jarvis-c2rust lib-replace 增加 --disabled-libs 选项，支持逗号分隔或文件输入，传递到 apply_library_replacement\n3) 保持最小变更，确保默认行为不受影响（未提供禁用列表时不改变现有逻辑）\n\n【函数收集器模块】\n1) 新增模块文件: src/jarvis/jarvis_c2rust/collector.py\n   - 提供函数 collect_function_names(files: List[Path], out_path: Path, compile_commands_root: Optional[Path] = None) -> Path\n   - 复用 scanner 中的 _try_import_libclang、scan_file、find_compile_commands、load_compile_commands\n   - 对每个输入文件调用 scan_file，提取 FunctionInfo，输出唯一的函数名（优先 qualified_name，回退 name）到指定 out_path，每行一个\n   - 采用 compile_commands.json（若存在）增强解析；否则默认使用 -I <file.parent>，失败时回退为空参数\n\n2) CLI 集成：在 src/jarvis/jarvis_c2rust/cli.py 增加子命令 collect\n   - 形参：files (Argument: 1..N Path)，out (Option: --out/-o Path)\n   - 调用 collector.collect_function_names 并输出结果路径\n\n【变更策略】\n- 先创建新模块文件（REWRITE），随后在下一步对 cli.py 进行最小范围 PATCH 添加子命令\n\n【系统集成】\n- 测试框架为迁移过程提供功能验证基线\n- 库替代禁用机制确保合规性与架构约束\n- 函数收集器增强代码理解与上下文质量\n- 三者共同支撑 C2Rust 渐进迁移的工程化实施\n\n【预期作用】\n- 为 C2Rust 转译前后的代码提供统一测试框架\n- 支持构建验证与基本功能检查\n- 为后续 Rust 代码测试迁移提供基线参考\n- 保障转译过程中功能等价性验证\n- 避免使用禁用库的替代方案，确保架构合规\n- 提升函数级上下文的准确性与覆盖度",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "test_script",
+    "agent",
+    "cli",
+    "step1",
+    "progress",
+    "build_integration",
+    "smoke_test",
+    "library_replacer",
+    "disabled_libraries",
+    "collector",
+    "clang",
+    "scanner",
+    "subcommand",
+    "migration_toolkit",
+    "compliance_control"
+  ],
+  "type": "project_long_term",
+  "merged_from": [
+    "merged_38cd2c91",
+    "20251026_001645_616886",
+    "20251025_234959_366282"
+  ],
+  "id": "merged_b2cc38d8",
+  "created_at": "2025-11-12T23:42:52.817489"
+}

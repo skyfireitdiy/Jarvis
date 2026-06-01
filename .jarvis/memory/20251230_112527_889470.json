@@ -1,0 +1,14 @@
+{
+  "id": "20251230_112527_889470",
+  "type": "project_long_term",
+  "tags": [
+    "TUI",
+    "integration",
+    "降级处理",
+    "config_schema",
+    "验证标准"
+  ],
+  "content": "TUI 集成验证的关键检查点：1) _run_tui_config_form 函数（utils.py 1039-1112行）需包含 ImportError 降级处理，返回 None 时触发降级；2) _interactive_config_setup 函数（1250-1310行）需正确调用 TUI 并判断返回值；3) 智能跳过逻辑：TUI 返回完整配置时（len(config_data) > 5）跳过 _collect_optional_config_interactively；4) 必须保留原有平台/模型选择逻辑（1150-1250行）和测试连接代码；5) 原有配置收集函数 _collect_optional_config_interactively 不能删除（2087行）",
+  "created_at": "2025-12-30T11:25:27.889509",
+  "updated_at": "2025-12-30T11:25:27.889513"
+}

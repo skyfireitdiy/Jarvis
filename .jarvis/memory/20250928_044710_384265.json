@@ -1,0 +1,13 @@
+{
+  "id": "20250928_044710_384265",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "diagram",
+    "plantuml",
+    "agent"
+  ],
+  "content": "架构图生成agent将基于code-reverse-design-expert.yaml进行修改:\n1. 修改name为\"ArchitectureDiagramExpert\"\n2. 更新description为使用PlantUML绘制系统架构图\n3. 调整system_prompt以专注于生成多种架构视图(逻辑/实现/进程/部署/用例视图)\n4. 输出要求改为PlantUML代码而非Markdown\n5. 添加颜色规范: \n   - 组件: #FFD700(金色) \n   - 接口: #87CEFA(天蓝)\n   - 数据: #90EE90(浅绿)\n   - 流程: #FFA07A(浅珊瑚)\n",
+  "created_at": "2025-09-28T04:47:10.384300",
+  "updated_at": "2025-09-28T04:47:10.384304"
+}

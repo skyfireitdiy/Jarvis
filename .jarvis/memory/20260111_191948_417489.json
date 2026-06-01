@@ -1,0 +1,15 @@
+{
+  "id": "20260111_191948_417489",
+  "type": "project_long_term",
+  "tags": [
+    "jqc",
+    "quick_config",
+    "typer",
+    "optional_parameters",
+    "user_input",
+    "cli"
+  ],
+  "content": "在jarvis的quick_config.py中，将命令行参数设置为可选的方式：\n1. 将typer.Option的默认值从...改为None\n2. 将参数类型从str改为Optional[str]\n3. 在函数开始处添加用户输入提示逻辑，检查参数是否为None，如果是则使用Prompt.ask()获取用户输入\n4. 这种方式适用于需要在命令行运行时提供交互式输入的场景",
+  "created_at": "2026-01-11T19:19:48.417508",
+  "updated_at": "2026-01-11T19:19:48.417512"
+}

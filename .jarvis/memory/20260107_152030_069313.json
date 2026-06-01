@@ -1,0 +1,13 @@
+{
+  "id": "20260107_152030_069313",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "panel_management",
+    "task_list_manager",
+    "jarvis_tools"
+  ],
+  "content": "在task_list_manager.py中实现了_find_window_with_available_panes方法，用于查找panel数量小于max_panes(默认4)的window。如果找到可用window则在其中split panel，否则创建新window。该实现通过tmux list-windows和list-panes命令获取window和pane信息，并正确处理了任务启动逻辑。",
+  "created_at": "2026-01-07T15:20:30.069339",
+  "updated_at": "2026-01-07T15:20:30.069359"
+}

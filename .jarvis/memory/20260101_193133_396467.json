@@ -1,0 +1,8 @@
+{
+  "id": "20260101_193133_396467",
+  "type": "project_long_term",
+  "tags": ["clipboard", "subprocess", "write-only"],
+  "content": "clipboard.py 文件中的所有 subprocess.Popen 调用都是写入操作（通过 stdin），不读取 stdout 或 stderr，因此不需要使用 decode_output 函数处理输出。涉及的命令包括：Windows clip、macOS pbcopy、Linux xsel 和 xclip。",
+  "created_at": "2026-01-01T19:31:33.396497",
+  "updated_at": "2026-01-01T19:31:33.396500"
+}

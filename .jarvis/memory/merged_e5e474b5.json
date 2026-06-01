@@ -1,0 +1,24 @@
+{
+  "content": "Jarvis C2Rust CLI 子命令体系设计：收集、转译与优化功能实现\n\n【总体架构】\n构建完整的 C2Rust CLI 工具链，包含函数收集、代码转译与后期优化三大核心子命令，支持渐进式迁移与质量提升。\n\n【函数收集子命令（2025-10-25）】\n\n【模块设计】\n- 新增模块：src/jarvis/jarvis_c2rust/collector.py\n- 提供函数：collect_function_names(files: List[Path], out_path: Path, compile_commands_root: Optional[Path] = None) -> Path\n\n【核心功能】\n- 复用 scanner 中的 _try_import_libclang、scan_file、find_compile_commands、load_compile_commands\n- 对每个输入文件调用 scan_file，提取 FunctionInfo\n- 输出唯一的函数名（优先 qualified_name，回退 name）到指定 out_path，每行一个\n- 采用 compile_commands.json（若存在）增强解析；否则默认使用 -I <file.parent>，失败时回退为空参数\n\n【CLI 集成】\n- 在 src/jarvis/jarvis_c2rust/cli.py 增加子命令 collect\n- 形参：files (Argument: 1..N Path)，out (Option: --out/-o Path)\n- 调用 collector.collect_function_names 并输出结果路径\n\n【转译子命令架构（2025-10-24）】\n\n【位置与命名】\n- 在 src/jarvis/jarvis_c2rust 下新增模块 transpiler.py，在 cli.py 中新增子命令 transpile，与现有 scan/plan 并列\n\n【数据输入】\n- 依赖 scanner 产物：<root>/.jarvis/c2rust/functions.jsonl（含函数位置信息、调用关系、拓扑顺序）与 types.jsonl（如有）\n- 源码根目录：默认当前工作目录或从扫描记录推断\n\n【转译流程（按 scanner 生成的函数顺序）】\n1) 为每个待转函数创建一个 LLM Agent（模块选择与签名生成Agent）：\n   - 输入：原C函数源码片段、位置信息、被调用函数清单、当前 crate 目录结构\n   - 产出：建议落盘目标Rust模块路径、函数签名，写入进度JSON\n\n2) 生成实现：\n   - 创建 CodeAgent 作为执行体，包含目标模块、函数签名、C源码片段、依赖函数信息、crate结构、放置位置建议\n   - 生成/更新对应Rust文件中的函数实现\n\n3) 构建与修复：\n   - 调用 cargo build（或项目构建命令）尝试编译\n   - 失败时收集错误、创建 CodeAgent 进行修复，迭代直到构建通过（设定失败重试上限）\n\n4) 代码审查与优化：\n   - 创建审查Agent进行代码审查；若summary指出问题，则再次创建 CodeAgent 优化\n\n5) 标记与映射：\n   - 将该函数标记为\"已转换\"，记录C符号到Rust符号/模块路径的映射到 symbol_map.json\n\n【产物与状态记录】\n- 进度文件：<root>/.jarvis/c2rust/progress.json\n- 映射文件：<root>/.jarvis/c2rust/symbol_map.json\n\n【优化子命令设计（2025-10-27）】\n\n【模块架构】\n- 新增模块：src/jarvis/jarvis_c2rust/optimizer.py\n- 提供：Optimizer 类与 optimize_project(entry_path, options) 入口\n\n【CLI 集成】\n- 在 src/jarvis/jarvis_c2rust/cli.py 增加子命令 optimize\n- 参数：项目路径/crate路径、是否启用每项优化（unsafe、结构、可见性、文档）、并发与重试选项\n\n【核心优化步骤】\n1) unsafe 清理：\n   - 逐文件逐 unsafe 块尝试移除 unsafe 后运行 `cargo check` 验证\n   - 成功则保留修改；失败则回滚并添加 `/// SAFETY: 说明` 文档\n\n2) 代码结构优化：\n   - 检测完全重复的函数（签名+正文文本相同）\n   - 在重复处添加 `/// TODO: duplicate of <path>::<func>` 文档提示\n   - 保守不做跨文件移动以降低风险\n\n3) 可见性优化：\n   - 对 `pub fn` 且仅在本 crate 内引用的函数，尝试降级为 `pub(crate) fn`\n   - 以全局 grep 的引用为依据，保守策略不直接改为私有\n\n4) 文档补充：\n   - 为无文档的模块与函数添加基础占位文档 `/// TODO: Add documentation`\n   - 在 crate 根增加迁移与安全说明\n\n【实施策略】\n- 按文件优化，必要时按依赖关系整体优化\n- 提供备份与回滚机制，所有变更均可复原\n- 工具与验证：优先使用 rust LSP（如可用），否则使用静态文本分析 + `cargo check` 验证\n- 日志与报告输出到 artifacts 目录\n\n【系统集成】\n- 三个子命令形成完整的工作流：收集 → 转译 → 优化\n- 共享数据格式与状态文件，支持无缝衔接\n- 都支持断点续跑与错误恢复机制\n- 统一的CLI接口设计，保持用户体验一致性\n\n【设计原则】\n- 模块化设计：每个子命令独立实现，便于维护与测试\n- 渐进处理：支持分阶段执行与状态保持\n- 错误恢复：完善的回滚与重试机制\n- 工具兼容：支持多种分析工具与验证方式\n- 用户友好：统一的参数设计与输出格式\n\n【预期效果】\n- 建立完整的C2Rust CLI工具链\n- 支持从函数收集到代码优化的全流程\n- 提供高质量的代码转换与优化能力\n- 确保迁移过程的可控性与可追溯性\n- 支持大规模项目的渐进式迁移",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "cli",
+    "subcommand",
+    "collector",
+    "transpile",
+    "optimizer",
+    "migration_toolchain",
+    "code_optimization",
+    "automated_migration",
+    "progressive_transformation"
+  ],
+  "type": "project_long_term",
+  "merged_from": [
+    "20251027_075928_136523",
+    "20251025_234959_366282",
+    "20251024_004920_607524"
+  ],
+  "id": "merged_e5e474b5",
+  "created_at": "2025-11-12T23:48:57.245219"
+}

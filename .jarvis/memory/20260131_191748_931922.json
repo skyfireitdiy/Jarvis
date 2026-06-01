@@ -1,0 +1,8 @@
+{
+  "id": "20260131_191748_931922",
+  "type": "project_long_term",
+  "tags": ["架构演进", "模块热插拔", "jarvis_plugin"],
+  "content": "## 模块热插拔机制 (jarvis_plugin)\n\n**位置**: src/jarvis/jarvis_plugin/\n**测试**: tests/jarvis_plugin/ (32个测试)\n\n**核心组件**:\n- PluginBase: 插件基类，定义生命周期方法\n- PluginMeta: 插件元数据（名称、版本、依赖）\n- PluginManager: 插件管理器，支持发现、加载、卸载、依赖检查\n\n**功能**: 插件发现、加载、卸载、生命周期管理、依赖检查、热重载",
+  "created_at": "2026-01-31T19:17:48.931937",
+  "updated_at": "2026-01-31T19:17:48.931941"
+}

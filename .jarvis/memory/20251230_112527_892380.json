@@ -1,0 +1,13 @@
+{
+  "id": "20251230_112527_892380",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "tui_app",
+    "config_schema",
+    "架构"
+  ],
+  "content": "Jarvis 配置架构：1) TUI 表单由 jarvis_config/tui_app.py 提供 run_tui_form 函数；2) 配置 schema 位于 jarvis_data/config_schema.json；3) 配置数据格式包含 ENV, llms, llm_groups, llm_group 四个核心键；4) LLM 配置名称生成规则：{platform}-{model} 转小写并替换空格和特殊字符；5) utils.py 负责配置收集、测试连接和写入文件",
+  "created_at": "2025-12-30T11:25:27.892397",
+  "updated_at": "2025-12-30T11:25:27.892400"
+}

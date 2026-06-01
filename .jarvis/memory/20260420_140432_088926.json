@@ -1,0 +1,8 @@
+{
+  "id": "20260420_140432_088926",
+  "type": "project_long_term",
+  "tags": ["VS Code扩展", "chatPanel", "UI优化", "渲染性能", "已完成"],
+  "content": "Chat面板渲染性能优化（chatPanel.ts）：\n1. renderMessageHtml 增加 renderHtmlCache（Map<string, string>），基于 variant|lang|text 做缓存 key，避免重复调用 marked.parse 等重量级操作\n2. renderMessages 增加增量追加快速路径（isAppendOnly 检测），当新消息列表只是在旧列表末尾追加时，只处理新增消息节点，跳过全量遍历\n3. 引入 prevMessageList 变量跟踪上一次渲染的消息列表\n4. 关键位置：chatPanel.ts 第40-42行（缓存变量）、第356-389行（renderMessageHtml缓存）、第753-873行（renderMessages增量路径+isAppendOnly函数）",
+  "created_at": "2026-04-20T14:04:32.088950",
+  "updated_at": "2026-04-20T14:04:32.088954"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "20250819_185855_346225",
+  "type": "project_long_term",
+  "tags": [
+    "config.py",
+    "platform_implementation",
+    "configuration",
+    "interruption",
+    "immediate_abort",
+    "base.py",
+    "chat_function"
+  ],
+  "content": "任务需求：在 /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_utils/config.py 中新增“立即中断”配置项（默认 false）。当该配置为 true 时，在 /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_platform/base.py 的 _chat 方法中，对 for s in self.chat(message) 的每次迭代检查是否发生中断，若发生则立即返回（提前结束 _chat 输出流）。\n",
+  "created_at": "2025-08-19T18:58:55.346256",
+  "updated_at": "2025-08-19T18:58:55.346260"
+}

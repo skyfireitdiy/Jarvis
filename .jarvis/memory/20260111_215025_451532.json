@@ -1,0 +1,8 @@
+{
+  "id": "20260111_215025_451532",
+  "type": "project_long_term",
+  "tags": ["repository", "gitee", "github", "install.sh", "mirror"],
+  "content": "Jarvis 项目仓库地址：\n- GitHub: https://github.com/skyfireitdiy/Jarvis.git\n- Gitee: https://gitee.com/skyfireitdiy/Jarvis.git\n\ninstall.sh 脚本位置：scripts/install.sh\n该脚本已实现降级策略：优先尝试 Gitee 镜像，失败后自动回退到 GitHub。",
+  "created_at": "2026-01-11T21:50:25.451565",
+  "updated_at": "2026-01-11T21:50:25.451569"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260118_012416_317237",
+  "type": "project_long_term",
+  "tags": ["refactor", "c_checker", "rules-separation"],
+  "content": "c_checker.py重构完成：将82个规则库独立到c_checker_rules.py，按9个规则类组织。c_checker.py从3000行减少到2840行（净删除160行），所有规则引用已替换为规则类属性，测试全部通过。规则类包括：BaseRules(4)、FormatCommandRules(6)、ThreadRules(7)、CppLockRules(9)、DataRaceRules(5)、DangerousUsageRules(7)、MemoryHelperRules(12)、CppSpecificRules(24)、HelperRules(6)。",
+  "created_at": "2026-01-18T01:24:16.317264",
+  "updated_at": "2026-01-18T01:24:16.317267"
+}

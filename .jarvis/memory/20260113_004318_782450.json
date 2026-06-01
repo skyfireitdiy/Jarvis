@@ -1,0 +1,8 @@
+{
+  "id": "20260113_004318_782450",
+  "type": "project_long_term",
+  "tags": ["methodology", "load_methodology", "数量限制", "token限制"],
+  "content": "在load_methodology函数中，对方法论数量进行了限制，最多加载10条方法论。此限制在selected_count >= 10时触发，会显示提示'已达到方法论数量限制 (selected_count/10)，停止加载更多方法论'并跳出循环。此限制与token限制并存，双重保障防止加载过多方法论内容。",
+  "created_at": "2026-01-13T00:43:18.782483",
+  "updated_at": "2026-01-13T00:43:18.782487"
+}

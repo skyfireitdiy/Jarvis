@@ -1,0 +1,8 @@
+{
+  "id": "20260117_205049_428411",
+  "type": "project_long_term",
+  "tags": ["refactoring", "stats.py", "SDD", "TDD"],
+  "content": "stats.py 重构规范：通过SDD和TDD流程优化时间范围处理逻辑。主要重构内容包括：1. 提取 _process_time_range() 静态方法处理时间范围参数；2. 提取 _infer_time_range_from_metadata() 静态方法基于元数据推断时间范围；3. 提取 _calculate_period_label() 和 _format_last_updated_time() 辅助方法。重构遵循小步快跑原则，编写完整的单元测试覆盖正常、边界和异常情况。",
+  "created_at": "2026-01-17T20:50:49.428431",
+  "updated_at": "2026-01-17T20:50:49.428434"
+}

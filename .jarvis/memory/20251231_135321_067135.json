@@ -1,0 +1,13 @@
+{
+  "id": "20251231_135321_067135",
+  "type": "project_long_term",
+  "tags": [
+    "config.py",
+    "web_llm",
+    "llm_groups",
+    "配置展开"
+  ],
+  "content": "web_llm 配置展开实现（src/jarvis/jarvis_utils/config.py）：\n\n1. 在 _expand_llm_references 函数（约279-295行）中处理 web_llm 引用：\n   - 解析 web_llm 引用并验证其存在性\n   - 展开为 web_platform、web_model、web_max_input_token_count\n   - 如果有 llm_config 则设置 web_llm_config\n   - 移除原始的 web_llm 引用键\n\n2. get_web_search_platform_name（1195-1213行）优先级：\n   - 优先：GLOBAL_CONFIG_DATA.get(\"web_platform\")（来自 web_llm 展开）\n   - 回退：web_search_platform（已废弃）\n\n3. get_web_search_model_name（1216-1234行）优先级：\n   - 优先：GLOBAL_CONFIG_DATA.get(\"web_model\")（来自 web_llm 展开）\n   - 回退：web_search_model（已废弃）\n\n4. 配置合并字段（365-382行）包含：web_platform、web_model、web_max_input_token_count、web_llm_config\n\n实现保持向后兼容，旧配置仍可工作但优先使用新配置。\n",
+  "created_at": "2025-12-31T13:53:21.067174",
+  "updated_at": "2025-12-31T13:53:21.067179"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260130_225419_836544",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_auto_fix",
+    "fix_history",
+    "bug_fix",
+    "threading"
+  ],
+  "content": "FixHistory死锁问题修复：\n\n问题：FixHistory类使用threading.Lock导致死锁\n原因：record_fix方法在持有锁的情况下调用_load_history和_save_history，而这两个方法也尝试获取同一个锁\n解决方案：将threading.Lock改为threading.RLock（可重入锁）\n\n修改位置：src/jarvis/jarvis_auto_fix/fix_history.py 第90行\n修改内容：self._lock: threading.RLock = threading.RLock()",
+  "created_at": "2026-01-30T22:54:19.836563",
+  "updated_at": "2026-01-30T22:54:19.836566"
+}

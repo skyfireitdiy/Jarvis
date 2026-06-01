@@ -1,0 +1,8 @@
+{
+  "id": "20260111_231032_895133",
+  "type": "project_long_term",
+  "tags": ["uv", "tool-update", "auto-install", "update-strategy"],
+  "content": "在_check_pip_updates()函数中实现了优先级更新策略：1) 首先检测是否通过uv tool安装；2) 如果是uv tool安装，优先使用uv tool upgrade命令更新；3) 如果不是uv tool安装或uv命令不可用，则回退到原有uv pip或pip更新方式；4) RAG特性处理：uv tool upgrade仅升级基础包，需额外执行pip install jarvis-ai-assistant[rag]安装RAG依赖。",
+  "created_at": "2026-01-11T23:10:32.895152",
+  "updated_at": "2026-01-11T23:10:32.895154"
+}

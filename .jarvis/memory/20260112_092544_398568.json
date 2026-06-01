@@ -1,0 +1,12 @@
+{
+  "id": "20260112_092544_398568",
+  "type": "project_long_term",
+  "tags": [
+    "v1.0_protocol",
+    "agent_parameter",
+    "tool_registry"
+  ],
+  "content": "v1.0工具协议：agent实例通过arguments字典注入到工具的execute方法中。工具可以通过`args.get('agent')`获取当前运行的agent实例，用于访问agent的属性或调用agent的方法。",
+  "created_at": "2026-01-12T09:25:44.398591",
+  "updated_at": "2026-01-12T09:25:44.398594"
+}

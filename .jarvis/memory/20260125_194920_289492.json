@@ -1,0 +1,8 @@
+{
+  "id": "20260125_194920_289492",
+  "type": "project_long_term",
+  "tags": ["bug_fix", "PrettyOutput", "压缩", "变量作用域"],
+  "content": "Bug修复：修复了自动压缩失败时'cannot access local variable PrettyOutput'错误\n\n根因：jarvis_agent/__init__.py中_print_compression_summary方法在try块中局部导入PrettyOutput，但在except块中使用它。当try块执行失败时，局部变量PrettyOutput未被赋值，导致except块中访问时出错。\n\n修复方案：删除_print_compression_summary方法中的冗余局部导入（第1458行），直接使用文件顶部已有的全局导入（第91行）。\n\n影响文件：src/jarvis/jarvis_agent/__init__.py",
+  "created_at": "2026-01-25T19:49:20.289520",
+  "updated_at": "2026-01-25T19:49:20.289524"
+}

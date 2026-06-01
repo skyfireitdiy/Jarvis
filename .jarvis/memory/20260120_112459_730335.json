@@ -1,0 +1,13 @@
+{
+  "id": "20260120_112459_730335",
+  "type": "project_long_term",
+  "tags": [
+    "icenter",
+    "page_content",
+    "oss_utils",
+    "authentication_required"
+  ],
+  "content": "无法通过oss icenter get命令获取iCenter页面内容，因为需要有效的UAC认证。认证方式包括：1) UDS服务（端口19996/5865/29273）；2) 环境变量（EMP_NO和AUTH_PW）。当前环境中未配置认证信息，无法访问受保护的页面内容。目标页面URL: https://i.zte.com.cn/#/shared/8d7a845c6c184bc5969385c6c79fe516/wiki/page/666dcab7f4d811f0a0cf11a032825f11/view，space-id: 8d7a845c6c184bc5969385c6c79fe516，page-id: 666dcab7f4d811f0a0cf11a032825f11",
+  "created_at": "2026-01-20T11:24:59.730364",
+  "updated_at": "2026-01-20T11:24:59.730369"
+}

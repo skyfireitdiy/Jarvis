@@ -1,0 +1,15 @@
+{
+  "id": "20260201_215904_395824",
+  "type": "project_long_term",
+  "tags": [
+    "智能增强",
+    "功能移除",
+    "代码清理",
+    "jarvis_autonomous",
+    "jarvis_digital_twin",
+    "经验总结"
+  ],
+  "content": "智能增强功能移除经验（2026-01）\n\n背景：\n项目决定移除智能增强功能（jarvis_autonomous、jarvis_digital_twin、jarvis_smart_advisor模块），因为性价比不高，LLM本身已具备相关能力。\n\n移除清单：\n1. 模块目录：\n   - src/jarvis/jarvis_autonomous/\n   - src/jarvis/jarvis_digital_twin/\n   - src/jarvis/jarvis_smart_advisor/\n\n2. 核心文件：\n   - src/jarvis/jarvis_tools/smart_advisor_tool.py\n\n3. run_loop.py 中的引用：\n   - TYPE_CHECKING 导入（DialogueManager、ContinuousLearningManager、AutonomousManager）\n   - 属性定义（_autonomous_enabled、_dialogue_manager、_continuous_learning_manager、_autonomous_manager）\n   - _init_autonomous_components 方法（74行）\n   - _preprocess_user_input 方法（智能增强逻辑）\n   - _postprocess_response 方法（智能增强逻辑）\n   - run 方法中的预处理和后处理调用\n   - is_enable_autonomous 导入\n\n移除步骤：\n1. 读取目标文件，确认需要删除的代码位置\n2. 删除 TYPE_CHECKING 中的导入\n3. 删除属性定义\n4. 删除初始化方法\n5. 简化方法为直接返回（_preprocess_user_input、_postprocess_response）\n6. 删除方法调用\n7. 删除未使用的导入\n8. 验证：搜索残留引用、运行静态检查\n\n验证方法：\n- grep 搜索关键词（autonomous、dialogue_manager、continuous_learning、digital_twin）\n- ruff 静态检查\n- mypy 类型检查\n\n关键教训：\n- 小步删除，每次提交一个checkpoint\n- 保持方法签名不变，只简化内部逻辑\n- 先删除方法实现，再删除调用点\n- 最后清理未使用的导入",
+  "created_at": "2026-02-01T21:59:04.395871",
+  "updated_at": "2026-02-01T21:59:04.395875"
+}

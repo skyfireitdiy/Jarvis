@@ -1,0 +1,8 @@
+{
+  "id": "20260206_232834_157618",
+  "type": "project_long_term",
+  "tags": ["session_manager", "commit_info", "架构改进"],
+  "content": "【commit信息保存架构改进】\n\n目标：统一commit信息保存逻辑，删除重复代码，增强元数据\n\n实现：\n1. 删除了Agent.save_session()中的重复commit保存逻辑（26行代码）\n2. 增强SessionManager._save_commit_info()方法，添加元数据字段\n3. 添加commit一致性校验的用户提示\n\ncommit文件结构（完整格式）：\n{\n  \"current_commit\": \"完整commit hash\",\n  \"start_commit\": \"起始commit hash（可选）\",\n  \"agent_name\": \"Agent名称\",\n  \"platform_name\": \"平台名称\",\n  \"model_name\": \"模型名称\",\n  \"timestamp\": \"ISO格式时间戳\"\n}\n\n影响文件：\n- src/jarvis/jarvis_agent/session_manager.py（修改）\n- src/jarvis/jarvis_agent/__init__.py（删除重复代码）\n\n提交记录：\n- 7cd9953: 添加commit一致性校验提示\n- 9891463: 修复文件路径安全问题\n- 55d0829: 增强commit信息保存元数据\n\n验证方式：下次保存session时检查commit文件包含所有6个字段",
+  "created_at": "2026-02-06T23:28:34.157639",
+  "updated_at": "2026-02-06T23:28:34.157642"
+}

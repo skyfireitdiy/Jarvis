@@ -1,0 +1,13 @@
+{
+  "id": "20260201_111436_310697",
+  "type": "project_long_term",
+  "tags": [
+    "digital_twin",
+    "proactive_service",
+    "service_orchestrator",
+    "阶段5.3"
+  ],
+  "content": "## ServiceOrchestrator 模块设计\n\n**文件位置**：`src/jarvis/jarvis_digital_twin/proactive_service/service_orchestrator.py`\n**测试文件**：`tests/jarvis_digital_twin/test_service_orchestrator.py`（40个测试，90%覆盖率）\n\n### 核心功能\n1. `orchestrate()`: 编排服务执行顺序（解决冲突→优先级排序→智能调整）\n2. `resolve_conflicts()`: 解决服务冲突（同类型/跨类型）\n3. `prioritize()`: 按优先级排序服务\n4. `get_execution_plan()`: 生成执行计划（含并行组）\n5. `register_conflict_rule()`: 注册冲突规则\n\n### 冲突解决策略（ConflictResolution枚举）\n- KEEP_FIRST: 保留第一个\n- KEEP_LAST: 保留最后一个\n- KEEP_HIGHEST_PRIORITY: 保留最高优先级\n- MERGE: 合并执行\n- CANCEL_BOTH: 都取消\n\n### 默认互斥规则\n- AUTO_ACTION 与 CLARIFICATION 互斥（CANCEL_BOTH）\n\n### 与NeedInferrer集成\n- 通过 `set_need_inferrer()` 设置\n- 在 `orchestrate()` 中调用 `_apply_intelligent_ordering()` 进行智能排序\n- 异常处理：推理失败时返回原列表",
+  "created_at": "2026-02-01T11:14:36.310713",
+  "updated_at": "2026-02-01T11:14:36.310716"
+}

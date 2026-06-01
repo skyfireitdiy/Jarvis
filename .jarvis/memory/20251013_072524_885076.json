@@ -1,0 +1,16 @@
+{
+  "id": "20251013_072524_885076",
+  "type": "project_long_term",
+  "tags": [
+    "multi_agent",
+    "novel_generator",
+    "workflow",
+    "change_request",
+    "requirement",
+    "gating",
+    "per_volume"
+  ],
+  "content": "Novel generator workflow update: switch to per-volume gating and sequential execution.\n- New rule: Once a specific volume's chapter plots (chapter_{NNNN}_plot.md) for all chapters in that volume are complete and the volume outline vol_{VV}_outline.md is approved, the system may immediately proceed to writing drafts (chapter_{NNNN}_draft.md) for that same volume. It no longer waits for all volumes' plots to be complete.\n- Execution order:\n  1) Generate the overall synopsis and per-volume outlines (02_synopsis_outline.md, vol_{VV}_outline.md for all volumes).\n  2) For Volume 01: generate all chapter plots -> generate all drafts (then polish, proofread per chapter).\n  3) For Volume 02: generate all chapter plots -> generate all drafts (then polish, proofread), and so on.\n- Required code changes in builtin/multi_agent/novel_generator.yaml:\n  * common_system_prompt: update gating rules that currently require all volumes' plots to be complete before any chapter drafting; change to per-volume gating.\n  * NovelCoordinator: update phase inference and progression logic to iterate by volume (after vol_{VV}_outline.md approved) and allow drafting once that volume’s plots are complete.\n  * ChapterWriter: relax the global constraint “all chapters across all volumes plots must be ready” to “all chapters in the current volume plots must be ready”.\n  * Keep file-as-state, continuity, ask_user checkpoints, and single-operation principle unchanged.\n",
+  "created_at": "2025-10-13T07:25:24.885111",
+  "updated_at": "2025-10-13T07:25:24.885115"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260117_112607_978846",
+  "type": "project_long_term",
+  "tags": [
+    "icenter",
+    "page_content",
+    "oss_utils",
+    "authentication_required"
+  ],
+  "content": "已分析iCenter页面访问需求。要获取iCenter页面内容（URL: https://i.zte.com.cn/#/shared/38cecafff16841349d3235dbc132d3f4/wiki/page/7ce5fd67ecf711f0abbae96e353d0657/view），需要有效的UAC认证。认证方式包括：1) UDS服务（端口19996/5865/29273）；2) 环境变量（EMP_NO和AUTH_PW）。当前环境中未配置认证信息，无法访问受保护的页面内容。",
+  "created_at": "2026-01-17T11:26:07.978879",
+  "updated_at": "2026-01-17T11:26:07.978882"
+}

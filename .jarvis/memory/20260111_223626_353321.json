@@ -1,0 +1,8 @@
+{
+  "id": "20260111_223626_353321",
+  "type": "project_long_term",
+  "tags": ["auto_print", "output", "emoji", "configuration"],
+  "content": "auto_print 函数的 emoji 前缀自动样式机制实现位置：src/jarvis/jarvis_utils/output.py\n\n核心工作原理：\n1. auto_print 函数通过检测文本开头的 emoji 前缀，自动识别输出类型\n2. emoji_mapping 字典将 emoji 映射到 OutputType 枚举类型\n3. OutputType 枚举定义所有支持的输出类型\n4. PrettyOutput._ICONS 字典为每个 OutputType 定义显示的 emoji 图标\n5. ConsoleOutputSink.emit 方法中的 3 个样式配置字典（style_config、text_colors、header_styles）为每个类型定义具体的 Rich 样式",
+  "created_at": "2026-01-11T22:36:26.353362",
+  "updated_at": "2026-01-11T22:36:26.353366"
+}

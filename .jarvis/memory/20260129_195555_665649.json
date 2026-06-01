@@ -1,0 +1,13 @@
+{
+  "id": "20260129_195555_665649",
+  "type": "project_long_term",
+  "tags": [
+    "curl",
+    "https_request",
+    "basic_auth",
+    "troubleshooting"
+  ],
+  "content": "使用curl访问需要基本认证的API时，如果认证失败，应检查：1) 是否使用了正确的HTTP密码（而非普通登录密码）；2) URL格式是否正确（某些服务需要在路径前加 '/a/'）；3) 认证格式是否正确（username:password的形式）",
+  "created_at": "2026-01-29T19:55:55.665671",
+  "updated_at": "2026-01-29T19:55:55.665675"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260105_093859_570828",
+  "type": "project_long_term",
+  "tags": [
+    "vite-config",
+    "api-proxy",
+    "vue-frontend"
+  ],
+  "content": "Vite配置关键信息：\n- 代理配置：/api 路径代理到 http://localhost:8080\n- 端口设置：开发服务器运行在端口 3000\n- 别名配置：@ 指向 src 目录\n- 构建输出：dist 目录，资源文件在 assets 目录",
+  "created_at": "2026-01-05T09:38:59.570850",
+  "updated_at": "2026-01-05T09:38:59.570853"
+}

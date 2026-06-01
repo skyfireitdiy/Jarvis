@@ -1,0 +1,8 @@
+{
+  "id": "20260111_214908_983865",
+  "type": "project_long_term",
+  "tags": ["publish-script", "git-push", "remote", "run_command_ignore_errors"],
+  "content": "publish.py脚本已修改为支持push所有remotes的main分支和tags。新增run_command_ignore_errors函数用于处理可失败的命令。使用git remote获取所有remotes，遍历每个remote分别push，错误时打印警告但不中断执行。",
+  "created_at": "2026-01-11T21:49:08.983889",
+  "updated_at": "2026-01-11T21:49:08.983893"
+}

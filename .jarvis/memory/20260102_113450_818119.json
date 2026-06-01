@@ -1,0 +1,8 @@
+{
+  "id": "20260102_113450_818119",
+  "type": "project_long_term",
+  "tags": ["jarvis", "llm_config", "configuration", "reference_system"],
+  "content": "Jarvis项目的LLM配置系统采用引用方式实现。llm_groups不再支持直接定义platform、model等参数，必须通过normal_llm、cheap_llm、smart_llm、web_llm引用llms中定义的配置。具体实现包括：\n\n1. llms: 定义可复用的LLM配置，包含platform、model、max_input_token_count、llm_config等参数\n2. llm_groups: 通过normal_llm、cheap_llm、smart_llm、web_llm引用llms中的配置名称\n3. llm_group: 选择要激活的LLM组名称\n4. 代码实现位于src/jarvis/jarvis_utils/config.py中的_expand_llm_references函数\n5. 配置模式定义在src/jarvis/jarvis_data/config_schema.json中\n\n这种设计确保了配置的复用性和一致性，避免了重复定义相同的LLM参数。",
+  "created_at": "2026-01-02T11:34:50.818146",
+  "updated_at": "2026-01-02T11:34:50.818149"
+}

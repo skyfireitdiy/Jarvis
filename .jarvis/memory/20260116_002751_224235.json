@@ -1,0 +1,8 @@
+{
+  "id": "20260116_002751_224235",
+  "type": "project_long_term",
+  "tags": ["jarvis_platform", "auto_summary", "token_limit", "bug"],
+  "content": "自动总结触发逻辑问题：\n\n问题描述：token显示已达到90%以上，但自动总结仍未触发。\n\n根本原因：\n1. `_get_token_usage_info` 计算的是：历史记录token + 当前响应token\n2. `_chat` 方法中第459行调用 `get_remaining_token_count()` 时，当前响应还未被添加到历史记录（`_append_session_history` 在第450行调用）\n3. `get_remaining_token_count` 只计算历史记录的token，不包括当前响应\n4. 总结触发条件是 remaining_tokens <= 25%（即已使用 >= 75%）\n\n举例说明：\n- 最大token：100000\n- 历史记录：78000 token (78%)\n- 当前响应：15000 token (15%)\n\n显示效果：\n- 进度条显示：78% + 15% = 93% (红色警告)\n\n实际判断：\n- get_remaining_token_count() 返回：100000 - 78000 = 22000 (22%)\n- 判断条件：22000 <= 25000 → True (应该触发)\n\n但问题在于：由于历史记录已经78%了，如果再添加当前响应的15%，就会变成93%，超过了25%剩余token的阈值。\n\n结论：代码逻辑应该是对的，但可能在边界情况下存在问题。需要进一步检查 threshold=25% 是否合理，或者是否有其他阻止条件。",
+  "created_at": "2026-01-16T00:27:51.224252",
+  "updated_at": "2026-01-16T00:27:51.224255"
+}

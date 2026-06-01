@@ -1,0 +1,8 @@
+{
+  "id": "20260111_214512_994933",
+  "type": "project_long_term",
+  "tags": ["welcome-message", "jarvis.py", "main.py", "代码位置"],
+  "content": "Jarvis欢迎信息位置：\n1. src/jarvis/jarvis_agent/jarvis.py (run_cli函数，约1146行)\n2. src/jarvis/jarvis_agent/main.py (cli函数，约68行)\n两处都通过init_env函数显示欢迎信息。",
+  "created_at": "2026-01-11T21:45:12.994965",
+  "updated_at": "2026-01-11T21:45:12.994969"
+}

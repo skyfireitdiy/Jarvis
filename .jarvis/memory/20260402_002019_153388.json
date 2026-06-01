@@ -1,0 +1,14 @@
+{
+  "id": "20260402_002019_153388",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "详细设计",
+    "系统设计",
+    "node模式",
+    "web-gateway"
+  ],
+  "content": "Jarvis node 模式设计背景：现有 jarvis_web_gateway 使用单 token（JARVIS_AUTH_TOKEN）、单 default session、主 /ws 与 /api/agent/{agent_id}/ws + /api/agent/{agent_id}/{path} 代理模型；Agent 由 AgentManager 在本地启动并继承同一 token。拟新增 --node 参数到 jarvis-web-gateway 与 jarvis-service，使 gateway 可工作在主节点或子节点模式。子节点通过长期 WebSocket 接入主节点，先登录获取主节点 token，再将本地 token 与主节点对齐。主节点维护节点注册表、agent 所属节点映射，并在客户端按节点创建 agent 时，把 HTTP/WS 流量通过主子节点长连转发到目标子节点，实现客户端无感访问远端 agent。设计需兼容现有单节点模式。",
+  "created_at": "2026-04-02T00:20:19.153413",
+  "updated_at": "2026-04-02T00:20:19.153418"
+}

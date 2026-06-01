@@ -1,0 +1,8 @@
+{
+  "id": "20260118_003426_247859",
+  "type": "project_long_term",
+  "tags": ["c_checker", "test", "rules", "TDD"],
+  "content": "验证c_checker_rules.py的单元测试时发现，源文件中有82个规则，但测试文件只覆盖了80个规则，缺少对RE_FREE_CALL_ANY和RE_SCOPED_LOCK两个规则的测试。测试文件tests/jarvis_sec/test_c_checker_rules.py已创建并包含9个规则类的测试，使用pytest框架验证每个规则的编译正确性和匹配能力。",
+  "created_at": "2026-01-18T00:34:26.247909",
+  "updated_at": "2026-01-18T00:34:26.247913"
+}

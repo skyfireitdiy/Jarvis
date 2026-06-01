@@ -1,0 +1,12 @@
+{
+  "id": "20260310_223828_022681",
+  "type": "project_long_term",
+  "tags": [
+    "web_gateway",
+    "completion",
+    "summary"
+  ],
+  "content": "Web Gateway 项目完成总结\n\n**任务统计**：\n- 总任务数: 19\n- 已完成: 18\n- 已放弃: 1 (task-3 被拆分为 task-5/6/7)\n- 失败: 0\n\n**核心成果**：\n\n1. **Gateway 模块**（jarvis_gateway）\n   - events.py: Gateway 事件模型定义\n   - gateway.py: IGateway 接口与 BaseGateway 基类\n   - cli_gateway.py: CLI Gateway 实现\n   - manager.py: get_current_gateway/set_current_gateway 管理\n\n2. **Web Gateway 后端**（jarvis_web_gateway）\n   - app.py: FastAPI 应用、WebSocket 路由、事件桥接\n   - cli.py: CLI 启动入口\n   - 支持 output_bridge/input_bridge/gateway_auth\n\n3. **Web Gateway 前端**（frontend/）\n   - Vue 3 + Vite + xterm.js\n   - 输出区: Markdown 渲染\n   - 输入区: 单行/多行切换\n   - 终端区: 多终端管理（动态创建、状态跟踪）\n\n4. **CLI 集成**\n   - jarvis.py: 新增 --web-gateway/--web-gateway-host/--web-gateway-port 参数\n   - code_agent.py: 新增相同参数\n   - 后台线程启动 uvicorn Server\n   - 退出时清理 Gateway\n\n5. **认证功能**\n   - config_schema.json: gateway_auth 配置\n   - config.py: get_gateway_auth_config() 读取\n   - gateway.py: _check_auth() 认证逻辑\n   - cli_gateway.py: 三类调用前认证\n\n6. **文档**\n   - gateway_spec.md: Gateway 模块规范\n   - web_gateway_app_spec.md: Web Gateway 应用规范\n   - web_gateway_guide.md: 使用指南（包含快速开始、协议说明、故障排查）\n\n**技术栈**：\n- 后端: FastAPI + WebSocket\n- 前端: Vue 3 + Vite + xterm.js + marked\n- 认证: 基于配置的固定 token/密码\n\n**验收标准达成**：\n✅ Gateway 接口可用并可切换实现\n✅ 现有 CLI 功能不受影响\n✅ 文档完整且示例可用\n✅ 后端可启动、WS 连通\n✅ 输出可见、输入可回传\n✅ 认证可控（默认允许未配置）\n✅ 多终端管理（独立终端、动态创建、状态跟踪）",
+  "created_at": "2026-03-10T22:38:28.022702",
+  "updated_at": "2026-03-10T22:38:28.022707"
+}

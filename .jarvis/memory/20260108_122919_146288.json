@@ -1,0 +1,13 @@
+{
+  "id": "20260108_122919_146288",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "session_info",
+    "window",
+    "panel"
+  ],
+  "content": "当前tmux session信息:\n- Session名称: wangmaobin-jarvis-81182087\n- Session详情: wangmaobin-jarvis-81182087: 2 windows (created Thu Jan  8 11:11:20 2026) (attached)\n- Window及Panel详情:\n  Window 1: 4 panes\n    - Pane 1 [inactive] /home/wangmaobin/code/tmp/test_c_obj\n    - Pane 2 [active] /home/wangmaobin/code/Jarvis\n    - Pane 3 [inactive] /home/wangmaobin/code/Jarvis\n    - Pane 4 [inactive] /home/wangmaobin/code/tmp/test_c_static_lib\n  Window 2: 1 panes\n    - Pane 1 [active] /home/wangmaobin/code/tmp/test_c_static_lib",
+  "created_at": "2026-01-08T12:29:19.146317",
+  "updated_at": "2026-01-08T12:29:19.146320"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260113_144333_606785",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_diagram_generator",
+    "rule_conversion",
+    "Graphviz",
+    "builtin_rules"
+  ],
+  "content": "架构图生成器Agent已成功转换为规则文件architecture_diagram_generator.md。该规则文件包含：1) 架构图生成的工作流程，包括需求澄清、代码阅读、组件识别、视图绘制和图表生成；2) Graphviz输出标准，定义了DOT语言的格式要求、布局方向、对齐方式等；3) 文件遵循markdown格式；4) builtin_rules.md文档已更新，包含新规则条目。",
+  "created_at": "2026-01-13T14:43:33.606823",
+  "updated_at": "2026-01-13T14:43:33.606826"
+}

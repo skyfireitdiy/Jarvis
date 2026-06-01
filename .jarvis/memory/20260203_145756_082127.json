@@ -1,0 +1,8 @@
+{
+  "id": "20260203_145756_082127",
+  "type": "project_long_term",
+  "tags": ["code_agent", "内置命令", "ListRule", "需求分类", "input_handler"],
+  "content": "## CodeAgent 内置命令优先处理优化\n\n**问题**：在 CodeAgent 中输入 `<ListRule>` 等内置命令时，系统仍然进入需求分类流程，而不是直接执行命令。\n\n**解决方案**：在 `code_agent.py` 的 `run` 方法中，在需求分类之前优先调用 `builtin_input_handler` 检查并处理内置命令。\n\n**修改内容**：\n1. 导入 `builtin_input_handler` 函数（第27行）\n2. 在 `run` 方法中，第306-311行添加内置命令处理逻辑：\n   ```python\n   # 优先处理内置命令（如 <ListRule>）\n   # 如果是内置命令且已被处理，则直接返回，不进入需求分类流程\n   processed_input, is_handled = builtin_input_handler(user_input, self)\n   if is_handled:\n       # 内置命令已处理完成，直接返回\n       return None\n   ```\n\n**效果**：\n- 输入 `<ListRule>` 等内置命令时，立即执行并显示结果，不再进入需求分类流程\n- 普通用户请求仍然正常进入需求分类流程\n\n**文件位置**：src/jarvis/jarvis_code_agent/code_agent.py\n\n**Commit ID**：ea919d1",
+  "created_at": "2026-02-03T14:57:56.082153",
+  "updated_at": "2026-02-03T14:57:56.082157"
+}

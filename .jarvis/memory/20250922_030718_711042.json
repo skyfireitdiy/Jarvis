@@ -1,0 +1,17 @@
+{
+  "id": "20250922_030718_711042",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "competition",
+    "wireless_ai_security_competition",
+    "security_vulnerability_analyst",
+    "jarvis_agent",
+    "paths",
+    "deadlines",
+    "deliverable"
+  ],
+  "content": "项目背景：准备参加“无线AI安全工具大赛”，以Jarvis项目中的“安全漏洞扫描Agent（security_vulnerability_analyst）”为参赛工具。\n关键路径：\n- /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_agent\n- /home/wangmaobin/code/Jarvis/builtin/agent/security_vulnerability_analyst.yaml\n大赛时间节点：\n- 工具征集截止：10月20日\n- 初评发布：10月24日\n- 决赛路演：10月28日（10分钟介绍+5分钟Q&A，需现场工具演示）\n交付物：编写《无线AI安全工具大赛-参赛材料.md》，覆盖方案流程与评分维度（初赛/决赛）所需内容，并准备路演脚本与可离线演示方案。\n",
+  "created_at": "2025-09-22T03:07:18.711073",
+  "updated_at": "2025-09-22T03:07:18.711077"
+}

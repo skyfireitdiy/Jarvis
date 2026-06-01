@@ -1,0 +1,8 @@
+{
+  "id": "20260128_004017_832766",
+  "type": "project_long_term",
+  "tags": ["规则文件", "Hacker News", "API", "开发工具"],
+  "content": "已创建 Hacker News 搜索规则文件：.jarvis/rules/development_tools/hacker_news_search.md。该规则文件包含完整的 Hacker News Algolia API 使用指南，包括 API 使用原则、搜索操作步骤、实用示例、错误处理和最佳实践。文件位置：/home/skyfire/code/Jarvis/.jarvis/rules/development_tools/hacker_news_search.md",
+  "created_at": "2026-01-28T00:40:17.832783",
+  "updated_at": "2026-01-28T00:40:17.832786"
+}

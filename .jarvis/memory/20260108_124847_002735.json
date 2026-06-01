@@ -1,0 +1,12 @@
+{
+  "id": "20260108_124847_002735",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "function_dependencies",
+    "dispatch_command_to_panel"
+  ],
+  "content": "dispatch_command_to_panel函数依赖的其他函数：\n1. find_or_create_jarvis_session：查找或创建jarvis session\n2. list_session_windows：获取session的所有window，返回格式为['index: name', ...]\n3. get_window_pane_count：获取window的pane数量，支持'index: name'或'index'格式的window_id\n4. create_panel：在指定window中创建panel，支持解析'index: name'格式的window_id\n5. create_window：创建新的window\n这些函数都已存在且功能正常，dispatch_command_to_panel函数通过这些函数组合实现完整功能",
+  "created_at": "2026-01-08T12:48:47.002759",
+  "updated_at": "2026-01-08T12:48:47.002762"
+}

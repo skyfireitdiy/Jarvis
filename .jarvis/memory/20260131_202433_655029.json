@@ -1,0 +1,8 @@
+{
+  "id": "20260131_202433_655029",
+  "type": "project_long_term",
+  "tags": ["jarvis_tools", "generate_rule", "tool_registry", "规则系统"],
+  "content": "## generate_rule 工具实现\n\n### 文件位置\n- 工具文件：`src/jarvis/jarvis_tools/generate_rule.py`\n- 测试文件：`tests/jarvis_tools/test_generate_rule.py`\n\n### 功能说明\n将 `jarvis_rule_generator` 模块的功能暴露给Agent使用，支持三个操作：\n1. `detect_patterns` - 检测代码模式（设计模式、编码风格等）\n2. `generate_rule` - 生成规则内容（Markdown格式）\n3. `save_rule` - 保存规则文件（支持project/global作用域）\n\n### 自动注册机制\n工具会被 `registry.py` 的 `_load_builtin_tools()` 方法自动加载，该方法会扫描 `jarvis_tools` 目录下所有 `.py` 文件，查找具有 `name`、`description`、`parameters`、`execute` 属性的类并自动注册。\n\n### 依赖关系\n- 复用 `jarvis_rule_generator.rule_generator` 模块的 `RuleGenerator`、`CodePattern`、`RuleGenerationContext` 类",
+  "created_at": "2026-01-31T20:24:33.655048",
+  "updated_at": "2026-01-31T20:24:33.655051"
+}

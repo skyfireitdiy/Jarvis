@@ -1,0 +1,8 @@
+{
+  "id": "20260115_231544_146221",
+  "type": "project_long_term",
+  "tags": ["rule_loading", "jarvis_agent", "rules_manager"],
+  "content": "Jarvis Agent 规则加载机制详解：\n\n1. **项目级规则加载**（.jarvis/rule）：\n   - 方法：RulesManager.read_project_rule()\n   - 路径：{root_dir}/.jarvis/rule\n   - 支持jinja2模板渲染\n\n2. **全局级规则加载**（~/.jarvis/rule）：\n   - 方法：RulesManager.read_global_rules()\n   - 路径：通过get_data_dir()获取，默认为~/.jarvis/rule\n   - 支持jinja2模板渲染\n\n3. **内置规则加载**（builtin/rules/）：\n   - 模块：builtin_rules.py\n   - 方法：_load_builtin_rules()在模块加载时自动执行\n   - 路径：{project_root}/builtin/rules/**/*.md\n   - 递归加载所有.md文件，使用文件名（不含.md）作为规则名\n   - 支持jinja2模板渲染\n\n4. **builtin_rules.md索引文件**：\n   - 方法：RulesManager._get_rule_from_builtin_index()\n   - 路径：{jarvis_src_dir}/builtin/rules/builtin_rules.md\n   - 解析Markdown链接格式：[规则名称]({{ template_var }}/path/to/rule.md)\n   - 支持模板变量：jarvis_src_dir、rule_file_dir\n\n5. **规则加载优先级**（从高到低）：\n   a. 中心规则仓库文件\n   b. 项目rules目录文件\n   c. 项目rules.yaml文件\n   d. 配置的rules目录文件\n   e. 全局rules.yaml文件\n   f. builtin_rules.md索引文件\n   g. builtin_rules.py内置规则（最低优先级）",
+  "created_at": "2026-01-15T23:15:44.146241",
+  "updated_at": "2026-01-15T23:15:44.146244"
+}

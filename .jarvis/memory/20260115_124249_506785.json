@@ -1,0 +1,13 @@
+{
+  "id": "20260115_124249_506785",
+  "type": "project_long_term",
+  "tags": [
+    "cli",
+    "parameters",
+    "jarvis",
+    "code_agent"
+  ],
+  "content": "Jarvis Code Agent CLI参数实现详情：\n- `-T`, `--task`: 用于直接在命令行提供任务内容\n- `--task-file`: 从文件读取任务描述（支持纯文本或JSON格式）\n- `-w`, `--worktree`: 启用git worktree模式，在独立分支上开发\n- `-d`, `--dispatch`: 将任务派发到新的tmux窗口中执行\n这些参数在src/jarvis/jarvis_code_agent/code_agent.py的cli函数中定义，并在文档中正确记录。",
+  "created_at": "2026-01-15T12:42:49.506810",
+  "updated_at": "2026-01-15T12:42:49.506814"
+}

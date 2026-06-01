@@ -1,0 +1,8 @@
+{
+  "id": "20260111_181647_734125",
+  "type": "project_long_term",
+  "tags": ["init_env", "configuration", "environment", "config_file"],
+  "content": "当init_env函数检测到没有配置文件时的行为：\n1. init_env函数会调用load_config()函数\n2. load_config函数检查配置文件是否存在（默认路径为~/.jarvis/config.yaml）\n3. 如果配置文件不存在，load_config会检查旧格式配置文件（~/.jarvis/env）\n4. 如果旧格式配置文件也不存在，会调用_interactive_config_setup函数\n5. _interactive_config_setup函数会启动Web配置界面（jcfg命令），引导用户进行配置\n6. 启动Web配置界面后会调用sys.exit(0)退出当前程序\n\n所以，当init_env检测到没有配置文件时，它会启动一个Web配置界面来引导用户设置配置，并在配置完成后退出当前实例。",
+  "created_at": "2026-01-11T18:16:47.734151",
+  "updated_at": "2026-01-11T18:16:47.734165"
+}

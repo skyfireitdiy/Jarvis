@@ -1,0 +1,8 @@
+{
+  "id": "20260111_225213_904381",
+  "type": "project_long_term",
+  "tags": ["output_system", "architecture", "OutputSink", "OutputType"],
+  "content": "Jarvis项目输出系统采用事件+Sink模式：1) OutputType枚举定义所有输出类型；2) OutputEvent数据类封装输出事件；3) OutputSink抽象接口定义emit方法；4) ConsoleOutputSink实现控制台输出。关键代码在src/jarvis/jarvis_utils/output.py",
+  "created_at": "2026-01-11T22:52:13.904413",
+  "updated_at": "2026-01-11T22:52:13.904418"
+}

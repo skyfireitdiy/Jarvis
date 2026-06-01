@@ -1,0 +1,12 @@
+{
+  "id": "20260115_104730_453773",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "auto-install",
+    "fix"
+  ],
+  "content": "jck自动安装功能代码审查修复：1) 提取_perform_check()辅助函数确保初始检查和重新检查逻辑一致；2) 优化错误处理：FileNotFoundError时break（jvs不存在无法继续），其他异常时continue继续尝试安装；3) 修复静态扫描问题（移除未使用变量、修正f-string）",
+  "created_at": "2026-01-15T10:47:30.453798",
+  "updated_at": "2026-01-15T10:47:30.453802"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260119_123211_709425",
+  "type": "project_long_term",
+  "tags": [
+    "fix_tool_call",
+    "builtin_command",
+    "<FixToolCall>",
+    "实现完成"
+  ],
+  "content": "已完成<FixToolCall>内置命令实现：1) 在Agent类添加_last_failed_tool_call_content属性 2) 在run_loop.py中每次LLM响应后直接保存当前响应内容到该属性 3) 在builtin_input_handler.py中实现FixToolCall标记处理，调用fix_tool_call_with_llm修复并执行 4) 在clear_history中重置该属性。用户可随时输入<FixToolCall>手动修复最近一次LLM响应中的工具调用格式错误。",
+  "created_at": "2026-01-19T12:32:11.709467",
+  "updated_at": "2026-01-19T12:32:11.709474"
+}

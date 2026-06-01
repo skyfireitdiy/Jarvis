@@ -1,0 +1,12 @@
+{
+  "id": "20260110_122427_452751",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "platform_removal",
+    "documentation"
+  ],
+  "content": "用户需求：删除文档中处理openai和claude平台以外的平台介绍和描述，因为其他平台准备废弃了。审查任务：验证代码修改是否正确完成了此需求。",
+  "created_at": "2026-01-10T12:24:27.452775",
+  "updated_at": "2026-01-10T12:24:27.452778"
+}

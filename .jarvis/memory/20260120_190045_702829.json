@@ -1,0 +1,12 @@
+{
+  "id": "20260120_190045_702829",
+  "type": "project_long_term",
+  "tags": [
+    "icenter",
+    "linker_wrapper",
+    "compilation"
+  ],
+  "content": "需要从iCenter页面获取链接器包装相关内容，强调所有编译（不仅仅是交叉编译）都需要包装链接器",
+  "created_at": "2026-01-20T19:00:45.702854",
+  "updated_at": "2026-01-20T19:00:45.702858"
+}

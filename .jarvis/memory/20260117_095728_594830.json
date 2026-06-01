@@ -1,0 +1,13 @@
+{
+  "id": "20260117_095728_594830",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "project_structure",
+    "modules",
+    "architecture"
+  ],
+  "content": "Jarvis项目结构分析：\n\n主要模块：\n- jarvis_agent: 核心AI代理功能\n- jarvis_code_agent: 代码专用代理，基于Agent优化\n- jarvis_sec: 安全分析套件，支持C/C++和Rust语言的安全扫描\n- jarvis_c2rust: C→Rust迁移套件\n- jarvis_multi_agent: 多智能体协作系统\n- jarvis_utils: 通用工具集\n- jarvis_tools: 工具管理和注册系统\n- jarvis_config: 配置管理系统\n- jarvis_rag: RAG知识库构建和查询\n- jarvis_platform_manager: 大语言模型平台管理\n\n安全相关组件：\n- builtin/agent/security_vulnerability_analyst.yaml: 安全漏洞分析师Agent配置\n- builtin/rules/security/security.md: 安全编码规则\n- builtin/rules/security/vulnerability-analysis.md: 安全漏洞分析规则\n- src/jarvis/jarvis_sec/: 安全分析模块，包含启发式扫描和AI深度验证功能\n\n代码分布：Python代码主要在src/jarvis/目录下，Rust代码较少，主要在测试案例中",
+  "created_at": "2026-01-17T09:57:28.594859",
+  "updated_at": "2026-01-17T09:57:28.594863"
+}

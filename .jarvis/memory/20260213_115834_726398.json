@@ -1,0 +1,8 @@
+{
+  "id": "20260213_115834_726398",
+  "type": "project_long_term",
+  "tags": ["代码规范", "安全", "Python"],
+  "content": "Python代码安全实践：防止命令注入\n\n在使用subprocess或构造shell命令时：\n1. 必须使用shlex.quote()对用户输入的文件路径进行转义\n2. import shlex语句必须放在文件顶部，不能在函数内部import\n3. 使用Dict[str, set]等类型注解时，需要from typing import Dict\n4. 访问split()结果前必须检查列表是否为空：command_parts = command.split(); tool_name = command_parts[0] if command_parts else 'unknown'\n\n示例：\nimport shlex\nfile_path = \"file with spaces.py\"\nsafe_path = shlex.quote(file_path)  # 'file with spaces.py'\ncmd = f\"eslint --fix {safe_path}\"",
+  "created_at": "2026-02-13T11:58:34.726413",
+  "updated_at": "2026-02-13T11:58:34.726416"
+}

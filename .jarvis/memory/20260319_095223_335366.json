@@ -1,0 +1,14 @@
+{
+  "id": "20260319_095223_335366",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "frontend",
+    "agent_proxy",
+    "port",
+    "url"
+  ],
+  "content": "前端连接Agent代理失败的bug修复\n\n问题描述：\n前端请求Web网关代理URL时，返回404错误。原因是URL缺少端口号。\n\n错误示例：\n- 错误URL: http://10.90.30.92/api/agent/{agentId}/ws (没有端口号)\n- 正确URL: http://10.90.30.92:8000/api/agent/{agentId}/ws\n\n修复内容：\n1. 修改buildAgentWebSocketUrl函数，添加port参数\n   - 新增参数：port = null\n   - 添加端口号处理：const portStr = port ? `:${port}` : ''\n\n2. 修改connectToAgent函数\n   - 获取host和port: const { host, port } = getGatewayAddress()\n   - 调用时传入port: buildAgentWebSocketUrl(host, agentId, null, port)\n\n3. 修改fetchAgentStatus函数\n   - 获取host和port: const { host, port } = getGatewayAddress()\n   - URL添加端口号: ${getHttpProtocol()}://${host}:${port}/api/agent/...\n\n修复后的效果：\n前端现在会正确构建包含端口号的URL，例如：\n- WebSocket: ws://10.90.30.92:8000/api/agent/{agentId}/ws\n- HTTP: http://10.90.30.92:8000/api/agent/{agentId}/status\n\nGit commits:\n- 6157cf8: 修改buildAgentWebSocketUrl添加port参数\n- 9af0b3c: 修改connectToAgent传入port参数\n- 81141fb: 修改fetchAgentStatus添加port参数",
+  "created_at": "2026-03-19T09:52:23.335394",
+  "updated_at": "2026-03-19T09:52:23.335398"
+}

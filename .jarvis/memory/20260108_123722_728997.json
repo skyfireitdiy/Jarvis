@@ -1,0 +1,13 @@
+{
+  "id": "20260108_123722_728997",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "create_panel",
+    "code_review",
+    "implementation"
+  ],
+  "content": "在tmux_wrapper.py中新增了create_panel函数，用于在指定的tmux session和window中创建panel并执行初始命令。函数支持水平/垂直分割、工作目录设置、pane大小百分比控制等参数，并包含完整的参数验证和错误处理机制。该函数符合项目中tmux相关功能的最佳实践。",
+  "created_at": "2026-01-08T12:37:22.729024",
+  "updated_at": "2026-01-08T12:37:22.729028"
+}

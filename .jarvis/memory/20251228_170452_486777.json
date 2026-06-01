@@ -1,0 +1,13 @@
+{
+  "id": "20251228_170452_486777",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "testing",
+    "optimization",
+    "pytest"
+  ],
+  "content": "测试文件 tests/jarvis_utils/test_utils_retry.py 优化记录：\n- 优化前：总耗时约132秒，4个用例未使用 @patch\n- 优化方法：为 test_success_after_retries、test_max_retries_exceeded、test_true_after_retries、test_false_after_max_retries 添加 @patch('jarvis.jarvis_utils.utils.time.sleep')\n- 优化后：12 passed in 0.56s，满足<1秒的目标\n- 验证命令：pytest tests/jarvis_utils/test_utils_retry.py -v --durations=0",
+  "created_at": "2025-12-28T17:04:52.486824",
+  "updated_at": "2025-12-28T17:04:52.486828"
+}

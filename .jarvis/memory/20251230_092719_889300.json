@@ -1,0 +1,14 @@
+{
+  "id": "20251230_092719_889300",
+  "type": "project_long_term",
+  "tags": [
+    "ArrayField",
+    "test_field_factory",
+    "测试用例",
+    "jarvis_config",
+    "Textual测试"
+  ],
+  "content": "ArrayField 测试用例位置：tests/jarvis_config/test_field_factory.py\n\n新增测试类：\n1. TestArrayFieldNewFeatures (244-354行)：测试不同类型的数组字段创建\n2. TestArrayItemField (357-408行)：测试数组项组件\n3. TestObjectEditModal (411-447行)：测试对象编辑模态窗口\n4. TestArrayFieldMethods (450-544行)：测试 ArrayField 的核心方法\n5. TestArrayItemFieldMethods (547-591行)：测试 ArrayItemField 的核心方法\n\n已知问题：\n- 当前测试只验证了方法存在性（hasattr），未验证实际功能\n- 缺少添加/删除项的实际功能测试\n- 缺少对象编辑的交互流程测试\n- 这些功能需要在完整的 Textual Widget 环境中测试",
+  "created_at": "2025-12-30T09:27:19.889359",
+  "updated_at": "2025-12-30T09:27:19.889364"
+}

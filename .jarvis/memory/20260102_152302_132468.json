@@ -1,0 +1,8 @@
+{
+  "id": "20260102_152302_132468",
+  "type": "project_long_term",
+  "tags": ["jarvis", "sub_code_agent", "review_logic", "disable_review"],
+  "content": "在Jarvis项目中，sub_code_agent.py文件中的SubCodeAgentTool类现在自动禁用review功能（disable_review = True），不再从父代理继承disable_review配置。这是为了在子代码代理中自动禁用代码审查功能。",
+  "created_at": "2026-01-02T15:23:02.132495",
+  "updated_at": "2026-01-02T15:23:02.132498"
+}

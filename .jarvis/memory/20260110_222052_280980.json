@@ -1,0 +1,8 @@
+{
+  "id": "20260110_222052_280980",
+  "type": "project_long_term",
+  "tags": ["code_review", "run_loop", "tool_call", "output_filter"],
+  "content": "用户需求：修改LLM输出处理逻辑，当LLM返回内容包含工具调用时，需要将<TOOL_CALL>标签及其内容隐藏后打印出来。当前代码修改在run_loop.py中添加了_filter_tool_calls_from_response函数来过滤工具调用内容，并修改了输出逻辑。",
+  "created_at": "2026-01-10T22:20:52.280997",
+  "updated_at": "2026-01-10T22:20:52.281000"
+}

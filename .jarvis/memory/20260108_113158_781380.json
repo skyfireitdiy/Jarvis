@@ -1,0 +1,13 @@
+{
+  "id": "20260108_113158_781380",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "tool_executor",
+    "tool_confirmation",
+    "security"
+  ],
+  "content": "在jarvis_agent/tool_executor.py中添加了_tool_call_parser函数用于解析工具调用参数，修改了execute_tool_call函数在用户确认前显示工具名称和参数摘要。功能变更：\n1. 新增_format_tool_args函数，用于格式化工具参数为友好字符串，包含敏感字段过滤（password, token, key, secret, auth, credential）、复杂类型简化、长字符串截断等安全措施\n2. 修改execute_tool_call函数，在TOOL_CALL类型的工具执行前，提取并显示工具名称和参数摘要，帮助用户确认将要执行的操作\n3. 确认ToolRegistry._extract_tool_calls方法存在，用于提取工具调用信息",
+  "created_at": "2026-01-08T11:31:58.781405",
+  "updated_at": "2026-01-08T11:31:58.781409"
+}

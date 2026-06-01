@@ -1,0 +1,13 @@
+{
+  "id": "20260110_113318_627593",
+  "type": "project_long_term",
+  "tags": [
+    "tongyi",
+    "file_upload",
+    "platform_modification",
+    "code_refactoring"
+  ],
+  "content": "在src/jarvis/jarvis_platform/tongyi.py中删除了upload_files和support_upload_files两个方法实现，以及相关的_get_upload_token、_get_content_type辅助方法和uploaded_file_info变量使用。同时base.py中的对应抽象方法也被删除。这是为了统一按不支持文件上传处理，简化代码实现。",
+  "created_at": "2026-01-10T11:33:18.627641",
+  "updated_at": "2026-01-10T11:33:18.627647"
+}

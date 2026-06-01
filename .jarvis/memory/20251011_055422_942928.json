@@ -1,0 +1,15 @@
+{
+  "id": "20251011_055422_942928",
+  "type": "project_long_term",
+  "tags": [
+    "wireless_ai_security_competition",
+    "security_evolution",
+    "rust",
+    "policy",
+    "metrics",
+    "jarvis_multi_agent"
+  ],
+  "content": "竞赛目标（三维度）与硬性约束：\n1) 安全提升（安全免疫力）\n   - 目标：使经过Agent处理的代码库，内存安全问题减少90%以上\n   - 要求：Agent能识别适合局部修复的模块 vs 需要采用更安全范式（Rust）重构的模块\n   - 约束：新增代码默认采用内存安全的Rust实现方式（“Rust-first”）\n2) 智能创新（代码炼金术）\n   - 目标：在混合语言代码库中，安全关键路径的代码100%达到内存安全标准\n   - 策略：自动判断C/C++哪些模块保留并加固，哪些重写为Rust；确保跨语言模块无缝协作（FFI/ABI边界清晰）\n3) 持续演进生态（进化引擎）\n   - 目标：建立代码安全量化评估体系，输出模块级语言建议与改进路径；形成“安全性单向递增”的机制\n   - 约束：新功能优先Rust，存量代码逐步迁移到安全实现；持续提升安全基线（度量指标落地到CI）\n\n对应在 multi_agent/security_evolution.yaml 的落地方向：\n- 在 StrategyPlanner/TransformationEngineer 中明确“Rust-first政策”和关键路径100%内存安全的强约束；\n- 在 VerificationEngineer 中强化度量指标：如关键路径unsafe=0、整体unsafe<5%、内存缺陷回归<阈值、月度趋势必须改善；\n- 在 RiskAssessmentExpert 中要求统一评分模型输出量化指标（严重性/可利用性/影响/修复复杂度）并产出可供CI追踪的度量；\n- 在 SecurityEvolutionLead 中加入持续演进闭环：基线建立、指标存档、路线图与结果归档，最终生成07_final_security_evolution_report.md；\n- 增强工具使用建议：rg/clang-tidy/cppcheck/asan/ubsan/cargo clippy/miri 等集成点（后续在实现步骤中逐步加入）。\n",
+  "created_at": "2025-10-11T05:54:22.942969",
+  "updated_at": "2025-10-11T05:54:22.942973"
+}

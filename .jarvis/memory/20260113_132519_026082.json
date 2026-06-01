@@ -1,0 +1,13 @@
+{
+  "id": "20260113_132519_026082",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "get_tool_config",
+    "bug_fix",
+    "tool_configuration"
+  ],
+  "content": "jck工具检查功能的修复：修改了get_tool_config函数，使其不仅在TOOLS_CONFIG中查找工具配置，还会在LINT_TOOLS_CONFIG和BUILD_TOOLS_CONFIG中查找。这解决了当使用jck -l（--check-lint）检查lint工具时，虽然工具列表包含了ruff、mypy、pylint等工具，但get_tool_config无法找到这些工具配置信息的问题。修复前，jck -l显示所有工具都未安装（已安装的工具也显示为未安装），修复后可以正确识别已安装的工具。",
+  "created_at": "2026-01-13T13:25:19.026107",
+  "updated_at": "2026-01-13T13:25:19.026111"
+}

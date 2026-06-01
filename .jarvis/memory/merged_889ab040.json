@@ -1,0 +1,14 @@
+{
+  "content": "Jarvis项目版本发布基础信息记录\n\n【版本信息】\n- 最新git tag版本号: v0.7.1\n- 当前日期: 2025-11-11\n\n【用途说明】\n这些信息将用于后续生成release note和朋友圈文案，作为版本发布流程的基础数据输入",
+  "tags": [
+    "git-tag",
+    "current-date",
+    "release-info",
+    "version-tracking",
+    "release-preparation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251111_002823_939504", "20251111_005207_870569"],
+  "id": "merged_889ab040",
+  "created_at": "2025-11-12T23:40:50.422193"
+}

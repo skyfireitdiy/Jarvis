@@ -1,0 +1,14 @@
+{
+  "id": "20250922_032511_610922",
+  "type": "project_long_term",
+  "tags": [
+    "competition",
+    "deliverable",
+    "material_path",
+    "diagram",
+    "jarvis"
+  ],
+  "content": "参赛材料与架构图产出：\n- 参赛材料文件：/home/wangmaobin/code/Jarvis/无线AI安全工具大赛-参赛材料.md\n- 架构图文件：/home/wangmaobin/code/Jarvis/docs/images/security_vulnerability_arch.png\n- 材料已在“三、架构与关键实现（工程化能力背书）”章节顶部插入架构图引用：![](docs/images/security_vulnerability_arch.png)\n- 参赛工具：SecurityVulnerabilityAnalyst（/home/wangmaobin/code/Jarvis/builtin/agent/security_vulnerability_analyst.yaml）\n",
+  "created_at": "2025-09-22T03:25:11.611518",
+  "updated_at": "2025-09-22T03:25:11.611527"
+}

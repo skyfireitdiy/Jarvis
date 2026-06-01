@@ -1,0 +1,8 @@
+{
+  "id": "20260117_221246_412516",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "refactoring", "spec", "architecture"],
+  "content": "task_list_manager重构方案：将3078行代码拆分为9个独立模块（TaskListManager、DependencyValidator、TaskExecutor、TaskVerifier、TmuxExecutor、AgentFactory、OutputProcessor、TokenCalculator、TaskListManagerTool），每个模块<1000行，符合单一职责原则。Spec文档位置：.jarvis/spec/task_list_manager_spec.md",
+  "created_at": "2026-01-17T22:12:46.412540",
+  "updated_at": "2026-01-17T22:12:46.412543"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260213_110835_064356",
+  "type": "project_long_term",
+  "tags": ["jarvis_lsp", "LSP功能", "diagnostic", "codeAction", "功能开发"],
+  "content": "## jarvis_lsp diagnostic/codeAction 功能开发完成\n\n**功能概述**：实现了 textDocument/diagnostic 和 textDocument/codeAction LSP 功能，为 LLM Agent 提供代码质量检查和自动修复能力。\n\n**核心功能**：\n1. diagnostic - 获取代码诊断信息（错误、警告、提示）\n2. codeAction - 获取代码修复建议（重构、优化）\n3. codeAction-by-name - 通过符号名获取修复建议（LLM 友好）\n\n**LLM 优化**：\n- 移除 --severity 参数（默认返回所有诊断）\n- 移除 column 参数（默认为 0）\n- 新增 codeAction-by-name 命令（基于符号名）\n\n**修改的文件**：\n- src/jarvis/jarvis_lsp/protocol.py（新增数据类）\n- src/jarvis/jarvis_lsp/client.py（新增方法）\n- src/jarvis/jarvis_lsp/daemon.py（新增方法）\n- src/jarvis/jarvis_lsp/daemon_client.py（新增方法）\n- src/jarvis/jarvis_lsp/cli.py（新增命令）\n- builtin/rules/development_tools/lsp_usage.md（新增规则文档）\n\n**代码质量**：\n- mypy strict 检查通过\n- ruff 检查通过\n- markdownlint 检查通过\n\n**性能表现**：\n- 第一次查询：约 5-7 秒（启动守护进程 + LSP 服务器 + 初始化）\n- 后续查询：约 5 秒（复用服务器，性能显著提升）\n\n**已知限制**：pylsp 不支持 textDocument/diagnostic 方法，工具会返回友好错误信息。",
+  "created_at": "2026-02-13T11:08:35.064379",
+  "updated_at": "2026-02-13T11:08:35.064383"
+}

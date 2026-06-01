@@ -1,0 +1,13 @@
+{
+  "id": "20250805_161526_259020",
+  "type": "project_long_term",
+  "tags": [
+    "platform_manager",
+    "jpm",
+    "cli_design",
+    "role_command"
+  ],
+  "content": "Jarvis Platform Manager (jpm) role命令参数设计：\n\nrole命令支持的参数：\n- -c/--config: 角色配置文件路径（默认: ~/.jarvis/roles.yaml）\n- -p/--platform: 指定平台，覆盖角色配置\n- -m/--model: 指定模型，覆盖角色配置\n- -t/--llm_type: 指定LLM类型（'normal'或'thinking'），覆盖角色配置\n- -g/--llm_group: 指定模型组，覆盖配置文件中的设置\n\n参数优先级：\n1. 命令行参数最高优先级\n2. llm_group配置（如果提供）\n3. 角色配置文件中的设置\n4. 系统默认配置\n\n实现细节：\n- role_command函数位于src/jarvis/jarvis_platform_manager/main.py\n- 使用role_llm_type变量避免与参数名冲突\n- 调用chat_with_model时传递llm_type参数以支持思考模式\n",
+  "created_at": "2025-08-05T16:15:26.259059",
+  "updated_at": "2025-08-05T16:15:26.259064"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260208_115008_392641",
+  "type": "project_long_term",
+  "tags": [
+    "session_manager",
+    "start_commit",
+    "commit_validation",
+    "session_restore"
+  ],
+  "content": "## SessionManager start_commit 恢复验证逻辑\n\n### 需求背景\n在恢复会话时，不仅要验证 start_commit 是否存在，还要验证仓库状态是否改变。\n\n### 实现方案\n\n#### 保存时（_save_commit_info）\n- 保存 `current_commit`（当时的最新 commit）\n- 保存 `start_commit`（任务的起始 commit）\n\n#### 恢复时（_restore_start_commit_info）\n1. 读取保存的 `saved_current_commit` 和 `saved_start_commit`\n2. 获取当前的 `current_commit`\n3. **对比验证**：\n   - 如果 `saved_current_commit != current_commit`：仓库状态已改变，**忽略保存的 start_commit**，直接使用当前最新 commit\n   - 如果一致：正常恢复保存的 `start_commit`\n   - 如果没有保存的 `start_commit`：使用当前最新 commit\n\n### 核心代码位置\n- `src/jarvis/jarvis_agent/session_manager.py:371-440` - _save_commit_info\n- `src/jarvis/jarvis_agent/session_manager.py:1081-1142` - _restore_start_commit_info\n\n### 设计思路\n通过对比保存时的 current_commit 和恢复时的 current_commit，可以准确判断仓库状态是否改变。这样可以避免在仓库状态改变后恢复错误的 start_commit，确保会话恢复的安全性。",
+  "created_at": "2026-02-08T11:50:08.392668",
+  "updated_at": "2026-02-08T11:50:08.392672"
+}

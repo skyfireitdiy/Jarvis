@@ -1,0 +1,14 @@
+{
+  "id": "20260102_153029_957397",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "task_list_manager",
+    "output_length",
+    "llm_context",
+    "dynamic_calculation"
+  ],
+  "content": "在Jarvis的task_list_manager.py中，已将固定的输出长度限制DEFAULT_MAX_TASK_OUTPUT_LENGTH（10000字符）替换为基于LLM模型配置的动态计算函数_calculate_default_max_output_length。该函数会根据agent的模型配置或全局模型组配置来计算合适的输出长度，通过get_max_input_token_count获取最大输入token数，然后计算限制值（取1/3的token数再转换为字符数），并确保返回值不小于1000字符。这解决了硬编码固定值的问题，使输出长度能够根据LLM的上下文窗口动态调整。",
+  "created_at": "2026-01-02T15:30:29.957430",
+  "updated_at": "2026-01-02T15:30:29.957433"
+}

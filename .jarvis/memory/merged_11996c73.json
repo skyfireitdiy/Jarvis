@@ -1,0 +1,24 @@
+{
+  "content": "Jarvis C2Rust 测试框架生成 Agent 实现与 Step 1 完成状态 + Web 后台运行机制\n\n【Jarvis C2Rust 测试框架生成 Agent】\n- 功能目标：为 C/C++ 项目生成测试框架的 Agent，负责为已有的 C/C++ 代码创建测试框架\n- 最终在 .jarvis/c2rust/test.sh 生成可执行测试脚本，运行该脚本可执行当前 C 项目的所有测试\n- 优先适配通用构建/测试入口：make test/check, ctest, meson test 等；若不存在则提供可扩展的占位实现\n- 最小变更、与现有 CLI 风格一致\n\n【实现位置】\n- 在 src/jarvis/jarvis_c2rust/cli.py 中定义测试框架生成 Agent\n\n【Step 1 完成状态】\n- CLI 命令：python -m jarvis.jarvis_c2rust.cli --root .\n- 生成文件：\n  * 测试脚本: .jarvis/c2rust/test.sh\n  * 进度文件: .jarvis/c2rust/progress.json\n\n【检测结果】\n- build_system: unknown（未检测到CMake/Meson/Autotools/Make/Bazel）\n- tests_found: false（无显式测试，已搭建smoke test）\n\n【test.sh 逻辑设计】\n- 构建阶段：若无法识别构建系统则跳过，仅输出提示\n- 测试阶段：无显式测试时执行smoke检查（构建成功即通过）\n- 扩展性：为后续添加具体测试用例预留接口\n\n【进度管理】\n- 断点续跑：进度写入 .jarvis/c2rust/progress.json（step=1, status=prepared）\n- 版本控制：当前源码改动已存在或与HEAD一致，git未检测到差异；后续步骤产生变更时统一按 [JARVIS-C2RUST] 规范提交\n\n【设计原则】\n- 兼容性优先：优先适配主流构建系统（CMake/Meson/Autotools/Make/Bazel）\n- 渐进增强：从smoke test开始，逐步完善具体测试用例\n- 最小侵入：不修改现有构建配置，仅生成独立测试脚本\n- 可扩展性：为复杂测试场景预留扩展点\n\n【预期作用】\n- 为 C2Rust 转译前后的代码提供统一测试框架\n- 支持构建验证与基本功能检查\n- 为后续 Rust 代码测试迁移提供基线参考\n- 保障转译过程中功能等价性验证\n\n【Web 后台运行机制】\n1) 每任务新建 Agent：\n   - 修改 web_server.py：/ws run_task 分支若 app.state.agent_manager 存在则调用 initialize() 生成新 Agent 执行；否则回退旧行为\n   - 修改 jarvis.py：start_web_server 传入 AgentManager 而非 Agent，以触发上述逻辑\n\n2) Web 后台运行/停止：\n   - jarvis.py：在 --web 时，若非子进程（JARVIS_WEB_DAEMON!=1），父进程以子进程方式后台启动自身（传递 --web/host/port 等），并写入 PID 文件 ~/.jarvis/jarvis_web_{port}.pid，然后返回\n   - 子进程（JARVIS_WEB_DAEMON=1）执行原始初始化流程并启动 uvicorn\n   - web_server.py：服务进程内也写 PID 文件并注册 atexit 和 SIGTERM/SIGINT 处理，确保正常退出清理 PID\n   - --web --stop：优先读取 ~/.jarvis/jarvis_web_{port}.pid 停止；兼容旧位置（data_dir）；若无 PID 文件，则按端口使用 lsof/ss 尝试查找并发送 SIGTERM；最后回退扫描 ~/.jarvis 下所有 jarvis_web_*.pid 尝试清理\n\n3) PID 文件规范：主路径固定 ~/.jarvis/jarvis_web_{port}.pid，兼容旧版 data_dir 路径读取与清理\n\n4) 兼容性与回退：未安装 lsof/ss 时不会报错，按可用信息尽力停止；若仍无法识别，给出提示\n\n【系统集成】\n- C2Rust 测试框架与 Web 后台运行机制共同支撑 Jarvis 多Agent系统的工程化部署\n- 测试脚本为迁移过程提供功能验证基线\n- Web 后台运行支持长时间任务的稳定执行与管理\n- 两者均遵循最小侵入与渐进增强的设计原则",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "test_script",
+    "agent",
+    "cli",
+    "step1",
+    "progress",
+    "build_integration",
+    "smoke_test",
+    "web_server",
+    "background",
+    "daemon",
+    "pidfile",
+    "web_mode",
+    "agent_management"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_38cd2c91", "20251008_212456_823216"],
+  "id": "merged_11996c73",
+  "created_at": "2025-11-12T23:42:34.301789"
+}

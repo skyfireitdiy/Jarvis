@@ -1,0 +1,15 @@
+{
+  "id": "20260206_125838_780920",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "commit命令",
+    "prefix",
+    "suffix",
+    "CodeAgent",
+    "handle_commit_confirmation"
+  ],
+  "content": "【Bug修复完成】commit命令使用agent中存储的prefix和suffix\n\n问题：builtin_input_handler.py中的commit命令直接使用GitCommitTool，只创建checkpoint而不是执行真正的git commit。\n\n根因：\n1. 错误使用了GitCommitTool().execute()，该工具只创建checkpoint\n2. 没有使用agent中存储的prefix和 suffix配置\n\n修复方案：\n1. 修改commit命令调用agent.git_manager.handle_commit_confirmation()方法\n2. 在CodeAgent类中添加prefix和suffix属性（在_init_code_agent_base_attributes中初始化为空字符串）\n3. 在CodeAgent.run()方法中设置self.prefix和self.suffix\n4. 修改builtin_input_handler.py使用agent.prefix和agent.suffix\n5. 在Agent基类中添加prefix和suffix属性的类型注解\n\n修改文件：\n- src/jarvis/jarvis_agent/builtin_input_handler.py（修改commit命令实现）\n- src/jarvis/jarvis_code_agent/code_agent.py（添加prefix/suffix属性并设置值）\n- src/jarvis/jarvis_agent/__init__.py（添加类型注解）\n\n验收标准：\n1. commit命令调用handle_commit_confirmation()执行真正的git commit\n2. 使用agent中存储的prefix和 suffix生成提交信息\n3. 通过mypy静态类型检查\n\n状态：已完成并验证",
+  "created_at": "2026-02-06T12:58:38.780942",
+  "updated_at": "2026-02-06T12:58:38.780946"
+}

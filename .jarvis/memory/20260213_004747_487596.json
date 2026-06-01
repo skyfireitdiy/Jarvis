@@ -1,0 +1,8 @@
+{
+  "id": "20260213_004747_487596",
+  "type": "project_long_term",
+  "tags": ["jarvis_lsp", "client", "fix", "completed"],
+  "content": "jarvis_lsp 客户端功能修复完成\n\n问题诊断：\n- LSP 服务器初始化超时（10秒）导致功能不正常\n- pylsp 初始化需要较长时间，10秒超时不够\n\n修复方案：\n- 将 LSPServerInstance.initialize_timeout 从 10 秒增加到 30 秒\n- 修改文件：src/jarvis/jarvis_lsp/server_manager.py\n\n验证结果：\n✅ document_symbols 命令正常工作，成功返回符号列表\n✅ daemon status 命令正常显示守护进程和 LSP 服务器状态\n✅ 守护进程自动启动功能正常工作\n✅ LSP 服务器复用机制正常工作\n✅ 代码质量：mypy strict 通过，ruff 通过\n\n性能表现：\n- 第一次查询：约 27 秒（启动守护进程 + LSP 服务器 + 初始化）\n- 后续查询：约 5 秒（复用服务器，性能显著提升）\n\n相关文件：\n- src/jarvis/jarvis_lsp/server_manager.py (修改：增加超时时间)\n- src/jarvis/jarvis_lsp/daemon.py (守护进程管理)\n- src/jarvis/jarvis_lsp/daemon_client.py (自动启动守护进程)\n- src/jarvis/jarvis_lsp/cli.py (CLI 接口)",
+  "created_at": "2026-02-13T00:47:47.487624",
+  "updated_at": "2026-02-13T00:47:47.487629"
+}

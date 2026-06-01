@@ -1,0 +1,18 @@
+{
+  "id": "20251105_032043_685214",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_sec",
+    "clustering",
+    "workflow",
+    "agent_pipeline",
+    "cluster_report",
+    "hid",
+    "verify",
+    "batching",
+    "progress"
+  ],
+  "content": "已在 jarvis.jarvis_sec.__init__.py 的 run_security_analysis 中插入“启发式聚类”步骤（直扫 → 聚类 → 单Agent验证）。\n关键点：\n- 对直扫候选进行精简后（compact_candidates），为每个候选生成：\n  - hid: 基于 file:line:category:pattern 的稳定哈希，前缀 H{C|R}，用于“告警编号”\n  - verify: 启发式“验证条件”描述，用于聚类与后续Agent上下文\n- 生成聚类报告：写入 {entry_path}/.jarvis/sec/cluster_report.json\n  - 字段：file, verification, issue_ids(=hid list), count\n- 批处理策略调整：\n  - 先在文件维度筛选（原逻辑保留，只处理单个文件），随后按 verify 聚类，单聚类作为一个批次提交Agent\n  - 每批上下文包含：cluster_verification, cluster_issue_ids, 以及批次候选（含 id/hid/verify）\n- Agent 输出解析逻辑兼容原有 id 映射；hid/verify 会随候选写入 JSONL 报告（.jarvis/sec/agent_issues.jsonl）\n- 目的：减少重复验证工作量，将“验证条件一致”的告警一次性处理，提高效率与一致性。\n",
+  "created_at": "2025-11-05T03:20:43.685254",
+  "updated_at": "2025-11-05T03:20:43.685260"
+}

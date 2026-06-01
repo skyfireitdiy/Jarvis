@@ -1,0 +1,12 @@
+{
+  "id": "20260115_103653_210639",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "tool-checker",
+    "cli"
+  ],
+  "content": "jck命令的实现位置：CLI入口在src/jarvis/jarvis_jck/cli.py，核心检查逻辑在src/jarvis/jarvis_jck/core.py的ToolChecker类。当前逻辑：检查工具安装状态，显示安装建议，返回退出码1（如有未安装工具）",
+  "created_at": "2026-01-15T10:36:53.210659",
+  "updated_at": "2026-01-15T10:36:53.210663"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260117_094941_985750",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-architecture",
+    "data-flow",
+    "user-input-processing"
+  ],
+  "content": "# Jarvis项目核心数据流和用户输入处理路径\n\n## 核心数据流\n1. 用户输入 → 输入处理器 → Agent运行循环 → 模型调用 → 工具调用 → 结果返回\n\n## 用户输入处理路径\n1. **输入接收**：通过`run(user_input: str)`方法接收用户输入\n2. **输入处理**：使用`builtin_input_handler`、`shell_input_handler`等处理器处理特殊标记\n   - `'<Pin>'`：固定重要内容\n   - `'<Summary>'`：触发摘要\n   - `'<Clear>'`：清空历史\n   - `'<ToolUsage>'`：获取工具使用提示\n   - `!`命令：执行shell命令\n3. **模型调用**：通过`_call_model()`调用AI模型获取响应\n   - 处理附加提示\n   - 管理对话长度\n   - 自动总结触发（基于token限制）\n4. **工具处理**：通过`_call_tools()`解析和执行工具调用\n   - ToolRegistry负责工具调用的解析和执行\n   - 支持多种工具协议版本\n5. **结果输出**：格式化输出结果并继续下一轮对话\n\n## 关键组件\n- `AgentRunLoop`：主运行循环，协调整个处理流程\n- `SessionManager`：管理会话状态和持久化\n- `ToolRegistry`：工具注册和执行系统\n- `MemoryManager`：三层记忆管理\n\n## 安全考虑\n- 工具调用参数过滤敏感信息（如password、token等）\n- 支持确认机制防止误操作\n- 上下文长度管理防止溢出\n- 会话持久化和恢复机制",
+  "created_at": "2026-01-17T09:49:41.985773",
+  "updated_at": "2026-01-17T09:49:41.985777"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260114_003813_988292",
+  "type": "project_long_term",
+  "tags": [
+    "prompt-optimization",
+    "load_rule",
+    "system-prompt",
+    "tool-priority"
+  ],
+  "content": "系统提示词优化：在 code_agent_prompts.py 中新增了'🚨 核心工具优先级'章节，位于元指令之后、模式速览之前。该章节强调 load_rule 工具是最高优先级工具，任何涉及项目规范、编码标准、流程定义、最佳实践的任务必须首先调用。规则文件包含架构设计原则、开发流程规范、代码质量标准、安全编码规范、性能优化指南、测试规范、工具配置等关键信息。规则目录位置：.jarvis/rules/ 和 builtin/rules/",
+  "created_at": "2026-01-14T00:38:13.988306",
+  "updated_at": "2026-01-14T00:38:13.988308"
+}

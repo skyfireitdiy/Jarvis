@@ -1,0 +1,13 @@
+{
+  "id": "20260130_235709_641463",
+  "type": "project_long_term",
+  "tags": [
+    "refactoring",
+    "move_method",
+    "jarvis_auto_fix",
+    "implementation"
+  ],
+  "content": "## MoveMethodRefactorer实现总结\n\n**文件位置**：\n- 实现：src/jarvis/jarvis_auto_fix/refactoring/move_method.py (~263行)\n- 测试：tests/jarvis_auto_fix/test_move_method.py (24个测试用例)\n- 模块导出：src/jarvis/jarvis_auto_fix/refactoring/__init__.py\n\n**核心类**：\n- MoveResult: 移动操作结果\n- MethodInfo: 方法信息（名称、参数、依赖等）\n- MethodAnalyzer: AST访问器，分析方法的依赖关系和self引用\n- MoveMethodRefactorer: 主重构器类\n\n**核心功能**：\n- move_method(): 主入口，将方法从源类移动到目标类\n- analyze_method_dependencies(): 分析方法的依赖\n- suggest_target_class(): 建议目标类\n\n**安全检查**：\n- 禁止移动抽象方法\n- 检查目标类是否已有同名方法\n\n**关键实现细节**：\n1. 使用field(default_factory=set)初始化Set类型的dataclass字段\n2. 处理空类：当移除方法后源类变空时，用pass语句替换而不是删除\n3. 处理目标类在源类之前的情况：需要正确调整行号\n4. 与FixHistory集成，支持回滚\n\n**测试覆盖率**：80%",
+  "created_at": "2026-01-30T23:57:09.641479",
+  "updated_at": "2026-01-30T23:57:09.641487"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20250922_032511_615028",
+  "type": "project_long_term",
+  "tags": [
+    "deployment",
+    "offline",
+    "compliance",
+    "config"
+  ],
+  "content": "无公网环境部署与合规要点（用于答辩与复用）：\n- 平台切换：通过 PlatformRegistry 指向内网LLM（OpenAI兼容网关/自研平台）\n- 推荐配置：~/.jarvis/config.yaml\n  JARVIS_PLATFORM: openai\n  ENV:\n    OPENAI_API_BASE: http://<内网LLM网关>/v1\n    OPENAI_API_KEY: <内网凭证>\n  JARVIS_EXECUTE_TOOL_CONFIRM: true\n  JARVIS_TOOL_FILTER_THRESHOLD: 30\n- 禁用/限制外网工具：启用执行确认，拒绝 search_web/read_webpage 等外网访问；或通过策略仅允许内网域名\n- 平台适配层位置：src/jarvis/jarvis_platform（kimi/openai/yuanbao/tongyi 等均可替换为内网端点）\n",
+  "created_at": "2025-09-22T03:25:11.615081",
+  "updated_at": "2025-09-22T03:25:11.615088"
+}

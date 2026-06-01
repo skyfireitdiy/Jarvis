@@ -1,0 +1,13 @@
+{
+  "id": "20260105_100214_511510",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "read_code",
+    "path_expansion",
+    "os.path.expanduser"
+  ],
+  "content": "在read_code.py的_read_single_file方法中，对filepath的处理已从直接使用os.path.abspath(filepath)修改为先调用os.path.expanduser(filepath)再转为绝对路径。这样做可以正确处理包含~的路径，将其展开为用户的home目录。修改后的代码：expanded_path = os.path.expanduser(filepath); abs_path = os.path.abspath(expanded_path)。原有的错误处理逻辑、文件验证检查等功能都保持不变。",
+  "created_at": "2026-01-05T10:02:14.511542",
+  "updated_at": "2026-01-05T10:02:14.511546"
+}

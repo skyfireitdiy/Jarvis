@@ -1,0 +1,14 @@
+{
+  "id": "20260201_113617_710363",
+  "type": "project_long_term",
+  "tags": [
+    "digital_twin",
+    "proactive_service",
+    "manager",
+    "阶段5.3",
+    "ProactiveServiceManager"
+  ],
+  "content": "## 阶段5.3.6 ProactiveServiceManager实现完成\n\n### 关键文件\n- 实现文件：`src/jarvis/jarvis_digital_twin/proactive_service/manager.py`（约250行）\n- 测试文件：`tests/jarvis_digital_twin/test_proactive_service_manager.py`（26个测试用例）\n- 模块导出：`src/jarvis/jarvis_digital_twin/proactive_service/__init__.py`\n- AgentRunLoop集成：`src/jarvis/jarvis_agent/run_loop.py`\n\n### ProactiveServiceManager核心功能\n1. `process_context()` - 处理上下文，执行主动服务（触发检查→编排→执行）\n2. `register_service()` - 注册服务（定义、处理器、评估器）\n3. `unregister_service()` - 注销服务\n4. `record_feedback()` - 记录用户反馈\n5. `get_service_stats()` - 获取服务统计\n6. `learn_and_adjust()` - 学习并调整策略\n\n### 依赖组件\n- ServiceTrigger（timing_judge可选注入）\n- ServiceOrchestrator（need_inferrer可选注入）\n- ServiceExecutor\n- FeedbackLearner（preference_learner可选注入）\n\n### AgentRunLoop集成\n- 在`_init_autonomous_components`中初始化ProactiveServiceManager\n- 在`_preprocess_user_input`中调用`process_context`处理主动服务\n- 通过`is_enable_autonomous()`配置启用\n\n### 测试覆盖率\n- manager.py: 97%（26个测试用例全部通过）\n- 现有AgentRunLoop测试不受影响",
+  "created_at": "2026-02-01T11:36:17.710381",
+  "updated_at": "2026-02-01T11:36:17.710384"
+}

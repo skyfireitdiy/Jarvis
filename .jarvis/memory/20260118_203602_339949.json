@@ -1,0 +1,8 @@
+{
+  "id": "20260118_203602_339949",
+  "type": "project_long_term",
+  "tags": ["refactoring", "task_list_manager", "SDD", "module_split"],
+  "content": "task_list_manager.py重构：3078行拆分为7个类（TaskListManager、DependencyValidator、TaskExecutor、TaskVerifier、AgentStateManager、TaskListTool、TaskListUtils），每个类控制在600行以内。Spec文档位于：/home/skyfire/code/Jarvis/.jarvis/spec/task_list_manager_refactoring.md",
+  "created_at": "2026-01-18T20:36:02.339987",
+  "updated_at": "2026-01-18T20:36:02.339991"
+}

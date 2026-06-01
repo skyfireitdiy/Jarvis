@@ -1,0 +1,13 @@
+{
+  "id": "20260108_124846_999591",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "dispatch_command_to_panel",
+    "panel_management",
+    "pane_count_bug"
+  ],
+  "content": "dispatch_command_to_panel函数实现细节：\n1. 函数功能：将shell命令派发到合适的tmux panel中执行\n2. 实现逻辑：\n   - 查找或创建{username}-jarvis-前缀的tmux session\n   - 获取session的所有window\n   - 遍历windows，查找panel数量不足4个的第一个window\n   - 根据panel数量智能选择分割方向：pane_count=1/3时使用水平分割(h)，pane_count=2时使用垂直分割(v)\n   - 在找到的window中创建panel并执行命令\n   - 如果没有panel数量不足4个的window，则创建新window再创建panel\n3. 返回值：成功返回创建的pane_id，失败返回None\n4. pane数量限制为4，与项目中其他地方的MAX_PANES_PER_WINDOW=4保持一致\n5. window名称生成：使用命令的前20个字符，格式为'cmd-{clean_name}'",
+  "created_at": "2026-01-08T12:48:46.999616",
+  "updated_at": "2026-01-08T12:48:46.999619"
+}

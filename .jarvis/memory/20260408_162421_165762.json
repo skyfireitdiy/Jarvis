@@ -1,0 +1,14 @@
+{
+  "id": "20260408_162421_165762",
+  "type": "project_long_term",
+  "tags": [
+    "bug修复",
+    "前端",
+    "VS Code扩展",
+    "状态管理",
+    "经验总结"
+  ],
+  "content": "## Bug修复：创建Agent时选择工作目录后agent类型被重置\n\n**问题描述**：\n在extension.ts中创建agent时，选择工作目录后，agent类型的选项会被重置，之前选择的类型丢失了。\n\n**根本原因**：\nagentType下拉菜单缺少change事件监听器。用户选择的agent类型不会被保存到createAgentFormState.agentType状态中。当选择工作目录后触发renderAgentListView()重建DOM时，会使用状态中的旧值（默认值'agent'）来渲染下拉菜单，导致用户的选择丢失。\n\n**修复方案**：\n1. 前端：在getAgentListHtml()方法中为agentType下拉菜单添加change事件监听器，发送changeAgentType消息到后端\n2. 后端：添加changeAgentType消息处理逻辑，调用updateCreateAgentDefaults()更新createAgentFormState.agentType状态\n\n**修改文件**：\n- src/jarvis/jarvis_vscode_extension/src/extension.ts\n\n**经验教训**：\n- 在VS Code Webview中，所有表单元素的状态变化都需要通过消息传递到后端保存\n- HTML模板中的selected属性只是初始渲染状态，不会跟踪用户交互后的变化\n- 需要确保前端事件监听器和后端消息处理的一致性",
+  "created_at": "2026-04-08T16:24:21.165795",
+  "updated_at": "2026-04-08T16:24:21.165799"
+}

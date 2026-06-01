@@ -1,0 +1,8 @@
+{
+  "id": "20260114_220157_143191",
+  "type": "project_long_term",
+  "tags": ["welcome_panel", "ui_width", "rich_panel", "completed_task"],
+  "content": "[UI优化-已完成] 修改欢迎panel宽度样式（Commit ID: dc86361）\n- 位置：src/jarvis/jarvis_utils/utils.py:962-977\n- 变更内容：实现panel宽度为max(终端宽度的1/2, 文字最小宽度)，且居中显示\n- 核心代码：使用terminal_width和content_width计算panel_width，设置expand=False和width=panel_width，使用Align.center()实现居中\n- 验证状态：编译通过，功能运行验证通过\n- 相关技术：Rich库的Panel组件、动态宽度计算、居中对齐",
+  "created_at": "2026-01-14T22:01:57.143228",
+  "updated_at": "2026-01-14T22:01:57.143233"
+}

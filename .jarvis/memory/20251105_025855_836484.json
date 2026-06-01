@@ -1,0 +1,14 @@
+{
+  "id": "20251105_025855_836484",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_sec",
+    "workflow",
+    "clustering",
+    "design_decision",
+    "implementation_plan"
+  ],
+  "content": "变更目标：在启发式扫描与Agent逐条分析之间增加“启发式告警聚类”步骤，减少后续Agent工作量；为所有启发式告警编号并输出聚类报告。本次仅实现扫描侧的编号+聚类与报告输出，不改动Agent处理流程。\n\n改造范围：src/jarvis/jarvis_sec/workflow.py\n- direct_scan: 在生成 issues 后，按顺序为每条告警分配全局递增ID（issue_id，从1开始），返回JSON中的issues带id。\n- 新增：compute_verification_key(issue_dict) 基于 category/pattern/evidence 进行轻量启发式键提取（如变量名、API名、UAF变量、unwrap等），用于近似“验证条件”。\n- 新增：build_clusters(issues, base_path) 以 (file, verification_key) 为聚类键，输出 clusters 列表：[{cluster_id, file, verification_key, category, language, issue_ids, count, representative_evidence, description_hint}]。\n- format_markdown_report: 在“统计概览”和“详细问题”之间新增“启发式聚类报告”章节，列出每个聚类的关键信息与包含的 issue_id 列表。\n- 返回结构：在 direct_scan 的 result 中新增 \"clusters\"；\"issues\" 为字典列表（asdict+id）。\n- run_with_agent：暂不修改（仍调用 jarvis.jarvis_sec.run_security_analysis）；后续Agent适配将读取 clusters 以成组处理。\n\n兼容性与最小变更：\n- 不修改 Issue dataclass，仅在输出JSON中加 id 字段。\n- 不影响现有 build_json_and_markdown 的调用路径；run_security_analysis_fast 如需展示聚类，可后续再改 oh_sec.report 模块，此次不动。\n- 代码风格与现有模块一致，函数内聚、无外部依赖。\n",
+  "created_at": "2025-11-05T02:58:55.836514",
+  "updated_at": "2025-11-05T02:58:55.836518"
+}

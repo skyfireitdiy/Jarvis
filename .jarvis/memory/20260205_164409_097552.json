@@ -1,0 +1,8 @@
+{
+  "id": "20260205_164409_097552",
+  "type": "project_long_term",
+  "tags": ["gitignore", "git_utils", "功能实现"],
+  "content": "          ## git_utils.py 默认 ignore 清单功能实现完成\n         \n          ### 实现内容\n          1. 导入 FileIgnorePatterns 类用于获取各语言默认 ignore 模式\n          2. 新增 get_default_gitignore_templates() 函数\n             - 按语言分组：Python, Rust, Go, Node.js, Java, C/C++, .NET\n             - 包含通用构建产物、依赖目录、IDE配置等\n             - 返回格式化的 .gitignore 内容\n          3. 修改 confirm_add_new_files() 函数\n             - 检测 .gitignore 是否缺少常见默认规则\n             - 提示用户是否添加默认模板\n             - 支持新建或追加模式\n             - 避免重复添加已存在的规则\n         \n          ### 修改文件\n          - src/jarvis/jarvis_utils/git_utils.py\n         \n          ### 提交记录\n          - Commit 1: a2a69ae - 添加导入和 get_default_gitignore_templates 函数，修改 confirm_add_new_files 逻辑\n          - Commit 2: 853a90c - 修复 mypy 类型错误，优化文件打开逻辑\n         \n          ### 验证状态\n          - ✅ 基础静态检查通过\n          - ✅ mypy 类型检查通过\n         \n          ### 功能特点\n          - 按语言分组，带注释说明\n          - 仅在用户需要时才添加默认模板\n          - 自动检测避免重复添加\n          - 支持新建和追加两种模式\n",
+  "created_at": "2026-02-05T16:44:09.097578",
+  "updated_at": "2026-02-05T16:44:09.097583"
+}

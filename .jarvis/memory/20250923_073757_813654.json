@@ -1,0 +1,15 @@
+{
+  "id": "20250923_073757_813654",
+  "type": "project_long_term",
+  "tags": [
+    "migration",
+    "rust",
+    "jarvis_agent",
+    "__init__.py",
+    "design_decision",
+    "implementation"
+  ],
+  "content": "已实施的迁移变更：\n1) 在 rust/jarvis_native/src/agent.rs 新增 PyClass Agent（Rust包装器），构造时通过 kwargs 透传构建 Python 侧原 Agent（在 __init__.py 中别名为 _PyAgent），并实现：\n   - __getattr__：将缺失属性与方法访问转发到内层 Python Agent（返回绑定到内层对象的属性/方法）\n   - __setattr__：将属性赋值转发到内层对象（兼容 agent.model = ... 等写法）\n   - getter/setter：为 run_input_handlers_next_turn、first 提供显式访问器（与运行循环紧密相关）\n   - __repr__、__inner__：便于调试与检查\n2) rust/jarvis_native/src/lib.rs 导出 m.add_class::<agent::Agent>()，jarvis_native 模块公开 Agent 类。\n3) Python 侧 src/jarvis/jarvis_agent/__init__.py：\n   - 保留原完整 Python Agent 并赋别名 _PyAgent\n   - 默认将公开的 Agent 绑定为 _jarvis_native.Agent（Rust包装器）；若原生模块不可用则回退为 _PyAgent\n   - 增加 __all__ = [\"Agent\", \"origin_agent_system_prompt\", \"show_agent_startup_stats\"] 保持公共API稳定\n4) 保持对外导入路径不变：from jarvis.jarvis_agent import Agent 仍可用；isinstance(agent, Agent) 仍成立（因两侧使用相同导出类对象）\n\n当前状态评估：\n- 功能保持不变：Rust Agent 作为薄包装委托至原 Python Agent，外部行为一致\n- 默认启用原生包装器，降低后续逐步迁移内部逻辑的成本\n- 未真正重写业务逻辑至 Rust，仅完成“入口与对象层”的 Rust 化与兼容转发\n\n回滚方式：\n- 若发现兼容问题：将 __init__.py 中的 Agent 映射改回 _PyAgent（或设置为在 import 失败时自动回退）\n\n下一步建议：\n- 逐步将 _call_model/_complete_task/_first_run 等关键路径在 Rust 中实现，并在 Rust 包装器中直接调用 Python组件（EventBus/PromptManager/ToolRegistry/Platform/Session等），保持事件流与接口不变\n- 将 show_agent_startup_stats 迁移/桥接到 Rust（可先从 Rust 调 Python 获取统计数据）\n- 增加单元测试覆盖 import、run、clear_history、tool 执行与事件触发，在 JARVIS_NATIVE 打开/关闭两种模式下验证一致性\n",
+  "created_at": "2025-09-23T07:37:57.813768",
+  "updated_at": "2025-09-23T07:37:57.813777"
+}

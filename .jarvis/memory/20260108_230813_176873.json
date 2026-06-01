@@ -1,0 +1,8 @@
+{
+  "id": "20260108_230813_176873",
+  "type": "project_long_term",
+  "tags": ["jarvis", "tmux", "tmux_wrapper", "session", "panel"],
+  "content": "tmux_wrapper.py 是 jarvis 项目的核心模块，负责 tmux 会话管理。主要函数：\n1. find_or_create_jarvis_session：查找或创建 jarvis session，支持 initial_command 参数直接以指定命令启动\n2. dispatch_command_to_panel：调度命令到 panel，优先使用现有 session，没有则创建新 session\n3. create_panel：在指定 session/window 创建 panel 并执行初始命令\n设计理念：优先复用现有 session，避免创建冗余的 shell pane，减少资源浪费",
+  "created_at": "2026-01-08T23:08:13.176893",
+  "updated_at": "2026-01-08T23:08:13.176895"
+}

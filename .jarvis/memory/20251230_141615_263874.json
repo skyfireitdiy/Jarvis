@@ -1,0 +1,16 @@
+{
+  "id": "20251230_141615_263874",
+  "type": "project_long_term",
+  "tags": [
+    "on_mount",
+    "MountError",
+    "TUI",
+    "ScrollableContainer",
+    "tui_app.py",
+    "Textual框架",
+    "组件生命周期"
+  ],
+  "content": "TUI 组件挂载错误修复经验：\n问题：在 Textual TUI 框架中，当尝试在父容器（如 ScrollableContainer）被框架挂载之前就向其 mount 子组件时，会抛出 MountError。\n\n解决方案：将子组件的挂载操作从构建方法（如 _build_form）延迟到 on_mount() 生命周期方法中执行。\n\n实现要点：\n1. 在 on_mount() 方法中使用 self.query_one(\"#component-id\", ComponentType) 获取已挂载的组件引用\n2. 调用填充方法（如 _populate_form_container）传入组件引用来填充内容\n3. 确保在 _build_form 等构建方法中只创建容器，不填充内容\n\n示例代码（src/jarvis/jarvis_config/tui_app.py 第 160-166 行）：\n```python\ndef on_mount(self) -> None:\n    \"\"\"应用挂载时调用。\"\"\"\n    self.title = self.title\n    # 获取表单容器并填充内容\n    form_container = self.query_one(\"#form-container\", ScrollableContainer)\n    self._populate_form_container(form_container)\n```\n\n约束条件：保持原有功能完整性和代码风格一致，修复后需通过静态检查和实际运行验证。",
+  "created_at": "2025-12-30T14:16:15.263950",
+  "updated_at": "2025-12-30T14:16:15.263955"
+}

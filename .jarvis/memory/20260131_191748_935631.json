@@ -1,0 +1,8 @@
+{
+  "id": "20260131_191748_935631",
+  "type": "project_long_term",
+  "tags": ["架构演进", "A/B测试", "jarvis_ab_test"],
+  "content": "## A/B测试机制 (jarvis_ab_test)\n\n**位置**: src/jarvis/jarvis_ab_test/\n**测试**: tests/jarvis_ab_test/ (22个测试)\n\n**核心组件**:\n- Experiment: 实验配置\n- Variant: 实验变体（带权重）\n- ABTestManager: A/B测试管理器\n- ExperimentStatus: 实验状态（draft/running/paused/completed/archived）\n- MetricType: 指标类型（count/sum/average/ratio）\n\n**功能**: 实验管理、用户分组（一致性哈希）、指标收集、结果分析、获胜变体判定",
+  "created_at": "2026-01-31T19:17:48.935642",
+  "updated_at": "2026-01-31T19:17:48.935644"
+}

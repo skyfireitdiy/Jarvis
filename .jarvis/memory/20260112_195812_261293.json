@@ -1,0 +1,14 @@
+{
+  "id": "20260112_195812_261293",
+  "type": "project_long_term",
+  "tags": [
+    "context",
+    "truncation",
+    "token",
+    "base.py",
+    "enhancement"
+  ],
+  "content": "优化了模型上下文处理机制：当剩余token为0且消息不足10条导致trim_messages()失败时，不再直接返回空字符串，而是尝试截断当前消息。修改位置：src/jarvis/jarvis_platform/base.py的_truncate_message_if_needed方法（696-735行）。新逻辑使用模型最大输入token的5%作为目标（至少100 tokens），在消息过长时截断，并尝试在完整句子或换行符处截断，确保即使上下文不足也能发送部分消息内容，避免完全失败。",
+  "created_at": "2026-01-12T19:58:12.261329",
+  "updated_at": "2026-01-12T19:58:12.261334"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260108_135020_640997",
+  "type": "project_long_term",
+  "tags": [
+    "tool_executor",
+    "user_confirmation",
+    "auto_print",
+    "parameter_summary"
+  ],
+  "content": "在工具执行前确认机制中添加了工具详情显示功能。当agent.execute_tool_confirm为True时，在用户确认前会显示工具名称和参数摘要，使用PrettyOutput.auto_print接口输出，emoji使用🔧表示工具执行。包含两个辅助函数：_parse_tool_call_info用于从响应中解析工具调用信息，_generate_param_summary用于生成参数摘要并过滤敏感信息（password, token, key, secret, auth, credential等），对长字符串进行截断处理，并替换换行符为空格。",
+  "created_at": "2026-01-08T13:50:20.641035",
+  "updated_at": "2026-01-08T13:50:20.641040"
+}

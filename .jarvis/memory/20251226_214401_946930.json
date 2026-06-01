@@ -1,0 +1,12 @@
+{
+  "id": "20251226_214401_946930",
+  "type": "project_long_term",
+  "tags": [
+    "edit_file",
+    "code_review",
+    "error_handling"
+  ],
+  "content": "edit_file.py 工具修改：在 _apply_normal_edits_to_content 方法中新增 search==replace 检查，用于识别无效的 patch 操作。当 LLM 生成的 patch 中 search 和 replace 内容完全相同时，会返回明确的错误信息到 stderr，避免工具无实际修改但返回成功执行的情况。",
+  "created_at": "2025-12-26T21:44:01.946965",
+  "updated_at": "2025-12-26T21:44:01.946969"
+}

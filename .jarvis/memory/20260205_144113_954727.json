@@ -1,0 +1,8 @@
+{
+  "id": "20260205_144113_954727",
+  "type": "project_long_term",
+  "tags": ["bug_fix", "session_management", "loadsession", "辅助文件过滤"],
+  "content": "Bug修复：loadsession时显示多个会话文件问题\n\n问题现象：\n执行loadsession时，会列出多个会话文件，包括正常的会话文件和辅助文件（_commit.json和_tasklist.json），导致用户混淆。\n\n根因分析：\nSessionManager._list_session_files()方法使用通配符模式匹配会话文件时，将所有匹配saved_session_{agent}_{platform}_{model}*.json的文件都返回，包括辅助文件。\n\n修复方案：\n在src/jarvis/jarvis_agent/session_manager.py的_list_session_files()方法中（第72-82行），添加过滤逻辑：\n- 遍历glob.glob()返回的所有文件\n- 排除以_commit.json或_tasklist.json结尾的辅助文件\n- 只返回真正的会话文件\n\n影响范围：\n- 修改文件：src/jarvis/jarvis_agent/session_manager.py\n- 影响功能：会话列表显示、会话恢复\n\n验收标准：\n执行loadsession时，不再显示_commit.json和_tasklist.json辅助文件，只显示真正的会话文件。\n\n修复日期：2026-02-05",
+  "created_at": "2026-02-05T14:41:13.954748",
+  "updated_at": "2026-02-05T14:41:13.954753"
+}

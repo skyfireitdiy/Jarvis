@@ -1,0 +1,8 @@
+{
+  "id": "20260111_125927_069914",
+  "type": "project_long_term",
+  "tags": ["prompts", "methodology", "methodology-scope", "task_analysis"],
+  "content": "任务分析提示词已更新，增加了关于方法论创建时scope参数的说明。当创建方法论时：\n- 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope=\"project\"\n- 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope=\"global\" 或省略该参数（默认为global）\n- 'project' 范围的方法论保存到项目目录（.jarvis/methodologies/）\n- 'global' 范围的方法论保存到用户数据目录",
+  "created_at": "2026-01-11T12:59:27.069941",
+  "updated_at": "2026-01-11T12:59:27.069945"
+}

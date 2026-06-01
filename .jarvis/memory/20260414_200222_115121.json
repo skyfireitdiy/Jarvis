@@ -1,0 +1,8 @@
+{
+  "id": "20260414_200222_115121",
+  "type": "project_long_term",
+  "tags": ["jarvis", "service", "npm_install", "error", "exit_code_126"],
+  "content": "Jarvis服务启动失败：npm install命令执行失败，退出码126。错误日志显示：'❌ 命令执行失败: npm install (退出码: 126)'。服务状态为deactivating (stop-sigterm)。可能原因：1) npm命令不可用 2) 权限问题 3) 前端依赖安装失败。",
+  "created_at": "2026-04-14T20:02:22.115144",
+  "updated_at": "2026-04-14T20:02:22.115149"
+}

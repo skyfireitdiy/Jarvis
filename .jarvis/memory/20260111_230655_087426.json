@@ -1,0 +1,8 @@
+{
+  "id": "20260111_230655_087426",
+  "type": "project_long_term",
+  "tags": ["install.sh", "uv", "uv-tool-install", "git", "direct-install"],
+  "content": "install.sh 已支持两种安装方式：1) 直接安装（推荐）- 使用 'uv tool install git+URL' 直接从 git 仓库安装，快速简单无需下载源码；2) 克隆安装 - 克隆源码到本地后使用 'uv tool install .' 安装，便于查看和修改代码。两种方式都支持 Gitee/GitHub 降级策略和 RAG 功能选择。安装完成后会根据安装方式给出不同的提示信息。",
+  "created_at": "2026-01-11T23:06:55.087457",
+  "updated_at": "2026-01-11T23:06:55.087461"
+}

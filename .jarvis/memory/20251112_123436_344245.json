@@ -1,0 +1,12 @@
+{
+  "id": "20251112_123436_344245",
+  "type": "project_long_term",
+  "tags": [
+    "logger_to_prettyoutput",
+    "lsp_client",
+    "refactor"
+  ],
+  "content": "将lsp_client.py中的日志打印从logger改为使用PrettyOutput，以保持项目统一的输出风格",
+  "created_at": "2025-11-12T12:34:36.344300",
+  "updated_at": "2025-11-12T12:34:36.344305"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260203_125733_348249",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "jvs命令", "任务分析", "交互模式"],
+  "content": "Bug修复：jvs命令在任务结束时没有询问是否进行任务分析\n\n问题根因：\n在 src/jarvis/jarvis_agent/__init__.py:2050 中，代码限制了只有在非交互模式（non_interactive=True）时才调用 trigger_task_analysis()，导致普通用户使用jvs命令时不会被询问是否进行任务分析。\n\n修复方案：\n移除了 if self.non_interactive: 条件判断，因为 trigger_task_analysis() 方法内部已经正确处理了交互/非交互两种模式。\n\n修复逻辑：\n1. trigger_task_analysis() 首先检查 use_analysis 是否启用\n2. 然后根据模式决定询问用户：\n   - 交互模式：询问用户，默认值为False（需要用户主动确认）\n   - 非交互模式：默认值为True（自动执行）\n\n修改文件：\n- src/jarvis/jarvis_agent/__init__.py:2049-2055\n\n修改内容：\n将 \"if self.non_interactive:\" 条件判断移除，直接调用 trigger_task_analysis()",
+  "created_at": "2026-02-03T12:57:33.348278",
+  "updated_at": "2026-02-03T12:57:33.348283"
+}

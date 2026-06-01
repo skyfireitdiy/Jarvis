@@ -1,0 +1,16 @@
+{
+  "id": "20251020_111431_376763",
+  "type": "project_long_term",
+  "tags": [
+    "plan",
+    "subtask",
+    "background_propagation",
+    "jarvis_agent",
+    "sub_agent",
+    "sub_code_agent",
+    "implementation"
+  ],
+  "content": "变更摘要：修复 plan 模式下子任务执行时缺失背景信息的问题，确保每个子任务能够获取完整的父任务上下文与前置子任务结果。\n\n修改点：\n1) src/jarvis/jarvis_agent/__init__.py::_maybe_plan_and_dispatch\n   - 在创建子Agent后，不再直接 child.run(st)，而是构造 child_prompt，包含内容：\n     - 原始任务（父任务）文本\n     - 子任务规划块（<SUB_TASK>...）\n     - 已完成的前置子任务结果块（<PREVIOUS_SUB_TASK_RESULTS>...）\n     - 当前子任务描述\n   - 目的：保证子任务拥有父任务背景与已执行结果，避免重复工作与信息缺失。\n\n2) src/jarvis/jarvis_tools/sub_agent.py\n   - 若未显式传入 background，则尝试从父Agent的 session.prompt 补全背景后再执行。\n   - 目的：通过工具 sub_agent 调用子Agent时同样具备父任务上下文。\n\n3) src/jarvis/jarvis_tools/sub_code_agent.py\n   - 若未显式传入 background，则尝试从父Agent的 session.prompt 补全背景后再执行。\n   - 目的：通过工具 sub_code_agent 调用 CodeAgent 子任务时具备父任务上下文。\n\n影响范围：\n- 适用于开启 plan 的场景，以及通过 sub_agent 和 sub_code_agent 执行子任务的路径。\n- CodeAgent 若开启 plan，其内部使用的通用 Agent 同样受 1) 的修复影响。\n- 不影响未开启 plan 的普通流程。\n\n风险与回退：\n- 构造的提示包含更多上下文，可能增加 token 使用；如发现上下文过长，可在后续增加截断或摘要机制。\n- 回退方式：恢复上述三个文件的相应变更前版本。\n",
+  "created_at": "2025-10-20T11:14:31.376794",
+  "updated_at": "2025-10-20T11:14:31.376797"
+}

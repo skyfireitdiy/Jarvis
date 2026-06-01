@@ -1,0 +1,19 @@
+{
+  "content": "小说生成多Agent系统工作流优化：跨章连续性与用户确认机制增强\n\n【总体目标】\n- 优化 builtin/multi_agent/novel_generator.yaml 工作流，强化跨章上下文连贯性\n- 增加用户确认机制，确保章节质量与用户意图对齐\n- 保持最小变更与可回退，确保系统稳定性与可维护性\n- 建立系统化的跨章连续性保障机制，提升叙事连贯性\n\n【核心原则】\n- 仅在指令层面增强，不引入复杂新文件结构与依赖\n- 单一操作原则：每个Agent每次只执行一个明确操作\n- 所有产出先REWRITE落盘，确保状态一致性\n- 最小变更优先，保持现有架构稳定\n- 强化在 SEND_MESSAGE 中传递\"上一章摘要/关键承接点\"的要求，避免粘贴长文，鼓励使用 read_code\n\n【跨章连续性机制】\n1) 章节编号统一：所有章节编号采用四位格式（0001, 0002, ...）\n2) 文件读取优先级：上一章读取优先级 proofread > polished > draft\n3) 消息传递规范：在SEND_MESSAGE中只传摘要与路径，避免粘贴长文\n4) 连续性维护：NovelCoordinator负责状态推进与continuity写回\n\n【强化机制设计】\n1) 协调者职责增强：\n   - 在推进章节时，优先读取上一章（proofread > polished > draft）\n   - 提炼承接要点并附带到 SEND_MESSAGE\n   - 在 novel_state.yaml 中为每章维护轻量\"continuity\"摘要（承接点/未竟线索/角色状态）\n   - 按幂等方式写入，供后续 agent 引用\n   - ChapterPlanner/Writer 已有跨章读取要求，扩展到 Polisher/Proofreader 做术语/风格/连续性检查（可选但推荐）\n\n2) Agent能力扩展：\n   - ChapterPolisher/ChapterProofreader：增加\"若 NN>1 可读取上一章文本进行一致性/术语/风格对齐检查\"的步骤\n   - 鼓励使用 read_code 而非长文本粘贴\n\n3) 系统提示词增强：\n   - 在 common_system_prompt 增加\"跨章连续性约定\"条目\n   - 明确跨章连续性的具体要求和操作规范\n\n【用户确认机制设计】\n- 变更要求：在生成章节草稿（chapter_{NN}_draft.md）后，系统必须暂停并询问用户确认或反馈\n- 协调者职责：NovelCoordinator 管理草稿阶段的暂停，只有在用户批准后或整合反馈迭代草稿后才进入润色阶段\n- 确认流程：\n  1. 生成 chapter_{NN}_draft.md\n  2. 系统暂停，向用户展示草稿内容\n  3. 等待用户确认或反馈\n  4. 根据用户输入决定：直接进入润色 或 基于反馈修改草稿\n  5. 用户确认后继续流程\n\n【状态管理增强】\n- 在 novel_state.yaml 中维护每章的 continuity 摘要\n- 增加章节状态字段（drafted/pending_user_review/approved）\n- 记录用户反馈与确认历史\n\n【最小修改方向】\n1) common_system_prompt 增强：\n   - 增加\"跨章连续性约定\"条目\n   - 明确用户确认流程要求\n\n2) NovelCoordinator 强化：\n   - 在\"消息发送指令\"和\"章节循环\"中强化发送上一章承接摘要与 continuity 字段维护\n   - 增加用户确认检查点，在草稿完成后暂停并等待用户输入\n   - 管理用户反馈的整合与迭代流程\n\n3) ChapterPolisher/ChapterProofreader 增强：\n   - 增加\"若 NN>1 可读取上一章文本进行一致性/术语/风格对齐检查\"的步骤\n   - 在连续性检查中考虑用户之前的反馈和偏好\n\n【设计约束】\n- 保持单一操作原则与子Agent托管长文本的既有模式\n- 避免引入复杂依赖，仅通过指令层面优化\n- 可选但推荐：Polisher/Proofreader的连续性检查\n- 用户确认机制应灵活，支持快速通过和详细反馈两种模式\n- 向后兼容：不破坏现有工作流\n\n【预期效果】\n- 提升小说叙事的跨章连贯性与一致性\n- 减少角色/情节/术语的前后矛盾\n- 确保章节质量符合用户期望\n- 建立用户参与的迭代机制，提升最终作品质量\n- 建立系统化的连续性保障机制\n- 保持工作流的简洁性与可维护性\n- 支持复杂长篇小说的稳定生成与质量控制\n- 平衡自动化效率与用户控制权\n\n【实施优先级】\n1. 首先实现跨章连续性机制（指令层面增强）\n2. 然后增加用户确认流程（草稿阶段暂停）\n3. 最后完善状态管理与反馈整合机制",
+  "tags": [
+    "novel_generator",
+    "multi_agent",
+    "workflow",
+    "context_continuity",
+    "narrative_coherence",
+    "user_confirmation",
+    "user_feedback_loop",
+    "optimization_principle",
+    "state_management",
+    "interactive_narrative_system"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_d6a1866d", "merged_97fef2af"],
+  "id": "merged_95c5b1e5",
+  "created_at": "2025-11-12T23:39:28.402473"
+}

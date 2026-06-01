@@ -1,0 +1,13 @@
+{
+  "id": "20260108_124545_759410",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "tmux_wrapper",
+    "set_window_tiled_layout",
+    "jarvis_utils"
+  ],
+  "content": "在tmux_wrapper.py中添加了set_window_tiled_layout函数，用于设置指定tmux session的window布局为平铺。函数签名：def set_window_tiled_layout(session_name: str, window_id: Optional[str] = None) -> bool。支持指定window_id（可以是'index'或'index: name'格式），如果window_id为None则设置当前window。使用subprocess.run调用'tmux select-layout -t target tiled'命令，并包含适当的错误处理和超时设置。",
+  "created_at": "2026-01-08T12:45:45.759457",
+  "updated_at": "2026-01-08T12:45:45.759462"
+}

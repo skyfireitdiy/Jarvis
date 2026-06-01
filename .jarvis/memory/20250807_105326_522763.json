@@ -1,0 +1,15 @@
+{
+  "id": "20250807_105326_522763",
+  "type": "project_long_term",
+  "tags": [
+    "ui_convention",
+    "startup",
+    "statistics",
+    "panel",
+    "rich",
+    "jarvis_agent"
+  ],
+  "content": "Jarvis 项目启动统计面板的 UI 约定：\n\n1. 使用 rich 库的 Panel 组件\n2. expand 参数设置为 False（不扩展到终端全宽）\n3. 内容使用 Align.center 居中对齐\n4. 边框样式为 \"blue\"\n5. 标题为 \"✨ Jarvis 资源概览 ✨\"，居中对齐\n6. padding 设置为 (1, 2)\n\n显示顺序约定：\n1. 欢迎信息（白色加粗）\n2. 工作目录（dim white 样式）\n3. 空行分隔\n4. 统计信息（使用 | 分隔，各项有不同颜色）\n\n这是项目中统一的启动信息展示风格。\n",
+  "created_at": "2025-08-07T10:53:26.522791",
+  "updated_at": "2025-08-07T10:53:26.522796"
+}

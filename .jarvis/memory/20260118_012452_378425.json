@@ -1,0 +1,8 @@
+{
+  "id": "20260118_012452_378425",
+  "type": "project_long_term",
+  "tags": ["refactor", "c_checker", "stage1-complete", "rules-independent"],
+  "content": "C代码检查器重构-阶段1完成：\n\n1. 规则库独立：成功将82个规则从c_checker.py独立到c_checker_rules.py\n2. 规则分类：按9个类别组织（BaseRules, FormatCommandRules, ThreadRules, CppLockRules, DataRaceRules, DangerousUsageRules, MemoryHelperRules, CppSpecificRules, HelperRules）\n3. 引用替换：所有规则引用已替换为规则类属性（如RE_UNSAFE_API → BaseRules.RE_UNSAFE_API）\n4. 代码精简：c_checker.py从3000行减少到2840行（净删除160行）\n5. 测试验证：所有测试通过（6个测试），82个规则100%测试覆盖\n6. 静态检查：ruff无错误\n\n关键文件：\n- src/jarvis/jarvis_sec/checkers/c_checker.py（已重构）\n- src/jarvis/jarvis_sec/checkers/c_checker_rules.py（新建）\n- tests/jarvis_sec/test_c_checker_rules.py（新增）\n\nGit提交：6390a64\n\n下一阶段目标：深度重构，将c_checker.py优化至<1000行",
+  "created_at": "2026-01-18T01:24:52.378444",
+  "updated_at": "2026-01-18T01:24:52.378446"
+}

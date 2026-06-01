@@ -1,0 +1,14 @@
+{
+  "id": "20260111_220452_174420",
+  "type": "project_long_term",
+  "tags": [
+    "token_calculation",
+    "read_webpage",
+    "content_length_limit",
+    "embedding",
+    "tiktoken"
+  ],
+  "content": "项目中 token 计算的标准方式：使用 get_context_token_count 函数（位于 src/jarvis/jarvis_utils/embedding.py），基于 tiktoken 的 'cl100k_base' 编码，并应用 10/7 倍的调整因子。这是项目统一的 token 计算标准，涉及内容长度限制的功能（如 read_webpage、rag、embedding 等）都应使用此函数而不是简单的字符数除以 4 的估算。",
+  "created_at": "2026-01-11T22:04:52.174450",
+  "updated_at": "2026-01-11T22:04:52.174454"
+}

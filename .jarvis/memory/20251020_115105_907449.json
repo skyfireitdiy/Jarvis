@@ -1,0 +1,17 @@
+{
+  "id": "20251020_115105_907449",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_book",
+    "docs",
+    "directory_index",
+    "planner",
+    "architecture",
+    "core_concepts",
+    "appendix",
+    "cross_refs"
+  ],
+  "content": "{\n  \"dir\": \"docs/jarvis_book\",\n  \"files\": [\n    \"1.项目介绍.md\",\n    \"2.快速开始.md\",\n    \"3.核心概念与架构.md\",\n    \"4.使用指南.md\",\n    \"5.功能扩展.md\",\n    \"6.高级主题.md\",\n    \"7.参与贡献.md\",\n    \"8.常见问题.md\",\n    \"9.附录.md\"\n  ],\n  \"focus_files\": {\n    \"core_concepts_architecture\": {\n      \"path\": \"docs/jarvis_book/3.核心概念与架构.md\",\n      \"analysis_memory_id\": \"20251020_115022_060235\",\n      \"plantuml_block_lines\": \"71-179\",\n      \"roles_responsibility_anchor_line\": 181,\n      \"planner_status\": \"未出现 Planner/TaskPlanner 描述；建议新增 3.1.7 与 3.3.x、更新架构图与工作流\"\n    },\n    \"appendix\": {\n      \"path\": \"docs/jarvis_book/9.附录.md\",\n      \"analysis_memory_id\": \"20251020_114926_809458\",\n      \"planner_related_key\": \"JARVIS_PLAN_MAX_DEPTH\",\n      \"lines_hint\": \"41-46\",\n      \"cli_switches_mentioned\": [\"--plan\", \"--no-plan\"]\n    },\n    \"cli_usage_to_check\": {\n      \"path\": \"docs/jarvis_book/4.使用指南.md\",\n      \"status\": \"待扫描是否存在 --plan/--no-plan 与规划相关操作说明\"\n    }\n  },\n  \"next_actions\": [\n    \"扫描 4.使用指南.md 中 CLI 与配置小节，定位 --plan/--no-plan 与规划深度说明位置\",\n    \"在 3.核心概念与架构.md 中新增 Planner/TaskPlanner 概念与组件详解，更新 PlantUML 架构图与时序/流程描述\",\n    \"在 9.附录.md 中核对配置表与 CLI 开关描述一致性（JARVIS_PLAN_MAX_DEPTH 与 --plan/--no-plan）\"\n  ],\n  \"cross_refs\": [\n    {\"from\": \"3.核心概念与架构.md\", \"to\": \"9.附录.md\", \"keys\": [\"JARVIS_PLAN_MAX_DEPTH\"]},\n    {\"from\": \"3.核心概念与架构.md\", \"to\": \"4.使用指南.md\", \"cli\": [\"--plan\", \"--no-plan\"]}\n  ]\n}\n",
+  "created_at": "2025-10-20T11:51:05.907470",
+  "updated_at": "2025-10-20T11:51:05.907474"
+}

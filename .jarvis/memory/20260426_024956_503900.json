@@ -1,0 +1,13 @@
+{
+  "id": "20260426_024956_503900",
+  "type": "project_long_term",
+  "tags": [
+    "gitee",
+    "remote",
+    "git",
+    "配置"
+  ],
+  "content": "Gitee Remote配置：\n- 仓库地址：git@gitee.com:skyfireitdiy/Jarvis.git\n- 用户名：skyfireitdiy\n- 仓库URL：https://gitee.com/skyfireitdiy/Jarvis\n- 添加命令：git remote add gitee git@gitee.com:skyfireitdiy/Jarvis.git",
+  "created_at": "2026-04-26T02:49:56.503942",
+  "updated_at": "2026-04-26T02:49:56.503949"
+}

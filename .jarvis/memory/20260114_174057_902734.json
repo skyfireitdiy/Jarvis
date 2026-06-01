@@ -1,0 +1,12 @@
+{
+  "id": "20260114_174057_902734",
+  "type": "project_long_term",
+  "tags": [
+    "get_normal_model_name",
+    "get_normal_platform_name",
+    "model_group_override"
+  ],
+  "content": "模型名称和平台名称获取函数支持 model_group_override 参数\n- get_normal_model_name(model_group_override=None)\n- get_normal_platform_name(model_group_override=None)\n- 通过 _get_resolved_model_config(model_group_override) 解析配置\n- 参数优先级: 传入参数 > 全局配置(llm_group) > 配置文件默认值\n- 用于在欢迎信息、日志等场景显示正确的模型信息",
+  "created_at": "2026-01-14T17:40:57.902764",
+  "updated_at": "2026-01-14T17:40:57.902768"
+}

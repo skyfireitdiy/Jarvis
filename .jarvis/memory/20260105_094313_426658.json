@@ -1,0 +1,13 @@
+{
+  "id": "20260105_094313_426658",
+  "type": "project_long_term",
+  "tags": [
+    "eslint",
+    "configuration",
+    "javascript",
+    "code-quality"
+  ],
+  "content": "在Jarvis项目中成功配置ESLint 9.39.2版本。配置文件使用新的eslint.config.js（ES模块格式），需要在package.json中设置\"type\": \"module\"。配置关键点包括：1) 使用export default语法 2) languageOptions配置ecmaVersion、sourceType和globals 3) rules中可设置no-var、no-unused-vars、no-console等规则 4) 需要本地安装ESLint作为开发依赖",
+  "created_at": "2026-01-05T09:43:13.426691",
+  "updated_at": "2026-01-05T09:43:13.426695"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260115_125707_983213",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "rule_refactor",
+    "naming_convention",
+    "sdd_template"
+  ],
+  "content": "Jarvis项目规则文件重构最佳实践：\n1. 命名规范：全小写+连字符分隔，如code-reverse-design.md\n2. 内容结构：必须包含五章节-工作流程、原则、要求、实践指导、检查清单\n3. 索引更新：builtin_rules.md必须同步更新文件路径和描述\n4. 版本历史：使用git mv保持文件重命名的版本历史\n5. 验证标准：git status显示rename状态，文件内容无丢失，索引链接有效",
+  "created_at": "2026-01-15T12:57:07.983254",
+  "updated_at": "2026-01-15T12:57:07.983258"
+}

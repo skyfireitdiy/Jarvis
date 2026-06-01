@@ -1,0 +1,22 @@
+{
+  "content": "Jarvis C2Rust 渐进式迁移系统设计：断点恢复机制与代码优化子命令\n\n【总体目标】\n在 src/jarvis 下创建 jarvis_c2rust 模块，采用\"workflow + agent\"模式实现 C/C++ -> Rust 渐进式迁移多智能体流程，支持中断后依赖仓库内文件状态断点续转，确保长流程LLM评估的可恢复性，最小侵入改造，通过文件状态管理实现进度追踪与恢复，并提供独立的代码优化能力。\n\n【核心架构】\n采用\"workflow + agent\"模式，参考规范文件：builtin/multi_agent/c2rust_migration.yaml\n\n【关键状态文件与目录】\n位于目标工程根目录的结构化状态管理：\n- c2rust_migration/{00_project_info.md, 01_build_script.sh, 02_test_script.sh, 03_rust_bridge_initialized, 04_unit_queue.json, 05_progress.md, patches/, diagnostics/}\n- scripts/{build.sh, test.sh, run_tests_with_rust.sh}\n- rust_bridge/{Cargo.toml, src/lib.rs, ...}\n\n【迁移代理体系】\n- MigrationCoordinator：整体流程协调与状态管理\n- BuildSystemDetector：构建系统识别与适配\n- TestHarnessEngineer：测试框架生成与维护\n- RustBridgeEngineer：Rust桥接层设计与实现\n- UnitSelector：迁移单元选择与优先级排序\n- TestAuthor：测试用例生成与验证\n- RustImplementer：Rust代码生成与移植\n- SafetyRefiner：安全性检查与优化\n- MigrationAuditor：质量审计与进度验证\n\n【断点恢复机制设计】\n为 jarvis_c2rust.library_replacer.apply_library_replacement 增加断点恢复能力：\n\n【新增参数（向后兼容）】\n- resume: bool = True（默认启用恢复）\n- checkpoint_path: Optional[Path]（默认使用 .jarvis/c2rust/library_replacer_checkpoint.json）\n- checkpoint_interval: int = 1（每处理N个节点保存一次进度）\n- clear_checkpoint_on_done: bool = True（完成后清理checkpoint）\n\n【Checkpoint内容】\n- key: { sjsonl绝对路径, library_name, llm_group, candidates(排序去重), disabled_libraries(归一化), max_funcs }\n- eval_counter, processed_roots(list[int]), pruned_dynamic(list[int]), selected_roots([{fid,res}])\n\n【恢复逻辑】\n- 如果 resume 且 checkpoint 存在且 key 匹配，则加载上述集合，跳过已处理节点，沿用已剪枝与已选根\n\n【保存策略】\n- 每次评估节点后，若达到 checkpoint_interval 则保存，使用临时文件+原子替换\n- 完成后根据 clear_checkpoint_on_done 清理checkpoint文件\n\n【代码优化子命令设计】\n为 jarvis_c2rust 增加独立优化子命令（optimize），在代码生成完毕后执行：\n\n【新增模块】\n- src/jarvis/jarvis_c2rust/optimizer.py：提供 Optimizer 类与 optimize_project(entry_path, options) 入口\n- CLI 在 src/jarvis/jarvis_c2rust/cli.py 增加 optimize 子命令\n\n【参数配置】\n- 项目路径/crate路径\n- 是否启用每项优化（unsafe、结构、可见性、文档）\n- 并发与重试选项\n\n【核心优化步骤】\n1) unsafe 清理：逐文件逐 unsafe 块尝试移除 unsafe 后运行 `cargo check` 验证；成功则保留修改；失败则回滚并在块前添加 `/// SAFETY: 说明` 文档，含首条编译错误摘要\n2) 代码结构优化：检测完全重复的函数（签名+正文文本相同），在重复处添加 `/// TODO: duplicate of <path>::<func>` 文档提示，保守不做跨文件移动以降低风险\n3) 可见性优化：对 `pub fn` 且仅在本 crate 内引用的函数，尝试降级为 `pub(crate) fn`；以全局 grep 的引用为依据，保守策略不直接改为私有，减少破坏性\n4) 文档补充：为无文档的模块与函数添加基础占位文档 `/// TODO: Add documentation`，并在 crate 根增加迁移与安全说明\n\n【实施策略】\n- 按文件优化，必要时按依赖关系整体优化\n- 提供备份与回滚机制，所有变更均可复原\n- 工具与验证：优先使用 rust LSP（如可用），否则使用静态文本分析 + `cargo check` 验证；日志与报告输出到 artifacts 目录\n\n【设计原则】\n- 一次只调用一个工具：确保操作的原子性和可追踪性\n- 产出必须先落盘：使用 REWRITE/PATCH 后再交接，保证状态一致性\n- 最小侵入改造：不破坏现有代码结构和构建系统\n- 文件即状态：通过文件存在性与内容判断阶段推进\n- 环境变量控制：通过 USE_RUST_BRIDGE 环境变量实现回退与切换\n\n【阶段推进机制】\n- 阶段推进依赖上述文件存在性与内容判断\n- 每个阶段完成后生成相应的状态文件\n- 支持从任意阶段断点续跑，无需从头开始\n\n【影响范围】\n- 仅修改 library_replacer.py 内部逻辑，接口向后兼容，不影响现有调用方\n- 整体架构在 jarvis_c2rust 模块内实现，与现有系统隔离\n- optimizer.py 作为独立模块，支持可选的后期优化流程\n\n【预期效果】\n- 支持长时间C2Rust迁移任务的中断与恢复\n- 提供清晰的进度追踪与状态管理\n- 确保迁移过程的可重复性和可验证性\n- 减少重复计算和资源浪费\n- 建立完整的迁移审计轨迹\n- 提供代码质量优化与安全增强能力\n- 支持可选的后期代码完善与文档补充",
+  "tags": [
+    "jarvis_c2rust",
+    "checkpoint",
+    "resume",
+    "optimizer",
+    "multi_agent",
+    "workflow",
+    "state_management",
+    "incremental_migration",
+    "file_state",
+    "code_optimization",
+    "migration_system",
+    "progressive_transformation",
+    "safety_enhancement"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251027_075928_136523", "merged_d0ac258b"],
+  "id": "merged_036cf54c",
+  "created_at": "2025-11-12T23:45:29.609822"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20250804_193631_703180",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "jarvis_agent",
+    "documentation"
+  ],
+  "content": "Jarvis Agent的核心架构由 `src/jarvis/jarvis_agent/__init__.py` 中的 `Agent` 类协调。其关键内部组件包括 `SessionManager`, `MemoryManager`, `TaskAnalyzer`, 和 `FileMethodologyManager`。项目中有至少两份重要的架构文档需要保持同步：`docs/jarvis_book/3.核心概念与架构.md` (详细) 和 `docs/technical_documentation.md` (高层)。\n",
+  "created_at": "2025-08-04T19:36:31.703206",
+  "updated_at": "2025-08-04T19:36:31.703211"
+}

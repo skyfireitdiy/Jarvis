@@ -1,0 +1,14 @@
+{
+  "id": "20260110_111237_050273",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "web_support_removal",
+    "platform_modification",
+    "support_web_method",
+    "code_cleanup"
+  ],
+  "content": "在Jarvis项目中移除了各个平台实现中的web支持功能：\n1. 删除了openai.py、claude.py、kimi.py、tongyi.py、yuanbao.py中的support_web()方法\n2. 移除了所有self.web的使用\n3. 修改了相关参数：kimi.py中use_search改为False，tongyi.py中searchType改为\"\"，yuanbao.py中改为[\"autoInternetSearch\"]\n4. 保持了代码缩进和风格一致，确保修改后的参数值符合不支持web的逻辑\n5. 保留了非web的回退逻辑（如requests抓取、ddgs搜索）",
+  "created_at": "2026-01-10T11:12:37.050307",
+  "updated_at": "2026-01-10T11:12:37.050311"
+}

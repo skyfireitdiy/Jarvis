@@ -1,0 +1,11 @@
+{
+  "id": "20260128_142006_612396",
+  "type": "project_long_term",
+  "tags": [
+    "rust_dynamic_library_info",
+    "compilation_principle"
+  ],
+  "content": "根据记忆检索，Rust动态库的关键信息包括：\n1. 编译原理：Rust动态库发布中的双文件机制原理 - 编译时使用rlib进行类型检查，运行时动态链接so库\n2. 关键流程：编译器读取rlib中的类型定义 -> 验证函数签名匹配 -> 动态链接器加载so库并解析符号表 -> 完成符号重定位\n3. 技术挑战：ABI兼容性是关键问题，工具链版本差异会导致问题，依赖版本必须完全匹配\n4. 优化技术：.rustc节是Rust编译器生成的元数据节，可使用cargo objcopy --remove-section=.rustc或objcopy --remove-section=.rustc命令删除以减小文件体积\n5. 链接器包装：在交叉编译环境中，Rust编译器生成的dylib会遇到符号版本兼容性问题，解决方案是创建链接器包装脚本，过滤掉导致问题的参数\n6. 性能优化：使用链接器包装脚本过滤--version-script*和--no-undefined-version参数，防止Rust编译器的版本脚本与工具链冲突",
+  "created_at": "2026-01-28T14:20:06.612424",
+  "updated_at": "2026-01-28T14:20:06.612428"
+}

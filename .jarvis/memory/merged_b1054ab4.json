@@ -1,0 +1,23 @@
+{
+  "content": "Jarvis Web 交互架构设计与终端界面优化\n\n【总体目标】\n构建完整的 Web 交互架构，使 Jarvis 支持基于浏览器的交互模式，并实现前端 xterm 终端与后端命令 TTY 的完全对接，支持交互式命令与实时输入输出，同时优化终端字体显示体验。\n\n【第一阶段：基础 Web 交互】\n- 新增 Web 模式，通过 WebSocket 重定向标准输入/输出，支持单行确认与多行输入\n- 输出：基于 jarvis_utils/output.py 的 OutputSink 抽象，新增 WebSocketOutputSink 将 OutputEvent 序列化为 JSON 广播给前端\n- 输入：Agent 已有 UserInteractionHandler，通过 _multiline_input 和 user_confirm 统一入口；Web 模式中注入自定义 multiline_inputer 与 confirm_callback 接管输入\n- CLI：在 jarvis_agent/jarvis.py 新增 --web [--host --port] 启动 Web 服务与 WS 桥接，注册 WebSocketOutputSink\n- AgentManager：扩展以支持 multiline_inputer 和 confirm_callback 透传至 Agent\n- 服务：新增 FastAPI + WebSocket 服务（jarvis_agent/web_server.py）：\n  * GET / 返回简易 HTML（含 JS：WebSocket 连接、事件显示、输入表单）\n  * WS /ws 双向通道：后端广播 OutputEvent；前端发送 user_input 或 confirm_response\n- 桥接：新增 web_bridge（jarvis_agent/web_bridge.py）提供线程安全桥接：\n  * broadcast(event_json) 给所有连接\n  * request_multiline_input(tip, print_on_empty) -> str\n  * request_confirm(tip, default) -> bool\n  * post_user_input(text)、post_confirm(value) 入队回调\n  * 提供注入函数 web_multiline_input 与 web_user_confirm 适配 Agent 接口\n- 前端事件约定（WS 下行）：output、input_request、confirm_request\n- 前端事件约定（WS 上行）：user_input、confirm_response\n\n【第二阶段：TTY 完全对接与交互式终端】\n- 目标：将前端 xterm 与后端 Jarvis 命令的 TTY 完全对接，实现无缝输入输出，支持交互式命令\n- 方向：建立双向通道（现有 /stdio 仅 server->client），前端 xterm 捕获键盘事件向后端发送原始按键数据\n- 后端通过 PTY（伪终端）或等效会话将数据写入子进程/Agent TTY，并将输出实时回传\n- 保持 /control 进行中断和 resize，将 resize 同步到 PTY 尺寸\n- 尽量最小改动，优先在 web_server 与现有 WebBridge/STDIO redirect 上扩展\n\n【终端字体优化】\n- Web UI 的 xterm 终端字体应优先使用 \"FiraCode Nerd Font\"\n- 实现方式：在前端初始化 xterm Terminal 时设置 fontFamily，并在页面 CSS 的 font-family 中将 \"FiraCode Nerd Font\" 置于首位\n- 提供 Fira Code、JetBrainsMono NF 等后备字体\n- 默认不内置/拉取 webfont，依赖用户本地安装，无法命中时回退到系统等宽字体\n\n【实施顺序（单步提交）】\n1) web_bridge.py（同步阻塞桥 + 注入输入函数）\n2) web_output_sink.py（OutputSink -> WS 广播）\n3) web_server.py（FastAPI + WS + HTML）\n4) AgentManager 扩展支持注入\n5) jarvis.py 增加 --web 启动参数与集成\n6) 验证本地启动与浏览器交互，兼容非交互模式\n\n【回退与影响】\n- 未启用 --web 时行为不变（控制台控制）\n- Web 仅新增 sink 与注入输入器，不修改核心循环，影响面最小\n- 失败回退：不注册 sink 且不注入输入器即回到控制台模式\n\n【设计原则】\n- 渐进实施：分两个阶段逐步完善 Web 交互能力\n- 最小侵入：优先在现有架构基础上扩展，减少核心修改\n- 用户体验：优化终端显示效果与交互响应\n- 兼容性：保持与现有控制台模式的兼容\n- 可扩展性：支持未来功能增强与界面优化\n\n【预期效果】\n- 实现完整的浏览器端 Jarvis 交互体验\n- 支持实时输入输出与交互式命令执行\n- 提供专业化的终端显示效果\n- 建立可扩展的 Web 交互架构基础",
+  "tags": [
+    "web",
+    "websocket",
+    "terminal",
+    "interactive",
+    "architecture",
+    "pty",
+    "xterm",
+    "ui",
+    "agent_io",
+    "io_redirect",
+    "nerd_font",
+    "web_interface",
+    "realtime_interaction",
+    "terminal_optimization"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_716d4754", "20251008_110737_138255"],
+  "id": "merged_b1054ab4",
+  "created_at": "2025-11-12T23:46:47.716028"
+}

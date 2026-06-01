@@ -1,0 +1,15 @@
+{
+  "id": "20260113_124732_132514",
+  "type": "project_long_term",
+  "tags": [
+    "interrupt",
+    "g_interrupt",
+    "while_true",
+    "while_success",
+    "utils",
+    "retry-mechanism"
+  ],
+  "content": "Jarvis 项目中断处理机制：\n1. 全局变量：g_interrupt (int) - 中断计数器\n2. 检测函数：get_interrupt() -> int - 返回当前中断计数\n3. 设置函数：set_interrupt(status: bool) - 设置或清除中断状态\n4. 关键工具函数位置：src/jarvis/jarvis_utils/utils.py\n   - while_success(func) - 循环执行直到成功，共享重试计数器，支持指数退避\n   - while_true(func) - 循环执行直到返回 True，不捕获异常\n5. 中断最佳实践：检测到中断后应直接返回，不清除中断标志，让上层调用者处理",
+  "created_at": "2026-01-13T12:47:32.132540",
+  "updated_at": "2026-01-13T12:47:32.132544"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260109_165934_725144",
+  "type": "project_long_term",
+  "tags": [
+    "platform_integration",
+    "code_cleanup",
+    "refactoring"
+  ],
+  "content": "在jarvis项目中删除平台相关接口的方法：删除src/jarvis/jarvis_platform/tongyi.py中的upload_files和_get_content_type方法。这些方法由于代码量大（约160行），需要精准删除。删除后需要确保文件语法正确，并验证name方法紧接在chat方法之后。同时清理了未使用的time导入。",
+  "created_at": "2026-01-09T16:59:34.725175",
+  "updated_at": "2026-01-09T16:59:34.725179"
+}

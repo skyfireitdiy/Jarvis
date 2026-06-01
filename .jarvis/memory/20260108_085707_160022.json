@@ -1,0 +1,14 @@
+{
+  "id": "20260108_085707_160022",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "quick_config",
+    "llm_config",
+    "openai",
+    "claude"
+  ],
+  "content": "quick_config.py修复了llm_config配置键名与平台实现不匹配的问题。原来的代码使用通用格式{platform}_api_key，但现在openai平台需要openai_api_key和openai_api_base，claude平台需要anthropic_api_key和anthropic_base_url。修复后的代码根据平台类型生成正确的配置键名。",
+  "created_at": "2026-01-08T08:57:07.160045",
+  "updated_at": "2026-01-08T08:57:07.160049"
+}

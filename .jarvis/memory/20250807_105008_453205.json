@@ -1,0 +1,14 @@
+{
+  "id": "20250807_105008_453205",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "startup",
+    "statistics",
+    "show_agent_startup_stats",
+    "initialization"
+  ],
+  "content": "show_agent_startup_stats 函数已从 utils.py 移动到 jarvis_agent/__init__.py。\n\n主要修改：\n1. 函数位置：从 src/jarvis/jarvis_utils/utils.py 移到 src/jarvis/jarvis_agent/__init__.py\n2. 函数签名：增加了 agent_name 和 model_name 参数\n3. 显示内容：\n   - 包含欢迎信息（Jarvis 初始化完成 - 使用 xx 模型）\n   - 显示工具数量格式为\"可用/全部\"\n   - 不再显示项目记忆数量\n4. UI设置：expand 参数设置为 False\n5. 实现细节：使用继承 ToolRegistry 并重写 _apply_tool_config_filter 方法来获取未过滤的工具总数\n",
+  "created_at": "2025-08-07T10:50:08.453236",
+  "updated_at": "2025-08-07T10:50:08.453240"
+}

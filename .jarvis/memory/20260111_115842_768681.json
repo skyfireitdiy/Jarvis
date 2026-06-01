@@ -1,0 +1,13 @@
+{
+  "id": "20260111_115842_768681",
+  "type": "project_long_term",
+  "tags": [
+    "load_methodology",
+    "parameter_refactoring",
+    "model_group",
+    "architecture_decision"
+  ],
+  "content": "load_methodology 函数参数简化：移除了 platform_name 和 model_name 参数，统一使用 model_group 参数。这是因为 model_group 已经包含了平台和模型的所有配置信息，无需额外的 platform_name 和 model_name 参数。这一简化使函数接口更清晰，维护成本更低。修改日期：2026-01-11",
+  "created_at": "2026-01-11T11:58:42.768709",
+  "updated_at": "2026-01-11T11:58:42.768712"
+}

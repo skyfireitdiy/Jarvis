@@ -1,0 +1,8 @@
+{
+  "id": "20260102_132813_706054",
+  "type": "project_long_term",
+  "tags": ["print", "PrettyOutput", "console_output", "jarvis-agent"],
+  "content": "在Jarvis项目中，需要将所有打印输出统一使用PrettyOutput.print或PrettyOutput.auto_print方法，替代原有的Console().print或rich.Console().print调用。对于需要输出表格等rich组件的场景，应使用StringIO捕获输出后再通过PrettyOutput.print输出，以保持输出风格一致。",
+  "created_at": "2026-01-02T13:28:13.706079",
+  "updated_at": "2026-01-02T13:28:13.706081"
+}

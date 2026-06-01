@@ -1,0 +1,14 @@
+{
+  "id": "20260106_145457_028785",
+  "type": "project_long_term",
+  "tags": [
+    "tool_execution_time",
+    "feedback_to_llm",
+    "config",
+    "jarvis_tools",
+    "registry"
+  ],
+  "content": "在Jarvis项目中，工具执行时间反馈功能已实现。通过在src/jarvis/jarvis_tools/registry.py中添加执行时间信息到输出中，并在src/jarvis/jarvis_utils/config.py中添加is_show_tool_execution_time配置函数，默认值为True。工具执行时间信息以<execution_time>标签格式添加到输出中，包含工具名称和执行耗时（秒）",
+  "created_at": "2026-01-06T14:54:57.028822",
+  "updated_at": "2026-01-06T14:54:57.028826"
+}

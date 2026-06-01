@@ -1,0 +1,8 @@
+{
+  "id": "20260213_115834_725058",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "lint配置", "扩展性"],
+  "content": "LINT_AUTO_FIX_COMMANDS扩展指南\n\n如何添加新的自动修复工具：\n1. 在src/jarvis/jarvis_code_agent/lint.py的LINT_AUTO_FIX_COMMANDS字典中添加映射\n2. key为lint工具名（与LINT_COMMAND_TEMPLATES_BY_FILE中的命令第一个单词对应）\n3. value为自动修复命令模板列表，支持{file_path}占位符\n4. 如果工具没有自动修复功能，使用空列表[]\n\n示例：\n\"新工具名\": [\"新工具 --fix {file_path}\", \"新工具 --format {file_path}\"]\n\n注意事项：\n- 命令模板中使用{file_path}占位符，系统会自动替换并转义\n- 优先使用工具自带的--fix或--auto-correct选项\n- 确保命令在项目根目录下可执行",
+  "created_at": "2026-02-13T11:58:34.725075",
+  "updated_at": "2026-02-13T11:58:34.725078"
+}

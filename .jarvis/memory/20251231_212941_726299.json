@@ -1,0 +1,8 @@
+{
+  "id": "20251231_212941_726299",
+  "type": "project_long_term",
+  "tags": ["code-style", "print", "auto_print", "jarvis_config"],
+  "content": "项目代码规范：调试输出使用 auto_print 替代 print\n- auto_print 来自 jarvis.jarvis_utils.output.PrettyOutput\n- DEBUG 信息使用参数：timestamp=False，添加 🔍 emoji 前缀\n- 示例：auto_print(f\"🔍 [DEBUG] 消息内容\", timestamp=False)\n- cli.py 等使用 rprint（rich库）的模块无需修改",
+  "created_at": "2025-12-31T21:29:41.726384",
+  "updated_at": "2025-12-31T21:29:41.726397"
+}

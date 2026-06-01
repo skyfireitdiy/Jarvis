@@ -1,0 +1,8 @@
+{
+  "id": "20260111_234944_321716",
+  "type": "project_long_term",
+  "tags": ["output", "PrettyOutput", "styling", "WARNING", "ERROR", "blink"],
+  "content": "PrettyOutput中WARNING和ERROR的样式配置统一使用blink=True标准闪烁效果：\n1. style_config字典：WARNING使用blink=True\n2. header_styles字典：WARNING使用blink=True\n3. ERROR在两处配置中也使用blink=True\n这样统一了警告和错误的视觉提醒效果，使用标准闪烁以保证更好的终端兼容性。修改位置：src/jarvis/jarvis_utils/output.py",
+  "created_at": "2026-01-11T23:49:44.321752",
+  "updated_at": "2026-01-11T23:49:44.321756"
+}

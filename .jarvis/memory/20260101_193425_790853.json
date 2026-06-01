@@ -1,0 +1,8 @@
+{
+  "id": "20260101_193425_790853",
+  "type": "project_long_term",
+  "tags": ["encoding-utility", "windows-compatibility", "decode_output"],
+  "content": "Jarvis项目中的编码兼容性策略：为防止在Windows系统上运行失败，需要为所有读取命令输出的位置添加编码兼容性。采用UTF-8优先，失败后回退到GBK的策略。decode_output函数已实现于src/jarvis/jarvis_utils/utils.py中。",
+  "created_at": "2026-01-01T19:34:25.790871",
+  "updated_at": "2026-01-01T19:34:25.790874"
+}

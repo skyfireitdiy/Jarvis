@@ -1,0 +1,8 @@
+{
+  "id": "20260113_004255_610484",
+  "type": "project_long_term",
+  "tags": ["load_methodology", "数量限制", "methodology"],
+  "content": "load_methodology函数已在src/jarvis/jarvis_utils/methodology.py中添加数量限制机制（第345-350行）。当加载的方法论数量达到10条时，会打印提示信息'ℹ️ 已达到方法论数量限制 (10/10)，停止加载更多方法论'并中断循环。数量限制检查位于token限制检查之前，确保优先控制数量。",
+  "created_at": "2026-01-13T00:42:55.610501",
+  "updated_at": "2026-01-13T00:42:55.610504"
+}

@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis C2Rust渐进迁移系统架构设计与路径标准化\n\n【总体目标】\n在 /home/skyfire/code/Jarvis/src/jarvis 下创建模块 jarvis_c2rust，提供一个命令行工具，自动推进 C/C++ -> Rust 渐进迁移与测试集成的全流程，要求每个步骤失败可修复、可重试、可断点续跑，并使用 Git 对每个变更步骤单独提交，提交信息格式为：[JARVIS-C2RUST] <步骤描述>。\n\n【项目结构】\n- 项目根：/home/skyfire/code/Jarvis\n- 代码根：/home/skyfire/code/Jarvis/src/jarvis\n- 新模块：/home/skyfire/code/Jarvis/src/jarvis/jarvis_c2rust\n- 状态与产物目录：.jarvis/c2rust/\n  * state.json（记录当前进度与可恢复信息）\n  * test.sh、test_rust.sh（测试脚本）\n  * unit_queue.json（扫描出的迁移单元列表）\n  * test_cases.json（收集的 C/C++ 测试用例）\n\n【路径标准化】\n将 c2rust 迁移提示词中出现的所有目录统一迁移到目标工程根目录下的 .jarvis/c2rust 子目录中：\n- c2rust_migration/ → .jarvis/c2rust/c2rust_migration/\n- scripts/ → .jarvis/c2rust/scripts/\n- rust_bridge/ → .jarvis/c2rust/rust_bridge/\n- 同步更新阶段判定与各 Agent 指令中的路径引用\n\n【CLI设计】\n- 提供命令 jarvis-c2rust（或通过现有 jarvis CLI 的子命令集成）\n- 主命令 run：可从 state.json 恢复进度继续执行\n\n【核心步骤（带自动修复循环）】\n1) 扫描构建与测试，生成/完善 .jarvis/c2rust/test.sh\n2) 运行测试脚本，失败则创建修复 agent 迭代修复\n3) 初始化 Rust 静态库工程并将其编译产物链接进现有工程，修改 test.sh\n4) 再次运行测试，失败则修复\n5) 扫描 C/C++ 单元，生成 unit_queue.json（含位置、类型、签名）\n6) 针对每个单元创建 agent 补充测试用例\n7) 运行测试并修复\n8) 将已补充测试的单元迁移到 Rust 并删除 C/C++ 实现\n9) 运行测试并修复\n10) 优化 Rust 实现，消除 unsafe、结构重构，必要时调整用例，直至通过\n11) 迭代直至所有单元迁移完成并删除 C/C++ 实现\n12) 收集所有 C/C++ 测试用例至 test_cases.json\n13) 生成 Rust 用例测试脚本 test_rust.sh\n14) 将 C/C++ 测试用例迁移到 Rust 工程（保留 C/C++ 实现用于对比）\n15) 对每条用例执行 test_rust.sh，失败则修复\n16) 迭代直至所有用例迁移完成并删除 C/C++ 实现\n17) 全局优化清理\n\n【模块组件】\n- cli.py：Typer/Click CLI 入口\n- orchestrator.py：状态机/步骤编排核心\n- scanner.py：构建/测试/单元扫描\n- agents.py：按步骤创建与驱动 Jarvis Agent\n- git_utils.py：每步提交管理\n- state.py：state.json 读写\n- fs_utils.py：脚本生成与路径处理\n- rust_init.py：Rust 工程初始化与链接集成\n- test_runner.py：运行 test.sh / test_rust.sh，失败驱动修复 agent\n\n【执行策略】\n- 每步执行流程：更新 state.json → 实施变更 → git add/commit\n- 提交信息格式：[JARVIS-C2RUST] <步骤描述>\n- 失败处理：循环尝试最多 N 次，必要时 fallback 到 ask_user 或开 repair agent 继续推进\n- 断点续跑：基于 state.json 恢复任意步骤\n- 可重试机制：每个步骤支持多次尝试与自动修复\n\n【设计原则】\n- 渐进迁移：小步快跑，每个单元独立迁移与验证\n- 自动化优先：最小人工干预，最大化Agent驱动\n- 可回退性：每步Git提交确保可追溯与可回退\n- 测试驱动：迁移前后必须通过测试验证\n- 路径统一：所有产物集中于 .jarvis/c2rust/ 目录\n\n【预期效果】\n- 实现 C/C++ 到 Rust 的安全、可控、可追溯的渐进迁移\n- 建立完整的测试验证体系确保功能等价\n- 提供断点续跑与自动修复能力提升工程效率\n- 统一的路径管理与状态跟踪机制",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "workflow",
+    "state_design",
+    "path",
+    "migration_system",
+    "automated_migration",
+    "test_driven",
+    "cli_design",
+    "progressive_transformation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251019_233349_020840", "20251019_205333_510231"],
+  "id": "merged_4e4a1118",
+  "created_at": "2025-11-12T23:42:15.625627"
+}

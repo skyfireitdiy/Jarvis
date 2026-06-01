@@ -1,0 +1,13 @@
+{
+  "id": "20251230_141321_283330",
+  "type": "project_long_term",
+  "tags": [
+    "tui_app.py",
+    "_populate_form_container",
+    "表单构建",
+    "代码架构"
+  ],
+  "content": "tui_app.py 中的 _populate_form_container() 方法架构：参数为 container: ScrollableContainer，根据 schema 类型构建表单：对象类型调用 _build_object_form()，单个字段使用 factory.create_field() 创建。该方法在 on_mount() 阶段被调用，确保容器已挂载。包含对 SchemaParser.TYPE_OBJECT、TYPE_ARRAY、TYPE_OBJECT 类型的完整处理逻辑。",
+  "created_at": "2025-12-30T14:13:21.283351",
+  "updated_at": "2025-12-30T14:13:21.283354"
+}

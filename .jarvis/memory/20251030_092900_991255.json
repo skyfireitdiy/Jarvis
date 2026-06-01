@@ -1,0 +1,16 @@
+{
+  "id": "20251030_092900_991255",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "transpiler",
+    "implementation_policy",
+    "no_todo",
+    "read_symbols",
+    "read_code",
+    "jarvis"
+  ],
+  "content": "决策更新（C2Rust转译器实现策略）：\n- 在生成Rust实现时，禁止使用 todo!/unimplemented! 作为占位。\n- 对于尚未实现的被调符号，要求读取其原始C语言实现（通过 read_symbols/read_code 获取C源码片段），并在本次最小必要范围内补齐对应的Rust实现，必要时新增合理模块或签名，以保证构建通过。\n- 测试与占位：如需返回占位值，使用合理默认值或 Result/Option，而非 panic!/todo!/unimplemented!；测试同样避免使用 todo!/unimplemented!。\n- 已改动位置：Transpiler._codeagent_generate_impl 的 requirement_lines 文案已调整，明确不再引导使用 todo，而是补齐未实现符号的Rust实现；“尚未转换的被调符号”提示也改为要求实现。\n- 兼容性：_resolve_pending_todos_for_symbol 仍保留以兼容可能存在的历史代码todo占位，但新生成逻辑不会再引导产生todo。\n",
+  "created_at": "2025-10-30T09:29:00.991287",
+  "updated_at": "2025-10-30T09:29:00.991291"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260115_114942_089170",
+  "type": "project_long_term",
+  "tags": [
+    "skill-development",
+    "rule_refactor",
+    "validation",
+    "builtin_rules"
+  ],
+  "content": "skill-development.md重构验证完成：标题改为'技能开发规则'，包含五个核心章节（原则、工作流程、具体要求、实践指导、检查清单），使用必须/禁止规范性语言，修复了markdown格式问题（添加了MD013和MD029禁用注释），保持了技能开发功能完整性（Git克隆、技能分析、注册规范等关键要素）。",
+  "created_at": "2026-01-15T11:49:42.089227",
+  "updated_at": "2026-01-15T11:49:42.089234"
+}
