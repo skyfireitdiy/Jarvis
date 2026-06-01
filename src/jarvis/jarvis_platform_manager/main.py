@@ -1095,9 +1095,10 @@ def group_set(
         raise typer.Exit(code=1)
 
     # 如果没有指定名称，使用交互式选择
+    # 如果没有指定名称，使用交互式选择
     if name is None:
         fzf_options = [
-            f"{group_name} (normal: {group_config.get('normal_llm', 'N/A')})"
+            f"{group_name} (smart: {group_config.get('smart_llm', 'N/A')}, normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')})"
             for group_name, group_config in sorted(llm_groups.items())
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要设置的模型组 > ")
