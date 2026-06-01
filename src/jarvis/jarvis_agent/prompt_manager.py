@@ -157,14 +157,7 @@ class PromptManager:
             }.get(current_model_type, current_model_type)
 
             # 根据模型类型推断可能的模式
-            model_to_modes = {
-                "smart": "HYPOTHESIZE 或 REVIEW",
-                "normal": "ANALYZE 或 EXECUTE",
-                "cheap": "RULE 或 COLLECT",
-            }
-            possible_modes = model_to_modes.get(current_model_type, "未知")
-
-            mode_hint = f"\n    - 当前使用 {model_type_display} 模型（适用于 {possible_modes} 模式）\n    - 如需切换 ARCHER 工作流模式，请调用 switch_mode 工具"
+            mode_hint = f"\n    - 当前使用 {model_type_display} 模型"
         except Exception:
             # 如果获取失败，不添加模式提示
             pass

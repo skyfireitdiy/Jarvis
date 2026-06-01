@@ -7,14 +7,12 @@ description: "消除编译警告、静态分析警告、代码检查告警等"
 
 ## 元指令
 
-**IMPORTANT**: 使用 `switch_mode` 工具切换 ARCHER 工作流模式。完成当前阶段后，调用 `switch_mode(mode="下一阶段", reason="切换原因")` 切换到下一阶段。工具会自动切换到对应的模型并继续执行。
+**IMPORTANT**: 遵循 ARCHER 工作流框架进行结构化思考和执行。根据任务复杂度灵活调整执行顺序。
 
-**模式切换示例**：
+**工作流程建议**：
 
-- 分析完成后：`switch_mode(mode="COLLECT", reason="需要收集代码信息")`
-- 收集完成后：`switch_mode(mode="HYPOTHESIZE", reason="准备设计方案")`
-- 方案确认后：`switch_mode(mode="EXECUTE", reason="开始执行修改")`
-- 执行完成后：`switch_mode(mode="REVIEW", reason="验证修改结果")`
+- 简单任务：ANALYZE → HYPOTHESIZE → EXECUTE → REVIEW
+- 复杂任务：ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW
 - 简单任务直接执行；复杂任务才用 task_list_manager，避免过度拆分。
 - **ARCHER 工作流灵活性说明（告警消除场景）**：
   - **准备阶段（A→R→C）灵活执行**：ANALYZE、RULE、COLLECT 三个阶段可根据任务复杂度灵活调整顺序或省略
