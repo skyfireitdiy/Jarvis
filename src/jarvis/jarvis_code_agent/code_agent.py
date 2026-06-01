@@ -4,6 +4,7 @@
 """
 
 import hashlib
+import logging
 import os
 from datetime import datetime
 
@@ -62,6 +63,8 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
 import jarvis.jarvis_utils.globals as jglobals
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -1275,7 +1278,8 @@ def cli(
                 GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
             # 创建自定义 FastAPI app，添加状态查询接口
-            from fastapi import FastAPI
+            from fastapi import FastAPI, Request
+            from fastapi.responses import JSONResponse
             from jarvis.jarvis_web_gateway.app import get_current_execution_status
 
             custom_app = FastAPI()
@@ -1338,6 +1342,45 @@ def cli(
                 from jarvis.jarvis_web_gateway.common_endpoints import get_tools_info
 
                 return get_tools_info()
+
+            @custom_app.post("/update_token")
+            async def update_token(request: Request):
+                """更新 Agent 的认证 Token。
+
+                当主网关重启后 Token 发生变化时，子网关通过此端点通知 Agent 更新 Token。
+
+                参数:
+                    token: 新的认证 Token
+
+                返回:
+                    dict: 操作结果
+                """
+                try:
+                    # 验证 Authorization Bearer token
+                    auth_header = request.headers.get("Authorization", "")
+                    current_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
+                    if not auth_header or not auth_header.startswith("Bearer "):
+                        return JSONResponse(
+                            status_code=401,
+                            content={"success": False, "error": "unauthorized"},
+                        )
+                    if auth_header[7:] != current_token:
+                        return JSONResponse(
+                            status_code=401,
+                            content={"success": False, "error": "invalid token"},
+                        )
+
+                    body = await request.json()
+                    new_token = body.get("token")
+                    if not new_token:
+                        return {"success": False, "error": "token is required"}
+
+                    os.environ["JARVIS_AUTH_TOKEN"] = new_token
+                    logger.info("Auth token updated via /update_token endpoint")
+                    return {"success": True}
+                except Exception as e:
+                    logger.error("Failed to update token: %s", e)
+                    return {"success": False, "error": str(e)}
 
             @custom_app.post("/message")
             async def receive_message(request: dict):
