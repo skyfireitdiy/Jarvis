@@ -1,0 +1,14 @@
+{
+  "id": "20260601_173234_896448",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "模型切换",
+    "_agent_type",
+    "_model_type",
+    "架构改进"
+  ],
+  "content": "Bug修复：模型切换不应修改 _agent_type\n\n问题：\n- switch_model 函数在切换到 smart 模型时将 _agent_type 改为 \"code_agent\"，切换到其他模型时改为 \"normal\"\n- _agent_type 应该反映 Agent 的实际类型（Agent vs CodeAgent），而不是当前使用的模型类型\n- CodeAgent 在初始化时已设置 self._agent_type = \"code_agent\"，不应因切换模型而改变\n\n修复内容：\n1. get_platform_type_from_agent 函数：改为直接读取 _model_type 属性，而非通过 _agent_type 推断\n   - 旧逻辑：code_agent → smart, 其他 → normal\n   - 新逻辑：直接返回 _model_type（smart/normal/cheap）\n\n2. switch_model 函数：移除对 _agent_type 的修改\n   - 不再根据模型类型修改 _agent_type\n   - _agent_type 始终反映 Agent 的真实类型\n\n3. switch_platform_type 函数：统一更新 _model_type\n   - 在函数内部自动更新 agent._model_type = platform_type\n   - 所有调用者无需再手动设置\n\n4. CodeAgent._switch_model_by_difficulty：移除冗余的 _model_type 设置\n\n关键区别：\n- _agent_type：Agent 的类型标识（\"normal\" 或 \"code_agent\"），由类初始化决定，不应被修改\n- _model_type：当前使用的模型类型（\"smart\"/\"normal\"/\"cheap\"），随模型切换而变化\n\n修改文件：\n- src/jarvis/jarvis_agent/builtin_input_handler.py\n- src/jarvis/jarvis_code_agent/code_agent.py",
+  "created_at": "2026-06-01T17:32:34.896475",
+  "updated_at": "2026-06-01T17:32:34.896481"
+}
