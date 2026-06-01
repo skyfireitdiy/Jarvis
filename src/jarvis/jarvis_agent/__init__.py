@@ -42,6 +42,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 # jarvis_agent 相关
 from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
+from jarvis.jarvis_agent.prompt_builder import get_tool_registry
 from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
 from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT
@@ -1148,10 +1149,7 @@ class Agent:
 
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
-        for handler in self.output_handler:
-            if isinstance(handler, ToolRegistry):
-                return handler
-        return None
+        return get_tool_registry(self.output_handler)
 
     def _ensure_save_memory_tool(self) -> None:
         """如果配置了强制保存记忆，确保 memory 工具在 use_tools 列表中"""
