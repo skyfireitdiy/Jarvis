@@ -725,10 +725,17 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
         if has_uncommitted_changes(cwd=git_root):
             return
 
-        # 获取远程tag更新
-        subprocess.run(
-            ["git", "fetch", "--tags"], cwd=git_root, check=True, capture_output=True
-        )
+        # 获取远程 tag 更新
+        try:
+            subprocess.run(
+                ["git", "fetch", "--tags"],
+                cwd=git_root,
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            # fetch 失败时静默处理，避免每次打开都提示错误
+            return
         # 获取最新本地tag
         local_tag_result = subprocess.run(
             ["git", "describe", "--tags", "--abbrev=0"],
