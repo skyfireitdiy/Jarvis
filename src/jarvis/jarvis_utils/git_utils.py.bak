@@ -1,0 +1,1461 @@
+"""
+Git工具模块
+该模块提供了与Git仓库交互的工具。
+包含以下功能：
+- 查找Git仓库的根目录
+- 检查是否有未提交的更改
+- 获取两个哈希值之间的提交历史
+- 获取最新提交的哈希值
+- 从Git差异中提取修改的行范围
+"""
+
+import datetime
+import os
+
+# -*- coding: utf-8 -*-
+import re
+import subprocess
+import sys
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
+
+# 全局标记：记录 confirm_add_new_files 是否已在当前流程中被调用
+# 用于避免在同一流程中重复询问用户是否添加新文件/二进制文件/大代码
+_confirm_add_new_files_called = False
+
+
+def reset_confirm_add_new_files_flag() -> None:
+    """重置 confirm_add_new_files 的全局标记
+
+    用于在新的流程开始时重置标记，允许重新进行文件确认
+    """
+    global _confirm_add_new_files_called
+    _confirm_add_new_files_called = False
+
+
+def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
+    """
+    切换到给定路径的Git根目录。
+
+    参数:
+        start_dir (str): 起始查找目录，默认为当前目录。
+        allow_init (bool): 如果不是Git仓库，是否允许初始化新的Git仓库。默认为False。
+
+    返回:
+        str: Git仓库根目录路径。
+
+    异常:
+        subprocess.CalledProcessError: 如果不是Git仓库且不允许初始化。
+    """
+    os.chdir(start_dir)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+        git_root = decode_output(result.stdout).strip()
+        if not git_root:
+            if allow_init:
+                subprocess.run(["git", "init"], check=True, capture_output=True)
+                git_root = os.path.abspath(".")
+            else:
+                raise subprocess.CalledProcessError(
+                    1, ["git", "rev-parse", "--show-toplevel"]
+                )
+    except subprocess.CalledProcessError:
+        # 如果不是Git仓库
+        if allow_init:
+            subprocess.run(["git", "init"], check=True, capture_output=True)
+            git_root = os.path.abspath(".")
+        else:
+            raise
+    os.chdir(git_root)
+    return git_root
+
+
+def find_git_root(start_dir: str = ".", allow_init: bool = False) -> str:
+    """
+    查找给定路径的Git根目录（不切换工作目录）。
+
+    参数:
+        start_dir (str): 起始查找目录，默认为当前目录。
+        allow_init (bool): 如果不是Git仓库，是否允许初始化新的Git仓库。默认为False。
+
+    返回:
+        str: Git仓库根目录路径。
+
+    异常:
+        subprocess.CalledProcessError: 如果不是Git仓库且不允许初始化。
+    """
+    abs_start_dir = os.path.abspath(start_dir)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=abs_start_dir,
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+        git_root = decode_output(result.stdout).strip()
+        if not git_root:
+            if allow_init:
+                subprocess.run(
+                    ["git", "init"], cwd=abs_start_dir, check=True, capture_output=True
+                )
+                git_root = abs_start_dir
+            else:
+                raise subprocess.CalledProcessError(
+                    1, ["git", "rev-parse", "--show-toplevel"]
+                )
+    except subprocess.CalledProcessError:
+        # 如果不是Git仓库
+        if allow_init:
+            subprocess.run(
+                ["git", "init"], cwd=abs_start_dir, check=True, capture_output=True
+            )
+            git_root = abs_start_dir
+        else:
+            raise
+    return git_root
+
+
+def has_uncommitted_changes(cwd: Optional[str] = None) -> bool:
+    """检查 Git 仓库中是否有未提交的更改
+
+    参数:
+        cwd: 工作目录路径，如果为 None 则使用当前目录
+
+    返回:
+        bool: 如果有未提交的更改返回 True，否则返回 False
+    """
+    # 兼容空仓库：使用 git status --porcelain 检测所有未提交的更改
+    # git diff 在空仓库中无法工作（没有 HEAD commit 作为基准），会错误地返回无差异
+    try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        # 如果 status 输出非空，说明有未提交的更改（包括未跟踪文件、修改文件、暂存文件等）
+        if status_result.stdout.strip():
+            return True
+    except Exception:
+        pass
+
+    # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）
+    process = subprocess.Popen(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+    )
+    stdout_bytes, _ = process.communicate()
+    staged_files_before_add = decode_output(stdout_bytes)
+    manually_staged_files = [
+        f.strip() for f in staged_files_before_add.split("\n") if f.strip()
+    ]
+
+    # 静默添加所有更改
+    subprocess.run(
+        ["git", "add", "-A"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+
+    # 检查工作目录更改
+    working_changes = (
+        subprocess.run(
+            ["git", "diff", "--exit-code"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        != 0
+    )
+
+    # 检查暂存区更改
+    staged_changes = (
+        subprocess.run(
+            ["git", "diff", "--cached", "--exit-code"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        != 0
+    )
+
+    # 静默重置更改
+    subprocess.run(
+        ["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+
+    # 重置后，重新添加之前手动暂存的可能被gitignore忽略的文件
+    for file_path in manually_staged_files:
+        if os.path.exists(file_path):
+            # 使用 -f 参数强制添加被 .gitignore 忽略的文件
+            subprocess.run(
+                ["git", "add", "-f", file_path], check=False, capture_output=True
+            )
+
+    return working_changes or staged_changes
+
+
+def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]:
+    """获取两个提交哈希值之间的提交列表
+
+    参数：
+        start_hash: 起始提交哈希值（不包含）
+        end_hash: 结束提交哈希值（包含）
+
+    返回：
+        List[Tuple[str, str]]: (提交哈希值, 提交信息) 元组列表
+    """
+    try:
+        # 使用git log和pretty格式获取哈希值和信息
+        result = subprocess.run(
+            ["git", "log", f"{start_hash}..{end_hash}", "--pretty=format:%H|%s"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,  # 禁用自动文本解码
+        )
+        if result.returncode != 0:
+            error_msg = decode_output(result.stderr)
+            PrettyOutput.auto_print(f"❌ 获取commit历史失败: {error_msg}")
+            return []
+
+        output = decode_output(result.stdout)
+        commits = []
+        for line in output.splitlines():
+            if "|" in line:
+                commit_hash, message = line.split("|", 1)
+                commits.append((commit_hash, message))
+        return commits
+
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 获取commit历史异常: {str(e)}")
+        return []
+
+
+# 修改后的获取差异函数
+
+
+def get_diff() -> str:
+    """使用git获取工作区差异，包括修改和新增的文件内容
+
+    返回:
+        str: 差异内容或错误信息
+    """
+    try:
+        # 检查是否为空仓库
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        confirm_add_new_files()
+        if head_check.returncode != 0:
+            # 空仓库情况，直接获取工作区差异
+            result = subprocess.run(
+                ["git", "diff"], capture_output=True, text=False, check=True
+            )
+        else:
+            # 暂存新增文件
+            subprocess.run(["git", "add", "-N", "."], check=True, capture_output=True)
+
+            # 获取所有差异（包括新增文件）
+            result = subprocess.run(
+                ["git", "diff", "HEAD"], capture_output=True, text=False, check=True
+            )
+
+            # 重置暂存区
+            subprocess.run(["git", "reset"], check=True, capture_output=True)
+
+        return decode_output(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        return f"获取差异失败: {str(e)}"
+    except Exception as e:
+        return f"发生意外错误: {str(e)}"
+
+
+def get_diff_stat_between_commits(
+    start_hash: str, end_hash: Optional[str] = None
+) -> str:
+    """获取两个commit之间的差异统计信息
+
+    参数:
+        start_hash: 起始commit哈希值（不包含）
+        end_hash: 结束commit哈希值（包含），如果为None则使用HEAD
+
+    返回:
+        str: 差异统计信息或错误信息
+    """
+    try:
+        if end_hash is None:
+            end_hash = "HEAD"
+
+        # 检查start_hash是否存在
+        start_check = subprocess.run(
+            ["git", "rev-parse", "--verify", start_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if start_check.returncode != 0:
+            return f"起始commit不存在: {start_hash}"
+
+        # 检查end_hash是否存在
+        end_check = subprocess.run(
+            ["git", "rev-parse", "--verify", end_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if end_check.returncode != 0:
+            return f"结束commit不存在: {end_hash}"
+
+        # 获取两个commit之间的差异统计信息
+        result = subprocess.run(
+            ["git", "diff", "--stat", f"{start_hash}..{end_hash}"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+
+        try:
+            return decode_output(result.stdout)
+        except Exception as e:
+            return f"解码输出失败: {str(e)}"
+
+    except subprocess.CalledProcessError as e:
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
+        return f"获取commit差异统计失败: {error_msg}"
+    except Exception as e:
+        return f"发生意外错误: {str(e)}"
+
+
+def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) -> str:
+    """获取两个commit之间的差异
+
+    参数:
+        start_hash: 起始commit哈希值（不包含）
+        end_hash: 结束commit哈希值（包含），如果为None则使用HEAD
+
+    返回:
+        str: 差异内容或错误信息
+    """
+    try:
+        if end_hash is None:
+            # 如果end_hash为None，使用HEAD
+            end_hash = "HEAD"
+
+        # 检查start_hash是否存在
+        start_check = subprocess.run(
+            ["git", "rev-parse", "--verify", start_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if start_check.returncode != 0:
+            return f"起始commit不存在: {start_hash}"
+
+        # 检查end_hash是否存在
+        end_check = subprocess.run(
+            ["git", "rev-parse", "--verify", end_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if end_check.returncode != 0:
+            return f"结束commit不存在: {end_hash}"
+
+        # 获取两个commit之间的差异
+        result = subprocess.run(
+            ["git", "diff", f"{start_hash}..{end_hash}"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+
+        try:
+            return decode_output(result.stdout)
+        except Exception as e:
+            return f"解码输出失败: {str(e)}"
+
+    except subprocess.CalledProcessError as e:
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
+        return f"获取commit差异失败: {error_msg}"
+    except Exception as e:
+        return f"发生意外错误: {str(e)}"
+
+
+def revert_file(filepath: str) -> None:
+    """增强版git恢复，处理新文件"""
+    import subprocess
+
+    try:
+        # 检查文件是否在版本控制中
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", filepath],
+            stderr=subprocess.PIPE,
+            text=False,  # 禁用自动文本解码
+        )
+        if result.returncode == 0:
+            subprocess.run(
+                ["git", "checkout", "HEAD", "--", filepath],
+                check=True,
+                capture_output=True,
+            )
+        else:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        subprocess.run(
+            ["git", "clean", "-f", "--", filepath], check=True, capture_output=True
+        )
+    except subprocess.CalledProcessError as e:
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
+        PrettyOutput.auto_print(f"❌ 恢复文件失败: {error_msg}")
+
+
+# 修改后的恢复函数
+
+
+def revert_change() -> None:
+    """恢复所有未提交的修改到HEAD状态"""
+    import subprocess
+
+    try:
+        # 检查是否为空仓库
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if head_check.returncode == 0:
+            subprocess.run(
+                ["git", "reset", "--hard", "HEAD"], check=True, capture_output=True
+            )
+        subprocess.run(["git", "clean", "-fd"], check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.auto_print(f"❌ 恢复更改失败: {str(e)}")
+
+
+def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
+    """检测是否有大量代码删除
+
+    参数:
+        threshold: 净删除行数阈值，默认200行
+
+    返回:
+        Optional[Dict[str, int]]: 如果检测到大量删除，返回包含统计信息的字典：
+            {
+                'insertions': int,  # 新增行数
+                'deletions': int,   # 删除行数
+                'net_deletions': int  # 净删除行数
+            }
+            如果没有大量删除或发生错误，返回None
+    """
+    try:
+        # 临时暂存所有文件以便获取完整的diff统计
+        subprocess.run(
+            ["git", "add", "-N", "."],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # 检查是否有HEAD
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+        )
+
+        if head_check.returncode == 0:
+            # 有HEAD，获取相对于HEAD的diff统计
+            diff_result = subprocess.run(
+                ["git", "diff", "HEAD", "--shortstat"],
+                capture_output=True,
+                check=False,
+            )
+        else:
+            # 空仓库，获取工作区diff统计
+            diff_result = subprocess.run(
+                ["git", "diff", "--shortstat"],
+                capture_output=True,
+                check=False,
+            )
+
+        # 重置暂存区
+        subprocess.run(
+            ["git", "reset"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # 解析插入和删除行数
+        if diff_result.returncode == 0 and diff_result.stdout:
+            output = decode_output(diff_result.stdout)
+            insertions = 0
+            deletions = 0
+            insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", output)
+            deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", output)
+            if insertions_match:
+                insertions = int(insertions_match.group(1))
+            if deletions_match:
+                deletions = int(deletions_match.group(1))
+
+            # 检查是否有大量代码删除（净删除超过阈值）
+            net_deletions = deletions - insertions
+            if net_deletions > threshold:
+                return {
+                    "insertions": insertions,
+                    "deletions": deletions,
+                    "net_deletions": net_deletions,
+                }
+        return None
+    except Exception:
+        # 如果检查过程中出错，返回None
+        return None
+
+
+# confirm_large_code_deletion函数已废弃，统一使用大模型询问
+
+
+def check_large_code_deletion(threshold: int = 30) -> bool:
+    """检查是否有大量代码删除
+
+    参数:
+        threshold: 净删除行数阈值，默认200行
+
+    返回:
+        bool: 始终返回True，由调用方统一处理大模型询问
+    """
+    # 检测功能现在由调用方统一处理
+    return True
+
+
+def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
+    """Handle the git commit workflow and return the commit details.
+
+    Args:
+        start_commit: 起始 commit hash，用于 squash 工作流
+
+    Returns:
+        bool: 提交是否成功
+    """
+    if is_confirm_before_apply_patch() and not user_confirm(
+        "是否要提交代码？", default=True
+    ):
+        revert_change()
+        return False
+
+    import subprocess
+
+    try:
+        confirm_add_new_files()
+
+        # 获取当前 HEAD
+        current_head = get_latest_commit_hash()
+
+        # 检查是否需要 squash：有 start_commit 且与当前 HEAD 不一致
+        if start_commit and start_commit != current_head:
+            # 执行 squash 操作：将 start_commit 之后的所有 commit 压缩成一个
+            subprocess.run(
+                ["git", "reset", "--soft", start_commit],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "提交代码"], check=True, capture_output=True
+            )
+            return True
+
+        # 原有逻辑：检查工作区是否有未提交的更改
+        if not has_uncommitted_changes():
+            return False
+
+        # 在提交前检查是否有大量代码删除
+        if not check_large_code_deletion():
+            return False
+
+        # 获取当前分支的提交总数
+        commit_result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            capture_output=True,
+            text=False,
+        )
+        if commit_result.returncode != 0:
+            return False
+
+        commit_count = int(decode_output(commit_result.stdout).strip())
+
+        # 暂存所有修改
+        subprocess.run(["git", "add", "."], check=True, capture_output=True)
+
+        # 提交变更
+        subprocess.run(
+            ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
+            check=True,
+            capture_output=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def get_latest_commit_hash() -> str:
+    """获取当前Git仓库的最新提交哈希值
+
+    返回：
+        str: 提交哈希值，如果不在Git仓库、空仓库或发生错误则返回空字符串
+    """
+    try:
+        # 首先检查是否存在HEAD引用
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+        )
+        if head_check.returncode != 0:
+            return ""  # 空仓库或无效HEAD
+
+        # 获取HEAD的完整哈希值
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+        )
+        return decode_output(result.stdout).strip() if result.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
+    """从Git差异中获取所有更改文件的修改行范围
+
+    返回：
+        字典，将文件路径映射到包含修改部分的（起始行, 结束行）范围元组。
+        行号从1开始。
+    """
+    # 获取所有文件的Git差异
+    # 仅用于解析修改行范围，减少上下文以降低输出体积和解析成本
+    proc = subprocess.run(
+        ["git", "show", "--no-color"],
+        capture_output=True,
+    )
+    diff_output = decode_output(proc.stdout)
+
+    # 解析差异以获取修改的文件及其行范围
+    result: Dict[str, List[Tuple[int, int]]] = {}
+    current_file = None
+
+    for line in diff_output.splitlines():
+        # 匹配类似"+++ b/path/to/file"的行
+        file_match = re.match(r"^\+\+\+ b/(.*)", line)
+        if file_match:
+            current_file = file_match.group(1)
+            continue
+
+        # 匹配类似"@@ -100,5 +100,7 @@"的行，其中+部分显示新行
+        range_match = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+        if range_match and current_file:
+            start_line = int(range_match.group(1))  # 保持从1开始
+            line_count = int(range_match.group(2)) if range_match.group(2) else 1
+            end_line = start_line + line_count - 1
+            if current_file not in result:
+                result[current_file] = []
+            result[current_file].append((start_line, end_line))
+
+    return result
+
+
+def is_file_in_git_repo(filepath: str) -> bool:
+    """检查文件是否在当前Git仓库中"""
+    import subprocess
+
+    try:
+        # 获取Git仓库根目录
+        repo_root_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True
+        )
+        repo_root = (
+            decode_output(repo_root_result.stdout).strip()
+            if repo_root_result.returncode == 0
+            else ""
+        )
+
+        # 检查文件路径是否在仓库根目录下
+        return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
+    except Exception:
+        return False
+
+
+def check_and_update_git_repo_background(repo_path: str) -> None:
+    """在后台线程中检查并更新git仓库（不进行用户交互）
+
+    此函数用于后台线程执行更新检查：
+    - 小版本更新：自动执行 git checkout 和 pip install
+    - 大版本更新：只写入标记文件，不执行更新
+    - 不进行用户确认，不要求重启
+
+    参数:
+        repo_path: 仓库路径
+    """
+    # 检查上次检查日期
+    last_check_file = os.path.join(get_data_dir(), "last_git_check")
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    if os.path.exists(last_check_file):
+        with open(last_check_file, "r") as f:
+            last_check_date = f.read().strip()
+        if last_check_date == today_str:
+            return
+
+    try:
+        git_root = find_git_root(repo_path)
+    except Exception:
+        return
+
+    try:
+        # 检查是否有未提交的修改
+        if has_uncommitted_changes(cwd=git_root):
+            return
+
+        # 获取远程tag更新
+        subprocess.run(
+            ["git", "fetch", "--tags"], cwd=git_root, check=True, capture_output=True
+        )
+        # 获取最新本地tag
+        local_tag_result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        # 获取最新远程tag
+        remote_tag_result = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", "origin"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        if remote_tag_result.returncode == 0:
+            # 提取最新的tag名称
+            tags = [
+                ref.split("/")[-1]
+                for ref in decode_output(remote_tag_result.stdout).splitlines()
+            ]
+            tags = sorted(
+                tags,
+                key=lambda x: [
+                    int(i) if i.isdigit() else i for i in re.split(r"([0-9]+)", x)
+                ],
+            )
+            remote_tag = tags[-1] if tags else ""
+
+        if (
+            local_tag_result.returncode == 0
+            and remote_tag_result.returncode == 0
+            and decode_output(local_tag_result.stdout).strip() != remote_tag
+        ):
+            # 检查是否为主版本升级(主版本号不同)
+            local_tag = decode_output(local_tag_result.stdout).strip()
+            try:
+                from packaging import version
+
+                # 移除tag前缀'v'后比较
+                local_ver = version.parse(local_tag.lstrip("v"))
+                remote_ver = version.parse(remote_tag.lstrip("v"))
+                is_major_upgrade = remote_ver.major != local_ver.major
+
+                if is_major_upgrade:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 检测到主版本升级: v{local_ver} -> v{remote_ver}"
+                    )
+                    PrettyOutput.auto_print(
+                        "主版本升级可能包含不兼容的API变更，将在后台记录更新标记。"
+                    )
+                    PrettyOutput.auto_print("ℹ️ 下次启动时将询问您是否执行主版本升级。")
+                    # 写入大版本更新标记
+                    from jarvis.jarvis_utils.utils import _set_major_update_pending
+
+                    _set_major_update_pending(remote_tag)
+                    # 更新检查日期，避免重复提示
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return
+            except Exception:
+                # 版本解析失败时，保持原有行为继续升级
+                pass
+
+            # 执行小版本更新：git checkout
+            subprocess.run(
+                ["git", "checkout", remote_tag],
+                cwd=git_root,
+                check=True,
+                stderr=subprocess.PIPE,
+            )
+            PrettyOutput.auto_print(f"✅ Jarvis已更新到tag {remote_tag}")
+
+            # 执行pip安装更新代码
+            try:
+                PrettyOutput.auto_print("ℹ️ 正在安装更新后的代码...")
+
+                # 检查是否在虚拟环境中
+                in_venv = hasattr(sys, "real_prefix") or (
+                    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+                )
+
+                # 检测 uv 可用性
+                from shutil import which as _which
+
+                uv_executable = None
+                if sys.platform == "win32":
+                    venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                else:
+                    venv_uv = os.path.join(sys.prefix, "bin", "uv")
+                if os.path.exists(venv_uv):
+                    uv_executable = venv_uv
+                else:
+                    path_uv = _which("uv")
+                    if path_uv:
+                        uv_executable = path_uv
+
+                # 根据环境选择安装命令
+                if uv_executable:
+                    install_cmd = [uv_executable, "pip", "install", "-e", "."]
+                else:
+                    install_cmd = [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-e",
+                        ".",
+                    ]
+
+                # 尝试安装
+                result = subprocess.run(install_cmd, cwd=git_root, capture_output=True)
+
+                if result.returncode == 0:
+                    PrettyOutput.auto_print("✅ 代码更新安装成功")
+                    PrettyOutput.auto_print(
+                        "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                    )
+                    # 写入重启标记，下次启动时提示用户重启
+                    from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                    _set_update_reboot_flag()
+                    # 更新检查日期
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return
+
+                # 处理权限错误
+                error_msg = decode_output(result.stderr).strip()
+                if not in_venv and (
+                    "Permission denied" in error_msg or "not writeable" in error_msg
+                ):
+                    # 后台线程不进行用户交互，直接尝试用户级安装
+                    user_result = subprocess.run(
+                        install_cmd + ["--user"],
+                        cwd=git_root,
+                        capture_output=True,
+                    )
+                    if user_result.returncode == 0:
+                        PrettyOutput.auto_print("✅ 用户级代码安装成功")
+                        PrettyOutput.auto_print(
+                            "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                        )
+                        # 写入重启标记
+                        from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                        _set_update_reboot_flag()
+                        # 更新检查日期
+                        with open(last_check_file, "w") as f:
+                            f.write(today_str)
+                        return
+
+                PrettyOutput.auto_print(f"❌ 代码安装失败: {error_msg}")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 安装过程中发生意外错误: {str(e)}")
+
+        # 更新检查日期文件
+        with open(last_check_file, "w") as f:
+            f.write(today_str)
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
+    finally:
+        pass
+
+
+def check_and_update_git_repo(repo_path: str) -> bool:
+    """检查并更新git仓库（带用户交互）
+
+    参数:
+        repo_path: 仓库路径
+
+    返回:
+        bool: 是否执行了更新
+    """
+    # 检查上次检查日期
+    last_check_file = os.path.join(get_data_dir(), "last_git_check")
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    if os.path.exists(last_check_file):
+        with open(last_check_file, "r") as f:
+            last_check_date = f.read().strip()
+        if last_check_date == today_str:
+            return False
+
+    try:
+        git_root = find_git_root(repo_path)
+    except Exception:
+        return False
+
+    try:
+        # 检查是否有未提交的修改
+        if has_uncommitted_changes(cwd=git_root):
+            return False
+
+        # 获取远程tag更新
+        subprocess.run(
+            ["git", "fetch", "--tags"], cwd=git_root, check=True, capture_output=True
+        )
+        # 获取最新本地tag
+        local_tag_result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        # 获取最新远程tag
+        remote_tag_result = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", "origin"],
+            cwd=git_root,
+            capture_output=True,
+        )
+        if remote_tag_result.returncode == 0:
+            # 提取最新的tag名称
+            tags = [
+                ref.split("/")[-1]
+                for ref in decode_output(remote_tag_result.stdout).splitlines()
+            ]
+            tags = sorted(
+                tags,
+                key=lambda x: [
+                    int(i) if i.isdigit() else i for i in re.split(r"([0-9]+)", x)
+                ],
+            )
+            remote_tag = tags[-1] if tags else ""
+
+        if (
+            local_tag_result.returncode == 0
+            and remote_tag_result.returncode == 0
+            and decode_output(local_tag_result.stdout).strip() != remote_tag
+        ):
+            PrettyOutput.auto_print(
+                f"ℹ️ 检测到新版本tag {remote_tag}，正在更新Jarvis..."
+            )
+
+            # 检查是否为主版本升级(主版本号不同)
+            local_tag = decode_output(local_tag_result.stdout).strip()
+            try:
+                from packaging import version
+
+                # 移除tag前缀'v'后比较
+                local_ver = version.parse(local_tag.lstrip("v"))
+                remote_ver = version.parse(remote_tag.lstrip("v"))
+                is_major_upgrade = remote_ver.major != local_ver.major
+
+                if is_major_upgrade:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 检测到主版本升级: v{local_ver} -> v{remote_ver}"
+                    )
+                    PrettyOutput.auto_print(
+                        "主版本升级可能包含不兼容的API变更,将在后台记录更新标记。"
+                    )
+                    PrettyOutput.auto_print("ℹ️ 下次启动时将询问您是否执行主版本升级。")
+                    # 写入大版本更新标记
+                    from jarvis.jarvis_utils.utils import _set_major_update_pending
+
+                    _set_major_update_pending(remote_tag)
+                    # 更新检查日期,避免重复提示
+                    with open(last_check_file, "w") as f:
+                        f.write(today_str)
+                    return False
+            except Exception:
+                # 版本解析失败时,保持原有行为继续升级
+                pass
+            subprocess.run(
+                ["git", "checkout", remote_tag],
+                cwd=git_root,
+                check=True,
+                stderr=subprocess.PIPE,
+            )
+            PrettyOutput.auto_print(f"✅ Jarvis已更新到tag {remote_tag}")
+
+            # 执行pip安装更新代码
+            try:
+                PrettyOutput.auto_print("ℹ️ 正在安装更新后的代码...")
+
+                # 检查是否在虚拟环境中
+                in_venv = hasattr(sys, "real_prefix") or (
+                    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+                )
+
+                # 检测 uv 可用性：优先虚拟环境内的 uv，其次 PATH 中的 uv
+                from shutil import which as _which
+
+                uv_executable = None
+                if sys.platform == "win32":
+                    venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
+                else:
+                    venv_uv = os.path.join(sys.prefix, "bin", "uv")
+                if os.path.exists(venv_uv):
+                    uv_executable = venv_uv
+                else:
+                    path_uv = _which("uv")
+                    if path_uv:
+                        uv_executable = path_uv
+
+                # 根据环境选择安装命令
+                # 根据 uv 可用性选择安装命令（优先使用 uv）
+                if uv_executable:
+                    install_cmd = [uv_executable, "pip", "install", "-e", "."]
+                else:
+                    install_cmd = [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-e",
+                        ".",
+                    ]
+
+                # 尝试安装
+                result = subprocess.run(install_cmd, cwd=git_root, capture_output=True)
+
+                if result.returncode == 0:
+                    PrettyOutput.auto_print("✅ 代码更新安装成功")
+                    PrettyOutput.auto_print(
+                        "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                    )
+                    # 写入重启标记，下次启动时提示用户重启
+                    from jarvis.jarvis_utils.utils import _set_update_reboot_flag
+
+                    _set_update_reboot_flag()
+                    return False
+
+                # 处理权限错误
+                error_msg = decode_output(result.stderr).strip()
+                if not in_venv and (
+                    "Permission denied" in error_msg or "not writeable" in error_msg
+                ):
+                    if user_confirm(
+                        "检测到权限问题，是否尝试用户级安装(--user)？", True
+                    ):
+                        user_result = subprocess.run(
+                            install_cmd + ["--user"],
+                            cwd=git_root,
+                            capture_output=True,
+                        )
+                        if user_result.returncode == 0:
+                            PrettyOutput.auto_print("✅ 用户级代码安装成功")
+                            PrettyOutput.auto_print(
+                                "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
+                            )
+                            # 写入重启标记，下次启动时提示用户重启
+                            from jarvis.jarvis_utils.utils import (
+                                _set_update_reboot_flag,
+                            )
+
+                            _set_update_reboot_flag()
+                            return False
+                        error_msg = decode_output(user_result.stderr).strip()
+
+                PrettyOutput.auto_print(f"❌ 代码安装失败: {error_msg}")
+                return False
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 安装过程中发生意外错误: {str(e)}")
+                return False
+        # 更新检查日期文件
+        with open(last_check_file, "w") as f:
+            f.write(today_str)
+        return False
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
+        return False
+    finally:
+        pass
+
+
+def get_diff_file_list() -> List[str]:
+    """获取HEAD到当前变更的文件列表，包括修改和新增的文件
+
+    返回:
+        List[str]: 修改和新增的文件路径列表
+    """
+    try:
+        confirm_add_new_files()
+
+        # 暂存新增文件
+        subprocess.run(["git", "add", "-N", "."], check=True, capture_output=True)
+
+        # 获取所有差异文件（包括新增文件）
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"], capture_output=True
+        )
+
+        # 重置暂存区
+        subprocess.run(["git", "reset"], check=True, capture_output=True)
+
+        if result.returncode != 0:
+            PrettyOutput.auto_print(
+                f"❌ 获取差异文件列表失败: {decode_output(result.stderr)}"
+            )
+            return []
+
+        return [f for f in decode_output(result.stdout).splitlines() if f]
+
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.auto_print(f"❌ 获取差异文件列表失败: {str(e)}")
+        return []
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 获取差异文件列表异常: {str(e)}")
+        return []
+
+
+def get_recent_commits_with_files() -> List[Dict[str, Any]]:
+    """获取最近5次提交的commit信息和文件清单
+
+    返回:
+        List[Dict[str, Any]]: 包含commit信息和文件清单的字典列表，格式为:
+            [
+                {
+                    'hash': str,
+                    'message': str,
+                    'author': str,
+                    'date': str,
+                    'files': List[str]  # 修改的文件列表 (最多20个文件)
+                },
+                ...
+            ]
+            失败时返回空列表
+    """
+    try:
+        # 获取当前git用户名
+        current_author_result = subprocess.run(
+            ["git", "config", "user.name"],
+            capture_output=True,
+        )
+        current_author = (
+            decode_output(current_author_result.stdout).strip()
+            if current_author_result.returncode == 0
+            else ""
+        )
+
+        # 获取当前用户最近5次提交的基本信息
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                "-5",
+                "--author=" + current_author,
+                "--pretty=format:%H%n%s%n%an%n%ad",
+            ],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            return []
+
+        # 解析提交信息
+        commits: List[Dict[str, Any]] = []
+        lines = decode_output(result.stdout).splitlines()
+        for i in range(0, len(lines), 4):
+            if i + 3 >= len(lines):
+                break
+            commit: Dict[str, Any] = {
+                "hash": lines[i],
+                "message": lines[i + 1],
+                "author": lines[i + 2],
+                "date": lines[i + 3],
+                "files": [],
+            }
+            commits.append(commit)
+
+        # 获取每个提交的文件修改清单
+        for commit in commits:
+            files_result = subprocess.run(
+                ["git", "show", "--name-only", "--pretty=format:", commit["hash"]],
+                capture_output=True,
+            )
+            if files_result.returncode == 0:
+                file_lines = decode_output(files_result.stdout).splitlines()
+                unique_files: Set[str] = set(filter(None, file_lines))
+                commit["files"] = list(unique_files)[:20]  # 限制最多20个文件
+
+        return commits
+
+    except subprocess.CalledProcessError:
+        return []
+
+
+def _get_new_files() -> List[str]:
+    """获取新增文件列表"""
+    result = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        check=True,
+    )
+    return decode_output(result.stdout).splitlines()
+
+
+def get_default_gitignore_templates() -> str:
+    """获取各语言的默认 .gitignore 模板
+
+    返回:
+        str: 格式化的 .gitignore 内容，按语言分组
+    """
+    # 延迟导入以避免循环依赖
+    from jarvis.jarvis_code_agent.code_analyzer.file_ignore import FileIgnorePatterns
+
+    templates = []
+
+    # Python
+    if FileIgnorePatterns.PYTHON_DIRS or FileIgnorePatterns.PYTHON_VENV_DIRS:
+        templates.append("# Python")
+        templates.extend(sorted(FileIgnorePatterns.PYTHON_DIRS))
+        templates.extend(sorted(FileIgnorePatterns.PYTHON_VENV_DIRS))
+        templates.append("")
+
+    # Rust
+    if FileIgnorePatterns.RUST_DIRS:
+        templates.append("# Rust")
+        templates.extend(sorted(FileIgnorePatterns.RUST_DIRS))
+        templates.append("")
+
+    # Go
+    if FileIgnorePatterns.GO_DIRS:
+        templates.append("# Go")
+        templates.extend(sorted(FileIgnorePatterns.GO_DIRS))
+        templates.append("")
+
+    # Node.js
+    if FileIgnorePatterns.NODE_DIRS:
+        templates.append("# Node.js")
+        templates.extend(sorted(FileIgnorePatterns.NODE_DIRS))
+        templates.append("")
+
+    # Java
+    if FileIgnorePatterns.JAVA_DIRS:
+        templates.append("# Java")
+        templates.extend(sorted(FileIgnorePatterns.JAVA_DIRS))
+        templates.append("")
+
+    # C/C++
+    if FileIgnorePatterns.C_CPP_DIRS:
+        templates.append("# C/C++")
+        templates.extend(sorted(FileIgnorePatterns.C_CPP_DIRS))
+        templates.append("")
+
+    # .NET
+    if FileIgnorePatterns.DOTNET_DIRS:
+        templates.append("# .NET")
+        templates.extend(sorted(FileIgnorePatterns.DOTNET_DIRS))
+        templates.append("")
+
+    # 通用构建产物
+    if FileIgnorePatterns.BUILD_DIRS:
+        templates.append("# Build artifacts")
+        templates.extend(sorted(FileIgnorePatterns.BUILD_DIRS))
+        templates.append("")
+
+    # 依赖目录
+    if FileIgnorePatterns.DEPENDENCY_DIRS:
+        templates.append("# Dependencies")
+        templates.extend(sorted(FileIgnorePatterns.DEPENDENCY_DIRS))
+        templates.append("")
+
+    # IDE 和编辑器
+    if FileIgnorePatterns.OTHER_DIRS:
+        templates.append("# IDE & Editors")
+        templates.extend(sorted(FileIgnorePatterns.OTHER_DIRS))
+        templates.append("")
+
+    # Jarvis 特定
+    templates.append("# Jarvis")
+    templates.extend(sorted(FileIgnorePatterns.dirs))
+
+    return "\n".join(templates)
+
+
+def confirm_add_new_files() -> None:
+    """确认新增文件、代码行数和二进制文件"""
+    global _confirm_add_new_files_called
+
+    # 如果已经确认过，直接返回，避免重复询问
+    if _confirm_add_new_files_called:
+        return
+
+    _confirm_add_new_files_called = True
+
+    def _get_added_lines() -> int:
+        """获取新增代码行数"""
+        diff_stats_result = subprocess.run(
+            ["git", "diff", "--numstat"],
+            capture_output=True,
+            check=True,
+        )
+        diff_stats = decode_output(diff_stats_result.stdout).splitlines()
+
+        added_lines = 0
+        for stat in diff_stats:
+            parts = stat.split()
+            if len(parts) >= 1:
+                try:
+                    added_lines += int(parts[0])
+                except ValueError:
+                    pass
+        return added_lines
+
+    def _get_binary_files(files: List[str]) -> List[str]:
+        """从文件列表中识别二进制文件"""
+        binary_files = []
+        for file in files:
+            try:
+                with open(file, "rb") as f:
+                    if b"\x00" in f.read(1024):
+                        binary_files.append(file)
+            except (IOError, PermissionError):
+                continue
+        return binary_files
+
+    def _check_conditions(
+        new_files: List[str], added_lines: int, binary_files: List[str]
+    ) -> bool:
+        """检查各种条件并打印提示信息"""
+        need_confirm = False
+        output_lines = []
+
+        if len(new_files) > 20:
+            output_lines.append(f"检测到{len(new_files)}个新增文件(选择N将重新检测)")
+            output_lines.append("新增文件列表:")
+            output_lines.extend(f"  - {file}" for file in new_files)
+            need_confirm = True
+
+        if added_lines > 500:
+            output_lines.append(f"检测到{added_lines}行新增代码(选择N将重新检测)")
+            need_confirm = True
+
+        if binary_files:
+            output_lines.append(
+                f"检测到{len(binary_files)}个二进制文件(选择N将重新检测)"
+            )
+            output_lines.append("二进制文件列表:")
+            output_lines.extend(f"  - {file}" for file in binary_files)
+            need_confirm = True
+
+        if output_lines:
+            emoji = "⚠️ " if need_confirm else "ℹ️ "
+            PrettyOutput.auto_print(emoji + ("\n" + emoji).join(output_lines))
+
+        return need_confirm
+
+    while True:
+        new_files = _get_new_files()
+        added_lines = _get_added_lines()
+        binary_files = _get_binary_files(new_files)
+
+        if not _check_conditions(new_files, added_lines, binary_files):
+            break
+
+        if not user_confirm(
+            "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
+            True,
+        ):
+            # 用户选择 N：处理 .gitignore
+            try:
+                repo_root_result = subprocess.run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    capture_output=True,
+                    check=True,
+                )
+                repo_root = decode_output(repo_root_result.stdout).strip() or "."
+            except Exception:
+                repo_root = "."
+            gitignore_path = os.path.join(repo_root, ".gitignore")
+
+            # 检查是否需要添加默认的各语言 ignore 模板
+            needs_default_templates = False
+            if os.path.exists(gitignore_path):
+                with open(gitignore_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # 只检查是否已包含 .jarvis
+                if ".jarvis" not in content:
+                    needs_default_templates = True
+            else:
+                needs_default_templates = True
+
+            # 询问是否添加默认模板
+            if needs_default_templates:
+                PrettyOutput.auto_print(
+                    "ℹ️ 检测到 .gitignore 缺少常见语言默认规则，建议添加以避免跟踪不必要的文件"
+                )
+                if user_confirm("是否添加各语言的默认 .gitignore 规则？", True):
+                    default_templates = get_default_gitignore_templates()
+                    try:
+                        if os.path.exists(gitignore_path):
+                            # 追加模式：检查并补齐换行
+                            with open(gitignore_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                            needs_newline = content and not content.endswith("\n")
+                            with open(
+                                gitignore_path, "a", encoding="utf-8", newline="\n"
+                            ) as f:
+                                if needs_newline:
+                                    f.write("\n")
+                                f.write("\n" + default_templates + "\n")
+                        else:
+                            # 新建模式
+                            with open(
+                                gitignore_path, "w", encoding="utf-8", newline="\n"
+                            ) as f:
+                                f.write(default_templates + "\n")
+                        PrettyOutput.auto_print("✅ 已添加各语言默认 .gitignore 规则")
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠️ 添加默认 .gitignore 规则失败: {str(e)}"
+                        )
+
+            # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 .gitignore 忽略）
+            files_to_ignore = sorted(set(new_files))
+
+            # 读取已存在的 .gitignore 以避免重复添加
+            existing_lines: Set[str] = set()
+            try:
+                if os.path.exists(gitignore_path):
+                    with open(gitignore_path, "r", encoding="utf-8") as f:
+                        existing_lines = set(line.strip() for line in f if line.strip())
+            except Exception:
+                existing_lines = set()
+
+            # 追加未存在的文件路径到 .gitignore（使用相对于仓库根目录的路径）
+            try:
+                with open(gitignore_path, "a", encoding="utf-8") as f:
+                    for file in files_to_ignore:
+                        abs_path = os.path.abspath(file)
+                        rel_path = os.path.relpath(abs_path, repo_root)
+                        # 避免无效的相对路径（不应出现 .. 前缀），有则回退用原始值
+                        entry = rel_path if not rel_path.startswith("..") else file
+                        if entry not in existing_lines:
+                            f.write(entry + "\n")
+                PrettyOutput.auto_print(
+                    "ℹ️ 已将未跟踪文件添加到 .gitignore，正在重新检测..."
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 更新 .gitignore 失败: {str(e)}")
+
+            continue
+
+        break
