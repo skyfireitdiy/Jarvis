@@ -1,0 +1,13 @@
+{
+  "id": "20260110_111237_051663",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "base_py_modification",
+    "web_support",
+    "architecture_decision"
+  ],
+  "content": "在base.py中删除了web支持相关的接口：\n1. 第52行删除了self.web属性\n2. 第564-566行删除了set_web方法\n3. 第758-760行删除了support_web抽象方法\n4. 所有平台实现都需要相应删除support_web方法并移除self.web的使用",
+  "created_at": "2026-01-10T11:12:37.051681",
+  "updated_at": "2026-01-10T11:12:37.051685"
+}

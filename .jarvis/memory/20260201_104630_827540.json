@@ -1,0 +1,8 @@
+{
+  "id": "20260201_104630_827540",
+  "type": "project_long_term",
+  "tags": ["digital_twin", "proactive_service", "types", "阶段5.3"],
+  "content": "阶段5.3主动服务系统类型定义完成\n\n目录位置：src/jarvis/jarvis_digital_twin/proactive_service/\n\n定义的类型：\n1. 枚举类型：\n   - ServiceType: SUGGESTION/REMINDER/AUTO_ACTION/INFORMATION/CLARIFICATION\n   - ServicePriority: CRITICAL/HIGH/MEDIUM/LOW/BACKGROUND\n   - ServiceStatus: PENDING/TRIGGERED/EXECUTING/COMPLETED/FAILED/CANCELLED/REJECTED\n   - FeedbackType: ACCEPTED/REJECTED/IGNORED/DEFERRED/MODIFIED\n\n2. 数据类：\n   - ServiceDefinition: 服务定义（service_id, service_type, name, description, priority, trigger_conditions, cooldown_seconds）\n   - ServiceResult: 服务执行结果（service_id, status, message, data, executed_at, duration_ms）\n   - ServiceFeedback: 服务反馈（service_id, feedback_type, user_comment, recorded_at）\n   - TriggerContext: 触发上下文（user_input, conversation_history, user_profile, predictions, timestamp）\n\n3. Protocol接口：\n   - ServiceHandlerProtocol: 服务处理器协议（handle, can_handle方法）\n   - TriggerEvaluatorProtocol: 触发评估器协议（evaluate, get_confidence方法）",
+  "created_at": "2026-02-01T10:46:30.827557",
+  "updated_at": "2026-02-01T10:46:30.827560"
+}

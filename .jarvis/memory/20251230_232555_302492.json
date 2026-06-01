@@ -1,0 +1,8 @@
+{
+  "id": "20251230_232555_302492",
+  "type": "project_long_term",
+  "tags": ["zen-ios-hybrid", "design-system", "ui"],
+  "content": "Zen-iOS Hybrid 前端设计规范：1) 全局底色 iOS 系统级灰 #F2F2F7；2) 毛玻璃效果 backdrop-blur-40px 到 60px，半透明背景 White/40-60；3) 双层物理描边：内描边 1px border-white/60，外描边 1px border-gray-200/40；4) 深度阴影 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.08)]；5) 圆角美学：大容器 rounded-[40px-50px]，功能块 rounded-[28px]，小组件 rounded-xl；6) 触觉反馈 active:scale-95。主按钮深空黑 #1C1C1E，开关器绿色 #34C759，字体使用 Inter 或 SF Pro Display。",
+  "created_at": "2025-12-30T23:25:55.302507",
+  "updated_at": "2025-12-30T23:25:55.302509"
+}

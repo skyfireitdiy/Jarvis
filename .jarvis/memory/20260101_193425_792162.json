@@ -1,0 +1,8 @@
+{
+  "id": "20260101_193425_792162",
+  "type": "project_long_term",
+  "tags": ["clipboard", "subprocess", "file-analysis"],
+  "content": "clipboard.py文件分析：src/jarvis/jarvis_utils/clipboard.py中的copy_to_clipboard函数实现了跨平台的剪贴板复制功能。所有subprocess.Popen调用均为写入操作（stdin=subprocess.PIPE），stdout和stderr均设置为subprocess.DEVNULL，不涉及读取命令输出，因此不需要使用decode_output函数。",
+  "created_at": "2026-01-01T19:34:25.792235",
+  "updated_at": "2026-01-01T19:34:25.792242"
+}

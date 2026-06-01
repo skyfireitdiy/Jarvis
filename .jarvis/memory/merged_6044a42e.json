@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis 智能体系统摘要机制增强：基于轮次的上下文管理与多Agent协作优化\n\n【Agent自动总结机制增强（2025-11-12）】\n\n【总体目标】\n将自动总结的触发条件从基于token阈值改为基于对话轮次，提升长会话稳定性与可预测性，增加参数 auto_summary_rounds，支持构造参数与配置文件双重配置，保持向后兼容。\n\n【核心变更】\n1) 新增轮次阈值机制\n   - 在 jarvis_agent/run_loop.py 中引入 self.auto_summary_rounds，默认值30，可通过环境变量 JARVIS_AUTO_SUMMARY_ROUNDS 覆盖\n   - 触发逻辑：在每轮循环开始处递增 conversation_rounds，达到阈值时调用 agent._summarize_and_clear_history()，并将生成的摘要以 addon_prompt 形式注入，随后将 conversation_rounds 重置为0\n\n2) 参数化配置支持\n   - 在 Agent.__init__ 新增构造参数 auto_summary_rounds，默认值为 None\n   - 语义：当为 None 时，使用配置文件（AgentConfig）中的默认值；否则优先使用传入值\n   - 贯通到 AgentConfig.resolve_defaults，并确保 AgentRunLoop 读取的生效值来自同一配置源\n\n3) 兼容性保障\n   - 保留原基于token的逻辑但默认关闭；如需启用，设置环境变量 JARVIS_ENABLE_TOKEN_SUMMARY=true\n   - 相关改动在 jarvis_agent/__init__.py 的 _manage_conversation_length 中完成\n   - 保持向后兼容，默认不改变既有行为；仅在显式传入时覆盖配置\n\n【影响范围】\n- 影响文件：\n  • src/jarvis/jarvis_agent/__init__.py（Agent 类、_manage_conversation_length 方法）\n  • src/jarvis/jarvis_agent/config.py（AgentConfig.resolve_defaults）\n  • src/jarvis/jarvis_agent/run_loop.py（轮次触发摘要逻辑）\n\n【多Agent摘要策略配置（2025-10-15）】\n\n【新增配置】\n- 配置键：JARVIS_MULTI_AGENT_SUMMARY_ON_SEND（bool，默认true）\n- 动机：控制多智能体在发送消息时是否生成上下文摘要，默认启用以增强协作交接的清晰性；可关闭以减少模型调用成本\n\n【实施方案】\n1) 在 jarvis_utils/config.py 增加接口 is_multi_agent_summary_on_send() -> bool，默认 True\n2) 在 jarvis_multi_agent/__init__.py 的 MultiAgent.run 中，生成摘要逻辑前读取该配置，若为 False 则跳过模型摘要生成（summary_text=\"\"）\n3) 在 jarvis_data/config_schema.json 增加该配置项，type boolean，default true，并补充说明\n4) 在 docs/jarvis_book/9.附录.md 的配置表中新增该项并说明用途与默认值\n\n【设计原则】\n- 风险控制：最小改动优先，保持现有行为不变\n- 配置统一：构造参数与配置文件使用同一解析路径\n- 可预测性：固定轮次触发有利于节奏稳定，减少token超限导致的突发清理\n- 可配置性：支持环境变量、构造参数、配置文件多级覆盖，便于按需调整策略\n- 协作优化：多Agent间摘要策略可配置，平衡清晰性与成本\n\n【系统集成】\n- Agent 级：基于轮次的自动总结，提升长会话稳定性\n- MultiAgent 级：可配置的发送摘要，优化协作效率\n- 配置体系：统一的配置管理，支持多层级覆盖\n- 兼容性：完整的向后兼容，不影响现有调用方\n\n【预期效果】\n- 减少长会话中因token超限导致的突发清理\n- 提供稳定的总结节奏（默认每30轮）\n- 支持灵活配置以适应不同场景需求\n- 优化多Agent协作的摘要生成策略\n- 降低不必要的模型调用成本\n- 保持完整的向后兼容性，不影响现有调用方",
+  "tags": [
+    "jarvis_agent",
+    "jarvis_multi_agent",
+    "summary_policy",
+    "auto_summary_rounds",
+    "configuration",
+    "context_continuity",
+    "configurable_thresholds",
+    "agent_optimization",
+    "collaborative_intelligence",
+    "adaptive_summary"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_36c771c2", "20251015_201325_894325"],
+  "id": "merged_6044a42e",
+  "created_at": "2025-11-12T23:47:58.685069"
+}

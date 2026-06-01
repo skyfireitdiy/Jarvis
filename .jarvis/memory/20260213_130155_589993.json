@@ -1,0 +1,14 @@
+{
+  "id": "20260213_130155_589993",
+  "type": "project_long_term",
+  "tags": [
+    "run_loop",
+    "input_handler",
+    "summary",
+    "原始用户输入",
+    "input processing"
+  ],
+  "content": "通过分析src/jarvis/jarvis_agent/run_loop.py和相关代码，发现在_summarymarize_and_clear_history方法中使用的是original_user_input属性，该属性存储的是处理前的原始用户输入，而非input_handler处理后的input。这个属性在Agent首次运行时（run方法中）被设置为user_input参数的原始值。",
+  "created_at": "2026-02-13T13:01:55.590023",
+  "updated_at": "2026-02-13T13:01:55.590027"
+}

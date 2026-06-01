@@ -1,0 +1,12 @@
+{
+  "id": "20251108_054655_533585",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "read_symbols",
+    "transpiler.py"
+  ],
+  "content": "在c2rust场景下，CodeAgent允许使用 read_symbols工具 '/home/wangmaobin/code/Jarvis/src/jarvis/jarvis_c2rust/transpiler.py'\n",
+  "created_at": "2025-11-08T05:46:55.533610",
+  "updated_at": "2025-11-08T05:46:55.533614"
+}

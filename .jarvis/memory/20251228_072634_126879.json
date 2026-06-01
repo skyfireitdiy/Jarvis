@@ -1,0 +1,12 @@
+{
+  "id": "20251228_072634_126879",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "llm_group",
+    "get_llm_config"
+  ],
+  "content": "get_llm_config 函数接受两个参数：platform_type（'normal'/'cheap'/'smart'）和 model_group_override（可选的模型组覆盖参数）。当 model_group_override 为 None 时，使用默认配置；当指定模型组时，会从该模型组的配置中获取对应的 llm_config（包含 api_key 等配置）。该函数通过调用 _get_resolved_model_config(model_group_override) 来解析配置。",
+  "created_at": "2025-12-28T07:26:34.126916",
+  "updated_at": "2025-12-28T07:26:34.126921"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260121_084520_112016",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "jgc",
+    "jcr",
+    "installation",
+    "usage"
+  ],
+  "content": "# Jarvis快速安装配置与使用指南\n\n## 1. Jarvis快速安装配置\n\n### 系统要求\n- **操作系统**: Jarvis 主要支持 Linux 系统。Windows 用户可以通过 WSL (Windows Subsystem for Linux) 来完整地体验 Jarvis 的所有功能。\n- **Python版本**: 需要 Python 3.9 或更高版本（支持 3.9-3.12）。\n\n### 安装方式\n\n#### 一键安装 (推荐)\n\nLinux/macOS:\n```bash\n# GitHub（推荐）\nbash -c \"$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)\"\n\n# 或者使用 Gitee 镜像（国内访问更快）\nbash -c \"$(curl -fsSL https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.sh)\"\n```\n\nWindows (PowerShell):\n```powershell\n# GitHub（推荐）\niex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))\n\n# 或者使用 Gitee 镜像（国内访问更快）\niex ((New-Object System.Net.WebClient).DownloadString('https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.ps1'))\n```\n\n#### 通过 uv 安装 (推荐)\n```bash\n# 1. 安装 uv (如果未安装)\ncurl -LsSf https://astral.sh/uv/install.sh | sh\n\n# 2. 使用 uv tool 安装 jarvis（推荐）\n# 从 GitHub 仓库安装\nuv tool install git+https://github.com/skyfireitdiy/Jarvis.git\n\n# 或从 Gitee 镜像安装（国内访问更快）\n# uv tool install git+https://gitee.com/skyfireitdiy/Jarvis.git\n```\n\n## 2. jgc 代码提交使用方法\n\njgc (jarvis-git-commit) 是 Jarvis 提供的自动化 Git 提交工具，能够分析代码变更并自动生成规范的提交信息。\n\n### 基本使用\n```bash\njgc  # 自动分析当前修改并提交\n```\n\n### 参数说明\n- `--root-dir`: Git仓库的根目录路径（默认为当前目录）\n- `--prefix`: 提交信息前缀\n- `--suffix`: 提交信息后缀\n- `-g`, `--llm-group`: 使用的模型组，覆盖配置文件中的设置\n\n### 功能特点\n- 自动分析代码变更内容\n- 生成符合 Conventional Commits 规范的提交信息\n- 支持中文提交信息\n- 自动暂存所有变更并提交\n\n## 3. jcr 代码审查使用方法\n\njcr (jarvis-code-review) 是 Jarvis 提供的智能代码审查工具，能够对代码进行全面的审查和分析。\n\n### 基本使用\n\n#### 审查当前未提交的变更\n```bash\njcr current  # 审查当前的未提交变更\n```\n\n#### 审查指定提交\n```bash\njcr commit <commit_sha>  # 审查指定的提交\n```\n\n#### 审查提交范围\n```bash\njcr range <start_commit> <end_commit>  # 审查提交范围之间的变更\n```\n\n#### 审查指定文件\n```bash\njcr file <file_path>  # 审查指定的文件\n```\n\n### 参数说明\n- `--root-dir`: 代码库根目录路径（默认为当前目录）\n- `-g`, `--llm-group`: 使用的模型组，覆盖配置文件中的设置\n- `--review-rule`: 自定义审查规则文件（可多次指定）\n\n### 审查框架\njcr 使用 SCRIPPPS 框架进行代码审查：\n- S - 安全与风险 (Security & Risk)\n- C - 正确性与完整性 (Correctness & Completeness)\n- R - 可靠性与鲁棒性 (Reliability & Robustness)\n- I - 接口与集成 (Interface & Integration)\n- P - 性能与效率 (Performance & Efficiency)\n- P - 可移植性与平台适配 (Portability & Platform Compatibility)\n- S - 结构与可维护性 (Structure & Maintainability)\n\njcr 还会根据检测到的编程语言应用相应的审查清单，并支持自定义审查规则。",
+  "created_at": "2026-01-21T08:45:20.112044",
+  "updated_at": "2026-01-21T08:45:20.112047"
+}

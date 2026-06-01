@@ -1,0 +1,14 @@
+{
+  "id": "20251230_092104_966749",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "ArrayField",
+    "实现",
+    "get_value",
+    "set_value"
+  ],
+  "content": "ArrayField 类核心方法（位于 src/jarvis/jarvis_config/field_factory.py）：\n- _add_item(): 添加新数组项\n- _remove_item(): 移除指定索引的数组项\n- _reindex_items(): 重新索引所有数组项\n- get_value(): 返回所有数组项的值列表\n- set_value(): 设置数组值，清除现有项并添加新项\n- compose(): 组合字段组件，包括标签、描述、数组项容器和添加按钮",
+  "created_at": "2025-12-30T09:21:04.966767",
+  "updated_at": "2025-12-30T09:21:04.966770"
+}

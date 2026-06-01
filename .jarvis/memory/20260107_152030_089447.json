@@ -1,0 +1,12 @@
+{
+  "id": "20260107_152030_089447",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "pane_count_bug",
+    "code_review"
+  ],
+  "content": "在_find_window_with_available_panes方法中，计算pane数量时使用len(panes_result.stdout.strip().split(\"\\n\"))存在潜在问题：当tmux list-panes命令返回空输出时，split('\\n')会返回一个包含空字符串的列表['']，其长度为1而不是0。这可能导致错误地认为window中有1个pane而不是0个。",
+  "created_at": "2026-01-07T15:20:30.089476",
+  "updated_at": "2026-01-07T15:20:30.089480"
+}

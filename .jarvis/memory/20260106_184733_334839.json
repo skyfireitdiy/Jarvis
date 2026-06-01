@@ -1,0 +1,13 @@
+{
+  "id": "20260106_184733_334839",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "printing",
+    "formatting",
+    "code_cleanup"
+  ],
+  "content": "在jarvis_agent模块中移除打印语句字符串开头的\\n换行符，保持字符串中间和末尾的\\n不变。涉及的打印函数包括：print(), rprint(), console.print(), PrettyOutput.print(), PrettyOutput.auto_print()。",
+  "created_at": "2026-01-06T18:47:33.334876",
+  "updated_at": "2026-01-06T18:47:33.334880"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260111_220236_544468",
+  "type": "project_long_term",
+  "tags": [
+    "install.sh",
+    "auto-completion",
+    "pyproject.toml",
+    "alignment",
+    "jarvis-commands"
+  ],
+  "content": "在install.sh中调整了自动补全命令数组，使其与pyproject.toml中的命令对齐。修改前tools数组包含13个命令，修改后包含20个命令，新增了jvsd, jcad, jsec, jc2r, jrg, jcfg, jqc等7个命令，确保了install.sh中的自动补全安装与pyproject.toml中定义的命令完全一致。",
+  "created_at": "2026-01-11T22:02:36.544519",
+  "updated_at": "2026-01-11T22:02:36.544527"
+}

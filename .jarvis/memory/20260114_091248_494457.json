@@ -1,0 +1,12 @@
+{
+  "id": "20260114_091248_494457",
+  "type": "project_long_term",
+  "tags": [
+    "anthropics-skills",
+    "skill-integration",
+    "jarvis-skills"
+  ],
+  "content": "anthropics/skills 已成功集成到 Jarvis 系统。集成信息：\n- 仓库地址：https://github.com/anthropics/skills\n- 本地位置：/home/wangmaobin/.jarvis/skills/skills\n- 注册文件：/home/wangmaobin/.jarvis/rules/skills.md\n- 技能内容：包含307个文件，51个目录，涵盖创意与设计、开发与技术、企业与通信、文档技能等多个领域\n- 主要特性：技能示例、技能规范（spec/）、技能模板（template/）、文档处理技能（PDF/Word/Excel/PowerPoint）、MCP服务器生成、Web应用测试等\n- 许可证：Apache 2.0（部分技能）\n- 适用场景：创建符合品牌指南的文档、数据分析、自动化任务、开发参考",
+  "created_at": "2026-01-14T09:12:48.494480",
+  "updated_at": "2026-01-14T09:12:48.494484"
+}

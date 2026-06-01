@@ -1,0 +1,24 @@
+{
+  "id": "20260201_223107_513767",
+  "type": "project_long_term",
+  "tags": [
+    "功能移除",
+    "代码清理",
+    "残留检查",
+    "jarvis_ab_test",
+    "jarvis_config_optimizer",
+    "jarvis_api_version",
+    "jarvis_methodology_generator",
+    "jarvis_stats",
+    "jarvis_arch_analyzer",
+    "jarvis_dependency_manager",
+    "jarvis_monitor",
+    "jarvis_auto_fix",
+    "jarvis_code_analysis",
+    "jarvis_knowledge_graph",
+    "jarvis_plugin"
+  ],
+  "content": "【批量模块删除任务总结】\n\n成功删除12个Jarvis模块的所有相关代码：\n\n**删除的模块**：\n- jarvis_ab_test, jarvis_config_optimizer, jarvis_api_version\n- jarvis_methodology_generator, jarvis_stats, jarvis_arch_analyzer\n- jarvis_dependency_manager, jarvis_monitor, jarvis_auto_fix\n- jarvis_code_analysis, jarvis_knowledge_graph, jarvis_plugin\n\n**删除统计**：\n- 约23495行代码（14042源码 + 8902测试 + 551工具）\n- 140+个文件（92源文件 + 48测试文件）\n\n**关键发现 - 容易遗漏的残留位置**：\n1. code_agent.py中的工具列表（_build_code_agent_tool_list方法）\n   - 删除了knowledge_graph_tool和arch_analyzer_tool引用\n2. pyproject.toml中的入口点定义\n   - 删除了jarvis-code-review和jcr入口点\n3. docs/images/中的架构图文件\n   - 删除了jarvis_stats的cluster_stats子图\n\n**经验教训**：\n- 删除模块后必须全面检查：import语句、工具注册表、配置文件、文档\n- 特别是动态工具列表和CLI入口点容易被遗漏\n- 建议使用rg进行全项目搜索确认无残留\n\n**验证方法**：\n1. 搜索import：rg \"from jarvis.$module.|import jarvis.$module\" src/ --type py\n2. 搜索工具名：rg \"tool_name\" src/ --type py\n3. 检查配置：rg module_name pyproject.toml\n4. 检查文档：rg module_name docs/",
+  "created_at": "2026-02-01T22:31:07.513787",
+  "updated_at": "2026-02-01T22:31:07.513791"
+}

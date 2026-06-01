@@ -1,0 +1,13 @@
+{
+  "id": "20260102_142036_300295",
+  "type": "project_long_term",
+  "tags": [
+    "coding_guidelines",
+    "typing",
+    "type_annotation",
+    "AI_CODE_DEVELOPMENT_GUIDELINES"
+  ],
+  "content": "# 类型注解规范维度开发指导\n\n## AI开发指令\n1. **基础类型注解**:\n   - 为所有函数参数和返回值提供类型注解\n   - 使用标准库typing模块中的类型\n   - 对复杂类型使用类型别名提高可读性\n   - 避免使用字符串形式的前向引用\n\n2. **可选类型和联合类型**:\n   - 使用Optional[T]表示可能为None的值\n   - 使用Union[T1, T2]表示多种可能的类型\n   - Python 3.10+中使用T1 | T2语法\n   - 在适当情况下使用默认值处理可选参数\n\n3. **泛型和集合类型**:\n   - 使用List[T]、Dict[K, V]、Tuple[T1, T2, ...]等泛型类型\n   - 为集合类型指定元素的具体类型\n   - 使用TypeVar定义泛型函数和类\n   - 使用Generic创建自定义泛型类\n\n4. **高级类型特性**:\n   - 使用Protocol定义结构化类型契约\n   - 使用Callable表示函数类型\n   - 使用Type[MyClass]表示类对象类型\n   - 在类型注解中使用类型检查工具支持的特性\n\n## 实际项目代码参考\n- **基础类型**: `src/jarvis/jarvis_utils/output.py` 中OutputEvent类的属性类型注解\n- **可选类型**: `src/jarvis/jarvis_config/schema_parser.py` 中多个函数使用Optional\n- **集合类型**: `src/jarvis/jarvis_platform/registry.py` 中Dict[str, Type[BasePlatform]]使用\n- **泛型使用**: `src/jarvis/jarvis_utils/config.py` 中广泛的typing模块使用\n- **类型转换**: `src/jarvis/jarvis_utils/output.py` 中使用cast进行类型转换",
+  "created_at": "2026-01-02T14:20:36.300316",
+  "updated_at": "2026-01-02T14:20:36.300319"
+}

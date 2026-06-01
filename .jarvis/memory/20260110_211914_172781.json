@@ -1,0 +1,8 @@
+{
+  "id": "20260110_211914_172781",
+  "type": "project_long_term",
+  "tags": ["build_system", "custom_build", "user_selection", "code_analyzer"],
+  "content": "在BuildSystemDetector类中添加Custom构建系统选项的修改方式：\n1. 在_get_supported_build_systems()方法中添加'custom (自定义构建命令)'到支持的系统列表\n2. 在_let_user_select_build_system()方法的all_systems列表中添加BuildSystem.CUSTOM选项\n这样实现了Custom构建系统加入用户可选择列表的功能",
+  "created_at": "2026-01-10T21:19:14.172796",
+  "updated_at": "2026-01-10T21:19:14.172798"
+}

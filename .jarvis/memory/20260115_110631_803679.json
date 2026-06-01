@@ -1,0 +1,13 @@
+{
+  "id": "20260115_110631_803679",
+  "type": "project_long_term",
+  "tags": [
+    "rule_refactor",
+    "vulnerability_analysis",
+    "content_structure",
+    "sdd_template"
+  ],
+  "content": "vulnerability-analysis.md重构经验：成功将角色定义格式转换为规则文档格式，包含5个核心章节：工作流程（4个阶段）、遵守原则（3个专业性原则）、具体要求和规范（分析报告要求+覆盖范围）、实践指导（最佳实践+报告建议）、执行检查清单（三阶段验收）。关键保持安全分析专业性和完整性，使用必须/禁止语句明确操作要求。",
+  "created_at": "2026-01-15T11:06:31.803722",
+  "updated_at": "2026-01-15T11:06:31.803727"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20250923_071432_142250",
+  "type": "project_long_term",
+  "tags": [
+    "migration",
+    "rust_integration",
+    "jarvis_agent",
+    "__init__.py",
+    "design_decision",
+    "plan"
+  ],
+  "content": "目标：将 src/jarvis/jarvis_agent/__init__.py 的 Agent 及相关流程迁移到 Rust（pyo3），功能保持不变，允许调整结构。\n\n总体策略（最小影响、稳定迭代）：\n1) 在 rust/jarvis_native 中新增 agent 模块（agent.rs），使用 pyo3 导出 PyAgent 类，提供与 Python 现有 Agent 基本一致的外部接口（构造、run、clear_history、save_session、restore_session、set_addon_prompt、get/set_user_data 等）。\n2) PyAgent 内部“主逻辑”迁移到 Rust，但尽量复用现有 Python 组件（EventBus、SessionManager、MemoryManager、TaskAnalyzer、FileMethodologyManager、PromptManager、PlatformRegistry、ToolRegistry 等），通过 pyo3 调用 Python 对象方法，以降低迁移体量与风险，保持行为一致。\n3) __init__.py 改为薄封装：仅导出从 jarvis_native 暴露出来的 Agent（或提供轻量回退逻辑），保持 import jarvis.jarvis_agent import Agent 的兼容性。\n4) show_agent_startup_stats 等函数：优先在 Rust 内实现壳层，调用 Python工具统计（ToolRegistry 等）以获取所需数据；如需，部分纯展示逻辑可留在 Python 并从 Rust 调用，后续再完全收拢到 Rust。\n5) 运行循环：维持现有 AgentRunLoop 等 Python 类，Rust 侧通过方法调用触发，逐步将关键路径迁移到 Rust（先桥接，后替换）。\n6) 事件机制：Rust 侧持有 Python EventBus 实例并在关键点 emit，确保 MemoryManager/TaskAnalyzer 等通过事件工作不变。\n7) 上下文与系统提示：Rust 侧按原有流程构建并设置 system_prompt（首选通过 PromptManager），并复用 Python Platform（BasePlatform）进行 chat 调用，确保模型交互行为不变。\n8) 记忆/文件/方法论：Rust 侧调用 Python MemoryManager/FileMethodologyManager 的现有接口，避免重复实现；原生能力（如 atomic_write_text）直接用 Rust 实现或沿用现有 jarvis_native 调用。\n\n预期变更：\n- 新增：rust/jarvis_native/src/agent.rs，更新 rust/jarvis_native/src/lib.rs 注册导出。\n- 调整：src/jarvis/jarvis_agent/__init__.py 替换为薄层导出（从 jarvis_native 导出 Agent）。\n\n风险与回退：\n- 风险：pyo3 跨语言调用复杂度、生命周期管理、GIL 管理、异常传播。\n- 回退：保留原 __init__.py 的备份分支；薄封装可切换回 Python Agent。\n\n分步实施计划：\n- Step 1: 勘察 jarvis_native 架构与导出模式，确定 pyo3 暴露形态（类/函数）。\n- Step 2: 在 Rust 侧实现 PyAgent 构造与最小可运行路径：初始化 Python组件（Platform、Session、EventBus、ToolRegistry 等），实现 run -> AgentRunLoop 调用打通（先复用 Python RunLoop），确保基本任务可跑通。\n- Step 3: 迁移系统提示与工具筛选、上下文管理、摘要与历史清理逻辑到 Rust（调用 Python工具/方法），保持事件发射点一致。\n- Step 4: 完成 show_agent_startup_stats 统计输出（Rust 调 Python获取数据）。\n- Step 5: 替换 __init__.py 为薄封装并联调。\n- Step 6: 补充测试与文档，逐步将更多路径原生化（可选后续迭代）。\n",
+  "created_at": "2025-09-23T07:14:32.142317",
+  "updated_at": "2025-09-23T07:14:32.142327"
+}

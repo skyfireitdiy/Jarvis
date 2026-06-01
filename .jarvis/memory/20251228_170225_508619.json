@@ -1,0 +1,13 @@
+{
+  "id": "20251228_170225_508619",
+  "type": "project_long_term",
+  "tags": [
+    "testing",
+    "optimization",
+    "patch",
+    "retry"
+  ],
+  "content": "测试优化实践：使用 @patch('jarvis.jarvis_utils.utils.time.sleep') 装饰器模拟 sleep 函数，可显著加快包含重试逻辑的测试执行速度。示例：test_utils_retry.py 中为4个慢速用例添加 @patch 后，执行时间从132秒降至约1.5秒。注意：所有涉及重试逻辑的测试用例都需要添加 @patch 装饰器和 mock_sleep 参数。",
+  "created_at": "2025-12-28T17:02:25.508663",
+  "updated_at": "2025-12-28T17:02:25.508667"
+}

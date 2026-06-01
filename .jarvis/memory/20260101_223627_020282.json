@@ -1,0 +1,14 @@
+{
+  "id": "20260101_223627_020282",
+  "type": "project_long_term",
+  "tags": [
+    "web_terminal",
+    "jarvis_web_terminal",
+    "terminal",
+    "websocket",
+    "xterm"
+  ],
+  "content": "Jarvis新增了web terminal模块，支持前端自动分屏，包含以下功能：\n1. 支持多种布局（quad, horizontal, vertical）\n2. 使用pty创建真实终端并转发输入输出\n3. WebSocket实现实时通信\n4. xterm.js作为前端终端实现\n5. 模块包含main.py(主逻辑), config.py(配置), quick_start.py(启动脚本), example.py(示例)\n6. 支持动态调整终端数量\n7. 实现了终端大小调整功能\n8. 包含管理API端点用于添加终端和获取状态",
+  "created_at": "2026-01-01T22:36:27.020357",
+  "updated_at": "2026-01-01T22:36:27.020365"
+}

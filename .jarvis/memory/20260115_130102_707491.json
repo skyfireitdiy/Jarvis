@@ -1,0 +1,13 @@
+{
+  "id": "20260115_130102_707491",
+  "type": "project_long_term",
+  "tags": [
+    "rule_refactor",
+    "builtin_rules",
+    "content_structure",
+    "sdd_template"
+  ],
+  "content": "规则文档重构标准化流程：1.重命名文件为全小写连字符格式 2.按sdd.md五章节模板重构内容(工作流程、原则、要求、实践指导、检查清单) 3.使用必须/禁止规范性语言 4.更新builtin_rules.md索引 5.验证链接有效性。七个文件成功重构：architecture-diagram-generation、script-generation、skill-development、mcp-integration、alert-management、dark-theme-design、light-theme-design。",
+  "created_at": "2026-01-15T13:01:02.707517",
+  "updated_at": "2026-01-15T13:01:02.707520"
+}

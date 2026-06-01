@@ -1,0 +1,8 @@
+{
+  "id": "20251229_225808_598657",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "widget_mapping", "textual"],
+  "content": "Textual Widget 与 JSON Schema 类型映射：string+enum->Select（枚举选择），string->Input（文本输入），number/integer->Input（数字输入，带类型转换），boolean->Switch（开关），array+enum->Select（多选，allow_multiple=True），array->TextArea（逗号分隔），object->None（嵌套表单容器，由调用者处理），null->FieldContainer（空字段）。",
+  "created_at": "2025-12-29T22:58:08.598674",
+  "updated_at": "2025-12-29T22:58:08.598676"
+}

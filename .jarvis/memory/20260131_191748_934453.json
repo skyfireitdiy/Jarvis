@@ -1,0 +1,8 @@
+{
+  "id": "20260131_191748_934453",
+  "type": "project_long_term",
+  "tags": ["架构演进", "灰度发布", "jarvis_canary"],
+  "content": "## 灰度发布机制 (jarvis_canary)\n\n**位置**: src/jarvis/jarvis_canary/\n**测试**: tests/jarvis_canary/ (25个测试)\n\n**核心组件**:\n- CanaryRelease: 发布配置（stable/canary版本、流量比例）\n- CanaryManager: 灰度发布管理器\n- ReleaseStage: 发布阶段（created/canary/rolling/completed/rolled_back）\n- TrafficRule: 流量规则（基于条件的路由）\n- RolloutStrategy: 发布策略（linear/exponential/manual）\n\n**功能**: 流量分配、渐进式发布、回滚机制、规则路由",
+  "created_at": "2026-01-31T19:17:48.934462",
+  "updated_at": "2026-01-31T19:17:48.934464"
+}

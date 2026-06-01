@@ -1,0 +1,14 @@
+{
+  "id": "20250825_124807_249648",
+  "type": "project_long_term",
+  "tags": [
+    "PrettyOutput",
+    "verbosity_reduction",
+    "rich",
+    "cli",
+    "printing_policy"
+  ],
+  "content": "约定：在循环中避免逐行打印（print/console/PrettyOutput）。应先在内存中收集（如列表累积）并在循环结束后一次性打印（例如使用 '\\n'.join(lines)），以避免PrettyOutput为每行加边框导致有效信息密度低。",
+  "created_at": "2025-08-25T12:48:07.249686",
+  "updated_at": "2025-08-25T12:48:07.249691"
+}

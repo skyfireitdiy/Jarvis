@@ -1,0 +1,14 @@
+{
+  "id": "20250929_035630_477082",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_book",
+    "documentation",
+    "numbering_fix",
+    "advanced_topics_order",
+    "4.使用指南"
+  ],
+  "content": "Jarvis Book documentation corrections:\n- 4.使用指南.md numbering normalized:\n  4.3 通用代理 (jvs)\n  4.4 代码代理 (jca)\n  4.5 平台管理器 (jpm)\n  4.6 Git提交助手 (jgc)\n  4.7 本地知识库 (jrg)\n  4.8 智能Shell (jss)\n  4.9 代码审查 (jcr)\n  4.10 高级Git工具\n  4.11 多智能体协作 (jma)\n  4.12 工具管理 (jt)\n  4.13 记忆系统\n  4.14 方法论管理 (jm)\n  4.15 使用统计 (jst)\n- Removed misplaced advanced topic markers in 4.使用指南; Chapter 4 must not contain any “6.x” sections.\n- Fixed stray code fence near the end of jst examples in 4.使用指南 (closed triple backticks).\n- 6.高级主题.md reordered to strict ascending sequence:\n  6.1 LLM与RAG组配置\n  6.2 快捷指令\n  6.3 自定义代理 (ja)\n  6.4 多代理协作系统 (jma)\n  6.5 聊天角色预设 (jpm role)\n  6.6 方法论共享与扩展\n  6.7 中心方法论库\n  6.8 中心工具库\n  6.9 工具组配置\n  6.10 工具调用后回调扩展（after_tool_call_cb） with subheadings 6.10.1..6.10.5 updated\n  6.11 配置系统详解\n  6.12 数据流与“思考-行动”循环\n  6.13 模型上下文协议 (MCP)\n  6.14 RAG 实现方案\n  6.15 记忆整理机制与实现原理\n  6.16 典型应用场景\nGuidance: Future edits must keep chapter numbering consistent and avoid cross-chapter content duplication.\n",
+  "created_at": "2025-09-29T03:56:30.477150",
+  "updated_at": "2025-09-29T03:56:30.477156"
+}

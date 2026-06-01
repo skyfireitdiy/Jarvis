@@ -1,0 +1,13 @@
+{
+  "id": "20260115_130934_837441",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "refactor",
+    "naming_convention",
+    "rule_format"
+  ],
+  "content": "builtin/rules目录重构完成：1)统一命名规范（全小写+连字符）；2)角色定义文件转为五章节规则格式（工作流程、原则、要求、实践指导、检查清单）；3)所有文件采用必须/禁止规范式语言；4)builtin_rules.md索引同步更新无死链；5)功能意图完整保留。重构参考模板：sdd.md，典型转换示例：code-reverse-design-expert.md→code-reverse-design.md，架构图生成器→架构图生成规则。",
+  "created_at": "2026-01-15T13:09:34.837474",
+  "updated_at": "2026-01-15T13:09:34.837478"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260201_150025_316780",
+  "type": "project_long_term",
+  "tags": [
+    "数据存储",
+    "智能增强",
+    "数字孪生",
+    "记忆系统",
+    "知识图谱",
+    "方法论"
+  ],
+  "content": "# 智能增强系统数据存储位置清单\n\n## 核心数据目录\n- **主数据目录**：`~/.jarvis/`（通过 `get_data_dir()` 获取）\n\n## 各模块存储位置\n\n### 1. 数字孪生系统（用户画像）\n- **路径**：`~/.jarvis/digital_twin/profiles/`\n- **文件格式**：`{user_id}_v{version}.json`\n- **管理类**：`UserProfileAggregator`（src/jarvis/jarvis_digital_twin/user_profile/aggregator.py）\n- **内容**：用户交互模式、偏好、目标追踪、元数据\n\n### 2. 记忆系统\n- **项目长期记忆**：`.jarvis/memory/`（项目本地）\n- **全局长期记忆**：`~/.jarvis/memory/global_long_term/`（跨项目）\n- **短期记忆**：`~/.jarvis/memory/short_term/`（存储在全局变量中）\n- **文件格式**：`{timestamp}_random.json`\n- **管理类**：`SaveMemoryTool`（src/jarvis/jarvis_tools/save_memory.py）\n\n### 3. 知识图谱\n- **路径**：`.jarvis/knowledge_graph/`\n- **结构**：\n  - `nodes/{node_type}/{node_id}.json`（按类型分目录存储节点）\n  - `edges/edges.json`（所有边的关系）\n- **管理类**：`KnowledgeGraph`（src/jarvis/jarvis_knowledge_graph/knowledge_graph.py）\n- **节点类型**：methodology, rule, memory, code, file, concept\n\n### 4. 方法论\n- **全局方法论**：`~/.jarvis/methodologies/`（跨项目共享）\n- **项目级方法论**：`.jarvis/methodologies/`（项目特定）\n- **文件格式**：`{md5_hash}.json`\n- **管理函数**：`_get_methodology_directory()`, `_get_project_methodology_directory()`（src/jarvis/jarvis_utils/methodology.py）\n\n### 5. 持续学习系统\n- **经验积累器**：与记忆系统集成，经验以记忆形式存储\n- **知识获取器**：与知识图谱系统集成，自动添加知识节点\n- **技能学习器**：与知识图谱和记忆系统集成\n\n## 配置文件位置\n- **用户配置**：`~/.jarvis.yaml`（主配置文件）\n- **项目配置**：`.jarvis/`（项目本地配置）\n\n## 路径获取函数\n- `get_data_dir()` → 返回 `~/.jarvis`\n- `find_git_root_and_cd()` → 获取Git根目录",
+  "created_at": "2026-02-01T15:00:25.316804",
+  "updated_at": "2026-02-01T15:00:25.316807"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20250929_122030_375337",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "diagram",
+    "documentation",
+    "code_analysis",
+    "ArchitectureDiagramGenerator"
+  ],
+  "content": "项目内置了一个名为 `ArchitectureDiagramGenerator` 的专用Agent，其核心能力是读取项目源代码，并自动生成多种架构视图的图表（使用Graphviz）。\n支持的视图包括：\n- 逻辑视图 (Logical View)\n- 实现视图 (Implementation View)\n- 进程视图 (Process View)\n- 部署视图 (Deployment View)\n- 用例视图 (Use Case View)\n这是一个强大的文档自动化工具，当需要理解或更新项目架构时，应优先考虑使用此Agent。\n",
+  "created_at": "2025-09-29T12:20:30.375374",
+  "updated_at": "2025-09-29T12:20:30.375379"
+}

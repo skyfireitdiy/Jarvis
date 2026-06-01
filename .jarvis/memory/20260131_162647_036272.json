@@ -1,0 +1,14 @@
+{
+  "id": "20260131_162647_036272",
+  "type": "project_long_term",
+  "tags": [
+    "dependency_injection",
+    "refactoring",
+    "AST分析",
+    "constructor_injection",
+    "DI_container"
+  ],
+  "content": "依赖注入重构器实现细节：1)使用AST分析检测硬编码依赖(self.attr = Class()模式) 2)支持构造函数注入和向后兼容模式 3)生成类型注解(Database | None) 4)创建依赖注入容器类 5)支持参数化依赖 6)与FixHistory集成记录变更支持回滚 7)完整测试覆盖包括错误处理和边界条件",
+  "created_at": "2026-01-31T16:26:47.036297",
+  "updated_at": "2026-01-31T16:26:47.036300"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260106_144313_247035",
+  "type": "project_long_term",
+  "tags": [
+    "TaskListManager",
+    "task_list",
+    "排序",
+    "功能实现"
+  ],
+  "content": "在task_list_manager.py中实现了按任务序号排序的功能，新增了_extract_task_number方法用于从task_id中提取数字部分进行排序，将原来的按优先级排序改为按task_id中的数字部分排序，以满足按照序号显示tasklist的需求。",
+  "created_at": "2026-01-06T14:43:13.247078",
+  "updated_at": "2026-01-06T14:43:13.247083"
+}

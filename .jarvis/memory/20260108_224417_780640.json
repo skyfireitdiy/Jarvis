@@ -1,0 +1,15 @@
+{
+  "id": "20260108_224417_780640",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "jarvis",
+    "tmux",
+    "shell_fallback",
+    "command_injection",
+    "bug_case"
+  ],
+  "content": "jarvis 项目代码审查案例：jvsd/jcad tmux shell_fallback 问题\n\n问题描述：\n在实现 jvsd 和 jcad 创建 tmux session 时不启动 shell 的需求时，发现一个隐藏的 bug：\n\n1. 正确修改：在 tmux_wrapper.py 的 create_panel 等函数中添加 shell_fallback 参数，修改条件判断从 `if stay_in_session_after_exit:` 改为 `if stay_in_session_after_exit and shell_fallback:`\n\n2. 遗漏问题：jvsd_cli.py 和 jcad_cli.py 中手动构造的命令字符串（第97行）直接包含了 `; exec {user_shell}`，这导致即使传递 shell_fallback=False，命令本身仍会在执行完成后启动 shell\n\n关键教训：\n- 代码审查时不仅要检查函数调用链和参数传递，还要检查命令字符串内容\n- 当 shell_fallback=False 时，手动构造的命令字符串也需要相应调整\n- 需要检查 jvsd_cli.py:97 和 jcad_cli.py:97 的命令构造逻辑，移除 `; exec {user_shell}` 部分\n\n相关文件：\n- src/jarvis/jarvis_agent/jvsd_cli.py (第97行)\n- src/jarvis/jarvis_code_agent/jcad_cli.py (第97行)\n- src/jarvis/jarvis_utils/tmux_wrapper.py",
+  "created_at": "2026-01-08T22:44:17.780661",
+  "updated_at": "2026-01-08T22:44:17.780663"
+}

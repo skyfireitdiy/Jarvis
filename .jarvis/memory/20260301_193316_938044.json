@@ -1,0 +1,8 @@
+{
+  "id": "20260301_193316_938044",
+  "type": "project_long_term",
+  "tags": ["后台线程", "daily_check_git_updates", "性能优化", "已完成"],
+  "content": "已将所有中心仓库更新检查改为后台线程执行，避免阻塞主线程：\n1. methodology.py - 方法论仓库更新检查\n2. registry.py - 工具仓库更新检查\n3. rules_manager.py - 规则仓库更新检查\n\n实现方式：使用 threading.Thread(target=check_xxx_updates, daemon=True).start()，确保后台线程异常不影响主流程",
+  "created_at": "2026-03-01T19:33:16.938063",
+  "updated_at": "2026-03-01T19:33:16.938066"
+}

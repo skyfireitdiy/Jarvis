@@ -1,0 +1,14 @@
+{
+  "id": "20260309_141825_339301",
+  "type": "project_long_term",
+  "tags": [
+    "设计方案",
+    "详细设计",
+    "系统设计",
+    "WebSocket网关",
+    "Jarvis"
+  ],
+  "content": "Jarvis WebSocket 交互网关详细设计：目标是在不破坏现有 CLI 行为的前提下，为 output.py 和 input.py 增加 WebSocket 交互能力，并为 execute_script.py 增加 captured/interactive 双后端。输出侧基于 OutputSink 扩展新增 WebSocketOutputSink，经 SessionOutputRouter/OutputMessagePublisher 将 OutputEvent 序列化后广播到远端会话。输入侧基于 InputProvider 抽象保留 CLIInputProvider，并新增 WebSocketInputProvider，通过 RemoteInputSession 和 InputSessionRegistry 承载远端输入。execute_script 采用 ExecutionBackend 抽象，包含 CapturedExecutionBackend 与 VirtualTTYExecutionBackend；execution_mode 支持 auto/captured/interactive。Windows 交互模式走 PTY/ConPTY 路径并通过 stream_publisher 发布 tool_stream 消息；Unix 首版在 interactive+stream_publisher 场景显式降级到 legacy terminal execution。设计强调会话隔离、消息顺序、断连处理、兼容性优先、安全控制、能力可关闭以及后续 server/router 装配扩展。",
+  "created_at": "2026-03-09T14:18:25.339324",
+  "updated_at": "2026-03-09T14:18:25.339328"
+}

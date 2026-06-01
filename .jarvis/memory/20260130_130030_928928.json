@@ -1,0 +1,13 @@
+{
+  "id": "20260130_130030_928928",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_arch_analyzer",
+    "模块设计",
+    "架构分析",
+    "阶段1"
+  ],
+  "content": "【jarvis_arch_analyzer模块架构设计】\n\n**模块位置**：src/jarvis/jarvis_arch_analyzer/\n\n**核心组件**：\n1. analyzer.py - 主分析器类\n   - ArchitectureAnalyzer：统一分析接口\n   - AnalysisResult：分析结果数据类\n   - ArchitectureReport：架构报告数据类\n\n2. complexity.py - 代码复杂度分析器\n   - ComplexityVisitor：AST访问器\n   - FunctionComplexity：函数复杂度数据\n   - 圈复杂度 = 基础值1 + 决策点 + 逻辑运算符 + lambda\n   - 认知复杂度 = 嵌套层级×2 + 逻辑运算符 + 分支跳转\n   - 高复杂度阈值：>10\n\n3. dependency.py - 依赖关系分析器\n   - DependencyAnalyzer：依赖分析器\n   - 循环依赖检测：DFS + 递归栈 + 路径追踪\n   - 耦合度计算：Ca = len(dependents), Ce = len(dependencies)\n   - 不稳定性：I = Ce / (Ca + Ce)\n   - 层级计算：迭代传播，level = max(被依赖层级) + 1\n\n4. duplication.py - 代码重复度分析器\n   - DuplicationAnalyzer：重复度分析器\n   - 使用ast.FunctionDef提取函数定义\n   - 代码标准化去除注释和空行\n   - 相似度使用difflib.SequenceMatcher\n   - 哈希优化使用MD5（usedforsecurity=False）\n   - 相似度阈值：0.85\n   - 最小函数行数：5行\n\n5. report.py - 健康度报告生成器\n   - HealthScoreCalculator：评分计算器\n   - ReportGenerator：报告生成器\n   - 评分权重：复杂度30%、依赖35%、重复度35%\n   - 风险等级：健康(90-100)、良好(70-89)、警告(50-69)、危险(<50)\n   - 支持格式：JSON、Markdown、HTML\n\n**测试覆盖**：\n- 67个测试用例全部通过\n- 平均覆盖率：92%\n- ruff/mypy/bandit检查全部通过\n\n**关键设计决策**：\n- 轻量级优先，避免重依赖（仅使用ast标准库）\n- 数据类（@dataclass）定义清晰的数据结构\n- 分离关注点：每个模块专注单一功能\n- 使用TYPE_CHECKING避免循环依赖\n- 使用枚举类型提升代码可读性",
+  "created_at": "2026-01-30T13:00:30.928950",
+  "updated_at": "2026-01-30T13:00:30.928955"
+}

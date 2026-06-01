@@ -1,0 +1,13 @@
+{
+  "id": "20260115_105544_339514",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "code_reverse_design",
+    "refactor",
+    "rule_format"
+  ],
+  "content": "代码反向设计规则重构完成：将code-reverse-design.md从角色定义格式重构为规则文档格式，包含工作流程、原则、要求规范、实践指导和检查清单等章节，保持原有功能意图不变，标题改为\"代码反向设计规则\"",
+  "created_at": "2026-01-15T10:55:44.339543",
+  "updated_at": "2026-01-15T10:55:44.339546"
+}

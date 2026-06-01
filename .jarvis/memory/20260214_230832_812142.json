@@ -1,0 +1,8 @@
+{
+  "id": "20260214_230832_812142",
+  "type": "project_long_term",
+  "tags": ["playwright_browser", "CLI开发", "命令行工具", "最佳实践"],
+  "content": "Playwright Browser CLI工具开发规范：\n1. 命令命名：使用小写+下划线（如double_click、fill_form）\n2. 命令行参数：使用小写+连字符（如--target-selector、--file-path）\n3. 返回格式：统一JSON格式{success, stdout, stderr}\n4. 错误处理：所有函数必须包含try-except，检查浏览器是否已启动\n5. 选择器支持：fill_form支持6种选择器（input[name]/input[id]/textarea[name]/textarea[id]/select[name]/select[id]）\n6. 临时文件路径：\n   - 下载目录：/tmp/playwright_downloads\n   - 表单结果：/tmp/playwright_browser/{browser_id}_fill_form_{timestamp}.txt\n7. 静态检查：mypy + ruff检查必须通过",
+  "created_at": "2026-02-14T23:08:32.812161",
+  "updated_at": "2026-02-14T23:08:32.812164"
+}

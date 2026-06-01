@@ -1,0 +1,12 @@
+{
+  "id": "20260315_202233_670595",
+  "type": "project_long_term",
+  "tags": [
+    "移动端导航",
+    "快捷按钮",
+    "用户体验"
+  ],
+  "content": "【移动端顶层导航栏优化】\n需求：将Agent侧边栏、终端面板和设置从二级菜单移到顶层导航栏，方便快速访问\n原因：二级菜单不够方便，移动端需要更快捷的访问方式\n实现：\n1. 在顶部导航栏添加mobile-header-actions容器，包含三个快捷按钮：\n   - 📋 Agent列表（showAgentSidebar）\n   - 💻 终端面板（showTerminalPanel）\n   - ⚙️ 设置（showSettingsModal）\n2. CSS样式：\n   - 默认隐藏（display: none）\n   - 移动端显示（@media max-width: 768px）\n   - 触摸目标44x44px，符合移动端标准\n3. 移动端隐藏原有的header-actions（桌面端操作区）\n代码位置：\n- frontend/src/App.vue 第43-54行（模板）\n- frontend/src/App.vue 第3702-3707行（样式）\n- frontend/src/App.vue 第5874-5883行（移动端样式）\n效果：\n- 移动端：三个快捷按钮在顶部栏，一键访问常用功能\n- 桌面端：保持原有布局，不受影响\n提交ID：925a94a（模板）、022c925（样式）、2f1410f（媒体查询）、6efaecf（触摸目标）",
+  "created_at": "2026-03-15T20:22:33.670610",
+  "updated_at": "2026-03-15T20:22:33.670612"
+}

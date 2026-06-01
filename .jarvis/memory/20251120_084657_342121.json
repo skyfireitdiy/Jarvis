@@ -1,0 +1,13 @@
+{
+  "id": "20251120_084657_342121",
+  "type": "project_long_term",
+  "tags": [
+    "comments_translation",
+    "project_structure",
+    "zh_cn_translation",
+    "jarvis_project"
+  ],
+  "content": "Jarvis项目需要将英文注释翻译为中文注释。项目包含320个文件，主要语言是Python(270个文件，74824行)。项目结构包括src/jarvis/下的多个模块，如jarvis_agent、jarvis_code_agent、jarvis_platform等。需要系统性地分析和翻译注释，优先处理核心模块的中文注释翻译。",
+  "created_at": "2025-11-20T08:46:57.342164",
+  "updated_at": "2025-11-20T08:46:57.342169"
+}

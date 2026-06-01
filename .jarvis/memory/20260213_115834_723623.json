@@ -1,0 +1,8 @@
+{
+  "id": "20260213_115834_723623",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "静态检查", "lint", "自动修复", "架构决策"],
+  "content": "CodeAgent静态检查告警处理机制：优先提示自动修复工具\n\n架构设计：\n1. 在lint.py中定义LINT_AUTO_FIX_COMMANDS映射表，key为lint工具名（如ruff、eslint、cargo），value为自动修复命令模板列表\n2. 在code_agent_lint.py中实现_get_auto_fix_suggestions方法，分析lint结果并生成自动修复命令建议\n3. 修改handle_static_analysis方法，在发现告警时优先显示自动修复建议\n\n支持的自动修复工具：\n- Python: ruff check --fix, ruff format\n- JavaScript/TypeScript: eslint --fix\n- Rust: cargo clippy --fix --allow-dirty\n- Go: go fmt, goimports -w\n- C/C++: clang-tidy --fix\n- Shell: shfmt -w\n- Ruby: rubocop --auto-correct\n- SQL: sqlfluff fix\n\n安全措施：\n- 使用shlex.quote对文件路径进行转义，防止命令注入\n- 自动修复命令仅作为建议提示，不自动执行",
+  "created_at": "2026-02-13T11:58:34.723648",
+  "updated_at": "2026-02-13T11:58:34.723653"
+}

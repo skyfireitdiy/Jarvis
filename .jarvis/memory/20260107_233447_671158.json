@@ -1,0 +1,13 @@
+{
+  "id": "20260107_233447_671158",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_transpilation",
+    "strategy_pattern",
+    "extensibility",
+    "plugin_system"
+  ],
+  "content": "通用转译框架的可扩展机制实现：\n\n1. 策略模式实现：\n- TranspilationStrategy 抽象基类定义策略接口\n- StrategyRegistry 管理策略注册和获取\n- register_strategy 装饰器简化策略注册\n\n2. 插件式扩展：\n- 支持动态注册新的转译策略\n- 通过装饰器模式实现策略注册\n- 默认策略 DefaultTranspilationStrategy\n\n3. 可扩展接口：\n- create_scanner, create_transpiler_core, create_optimizer 抽象方法\n- 工厂模式创建组件实例\n- 保持接口向后兼容性",
+  "created_at": "2026-01-07T23:34:47.671176",
+  "updated_at": "2026-01-07T23:34:47.671178"
+}

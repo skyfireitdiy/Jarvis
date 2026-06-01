@@ -1,0 +1,12 @@
+{
+  "id": "20250806_173127_062091",
+  "type": "project_long_term",
+  "tags": [
+    "pyproject.toml",
+    "configuration",
+    "mirror_sources"
+  ],
+  "content": "在 pyproject.toml 文件中，对 Python 包镜像源进行了配置，删除了 ZTE 源，并统一了其他源的格式，包括清华大学、阿里云和中国科技大学的镜像源。\n",
+  "created_at": "2025-08-06T17:31:27.062131",
+  "updated_at": "2025-08-06T17:31:27.062136"
+}

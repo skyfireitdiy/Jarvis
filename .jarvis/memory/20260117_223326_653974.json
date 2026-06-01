@@ -1,0 +1,8 @@
+{
+  "id": "20260117_223326_653974",
+  "type": "project_long_term",
+  "tags": ["utils.py", "refactoring", "module_split", "architecture"],
+  "content": "utils.py 重构拆分方案（2555行代码）：\n\n1. 拆分后的模块结构：\n   - utils.py（兼容导出层，~50行）\n   - encoding.py（编码解码，~30行）\n   - command_mapper.py（命令映射，~50行）\n   - installation_detector.py（安装检测，~150行）\n   - update_checker.py（版本更新，~250行）\n   - config_manager/（配置管理包，4-5个子模块）\n   - retry.py（重试机制，~100行）\n   - file_ops.py（文件操作，~50行）\n   - stats_display.py（统计显示，~50行）\n   - context_manager.py（上下文管理，~50行）\n\n2. 关键设计原则：\n   - 保持向后兼容：utils.py 作为兼容导出层，重新导出所有接口\n   - 职责单一：每个模块只负责一个功能域\n   - 代码规模控制：每个模块 < 300 行（config_manager 子模块）\n   - 无循环依赖：模块间单向依赖\n\n3. Spec 文档位置：.jarvis/spec/utils_spec.md",
+  "created_at": "2026-01-17T22:33:26.654001",
+  "updated_at": "2026-01-17T22:33:26.654004"
+}

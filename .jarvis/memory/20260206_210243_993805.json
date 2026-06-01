@@ -1,0 +1,13 @@
+{
+  "id": "20260206_210243_993805",
+  "type": "project_long_term",
+  "tags": [
+    "auto_resume_session",
+    "config",
+    "documentation",
+    "功能文档"
+  ],
+  "content": "添加自动恢复会话配置文档\n\n配置名称：auto_resume_session\n\n配置文件位置：\n1. src/jarvis/jarvis_data/config_schema.json - JSON Schema定义\n2. docs/jarvis_book/9.附录.md - 用户文档\n\n配置详情：\n- 类型：boolean\n- 默认值：false\n- 描述：是否自动恢复会话（启动时自动恢复最近的会话，无需手动选择）\n\n实现位置：\n- src/jarvis/jarvis_utils/config.py - is_auto_resume_session() 函数读取此配置\n- src/jarvis/jarvis_code_agent/code_agent.py - 使用此配置决定是否自动恢复会话\n\n功能说明：\n- 当设置为true时，启动CodeAgent会自动恢复最近的会话\n- 用户无需手动选择会话文件，提升使用体验\n- 配合save_session_history使用，可以保存并自动恢复会话状态\n\n文档更新：\n- ✅ config_schema.json中添加了完整的配置项定义\n- ✅ 9.附录.md中添加了配置说明表格行\n- ✅ JSON格式验证通过",
+  "created_at": "2026-02-06T21:02:43.993824",
+  "updated_at": "2026-02-06T21:02:43.993827"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260201_141617_613025",
+  "type": "project_long_term",
+  "tags": ["TimingJudge", "LLM集成", "数字孪生", "智能增强", "PrettyOutput"],
+  "content": "TimingJudge组件LLM集成完成：\n1. 在__init__中添加llm_client参数（可选，默认None）\n2. 实现_llm_judge_timing方法，返回Optional[Dict[str, Any]]\n3. LLM prompt设计：分析用户状态（stuck/busy/exploring/focused/idle）、紧急度（critical/high/medium/low/none）、是否应该交互\n4. should_offer_help方法优先使用LLM，失败时降级到规则模式\n5. 关键技术点：\n   - 使用complete()方法进行无状态LLM调用\n   - LLM模式和规则模式使用不同变量名避免类型冲突（llm_user_state vs user_state）\n   - 类型注解：result: Dict[str, Any] = json.loads(...)\n   - 使用PrettyOutput.auto_print进行过程打印，不要用print\n   - 过程打印格式：⏰ 时机判断: 用户状态={state}, 紧急度={urgency} (模式: LLM/规则)\n6. 异常处理：所有LLM调用都包裹在try-except中，失败返回None触发降级\n7. 枚举转换：UserState[user_state_str.upper()]将字符串转为枚举",
+  "created_at": "2026-02-01T14:16:17.613041",
+  "updated_at": "2026-02-01T14:16:17.613044"
+}

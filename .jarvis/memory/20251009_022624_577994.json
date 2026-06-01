@@ -1,0 +1,16 @@
+{
+  "id": "20251009_022624_577994",
+  "type": "project_long_term",
+  "tags": [
+    "bug",
+    "web_server",
+    "xterm",
+    "interactive",
+    "execute_script",
+    "stdio_redirect",
+    "pty"
+  ],
+  "content": "问题根因：前端xterm无法与后端交互的主要原因有两点：\n1) execute_script工具的设计不支持交互式命令。它通过“script -q -c ... 输出到临时文件”的方式收集输出，未绑定子进程stdin，也未进行流式转发；其描述中明确“不具备交互式操作的能力，不适合需要交互式操作”。因此交互式Shell/SSH等命令无法与前端输入对接。\n2) Web STDIN重定向未启用。/stdio端点调用的是 feed_web_stdin，仅当 enable_web_stdin_redirect() 被调用后，sys.stdin才会被替换为Web输入源。目前 start_web_server 并未启用 enable_web_stdin_redirect/enable_web_stdio_redirect，导致即便前端发送stdin数据也无法被Python层接收；同时子进程也不会使用Python层的stdin。\n\n影响：所有需要实时输入的交互式命令在web模式下不可用；只适用于一次性非交互脚本执行并在结束后返回结果的场景。\n\n改造计划（分步最小变更）：\nA. 在web服务启动时启用 enable_web_stdin_redirect 和 enable_web_stdio_redirect，确保Python层的input()/print()可以通过WebSocket与xterm交互（解决基本STDIN/STDOUT桥接问题）。\nB. 新增或扩展一个支持交互的命令执行工具（可命名virtual_tty或在execute_script中增加interactive模式）：使用pty模块生成伪终端，子进程的stdin/stdout/stderr绑定到PTY；将PTY输出通过WebBridge以\"type: stdio\"实时广播；将/stdio前端输入写入到PTY，从而实现真正交互。并支持窗口大小调整（通过/control通道的resize，用ioctl(TIOCSWINSZ)设置PTY尺寸）。\nC. 保持execute_script原行为用于非交互场景，避免影响现有功能；交互模式单独分支，明确不受JARVIS_NON_INTERACTIVE限制或给出合理超时策略。\n",
+  "created_at": "2025-10-09T02:26:24.578021",
+  "updated_at": "2025-10-09T02:26:24.578026"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20250805_155537_639135",
+  "type": "project_long_term",
+  "tags": [
+    "visualization",
+    "plotext",
+    "chart_config"
+  ],
+  "content": "在visualizer.py中，柱状图(plot_bar_chart)已添加数值统计信息显示功能，包含最小值、最大值和平均值，与折线图(plot_line_chart)保持一致的统计信息展示方式。",
+  "created_at": "2025-08-05T15:55:37.639169",
+  "updated_at": "2025-08-05T15:55:37.639176"
+}

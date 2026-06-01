@@ -1,0 +1,13 @@
+{
+  "id": "20260315_203127_340838",
+  "type": "project_long_term",
+  "tags": [
+    "移动端适配",
+    "快捷键",
+    "UI优化",
+    "移动端菜单删除"
+  ],
+  "content": "【移动端UI优化完成 - 删除菜单，添加快捷按钮】\n\n完成内容：\n1. **人工介入移到快捷按钮**：在移动端快捷按钮区域添加人工介入按钮（第51-53行），仅显示图标👤，不显示文字\n2. **删除汉堡菜单**：移除移动端菜单按钮（☰）\n3. **删除整个移动端菜单**：移除菜单遮罩层、菜单主体、所有菜单项（Agent侧边栏、终端面板、设置、人工介入、Agent信息）\n4. **删除相关CSS样式**：\n   - 移动端菜单按钮样式（.mobile-menu-btn）\n   - 移动端菜单遮罩层样式（.mobile-menu-overlay）\n   - 移动端菜单样式（.mobile-menu及其变体）\n   - 移动端菜单项样式（.mobile-menu-item、.menu-icon、.menu-text等）\n   - 移动端菜单Agent信息样式（.mobile-menu-agent等）\n5. **删除相关函数**：toggleMobileMenu函数\n6. **删除媒体查询样式**：@media (max-width: 768px)中的.mobile-menu-btn和.mobile-menu相关样式\n\n移动端快捷按钮（最终布局）：\n- 📋 Agent列表\n- 💻 终端面板\n- 👤 人工介入（新增，仅图标）\n- ⚙️ 设置\n\n修改文件：frontend/src/App.vue\n提交记录：\n- 0031caf：添加人工介入按钮到移动端快捷按钮\n- 61bcf4e：删除汉堡菜单按钮\n- 5e6dc36：删除整个移动端菜单HTML结构\n- ad3327e：删除移动端菜单CSS样式\n- 4e8243c：删除媒体查询中的移动端菜单样式\n- c5f62d2：删除媒体查询中的mobile-menu-btn样式\n- df3cdc1：删除toggleMobileMenu函数\n\n验证状态：✅ 编译通过，CSS文件大小从45.53KB减少到43.24KB\n\n优势：\n- 更简洁的UI，减少点击层级\n- 所有功能按钮直接可见，无需打开菜单\n- 节省代码空间，减少维护成本",
+  "created_at": "2026-03-15T20:31:27.340859",
+  "updated_at": "2026-03-15T20:31:27.340862"
+}

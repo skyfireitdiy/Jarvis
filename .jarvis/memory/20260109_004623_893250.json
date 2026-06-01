@@ -1,0 +1,14 @@
+{
+  "id": "20260109_004623_893250",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "jarvis-agent",
+    "run_loop",
+    "llm_output",
+    "console_output"
+  ],
+  "content": "在jarvis的AgentRunLoop中，LLM输出的打印逻辑已从'仅在需要用户输入时打印'修改为'只要没有工具调用的LLM输出都打印'。新的实现将LLM输出打印逻辑从循环末尾移到了AFTER_TOOL_CALL事件处理后，通过检查safe_tool_prompt是否为空来判断是否有工具调用，若无工具调用则打印current_response。",
+  "created_at": "2026-01-09T00:46:23.893271",
+  "updated_at": "2026-01-09T00:46:23.893275"
+}

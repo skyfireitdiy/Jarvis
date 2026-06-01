@@ -1,0 +1,8 @@
+{
+  "id": "20260117_222613_912286",
+  "type": "project_long_term",
+  "tags": ["c_checker", "spec", "refactoring", "rule_separation", "SDD"],
+  "content": "c_checker模块重构Spec文档已创建完成，位于.jarvis/spec/c_checker_spec.md。该Spec文档详细描述了将c_checker.py中的正则表达式规则库（约158行）分离到独立的c_checker_rules.py模块的方案，实现规则与检查逻辑的解耦。文档包含9个规则类别：BaseRules、FormatCommandRules、ThreadRules、CppLockRules、DataRaceRules、DangerousUsageRules、MemoryHelperRules、CppSpecificRules、HelperRules，总计78个正则表达式规则。Spec中包含完整的功能概述、接口定义、规则库分离设计、验收标准等章节，确保重构过程可验证。",
+  "created_at": "2026-01-17T22:26:13.912308",
+  "updated_at": "2026-01-17T22:26:13.912311"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20251025_060835_349742",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "pruner",
+    "dependency",
+    "library_replacer",
+    "design_decision"
+  ],
+  "content": "新增模块: src/jarvis/jarvis_c2rust/library_replacer.py\n目标: 基于依赖图检测是否存在某个函数，其子树中的所有函数都可由指定的标准库/第三方crate替代；若满足，则将该函数的依赖替换为对应库API并删除其子孙节点。\n核心API: apply_library_replacement(db_path: Path, library_name: str, mapping: Dict[str, str], out_symbols_path: Optional[Path]=None, out_mapping_path: Optional[Path]=None) -> Dict[str, Path]\n- db_path: symbols.jsonl 或其所在目录\n- library_name: 指定的库名（如 \"std\" 或 \"regex\"）\n- mapping: C函数(或qualified_name) -> Rust库API 的显式映射（用于判定覆盖与替换），仅匹配函数节点\n- 输出:\n  - symbols_library_pruned.jsonl: 剪枝后的符号表（删除被替换根的所有函数子孙；保留根并将其ref替换为对应库API）\n  - library_replacements.jsonl: 替代映射（id,name,qualified_name,library,function）\n  - 兼容输出: symbols_prune.jsonl 与 symbols.jsonl（别名）\n  - translation_order_prune.jsonl 与 translation_order.jsonl（别名）\n算法:\n1) 读取symbols.jsonl，构造仅函数的ID图与父入边映射；\n2) 对每个函数fid，计算其从fid可达的函数集合desc，包括fid本身；\n3) 若desc内所有函数在mapping中都有对应项且映射的库名一致为library_name，则此fid可作为替代根：\n   - 记录fid的替代记录（library_name, mapping[fid]）\n   - 生成待删除集合：desc（子孙全部删除）\n   - 更新fid记录：将其ref替换为 [mapping[fid]]（指向库API），并去除对内部函数的引用\n4) 多根时采用贪心策略（按可删除子树规模从大到小处理，避免交叉覆盖冲突），避免重复删除；\n5) 写出新symbols与替代映射；计算翻译顺序并生成通用与阶段特有输出。\n约束与风格:\n- 不引入循环依赖；重用scanner.compute_translation_order_jsonl\n- 输出路径与日志风格参照 pruner.py，保证兼容“symbols_prune.jsonl/translation_order_prune.jsonl/别名输出”\n- 不改变类型(category==\"type\")记录，仅作用于函数",
+  "created_at": "2025-10-25T06:08:35.349766",
+  "updated_at": "2025-10-25T06:08:35.349769"
+}

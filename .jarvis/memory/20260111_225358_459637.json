@@ -1,0 +1,8 @@
+{
+  "id": "20260111_225358_459637",
+  "type": "project_long_term",
+  "tags": ["bug_fix", "KeyError", "OutputSink"],
+  "content": "修复ConsoleOutputSink中缺失OutputType样式定义导致的KeyError问题。当某个OutputType（如DIRECTORY）在styles字典中没有对应样式配置时，系统会报错：[输出后端错误] ConsoleOutputSink: <OutputType.DIRECTORY: 'DIRECTORY'>。解决方法是将缺失的OutputType添加到样式映射中。",
+  "created_at": "2026-01-11T22:53:58.459650",
+  "updated_at": "2026-01-11T22:53:58.459652"
+}

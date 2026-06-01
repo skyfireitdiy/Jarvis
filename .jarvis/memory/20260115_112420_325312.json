@@ -1,0 +1,13 @@
+{
+  "id": "20260115_112420_325312",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "batch_install",
+    "optimization",
+    "jvs"
+  ],
+  "content": "jck命令批量安装优化：将循环调用jvs逐个安装改为单次批量安装，构建复合描述字符串\"在当前环境安装tool1，在当前环境安装tool2\"，通过单次subprocess.run调用提高效率，保持原有错误处理和用户界面兼容性",
+  "created_at": "2026-01-15T11:24:20.325338",
+  "updated_at": "2026-01-15T11:24:20.325342"
+}

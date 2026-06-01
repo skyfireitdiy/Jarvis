@@ -1,0 +1,15 @@
+{
+  "content": "Jarvis项目Git发布流程自动化经验总结\n\n【标准发布步骤】\n1. 检查未提交代码：使用 `git status --porcelain` 检查是否有未提交的变更，如有则使用jgc命令快速提交\n2. 获取最新版本号：使用 `git describe --tags $(git rev-list --tags --max-count=1)` 获取最新tag\n3. 获取当前时间：使用 `date +\"%Y-%m-%d\"` 格式化日期\n4. 获取代码变更：使用 `git diff <tag>..HEAD | cat -` 获取完整的代码修改信息\n5. 分析代码变更并生成Release Note和推广文案\n\n【关键工具和命令】\n- jgc命令：项目的自定义提交命令，用于快速提交代码\n- git diff分析：获取详细的代码变更信息\n- version_confirm工具：可以正常获取版本号建议\n- generate_release_note工具：存在bug（Version对象没有patch属性错误）\n\n【Release Note格式规范】\n- 包含新功能、修复、优化、文档、其他等分类\n- 版本号格式：v{major}.{minor}.{patch}\n- 按标准Markdown格式输出\n\n【朋友圈推广文案风格】\n1. 专业技术风：突出技术价值和改进\n2. 简洁明了风：核心信息清晰传达\n3. 问题解决风：强调解决了哪些问题\n4. 用户友好风：从用户体验角度描述\n5. 开发者导向风：面向开发者群体的技术说明\n\n【注意事项】\n- jgc命令是项目的自定义提交命令，用于快速提交代码\n- generate_release_note工具存在已知bug，需要修复Version对象的patch属性\n- version_confirm工具工作正常，可用于版本号确认\n- 确保git diff命令格式正确：git diff <tag>..HEAD | cat -\n\n【设计原则】\n- 自动化优先：减少手动操作，提高发布效率\n- 标准化输出：确保Release Note和文案格式统一\n- 变更透明：基于实际git diff确保内容准确性\n- 多渠道适配：生成不同风格的推广文案适应不同场景\n\n【预期效果】\n- 提高发布流程的效率和一致性\n- 确保版本变更信息的准确传达\n- 支持多场景的推广需求\n- 建立可持续的版本管理机制",
+  "tags": [
+    "git-workflow",
+    "release-process",
+    "automation",
+    "jarvis",
+    "release-automation",
+    "version-management"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251110_235035_182625", "20251110_234353_883363"],
+  "id": "merged_eb7dfe6c",
+  "created_at": "2025-11-12T23:40:37.764897"
+}

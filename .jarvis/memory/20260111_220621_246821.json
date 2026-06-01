@@ -1,0 +1,13 @@
+{
+  "id": "20260111_220621_246821",
+  "type": "project_long_term",
+  "tags": [
+    "read_webpage",
+    "token_calculation",
+    "content_truncation",
+    "jarvis_tools"
+  ],
+  "content": "在read_webpage工具中，内容长度限制已从字符计数改为token计数。关键变更：1) 使用get_context_token_count函数计算token数量；2) 实现了基于token的逐步截断算法；3) calculate_content_length_limit函数原本返回字符限制，现在被用作token限制；4) 日志输出已更新为token单位。这种变更更符合LLM的上下文管理实践。",
+  "created_at": "2026-01-11T22:06:21.246850",
+  "updated_at": "2026-01-11T22:06:21.246854"
+}

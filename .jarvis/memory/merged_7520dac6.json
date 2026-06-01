@@ -1,0 +1,22 @@
+{
+  "content": "Jarvis C2Rust 测试框架生成与 Agent 编排系统实现\n\n【功能目标】\n- 为 C/C++ 项目生成测试框架的 Agent，负责为已有的 C/C++ 代码创建测试框架\n- 最终在 .jarvis/c2rust/test.sh 生成可执行测试脚本，运行该脚本可执行当前 C 项目的所有测试\n- 优先适配通用构建/测试入口：make test/check, ctest, meson test 等；若不存在则提供可扩展的占位实现\n- 建立轻量级 Agent 编排与记录能力，支持全流程自动化与断点续跑\n\n【实现位置】\n- 在 src/jarvis/jarvis_c2rust/cli.py 中定义测试框架生成 Agent\n\n【Step 1 完成状态】\n- CLI 命令：python -m jarvis.jarvis_c2rust.cli --root .\n- 生成文件：\n  * 测试脚本: .jarvis/c2rust/test.sh\n  * 进度文件: .jarvis/c2rust/progress.json\n\n【检测结果】\n- build_system: unknown（未检测到CMake/Meson/Autotools/Make/Bazel）\n- tests_found: false（无显式测试，已搭建smoke test）\n\n【test.sh 逻辑设计】\n- 构建阶段：若无法识别构建系统则跳过，仅输出提示\n- 测试阶段：无显式测试时执行smoke检查（构建成功即通过）\n- 扩展性：为后续添加具体测试用例预留接口\n\n【Agent 编排与记录能力】\n- 目录结构：\n  - .jarvis/c2rust/agents/records/*.json：Agent记录（id、kind、status、timestamps、payload、artifacts、logs）\n  - .jarvis/c2rust/agents/logs/*.log：Agent日志（时间戳行）\n  - .jarvis/c2rust/unit_tests/*.md：Step 5 为每个单元生成的占位补测说明文件\n\n【CLI 变更】\n- 新增 Agent 基础设施：create_agent、update_agent_status、append_agent_log、ensure_base_dirs 中创建目录\n- 在以下步骤中显式创建与更新Agent：\n  - Step 0 build_detect：扫描构建并生成 test.sh\n  - Step 1 repair_test：运行 test.sh 并基础修复\n  - Step 2 rust_init：初始化 Rust staticlib 工程并集成到 test.sh 构建段\n  - Step 3 repair_test_after_link：Rust 构建后再次测试与修复\n  - Step 4 scan_units：扫描C/C++单元生成 unit_queue.json\n  - Step 5 augment_tests_per_unit：为每个单元创建Agent并生成占位测试说明文件（unit_tests/<symbol>.md）\n  - Step 7 migrate_unit：根据 unit_queue.json 生成Rust extern \"C\"桩代码到 rustlib/src/lib.rs 标记区间\n  - Step 8/9/11/12/13/14/15/16：均创建相应Agent并记录占位行为与提交\n- 新增命令：jc2r goto、jc2r run-from（可从指定步骤重跑）\n\n【Rust 工程与构建】\n- .jarvis/c2rust/rustlib 单一 staticlib 工程，lib.rs 默认导出 #[unsafe(no_mangle)] c2rust_hello() -> i32\n- test.sh 含\"受保护的 Rust 构建段\"，存在 Cargo.toml 时才构建\n- 新增 test_rust.sh 生成与运行逻辑（静态库场景构建即为通过）\n\n【状态与提交】\n- 每一步均调用 git_commit，提交信息前缀 [JARVIS-C2RUST]\n- 断点续跑：.jarvis/c2rust/state.json 管理 step_index 与 completed_steps\n\n【进度管理】\n- 断点续跑：进度写入 .jarvis/c2rust/progress.json（step=1, status=prepared）\n- 版本控制：当前源码改动已存在或与HEAD一致，git未检测到差异；后续步骤产生变更时统一按 [JARVIS-C2RUST] 规范提交\n\n【设计原则】\n- 兼容性优先：优先适配主流构建系统（CMake/Meson/Autotools/Make/Bazel）\n- 渐进增强：从smoke test开始，逐步完善具体测试用例\n- 最小侵入：不修改现有构建配置，仅生成独立测试脚本\n- 可扩展性：为复杂测试场景预留扩展点\n\n【预期作用】\n- 为 C2Rust 转译前后的代码提供统一测试框架\n- 支持构建验证与基本功能检查\n- 为后续 Rust 代码测试迁移提供基线参考\n- 保障转译过程中功能等价性验证\n- 建立完整的 Agent 编排与记录体系支持全流程自动化\n- 提供断点续跑与状态管理能力\n- 注意：目前 Step 6/8 等修复与 Step 13 等迁移为占位或最小实现，已创建Agent与日志记录，后续可逐步增强实际逻辑",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "test_script",
+    "agent",
+    "cli",
+    "step1",
+    "progress",
+    "build_integration",
+    "smoke_test",
+    "pipeline",
+    "state_management",
+    "migration_automation",
+    "agent_orchestration"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_38cd2c91", "20251019_212413_004342"],
+  "id": "merged_7520dac6",
+  "created_at": "2025-11-12T23:43:11.590265"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260117_094432_998997",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "overview",
+    "jarvis_agent",
+    "jarvis_code_agent",
+    "jarvis_sec"
+  ],
+  "content": "# Jarvis项目架构概览\n\n## 核心模块\n1. **jarvis_agent**: 核心Agent框架，提供基础的AI代理功能\n   - Agent类：主要的代理实现，包含运行循环、工具调用、记忆管理等功能\n   - run_loop.py：代理的主运行循环\n   - tool_executor.py：工具执行器\n   - input_handlers：内置、shell输入处理器\n\n2. **jarvis_code_agent**: 代码专用Agent\n   - 基于jarvis_agent构建，专为代码任务优化\n   - 提供代码分析、符号查找、精确编辑等功能\n\n3. **jarvis_sec**: 安全分析模块\n   - 提供代码安全扫描和分析功能\n\n## 数据流\n用户输入 → 输入处理器 → Agent运行循环 → 模型调用 → 工具调用 → 结果返回\n\n## 关键组件\n- ToolRegistry：工具注册和执行系统\n- MemoryManager：三层记忆管理（短期、项目长期、全局长期）\n- PlatformRegistry：各种LLM平台的适配器\n- SessionManager：会话管理",
+  "created_at": "2026-01-17T09:44:32.999017",
+  "updated_at": "2026-01-17T09:44:32.999021"
+}

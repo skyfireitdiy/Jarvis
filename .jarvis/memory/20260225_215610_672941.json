@@ -1,0 +1,8 @@
+{
+  "id": "20260225_215610_672941",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "Windows编码", "static_analysis", "surrogates", "UTF-8"],
+  "content": "Windows静态扫描乱码问题修复方案（2026-02-25）\n\n问题现象：\n- Windows环境下执行静态扫描时，subprocess返回的输出包含乱码\n- 最终抛出异常：'utf-8' codec can't encode characters in position 26-27: surrogates not allowed\n\n根本原因：\n- Windows下subprocess使用encoding='utf-8'和errors='replace'参数时，命令输出的默认编码（GBK/CP936）会被强制用UTF-8解码\n- errors='replace'会将无效字节替换为surrogate字符（U+DC80-U+DCFF）\n- 当包含surrogates的字符串传递给PrettyOutput.auto_print()并最终编码为UTF-8时，会抛出异常\n\n修复方案：\n1. 在LintManager类中添加_clean_surrogates静态方法\n2. 该方法使用encode('utf-8', errors='replace').decode('utf-8')将surrogates替换为替换字符\n3. 在两处位置应用清理：\n   - 静态检查失败打印output_preview前\n   - 异常处理打印异常消息前\n\n修改文件：\n- src/jarvis/jarvis_code_agent/code_agent_lint.py\n\n影响范围：\n- 只影响输出显示，不影响传递给LLM的结果（第100-109行的results保持原样）\n- 正常的UTF-8输出不受影响",
+  "created_at": "2026-02-25T21:56:10.672958",
+  "updated_at": "2026-02-25T21:56:10.672962"
+}

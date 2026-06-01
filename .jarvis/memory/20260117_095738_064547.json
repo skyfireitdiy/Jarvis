@@ -1,0 +1,14 @@
+{
+  "id": "20260117_095738_064547",
+  "type": "project_long_term",
+  "tags": [
+    "security",
+    "jarvis_sec",
+    "security_analysis",
+    "vulnerability",
+    "sast"
+  ],
+  "content": "Jarvis安全分析组件详细信息：\n\n1. 安全漏洞分析师Agent (builtin/agent/security_vulnerability_analyst.yaml):\n- 专门用于查找逻辑/安全漏洞的专家Agent\n- 能够分析代码功能，识别潜在的逻辑错误和安全漏洞\n- 支持多种编程语言和常见安全攻击模式的识别\n\n2. 安全编码规则 (builtin/rules/security/security.md):\n- 包含输入验证、最小权限、敏感数据保护等核心安全原则\n- 防范SQL注入、XSS、CSRF等常见安全问题\n- 提供安全编码检查清单\n\n3. 漏洞分析规则 (builtin/rules/security/vulnerability-analysis.md):\n- 定义了代码理解、漏洞扫描、逻辑缺陷挖掘、报告生成的工作流程\n- 提供漏洞分析报告的标准格式和要求\n\n4. jarvis_sec模块 (src/jarvis/jarvis_sec/):\n- 安全分析套件，支持启发式扫描和AI深度验证\n- 包含C/C++和Rust语言的安全检查器\n- 提供聚类、验证、报告生成等功能\n- 支持JSON和Markdown格式的报告输出\n- 包含checkers目录，有c_checker.py和rust_checker.py",
+  "created_at": "2026-01-17T09:57:38.064574",
+  "updated_at": "2026-01-17T09:57:38.064578"
+}

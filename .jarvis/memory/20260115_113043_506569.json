@@ -1,0 +1,14 @@
+{
+  "id": "20260115_113043_506569",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "documentation",
+    "cli",
+    "jca",
+    "parameters"
+  ],
+  "content": "Jarvis项目中jca命令的完整参数列表：\n- -r, --requirement: 提供代码相关的需求描述\n- -T, --task: 要处理的任务描述（可直接在命令行提供任务内容）\n- --task-file: 从文件读取任务描述（支持纯文本或JSON格式）\n- -g, --llm-group: 使用的模型组，覆盖配置文件中的设置\n- -G, --tool-group: 使用的工具组，覆盖配置文件中的设置\n- -f, --config: 配置文件路径\n- --append-tools: 要追加的工具列表，用逗号分隔\n- --restore-session: 从.jarvis/saved_session.json恢复会话状态\n- --prefix: 提交信息前缀（用空格分隔）\n- --suffix: 提交信息后缀（用换行分隔）\n- --rule-names: 指定规则名称列表，用逗号分隔\n- --disable-review: 禁用代码审查功能\n- --review-max-iterations: 代码审查最大迭代次数（默认0表示无限模式）\n- -n, --non-interactive: 启用非交互模式\n- -w, --worktree: 启用git worktree模式，在独立分支上开发\n- -d, --dispatch: 将任务派发到新的tmux窗口中执行\n\n重要发现：文档中曾缺少-T、--task-file、-w、-d等关键参数，且--review-max-iterations的描述不准确（默认0应为无限模式而非不限制）",
+  "created_at": "2026-01-15T11:30:43.506608",
+  "updated_at": "2026-01-15T11:30:43.506612"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260411_131218_785081",
+  "type": "project_long_term",
+  "tags": ["VS Code扩展", "终端会话", "xterm", "样式修复", "隐藏辅助元素"],
+  "content": "修复了xterm-helper-textarea显示问题：\n1. 用户发现xterm.js自动创建的辅助textarea变得可见\n2. 在extension.ts中添加了隐藏样式：\n   - .xterm-helpers { position: absolute; left: -9999px; top: -9999px; }\n   - .xterm-helper-textarea { position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none; }\n3. 确保xterm输入功能正常，只是隐藏辅助元素",
+  "created_at": "2026-04-11T13:12:18.785114",
+  "updated_at": "2026-04-11T13:12:18.785118"
+}

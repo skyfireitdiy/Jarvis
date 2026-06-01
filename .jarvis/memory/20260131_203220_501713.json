@@ -1,0 +1,8 @@
+{
+  "id": "20260131_203220_501713",
+  "type": "project_long_term",
+  "tags": ["jarvis_tools", "tool_registry", "tool_development"],
+  "content": "Jarvis工具开发规范：\n1. 工具类需要定义name、description、parameters属性\n2. 实现execute(self, args: Dict[str, Any]) -> Dict[str, Any]方法\n3. 返回格式：{\"success\": bool, \"stdout\": str, \"stderr\": str}\n4. 工具文件放在src/jarvis/jarvis_tools/目录下，registry.py会自动扫描加载\n5. 工具名称应与文件名一致（不含.py后缀）\n6. 参考文件：generate_rule.py、knowledge_graph_tool.py",
+  "created_at": "2026-01-31T20:32:20.501726",
+  "updated_at": "2026-01-31T20:32:20.501728"
+}

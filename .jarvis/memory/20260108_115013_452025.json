@@ -1,0 +1,14 @@
+{
+  "id": "20260108_115013_452025",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "window_management",
+    "MAX_PANES_PER_WINDOW",
+    "task_allocation",
+    "jarvis_tools"
+  ],
+  "content": "在jarvis工具中，task_list_manager类的MAX_PANES_PER_WINDOW = 4 设置用于限制每个tmux窗口的最大pane数量。之前的逻辑会在达到pane限制时创建新窗口，但由于复杂性问题导致即使达到4个pane也不创建新窗口。修复方案是简化策略，为每个任务创建独立窗口，避免pane复用的复杂性。",
+  "created_at": "2026-01-08T11:50:13.452077",
+  "updated_at": "2026-01-08T11:50:13.452082"
+}

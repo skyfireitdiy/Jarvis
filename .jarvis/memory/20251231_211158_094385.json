@@ -1,0 +1,8 @@
+{
+  "id": "20251231_211158_094385",
+  "type": "project_long_term",
+  "tags": ["claude", "platform", "jarvis", "implementation"],
+  "content": "Claude平台接口实现已完成：\n1. 文件：src/jarvis/jarvis_platform/claude.py (320行)\n2. 依赖：anthropic>=0.40.0 (已添加到 pyproject.toml)\n3. 核心特性：\n   - 使用官方 anthropic SDK\n   - 默认模型：claude-3-5-sonnet-20241022\n   - 环境变量：ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL\n   - 系统提示通过 system 参数设置（符合 Anthropic API 规范）\n   - 支持流式对话输出\n   - 正确处理消息历史格式转换\n4. 与 OpenAI 实现的差异：\n   - OpenAI 将系统消息作为第一条消息，Claude 使用独立的 system 参数\n   - Claude 的 save/restore 包含 system_message 状态保存",
+  "created_at": "2025-12-31T21:11:58.094404",
+  "updated_at": "2025-12-31T21:11:58.094407"
+}

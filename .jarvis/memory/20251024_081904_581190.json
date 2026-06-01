@@ -1,0 +1,13 @@
+{
+  "id": "20251024_081904_581190",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "llm_module_agent.py",
+    "output_validation",
+    "auto_retry"
+  ],
+  "content": "在 LLMRustCratePlannerAgent 中实现了对 Agent 输出格式的自动重试机制：\n- 新增 _validate_project_entries(entries) 校验逻辑，强制规则：\n  * 必须存在 src/lib.rs；\n  * 若原项目包含 main：禁止 src/main.rs，且必须包含 src/bin/<crate_name>.rs；\n  * 若原项目不包含 main：禁止 src/main.rs，且禁止存在 src/bin/ 目录。\n- 新增 _build_retry_summary_prompt(base_summary_prompt, error_reason)，在重试时将失败原因反馈给模型并强化输出规范。\n- 修改 _get_project_yaml_text()：加入最多 5 次重试逻辑；每次尝试解析并校验 YAML，不通过则携带原因重试；最终返回最后一次输出（上层可决定是否失败）。\n- 解析器仍优先使用 PyYAML，不可用或失败时回退到轻量解析器，兼容 `- name/:` 目录语法。\n影响范围：仅 jarvis_c2rust/llm_module_agent.py 生成阶段；应用与后续 CodeAgent 构建流程未改动。\n",
+  "created_at": "2025-10-24T08:19:04.581218",
+  "updated_at": "2025-10-24T08:19:04.581222"
+}

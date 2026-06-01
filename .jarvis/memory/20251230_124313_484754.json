@@ -1,0 +1,13 @@
+{
+  "id": "20251230_124313_484754",
+  "type": "project_long_term",
+  "tags": [
+    "config_extraction",
+    "TUI",
+    "handle_interactive_config_option",
+    "jarvis.py"
+  ],
+  "content": "handle_interactive_config_option函数配置提取需求：\n当前实现（jarvis.py 152-221行）只调用_collect_optional_config_interactively，缺少以下逻辑：\n1. 从现有配置中提取平台名称\n2. 提取模型名称\n3. 提取环境变量（ENV）\n4. 提取LLM配置（llm_config）\n5. 提取最大token数量（max_input_token_count）\n6. 获取第一个LLM配置\n7. 确定默认llm_group\n\n错误处理要求：\n- 处理llms字段缺失的情况\n- 处理llms为空字典的情况\n- 处理llm_group字段缺失的情况\n- 处理配置结构不完整的降级方案\n- 添加对配置字段的类型检查和验证\n\nTUI集成目标：将提取的配置作为默认值传递给_run_tui_config_form函数\n",
+  "created_at": "2025-12-30T12:43:13.484773",
+  "updated_at": "2025-12-30T12:43:13.484775"
+}

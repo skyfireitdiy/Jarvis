@@ -1,0 +1,8 @@
+{
+  "id": "20260118_220156_145412",
+  "type": "project_long_term",
+  "tags": ["refactoring", "module_split", "task_manager"],
+  "content": "在Jarvis项目的task_list_manager.py重构过程中，采用了SDD+TDD流程进行模块拆分。拆分顺序为：TaskListUtils -> AgentStateManager -> DependencyValidator -> TaskListManager -> TaskExecutor -> TaskVerifier -> TaskListTool。每个模块都控制在指定行数范围内（通常600行以内），保持职责单一原则。",
+  "created_at": "2026-01-18T22:01:56.145431",
+  "updated_at": "2026-01-18T22:01:56.145433"
+}

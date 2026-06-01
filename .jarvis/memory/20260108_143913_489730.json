@@ -1,0 +1,14 @@
+{
+  "id": "20260108_143913_489730",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "layout",
+    "init_env",
+    "tiled_layout",
+    "architecture_decision"
+  ],
+  "content": "将tmux窗口平铺布局设置从多个函数中移除，统一移动到init_env函数中进行管理。这样可以确保在初始化环境时统一设置tiled布局，避免在多个地方重复设置。修改包括：1) 移除dispatch_to_tmux_window函数中创建新pane后自动切换到tiled布局的代码；2) 移除dispatch_command_to_panel函数中对set_window_tiled_layout的调用；3) 移除_dispatch_to_existing_jarvis_session函数中panel创建成功后切换到tiled布局的代码；4) 在init_env函数中添加了统一的tiled布局设置代码，只在TMUX环境中执行。",
+  "created_at": "2026-01-08T14:39:13.489763",
+  "updated_at": "2026-01-08T14:39:13.489767"
+}

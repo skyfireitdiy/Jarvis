@@ -1,0 +1,8 @@
+{
+  "id": "20251019_092234_729488",
+  "type": "project_long_term",
+  "tags": ["mvp", "initial_phase", "timeline", "docker", "reproducibility"],
+  "content": "初赛MVP最小落地：\n- 目标：一周内完成 bzip2 全量扫描、证据报告、最小修复PoC、1个OH库问题检出；产出可编译补丁、结构化报告、CLI、Docker镜像\n- 步骤：docker基线→clone bzip2+1个OH库→静态分析（clang-tidy/cppcheck/scan-build/Infer）→ASan/UBSan运行→聚合证据VulnReport→生成FixPlan并产出PatchSet→编译与测试→报告\n- 复现：锁版本、seed、容器内路径一致；日志trace id；退出码语义化\n",
+  "created_at": "2025-10-19T09:22:34.729506",
+  "updated_at": "2025-10-19T09:22:34.729509"
+}

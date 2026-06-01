@@ -1,0 +1,11 @@
+{
+  "id": "20260106_090140_876606",
+  "type": "project_long_term",
+  "tags": [
+    "session_listing",
+    "session_file_parsing"
+  ],
+  "content": "Session文件解析和列表显示实现：\n\n1. _parse_session_files() 方法返回 (文件路径, 时间戳) 元组列表，按时间戳降序排列\n2. ListSessions 命令显示会话文件的详细信息包括时间、大小等\n3. 时间戳提取使用正则表达式 r'_(\\d{8}_\\d{6})\\.json$' 精确匹配 YYYYMMDD_HHMMSS 格式\n4. 无时间戳的旧格式文件会排在列表末尾",
+  "created_at": "2026-01-06T09:01:40.876626",
+  "updated_at": "2026-01-06T09:01:40.876630"
+}

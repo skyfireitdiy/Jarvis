@@ -1,0 +1,8 @@
+{
+  "id": "20260201_013358_824112",
+  "type": "project_long_term",
+  "tags": ["jarvis_digital_twin", "user_profile", "goal_tracker", "阶段5.1"],
+  "content": "GoalTracker目标追踪器模块实现完成。\n\n文件位置：\n- 实现：src/jarvis/jarvis_digital_twin/user_profile/goal_tracker.py\n- 测试：tests/jarvis_digital_twin/test_goal_tracker.py（40个测试）\n\n核心数据类：\n- GoalType：目标类型枚举（SHORT_TERM/MEDIUM_TERM/LONG_TERM）\n- GoalStatus：目标状态枚举（ACTIVE/COMPLETED/PAUSED/ABANDONED）\n- GoalProgress：目标进度数据类\n- TrackedGoal：追踪目标数据类（包含id、goal_type、description、progress、confidence等）\n- GoalInferenceResult：目标推断结果数据类\n\nGoalTracker类核心方法：\n- track_goal()：追踪新目标\n- infer_goals_from_context()：从上下文推断目标\n- get_current_goals()：获取当前目标列表\n- update_goal_progress()：更新目标进度\n- get_goal_by_id()：根据ID获取目标\n- update_goal_status()：更新目标状态\n- remove_goal()：移除目标\n- get_goals_by_tag()：根据标签获取目标\n- get_sub_goals()：获取子目标\n- get_goal_statistics()：获取目标统计\n\n特性：支持目标层级（父子目标）、从对话自动识别目标、置信度评估。",
+  "created_at": "2026-02-01T01:33:58.824133",
+  "updated_at": "2026-02-01T01:33:58.824136"
+}

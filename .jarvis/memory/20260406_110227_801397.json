@@ -1,0 +1,8 @@
+{
+  "id": "20260406_110227_801397",
+  "type": "project_long_term",
+  "tags": ["GLM模型", "bug修复", "max_tokens", "openai.py", "经验总结"],
+  "content": "## GLM 模型返回部分内容问题修复经验\n\n### 问题描述\nGLM 模型（z-ai/glm4.7 via NVIDIA API）总是返回部分内容，用户只能看到推理过程的一部分，没有正式回复内容。\n\n### 根本原因\n- GLM 模型会返回 `reasoning_content`（推理过程），这会消耗大量 token\n- 默认的 max_tokens 不足以支撑推理过程 + 正式内容生成\n- API 响应被截断，`finish_reason: \"length\"`\n\n### 调试方法\n使用 curl 测试 API 响应：\n```bash\ncurl -s -X POST 'https://integrate.api.nvidia.com/v1/chat/completions' \\\n-H 'Content-Type: application/json' \\\n-H 'Authorization: Bearer <API_KEY>' \\\n-d '{\n  \"model\": \"z-ai/glm4.7\",\n  \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in 10 words\"}],\n  \"max_tokens\": 1048576,\n  \"stream\": false\n}'\n```\n\n### 修复方案\n在 `src/jarvis/jarvis_platform/openai.py` 的 `chat` 方法中，为 `api_params` 添加默认的 `max_tokens=1048576`：\n\n```python\n# 如果没有指定 max_tokens，设置为 1M 确保有足够空间处理 reasoning_content\nif \"max_tokens\" not in api_params:\n    api_params[\"max_tokens\"] = 1048576  # 1M tokens\n```\n\n### 验证结果\n- 修复前：`finish_reason: \"length\"`，`completion_tokens: 32`\n- 修复后：`finish_reason: \"stop\"`，`completion_tokens: 638`\n- 响应包含完整的推理过程和正式回复内容\n\n### 相关文件\n- `src/jarvis/jarvis_platform/openai.py` (chat 方法)\n- `~/.jarvis/config.yaml` (glm-nv 配置)\n\n### 提交记录\n- Commit: 0ac180d",
+  "created_at": "2026-04-06T11:02:27.801414",
+  "updated_at": "2026-04-06T11:02:27.801418"
+}

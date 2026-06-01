@@ -1,0 +1,13 @@
+{
+  "id": "20260114_084406_121117",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_input_handler",
+    "rule",
+    "rule_tag",
+    "input_handler"
+  ],
+  "content": "builtin_input_handler.py 已实现 rule 内容标签包裹功能：在处理 'rule:xxx' 标记时（第185-199行），会自动将 rule 内容包裹在 <rule></rule> 标签中，并添加分隔线。具体实现：modified_input.replace(f\"'<{tag}>'\", f\"<rule>\\n{rule_content}\\n</rule>{separator}\")",
+  "created_at": "2026-01-14T08:44:06.121150",
+  "updated_at": "2026-01-14T08:44:06.121154"
+}

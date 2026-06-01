@@ -1,0 +1,8 @@
+{
+  "id": "20260201_172809_971303",
+  "type": "project_long_term",
+  "tags": ["持续学习", "持久化", "功能实现"],
+  "content": "## Jarvis持续学习系统自动持久化功能实现完成\n\n### 实现内容\n\n1. **持久化路径函数**（config.py 第583-597行）\n   - 添加 get_continuous_learning_dir() 函数\n   - 返回 ~/.jarvis/continuous_learning 路径\n   - 自动创建目录\n\n2. **save_to_disk() 方法**（manager.py 第700-764行）\n   - 保存5个JSON文件：statistics.json, knowledge.json, skills.json, experiences.json, adaptations.json\n   - 使用原子写入（临时文件+os.replace）确保数据安全\n   - 返回保存结果字典\n\n3. **load_from_disk() 方法**（manager.py 第766-829行）\n   - 加载3个JSON文件：knowledge.json, skills.json, experiences.json\n   - 文件不存在时不报错，优雅处理\n   - 调用 import_learnings() 导入数据\n\n4. **自动加载逻辑**（manager.py 第90-103行）\n   - 在 __init__ 方法末尾调用 load_from_disk()\n   - 使用 try-except 包裹，加载失败不影响初始化\n   - 成功加载时打印加载结果\n\n5. **自动保存逻辑**\n   - learn_from_interaction() 末尾（第252-256行）\n   - learn_from_task_result() 末尾（第367-371行）\n   - 使用 try-except 包裹，保存失败不影响学习结果\n\n### 技术特点\n\n- **数据格式**：JSON，与现有export/import兼容\n- **原子写入**：使用临时文件+os.replace确保数据安全\n- **容错处理**：所有IO操作都有try-except保护，失败不影响主流程\n- **自动触发**：程序启动时自动加载，学习后自动保存\n- **存储位置**：~/.jarvis/continuous_learning/\n\n### Git提交记录\n\n- Commit 056c094: 添加持久化路径函数\n- Commit e6dbc84: 添加save_to_disk和load_from_disk方法\n- Commit 1f18cb1: 添加自动保存逻辑",
+  "created_at": "2026-02-01T17:28:09.971322",
+  "updated_at": "2026-02-01T17:28:09.971325"
+}

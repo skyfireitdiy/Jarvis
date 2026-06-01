@@ -1,0 +1,14 @@
+{
+  "id": "20251230_140831_856839",
+  "type": "project_long_term",
+  "tags": [
+    "tui_app",
+    "ScrollableContainer",
+    "MountError",
+    "textual",
+    "TUI"
+  ],
+  "content": "TUI 应用中的组件挂载错误修复：在 Textual 框架中，ScrollableContainer 在被框架挂载前不能直接挂载子组件，否则会触发 MountError。解决方案是将表单内容的挂载操作从 _build_form() 方法延迟到 on_mount() 生命周期阶段执行。相关文件：src/jarvis/jarvis_config/tui_app.py，关键方法：_build_form()（第164行）、_build_object_form()（第169行）、on_mount()。",
+  "created_at": "2025-12-30T14:08:31.856884",
+  "updated_at": "2025-12-30T14:08:31.856888"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260417_042216_252701",
+  "type": "project_long_term",
+  "tags": ["tui", "code-review", "spec-implementation", "inconsistency"],
+  "content": "Jarvis TUI代码审查发现：1) Spec文档中ConnectionManager定义了disconnect方法，但实际实现是disconnect_gateway和disconnect_agent，存在接口不一致；2) 第2轮修复总结声称已更新Spec文档，但实际Spec中仍为disconnect方法；3) TUI版本实现了核心功能（认证、连接、Agent管理、聊天、终端面板），但缺少web版本的部分高级功能（批量操作、编辑器面板等）。",
+  "created_at": "2026-04-17T04:22:16.252744",
+  "updated_at": "2026-04-17T04:22:16.252751"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20251025_043746_015193",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "crate_dir_policy",
+    "path_convention"
+  ],
+  "content": "默认crate目录设置为当前目录的同级目录：<parent_of_cwd>/<cwd_name>_rs（例如 /a/b/c -> /a/b/c_rs），不再创建在当前目录内部。",
+  "created_at": "2025-10-25T04:37:46.015219",
+  "updated_at": "2025-10-25T04:37:46.015223"
+}

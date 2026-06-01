@@ -1,0 +1,13 @@
+{
+  "id": "20250804_212552_911608",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "configuration",
+    "JARVIS_FORCE_SAVE_MEMORY",
+    "memory"
+  ],
+  "content": "在Jarvis项目中，环境变量 `JARVIS_FORCE_SAVE_MEMORY` 的作用不是强制保存每一步记忆，而是在特定时机（如上下文历史被清理前或任务完成时）提示用户手动保存记忆，以防止重要信息丢失。其具体逻辑定义在 `src/jarvis/jarvis_agent/__init__.py` 中。\n",
+  "created_at": "2025-08-04T21:25:52.911633",
+  "updated_at": "2025-08-04T21:25:52.911637"
+}

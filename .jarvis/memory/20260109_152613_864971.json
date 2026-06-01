@@ -1,0 +1,15 @@
+{
+  "id": "20260109_152613_864971",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "session_management",
+    "jarvis_command",
+    "jvs",
+    "jca",
+    "behavior_change"
+  ],
+  "content": "在tmux环境中运行jvs/jca命令的行为变更：修改前在tmux中会直接继续执行当前命令，修改后会查找jarvis session并在其中创建新的panel来执行命令，而不是attach到现有session。这解决了用户在已有tmux session中运行命令时不会创建新panel的问题。",
+  "created_at": "2026-01-09T15:26:13.864996",
+  "updated_at": "2026-01-09T15:26:13.865000"
+}

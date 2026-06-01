@@ -1,0 +1,13 @@
+{
+  "id": "20260105_162805_814734",
+  "type": "project_long_term",
+  "tags": [
+    "auto_complete",
+    "task_list",
+    "LLM_decision",
+    "user_confirmation"
+  ],
+  "content": "在Jarvis的自动完成功能中添加任务列表检查逻辑：\n\n1. 当触发自动完成时，检查任务列表中是否有PENDING或RUNNING状态的任务\n2. 如果有未完成任务，构造提示信息询问LLM是否确认完成\n3. 使用<!!!YES!!!>和<!!!NO!!!>标识进行决策解析\n4. 安全优先策略：无法明确判断时默认不完成\n5. 包含异常处理，使用try-except包裹检查逻辑\n6. 使用hasattr检查task_list_manager存在性\n7. 通过PrettyOutput.auto_print输出用户友好的信息\n\n实现位置：src/jarvis/jarvis_agent/run_loop.py 第236行附近的自动完成检查逻辑",
+  "created_at": "2026-01-05T16:28:05.814761",
+  "updated_at": "2026-01-05T16:28:05.814765"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260111_215526_043931",
+  "type": "project_long_term",
+  "tags": [
+    "uv",
+    "install",
+    "global",
+    "jarvis",
+    "scripts/install.sh",
+    "uv-tool-install"
+  ],
+  "content": "Jarvis 安装脚本 scripts/install.sh 已从虚拟环境安装方式改为 uv tool install 全局安装方式。主要修改：1) 删除 VENV_DIR 变量；2) 使用 uv tool install 替代 uv pip install 和虚拟环境创建；3) 删除 Shell 环境配置部分；4) 简化完成提示；5) 自动补全安装不再需要激活虚拟环境。这样用户无需修改 rc 文件即可直接使用 jarvis 命令。",
+  "created_at": "2026-01-11T21:55:26.043960",
+  "updated_at": "2026-01-11T21:55:26.043964"
+}

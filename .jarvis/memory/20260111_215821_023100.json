@@ -1,0 +1,8 @@
+{
+  "id": "20260111_215821_023100",
+  "type": "project_long_term",
+  "tags": ["search_web", "token_calculation", "bug_fix"],
+  "content": "search_web.py中的token计算修复：修改前每次循环都调用calculate_content_length_limit(agent)重新计算，导致返回最大值；修复后在循环前计算一次content_length_limit，每次循环使用remaining_limit = content_length_limit - len(full_content)来计算剩余可用长度，避免了重复计算问题。",
+  "created_at": "2026-01-11T21:58:21.023133",
+  "updated_at": "2026-01-11T21:58:21.023137"
+}

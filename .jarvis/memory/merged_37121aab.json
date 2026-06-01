@@ -1,0 +1,31 @@
+{
+  "content": "开源鸿蒙AI安全演进Agent竞赛（oh-sec）综合性实施方案与技术架构\n\n【项目位置与目标】\n- 实现位置：/home/skyfire/code/Jarvis/builtin/multi_agent\n- 参考文档：/home/skyfire/code/10-12-docs\n- 总目标：构建能理解C/C++/Rust、多维安全分析、智能决策（修复/加固/重写）、高质量安全代码生成的人机协作Agent\n- 必选基准库：bzip2（C，贯穿三阶段：初赛识别问题、复赛核心模块重写、决赛完整迁移优化；对标bzip2-rs）\n- 分级测试库（至少覆盖1个，复赛需≥2个）：commonlibrary_c_utils、hiviewdfx_hilog、communication_ipc、request_request、ylong_runtime、security_asset、hisysevent\n- 语言范围：C/C++/Rust混合代码库，基于开源鸿蒙生态\n\n【核心架构约束】\n- 必须基于现有实现：src/jarvis/jarvis_agent/__init__.py 与 src/jarvis/jarvis_multi_agent/__init__.py 进行多Agent方案设计与扩展\n- 优先最小改动，保持项目风格与规范\n- 先分析项目结构与现有代码再实施\n- 不得修改现有文件；仅可在 src/jarvis/ 下新增模块\n\n【核心能力要求】\n1) 多维度代码理解：语法/语义/架构/安全\n2) 智能决策引擎：风险评估、路径规划、成本收益、演进路线图\n3) 高质量代码生成：Rust优先、功能等价、性能友好、文档与测试（unsafe<5%，性能损耗<50%）\n4) 人机协作：结果可视、可调参与、理由解释、学习偏好\n\n【功能能力要求】\n- 分析能力：静态分析、语义分析、数据流分析、并发分析\n- 决策规划：修复策略、加固方案、重写路径规划\n- 代码生成：优先Rust实现，保证功能等价与性能友好\n- 验证能力：编译验证、测试验证、性能基准对比\n- 人机协作界面：CLI命令行接口、结构化报告输出\n\n【量化目标】\n- 检出率≥90%，建议采纳率≥75%，生成代码质量≥90分，效率10x，支持增量分析\n- 阶段一目标：检出率≥60%（重点：内存管理、缓冲区操作、错误处理）\n\n【评分体系与门槛】\n初赛评分维度：安全检出能力（25分）、代码生成质量（25分）、技术创新（20分）、工程完整性（20分）、文档规范（10分）\n晋级门槛：\n- 初赛：能处理bzip2与≥1个OH库；检出率≥60%、代码生成成功率≥50%；材料完整；总分≥60且基础能力≥24；前12名晋级\n- 复赛：bzip2迁移API覆盖≥70%；≥2个OH库改进；A组（前6名）进入决赛路演\n- 决赛：现场演示、实战挑战、专家质询；评分维度：完成度、创新性、工程成熟、实战、价值\n\n【技术架构设计】\n基于Jarvis多Agent框架的\"OpenHarmony安全演进多Agent套件\"（jarvis/oh_sec）\n核心框架：\n- 单Agent：jarvis_agent.Agent 支持单步工具调用、BEFORE/AFTER 事件、工具筛选；in_multi_agent=True 时不强制 auto_complete\n- 多Agent：jarvis_multi_agent.MultiAgent 提供 SEND_MESSAGE 路由与严格校验、agents_config 配置、summary_on_send、common_system_prompt\n- 协议：SEND_MESSAGE 仅允许一块，必须包含 to 和 content（建议使用 |2 格式）\n- 工具：execute_script、read_code、sub_agent、sub_code_agent；execute_script 非交互、5分钟超时\n\n【子Agent体系（阶段一：静态检出与修复建议）】\n1) SecurityOrchestrator（主控/编排）：任务分解、消息路由、全局状态与里程碑管理\n2) RepoIndexer（仓库索引/模块划分）：扫描仓库生成 ModuleIndex 与 CorePath\n3) CCppStaticAnalyzer（C/C++静态分析）：clang-tidy/scan-build，检测缓冲区溢出、UAF、空指针、越界、整数溢出\n4) RustStaticAnalyzer（Rust静态分析）：clippy、cargo-audit、unsafe 扫描\n5) ConcurrencyAnalyzer（并发/生命周期专项）：竞态、死锁、生命周期、引用有效性检查\n6) DataFlowAnalyzer（数据流/污点分析）：跨函数数据流、边界检查匹配、危险API使用识别\n7) RiskAssessor（风险量化/优先级）：对 Findings 打分并排序，生成 RiskReport 与 PrioritizedIssues\n8) PatchAdvisor（加固/重构路径规划）：为每个模块制定修复/加固/重写（Rust）策略与成本收益分析\n9) RustRewriter（Rust重写）：生成Rust等价实现（尽量0-unsafe）、单元测试与文档\n10) CHardener（C/C++加固）：内存安全加固（边界检查、RAII、线程安全封装）\n11) InteropEngineer（跨语言集成）：C/Rust FFI桥接、构建脚本、API兼容适配\n12) TestRunner（编译/测试）：构建与运行测试，生成覆盖率与可复现脚本\n13) PerfBench（性能与内存）：基准对比（功能等价前提下Rust vs 原C）、内存使用、性能损耗\n14) ReportAgent（报告/评分对齐）：面向评分维度生成结构化报告与提交材料\n\n【数据契约（Artifacts）】\n- ModuleIndex: { modules: [name, files, deps], language, loc, hotspots }\n- CorePath: { entrypoints, callgraph_subset }\n- Findings: [{ id, file, line, category, cwe, severity, evidence, suggested_fix }]\n- DataflowMap: graph/edges (producer→consumer), taint paths\n- RiskReport: { issue_id → risk_score (0-100), rationale }\n- PrioritizedIssues: 排序后的 issue 列表\n- Plan: { module → { strategy: fix|harden|rewrite_rust, cost, benefit, risk, api_compat, interop } }\n- Patches: { patch_id, language, diff, safety_notes, tests_updated }\n- InteropSpec: FFI接口、构建规则、封装边界\n- TestSpecs/TestResults: 用例描述、输入/期望、覆盖目标、通过/失败、覆盖率\n- Benchmarks: 性能/内存指标对比\n- Reports: 评分维度对齐的Markdown/JSON\n\n【编排流程（阶段与消息流）】\n1) Orchestrator → RepoIndexer: 建索引与核心路径\n2) 并发触发分析：CCppStaticAnalyzer、ConcurrencyAnalyzer、DataFlowAnalyzer、RustStaticAnalyzer\n3) 汇总→ RiskAssessor：统一打分与优先级排序\n4) → PatchAdvisor：为模块产出策略（修复/加固/重写）\n5) 对 rewrite_rust：→ RustRewriter；对 fix/harden：→ CHardener；→ InteropEngineer\n6) → TestRunner：编译、测试、覆盖率；→ PerfBench：性能与内存\n7) → ReportAgent：汇总出技术报告与提交材料\n8) Orchestrator 依据结果循环迭代（增量分析与回归）\n\n【消息协议】\n- 统一以 YAML 负载承载 artifact，字段：{ task_id, from, to, intent, artifacts: {type: name, uri|inline}, constraints, next_suggestion }\n- content 使用 |2 多行块，嵌入 JSON/YAML artifacts，并附指令摘要\n\n【目录规划】\n- src/jarvis/oh_sec/__init__.py：暴露 create_security_multi_agent() 与 run_security_analysis(entry) 入口\n- src/jarvis/oh_sec/prompts.py：各子Agent系统提示词\n- src/jarvis/oh_sec/workflow.py：编排与任务路由、用户输入预处理、输出格式化\n- src/jarvis/oh_sec/checkers/c_checker.py：C/C++启发式规则实现（正则+模式+上下文片段检索）\n- src/jarvis/oh_sec/checkers/rust_checker.py：Rust安全检查规则实现\n- src/jarvis/oh_sec/report.py：聚合器与评分模型（命中规则权重、置信度计算）\n\n【工程实施要求】\n- CLI可调用：提供命令行入口，支持参数化配置\n- 日志与错误处理：完整异常捕获、结构化日志输出、错误恢复机制\n- 增量扫描：支持断点续跑、进度持久化、增量分析优化\n- 持续演进指标化：量化评估指标、演进路线图、安全性趋势监控\n\n【环境与约束】\n- 环境：Linux（Ubuntu 20.04+）、Rust 1.70+、GCC9+/Clang10+、统一Docker评测、建议云端推理API\n- 评测环境Docker化：需可在容器内一键运行\n- 保证环境一致性：Linux(Ubuntu 20.04+)、Rust 1.70+、GCC/Clang 9+/10+\n\n【运行方式】\n- 通过 create_security_multi_agent().run(user_prompt) 启动\n- 或调用 run_security_analysis(target_path) 自动构建 user_prompt 与消息流\n- CLI 命令：jarvis oh-sec analyze --repo <path> --targets bzip2,commonlibrary_c_utils\n\n【实施里程碑】\n- 初赛阶段：实现CLI可运行的多Agent系统，支持bzip2静态/语义分析、风险量化报告、至少一个OH库基础检出；输出演进建议与可选Rust重写PoC\n- 复赛阶段：引入 RustRewriter + InteropEngineer，完成 bzip2 核心模块迁移（API覆盖率≥70%）；扩展到 2+ 个 OH 库，覆盖并发/生命周期/跨语言复杂场景；加入 PerfBench，完成性能对比与优化建议\n- 决赛阶段：全流程自动化编排、指标闭环、风险回退；完整迁移、性能对比、未知片段实战分析；现场演示、实战挑战、专家质询\n\n【错误处理与回退】\n- SEND_MESSAGE 严格校验；解析失败返回修复建议\n- 每阶段失败可重试；编译失败自动回收前一版本补丁；保留日志与工件路径\n- 超时/长输出通过 rg 过滤（execute_script 指南）\n\n【实施原则】\n- 最小改动优先：在现有框架基础上扩展，不破坏原有结构\n- 项目风格一致：遵循现有代码规范、命名约定、架构模式\n- 渐进式增强：先实现核心流程，再逐步完善断点、优化、指标等高级特性\n\n【交付物要求】\n- CLI入口、结构ured日志、错误处理、可复现测试套、演示脚本\n- 技术报告、README、依赖说明、评分维度对齐的Markdown/JSON报告",
+  "tags": [
+    "oh-sec",
+    "competition",
+    "OpenHarmony",
+    "multi_agent",
+    "security",
+    "code_migration",
+    "rust",
+    "static_analysis",
+    "risk_assessment",
+    "architecture",
+    "workflow",
+    "CLI",
+    "jarvis_agent",
+    "jarvis_multi_agent",
+    "SEND_MESSAGE",
+    "agents_config",
+    "concurrency",
+    "environment",
+    "scoring",
+    "dockerization",
+    "incremental",
+    "systematic_implementation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_113c1fe8", "merged_fe33c50e"],
+  "id": "merged_37121aab",
+  "created_at": "2025-11-12T23:38:51.705161"
+}

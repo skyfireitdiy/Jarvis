@@ -1,0 +1,13 @@
+{
+  "id": "20260131_110616_833139",
+  "type": "project_long_term",
+  "tags": [
+    "evolution",
+    "phase1",
+    "refactoring",
+    "extract_interface"
+  ],
+  "content": "ExtractInterfaceRefactorer类提供了完整的接口提取功能，包括InterfaceMethodAnalyzer用于分析类的方法、方法签名和文档字符串，支持生成ABC或Protocol类型的接口定义，能够自动修改原类以继承生成的接口，并记录到FixHistory中。",
+  "created_at": "2026-01-31T11:06:16.833163",
+  "updated_at": "2026-01-31T11:06:16.833167"
+}

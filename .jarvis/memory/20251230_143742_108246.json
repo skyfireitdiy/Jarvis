@@ -1,0 +1,13 @@
+{
+  "id": "20251230_143742_108246",
+  "type": "project_long_term",
+  "tags": [
+    "Textual框架",
+    "tui_app",
+    "MountError",
+    "component_lifecycle"
+  ],
+  "content": "Textual TUI 组件挂载时序问题修复方案：\n\n问题：尝试在 ScrollableContainer 被框架挂载之前就向其 mount 子组件会导致 MountError\n\n解决方案：将表单内容的挂载操作从 compose() 阶段延迟到 on_mount() 阶段执行\n\n代码实现模式（src/jarvis/jarvis_config/tui_app.py）：\n- compose(): 返回空的 ScrollableContainer(id=\"form-container\")\n- on_mount(): 使用 query_one(\"#form-container\") 获取已挂载容器，再调用 _populate_form_container() 填充内容\n- _populate_form_container(): 接收已挂载的容器参数，动态挂载所有表单字段\n\n关键点：\n1. query_one() 只能在组件被框架挂载后才能使用\n2. compose() 返回的组件会被框架自动挂载\n3. on_mount() 在所有 compose() 返回的组件挂载完成后被调用\n4. 保持原有功能完整性，不破坏已有的表单构建逻辑",
+  "created_at": "2025-12-30T14:37:42.108278",
+  "updated_at": "2025-12-30T14:37:42.108282"
+}

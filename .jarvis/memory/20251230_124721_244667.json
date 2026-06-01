@@ -1,0 +1,13 @@
+{
+  "id": "20251230_124721_244667",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "error_handling",
+    "config_validation",
+    "handle_interactive_config_option"
+  ],
+  "content": "Jarvis 配置加载的错误处理方案（handle_interactive_config_option 函数）：\n1. 配置字段缺失处理：\n   - 所有字段访问使用 .get() 方法并提供默认值\n   - llm_group 不存在时默认为 \"default\"\n   - llm_groups、llms、ENV 不存在时默认为空字典\n   - platform、model 不存在时默认为空字符串\n   - max_input_token_count 不存在时默认为 128000\n2. LLM 名称获取失败的降级处理：\n   - 优先从 llm_group 的 normal_llm 获取\n   - 如果不存在，使用 llms 字典的第一个键\n3. 多层异常捕获：\n   - 顶层 try-except 捕获所有配置处理异常\n   - 读取文件头部的异常处理（失败时 header 为空字符串）\n   - Schema 路径生成的异常处理（失败时 header 为空字符串）\n   - 默认值剔除的异常处理（失败时静默跳过）",
+  "created_at": "2025-12-30T12:47:21.244694",
+  "updated_at": "2025-12-30T12:47:21.244697"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260119_093139_961817",
+  "type": "project_long_term",
+  "tags": [
+    "session_management",
+    "architecture",
+    "SessionRestorable",
+    "unified_design",
+    "code_agent"
+  ],
+  "content": "会话管理统一架构设计：创建 SessionRestorable 抽象基类，所有需要会话保存和恢复功能的类都继承此类。基类提供统一的 save_session() 和 restore_session() 实现，子类只需实现 _get_session_state()、_set_session_state() 和 _get_session_file_prefix() 三个抽象方法。这种设计遵循单一职责、开闭原则、里氏替换和依赖倒置原则，便于未来扩展其他 Agent 类（如 ChatAgent、TaskAgent）的会话管理功能。",
+  "created_at": "2026-01-19T09:31:39.961848",
+  "updated_at": "2026-01-19T09:31:39.961852"
+}

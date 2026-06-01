@@ -1,0 +1,8 @@
+{
+  "id": "20260104_222900_790877",
+  "type": "project_long_term",
+  "tags": ["jsonlint", "installation", "software_installation"],
+  "content": "用户请求安装jsonlint工具。需要查找jsonlint的安装方式，确认是通过npm安装还是通过压缩包方式安装，然后进行安装并验证。",
+  "created_at": "2026-01-04T22:29:00.790897",
+  "updated_at": "2026-01-04T22:29:00.790900"
+}

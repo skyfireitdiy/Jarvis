@@ -1,0 +1,15 @@
+{
+  "id": "20260201_230619_925275",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "interrupt",
+    "platform",
+    "methodology",
+    "KeyboardInterrupt",
+    "improved"
+  ],
+  "content": "## Bug修复：用户中断后方法论加载失败（改进版）\n\n**问题现象**：用户按 Ctrl+C 中断后，再次执行任务时，方法论加载失败，日志显示\"❌ 加载方法论失败: 返回结果为空\"\n\n**根本原因**：\n1. 用户按 Ctrl+C 时，全局中断标志 `g_interrupt` 被递增\n2. 创建新平台实例并调用 LLM 时，这个中断标志没有被清除\n3. 新平台的 `_chat()` 方法检测到 `get_interrupt()` 为 True，立即返回空字符串\n4. `chat_until_success()` 检测到空结果，抛出 `ValueError(\"返回结果为空\")`\n\n**最终修复方案（方案B - 更优）**：\n在 `BasePlatform.chat_until_success()` 方法开始时添加 `set_interrupt(False)`，确保每次新的对话都从干净的状态开始。\n\n**为什么在 `chat_until_success()` 中比在 `__init__()` 中更好**：\n1. **语义更清晰**：每次新的对话都应该清除之前的中断状态\n2. **不受实例管理影响**：无论实例是否被缓存/复用都能正确工作\n3. **集中管理**：中断清除逻辑在一个地方，更容易维护\n4. **不影响重试**：因为重试时不会再次进入 `chat_until_success()`\n\n**修改文件**：\n- `src/jarvis/jarvis_platform/base.py`\n  - 第41行：添加 `from jarvis.jarvis_utils.globals import set_interrupt`\n  - 第553行：在 `chat_until_success()` 方法开始处添加 `set_interrupt(False)`\n\n**影响范围**：\n- 所有调用 `chat_until_success()` 的场景都会受益\n- 确保每次新对话都不会受到之前中断的影响\n\n**修复时间**：2025年\n**Commit ID**：b540822",
+  "created_at": "2026-02-01T23:06:19.925314",
+  "updated_at": "2026-02-01T23:06:19.925319"
+}

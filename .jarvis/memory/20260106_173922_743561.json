@@ -1,0 +1,14 @@
+{
+  "id": "20260106_173922_743561",
+  "type": "project_long_term",
+  "tags": [
+    "jcad",
+    "multi_line_input",
+    "temporary_file",
+    "requirement_file",
+    "cli"
+  ],
+  "content": "jcad_cli.py 中实现了多行输入处理逻辑：\n1. 当输入包含换行符时，将内容写入临时文件\n2. 使用 _write_task_to_temp_file 函数创建临时文件\n3. run_jca_dispatch 函数中判断参数是否为文件路径，如果是则使用 --requirement-file 参数，否则使用 --requirement 参数\n4. 临时文件使用完后会自动清理，确保不留下垃圾文件\n5. 交互模式和直接模式都支持多行输入处理",
+  "created_at": "2026-01-06T17:39:22.743595",
+  "updated_at": "2026-01-06T17:39:22.743598"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260107_231829_046592",
+  "type": "project_long_term",
+  "tags": ["jarvis", "transpilation", "framework", "architecture"],
+  "content": "Jarvis通用转译框架架构设计：\n1. 框架位于src/jarvis/jarvis_transpilation目录\n2. 包含base.py（抽象基类和协议定义）、config.py（配置管理器）、state.py（状态管理器）、scanner.py（扫描器基类）、transpiler.py（转译器核心）、optimizer.py（优化器基类）和default.py（默认实现类）\n3. 采用抽象基类模式，定义了BaseTranspiler、BaseScanner、BaseOptimizer等抽象类\n4. 提供了可配置的转译流程，支持扫描、转译、优化和验证等步骤\n5. 设计了状态管理机制，支持断点续传功能\n6. 通过TranspilationConfig和ConfigManager进行配置管理\n7. 提供了DefaultTranspiler和TranspilationFramework作为默认实现",
+  "created_at": "2026-01-07T23:18:29.046607",
+  "updated_at": "2026-01-07T23:18:29.046610"
+}

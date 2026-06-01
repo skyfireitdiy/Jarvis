@@ -1,0 +1,8 @@
+{
+  "id": "20260111_125007_918348",
+  "type": "project_long_term",
+  "tags": ["code_agent", "refactoring", "__init__", "最佳实践"],
+  "content": "CodeAgent.__init__重构方案：将初始化逻辑提取为6个私有方法提高可读性\n\n重构方案：\n1. _init_basic_attributes: 初始化基本属性（root_dir, tool_group, disable_review, review_max_iterations, start_commit）\n2. _init_managers: 初始化所有管理器（context_manager, rules_manager, git_manager等）\n3. _init_tools: 准备工具列表（base_tools, append_tools处理, 去重逻辑）\n4. _prepare_parent_init_params: 准备父类初始化参数（system_prompt, use_methodology等）\n5. _init_context_recommender: 初始化上下文推荐器（需要在父类初始化后执行）\n6. _subscribe_events: 订阅事件\n\n重构步骤：\n1. 添加所有私有方法\n2. 重构__init__方法调用私有方法\n3. 添加清晰的分组注释\n4. 验证功能完整性\n\n重构文件：src/jarvis/jarvis_code_agent/code_agent.py",
+  "created_at": "2026-01-11T12:50:07.918376",
+  "updated_at": "2026-01-11T12:50:07.918379"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "20250806_173755_590198",
+  "type": "project_long_term",
+  "tags": [
+    "installation",
+    "documentation"
+  ],
+  "content": "Jarvis项目提供了多种安装方式：\n1. 一键安装脚本(推荐)\n2. 手动安装(源码/PyPI)\n3. 通过uv安装(推荐)\n\n关键点：\n- 使用`-e .`可编辑模式安装便于开发\n- uv安装需要先安装uv工具\n- 安装后建议将虚拟环境激活命令添加到shell配置文件\n",
+  "created_at": "2025-08-06T17:37:55.590224",
+  "updated_at": "2025-08-06T17:37:55.590229"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260205_144445_361487",
+  "type": "project_long_term",
+  "tags": ["refactoring", "session_management", "文件组织", "目录结构"],
+  "content": "重构：将会话文件移至独立子目录\n\n需求背景：\n将会话文件从 .jarvis/ 根目录移到 .jarvis/sessions/ 子目录，实现更好的文件组织结构。\n\n修改内容：\n1. session_manager.py（2处）：\n   - _list_session_files() 方法中的 session_dir\n   - save_session() 方法中的 session_dir\n\n2. __init__.py（4处）：\n   - _save_task_lists() 方法中的 session_dir\n   - save_session() 方法中保存commit信息时的 session_dir\n   - restore_session() 方法中恢复commit信息时的 session_dir\n   - _restore_task_lists() 方法中的 session_dir\n\n修改方案：\n将所有 `session_dir = os.path.join(os.getcwd(), \".jarvis\")` 替换为\n`session_dir = os.path.join(os.getcwd(), \".jarvis\", \"sessions\")`\n\n影响范围：\n- 修改文件：src/jarvis/jarvis_agent/session_manager.py、src/jarvis/jarvis_agent/__init__.py\n- 影响功能：会话保存、会话恢复、commit信息保存/恢复、tasklist保存/恢复\n\n目录结构变化：\n旧：.jarvis/saved_session_*.json\n新：.jarvis/sessions/saved_session_*.json\n\n验收标准：\n✅ Python语法检查通过\n✅ 所有6处session_dir均已修改\n✅ 会话文件将保存到 .jarvis/sessions/ 目录\n\n修复日期：2026-02-05",
+  "created_at": "2026-02-05T14:44:45.361516",
+  "updated_at": "2026-02-05T14:44:45.361521"
+}

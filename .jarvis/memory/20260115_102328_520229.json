@@ -1,0 +1,14 @@
+{
+  "id": "20260115_102328_520229",
+  "type": "project_long_term",
+  "tags": [
+    "jvsd",
+    "tmux",
+    "bug",
+    "dispatch",
+    "panel"
+  ],
+  "content": "jvsd命令多创建panel的问题：jvsd_cli.py在构造jvs命令时使用了-d参数，导致jvs启动后再次触发dispatch_to_tmux_window，创建了第二个panel。修复方案是在jvsd_cli.py中移除-d参数，因为jvsd已经通过dispatch_command_to_panel创建了panel，不需要jvs再次dispatch。",
+  "created_at": "2026-01-15T10:23:28.520252",
+  "updated_at": "2026-01-15T10:23:28.520255"
+}

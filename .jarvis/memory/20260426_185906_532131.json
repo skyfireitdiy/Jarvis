@@ -1,0 +1,12 @@
+{
+  "id": "20260426_185906_532131",
+  "type": "project_long_term",
+  "tags": [
+    "aarch64依赖制作",
+    "deps",
+    "完成"
+  ],
+  "content": "## aarch64依赖包制作完成\n\n### 完成时间\n2025-04-26 18:37\n\n### 目录位置\nsrc/jarvis/jarvis_data/deps/aarch64_linux/\n\n### 包含工具\n- fd 10.4.2\n- fzf 0.56.3 (静态链接)\n- rg 14.1.1 (ripgrep)\n- tmux 2.8\n- uv 0.11.7\n- loc 0.5.0\n\n### 技术方案\n使用wrapper script方式，通过ld-linux-aarch64.so.1动态链接器加载程序\n\n### 依赖库\nld-linux-aarch64.so.1, libc.so.6, libdl.so.2, libevent-2.1.so.6, libgcc_s.so.1, libm.so.6, libpthread.so.0, libresolv.so.2, libtinfo.so.6, libutempter.so.0, libutil.so.1",
+  "created_at": "2026-04-26T18:59:06.532190",
+  "updated_at": "2026-04-26T18:59:06.532199"
+}

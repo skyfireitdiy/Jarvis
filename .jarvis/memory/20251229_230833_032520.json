@@ -1,0 +1,8 @@
+{
+  "id": "20251229_230833_032520",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "tui_app", "textual", "schema_form_app"],
+  "content": "jarvis_config 模块 TUI 应用实现：\n- 位置：/home/skyfire/code/Jarvis/src/jarvis/jarvis_config/tui_app.py\n- 核心类：SchemaFormApp 继承自 Textual App\n- 主要功能：动态生成表单界面、支持嵌套对象层级显示、滚动浏览、实时验证、提交前验证、错误提示显示\n- 关键方法：\n  * _build_form(): 构建表单界面\n  * _build_object_form(): 构建对象类型表单，支持嵌套\n  * _validate_and_collect(): 验证表单并收集数据\n  * _show_errors(): 显示错误信息\n- 组件：NestedObjectContainer 用于嵌套对象层级显示\n- 验证：10个测试场景全部通过（基础字段、嵌套对象、数组、枚举、必填验证、类型验证、取消功能、默认值、滚动、错误提示）",
+  "created_at": "2025-12-29T23:08:33.032536",
+  "updated_at": "2025-12-29T23:08:33.032538"
+}

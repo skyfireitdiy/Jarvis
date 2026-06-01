@@ -1,0 +1,13 @@
+{
+  "id": "20260130_234732_375445",
+  "type": "project_long_term",
+  "tags": [
+    "inline_function",
+    "refactoring",
+    "implementation",
+    "jarvis_auto_fix"
+  ],
+  "content": "InlineFunctionRefactorer实现完成：605行代码，88%测试覆盖率，24个测试用例全部通过。核心功能：1)使用AST分析函数安全性（SideEffectChecker检测副作用、递归、多返回值）2)CallSiteFinder查找所有调用点 3)IdentifierReplacer处理参数替换 4)与FixHistory集成支持回滚。安全约束：禁止内联有副作用、递归、默认参数、*args/**kwargs的函数。",
+  "created_at": "2026-01-30T23:47:32.375466",
+  "updated_at": "2026-01-30T23:47:32.375469"
+}

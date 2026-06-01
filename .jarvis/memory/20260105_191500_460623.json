@@ -1,0 +1,13 @@
+{
+  "id": "20260105_191500_460623",
+  "type": "project_long_term",
+  "tags": [
+    "worktree",
+    "merge_back",
+    "git",
+    "fix"
+  ],
+  "content": "worktree_manager.py 中的 merge_back 方法修复了 worktree 合并失败的问题。主要修改包括：1. 添加了主仓库状态检查，确保主仓库是干净的。2. 移除了在主仓库中切换分支的代码（避免 'branch already checked out' 错误），因为 worktree 分支已经在 worktree 路径中检出。3. 调整了 rebase 操作直接在 worktree_path 中执行。4. 简化了异常处理和恢复逻辑。这些修改解决了 'fatal: branch is already checked out' 的错误，因为在 worktree 中的分支不应该在主仓库中进行切换操作。",
+  "created_at": "2026-01-05T19:15:00.460654",
+  "updated_at": "2026-01-05T19:15:00.460659"
+}

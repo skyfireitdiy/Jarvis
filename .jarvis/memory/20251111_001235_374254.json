@@ -1,0 +1,8 @@
+{
+  "id": "20251111_001235_374254",
+  "type": "project_long_term",
+  "tags": ["git-workflow", "release-automation", "jarvis-agent"],
+  "content": "Jarvis项目Git工作流程规范：\n1. 提交前检查：使用`git status --porcelain`检查未提交代码\n2. 自动提交：使用`jgc`命令自动提交变更，无需参数\n3. 版本管理：使用`git describe --tags --abbrev=0`获取最新tag\n4. 变更分析：使用`git diff <tag>..HEAD | cat -`获取代码修改详情\n5. Release Note生成：基于git diff结果分类生成release note\n\n最新发现的问题修复：\n- 问题：子Agent自动完成模式可能无法正确启用\n- 解决方案：在TaskPlanner中增加双重保障机制\n  * 初始化时设置child_kwargs[\"auto_complete\"] = True\n  * 创建后再次显式设置child.auto_complete = True\n- 文件位置：src/jarvis/jarvis_agent/task_planner.py\n\n版本信息：\n- 当前最新tag：v0.7.1\n- 下一版本建议：v0.7.2\n- jgc工具版本：v0.7.1\n",
+  "created_at": "2025-11-11T00:12:35.374268",
+  "updated_at": "2025-11-11T00:12:35.374270"
+}

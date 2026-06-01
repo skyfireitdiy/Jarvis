@@ -1,0 +1,13 @@
+{
+  "id": "20260106_190836_355445",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_project",
+    "code_formatting",
+    "print_statements",
+    "newline_removal"
+  ],
+  "content": "在Jarvis项目中，需要移除打印语句中字符串开头的换行符(\\n)，以规范化输出格式。涉及的打印函数包括：print(), rprint(), console.print(), PrettyOutput.print(), PrettyOutput.auto_print()。修改规则：只删除字符串开头的 \\n，保持字符串中间和末尾的 \\n 不变。验证标准：使用 grep 或 rg 验证不再存在打印语句中字符串以 \\n 开头的情况。",
+  "created_at": "2026-01-06T19:08:36.355506",
+  "updated_at": "2026-01-06T19:08:36.355510"
+}

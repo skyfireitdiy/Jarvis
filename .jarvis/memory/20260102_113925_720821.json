@@ -1,0 +1,15 @@
+{
+  "id": "20260102_113925_720821",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "rag_config",
+    "configuration_management",
+    "embeddings",
+    "rerankers",
+    "rag_groups"
+  ],
+  "content": "Jarvis项目的RAG配置同步规则：\n1. rag_groups中不再支持直接定义embedding_model、embedding_type等参数\n2. 必须通过引用embeddings/rerankers中定义的配置\n3. config.py包含完整的RAG配置处理函数，包括_resolve_embedding_reference、_resolve_reranker_reference、_expand_rag_references等\n4. config_schema.json中定义了embeddings、rerankers、rag_groups的完整schema\n5. 9.附录.md文档中包含了rag配置项的详细说明和使用示例",
+  "created_at": "2026-01-02T11:39:25.720868",
+  "updated_at": "2026-01-02T11:39:25.720872"
+}

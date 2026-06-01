@@ -1,0 +1,14 @@
+{
+  "id": "20260201_230407_046232",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "interrupt",
+    "platform",
+    "methodology",
+    "KeyboardInterrupt"
+  ],
+  "content": "## Bug修复：用户中断后方法论加载失败\n\n**问题现象**：用户按 Ctrl+C 中断后，再次执行任务时，方法论加载失败，日志显示\"❌ 加载方法论失败: 返回结果为空\"\n\n**根本原因**：\n1. 用户按 Ctrl+C 时，全局中断标志 `g_interrupt` 被递增\n2. 创建新平台实例时，这个中断标志没有被清除\n3. 新平台的 `_chat()` 方法检测到 `get_interrupt()` 为 True，立即返回空字符串\n4. `chat_until_success()` 检测到空结果，抛出 `ValueError(\"返回结果为空\")`\n\n**修复方案**：\n在 `BasePlatform.__init__()` 方法中添加 `set_interrupt(False)`，确保每次创建新平台实例时都清除中断标志，以干净的状态开始。\n\n**修改文件**：\n- `src/jarvis/jarvis_platform/base.py`\n  - 第41行：添加 `from jarvis.jarvis_utils.globals import set_interrupt`\n  - 第86行：在 `__init__` 方法末尾添加 `set_interrupt(False)`\n\n**影响范围**：\n- 所有创建新平台实例的场景都会受益\n- 不影响正在运行的对话（因为只在初始化时清除）\n- 确保新平台实例不会受到之前中断的影响\n\n**修复时间**：2025年",
+  "created_at": "2026-02-01T23:04:07.046272",
+  "updated_at": "2026-02-01T23:04:07.046277"
+}

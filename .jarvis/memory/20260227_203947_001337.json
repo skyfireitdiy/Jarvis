@@ -1,0 +1,8 @@
+{
+  "id": "20260227_203947_001337",
+  "type": "project_long_term",
+  "tags": ["session_manager", "short_term_memory", "功能开发"],
+  "content": "已完成session_manager的短期记忆保存恢复功能：\n1. 在_save_agent_state方法中，通过get_short_term_memories()获取所有短期记忆\n2. 将短期记忆保存到state_data[\"short_term_memories\"]字段\n3. 在_restore_agent_state方法中，从state文件读取短期记忆并通过add_short_term_memory()恢复\n4. 修改使用try-except包装，失败不影响主流程\n5. 添加了相应的日志输出（💾保存、💾恢复）",
+  "created_at": "2026-02-27T20:39:47.001373",
+  "updated_at": "2026-02-27T20:39:47.001377"
+}

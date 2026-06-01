@@ -1,0 +1,13 @@
+{
+  "id": "20260106_174556_993063",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "interrupt_handling",
+    "review_skip",
+    "non_interactive_mode"
+  ],
+  "content": "在CodeAgent中添加了_interrupted_exit标志来处理Ctrl+C中断退出时跳过code review的逻辑：\n1. 在__init__方法中初始化self._interrupted_exit = False\n2. 在run方法的RuntimeError异常处理中设置self._interrupted_exit = True\n3. 在_review_and_fix方法开头检查该标志，如果为True则跳过review\n该修改保持了交互模式下仍跳过review的原有行为（not self.non_interactive）",
+  "created_at": "2026-01-06T17:45:56.993105",
+  "updated_at": "2026-01-06T17:45:56.993110"
+}

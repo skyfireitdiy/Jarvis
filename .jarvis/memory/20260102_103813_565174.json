@@ -1,0 +1,8 @@
+{
+  "id": "20260102_103813_565174",
+  "type": "project_long_term",
+  "tags": ["parallel_execution", "task_list_manager", "result_collection"],
+  "content": "在task_list_manager.py的_execute_parallel_tasks方法中实现了并行任务结果收集机制。关键实现包括：1) 使用final_results列表收集所有并行任务结果；2) 遍历parallel_tasks中的每个任务，获取任务详情并存储到结果列表；3) 每个结果包含task_id、task_name、status和actual_output字段，确保结果与任务正确关联；4) 返回统一格式的汇总结果，包含success标志、stdout（含汇总信息和结果列表）和stderr。",
+  "created_at": "2026-01-02T10:38:13.565194",
+  "updated_at": "2026-01-02T10:38:13.565196"
+}

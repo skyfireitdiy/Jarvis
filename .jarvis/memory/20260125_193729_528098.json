@@ -1,0 +1,14 @@
+{
+  "id": "20260125_193729_528098",
+  "type": "project_long_term",
+  "tags": [
+    "print_markdown",
+    "markdown高亮",
+    "PrettyOutput",
+    "Panel输出",
+    "代码改进"
+  ],
+  "content": "已完成：在PrettyOutput类中新增print_markdown接口，支持带边框的markdown高亮输出\n\n新增方法：\n- PrettyOutput.print_markdown(content, title, border_style, theme)\n\n修改文件：\n- src/jarvis/jarvis_agent/run_loop.py (LLM响应)\n- src/jarvis/jarvis_agent/__init__.py (对话总结、压缩摘要、任务总结)\n- src/jarvis/jarvis_platform_manager/main.py (平台响应)\n\n特点：\n- 使用Syntax对象实现markdown语法高亮\n- 使用Panel保留边框和标题\n- 支持自定义border_style和theme\n- 统一了项目中的Panel markdown输出方式",
+  "created_at": "2026-01-25T19:37:29.528122",
+  "updated_at": "2026-01-25T19:37:29.528127"
+}

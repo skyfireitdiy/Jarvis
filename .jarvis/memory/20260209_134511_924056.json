@@ -1,0 +1,8 @@
+{
+  "id": "20260209_134511_924056",
+  "type": "project_long_term",
+  "tags": ["ListRule", "规则管理", "排序优化"],
+  "content": "## ListRule 排序优化\n\n**需求**：在 `<ListRule>` 命令的输出中，已激活的规则显示在最底部，未激活的规则按目录排序。\n\n**实现**：修改 `src/jarvis/jarvis_agent/rules_manager.py` 的 `get_all_rules_with_status()` 方法，在返回 `rules_info` 之前添加排序逻辑：\n\n```python\n# 排序：已激活的规则放在最底部，未激活的规则按目录排序\n# 使用 (is_loaded, rule_name) 作为排序键，确保 False(未激活) 在前，True(已激活) 在后\nrules_info.sort(key=lambda x: (x[2], x[0]))\n```\n\n**效果**：\n- 未激活的规则（is_loaded=False）显示在前，按规则名称字典序排序\n- 已激活的规则（is_loaded=True）显示在后，按规则名称字典序排序\n- 规则名称包含路径信息（如 `project:deployment/version_release.md`），字典序即实现了按目录排序\n\n**Commit**: c9e6856",
+  "created_at": "2026-02-09T13:45:11.924079",
+  "updated_at": "2026-02-09T13:45:11.924083"
+}

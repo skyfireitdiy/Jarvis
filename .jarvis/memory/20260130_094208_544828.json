@@ -1,0 +1,13 @@
+{
+  "id": "20260130_094208_544828",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "import",
+    "module",
+    "best_practice"
+  ],
+  "content": "【Jarvis项目导入路径规范】\n- 获取数据目录：from jarvis.jarvis_utils.config import get_data_dir\n- get_jarvis_data_dir()函数不存在，应使用get_data_dir()\n- 所有工具模块导入应使用标准路径模式",
+  "created_at": "2026-01-30T09:42:08.544855",
+  "updated_at": "2026-01-30T09:42:08.544860"
+}

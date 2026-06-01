@@ -1,0 +1,8 @@
+{
+  "id": "20260102_103813_566473",
+  "type": "project_long_term",
+  "tags": ["parallel_execution", "result_format"],
+  "content": "并行任务执行结果的返回格式：{success: bool, stdout: json字符串包含message、total_tasks、completed_count、failed_count和results列表, stderr: 错误信息字符串}。这种格式便于后续处理并行任务的执行结果。",
+  "created_at": "2026-01-02T10:38:13.566492",
+  "updated_at": "2026-01-02T10:38:13.566495"
+}

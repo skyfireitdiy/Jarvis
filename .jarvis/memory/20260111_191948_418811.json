@@ -1,0 +1,14 @@
+{
+  "id": "20260111_191948_418811",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_commands",
+    "entry_points",
+    "setup.py",
+    "jqc",
+    "jarvis-quick-config"
+  ],
+  "content": "jarvis项目的命令行工具在setup.py中通过console_scripts条目点注册，其中jqc是jarvis-quick-config的简写：\n\"jarvis-quick-config=jarvis.jarvis_utils.quick_config:app\",\n\"jqc=jarvis.jarvis_utils.quick_config:app\",",
+  "created_at": "2026-01-11T19:19:48.418828",
+  "updated_at": "2026-01-11T19:19:48.418830"
+}

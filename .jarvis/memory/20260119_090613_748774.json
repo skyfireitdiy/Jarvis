@@ -1,0 +1,13 @@
+{
+  "id": "20260119_090613_748774",
+  "type": "project_long_term",
+  "tags": [
+    "output",
+    "color_config",
+    "ui",
+    "jarvis"
+  ],
+  "content": "Jarvis 输出颜色配置优化：\n- 高优先级（ERROR/SUCCESS/WARNING/START/TARGET/STOP）使用 bright_ 前缀鲜艳颜色 + bold/blink 特效\n- 中优先级（SYSTEM/CODE/RESULT/USER/TOOL/PLANNING/DIRECTORY/NORMAL_MODEL/SMART_MODEL）使用标准颜色\n- 低优先级（DEBUG/PROGRESS/INFO/STATISTICS/RETRY/ROLLBACK/CHEAP_MODEL）使用 grey30/grey50/grey58/grey70 灰色系\n- 配置位置：src/jarvis/jarvis_utils/output.py 的 style_config（182-305行）和 text_colors（322-345行）",
+  "created_at": "2026-01-19T09:06:13.748813",
+  "updated_at": "2026-01-19T09:06:13.748817"
+}

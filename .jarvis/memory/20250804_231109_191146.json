@@ -1,0 +1,13 @@
+{
+  "id": "20250804_231109_191146",
+  "type": "project_long_term",
+  "tags": [
+    "documentation",
+    "jarvis_book",
+    "technical_documentation",
+    "doc_structure"
+  ],
+  "content": "Jarvis项目文档结构：\n- docs/jarvis_book/ 是主要的用户文档目录，包含9个章节\n- docs/technical_documentation.md 是技术文档，已合并到jarvis_book\n\n文档章节对应关系：\n1. 项目介绍.md - 包含设计哲学、Vibe Working、系统架构\n2. 快速开始.md - 安装和基础配置\n3. 核心概念与架构.md - 包含核心组件详解（Agent、ToolRegistry、PlatformRegistry）\n4. 使用指南.md - 包含首次运行配置、通用交互技巧、各工具使用说明\n5. 功能扩展.md - 包含工具开发、平台扩展、开发环境设置、贡献指南\n6. 高级主题.md - 包含配置系统、数据流、MCP协议、RAG实现、方法论系统\n7. 参与贡献.md - 贡献流程\n8. 常见问题.md - FAQ\n9. 附录.md - 配置项列表等\n",
+  "created_at": "2025-08-04T23:11:09.191177",
+  "updated_at": "2025-08-04T23:11:09.191182"
+}

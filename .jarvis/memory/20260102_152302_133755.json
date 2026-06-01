@@ -1,0 +1,8 @@
+{
+  "id": "20260102_152302_133755",
+  "type": "project_long_term",
+  "tags": ["jarvis", "task_list_manager", "git_utils", "verification"],
+  "content": "task_list_manager.py文件中添加了git提交哈希记录和diff计算功能，用于在任务验证过程中提供代码变更diff信息。通过get_latest_commit_hash和get_diff_between_commits函数记录任务执行前后的代码变更，并将diff信息添加到验证背景中。",
+  "created_at": "2026-01-02T15:23:02.133771",
+  "updated_at": "2026-01-02T15:23:02.133774"
+}

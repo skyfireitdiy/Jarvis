@@ -1,0 +1,13 @@
+{
+  "id": "20260102_153029_958738",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "task_list_manager",
+    "remaining_tokens",
+    "context_window"
+  ],
+  "content": "task_list_manager中的_get_max_output_length方法优先使用agent模型的剩余token数量来计算最大输出长度，通过agent.model.get_remaining_token_count()获取剩余token，使用剩余token的2/3作为限制，保留1/3作为安全余量。如果获取失败，则回退到使用全局模型组的输入窗口大小。",
+  "created_at": "2026-01-02T15:30:29.958754",
+  "updated_at": "2026-01-02T15:30:29.958756"
+}

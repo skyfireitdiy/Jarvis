@@ -1,0 +1,13 @@
+{
+  "id": "20260114_174057_887418",
+  "type": "project_long_term",
+  "tags": [
+    "init_env",
+    "model_group",
+    "欢迎信息",
+    "参数传递"
+  ],
+  "content": "init_env 函数支持 model_group 参数，用于在欢迎信息中显示正确的模型\n- 函数签名: init_env(welcome_str, config_file=None, model_group=None)\n- 模型组显示逻辑: _show_usage_stats -> get_normal_model_name(model_group_override) -> _get_resolved_model_config(model_group_override)\n- 优先级: model_group_override > GLOBAL_CONFIG_DATA.get('llm_group') > 默认值\n- 修改时间: 2025-01-14",
+  "created_at": "2026-01-14T17:40:57.887446",
+  "updated_at": "2026-01-14T17:40:57.887450"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260110_124800_575870",
+  "type": "project_long_term",
+  "tags": [
+    "llm_config",
+    "config_schema",
+    "文档更新",
+    "9.附录.md"
+  ],
+  "content": "9.附录.md文档已更新，删除了9个已过时的LLM配置参数：max_input_token_count, platform, model, cheap_platform, cheap_model, cheap_max_input_token_count, smart_platform, smart_model, smart_max_input_token_count。这些参数已被新的引用方式替代（通过llms定义和llm_groups中的normal_llm、cheap_llm、smart_llm引用），与config.py和config_schema.json中的实现保持一致。",
+  "created_at": "2026-01-10T12:48:00.575903",
+  "updated_at": "2026-01-10T12:48:00.575907"
+}

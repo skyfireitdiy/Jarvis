@@ -1,0 +1,8 @@
+{
+  "id": "20260201_113928_798767",
+  "type": "project_long_term",
+  "tags": ["digital_twin", "proactive_service", "architecture", "阶段5.3"],
+  "content": "## 主动服务系统架构（阶段5.3）\n\n### 模块位置\n`src/jarvis/jarvis_digital_twin/proactive_service/`\n\n### 核心组件\n\n1. **types.py** - 类型定义\n   - ServiceType（5种服务类型）\n   - ServicePriority（5级优先级）\n   - ServiceStatus（7种状态）\n   - FeedbackType（5种反馈类型）\n   - ServiceDefinition, ServiceResult, ServiceFeedback, TriggerContext\n   - ServiceHandlerProtocol, TriggerEvaluatorProtocol\n\n2. **service_trigger.py** - 服务触发器\n   - ServiceTrigger类\n   - KeywordTriggerEvaluator, PatternTriggerEvaluator, ContextTriggerEvaluator\n   - 冷却期机制、TimingJudge集成\n\n3. **service_orchestrator.py** - 服务编排器\n   - ServiceOrchestrator类\n   - ConflictResolution枚举（5种策略）\n   - ExecutionPlan数据类\n   - NeedInferrer集成\n\n4. **service_executor.py** - 服务执行器\n   - ServiceExecutor类\n   - SuggestionHandler, ReminderHandler, InformationHandler, ClarificationHandler\n\n5. **feedback_learner.py** - 反馈学习器\n   - FeedbackLearner类\n   - ServiceStats, LearningResult数据类\n   - 阈值自动调整\n\n6. **manager.py** - 主动服务管理器\n   - ProactiveServiceManager类\n   - 整合所有组件的统一接口\n   - 已集成到AgentRunLoop\n\n### 集成方式\n- 在AgentRunLoop._init_autonomous_components中初始化\n- 在_preprocess_user_input中调用process_context\n- 通过is_enable_autonomous()配置启用",
+  "created_at": "2026-02-01T11:39:28.798784",
+  "updated_at": "2026-02-01T11:39:28.798787"
+}

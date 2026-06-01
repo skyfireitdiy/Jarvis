@@ -1,0 +1,13 @@
+{
+  "id": "20260310_223126_066858",
+  "type": "project_long_term",
+  "tags": [
+    "web_gateway",
+    "frontend",
+    "multi_terminal",
+    "xterm.js"
+  ],
+  "content": "前端多终端管理已实现：\n\n**核心功能**：\n1. 每次调用 `execute_script` 创建独立终端（通过 `execution_id` 区分）\n2. 动态创建：首次收到 `execution` 事件时创建对应终端\n3. 状态管理：根据 `message_type === 'tool_stream_end'` 禁用终端交互\n4. UI展示：多个终端垂直排列，显示 `execution_id` 和完成状态\n\n**关键实现**：\n- 数据结构：`terminals = ref([{ executionId, terminal, active, hostEl }])`\n- DOM绑定：`setTerminalRef(executionId, el)` 动态绑定终端元素\n- 初始化：在 `appendExecution()` 中 `nextTick()` 后创建 xterm 实例\n\n**验收条件**：\n- 页面加载时不创建终端\n- 收到 `execution` 事件时动态创建\n- 执行完成后显示\"已完成\"并禁用交互\n- 多个终端互不影响",
+  "created_at": "2026-03-10T22:31:26.066902",
+  "updated_at": "2026-03-10T22:31:26.066906"
+}

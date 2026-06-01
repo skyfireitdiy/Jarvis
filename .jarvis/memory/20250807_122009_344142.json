@@ -1,0 +1,14 @@
+{
+  "id": "20250807_122009_344142",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "startup",
+    "ui_convention",
+    "rich",
+    "utils.py"
+  ],
+  "content": "**项目实现：Jarvis启动界面UI结构**\n\nJarvis的启动信息展示（包括欢迎语、统计、使命、愿景等）已在 `src/jarvis/jarvis_utils/utils.py` 中被重构。\n\n**核心结构**:\n1.  **统一渲染函数**: 所有启动UI元素都在 `_show_usage_stats(welcome_str: str)` 函数中进行统一布局和渲染。原有的 `_show_welcome_message` 函数已被移除。\n2.  **整体封装**: 整个启动信息被封装在一个最外层的 `Panel` 中，该 `Panel` 提供了统一的边框和标题 (\"Jarvis Status\")。\n3.  **两栏布局**: 内部使用一个 `Table` 实现左右两栏布局 (`ratio=6:4`)，该布局填充整个外部 `Panel`。\n    - **左栏**: 显示详细的统计信息 `Table`。\n    - **右栏**: 使用 `Group` 垂直排列多个 `Panel`，包括欢迎信息、总体表现、愿景和使命。\n4.  **样式约定**: 右栏的所有 `Panel` 均设置了 `expand=True`，以确保宽度一致，实现美观对齐。\n",
+  "created_at": "2025-08-07T12:20:09.344177",
+  "updated_at": "2025-08-07T12:20:09.344185"
+}

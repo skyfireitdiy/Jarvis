@@ -1,0 +1,15 @@
+{
+  "id": "20260212_134844_878051",
+  "type": "project_long_term",
+  "tags": [
+    "架构优化",
+    "代码重构",
+    "模块职责",
+    "switch_model_group",
+    "builtin_input_handler",
+    "input.py"
+  ],
+  "content": "## switch_model_group 函数重构\n\n**问题**：switch_model_group 等模型组相关函数定义在 input.py 中不合理\n- input.py 是输入处理工具模块，应专注于输入处理（单行输入、多行输入、补全等）\n- switch_model_group 是业务逻辑，应该在业务逻辑模块中\n\n**解决方案**：将5个模型组相关函数从 input.py 移动到 builtin_input_handler.py\n- get_platform_type_from_agent\n- list_model_groups\n- check_context_limit\n- perform_switch\n- switch_model_group\n\n**涉及文件**：\n- src/jarvis/jarvis_agent/builtin_input_handler.py（新增函数）\n- src/jarvis/jarvis_utils/input.py（删除函数）\n\n**提交记录**：\n- f509f59: 添加函数到 builtin_input_handler.py\n- fa013dc: 从 input.py 删除函数\n- fec86d0: 更新导入语句\n\n**架构原则**：\n- input.py：输入处理工具（单行输入、多行输入、补全、user_confirm等）\n- builtin_input_handler.py：业务逻辑和内置命令处理（SwitchModel、Commit等）",
+  "created_at": "2026-02-12T13:48:44.878085",
+  "updated_at": "2026-02-12T13:48:44.878090"
+}

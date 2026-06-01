@@ -1,0 +1,15 @@
+{
+  "id": "20260204_142529_320960",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "Rich Text",
+    "IndexError",
+    "jarvis_platform",
+    "流式输出",
+    "滚动逻辑"
+  ],
+  "content": "## Bug修复：Rich Text IndexError in _chat_with_pretty_output\n\n**文件**: src/jarvis/jarvis_platform/base.py\n**方法**: _chat_with_pretty_output > _update_panel_content\n**修复日期**: 2025-02-04\n\n### 问题描述\n当流式输出内容超过终端高度时，触发滚动逻辑后继续append新内容会导致`IndexError: list index out of range`。\n\n### 根本原因\n直接修改`text_content.plain`属性导致Rich Text对象的内部spans列表（记录文本样式范围）与实际文本内容不同步。后续调用`text_content.append()`时，新的span索引基于旧的spans列表，导致索引越界。\n\n### 修复方案\n**原代码（第328-330行）**:\n```python\nif len(lines) > max_text_height:\n    text_content.plain = \"\\n\".join(\n        [line.plain for line in lines[-max_text_height:]]\n    )\n```\n\n**修复后**:\n```python\nif len(lines) > max_text_height:\n    # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致\n    # 这确保了Rich内部spans列表与文本内容保持同步\n    new_text = Text(\"\\n\".join(\n        [line.plain for line in lines[-max_text_height:]]\n    ), overflow=\"fold\")\n    text_content = new_text\n    panel.renderable = text_content\n```\n\n### 关键改动\n1. 在`_update_panel_content`函数的`nonlocal`声明中添加`text_content`\n2. 创建新的Text对象替代直接修改plain属性\n3. 更新Panel的renderable属性以引用新的Text对象\n\n### 验证结果\n- ✓ 语法检查通过\n- ✓ 模拟测试通过（多次滚动和添加内容均无IndexError）\n- ✓ 不影响其他输出模式（simple、suppressed）\n\n### 经验总结\n**教训**: Rich Text对象内部维护了spans列表来跟踪样式范围，直接修改plain属性会破坏内部状态一致性。正确做法是创建新的Text对象或使用Rich提供的API进行修改。\n\n**适用场景**: 任何需要修改Rich Text对象内容的场景都应避免直接修改plain属性。",
+  "created_at": "2026-02-04T14:25:29.320996",
+  "updated_at": "2026-02-04T14:25:29.321000"
+}

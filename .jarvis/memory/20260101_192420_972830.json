@@ -1,0 +1,8 @@
+{
+  "id": "20260101_192420_972830",
+  "type": "project_long_term",
+  "tags": ["代码规范", "subprocess"],
+  "content": "项目中 subprocess.run 的标准使用规范：1) 移除 text=True 参数 2) 移除 encoding 和 errors 参数 3) 设置 capture_output=True 4) 使用 decode_output(result.stdout) 和 decode_output(result.stderr) 处理输出。已验证的调用位置包括：_check_pip_updates (478行)、get_loc_stats (2362行)、_pull_git_repo (2378,2389,2401,2424,2434,2446,2455行)。",
+  "created_at": "2026-01-01T19:24:20.972843",
+  "updated_at": "2026-01-01T19:24:20.972845"
+}

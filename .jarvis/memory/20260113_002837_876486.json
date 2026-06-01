@@ -1,0 +1,15 @@
+{
+  "id": "20260113_002837_876486",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "refactoring",
+    "render_rule_template",
+    "jinja2",
+    "template_utils",
+    "module-structure"
+  ],
+  "content": "项目架构重构：render_rule_template 函数已从 builtin_rules.py 提取到公共模块 jarvis_utils/template_utils.py。该函数支持 jinja2 模板渲染，内置变量包括：current_dir, git_root_dir, jarvis_data_dir, jarvis_src_dir, rule_file_dir, script_dir。所有调用处（code_agent_rules.py, builtin_rules.py, load_rule.py）都已更新为从新模块导入。这是一个重要的架构优化点，提高了代码复用性。",
+  "created_at": "2026-01-13T00:28:37.876525",
+  "updated_at": "2026-01-13T00:28:37.876531"
+}

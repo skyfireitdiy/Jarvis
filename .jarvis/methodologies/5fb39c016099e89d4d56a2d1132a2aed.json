@@ -1,0 +1,5 @@
+{
+  "problem_type": "为CodeAgent添加工具",
+  "content": "## 问题重述\n为CodeAgent添加新的工具，使其在执行代码修改任务时可以使用该工具。\n\n## 解决流程\n1. **确认工具实现**：确保要添加的工具已在jarvis_tools中实现，名称正确\n2. **定位工具列表**：打开 src/jarvis/jarvis_code_agent/code_agent.py，找到 _build_code_agent_tool_list 方法（约第173行）\n3. **添加工具名称**：\n   - 在 base_tools 列表中添加工具名称字符串\n   - 按字母顺序排列，保持列表有序\n   - 添加简洁的工具注释，格式：`\"tool_name\",  # 工具描述`\n4. **验证修改**：确认工具已正确添加，代码风格与现有代码一致\n\n## 注意事项\n- 只需添加工具名称字符串，无需导入或注册其他内容\n- 工具由父类Agent统一管理，通过名称字符串识别\n- 保持代码风格一致性，使用相同的缩进和注释格式\n- 如果工具是条件启用的（如task_list_manager），参考现有条件判断逻辑\n\n## 示例\n```python\nbase_tools = [\n    \"execute_script\",  # 脚本执行工具\n    \"read_code\",  # 代码读取工具\n    \"edit_file\",  # 普通 search/replace 编辑工具\n    \"load_rule\",  # 规则加载工具  # 新添加\n    \"virtual_tty\",  # 虚拟终端工具，支持交互式操作\n    ...\n]\n```",
+  "scope": "project"
+}

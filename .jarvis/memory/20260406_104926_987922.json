@@ -1,0 +1,13 @@
+{
+  "id": "20260406_104926_987922",
+  "type": "project_long_term",
+  "tags": [
+    "glm4.7",
+    "reasoning_content",
+    "openai.py",
+    "修复"
+  ],
+  "content": "修复了 GLM 模型返回空响应的问题。根本原因：代码只处理 content 字段，没有处理 reasoning_content 字段。修复方案：在 openai.py 的 chat 方法中，流式模式同时处理 choice.delta.reasoning_content 和 choice.delta.content；非流式模式拼接 message.reasoning_content 和 message.content；回退处理同样处理两个字段。修改文件：src/jarvis/jarvis_platform/openai.py。",
+  "created_at": "2026-04-06T10:49:26.987939",
+  "updated_at": "2026-04-06T10:49:26.987942"
+}

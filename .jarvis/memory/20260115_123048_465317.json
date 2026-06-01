@@ -1,0 +1,12 @@
+{
+  "id": "20260115_123048_465317",
+  "type": "project_long_term",
+  "tags": [
+    "token",
+    "output",
+    "base.py"
+  ],
+  "content": "模型响应完成的token比例显示位置：src/jarvis/jarvis_platform/base.py的_chat方法中（约第417-430行）。通过调用_get_token_usage_info(response)获取usage_percent、percent_color、progress_bar三个参数，使用PrettyOutput.auto_print输出格式化的token使用信息，包括进度条、百分比和具体数值。相关方法：_get_platform_max_input_token_count()获取最大token限制，get_used_token_count()获取历史token数，get_context_token_count()计算当前响应token数。",
+  "created_at": "2026-01-15T12:30:48.465342",
+  "updated_at": "2026-01-15T12:30:48.465346"
+}

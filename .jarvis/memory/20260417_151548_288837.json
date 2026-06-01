@@ -1,0 +1,8 @@
+{
+  "id": "20260417_151548_288837",
+  "type": "project_long_term",
+  "tags": ["git", "线程安全", "工作目录", "修复"],
+  "content": "修复了git自动更新处理中的线程安全问题：\n1. 问题：后台线程执行git更新命令时使用os.chdir切换工作目录，影响主流程工作目录\n2. 解决方案：\n   - 创建find_git_root函数，使用cwd参数不切换工作目录\n   - 修改has_uncommitted_changes函数，添加cwd参数\n   - 修改check_and_update_git_repo_background和check_and_update_git_repo函数，使用find_git_root替代find_git_root_and_cd\n   - 移除finally块中的os.chdir(curr_dir)调用，添加pass语句\n3. 关键文件：src/jarvis/jarvis_utils/git_utils.py\n4. 初始commit：62ea6de31a29e70673ee58cb64ef6fcbf9918e95\n5. 验证：ruff和mypy静态检查全部通过",
+  "created_at": "2026-04-17T15:15:48.288897",
+  "updated_at": "2026-04-17T15:15:48.288905"
+}

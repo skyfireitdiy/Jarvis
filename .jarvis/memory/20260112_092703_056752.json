@@ -1,0 +1,13 @@
+{
+  "id": "20260112_092703_056752",
+  "type": "project_long_term",
+  "tags": [
+    "rules",
+    "loading",
+    "priority",
+    "RulesManager"
+  ],
+  "content": "JARVIS 规则加载机制：规则可以从多个位置加载，包括中心规则仓库（通过 central_rules_repo 配置）、项目规则目录（.jarvis/rules/）、配置的规则目录（rules_load_dirs）、全局规则目录（~/.jarvis/rules/）、内置规则目录（builtin/rules/ 和 builtin/test_rules/）。指定规则时使用 --rule-names 参数，支持逗号分隔多个规则。系统会按优先级查找规则，同名规则以优先级高的为准。",
+  "created_at": "2026-01-12T09:27:03.056768",
+  "updated_at": "2026-01-12T09:27:03.056771"
+}

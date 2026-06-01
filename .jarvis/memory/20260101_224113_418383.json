@@ -1,0 +1,13 @@
+{
+  "id": "20260101_224113_418383",
+  "type": "project_long_term",
+  "tags": [
+    "web_terminal",
+    "terminal_implementation",
+    "pty_forwarding",
+    "xterm_integration"
+  ],
+  "content": "Web Terminal模块实现：\n\n1. 主要文件结构：\n   - main.py: WebTerminalServer类，处理WebSocket连接和PTY转发\n   - config.py: WebTerminalConfig类，管理配置\n   - quick_start.py: CLI启动脚本\n   - __init__.py: 模块导出\n   - example.py: 使用示例\n\n2. 核心功能：\n   - 前端自动分屏（支持quad/horizontal/vertical布局）\n   - WebSocket与PTY双向转发（stdin/stdout）\n   - 支持终端大小调整\n   - 使用xterm.js前端终端\n   - 跨域安全限制（仅本地访问）\n\n3. 实现方式：\n   - 使用pty.fork()创建伪终端\n   - 通过select同时监听WebSocket和终端FD\n   - 前端使用CSS Flexbox实现分屏布局\n   - 支持多个终端同时运行\n\n4. 启动方式：\n   - CLI: jarvis-web-terminal --host 127.0.0.1 --port 8766 --layout quad --terminal_count 4\n   - 缩写: jwt (也指向同一路由)",
+  "created_at": "2026-01-01T22:41:13.418423",
+  "updated_at": "2026-01-01T22:41:13.418427"
+}

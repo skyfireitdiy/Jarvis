@@ -1,0 +1,8 @@
+{
+  "id": "20260214_105213_321438",
+  "type": "project_long_term",
+  "tags": ["CodeAgent", "规则合并", "配置文件", "任务完成"],
+  "content": "## CodeAgent 默认规则支持完成 (2026-02-14)\n\n**问题**：jca 命令直接创建 CodeAgent 实例，没有使用 AgentManager，导致配置文件中的默认规则不生效。\n\n**解决方案**：在 CodeAgent 中添加规则合并逻辑\n\n**修改内容**：\n- 新增 `_merge_rule_names(cli_rule_names)` 方法\n  - 从配置文件读取默认规则列表\n  - 解析命令行规则（逗号分隔的字符串）\n  - 合并两个列表并去重（保持顺序）\n  - 返回逗号分隔的字符串\n\n- 在 `_prepare_code_agent_parent_init()` 中\n  - 提前提取 kwargs 中的 rule_names\n  - 调用 _merge_rule_names() 合并规则\n  - 将合并后的规则传递给父类\n\n**修改文件**：\n- `src/jarvis/jarvis_code_agent/code_agent.py` (34行新增)\n\n**验收结果**：\n- ✅ Python 语法检查通过\n- ✅ Ruff 静态检查通过\n- ✅ MyPy 类型检查通过\n- ✅ 代码已提交到 Git (29c5367a)\n\n**配置示例**：\n```yaml\ndefault_rule_names:\n  - \"builtin:agent_personality/flirty.md\"\n```\n\n命令行使用：\n```bash\njca --rule-names \"rule1,rule2\"\n```\n\n合并效果：\n- 配置文件: [rule1, rule2]\n- 命令行: rule3,rule4\n- 结果: rule1,rule2,rule3,rule4（去重保序）",
+  "created_at": "2026-02-14T10:52:13.321465",
+  "updated_at": "2026-02-14T10:52:13.321469"
+}

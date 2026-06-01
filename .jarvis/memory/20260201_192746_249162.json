@@ -1,0 +1,8 @@
+{
+  "id": "20260201_192746_249162",
+  "type": "project_long_term",
+  "tags": ["github_pages", "mkdocs", "documentation", "deployment"],
+  "content": "GitHub Pages 部署配置完成：\n1. 创建了 mkdocs.yml 配置文件，使用 Material theme，支持中文搜索、深色模式等\n2. 创建了 .github/workflows/deploy-docs.yml 自动部署工作流\n3. 创建了 requirements-docs.txt 依赖文件\n4. 创建了 docs/GITHUB_PAGES_DEPLOYMENT.md 部署指南\n\n下一步：需要在 GitHub 仓库设置中启用 Pages，选择 Source 为 GitHub Actions",
+  "created_at": "2026-02-01T19:27:46.249188",
+  "updated_at": "2026-02-01T19:27:46.249192"
+}

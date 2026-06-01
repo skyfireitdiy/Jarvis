@@ -1,0 +1,15 @@
+{
+  "id": "20250826_150717_999170",
+  "type": "project_long_term",
+  "tags": [
+    "platform_registry",
+    "platform_manager",
+    "tongyi",
+    "thinking_platform",
+    "change_request",
+    "design_decision"
+  ],
+  "content": "变更决策：删除 thingking_platform/thinking_platform 平台实现及引用；Tongyi 平台统一使用 normal 模式，不再使用 thinking 模式；清理相关代码、配置与文档以保持一致。",
+  "created_at": "2025-08-26T15:07:17.999199",
+  "updated_at": "2025-08-26T15:07:17.999202"
+}

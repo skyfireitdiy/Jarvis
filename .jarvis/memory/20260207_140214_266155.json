@@ -1,0 +1,8 @@
+{
+  "id": "20260207_140214_266155",
+  "type": "project_long_term",
+  "tags": ["session_manager", "会话恢复", "bugfix", "session_name"],
+  "content": "## 会话恢复功能修复 (2025-02-07)\n\n### 问题描述\n会话保存时使用了带session_name前缀的新文件名格式（如`代码统计分析_saved_session_CodeAgent_openai_GLM-4.7_20260207_135405.json`），但恢复时的匹配模式仍期望旧格式（无前缀），导致无法找到文件。\n\n### 修复内容\n修改了`src/jarvis/jarvis_agent/session_manager.py`中的三处代码：\n\n1. **_list_session_files()方法（第129行）**：\n   - 修改前：`f\"saved_session_{self.agent_name}_{platform_name}_{model_name}*.json\"`\n   - 修改后：`f\"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json\"`\n\n2. **_cleanup_old_sessions()方法（第356行）**：\n   - 修改前：`f\"saved_session_{self.agent_name}_{platform_name}_{model_name}*.json\"`\n   - 修改后：`f\"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json\"`\n\n3. **_restore_start_commit_info()方法（第996行）**：\n   - 修改前：直接构建`base_name`，没有考虑session_name前缀\n   - 修改后：使用`_get_session_file_prefix()`方法获取正确的前缀\n\n### 修复效果\n- ✅ 新的匹配模式使用`*`通配符在开头，能够匹配带session_name前缀的新格式文件\n- ✅ 向后兼容：仍能匹配旧格式文件（无session_name前缀）\n- ✅ commit信息文件也能正确匹配和恢复\n\n### 相关文件\n- 主要修改：`src/jarvis/jarvis_agent/session_manager.py`\n- 测试文件：`tests/jarvis_agent/test_session_manager.py`",
+  "created_at": "2026-02-07T14:02:14.266177",
+  "updated_at": "2026-02-07T14:02:14.266182"
+}

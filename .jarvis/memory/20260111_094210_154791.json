@@ -1,0 +1,12 @@
+{
+  "id": "20260111_094210_154791",
+  "type": "project_long_term",
+  "tags": [
+    "project-level-methodology",
+    "methodology-scope",
+    "jarvis-architecture"
+  ],
+  "content": "Jarvis项目级方法论实现要点：\n1. 新增了`_get_project_methodology_directory()`函数获取项目级方法论目录（.jarvis/methodologies）\n2. 所有导入和提取命令（import, extract, extract-url）都增加了--scope参数，默认为global，可选project\n3. `_load_all_methodologies()`函数现在优先加载项目级方法论目录，实现项目级方法论覆盖全局方法论的机制\n4. 每个方法论JSON文件都包含scope字段，标识其作用域\n5. 项目级方法论目录在Git仓库根目录下的.jarvis/methodologies路径中\n6. 如果当前不在Git仓库中，项目级方法论功能会提示错误但不会中断程序",
+  "created_at": "2026-01-11T09:42:10.154808",
+  "updated_at": "2026-01-11T09:42:10.154811"
+}

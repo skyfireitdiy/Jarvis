@@ -1,0 +1,12 @@
+{
+  "id": "20260112_114424_639492",
+  "type": "project_long_term",
+  "tags": [
+    "rules",
+    "clean_architecture",
+    "builtin_rules"
+  ],
+  "content": "已在 builtin/rules 目录下创建整洁架构规则文件 clean_architecture.md，包含依赖规则、架构层次（Entities/Use Cases/Interface Adapters/Frameworks）、实践规范、代码示例和检查清单。文件通过 markdownlint 检查，符合项目规则格式规范。",
+  "created_at": "2026-01-12T11:44:24.639516",
+  "updated_at": "2026-01-12T11:44:24.639519"
+}

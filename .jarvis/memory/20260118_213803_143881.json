@@ -1,0 +1,8 @@
+{
+  "id": "20260118_213803_143881",
+  "type": "project_long_term",
+  "tags": ["task_manager", "refactoring", "module_split", "TaskListManager"],
+  "content": "TaskListManager类已从原task_list_manager.py中拆分出来，创建了新的src/jarvis/jarvis_tools/task_manager.py文件。该类包含任务列表的核心CRUD操作方法：create_task_list, add_tasks, update_task_status, get_task_list, get_task_list_summary, get_task_detail, update_task_status等。文件目前有694行，超过了600行的限制，需要进一步优化拆分。",
+  "created_at": "2026-01-18T21:38:03.143912",
+  "updated_at": "2026-01-18T21:38:03.143915"
+}

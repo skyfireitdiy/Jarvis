@@ -1,0 +1,12 @@
+{
+  "id": "20260119_122552_256784",
+  "type": "project_long_term",
+  "tags": [
+    "fix_tool_call",
+    "builtin_command",
+    "<FixToolCall>"
+  ],
+  "content": "实现<FixToolCall>内置命令：1) 在Agent类添加_last_failed_tool_call_content属性保存失败的工具调用内容 2) 在run_loop.py中连续5次无工具调用时自动保存 3) 在builtin_input_handler.py中处理FixToolCall标记，调用fix_tool_call_with_llm修复并执行 4) 在clear_history中重置该属性",
+  "created_at": "2026-01-19T12:25:52.256825",
+  "updated_at": "2026-01-19T12:25:52.256830"
+}

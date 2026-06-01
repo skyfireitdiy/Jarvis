@@ -1,0 +1,12 @@
+{
+  "id": "20251115_085959_237894",
+  "type": "project_long_term",
+  "tags": [
+    "project_structure",
+    "translation_task",
+    "comments"
+  ],
+  "content": "Jarvis项目结构：Python项目，263个Python文件共70755行代码。主要模块包括jarvis_agent, jarvis_code_agent, jarvis_tools等。当前任务是将指定文件中的注释翻译为中文。",
+  "created_at": "2025-11-15T08:59:59.237938",
+  "updated_at": "2025-11-15T08:59:59.237943"
+}

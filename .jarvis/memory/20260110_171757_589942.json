@@ -1,0 +1,12 @@
+{
+  "id": "20260110_171757_589942",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "tool_configuration",
+    "default_tools"
+  ],
+  "content": "CodeAgent 默认工具配置中包含: \"execute_script\", \"read_code\", \"edit_file\", \"virtual_tty\", \"search_web\"。其中 \"search_web\" 作为网络搜索工具在2026年1月10日被添加为默认工具。",
+  "created_at": "2026-01-10T17:17:57.589978",
+  "updated_at": "2026-01-10T17:17:57.589983"
+}

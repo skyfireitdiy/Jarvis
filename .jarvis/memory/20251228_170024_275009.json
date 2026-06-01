@@ -1,0 +1,14 @@
+{
+  "id": "20251228_170024_275009",
+  "type": "project_long_term",
+  "tags": [
+    "testing",
+    "patch",
+    "optimization",
+    "retry",
+    "jarvis"
+  ],
+  "content": "Jarvis 项目测试优化实践：使用 @patch('jarvis.jarvis_utils.utils.time.sleep') 装饰器模拟 sleep 函数，在测试函数签名中添加 mock_sleep 参数，消除真实 sleep 等待时间，将测试时间从 132 秒降至 1 秒以内。适用于 TestWhileTrue 类中的重试测试用例。",
+  "created_at": "2025-12-28T17:00:24.275040",
+  "updated_at": "2025-12-28T17:00:24.275044"
+}

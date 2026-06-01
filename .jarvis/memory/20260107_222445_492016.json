@@ -1,0 +1,13 @@
+{
+  "id": "20260107_222445_492016",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "jarvis_translator",
+    "module_refactoring",
+    "backward_compatibility"
+  ],
+  "content": "在jarvis项目中，将c2rust中语言无关的通用函数移动到公共转换框架模块jarvis_translator.utils中。具体包括read_json, write_json, dir_tree, extract_json_from_summary, extract_files_from_git_diff, get_modified_files_from_git, truncate_git_diff_with_context_limit, detect_test_deletion, ask_llm_about_test_deletion, check_and_handle_test_deletion等函数。c2rust.utils模块通过从公共模块导入这些函数来保持向后兼容性。",
+  "created_at": "2026-01-07T22:24:45.492038",
+  "updated_at": "2026-01-07T22:24:45.492041"
+}

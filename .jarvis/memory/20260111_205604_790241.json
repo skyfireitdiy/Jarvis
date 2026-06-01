@@ -1,0 +1,14 @@
+{
+  "id": "20260111_205604_790241",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "task_analyzer",
+    "satisfaction",
+    "满意度",
+    "skip_satisfaction"
+  ],
+  "content": "CodeAgent 跳过满意度收集的实现方式：在 TaskAnalyzer.collect_satisfaction_feedback 方法开头添加 isinstance(self.agent, CodeAgent) 检查，如果是 CodeAgent 实例则直接返回空字符串，跳过满意度收集流程。修改位置：src/jarvis/jarvis_agent/task_analyzer.py 第 172-196 行。",
+  "created_at": "2026-01-11T20:56:04.790271",
+  "updated_at": "2026-01-11T20:56:04.790275"
+}

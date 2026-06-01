@@ -1,0 +1,16 @@
+{
+  "id": "20250923_021350_339434",
+  "type": "project_long_term",
+  "tags": [
+    "rust",
+    "migration",
+    "jarvis_native",
+    "retriever",
+    "bm25",
+    "atomic_write",
+    "git_utils"
+  ],
+  "content": "当前jarvis_native模块已导出：stats_*（metrics/overlap/git_modified_line_ranges）、file_utils（md5/行数/多种git查询/原子写文本JSON字节）、toolcall（extract_tool_call_blocks）。Python侧 retriever.ChromaRetriever 已使用：\n- _compute_md5 -> jarvis_native.get_file_md5（限制读取前100MB）\n- _save_bm25_index/_save_manifest -> 使用 atomic_write_bytes/atomic_write_json_str 落盘\n待迁移候选（独立/IO密集/易原生化）：\n1) 索引变更检测：将 _detect_changed_or_deleted 迁移到Rust，提供 rag_detect_changes(manifest_path: str) -> {'changed': [...], 'deleted': [...]}，在Rust侧读取manifest JSON，逐个检查文件是否存在、size变更、mtime变化时再按需计算md5（沿用现有get_file_md5逻辑与限制）。\n2) 清单更新：提供 rag_update_manifest(sources: List[str], manifest_path: str) -> int（返回更新条数），内部stat+md5并原子写；Python仅调用。\n3) 轻量清理：移除 retriever.py 未使用的 hashlib 导入。\n先做(1)最小可用，便于在检索前快速原生检测变更；再评估(2)以进一步减少Python-IO。\n",
+  "created_at": "2025-09-23T02:13:50.339496",
+  "updated_at": "2025-09-23T02:13:50.339504"
+}

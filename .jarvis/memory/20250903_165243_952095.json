@@ -1,0 +1,16 @@
+{
+  "id": "20250903_165243_952095",
+  "type": "project_long_term",
+  "tags": [
+    "git_commiter",
+    "agent_model",
+    "platform_usage",
+    "parameter_naming",
+    "JARVIS_FORCE_SAVE_MEMORY",
+    "P0",
+    "implementation_detail"
+  ],
+  "content": "任务目标：\n- 文件：/home/wangmaobin/code/Jarvis/src/jarvis/jarvis_git_utils/git_commiter.py\n- 要求：如果存在 agent，则使用 agent 的相同平台与模型执行；调用方尽量传入 agent 对象，以便 git_commiter 继承 agent 的平台与模型配置。\n\n约束与实现建议：\n- 尽量以最小改动适配：在 git_commiter 支持接收可选 agent 参数（例如 agent=None），当传入时优先复用 agent.platform 与 agent.model 或等价配置。\n- 默认行为保持兼容：未传入 agent 时沿用原有平台与模型的默认配置。\n- 调用点尽量透传 agent：在已存在 agent 的上下文中，修改调用处将 agent 传入。\n- 风格一致性：遵守现有命名与参数风格（如 prefix/suffix 等近期提交风格）。\n- 影响范围控制：仅改动 git_commiter.py 及其直接调用处，避免波及不相关模块。\n",
+  "created_at": "2025-09-03T16:52:43.952156",
+  "updated_at": "2025-09-03T16:52:43.952162"
+}

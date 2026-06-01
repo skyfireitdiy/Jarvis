@@ -1,0 +1,15 @@
+{
+  "id": "20260226_222748_145483",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "Windows",
+    "execute_script",
+    "Ctrl+T",
+    "interpreter",
+    "shell_input_handler"
+  ],
+  "content": "## Ctrl+T Windows 报错修复\n\n**问题**: Windows 上按 Ctrl+T 报错 `execvpe(/bin/bash) failed: No such file or directory`\n\n**根因**: `shell_input_handler.py` 硬编码使用 bash 解释器，即使脚本内容是 PowerShell 命令\n\n**解决方案**: 在 `src/jarvis/jarvis_agent/shell_input_handler.py` 中添加 `_detect_interpreter()` 函数，根据脚本第一行自动检测解释器：\n- Windows: 检测 `powershell`/`pwsh`/`cmd` 开头的命令\n- Unix/Linux: 检测 `env` 命令，返回 bash\n- 默认: 返回 bash\n\n**影响文件**: `src/jarvis/jarvis_agent/shell_input_handler.py`\n\n**修复日期**: 2025-01-06",
+  "created_at": "2026-02-26T22:27:48.145503",
+  "updated_at": "2026-02-26T22:27:48.145507"
+}

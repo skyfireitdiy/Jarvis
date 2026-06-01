@@ -1,0 +1,12 @@
+{
+  "id": "20260110_113113_317239",
+  "type": "project_long_term",
+  "tags": [
+    "config_schema",
+    "llm_groups",
+    "validation"
+  ],
+  "content": "config_schema.json的llm_groups定义现在只包含normal_llm、cheap_llm、smart_llm三个属性，不再包含web_llm",
+  "created_at": "2026-01-10T11:31:13.317263",
+  "updated_at": "2026-01-10T11:31:13.317267"
+}

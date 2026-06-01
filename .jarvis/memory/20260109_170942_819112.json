@@ -1,0 +1,14 @@
+{
+  "id": "20260109_170942_819112",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "interface_removal",
+    "kimi.py",
+    "base.py",
+    "refactoring"
+  ],
+  "content": "在src/jarvis/jarvis_platform/kimi.py中删除了7个接口方法的实现：support_web、upload_files、set_web、get_env_config_guide、get_env_defaults、get_required_env_keys、support_upload_files。这是平台接口重构的一部分，这些接口的相关调用方代码也需要同步删除。",
+  "created_at": "2026-01-09T17:09:42.819137",
+  "updated_at": "2026-01-09T17:09:42.819141"
+}

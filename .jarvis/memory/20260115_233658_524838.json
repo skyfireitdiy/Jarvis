@@ -1,0 +1,8 @@
+{
+  "id": "20260115_233658_524838",
+  "type": "project_long_term",
+  "tags": ["rule_prepend", "user_input", "agent"],
+  "content": "规则前置到用户输入的修改：\n\n**修改位置**：src/jarvis/jarvis_agent/__init__.py\n\n**修改内容**：\n1. _init_managers() (第658行)：\n   - 原：`_, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)`\n   - 改：`self.loaded_rules, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)`\n   - 作用：保存加载的规则内容，不丢弃\n\n2. run() (第1844-1846行)：\n   - 新增：将规则内容添加到用户输入的最前面\n   - 格式：`<rules>\\n{self.loaded_rules}\\n</rules>\\n\\n{enhanced_input}`\n   - 条件：只有当存在loaded_rules且不为空时才添加\n\n**效果**：\n- 三个规则文件（.jarvis/rule、~/.jarvis/rule、builtin_rules.md）的内容会在第一次运行时被添加到用户输入的最前面\n- 规则名称已经被记录在self.loaded_rule_names中（原有功能）\n- 规则以XML标签格式包裹，便于AI识别",
+  "created_at": "2026-01-15T23:36:58.524861",
+  "updated_at": "2026-01-15T23:36:58.524864"
+}

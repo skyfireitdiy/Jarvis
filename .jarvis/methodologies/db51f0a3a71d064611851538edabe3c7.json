@@ -1,0 +1,5 @@
+{
+  "problem_type": "命令行工具配置同步",
+  "content": "## 问题重述\n当项目使用 pyproject.toml 定义命令行工具（[project.scripts]）时，安装脚本（如 install.sh）中的自动补全命令列表需要与 pyproject.toml 中定义的命令保持一致，否则会出现某些工具缺少自动补全功能的问题。\n\n## 可复用解决流程\n\n### 1. 识别配置依赖关系\n- 找出定义命令行工具的主配置文件（通常是 pyproject.toml 的 [project.scripts] 或 setup.py 的 entry_points）\n- 找出需要引用这些命令的其他文件（如安装脚本、文档、CI 配置等）\n\n### 2. 提取命令列表\n从 pyproject.toml 中提取所有短命令别名（简称）：\n```toml\n[project.scripts]\njarvis = \"...\"\njvs = \"...\"  # 提取这个简称\n```\n\n### 3. 同步配置\n将提取的命令列表同步到目标文件，确保：\n- 所有短命令都被包含\n- 命令名称拼写正确\n- 列表格式符合目标文件要求（如 shell 数组、JSON 列表等）\n\n### 4. 验证一致性\n- 对比两个文件中的命令列表数量\n- 确认所有命令都能正确安装补全\n\n## 注意事项\n1. **单一数据源原则**：pyproject.toml 应作为命令定义的唯一真实来源\n2. **变更同步**：当添加/删除命令时，必须同步更新所有引用该命令列表的文件\n3. **完整覆盖**：确保自动补全覆盖所有用户可能使用的命令（包括长命令和短命令）\n4. **版本控制**：修改后及时提交，避免配置漂移\n\n## 可选步骤（自动化方向）\n- 可以创建一个同步脚本，自动从 pyproject.toml 提取命令列表并生成目标配置\n- 可以在 CI 中添加检查，验证配置一致性\n- 考虑使用构建工具生成配置，减少手动同步\n\n## 当前项目配置\n- pyproject.toml: 定义了 40 个命令行工具（20 个长命令 + 20 个短命令）\n- install.sh: 第 121 行的 tools 数组包含所有 20 个短命令\n- 短命令列表: jvs, jvsd, ja, jca, jcad, jcr, jgc, jgs, jsec, jc2r, jrg, jpm, jma, jcfg, jqc, jt, jm, jss, jst, jmo",
+  "scope": "project"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260112_170230_116430",
+  "type": "project_long_term",
+  "tags": [
+    "worktree",
+    "git",
+    "jcad",
+    "isolation"
+  ],
+  "content": "jcad 默认启用 Git worktree 工作流程：1. 创建 worktree（分支名格式：jarvis-{project_name}-{timestamp}-{random_suffix}）2. 链接配置（将原仓库 .jarvis 目录软链接到 worktree）3. 自动提交未保存更改 4. 执行任务 5. 合并回主分支（使用 rebase 策略变基后 fast-forward 合并）6. 清理资源（自动删除 worktree 目录和分支）。优势：隔离开发、自动管理、配置同步、智能合并、自动清理",
+  "created_at": "2026-01-12T17:02:30.116450",
+  "updated_at": "2026-01-12T17:02:30.116455"
+}

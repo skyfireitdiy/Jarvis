@@ -1,0 +1,8 @@
+{
+  "id": "20260111_132843_421806",
+  "type": "project_long_term",
+  "tags": ["Agent", "初始化", "代码结构"],
+  "content": "Agent类的初始化结构顺序：\n1. 初始化基础属性（_init_basic_attributes）：name、description、system_prompt、auto_complete等\n2. 初始化模型和会话（_init_model、_init_session）\n3. 初始化处理器和交互（_init_handlers、UserInteractionHandler）\n4. 解析配置参数（_resolve_config）：use_methodology、use_analysis等的回退逻辑\n5. 初始化事件总线和管理器（_init_managers）：EventBus、MemoryManager、TaskAnalyzer等\n6. 确保工具可用（_ensure_tools）：force_save_memory、use_analysis条件下的工具检查\n7. 设置系统提示词（_setup_system_prompt）\n8. 动态加载工具调用后回调（_load_after_tool_callbacks）\n\n注意：事件总线必须先于管理器初始化，以便管理器在构造中安全订阅事件。",
+  "created_at": "2026-01-11T13:28:43.421839",
+  "updated_at": "2026-01-11T13:28:43.421844"
+}

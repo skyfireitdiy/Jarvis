@@ -1,0 +1,8 @@
+{
+  "id": "20260102_142036_301560",
+  "type": "project_long_term",
+  "tags": ["typing", "type_annotation", "python_typing"],
+  "content": "# Python类型注解使用模式\n\n项目中广泛使用了typing模块的各种功能，包括：\n- 基础类型：Dict, List, Tuple, Any\n- 可选类型：Optional\n- 联合类型：Union\n- 类型转换：cast\n- 类型别名和字典类型：Dict[str, Any], Dict[str, Type[BasePlatform]]等\n\n这些类型注解主要用于提升代码可读性、支持IDE类型检查以及帮助AI理解和生成符合项目风格的代码。",
+  "created_at": "2026-01-02T14:20:36.301575",
+  "updated_at": "2026-01-02T14:20:36.301578"
+}

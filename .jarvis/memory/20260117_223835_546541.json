@@ -1,0 +1,8 @@
+{
+  "id": "20260117_223835_546541",
+  "type": "project_long_term",
+  "tags": ["utils.py", "refactoring", "spec", "module_split", "SDD"],
+  "content": "Utils.py模块重构规范文档要点：\n\n1. 模块拆分方案：\n- encoding.py (~30行)：编码解码功能\n- command_mapper.py (~50行)：命令映射字典管理\n- installation_detector.py (~150行)：安装检测\n- update_checker.py (~250行)：更新检查\n- config_manager/：配置管理包（包含__init__.py, loader.py, interactive.py, schema.py, collectors.py）\n- retry.py (~100行)：重试机制\n- file_ops.py (~50行)：文件操作\n- stats_display.py (~50行)：统计显示\n- context_manager.py (~50行)：上下文管理\n\n2. 重构目标：\n- 遵循单一职责原则\n- 每个模块代码行数 < 300 行（config_manager子模块除外）\n- 保持向后兼容性\n- 测试覆盖率 ≥ 80%\n\n3. 向后兼容方案：\n- utils.py 保留为兼容导出层，重新导出所有公共接口\n- 保持原有导入路径不变\n- 保持函数签名和返回值一致",
+  "created_at": "2026-01-17T22:38:35.546576",
+  "updated_at": "2026-01-17T22:38:35.546579"
+}

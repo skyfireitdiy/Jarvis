@@ -1,0 +1,16 @@
+{
+  "id": "20250923_094535_235805",
+  "type": "project_long_term",
+  "tags": [
+    "security_vulnerability_analyst",
+    "architecture",
+    "workflow",
+    "jarvis_book",
+    "tool_registry",
+    "run_loop",
+    "memory_system"
+  ],
+  "content": "定义与架构要点（用于撰写“项目概述/流程/架构与关键实现”）\n- 角色定义（builtin/agent/security_vulnerability_analyst.yaml）：\n  * 名称：SecurityVulnerabilityAnalyst\n  * 描述：逻辑/安全漏洞查找专家；分析用户提供代码目录/文件，识别逻辑/安全漏洞；不确定之处可询问用户\n  * 核心能力：理解代码与业务逻辑；识别常见安全漏洞（SQL注入/XSS/CSRF/命令注入等）；逻辑缺陷与边界条件；依赖与第三方库安全；漏洞严重度评估\n  * 任务流程：代码理解(read_code) -> 漏洞识别(search_web查询CVE等) -> 逻辑缺陷挖掘 -> 报告生成（位置/描述/严重度/复现/修复建议）\n  * 输出要求：完整漏洞分析报告，含代码片段与可操作修复建议；沟通风格专业严谨，遇到不确定求证\n  * 可用工具：read_code, execute_script, search_web, ask_user\n- Jarvis 架构支撑（docs/jarvis_book/3.核心概念与架构.md）：\n  * 端到端工作流（3.2.3）：CLI分派 -> Agent主循环向ToolRegistry请求工具清单并调用LLM决策 -> 委托ToolRegistry执行TOOL_CALL -> 标准返回(need_return, tool_prompt) -> 事件总线广播 BEFORE/AFTER_TOOL_CALL -> 循环直到完成\n  * Agent职责（3.3.1）：任务理解/工具调用/状态与记忆管理/任务分析/文件与方法论处理；初始化包含模型/会话/处理器/配置/管理器与总线\n  * 运行循环（3.3.1/3.3.11）：_first_run -> _call_model -> 中断处理 -> BEFORE_TOOL_CALL -> _call_tools -> 拼接tool_prompt -> AFTER_TOOL_CALL -> 自动完成/继续/完成\n  * 工具注册表（3.3.2）：动态加载（内置/外部/MCP）；执行流程（解析->查找->校验->execute->格式化输出）；协议版本兼容；缺失结束标签自动补全；大输出自动上传/智能截断\n  * 记忆系统实现（3.3.4）：MemoryManager 提供 prepare_memory_tags_prompt/prompt_memory_save/add_memory_prompts_to_addon；在任务开始/中断/完成/清理前触发记忆流程\n  * 执行流程时序图（3.3.7）：初始化与任务执行阶段的交互序列（Agent、ToolRegistry、PlatformRegistry、MemoryManager、TaskAnalyzer、FileMethodologyManager）\n",
+  "created_at": "2025-09-23T09:45:35.235894",
+  "updated_at": "2025-09-23T09:45:35.235905"
+}

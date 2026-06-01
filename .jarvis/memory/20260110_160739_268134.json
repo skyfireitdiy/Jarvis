@@ -1,0 +1,12 @@
+{
+  "id": "20260110_160739_268134",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "session_management",
+    "error_handling"
+  ],
+  "content": "在_find_jarvis_session函数中添加了has_session检查以验证会话是否真正可用，避免返回异常退出的会话。修改前，函数会返回list-sessions中显示的会话，但这些会话可能已经异常退出，无法正常attach。修改后，在返回会话名之前先调用has_session函数验证其可用性。",
+  "created_at": "2026-01-10T16:07:39.268177",
+  "updated_at": "2026-01-10T16:07:39.268183"
+}

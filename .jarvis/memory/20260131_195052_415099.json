@@ -1,0 +1,14 @@
+{
+  "id": "20260131_195052_415099",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_rule_generator",
+    "rule",
+    "自动生成",
+    "知识自主积累",
+    "阶段2"
+  ],
+  "content": "## 规则自动生成器模块实现\n\n### 模块位置\n- 源代码：`src/jarvis/jarvis_rule_generator/`\n- 测试：`tests/jarvis_rule_generator/`\n\n### 核心类\n1. **CodePattern** - 代码模式数据类\n   - pattern_type: 模式类型（design_pattern, coding_style, architecture, best_practice）\n   - pattern_name: 模式名称\n   - description: 模式描述\n   - code_examples: 代码示例列表\n   - file_paths: 相关文件路径\n   - occurrence_count: 出现次数\n   - context: 上下文信息\n\n2. **RuleGenerationContext** - 规则生成上下文\n   - source_type: 来源类型（code_pattern, best_practice, user_request）\n   - pattern: 关联的代码模式\n   - description: 规则描述\n   - scope: 作用域（project/global）\n\n3. **RuleQualityScore** - 规则质量评分\n   - completeness: 完整性（25分）\n   - executability: 可执行性（25分）\n   - generality: 通用性（20分）\n   - uniqueness: 独特性（15分）\n   - code_examples: 代码示例（15分）\n   - 质量阈值：70分\n\n4. **RuleGenerator** - 规则生成器\n   - extract_rule_from_code(): 从代码中提取规则\n   - detect_patterns(): 检测代码模式\n   - generate_rule_content(): 生成规则内容\n   - detect_rule_conflict(): 检测规则冲突\n   - evaluate_rule_quality(): 评估规则质量\n   - save_rule(): 保存规则文件\n\n### 规则模板格式\n```markdown\n# {rule_name}\n## 规则简介\n## 你必须遵循的工作流程\n## 你必须遵守的原则\n## 实践指导\n## 代码示例\n## 执行检查清单\n```\n\n### 冲突检测机制\n- 名称冲突：自动添加后缀\n- 内容相似（≥70%）：提示合并或覆盖\n- 原则矛盾：拒绝生成\n\n### 测试覆盖率\n- __init__.py: 100%\n- rule_generator.py: 91%",
+  "created_at": "2026-01-31T19:50:52.415126",
+  "updated_at": "2026-01-31T19:50:52.415129"
+}

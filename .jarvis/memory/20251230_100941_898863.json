@@ -1,0 +1,13 @@
+{
+  "id": "20251230_100941_898863",
+  "type": "project_long_term",
+  "tags": [
+    "configure_by_tui",
+    "integration",
+    "config_schema",
+    "降级处理"
+  ],
+  "content": "TUI 配置集成模式：在 _interactive_config_setup 函数中，步骤8位置集成了 TUI 配置逻辑。\n\n实现细节：\n1. 加载 schema 文件：Path(__file__).parent.parent / \"jarvis_data\" / \"config_schema.json\"\n2. 过滤动态逻辑已处理的字段：excluded_fields = [\"ENV\", \"llms\", \"llm_groups\", \"llm_group\"]\n3. 调用 configure_by_tui(schema=filtered_schema, defaults=config_data, title=\"Jarvis 配置\")\n4. 合并结果：config_data.update(tui_result)\n\n异常处理策略：\n- ImportError：Textual 未安装，跳过 TUI 配置并提示\n- Exception：TUI 配置失败，使用默认值并显示错误信息\n- 用户取消（tui_result 为 None）：提示用户取消，使用默认值",
+  "created_at": "2025-12-30T10:09:41.898900",
+  "updated_at": "2025-12-30T10:09:41.898904"
+}

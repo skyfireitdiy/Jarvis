@@ -1,0 +1,13 @@
+{
+  "id": "20260110_111939_873371",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "code_agent",
+    "rules",
+    "behavior_change"
+  ],
+  "content": "jarvis代码代理规则系统行为变更：规则文件现在只支持.md后缀，不再支持无后缀的规则文件（内置规则除外）。此变更影响规则读取和规则目录遍历功能。",
+  "created_at": "2026-01-10T11:19:39.873389",
+  "updated_at": "2026-01-10T11:19:39.873393"
+}

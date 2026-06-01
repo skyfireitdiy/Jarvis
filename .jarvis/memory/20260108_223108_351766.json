@@ -1,0 +1,8 @@
+{
+  "id": "20260108_223108_351766",
+  "type": "project_long_term",
+  "tags": ["tmux", "jarvis", "session", "jvsd", "jcad"],
+  "content": "jarvis项目中，jvsd和jcad使用tmux_wrapper.py中的dispatch_command_to_panel函数创建tmux session。create_panel函数支持stay_in_session_after_exit参数：True表示命令执行后启动shell保持会话（默认），False表示命令执行后直接退出pane。参数通过tmux split-window命令传递。",
+  "created_at": "2026-01-08T22:31:08.351786",
+  "updated_at": "2026-01-08T22:31:08.351789"
+}

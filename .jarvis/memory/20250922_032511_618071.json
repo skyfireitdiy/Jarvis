@@ -1,0 +1,12 @@
+{
+  "id": "20250922_032511_618071",
+  "type": "project_long_term",
+  "tags": [
+    "commands",
+    "usage",
+    "runbook"
+  ],
+  "content": "快速运行命令与示例：\n- 直接命令：\n  jarvis-agent -c /home/wangmaobin/code/Jarvis/builtin/agent/security_vulnerability_analyst.yaml -T \"请扫描路径: <项目根>，输出Markdown报告到 ./安全漏洞分析报告.md\"\n- 交互模式：运行 jarvis 或 ja，根据提示输入扫描任务与路径\n- CI集成：在流水线中调用上述命令，归档报告或同步到内网门户/iCenter\n",
+  "created_at": "2025-09-22T03:25:11.618108",
+  "updated_at": "2025-09-22T03:25:11.618114"
+}

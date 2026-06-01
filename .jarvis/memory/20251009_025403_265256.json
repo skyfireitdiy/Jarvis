@@ -1,0 +1,15 @@
+{
+  "id": "20251009_025403_265256",
+  "type": "project_long_term",
+  "tags": [
+    "web_server",
+    "xterm",
+    "stdio_redirect",
+    "interactive",
+    "virtual_tty",
+    "root_cause"
+  ],
+  "content": "根因分析：前端 xterm 的输入通过 /stdio -> feed_web_stdin 注入到 Python 层的 sys.stdin，仅适用于 input()/readline() 的行缓冲交互；但当前执行交互式命令多由 execute_script 或 subprocess/外部程序完成，这些子进程拥有独立的 TTY/STDIN，不会读取 Python 的 sys.stdin，因此无法接收浏览器输入。execute_script 还通过 `script -q -c ...` 采集输出到文件，明确为非交互设计。\n另外，虽然存在 VirtualTTYTool（基于 PTY 的持久交互会话），但 web_server 未与其集成，前端 xterm 输入没有桥接到虚拟TTY的 master_fd，导致无法在 Web 上进行真正的交互式会话。\n结论：缺少“前端 xterm ↔ 后端 PTY”的桥接通道，当前 STDIN 重定向仅影响 Python 层，不影响子进程。\n修复思路（最小变更优先）：在 web_server 中新增一个专用 WebSocket 端点（如 /terminal），在连接时创建并管理一个 PTY 会话（可复用 VirtualTTYTool 或直接用 pty），将 PTY 的输出实时推送到前端并将前端的按键输入写入 master_fd；可选支持窗口大小调整（TIOCSWINSZ）。同时在文档与 execute_script 的描述中强调其非交互性质，并推荐使用 virtual_tty 进行交互。\n",
+  "created_at": "2025-10-09T02:54:03.265281",
+  "updated_at": "2025-10-09T02:54:03.265284"
+}

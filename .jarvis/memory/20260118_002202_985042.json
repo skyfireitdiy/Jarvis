@@ -1,0 +1,8 @@
+{
+  "id": "20260118_002202_985042",
+  "type": "project_long_term",
+  "tags": ["c_checker", "refactoring", "规则库分离", "SDD", "TDD"],
+  "content": "c_checker重构任务：将78个正则表达式规则从c_checker.py（2988行）分离到独立的c_checker_rules.py。规则按9个类别组织：BaseRules（4个）、FormatCommandRules（6个）、ThreadRules（7个）、CppLockRules（8个）、DataRaceRules（5个）、DangerousUsageRules（7个）、MemoryHelperRules（12个）、CppSpecificRules（23个）、HelperRules（6个）。严格遵循TDD流程，红-绿-重构循环。验收标准：测试覆盖率>=80%、所有测试通过、c_checker.py简化到<1000行。",
+  "created_at": "2026-01-18T00:22:02.985057",
+  "updated_at": "2026-01-18T00:22:02.985060"
+}

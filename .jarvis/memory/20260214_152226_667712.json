@@ -1,0 +1,16 @@
+{
+  "id": "20260214_152226_667712",
+  "type": "project_long_term",
+  "tags": [
+    "bugfix",
+    "thread_safety",
+    "rich",
+    "Live",
+    "PrettyOutput",
+    "base.py",
+    "IndexError"
+  ],
+  "content": "## Rich Live 线程安全修复 (2026-02-19)\n\n### 问题描述\n`src/jarvis/jarvis_platform/base.py` 在使用 pretty output 模式时偶尔出现 `IndexError: list index out of range` 错误，发生在 rich 的 `Text.divide()` 方法中。\n\n### 根本原因\n- rich 的 `Live` 组件有一个内部刷新线程，每秒刷新 10 次（`refresh_per_second=10`）\n- 主线程在迭代响应时，不断修改 `text_content` 和 `panel` 对象\n- 后台刷新线程在渲染时访问了已经被替换的对象，导致 `line_ranges` 列表不一致\n- 触发路径：Live 内部线程渲染 → 访问 Text.line_ranges → 索引越界\n\n### 修复方案\n1. **添加线程锁**：在 `BasePlatform.__init__` 中创建 `self._panel_lock = threading.RLock()`\n2. **保护更新逻辑**：在 `_update_panel_content` 中使用锁包裹整个 panel 更新过程\n3. **异常处理**：在 `live.update(panel)` 周围添加 try-except，捕获 `IndexError` 和 `RuntimeError`\n4. **可重入锁**：使用 RLock 而非 Lock，避免死锁\n\n### 修复文件\n- `src/jarvis/jarvis_platform/base.py`\n\n### 验证方法\n- 在多线程场景下测试 pretty output 功能\n- 确保不再出现 `IndexError: list index out of range`\n- 验证响应内容正常显示，无渲染异常\n\n### 经验总结\n- **不可控的内部线程**：当使用第三方库的内部线程（如 rich Live）时，无法直接控制其行为\n- **保护共享对象**：通过锁保护对共享对象（panel、text_content）的修改\n- **防御性编程**：添加异常处理，即使出现内部冲突也不影响主流程\n- **原子性保证**：锁应该包裹从对象修改到传递给外部调用的整个过程\n\n### Commit IDs\n- da0d2e1: 添加 threading 导入和线程锁\n- e74a578: 添加异常处理保护 live.update\n- efb53a6: 修复静态检查问题",
+  "created_at": "2026-02-14T15:22:26.667735",
+  "updated_at": "2026-02-14T15:22:26.667739"
+}

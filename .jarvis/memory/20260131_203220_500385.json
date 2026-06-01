@@ -1,0 +1,8 @@
+{
+  "id": "20260131_203220_500385",
+  "type": "project_long_term",
+  "tags": ["jarvis_tools", "knowledge_graph", "tool_integration", "阶段2"],
+  "content": "knowledge_graph_tool工具已创建完成，位于src/jarvis/jarvis_tools/knowledge_graph_tool.py。该工具将jarvis_knowledge_graph模块的功能暴露给Agent使用，支持四种操作：\n1. add_node: 添加知识节点（支持methodology/rule/memory/code/file/concept类型）\n2. query_nodes: 按类型、标签、名称查询节点\n3. add_edge: 添加两个节点之间的关系（支持references/depends_on/similar_to/derived_from/implements/related_to/part_of/supersedes类型）\n4. get_related: 获取与指定节点相关的知识\n\n测试文件：tests/jarvis_tools/test_knowledge_graph_tool.py（19个测试，覆盖率97%）",
+  "created_at": "2026-01-31T20:32:20.500405",
+  "updated_at": "2026-01-31T20:32:20.500409"
+}

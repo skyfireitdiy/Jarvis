@@ -1,0 +1,13 @@
+{
+  "id": "20251230_125027_130088",
+  "type": "project_long_term",
+  "tags": [
+    "handle_interactive_config_option",
+    "TUI",
+    "config",
+    "verification"
+  ],
+  "content": "handle_interactive_config_option 函数实现（第152-248行）：\n1. 数据提取逻辑（172-197行）：从现有配置中提取 llm_group 名称、normal_llm、platform、model、max_input_token_count、llm_config、ENV 等信息\n2. TUI 调用（200-206行）：使用 _run_tui_config_form 函数，传递提取的配置作为默认值\n3. 配置保存（208-242行）：保留 schema 头处理逻辑、配置精简逻辑\n4. 错误处理：异常捕获和处理完整\n该实现支持配置文件存在时使用 TUI 修改配置，保持向后兼容性",
+  "created_at": "2025-12-30T12:50:27.130122",
+  "updated_at": "2025-12-30T12:50:27.130126"
+}

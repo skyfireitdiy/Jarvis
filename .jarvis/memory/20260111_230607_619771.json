@@ -1,0 +1,8 @@
+{
+  "id": "20260111_230607_619771",
+  "type": "project_long_term",
+  "tags": ["uv-tool", "auto-update", "jarvis"],
+  "content": "Jarvis自动更新功能已增强，支持检测uv tool安装场景。新增_is_installed_via_uv_tool()函数用于检测安装方式：1) 检查sys.argv[0]路径是否在~/.local/bin/或相关目录；2) 执行uv tool list验证。如果检测到uv tool安装，使用'uv tool upgrade jarvis-ai-assistant'命令更新；否则保持原有的uv pip/pip更新逻辑。修改文件：src/jarvis/jarvis_utils/utils.py",
+  "created_at": "2026-01-11T23:06:07.619809",
+  "updated_at": "2026-01-11T23:06:07.619813"
+}

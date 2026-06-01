@@ -1,0 +1,8 @@
+{
+  "id": "20260111_232212_767686",
+  "type": "project_long_term",
+  "tags": ["task_list", "architecture", "priority", "sorting", "dataclass"],
+  "content": "任务列表架构决策：删除了Task类的priority字段，改为按task_id数字部分升序排序。理由：priority字段在实际使用中作用不大，简化了任务管理逻辑。排序逻辑使用extract_task_number函数提取task_id中的数字部分进行排序，确保task-1, task-2, task-3的顺序。",
+  "created_at": "2026-01-11T23:22:12.767718",
+  "updated_at": "2026-01-11T23:22:12.767722"
+}

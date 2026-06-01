@@ -1,0 +1,8 @@
+{
+  "id": "20260205_103239_130500",
+  "type": "project_long_term",
+  "tags": ["jsec", "cli", "refactor", "completed"],
+  "content": "jsec 工具配置简化完成：\n\n1. **配置结构简化**：\n   - 删除了 `scan_scope.type` 字段\n   - 将 `scan_scope.target` 简化为 `target`\n   - 配置文件从 `scan_scope: {type: directory, target: .}` 简化为 `target: .`\n\n2. **config 子命令更新**：\n   - 删除 `--scope-type` 参数\n   - `--target` 参数现在接受文件路径或目录路径\n   - 帮助文档已更新\n\n3. **scan 子命令更新**：\n   - 自动判断 target 是文件还是目录\n   - 文件模式：扫描文件所在目录，然后过滤只保留该文件的问题\n   - 目录模式：扫描该目录下的所有文件\n   - 添加了 `_filter_result_by_file()` 函数实现过滤逻辑\n\n4. **使用示例**：\n   - 扫描目录：`jsec config --target ./src`\n   - 扫描文件：`jsec config --target ./src/main.c`\n\n所有代码已通过静态检查，功能测试通过！",
+  "created_at": "2026-02-05T10:32:39.130550",
+  "updated_at": "2026-02-05T10:32:39.130558"
+}

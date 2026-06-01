@@ -1,0 +1,15 @@
+{
+  "id": "20251010_042348_102627",
+  "type": "project_long_term",
+  "tags": [
+    "bug",
+    "cli",
+    "jvs",
+    "multi_agent",
+    "parameter_passing",
+    "g_option"
+  ],
+  "content": "Bug: jvs CLI '-g' 参数未传递到 multi_agent 的参数中，需要在 CLI 到 multi_agent 调用链路中补齐传递。",
+  "created_at": "2025-10-10T04:23:48.102663",
+  "updated_at": "2025-10-10T04:23:48.102668"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260117_110951_458250",
+  "type": "project_long_term",
+  "tags": [
+    "skill-development",
+    "oss_utils",
+    "skill_registration"
+  ],
+  "content": "成功将 /home/wangmaobin/code/oss_utils-0.0.1 注册为Jarvis技能。技能信息已添加到 /home/wangmaobin/.jarvis/rule 文件中，包含技能名称、功能描述、位置和添加时间。",
+  "created_at": "2026-01-17T11:09:51.458271",
+  "updated_at": "2026-01-17T11:09:51.458275"
+}

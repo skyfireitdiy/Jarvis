@@ -1,0 +1,13 @@
+{
+  "id": "20251230_092104_965327",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "test_field_factory",
+    "ArrayField",
+    "测试结构"
+  ],
+  "content": "jarvis_config 模块测试结构：\n- 测试文件位置：tests/jarvis_config/test_field_factory.py\n- 新增测试类：TestArrayFieldNewFeatures（测试带items_schema的数组字段）、TestArrayItemField（测试数组项字段）、TestObjectEditModal（测试对象编辑模态窗口）\n- 测试覆盖范围：基本类型数组（string, number, integer, boolean）和对象类型数组\n- 验证命令：pytest tests/jarvis_config/test_field_factory.py -v（26个测试）和 pytest tests/jarvis_config/ -v（109个测试）",
+  "created_at": "2025-12-30T09:21:04.965357",
+  "updated_at": "2025-12-30T09:21:04.965361"
+}

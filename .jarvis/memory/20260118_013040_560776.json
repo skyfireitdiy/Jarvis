@@ -1,0 +1,8 @@
+{
+  "id": "20260118_013040_560776",
+  "type": "project_long_term",
+  "tags": ["c_checker", "refactoring", "规则库分离", "completed"],
+  "content": "c_checker规则库独立重构完成：将82个正则表达式规则从c_checker.py（2988行→2862行，-126行）独立到c_checker_rules.py（288行）。规则按9个类别组织：BaseRules(4)、FormatCommandRules(6)、ThreadRules(7)、CppLockRules(9)、DataRaceRules(5)、DangerousUsageRules(7)、MemoryHelperRules(12)、CppSpecificRules(24)、HelperRules(6)。测试覆盖100%（82个规则全部测试通过），功能行为完全一致。c_checker.py行数2862行，需进一步深度优化才能达到<1000行目标。",
+  "created_at": "2026-01-18T01:30:40.560807",
+  "updated_at": "2026-01-18T01:30:40.560810"
+}

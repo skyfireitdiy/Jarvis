@@ -1,0 +1,8 @@
+{
+  "id": "20251215_225815_883308",
+  "type": "project_long_term",
+  "tags": ["code_scanning", "security_tool", "requirements"],
+  "content": "### 代码安全扫描工具核心功能需求\n1. 多语言支持(Python/Java/JavaScript)\n2. 漏洞检测能力(SQL注入/XSS/敏感信息泄露等)\n3. 集成开源工具(Bandit/Semgrep)\n4. 多种扫描模式(全量/增量/CI集成)\n5. 报告输出(HTML/JSON/Markdown)\n6. 扩展性需求(自定义规则/插件架构)\n7. 性能需求(并行扫描/资源控制)\n8. 集成需求(CI/CD/IDE)",
+  "created_at": "2025-12-15T22:58:15.883327",
+  "updated_at": "2025-12-15T22:58:15.883330"
+}

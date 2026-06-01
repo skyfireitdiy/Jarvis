@@ -1,0 +1,14 @@
+{
+  "id": "20260314_112538_364184",
+  "type": "project_long_term",
+  "tags": [
+    "gateway",
+    "frontend",
+    "xterm",
+    "persistence",
+    "task-completed"
+  ],
+  "content": "## 终端内容持久化功能已完成\n\n### 问题描述\n切换 Agent 后，之前的终端消息消失。这是 xterm.js 的特殊性导致的：xterm 将终端输出保存在自己的内存缓冲区中，当终端对象被销毁或从 DOM 移除时，内容就会丢失。\n\n### 解决方案\n在终端退出时（`tool_stream_end`）获取 xterm 的 buffer 内容，并保存到消息列表中。\n\n### 实现功能\n1. **获取终端内容**：使用 `terminal.buffer.active` API 获取所有行\n2. **保存为消息**：创建 `terminal_content` 类型的消息，包含终端内容、execution_id、时间戳\n3. **添加到消息列表**：保存到 `allOutputs[agentId]` 中，与 Agent 关联\n4. **模板显示**：在消息列表中显示历史终端内容\n5. **CSS 样式**：添加了 `.terminal-history`、`.terminal-history-header`、`.terminal-history-content` 样式\n\n### 技术实现\n- 文件：`frontend/src/App.vue`\n- 保存位置：`appendExecution()` 函数，`tool_stream_end` 事件处理\n- 显示位置：消息列表模板，`output_type === 'terminal_content'`\n- 样式：深色主题，等宽字体，可滚动\n\n### 验收结果\n- ✅ 前端编译通过\n- ✅ 终端内容在退出时保存到消息列表\n- ✅ 切换 Agent 后历史终端内容可见\n\n### Git Commits\n- 9808d85: 添加终端内容保存逻辑\n- cc78563: 添加终端内容显示模板\n- 1b5e145: 添加终端历史记录样式",
+  "created_at": "2026-03-14T11:25:38.364219",
+  "updated_at": "2026-03-14T11:25:38.364224"
+}

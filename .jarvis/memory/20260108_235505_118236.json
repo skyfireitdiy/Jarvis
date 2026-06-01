@@ -1,0 +1,8 @@
+{
+  "id": "20260108_235505_118236",
+  "type": "project_long_term",
+  "tags": ["jarvis", "run_loop", "KeyboardInterrupt", "exception_handling"],
+  "content": "jarvis项目run_loop.py的KeyboardInterrupt处理模式：在关键步骤（_call_model、_call_tools、_get_next_user_action）和外层循环中添加try-except KeyboardInterrupt，通过_handle_interrupt_with_input()方法获取用户补充信息并继续执行，而不是直接退出。该函数提供交互式选择：1.跳过补充信息继续执行 2.完全退出程序。",
+  "created_at": "2026-01-08T23:55:05.118254",
+  "updated_at": "2026-01-08T23:55:05.118256"
+}

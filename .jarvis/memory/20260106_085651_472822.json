@@ -1,0 +1,12 @@
+{
+  "id": "20260106_085651_472822",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_input_handler",
+    "ListSessions",
+    "session_listing"
+  ],
+  "content": "内置输入处理器添加了ListSessions功能，通过特殊标记'<ListSessions>'触发，可列出所有已保存的会话文件，显示文件名、时间戳和文件大小信息。实现方式是在builtin_input_handler.py中添加了对应处理逻辑。",
+  "created_at": "2026-01-06T08:56:51.472845",
+  "updated_at": "2026-01-06T08:56:51.472850"
+}

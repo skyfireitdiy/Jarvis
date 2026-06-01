@@ -1,0 +1,12 @@
+{
+  "id": "20250805_114603_737852",
+  "type": "project_long_term",
+  "tags": [
+    "platform_manager",
+    "cli_configuration",
+    "model_group"
+  ],
+  "content": "在Jarvis平台管理器中，模型组配置通过以下方式实现：\n1. 使用`_get_resolved_model_config`函数解析模型组配置\n2. 通过`--llm_group`参数可以覆盖默认模型组配置\n3. 模型组配置优先级高于单独的平台/模型参数\n4. 默认模型组配置存储在GLOBAL_CONFIG_DATA['JARVIS_LLM_GROUPS']中\n",
+  "created_at": "2025-08-05T11:46:03.737880",
+  "updated_at": "2025-08-05T11:46:03.737884"
+}

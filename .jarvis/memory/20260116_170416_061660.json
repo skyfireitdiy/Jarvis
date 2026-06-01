@@ -1,0 +1,15 @@
+{
+  "id": "20260116_170416_061660",
+  "type": "project_long_term",
+  "tags": [
+    "base.py",
+    "jarvis_platform",
+    "递归",
+    "总结",
+    "bug_fix",
+    "completed"
+  ],
+  "content": "BasePlatform递归总结问题修复完成：\n\n修改时间：2026-01-16\n\n修改文件：src/jarvis/jarvis_platform/base.py\n\n修改内容：\n1. 在__init__方法中添加了self._summarizing = False标志位（第67行）\n2. 在总结逻辑中添加了防递归保护（第458-533行）：\n   - 如果self._summarizing为True，跳过总结检查并打印提示\n   - 调用总结方法前设置self._summarizing = True\n   - 在finally块中重置self._summarizing = False\n\n修复效果：\n- 彻底解决了总结过程中的无限递归问题\n- 总结功能正常工作，不受影响\n- 非总结对话不受影响\n- 使用finally块确保标志位必定被重置，避免状态异常\n\n代码质量：\n- 通过基础静态检查\n- 通过静态扫描\n- 代码风格与原有代码一致",
+  "created_at": "2026-01-16T17:04:16.061688",
+  "updated_at": "2026-01-16T17:04:16.061692"
+}

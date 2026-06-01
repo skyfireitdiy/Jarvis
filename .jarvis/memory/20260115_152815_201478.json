@@ -1,0 +1,15 @@
+{
+  "id": "20260115_152815_201478",
+  "type": "project_long_term",
+  "tags": [
+    "bug",
+    "jarvis_platform",
+    "rich_tag",
+    "percent_color",
+    "base.py",
+    "token_usage"
+  ],
+  "content": "## Rich 标签不匹配错误分析\n\n### 错误表现\n```\nclosing tag '[/{percent_color}]' at position 139 doesn't match any open tag\n```\n\n### 根本原因\n在 `src/jarvis/jarvis_platform/base.py` 的 `_update_panel_subtitle_with_token` 函数中：\n\n1. **正常流程**（第160-166行）:\n   - 调用 `_get_token_usage_info()` 获取 `percent_color`（red/yellow/green）\n   - 计算得到 `max_tokens` 和 `total_tokens`\n   - 在第174行/第183行使用 `[{percent_color}]` 和 `[/{percent_color}]` 标签\n\n2. **异常流程**（第187-195行）:\n   - 当上述代码抛出异常时，进入 except 块\n   - **关键问题**：except 块中没有重新定义 `percent_color` 变量\n   - 在第193行仍然尝试使用 `[{percent_color}]` 标签\n   - 由于 `percent_color` 变量可能未被定义或具有异常值，导致标签格式错误\n\n### 触发条件\n- `_get_token_usage_info()` 抛出异常（如 `get_used_token_count()` 失败）\n- 或者 `max_tokens <= 0` 或 `progress_bar` 为空时\n- 或者任何计算过程中出现错误\n\n### 修复方案\n在 except 块中定义默认的 `percent_color` 值，避免使用未定义或异常的变量。\n\n### 位置\n文件：`src/jarvis/jarvis_platform/base.py`\n函数：`_update_panel_subtitle_with_token` (第141-200行)",
+  "created_at": "2026-01-15T15:28:15.201527",
+  "updated_at": "2026-01-15T15:28:15.201531"
+}

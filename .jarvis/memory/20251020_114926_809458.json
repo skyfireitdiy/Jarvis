@@ -1,0 +1,18 @@
+{
+  "id": "20251020_114926_809458",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_book",
+    "appendix",
+    "docs",
+    "task_planner",
+    "cli",
+    "config",
+    "9.附录.md",
+    "headings",
+    "segments"
+  ],
+  "content": "{\n  \"file_path\": \"docs/jarvis_book/9.附录.md\",\n  \"dir\": \"docs/jarvis_book\",\n  \"line_count\": 85,\n  \"headings\": [\n    {\"level\": 1, \"title\": \"9. 附录\", \"line\": 1, \"anchor\": null},\n    {\"level\": 2, \"title\": \"9.1 完整配置项列表\", \"line\": 3, \"anchor\": null},\n    {\"level\": 2, \"title\": \"9.2 许可证信息\", \"line\": 72, \"anchor\": null}\n  ],\n  \"planner_related\": [\n    {\n      \"key\": \"JARVIS_PLAN_MAX_DEPTH\",\n      \"lines\": \"41-46\",\n      \"excerpt\": \"| `JARVIS_PLAN_MAX_DEPTH`           | `3`                                       | 任务规划的最大层数；用于限制 plan 模式的递归拆分深度。启用/禁用规划通过 CLI 开关 --plan/--no-plan（支持 jvs 与 jca）控制。 |\"\n    }\n  ],\n  \"related_keys\": [\n    {\n      \"key\": \"JARVIS_USE_METHODOLOGY\",\n      \"line\": 55,\n      \"excerpt\": \"| `JARVIS_USE_METHODOLOGY`          | `true`                                    | 是否启用方法论功能，让AI先思考策略再执行。                 |\"\n    },\n    {\n      \"key\": \"JARVIS_USE_ANALYSIS\",\n      \"line\": 56,\n      \"excerpt\": \"| `JARVIS_USE_ANALYSIS`             | `true`                                    | 是否启用任务分析功能，让AI先分解任务再执行。               |\"\n    }\n  ],\n  \"notes\": \"本文件未包含显式锚点，锚点应由文档引擎自动生成。需要在核心概念与架构章节补充 Planner，并在附录保持与 CLI 开关 --plan/--no-plan 的一致性。\"\n}\n",
+  "created_at": "2025-10-20T11:49:26.809485",
+  "updated_at": "2025-10-20T11:49:26.809489"
+}

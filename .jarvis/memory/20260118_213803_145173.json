@@ -1,0 +1,8 @@
+{
+  "id": "20260118_213803_145173",
+  "type": "project_long_term",
+  "tags": ["task_manager", "testing", "TaskListManager"],
+  "content": "TaskListManager拆分后，测试发现有一个测试用例失败：TestBatchExecution::test_validate_batch_execution_conditions_dependent_on_each_other。错误信息显示批量执行验证的错误信息与预期不符，需要修复相关逻辑以使所有测试通过。",
+  "created_at": "2026-01-18T21:38:03.145187",
+  "updated_at": "2026-01-18T21:38:03.145189"
+}

@@ -1,0 +1,18 @@
+{
+  "content": "小说生成系统工作流优化与正文写作前置条件收紧政策\n\n【总体目标】\n优化小说生成多Agent系统的工作流，实施分卷架构管理与章节梗概前置约束，确保叙事连贯性与结构完整性。\n\n【分卷架构设计】\n1) Generate volume info first (outline.volumes with index, name, outline_file, state_file, chapter_range)\n2) Based on volume info, generate all volumes' outline files (vol_{VV}_outline.md) containing per-chapter descriptions (目标/冲突/转折/悬念)\n3) Based on each volume's outline, generate all chapters' story plots (chapter_{NNNN}_plot.md)\n4) Only after the above activities are completed, start chapter body generation\n\n【正文写作前置条件收紧政策（2025-10-12）】\n- 目标：必须等到所有章节梗概（chapter_{NNNN}_plot.md）全部生成完成后，才能开始正文写作（ChapterWriter）\n- 变更位置：builtin/multi_agent/novel_generator.yaml -> ChapterWriter.system_prompt.流程\n- 原文：当本章已存在 `chapter_{NNNN}_plot.md` 即可启动正文写作\n- 新规：不得单章启动写作；需确认按各卷 vol_{VV}_outline.md 列出的全部章节均已存在 chapter_{NNNN}_plot.md（即全量章节梗概齐备）后，方可启动正文写作；否则请求 NovelCoordinator 继续章节梗概规划并暂停写作\n\n【工作流状态演进】\n考虑 refining progress.status: init -> roles_done -> outline_in_review -> outline_done -> plots_planning -> writing_loop -> completed; optionally add intermediate markers (volumes_planned, volume_outlines_done) if needed for clarity\n\n【角色职责调整】\n- SynopsisOutliner：更新为首先 produce volume info 并 split per-volume outline files\n- ChapterPlanner：保持不变，继续逐章生成梗概；完成 all plots before writing begins\n- NovelCoordinator：已在\"初始动作/工作流\"中声明仅当所有章节梗概齐备后进入写作循环\n- ChapterWriter：新增自我约束机制，防止提前写作\n\n【实施约束】\n- Enforcement: NovelCoordinator must not start ChapterWriter until all chapter plots are completed and status switches to writing_loop\n- 相关一致性：ChapterWriter 本体也进行自我约束，与 NovelCoordinator 的流程声明保持一致\n- 风险与回退：如需恢复旧逻辑，仅需还原 ChapterWriter.system_prompt 流程中的该行描述\n\n【设计原则】\n- 结构完整性：确保分卷架构与章节规划的完整性\n- 叙事连贯性：通过梗概前置保障故事发展的逻辑性\n- 渐进控制：分阶段推进，避免跳跃式执行\n- 可回退性：保持配置的灵活性与恢复能力\n\n【预期效果】\n- 提升小说整体架构的完整性和逻辑性\n- 保障多章节叙事中的连贯性与一致性\n- 减少因提前写作导致的结构问题与返工\n- 建立清晰的阶段推进机制与质量控制点\n- 支持复杂长篇小说的系统化生成",
+  "tags": [
+    "novel_generator",
+    "workflow",
+    "architecture",
+    "chapter_plots_gate",
+    "policy",
+    "volume_planning",
+    "narrative_coherence",
+    "progressive_generation",
+    "structural_control"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251012_173738_669010", "20251012_202907_770713"],
+  "id": "merged_bb469597",
+  "created_at": "2025-11-12T23:46:00.678099"
+}

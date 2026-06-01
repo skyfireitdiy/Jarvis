@@ -1,0 +1,8 @@
+{
+  "id": "20260201_121330_187436",
+  "type": "project_long_term",
+  "tags": ["digital_twin", "continuous_learning", "adaptive_engine", "阶段5.4"],
+  "content": "## AdaptiveEngine 自适应引擎实现\n\n**文件位置**：src/jarvis/jarvis_digital_twin/continuous_learning/adaptive_engine.py\n\n**核心类**：\n- AdaptationType: 适应类型枚举（THRESHOLD/STRATEGY/BEHAVIOR/PREFERENCE）\n- AdaptationResult: 适应结果数据类\n- ThresholdAdapter: 阈值适配器（调整触发阈值）\n- StrategyAdapter: 策略适配器（调整执行策略）\n- BehaviorAdapter: 行为适配器（调整行为模式）\n- AdaptiveEngine: 自适应引擎主类\n\n**核心方法**：\n- adapt_to_feedback(): 根据反馈调整阈值\n- adapt_to_context(): 根据上下文调整行为\n- optimize_performance(): 优化性能（批量调整阈值/策略/行为）\n- rollback_adaptation(): 回滚调整\n- apply_user_preference(): 应用用户偏好\n\n**测试覆盖**：53个测试用例，覆盖率87%\n\n**与其他模块集成**：\n- 可与FeedbackLearner集成获取反馈数据\n- 可与UserProfile集成获取用户偏好",
+  "created_at": "2026-02-01T12:13:30.187455",
+  "updated_at": "2026-02-01T12:13:30.187458"
+}

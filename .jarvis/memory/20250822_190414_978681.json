@@ -1,0 +1,15 @@
+{
+  "id": "20250822_190414_978681",
+  "type": "project_long_term",
+  "tags": [
+    "sub_agent",
+    "sub_code_agent",
+    "jarvis_tools",
+    "tool_registry",
+    "capability",
+    "project_status_summary"
+  ],
+  "content": "项目已支持子Agent能力：\n- 通用子Agent：src/jarvis/jarvis_tools/sub_agent.py（工具名：SubAgent）\n  用途：将子任务交给通用 Agent 执行，自动完成并生成总结\n  主要参数：task（必填）、background（可选）\n- 代码子Agent：src/jarvis/jarvis_tools/sub_code_agent.py（工具名：sub_code_agent）\n  用途：将代码相关子任务交给 CodeAgent 托管执行，自动完成并生成总结\n  主要参数：task（必填）、background（可选）\n- 注册与使用：\n  * src/jarvis/jarvis_code_agent/code_agent.py 的工具列表包含 \"sub_code_agent\"\n  * 使用建议位于 src/jarvis/jarvis_agent/__init__.py（约180-191行），明确区分 sub_agent 与 sub_code_agent 的场景\n- 默认行为：子Agent需自动完成（auto_complete=True）且生成总结（need_summary=True）\n",
+  "created_at": "2025-08-22T19:04:14.978717",
+  "updated_at": "2025-08-22T19:04:14.978722"
+}

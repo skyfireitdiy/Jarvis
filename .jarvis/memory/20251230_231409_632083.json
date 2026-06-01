@@ -1,0 +1,8 @@
+{
+  "id": "20251230_231409_632083",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "testing", "fixtures"],
+  "content": "jarvis_config 测试结构已创建：tests/jarvis_config/__init__.py 和 conftest.py\nconftest.py 定义了四个 fixtures：\n1. sample_schema_file - 创建临时 JSON Schema 文件，包含 string/integer/number/boolean/array/object 类型\n2. parser_with_schema - 使用 sample_schema_file 初始化的 SchemaParser 实例\n3. valid_config_data - 有效的配置数据\n4. invalid_config_data - 无效的配置数据\n\nSchema 包含的约束条件：required, default, enum, minimum, maximum, minLength, maxLength, minItems, maxItems",
+  "created_at": "2025-12-30T23:14:09.632103",
+  "updated_at": "2025-12-30T23:14:09.632105"
+}

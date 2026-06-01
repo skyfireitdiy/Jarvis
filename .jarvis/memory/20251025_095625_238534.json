@@ -1,0 +1,14 @@
+{
+  "id": "20251025_095625_238534",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "scanner",
+    "translation_order",
+    "bug_fix",
+    "design_decision"
+  ],
+  "content": "修复 compute_translation_order_jsonl 输出 translation_order.jsonl 缺少 ids 字段导致仅出现 \"roots\": [\"main\"] 重复的问题。\n变更点:\n- 在步骤生成时加入 \"ids\" 字段，分别记录已选组件内的函数ID列表（selected）以及延迟入口（delayed_entries）的ID列表。\n- 保持 \"symbols\" 在最终写出前被清理，输出仅含 step、ids、group、roots、created_at（roots 为字符串标签，默认包含根函数名/限定名）。\n影响范围:\n- library_replacer 使用 compute_translation_order_jsonl 生成 translation_order_prune.jsonl 并复制为 translation_order.jsonl，现将包含 ids，便于后续转译阶段准确定位符号。\n注意事项:\n- 函数文档中 roots 描述为 ID 列表，但当前实现输出的是字符串标签（名称/限定名）。如需严格对齐文档，可后续调整为 roots_ids 或 roots 使用 ID；暂不改动以减少影响。\n回滚与兼容:\n- 更改为附加字段，不影响既有读取逻辑；下游如依赖 ids 字段应更新读取代码以使用该字段。\n",
+  "created_at": "2025-10-25T09:56:25.238586",
+  "updated_at": "2025-10-25T09:56:25.238593"
+}

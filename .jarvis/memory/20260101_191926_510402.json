@@ -1,0 +1,8 @@
+{
+  "id": "20260101_191926_510402",
+  "type": "project_long_term",
+  "tags": ["decode_output", "subprocess", "windows-compatibility", "encoding"],
+  "content": "src/jarvis/jarvis_utils/input.py 已使用 decode_output 函数处理所有 subprocess.run 的输出，实现 Windows 编码兼容性（UTF-8优先，失败后回退GBK）。共有4处 subprocess.run 调用（行号：406、1015、1055、1165），全部已正确修改。",
+  "created_at": "2026-01-01T19:19:26.510448",
+  "updated_at": "2026-01-01T19:19:26.510453"
+}

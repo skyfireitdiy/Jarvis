@@ -1,0 +1,14 @@
+{
+  "id": "20260131_201042_061559",
+  "type": "project_long_term",
+  "tags": [
+    "知识图谱",
+    "jarvis_knowledge_graph",
+    "实现完成",
+    "阶段2",
+    "知识自主积累"
+  ],
+  "content": "## 知识图谱核心模块实现完成\n\n### 模块位置\n- 源码：`src/jarvis/jarvis_knowledge_graph/`\n- 测试：`tests/jarvis_knowledge_graph/`\n\n### 核心组件\n1. **NodeType枚举**：METHODOLOGY, RULE, MEMORY, CODE, FILE, CONCEPT\n2. **RelationType枚举**：REFERENCES, DEPENDS_ON, SIMILAR_TO, DERIVED_FROM, IMPLEMENTS, RELATED_TO, PART_OF, SUPERSEDES\n3. **KnowledgeNode数据类**：node_id, node_type, name, description, source_path, tags, metadata, created_at, updated_at\n4. **KnowledgeEdge数据类**：edge_id, source_id, target_id, relation_type, strength, description, metadata, created_at\n5. **KnowledgeGraph类**：节点CRUD、边CRUD、图查询、持久化存储\n\n### 核心接口\n- add_node/get_node/update_node/delete_node/query_nodes\n- add_edge/get_edges/delete_edge\n- get_neighbors/find_path/get_related_knowledge\n- get_stats\n\n### 存储方案\n```\n.jarvis/knowledge_graph/\n├── nodes/{type}/{node_id}.json\n└── edges/edges.json\n```\n\n### 测试覆盖率\n- 40个测试用例全部通过\n- 覆盖率：96%（超过80%要求）\n- 静态扫描通过（ruff、mypy）",
+  "created_at": "2026-01-31T20:10:42.061577",
+  "updated_at": "2026-01-31T20:10:42.061580"
+}

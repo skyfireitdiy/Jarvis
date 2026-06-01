@@ -1,0 +1,14 @@
+{
+  "id": "20260106_090140_875233",
+  "type": "project_long_term",
+  "tags": [
+    "multi_session_support",
+    "session_management",
+    "save_session",
+    "restore_session",
+    "ListSessions"
+  ],
+  "content": "Jarvis Agent 多会话支持实现详情：\n\n1. 会话文件命名规则变更：\n   - 从旧格式: saved_session_{agent_name}_{platform_name}_{model_name}.json\n   - 到新格式: saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json\n   - 时间戳格式: YYYYMMDD_HHMMSS (如: 20250106_084038)\n\n2. 关键功能实现：\n   - SessionManager._list_session_files(): 扫描匹配当前会话的会话文件\n   - SessionManager._extract_timestamp(): 从文件名提取时间戳\n   - SessionManager._parse_session_files(): 解析会话文件列表并按时间戳降序排列\n   - restore_session() 方法支持检测多个会话文件时让用户选择\n\n3. 新增命令：\n   - RestoreSession: 恢复会话，支持多会话选择\n   - ListSessions: 列出所有可恢复的会话文件\n\n4. 非交互模式支持：在非交互模式下自动恢复最新会话\n\n5. 向后兼容：支持新旧两种格式的会话文件\n\n6. Commit文件同步：与会话文件使用相同时间戳保存commit信息",
+  "created_at": "2026-01-06T09:01:40.875257",
+  "updated_at": "2026-01-06T09:01:40.875260"
+}

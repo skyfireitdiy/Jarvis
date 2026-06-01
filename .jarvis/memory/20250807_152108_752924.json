@@ -1,0 +1,13 @@
+{
+  "id": "20250807_152108_752924",
+  "type": "project_long_term",
+  "tags": [
+    "installation",
+    "configuration",
+    "uv",
+    "mirror_sources"
+  ],
+  "content": "为了加速 uv 在安装过程中下载 Python 版本，项目安装脚本已配置环境变量 `UV_PYTHON_INSTALL_MIRROR` 指向 `https://python-standalone.org/mirror/astral-sh/python-build-standalone/`。\n",
+  "created_at": "2025-08-07T15:21:08.752953",
+  "updated_at": "2025-08-07T15:21:08.752958"
+}

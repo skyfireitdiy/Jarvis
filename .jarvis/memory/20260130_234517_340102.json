@@ -1,0 +1,13 @@
+{
+  "id": "20260130_234517_340102",
+  "type": "project_long_term",
+  "tags": [
+    "refactoring",
+    "inline_function",
+    "jarvis_auto_fix",
+    "代码重构"
+  ],
+  "content": "InlineFunctionRefactorer实现完成：\n\n**文件位置**：\n- 实现：src/jarvis/jarvis_auto_fix/refactoring/inline_function.py\n- 测试：tests/jarvis_auto_fix/test_inline_function.py\n\n**核心类**：\n- InlineFunctionRefactorer：主重构器类\n- InlineResult：内联操作结果\n- FunctionInfo：函数信息\n- SideEffectChecker：副作用检查器\n- CallSiteFinder：调用点查找器\n- IdentifierReplacer：标识符替换器\n\n**安全检查**：\n- 禁止内联递归函数\n- 禁止内联有副作用的函数（print、open、global、nonlocal等）\n- 禁止内联生成器函数（yield）\n- 禁止内联有多个return的函数\n- 禁止内联有默认参数或*args/**kwargs的函数\n- 禁止内联修改对象属性或下标的函数\n\n**测试覆盖率**：88%（24个测试用例）",
+  "created_at": "2026-01-30T23:45:17.340118",
+  "updated_at": "2026-01-30T23:45:17.340120"
+}

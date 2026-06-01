@@ -1,0 +1,16 @@
+{
+  "id": "20260111_235447_009861",
+  "type": "project_long_term",
+  "tags": [
+    "output",
+    "PrettyOutput",
+    "ConsoleOutputSink",
+    "WARNING",
+    "ERROR",
+    "blink",
+    "style"
+  ],
+  "content": "在PrettyOutput的ConsoleOutputSink实现中，警告(WARNING)和错误(ERROR)类型的输出样式都使用了blink=True参数，使字体闪烁以提醒用户。修复了原始代码中WARNING类型使用blink2=True的错误参数名，统一使用blink=True参数。ERROR类型在修改前就已经使用blink=True，WARNING类型从blink2=True修改为blink=True。",
+  "created_at": "2026-01-11T23:54:47.009905",
+  "updated_at": "2026-01-11T23:54:47.009909"
+}

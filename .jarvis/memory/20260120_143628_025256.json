@@ -1,0 +1,13 @@
+{
+  "id": "20260120_143628_025256",
+  "type": "project_long_term",
+  "tags": [
+    "run_loop",
+    "auto_complete",
+    "tool_call",
+    "summary"
+  ],
+  "content": "在run_loop.py文件中，当工具调用后触发自动总结的流程如下：\n\n1. 在AgentRunLoop.run()方法中，工具调用后会检查是否需要自动完成(auto_complete)。\n\n2. 检查条件：`if ag.auto_complete and is_auto_complete(current_response):`\n   - auto_complete：由Agent初始化时设置的标志\n   - is_auto_complete()：检查响应中是否包含ot('!!!COMPLETE!!!')标记\n\n3. 当检测到自动完成标记后，会进行以下检查：\n   - 检查是否没有代码修改（仅对CodeAgent）\n   - 检查是否有未完成的任务\n   - 这些检查是为了确保在没有代码修改或有未完成任务时，不会错误地自动完成\n\n4. 如果should_auto_complete为True，会执行：\n   - 先运行ag._complete_task(auto_completed=True)，触发记忆整理/事件等副作用\n   - 根据need_summary标志决定返回值\n\n5. 另外，代码中还会检测ot('!!!SUMMARY!!!')标记来触发总结并清空历史：\n   - 检测到!!!SUMMARY!!!标记后，会调用ag._summarize_and_clear_history()\n   - 在总结前会获取git diff信息\n   - 将摘要作为下一轮的附加提示加入，维持上下文连续性\n   - 重置对话长度计数器\n\n6. 在工具调用后，还会有事件处理：\n   - 会触发AFTER_TOOL_CALL事件，广播给订阅者\n   - 这些订阅的回调函数可能会影响后续流程\n\n7. 如果连续5次没有工具调用，还会尝试使用大模型修复工具调用格式。\n\n完整的自动总结流程涉及：工具调用 → 检查自动完成标记 → 检查代码修改和任务状态 → 执行总结和清理历史 → 返回结果。",
+  "created_at": "2026-01-20T14:36:28.025302",
+  "updated_at": "2026-01-20T14:36:28.025306"
+}

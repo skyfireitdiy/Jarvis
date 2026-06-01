@@ -1,0 +1,8 @@
+{
+  "id": "20260111_120408_168999",
+  "type": "project_long_term",
+  "tags": ["load_methodology", "context_window", "token_limit", "methodology"],
+  "content": "load_methodology 函数优化：直接使用平台上下文窗口大小限制方法论内容，而非使用'剩余token'概念。修改位置：src/jarvis/jarvis_utils/methodology.py 第293-308行。将 platform.get_remaining_token_count() 改为 platform._get_platform_max_input_token_count()，将限制比例从 2/3 提升到 0.75，使代码语义更清晰且提供更多可用空间。",
+  "created_at": "2026-01-11T12:04:08.169018",
+  "updated_at": "2026-01-11T12:04:08.169021"
+}

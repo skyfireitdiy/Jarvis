@@ -1,0 +1,19 @@
+{
+  "content": "小说生成多Agent系统流程增强：分卷大纲强制化与线索登记机制设计\n\n【总体目标】\n- 强化小说生成流水线的结构化管理，确保分卷大纲的完整性与线索追踪的持续性\n- 通过分卷大纲强制化提升整体架构稳定性，通过线索登记机制保障叙事连贯性\n- 规范02_synopsis_outline.md仅保存卷级大纲，不再包含逐章细节\n\n【分卷大纲强制化要求】\n1) 流程门槛升级\n   - 纲要阶段必须强化为\"必须先完成分卷大纲与每卷章节大纲\"的强制性门槛\n   - 在状态推断与进度自检中，若 02_synopsis_outline.md 已存在但任一 vol_{VV}_outline.md 缺失，仍处于\"大纲阶段\"，不得进入章节梗概规划或写作阶段\n   - 移除从 02_synopsis_outline.md 直接解析章节列表的回退路径\n\n2) 角色职责明确化\n   - SynopsisOutliner：必须先规划分卷信息，并为每卷生成 vol_{VV}_outline.md（含该卷所有章节条目且每章包含：目标/冲突/转折/悬念），得到用户批准后才能进入章节梗概规划\n   - ChapterPlanner：必须严格依据对应的 vol_{VV}_outline.md 进行章节梗概生成；如缺失对应卷大纲，需请求 Coordinator 先补齐分卷大纲（不再回退到 02_synopsis_outline.md）\n   - NovelCoordinator：流程与自检需更新，章节循环的目标集合只能来源于各卷 vol_{VV}_outline.md；无 vol 文件则继续停留在 SynopsisOutliner 阶段直至补齐并批准\n\n3) 02_synopsis_outline.md 规范更新\n   - 仅保存卷级大纲，不再包含逐章细节\n   - 内容包括整书梗概/视角时态/整体结构与节奏、分卷信息（卷名、章节范围、每卷概述）\n   - 严格给出总章节数N与自动计算卷数K、每卷章节范围\"章节范围: 第{start:04d}章 - 第{end:04d}章\"\n   - 随后基于该卷大纲分别生成每卷的 vol_{VV}_outline.md，逐章覆盖且每章包含\"目标/冲突/转折/悬念\"四要素\n   - 章节循环仅以各卷 vol_{VV}_outline.md 为唯一来源\n   - 需更新SynopsisOutliner的输出格式与自检逻辑，使02_synopsis_outline.md不再枚举每章四要素；四要素校验转移到各 vol_{VV}_outline.md\n\n【线索登记机制设计】\n1) 文件结构与定位\n   - 使用项目根目录的 clues_registry.yaml 存储\"未竟线索/坑点\"索引\n   - 该文件作为内容索引，不作为进度状态文件（不违反\"文件即状态\"的进度管理约定）\n\n2) 数据结构（YAML格式）\n   version: 1\n   open_clues:\n     - id: CLUE-0001  # 递增分配，四位补零\n       title: 简短描述（基于章节梗概或正文中显式提出的坑点/线索）\n       introduced_in: chapter_XXXX_plot.md  # 首次出现文件路径\n       occurrences:\n         - chapter_XXXX_plot.md\n         - chapter_YYYY_draft.md\n\n3) 生成与维护策略\n   - ChapterPlanner职责：在生成并保存 chapter_{NNNN}_plot.md 后，提取\"关键线索与道具\"与\"悬念与收尾\"中的坑点/线索，更新 clues_registry.yaml\n     · 若为新线索：创建新条目（status隐含为open，不单独存储；introduced_in=当前plot路径；occurrences含当前路径）\n     · 若为既有线索：仅向 occurrences 追加当前文件路径\n     · 不删除任何条目\n   - ChapterWriter职责：在生成并保存 chapter_{NNNN}_draft.md 后，依据正文判断对线索的处理\n     · 若本章解决了既有线索：从 open_clues 中移除该条目（遵循用户\"填上了就删除\"的要求）\n     · 若文本新增了未竟线索：按新增规则补充条目\n     · 对被提及的未竟线索：向 occurrences 追加当前文件路径\n   - 两者均需在 clues_registry.yaml 不存在时自动创建；使用 REWRITE 覆盖式保存，避免并发/冲突中的部分写入\n\n4) 系统集成点\n   - 修改 ChapterPlanner.system_prompt 的\"sub_agent 参数要求.task\"以包含登记文件更新\n   - 修改 ChapterWriter.system_prompt 的\"sub_agent 参数要求.task\"以包含登记文件更新\n\n【设计原则】\n- 结构完整性：分卷大纲作为章节生成的必要前提，确保整体架构稳定\n- 线索连续性：通过系统化登记保障叙事线索的连贯与发展\n- 状态一致性：遵循\"文件即状态\"原则，线索登记作为内容索引而非进度状态\n- 渐进维护：支持增量更新，不删除历史记录，便于回溯与分析\n\n【预期效果】\n- 提升小说整体架构的完整性和逻辑性\n- 保障多章节叙事中的线索连贯性与回收管理\n- 减少因大纲不完整导致的返工与重构\n- 提供系统化的线索追踪机制，支持复杂叙事结构的构建\n- 确保章节生成严格遵循分卷架构，提升叙事 coherence",
+  "tags": [
+    "novel_generator",
+    "multi_agent",
+    "workflow",
+    "clues_registry",
+    "volume_outline_requirement",
+    "outline",
+    "story_arc_management",
+    "narrative_coherence",
+    "structural_planning",
+    "content_tracking"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_446110b0", "20251012_191429_576914"],
+  "id": "merged_59fdb373",
+  "created_at": "2025-11-12T23:39:48.767505"
+}

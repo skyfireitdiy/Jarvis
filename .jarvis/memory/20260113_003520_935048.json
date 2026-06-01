@@ -1,0 +1,13 @@
+{
+  "id": "20260113_003520_935048",
+  "type": "project_long_term",
+  "tags": [
+    "render_rule_template",
+    "PrettyOutput",
+    "template_utils",
+    "output-format"
+  ],
+  "content": "render_rule_template 函数位于 src/jarvis/jarvis_utils/template_utils.py，支持可选的 file_path 参数用于打印加载成功信息。规则名称通过 Path(file_path).stem 提取（文件名不含后缀）。输出应使用 PrettyOutput.auto_print 而不是 print，以保持输出格式统一美观。",
+  "created_at": "2026-01-13T00:35:20.935064",
+  "updated_at": "2026-01-13T00:35:20.935068"
+}

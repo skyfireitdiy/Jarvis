@@ -1,0 +1,13 @@
+{
+  "id": "20260105_212625_566833",
+  "type": "project_long_term",
+  "tags": [
+    "agent",
+    "task_list",
+    "save_session",
+    "implementation_detail"
+  ],
+  "content": "Agent类中新增了_save_task_lists方法，在save_session时自动保存任务列表。实现细节：\n1. 检查Agent是否具有task_list_manager属性和task_lists数据\n2. 文件命名规则：saved_session_{agent_name}_{platform_name}_{model_name}_tasklist.json\n3. 保存位置：与会话文件相同的目录(.jarvis)\n4. 数据结构：{\"task_lists\": {task_list_id: task_list.to_dict()}}\n5. 任务列表保存失败不影响主会话保存流程",
+  "created_at": "2026-01-05T21:26:25.566873",
+  "updated_at": "2026-01-05T21:26:25.566878"
+}

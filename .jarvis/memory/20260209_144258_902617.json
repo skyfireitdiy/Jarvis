@@ -1,0 +1,8 @@
+{
+  "id": "20260209_144258_902617",
+  "type": "project_long_term",
+  "tags": ["规则管理", "builtin_rules", "rule.md", "规则显示", "功能改进"],
+  "content": "## 功能改进：builtin/rules/rule.md 自动加载显示\n\n### 问题描述\n`builtin/rules/rule.md` 文件虽然已经被自动加载，但没有像 `project_rule` 和 `global_rule` 那样作为独立的规则条目显示在规则列表中。\n\n### 解决方案\n在 `RulesManager.get_all_rules_with_status()` 方法中添加了对 `builtin_rules` 的显示处理：\n\n**修改文件**：`src/jarvis/jarvis_agent/rules_manager.py`\n\n**修改位置**：在处理 `global_rule` 的代码块之后（约第932行），添加了处理 `builtin_rules` 的代码块。\n\n**关键代码**：\n```python\n# 处理内置规则索引文件 builtin/rules/rule.md\ntry:\n    from jarvis.jarvis_utils.template_utils import _get_builtin_dir\n    builtin_dir = _get_builtin_dir()\n    if builtin_dir is not None:\n        builtin_rule_path = builtin_dir / \"rules\" / \"rule.md\"\n        if builtin_rule_path.exists() and builtin_rule_path.is_file():\n            preview = self.get_rule_preview(\"builtin_rules\")\n            is_loaded = \"builtin_rules\" in self._active_rules\n            is_loaded = is_loaded or \"builtin_rules\" in self.loaded_rules\n            rules_info.append((\"builtin_rules\", preview, is_loaded, str(builtin_rule_path)))\nexcept Exception:\n    pass\n```\n\n### 验证结果\n- ✅ `builtin_rules` 正确显示在规则列表中\n- ✅ 加载状态正确显示为\"已激活\"\n- ✅ 文件路径正确指向 `builtin/rules/rule.md`\n- ✅ 与 `project_rule` 和 `global_rule` 的显示方式保持一致\n- ✅ 所有相关测试通过\n\n### 技术细节\n- `builtin_rules` 已经在 `_load_default_rules()` 中被自动加载并添加到 `_active_rules`\n- 但在 `get_all_rules_with_status()` 中缺少对应的显示处理\n- 修改后的代码遵循了相同的模式，确保了一致性",
+  "created_at": "2026-02-09T14:42:58.902642",
+  "updated_at": "2026-02-09T14:42:58.902648"
+}

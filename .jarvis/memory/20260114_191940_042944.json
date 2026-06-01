@@ -1,0 +1,8 @@
+{
+  "id": "20260114_191940_042944",
+  "type": "project_long_term",
+  "tags": ["token_calibration", "code_review", "jarvis"],
+  "content": "Token校准功能的代码审查 - 用户需求是实现Claude和OpenAI平台的token校准功能，当前修改仅添加了token_calibration.md规则文件，未实现相关代码修改",
+  "created_at": "2026-01-14T19:19:40.042963",
+  "updated_at": "2026-01-14T19:19:40.042967"
+}
