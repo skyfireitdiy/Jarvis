@@ -1524,9 +1524,17 @@ class ChildNodeClient:
         if not token:
             raise RuntimeError("missing token from master")
 
+        # 保存旧 token，用于向已运行的 Agent 认证
+        old_token = os.environ.get("JARVIS_AUTH_TOKEN")
+
+        # 更新本节点的 token
         os.environ["JARVIS_AUTH_TOKEN"] = token
         self._node_runtime.token_sync_state.mark_success("master")
         self._node_runtime.mark_ready()
+
+        # 如果 token 发生变化，通知所有本地 Agent 更新 token
+        if old_token and old_token != token:
+            await self._notify_agents_token_update(old_token, token)
         logger.info(
             "[NODE] child connected to master node_id=%s ws_url=%s",
             config.effective_node_id,
@@ -2039,3 +2047,64 @@ class ChildNodeClient:
                 },
                 request_id=request_id,
             )
+
+    async def _notify_agents_token_update(self, old_token: str, new_token: str) -> None:
+        """通知所有本地 Agent 更新认证 Token。
+
+        当主网关重启后 Token 发生变化时，子网关用旧 Token 向 Agent 认证，
+        调用 /update_token 端点通知 Agent 更新为新 Token。
+        全部更新完成后，旧 Token 不再需要（Agent 已使用新 Token）。
+
+        Args:
+            old_token: 变更前的旧 Token，用于向 Agent 认证
+            new_token: 变更后的新 Token，传递给 Agent 更新
+        """
+        agents = self._agent_manager.get_agent_list()
+        if not agents:
+            return
+
+        logger.info(
+            "[NODE] Token changed, notifying %d local agent(s) to update token",
+            len(agents),
+        )
+
+        for agent_info in agents:
+            agent_id = agent_info.get("agent_id")
+            port = agent_info.get("port")
+            if not port:
+                continue
+
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    resp = await client.post(
+                        f"http://127.0.0.1:{port}/update_token",
+                        json={"token": new_token},
+                        headers={"Authorization": f"Bearer {old_token}"},
+                    )
+                    if resp.status_code == 200:
+                        result = resp.json()
+                        if result.get("success"):
+                            logger.info(
+                                "[NODE] Agent %s token updated successfully",
+                                agent_id,
+                            )
+                        else:
+                            logger.warning(
+                                "[NODE] Agent %s token update failed: %s",
+                                agent_id,
+                                result.get("error"),
+                            )
+                    else:
+                        logger.warning(
+                            "[NODE] Agent %s token update request failed: HTTP %d",
+                            agent_id,
+                            resp.status_code,
+                        )
+            except Exception as exc:
+                logger.warning(
+                    "[NODE] Failed to notify agent %s token update: %s",
+                    agent_id,
+                    exc,
+                )
+
+        logger.info("[NODE] All local agents notified of token update")
