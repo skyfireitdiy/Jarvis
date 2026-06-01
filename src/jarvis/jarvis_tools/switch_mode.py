@@ -51,7 +51,7 @@ class SwitchModeTool:
         "required": ["mode"],
     }
 
-    def __call__(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行模式切换
 
         参数:
