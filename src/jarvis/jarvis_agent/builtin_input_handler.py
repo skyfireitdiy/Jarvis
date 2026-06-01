@@ -1233,6 +1233,10 @@ def switch_model(agent: Any) -> bool:
     current_platform_type = get_platform_type_from_agent(agent)
     PrettyOutput.auto_print(f"📌 当前模型类型: {current_platform_type}")
 
+    # 获取全局配置以获取 LLM 详情
+    global_config = _get_global_config()
+    llms_config = global_config.get("llms", {})
+
     # 显示模型列表
     table = Table(
         title=f"📋 模型组 '{current_group}' 的可用模型",
@@ -1240,16 +1244,25 @@ def switch_model(agent: Any) -> bool:
         header_style="bold magenta",
         expand=True,
     )
-    table.add_column("编号", style="cyan", justify="center")
-    table.add_column("类型", style="green")
-    table.add_column("模型名称", style="magenta")
-    table.add_column("状态", style="yellow", justify="center")
+    table.add_column("编号", style="cyan", justify="center", ratio=1)
+    table.add_column("类型", style="green", justify="left", ratio=1)
+    table.add_column("模型名称", style="magenta", justify="left", ratio=2)
+    table.add_column("多模态", style="yellow", justify="center", ratio=1)
+    table.add_column("上下文长度", style="blue", justify="right", ratio=1)
+    table.add_column("状态", style="white", justify="center", ratio=1)
 
     for idx, (model_type, type_name, model_name) in enumerate(available_models, 1):
+        # 获取 LLM 配置详情
+        llm_detail = llms_config.get(model_name, {})
+        max_tokens = llm_detail.get("max_input_token_count", "N/A")
+        supports_multimodal = llm_detail.get("llm_config", {}).get(
+            "supports_multimodal", False
+        )
+        multimodal_str = "✅" if supports_multimodal else "❌"
         status = "✓ 当前" if model_type == current_platform_type else ""
-        table.add_row(str(idx), type_name, model_name, status)
-
-    _print_table_for_terminal_or_frontend(table)
+        table.add_row(
+            str(idx), type_name, model_name, multimodal_str, str(max_tokens), status
+        )
 
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
