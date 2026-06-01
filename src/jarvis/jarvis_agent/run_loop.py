@@ -73,14 +73,29 @@ class AgentRunLoop:
         return user_input
 
     def _postprocess_response(self, response: str) -> str:
-        """后处理响应（直接返回）
+        """后处理响应：提取并删除阶段标识，更新到agent属性
 
         Args:
             response: 原始响应
 
         Returns:
-            原始响应
+            处理后的响应（删除阶段标识）
         """
+        # 提取阶段标识 [MODE: xxx]
+        import re
+
+        # 匹配 [MODE: xxx] 及其后面的连续空行
+        mode_pattern = r"^\[MODE:\s*([A-Z_]+)\]\s*\n(\s*\n)*"
+        match = re.match(mode_pattern, response, re.MULTILINE)
+
+        if match:
+            mode = match.group(1)
+            # 更新agent的当前阶段
+            if hasattr(self.agent, "state_manager"):
+                self.agent.state_manager.set_mode(mode)
+            # 从响应中删除阶段标识及周围的连续空行
+            response = re.sub(mode_pattern, "", response, count=1)
+
         return response
 
     def _filter_tool_calls_from_response(self, response: str) -> str:

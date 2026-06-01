@@ -81,6 +81,7 @@ class AgentStateManager:
 
     def __init__(self):
         self._status = AgentStatus.RUNNING  # 初始状态：运行中
+        self._current_mode = None  # 当前ARCHER工作流阶段
         self._lock = threading.Lock()
 
     def get_status(self) -> str:
@@ -97,6 +98,16 @@ class AgentStateManager:
     def set_running(self) -> None:
         """设置为运行状态。"""
         self.set_status(AgentStatus.RUNNING)
+
+    def get_mode(self) -> Optional[str]:
+        """获取当前ARCHER工作流阶段。"""
+        with self._lock:
+            return self._current_mode
+
+    def set_mode(self, mode: Optional[str]) -> None:
+        """设置当前ARCHER工作流阶段。"""
+        with self._lock:
+            self._current_mode = mode
 
     def set_waiting_multi(self) -> None:
         """设置为等待多行输入状态。"""
