@@ -1264,6 +1264,8 @@ def switch_model(agent: Any) -> bool:
             str(idx), type_name, model_name, multimodal_str, str(max_tokens), status
         )
 
+    _print_table_for_terminal_or_frontend(table)
+
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
     while True:
