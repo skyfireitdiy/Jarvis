@@ -1,7 +1,19 @@
 # -*- coding: utf-8 -*-
 from typing import List
+from typing import Optional
 
 from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
+from jarvis.jarvis_tools.registry import ToolRegistry
+
+
+def get_tool_registry(
+    output_handlers: List[OutputHandlerProtocol],
+) -> Optional[ToolRegistry]:
+    """Get the ToolRegistry instance from output handlers."""
+    for handler in output_handlers:
+        if isinstance(handler, ToolRegistry):
+            return handler
+    return None
 
 
 def build_action_prompt(output_handlers: List[OutputHandlerProtocol]) -> str:
@@ -14,6 +26,10 @@ def build_action_prompt(output_handlers: List[OutputHandlerProtocol]) -> str:
     Returns:
         A formatted string containing the action prompt.
     """
+    # Check if switch_mode tool is available via ToolRegistry
+    tool_registry = get_tool_registry(output_handlers)
+    has_switch_mode = tool_registry is not None and "switch_mode" in tool_registry.tools
+
     action_prompt = """
 <actions>
 # 🧰 可用操作
@@ -57,8 +73,10 @@ def build_action_prompt(output_handlers: List[OutputHandlerProtocol]) -> str:
 4. **处理完结果后再调用新的操作**：必须完整处理当前工具的执行结果，包括错误信息、输出内容等，然后再决定下一步操作。
 5. **严格按照每个操作的格式执行**：必须遵循每个工具调用的格式要求，包括参数类型、必需字段等。
 6. 如果对操作使用不清楚，请请求帮助
-7. **必须使用 switch_mode 切换工作流模式**：不同阶段涉及不同模型的选择（ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW），完成当前阶段后务必调用 switch_mode 切换到下一阶段，否则无法正确切换模型
-</rules>
-</actions>
 """
+
+    if has_switch_mode:
+        action_prompt += "7. **必须使用 switch_mode 切换工作流模式**：不同阶段涉及不同模型的选择（ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW），完成当前阶段后务必调用 switch_mode 切换到下一阶段，否则无法正确切换模型\n"
+
+    action_prompt += "</rules>\n</actions>\n"
     return action_prompt
