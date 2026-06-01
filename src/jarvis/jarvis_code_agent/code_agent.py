@@ -35,7 +35,6 @@ from jarvis.jarvis_code_agent.code_agent_prompts import (
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
-from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_quick_mode
@@ -374,12 +373,6 @@ class CodeAgent(Agent):
 
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
-
-    def _init_model(self) -> None:
-        """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
-        self.model = PlatformRegistry().get_smart_platform()
-        self.model.set_suppress_output(False)
-        self.model.agent = self
 
     def run(
         self,
