@@ -796,6 +796,8 @@ class AgentRunLoop:
 
                 # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
                 if current_response and current_response.strip():
+                    # 先移除阶段标识 [MODE: xxx]
+                    current_response = self._postprocess_response(current_response)
                     # 过滤掉 <TOOL_CALL>...</TOOL_CALL> 标签及其内容
                     filtered_response = self._filter_tool_calls_from_response(
                         current_response
