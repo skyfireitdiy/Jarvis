@@ -61,9 +61,6 @@ class AgentRunLoop:
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
 
-        # ARCHER 工作流状态跟踪
-        self._current_mode: Optional[str] = None  # 当前的 MODE 状态
-
     def _preprocess_user_input(self, user_input: str) -> str:
         """预处理用户输入（直接返回）
 

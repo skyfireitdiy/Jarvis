@@ -1636,9 +1636,9 @@ class Agent:
 
             # 压缩更早的消息
             try:
-                # 创建临时模型，强制使用 cheap 模型以优化成本
+                # 创建临时模型，使用与当前会话相同的模型
                 # （不传入系统提示词，因为会通过 set_messages 设置）
-                temp_model = self._create_temp_model(force_model_type="cheap")
+                temp_model = self._create_temp_model()
 
                 # 使用 set_messages 设置对话历史，包含系统消息和需要压缩的旧消息
                 messages_to_set = system_messages + old_messages
