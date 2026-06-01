@@ -128,15 +128,32 @@ def llm_list() -> None:
     llms = config.get("llms", {})
 
     if not llms:
-        PrettyOutput.auto_print("ℹ️ 没有配置任何 LLM")
+        PrettyOutput.auto_print("ℹ️  没有配置任何 LLM")
         return
 
-    PrettyOutput.auto_print("✅ LLM 配置列表:")
+    # 创建 rich 表格
+    table = Table(title="✅ LLM 配置列表", expand=True)
+    table.add_column("名称", style="cyan", justify="left", ratio=2, no_wrap=True)
+    table.add_column("平台", style="green", justify="left", ratio=1, no_wrap=True)
+    table.add_column("模型", style="yellow", justify="left", ratio=2, no_wrap=True)
+    table.add_column("多模态", style="magenta", justify="center", ratio=1, no_wrap=True)
+    table.add_column("上下文长度", style="blue", justify="right", ratio=1, no_wrap=True)
+
+    # 添加数据行
     for name in sorted(llms.keys()):
         llm_config = llms[name]
         platform = llm_config.get("platform", "unknown")
         model = llm_config.get("model", "unknown")
-        PrettyOutput.auto_print(f"  • {name} ({platform}/{model})")
+        max_tokens = llm_config.get("max_input_token_count", "N/A")
+        supports_multimodal = llm_config.get("llm_config", {}).get(
+            "supports_multimodal", False
+        )
+        multimodal_str = "✅" if supports_multimodal else "❌"
+        table.add_row(name, platform, model, multimodal_str, str(max_tokens))
+
+    # 打印表格
+    console = Console()
+    console.print(table)
 
 
 @llm_app.command("show")
