@@ -766,6 +766,18 @@ class PrettyOutput:
         except Exception:
             pass
 
+        # 获取当前 ARCHER 工作流阶段
+        try:
+            from jarvis.jarvis_utils.globals import get_current_agent
+
+            agent = get_current_agent()
+            if agent and hasattr(agent, "state_manager"):
+                current_mode = agent.state_manager.get_mode()
+                if current_mode and "current_mode" not in context:
+                    context["current_mode"] = current_mode
+        except Exception:
+            pass
+
         # 获取是否无交互模式
         try:
             from jarvis.jarvis_utils.config import is_non_interactive
@@ -913,6 +925,11 @@ class PrettyOutput:
         # 如果打印的内容中有换行，就在要打印的内容开头添加一个换行
         if "\n" in text:
             text = f"\n{text}"
+
+        # 如果有当前阶段信息，在文本前添加阶段标识
+        if context and "current_mode" in context:
+            mode = context["current_mode"]
+            text = f"[{mode}] {text}"
 
         # 使用现有的print方法进行着色输出
         PrettyOutput._print(
