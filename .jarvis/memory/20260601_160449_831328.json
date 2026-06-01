@@ -1,0 +1,12 @@
+{
+  "id": "20260601_160449_831328",
+  "type": "project_long_term",
+  "tags": [
+    "架构决策",
+    "ARCHER工作流",
+    "模型选择"
+  ],
+  "content": "架构决策：移除 ARCHER 工作流的动态模型切换机制\n\n决策背景：\n- 原设计：ARCHER 工作流的不同阶段（ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW）映射到不同模型类型（smart/normal/cheap）\n- 问题：LLM 不总是主动调用 switch_mode 工具，导致模式和模型无法正确切换\n\n决策内容：\n1. 保留 ARCHER 工作流作为思考框架和提示词指导\n2. 移除 switch_mode 工具和动态模型切换逻辑\n3. 在任务开始时根据任务类型选择合适的模型，整个任务过程使用同一模型\n4. 可选：提供手动切换命令供用户在必要时使用\n\n决策理由：\n1. 动态切换增加系统复杂度，容易出错\n2. 依赖 LLM 工具调用能力不可靠\n3. 频繁切换打断对话连续性\n4. 成本优化效果有限，复杂度大于收益\n5. 简化后的系统更可靠、易维护\n\n影响范围：\n- 移除 src/jarvis/jarvis_tools/switch_mode.py\n- 修改 builtin/prompts/code_agent_system/ 中的提示词，移除强制模式切换要求\n- 简化 src/jarvis/jarvis_agent/run_loop.py 中的模式跟踪逻辑\n- 更新相关文档",
+  "created_at": "2026-06-01T16:04:49.831353",
+  "updated_at": "2026-06-01T16:04:49.831358"
+}
