@@ -886,7 +886,7 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
         with open(last_check_file, "w") as f:
             f.write(today_str)
     except Exception as e:
-        PrettyOutput.auto_print(f"⚠️ Git仓库更新检查失败: {e}")
+        PrettyOutput.auto_print(f"⚠️ 更新检查失败: {str(e)}")
     finally:
         pass
 
