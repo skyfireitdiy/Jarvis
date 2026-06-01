@@ -988,15 +988,15 @@ def check_context_limit(
     )
 
 
-def perform_switch(
-    agent: Any, new_model_group: str, platform_type: str = "normal"
+def switch_platform_type(
+    agent: Any, platform_type: str, preserve_model_group: bool = True
 ) -> bool:
-    """执行模型组切换
+    """切换平台类型（smart/normal/cheap），保持或更新模型组
 
     参数:
         agent: Agent 实例
-        new_model_group: 新模型组名称
-        platform_type: 平台类型 ('normal' 或 'smart')
+        platform_type: 平台类型 ('smart', 'normal', 或 'cheap')
+        preserve_model_group: 是否保持当前模型组不变（默认True）
 
     返回:
         bool: 是否切换成功
@@ -1005,13 +1005,12 @@ def perform_switch(
         # 保存旧模型的消息
         old_messages = agent.model.get_messages()
 
-        # 更新全局配置
-        set_llm_group(new_model_group)
-
         # 重新创建模型
         platform_registry = PlatformRegistry()
         if platform_type == "smart":
             agent.model = platform_registry.get_smart_platform()
+        elif platform_type == "cheap":
+            agent.model = platform_registry.get_cheap_platform()
         else:
             agent.model = platform_registry.get_normal_platform()
 
@@ -1026,6 +1025,30 @@ def perform_switch(
         agent.session.model = agent.model
 
         return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 切换平台类型失败: {e}")
+        return False
+
+
+def perform_switch(
+    agent: Any, new_model_group: str, platform_type: str = "normal"
+) -> bool:
+    """执行模型组切换
+
+    参数:
+        agent: Agent 实例
+        new_model_group: 新模型组名称
+        platform_type: 平台类型 ('normal' 或 'smart')
+
+    返回:
+        bool: 是否切换成功
+    """
+    try:
+        # 更新全局配置
+        set_llm_group(new_model_group)
+
+        # 使用通用的平台类型切换函数
+        return switch_platform_type(agent, platform_type, preserve_model_group=False)
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换模型组失败: {e}")
         return False
