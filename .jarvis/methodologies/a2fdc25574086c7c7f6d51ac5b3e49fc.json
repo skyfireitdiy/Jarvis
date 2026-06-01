@@ -1,0 +1,5 @@
+{
+  "problem_type": "规则注册流程",
+  "content": "规则注册流程（Jarvis项目专用）\n\n## 问题重述\n在Jarvis项目中，当新增规则文件后，必须将规则注册到项目规则列表中，以确保规则能够被正确加载和使用。\n\n## 可复用解决流程\n\n### 1. 创建规则文件\n- 位置：`{{ git_root_dir }}/.jarvis/rules/<rule_name>.md`\n- 命名规范：小写字母、下划线分隔、.md后缀\n- 格式规范：遵循 `builtin/rules/add_rule.md` 的要求\n\n### 2. 更新规则列表文件\n- 文件位置：`{{ git_root_dir }}/.jarvis/rule`\n- 参考格式：`{{ rule_file_dir }}/builtin_rules.md`\n- 添加内容：\n  ```markdown\n  ### 规则名称\n \n  规则简短描述。（{{ git_root_dir }}/.jarvis/rules/<rule_name>.md）\n  ```\n- 分类要求：将规则添加到合适的分类下（如架构设计、开发流程、代码质量等）\n\n### 3. 验证注册\n- 检查规则文件是否存在：`ls {{ git_root_dir }}/.jarvis/rules/<rule_name>.md`\n- 检查规则列表是否已更新：`grep \"规则名称\" {{ git_root_dir }}/.jarvis/rule`\n- 确认格式符合规范\n\n## 注意事项\n- **变量使用**：规则列表中的路径变量可立即渲染，不使用 `{% raw %}` 标签\n- **代码块示例**：在markdown代码块中的变量需使用 `{% raw %}` 避免被渲染\n- **一致性**：保持规则描述风格与现有规则一致\n- **分类准确**：选择最合适的分类，便于后续查找和维护\n\n## 相关文件\n- 规范文档：`builtin/rules/add_rule.md`\n- 规则列表示例：`builtin/rules/builtin_rules.md`\n- 项目规则列表：`.jarvis/rule`\n\n## 检查清单\n- [ ] 规则文件已创建在 `.jarvis/rules/` 目录\n- [ ] 规则已注册到 `.jarvis/rule` 文件\n- [ ] 规则注册格式符合规范\n- [ ] 分类选择合理\n- [ ] 描述清晰简洁",
+  "scope": "project"
+}
