@@ -1,0 +1,13 @@
+{
+  "id": "20260601_172318_149608",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "模型切换",
+    "代码复用",
+    "switch_platform_type"
+  ],
+  "content": "代码重构：提取通用的模型切换函数\n\n背景：\n- 原有 `perform_switch` 函数用于切换模型组，但不支持 cheap 类型\n- `CodeAgent._switch_model_by_difficulty` 重复实现了类似的模型切换逻辑\n\n重构内容：\n1. 在 `builtin_input_handler.py` 中创建 `switch_platform_type` 函数\n   - 支持 smart/normal/cheap 三种平台类型\n   - 保持当前模型组不变（preserve_model_group=True）\n   - 自动处理消息历史保存和恢复\n   - 自动更新 session.model 引用\n\n2. 重构 `perform_switch` 函数\n   - 调用 `switch_platform_type` 实现核心逻辑\n   - 保留模型组切换功能（set_llm_group）\n\n3. 简化 `CodeAgent._switch_model_by_difficulty` 方法\n   - 直接调用 `switch_platform_type` 函数\n   - 移除重复的模型切换逻辑（60+ 行代码简化为 10+ 行）\n   - 保留系统提示词设置和输出信息\n\n优势：\n- 代码复用：避免重复实现相同逻辑\n- 易维护：模型切换逻辑集中在一处\n- 功能完整：支持所有平台类型（smart/normal/cheap）\n- 可扩展：其他地方需要切换模型时可直接复用\n\n修改文件：\n- src/jarvis/jarvis_agent/builtin_input_handler.py（新增 switch_platform_type 函数）\n- src/jarvis/jarvis_code_agent/code_agent.py（简化 _switch_model_by_difficulty 方法）",
+  "created_at": "2026-06-01T17:23:18.149636",
+  "updated_at": "2026-06-01T17:23:18.149640"
+}

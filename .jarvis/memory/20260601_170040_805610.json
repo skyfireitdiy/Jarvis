@@ -1,0 +1,12 @@
+{
+  "id": "20260601_170040_805610",
+  "type": "project_long_term",
+  "tags": [
+    "任务分类",
+    "难度评估",
+    "代码修改"
+  ],
+  "content": "任务分类功能增强 - 增加难度等级评估\n\n修改内容：\n1. 修改 `classify_user_request` 函数返回类型：从 `str` 改为 `Tuple[str, str]`，返回 (场景类型, 难度等级)\n2. 更新分类提示词：增加难度等级说明（easy/medium/hard），要求 LLM 同时返回场景类型和难度\n3. 修改响应解析逻辑：支持解析新的返回格式（scenario: xxx 和 difficulty: xxx）\n4. 更新调用位置：`code_agent.py` 第486行，解包返回的元组\n5. 添加 TODO 注释：标记难度信息后续需要传递给任务管理器或资源调度器\n\n修改文件：\n- src/jarvis/jarvis_code_agent/code_agent_prompts.py（第2行、122行、155-215行）\n- src/jarvis/jarvis_code_agent/code_agent.py（第486-489行）\n\n难度等级定义：\n- easy（简单）：1-2步可完成，单文件修改，无复杂依赖\n- medium（中等）：3-5步，涉及多个文件，有一定依赖关系\n- hard（困难）：5步以上，架构级修改，复杂依赖关系\n\n验证状态：\n- 静态检查通过\n- 类型检查通过\n- 功能逻辑正确\n- 待完成：将难度信息传递给任务管理器",
+  "created_at": "2026-06-01T17:00:40.805644",
+  "updated_at": "2026-06-01T17:00:40.805648"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260601_171832_972307",
+  "type": "project_long_term",
+  "tags": [
+    "代码重构",
+    "模型切换",
+    "代码复用"
+  ],
+  "content": "改进模型切换功能 - 参考现有实现\n\n改进内容：\n1. 参考 `builtin_input_handler.py` 中的 `perform_switch` 函数（第991行）\n2. 增加消息历史的保存和恢复功能\n3. 明确设置 `set_suppress_output(False)`\n4. 使用 `hasattr` 进行安全的方法检查\n\n关键改进点：\n- 保存旧模型消息：`old_messages = self.model.get_messages()`\n- 切换模型后恢复消息：`self.model.set_messages(old_messages)`\n- 设置输出抑制：`self.model.set_suppress_output(False)`\n- 这确保了切换模型后对话历史的连续性\n\n修改文件：\n- src/jarvis/jarvis_code_agent/code_agent.py（第152-220行）\n\n参考函数：\n- src/jarvis/jarvis_agent/builtin_input_handler.py::perform_switch（第991-1031行）\n- src/jarvis/jarvis_agent/builtin_input_handler.py::switch_model（第1186行）\n\n技术要点：\n- 模型切换需要保持消息历史连续性\n- 需要更新 session.model 引用\n- 需要重新设置系统提示词\n- 需要设置 agent 引用和输出抑制标志",
+  "created_at": "2026-06-01T17:18:32.972332",
+  "updated_at": "2026-06-01T17:18:32.972336"
+}

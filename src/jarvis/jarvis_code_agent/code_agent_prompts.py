@@ -2,7 +2,7 @@
 """CodeAgent 系统提示词模块"""
 
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import yaml  # type: ignore[import-untyped]
 
@@ -119,7 +119,9 @@ def _get_scenario_types() -> Dict[str, str]:
 SCENARIO_TYPES = _get_scenario_types()
 
 
-def classify_user_request(user_input: Union[str, List[ContentBlock]]) -> str:
+def classify_user_request(
+    user_input: Union[str, List[ContentBlock]],
+) -> Tuple[str, str]:
     """使用 normal_llm 对用户需求进行分类
 
     参数:
@@ -155,9 +157,8 @@ def classify_user_request(user_input: Union[str, List[ContentBlock]]) -> str:
             scenario_ids.append(scenario_id)
 
         scenarios_text = "\n".join(scenarios_list)
-        scenario_ids_text = "/".join(scenario_ids)
 
-        classification_prompt = f"""请分析以下用户需求，判断其属于哪个开发场景类型。
+        classification_prompt = f"""请分析以下用户需求，判断其属于哪个开发场景类型，并评估任务难度。
 
 用户需求：
 {user_input}
@@ -165,32 +166,62 @@ def classify_user_request(user_input: Union[str, List[ContentBlock]]) -> str:
 可选场景类型：
 {scenarios_text}
 
-请只返回场景类型的英文标识（{scenario_ids_text}），不要包含其他内容。
-如果无法明确判断，返回 default。
+任务难度等级：
+- easy（简单）：单文件修改、简单配置调整、明确的小改动
+- medium（中等）：多文件修改、需要理解业务逻辑、涉及一定复杂度
+- hard（困难）：架构级改动、复杂重构、需要深入分析和设计
+
+请按以下格式返回（只返回这两行，不要包含其他内容）：
+scenario: <场景类型>
+difficulty: <难度等级>
+
+如果无法明确判断场景类型，scenario 返回 default。
+如果无法明确判断难度，difficulty 返回 medium。
 """
 
         # 使用 normal_llm 进行分类
         response = platform.chat_until_success(classification_prompt)
 
-        # 解析响应，提取场景类型
+        # 解析响应，提取场景类型和难度
         response = response.strip().lower()
 
-        # 检查响应是否包含有效的场景类型
-        for scenario_type in SCENARIO_TYPES.keys():
-            if scenario_type in response or response == scenario_type:
-                PrettyOutput.auto_print(
-                    f"📋 需求分类结果: {SCENARIO_TYPES[scenario_type]} ({scenario_type})"
-                )
-                return scenario_type
+        # 初始化默认值
+        scenario = "default"
+        difficulty = "medium"
 
-        # 如果无法识别，返回默认类型
-        PrettyOutput.auto_print("📋 需求分类结果: 通用开发 (default)")
-        return "default"
+        # 解析响应格式：scenario: xxx\ndifficulty: yyy
+        lines = response.split("\n")
+        for line in lines:
+            line = line.strip()
+            if line.startswith("scenario:"):
+                scenario_value = line.split(":", 1)[1].strip()
+                # 验证场景类型是否有效
+                for scenario_type in SCENARIO_TYPES.keys():
+                    if (
+                        scenario_type in scenario_value
+                        or scenario_value == scenario_type
+                    ):
+                        scenario = scenario_type
+                        break
+            elif line.startswith("difficulty:"):
+                difficulty_value = line.split(":", 1)[1].strip()
+                # 验证难度等级是否有效
+                if difficulty_value in ["easy", "medium", "hard"]:
+                    difficulty = difficulty_value
+
+        # 输出分类结果
+        difficulty_display = {"easy": "简单", "medium": "中等", "hard": "困难"}.get(
+            difficulty, difficulty
+        )
+        PrettyOutput.auto_print(
+            f"📋 需求分类结果: {SCENARIO_TYPES.get(scenario, '通用开发')} ({scenario}) | 难度: {difficulty_display} ({difficulty})"
+        )
+        return scenario, difficulty
 
     except Exception as e:
-        # 分类失败时返回默认类型
-        PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认场景")
-        return "default"
+        # 分类失败时返回默认类型和中等难度
+        PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认类型")
+        return "default", "medium"
 
 
 def _load_prompt_from_file(scenario: str) -> str:
