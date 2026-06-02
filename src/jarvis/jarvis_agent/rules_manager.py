@@ -1302,7 +1302,7 @@ class RulesManager:
         PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
         return []
     
-    def _search_remote_skills(self, query: str) -> List['SkillResult']:
+    def _search_remote_skills(self, query: str) -> List[Any]:
         """搜索远程技能市场"""
         try:
             from jarvis.jarvis_tools.skill_search import SkillSearchEngine
@@ -1325,7 +1325,7 @@ class RulesManager:
             PrettyOutput.auto_print(f"⚠️  远程搜索失败：{e}")
             return []
     
-    def _auto_install_skills(self, skills: List['SkillResult']) -> List[str]:
+    def _auto_install_skills(self, skills: List[Any]) -> List[str]:
         """自动安装技能"""
         try:
             from jarvis.jarvis_tools.skill_installer import SkillInstaller
@@ -1336,7 +1336,7 @@ class RulesManager:
             for skill in skills:
                 try:
                     # 下载并保存 SKILL.md (不转换，原样保存)
-                    rule_path = installer.install(skill)
+                    installer.install(skill)
                     installed_names.append(skill.name)
                 except Exception as e:
                     PrettyOutput.auto_print(f"⚠️  安装失败 {skill.name}: {e}")
