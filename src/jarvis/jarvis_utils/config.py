@@ -335,7 +335,10 @@ def get_shell_name() -> str:
     返回：
         str: Shell名称（例如bash, zsh, fish），默认为bash
     """
-    shell_path = os.getenv("SHELL", "/bin/bash")
+    if os.name == "nt":
+        shell_path = os.getenv("COMSPEC", "cmd.exe")
+    else:
+        shell_path = os.getenv("SHELL", "/bin/bash")
     return os.path.basename(shell_path).lower()
 
 

@@ -94,13 +94,13 @@ class VirtualTTYTool:
                     "process": None,
                     "output_queue": _queue.Queue(),
                     "output_thread": None,
-                    "shell": "cmd.exe",
+                    "shell": os.getenv("COMSPEC", "cmd.exe"),
                 }
             else:
                 agent.tty_sessions[tty_id] = {
                     "master_fd": None,
                     "pid": None,
-                    "shell": "/bin/bash",
+                    "shell": os.getenv("SHELL", "/bin/bash"),
                 }
 
         action = args.get("action", "").strip().lower()
@@ -548,7 +548,7 @@ class VirtualTTYTool:
             agent.tty_sessions[tty_id] = {
                 "master_fd": None,
                 "pid": None,
-                "shell": "/bin/bash",
+                "shell": os.getenv("SHELL", "/bin/bash"),
             }
 
             return {

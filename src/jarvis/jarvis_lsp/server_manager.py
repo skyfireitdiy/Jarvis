@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import signal
 import os
 import subprocess
 import sys
@@ -409,7 +410,10 @@ class LSPServerManager:
                         for pid in result.stdout.strip().split("\n"):
                             if pid:
                                 try:
-                                    os.kill(int(pid), 9)
+                                    if sys.platform == "win32":
+                                        os.kill(int(pid), signal.SIGTERM)
+                                    else:
+                                        os.kill(int(pid), signal.SIGKILL)
                                 except (ProcessLookupError, ValueError):
                                     pass
                 except Exception:
@@ -462,8 +466,14 @@ class LSPServerManager:
 
                     # 检查进程是否还在运行
                     try:
-                        # 使用 os.kill(pid, 0) 检查进程是否存在
-                        os.kill(info["pid"], 0)
+                        if sys.platform == "win32":
+                            # Windows: os.kill(pid, 0) 不可用
+                            from jarvis.jarvis_utils.utils import _is_process_alive
+
+                            if not _is_process_alive(info["pid"]):
+                                raise ProcessLookupError
+                        else:
+                            os.kill(info["pid"], 0)
                     except ProcessLookupError:
                         # 进程不存在，从持久化文件中移除
                         self._remove_server_state(key)

@@ -21,6 +21,7 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.utils import _is_process_alive
 import jarvis.jarvis_utils.globals as jglobals
 
 
@@ -768,9 +769,4 @@ class AgentManager:
         Returns:
             True 运行中，False 已停止
         """
-        try:
-            # 发送信号 0 检查进程是否存在
-            os.kill(pid, 0)
-            return True
-        except (ProcessLookupError, OSError):
-            return False
+        return _is_process_alive(pid)
