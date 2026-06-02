@@ -418,9 +418,7 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
 
 def print_language_support_table() -> None:
     """打印语言功能支持表格"""
-    from rich.align import Align
-    from rich.console import Console
-    from rich.table import Table
+    from jarvis.jarvis_utils.output import PrettyOutput
 
     info = _collect_language_support_info()
 
@@ -473,23 +471,10 @@ def print_language_support_table() -> None:
     if not languages:
         return
 
-    # 创建表格
-    table = Table(
-        title="[bold cyan]编程语言功能支持情况[/bold cyan]",
-        show_header=True,
-        header_style="bold magenta",
-        border_style="blue",
-        title_style="bold cyan",
-        show_lines=False,
-        padding=(0, 1),
-    )
-
-    # 添加语言列（第一列）
-    table.add_column("语言", style="cyan", no_wrap=True, justify="left")
-
-    # 添加功能列
-    for feature in features:
-        table.add_column(feature, justify="center", style="green", no_wrap=True)
+    # 构建 Markdown 表格
+    md_lines = ["## 编程语言功能支持情况", ""]
+    md_lines.append("| 语言 | " + " | ".join(features) + " |")
+    md_lines.append("|------|" + "-|" * len(features))
 
     # 添加语言行
     for lang in languages:
@@ -500,16 +485,13 @@ def print_language_support_table() -> None:
             if supported:
                 # 如果是构建验证，显示构建系统名称
                 if feature == "构建验证" and isinstance(supported, str):
-                    row.append(f"[bold green]{supported}[/bold green]")
+                    row.append(f"**{supported}**")
                 else:
-                    row.append("[bold green]✓[/bold green]")
+                    row.append("**✓**")
             else:
-                row.append("[bold red]✗[/bold red]")
-        table.add_row(*row)
+                row.append("**✗**")
+        md_lines.append("| " + " | ".join(row) + " |")
 
-    console = Console()
-    console.print()
-    # 居中显示表格
-    aligned_table = Align.center(table)
-    console.print(aligned_table)
-    console.print()
+    # 打印表格
+    md_table = "\n".join(md_lines)
+    PrettyOutput.print_markdown(md_table)
