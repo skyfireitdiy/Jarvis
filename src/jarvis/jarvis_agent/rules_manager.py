@@ -1306,7 +1306,9 @@ class RulesManager:
     def _search_remote_skills(self, query: str) -> List[Any]:
         """搜索远程技能市场"""
         try:
-            from jarvis.jarvis_tools.skill_search import SkillSearchEngine
+            from jarvis.jarvis_agent.skill_discovery.search_engine import (
+                SkillSearchEngine,
+            )
 
             engine = SkillSearchEngine(
                 min_relevance=0.5, min_quality=5.0, max_results=10
@@ -1326,7 +1328,7 @@ class RulesManager:
     def _auto_install_skills(self, skills: List[Any]) -> List[str]:
         """自动安装技能"""
         try:
-            from jarvis.jarvis_tools.skill_installer import SkillInstaller
+            from jarvis.jarvis_agent.skill_discovery.installer import SkillInstaller
 
             installer = SkillInstaller(rules_manager=self)
             installed_names = []

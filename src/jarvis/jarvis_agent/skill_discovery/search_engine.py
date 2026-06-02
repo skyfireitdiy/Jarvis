@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-"""技能搜索引擎 - 使用依赖注入管理多个搜索源"""
+"""技能搜索引擎 - 使用依赖注入管理多个发现源"""
 
 import asyncio
 from typing import List, Dict, Optional
-from .skill_sources.base import ISkillSource, SkillResult
+from .sources.base import ISkillSource, SkillResult
 
 
 class SkillSearchEngine:
     """
     技能搜索引擎
 
-    使用依赖注入接收所有搜索源，负责：
+    使用依赖注入接收所有发现源，负责：
     1. 并行执行所有源的搜索
     2. 合并、去重、排序结果
     3. 过滤低质量结果
@@ -25,12 +25,12 @@ class SkillSearchEngine:
     ):
         """
         参数:
-            sources: 搜索源列表（依赖注入）
+            sources: 发现源列表（依赖注入）
             min_relevance: 最小相关度阈值
             min_quality: 最小质量分阈值
             max_results: 最大返回结果数
         """
-        # 依赖注入：搜索源
+        # 依赖注入：发现源
         self.sources = sources or self._default_sources()
 
         # 配置
@@ -39,8 +39,9 @@ class SkillSearchEngine:
         self.max_results = max_results
 
     def _default_sources(self) -> List[ISkillSource]:
-        """默认搜索源（可按需覆盖）"""
-        from .skill_sources import SkillHubSource, GitHubSkillSource
+        """默认发现源（可按需覆盖）"""
+        from .sources.skillhub import SkillHubSource
+        from .sources.github import GitHubSkillSource
 
         return [
             SkillHubSource(),  # 高优先级
@@ -105,13 +106,13 @@ class SkillSearchEngine:
         return {name: (result is True) for name, result in zip(tasks.keys(), results)}
 
     def add_source(self, source: ISkillSource) -> None:
-        """动态添加搜索源"""
+        """动态添加发现源"""
         self.sources.append(source)
         # 按优先级排序
         self.sources.sort(key=lambda s: s.priority)
 
     def remove_source(self, source_name: str) -> bool:
-        """移除搜索源"""
+        """移除发现源"""
         for i, source in enumerate(self.sources):
             if source.name == source_name:
                 del self.sources[i]
