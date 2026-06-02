@@ -3113,9 +3113,22 @@ async function loadHistoryMessages(prepend = false) {
         if (msg.output_type === 'execution') {
           const isLast = executionIndices.length > 0 && idx === executionIndices[executionIndices.length - 1]
           if (!isLast && !msg.is_finished) {
-            // 非最后一条execution：强制标记为已完成（不管terminal_content是否为空）
+            // 非最后一条execution：强制标记为已完成
             console.log(`[HISTORY] Fixing non-last execution message: ${msg.execution_id}, setting is_finished=true`)
             msg.is_finished = true
+            // 如果没有terminal_content，添加占位文本，避免显示空白区域
+            if (!msg.terminal_content) {
+              console.log(`[HISTORY] Non-last execution ${msg.execution_id} has no terminal_content, adding placeholder`)
+              msg.terminal_content = '(终端输出未保存或执行被中断)'
+            }
+          }
+          // 对于最后一条execution：如果标记为未完成但没有terminal_content，需要进一步判断
+          if (isLast && !msg.is_finished && !msg.terminal_content) {
+            console.log(`[HISTORY] Last execution ${msg.execution_id} is marked as unfinished with no content`)
+            // 这种情况可能是：
+            // 1. 真的在运行中（但这不太可能出现在历史记录中）
+            // 2. 异常中断导致状态不一致
+            // 保持 is_finished=false 让模板尝试创建终端，setTerminalRef会进一步判断
           }
         }
         const html = renderMessageHtml(msg)
