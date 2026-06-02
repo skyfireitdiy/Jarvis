@@ -77,12 +77,12 @@ dependencies = [
     "websockets",
     "httpx",
     "jieba",
+    "aiohttp>=3.9.0",
     ]
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
     browser = ["playwright==1.48.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'"]
-    skill-discovery = ["aiohttp>=3.9.0"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
     clang18 = ["clang==18.*"]
