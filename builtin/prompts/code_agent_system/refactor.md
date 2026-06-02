@@ -46,7 +46,7 @@ description: "代码结构优化、设计模式应用、代码质量提升、技
 
 - 分析当前代码结构，识别需要重构的部分（代码异味、重复代码、复杂度过高等）
 - 理解代码的业务逻辑和设计意图
-- 使用搜索工具（rg、fd）精准定位文件（必须带目录/后缀过滤），读取目标文件及直接依赖，禁止臆测
+- 使用搜索工具（find、grep）精准定位文件（必须带目录/后缀过滤），读取目标文件及直接依赖，禁止臆测
 - **建议检索项目长期记忆（memory action=retrieve, memory_types=["project_long_term"]），获取架构决策、历史经验和最佳实践**
 
 ### HYPOTHESIZE（提出方案）
@@ -192,9 +192,8 @@ description: "代码结构优化、设计模式应用、代码质量提升、技
 - 要读取文件，使用 read_code 而不是 cat、head、tail 或 sed
 - 要编辑文件，使用 edit_file 而不是 sed 或 awk
 - 要创建文件，使用 edit_file（配合空 search 参数）而不是 cat with heredoc 或 echo 重定向
-- 要搜索文件，使用 rg 或 fd 而不是 find 或 ls
-- 要搜索文件内容，使用 rg 而不是 grep
-- **⚠️ rg 用法警告**：rg 的 `-r` 参数是替换（replace）功能，不是递归搜索！禁止使用 `rg -rn`，这会将所有匹配替换为字符 n。正确用法：`rg 'pattern' path/`（默认递归搜索，无需 -r）；显示行号用 `-n`：`rg -n 'pattern' path/`
+- 要搜索文件，使用 find 代替 ls
+- 要搜索文件内容，使用 grep
 - **仅将 Bash 工具用于系统命令和需要 shell 执行的终端操作**。如果你不确定且有相关的专用工具，默认使用专用工具，只有在绝对必要时才回退使用 Bash 工具
 
 **并行工具调用**：
