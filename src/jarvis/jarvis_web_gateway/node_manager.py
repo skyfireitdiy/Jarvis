@@ -916,6 +916,25 @@ class NodeConnectionManager:
             len(payload.get("messages") or []),
         )
         try:
+            # 心跳拦截：如果消息是 ping，直接回复 pong，不转发给 Agent
+            messages = payload.get("messages") or []
+            if len(messages) == 1:
+                try:
+                    msg_data = (
+                        json.loads(messages[0])
+                        if isinstance(messages[0], str)
+                        else messages[0]
+                    )
+                    if isinstance(msg_data, dict) and msg_data.get("type") == "ping":
+                        logger.debug("[HEARTBEAT] Ping received, sending pong directly")
+                        return build_node_message(
+                            AGENT_WS_SEND_RESPONSE,
+                            {"success": True, "session_id": session_id, "pong": True},
+                            request_id=request_id,
+                        )
+                except (json.JSONDecodeError, TypeError):
+                    pass  # 非 JSON 消息，继续正常转发
+
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
@@ -923,7 +942,7 @@ class NodeConnectionManager:
             if agent_ws.state != State.OPEN:
                 self._agent_ws_sessions.pop(session_id, None)
                 raise RuntimeError(f"ws session already closed: {session_id}")
-            for item in payload.get("messages") or []:
+            for item in messages:
                 await agent_ws.send(str(item))
             return build_node_message(
                 AGENT_WS_SEND_RESPONSE,

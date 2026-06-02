@@ -1080,6 +1080,11 @@ const auth = ref({
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
+
+// Agent 心跳检测相关状态
+const lastPongTime = ref(new Map()) // agentId -> 最后收到 pong 的时间戳
+const HEARTBEAT_INTERVAL = 5000 // 心跳间隔：5 秒发送一次 ping
+const HEARTBEAT_TIMEOUT = 15000 // 心跳超时时间：15 秒（3 次）未收到 pong 就重连
 const connecting = ref(false)
 const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
 const connectErrorMessage = ref('')  // 连接错误信息
@@ -3958,7 +3963,14 @@ async function connectToAgent(agent, retryCount = 0) {
           console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
           return
         }
-        // pong 消息处理已移除
+        
+        // 处理 pong 响应（心跳机制）
+        if (message.type === 'pong' || (message.success && message.pong)) {
+          lastPongTime.value.set(agentId, Date.now())
+          console.log(`[HEARTBEAT] Received pong from agent ${agentId}`)
+          return // pong 消息不需要继续处理
+        }
+        
         handleMessage(message, agentId)
       }
       
@@ -8119,9 +8131,57 @@ watch(activeEditorTabPath, async (path) => {
   activateEditorTab(path)
 })
 
+// Agent 心跳定时器
+let heartbeatTimer = null
+
+// 检查心跳超时并触发重连
+function checkHeartbeatTimeout() {
+  const now = Date.now()
+  sockets.value.forEach((ws, agentId) => {
+    const lastPong = lastPongTime.value.get(agentId)
+    // 如果超过超时时间未收到 pong，认为连接已断
+    if (!lastPong || (now - lastPong > HEARTBEAT_TIMEOUT)) {
+      console.warn(`[HEARTBEAT] Timeout for agent ${agentId}, last pong: ${lastPong ? new Date(lastPong).toLocaleTimeString() : 'never'}, triggering reconnect...`)
+      // 关闭旧连接，触发重连
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+      sockets.value.delete(agentId)
+      lastPongTime.value.delete(agentId)
+      // 如果是当前活跃 Agent，触发重连
+      if (agentId === currentAgentId.value) {
+        const agent = agentMap.value.get(agentId)
+        if (agent) {
+          connectToAgent(agent).catch(e => console.warn(`[HEARTBEAT] Reconnect failed for ${agentId}:`, e.message))
+        }
+      }
+    }
+  })
+}
+
+// 发送心跳到所有 Agent 连接
+function sendHeartbeat() {
+  const now = Date.now()
+  sockets.value.forEach((ws, agentId) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log(`[HEARTBEAT] Sending ping to agent ${agentId}`)
+      // 记录发送时间（用于超时检测）
+      lastPongTime.value.set(agentId, now) // 先更新为发送时间，收到 pong 后会再次更新
+      ws.send(JSON.stringify({ type: 'ping' }))
+    }
+  })
+  
+  // 检查是否有连接超时
+  checkHeartbeatTimeout()
+}
+
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
   console.log('[app] Mounted')
+
+  // 启动心跳机制
+  heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
+  console.log(`[HEARTBEAT] Started with interval ${HEARTBEAT_INTERVAL}ms`)
 
   // 尝试从 localStorage 加载已保存的 token（免登录功能）
   loadSavedToken()
@@ -8266,6 +8326,14 @@ onUnmounted(() => {
     socketState: socket.value?.readyState,
     connecting: connecting.value,
   })
+  
+  // 清理心跳定时器
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+    console.log('[HEARTBEAT] Stopped')
+  }
+  
   stopAgentSidebarResize()
   stopEditorPanelInteraction()
   stopEditorFileHeartbeat()
