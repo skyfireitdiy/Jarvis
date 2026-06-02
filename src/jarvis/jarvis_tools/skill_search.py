@@ -2,7 +2,7 @@
 """技能搜索引擎 - 使用依赖注入管理多个搜索源"""
 
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from .skill_sources.base import ISkillSource, SkillResult
 
 
