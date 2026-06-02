@@ -24,6 +24,8 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from jarvis.jarvis_utils.globals import clear_script_pid
+from jarvis.jarvis_utils.globals import set_script_pid
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # 匹配 ANSI/终端转义序列
@@ -792,6 +794,7 @@ class ScriptTool:
                 start_new_session=True,
                 close_fds=True,
             )
+            set_script_pid(proc.pid)
         except Exception as e:
             os.close(master_fd)
             os.close(slave_fd)
@@ -872,6 +875,7 @@ class ScriptTool:
             # 如果 pyte 处理失败，回退到原来的逻辑
             output = "".join(captured).strip()
         exit_code = proc.returncode if proc.returncode is not None else -1
+        clear_script_pid()
         if timed_out:
             self._publish_execution_event(
                 stream_publisher,
@@ -956,9 +960,11 @@ class ScriptTool:
                     cwd=os.getcwd(),
                     env=env,
                 )
+                set_script_pid(proc.pid)
                 try:
                     stdout_bytes, stderr_bytes = proc.communicate(timeout=get_timeout())
                 except subprocess.TimeoutExpired:
+                    clear_script_pid()
                     try:
                         proc.terminate()
                         proc.wait(timeout=2)
@@ -982,6 +988,7 @@ class ScriptTool:
                 output = (
                     stdout_str + ("\n" + stderr_str if stderr_str else "")
                 ).strip()
+                clear_script_pid()
                 return {
                     "success": proc.returncode == 0,
                     "stdout": output,
@@ -1116,6 +1123,7 @@ class ScriptTool:
                     proc = None
                     try:
                         proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
+                        set_script_pid(proc.pid)
                         try:
                             proc.wait(timeout=get_script_execution_timeout())
                         except subprocess.TimeoutExpired:
@@ -1151,6 +1159,7 @@ class ScriptTool:
                             output = self.get_display_output(output_file)
                         except Exception as ee:
                             output = f"读取输出文件失败: {str(ee)}"
+                        clear_script_pid()
                         return {
                             "success": False,
                             "stdout": output,
@@ -1167,6 +1176,7 @@ class ScriptTool:
                                     proc.stderr.close()
                             except Exception:
                                 pass
+                        clear_script_pid()
 
                     try:
                         output = self.get_display_output(output_file)
