@@ -3302,43 +3302,7 @@ async function connect() {
     }))
     console.log('[ws] connection_lock sent', connectionLockEnabled.value)
 
-    // 启动心跳机制，防止空闲连接被中间件/代理超时断开
-    ws._lastPongTime = Date.now()
-    ws._lastPingTime = Date.now()
-    const heartbeatInterval = 30000 // 30秒发送一次心跳
-    const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
-    ws._heartbeatTimer = setInterval(() => {
-      const now = Date.now()
-      // 检测浏览器休眠恢复：如果距上次ping时间远超心跳间隔，说明浏览器被挂起了
-      // 此时不应判定超时，而是重置心跳状态并重新发送ping
-      if (ws._lastPingTime && (now - ws._lastPingTime) > heartbeatInterval * 2) {
-        console.log('[ws] Browser may have been suspended, resetting heartbeat state')
-        ws._lastPongTime = now
-      }
-      // 检查是否超时未收到pong
-      if (ws._lastPongTime && (now - ws._lastPongTime) > heartbeatInterval + heartbeatTimeout) {
-        console.warn('[ws] Heartbeat timeout, closing connection')
-        clearInterval(ws._heartbeatTimer)
-        ws._heartbeatTimer = null
-        // 立即清理socket状态，避免UI仍显示已连接
-        if (socket.value === ws) {
-          socket.value = null
-        }
-        ws.close()
-        return
-      }
-      try {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws._lastPingTime = Date.now()
-          ws.send(JSON.stringify({ type: 'ping' }))
-          console.log('[ws] Heartbeat ping sent')
-        }
-      } catch (e) {
-        console.warn('[ws] Failed to send heartbeat', e)
-        clearInterval(ws._heartbeatTimer)
-        ws._heartbeatTimer = null
-      }
-    }, heartbeatInterval)
+    // 心跳机制已移除
   }
   ws.onmessage = (event) => {
     // 忽略非当前连接的消息（重连时旧连接可能仍收到消息）
@@ -3354,12 +3318,7 @@ async function connect() {
       return
     }
 
-    // 处理心跳pong响应，更新时间戳防止超时
-    if (message.type === 'pong') {
-      ws._lastPongTime = Date.now()
-      console.log('[ws] Heartbeat pong received')
-      return
-    }
+    // pong 消息处理已移除
 
     handleMessage(message)
   }
@@ -3373,11 +3332,6 @@ async function connect() {
     })
     socket.value = null
     connecting.value = false
-    // 清理心跳定时器
-    if (ws._heartbeatTimer) {
-      clearInterval(ws._heartbeatTimer)
-      ws._heartbeatTimer = null
-    }
     // 连接断开，销毁所有独立终端
     console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
@@ -4004,11 +3958,7 @@ async function connectToAgent(agent, retryCount = 0) {
           console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
           return
         }
-        // 处理心跳pong响应
-        if (message.type === 'pong') {
-          ws._lastPongTime = Date.now()
-          return
-        }
+        // pong 消息处理已移除
         handleMessage(message, agentId)
       }
       
@@ -4035,53 +3985,14 @@ async function connectToAgent(agent, retryCount = 0) {
         // 标记连接已完成（在onclose中用于判断是否需要重试）
         ws._connectionCompleted = true
 
-        // 启动心跳机制
-        ws._lastPongTime = Date.now()
-        ws._lastPingTime = Date.now()
-        ws._pingCount = 0
-        const heartbeatInterval = 30000 // 30秒发送一次心跳
-        const heartbeatTimeout = 15000 // 15秒无pong响应视为超时
-        ws._heartbeatTimer = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            const now = Date.now()
-            // 检测浏览器休眠恢复：如果距上次ping时间远超心跳间隔，说明浏览器被挂起了
-            // 此时不应判定超时，而是重置心跳状态并重新发送ping
-            if (ws._lastPingTime && (now - ws._lastPingTime) > heartbeatInterval * 2) {
-              console.log(`[AGENT ${agentId}] Browser may have been suspended, resetting heartbeat state. gap=${now - ws._lastPingTime}ms`)
-              ws._lastPongTime = now
-            }
-            // 检查是否超时未收到pong
-            const pongAge = now - ws._lastPongTime
-            if (ws._lastPongTime && pongAge > heartbeatInterval + heartbeatTimeout) {
-              console.warn(`[AGENT ${agentId}] Heartbeat timeout after ${pongAge}ms without pong (ping#${ws._pingCount}), closing connection`)
-              clearInterval(ws._heartbeatTimer)
-              ws.close()
-              return
-            }
-            try {
-              ws._lastPingTime = Date.now()
-              ws._pingCount = (ws._pingCount || 0) + 1
-              ws.send(JSON.stringify({ type: 'ping' }))
-              console.log(`[AGENT ${agentId}] Heartbeat ping sent (ping#${ws._pingCount}), lastPongAge=${now - ws._lastPongTime}ms`)
-            } catch (e) {
-              console.warn(`[AGENT ${agentId}] Failed to send heartbeat`, e)
-              clearInterval(ws._heartbeatTimer)
-            }
-          } else {
-            clearInterval(ws._heartbeatTimer)
-          }
-        }, heartbeatInterval)
+        // Agent 心跳机制已移除
 
         // 连接成功，resolve Promise
         resolve(ws)
       }
       
       ws.onclose = (event) => {
-        // 清理心跳定时器
-        if (ws._heartbeatTimer) {
-          clearInterval(ws._heartbeatTimer)
-          ws._heartbeatTimer = null
-        }
+        // 心跳定时器清理代码已移除
 
         // 已建立的连接断开（connectionHandled=true 且 _connectionCompleted=true）
         // 需要触发重连，而不是忽略
@@ -5911,13 +5822,7 @@ function handleMessage(message, agentId = null) {
   
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
-  // 处理心跳 pong 响应
-  if (type === 'pong') {
-    if (socket.value) {
-      socket.value._lastPongTime = Date.now()
-    }
-    return
-  }
+  // pong 消息处理已移除
   if (type === 'ready') {
 
     // 恢复之前的输入请求状态
