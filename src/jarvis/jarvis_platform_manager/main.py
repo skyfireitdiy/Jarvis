@@ -943,20 +943,26 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
         "Smart LLM 配置 (序号或名称，留空则与 normal 相同): ", allow_empty=True
     )
 
-    # 自动生成模型组名称（如果未提供）
+    # 如果未提供模型组名称，提示用户输入
     if name is None:
-        # 根据选择的配置生成名称
+        # 根据选择的配置生成默认名称建议
         if cheap_llm and smart_llm:
             if cheap_llm == smart_llm == normal_llm:
-                name = normal_llm
+                default_name = normal_llm
             else:
-                name = f"{normal_llm}+{cheap_llm}+{smart_llm}"
+                default_name = f"{normal_llm}+{cheap_llm}+{smart_llm}"
         elif cheap_llm and cheap_llm != normal_llm:
-            name = f"{normal_llm}+{cheap_llm}"
+            default_name = f"{normal_llm}+{cheap_llm}"
         elif smart_llm and smart_llm != normal_llm:
-            name = f"{normal_llm}+{smart_llm}"
+            default_name = f"{normal_llm}+{smart_llm}"
         else:
-            name = normal_llm
+            default_name = normal_llm
+
+        # 提示用户输入模型组名称，提供默认值
+        name_input = get_single_line_input(
+            f"请输入模型组名称 (默认：{default_name}): "
+        ).strip()
+        name = name_input if name_input else default_name
 
     if name in config["llm_groups"]:
         from jarvis.jarvis_utils.input import user_confirm
