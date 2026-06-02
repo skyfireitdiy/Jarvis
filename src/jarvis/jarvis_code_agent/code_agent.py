@@ -902,7 +902,7 @@ git reset --hard {start_commit}
                                 check=True,
                             )
                             PrettyOutput.auto_print(
-                                f"✅ 已创建备份分支: {backup_branch}"
+                                f"✅ 已创建备份分支：{backup_branch}（变更超过 1000 行，已自动备份，请手动确认提交）"
                             )
                         except subprocess.CalledProcessError as e:
                             PrettyOutput.auto_print(f"⚠️ 创建备份分支失败: {str(e)}")
@@ -911,15 +911,6 @@ git reset --hard {start_commit}
                             PrettyOutput.auto_print(f"⚠️ 备份分支创建异常: {str(e)}")
                             PrettyOutput.auto_print("将继续执行压缩操作...")
 
-                        self.git_manager.handle_commit_confirmation(
-                            commits,
-                            self.start_commit,
-                            prefix=self.prefix,
-                            suffix=self.suffix,
-                            agent=self,
-                            post_process_func=self.post_process_manager.post_process_modified_files,
-                            skip_confirm=True,
-                        )
             else:
                 final_ret += "\n修改被拒绝\n"
                 final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
