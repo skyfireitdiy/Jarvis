@@ -40,7 +40,8 @@ class SkillSearchEngine:
     
     def _default_sources(self) -> List[ISkillSource]:
         """默认发现源（可按需覆盖）"""
-        from .sources import SkillHubSource, GitHubSkillSource
+        from .sources.skillhub import SkillHubSource
+        from .sources.github import GitHubSkillSource
         
         return [
             SkillHubSource(),      # 高优先级
