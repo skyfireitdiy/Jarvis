@@ -769,12 +769,24 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                 try:
                     abs_skill_path = os.path.abspath(skill_path)
-                    os.symlink(abs_skill_path, link_path)
-                    PrettyOutput.auto_print(
-                        f"✅ Skill 软链接创建成功: {link_path} -> {abs_skill_path}"
-                    )
+                    if os.name == "nt":
+                        # Windows: use copy instead of symlink
+                        import shutil
+
+                        if os.path.isdir(abs_skill_path):
+                            shutil.copytree(abs_skill_path, link_path)
+                        else:
+                            shutil.copy2(abs_skill_path, link_path)
+                        PrettyOutput.auto_print(
+                            f"✅ Skill 文件复制成功: {link_path} <- {abs_skill_path}"
+                        )
+                    else:
+                        os.symlink(abs_skill_path, link_path)
+                        PrettyOutput.auto_print(
+                            f"✅ Skill 软链接创建成功: {link_path} -> {abs_skill_path}"
+                        )
                 except Exception as e:
-                    PrettyOutput.auto_print(f"❌ 创建软链接失败: {e}")
+                    PrettyOutput.auto_print(f"❌ 创建链接/复制失败: {e}")
             else:
                 PrettyOutput.auto_print(
                     "❌ 无效的参数，请提供远程仓库链接（http/https/ssh）或本地绝对路径"

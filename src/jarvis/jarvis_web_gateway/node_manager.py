@@ -68,6 +68,9 @@ from .node_protocol import (
 )
 from .node_runtime import AgentRouteInfo, NodeInfo, NodeRuntime
 
+# Windows 重启命令 TCP 端口（与 app.py 中 _RESTART_COMMAND_TCP_PORT 保持一致）
+_RESTART_COMMAND_TCP_PORT = 18766
+
 logger = logging.getLogger(__name__)
 
 CHILD_HEARTBEAT_INTERVAL_SECONDS = 10
@@ -1889,12 +1892,30 @@ class ChildNodeClient:
                 )
 
             import signal
+            import sys
 
             service_pid = int(service_pid_text)
             # 根据 restart_frontend 参数选择信号
-            signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
-            signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
-            os.kill(service_pid, signal_to_send)
+            if sys.platform != "win32":
+                signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
+                signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
+                os.kill(service_pid, signal_to_send)
+            else:
+                # Windows: 通过 TCP 命令通道发送重启命令
+                import socket as socket_module
+
+                command = "RESTART_ALL" if restart_frontend else "RESTART_GATEWAY_ONLY"
+                try:
+                    sock = socket_module.socket(
+                        socket_module.AF_INET, socket_module.SOCK_STREAM
+                    )
+                    sock.connect(("127.0.0.1", _RESTART_COMMAND_TCP_PORT))
+                    sock.sendall(command.encode("utf-8") + b"\n")
+                    sock.close()
+                    signal_name = command
+                except Exception as e:
+                    logger.warning(f"Failed to send restart command via TCP: {e}")
+                    signal_name = f"TCP_FAILED: {e}"
 
             message_text = (
                 "已请求 jarvis-service 重启所有服务"

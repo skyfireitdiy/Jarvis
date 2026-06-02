@@ -357,6 +357,21 @@ def _read_lock_owner_pid(lock_path: Path) -> Optional[int]:
 def _is_process_alive(pid: int) -> bool:
     if pid is None or pid <= 0:
         return False
+    if sys.platform == "win32":
+        # Windows: os.kill(pid, 0) 不可用，使用 ctypes 调用 OpenProcess
+        import ctypes
+
+        try:
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = ctypes.windll.kernel32.OpenProcess(  # type: ignore[attr-defined]
+                PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+            )
+            if handle:
+                ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+                return True
+            return False
+        except OSError:
+            return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

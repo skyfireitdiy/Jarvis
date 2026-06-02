@@ -6,14 +6,9 @@
 
 from __future__ import annotations
 
-import fcntl
 import os
-import pty
-import select
 import shutil
-import struct
 import subprocess
-import termios
 import threading
 import uuid
 from dataclasses import dataclass
@@ -24,6 +19,16 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+# Platform-specific imports
+if os.name == "nt":
+    import queue as _queue
+else:
+    import fcntl
+    import pty
+    import select
+    import struct
+    import termios
+
 
 @dataclass
 class TerminalSession:
@@ -32,13 +37,16 @@ class TerminalSession:
     terminal_id: str
     interpreter: str
     working_dir: str
-    master_fd: int
-    proc: Optional[subprocess.Popen]
+    master_fd: Optional[int] = None  # Unix only
+    proc: Optional[subprocess.Popen] = None
     stream_publisher: Optional[Any] = None
     session_id: str = "default"
     _closed: bool = False
     _output_sequence: int = 0
     _sequence_lock: threading.Lock = field(default_factory=threading.Lock)
+    # Windows-specific fields
+    _output_queue: Optional[Any] = field(default=None)  # queue.Queue on Windows
+    _output_thread: Optional[threading.Thread] = field(default=None)
 
     def next_sequence(self) -> int:
         """获取下一个输出序列号。"""
@@ -53,11 +61,12 @@ class TerminalSession:
                 return
             self._closed = True
 
-        # 关闭PTY
-        try:
-            os.close(self.master_fd)
-        except OSError:
-            pass
+        # 关闭PTY (Unix)
+        if self.master_fd is not None:
+            try:
+                os.close(self.master_fd)
+            except OSError:
+                pass
 
         # 终止进程
         if self.proc is not None:
@@ -87,7 +96,15 @@ class TerminalSession:
         if self.is_closed():
             return
         try:
-            os.write(self.master_fd, data.encode("utf-8", errors="ignore"))
+            if os.name == "nt":
+                # Windows: write to subprocess stdin
+                if self.proc is not None and self.proc.stdin is not None:
+                    self.proc.stdin.write(data.encode("utf-8", errors="ignore"))
+                    self.proc.stdin.flush()
+            else:
+                # Unix: write to PTY master fd
+                if self.master_fd is not None:
+                    os.write(self.master_fd, data.encode("utf-8", errors="ignore"))
         except OSError:
             self.close()
 
@@ -97,12 +114,16 @@ class TerminalSession:
             return
         if rows <= 0 or cols <= 0:
             return
+        if os.name == "nt":
+            # Windows: resize not supported via subprocess, no-op
+            return
         try:
-            fcntl.ioctl(
-                self.master_fd,
-                termios.TIOCSWINSZ,
-                struct.pack("HHHH", rows, cols, 0, 0),
-            )
+            if self.master_fd is not None:
+                fcntl.ioctl(
+                    self.master_fd,
+                    termios.TIOCSWINSZ,
+                    struct.pack("HHHH", rows, cols, 0, 0),
+                )
         except Exception:
             pass
 
@@ -180,89 +201,185 @@ class TerminalSessionManager:
             try:
                 # 检查解释器是否存在
                 if not shutil.which(interpreter):
+                    fallback = "cmd.exe" if os.name == "nt" else "bash"
                     print(
-                        f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to bash"
+                        f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to {fallback}"
                     )
-                    interpreter = "bash"
-
-                # 创建PTY
-                master_fd, slave_fd = pty.openpty()
+                    interpreter = fallback
 
                 # 设置工作目录
                 if not os.path.isabs(working_dir):
                     working_dir = os.path.abspath(working_dir)
 
-                # 启动子进程
-                env = os.environ.copy()
-                # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
-                env["TERM"] = "xterm-256color"
-                if interpreter in ("python", "python2", "python3"):
-                    env["PYTHONIOENCODING"] = "utf-8"
-
-                # 构建命令
-                # fish 在 PTY 环境中无法直接启动，但可以通过 bash -c exec fish 启动
-                # 这样 fish 会继承正确的进程组设置
-                if interpreter.endswith("fish"):
-                    print(
-                        "[TerminalSessionManager] Fish shell detected, using bash -c exec fish"
+                if os.name == "nt":
+                    return self._create_session_windows(
+                        terminal_id,
+                        interpreter,
+                        working_dir,
+                        stream_publisher,
+                        session_id,
                     )
-                    cmd = ["bash", "-c", f"exec {interpreter} -i"]
-                    actual_interpreter = interpreter
                 else:
-                    cmd = [interpreter]
-                    actual_interpreter = interpreter
-
-                proc = subprocess.Popen(
-                    cmd,
-                    stdin=slave_fd,
-                    stdout=slave_fd,
-                    stderr=slave_fd,
-                    cwd=working_dir,
-                    env=env,
-                    preexec_fn=os.setsid,
-                )
-
-                # 关闭slave_fd（子进程已经持有）
-                os.close(slave_fd)
-
-                # 创建会话对象
-                session = TerminalSession(
-                    terminal_id=terminal_id,
-                    interpreter=actual_interpreter,
-                    working_dir=working_dir,
-                    master_fd=master_fd,
-                    proc=proc,
-                    stream_publisher=stream_publisher,
-                    session_id=session_id,
-                )
-
-                self._sessions[terminal_id] = session
-
-                # 启动输出读取线程
-                thread = threading.Thread(
-                    target=self._read_output,
-                    args=(session,),
-                    daemon=True,
-                    name=f"terminal-{terminal_id}",
-                )
-                thread.start()
-
-                return terminal_id, None
+                    return self._create_session_unix(
+                        terminal_id,
+                        interpreter,
+                        working_dir,
+                        stream_publisher,
+                        session_id,
+                    )
 
             except Exception as e:
-                # 清理资源
-                try:
-                    os.close(master_fd)
-                except Exception:
-                    pass
-                try:
-                    os.close(slave_fd)
-                except Exception:
-                    pass
                 return None, f"创建终端失败: {str(e)}"
 
-    def _read_output(self, session: TerminalSession) -> None:
-        """读取终端输出的线程函数。"""
+    def _create_session_unix(
+        self,
+        terminal_id: str,
+        interpreter: str,
+        working_dir: str,
+        stream_publisher: Optional[Any],
+        session_id: str,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Unix/Linux: 使用PTY创建终端会话。"""
+        master_fd, slave_fd = pty.openpty()
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+        if interpreter in ("python", "python2", "python3"):
+            env["PYTHONIOENCODING"] = "utf-8"
+
+        # fish 在 PTY 环境中无法直接启动，可以通过 bash -c exec fish 启动
+        if interpreter.endswith("fish"):
+            print(
+                "[TerminalSessionManager] Fish shell detected, using bash -c exec fish"
+            )
+            cmd = ["bash", "-c", f"exec {interpreter} -i"]
+            actual_interpreter = interpreter
+        else:
+            cmd = [interpreter]
+            actual_interpreter = interpreter
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                cwd=working_dir,
+                env=env,
+                preexec_fn=os.setsid,
+            )
+
+            os.close(slave_fd)
+
+            session = TerminalSession(
+                terminal_id=terminal_id,
+                interpreter=actual_interpreter,
+                working_dir=working_dir,
+                master_fd=master_fd,
+                proc=proc,
+                stream_publisher=stream_publisher,
+                session_id=session_id,
+            )
+
+            self._sessions[terminal_id] = session
+
+            thread = threading.Thread(
+                target=self._read_output_unix,
+                args=(session,),
+                daemon=True,
+                name=f"terminal-{terminal_id}",
+            )
+            thread.start()
+
+            return terminal_id, None
+
+        except Exception as e:
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+            try:
+                os.close(slave_fd)
+            except Exception:
+                pass
+            return None, f"创建终端失败: {str(e)}"
+
+    def _create_session_windows(
+        self,
+        terminal_id: str,
+        interpreter: str,
+        working_dir: str,
+        stream_publisher: Optional[Any],
+        session_id: str,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Windows: 使用subprocess+pipe创建终端会话。"""
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+
+        try:
+            proc = subprocess.Popen(
+                [interpreter],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=working_dir,
+                env=env,
+                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            )
+
+            output_queue = _queue.Queue()
+
+            session = TerminalSession(
+                terminal_id=terminal_id,
+                interpreter=interpreter,
+                working_dir=working_dir,
+                master_fd=None,
+                proc=proc,
+                stream_publisher=stream_publisher,
+                session_id=session_id,
+                _output_queue=output_queue,
+            )
+
+            self._sessions[terminal_id] = session
+
+            # 启动输出读取线程
+            def read_output() -> None:
+                while not session.is_closed():
+                    try:
+                        if proc.stdout is None:
+                            break
+                        data = proc.stdout.read(4096)
+                        if not data:
+                            break
+                        output_queue.put(data)
+                    except Exception:
+                        break
+
+            output_thread = threading.Thread(
+                target=read_output,
+                daemon=True,
+                name=f"terminal-reader-{terminal_id}",
+            )
+            output_thread.start()
+            session._output_thread = output_thread
+
+            # 启动发布线程
+            publish_thread = threading.Thread(
+                target=self._read_output_windows,
+                args=(session,),
+                daemon=True,
+                name=f"terminal-pub-{terminal_id}",
+            )
+            publish_thread.start()
+
+            return terminal_id, None
+
+        except Exception as e:
+            return None, f"创建终端失败: {str(e)}"
+
+    def _read_output_unix(self, session: TerminalSession) -> None:
+        """Unix/Linux: 读取PTY输出的线程函数。"""
+        assert session.master_fd is not None, "master_fd must be set for Unix sessions"
         print(
             f"[TerminalSessionManager] Starting output reader for terminal {session.terminal_id}"
         )
@@ -302,6 +419,33 @@ class TerminalSessionManager:
                 break
         print(
             f"[TerminalSessionManager] Output reader stopped for terminal {session.terminal_id}"
+        )
+
+        # 检查进程退出状态
+        if session.proc is not None:
+            return_code = session.proc.poll()
+            print(f"[TerminalSessionManager] Process exit code: {return_code}")
+
+        # 进程结束，清理会话
+        self.close_session(session.terminal_id)
+
+    def _read_output_windows(self, session: TerminalSession) -> None:
+        """Windows: 从queue读取输出并发布到WebSocket。"""
+        assert session._output_queue is not None, (
+            "output_queue must be set for Windows sessions"
+        )
+        print(
+            f"[TerminalSessionManager] Starting Windows output publisher for terminal {session.terminal_id}"
+        )
+        while not session.is_closed():
+            try:
+                data = session._output_queue.get(timeout=0.1)
+                if data:
+                    session._publish_output(data)
+            except Exception:  # queue.Empty or timeout
+                continue
+        print(
+            f"[TerminalSessionManager] Windows output publisher stopped for terminal {session.terminal_id}"
         )
 
         # 检查进程退出状态
