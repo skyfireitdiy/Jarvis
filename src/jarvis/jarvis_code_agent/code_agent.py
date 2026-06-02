@@ -296,7 +296,6 @@ class CodeAgent(Agent):
             "search_web",  # 网络搜索工具
             "read_webpage",  # 网页内容读取工具
             "memory",  # 记忆管理工具（支持save/retrieve/clear操作）
-            "goal_manager",  # 当前会话目标管理工具
             "methodology",  # 方法论工具
             "symbol_dependency",  # 符号依赖查询工具
             "add_images",  # 添加图片到对话上下文工具
