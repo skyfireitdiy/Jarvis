@@ -8,6 +8,7 @@ from pathlib import Path
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -1258,4 +1259,87 @@ class RulesManager:
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  规则内容过滤失败: {e}，使用原始规则列表")
-            return rule_names
+
+    def match_rules_to_task(self, task_description: str) -> List[str]:
+        """
+        为任务匹配规则（扩展现有方法，支持远程技能搜索）
+
+        流程：
+        1. 先匹配本地规则
+        2. 如果匹配度低，触发远程技能搜索
+        3. 自动下载并加载高匹配度的技能
+        4. 重新匹配（包含新安装的规则）
+
+        参数:
+            task_description: 任务描述
+
+        返回:
+            匹配的规则名称列表
+        """
+        # === 步骤 1: 现有本地匹配逻辑 ===
+        local_matches = self.select_rule_by_task(task_description)
+        local_matches = local_matches or []
+
+        # 如果本地已有高匹配规则，直接返回
+        if local_matches:
+            PrettyOutput.auto_print(f"✅ 本地匹配到 {len(local_matches)} 个规则")
+            return local_matches
+
+        # === 步骤 2: 触发远程技能搜索 ===
+        PrettyOutput.auto_print("🔍 本地规则不足，正在搜索远程技能...")
+        remote_skills = self._search_remote_skills(task_description)
+
+        if remote_skills:
+            # 自动安装 Top 3 高匹配技能
+            installed = self._auto_install_skills(remote_skills[:3])
+            if installed:
+                PrettyOutput.auto_print(
+                    f"✅ 已自动安装 {len(installed)} 个技能：{', '.join(installed)}"
+                )
+                # 重新匹配（现在包含新安装的规则）
+                PrettyOutput.auto_print("🔄 重新匹配规则...")
+                return self.select_rule_by_task(task_description) or []
+
+        PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
+        return []
+
+    def _search_remote_skills(self, query: str) -> List[Any]:
+        """搜索远程技能市场"""
+        try:
+            from jarvis.jarvis_tools.skill_search import SkillSearchEngine
+
+            engine = SkillSearchEngine(
+                min_relevance=0.5, min_quality=5.0, max_results=10
+            )
+            results = engine.search(query)
+
+            # 过滤：只保留高相关度 (>0.7) 且高质量 (>7.0) 的技能
+            filtered = [
+                r for r in results if r.relevance_score > 0.7 and r.quality_score > 7.0
+            ]
+
+            return filtered
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  远程搜索失败：{e}")
+            return []
+
+    def _auto_install_skills(self, skills: List[Any]) -> List[str]:
+        """自动安装技能"""
+        try:
+            from jarvis.jarvis_tools.skill_installer import SkillInstaller
+
+            installer = SkillInstaller(rules_manager=self)
+            installed_names = []
+
+            for skill in skills:
+                try:
+                    # 下载并保存 SKILL.md (不转换，原样保存)
+                    installer.install(skill)
+                    installed_names.append(skill.name)
+                except Exception as e:
+                    PrettyOutput.auto_print(f"⚠️  安装失败 {skill.name}: {e}")
+
+            return installed_names
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  安装器初始化失败：{e}")
+            return []
