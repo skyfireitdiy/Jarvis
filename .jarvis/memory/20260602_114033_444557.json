@@ -1,0 +1,8 @@
+{
+  "id": "20260602_114033_444557",
+  "type": "project_long_term",
+  "tags": ["架构决策", "WebSocket", "心跳机制", "连接管理"],
+  "content": "## WebSocket 心跳机制移除决策\n\n**决策时间**: 2024年\n\n**背景**: 前端与 Agent 之间的 WebSocket 连接存在心跳机制（30秒 ping，15秒超时），但用户认为端到端心跳无法有效监控 Agent 健康状态，决定完全移除。\n\n**移除内容**:\n1. 前端心跳定时器（30秒发送 ping）\n2. 前端 pong 响应处理\n3. 后端 Gateway 的 ping/pong 处理\n4. 后端 Gateway 的 ping 消息拦截\n\n**保留机制**:\n- WebSocket 原生的 onclose/onerror 事件监听\n- 基于 onclose 的自动重连机制：\n  * /ws 连接：5秒固定间隔，无限重连\n  * Agent 连接：后台 Agent 最多重试3次，当前 Agent 无限重连\n\n**影响**:\n- 移除了应用层心跳检测，完全依赖 TCP/WebSocket 原生连接状态\n- 不会因心跳误判（如浏览器休眠）导致不必要的重连\n- 减少了网络流量和 CPU 消耗\n- 断开重连功能完全不受影响\n\n**文件变更**:\n- src/jarvis/jarvis_web_gateway/app.py: 删除 ping/pong 处理和拦截代码\n- src/jarvis/jarvis_service/frontend/src/App.vue: 删除所有心跳相关代码（定时器、pong处理、清理代码）\n\n**代码变更统计**: 删除约111行代码",
+  "created_at": "2026-06-02T11:40:33.444594",
+  "updated_at": "2026-06-02T11:40:33.444599"
+}
