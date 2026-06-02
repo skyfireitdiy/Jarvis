@@ -113,7 +113,11 @@ class CodeReviewer:
         return "\n".join(truncated_lines)
 
     def generate_review_target(self, max_retries: int = 3) -> str:
-        """生成代码审查的目标和验收准则。"""
+        """生成代码审查的目标和验收准则。
+
+        注意：本方法会获取当前 git diff 并基于实际代码变更生成验收标准，
+        而不是基于完整的对话历史，以避免将已提交的代码也包含在验收标准中。
+        """
         from jarvis.jarvis_platform.registry import PlatformRegistry
 
         if self.model is None:
@@ -134,7 +138,19 @@ class CodeReviewer:
         new_model.set_messages(messages)
         new_model.set_suppress_output(False)
 
-        prompt = """请根据以上对话历史，总结本次代码审查应关注的任务目标和验收准则。
+        # 获取当前 git diff 并截断，用于生成更精准的验收标准
+        git_diff = self.check_and_get_git_diff()
+        diff_for_prompt = ""
+        if git_diff:
+            # 使用 0.2 的 token 比例截断 diff，避免占用过多上下文
+            diff_for_prompt = self.truncate_diff_for_review(git_diff, token_ratio=0.2)
+
+        prompt = """请根据对话历史和代码变更，总结本次代码审查应关注的任务目标和验收准则。
+
+【重要提示】
+- **只关注当前未提交的代码变更**：如果对话历史中包含多次修复迭代，请只关注最终当前的代码状态
+- **忽略已提交的代码**：不要将历史对话中已经提交过的代码纳入验收标准
+- **基于实际变更生成验收标准**：参考下方的代码变更摘要，确保验收标准与实际修改匹配
 
 请确保输出包含以下四个关键部分（必须包含这些关键字）：
 1. 任务目标 - 说明本次代码修改应该完成什么
@@ -154,7 +170,11 @@ class CodeReviewer:
 - "关键变更点"
 - "关键信息导航"""
 
-        # 如果有start_commit，在prompt中追加提示，只走查该commit之后的代码
+        # 如果有代码变更摘要，添加到 prompt 中
+        if diff_for_prompt:
+            prompt += f"\n\n【代码变更摘要】\n```diff\n{diff_for_prompt}\n```"
+
+        # 如果有 start_commit，在 prompt 中追加提示，只走查该 commit 之后的代码
         if self.start_commit:
             prompt += (
                 f"\n\n<start_commit_context>\n"
