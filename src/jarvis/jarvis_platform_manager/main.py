@@ -8,10 +8,7 @@ import sys
 from pathlib import Path
 import yaml  # type: ignore[import-untyped]
 
-
 from jarvis.jarvis_utils.output import PrettyOutput
-from rich.console import Console
-from rich.table import Table
 
 # -*- coding: utf-8 -*-
 from typing import Any
@@ -121,6 +118,11 @@ def _save_config(config: Dict[str, Any]) -> bool:
 # ============================================================================
 
 
+# ============================================================================
+# LLM 管理子命令
+# ============================================================================
+
+
 @llm_app.command("list")
 def llm_list() -> None:
     """列出所有 LLM 配置"""
@@ -128,16 +130,13 @@ def llm_list() -> None:
     llms = config.get("llms", {})
 
     if not llms:
-        PrettyOutput.auto_print("ℹ️  没有配置任何 LLM")
+        PrettyOutput.auto_print("ℹ️ 没有找到 LLM 配置")
         return
 
-    # 创建 rich 表格
-    table = Table(title="✅ LLM 配置列表", expand=True)
-    table.add_column("名称", style="cyan", justify="left", ratio=2, no_wrap=True)
-    table.add_column("平台", style="green", justify="left", ratio=1, no_wrap=True)
-    table.add_column("模型", style="yellow", justify="left", ratio=2, no_wrap=True)
-    table.add_column("多模态", style="magenta", justify="center", ratio=1, no_wrap=True)
-    table.add_column("上下文长度", style="blue", justify="right", ratio=1, no_wrap=True)
+    # 创建 markdown 表格
+    md_lines = ["## ✅ LLM 配置列表", ""]
+    md_lines.append("| 名称 | 平台 | 模型 | 多模态 | 上下文长度 |")
+    md_lines.append("|------|------|------|--------|--------------|")
 
     # 添加数据行
     for name in sorted(llms.keys()):
@@ -149,11 +148,13 @@ def llm_list() -> None:
             "supports_multimodal", False
         )
         multimodal_str = "✅" if supports_multimodal else "❌"
-        table.add_row(name, platform, model, multimodal_str, str(max_tokens))
+        md_lines.append(
+            f"| {name} | {platform} | {model} | {multimodal_str} | {max_tokens} |"
+        )
 
     # 打印表格
-    console = Console()
-    console.print(table)
+    md_table = "\n".join(md_lines)
+    PrettyOutput.print_markdown(md_table)
 
 
 @llm_app.command("show")
@@ -781,15 +782,13 @@ def group_list() -> None:
     llm_groups = config.get("llm_groups", {})
 
     if not llm_groups:
-        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        PrettyOutput.auto_print("ℹ️ 没有找到模型组")
         return
 
-    # 创建 rich 表格
-    table = Table(title="✅ 模型组列表", expand=True)
-    table.add_column("组名", style="cyan", justify="left", ratio=1, no_wrap=True)
-    table.add_column("normal", style="green", justify="left", ratio=2, no_wrap=True)
-    table.add_column("smart", style="yellow", justify="left", ratio=2, no_wrap=True)
-    table.add_column("cheap", style="blue", justify="left", ratio=2, no_wrap=True)
+    # 创建 markdown 表格
+    md_lines = ["## ✅ 模型组列表", ""]
+    md_lines.append("| 组名 | normal | smart | cheap |")
+    md_lines.append("|------|--------|-------|-------|")
 
     # 添加数据行
     for name in sorted(llm_groups.keys()):
@@ -797,11 +796,11 @@ def group_list() -> None:
         normal_llm = group_config.get("normal_llm", "N/A")
         smart_llm = group_config.get("smart_llm", "N/A")
         cheap_llm = group_config.get("cheap_llm", "N/A")
-        table.add_row(name, normal_llm, smart_llm, cheap_llm)
+        md_lines.append(f"| {name} | {normal_llm} | {smart_llm} | {cheap_llm} |")
 
     # 打印表格
-    console = Console()
-    console.print(table)
+    md_table = "\n".join(md_lines)
+    PrettyOutput.print_markdown(md_table)
 
 
 @group_app.command("show")
