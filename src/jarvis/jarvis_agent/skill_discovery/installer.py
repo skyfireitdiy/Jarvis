@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import requests
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 from abc import ABC, abstractmethod
