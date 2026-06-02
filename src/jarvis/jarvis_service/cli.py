@@ -6,7 +6,9 @@ import os
 import secrets
 import shutil
 import signal
+import sys
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -457,7 +459,14 @@ def build_service_config(
 
 def get_single_instance_lock_path() -> Path:
     """返回当前用户的服务实例锁文件路径。"""
-    return Path(get_data_dir()) / f"jarvis-service-{os.getuid()}.lock"
+    if os.name == "nt":
+        # Windows: use username instead of uid
+        import getpass
+
+        user_id = getpass.getuser()
+    else:
+        user_id = str(os.getuid())
+    return Path(get_data_dir()) / f"jarvis-service-{user_id}.lock"
 
 
 def release_single_instance_lock() -> None:
@@ -476,10 +485,15 @@ def acquire_single_instance_lock() -> None:
     lock_file_path.parent.mkdir(parents=True, exist_ok=True)
     lock_handle = open(lock_file_path, "w", encoding="utf-8")
     try:
-        import fcntl
+        if sys.platform == "win32":
+            import msvcrt
 
-        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
+            msvcrt.locking(lock_handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (BlockingIOError, OSError):
         lock_handle.close()
         PrettyOutput.auto_print("❌ 当前用户已有 jarvis-service 实例正在运行")
         raise typer.Exit(code=1)
@@ -490,14 +504,62 @@ def acquire_single_instance_lock() -> None:
     atexit.register(release_single_instance_lock)
 
 
+# Windows 重启命令 TCP 端口（与 app.py / node_manager.py 中保持一致）
+_RESTART_COMMAND_TCP_PORT = 18766
+
+
+def _start_restart_command_server(controller: ServiceController) -> None:
+    """Windows: 启动 TCP 命令服务器，接收重启命令。
+
+    在守护线程中运行，监听 127.0.0.1:18766，接收以下命令：
+    - RESTART_ALL: 触发完整重启（等价于 SIGUSR1）
+    - RESTART_GATEWAY_ONLY: 仅重启网关（等价于 SIGUSR2）
+    """
+    import socket as _socket
+
+    _stop_event = threading.Event()
+
+    def _serve() -> None:
+        server = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        server.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", _RESTART_COMMAND_TCP_PORT))
+        server.listen(1)
+        server.settimeout(1.0)  # 允许优雅退出
+        try:
+            while not _stop_event.is_set():
+                try:
+                    conn, _ = server.accept()
+                    try:
+                        data = conn.recv(1024).decode("utf-8").strip()
+                        if data == "RESTART_ALL":
+                            controller.request_restart(None, None)  # type: ignore[arg-type]
+                        elif data == "RESTART_GATEWAY_ONLY":
+                            controller.request_restart_gateway_only(None, None)  # type: ignore[arg-type]
+                    finally:
+                        conn.close()
+                except _socket.timeout:
+                    continue
+                except OSError:
+                    break
+        finally:
+            server.close()
+
+    t = threading.Thread(target=_serve, daemon=True, name="restart-cmd-server")
+    t.start()
+
+
 def run_service(config: ServiceConfig) -> None:
     """启动 Jarvis 服务循环。"""
     acquire_single_instance_lock()
     controller = ServiceController(config)
     signal.signal(signal.SIGINT, controller.request_exit)
     signal.signal(signal.SIGTERM, controller.request_exit)
-    signal.signal(signal.SIGUSR1, controller.request_restart)
-    signal.signal(signal.SIGUSR2, controller.request_restart_gateway_only)
+    if sys.platform != "win32":
+        signal.signal(signal.SIGUSR1, controller.request_restart)
+        signal.signal(signal.SIGUSR2, controller.request_restart_gateway_only)
+    else:
+        # Windows: SIGUSR1/SIGUSR2 不可用，通过 TCP 命令通道触发重启
+        _start_restart_command_server(controller)
     controller.run_forever()
 
 

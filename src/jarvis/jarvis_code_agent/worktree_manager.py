@@ -226,9 +226,18 @@ class WorktreeManager:
 
                 # 创建软链接：worktree/.jarvis/item -> 原仓库/.jarvis/item
                 try:
-                    os.symlink(src_path, dst_path)
-                    item_type = "目录" if os.path.isdir(src_path) else "文件"
-                    PrettyOutput.auto_print(f"🔗 已创建{item_type}软链接: {item}")
+                    if os.name == "nt":
+                        # Windows: use copy instead of symlink (requires admin privilege)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                        item_type = "目录" if os.path.isdir(src_path) else "文件"
+                        PrettyOutput.auto_print(f"📋 已复制{item_type}: {item}")
+                    else:
+                        os.symlink(src_path, dst_path)
+                        item_type = "目录" if os.path.isdir(src_path) else "文件"
+                        PrettyOutput.auto_print(f"🔗 已创建{item_type}软链接: {item}")
                 except Exception as e:
                     PrettyOutput.auto_print(f"⚠️ 创建软链接失败 {item}: {str(e)}")
 

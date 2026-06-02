@@ -15,6 +15,7 @@ import pathlib
 import shutil
 import signal
 import subprocess
+import sys
 import uuid
 
 import yaml  # type: ignore[import-untyped]
@@ -107,9 +108,12 @@ except ImportError:
 # 全局 AgentManager，用于状态变更回调
 _global_agent_manager: Optional[AgentManager] = None
 
-# Unix Domain Socket 服务器（用于提供 node_secret 给子节点）
+# Node Secret 服务器（用于提供 node_secret 给子节点）
+# Linux: Unix Domain Socket, Windows: TCP Socket
 _node_secret_socket_server: Optional[asyncio.Server] = None
 _NODE_SECRET_SOCKET_PATH = os.path.expanduser("~/.jarvis/gateway/node_secret.sock")
+_NODE_SECRET_TCP_PORT = 18765  # Windows 使用 TCP 端口
+_RESTART_COMMAND_TCP_PORT = 18766  # Windows 重启命令 TCP 端口
 
 # 状态更新回调函数
 _status_update_callback: Optional[Callable[[str], None]] = None
@@ -158,7 +162,10 @@ async def _handle_node_secret_client(
 
 
 async def _start_node_secret_socket_server(node_config: NodeRuntimeConfig) -> None:
-    """启动 Unix Domain Socket 服务器（仅在 master 模式下）。
+    """启动 Node Secret 服务器（仅在 master 模式下）。
+
+    Linux: Unix Domain Socket
+    Windows: TCP Socket (localhost only)
 
     Args:
         node_config: Node 运行时配置
@@ -169,52 +176,73 @@ async def _start_node_secret_socket_server(node_config: NodeRuntimeConfig) -> No
     if not node_config.is_master:
         return
 
-    # 确保目录存在
-    socket_dir = os.path.dirname(_NODE_SECRET_SOCKET_PATH)
-    os.makedirs(socket_dir, exist_ok=True)
-
-    # 删除旧的 socket 文件（如果存在）
-    if os.path.exists(_NODE_SECRET_SOCKET_PATH):
+    if sys.platform == "win32":
+        # Windows: 使用 TCP Socket
         try:
-            os.unlink(_NODE_SECRET_SOCKET_PATH)
-            logger.info(f"Removed old socket file: {_NODE_SECRET_SOCKET_PATH}")
+            _node_secret_socket_server = await asyncio.start_server(
+                _handle_node_secret_client,
+                host="127.0.0.1",
+                port=_NODE_SECRET_TCP_PORT,
+            )
+            logger.info(
+                f"Node secret TCP server started at 127.0.0.1:{_NODE_SECRET_TCP_PORT}"
+            )
         except Exception as e:
-            logger.warning(f"Failed to remove old socket file: {e}")
+            logger.error(f"Failed to start node secret TCP server: {e}")
+            raise
+    else:
+        # Linux: 使用 Unix Domain Socket
+        # 确保目录存在
+        socket_dir = os.path.dirname(_NODE_SECRET_SOCKET_PATH)
+        os.makedirs(socket_dir, exist_ok=True)
 
-    # 启动 Unix Domain Socket 服务器
-    try:
-        _node_secret_socket_server = await asyncio.start_unix_server(
-            _handle_node_secret_client, path=_NODE_SECRET_SOCKET_PATH
-        )
+        # 删除旧的 socket 文件（如果存在）
+        if os.path.exists(_NODE_SECRET_SOCKET_PATH):
+            try:
+                os.unlink(_NODE_SECRET_SOCKET_PATH)
+                logger.info(f"Removed old socket file: {_NODE_SECRET_SOCKET_PATH}")
+            except Exception as e:
+                logger.warning(f"Failed to remove old socket file: {e}")
 
-        # 设置严格的文件权限（仅当前用户可读写）
-        os.chmod(_NODE_SECRET_SOCKET_PATH, 0o600)
+        # 启动 Unix Domain Socket 服务器
+        try:
+            _node_secret_socket_server = await asyncio.start_unix_server(
+                _handle_node_secret_client, path=_NODE_SECRET_SOCKET_PATH
+            )
 
-        logger.info(
-            f"Node secret socket server started at {_NODE_SECRET_SOCKET_PATH} (mode: 0600)"
-        )
-    except Exception as e:
-        logger.error(f"Failed to start node secret socket server: {e}")
-        raise
+            # 设置严格的文件权限（仅当前用户可读写）
+            os.chmod(_NODE_SECRET_SOCKET_PATH, 0o600)
+
+            logger.info(
+                f"Node secret socket server started at {_NODE_SECRET_SOCKET_PATH} (mode: 0600)"
+            )
+        except Exception as e:
+            logger.error(f"Failed to start node secret socket server: {e}")
+            raise
 
 
 async def _stop_node_secret_socket_server() -> None:
-    """停止 Unix Domain Socket 服务器并清理 socket 文件。"""
+    """停止 Node Secret 服务器并清理资源。
+
+    Linux: 清理 Unix Domain Socket 文件
+    Windows: 无需清理文件
+    """
     global _node_secret_socket_server
 
     if _node_secret_socket_server is not None:
         _node_secret_socket_server.close()
         await _node_secret_socket_server.wait_closed()
         _node_secret_socket_server = None
-        logger.info("Node secret socket server stopped")
+        logger.info("Node secret server stopped")
 
-    # 清理 socket 文件
-    if os.path.exists(_NODE_SECRET_SOCKET_PATH):
-        try:
-            os.unlink(_NODE_SECRET_SOCKET_PATH)
-            logger.info(f"Removed socket file: {_NODE_SECRET_SOCKET_PATH}")
-        except Exception as e:
-            logger.warning(f"Failed to remove socket file: {e}")
+    # Linux: 清理 socket 文件
+    if sys.platform != "win32":
+        if os.path.exists(_NODE_SECRET_SOCKET_PATH):
+            try:
+                os.unlink(_NODE_SECRET_SOCKET_PATH)
+                logger.info(f"Removed socket file: {_NODE_SECRET_SOCKET_PATH}")
+            except Exception as e:
+                logger.warning(f"Failed to remove socket file: {e}")
 
 
 # 全局当前执行状态（用于 /status 接口）
@@ -2508,11 +2536,30 @@ def create_app(
 
             service_pid = int(service_pid_text)
             # 根据 restart_frontend 参数选择信号
-            # SIGUSR1: 重启所有服务（包括前端）
-            # SIGUSR2: 只重启网关服务
-            signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
-            signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
-            os.kill(service_pid, signal_to_send)
+            # Linux: SIGUSR1/SIGUSR2
+            # Windows: 通过 TCP 命令通道发送重启命令
+            if sys.platform != "win32":
+                # SIGUSR1: 重启所有服务（包括前端）
+                # SIGUSR2: 只重启网关服务
+                signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
+                signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
+                os.kill(service_pid, signal_to_send)
+            else:
+                # Windows: 通过 TCP 命令通道发送重启命令
+                import socket as socket_module
+
+                command = "RESTART_ALL" if restart_frontend else "RESTART_GATEWAY_ONLY"
+                try:
+                    sock = socket_module.socket(
+                        socket_module.AF_INET, socket_module.SOCK_STREAM
+                    )
+                    sock.connect(("127.0.0.1", _RESTART_COMMAND_TCP_PORT))
+                    sock.sendall(command.encode("utf-8") + b"\n")
+                    sock.close()
+                    signal_name = command
+                except Exception as e:
+                    logger.warning(f"Failed to send restart command via TCP: {e}")
+                    signal_name = f"TCP_FAILED: {e}"
             message = (
                 "已请求 jarvis-service 重启所有服务"
                 if restart_frontend

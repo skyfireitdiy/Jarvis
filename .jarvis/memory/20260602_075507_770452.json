@@ -1,0 +1,8 @@
+{
+  "id": "20260602_075507_770452",
+  "type": "project_long_term",
+  "tags": ["windows-adaptation", "cross-platform", "completed"],
+  "content": "Jarvis项目Linux→Windows适配已完成所有8个任务：\n\ntask-1: os.getuid()→平台分支(cli.py:458-460)\ntask-2: 硬编码shell路径→COMSPEC/env SHELL分支(config.py:338, virtual_tty.py:103,551)\ntask-3: os.symlink→Windows用shutil.copy2/copytree(worktree_manager.py:229, builtin_input_handler.py:772)\ntask-4: terminal_session_manager Windows适配(条件导入、数据类适配、平台分支方法)\ntask-5: Unix Domain Socket→TCP(app.py服务端，端口18765)\ntask-6: SIGUSR信号→TCP命令通道(cli.py TCP服务器端口18766, app.py/node_manager.py发送端)\ntask-7: fcntl文件锁→跨平台(cli.py:484, Windows用msvcrt.locking)\ntask-8: 进程信号发送适配(utils.py _is_process_alive用ctypes OpenProcess, agent_manager.py用_is_process_alive, server_manager.py SIGKILL→SIGTERM+os.kill(pid,0)→_is_process_alive)\n\n关键端口：18765=node_secret TCP, 18766=restart命令TCP\n关键函数：_is_process_alive(utils.py)跨平台进程检查, _start_restart_command_server(cli.py)Windows TCP命令服务器\n\n所有修改保持Linux原有逻辑不变，仅添加Windows分支。",
+  "created_at": "2026-06-02T07:55:07.770510",
+  "updated_at": "2026-06-02T07:55:07.770529"
+}
