@@ -1071,13 +1071,14 @@ class RulesManager:
 
 要求：
 1. 仔细分析任务描述，选择最匹配的规则
-2. **数量限制**：最多只能选择1-5个规则，严禁超过5个
-3. 如果有多个规则相关，选择最相关的1-5个规则，不要选择过多
-4. **重要**：如果没有合适的规则或规则与任务无关，可以直接返回 "NONE" 或 "none"
-5. 严格按照以下格式返回序号：<NUM>序号1,序号2,序号3,序号4,序号5</NUM>
-6. 例如：<NUM>5</NUM> 或 <NUM>2,3,5,7,9</NUM> 或 <NUM>none</NUM>
-7. 多个序号之间用逗号分隔，不要有空格
-8. 只返回<NUM>标签内的内容，不要有其他任何输出
+2. **数量限制**：最多只能选择 1-5 个规则，严禁超过 5 个
+3. 如果有多个规则相关，选择最相关的 1-5 个规则，不要选择过多
+4. **重要**：如果没有合适的规则或规则与任务无关，可以返回 "NONE" 或 "none"
+5. **任务不需要规则**：如果任务很简单（如打招呼、简单计算、查询时间等），不需要任何规则/技能即可完成，请返回 "__NO_RULES_NEEDED__"
+6. 严格按照以下格式返回序号：<NUM>序号 1,序号 2,序号 3,序号 4,序号 5</NUM>
+7. 例如：<NUM>5</NUM> 或 <NUM>2,3,5,7,9</NUM> 或 <NUM>none</NUM> 或 <NUM>__NO_RULES_NEEDED__</NUM>
+8. 多个序号之间用逗号分隔，不要有空格
+9. 只返回<NUM>标签内的内容，不要有其他任何输出
 
 选择的规则序号："""
 
@@ -1096,10 +1097,14 @@ class RulesManager:
                 selected_index_str = response.strip()
             else:
                 selected_index_str = num_match.group(1).strip()
-
             # 验证返回值
+            if selected_index_str and selected_index_str == "__NO_RULES_NEEDED__":
+                PrettyOutput.auto_print("✅ 任务简单，无需安装技能即可直接完成")
+                return ["__NO_RULES_NEEDED__"]
+
             if not selected_index_str or selected_index_str.lower() == "none":
-                PrettyOutput.auto_print("⚠️  未匹配到合适的规则")
+                PrettyOutput.auto_print("⚠️  本地规则匹配：没有合适的规则")
+                return None
                 return None
 
             # 解析编号（支持多个编号，用逗号分隔）
@@ -1209,10 +1214,11 @@ class RulesManager:
 2. **保守策略**：如果不确定规则是否相关，倾向于保留该规则
 3. 只选择规则内容确实与任务匹配的规则
 4. 如果没有相关的规则，返回 "none"
-5. 严格按照以下格式返回规则名称：<VALID>规则名称1,规则名称2</VALID>
-6. 例如：<VALID>builtin:xxx.md</VALID> 或 <VALID>project:yyy.md,global:zzz.md</VALID>
-7. 多个规则名称之间用逗号分隔，不要有空格
-8. 只返回<VALID>标签内的内容，不要有其他任何输出
+5. **任务不需要规则**：如果任务很简单（如打招呼、简单计算、查询时间等），不需要任何规则/技能即可完成，请返回 "__NO_RULES_NEEDED__"
+6. 严格按照以下格式返回规则名称：<VALID>规则名称 1,规则名称 2</VALID>
+7. 例如：<VALID>builtin:xxx.md</VALID> 或 <VALID>project:yyy.md,global:zzz.md</VALID> 或 <VALID>__NO_RULES_NEEDED__</VALID>
+8. 多个规则名称之间用逗号分隔，不要有空格
+9. 只返回<VALID>标签内的内容，不要有其他任何输出
 
 选择的规则名称："""
 
@@ -1238,9 +1244,13 @@ class RulesManager:
                 valid_rules_str = response.strip()
             else:
                 valid_rules_str = valid_match.group(1).strip()
-
             # 验证返回值
+            if valid_rules_str and valid_rules_str == "__NO_RULES_NEEDED__":
+                PrettyOutput.auto_print("✅ 任务简单，无需安装技能即可直接完成")
+                return ["__NO_RULES_NEEDED__"]
+
             if not valid_rules_str or valid_rules_str.lower() == "none":
+                return []
                 return []
 
             # 解析规则名称
@@ -1280,6 +1290,11 @@ class RulesManager:
         local_matches = self.select_rule_by_task(task_description)
         local_matches = local_matches or []
 
+        # 检查是否标记为"不需要规则"
+        if local_matches == ["__NO_RULES_NEEDED__"]:
+            PrettyOutput.auto_print("✅ 任务简单，无需安装技能即可直接完成")
+            return []
+
         # 如果本地已有高匹配规则，直接返回
         if local_matches:
             PrettyOutput.auto_print(f"✅ 本地匹配到 {len(local_matches)} 个规则")
@@ -1289,16 +1304,44 @@ class RulesManager:
         PrettyOutput.auto_print("🔍 本地规则不足，正在搜索远程技能...")
         remote_skills = self._search_remote_skills(task_description)
 
-        if remote_skills:
-            # 自动安装 Top 3 高匹配技能
-            installed = self._auto_install_skills(remote_skills[:3])
-            if installed:
+        if not remote_skills:
+            PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
+            return []
+
+        # === 步骤 3: 使用 LLM 评估远程技能 ===
+        PrettyOutput.auto_print(
+            f"🤖 正在使用 AI 评估 {len(remote_skills)} 个远程技能..."
+        )
+        evaluated_skills = self._evaluate_remote_skills_with_llm(
+            task_description, remote_skills
+        )
+
+        if not evaluated_skills:
+            PrettyOutput.auto_print("⚠️ LLM 评估完成，但没有推荐安装的 skill")
+            return []
+
+        PrettyOutput.auto_print(f"✅ LLM 推荐安装 {len(evaluated_skills)} 个技能:")
+        for i, (skill, eval_result) in enumerate(evaluated_skills[:5], 1):
+            PrettyOutput.auto_print(
+                f"   {i}. {skill.name} - 评分：{eval_result.score:.1f}/10"
+            )
+            PrettyOutput.auto_print(f"      理由：{eval_result.recommendation}")
+            if eval_result.concerns:
                 PrettyOutput.auto_print(
-                    f"✅ 已自动安装 {len(installed)} 个技能：{', '.join(installed)}"
+                    f"      注意：{', '.join(eval_result.concerns)}"
                 )
-                # 重新匹配（现在包含新安装的规则）
-                PrettyOutput.auto_print("🔄 重新匹配规则...")
-                return self.select_rule_by_task(task_description) or []
+
+        # === 步骤 4: 安装 LLM 推荐的技能 ===
+        installed = self._auto_install_skills(
+            [skill for skill, _ in evaluated_skills[:3]]
+        )
+        if installed:
+            PrettyOutput.auto_print(
+                f"✅ 已自动安装 {len(installed)} 个技能：{', '.join(installed)}"
+            )
+            # 重新匹配（现在包含新安装的规则）
+            PrettyOutput.auto_print("🔄 重新匹配规则...")
+            return self.select_rule_by_task(task_description) or []
 
         PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
         return []
@@ -1325,6 +1368,55 @@ class RulesManager:
             PrettyOutput.auto_print(f"⚠️  远程搜索失败：{e}")
             return []
 
+    def _evaluate_remote_skills_with_llm(
+        self, task_description: str, skills: List[Any]
+    ) -> List[tuple]:
+        """
+        使用 LLM 评估远程技能
+
+        参数:
+            task_description: 任务描述
+            skills: 远程技能列表
+
+        返回:
+            [(skill, evaluation), ...] 按评分降序排列，只返回 should_install=True 的技能
+        """
+        try:
+            from jarvis.jarvis_agent.skill_discovery.skill_evaluator import (
+                SkillEvaluator,
+            )
+
+            # 获取 LLM 客户端（复用现有的 llm 实例）
+            llm_client = getattr(self, "llm", None)
+            if not llm_client:
+                PrettyOutput.auto_print(
+                    "⚠️ 无可用 LLM 客户端，跳过 AI 评估，直接安装 Top 3"
+                )
+                # 降级：返回原始搜索结果的前 3 个
+                return [(s, None) for s in skills[:3]]
+
+            # 创建评估器
+            evaluator = SkillEvaluator(llm_client=llm_client, model="default")
+
+            # 批量评估
+            evaluations = evaluator.evaluate_batch(
+                task_description, skills, max_concurrent=3
+            )
+
+            # 只保留推荐安装的技能
+            recommended = [
+                (eval.skill, eval)
+                for eval in evaluations
+                if eval.should_install and eval.score >= 5.0
+            ]
+
+            return recommended
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ LLM 评估失败：{e}，降级为直接安装 Top 3")
+            # 降级：返回原始搜索结果的前 3 个
+            return [(s, None) for s in skills[:3]]
+
     def _auto_install_skills(self, skills: List[Any]) -> List[str]:
         """自动安装技能"""
         try:
@@ -1339,7 +1431,7 @@ class RulesManager:
                     installer.install(skill)
                     installed_names.append(skill.name)
                 except Exception as e:
-                    PrettyOutput.auto_print(f"⚠️  安装失败 {skill.name}: {e}")
+                    PrettyOutput.auto_print(f"⚠️ 安装技能 '{skill.name}' 失败：{e}")
 
             return installed_names
         except Exception as e:
