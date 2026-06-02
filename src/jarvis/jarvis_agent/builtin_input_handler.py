@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import io
 import os
 import re
 from datetime import datetime
@@ -9,8 +8,6 @@ from typing import Optional
 from typing import Tuple
 
 import yaml
-from rich.console import Console
-from rich.table import Table
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.main import chat_with_model
@@ -37,29 +34,29 @@ from jarvis.jarvis_utils.git_utils import (
 )
 
 
-def _print_table_for_terminal_or_frontend(table: Table) -> None:
-    """根据运行环境选择终端富样式或前端纯文本输出表格。"""
-    try:
-        from jarvis.jarvis_gateway.manager import get_current_gateway
-
-        has_gateway = get_current_gateway() is not None
-    except Exception:
-        has_gateway = False
-
-    if has_gateway:
-        string_io = io.StringIO()
-        console_plain = Console(
-            file=string_io,
-            force_terminal=False,
-            no_color=True,
-            legacy_windows=False,
-            width=100,
-        )
-        console_plain.print(table)
-        PrettyOutput.auto_print(string_io.getvalue(), timestamp=False)
-        return
-
-    Console().print(table)
+def _print_markdown_table(
+    title: str,
+    headers: List[str],
+    rows: List[List[str]],
+    header_styles: Optional[List[str]] = None,
+) -> None:
+    """输出 markdown 表格，兼容终端和前端。"""
+    # 构建表头行
+    header_row = "| " + " | ".join(headers) + " |"
+    # 构建分隔行
+    separator_row = "| " + " | ".join(["---"] * len(headers)) + " |"
+    # 构建数据行
+    data_rows = ["| " + " | ".join(row) + "|" for row in rows]
+    # 组合 markdown 内容
+    md_content = (
+        f"## {title}\n\n"
+        + header_row
+        + "\n"
+        + separator_row
+        + "\n"
+        + "\n".join(data_rows)
+    )
+    PrettyOutput.print_markdown(md_content)
 
 
 # 辅助函数：获取全局配置数据（避免导入时绑定问题）
@@ -278,25 +275,16 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             if not rules_info:
                 PrettyOutput.auto_print("📋 未找到任何规则")
             else:
-                table = Table(
-                    title="📋 所有可用规则",
-                    show_header=True,
-                    header_style="bold magenta",
-                    expand=True,
-                )
-
-                table.add_column("规则名称", style="cyan", no_wrap=False)
-                table.add_column("内容预览", style="green")
-                table.add_column("文件路径", style="yellow", no_wrap=False)
-                table.add_column("状态", justify="center")
-
+                # 构建 markdown 表格
+                headers = ["规则名称", "内容预览", "文件路径", "状态"]
+                rows = []
                 for rule_name, preview, is_loaded, file_path in rules_info:
                     if len(file_path) > 37:
                         file_path = file_path[:37] + "..."
                     status = "✅ 已激活" if is_loaded else "🔴 未激活"
-                    table.add_row(rule_name, preview, file_path, status)
+                    rows.append([rule_name, preview, file_path, status])
 
-                _print_table_for_terminal_or_frontend(table)
+                _print_markdown_table("📋 所有可用规则", headers, rows)
                 PrettyOutput.auto_print(
                     f"总计: {len(rules_info)} 个规则", timestamp=False
                 )
@@ -1075,24 +1063,14 @@ def switch_model_group(agent: Any) -> bool:
         return False
 
     # 显示模型组列表
-    table = Table(
-        title="📋 可用模型组",
-        show_header=True,
-        header_style="bold magenta",
-        expand=True,
-    )
-    table.add_column("编号", style="cyan", justify="center")
-    table.add_column("模型组名称", style="green")
-    table.add_column("Smart", style="cyan", justify="center")
-    table.add_column("Normal", style="magenta", justify="center")
-    table.add_column("Cheap", style="yellow", justify="center")
-
+    headers = ["编号", "模型组名称", "Smart", "Normal", "Cheap"]
+    rows = []
     for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(
         groups, 1
     ):
-        table.add_row(str(idx), group_name, smart_model, normal_model, cheap_model)
+        rows.append([str(idx), group_name, smart_model, normal_model, cheap_model])
 
-    _print_table_for_terminal_or_frontend(table)
+    _print_markdown_table("📋 可用模型组", headers, rows)
 
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
@@ -1263,19 +1241,8 @@ def switch_model(agent: Any) -> bool:
     llms_config = global_config.get("llms", {})
 
     # 显示模型列表
-    table = Table(
-        title=f"📋 模型组 '{current_group}' 的可用模型",
-        show_header=True,
-        header_style="bold magenta",
-        expand=True,
-    )
-    table.add_column("编号", style="cyan", justify="center", ratio=1)
-    table.add_column("类型", style="green", justify="left", ratio=1)
-    table.add_column("模型名称", style="magenta", justify="left", ratio=2)
-    table.add_column("多模态", style="yellow", justify="center", ratio=1)
-    table.add_column("上下文长度", style="blue", justify="right", ratio=1)
-    table.add_column("状态", style="white", justify="center", ratio=1)
-
+    headers = ["编号", "类型", "模型名称", "多模态", "上下文长度", "状态"]
+    rows = []
     for idx, (model_type, type_name, model_name) in enumerate(available_models, 1):
         # 获取 LLM 配置详情
         llm_detail = llms_config.get(model_name, {})
@@ -1285,11 +1252,11 @@ def switch_model(agent: Any) -> bool:
         )
         multimodal_str = "✅" if supports_multimodal else "❌"
         status = "✓ 当前" if model_type == current_platform_type else ""
-        table.add_row(
-            str(idx), type_name, model_name, multimodal_str, str(max_tokens), status
+        rows.append(
+            [str(idx), type_name, model_name, multimodal_str, str(max_tokens), status]
         )
 
-    _print_table_for_terminal_or_frontend(table)
+    _print_markdown_table(f"📋 模型组 '{current_group}' 的可用模型", headers, rows)
 
     # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")

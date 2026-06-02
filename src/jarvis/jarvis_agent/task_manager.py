@@ -6,8 +6,6 @@ import os
 
 import yaml  # type: ignore[import-untyped]
 from prompt_toolkit import prompt
-from rich.console import Console
-from rich.table import Table
 
 from jarvis.jarvis_agent import get_multiline_input
 from jarvis.jarvis_agent import user_confirm
@@ -70,14 +68,22 @@ class TaskManager:
             return ""
 
         task_names = list(tasks.keys())
-        # 使用 rich.Table 展示预定义任务
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("No.", style="cyan", no_wrap=True)
-        table.add_column("任务名", style="bold")
-        for i, name in enumerate(task_names, 1):
-            table.add_row(str(i), name)
-        Console().print(table)
-        PrettyOutput.auto_print("ℹ️ [0] 跳过预定义任务")
+        # 使用 markdown 表格展示预定义任务
+        headers = ["No.", "任务名"]
+        rows = [[str(i), name] for i, name in enumerate(task_names, 1)]
+        header_row = "| " + " | ".join(headers) + " |"
+        separator_row = "| " + " | ".join(["---"] * len(headers)) + " |"
+        data_rows = ["| " + " | ".join(row) + "|" for row in rows]
+        md_content = (
+            "## 预定义任务\n\n"
+            + header_row
+            + "\n"
+            + separator_row
+            + "\n"
+            + "\n".join(data_rows)
+        )
+        PrettyOutput.print_markdown(md_content)
+        PrettyOutput.auto_print("ℹ️ 请选择要执行的任务（输入编号或使用上下键选择）：")
 
         # Try fzf selection first (with numbered options and a skip option)
         fzf_list = [f"{0:>3} | 跳过预定义任务"] + [

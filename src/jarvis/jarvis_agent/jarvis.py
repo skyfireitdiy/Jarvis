@@ -16,8 +16,7 @@ from typing import Tuple
 
 import typer
 import yaml  # type: ignore[import-untyped]
-from rich.console import Console
-from rich.table import Table
+
 
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_agent.agent_manager import AgentManager
@@ -164,68 +163,32 @@ app = typer.Typer(help="Jarvis AI 助手")
 def print_commands_overview() -> None:
     """打印命令与快捷方式总览表。"""
     try:
-        cmd_table = Table(show_header=True, header_style="bold magenta")
-        cmd_table.add_column("命令", style="bold")
-        cmd_table.add_column("快捷方式", style="cyan")
-        cmd_table.add_column("功能描述", style="white")
+        md_content = """## Jarvis 命令与快捷方式
 
-        cmd_table.add_row(
-            "jarvis",
-            "jvs",
-            "通用AI代理，适用于多种任务（支持 --quick-config 快速配置 LLM）",
-        )
-        cmd_table.add_row("jarvis-agent", "ja", "AI代理基础功能，处理会话和任务")
-        cmd_table.add_row(
-            "jarvis-agent-dispatcher", "jvsd", "jvs 的便捷封装，支持任务派发和交互模式"
-        )
-        cmd_table.add_row(
-            "jarvis-code-agent",
-            "jca",
-            "专注于代码分析、修改和生成的代码代理",
-        )
-        cmd_table.add_row(
-            "jarvis-code-agent-dispatcher",
-            "jcad",
-            "jca 的便捷封装，支持任务派发和交互模式",
-        )
-        cmd_table.add_row(
-            "jarvis-git-commit",
-            "jgc",
-            "自动化分析代码变更并生成规范的Git提交信息",
-        )
-        cmd_table.add_row("jarvis-git-squash", "jgs", "Git提交历史整理工具")
-        cmd_table.add_row(
-            "jarvis-config",
-            "jcfg",
-            "配置管理工具，基于 JSON Schema 动态生成配置 Web 页面",
-        )
-        cmd_table.add_row("jarvis-quick-config", "jqc", "快速配置 LLM 平台")
-        cmd_table.add_row("jarvis-lsp", "jlsp", "LSP 语言服务器")
-        cmd_table.add_row("jarvis-browser", "jb", "浏览器自动化")
-        cmd_table.add_row("jarvis-windows", "jw", "Windows GUI 自动化")
-        cmd_table.add_row("jarvis-rules-index", "jri", "规则索引管理")
-        cmd_table.add_row(
-            "jarvis-platform-manager",
-            "jpm",
-            "管理和测试不同的大语言模型平台",
-        )
-        cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
-        cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
-
-        cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
-        cmd_table.add_row(
-            "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
-        )
-        cmd_table.add_row(
-            "jarvis-c2rust", "jc2r", "C→Rust 迁移套件，支持渐进式迁移和智能库替代"
-        )
-        cmd_table.add_row(
-            "jarvis-memory-organizer",
-            "jmo",
-            "记忆管理工具，支持整理、合并、导入导出记忆",
-        )
-
-        Console().print(cmd_table)
+| 命令 | 快捷方式 | 功能描述 |
+|------|----------|----------|
+| jarvis | jvs | 通用AI代理，适用于多种任务（支持 --quick-config 快速配置 LLM） |
+| jarvis-agent | ja | AI代理基础功能，处理会话和任务 |
+| jarvis-agent-dispatcher | jvsd | jvs 的便捷封装，支持任务派发和交互模式 |
+| jarvis-code-agent | jca | 专注于代码分析、修改和生成的代码代理 |
+| jarvis-code-agent-dispatcher | jcad | jca 的便捷封装，支持任务派发和交互模式 |
+| jarvis-git-commit | jgc | 自动化分析代码变更并生成规范的Git提交信息 |
+| jarvis-git-squash | jgs | Git提交历史整理工具 |
+| jarvis-config | jcfg | 配置管理工具，基于 JSON Schema 动态生成配置 Web 页面 |
+| jarvis-quick-config | jqc | 快速配置 LLM 平台 |
+| jarvis-lsp | jlsp | LSP 语言服务器 |
+| jarvis-browser | jb | 浏览器自动化 |
+| jarvis-windows | jw | Windows GUI 自动化 |
+| jarvis-rules-index | jri | 规则索引管理 |
+| jarvis-platform-manager | jpm | 管理和测试不同的大语言模型平台 |
+| jarvis-tool | jt | 工具管理与调用系统 |
+| jarvis-methodology | jm | 方法论知识库管理 |
+| jarvis-smart-shell | jss | 实验性的智能Shell功能 |
+| jarvis-sec | jsec | 安全分析套件，结合启发式扫描和 AI 深度验证 |
+| jarvis-c2rust | jc2r | C→Rust 迁移套件，支持渐进式迁移和智能库替代 |
+| jarvis-memory-organizer | jmo | 记忆管理工具，支持整理、合并、导入导出记忆 |
+"""
+        PrettyOutput.print_markdown(md_content, title="命令与快捷方式总览")
     except Exception:
         # 静默忽略渲染异常，避免影响主流程
         pass
@@ -698,14 +661,9 @@ def handle_builtin_config_selector(
                 )
 
                 PrettyOutput.auto_print("✅ 可用的内置配置")
-                # 使用 rich Table 呈现
-                table = Table(show_header=True, header_style="bold magenta")
-                table.add_column("No.", style="cyan", no_wrap=True)
-                table.add_column("类型", style="green", no_wrap=True)
-                table.add_column("名称", style="bold")
-                table.add_column("文件", style="dim")
-                table.add_column("描述", style="white")
 
+                # 构建 markdown 表格
+                md_rows = []
                 for idx, opt in enumerate(options, 1):
                     category = str(opt.get("category", ""))
                     name = str(opt.get("name", ""))
@@ -719,12 +677,19 @@ def handle_builtin_config_selector(
                             parts.append(f"{count} 个角色")
                         if isinstance(details_val, str) and details_val:
                             parts.append(details_val)
-                        desc_display = "\n".join(parts) if parts else ""
+                        desc_display = " / ".join(parts) if parts else ""
                     else:
                         desc_display = str(opt.get("desc", ""))
-                    table.add_row(str(idx), category, name, file_path, desc_display)
+                    md_rows.append(
+                        f"| {idx} | {category} | {name} | {file_path} | {desc_display} |"
+                    )
 
-                Console().print(table)
+                md_content = """## 可用的内置配置
+
+| No. | 类型 | 名称 | 文件 | 描述 |
+|-----|------|------|------|------|
+""" + "\n".join(md_rows)
+                PrettyOutput.print_markdown(md_content)
 
                 # Try to use fzf for selection if available (include No. to support number-based filtering)
                 fzf_options = [
