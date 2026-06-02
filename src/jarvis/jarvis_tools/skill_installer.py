@@ -3,7 +3,7 @@
 
 import os
 import requests
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 
 # 避免循环导入
@@ -19,7 +19,7 @@ class IDownloader:
     
     def download(self, url: str) -> str:
         """下载文件内容"""
-        pass
+        ...
 
 
 class RequestsDownloader(IDownloader):
