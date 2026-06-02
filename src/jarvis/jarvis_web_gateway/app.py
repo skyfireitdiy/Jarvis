@@ -82,7 +82,7 @@ from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegis
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
-from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt, get_script_pid
 import jarvis.jarvis_utils.globals as jglobals
 from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 from jarvis.jarvis_utils.config import (
@@ -680,6 +680,13 @@ class WebSocketConnectionManager:
             )
             return
         if message_type == "manual_interrupt":
+            # 先检查是否有正在运行的脚本进程，如果有则发送 SIGINT 信号
+            script_pid = get_script_pid()
+            if script_pid is not None:
+                try:
+                    os.kill(script_pid, signal.SIGINT)
+                except OSError:
+                    pass  # 进程可能已经结束
             set_interrupt(True)
             return
         if message_type == "get_status":
