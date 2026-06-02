@@ -2,7 +2,7 @@
 """技能评估器 - 使用 LLM 评估远程技能的相关性和价值"""
 
 import asyncio
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 from dataclasses import dataclass
 from .sources.base import SkillResult
 
