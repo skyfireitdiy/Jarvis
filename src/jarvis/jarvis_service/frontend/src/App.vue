@@ -6164,12 +6164,8 @@ function handleMessage(message, agentId = null) {
         console.log(`[ws] Agent ${agentId} connection locked (normal switch behavior)`)
       }
     }
-    
-    appendOutput({
-      output_type: 'ERROR',
-      text: errorMessage,
-      lang: 'text',
-    })
+    // 不再通过 appendOutput 显示系统错误消息，避免污染会话窗口
+    // 错误信息仍通过 console.warn 输出，便于调试
   } else if (type === 'status_update') {
     // 更新 Agent 执行状态
     if (payload?.execution_status) {
