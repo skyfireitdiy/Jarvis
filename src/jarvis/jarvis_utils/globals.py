@@ -55,6 +55,10 @@ running_agent_stack: List[str] = []  # 正在运行的agent栈（最顶层是当
 g_in_chat: int = 0
 # 表示是否接收到中断信号
 g_interrupt: int = 0
+# 当前运行的脚本进程 PID
+current_script_pid: Optional[int] = None
+
+
 # 使用自定义主题配置rich控制台
 custom_theme = Theme(
     {
@@ -250,6 +254,37 @@ def get_interrupt() -> int:
         int: 当前中断计数
     """
     return g_interrupt
+
+
+def set_script_pid(pid: Optional[int]) -> None:
+    """
+    设置当前运行的脚本进程 PID。
+
+    参数:
+        pid: 进程 PID，为 None 时表示清空
+    """
+    global current_script_pid
+    current_script_pid = pid
+
+
+def get_script_pid() -> Optional[int]:
+    """
+    获取当前运行的脚本进程 PID。
+
+    返回:
+        Optional[int]: 当前脚本进程 PID，如果没有正在运行的脚本则返回 None
+    """
+    global current_script_pid
+    return current_script_pid
+
+
+def clear_script_pid() -> None:
+    """
+    清除当前运行的脚本进程 PID。
+    应该在脚本执行完毕后调用。
+    """
+    global current_script_pid
+    current_script_pid = None
 
 
 def set_last_message(message: str) -> None:
