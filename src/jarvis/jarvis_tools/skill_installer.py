@@ -14,9 +14,13 @@ from jarvis.jarvis_utils.config import get_data_dir
 from .skill_sources.base import SkillResult
 
 
-class IDownloader:
+from abc import ABC, abstractmethod
+
+
+class IDownloader(ABC):
     """下载器抽象接口（便于测试和替换）"""
     
+    @abstractmethod
     def download(self, url: str) -> str:
         """下载文件内容"""
         ...
@@ -106,7 +110,10 @@ class SkillInstaller:
         # 5. 热加载（如果提供了 rules_manager）
         if self.rules_manager:
             try:
-                self.rules_manager.load_rule_file(rule_path)
+                # 使用 getattr 避免类型检查错误
+                load_method = getattr(self.rules_manager, 'load_rule_file', None)
+                if load_method:
+                    load_method(rule_path)
             except Exception:
                 # 加载失败不影响安装成功
                 pass
