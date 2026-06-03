@@ -457,6 +457,146 @@ license: MIT
 - 参考文档：`related_rule.md`
 ````
 
+## 配套脚本规范
+
+在创建规则时，如果规则涉及需要自动化执行的辅助操作，可以同时创建与之配套的脚本文件。
+
+### 何时创建配套脚本
+
+**建议创建配套脚本的场景：**
+
+- 规则需要执行重复性的复杂操作
+- 规则涉及文件生成、转换或批量处理
+- 规则需要与其他工具或系统集成
+- 规则的验证需要自动化检查
+
+**可选的场景：**
+
+- 简单的单次操作（直接内联到规则中即可）
+- 纯文档性质的规则（无需脚本）
+
+### 脚本命名规范
+
+- **必须**：使用与规则文件相同的基础名称
+- **必须**：脚本扩展名应反映其语言/类型（如 `.sh`、`.py`、`.ps1`）
+- **必须**：使用小写字母和下划线
+
+**命名示例：**
+
+| 规则文件             | 配套脚本              |
+| -------------------- | --------------------- |
+| `code_review.md`     | `code_review.sh`      |
+| `deploy_helper.md`   | `deploy_helper.py`    |
+| `batch_processor.md` | `batch_processor.ps1` |
+
+### 脚本位置规范
+
+**项目规则配套脚本：**
+
+```text
+{{ git_root_dir }}/.jarvis/rules/<category>/scripts/<script_name>.<ext>
+```
+
+**全局规则配套脚本：**
+
+```text
+{{ jarvis_data_dir }}/rules/<category>/scripts/<script_name>.<ext>
+```
+
+**脚本目录结构示例：**
+
+```text
+.jarvis/rules/
+└── code_quality/
+    ├── code_review.md          # 规则文件
+    └── scripts/
+        ├── code_review.sh      # 配套脚本
+        └── requirements.txt    # 脚本依赖（可选）
+```
+
+### 脚本与规则的关联
+
+#### 1. 在规则中引用脚本
+
+在规则文件的适当位置引用配套脚本，例如：
+
+````markdown
+### 自动化工具
+
+本规则配套的自动化脚本位于：`{% raw %}{{ rule_file_dir }}{% endraw %}/scripts/code_review.sh`
+
+**使用方式：**
+
+```bash
+./scripts/code_review.sh --path ./src --output report.md
+```
+````
+
+#### 2. 脚本头注释
+
+建议在脚本开头添加规则关联说明：
+
+```bash
+#!/bin/bash
+#===============================================================================
+# 规则关联: code_review.md
+# 说明: 代码审查规则的自动化执行脚本
+# 位置: .jarvis/rules/code_quality/scripts/code_review.sh
+#===============================================================================
+```
+
+### 脚本开发要求
+
+**必须遵守：**
+
+- **可执行性**：脚本必须是可执行的（设置正确的文件权限）
+- **独立性**：脚本应尽量独立，不依赖未在项目中声明的工具
+- **文档化**：添加足够的注释说明脚本用途和使用方法
+- **错误处理**：脚本应包含基本的错误处理和退出码
+
+**建议遵守：**
+
+- 添加 `--help` 或 `-h` 选项显示使用说明
+- 支持配置文件或命令行参数
+- 记录详细日志便于排查问题
+
+### 脚本依赖管理
+
+如果脚本有外部依赖，建议在脚本目录添加依赖说明文件：
+
+**依赖文件命名：**
+
+- Python: `requirements.txt`
+- Node.js: `package.json`
+- 通用: `DEPENDENCIES.md`
+
+**示例 `DEPENDENCIES.md`：**
+
+````markdown
+# 脚本依赖说明
+
+## code_review.sh
+
+### 必需工具
+
+- `shellcheck`: 代码检查
+- `git`: Git 操作
+
+### 可选工具
+
+- `fd`: 文件查找（未安装时使用 `find` 替代）
+
+## 安装方式
+
+```bash
+# Ubuntu/Debian
+sudo apt install shellcheck fd
+
+# macOS
+brew install shellcheck fd
+```
+````
+
 ## 最佳实践
 
 ### 1. 规则设计原则
