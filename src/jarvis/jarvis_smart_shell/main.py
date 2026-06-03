@@ -25,7 +25,7 @@ Example:
 
 def execute_command(command: str, should_run: bool) -> None:
     """Print command without execution"""
-    PrettyOutput.auto_print(command)
+    print(command)
     if should_run:
         # 核心功能：执行shell命令（用户提供）
         os.system(command)  # nosec B605
@@ -378,6 +378,8 @@ def process_request(request: str) -> Optional[str]:
         # Get language model instance
         # 使用normal平台，智能shell命令生成是一般任务
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
+        # 抑制与 LLM 交互的详细输出
+        model.set_suppress_output(True)
 
         shell = get_shell_name()
         current_path = os.getcwd()
