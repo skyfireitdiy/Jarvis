@@ -2727,6 +2727,11 @@ class Agent:
 
             # 如果成功选择了规则，将其激活
             if selected_rules:
+                # 检查是否为"不需要规则"的标记
+                if selected_rules == ["__NO_RULES_NEEDED__"]:
+                    PrettyOutput.auto_print("✅ 任务简单，无需特定规则即可完成")
+                    return
+
                 # 遍历规则列表并激活
                 for rule_name in selected_rules:
                     # 使用 load_rule 方法加载规则（内部会检查重复并自动合并）
