@@ -650,16 +650,8 @@ git reset --hard {start_commit}
 
             # 根据配置在任务结束时手动调用分析功能（在最终提交之前）
             if self._use_analysis_config:
-                # 询问用户是否需要分析
-                # 检测是否在 gateway 模式下
-                try:
-                    from jarvis.jarvis_gateway.manager import get_current_gateway
-
-                    is_gateway = get_current_gateway() is not None
-                except Exception:
-                    is_gateway = False
-                # gateway 模式或非交互模式默认为True（执行分析），交互模式默认为False（不执行分析）
-                default_analyze = is_gateway or bool(self.non_interactive)
+                # 询问用户是否需要分析，默认不执行分析
+                default_analyze = bool(self.non_interactive)
                 should_analyze = user_confirm(
                     "📊 是否对本次任务进行分析并生成方法论？",
                     default=default_analyze,
