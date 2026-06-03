@@ -3601,28 +3601,58 @@ def create_app(
                     if line.strip()
                 ]
 
-            # 模糊搜索
+            # 使用 fzf 进行模糊搜索
             search_results = []
             if query and files:
-                scored_items = process.extract(
-                    query,
-                    files,
-                    limit=50,
-                )
-                scored_items = [
-                    (item[0], item[1])
-                    for item in scored_items
-                    if item[1] > 10  # 最小分数阈值
-                ]
-                for path, score in scored_items:
-                    search_results.append(
-                        {
-                            "type": "file",
-                            "value": path,
-                            "display": f"{path} ({score}%)" if score < 100 else path,
-                            "description": "File",
-                        }
+                import shutil
+
+                if shutil.which("fzf"):
+                    # fzf 过滤模式 - 按相关性排序
+                    try:
+                        proc = subprocess.run(
+                            ["fzf", "-f", query],
+                            input="\n".join(files).encode("utf-8"),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
+                        if proc.returncode == 0:
+                            matched = (
+                                decode_output(proc.stdout).strip().split("\n")[:300]
+                            )
+                            for path in matched:
+                                if path:
+                                    search_results.append(
+                                        {
+                                            "type": "file",
+                                            "value": path,
+                                            "display": path,
+                                            "description": "File",
+                                        }
+                                    )
+                    except Exception:
+                        pass
+
+                # 回退到 fuzzywuzzy
+                if not search_results:
+                    scored_items = process.extract(
+                        query,
+                        files,
+                        limit=300,
                     )
+                    scored_items = [
+                        (item[0], item[1]) for item in scored_items if item[1] > 10
+                    ]
+                    for path, score in scored_items:
+                        search_results.append(
+                            {
+                                "type": "file",
+                                "value": path,
+                                "display": f"{path} ({score}%)"
+                                if score < 100
+                                else path,
+                                "description": "File",
+                            }
+                        )
 
             return {"success": True, "data": search_results}
         except Exception as e:
