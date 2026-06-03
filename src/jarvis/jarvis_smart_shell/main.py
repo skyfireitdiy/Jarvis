@@ -424,6 +424,8 @@ def request_command(
     ),
 ):
     """描述您想要执行的操作（用自然语言描述）"""
+    # 设置环境变量，跳过终端嵌套检查（JSS 可能被 shell handler 调用）
+    os.environ["terminal"] = "0"
     should_run = False
     if not request:
         # 检查是否在交互式终端中运行
