@@ -319,8 +319,8 @@ def load_methodology(
         try:
             # 直接获取模型的最大输入token数（上下文窗口）
             max_input_tokens = platform._get_platform_max_input_token_count()
-            # 使用上下文窗口的0.75作为方法论限制，保留0.25作为安全余量
-            methodology_token_limit = int(max_input_tokens * 0.75)
+            # 使用上下文窗口的0.80作为方法论限制，保留0.20作为安全余量
+            methodology_token_limit = int(max_input_tokens * 0.80)
             if methodology_token_limit <= 0:
                 methodology_token_limit = None
         except Exception:
@@ -329,7 +329,7 @@ def load_methodology(
         # 回退方案：使用cheap模型的输入窗口限制
         if methodology_token_limit is None:
             max_input_tokens = get_cheap_max_input_token_count()
-            methodology_token_limit = int(max_input_tokens * 0.75)
+            methodology_token_limit = int(max_input_tokens * 0.80)
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分
