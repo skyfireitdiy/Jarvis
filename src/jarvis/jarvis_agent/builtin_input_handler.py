@@ -290,6 +290,68 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 )
 
             return "", True
+        elif tag == "UnloadRule":
+            # 卸载已加载的规则
+            loaded_rules = list(agent.rules_manager.loaded_rules)
+            if not loaded_rules:
+                _print_markdown_table(
+                    "📋 已加载的规则", ["序号", "规则名称"], [["-", "无"]]
+                )
+                PrettyOutput.auto_print("⚠️  没有已加载的规则")
+                return "", True
+
+            # 构建表格数据
+            rows = []
+            for i, rule in enumerate(loaded_rules, 1):
+                rows.append([str(i), rule])
+
+            _print_markdown_table("📋 已加载的规则", ["序号", "规则名称"], rows)
+
+            # 获取用户选择的序号
+            idx_str = get_single_line_input(
+                "请输入要卸载的规则序号（多个用逗号分隔，如 1,3,5）："
+            )
+            if not idx_str.strip():
+                PrettyOutput.auto_print("❌ 未输入序号，操作已取消")
+                return "", True
+
+            # 解析并卸载
+            try:
+                indices = [int(x.strip()) for x in idx_str.split(",")]
+                unloaded = []
+                for idx in indices:
+                    if 1 <= idx <= len(loaded_rules):
+                        rule_to_unload = loaded_rules[idx - 1]
+                        agent.rules_manager.unload_rule(rule_to_unload)
+                        unloaded.append(rule_to_unload)
+                    else:
+                        PrettyOutput.auto_print(f"⚠️  无效序号：{idx}")
+
+                if unloaded:
+                    PrettyOutput.auto_print(
+                        f"✅ 已卸载 {len(unloaded)} 个规则：{', '.join(unloaded)}"
+                    )
+                else:
+                    PrettyOutput.auto_print("❌ 没有成功卸载任何规则")
+            except ValueError:
+                PrettyOutput.auto_print("❌ 输入格式错误，请输入数字序号")
+
+            return "", True
+        elif tag == "ClearRules":
+            # 清空所有已加载的规则（保留默认规则）
+            loaded_rules = list(agent.rules_manager.loaded_rules)
+            if not loaded_rules:
+                PrettyOutput.auto_print("📋 没有已加载的规则")
+                return "", True
+
+            # 遍历卸载所有规则
+            count = 0
+            for rule in loaded_rules:
+                agent.rules_manager.unload_rule(rule)
+                count += 1
+
+            PrettyOutput.auto_print(f"✅ 已清空 {count} 个规则")
+            return "", True
         elif tag == "SaveSession":
             # 检查是否允许使用SaveSession命令
             if not getattr(agent, "allow_savesession", False):
