@@ -179,6 +179,8 @@ BUILTIN_COMMANDS = [
     ("RestoreSession", "恢复会话"),
     ("ListSessions", "列出所有会话"),
     ("ListRule", "列出所有规则"),
+    ("UnloadRule", "卸载已加载的规则"),
+    ("ClearRules", "清空所有已加载的规则"),
     ("Quiet", "无人值守模式"),
     ("AutoComplete", "自动完成后转交用户"),
     ("FixToolCall", "修复工具调用"),
