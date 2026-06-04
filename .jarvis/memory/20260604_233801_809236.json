@@ -1,0 +1,8 @@
+{
+  "id": "20260604_233801_809236",
+  "type": "project_long_term",
+  "tags": ["架构决策", "scenario_prompts", "公共模块"],
+  "content": "场景提示词公共模块架构：\n- 公共模块：src/jarvis/jarvis_utils/scenario_prompts.py，包含 _get_prompt_dirs()、_load_scenario_types()、_get_scenario_types()、_load_prompt_from_file()、classify_user_request()、get_system_prompt()\n- 薄包装层：agent_prompts.py 和 code_agent_prompts.py，通过 scenario_subdir 参数区分\n- 双目录加载：数据目录(~/.jarvis/prompts/{subdir}/)优先级高于builtin目录\n- builtin路径计算：Path(__file__).parent.parent.parent.parent / 'builtin' / 'prompts'（从jarvis_utils向上4级到项目根目录）\n- 参数化区分：scenario_subdir、default_scenario_name、classification_context、difficulty_descriptions",
+  "created_at": "2026-06-04T23:38:01.809305",
+  "updated_at": "2026-06-04T23:38:01.809314"
+}
