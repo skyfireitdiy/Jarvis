@@ -2401,6 +2401,33 @@ class Agent:
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
                 set_current_agent(self.name, self)  # 标记agent开始运行
+
+                # 通用Agent需求分类（仅在首次运行且启用分类时执行）
+                if self.first and is_enable_request_classification() and not self.quick_mode:
+                    try:
+                        from jarvis.jarvis_agent.agent_prompts import classify_user_request, get_system_prompt
+
+                        scenario, difficulty = classify_user_request(user_input)
+
+                        # 根据难度切换模型
+                        self._switch_model_by_difficulty(difficulty)
+
+                        # 根据分类结果获取对应的系统提示词并更新
+                        scenario_system_prompt = get_system_prompt(scenario)
+                        if scenario_system_prompt != self.system_prompt:
+                            self.system_prompt = scenario_system_prompt
+                            # 更新模型的系统提示词
+                            if self.model:
+                                # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                                if self.prompt_manager:
+                                    prompt_text = self.prompt_manager.build_system_prompt(self)
+                                    self.model.set_system_prompt(prompt_text)
+                                else:
+                                    self.model.set_system_prompt(self.system_prompt)
+                    except Exception as e:
+                        from jarvis.jarvis_utils.output import PrettyOutput
+                        PrettyOutput.auto_print(f"⚠️ 通用Agent需求分类失败: {e}，使用默认配置")
+
             non_interactive_note = ""
             if getattr(self, "non_interactive", False):
                 non_interactive_note = (
