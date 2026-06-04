@@ -152,53 +152,7 @@ class CodeAgent(Agent):
 
         return "\n".join(text_parts) if text_parts else "[多模态内容]"
 
-    def _switch_model_by_difficulty(self, difficulty: str) -> None:
-        """根据任务难度切换模型
-
-        参数:
-            difficulty: 任务难度等级（easy/medium/hard）
-        """
-        # 难度到模型类型的映射
-        difficulty_to_model_type = {
-            "easy": "cheap",
-            "medium": "normal",
-            "hard": "smart",
-        }
-
-        model_type = difficulty_to_model_type.get(difficulty, "normal")
-        current_model_type = getattr(self, "_model_type", "normal")
-
-        # 如果模型类型没有变化，不需要切换
-        if model_type == current_model_type:
-            return
-
-        # 使用通用的 switch_platform_type 函数进行切换
-        success = switch_platform_type(self, model_type, preserve_model_group=True)
-
-        if success:
-            # 更新模型类型标记
-            self._model_type = model_type
-
-            # 如果有系统提示词，设置到新模型
-            if hasattr(self, "system_prompt") and self.system_prompt:
-                # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                if hasattr(self, "prompt_manager") and self.prompt_manager:
-                    prompt_text = self.prompt_manager.build_system_prompt(self)
-                    self.model.set_system_prompt(prompt_text)
-                else:
-                    self.model.set_system_prompt(self.system_prompt)
-
-            # 输出切换信息
-            model_type_display = {
-                "cheap": "经济",
-                "normal": "标准",
-                "smart": "智能",
-            }.get(model_type, model_type)
-            PrettyOutput.auto_print(
-                f"🔄 根据任务难度（{difficulty}）切换模型类型: {model_type_display} ({model_type})"
-            )
-        else:
-            PrettyOutput.auto_print(f"⚠️ 切换到 {model_type} 模型失败，保持当前模型")
+️ 切换到 {model_type} 模型失败，保持当前模型")
 
     def _append_to_session_prompt(self, content: str) -> None:
         """安全地追加内容到 session.prompt
