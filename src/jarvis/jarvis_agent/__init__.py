@@ -41,6 +41,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 # 本地库导入
 # jarvis_agent 相关
 from jarvis.jarvis_utils.config import is_enable_quick_mode
+from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.prompt_builder import get_tool_registry
 from jarvis.jarvis_agent.prompt_manager import PromptManager
