@@ -941,6 +941,40 @@ class Agent:
         else:
             PrettyOutput.auto_print("⚠️ 模型切换失败，保持当前模型")
 
+    def _classify_and_switch_model(
+        self,
+        user_input: Union[str, List[ContentBlock]],
+        classify_fn: Callable,
+        get_prompt_fn: Callable,
+    ) -> None:
+        """执行需求分类、模型切换和系统提示词更新的统一流程
+
+        参数:
+            user_input: 用户输入的需求描述
+            classify_fn: 分类函数，签名为 (user_input) -> (scenario, difficulty)
+            get_prompt_fn: 获取系统提示词函数，签名为 (scenario) -> str
+        """
+        try:
+            scenario, difficulty = classify_fn(user_input)
+
+            # 根据难度切换模型
+            self._switch_model_by_difficulty(difficulty)
+
+            # 根据分类结果获取对应的系统提示词并更新
+            scenario_system_prompt = get_prompt_fn(scenario)
+            if scenario_system_prompt != self.system_prompt:
+                self.system_prompt = scenario_system_prompt
+                # 更新模型的系统提示词
+                if self.model:
+                    # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                    if self.prompt_manager:
+                        prompt_text = self.prompt_manager.build_system_prompt(self)
+                        self.model.set_system_prompt(prompt_text)
+                    else:
+                        self.model.set_system_prompt(self.system_prompt)
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认配置")
+
     def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
         prompt_text = self.prompt_manager.build_system_prompt(self)
