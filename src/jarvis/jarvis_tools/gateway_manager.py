@@ -121,7 +121,7 @@ class GatewayManagerTool:
             # list_model_groups / create_agent / list_directory 操作的参数
             "node_id": {
                 "type": "string",
-                "description": "目标节点 ID（list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点；delete_agent 操作可选，默认为本节点）",
+                "description": "目标节点 ID（send_to_agent 操作可选，未指定时自动查询 Agent 所在节点；list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点；delete_agent 操作可选，默认为本节点）",
             },
             # list_directory 操作的参数
             "path": {
@@ -301,7 +301,7 @@ class GatewayManagerTool:
             group_description = args.get("group_description")
         try:
             if action == "send_to_agent":
-                return self._send_to_agent(agent_id, message)
+                return self._send_to_agent(agent_id, message, node_id=node_id)
             elif action == "list_agents":
                 return self._list_agents()
             elif action == "list_nodes":
@@ -501,15 +501,19 @@ class GatewayManagerTool:
             "stderr": "",
         }
 
-    def _send_to_agent(self, agent_id: Any, message: str) -> Dict[str, Any]:
+    def _send_to_agent(
+        self, agent_id: Any, message: str, node_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """向指定 Agent(s) 发送消息。
 
         通过 Web Gateway 的 /api/agent/{agent_id}/message 接口发送消息，
         Gateway 会将请求代理到目标 Agent 的 /message 接口。
+        当目标 Agent 在子节点时，通过 /api/node/{node_id}/agent/{agent_id}/message 路由转发。
 
         参数:
             agent_id: 目标 Agent ID (支持 str 或 List[str])
             message: 消息内容
+            node_id: 目标节点 ID（可选，未指定时自动查询 Agent 所在节点）
 
         返回:
             Dict[str, Any]: 发送结果
@@ -548,10 +552,45 @@ class GatewayManagerTool:
         results = []
         all_success = True
 
+        # 构建 agent_id -> node_id 映射，用于确定路由路径
+        agent_node_map: Dict[str, str] = {}
+        if node_id:
+            # 用户指定了 node_id，所有目标 Agent 使用同一 node_id
+            for target_id in target_ids:
+                agent_node_map[target_id] = node_id
+        else:
+            # 未指定 node_id，查询 Agent 列表获取各 Agent 所在节点
+            try:
+                agents_result = self._request_gateway(
+                    method="GET",
+                    path="/api/agents",
+                    error_prefix="Failed to query agent list",
+                )
+                if agents_result["success"]:
+                    agents_data = agents_result["data"]
+                    if agents_data.get("success"):
+                        for agent_info in agents_data.get("data") or []:
+                            aid = str(agent_info.get("agent_id", ""))
+                            if aid in target_ids:
+                                agent_node_map[aid] = agent_info.get(
+                                    "node_id", "master"
+                                )
+            except Exception:
+                pass  # 查询失败时 fallback 到原有路径
+
         for target_id in target_ids:
+            target_node_id = agent_node_map.get(target_id)
+            # 判断是否需要走子节点路由
+            if target_node_id and target_node_id != "master":
+                # 子节点 Agent：通过 /api/node/{node_id}/agent/{agent_id}/message 路由
+                path = f"/api/node/{target_node_id}/agent/{target_id}/message"
+            else:
+                # 本地/master Agent：走原有路径
+                path = f"/api/agent/{target_id}/message"
+
             result = self._request_gateway(
                 method="POST",
-                path=f"/api/agent/{target_id}/message",
+                path=path,
                 json_data={"sender_id": sender_id, "content": enhanced_message},
                 error_prefix=f"Failed to send message to agent {target_id}",
             )
