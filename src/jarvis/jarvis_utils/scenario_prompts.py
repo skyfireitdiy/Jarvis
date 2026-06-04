@@ -6,7 +6,6 @@
 用户扩展文件可覆盖 builtin 同名文件。
 """
 
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
@@ -187,7 +186,7 @@ def classify_user_request(
     scenario_subdir: str,
     default_scenario_name: str = "通用任务",
     classification_context: str = "场景类型",
-    difficulty_descriptions: Dict[str, str] = None,
+    difficulty_descriptions: Dict[str, str] | None = None,
 ) -> Tuple[str, str]:
     """使用 normal_llm 对用户需求进行分类
 
@@ -292,8 +291,8 @@ difficulty: <难度等级>
         )
         return scenario, difficulty
 
-    except Exception as e:
-        PrettyOutput.auto_print(f"⚠")
+    except Exception:
+        PrettyOutput.auto_print("⚠")
         return "default", "medium"
 
 
