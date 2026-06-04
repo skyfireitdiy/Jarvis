@@ -658,9 +658,14 @@ class GatewayManagerTool:
                 }
 
             agents = gateway_data.get("data", [])
+            current_agent_id = jglobals.agent_id
+            result_data = {
+                "current_agent_id": current_agent_id,
+                "agents": agents,
+            }
             return {
                 "success": True,
-                "stdout": json.dumps(agents, ensure_ascii=False, indent=2),
+                "stdout": json.dumps(result_data, ensure_ascii=False, indent=2),
                 "stderr": "",
             }
         else:
@@ -696,7 +701,11 @@ class GatewayManagerTool:
 
             # 提取节点相关信息
             data = gateway_data.get("data", {})
+            current_node_id = data.get("node", {}).get("node_id")
+            current_agent_id = jglobals.agent_id
             node_info = {
+                "current_node_id": current_node_id,
+                "current_agent_id": current_agent_id,
                 "node": data.get("node", {}),
                 "runtime_status": data.get("runtime_status", "unknown"),
                 "nodes": data.get("nodes", []),
