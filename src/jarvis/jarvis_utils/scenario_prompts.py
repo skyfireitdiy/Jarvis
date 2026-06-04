@@ -17,8 +17,8 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.config import get_data_dir
 
 
-# builtin 提示词根目录
-_BUILTIN_PROMPTS_ROOT = Path(__file__).parent.parent.parent / "builtin" / "prompts"
+# builtin 提示词根目录（从 jarvis_utils 向上4级到达项目根目录）
+_BUILTIN_PROMPTS_ROOT = Path(__file__).parent.parent.parent.parent / "builtin" / "prompts"
 
 
 def _get_prompt_dirs(scenario_subdir: str) -> List[Path]:
