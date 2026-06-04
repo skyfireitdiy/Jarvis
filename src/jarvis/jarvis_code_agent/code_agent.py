@@ -152,7 +152,7 @@ class CodeAgent(Agent):
 
         return "\n".join(text_parts) if text_parts else "[多模态内容]"
 
-️ 切换到 {model_type} 模型失败，保持当前模型")
+
 
     def _append_to_session_prompt(self, content: str) -> None:
         """安全地追加内容到 session.prompt
