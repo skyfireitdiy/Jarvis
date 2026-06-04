@@ -2492,7 +2492,7 @@ class Agent:
                 if self.first and is_enable_request_classification() and not self.quick_mode:
                     from jarvis.jarvis_agent.agent_prompts import classify_user_request, get_system_prompt
 
-                    self._classify_and_switch_model(user_input, classify_user_request, get_system_prompt)️ 通用Agent需求分类失败: {e}，使用默认配置")
+                    self._classify_and_switch_model(user_input, classify_user_request, get_system_prompt)
 
             non_interactive_note = ""
             if getattr(self, "non_interactive", False):
