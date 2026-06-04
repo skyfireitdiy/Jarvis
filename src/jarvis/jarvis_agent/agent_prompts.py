@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """通用Agent系统提示词模块
 
-提供场场景分类、难度评估和系统提示词加载功能。
+提供场景分类、难度评估和系统提示词加载功能。
 场景提示词文件位于 builtin/prompts/agent_system/ 目录，
 用户扩展文件可放置于 ~/.jarvis/prompts/agent_system/ 目录。
 """
