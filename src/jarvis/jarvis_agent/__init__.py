@@ -939,7 +939,7 @@ class Agent:
                 f"🔄 根据任务难度（{difficulty}）切换模型类型: {model_type_display} ({model_type})"
             )
         else:
-            PrettyOutput.auto_print(f"⚠️ 模型切换失败，保持当前模型")
+            PrettyOutput.auto_print("⚠️ 模型切换失败，保持当前模型")
 
     def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
