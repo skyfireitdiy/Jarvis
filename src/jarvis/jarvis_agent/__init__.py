@@ -41,6 +41,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 # 本地库导入
 # jarvis_agent 相关
 from jarvis.jarvis_utils.config import is_enable_quick_mode
+from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.prompt_builder import get_tool_registry
 from jarvis.jarvis_agent.prompt_manager import PromptManager
@@ -888,6 +889,91 @@ class Agent:
             file_context_handler,
         ]
         self.multiline_inputer = multiline_inputer or get_multiline_input
+
+    def _switch_model_by_difficulty(self, difficulty: str) -> None:
+        """根据任务难度切换模型
+
+        参数:
+            difficulty: 任务难度等级（easy/medium/hard）
+        """
+        # 难度到模型类型的映射
+        difficulty_to_model_type = {
+            "easy": "cheap",
+            "medium": "normal",
+            "hard": "smart",
+        }
+
+        model_type = difficulty_to_model_type.get(difficulty, "normal")
+        current_model_type = getattr(self, "_model_type", "normal")
+
+        # 如果模型类型没有变化，不需要切换
+        if model_type == current_model_type:
+            return
+
+        # 延迟导入以避免循环依赖
+        from jarvis.jarvis_agent.builtin_input_handler import switch_platform_type
+
+        # 使用通用的 switch_platform_type 函数进行切换
+        success = switch_platform_type(self, model_type, preserve_model_group=True)
+
+        if success:
+            # 更新模型类型标记
+            self._model_type = model_type
+
+            # 如果有系统提示词，设置到新模型
+            if hasattr(self, "system_prompt") and self.system_prompt:
+                # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                if hasattr(self, "prompt_manager") and self.prompt_manager:
+                    prompt_text = self.prompt_manager.build_system_prompt(self)
+                    self.model.set_system_prompt(prompt_text)
+                else:
+                    self.model.set_system_prompt(self.system_prompt)
+
+            # 输出切换信息
+            model_type_display = {
+                "cheap": "经济",
+                "normal": "标准",
+                "smart": "智能",
+            }.get(model_type, model_type)
+            PrettyOutput.auto_print(
+                f"🔄 根据任务难度（{difficulty}）切换模型类型: {model_type_display} ({model_type})"
+            )
+        else:
+            PrettyOutput.auto_print("⚠️ 模型切换失败，保持当前模型")
+
+    def _classify_and_switch_model(
+        self,
+        user_input: Union[str, List[ContentBlock]],
+        classify_fn: Callable,
+        get_prompt_fn: Callable,
+    ) -> None:
+        """执行需求分类、模型切换和系统提示词更新的统一流程
+
+        参数:
+            user_input: 用户输入的需求描述
+            classify_fn: 分类函数，签名为 (user_input) -> (scenario, difficulty)
+            get_prompt_fn: 获取系统提示词函数，签名为 (scenario) -> str
+        """
+        try:
+            scenario, difficulty = classify_fn(user_input)
+
+            # 根据难度切换模型
+            self._switch_model_by_difficulty(difficulty)
+
+            # 根据分类结果获取对应的系统提示词并更新
+            scenario_system_prompt = get_prompt_fn(scenario)
+            if scenario_system_prompt != self.system_prompt:
+                self.system_prompt = scenario_system_prompt
+                # 更新模型的系统提示词
+                if self.model:
+                    # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                    if self.prompt_manager:
+                        prompt_text = self.prompt_manager.build_system_prompt(self)
+                        self.model.set_system_prompt(prompt_text)
+                    else:
+                        self.model.set_system_prompt(self.system_prompt)
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认配置")
 
     def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
@@ -2401,6 +2487,22 @@ class Agent:
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
                 set_current_agent(self.name, self)  # 标记agent开始运行
+
+                # 通用Agent需求分类（仅在首次运行且启用分类时执行）
+                if (
+                    self.first
+                    and is_enable_request_classification()
+                    and not self.quick_mode
+                ):
+                    from jarvis.jarvis_agent.agent_prompts import (
+                        classify_user_request,
+                        get_system_prompt,
+                    )
+
+                    self._classify_and_switch_model(
+                        user_input, classify_user_request, get_system_prompt
+                    )
+
             non_interactive_note = ""
             if getattr(self, "non_interactive", False):
                 non_interactive_note = (
