@@ -29,7 +29,6 @@ from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_agent.builtin_input_handler import (
     builtin_input_handler,
-    switch_platform_type,
 )
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.code_agent_prompts import (
