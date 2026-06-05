@@ -1,0 +1,8 @@
+{
+  "id": "20260605_151150_896991",
+  "type": "project_long_term",
+  "tags": ["前端架构", "编辑器迁移", "CodeMirror", "技术决策"],
+  "content": "Jarvis 前端编辑器已从 Monaco Editor 迁移到 CodeMirror 6。关键决策：选择 CodeMirror 6 的原因是体积小（Monaco 5MB → CodeMirror 333KB，减少93%）、移动端性能好、API 现代化。核心实现：全局共享 codeMirrorView 实例，每次标签切换重建 EditorState 确保语言扩展正确加载，使用 EditorView.editable.reconfigure() 动态切换只读/编辑模式。支持 7 种语言：JS/TS/Python/HTML/CSS/JSON/Markdown。主要文件：src/jarvis/jarvis_service/frontend/src/App.vue（编辑器逻辑）、vite.config.js（构建配置）。",
+  "created_at": "2026-06-05T15:11:50.897030",
+  "updated_at": "2026-06-05T15:11:50.897037"
+}

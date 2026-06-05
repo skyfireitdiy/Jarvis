@@ -746,6 +746,28 @@ import CreateAgentModal from './components/CreateAgentModal.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 
+// CodeMirror 6 imports
+import { EditorView, keymap } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
+import { javascript } from '@codemirror/lang-javascript'
+import { python } from '@codemirror/lang-python'
+import { html } from '@codemirror/lang-html'
+import { css } from '@codemirror/lang-css'
+import { json } from '@codemirror/lang-json'
+import { markdown } from '@codemirror/lang-markdown'
+import { oneDark } from '@codemirror/theme-one-dark'
+import {
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  foldGutter,
+  foldKeymap
+} from '@codemirror/language'
+import { lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
+import { highlightActiveLine, highlightSpecialChars, drawSelection, rectangularSelection, crosshairCursor } from '@codemirror/view'
+import { bracketMatching } from '@codemirror/language'
+
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
 const MERMAID_BLOCK_LANGUAGE = 'mermaid'
@@ -1069,6 +1091,32 @@ function getLanguageFromFilename(filename) {
     'log': 'plaintext'
   }
   return langMap[ext] || 'plaintext'
+}
+
+// CodeMirror 6 语言支持函数
+function getCodeMirrorLanguage(filename) {
+  if (!filename) return null
+  const ext = filename.split('.').pop().toLowerCase()
+  
+  // 返回对应的 CodeMirror 语言扩展
+  const langMap = {
+    'js': javascript,
+    'jsx': javascript,
+    'ts': javascript({ typescript: true }),
+    'tsx': javascript({ typescript: true, jsx: true }),
+    'py': python,
+    'html': html,
+    'htm': html,
+    'vue': html, // Vue 文件暂时当作 HTML 处理
+    'css': css,
+    'scss': css,
+    'less': css,
+    'json': json,
+    'md': markdown,
+    'markdown': markdown
+  }
+  
+  return langMap[ext] || null
 }
 
 // 认证和连接配置
@@ -1439,7 +1487,7 @@ const editorPanelInteraction = ref({
 const editorPanelRef = ref(null)
 const editorContainerRef = computed(() => editorPanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
-const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), monacoEditor: null }]
+const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, isEditable: false, showSidebar: true, sidebarView: 'files' }]
 const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
 
 // 保持向后兼容的计算属性
@@ -1455,7 +1503,7 @@ const activeEditorSession = computed(() => {
   return editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value) || null
 })
 const editorModels = new Map()
-let monacoEditor = null
+let codeMirrorView = null  // CodeMirror 6 EditorView instance
 let editorFileHeartbeatTimer = null
 const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
@@ -1667,7 +1715,7 @@ function toggleEditorMaximize() {
     isEditorMaximized.value = true
   }
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -1883,52 +1931,122 @@ function markEditorTabExternalModified(path, value) {
   }
 }
 
-function ensureMonacoEditor() {
-  if (monacoEditor || !editorContainerRef.value) return
+function ensureCodeMirrorEditor() {
+  if (codeMirrorView || !editorContainerRef.value) return
 
-  monacoEditor = monaco.editor.create(editorContainerRef.value, {
-    value: '',
-    language: 'plaintext',
-    theme: 'vs-dark',
-    automaticLayout: true,
-    minimap: { enabled: false },
-    folding: true,
-    scrollBeyondLastLine: false,
-    fontSize: 13,
-    tabSize: 2,
-    wordWrap: 'off',
-    renderWhitespace: 'selection',
-    readOnly: !isEditorEditable.value,
+  // 创建 CodeMirror 6 基础扩展
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightSpecialChars(),
+    history(),
+    foldGutter(),
+    drawSelection(),
+    EditorState.allowMultipleSelections.of(true),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    bracketMatching(),
+    rectangularSelection(),
+    crosshairCursor(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    keymap.of([
+      ...defaultKeymap,
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap
+    ]),
+    oneDark,
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        const path = activeEditorTabPath.value
+        if (!path) return
+        const tab = getEditorTabByPath(path)
+        if (!tab) return
+        tab.content = update.state.doc.toString()
+        tab.isDirty = tab.content !== tab.originalContent
+      }
+    }),
+    EditorView.editable.of(isEditorEditable.value)
+  ]
+
+  // 创建编辑器状态
+  const state = EditorState.create({
+    doc: '',
+    extensions
   })
 
-  monacoEditor.onDidChangeModel(() => {
-    const model = monacoEditor.getModel()
-    if (!model) return
-    const path = model.uri.path
-    const tab = getEditorTabByPath(path)
-    if (!tab) return
-    tab.content = model.getValue()
-    tab.isDirty = tab.content !== tab.originalContent
+  // 创建编辑器视图
+  codeMirrorView = new EditorView({
+    state,
+    parent: editorContainerRef.value
   })
 }
 
-function layoutMonacoEditor() {
-  if (monacoEditor) {
-    monacoEditor.layout()
+function layoutCodeMirrorEditor() {
+  // CodeMirror 6 自动处理布局，但可以手动请求测量
+  if (codeMirrorView) {
+    codeMirrorView.requestMeasure()
   }
 }
 
 function activateEditorTab(path) {
   activeEditorTabPath.value = path
-  const model = editorModels.get(path)
-  if (monacoEditor && model) {
-    monacoEditor.setModel(model)
-    monaco.editor.setModelLanguage(model, getLanguageFromFilename(path))
-    nextTick(() => {
-      layoutMonacoEditor()
-      monacoEditor.focus()
-    })
+  const tab = getEditorTabByPath(path)
+  if (!tab || !codeMirrorView) return
+
+  // 获取语言扩展
+  const languageExtension = getCodeMirrorLanguage(path)
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightSpecialChars(),
+    history(),
+    foldGutter(),
+    drawSelection(),
+    EditorState.allowMultipleSelections.of(true),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    bracketMatching(),
+    rectangularSelection(),
+    crosshairCursor(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    keymap.of([
+      ...defaultKeymap,
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap
+    ]),
+    oneDark,
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        const currentPath = activeEditorTabPath.value
+        if (!currentPath) return
+        const currentTab = getEditorTabByPath(currentPath)
+        if (!currentTab) return
+        currentTab.content = update.state.doc.toString()
+        currentTab.isDirty = currentTab.content !== currentTab.originalContent
+      }
+    }),
+    EditorView.editable.of(isEditorEditable.value)
+  ]
+
+  // 如果有语言扩展，添加它
+  if (languageExtension) {
+    extensions.push(languageExtension())
   }
+
+  // 创建新状态并更新编辑器
+  const newState = EditorState.create({
+    doc: tab.content,
+    extensions
+  })
+
+  codeMirrorView.setState(newState)
+
+  nextTick(() => {
+    layoutCodeMirrorEditor()
+    codeMirrorView.focus()
+  })
 }
 
 function resolveAgentRelativePath(relativePath) {
@@ -1983,12 +2101,12 @@ function setEditorSidebarView(view) {
   if (view === 'files') {
     nextTick(() => {
       ensureEditorSidebarFileTree()
-      layoutMonacoEditor()
+      layoutCodeMirrorEditor()
     })
     return
   }
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -2003,7 +2121,7 @@ function toggleEditorSearchSidebar() {
 function closeEditorSidebar() {
   showEditorSidebar.value = false
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -2068,23 +2186,23 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   // 使用当前Agent的agentId
   await openEditorFile(absolutePath, currentAgentId.value)
   await nextTick()
-  const model = editorModels.get(absolutePath)
-  if (!monacoEditor || !model) {
+  
+  if (!codeMirrorView) {
     return
   }
 
-  monacoEditor.setModel(model)
-  const column = Number(matchStart || 0) + 1
-  const endColumn = Math.max(column, Number(matchEnd || matchStart || 0) + 1)
-  monacoEditor.revealLineInCenter(Number(lineNumber || 1))
-  monacoEditor.setPosition({ lineNumber: Number(lineNumber || 1), column })
-  monacoEditor.setSelection({
-    startLineNumber: Number(lineNumber || 1),
-    startColumn: column,
-    endLineNumber: Number(lineNumber || 1),
-    endColumn,
+  // CodeMirror 使用 0-based 位置
+  const line = Math.max(0, Number(lineNumber || 1) - 1)
+  const from = codeMirrorView.state.doc.line(line + 1).from + Number(matchStart || 0)
+  const to = codeMirrorView.state.doc.line(line + 1).from + Math.max(Number(matchStart || 0), Number(matchEnd || matchStart || 0))
+
+  // 滚动到行并选中匹配文本
+  codeMirrorView.dispatch({
+    selection: { anchor: from, head: to },
+    effects: EditorView.scrollIntoView(from, { y: 'center' })
   })
-  monacoEditor.focus()
+  
+  codeMirrorView.focus()
 }
 
 async function fetchFileContent(path, agentId = null) {
@@ -2159,9 +2277,23 @@ async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
   tab.externalModified = false
   updateEditorTabFileStat(tab, fileStat)
 
-  const model = editorModels.get(path)
-  if (model && model.getValue() !== content) {
-    model.setValue(content)
+  // 如果当前激活的标签是这个文件，更新编辑器内容
+  if (codeMirrorView && activeEditorTabPath.value === path) {
+    const currentContent = codeMirrorView.state.doc.toString()
+    if (currentContent !== content) {
+      // 保存光标位置
+      const cursorPos = codeMirrorView.state.selection.main.head
+      // 更新文档内容
+      codeMirrorView.dispatch({
+        changes: { from: 0, to: codeMirrorView.state.doc.length, insert: content }
+      })
+      // 恢复光标位置（如果仍然有效）
+      if (cursorPos <= content.length) {
+        codeMirrorView.dispatch({
+          selection: { anchor: cursorPos, head: cursorPos }
+        })
+      }
+    }
   }
 
   if (showAutoRefreshToast) {
@@ -2263,13 +2395,6 @@ async function openEditorFile(path, agentId = null) {
     updateEditorTabFileStat(tab, fileStat)
     tab.loading = false
 
-    let model = editorModels.get(path)
-    if (!model) {
-      model = monaco.editor.createModel(content, tab.language, monaco.Uri.file(path))
-      editorModels.set(path, model)
-    }
-    model.setValue(content)
-
     await nextTick()
     // 确保编辑器容器存在（当从无标签状态打开时需要等待DOM更新）
     let retryCount = 0
@@ -2277,7 +2402,7 @@ async function openEditorFile(path, agentId = null) {
       await new Promise(resolve => setTimeout(resolve, 50))
       retryCount++
     }
-    ensureMonacoEditor()
+    ensureCodeMirrorEditor()
     activateEditorTab(path)
   } catch (error) {
     tab.loading = false
@@ -2289,8 +2414,11 @@ async function saveEditorTab(path) {
   const tab = getEditorTabByPath(path)
   if (!tab) return
 
-  const model = editorModels.get(path)
-  const content = model ? model.getValue() : tab.content
+  // CodeMirror: 直接从 tab 或编辑器获取内容
+  let content = tab.content
+  if (codeMirrorView && activeEditorTabPath.value === path) {
+    content = codeMirrorView.state.doc.toString()
+  }
 
   const { host, port } = getGatewayAddress()
   const targetNodeId = getEditorTargetNodeId()
@@ -2330,8 +2458,11 @@ async function saveActiveEditorTab() {
 
 function toggleEditorEditable() {
   isEditorEditable.value = !isEditorEditable.value
-  if (monacoEditor) {
-    monacoEditor.updateOptions({ readOnly: !isEditorEditable.value })
+  if (codeMirrorView) {
+    // 重新配置编辑器的可编辑状态
+    codeMirrorView.dispatch({
+      effects: EditorView.editable.reconfigure(isEditorEditable.value)
+    })
   }
 }
 
@@ -2380,7 +2511,7 @@ function createEditorForAgent(agent) {
       tabs: [],
       activeTabPath: null,
       editorModels: new Map(),
-      monacoEditor: null,
+      // CodeMirror: 编辑器实例是全局共享的，不在会话中存储
       isEditable: false,
       showSidebar: true,
       sidebarView: 'files'
@@ -2416,15 +2547,8 @@ async function closeEditorSession(agentId) {
     if (!confirmed) return
   }
 
-  // 清理 Monaco 模型
-  session.editorModels.forEach(model => model.dispose())
-  session.editorModels.clear()
-
-  // 清理 Monaco 编辑器
-  if (session.monacoEditor) {
-    session.monacoEditor.dispose()
-    session.monacoEditor = null
-  }
+  // CodeMirror: 会话关闭时不需要特殊清理
+  // 编辑器实例是全局的，由主编辑器管理
 
   // 从数组中移除
   editorSessions.value.splice(sessionIndex, 1)
@@ -2475,11 +2599,8 @@ async function closeEditorTab(path) {
   const wasActive = activeEditorTabPath.value === path
   editorTabs.value.splice(index, 1)
 
-  const model = editorModels.get(path)
-  if (model) {
-    model.dispose()
-    editorModels.delete(path)
-  }
+  // CodeMirror 不需要手动处理模型，清理 editorModels（如果还在使用）
+  editorModels.delete(path)
 
   if (wasActive) {
     const nextTab = editorTabs.value[index] || editorTabs.value[index - 1] || null
@@ -2487,9 +2608,9 @@ async function closeEditorTab(path) {
       activateEditorTab(nextTab.path)
     } else {
       activeEditorTabPath.value = null
-      if (monacoEditor) {
-        monacoEditor.dispose()
-        monacoEditor = null
+      if (codeMirrorView) {
+        codeMirrorView.destroy()
+        codeMirrorView = null
       }
     }
   }
@@ -8113,11 +8234,11 @@ watch(showEditorPanel, async (visible) => {
   if (visible) {
     ensureEditorPanelInViewport()
     await nextTick()
-    ensureMonacoEditor()
+    ensureCodeMirrorEditor()
     if (activeEditorTabPath.value) {
       activateEditorTab(activeEditorTabPath.value)
     }
-    nextTick(() => layoutMonacoEditor())
+    nextTick(() => layoutCodeMirrorEditor())
   } else {
     stopEditorPanelInteraction()
   }
@@ -8126,7 +8247,7 @@ watch(showEditorPanel, async (visible) => {
 watch(activeEditorTabPath, async (path) => {
   if (!path) return
   await nextTick()
-  ensureMonacoEditor()
+  ensureCodeMirrorEditor()
   activateEditorTab(path)
 })
 
@@ -8245,7 +8366,7 @@ onMounted(() => {
     saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -8338,11 +8459,12 @@ onUnmounted(() => {
   stopEditorFileHeartbeat()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
-  if (monacoEditor) {
-    monacoEditor.dispose()
-    monacoEditor = null
+  // 清理 CodeMirror 编辑器
+  if (codeMirrorView) {
+    codeMirrorView.destroy()
+    codeMirrorView = null
   }
-  editorModels.forEach(model => model.dispose())
+  // editorModels 不再需要特殊清理（CodeMirror 不使用）
   editorModels.clear()
 
   // 移除全局键盘事件监听
