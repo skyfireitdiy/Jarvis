@@ -67,6 +67,7 @@ from .node_protocol import (
     build_node_message,
 )
 from .node_runtime import AgentRouteInfo, NodeInfo, NodeRuntime
+from .system_info import get_node_description, get_system_info
 
 # Windows 重启命令 TCP 端口（与 app.py 中 _RESTART_COMMAND_TCP_PORT 保持一致）
 _RESTART_COMMAND_TCP_PORT = 18766
@@ -186,7 +187,12 @@ class NodeConnectionManager:
                 message_type = next_message.get("type")
                 request_id = next_message.get("request_id")
                 if message_type == NODE_HEARTBEAT:
-                    self._node_runtime.node_registry.mark_heartbeat(node_id)
+                    payload = next_message.get("payload") or {}
+                    system_info = payload.get("system_info") or {}
+                    description = payload.get("description") or ""
+                    self._node_runtime.node_registry.mark_heartbeat(
+                        node_id, system_info=system_info, description=description
+                    )
                     continue
                 # 响应消息处理：如果有request_id，尝试匹配pending请求或流式队列
                 if request_id:
@@ -1568,11 +1574,20 @@ class ChildNodeClient:
                 await asyncio.sleep(CHILD_HEARTBEAT_INTERVAL_SECONDS)
                 if self._ws is None:
                     raise RuntimeError("node websocket is closed")
+
+                # 获取系统信息和节点描述
+                system_info = get_system_info()
+                description = get_node_description()
+
                 await self._ws.send(
                     json.dumps(
                         build_node_message(
                             NODE_HEARTBEAT,
-                            {"node_id": config.effective_node_id},
+                            {
+                                "node_id": config.effective_node_id,
+                                "system_info": system_info,
+                                "description": description,
+                            },
                         )
                     )
                 )
