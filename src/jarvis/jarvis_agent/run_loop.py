@@ -243,9 +243,9 @@ class AgentRunLoop:
             remaining_tokens -= current_message_tokens
 
             # 检查是否满足压缩触发条件
-            # 条件1：剩余token低于25%（即已使用超过75%）
+            # 条件1：剩余token低于20%（即已使用超过80%）
             token_limit_triggered = max_input_tokens > 0 and remaining_tokens <= int(
-                max_input_tokens * 0.25
+                max_input_tokens * 0.20
             )
 
             # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
@@ -305,7 +305,7 @@ class AgentRunLoop:
                         remaining_tokens -= current_message_tokens
                         token_limit_triggered = (
                             max_input_tokens > 0
-                            and remaining_tokens <= int(max_input_tokens * 0.25)
+                            and remaining_tokens <= int(max_input_tokens * 0.20)
                         )
                         should_compress = token_limit_triggered or turn_limit_triggered
 
