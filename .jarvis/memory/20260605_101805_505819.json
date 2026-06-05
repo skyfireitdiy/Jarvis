@@ -1,0 +1,8 @@
+{
+  "id": "20260605_101805_505819",
+  "type": "project_long_term",
+  "tags": ["节点", "心跳", "系统信息", "架构"],
+  "content": "## 节点心跳系统信息增强\n\n### 实现概述\n在 child 与 master 的心跳中增加了节点信息，包括系统信息和节点描述。\n\n### 关键组件\n1. **system_info.py**: 新增系统信息获取模块，使用 psutil 获取 OS、内存、CPU 等信息\n2. **NodeInfo**: 增加 `system_info` 和 `description` 字段\n3. **心跳发送**: ChildNodeClient 在心跳 payload 中包含系统信息和节点描述\n4. **心跳接收**: NodeConnectionManager 接收并更新节点信息\n5. **NodeRegistry.mark_heartbeat**: 支持更新 system_info 和 description\n\n### 节点描述文件\n- 路径: `~/.jarvis/gateway/node_description.md`\n- 格式: Markdown\n- 如果文件不存在，返回空字符串\n\n### API 端点\n- `/api/node/status`: 返回的节点列表自动包含 system_info 和 description 字段\n- `gateway_manager` 工具的 `list_nodes` 操作会返回完整节点数据\n\n### 依赖\n- 新增依赖: `psutil>=5.9.0`",
+  "created_at": "2026-06-05T10:18:05.505860",
+  "updated_at": "2026-06-05T10:18:05.505868"
+}

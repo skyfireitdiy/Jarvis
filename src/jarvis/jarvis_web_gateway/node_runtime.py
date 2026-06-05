@@ -19,6 +19,8 @@ class NodeInfo:
     capabilities: Dict[str, Any] = field(default_factory=dict)
     connection_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    system_info: Dict[str, Any] = field(default_factory=dict)
+    description: str = ""
 
 
 @dataclass
@@ -69,12 +71,21 @@ class NodeRegistry:
         node_info.last_heartbeat_at = datetime.utcnow().isoformat()
         self._nodes[node_info.node_id] = node_info
 
-    def mark_heartbeat(self, node_id: str) -> None:
+    def mark_heartbeat(
+        self,
+        node_id: str,
+        system_info: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = None,
+    ) -> None:
         node = self._nodes.get(node_id)
         if node is None:
             return
         node.last_heartbeat_at = datetime.utcnow().isoformat()
         node.status = "online"
+        if system_info is not None:
+            node.system_info = system_info
+        if description is not None:
+            node.description = description
 
     def mark_offline(self, node_id: str) -> None:
         node = self._nodes.get(node_id)

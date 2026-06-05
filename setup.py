@@ -77,6 +77,7 @@ setup(
         "mkdocs-material",
         "mkdocs-git-revision-date-localized-plugin",
         "pymdown-extensions",
+        "psutil>=5.9.0",
     ],
     extras_require={
         "clang16": ["clang==16.*"],
