@@ -1353,15 +1353,30 @@ class RulesManager:
                 SkillSearchEngine,
             )
 
+            PrettyOutput.auto_print(f"🔍 正在搜索远程技能库，关键词: {query[:50]}...")
             engine = SkillSearchEngine(
                 min_relevance=0.5, min_quality=5.0, max_results=10
             )
+            PrettyOutput.auto_print(
+                f"🔍 搜索源: {len(engine.sources)} 个 (SkillHub, GitHub)"
+            )
             results = engine.search(query)
+            PrettyOutput.auto_print(f"🔍 搜索完成，原始结果: {len(results)} 个技能")
+
+            # 显示搜索到的技能概览
+            if results:
+                for i, r in enumerate(results[:5], 1):
+                    PrettyOutput.auto_print(
+                        f"   {i}. {r.name} (相关度: {r.relevance_score:.2f}, 质量: {r.quality_score:.1f})"
+                    )
 
             # 过滤：只保留高相关度 (>0.7) 且高质量 (>7.0) 的技能
             filtered = [
                 r for r in results if r.relevance_score > 0.7 and r.quality_score > 7.0
             ]
+            PrettyOutput.auto_print(
+                f"🔍 过滤后保留: {len(filtered)} 个技能 (阈值: 相关度>0.7, 质量>7.0)"
+            )
 
             return filtered
         except Exception as e:
@@ -1390,18 +1405,20 @@ class RulesManager:
             llm_client = getattr(self, "llm", None)
             if not llm_client:
                 PrettyOutput.auto_print(
-                    "⚠️ 无可用 LLM 客户端，跳过 AI 评估，直接安装 Top 3"
+                    "⚠ LLM 客户端不可用，跳过技能评估，直接使用搜索结果"
                 )
                 # 降级：返回原始搜索结果的前 3 个
                 return [(s, None) for s in skills[:3]]
 
             # 创建评估器
+            PrettyOutput.auto_print(f"🤖 正在使用 AI 评估 {len(skills)} 个远程技能...")
             evaluator = SkillEvaluator(llm_client=llm_client, model="default")
 
             # 批量评估
             evaluations = evaluator.evaluate_batch(
                 task_description, skills, max_concurrent=3
             )
+            PrettyOutput.auto_print(f"🤖 评估完成，共评估 {len(evaluations)} 个技能")
 
             # 只保留推荐安装的技能
             recommended = [
@@ -1409,6 +1426,10 @@ class RulesManager:
                 for eval in evaluations
                 if eval.should_install and eval.score >= 5.0
             ]
+            if not recommended:
+                PrettyOutput.auto_print("🤖 AI 评估后无推荐安装的技能")
+            else:
+                PrettyOutput.auto_print(f"🤖 AI 推荐安装 {len(recommended)} 个技能")
 
             return recommended
 
