@@ -369,17 +369,18 @@ class BasePlatform(ABC):
                 usage_percent, percent_color, progress_bar = self._get_token_usage_info(
                     response
                 )
-                threshold = get_conversation_turn_threshold()
-                PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
-                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | Token: {usage_percent:.1f}%"
-                )
+                # threshold = get_conversation_turn_threshold()
+                # PrettyOutput.auto_print(
+                #     f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                #     f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | Token: {usage_percent:.1f}%"
+                # )
             except Exception:
-                threshold = get_conversation_turn_threshold()
-                PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
-                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
-                )
+                # threshold = get_conversation_turn_threshold()
+                # PrettyOutput.auto_print(
+                #     f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                #     f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+                # )
+                pass
         else:
             response, reasoning_content = self._chat_with_suppressed_output(
                 message, max_output
