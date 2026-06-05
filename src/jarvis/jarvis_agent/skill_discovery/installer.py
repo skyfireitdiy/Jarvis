@@ -4,7 +4,6 @@
 import os
 import shutil
 import subprocess
-import tempfile
 import requests
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
@@ -110,7 +109,7 @@ class SkillInstaller:
         return self._install_via_git_clone(skill, repo_info)
 
     def _install_via_git_clone(self, skill: SkillResult, repo_info: dict) -> str:
-        """通过 git clone 安装技能包"""
+        """通过 git clone 安装技能包（直接克隆到规则目录，不修改原始内容）"""
         clone_url = repo_info.get("clone_url", "")
         subdir = repo_info.get("subdir", "")
 
@@ -118,74 +117,55 @@ class SkillInstaller:
             raise ValueError(f"无效的仓库信息：{repo_info}")
 
         rule_name = self._sanitize_name(skill.name)
+        target_skill_dir = os.path.join(self.install_dir, rule_name)
 
-        # 创建临时目录
-        temp_dir = tempfile.mkdtemp(prefix="skill_install_")
+        # 清理已存在的同名目录
+        if os.path.exists(target_skill_dir):
+            shutil.rmtree(target_skill_dir)
 
-        try:
-            # git clone --depth 1
-            result = subprocess.run(
-                ["git", "clone", "--depth", "1", clone_url, temp_dir],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
+        # git clone --depth 1 直接到规则目录
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", clone_url, target_skill_dir],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
 
-            if result.returncode != 0:
-                raise ValueError(f"Git clone 失败：{result.stderr}")
-
-            # 定位技能子目录
-            skill_dir = os.path.join(temp_dir, subdir)
-            skill_md_path = os.path.join(skill_dir, "SKILL.md")
-
-            if not os.path.exists(skill_md_path):
-                # 尝试不带 skills 前缀的路径
-                alt_subdir = (
-                    subdir.replace("skills/", "", 1)
-                    if subdir.startswith("skills/")
-                    else f"skills/{subdir}"
-                )
-                alt_skill_dir = os.path.join(temp_dir, alt_subdir)
-                alt_skill_md_path = os.path.join(alt_skill_dir, "SKILL.md")
-
-                if os.path.exists(alt_skill_md_path):
-                    skill_dir = alt_skill_dir
-                    skill_md_path = alt_skill_md_path
-                else:
-                    raise ValueError(f"在子目录 {subdir} 中未找到 SKILL.md")
-
-            # 读取 SKILL.md
-            with open(skill_md_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            # 复制整个技能目录到安装位置
-            target_skill_dir = os.path.join(self.install_dir, rule_name)
+        if result.returncode != 0:
+            # clone 失败时清理残留目录
             if os.path.exists(target_skill_dir):
                 shutil.rmtree(target_skill_dir)
-            shutil.copytree(skill_dir, target_skill_dir)
+            raise ValueError(f"Git clone 失败：{result.stderr}")
 
-            # 添加来源注释到 SKILL.md
-            content_with_header = self._add_source_header(content, skill)
-            with open(
-                os.path.join(target_skill_dir, "SKILL.md"), "w", encoding="utf-8"
-            ) as f:
-                f.write(content_with_header)
+        # 定位技能子目录中的 SKILL.md
+        skill_md_path = os.path.join(target_skill_dir, subdir, "SKILL.md")
 
-            # 热加载
-            if self.rules_manager:
-                try:
-                    load_method = getattr(self.rules_manager, "load_rule_file", None)
-                    if load_method:
-                        load_method(os.path.join(target_skill_dir, "SKILL.md"))
-                except Exception:
-                    pass
+        if not os.path.exists(skill_md_path):
+            # 尝试不带 skills 前缀的路径
+            alt_subdir = (
+                subdir.replace("skills/", "", 1)
+                if subdir.startswith("skills/")
+                else f"skills/{subdir}"
+            )
+            alt_skill_md_path = os.path.join(target_skill_dir, alt_subdir, "SKILL.md")
 
-            return os.path.join(target_skill_dir, "SKILL.md")
+            if os.path.exists(alt_skill_md_path):
+                skill_md_path = alt_skill_md_path
+            else:
+                # clone 成功但找不到 SKILL.md，清理并报错
+                shutil.rmtree(target_skill_dir)
+                raise ValueError(f"在子目录 {subdir} 中未找到 SKILL.md")
 
-        finally:
-            # 清理临时目录
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+        # 热加载（不修改 SKILL.md，保持原始内容）
+        if self.rules_manager:
+            try:
+                load_method = getattr(self.rules_manager, "load_rule_file", None)
+                if load_method:
+                    load_method(skill_md_path)
+            except Exception:
+                pass
+
+        return skill_md_path
 
     def _add_source_header(self, content: str, skill: SkillResult) -> str:
         """在原始内容前添加来源注释"""
