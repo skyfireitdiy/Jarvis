@@ -317,13 +317,19 @@ class CLIInputProvider(InputProvider):
         self._prompting_thread_id: Optional[int] = None
 
     def inject_prompt(self, prompt: str) -> None:
-        """注入提示词到下一次输入中"""
+        """注入提示词到下一次输入中（统一使用全局缓冲区）"""
+        from jarvis.jarvis_utils.globals import add_input_buffer
+
+        # 添加到全局缓冲区（主要机制）
+        add_input_buffer(prompt)
+
+        # 向后兼容：同时维护旧的注入列表（用于正在等待输入时的中断）
         with self._inject_lock:
             self._injected_prompts.append(prompt)
 
-            # 如果当前正在等待输入，写入全局缓冲区并发送信号中断
+            # 如果当前正在等待输入，写入本地缓冲区并发送信号中断
             if self._is_prompting and self._prompting_thread_id is not None:
-                # 将注入内容写入全局缓冲区
+                # 将注入内容写入本地缓冲区
                 if self._injected_buffer is None:
                     self._injected_buffer = prompt
                 else:
@@ -370,7 +376,15 @@ class CLIInputProvider(InputProvider):
         preset: Optional[str] = None,
         preset_cursor: Optional[int] = None,
     ) -> str:
-        # 检查是否有注入的提示词
+        # 优先检查全局缓冲区（统一注入机制）
+        from jarvis.jarvis_utils.globals import get_input_buffer
+
+        buffered_messages = get_input_buffer()
+        if buffered_messages:
+            result = "\n".join(buffered_messages)
+            return result
+
+        # 检查是否有注入的提示词（向后兼容）
         injected = self._consume_injected_prompts()
         if injected is not None:
             return injected
