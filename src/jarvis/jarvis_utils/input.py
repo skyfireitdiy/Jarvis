@@ -311,11 +311,40 @@ class CLIInputProvider(InputProvider):
     def __init__(self) -> None:
         self._injected_prompts: list = []
         self._inject_lock = threading.Lock()
+        # 全局缓冲区，用于在等待输入时注入内容
+        self._injected_buffer: Optional[str] = None
+        self._is_prompting = False
+        self._prompting_thread_id: Optional[int] = None
 
     def inject_prompt(self, prompt: str) -> None:
         """注入提示词到下一次输入中"""
         with self._inject_lock:
             self._injected_prompts.append(prompt)
+
+            # 如果当前正在等待输入，写入全局缓冲区并发送信号中断
+            if self._is_prompting and self._prompting_thread_id is not None:
+                # 将注入内容写入全局缓冲区
+                if self._injected_buffer is None:
+                    self._injected_buffer = prompt
+                else:
+                    self._injected_buffer += "\n" + prompt
+
+                # 发送线程级 SIGINT 信号中断输入
+                try:
+                    import signal
+
+                    if hasattr(signal, "pthread_kill"):
+                        # 验证线程ID是否有效（检查是否是当前进程的活动线程）
+                        import threading
+
+                        active_threads = {t.ident for t in threading.enumerate()}
+                        if self._prompting_thread_id in active_threads:
+                            signal.pthread_kill(
+                                self._prompting_thread_id, signal.SIGINT
+                            )
+                except Exception:
+                    # Windows 或其他不支持 pthread_kill 的平台，或线程已不存在，降级为延迟注入
+                    pass
 
     def _consume_injected_prompts(self) -> Optional[str]:
         """消费所有已注入的提示词，合并返回"""
@@ -325,6 +354,15 @@ class CLIInputProvider(InputProvider):
             prompts = self._injected_prompts.copy()
             self._injected_prompts.clear()
         return "\n".join(prompts)
+
+    def _check_injected_buffer(self) -> Optional[str]:
+        """检查并消费全局缓冲区的内容"""
+        with self._inject_lock:
+            if self._injected_buffer is None:
+                return None
+            content = self._injected_buffer
+            self._injected_buffer = None
+            return content
 
     def get_multiline_input(
         self,
@@ -336,9 +374,21 @@ class CLIInputProvider(InputProvider):
         injected = self._consume_injected_prompts()
         if injected is not None:
             return injected
-        return _get_multiline_input_internal(
-            tip, preset=preset, preset_cursor=preset_cursor
-        )
+
+        # 设置状态标志，记录当前线程ID
+        with self._inject_lock:
+            self._is_prompting = True
+            self._prompting_thread_id = threading.get_ident()
+
+        try:
+            return _get_multiline_input_internal(
+                tip, preset=preset, preset_cursor=preset_cursor, provider=self
+            )
+        finally:
+            # 清除状态标志
+            with self._inject_lock:
+                self._is_prompting = False
+                self._prompting_thread_id = None
 
 
 _default_input_provider: InputProvider = CLIInputProvider()
@@ -1407,7 +1457,10 @@ def _show_history_and_copy() -> None:
 
 
 def _get_multiline_input_internal(
-    tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
+    tip: str,
+    preset: Optional[str] = None,
+    preset_cursor: Optional[int] = None,
+    provider: Optional["CLIInputProvider"] = None,
 ) -> str:
     """
     Internal function to get multiline input using prompt_toolkit.
@@ -1645,6 +1698,11 @@ def _get_multiline_input_internal(
         )
         return str(result).strip() if result else ""
     except (KeyboardInterrupt, EOFError):
+        # 检查全局缓冲区，如果有注入内容则返回注入内容
+        if provider is not None:
+            injected = provider._check_injected_buffer()
+            if injected is not None:
+                return injected
         return CTRL_C_SENTINEL
 
 
