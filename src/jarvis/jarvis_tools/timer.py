@@ -212,7 +212,9 @@ class TimerManager:
 
             provider = get_current_input_provider()
             if provider:
-                provider.inject_prompt(f"[Timer] {task.prompt_text}")
+                # 构建注入消息，包含定时器信息
+                inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {task.prompt_text}"
+                provider.inject_prompt(inject_message)
                 PrettyOutput.auto_print(f"定时提示已注入: {task.prompt_text}")
             else:
                 PrettyOutput.auto_print(f"定时提示(无输入提供者): {task.prompt_text}")
@@ -222,19 +224,49 @@ class TimerManager:
     def _execute_tool_task(self, task: TimerTask) -> None:
         """执行工具调用任务"""
         try:
+            from jarvis.jarvis_utils.input import get_current_input_provider
+
             registry = self._get_registry()
             tool = registry.get_tool(task.tool_name)
             if tool:
                 PrettyOutput.auto_print(f"定时执行工具: {task.tool_name}")
                 result = tool.func(**task.tool_args)
+
+                # 构建结果消息
                 if result:
-                    PrettyOutput.auto_print(
-                        f"工具执行结果: {result.get('message', result)}"
-                    )
+                    result_message = result.get("message", str(result))
+                    PrettyOutput.auto_print(f"工具执行结果: {result_message}")
+                else:
+                    result_message = "工具执行完成（无返回值）"
+
+                # 注入结果到输入
+                provider = get_current_input_provider()
+                if provider:
+                    inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] 工具 {task.tool_name} 执行完成\n结果: {result_message}"
+                    provider.inject_prompt(inject_message)
             else:
-                PrettyOutput.auto_print(f"工具不存在: {task.tool_name}")
+                error_message = f"工具不存在: {task.tool_name}"
+                PrettyOutput.auto_print(error_message)
+
+                # 注入错误信息
+                provider = get_current_input_provider()
+                if provider:
+                    inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {error_message}"
+                    provider.inject_prompt(inject_message)
         except Exception as e:
-            PrettyOutput.auto_print(f"工具执行失败: {e}")
+            error_message = f"工具执行失败: {e}"
+            PrettyOutput.auto_print(error_message)
+
+            # 注入错误信息
+            try:
+                from jarvis.jarvis_utils.input import get_current_input_provider
+
+                provider = get_current_input_provider()
+                if provider:
+                    inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {error_message}"
+                    provider.inject_prompt(inject_message)
+            except Exception:
+                pass
 
     def cancel_task(self, task_id: str) -> bool:
         """取消定时任务"""
