@@ -417,10 +417,14 @@ class SessionManager:
 
             # 获取 start_commit（优先从 agent 属性获取，兼容 user_data）
             start_commit = None
+            last_backup_commit = None
             if self.agent:
                 # 优先检查 agent 的 start_commit 属性（CodeAgent 使用这种方式）
                 if hasattr(self.agent, "start_commit"):
                     start_commit = self.agent.start_commit
+                # 同时保存 last_backup_commit（如果有）
+                if hasattr(self.agent, "last_backup_commit"):
+                    last_backup_commit = self.agent.last_backup_commit
                 # 兼容：如果没有属性，尝试从 user_data 获取
                 elif hasattr(self.agent, "get_user_data"):
                     start_commit = self.agent.get_user_data("start_commit")
@@ -448,6 +452,8 @@ class SessionManager:
             }
             if start_commit:
                 commit_info["start_commit"] = start_commit
+            if last_backup_commit:
+                commit_info["last_backup_commit"] = last_backup_commit
             if self.current_session_name:
                 commit_info["session_name"] = self.current_session_name
 
@@ -1476,6 +1482,7 @@ class SessionManager:
 
                     # 获取保存的 commit 信息
                     saved_start_commit = commit_data.get("start_commit")
+                    saved_last_backup_commit = commit_data.get("last_backup_commit")
                     saved_current_commit = commit_data.get("current_commit")
 
                     # 获取当前的最新 commit
@@ -1495,9 +1502,18 @@ class SessionManager:
                     elif saved_start_commit:
                         # 仓库状态未改变，可以恢复保存的 start_commit
                         self.agent.start_commit = saved_start_commit
+                        # 同时恢复 last_backup_commit（如果有且agent支持）
+                        if saved_last_backup_commit and hasattr(
+                            self.agent, "last_backup_commit"
+                        ):
+                            self.agent.last_backup_commit = saved_last_backup_commit
                         PrettyOutput.auto_print(
                             f"✅ 已恢复start_commit信息: {self.agent.start_commit[:8] if self.agent.start_commit else 'None'}..."
                         )
+                        if saved_last_backup_commit:
+                            PrettyOutput.auto_print(
+                                f"✅ 已恢复last_backup_commit信息: {saved_last_backup_commit[:8]}..."
+                            )
                     else:
                         # 没有保存的 start_commit，使用当前最新 commit
                         self.agent.start_commit = current_commit

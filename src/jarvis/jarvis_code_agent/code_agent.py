@@ -188,6 +188,8 @@ class CodeAgent(Agent):
 
         # Git 相关初始化：存储开始时的 commit hash，用于后续 git diff 获取
         self.start_commit: Optional[str] = None
+        # 记录上次备份时的 commit hash，用于计算增量备份
+        self.last_backup_commit: Optional[str] = None
 
         # Commit prefix 和 suffix，用于生成提交信息
         self.prefix: str = ""
@@ -816,7 +818,11 @@ git reset --hard {start_commit}
                     assert (
                         self.start_commit is not None and latest_commit_hash is not None
                     )
-                    commits = get_commits_between(self.start_commit, latest_commit_hash)
+                    # 使用上次备份的提交作为起点，如果没有则使用初始提交
+                    backup_start_commit = self.last_backup_commit or self.start_commit
+                    commits = get_commits_between(
+                        backup_start_commit, latest_commit_hash
+                    )
                     if total_lines > 1000:
                         # 在压缩前创建备份分支
                         try:
@@ -835,6 +841,8 @@ git reset --hard {start_commit}
                             PrettyOutput.auto_print(
                                 f"✅ 已创建备份分支：{backup_branch}（变更超过 1000 行，已自动备份，请手动确认提交）"
                             )
+                            # 更新上次备份的提交点，下次备份将从这里开始计算
+                            self.last_backup_commit = latest_commit_hash
                         except subprocess.CalledProcessError as e:
                             PrettyOutput.auto_print(f"⚠️ 创建备份分支失败：{str(e)}")
                         except Exception as e:
