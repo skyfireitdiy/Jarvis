@@ -1,0 +1,8 @@
+{
+  "id": "20260606_142256_151968",
+  "type": "project_long_term",
+  "tags": ["timer", "工具开发", "架构设计"],
+  "content": "## Timer工具实现方案\n\n### 核心设计\n- **TimerManager全局单例**：使用threading.Lock保护_tasks字典，确保线程安全\n- **TimerTask数据类**：包含task_id、task_type、time_type、time_value、tool_name、tool_args、prompt_text、interval_seconds、status、next_fire_time等字段\n- **threading.Timer调度**：daemon=True不阻止程序退出，支持相对/绝对/循环定时\n\n### 三种任务类型\n1. **prompt**：通过InputProvider.inject_prompt()注入提示词到CLI输入队列\n2. **tool_call**：通过ToolRegistry执行指定工具\n3. **delayed_tool_call**：延时执行工具（类似tool_call但语义不同）\n\n### 持久化机制\n- **会话保存**：_save_agent_state中调用get_timer_manager().get_state()保存到state_data[\"timer\"]\n- **会话恢复**：_restore_agent_state中调用restore_state()恢复定时器状态\n- **过期处理**：interval任务重新调度，relative任务自动跳过\n\n### 工具返回值格式\n- 遵循项目标准：{\"success\": bool, \"stdout\": str, \"stderr\": str, ...}\n- execute方法签名：def execute(self, args: Dict[str, Any]) -> Dict[str, Any]\n\n### 关键文件\n- src/jarvis/jarvis_tools/timer.py (新增，449行)\n- src/jarvis/jarvis_utils/input.py (修改，添加inject_prompt机制)\n- src/jarvis/jarvis_agent/session_manager.py (修改，添加timer持久化)",
+  "created_at": "2026-06-06T14:22:56.151995",
+  "updated_at": "2026-06-06T14:22:56.151999"
+}
