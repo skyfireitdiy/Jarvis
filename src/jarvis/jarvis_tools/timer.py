@@ -350,24 +350,24 @@ class TimerManager:
 class TimerTool:
     """定时器工具
 
-    支持定时执行工具、定时添加提示词到多行输入、延时执行工具。
-    支持相对/绝对/循环定时。
+    支持定时注入提示词到多行输入，支持相对/绝对/循环定时。
+    注意：定时执行工具功能已集成到工具调用中，可在任意工具调用的 arguments 中添加 after/at/loop 参数。
     """
 
     name = "timer"
-    description = "定时器工具：支持定时执行工具、定时添加提示词、延时执行工具，支持相对/绝对/循环定时"
+    description = "定时器工具：支持定时注入提示词，管理定时任务（取消/列出/清除）"
     parameters = {
         "type": "object",
         "properties": {
             "operation": {
                 "type": "string",
-                "description": "操作类型：add(添加定时任务)、cancel(取消任务)、list(列出所有任务)、clear(清除所有任务)",
+                "description": "操作类型：add(添加定时提示词任务)、cancel(取消任务)、list(列出所有任务)、clear(清除所有任务)",
                 "enum": ["add", "cancel", "list", "clear"],
             },
             "task_type": {
                 "type": "string",
-                "description": "任务类型（add操作必填）：tool_call(定时执行工具)、prompt(定时注入提示词)、delayed_tool_call(延时执行工具)",
-                "enum": ["tool_call", "prompt", "delayed_tool_call"],
+                "description": "任务类型（add操作必填）：仅支持 prompt(定时注入提示词)",
+                "enum": ["prompt"],
             },
             "time_type": {
                 "type": "string",
@@ -378,17 +378,9 @@ class TimerTool:
                 "type": "string",
                 "description": "时间值（add操作必填）：relative时为秒数、absolute时为ISO时间字符串、interval时为间隔秒数",
             },
-            "tool_name": {
-                "type": "string",
-                "description": "工具名称（tool_call/delayed_tool_call类型必填）",
-            },
-            "tool_args": {
-                "type": "object",
-                "description": "工具参数（tool_call/delayed_tool_call类型可选）",
-            },
             "prompt_text": {
                 "type": "string",
-                "description": "提示词文本（prompt类型必填）",
+                "description": "提示词文本（add操作必填）",
             },
             "task_id": {
                 "type": "string",
@@ -417,24 +409,32 @@ class TimerTool:
             return {"success": False, "message": f"无效的操作: {operation}"}
 
     def _handle_add(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """处理添加定时任务"""
+        """处理添加定时提示词任务"""
         task_type = kwargs.get("task_type")
         time_type = kwargs.get("time_type")
         time_value = kwargs.get("time_value")
+        prompt_text = kwargs.get("prompt_text")
+
         if not task_type:
             return {"success": False, "message": "add操作必须指定 task_type"}
+        if task_type != "prompt":
+            return {
+                "success": False,
+                "message": "timer工具仅支持 prompt 类型任务。定时执行工具请在工具调用的 arguments 中添加 after/at/loop 参数。",
+            }
         if not time_type:
             return {"success": False, "message": "add操作必须指定 time_type"}
         if not time_value:
             return {"success": False, "message": "add操作必须指定 time_value"}
+        if not prompt_text:
+            return {"success": False, "message": "prompt类型任务必须指定 prompt_text"}
+
         try:
             task = self.manager.add_task(
                 task_type=task_type,
                 time_type=time_type,
                 time_value=time_value,
-                tool_name=kwargs.get("tool_name"),
-                tool_args=kwargs.get("tool_args", {}),
-                prompt_text=kwargs.get("prompt_text"),
+                prompt_text=prompt_text,
                 interval_seconds=float(kwargs.get("time_value", 0))
                 if time_type == "interval"
                 else None,
