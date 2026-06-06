@@ -292,7 +292,8 @@ def load_methodology(
                     selected_indices_str = ",".join(valid_numbers)
 
         if selected_indices_str.lower() == "none":
-            return "没有历史方法论可参考"
+            PrettyOutput.auto_print("没有历史方法论可参考")
+            return "⚠️ 没有历史方法论可参考"
 
         # 解析选择的序号
         selected_methodologies = []
