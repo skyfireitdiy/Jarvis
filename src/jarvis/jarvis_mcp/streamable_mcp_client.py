@@ -215,7 +215,8 @@ class StreamableMcpClient(McpClient):
 
             if "text/event-stream" in content_type.lower():
                 # 处理SSE格式响应
-                response_text = response.text
+                # 强制使用 UTF-8 解码，避免 requests 猜测错误（默认 ISO-8859-1）
+                response_text = response.content.decode('utf-8')
                 for line in response_text.splitlines():
                     line = line.strip()
                     if line.startswith("data:"):
