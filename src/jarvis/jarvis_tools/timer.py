@@ -409,12 +409,13 @@ class TimerTool:
             )
             return {
                 "success": True,
-                "message": f"定时任务已添加 (ID: {task.task_id})",
+                "stdout": f"定时任务已添加 (ID: {task.task_id})",
+                "stderr": "",
                 "task_id": task.task_id,
                 "next_fire_time": task.next_fire_time,
             }
         except ValueError as e:
-            return {"success": False, "message": str(e)}
+            return {"success": False, "stdout": "", "stderr": str(e)}
 
     def _handle_cancel(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         """处理取消定时任务"""
@@ -422,14 +423,23 @@ class TimerTool:
         if not task_id:
             return {"success": False, "message": "cancel操作必须指定 task_id"}
         if self.manager.cancel_task(task_id):
-            return {"success": True, "message": f"定时任务 {task_id} 已取消"}
-        return {"success": False, "message": f"定时任务 {task_id} 不存在"}
+            return {
+                "success": True,
+                "stdout": f"定时任务 {task_id} 已取消",
+                "stderr": "",
+            }
+        return {"success": False, "stdout": "", "stderr": f"定时任务 {task_id} 不存在"}
 
     def _handle_list(self) -> Dict[str, Any]:
         """处理列出定时任务"""
         tasks = self.manager.list_tasks()
         if not tasks:
-            return {"success": True, "message": "当前没有定时任务", "tasks": []}
+            return {
+                "success": True,
+                "stdout": "当前没有定时任务",
+                "stderr": "",
+                "tasks": [],
+            }
         lines = ["当前定时任务:"]
         for t in tasks:
             lines.append(
@@ -445,4 +455,4 @@ class TimerTool:
     def _handle_clear(self) -> Dict[str, Any]:
         """处理清除所有定时任务"""
         count = self.manager.clear_tasks()
-        return {"success": True, "message": f"已清除 {count} 个定时任务"}
+        return {"success": True, "stdout": f"已清除 {count} 个定时任务", "stderr": ""}
