@@ -56,7 +56,8 @@ class AutoSelectRuleTool:
                     "stderr": "agent 没有 rules_manager 属性",
                 }
 
-            selected_rules = rules_manager.select_rule_by_task(task_description)
+            # 使用 match_rules_to_task 支持本地+远程搜索
+            selected_rules = rules_manager.match_rules_to_task(task_description)
 
             if not selected_rules:
                 return {
