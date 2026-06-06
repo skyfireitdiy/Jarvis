@@ -240,7 +240,7 @@ class TimerManager:
             tool = registry.get_tool(task.tool_name)
             if tool:
                 PrettyOutput.auto_print(f"定时执行工具: {task.tool_name}")
-                result = tool.func(**task.tool_args)
+                result = tool.func(task.tool_args)
 
                 # 构建结果消息
                 result_message = (
