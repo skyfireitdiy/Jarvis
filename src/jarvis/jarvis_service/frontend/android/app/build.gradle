@@ -16,8 +16,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // 从环境变量读取签名配置（支持本地构建和 CI/CD）
+            def keystoreFile = System.getenv("KEYSTORE_FILE") ?: "./jarvis-release-key.jks"
+            storeFile file(keystoreFile)
+            storePassword System.getenv("KEYSTORE_STORE_PASSWORD")
+            keyAlias System.getenv("KEYSTORE_KEY_ALIAS") ?: "jarvis-key"
+            keyPassword System.getenv("KEYSTORE_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
