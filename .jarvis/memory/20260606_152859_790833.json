@@ -1,0 +1,8 @@
+{
+  "id": "20260606_152859_790833",
+  "type": "project_long_term",
+  "tags": ["定时器", "timer工具", "架构简化", "功能迁移"],
+  "content": "# TimerTool 功能简化\n\n## 背景\n\n定时执行工具功能已集成到工具调用系统（registry.py），通过在 arguments 中添加 after/at/loop 参数即可使用，无需单独调用 timer 工具。\n\n## 修改内容\n\n**文件**: `src/jarvis/jarvis_tools/timer.py`\n**修改类**: `TimerTool` (line 350-487)\n\n### 移除的功能\n\n1. **task_type 枚举值移除**：\n   - 移除：`tool_call`（定时执行工具）\n   - 移除：`delayed_tool_call`（延时执行工具）\n   - 保留：`prompt`（定时注入提示词）\n\n2. **参数移除**：\n   - 移除：`tool_name`（工具名称）\n   - 移除：`tool_args`（工具参数）\n   - 保留：`prompt_text`（提示词文本）\n\n3. **_handle_add 方法增强**：\n   - 添加 task_type 验证：仅允许 \"prompt\" 类型\n   - 添加错误提示：引导用户使用工具调用中的定时参数\n   - 错误消息：\"timer工具仅支持 prompt 类型任务。定时执行工具请在工具调用的 arguments 中添加 after/at/loop 参数。\"\n\n### 保留的功能\n\n1. **定时注入提示词**：完整保留 prompt 类型功能\n2. **任务管理**：完整保留 cancel、list、clear 操作\n3. **TimerManager**：核心管理器保持不变，仍支持所有任务类型（供 registry.py 使用）\n\n## 使用方式\n\n### 定时执行工具（新方式，推荐）\n\n```json\n// 在任意工具调用中添加定时参数\n{\n  \"name\": \"execute_script\",\n  \"arguments\": {\n    \"script_content\": \"echo hello\",\n    \"after\": 10  // 10秒后执行\n  }\n}\n```\n\n### 定时注入提示词（继续使用 timer 工具）\n\n```json\n{\n  \"name\": \"timer\",\n  \"arguments\": {\n    \"operation\": \"add\",\n    \"task_type\": \"prompt\",\n    \"time_type\": \"relative\",\n    \"time_value\": \"10\",\n    \"prompt_text\": \"请检查任务状态\"\n  }\n}\n```\n\n## 优势\n\n1. **简化使用**：定时执行工具无需单独工具，直接在工具调用中添加参数\n2. **功能分离**：timer 工具专注于提示词注入和任务管理\n3. **向后兼容**：TimerManager 核心功能不变，支持所有任务类型\n4. **清晰职责**：工具调用负责工具定时，timer工具负责提示词定时",
+  "created_at": "2026-06-06T15:28:59.790860",
+  "updated_at": "2026-06-06T15:28:59.790865"
+}

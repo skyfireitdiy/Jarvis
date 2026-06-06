@@ -50,6 +50,23 @@ tool_call_help = """
 }
 ```
 
+**定时执行（可选）**
+在 arguments 中添加以下任一参数可创建定时任务：
+- `after`: 延时执行（秒），例如 `"after": 10` 表示10秒后执行
+- `at`: 定时执行（ISO格式时间），例如 `"at": "2024-12-31T23:59:59"`
+- `loop`: 循环执行（秒），例如 `"loop": 60` 表示每60秒执行一次
+
+```json
+// 示例：10秒后执行脚本
+{
+  "name": "execute_script",
+  "arguments": {
+    "script_content": "echo hello",
+    "after": 10
+  }
+}
+```
+
 **Json格式特性**
 - 字符串引号：可使用双引号或单引号
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
@@ -58,6 +75,7 @@ tool_call_help = """
 **关键规则**
 1. 每次只使用一个工具，等待结果后再进行下一步
 2. 信息不足时询问用户，不要在没有完整信息的情况下继续
+3. 定时参数（after/at/loop）会自动创建定时任务，工具不会立即执行
 
 **多个工具调用**
 - 支持一次调用多个工具，每个工具调用是一个独立的 JSON 对象：
@@ -1254,6 +1272,50 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = tool_call_help
                     PrettyOutput.auto_print("❌ 工具参数格式无效")
                     return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
+
+            # 检查是否包含定时参数（after/at/loop）
+            if isinstance(args, dict):
+                timer_params = {}
+                if "after" in args:
+                    timer_params["time_type"] = "relative"
+                    timer_params["time_value"] = args.pop("after")
+                elif "at" in args:
+                    timer_params["time_type"] = "absolute"
+                    timer_params["time_value"] = args.pop("at")
+                elif "loop" in args:
+                    timer_params["time_type"] = "interval"
+                    timer_params["time_value"] = args.pop("loop")
+                    timer_params["interval_seconds"] = timer_params["time_value"]
+
+                # 如果包含定时参数，创建定时任务而不是立即执行
+                if timer_params:
+                    from jarvis.jarvis_tools.timer import get_timer_manager
+
+                    timer_manager = get_timer_manager()
+                    try:
+                        task = timer_manager.add_task(
+                            task_type="tool_call",
+                            time_type=timer_params["time_type"],
+                            time_value=timer_params["time_value"],
+                            tool_name=name,
+                            tool_args=args,
+                            interval_seconds=timer_params.get("interval_seconds"),
+                        )
+                        time_desc = ""
+                        if timer_params["time_type"] == "relative":
+                            time_desc = f"{timer_params['time_value']}秒后"
+                        elif timer_params["time_type"] == "absolute":
+                            time_desc = f"在 {timer_params['time_value']}"
+                        elif timer_params["time_type"] == "interval":
+                            time_desc = f"每 {timer_params['time_value']}秒"
+
+                        msg = f"✅ 已创建定时任务 #{task.task_id}：{time_desc}执行工具 {name}"
+                        PrettyOutput.auto_print(msg)
+                        return msg
+                    except Exception as e:
+                        error_msg = f"❌ 创建定时任务失败: {e}"
+                        PrettyOutput.auto_print(error_msg)
+                        return error_msg
 
             # 生成参数摘要，过滤敏感信息
             param_summary = ""
