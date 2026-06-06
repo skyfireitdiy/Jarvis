@@ -110,6 +110,24 @@ class AgentRunLoop:
         from jarvis.jarvis_utils.utils import extract_json_from_text
         from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
+        # 首先移除 <tool_call>工具名称 参数JSON 格式
+        tool_call_pattern = r"<tool_call>\s*\w+\s+"
+        matches = list(re.finditer(tool_call_pattern, response))
+
+        # 从后往前删除，避免索引变化
+        for match in reversed(matches):
+            json_start = match.end()
+            # 跳过空白字符，找到 { 的位置
+            while json_start < len(response) and response[json_start].isspace():
+                json_start += 1
+
+            if json_start < len(response) and response[json_start] == "{":
+                # 使用 extract_json_from_text 提取完整的JSON对象
+                json_str, end_pos = extract_json_from_text(response, json_start)
+                if json_str:
+                    # 删除从 <tool_call> 到 JSON 结束的整段内容
+                    response = response[: match.start()] + response[end_pos:]
+
         # 纯JSON协议：扫描并移除所有包含name和arguments字段的JSON对象
         # 同时清理周围的 ```json 或 ``` 标记
         filtered = ""
