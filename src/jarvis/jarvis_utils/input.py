@@ -300,9 +300,31 @@ class InputProvider(ABC):
     ) -> str:
         raise NotImplementedError
 
+    def inject_prompt(self, prompt: str) -> None:
+        """注入提示词到下一次输入中（默认空实现，子类可覆写）。"""
+        pass
+
 
 class CLIInputProvider(InputProvider):
     """默认本地 CLI 输入提供者，复用既有 prompt_toolkit 实现。"""
+
+    def __init__(self) -> None:
+        self._injected_prompts: list = []
+        self._inject_lock = threading.Lock()
+
+    def inject_prompt(self, prompt: str) -> None:
+        """注入提示词到下一次输入中"""
+        with self._inject_lock:
+            self._injected_prompts.append(prompt)
+
+    def _consume_injected_prompts(self) -> Optional[str]:
+        """消费所有已注入的提示词，合并返回"""
+        with self._inject_lock:
+            if not self._injected_prompts:
+                return None
+            prompts = self._injected_prompts.copy()
+            self._injected_prompts.clear()
+        return "\n".join(prompts)
 
     def get_multiline_input(
         self,
@@ -310,6 +332,10 @@ class CLIInputProvider(InputProvider):
         preset: Optional[str] = None,
         preset_cursor: Optional[int] = None,
     ) -> str:
+        # 检查是否有注入的提示词
+        injected = self._consume_injected_prompts()
+        if injected is not None:
+            return injected
         return _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )

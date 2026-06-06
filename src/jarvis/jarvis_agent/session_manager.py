@@ -1256,6 +1256,17 @@ class SessionManager:
                 ),
             }
 
+        # 保存Timer定时器状态
+        try:
+            from jarvis.jarvis_tools.timer import get_timer_manager
+
+            timer_manager = get_timer_manager()
+            timer_state = timer_manager.get_state()
+            if timer_state.get("tasks"):
+                state_data["timer"] = timer_state
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠ 保存定时器状态失败: {e}")
+
         # 导入SafeEncoder（避免循环导入）
         from jarvis.jarvis_agent import SafeEncoder
 
@@ -1438,6 +1449,17 @@ class SessionManager:
                         PrettyOutput.auto_print(
                             f"✅ 已重新激活 {reactivated_count} 个规则: {rule_names}"
                         )
+
+            # 恢复Timer定时器状态
+            timer_state = state_data.get("timer")
+            if timer_state:
+                try:
+                    from jarvis.jarvis_tools.timer import get_timer_manager
+
+                    timer_manager = get_timer_manager()
+                    timer_manager.restore_state(timer_state)
+                except Exception as e:
+                    PrettyOutput.auto_print(f"⚠ 恢复定时器状态失败: {e}")
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 恢复Agent状态失败: {e}")
