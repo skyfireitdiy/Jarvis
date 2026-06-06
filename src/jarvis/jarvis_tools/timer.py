@@ -370,13 +370,13 @@ class TimerTool:
         """初始化定时器工具"""
         self.manager = get_timer_manager()
 
-    def execute(self, **kwargs) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行定时器操作"""
-        operation = kwargs.get("operation", "")
+        operation = args.get("operation", "")
         if operation == "add":
-            return self._handle_add(kwargs)
+            return self._handle_add(args)
         elif operation == "cancel":
-            return self._handle_cancel(kwargs)
+            return self._handle_cancel(args)
         elif operation == "list":
             return self._handle_list()
         elif operation == "clear":
