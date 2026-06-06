@@ -205,25 +205,31 @@ class TimerManager:
             task.status = "completed"
             PrettyOutput.auto_print(f"定时任务 {task_id} 执行失败: {e}")
 
+    def _inject_message(self, message: str, description: str = "") -> None:
+        """统一的消息注入方法
+
+        Args:
+            message: 要注入的消息内容
+            description: 用于日志的描述信息（如"定时提示"、"工具执行结果"）
+        """
+        from jarvis.jarvis_utils.globals import add_input_buffer, input_inject_callback
+
+        # 优先使用输入注入回调（如果Agent正在等待输入）
+        if input_inject_callback is not None:
+            input_inject_callback(message)
+        else:
+            add_input_buffer(message)
+
+        # 打印日志
+        if description:
+            PrettyOutput.auto_print(description)
+
     def _execute_prompt_task(self, task: TimerTask) -> None:
         """执行提示词注入任务"""
         try:
-            from jarvis.jarvis_utils.globals import (
-                add_input_buffer,
-                input_inject_callback,
-            )
-
             # 构建注入消息，包含定时器信息
             inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {task.prompt_text}"
-
-            # 优先使用输入注入回调（如果Agent正在等待输入）
-            if input_inject_callback is not None:
-                input_inject_callback(inject_message)
-                PrettyOutput.auto_print(f"定时提示已注入: {task.prompt_text}")
-            else:
-                # 否则添加到全局缓冲区
-                add_input_buffer(inject_message)
-                PrettyOutput.auto_print(f"定时提示已注入: {task.prompt_text}")
+            self._inject_message(inject_message, f"定时提示已注入: {task.prompt_text}")
         except Exception as e:
             PrettyOutput.auto_print(f"提示词注入失败: {e}")
 
@@ -237,62 +243,30 @@ class TimerManager:
                 result = tool.func(**task.tool_args)
 
                 # 构建结果消息
-                if result:
-                    result_message = result.get("message", str(result))
-                    PrettyOutput.auto_print(f"工具执行结果: {result_message}")
-                else:
-                    result_message = "工具执行完成（无返回值）"
-
-                # 注入结果到输入
-                from jarvis.jarvis_utils.globals import (
-                    add_input_buffer,
-                    input_inject_callback,
+                result_message = (
+                    result.get("message", str(result))
+                    if result
+                    else "工具执行完成（无返回值）"
                 )
+                PrettyOutput.auto_print(f"工具执行结果: {result_message}")
 
                 inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] 工具 {task.tool_name} 执行完成\n结果: {result_message}"
-
-                # 优先使用输入注入回调（如果Agent正在等待输入）
-                if input_inject_callback is not None:
-                    input_inject_callback(inject_message)
-                else:
-                    add_input_buffer(inject_message)
+                self._inject_message(
+                    inject_message, f"工具执行结果已注入: {result_message}"
+                )
             else:
                 error_message = f"工具不存在: {task.tool_name}"
                 PrettyOutput.auto_print(error_message)
-
-                # 注入错误信息
-                from jarvis.jarvis_utils.globals import (
-                    add_input_buffer,
-                    input_inject_callback,
-                )
-
                 inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {error_message}"
-
-                # 优先使用输入注入回调（如果Agent正在等待输入）
-                if input_inject_callback is not None:
-                    input_inject_callback(inject_message)
-                else:
-                    add_input_buffer(inject_message)
+                self._inject_message(inject_message, f"工具错误已注入: {error_message}")
         except Exception as e:
             error_message = f"工具执行失败: {e}"
             PrettyOutput.auto_print(error_message)
-
-            # 注入错误信息
             try:
-                from jarvis.jarvis_utils.globals import (
-                    add_input_buffer,
-                    input_inject_callback,
-                )
-
                 inject_message = f"[Timer#{task.task_id[:8]}|{task.task_type}|{task.time_type}] {error_message}"
-
-                # 优先使用输入注入回调（如果Agent正在等待输入）
-                if input_inject_callback is not None:
-                    input_inject_callback(inject_message)
-                else:
-                    add_input_buffer(inject_message)
+                self._inject_message(inject_message, f"工具异常已注入: {error_message}")
             except Exception:
-                pass
+                pass  # 忽略二次异常
 
     def cancel_task(self, task_id: str) -> bool:
         """取消定时任务"""
