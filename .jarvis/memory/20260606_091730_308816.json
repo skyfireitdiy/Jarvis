@@ -1,0 +1,12 @@
+{
+  "id": "20260606_091730_308816",
+  "type": "project_long_term",
+  "tags": [
+    "interrupt_mechanism",
+    "execute_script_enhancement",
+    "completed_task"
+  ],
+  "content": "任务：增强execute_script工具的中断响应能力\n\n修改内容：\n1. 在src/jarvis/jarvis_tools/execute_script.py:28添加get_interrupt导入\n2. Windows交互模式reader函数（line 377-379）：添加中断检查循环\n3. Unix交互模式reader函数（line 670-672）：添加中断检查循环\n4. Windows非交互模式_execute_on_windows方法（line 972-995）：将proc.communicate()改为轮询方式，每0.1秒检查get_interrupt()>0\n5. Unix非交互模式_execute_on_unix_non_interactive方法（line 1156-1178）：将proc.wait()改为轮询方式，每0.1秒检查get_interrupt()>0\n\n技术实现：\n- 使用轮询式中断检查而非信号驱动，确保跨平台兼容性\n- 保持现有SIGINT信号处理机制作为第一道防线\n- 轮询间隔0.1秒，平衡响应速度和性能影响\n- 检测到中断时立即终止进程并返回\"执行被用户中断。\"错误信息\n\n验证结果：\n- 代码编译通过（py_compile无错误）\n- ruff静态检查通过（F401警告已解决）\n- ScriptTool类可正常实例化\n- 所有四种执行模式（Windows交互/非交互、Unix交互/非交互）均包含中断检查逻辑",
+  "created_at": "2026-06-06T09:17:30.308864",
+  "updated_at": "2026-06-06T09:17:30.308872"
+}

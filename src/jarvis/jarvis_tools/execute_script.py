@@ -25,6 +25,7 @@ from typing import Tuple
 from typing import Union
 
 from jarvis.jarvis_utils.globals import clear_script_pid
+from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_script_pid
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -373,6 +374,9 @@ class ScriptTool:
         def reader(pty_proc: Any) -> None:
             try:
                 while pty_proc.isalive():
+                    # 检查是否收到中断信号
+                    if get_interrupt() > 0:
+                        break
                     poll_resize()
                     try:
                         data = pty_proc.read(4096)
@@ -663,6 +667,9 @@ class ScriptTool:
         def reader(proc: subprocess.Popen[Any]) -> None:
             try:
                 while not stop_event.is_set():
+                    # 检查是否收到中断信号
+                    if get_interrupt() > 0:
+                        break
                     poll_resize()
                     if proc.poll() is not None:
                         ready, _, _ = select.select([master_fd], [], [], 0.1)
@@ -962,7 +969,33 @@ class ScriptTool:
                 )
                 set_script_pid(proc.pid)
                 try:
-                    stdout_bytes, stderr_bytes = proc.communicate(timeout=get_timeout())
+                    # 使用轮询方式检查中断，而不是直接调用 communicate
+                    import time
+
+                    start_time = time.time()
+                    timeout_val = get_timeout()
+                    while proc.poll() is None:
+                        # 检查是否收到中断信号
+                        if get_interrupt() > 0:
+                            proc.terminate()
+                            try:
+                                proc.wait(timeout=2)
+                            except subprocess.TimeoutExpired:
+                                proc.kill()
+                                proc.wait()
+                            clear_script_pid()
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": "执行被用户中断。",
+                            }
+                        # 短暂等待后继续检查
+                        elapsed = time.time() - start_time
+                        if timeout_val and elapsed >= timeout_val:
+                            raise subprocess.TimeoutExpired(cmd, timeout_val)
+                        time.sleep(0.1)
+                    # 进程已结束，获取输出
+                    stdout_bytes, stderr_bytes = proc.communicate()
                 except subprocess.TimeoutExpired:
                     clear_script_pid()
                     try:
@@ -1121,28 +1154,53 @@ class ScriptTool:
                         )
                     timed_out = False
                     proc = None
+                    import time
+
+                    start_time = time.time()
+                    timeout_val = get_script_execution_timeout()
+
                     try:
                         proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
                         set_script_pid(proc.pid)
-                        try:
-                            proc.wait(timeout=get_script_execution_timeout())
-                        except subprocess.TimeoutExpired:
-                            timed_out = True
-                            try:
+                        # 使用轮询方式检查中断，而不是直接调用 wait
+                        while proc.poll() is None:
+                            # 检查是否收到中断信号
+                            if get_interrupt() > 0:
                                 proc.terminate()
-                                proc.wait(timeout=2)
-                            except subprocess.TimeoutExpired:
                                 try:
+                                    proc.wait(timeout=2)
+                                except subprocess.TimeoutExpired:
                                     proc.kill()
                                     proc.wait()
-                                except Exception:
-                                    pass
+                                clear_script_pid()
+                                return {
+                                    "success": False,
+                                    "stdout": "",
+                                    "stderr": "执行被用户中断。",
+                                }
+                            # 短暂等待后继续检查
+                            elapsed = time.time() - start_time
+                            if timeout_val and elapsed >= timeout_val:
+                                timed_out = True
+                                break
+                            time.sleep(0.1)
+                    except Exception:
+                        timed_out = True
+                        try:
+                            proc.terminate()
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            try:
+                                proc.kill()
+                                proc.wait()
                             except Exception:
-                                try:
-                                    proc.kill()
-                                    proc.wait()
-                                except Exception:
-                                    pass
+                                pass
+                        except Exception:
+                            try:
+                                proc.kill()
+                                proc.wait()
+                            except Exception:
+                                pass
                     except Exception as e:
                         if proc is not None:
                             try:
