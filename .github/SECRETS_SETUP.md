@@ -93,14 +93,17 @@ git push origin v1.0.0
 ### Q: 构建失败提示 "Keystore file not found"？
 
 A: 检查 `ANDROID_KEYSTORE_FILE` 是否正确配置：
+
 - 确保 base64 编码正确（无换行符）
 - 使用 `base64 -w 0` 参数（Linux）或 `base64 -i`（macOS）
 
 ### Q: 构建失败提示 "Failed to sign APK"？
 
 A: 检查密码是否正确：
+
 - 确认 `KEYSTORE_KEY_PASSWORD` 和 `KEYSTORE_STORE_PASSWORD` 与 keystore 文件匹配
 - 可以在本地使用以下命令验证密码：
+
   ```bash
   keytool -list -v -keystore src/jarvis/jarvis_service/frontend/android/app/jarvis-release-key.jks
   ```
@@ -116,10 +119,12 @@ A: 通常 5-10 分钟，具体取决于 GitHub Actions 队列和网络状况。
 ### Q: 如何下载构建的 APK？
 
 **方式 1（Artifacts）：**
+
 1. 进入 **Actions** → 选择构建运行记录
 2. 在 **Artifacts** 部分下载 APK
 
 **方式 2（Releases）：**
+
 1. 进入 **Releases** 页面
 2. 找到对应版本的 Release
 3. 在 **Assets** 部分下载 APK
