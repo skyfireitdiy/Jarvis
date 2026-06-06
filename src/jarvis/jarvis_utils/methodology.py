@@ -14,7 +14,6 @@ import threading
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.globals import console
 from typing import Any
 from typing import Dict
 from typing import List
@@ -180,7 +179,7 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
                     if problem_type and content:
                         all_methodologies.append((problem_type, content))
             except Exception as e:
-                filename = os.path.basename(filepath)
+                filename = os.path.basename(str(filepath))
                 error_lines.append(f"加载方法论文件 {filename} 失败: {str(e)}")
 
     # 统一打印目录警告与文件加载失败信息
@@ -399,7 +398,12 @@ def load_methodology(
         )
 
         # 如果内容不大，直接使用chat_until_success
-        return platform.chat_until_success(final_prompt)
+        result = platform.chat_until_success(final_prompt)
+
+        # 打印大模型返回的方法论执行步骤
+        PrettyOutput.print_markdown(result, title="📋 从方法论总结的执行步骤")
+
+        return result
 
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 加载方法论失败: {str(e)}")
