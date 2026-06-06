@@ -936,6 +936,33 @@ class ToolRegistry(OutputHandlerProtocol):
         auto_completed = False
         ret: list = []
 
+        # 首先尝试解析 <tool_call>工具名称 参数JSON 格式
+        # 正则匹配: <tool_call> 后面跟工具名称(字母数字下划线)
+        tool_call_pattern = r"<tool_call>\s*(\w+)\s+"
+        matches = re.finditer(tool_call_pattern, content)
+
+        for match in matches:
+            tool_name = match.group(1)
+            # 从匹配结束位置开始查找JSON对象
+            json_start = match.end()
+            # 跳过空白字符，找到 { 的位置
+            while json_start < len(content) and content[json_start].isspace():
+                json_start += 1
+
+            if json_start < len(content) and content[json_start] == "{":
+                # 使用 extract_json_from_text 提取完整的JSON对象
+                json_str, end_pos = extract_json_from_text(content, json_start)
+                if json_str:
+                    try:
+                        # 尝试解析JSON参数
+                        arguments = json_loads(json_str)
+                        # 构造标准格式的工具调用
+                        tool_call = {"name": tool_name, "arguments": arguments}
+                        ret.append(tool_call)
+                    except Exception:
+                        # 如果JSON解析失败，跳过这个匹配
+                        continue
+
         # 直接从全文中扫描所有 { 位置，尝试提取JSON并验证关键字段
         used_ranges: list = []  # 记录已使用的JSON范围，避免重复
         for i, ch in enumerate(content):
