@@ -1,0 +1,12 @@
+{
+  "id": "20260606_142539_134814",
+  "type": "project_long_term",
+  "tags": [
+    "stock_analysis",
+    "rule",
+    "architecture"
+  ],
+  "content": "股票分析规则架构：\n1. 规则文档：~/.jarvis/rules/stock_analysis/stock_analysis.md\n2. 脚本目录：~/.jarvis/rules/stock_analysis/scripts/\n   - stock_info.py: StockInfoFetcher类，fetch_stock_info方法调用东方财富push2 API\n   - stock_history.py: StockHistoryFetcher类，fetch_history方法支持日K/周K/月K，前复权处理\n   - technical_indicators.py: TechnicalIndicators类，calculate_all方法计算MA/MACD/KDJ/RSI/BOLL等指标，analyze_signals方法分析技术信号\n   - generate_report.py: StockReportGenerator类，calculate_score方法计算技术面评分（趋势/动能/支撑阻力/量价），identify_support_resistance方法识别支撑阻力位，generate_report方法生成Markdown报告\n3. 技术栈：Python 3.12+、pandas、numpy、requests\n4. 关键参数：MA周期[5,10,20,60,120,250]，RSI周期[6,12,24]，布林带周期20、标准差2.0\n5. 评分标准：综合评分≥8强烈推荐，≥7推荐，≥6中性偏多，≥5中性，≥4中性偏空，≥3谨慎，<3回避",
+  "created_at": "2026-06-06T14:25:39.134867",
+  "updated_at": "2026-06-06T14:25:39.134875"
+}

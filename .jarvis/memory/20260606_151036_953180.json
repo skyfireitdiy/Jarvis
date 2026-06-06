@@ -1,0 +1,12 @@
+{
+  "id": "20260606_151036_953180",
+  "type": "project_long_term",
+  "tags": [
+    "stock_analysis",
+    "system_architecture",
+    "data_fetching"
+  ],
+  "content": "股票分析系统重构完成（2024-01-20）：\n1. 系统定位：从\"分析判断型\"重构为\"数据抓取型\"，脚本仅获取客观数据，分析工作交给LLM\n2. 脚本重构：\n   - fundamental_analysis.py → FundamentalDataFetcher（移除分析逻辑，只保留数据抓取）\n   - capital_flow_analysis.py → CapitalFlowDataFetcher（移除分析逻辑，只保留数据抓取）\n   - macro_policy_analysis.py → MacroPolicyDataFetcher（移除分析逻辑，只保留数据抓取）\n   - comprehensive_analysis.py → ComprehensiveDataFetcher（移除分析逻辑，只保留数据整合）\n3. 规则文档更新：stock_analysis.md已更新，将\"分析\"相关描述改为\"数据抓取\"，报告模板从评分制改为数据展示\n4. 数据源：腾讯证券API（替代东方财富API，因后者502错误）\n5. 技术栈：Python 3.12+、pandas、numpy、requests\n6. 输出格式：JSON（机器可读）+ Markdown摘要（人类可读）\n7. 关键原则：脚本不提供确定性买卖建议，仅呈现客观数据",
+  "created_at": "2026-06-06T15:10:36.953224",
+  "updated_at": "2026-06-06T15:10:36.953230"
+}

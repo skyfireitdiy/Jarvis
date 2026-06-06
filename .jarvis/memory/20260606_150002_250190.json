@@ -1,0 +1,12 @@
+{
+  "id": "20260606_150002_250190",
+  "type": "project_long_term",
+  "tags": [
+    "stock_analysis",
+    "architecture",
+    "scripts"
+  ],
+  "content": "股票分析系统完整架构（已实现多维度综合分析）：\n\n## 系统架构\n- 数据源：腾讯证券API（替代东方财富API，因后者502错误）\n- 分析框架：技术面(35%)+基本面(30%)+资金面(20%)+宏观面(15%)\n- 综合评分：加权计算，10分制，分7级评级（强烈推荐/推荐/中性偏多/中性/中性偏空/谨慎/回避）\n\n## 脚本清单（~/.jarvis/rules/stock_analysis/scripts/）\n1. stock_info.py - StockInfoFetcher类，腾讯实时行情API\n2. stock_history.py - StockHistoryFetcher类，腾讯K线API（支持日K/周K/月K，前复权/后复权）\n3. technical_indicators.py - TechnicalIndicators类，计算MA/MACD/KDJ/RSI/BOLL等28个指标\n4. generate_report.py - StockReportGenerator类，生成技术面Markdown报告\n5. fundamental_analysis.py - FundamentalAnalyzer类，基本面分析（ROE/成长性/估值等）\n6. capital_flow_analysis.py - CapitalFlowAnalyzer类，资金面分析（主力/散户/大宗交易）\n7. macro_policy_analysis.py - MacroPolicyAnalyzer类，宏观政策分析（GDP/CPI/PMI/政策）\n8. comprehensive_analysis.py - ComprehensiveAnalyzer类，整合四大模块生成综合报告\n\n## 关键参数\n- MA周期：[5,10,20,60,120,250]\n- RSI周期：[6,12,24]\n- 布林带：周期20，标准差2.0\n- 评分阈值：≥8强烈推荐，≥7推荐，≥6中性偏多，≥5中性，≥4中性偏空，≥3谨慎，<3回避\n\n## 技术栈\n- Python 3.12+\n- pandas, numpy, requests\n- 腾讯证券API（qt.gtimg.cn实时行情，fqkline/get历史K线）\n\n## 使用示例\n```bash\n# 单独分析\npython stock_info.py 002221 -v\npython fundamental_analysis.py 002221 -v\npython capital_flow_analysis.py 002221 -v\npython macro_policy_analysis.py -v\n\n# 综合分析\npython comprehensive_analysis.py 002221 -v\npython comprehensive_analysis.py 002221 -o report.md  # 输出Markdown报告\n```\n\n## 注意事项\n- 抓取间隔≥3秒，避免被封IP\n- 腾讯API返回JavaScript变量格式，需正则提取\n- 单次最多1000条K线，长周期需分页\n- 基本面/资金面数据源待完善（当前使用模拟数据）",
+  "created_at": "2026-06-06T15:00:02.250260",
+  "updated_at": "2026-06-06T15:00:02.250269"
+}
