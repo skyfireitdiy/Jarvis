@@ -2824,8 +2824,8 @@ class Agent:
                 PrettyOutput.auto_print("ℹ️  用户已指定规则，跳过自动规则选择")
                 return
 
-            # 调用规则选择方法（内部已包含内容过滤）
-            selected_rules = self.rules_manager.select_rule_by_task(task_description)
+            # 调用规则匹配方法（支持本地+远程搜索）
+            selected_rules = self.rules_manager.match_rules_to_task(task_description)
 
             # 如果成功选择了规则，将其激活
             if selected_rules:
