@@ -197,6 +197,7 @@ BUILTIN_COMMANDS = [
     ("SubCodeAgent", "启动子CodeAgent执行代码任务"),
     ("Init", "初始化项目综述"),
     ("TestCase", "生成需求测试用例"),
+    ("QuickConfig", "快速配置LLM平台"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []

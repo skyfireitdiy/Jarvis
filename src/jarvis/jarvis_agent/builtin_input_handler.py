@@ -248,6 +248,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"❌ 解析错误：{e}")
 
             return "", True
+        elif tag == "QuickConfig":
+            from jarvis.jarvis_utils.quick_config import run_quick_config
+
+            try:
+                run_quick_config()
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 快速配置失败: {e}")
+            return "", True
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)
