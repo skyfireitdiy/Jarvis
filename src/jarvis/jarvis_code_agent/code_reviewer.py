@@ -112,11 +112,42 @@ class CodeReviewer:
 
         return "\n".join(truncated_lines)
 
+    def get_modified_files_list(self) -> Optional[str]:
+        """从 start_commit 到 HEAD 的变更中提取修改文件列表。
+
+        返回格式化的文件列表字符串，不包含具体 diff 内容，
+        避免诱导模型根据 diff 生成贴合代码的验收标准。
+        """
+        if self.start_commit:
+            git_diff = get_diff_between_commits(self.start_commit)
+        else:
+            git_diff = self.check_and_get_git_diff()
+
+        if not git_diff:
+            return None
+
+        files = set()
+        pattern = r"^diff --git a/([^\s]+) b/([^\s]+)$"
+        for line in git_diff.split("\n"):
+            match = re.match(pattern, line)
+            if match:
+                file_a = match.group(1)
+                file_b = match.group(2)
+                files.add(file_b)
+                if file_a != file_b:
+                    files.add(file_a)
+
+        if not files:
+            return None
+
+        return "\n".join(f"  - {f}" for f in sorted(files))
+
     def generate_review_target(self, max_retries: int = 3) -> str:
         """生成代码审查的目标和验收准则。
 
-        注意：本方法会获取当前 git diff 并基于实际代码变更生成验收标准，
-        而不是基于完整的对话历史，以避免将已提交的代码也包含在验收标准中。
+        注意：本方法只传入修改文件列表而非完整 diff，
+        避免模型根据具体代码变更生成诱导性验收标准。
+        验收准则应基于对话历史独立生成，文件列表仅作为定位参考。
         """
         from jarvis.jarvis_platform.registry import PlatformRegistry
 
@@ -138,19 +169,15 @@ class CodeReviewer:
         new_model.set_messages(messages)
         new_model.set_suppress_output(False)
 
-        # 获取当前 git diff 并截断，用于生成更精准的验收标准
-        git_diff = self.check_and_get_git_diff()
-        diff_for_prompt = ""
-        if git_diff:
-            # 使用 0.2 的 token 比例截断 diff，避免占用过多上下文
-            diff_for_prompt = self.truncate_diff_for_review(git_diff, token_ratio=0.2)
+        # 只获取修改文件列表，不传入完整 diff，避免诱导性验收标准
+        modified_files = self.get_modified_files_list()
 
-        prompt = """请根据对话历史和代码变更，总结本次代码审查应关注的任务目标和验收准则。
+        prompt = """请根据对话历史，总结本次代码审查应关注的任务目标和验收准则。
 
 【重要提示】
 - **只关注当前未提交的代码变更**：如果对话历史中包含多次修复迭代，请只关注最终当前的代码状态
 - **忽略已提交的代码**：不要将历史对话中已经提交过的代码纳入验收标准
-- **基于实际变更生成验收标准**：参考下方的代码变更摘要，确保验收标准与实际修改匹配
+- **独立生成验收准则**：验收准则应基于对话历史中的用户需求独立生成，不应被具体代码实现细节诱导。下方仅提供修改文件列表作为定位参考，不包含具体代码变更内容
 
 请确保输出包含以下四个关键部分（必须包含这些关键字）：
 1. 任务目标 - 说明本次代码修改应该完成什么
@@ -170,9 +197,9 @@ class CodeReviewer:
 - "关键变更点"
 - "关键信息导航"""
 
-        # 如果有代码变更摘要，添加到 prompt 中
-        if diff_for_prompt:
-            prompt += f"\n\n【代码变更摘要】\n```diff\n{diff_for_prompt}\n```"
+        # 只传入修改文件列表，不传入完整 diff
+        if modified_files:
+            prompt += f"\n\n【修改文件列表】\n{modified_files}"
 
         # 如果有 start_commit，在 prompt 中追加提示，只走查该 commit 之后的代码
         if self.start_commit:
