@@ -626,8 +626,8 @@ def install_command(
     _install_systemd_service(config)
 
 
-@app.command(name="start")
-def start_command(
+@app.command(name="run")
+def run_command(
     gateway_host: Optional[str] = typer.Option(
         None,
         "--gateway-host",
@@ -679,7 +679,7 @@ def start_command(
         help="开发模式：前端以 dev 模式启动（热加载）",
     ),
 ) -> None:
-    """启动 Jarvis Service。"""
+    """直接运行 Jarvis Service（非systemd管理）。"""
     config = build_service_config(
         gateway_host=gateway_host,
         gateway_port=gateway_port,
@@ -693,6 +693,182 @@ def start_command(
         dev_mode=dev_mode,
     )
     run_service(config)
+
+
+@app.command(name="start")
+def start_service_command(
+    mode: str = typer.Argument(
+        ...,
+        help="要启动的服务模式：master 或 child",
+    ),
+) -> None:
+    """启动systemd管理的Jarvis服务。
+
+    根据指定的模式启动对应的systemd服务（jarvis-master.service或jarvis-child.service）。
+    """
+    mode_lower = mode.lower()
+    if mode_lower not in ["master", "child"]:
+        PrettyOutput.auto_print(f"❌ 无效的模式: {mode}。请使用 'master' 或 'child'")
+        raise typer.Exit(code=1)
+
+    service_name = _get_service_name(mode_lower)
+    PrettyOutput.auto_print(f"🚀 正在启动 {mode_lower} 服务: {service_name}")
+
+    # 先执行daemon-reload确保systemd识别新创建或修改的服务文件
+    try:
+        subprocess.run(
+            ["systemctl", "--user", "daemon-reload"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠ daemon-reload失败: {e}")
+
+    if _run_systemctl_action("start", mode_lower):
+        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已启动")
+    else:
+        PrettyOutput.auto_print(f"💡 请手动执行: systemctl --user start {service_name}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="stop")
+def stop_service_command(
+    mode: str = typer.Argument(
+        ...,
+        help="要停止的服务模式：master 或 child",
+    ),
+) -> None:
+    """停止systemd管理的Jarvis服务。
+
+    根据指定的模式停止对应的systemd服务（jarvis-master.service或jarvis-child.service）。
+    """
+    mode_lower = mode.lower()
+    if mode_lower not in ["master", "child"]:
+        PrettyOutput.auto_print(f"❌ 无效的模式: {mode}。请使用 'master' 或 'child'")
+        raise typer.Exit(code=1)
+
+    service_name = _get_service_name(mode_lower)
+    PrettyOutput.auto_print(f"🛑 正在停止 {mode_lower} 服务: {service_name}")
+
+    if _run_systemctl_action("stop", mode_lower):
+        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已停止")
+    else:
+        PrettyOutput.auto_print(f"💡 请手动执行: systemctl --user stop {service_name}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="switch")
+def switch_service_command(
+    target_mode: str = typer.Argument(
+        ...,
+        help="要切换到的目标模式：master 或 child",
+    ),
+) -> None:
+    """切换Jarvis服务的运行模式。
+
+    先停止当前运行的服务，然后启动目标模式的服务。确保不会同时运行master和child。
+    """
+    target_mode_lower = target_mode.lower()
+    if target_mode_lower not in ["master", "child"]:
+        PrettyOutput.auto_print(
+            f"❌ 无效的目标模式: {target_mode}。请使用 'master' 或 'child'"
+        )
+        raise typer.Exit(code=1)
+
+    # 检测当前运行的服务
+    master_running = _run_systemctl_action("is-active", "master")
+    child_running = _run_systemctl_action("is-active", "child")
+
+    # 检查是否已经是目标模式
+    if (target_mode_lower == "master" and master_running) or (
+        target_mode_lower == "child" and child_running
+    ):
+        PrettyOutput.auto_print(f"ℹ️ 无需切换，{target_mode_lower} 服务已在运行")
+        return
+
+    # 停止当前运行的服务
+    stop_success = True
+    if master_running and target_mode_lower == "child":
+        PrettyOutput.auto_print("🛑 正在停止 master 服务...")
+        if not _run_systemctl_action("stop", "master"):
+            PrettyOutput.auto_print("❌ 停止 master 服务失败，无法继续切换")
+            stop_success = False
+    elif child_running and target_mode_lower == "master":
+        PrettyOutput.auto_print("🛑 正在停止 child 服务...")
+        if not _run_systemctl_action("stop", "child"):
+            PrettyOutput.auto_print("❌ 停止 child 服务失败，无法继续切换")
+            stop_success = False
+
+    if not stop_success:
+        raise typer.Exit(code=1)
+
+    # 启动目标服务
+    target_service_name = _get_service_name(target_mode_lower)
+    PrettyOutput.auto_print(
+        f"🚀 正在启动 {target_mode_lower} 服务: {target_service_name}"
+    )
+
+    if _run_systemctl_action("start", target_mode_lower):
+        PrettyOutput.auto_print(f"✅ 已切换到 {target_mode_lower} 模式")
+    else:
+        PrettyOutput.auto_print(
+            f"⚠ 启动失败，请手动执行: systemctl --user start {target_service_name}"
+        )
+        raise typer.Exit(code=1)
+
+
+def _get_service_name(node_mode: Optional[str]) -> str:
+    """根据节点模式返回systemd服务文件名。
+
+    Args:
+        node_mode: 节点模式（"master"或"child"），None时默认为"master"
+
+    Returns:
+        服务文件名（如"jarvis-master.service"或"jarvis-child.service"）
+    """
+    mode = (node_mode or "master").lower()
+    if mode == "master":
+        return "jarvis-master.service"
+    elif mode == "child":
+        return "jarvis-child.service"
+    else:
+        # 未知模式，回退到master
+        return "jarvis-master.service"
+
+
+def _run_systemctl_action(action: str, node_mode: Optional[str]) -> bool:
+    """执行systemctl命令（start/stop/is-active）。
+
+    Args:
+        action: systemctl动作（"start", "stop", "is-active"）
+        node_mode: 节点模式（"master"或"child"）
+
+    Returns:
+        对于is-active：True表示正在运行，False表示未运行
+        对于start/stop：True表示成功，False表示失败
+    """
+    service_name = _get_service_name(node_mode)
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", action, service_name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if action == "is-active":
+            return result.returncode == 0 and result.stdout.strip() == "active"
+        else:
+            if result.returncode == 0:
+                return True
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠ {action} {service_name}失败: {result.stderr.strip()}"
+                )
+                return False
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠ 执行systemctl {action} {service_name}异常: {e}")
+        return False
 
 
 def _install_systemd_service(config: ServiceConfig) -> None:
@@ -728,8 +904,13 @@ def _install_systemd_service(config: ServiceConfig) -> None:
 
     proxy_env_section = "\n".join(proxy_env_vars) if proxy_env_vars else ""
 
+    # 根据node_mode确定服务文件名和描述
+    service_name = _get_service_name(config.node_mode)
+    mode_display = config.node_mode or "master"
+    PrettyOutput.auto_print(f"📦 正在安装 {mode_display} 模式服务: {service_name}")
+
     service_content = """[Unit]
-Description=Jarvis Service
+Description=Jarvis Service ({mode})
 After=network.target
 
 [Service]
@@ -737,7 +918,8 @@ Type=simple
 Environment=PATH={path}
 {proxy_env}
 WorkingDirectory={project_root}
-ExecStart={service_executable} start --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
+ExecStart={service_executable} run --gateway-host {gateway_host} --gateway-port {gateway_port} --frontend-host {frontend_host} --frontend-port {frontend_port}""".format(
+        mode=mode_display,
         path=current_path,
         project_root=config.project_root,
         service_executable=service_executable,
@@ -773,46 +955,11 @@ WantedBy=default.target
     systemd_user_dir.mkdir(parents=True, exist_ok=True)
 
     # 写入服务文件
-    service_file_path = systemd_user_dir / "jarvis-service.service"
+    service_file_path = systemd_user_dir / service_name
     service_file_path.write_text(service_content, encoding="utf-8")
 
     PrettyOutput.auto_print(f"✅ systemd 服务文件已创建: {service_file_path}")
-
-    # 自动 enable 并启动服务
-    try:
-        subprocess.run(
-            ["systemctl", "--user", "daemon-reload"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        enable_result = subprocess.run(
-            ["systemctl", "--user", "enable", "jarvis-service.service"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if enable_result.returncode == 0:
-            PrettyOutput.auto_print("✅ jarvis-service 已设为开机自启")
-        else:
-            PrettyOutput.auto_print(f"⚠ enable 失败: {enable_result.stderr.strip()}")
-
-        start_result = subprocess.run(
-            ["systemctl", "--user", "start", "jarvis-service.service"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if start_result.returncode == 0:
-            PrettyOutput.auto_print("✅ jarvis-service 已启动")
-        else:
-            PrettyOutput.auto_print(
-                f"⚠ start 失败: {start_result.stderr.strip()}\n💡 请手动执行: systemctl --user start jarvis-service.service"
-            )
-    except Exception as e:
-        PrettyOutput.auto_print(
-            f"⚠ 自动启用/启动失败: {e}\n💡 请手动执行: systemctl --user enable --now jarvis-service.service"
-        )
+    PrettyOutput.auto_print(f"💡 请使用 'jarvis-service start {mode_display}' 启动服务")
 
     # 启用 linger 模式，使服务在用户注销后继续运行
     try:
@@ -862,9 +1009,9 @@ WantedBy=default.target
 
     PrettyOutput.auto_print("📋 服务管理命令:")
     PrettyOutput.auto_print("  systemctl --user daemon-reload")
-    PrettyOutput.auto_print("  systemctl --user enable jarvis-service.service")
-    PrettyOutput.auto_print("  systemctl --user start jarvis-service.service")
-    PrettyOutput.auto_print("  systemctl --user status jarvis-service.service")
+    PrettyOutput.auto_print(f"  systemctl --user enable {service_name}")
+    PrettyOutput.auto_print(f"  systemctl --user start {service_name}")
+    PrettyOutput.auto_print(f"  systemctl --user status {service_name}")
 
 
 def main() -> None:
