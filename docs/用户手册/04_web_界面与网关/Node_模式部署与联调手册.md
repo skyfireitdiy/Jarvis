@@ -17,15 +17,15 @@
 
 ### 1. 启动主节点
 
-1. 在主节点机器上启动 Web Gateway。
-2. 示例：`jarvis-service start --node-mode master`
-3. 如有需要，再补充监听地址、端口和密码参数。
+1. 在主节点机器上运行 Web Gateway。
+2. 示例：`jarvis-service run --node-mode master`
+3. 如需长期运行，可使用 `jarvis-service install --node-mode master` 安装为 systemd 服务，然后使用 `jarvis-service start master` 启动服务。
 
 ### 2. 启动子节点
 
-1. 在子节点机器上启动 Web Gateway。
-2. 示例：`jarvis-service start --node-mode child --node-id worker-01 --master-url ws://master-host:8000 --node-secret your_secret`
-3. 确保子节点具备接入主节点所需的网络可达性与配置。
+1. 在子节点机器上运行 Web Gateway。
+2. 示例：`jarvis-service run --node-mode child --node-id worker-01 --master-url ws://master-host:8000 --node-secret your_secret`
+3. 如需长期运行，可使用 `jarvis-service install --node-mode child --node-id worker-01 --master-url ws://master-host:8000 --node-secret your_secret` 安装为 systemd 服务，然后使用 `jarvis-service start child` 启动服务。
 
 ### 3. 验证子节点接入
 
