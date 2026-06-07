@@ -684,6 +684,11 @@ def _clear_previous_prompt(text: str) -> None:
     Args:
         text: 上一次的输入文本
     """
+    # Windows平台禁用ANSI转义序列清除，避免终端状态混乱导致乱码
+    # Windows的cmd.exe和部分终端默认不支持ANSI转义序列，需要启用VT处理模式
+    if sys.platform == "win32":
+        return
+
     try:
         rows_total = _calc_prompt_rows(text)
         for _ in range(rows_total):
