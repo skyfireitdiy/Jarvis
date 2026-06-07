@@ -981,6 +981,45 @@ class ToolRegistry(OutputHandlerProtocol):
                         # 如果JSON解析失败，跳过这个匹配
                         continue
 
+        # 尝试解析 "工具名 + markdown代码块" 格式
+        # 匹配模式: 工具名单独一行，后面跟 ```lang\n内容\n```
+        code_block_pattern = r"(?:^|\n)(\w+)\s*\n```[a-zA-Z]*\n(.*?)\n```"
+        code_block_matches = re.finditer(code_block_pattern, content, re.DOTALL)
+
+        for match in code_block_matches:
+            tool_name = match.group(1)
+            code_content = match.group(2).strip()
+
+            # 检查是否已被前面的解析处理过
+            already_found = False
+            for existing in ret:
+                if isinstance(existing, dict) and existing.get("name") == tool_name:
+                    already_found = True
+                    break
+            if already_found:
+                continue
+
+            # 尝试将代码块内容解析为JSON
+            try:
+                parsed_content = json_loads(code_content)
+                if isinstance(parsed_content, dict):
+                    if "name" in parsed_content and "arguments" in parsed_content:
+                        # 已经是标准格式
+                        ret.append(parsed_content)
+                    else:
+                        # JSON内容作为arguments
+                        tool_call = {"name": tool_name, "arguments": parsed_content}
+                        ret.append(tool_call)
+                    auto_completed = True
+                    continue
+            except Exception:
+                pass
+
+            # 代码块内容不是JSON，构造简单参数
+            tool_call = {"name": tool_name, "arguments": {"content": code_content}}
+            ret.append(tool_call)
+            auto_completed = True
+
         # 直接从全文中扫描所有 { 位置，尝试提取JSON并验证关键字段
         used_ranges: list = []  # 记录已使用的JSON范围，避免重复
         for i, ch in enumerate(content):
