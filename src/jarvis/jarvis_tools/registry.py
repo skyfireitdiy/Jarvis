@@ -932,6 +932,129 @@ class ToolRegistry(OutputHandlerProtocol):
         return None, False
 
     @staticmethod
+    def _parse_tool_call_format(content: str) -> list:
+        """解析 <tool_call>工具名称 参数JSON 格式"""
+        ret: list = []
+        tool_call_pattern = r"<tool_call>\s*(\w+)\s+"
+        matches = re.finditer(tool_call_pattern, content)
+
+        for match in matches:
+            tool_name = match.group(1)
+            json_start = match.end()
+            while json_start < len(content) and content[json_start].isspace():
+                json_start += 1
+
+            if json_start < len(content) and content[json_start] == "{":
+                json_str, end_pos = extract_json_from_text(content, json_start)
+                if json_str:
+                    try:
+                        arguments = json_loads(json_str)
+                        tool_call = {"name": tool_name, "arguments": arguments}
+                        ret.append(tool_call)
+                    except Exception:
+                        continue
+        return ret
+
+    @staticmethod
+    def _parse_xml_tag_format(content: str, existing: list) -> list:
+        """解析 XML 标签格式: <name>...</name><arguments>...</arguments>"""
+        ret: list = []
+        xml_name_pattern = r"<name>\s*(\w+)\s*</name>"
+        xml_name_matches = list(re.finditer(xml_name_pattern, content))
+
+        for name_match in xml_name_matches:
+            xml_tool_name = name_match.group(1)
+            search_start = name_match.end()
+            xml_args_pattern = r"<arguments>\s*"
+            args_match = re.search(xml_args_pattern, content[search_start:])
+            if args_match:
+                args_content_start = search_start + args_match.end()
+                close_tag_pos = content.find("</arguments>", args_content_start)
+                if close_tag_pos != -1:
+                    args_content = content[args_content_start:close_tag_pos].strip()
+                    try:
+                        arguments = json_loads(args_content)
+                        tool_call = {"name": xml_tool_name, "arguments": arguments}
+                        already_found = False
+                        for ex in existing:
+                            if isinstance(ex, dict) and ex.get("name") == xml_tool_name:
+                                already_found = True
+                                break
+                        if not already_found:
+                            ret.append(tool_call)
+                    except Exception:
+                        pass
+        return ret
+
+    @staticmethod
+    def _parse_code_block_format(content: str, existing: list) -> Tuple[list, bool]:
+        """解析 工具名 + markdown代码块 格式"""
+        ret: list = []
+        auto_completed = False
+        code_block_pattern = r"(?:^|\n)(\w+)\s*\n```[a-zA-Z]*\n(.*?)\n```"
+        code_block_matches = re.finditer(code_block_pattern, content, re.DOTALL)
+
+        for match in code_block_matches:
+            tool_name = match.group(1)
+            code_content = match.group(2).strip()
+
+            already_found = False
+            for ex in existing:
+                if isinstance(ex, dict) and ex.get("name") == tool_name:
+                    already_found = True
+                    break
+            if already_found:
+                continue
+
+            try:
+                parsed_content = json_loads(code_content)
+                if isinstance(parsed_content, dict):
+                    if "name" in parsed_content and "arguments" in parsed_content:
+                        ret.append(parsed_content)
+                    else:
+                        tool_call = {"name": tool_name, "arguments": parsed_content}
+                        ret.append(tool_call)
+                    auto_completed = True
+                    continue
+            except Exception:
+                pass
+
+            tool_call = {"name": tool_name, "arguments": {"content": code_content}}
+            ret.append(tool_call)
+            auto_completed = True
+        return ret, auto_completed
+
+    @staticmethod
+    def _parse_embedded_json_format(content: str) -> list:
+        """从全文扫描JSON对象，提取含name+arguments的标准格式"""
+        ret: list = []
+        used_ranges: list = []
+        for i, ch in enumerate(content):
+            if ch == "{":
+                in_used = False
+                for start, end in used_ranges:
+                    if start <= i <= end:
+                        in_used = True
+                        break
+                if in_used:
+                    continue
+
+                json_str, end_pos = extract_json_from_text(content, i)
+                if json_str:
+                    try:
+                        parsed = json_loads(json_str)
+                        if (
+                            isinstance(parsed, dict)
+                            and "name" in parsed
+                            and "arguments" in parsed
+                        ):
+                            ret.append(parsed)
+                            used_ranges.append((i, end_pos))
+                    except Exception:
+                        continue
+        return ret
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
         agent: Optional[Any] = None,
@@ -954,100 +1077,22 @@ class ToolRegistry(OutputHandlerProtocol):
         auto_completed = False
         ret: list = []
 
-        # 首先尝试解析 <tool_call>工具名称 参数JSON 格式
-        # 正则匹配: <tool_call> 后面跟工具名称(字母数字下划线)
-        tool_call_pattern = r"<tool_call>\s*(\w+)\s+"
-        matches = re.finditer(tool_call_pattern, content)
+        # 1. 解析 <tool_call>工具名称 参数JSON 格式
+        ret.extend(ToolRegistry._parse_tool_call_format(content))
 
-        for match in matches:
-            tool_name = match.group(1)
-            # 从匹配结束位置开始查找JSON对象
-            json_start = match.end()
-            # 跳过空白字符，找到 { 的位置
-            while json_start < len(content) and content[json_start].isspace():
-                json_start += 1
+        # 2. 解析 XML 标签格式: <name>...</name><arguments>...</arguments>
+        ret.extend(ToolRegistry._parse_xml_tag_format(content, ret))
 
-            if json_start < len(content) and content[json_start] == "{":
-                # 使用 extract_json_from_text 提取完整的JSON对象
-                json_str, end_pos = extract_json_from_text(content, json_start)
-                if json_str:
-                    try:
-                        # 尝试解析JSON参数
-                        arguments = json_loads(json_str)
-                        # 构造标准格式的工具调用
-                        tool_call = {"name": tool_name, "arguments": arguments}
-                        ret.append(tool_call)
-                    except Exception:
-                        # 如果JSON解析失败，跳过这个匹配
-                        continue
+        # 3. 解析 "工具名 + markdown代码块" 格式
+        code_block_results, auto_completed = ToolRegistry._parse_code_block_format(
+            content, ret
+        )
+        ret.extend(code_block_results)
 
-        # 尝试解析 "工具名 + markdown代码块" 格式
-        # 匹配模式: 工具名单独一行，后面跟 ```lang\n内容\n```
-        code_block_pattern = r"(?:^|\n)(\w+)\s*\n```[a-zA-Z]*\n(.*?)\n```"
-        code_block_matches = re.finditer(code_block_pattern, content, re.DOTALL)
+        # 4. 从全文扫描JSON对象，提取含name+arguments的标准格式
+        ret.extend(ToolRegistry._parse_embedded_json_format(content))
 
-        for match in code_block_matches:
-            tool_name = match.group(1)
-            code_content = match.group(2).strip()
-
-            # 检查是否已被前面的解析处理过
-            already_found = False
-            for existing in ret:
-                if isinstance(existing, dict) and existing.get("name") == tool_name:
-                    already_found = True
-                    break
-            if already_found:
-                continue
-
-            # 尝试将代码块内容解析为JSON
-            try:
-                parsed_content = json_loads(code_content)
-                if isinstance(parsed_content, dict):
-                    if "name" in parsed_content and "arguments" in parsed_content:
-                        # 已经是标准格式
-                        ret.append(parsed_content)
-                    else:
-                        # JSON内容作为arguments
-                        tool_call = {"name": tool_name, "arguments": parsed_content}
-                        ret.append(tool_call)
-                    auto_completed = True
-                    continue
-            except Exception:
-                pass
-
-            # 代码块内容不是JSON，构造简单参数
-            tool_call = {"name": tool_name, "arguments": {"content": code_content}}
-            ret.append(tool_call)
-            auto_completed = True
-
-        # 直接从全文中扫描所有 { 位置，尝试提取JSON并验证关键字段
-        used_ranges: list = []  # 记录已使用的JSON范围，避免重复
-        for i, ch in enumerate(content):
-            if ch == "{":
-                # 检查是否已在已使用的范围内
-                in_used = False
-                for start, end in used_ranges:
-                    if start <= i <= end:
-                        in_used = True
-                        break
-                if in_used:
-                    continue
-
-                json_str, end_pos = extract_json_from_text(content, i)
-                if json_str:
-                    try:
-                        parsed = json_loads(json_str)
-                        if (
-                            isinstance(parsed, dict)
-                            and "name" in parsed
-                            and "arguments" in parsed
-                        ):
-                            ret.append(parsed)
-                            used_ranges.append((i, end_pos))
-                    except Exception:
-                        continue
-
-        # 如果标准提取失败，使用宽泛提取作为兜底
+        # 5. 宽泛提取作为兜底
         if not ret:
             fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
             if fuzzy_results:
