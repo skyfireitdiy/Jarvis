@@ -136,7 +136,7 @@ def ensure_bundled_deps_in_path() -> Optional[Path]:
         return deps_dir
 
     os.environ["PATH"] = (
-        deps_dir_str if not current_path else deps_dir_str + os.pathsep + current_path
+        deps_dir_str if not current_path else current_path + os.pathsep + deps_dir_str
     )
     return deps_dir
 

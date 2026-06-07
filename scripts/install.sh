@@ -74,7 +74,7 @@ ensure_uv_available() {
         exit 1
     fi
 
-    export PATH="$deps_dir:$PATH"
+    export PATH="$PATH:$deps_dir"
     echo "已将内置依赖目录加入 PATH: $deps_dir"
 
     if ! command -v uv &> /dev/null; then
