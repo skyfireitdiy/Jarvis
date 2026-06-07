@@ -1,0 +1,11 @@
+{
+  "id": "20260607_164505_968838",
+  "type": "project_long_term",
+  "tags": [
+    "version_release",
+    "workflow"
+  ],
+  "content": "Jarvis版本发布流程（v3.1.10验证）：\n1. 记录当前commit id：git rev-parse HEAD\n2. 获取最新tag：git describe --tags --abbrev=0\n3. 运行pytest测试：pytest -v --tb=short（必须全部通过）\n4. 获取代码变更：git diff <last_tag> HEAD --stat 和 git diff <last_tag> HEAD | head -n 500\n5. 学习ReleaseNote格式：读取ReleaseNote.md前200行\n6. 生成ReleaseNote内容：基于git diff分析，用户视角描述功能改进，禁止技术细节（代码行数、文件路径、方法名）\n7. 插入新版本到ReleaseNote.md头部\n8. 提交ReleaseNote：git add ReleaseNote.md && git commit -m \"docs: 发布vX.Y.Z版本\"\n9. 执行发布脚本：./scripts/publish.py patch|minor|major\n关键约束：禁止使用git log获取变更信息；禁止手动创建tag；禁止手动push代码；ReleaseNote必须符合项目格式规范（图标系统+条目格式）。",
+  "created_at": "2026-06-07T16:45:05.968878",
+  "updated_at": "2026-06-07T16:45:05.968884"
+}
