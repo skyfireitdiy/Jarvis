@@ -532,9 +532,9 @@ def _start_restart_command_server(controller: ServiceController) -> None:
                     try:
                         data = conn.recv(1024).decode("utf-8").strip()
                         if data == "RESTART_ALL":
-                            controller.request_restart(None, None)  # type: ignore[arg-type]
+                            controller.request_restart(0, None)
                         elif data == "RESTART_GATEWAY_ONLY":
-                            controller.request_restart_gateway_only(None, None)  # type: ignore[arg-type]
+                            controller.request_restart_gateway_only(0, None)
                     finally:
                         conn.close()
                 except _socket.timeout:
@@ -777,6 +777,42 @@ WantedBy=default.target
     service_file_path.write_text(service_content, encoding="utf-8")
 
     PrettyOutput.auto_print(f"✅ systemd 服务文件已创建: {service_file_path}")
+
+    # 自动 enable 并启动服务
+    try:
+        subprocess.run(
+            ["systemctl", "--user", "daemon-reload"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        enable_result = subprocess.run(
+            ["systemctl", "--user", "enable", "jarvis-service.service"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if enable_result.returncode == 0:
+            PrettyOutput.auto_print("✅ jarvis-service 已设为开机自启")
+        else:
+            PrettyOutput.auto_print(f"⚠ enable 失败: {enable_result.stderr.strip()}")
+
+        start_result = subprocess.run(
+            ["systemctl", "--user", "start", "jarvis-service.service"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if start_result.returncode == 0:
+            PrettyOutput.auto_print("✅ jarvis-service 已启动")
+        else:
+            PrettyOutput.auto_print(
+                f"⚠ start 失败: {start_result.stderr.strip()}\n💡 请手动执行: systemctl --user start jarvis-service.service"
+            )
+    except Exception as e:
+        PrettyOutput.auto_print(
+            f"⚠ 自动启用/启动失败: {e}\n💡 请手动执行: systemctl --user enable --now jarvis-service.service"
+        )
 
     # 启用 linger 模式，使服务在用户注销后继续运行
     try:
