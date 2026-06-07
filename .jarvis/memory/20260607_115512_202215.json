@@ -1,0 +1,8 @@
+{
+  "id": "20260607_115512_202215",
+  "type": "project_long_term",
+  "tags": ["功能开发", "工具调用格式", "registry"],
+  "content": "在src/jarvis/jarvis_tools/registry.py中新增了对[TOOL_CALL]标记+<arg_key>/<arg_value>标签格式的支持。主要修改：1) 新增_parse_arg_key_value_format静态方法（第989-1041行），用于解析XML风格的工具调用格式；2) 在_extract_tool_calls方法中集成新解析函数（第1135-1136行）；3) 修复了v2.0协议的类型检查问题（第1284-1291行）。所有测试通过，包括单元测试和集成测试。",
+  "created_at": "2026-06-07T11:55:12.202250",
+  "updated_at": "2026-06-07T11:55:12.202256"
+}

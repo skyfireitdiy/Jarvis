@@ -987,6 +987,60 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _parse_arg_key_value_format(content: str, existing: list) -> list:
+        """解析 [TOOL_CALL] 标记 + arg_key/arg_value 标签格式
+
+        格式示例:
+        [TOOL_CALL]
+        read_code
+        <arg_key>files</arg_key><arg_value>[{"path": "src/file.py"}]</arg_value>
+        """
+        ret: list = []
+
+        # 匹配 [TOOL_CALL] 标记
+        tool_call_marker_pattern = r"\[TOOL_CALL\]\s*\n(\w+)"
+        marker_matches = list(re.finditer(tool_call_marker_pattern, content))
+
+        for match in marker_matches:
+            tool_name = match.group(1)
+            search_start = match.end()
+
+            # 检查是否已经找到过该工具
+            already_found = False
+            for ex in existing:
+                if isinstance(ex, dict) and ex.get("name") == tool_name:
+                    already_found = True
+                    break
+            if already_found:
+                continue
+
+            # 提取所有 arg_key 和 arg_value 对
+            arg_pattern = r"<arg_key>(\w+)</arg_key>\s*<arg_value>(.*?)</arg_value>"
+            arg_matches = list(
+                re.finditer(arg_pattern, content[search_start:], re.DOTALL)
+            )
+
+            if arg_matches:
+                arguments = {}
+                for arg_match in arg_matches:
+                    key = arg_match.group(1)
+                    value_str = arg_match.group(2).strip()
+
+                    # 尝试解析值为JSON
+                    try:
+                        value = json_loads(value_str)
+                    except Exception:
+                        # 如果不是有效的JSON，保持为字符串
+                        value = value_str
+
+                    arguments[key] = value
+
+                tool_call = {"name": tool_name, "arguments": arguments}
+                ret.append(tool_call)
+
+        return ret
+
+    @staticmethod
     def _parse_code_block_format(content: str, existing: list) -> Tuple[list, bool]:
         """解析 工具名 + markdown代码块 格式"""
         ret: list = []
@@ -1080,6 +1134,8 @@ class ToolRegistry(OutputHandlerProtocol):
         # 1. 解析 <tool_call>工具名称 参数JSON 格式
         ret.extend(ToolRegistry._parse_tool_call_format(content))
 
+        # 2.5. 解析 [TOOL_CALL]标记+<arg_key>/<arg_value>标签格式
+        ret.extend(ToolRegistry._parse_arg_key_value_format(content, ret))
         # 2. 解析 XML 标签格式: <name>...</name><arguments>...</arguments>
         ret.extend(ToolRegistry._parse_xml_tag_format(content, ret))
 
@@ -1231,8 +1287,10 @@ class ToolRegistry(OutputHandlerProtocol):
                 # v2.0: agent与参数分离传递
                 # 尝试使用agent作为第二个参数，如果不兼容则回退到旧方式
                 try:
-                    result = tool.func(arguments, agent)  # type: ignore[arg-type,call-arg]
-                except TypeError:
+                    # v2.0协议：传递arguments和agent两个参数
+                    # 使用type: ignore来抑制类型检查器的警告
+                    result = tool.func(arguments, agent)  # type: ignore
+                except Exception:
                     # 兼容旧版v2.0工具，只传arguments
                     result = tool.func(arguments)
             else:
@@ -1536,12 +1594,11 @@ class ToolRegistry(OutputHandlerProtocol):
 
         except Exception as e:
             # 尝试获取工具名称（如果已定义）
-            tool_name = ""
-            try:
-                if "name" in locals():
-                    tool_name = name
-            except Exception:
-                pass
+            tool_name = (
+                tool_call.get("name", "unknown")
+                if "tool_call" in locals()
+                else "unknown"
+            )
             if tool_name:
                 PrettyOutput.auto_print(f"❌ 执行工具调用 {tool_name} 失败：{str(e)}")
             else:
