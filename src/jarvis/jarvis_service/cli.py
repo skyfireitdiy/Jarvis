@@ -699,12 +699,13 @@ def run_command(
 def start_service_command(
     mode: str = typer.Argument(
         ...,
-        help="要启动的服务模式：master 或 child",
+        help="要启动的服务模式：master或child",
     ),
 ) -> None:
     """启动systemd管理的Jarvis服务。
 
-    根据指定的模式启动对应的systemd服务（jarvis-master.service或jarvis-child.service）。
+    根据指定的模式启动对应的systemd服务（jarvis-master.service或jarvis-child.service），
+    并自动启用（enable）该服务，同时禁用（disable）另一个模式的服务。
     """
     mode_lower = mode.lower()
     if mode_lower not in ["master", "child"]:
@@ -725,23 +726,40 @@ def start_service_command(
     except Exception as e:
         PrettyOutput.auto_print(f"⚠ daemon-reload失败: {e}")
 
-    if _run_systemctl_action("start", mode_lower):
-        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已启动")
-    else:
+    # 启动服务
+    if not _run_systemctl_action("start", mode_lower):
         PrettyOutput.auto_print(f"💡 请手动执行: systemctl --user start {service_name}")
         raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"✅ {mode_lower} 服务已启动")
+
+    # 启用当前服务
+    PrettyOutput.auto_print(f"🔧 正在启用 {mode_lower} 服务...")
+    if _run_systemctl_enable_disable("enable", mode_lower):
+        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已启用（开机自启）")
+    else:
+        PrettyOutput.auto_print(f"⚠ 启用{mode_lower}服务失败，但服务仍在运行")
+
+    # 禁用另一个模式的服务
+    other_mode = "child" if mode_lower == "master" else "master"
+    PrettyOutput.auto_print(f"🔧 正在禁用 {other_mode} 服务...")
+    if _run_systemctl_enable_disable("disable", other_mode):
+        PrettyOutput.auto_print(f"✅ {other_mode} 服务已禁用")
+    else:
+        PrettyOutput.auto_print(f"⚠ 禁用{other_mode}服务失败")
 
 
 @app.command(name="stop")
 def stop_service_command(
     mode: str = typer.Argument(
         ...,
-        help="要停止的服务模式：master 或 child",
+        help="要停止的服务模式：master或child",
     ),
 ) -> None:
     """停止systemd管理的Jarvis服务。
 
-    根据指定的模式停止对应的systemd服务（jarvis-master.service或jarvis-child.service）。
+    根据指定的模式停止对应的systemd服务（jarvis-master.service或jarvis-child.service），
+    并自动禁用（disable）该服务。
     """
     mode_lower = mode.lower()
     if mode_lower not in ["master", "child"]:
@@ -751,23 +769,32 @@ def stop_service_command(
     service_name = _get_service_name(mode_lower)
     PrettyOutput.auto_print(f"🛑 正在停止 {mode_lower} 服务: {service_name}")
 
-    if _run_systemctl_action("stop", mode_lower):
-        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已停止")
-    else:
+    # 停止服务
+    if not _run_systemctl_action("stop", mode_lower):
         PrettyOutput.auto_print(f"💡 请手动执行: systemctl --user stop {service_name}")
         raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"✅ {mode_lower} 服务已停止")
+
+    # 禁用服务
+    PrettyOutput.auto_print(f"🔧 正在禁用 {mode_lower} 服务...")
+    if _run_systemctl_enable_disable("disable", mode_lower):
+        PrettyOutput.auto_print(f"✅ {mode_lower} 服务已禁用")
+    else:
+        PrettyOutput.auto_print(f"⚠ 禁用{mode_lower}服务失败，但服务已停止")
 
 
 @app.command(name="switch")
 def switch_service_command(
     target_mode: str = typer.Argument(
         ...,
-        help="要切换到的目标模式：master 或 child",
+        help="要切换到的目标模式：master或child",
     ),
 ) -> None:
     """切换Jarvis服务的运行模式。
 
     先停止当前运行的服务，然后启动目标模式的服务。确保不会同时运行master和child。
+    切换时会自动启用（enable）目标服务并禁用（disable）另一个服务。
     """
     target_mode_lower = target_mode.lower()
     if target_mode_lower not in ["master", "child"]:
@@ -784,7 +811,7 @@ def switch_service_command(
     if (target_mode_lower == "master" and master_running) or (
         target_mode_lower == "child" and child_running
     ):
-        PrettyOutput.auto_print(f"ℹ️ 无需切换，{target_mode_lower} 服务已在运行")
+        PrettyOutput.auto_print(f"ℹ️ 当前已经是 {target_mode_lower} 模式")
         return
 
     # 停止当前运行的服务
@@ -809,13 +836,28 @@ def switch_service_command(
         f"🚀 正在启动 {target_mode_lower} 服务: {target_service_name}"
     )
 
-    if _run_systemctl_action("start", target_mode_lower):
-        PrettyOutput.auto_print(f"✅ 已切换到 {target_mode_lower} 模式")
-    else:
+    if not _run_systemctl_action("start", target_mode_lower):
         PrettyOutput.auto_print(
             f"⚠ 启动失败，请手动执行: systemctl --user start {target_service_name}"
         )
         raise typer.Exit(code=1)
+
+    PrettyOutput.auto_print(f"✅ 已切换到 {target_mode_lower} 模式")
+
+    # 启用目标服务并禁用另一个服务
+    PrettyOutput.auto_print(f"🔧 正在启用 {target_mode_lower} 服务...")
+    if _run_systemctl_enable_disable("enable", target_mode_lower):
+        PrettyOutput.auto_print(f"✅ {target_mode_lower} 服务已启用")
+    else:
+        PrettyOutput.auto_print(f"⚠ 启用{target_mode_lower}服务失败")
+
+    # 禁用另一个模式的服务
+    other_mode = "child" if target_mode_lower == "master" else "master"
+    PrettyOutput.auto_print(f"🔧 正在禁用 {other_mode} 服务...")
+    if _run_systemctl_enable_disable("disable", other_mode):
+        PrettyOutput.auto_print(f"✅ {other_mode} 服务已禁用")
+    else:
+        PrettyOutput.auto_print(f"⚠ 禁用{other_mode}服务失败")
 
 
 def _get_service_name(node_mode: Optional[str]) -> str:
@@ -866,6 +908,36 @@ def _run_systemctl_action(action: str, node_mode: Optional[str]) -> bool:
                     f"⚠ {action} {service_name}失败: {result.stderr.strip()}"
                 )
                 return False
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠ 执行systemctl {action} {service_name}异常: {e}")
+        return False
+
+
+def _run_systemctl_enable_disable(action: str, node_mode: Optional[str]) -> bool:
+    """执行systemctl enable/disable命令。
+
+    Args:
+        action: systemctl动作（"enable"或"disable"）
+        node_mode: 节点模式（"master"或"child"）
+
+    Returns:
+        True表示成功，False表示失败
+    """
+    service_name = _get_service_name(node_mode)
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", action, service_name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return True
+        else:
+            PrettyOutput.auto_print(
+                f"⚠ {action} {service_name}失败: {result.stderr.strip()}"
+            )
+            return False
     except Exception as e:
         PrettyOutput.auto_print(f"⚠ 执行systemctl {action} {service_name}异常: {e}")
         return False
