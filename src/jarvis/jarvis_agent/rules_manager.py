@@ -1,6 +1,7 @@
 """CodeAgent 规则管理模块"""
 
 import os
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -1251,7 +1252,6 @@ class RulesManager:
 
             if not valid_rules_str or valid_rules_str.lower() == "none":
                 return []
-                return []
 
             # 解析规则名称
             valid_rule_names = []
@@ -1261,14 +1261,13 @@ class RulesManager:
                 if rule_name in rule_names:
                     valid_rule_names.append(rule_name)
                 else:
-                    PrettyOutput.auto_print(
-                        f"⚠️  模型返回的规则名称不在原始列表中: {rule_name}"
-                    )
+                    PrettyOutput.auto_print(f"⚠️  规则 '{rule_name}' 不在候选列表中")
 
             return valid_rule_names if valid_rule_names else rule_names
 
         except Exception as e:
-            PrettyOutput.auto_print(f"⚠️  规则内容过滤失败: {e}，使用原始规则列表")
+            PrettyOutput.auto_print(f"⚠️  过滤规则失败：{e}")
+            return rule_names  # 发生异常时返回原始规则列表
 
     def match_rules_to_task(self, task_description: str) -> List[str]:
         """
@@ -1346,6 +1345,74 @@ class RulesManager:
         PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
         return []
 
+    def _generate_search_keywords(self, query: str) -> List[str]:
+        """使用LLM根据任务描述生成精准的搜索关键词
+
+        参数:
+            query: 任务描述字符串
+
+        返回:
+            List[str]: 生成的3-5个搜索关键词列表，如果LLM不可用则返回空列表
+        """
+        try:
+            # 构造生成关键词的prompt
+            prompt = f"""请根据以下任务描述，生成3-5个精准的英文搜索关键词，用于在技能库中搜索相关技能。
+
+<task_description>
+{query}
+</task_description>
+
+要求：
+1. 关键词应该是英文单词或短语
+2. 关键词应该能准确反映任务的核心需求
+3. 避免过于宽泛的词（如'tool', 'helper'）
+4. 优先使用技术术语和具体功能描述
+5. 按照相关性从高到低排序
+6. 只返回关键词列表，每行一个，不要有其他任何输出
+
+示例格式：
+python file processing
+automation script
+data parsing
+
+关键词："""
+
+            # 调用LLM生成关键词（使用cheap模型以降低成本）
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = registry.get_cheap_platform()
+            if model is None:
+                PrettyOutput.auto_print("⚠️ cheap模型不可用，无法生成搜索关键词")
+                return []
+
+            # 关闭输出抑制，允许模型输出分析过程
+            model.set_suppress_output(False)
+            response = model.chat_until_success(prompt).strip()
+            model.set_suppress_output(True)
+
+            # 解析响应，提取关键词
+            keywords = []
+            for line in response.split("\n"):
+                line = line.strip()
+                if line and not line.startswith("关键词"):
+                    # 清理可能的编号或标记
+                    cleaned = re.sub(r"^[\d\.\-\*]+\s*", "", line)
+                    if cleaned:
+                        keywords.append(cleaned)
+
+            # 限制最多5个关键词
+            result = keywords[:5]
+
+            if result:
+                PrettyOutput.auto_print(f"✅ LLM生成了 {len(result)} 个搜索关键词")
+            else:
+                PrettyOutput.auto_print("⚠️ LLM未能生成有效的关键词")
+
+            return result
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 生成搜索关键词失败：{str(e)}")
+            return []
+
     def _search_remote_skills(self, query: str) -> List[Any]:
         """搜索远程技能市场"""
         try:
@@ -1353,21 +1420,32 @@ class RulesManager:
                 SkillSearchEngine,
             )
 
-            PrettyOutput.auto_print(f"🔍 正在搜索远程技能库，关键词: {query[:50]}...")
+            # 步骤1: 使用LLM生成精准的搜索关键词
+            search_keywords = self._generate_search_keywords(query)
+            if not search_keywords:
+                PrettyOutput.auto_print("⚠️ LLM生成关键词失败，无法进行搜索")
+                return []
+
+            PrettyOutput.auto_print(
+                f"🔍 根据任务描述生成搜索关键词：{', '.join(search_keywords)}"
+            )
+
+            # 步骤2: 使用生成的关键词进行搜索
             engine = SkillSearchEngine(
                 min_relevance=0.5, min_quality=5.0, max_results=10
             )
             PrettyOutput.auto_print(
-                f"🔍 搜索源: {len(engine.sources)} 个 (SkillHub, GitHub)"
+                f"🔍 搜索源：{len(engine.sources)} 个 (SkillHub, GitHub)"
             )
-            results = engine.search(query)
-            PrettyOutput.auto_print(f"🔍 搜索完成，原始结果: {len(results)} 个技能")
+            # 使用第一个（最相关）的关键词进行搜索
+            results = engine.search(search_keywords[0])
+            PrettyOutput.auto_print(f"🔍 搜索完成，原始结果：{len(results)} 个技能")
 
             # 显示搜索到的技能概览
             if results:
                 for i, r in enumerate(results[:5], 1):
                     PrettyOutput.auto_print(
-                        f"   {i}. {r.name} (相关度: {r.relevance_score:.2f}, 质量: {r.quality_score:.1f})"
+                        f"   {i}. {r.name} (相关度：{r.relevance_score:.2f}, 质量：{r.quality_score:.1f})"
                     )
 
             # 过滤：只保留高相关度 (>0.7) 且高质量 (>7.0) 的技能
@@ -1375,12 +1453,12 @@ class RulesManager:
                 r for r in results if r.relevance_score > 0.7 and r.quality_score > 7.0
             ]
             PrettyOutput.auto_print(
-                f"🔍 过滤后保留: {len(filtered)} 个技能 (阈值: 相关度>0.7, 质量>7.0)"
+                f"🔍 过滤后保留：{len(filtered)} 个技能 (阈值：相关度>0.7, 质量>7.0)"
             )
 
             return filtered
         except Exception as e:
-            PrettyOutput.auto_print(f"⚠️  远程搜索失败：{e}")
+            PrettyOutput.auto_print(f"⚠️ 搜索远程技能失败：{str(e)}")
             return []
 
     def _evaluate_remote_skills_with_llm(
