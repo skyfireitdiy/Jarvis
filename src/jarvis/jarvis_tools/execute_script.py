@@ -26,6 +26,7 @@ from typing import Union
 
 from jarvis.jarvis_utils.globals import clear_script_pid
 from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_script_pid
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -830,10 +831,49 @@ class ScriptTool:
         timeout = get_timeout() if callable(get_timeout) else None
         timed_out = False
         try:
+            # 使用轮询方式检查中断，而不是直接调用 wait
+            start_time = time.time()
             if timeout is None:
-                proc.wait()
+                while proc.poll() is None:
+                    # 检查是否收到中断信号
+                    if get_interrupt() > 0:
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            proc.kill()
+                            proc.wait()
+                        clear_script_pid()
+                        set_interrupt(False)
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "执行被用户中断。",
+                        }
+                    time.sleep(0.1)
             else:
-                proc.wait(timeout=timeout)
+                while proc.poll() is None:
+                    # 检查是否超时
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise subprocess.TimeoutExpired(argv, timeout)
+                    # 检查是否收到中断信号
+                    if get_interrupt() > 0:
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            proc.kill()
+                            proc.wait()
+                        clear_script_pid()
+                        set_interrupt(False)
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "执行被用户中断。",
+                        }
+                    time.sleep(0.1)
+            # 进程已结束，获取输出（已经在reader线程中捕获）
         except subprocess.TimeoutExpired:
             timed_out = True
             stop_event.set()
