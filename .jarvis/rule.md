@@ -1,9 +1,11 @@
 # 项目综述
 
+> 最后更新：2025-12-21 | 变更摘要：更新版本号至3.1.9，补充代码统计数据，完善技术栈细节
+
 ## 项目概述
 
 **项目名称**: Jarvis AI Assistant  
-**版本**: 3.1.2  
+**版本**: 3.1.9  
 **定位**: 本地运行、开箱即用、可深度定制的 AI 开发助手平台  
 **目标用户**: 个人开发者、工程团队、专项场景用户
 
@@ -20,7 +22,7 @@
 
 ### 编程语言
 
-- **Python**: 3.12 (严格要求)
+- **Python**: 3.12 (严格要求，pyproject.toml中指定 `requires-python = "==3.12.*"`)
 
 ### 核心框架
 
@@ -28,15 +30,31 @@
 - **Uvicorn**: 0.33.0 (ASGI 服务器)
 - **OpenAI SDK**: 1.78.1 (AI 模型调用)
 - **Anthropic SDK**: >=0.40.0 (Claude 模型支持)
+- **Requests**: 2.32.3 (HTTP 客户端)
+- **PyYAML**: >=5.3.1 (YAML解析)
+- **Jinja2**: >=3.0.0 (模板引擎)
+- **Typer**: (CLI框架)
+- **Websockets**: (WebSocket支持)
+- **HTTPX**: (异步HTTP客户端)
+- **AIOHTTP**: >=3.9.0 (异步HTTP)
 
 ### 关键依赖
 
-- **代码解析**: tree-sitter 系列 (支持 JS/TS/Rust/Go/Java/C/C++/Python/HTML/CSS/SQL/YAML/Markdown 等)
-- **终端UI**: prompt_toolkit, pygments, rich, pyte
-- **Web抓取**: playwright, beautifulsoup4, lxml, markdownify
-- **文本处理**: tiktoken, jieba, fuzzywuzzy, python-Levenshtein
-- **代码检查**: ruff, bandit, python-lsp-server
+- **代码解析**: tree-sitter 0.25.2 系列 (支持 JS/TS/Rust/Go/Java/C/C++/Python/HTML/CSS/SQL/YAML/Markdown/Bash 等15+语言)
+- **终端UI**: prompt_toolkit 3.0.50, pygments 2.19.2, rich 14.2.0, pyte 0.8.2
+- **Web抓取**: playwright 1.48.0, beautifulsoup4, lxml 6.0.0, markdownify
+- **文本处理**: tiktoken 0.7.0, jieba, fuzzywuzzy 0.18.0, python-Levenshtein 0.25.1
+- **代码检查**: ruff, bandit, python-lsp-server>=1.14.0
 - **测试**: pytest, pytest-xdist, pytest-asyncio
+- **其他工具**: colorama 0.4.6, packaging>=24.2, jsonnet>=0.20.0, ddgr, mkdocs-material
+
+## 代码统计
+
+| 语言   | 文件数 | 代码行数 |
+| ------ | ------ | -------- |
+| Python | 311    | 130,400  |
+
+> 注：统计范围 src/ 目录下的Python文件
 
 ## 目录结构
 
@@ -91,10 +109,12 @@ Jarvis/
 │   └── symbol_cache/             # 符号缓存
 ├── docs/                         # 文档
 ├── frontend/                     # 前端代码
-├── pyproject.toml                # 项目配置
+├── pyproject.toml                # 项目配置（版本3.1.9，Python 3.12严格约束）
 ├── setup.py                      # 安装脚本
 ├── Dockerfile                    # Docker镜像
-└── docker-compose.yml            # Docker编排
+├── docker-compose.yml            # Docker编排
+├── start.sh                      # 启动脚本
+└── README.md                     # 项目说明
 ```
 
 ## 核心模块
@@ -417,8 +437,15 @@ tests/
 
 支持多种模型:
 
-- OpenAI: gpt-4, gpt-4-turbo, gpt-3.5-turbo
-- Anthropic: claude-3-opus, claude-3-sonnet, claude-3-haiku
+- **OpenAI**: gpt-4, gpt-4-turbo, gpt-3.5-turbo (通过 openai==1.78.1)
+- **Anthropic**: claude-3-opus, claude-3-sonnet, claude-3-haiku (通过 anthropic>=0.40.0)
+- **环境变量**: `JARVIS_MODEL` 指定默认模型（默认gpt-4）
+
+### 可选依赖
+
+- **browser**: playwright==1.48.0 (浏览器自动化)
+- **clang16/17/18/19/20/21**: Clang编译器支持 (C→Rust迁移)
+- **tree-sitter-***: 各语言解析器独立安装选项
 
 ## 架构特点
 
