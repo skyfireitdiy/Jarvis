@@ -956,6 +956,56 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _parse_special_marker_format(content: str) -> list:
+        """解析特殊标记格式: <|tool_call_begin|>functions.tool_name:index<|tool_call_argument_begin|>JSON<|tool_call_end|>"""
+        ret: list = []
+        # 匹配 <|tool_call_begin|>functions.{tool_name}:{index}<|tool_call_argument_begin|>
+        pattern = r"<\|tool_call_begin\|>functions\.([a-zA-Z_][a-zA-Z0-9_]*):\d+<\|tool_call_argument_begin\|>"
+        matches = re.finditer(pattern, content)
+
+        for match in matches:
+            tool_name = match.group(1)  # 提取实际工具名
+            json_start = match.end()
+
+            # 查找 <|tool_call_end|> 标记来确定JSON结束位置
+            end_marker = "<|tool_call_end|>"
+            end_pos = content.find(end_marker, json_start)
+            if end_pos == -1:
+                # 如果没有结束标记，尝试从当前位置提取JSON
+                if json_start < len(content) and content[json_start] == "{":
+                    json_str, _ = extract_json_from_text(content, json_start)
+                    if json_str:
+                        try:
+                            arguments = json_loads(json_str)
+                            tool_call = {"name": tool_name, "arguments": arguments}
+                            ret.append(tool_call)
+                        except Exception:
+                            continue
+            else:
+                # 有结束标记，提取标记之间的内容
+                json_content = content[json_start:end_pos].strip()
+                if json_content.startswith("{"):
+                    try:
+                        arguments = json_loads(json_content)
+                        tool_call = {"name": tool_name, "arguments": arguments}
+                        ret.append(tool_call)
+                    except Exception:
+                        # JSON解析失败，尝试使用extract_json_from_text
+                        if json_start < len(content) and content[json_start] == "{":
+                            json_str, _ = extract_json_from_text(content, json_start)
+                            if json_str:
+                                try:
+                                    arguments = json_loads(json_str)
+                                    tool_call = {
+                                        "name": tool_name,
+                                        "arguments": arguments,
+                                    }
+                                    ret.append(tool_call)
+                                except Exception:
+                                    continue
+        return ret
+
+    @staticmethod
     def _parse_xml_tag_format(content: str, existing: list) -> list:
         """解析 XML 标签格式: <name>...</name><arguments>...</arguments>"""
         ret: list = []
@@ -1133,6 +1183,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 1. 解析 <tool_call>工具名称 参数JSON 格式
         ret.extend(ToolRegistry._parse_tool_call_format(content))
+
+        # 1.5. 解析特殊标记格式: <|tool_call_begin|>functions.tool_name:index<|tool_call_argument_begin|>
+        ret.extend(ToolRegistry._parse_special_marker_format(content))
 
         # 2.5. 解析 [TOOL_CALL]标记+<arg_key>/<arg_value>标签格式
         ret.extend(ToolRegistry._parse_arg_key_value_format(content, ret))
