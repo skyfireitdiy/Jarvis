@@ -1,0 +1,13 @@
+{
+  "id": "20260608_161317_059723",
+  "type": "project_long_term",
+  "tags": [
+    "agent_network",
+    "rules",
+    "architecture",
+    "self_evolving"
+  ],
+  "content": "自进化Agent网络规则体系已创建完成，包含7个规则文件：\n1. self_evolving_network.md（主规则）- 指导整体网络架构\n2. intelligent_scheduling.md - 智能调度规则\n3. knowledge_management.md - 知识管理规则\n4. network_monitoring.md - 网络监控规则\n5. fault_recovery.md - 故障恢复规则\n6. self_evolution.md - 自进化规则\n7. agent_execution.md - Agent执行规则\n\n所有规则文件位于：/home/skyfire/code/Jarvis/builtin/rules/agent_network/\n\n架构设计核心要点：\n- 对等性：所有Agent都是对等的网络节点，没有永久中心控制点\n- 智能调度：调度Agent是临时角色，可以根据节点架构灵活规划Agent部署\n- 知识库为中心：所有Agent围绕知识库进行协作\n- 自进化能力：网络能够根据运行情况自动优化、学习和进化\n- 故障恢复：具备网络自我诊断和恢复能力",
+  "created_at": "2026-06-08T16:13:17.059762",
+  "updated_at": "2026-06-08T16:13:17.059769"
+}
