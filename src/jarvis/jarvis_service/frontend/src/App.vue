@@ -8384,8 +8384,34 @@ onUnmounted(() => {
   }
 })
 
+// 播放提示音
+function playNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+
+    oscillator.frequency.value = 800
+    oscillator.type = 'sine'
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.3)
+  } catch (e) {
+    console.log('[Notification] 无法播放提示音:', e)
+  }
+}
+
 // 发送系统通知
-function sendSystemNotification(message: string) {
+function sendSystemNotification(message) {
+  // 播放提示音
+  playNotificationSound()
+
   // 检查浏览器是否支持 Notification API
   if (!('Notification' in window)) {
     console.log('[Notification] 浏览器不支持系统通知')
