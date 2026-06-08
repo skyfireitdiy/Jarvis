@@ -6107,6 +6107,20 @@ function handleMessage(message, agentId = null) {
           }
         })
       }
+
+      // Agent结束时发送系统通知
+      if (['stopped', 'finished'].includes(payload.execution_status)) {
+        const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
+        const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
+        sendSystemNotification(`${agentName} 已退出`)
+      }
+
+      // 从运行状态切换到输入状态时发送系统通知
+      if (['waiting', 'waiting_confirm', 'waiting_multi'].includes(payload.execution_status)) {
+        const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
+        const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
+        sendSystemNotification(`${agentName} 等待输入`)
+      }
     }
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
@@ -8369,6 +8383,34 @@ onUnmounted(() => {
     console.log('[app] Diagram MutationObserver disconnected')
   }
 })
+
+// 发送系统通知
+function sendSystemNotification(message: string) {
+  // 检查浏览器是否支持 Notification API
+  if (!('Notification' in window)) {
+    console.log('[Notification] 浏览器不支持系统通知')
+    return
+  }
+
+  // 如果已经获得权限，直接发送通知
+  if (Notification.permission === 'granted') {
+    new Notification('Jarvis', {
+      body: message,
+      icon: '/icons/jarvis-logo.png'
+    })
+  }
+  // 如果还没有拒绝，请求权限
+  else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        new Notification('Jarvis', {
+          body: message,
+          icon: '/icons/jarvis-logo.png'
+        })
+      }
+    })
+  }
+}
 </script>
 
 <style>
