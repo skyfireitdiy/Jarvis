@@ -1868,6 +1868,14 @@ WantedBy=default.target
     PrettyOutput.auto_print(f"✅ systemd 服务文件已创建: {service_file_path}")
     PrettyOutput.auto_print(f"💡 请使用 'jarvis-service start {mode_display}' 启动服务")
 
+    # 仅在非 Windows 系统上显示 systemctl 命令提示
+    if sys.platform != "win32":
+        PrettyOutput.auto_print("📋 服务管理命令:")
+        PrettyOutput.auto_print("  systemctl --user daemon-reload")
+        PrettyOutput.auto_print(f"  systemctl --user enable {service_name}")
+        PrettyOutput.auto_print(f"  systemctl --user start {service_name}")
+        PrettyOutput.auto_print(f"  systemctl --user status {service_name}")
+
     # 启用 linger 模式，使服务在用户注销后继续运行
     try:
         import getpass
