@@ -804,17 +804,6 @@ git reset --hard {start_commit}
                 else:
                     diff_lines = ""
                 if diff_lines:
-                    lines_added = sum(
-                        1
-                        for line in diff_lines
-                        if line.startswith("+") and not line.startswith("+++")
-                    )
-                    lines_removed = sum(
-                        1
-                        for line in diff_lines
-                        if line.startswith("-") and not line.startswith("---")
-                    )
-                    total_lines = lines_added + lines_removed
                     assert (
                         self.start_commit is not None and latest_commit_hash is not None
                     )
@@ -823,7 +812,26 @@ git reset --hard {start_commit}
                     commits = get_commits_between(
                         backup_start_commit, latest_commit_hash
                     )
-                    if total_lines > 1000:
+
+                    # 计算从上次备份点到当前的增量变更（用于备份判断）
+                    diff_lines_since_backup = get_diff_between_commits(
+                        backup_start_commit, latest_commit_hash
+                    )
+                    lines_added_since_backup = sum(
+                        1
+                        for line in diff_lines_since_backup
+                        if line.startswith("+") and not line.startswith("+++")
+                    )
+                    lines_removed_since_backup = sum(
+                        1
+                        for line in diff_lines_since_backup
+                        if line.startswith("-") and not line.startswith("---")
+                    )
+                    incremental_lines = (
+                        lines_added_since_backup + lines_removed_since_backup
+                    )
+
+                    if incremental_lines > 1000:
                         # 在压缩前创建备份分支
                         try:
                             # 生成备份分支名（格式：backup/YYYY-MM-DD_HH-MM-SS）
