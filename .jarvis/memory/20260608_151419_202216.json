@@ -1,0 +1,13 @@
+{
+  "id": "20260608_151419_202216",
+  "type": "project_long_term",
+  "tags": [
+    "gateway_manager",
+    "bug_fix",
+    "codeagent",
+    "worktree_conflict"
+  ],
+  "content": "## gateway_manager 工具 codeagent 创建失败修复\n\n### 问题现象\n创建 codeagent 类型 Agent 时报错 `'list' object has no attribute 'get'`，但创建 agent 类型正常。\n\n### 根本原因\n`_check_worktree_conflict` 方法（第 894-956 行）假设 `agents_data[\"data\"]` 是字典，但网关 API `GET /api/agents` 返回的 `data` 字段是列表格式：`{\"success\": true, \"data\": [agent1, agent2, ...]}`。\n\n### 修复方案\n在 `_check_worktree_conflict` 方法中添加类型检查：\n```python\ndata_field = agents_data.get(\"data\", {})\nif isinstance(data_field, list):\n    agents_list = data_field\nelif isinstance(data_field, dict):\n    agents_list = data_field.get(\"agents\", [])\nelse:\n    agents_list = []\n```\n\n### 关键文件\n- `src/jarvis/jarvis_tools/gateway_manager.py`\n- `_check_worktree_conflict` 方法（第 894-956 行）\n- `_create_agent` 方法（第 769-892 行）\n\n### 经验教训\n1. 网关 API 返回格式可能不一致，需要做防御性编程\n2. `codeagent` 类型会触发 worktree 冲突检查，`agent` 类型不会\n3. 修改时需要同时检查调用链中的所有相关方法",
+  "created_at": "2026-06-08T15:14:19.202247",
+  "updated_at": "2026-06-08T15:14:19.202252"
+}
