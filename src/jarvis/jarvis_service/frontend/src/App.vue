@@ -8384,28 +8384,41 @@ onUnmounted(() => {
   }
 })
 
-// 播放提示音
+// 播放单次提示音
+function playSingleBeep(audioContext, startTime) {
+  const oscillator = audioContext.createOscillator()
+  const gainNode = audioContext.createGain()
+
+  oscillator.connect(gainNode)
+  gainNode.connect(audioContext.destination)
+
+  oscillator.frequency.value = 800
+  oscillator.type = 'sine'
+
+  gainNode.gain.setValueAtTime(0.3, startTime)
+  gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2)
+
+  oscillator.start(startTime)
+  oscillator.stop(startTime + 0.2)
+}
+
+// 播放提示音（连续三次）
 function playNotificationSound() {
   try {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
+    const now = audioContext.currentTime
 
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
-
-    oscillator.frequency.value = 800
-    oscillator.type = 'sine'
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-    oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.3)
+    // 连续播放三次提示音，每次间隔0.25秒
+    playSingleBeep(audioContext, now)
+    playSingleBeep(audioContext, now + 0.25)
+    playSingleBeep(audioContext, now + 0.5)
   } catch (e) {
     console.log('[Notification] 无法播放提示音:', e)
   }
 }
+
+// 通知权限状态
+let notificationPermissionRequested = false
 
 // 发送系统通知
 function sendSystemNotification(message) {
@@ -8425,8 +8438,9 @@ function sendSystemNotification(message) {
       icon: '/icons/jarvis-logo.png'
     })
   }
-  // 如果还没有拒绝，请求权限
-  else if (Notification.permission !== 'denied') {
+  // 如果还没有拒绝且尚未请求过权限，请求权限
+  else if (Notification.permission !== 'denied' && !notificationPermissionRequested) {
+    notificationPermissionRequested = true
     Notification.requestPermission().then(permission => {
       if (permission === 'granted') {
         new Notification('Jarvis', {
