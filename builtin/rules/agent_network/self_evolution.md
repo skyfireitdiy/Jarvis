@@ -6,6 +6,27 @@ license: MIT
 
 # 自进化规则
 
+## 核心概念澄清
+
+**Agent（智能体）**：
+
+- 独立的智能实体，有自己的工作目录、模型、任务
+- 使用 `gateway_manager` 工具的 `create_agent` 操作创建
+- agent_type 必须是 `'agent'` 或 `'codeagent'`
+- 示例：知识库Agent、监控Agent、调度Agent
+
+**Tool（工具）**：
+
+- 供Agent调用的功能模块
+- 使用 `meta_agent` 工具创建（不在此规则范围内）
+- 示例：memory工具、execute_script工具、read_code工具
+
+**常见错误警示**：
+
+- ❌ 混淆Agent和工具的概念
+- ❌ 使用错误的agent_type（如'knowledge'、'monitor'等）
+- ❌ 尝试用工具创建方式创建Agent
+
 ## 核心原则
 
 **完成用户任务是第1位的。** 自进化的所有机制——分布式学习、能力进化、网络进化——都必须服务于更好地完成用户任务。当进化行为与用户任务完成产生冲突时，必须优先保障用户任务的完成。
