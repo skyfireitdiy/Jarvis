@@ -1,0 +1,13 @@
+{
+  "id": "20260608_172548_094184",
+  "type": "project_long_term",
+  "tags": [
+    "bug修复",
+    "规则加载",
+    "auto_select_rule",
+    "状态同步"
+  ],
+  "content": "## 规则加载状态不同步问题修复\n\n**问题**: auto_select_rule 工具加载的规则在 /rules 端点显示为未加载\n\n**根本原因**: auto_select_rule 使用 get_named_rule() 只读取内容，未调用 load_rule() 更新状态。/rules 端点依赖 rules_manager.loaded_rules 集合判断加载状态。\n\n**修复方案**: 将 auto_select_rule.py 第79-83行的 get_named_rule() 改为 load_rule()，确保规则状态被记录到 loaded_rules 集合。\n\n**修复文件**: /home/wangmaobin/Jarvis/src/jarvis/jarvis_tools/auto_select_rule.py\n\n**关键知识点**:\n1. RulesManager 有两个获取规则方法：\n   - get_named_rule(): 只读取内容，不更新状态\n   - load_rule(): 读取内容并更新 loaded_rules 集合和 _loaded_rules 缓存\n2. /rules 端点通过 get_all_rules_with_status() 检查 loaded_rules 集合判断加载状态\n3. 工具如需让规则显示为已加载，必须调用 load_rule()\n\n**完整分析报告**: /home/wangmaobin/auto_work/rule_loading_analysis.md",
+  "created_at": "2026-06-08T17:25:48.094238",
+  "updated_at": "2026-06-08T17:25:48.094243"
+}

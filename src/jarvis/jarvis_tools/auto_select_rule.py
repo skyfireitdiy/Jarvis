@@ -78,9 +78,13 @@ class AutoSelectRuleTool:
 
             rule_contents = []
             for rule_name in selected_rules:
-                rule_content = rules_manager.get_named_rule(rule_name)
-                if rule_content:
-                    rule_contents.append({"name": rule_name, "content": rule_content})
+                # 使用 load_rule() 方法来加载规则，这会更新 loaded_rules 状态
+                success = rules_manager.load_rule(rule_name)
+                if success:
+                    # 从缓存中获取已加载的规则内容
+                    rule_content = rules_manager._loaded_rules.get(rule_name)
+                    if rule_content:
+                        rule_contents.append({"name": rule_name, "content": rule_content})
 
             output_lines = [f"已为任务选择 {len(rule_contents)} 个规则：", ""]
             for rule_info in rule_contents:
