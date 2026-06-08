@@ -5,6 +5,7 @@
 支持相对/绝对/循环定时，定时器为全局实例，会话保存/恢复时需持久化。
 """
 
+import json
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -439,12 +440,14 @@ class TimerTool:
                 if time_type == "interval"
                 else None,
             )
-            return {
-                "success": True,
-                "stdout": f"定时任务已添加 (ID: {task.task_id})",
-                "stderr": "",
+            result_data = {
                 "task_id": task.task_id,
                 "next_fire_time": task.next_fire_time,
+            }
+            return {
+                "success": True,
+                "stdout": json.dumps(result_data, ensure_ascii=False, indent=2),
+                "stderr": "",
             }
         except ValueError as e:
             return {"success": False, "stdout": "", "stderr": str(e)}
@@ -468,21 +471,22 @@ class TimerTool:
         if not tasks:
             return {
                 "success": True,
-                "stdout": "当前没有定时任务",
+                "stdout": json.dumps(
+                    {"tasks": [], "message": "当前没有定时任务"},
+                    ensure_ascii=False,
+                    indent=2,
+                ),
                 "stderr": "",
-                "tasks": [],
             }
-        lines = ["当前定时任务:"]
-        for t in tasks:
-            lines.append(
-                f"  ID: {t['task_id']} | 类型: {t['task_type']} | 时间类型: {t['time_type']} | 状态: {t['status']}"
-            )
-            if t.get("tool_name"):
-                lines.append(f"    工具: {t['tool_name']}")
-            if t.get("prompt_text"):
-                lines.append(f"    提示: {t['prompt_text']}")
-            lines.append(f"    下次触发: {t.get('next_fire_time', 'N/A')}")
-        return {"success": True, "message": "\n".join(lines), "tasks": tasks}
+        result_data = {
+            "tasks": tasks,
+            "total": len(tasks),
+        }
+        return {
+            "success": True,
+            "stdout": json.dumps(result_data, ensure_ascii=False, indent=2),
+            "stderr": "",
+        }
 
     def _handle_clear(self) -> Dict[str, Any]:
         """处理清除所有定时任务"""
