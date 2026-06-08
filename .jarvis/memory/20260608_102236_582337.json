@@ -1,0 +1,12 @@
+{
+  "id": "20260608_102236_582337",
+  "type": "project_long_term",
+  "tags": [
+    "网络调试",
+    "代理配置",
+    "websockets库限制"
+  ],
+  "content": "Jarvis节点间通信代理问题解决方案：\n\n**问题**：websockets 16.0库使用urllib.request.proxy_bypass()判断是否需要绕过代理，但该函数不支持CIDR格式的no_proxy配置（如10.0.0.0/8），导致内部IP地址被错误路由到企业代理服务器。\n\n**解决方案**：在src/jarvis/jarvis_web_gateway/node_manager.py中实现_get_proxy_for_url()方法，智能判断URL是否需要使用代理：\n1. 使用ipaddress.is_private检测私有IP地址段（10.x.x.x, 172.16-31.x.x, 192.168.x.x），自动绕过代理\n2. 手动解析no_proxy环境变量，支持CIDR格式匹配\n3. 支持传统域名后缀匹配（如.example.com）\n4. 对于公网地址，保留使用http_proxy环境变量配置的代理\n\n**关键代码位置**：node_manager.py第1514-1582行\n**依赖库**：ipaddress（标准库）, urllib.parse.urlparse\n\n**优势**：相比硬编码proxy=None，该方案既解决了内网连接问题，又保留了外网连接时使用代理的能力，具有更好的环境适应性。",
+  "created_at": "2026-06-08T10:22:36.582364",
+  "updated_at": "2026-06-08T10:22:36.582369"
+}
