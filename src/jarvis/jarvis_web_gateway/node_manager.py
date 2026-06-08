@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import os
@@ -12,6 +13,7 @@ import random
 import shutil
 import uuid
 from typing import Any, AsyncGenerator, Dict, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -1509,20 +1511,75 @@ class ChildNodeClient:
             logger.info("[NODE] reconnect to master in %.2f seconds", reconnect_delay)
             await asyncio.sleep(reconnect_delay)
 
+    def _get_proxy_for_url(self, ws_url: str) -> Optional[str]:
+        """
+        智能判断URL是否需要使用代理。
+        
+        规则：
+        1. 如果目标地址是内网IP（10.x.x.x, 172.16-31.x.x, 192.168.x.x），返回None（不使用代理）
+        2. 如果目标地址在no_proxy列表中（支持CIDR格式），返回None
+        3. 否则返回http_proxy环境变量的值（可能为None）
+        """
+        # 解析URL获取主机名和端口
+        parsed = urlparse(ws_url)
+        hostname = parsed.hostname
+        if not hostname:
+            return os.environ.get("http_proxy")
+        
+        # 尝试将主机名解析为IP地址
+        try:
+            ip_addr = ipaddress.ip_address(hostname)
+        except ValueError:
+            # 如果是域名，尝试DNS解析
+            import socket
+            try:
+                ip_str = socket.gethostbyname(hostname)
+                ip_addr = ipaddress.ip_address(ip_str)
+            except (socket.gaierror, OSError):
+                # DNS解析失败，回退到环境变量
+                return os.environ.get("http_proxy")
+        
+        # 检查是否是私有IP地址（内网）
+        if ip_addr.is_private:
+            logger.debug("[PROXY] %s is private IP, bypassing proxy", hostname)
+            return None
+        
+        # 检查no_proxy环境变量（手动解析以支持CIDR格式）
+        no_proxy = os.environ.get("no_proxy", "")
+        if no_proxy:
+            for entry in no_proxy.split(","):
+                entry = entry.strip()
+                if not entry:
+                    continue
+                # 处理CIDR格式（如10.0.0.0/8）
+                if "/" in entry:
+                    try:
+                        network = ipaddress.ip_network(entry, strict=False)
+                        if ip_addr in network:
+                            logger.debug("[PROXY] %s matches CIDR %s in no_proxy, bypassing proxy", hostname, entry)
+                            return None
+                    except ValueError:
+                        continue
+                # 处理普通IP或域名匹配
+                elif entry.startswith("."):
+                    # 域名后缀匹配（如.example.com）
+                    if hostname.endswith(entry):
+                        logger.debug("[PROXY] %s matches domain suffix %s in no_proxy, bypassing proxy", hostname, entry)
+                        return None
+                elif entry == hostname or entry == "*":
+                    logger.debug("[PROXY] %s matches %s in no_proxy, bypassing proxy", hostname, entry)
+                    return None
+        
+        # 默认返回http_proxy配置
+        proxy_url = os.environ.get("http_proxy")
+        if proxy_url:
+            logger.debug("[PROXY] Using proxy %s for %s", proxy_url, hostname)
+        return proxy_url
+
     async def _connect_once(self, ws_url: str) -> None:
         config = self._node_runtime.config
-        # 从环境变量读取代理配置并规范化格式
-        proxy_env = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
-        proxy_url: Optional[str] = None
-        if proxy_env:
-            proxy_env = proxy_env.strip()
-            # 规范化代理 URL：如果缺少协议前缀，添加 http://
-            if proxy_env and not proxy_env.startswith(
-                ("http://", "https://", "socks://", "socks5://")
-            ):
-                proxy_url = f"http://{proxy_env}"
-            else:
-                proxy_url = proxy_env
+        # 智能判断是否需要使用代理：检查目标地址是否属于内网或no_proxy列表
+        proxy_url = self._get_proxy_for_url(ws_url)
         self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=proxy_url)
         await self._ws.send(
             json.dumps(
