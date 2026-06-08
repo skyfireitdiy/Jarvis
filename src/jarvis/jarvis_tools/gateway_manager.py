@@ -925,10 +925,31 @@ class GatewayManagerTool:
             return None
 
         agents_data = agents_result["data"]
+        # 修复：处理列表类型的响应
+        if isinstance(agents_data, list):
+            if len(agents_data) == 0:
+                return None
+            elif len(agents_data) == 1:
+                agents_data = agents_data[0]
+            else:
+                # 多个结果，取第一个并记录警告
+                import logging
+                logging.warning(f"Gateway returned list with {len(agents_data)} items in worktree check, using first one")
+                agents_data = agents_data[0]
+        
         if not agents_data.get("success"):
             return None
 
-        agents_list = agents_data.get("data", {}).get("agents", [])
+        # 修复：正确处理 data 字段是列表的情况
+        data_field = agents_data.get("data", {})
+        if isinstance(data_field, list):
+            # data 是列表，直接作为 agents_list
+            agents_list = data_field
+        elif isinstance(data_field, dict):
+            # data 是字典，从 agents 键获取列表
+            agents_list = data_field.get("agents", [])
+        else:
+            agents_list = []
         for agent in agents_list:
             # 已停止的 agent 不冲突
             if agent.get("status") in ("stopped", "completed", "failed", "abandoned"):
