@@ -149,3 +149,56 @@ class TestToolRegistry:
         result = registry.execute_tool("failing_tool", {})
         assert result["success"] is False
         assert "stderr" in result
+
+    def test_parse_special_marker_format_with_end_marker(self):
+        """测试解析特殊标记格式（带结束标记）"""
+        content = """<|tool_calls_section_begin|>
+<|tool_call_begin|>functions.read_code:0<|tool_call_argument_begin|>
+{"files": [{"path": "test.py"}]}
+<|tool_call_end|>
+"""
+        result = ToolRegistry._parse_special_marker_format(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"] == {"files": [{"path": "test.py"}]}
+
+    def test_parse_special_marker_format_without_end_marker(self):
+        """测试解析特殊标记格式（无结束标记）"""
+        content = '<|tool_call_begin|>functions.execute_script:1<|tool_call_argument_begin|>{"script_content": "echo hello"}'
+        result = ToolRegistry._parse_special_marker_format(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "execute_script"
+        assert result[0]["arguments"] == {"script_content": "echo hello"}
+
+    def test_parse_special_marker_format_multiple_calls(self):
+        """测试解析多个工具调用"""
+        content = """<|tool_call_begin|>functions.read_code:0<|tool_call_argument_begin|>
+{"files": [{"path": "a.py"}]}
+<|tool_call_end|>
+<|tool_call_begin|>functions.edit_file:1<|tool_call_argument_begin|>
+{"files": [{"file_path": "b.py"}]}
+<|tool_call_end|>
+"""
+        result = ToolRegistry._parse_special_marker_format(content)
+        assert len(result) == 2
+        assert result[0]["name"] == "read_code"
+        assert result[1]["name"] == "edit_file"
+
+    def test_parse_special_marker_format_invalid_json(self):
+        """测试解析无效JSON的情况"""
+        content = """<|tool_call_begin|>functions.test_tool:0<|tool_call_argument_begin|>
+{invalid json}
+<|tool_call_end|>
+"""
+        result = ToolRegistry._parse_special_marker_format(content)
+        # 无效JSON应该被跳过，返回空列表
+        assert len(result) == 0
+
+    def test_extract_tool_calls_with_special_marker(self):
+        """测试_extract_tool_calls能正确解析特殊标记格式"""
+        content = '<|tool_call_begin|>functions.read_code:0<|tool_call_argument_begin|>{"files": [{"path": "test.py"}]}<|tool_call_end|>'
+        result, error, auto_completed = ToolRegistry._extract_tool_calls(content)
+        assert error == ""
+        # 单个工具调用时，返回的是 {name, arguments} 字典
+        assert result["name"] == "read_code"
+        assert result["arguments"] == {"files": [{"path": "test.py"}]}
