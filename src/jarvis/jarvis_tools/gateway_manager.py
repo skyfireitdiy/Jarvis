@@ -853,6 +853,22 @@ class GatewayManagerTool:
 
         if result["success"]:
             gateway_data = result["data"]
+            # 修复：处理列表类型的响应
+            if isinstance(gateway_data, list):
+                if len(gateway_data) == 0:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "Gateway returned empty list",
+                    }
+                elif len(gateway_data) == 1:
+                    gateway_data = gateway_data[0]
+                else:
+                    # 多个结果，取第一个并记录警告
+                    import logging
+                    logging.warning(f"Gateway returned list with {len(gateway_data)} items, using first one")
+                    gateway_data = gateway_data[0]
+            
             if not gateway_data.get("success"):
                 error_info = gateway_data.get("error", {})
                 error_msg = (
