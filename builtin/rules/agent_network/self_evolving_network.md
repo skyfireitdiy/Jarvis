@@ -36,13 +36,15 @@ license: MIT
   "name": "gateway_manager",
   "arguments": {
     "action": "create_agent",
-    "agent_type": "agent",
+    "agent_type": "codeagent",
     "agent_name": "knowledge_base_agent",
     "working_dir": "/path/to/knowledge/work",
-    "task": "管理知识库，存储和检索Agent网络的经验和最佳实践"
+    "no_interaction_mode": false
   }
 }
 ```
+
+**注意**：知识库Agent必须是 `codeagent` 类型，且 `no_interaction_mode` 必须为 `false`（常驻运行，不能无人值守）。
 
 ### 创建监控Agent
 
