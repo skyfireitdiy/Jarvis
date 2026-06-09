@@ -1330,6 +1330,40 @@ def cli(
 
                 return get_tools_info()
 
+            @custom_app.post("/sessions/save")
+            async def save_session():
+                """保存当前会话并返回文件路径。"""
+                try:
+                    from jarvis.jarvis_utils.globals import (
+                        global_agents,
+                        running_agent_stack,
+                    )
+
+                    # 获取根agent（running_agent_stack中第一个，即最早启动的agent）
+                    if not running_agent_stack:
+                        return {"success": False, "error": "No active agent"}
+
+                    root_agent_name = running_agent_stack[0]
+                    agent = global_agents.get(root_agent_name)
+
+                    if agent is None:
+                        return {"success": False, "error": "No active agent"}
+
+                    # 调用 session_manager 的 save_session 方法
+                    result = agent.session.save_session()
+                    if result:
+                        # 获取保存的会话文件路径
+                        session_file = agent.session.last_restored_session or ""
+                        return {
+                            "success": True,
+                            "session_file": session_file,
+                            "message": "Session saved successfully",
+                        }
+                    else:
+                        return {"success": False, "error": "Failed to save session"}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+
             @custom_app.post("/update_token")
             async def update_token(request: Request):
                 """更新 Agent 的认证 Token。
