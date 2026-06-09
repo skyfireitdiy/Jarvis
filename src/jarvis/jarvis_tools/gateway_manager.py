@@ -217,7 +217,7 @@ class GatewayManagerTool:
     def execute(
         self,
         action: str,
-        agent_id: Optional[str] = None,
+        agent_id: Optional[Union[str, list]] = None,
         message: str = "",
         node_id: Optional[str] = None,
         path: str = "",
@@ -366,7 +366,22 @@ class GatewayManagerTool:
             elif action == "send_group_message":
                 return self._send_group_message(group_id=group_id, message=message)
             elif action == "regenerate_agent":
-                return self._regenerate_agent(agent_id=agent_id, node_id=node_id)
+                # 支持批量重生
+                if isinstance(agent_id, list):
+                    results = []
+                    for single_id in agent_id:
+                        result = self._regenerate_agent(agent_id=single_id, node_id=node_id)
+                        results.append({"agent_id": single_id, **result})
+                    
+                    # 判断整体是否成功
+                    all_success = all(r.get("success", False) for r in results)
+                    return {
+                        "success": all_success,
+                        "stdout": json.dumps(results, ensure_ascii=False, indent=2),
+                        "stderr": "" if all_success else "Some agents failed to regenerate",
+                    }
+                else:
+                    return self._regenerate_agent(agent_id=agent_id, node_id=node_id)
             else:
                 return {
                     "success": False,
@@ -1453,23 +1468,56 @@ class GatewayManagerTool:
         }
 
     def _delete_agent(
-        self, agent_id: Optional[str] = None, node_id: Optional[str] = None
+        self, agent_id: Optional[Union[str, list]] = None, node_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """删除指定的 Agent。
+        """删除指定的 Agent（支持批量删除）。
 
         通过 Web Gateway 的 DELETE /api/agents/{agent_id} 接口删除 Agent，
         支持跨节点删除（通过 node_id 参数指定目标节点）。
+        支持传入单个 agent_id 字符串或 agent_id 字符串列表进行批量删除。
 
         参数:
-            agent_id: 要删除的 Agent ID（必填）
+            agent_id: 要删除的 Agent ID（必填），支持单个字符串或字符串列表
             node_id: 目标节点 ID，默认为空（表示本节点）
 
         返回:
             Dict[str, Any]: 删除结果
+                - 单个 agent_id 时返回单个删除结果
+                - 列表 agent_id 时返回包含 results 列表的结果
         """
         if not agent_id:
             return {"success": False, "stdout": "", "stderr": "agent_id is required"}
 
+        # 处理批量删除
+        if isinstance(agent_id, list):
+            results = []
+            for single_id in agent_id:
+                result = self._delete_single_agent(single_id, node_id)
+                results.append({"agent_id": single_id, **result})
+            
+            # 判断整体是否成功
+            all_success = all(r.get("success", False) for r in results)
+            return {
+                "success": all_success,
+                "stdout": json.dumps(results, ensure_ascii=False, indent=2),
+                "stderr": "" if all_success else "Some agents failed to delete",
+            }
+        else:
+            # 单个删除
+            return self._delete_single_agent(agent_id, node_id)
+
+    def _delete_single_agent(
+        self, agent_id: str, node_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """删除单个 Agent（内部方法）。
+
+        参数:
+            agent_id: 要删除的 Agent ID
+            node_id: 目标节点 ID
+
+        返回:
+            Dict[str, Any]: 删除结果
+        """
         # 解析节点 ID
         try:
             resolved_node_id = self._resolve_node_id(agent_id, node_id)
