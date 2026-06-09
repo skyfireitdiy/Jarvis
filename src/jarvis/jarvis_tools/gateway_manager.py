@@ -2009,7 +2009,7 @@ class GatewayManagerTool:
         try:
             save_data = save_result["data"]
             if not save_data.get("success"):
-                error_info = save_data.get("error", {})
+                error_info = save_data.get("error", "unknown error")
                 error_msg = (
                     error_info.get("message", "unknown error")
                     if isinstance(error_info, dict)
@@ -2020,7 +2020,7 @@ class GatewayManagerTool:
                     "stdout": "",
                     "stderr": f"Failed to save session: {error_msg}",
                 }
-            session_file = save_data.get("data", {}).get("session_file")
+            session_file = save_data.get("session_file")
             if not session_file:
                 return {
                     "success": False,
