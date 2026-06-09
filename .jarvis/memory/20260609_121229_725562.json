@@ -1,0 +1,8 @@
+{
+  "id": "20260609_121229_725562",
+  "type": "project_long_term",
+  "tags": ["bug修复", "客户端-服务端协同", "FastAPI", "请求体解析"],
+  "content": "修复 join_group/leave_group 'Expecting value' bug 的经验：\n\n1. **问题根因**：客户端发送 POST 请求时未传递请求体，导致服务端解析 JSON 失败\n2. **修复模式**：\n   - 客户端：确保传递必要的请求参数（如 agent_id）\n   - 服务端：使用 try/except 包裹 request.json() 调用，优雅处理空 body 或无效 JSON\n3. **关键代码位置**：\n   - 客户端：gateway_manager.py 的 _join_group/_leave_group 方法\n   - 服务端：app.py 的 join_group/leave_group 函数\n4. **错误处理最佳实践**：\n   - 返回明确的错误码（如 INVALID_PARAMS）而非通用 INTERNAL_ERROR\n   - 提供清晰的错误消息帮助调试\n5. **全局变量访问**：通过 jglobals.agent_id 获取当前 Agent ID",
+  "created_at": "2026-06-09T12:12:29.725597",
+  "updated_at": "2026-06-09T12:12:29.725603"
+}

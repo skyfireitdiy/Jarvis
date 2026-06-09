@@ -1,0 +1,8 @@
+{
+  "id": "20260609_121229_727196",
+  "type": "project_long_term",
+  "tags": ["Gateway API", "群组功能", "API设计"],
+  "content": "Gateway 群组 API 设计规范：\n\n1. **API 端点**：\n   - POST /api/groups/{group_id}/join：加入群组\n   - POST /api/groups/{group_id}/leave：退出群组\n2. **请求格式**：\n   - 必须传递 JSON body：{\"agent_id\": \"string\"}\n   - agent_id 为必填参数\n3. **响应格式**：\n   - 成功：{\"success\": true}\n   - 失败：{\"success\": false, \"error\": {\"code\": \"string\", \"message\": \"string\"}}\n4. **错误码**：\n   - NOT_FOUND：群组不存在\n   - INVALID_PARAMS：参数无效（包括空 body、缺少 agent_id）\n   - INTERNAL_ERROR：内部错误\n5. **实现要点**：\n   - 服务端必须验证请求体格式\n   - 客户端必须传递所有必要参数",
+  "created_at": "2026-06-09T12:12:29.727226",
+  "updated_at": "2026-06-09T12:12:29.727232"
+}

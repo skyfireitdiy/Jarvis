@@ -1807,38 +1807,60 @@ class GatewayManagerTool:
     def _join_group(self, group_id: Optional[str] = None) -> Dict[str, Any]:
         """加入群组。
 
-        参数:
-            group_id: 群组 ID
+               参数:
 
-        返回:
-            Dict[str, Any]: 执行结果
+        group_id: 群组 ID
+
+               返回:
+                   Dict[str, Any]: 执行结果
         """
         if not group_id:
             return {"success": False, "stdout": "", "stderr": "group_id is required"}
 
+        # 获取当前 agent_id
+        agent_id = jglobals.agent_id
+        if not agent_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "agent_id is not available",
+            }
+
         result = self._request_gateway(
             method="POST",
             path=f"/api/groups/{group_id}/join",
+            json_data={"agent_id": agent_id},
             error_prefix=f"Failed to join group {group_id}",
         )
 
         return self._handle_gateway_response(result)
 
     def _leave_group(self, group_id: Optional[str] = None) -> Dict[str, Any]:
-        """退出群组。
+        """退出群
+        组。
 
-        参数:
-            group_id: 群组 ID
+                参数:
+                    group_id: 群组 ID
 
-        返回:
-            Dict[str, Any]: 执行结果
+                返回:
+                    Dict[str, Any]: 执行结果
         """
         if not group_id:
             return {"success": False, "stdout": "", "stderr": "group_id is required"}
 
+        # 获取当前 agent_id
+        agent_id = jglobals.agent_id
+        if not agent_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "agent_id is not available",
+            }
+
         result = self._request_gateway(
             method="POST",
             path=f"/api/groups/{group_id}/leave",
+            json_data={"agent_id": agent_id},
             error_prefix=f"Failed to leave group {group_id}",
         )
 
