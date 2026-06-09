@@ -72,9 +72,10 @@ class GatewayManagerTool:
 18. **join_group**: 加入群组
 19. **leave_group**: 退出群组
 20. **send_group_message**: 发送群组消息
+21. **regenerate_agent**: 无损重生指定 Agent
 
 **重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message）
+- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent）
 - 参数根据操作类型而有所不同"""
 
     parameters = {
@@ -103,8 +104,9 @@ class GatewayManagerTool:
                     "join_group",
                     "leave_group",
                     "send_group_message",
+                    "regenerate_agent",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）、regenerate_agent（无损重生指定 Agent）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -112,7 +114,7 @@ class GatewayManagerTool:
                     {"type": "string"},
                     {"type": "array", "items": {"type": "string"}},
                 ],
-                "description": "目标 Agent 的 ID（send_to_agent 操作必填；delete_agent 操作必填）。支持单个 ID 字符串或 ID 数组。",
+                "description": "目标 Agent 的 ID（send_to_agent 操作必填；delete_agent 操作必填；regenerate_agent 操作必填）。支持单个 ID 字符串或 ID 数组。",
             },
             "message": {
                 "type": "string",
@@ -121,7 +123,7 @@ class GatewayManagerTool:
             # list_model_groups / create_agent / list_directory 操作的参数
             "node_id": {
                 "type": "string",
-                "description": "目标节点 ID（send_to_agent 操作可选，未指定时自动查询 Agent 所在节点；list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点；delete_agent 操作可选，默认为本节点）",
+                "description": "目标节点 ID（send_to_agent 操作可选，未指定时自动查询 Agent 所在节点；list_model_groups 操作可选，默认为 master；create_agent 操作可选，默认为本节点；list_directory 操作可选，默认为本节点；delete_agent 操作可选，默认为本节点；regenerate_agent 操作可选，默认为本节点）",
             },
             # list_directory 操作的参数
             "path": {
@@ -361,6 +363,8 @@ class GatewayManagerTool:
                 return self._leave_group(group_id=group_id)
             elif action == "send_group_message":
                 return self._send_group_message(group_id=group_id, message=message)
+            elif action == "regenerate_agent":
+                return self._regenerate_agent(agent_id=agent_id, node_id=node_id)
             else:
                 return {
                     "success": False,
@@ -628,6 +632,49 @@ class GatewayManagerTool:
             "stdout": stdout_str,
             "stderr": "" if all_success else "Some messages failed to send",
         }
+
+    def _resolve_node_id(self, agent_id: str, node_id: Optional[str] = None) -> str:
+        """解析 Agent 所在的节点 ID。
+
+        如果未指定 node_id，则从 Agent 列表中查询。
+
+        参数:
+            agent_id: Agent ID
+            node_id: 目标节点 ID（可选）
+
+        返回:
+            str: 节点 ID
+
+        异常:
+            ValueError: 如果无法解析节点 ID
+        """
+        if node_id:
+            return node_id
+
+        # 获取 Agent 列表
+        list_result = self._list_agents()
+        if not list_result["success"]:
+            raise ValueError(
+                f"Failed to list agents: {list_result.get('stderr', 'unknown error')}"
+            )
+
+        # 解析 Agent 列表
+        try:
+            agents_data = json.loads(list_result["stdout"])
+            agents = agents_data.get("agents", [])
+        except (json.JSONDecodeError, KeyError):
+            raise ValueError("Failed to parse agents list")
+
+        # 查找目标 Agent
+        for agent in agents:
+            if agent.get("agent_id") == agent_id:
+                resolved_node_id = agent.get("node_id")
+                if resolved_node_id:
+                    return resolved_node_id
+                else:
+                    raise ValueError(f"Agent {agent_id} has no node_id information")
+
+        raise ValueError(f"Agent {agent_id} not found")
 
     def _list_agents(self) -> Dict[str, Any]:
         """获取所有 Agent 列表。
@@ -1417,14 +1464,20 @@ class GatewayManagerTool:
         if not agent_id:
             return {"success": False, "stdout": "", "stderr": "agent_id is required"}
 
+        # 解析节点 ID
+        try:
+            resolved_node_id = self._resolve_node_id(agent_id, node_id)
+        except ValueError as e:
+            return {"success": False, "stdout": "", "stderr": str(e)}
+
         err = self._get_master_url("delete agent")
         if err:
             return err
 
         # 构建 query 参数
         query_params: Dict[str, str] = {}
-        if node_id:
-            query_params["node_id"] = node_id
+        if resolved_node_id:
+            query_params["node_id"] = resolved_node_id
 
         result = self._request_gateway(
             method="DELETE",
@@ -1844,3 +1897,162 @@ class GatewayManagerTool:
             }
         else:
             return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _regenerate_agent(
+        self, agent_id: Optional[str] = None, node_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """无损重生指定 Agent。
+
+        通过以下步骤实现 Agent 的无损重生：
+        1. 获取 Agent 完整配置信息（名称、工作目录、类型、模型组等）
+        2. 调用 Agent 的 /sessions/save 端点保存会话
+        3. 删除 Agent
+        4. 使用相同参数重建 Agent，补充 restore_session=session_file
+        5. 返回新 Agent 信息
+
+        参数:
+            agent_id: 要重生的 Agent ID（必填）
+            node_id: 目标节点 ID，默认为空（表示本节点）
+
+        返回:
+            Dict[str, Any]: 重生结果
+        """
+        if not agent_id:
+            return {"success": False, "stdout": "", "stderr": "agent_id is required"}
+
+        err = self._get_master_url("regenerate agent")
+        if err:
+            return err
+
+        # 1. 获取 Agent 列表，找到目标 Agent 的配置信息
+        list_result = self._list_agents()
+        if not list_result["success"]:
+            return list_result
+
+        # 解析 Agent 列表
+        try:
+            agents_data = json.loads(list_result["stdout"])
+            agents = agents_data.get("agents", [])
+        except (json.JSONDecodeError, KeyError):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Failed to parse agents list",
+            }
+
+        # 查找目标 Agent
+        target_agent = None
+        for agent in agents:
+            if agent.get("agent_id") == agent_id:
+                target_agent = agent
+                break
+
+        if not target_agent:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Agent {agent_id} not found",
+            }
+
+        # 解析节点 ID
+        try:
+            resolved_node_id = self._resolve_node_id(agent_id, node_id)
+        except ValueError as e:
+            return {"success": False, "stdout": "", "stderr": str(e)}
+
+        # 2. 保存 Agent 的会话
+        # 构建保存会话的请求
+        save_session_path = f"/api/agents/{agent_id}/sessions/save"
+        # 构建 query 参数
+        query_params: Dict[str, str] = {}
+        if resolved_node_id:
+            query_params["node_id"] = resolved_node_id
+        save_result = self._request_gateway(
+            method="POST",
+            path=save_session_path,
+            params=query_params if query_params else None,
+            error_prefix=f"Failed to save session for agent {agent_id}",
+        )
+
+        if not save_result["success"]:
+            return save_result
+
+        # 解析保存结果，获取会话文件路径
+        try:
+            save_data = save_result["data"]
+            if not save_data.get("success"):
+                error_info = save_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Failed to save session: {error_msg}",
+                }
+            session_file = save_data.get("data", {}).get("session_file")
+            if not session_file:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "Session saved but no session file path returned",
+                }
+        except (KeyError, TypeError):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Failed to parse session save response",
+            }
+
+        # 3. 删除 Agent
+        delete_result = self._delete_agent(agent_id=agent_id, node_id=resolved_node_id)
+        if not delete_result["success"]:
+            return delete_result
+
+        # 4. 使用相同参数重建 Agent，补充 restore_session 参数
+        # 从目标 Agent 配置中提取参数
+        create_params = {
+            "agent_type": target_agent.get("agent_type"),
+            "working_dir": target_agent.get("working_dir"),
+            "name": target_agent.get("name"),
+            "llm_group": target_agent.get("llm_group"),
+            "tool_group": target_agent.get("tool_group"),
+            "config_file": target_agent.get("config_file"),
+            "task": target_agent.get("task"),
+            "additional_args": target_agent.get("additional_args"),
+            "worktree": target_agent.get("worktree", False),
+            "quick_mode": target_agent.get("quick_mode", False),
+            "restore_session": session_file,
+            "no_interaction_mode": target_agent.get("no_interaction_mode", False),
+            "node_id": resolved_node_id,
+        }
+
+        # 创建新 Agent
+        create_result = self._create_agent(**create_params)
+        if not create_result["success"]:
+            return create_result
+
+        # 5. 返回新 Agent 信息
+        try:
+            new_agent_data = json.loads(create_result["stdout"])
+            return {
+                "success": True,
+                "stdout": json.dumps(
+                    {
+                        "message": f"Agent {agent_id} regenerated successfully",
+                        "session_file": session_file,
+                        "new_agent": new_agent_data,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "stderr": "",
+            }
+        except json.JSONDecodeError:
+            return {
+                "success": True,
+                "stdout": create_result["stdout"],
+                "stderr": "",
+            }
