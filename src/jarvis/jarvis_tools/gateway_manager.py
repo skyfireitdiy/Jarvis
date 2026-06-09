@@ -4,7 +4,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import httpx
 
@@ -172,8 +172,8 @@ class GatewayManagerTool:
                 "description": "是否启用快速模式（create_agent 操作可选，默认为 false）",
             },
             "restore_session": {
-                "type": "string",
-                "description": "恢复会话的文件路径（create_agent 操作可选，默认为 null，不恢复会话）",
+                "anyOf": [{"type": "boolean"}, {"type": "string"}],
+                "description": "恢复会话参数（create_agent 操作可选，默认为 null，不恢复会话）。布尔值 true 表示交互式选择会话文件；字符串表示指定的会话文件路径",
             },
             "no_interaction_mode": {
                 "type": "boolean",
@@ -232,7 +232,7 @@ class GatewayManagerTool:
         worktree: bool = False,
         quick_mode: bool = False,
         restore: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         timer_id: Optional[str] = None,
         schedule: Optional[Dict[str, Any]] = None,
@@ -828,7 +828,7 @@ class GatewayManagerTool:
         worktree: bool = False,
         quick_mode: bool = False,
         restore: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -1045,7 +1045,7 @@ class GatewayManagerTool:
         worktree: bool = False,
         quick_mode: bool = False,
         restore: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
     ) -> Dict[str, Any]:

@@ -2733,6 +2733,16 @@ def create_app(
             worktree = bool(request.get("worktree", False))
             quick_mode = bool(request.get("quick_mode", False))
             restore_session = request.get("restore_session")
+            # 确保 restore_session 是布尔值或字符串
+            if isinstance(restore_session, str):
+                # 如果是字符串，保持原样（指定文件路径）
+                pass
+            elif restore_session:
+                # 如果是真值（如 True），转换为布尔值
+                restore_session = True
+            else:
+                # 如果是假值（如 False, None），转换为 False
+                restore_session = False
             no_interaction_mode = bool(request.get("no_interaction_mode", False))
             proxy_node = request.get("proxy_node")
             target_node_id = str(request.get("node_id") or "").strip()

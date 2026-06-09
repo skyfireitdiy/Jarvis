@@ -19,6 +19,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.utils import _is_process_alive
@@ -41,7 +42,7 @@ class AgentInfo:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
     ) -> None:
@@ -132,7 +133,7 @@ class AgentManager:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -523,7 +524,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]],
         worktree: bool = False,
         quick_mode: bool = False,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
         agent_id: Optional[str] = None,
