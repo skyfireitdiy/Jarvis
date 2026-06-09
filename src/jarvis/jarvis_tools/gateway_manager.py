@@ -1990,6 +1990,7 @@ class GatewayManagerTool:
 
         # 2. 保存 Agent 的会话
         # 构建保存会话的请求
+        session_file = None  # 默认无会话文件
         save_session_path = f"/api/agent/{agent_id}/sessions/save"
         # 构建 query 参数
         query_params: Dict[str, str] = {}
@@ -2002,37 +2003,19 @@ class GatewayManagerTool:
             error_prefix=f"Failed to save session for agent {agent_id}",
         )
 
-        if not save_result["success"]:
-            return save_result
-
         # 解析保存结果，获取会话文件路径
-        try:
-            save_data = save_result["data"]
-            if not save_data.get("success"):
-                error_info = save_data.get("error", "unknown error")
-                error_msg = (
-                    error_info.get("message", "unknown error")
-                    if isinstance(error_info, dict)
-                    else str(error_info)
-                )
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"Failed to save session: {error_msg}",
-                }
-            session_file = save_data.get("session_file")
-            if not session_file:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "Session saved but no session file path returned",
-                }
-        except (KeyError, TypeError):
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Failed to parse session save response",
-            }
+        # 保存失败不阻断重生流程，仅跳过会话恢复
+        if save_result.get("success"):
+            try:
+                save_data = save_result["data"]
+                if save_data.get("success"):
+                    session_file = save_data.get("session_file")
+            except (KeyError, TypeError):
+                pass
+
+        if not session_file:
+            # 没有可恢复的会话，仍继续重生（不恢复会话）
+            pass
 
         # 3. 删除 Agent
         delete_result = self._delete_agent(agent_id=agent_id, node_id=resolved_node_id)
@@ -2052,8 +2035,8 @@ class GatewayManagerTool:
             "additional_args": target_agent.get("additional_args"),
             "worktree": target_agent.get("worktree", False),
             "quick_mode": target_agent.get("quick_mode", False),
-            "restore": True,
-            "restore_session": session_file,
+            "restore": bool(session_file),
+            "restore_session": session_file if session_file else None,
             "no_interaction_mode": target_agent.get("no_interaction_mode", False),
             "node_id": resolved_node_id,
         }
