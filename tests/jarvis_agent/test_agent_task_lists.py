@@ -364,7 +364,7 @@ class TestAgentTaskLists:
                                 self.agent.session, "_restore_task_lists"
                             ) as mock_restore_task_lists:
                                 # 执行restore_session
-                                result = self.agent.restore_session()
+                                result = self.agent.restore_session(True)
 
                                 # 验证restore_session返回True
                                 assert result is True
