@@ -41,7 +41,7 @@ class AgentInfo:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
     ) -> None:
@@ -132,7 +132,7 @@ class AgentManager:
         worktree: bool = False,
         node_id: str = "master",
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -523,7 +523,7 @@ class AgentManager:
         additional_args: Optional[Dict[str, Any]],
         worktree: bool = False,
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
         agent_id: Optional[str] = None,
@@ -573,7 +573,7 @@ class AgentManager:
 
         # 添加恢复会话参数
         if restore_session:
-            cmd.append("-r")
+            cmd.extend(["-r", restore_session])
 
         # 添加非交互模式参数
         if no_interaction_mode:

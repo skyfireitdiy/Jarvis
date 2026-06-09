@@ -427,7 +427,7 @@ class NodeConnectionManager:
                 worktree=bool(payload.get("worktree", False)),
                 node_id=self._node_runtime.local_node_id,
                 quick_mode=bool(payload.get("quick_mode", False)),
-                restore_session=bool(payload.get("restore_session", False)),
+                restore_session=payload.get("restore_session"),
                 no_interaction_mode=bool(payload.get("no_interaction_mode", False)),
                 proxy_node=payload.get("proxy_node"),
             )
@@ -1514,7 +1514,7 @@ class ChildNodeClient:
     def _get_proxy_for_url(self, ws_url: str) -> Optional[str]:
         """
         智能判断URL是否需要使用代理。
-        
+
         规则：
         1. 如果目标地址是内网IP（10.x.x.x, 172.16-31.x.x, 192.168.x.x），返回None（不使用代理）
         2. 如果目标地址在no_proxy列表中（支持CIDR格式），返回None
@@ -1525,25 +1525,26 @@ class ChildNodeClient:
         hostname = parsed.hostname
         if not hostname:
             return os.environ.get("http_proxy")
-        
+
         # 尝试将主机名解析为IP地址
         try:
             ip_addr = ipaddress.ip_address(hostname)
         except ValueError:
             # 如果是域名，尝试DNS解析
             import socket
+
             try:
                 ip_str = socket.gethostbyname(hostname)
                 ip_addr = ipaddress.ip_address(ip_str)
             except (socket.gaierror, OSError):
                 # DNS解析失败，回退到环境变量
                 return os.environ.get("http_proxy")
-        
+
         # 检查是否是私有IP地址（内网）
         if ip_addr.is_private:
             logger.debug("[PROXY] %s is private IP, bypassing proxy", hostname)
             return None
-        
+
         # 检查no_proxy环境变量（手动解析以支持CIDR格式）
         no_proxy = os.environ.get("no_proxy", "")
         if no_proxy:
@@ -1556,7 +1557,11 @@ class ChildNodeClient:
                     try:
                         network = ipaddress.ip_network(entry, strict=False)
                         if ip_addr in network:
-                            logger.debug("[PROXY] %s matches CIDR %s in no_proxy, bypassing proxy", hostname, entry)
+                            logger.debug(
+                                "[PROXY] %s matches CIDR %s in no_proxy, bypassing proxy",
+                                hostname,
+                                entry,
+                            )
                             return None
                     except ValueError:
                         continue
@@ -1564,12 +1569,20 @@ class ChildNodeClient:
                 elif entry.startswith("."):
                     # 域名后缀匹配（如.example.com）
                     if hostname.endswith(entry):
-                        logger.debug("[PROXY] %s matches domain suffix %s in no_proxy, bypassing proxy", hostname, entry)
+                        logger.debug(
+                            "[PROXY] %s matches domain suffix %s in no_proxy, bypassing proxy",
+                            hostname,
+                            entry,
+                        )
                         return None
                 elif entry == hostname or entry == "*":
-                    logger.debug("[PROXY] %s matches %s in no_proxy, bypassing proxy", hostname, entry)
+                    logger.debug(
+                        "[PROXY] %s matches %s in no_proxy, bypassing proxy",
+                        hostname,
+                        entry,
+                    )
                     return None
-        
+
         # 默认返回http_proxy配置
         proxy_url = os.environ.get("http_proxy")
         if proxy_url:

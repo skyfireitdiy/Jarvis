@@ -170,8 +170,8 @@ class GatewayManagerTool:
                 "description": "是否启用快速模式（create_agent 操作可选，默认为 false）",
             },
             "restore_session": {
-                "type": "boolean",
-                "description": "是否恢复上一次会话（create_agent 操作可选，默认为 false）",
+                "type": "string",
+                "description": "恢复会话的文件路径（create_agent 操作可选，默认为 null，不恢复会话）",
             },
             "no_interaction_mode": {
                 "type": "boolean",
@@ -229,7 +229,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         timer_id: Optional[str] = None,
         schedule: Optional[Dict[str, Any]] = None,
@@ -290,7 +290,7 @@ class GatewayManagerTool:
             additional_args = args.get("additional_args")
             worktree = args.get("worktree", False)
             quick_mode = args.get("quick_mode", False)
-            restore_session = args.get("restore_session", False)
+            restore_session = args.get("restore_session")
             no_interaction_mode = args.get("no_interaction_mode", False)
             timer_id = args.get("timer_id")
             schedule = args.get("schedule")
@@ -778,7 +778,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -866,9 +866,12 @@ class GatewayManagerTool:
                 else:
                     # 多个结果，取第一个并记录警告
                     import logging
-                    logging.warning(f"Gateway returned list with {len(gateway_data)} items, using first one")
+
+                    logging.warning(
+                        f"Gateway returned list with {len(gateway_data)} items, using first one"
+                    )
                     gateway_data = gateway_data[0]
-            
+
             if not gateway_data.get("success"):
                 error_info = gateway_data.get("error", {})
                 error_msg = (
@@ -934,9 +937,12 @@ class GatewayManagerTool:
             else:
                 # 多个结果，取第一个并记录警告
                 import logging
-                logging.warning(f"Gateway returned list with {len(agents_data)} items in worktree check, using first one")
+
+                logging.warning(
+                    f"Gateway returned list with {len(agents_data)} items in worktree check, using first one"
+                )
                 agents_data = agents_data[0]
-        
+
         if not agents_data.get("success"):
             return None
 
@@ -988,7 +994,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -1014,7 +1020,7 @@ class GatewayManagerTool:
         if quick_mode:
             body["quick_mode"] = True
         if restore_session:
-            body["restore_session"] = True
+            body["restore_session"] = restore_session
         if no_interaction_mode:
             body["no_interaction_mode"] = True
         if node_id:
