@@ -45,21 +45,45 @@ license: MIT
   "name": "gateway_manager",
   "arguments": {
     "action": "create_agent",
-    "agent_type": "agent",
+    "agent_type": "codeagent",
     "agent_name": "knowledge_base_agent",
     "working_dir": "/path/to/knowledge/work",
-    "task": "管理知识库，存储和检索Agent网络的经验和最佳实践"
+    "no_interaction_mode": false
   }
 }
 ```
 
+**关键注意事项**：
+
+- `agent_type` 必须是 `codeagent`（不是 `agent`），知识库Agent需要代码能力来管理文件
+- `agent_name` 必须显式指定，否则Agent的name字段为null
+- `no_interaction_mode` 必须为 `false`（知识库Agent需常驻系统，不能设为无人值守，否则运行一轮后自动退出）
+- 不要设置 `task` 参数，交互式Agent不需要初始任务
+
 ### 知识库路径配置
 
-知识库默认存储在项目的 `.jarvis/memory/` 目录下，支持以下类型：
+知识库由知识库Agent管理，存储在项目的 `knowledge_base/` 目录下，包含以下子目录：
 
-- `project_long_term`：项目级长期记忆
-- `global_long_term`：全局长期记忆
-- `short_term`：短期记忆
+- `experiences/`：经验分享
+- `best_practices/`：最佳实践
+- `solutions/`：解决方案
+- `patterns/`：知识模式
+- `collective_wisdom/`：集体智慧
+- `index/`：索引文件
+
+**⚠️ 强制规则：新知识必须保存到知识库Agent**
+
+只要有新的知识产生（包括但不限于：Bug修复经验、最佳实践、架构决策、配置信息、解决方案等），**必须**将知识发送给知识库Agent保存。
+
+**执行方式**：
+- 使用 `gateway_manager send_to_agent` 将知识发送给知识库Agent
+- 知识库Agent会自动将知识保存到 `knowledge_base/` 目录并更新索引
+
+**原则**：
+1. 知识库Agent是自进化网络的知识管理核心，所有知识应归它管理
+2. `memory` 工具仅用于保存Agent运行上下文（如当前任务状态、临时信息），**不用于保存知识**
+3. 无需用户提醒，主动将新知识发送给知识库Agent
+4. 每次产生新知识时，在任务完成后主动发送给知识库Agent
 
 ### 知识条目格式规范
 
