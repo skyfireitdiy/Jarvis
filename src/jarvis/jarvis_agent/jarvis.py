@@ -436,6 +436,7 @@ def try_switch_to_jca_if_git_repo(
     llm_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
+    restore: bool,
     restore_session: Optional[str],
     task: Optional[str],
     keep_jvs: bool = False,
@@ -469,9 +470,9 @@ def try_switch_to_jca_if_git_repo(
                     args += ["-G", tool_group]
                 if config_file:
                     args += ["-f", config_file]
-                if restore_session is True:
-                    args += ["--restore-session"]  # 交互式选择恢复会话
-                elif restore_session:
+                if restore:
+                    args += ["--restore"]  # 交互式选择恢复会话
+                if restore_session:
                     args += ["--restore-session", restore_session]  # 指定会话文件路径
                 if task:
                     args += ["-T", task]
@@ -824,11 +825,17 @@ def run_cli(
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="自定义配置文件路径"
     ),
+    restore: bool = typer.Option(
+        False,
+        "-r",
+        "--restore",
+        help="交互式选择恢复会话",
+    ),
     restore_session: Optional[str] = typer.Option(
         None,
-        "-r",
+        "-R",
         "--restore-session",
-        help="恢复会话。不带参数时从默认路径恢复，带参数时从指定文件恢复",
+        help="从指定会话文件恢复",
     ),
     edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
     share_methodology: bool = typer.Option(
@@ -1111,6 +1118,7 @@ def run_cli(
             llm_group,
             tool_group,
             config_file,
+            restore,
             restore_session,
             task,
             keep_jvs,
