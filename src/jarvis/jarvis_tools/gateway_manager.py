@@ -231,6 +231,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
+        restore: bool = False,
         restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         timer_id: Optional[str] = None,
@@ -322,6 +323,7 @@ class GatewayManagerTool:
                     additional_args=additional_args,
                     worktree=worktree,
                     quick_mode=quick_mode,
+                    restore=restore,
                     restore_session=restore_session,
                     no_interaction_mode=no_interaction_mode,
                     node_id=node_id,
@@ -825,6 +827,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
+        restore: bool = False,
         restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
@@ -1041,6 +1044,7 @@ class GatewayManagerTool:
         additional_args: Optional[str] = None,
         worktree: bool = False,
         quick_mode: bool = False,
+        restore: bool = False,
         restore_session: Optional[str] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
@@ -1068,6 +1072,8 @@ class GatewayManagerTool:
             body["quick_mode"] = True
         if restore_session:
             body["restore_session"] = restore_session
+        if restore:
+            body["restore"] = True
         if no_interaction_mode:
             body["no_interaction_mode"] = True
         if node_id:
@@ -2024,6 +2030,7 @@ class GatewayManagerTool:
             "additional_args": target_agent.get("additional_args"),
             "worktree": target_agent.get("worktree", False),
             "quick_mode": target_agent.get("quick_mode", False),
+            "restore": True,
             "restore_session": session_file,
             "no_interaction_mode": target_agent.get("no_interaction_mode", False),
             "node_id": resolved_node_id,

@@ -1057,11 +1057,17 @@ def cli(
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
     ),
+    restore: bool = typer.Option(
+        False,
+        "-r",
+        "--restore",
+        help="交互式选择恢复会话",
+    ),
     restore_session: Optional[str] = typer.Option(
         None,
-        "-r",
+        "-R",
         "--restore-session",
-        help="恢复会话。不带参数时从默认路径恢复，带参数时从指定文件恢复",
+        help="从指定会话文件恢复",
     ),
     prefix: str = typer.Option(
         "",
@@ -1480,9 +1486,8 @@ def cli(
             set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
-        if restore_session is not None or is_auto_resume_session():
+        if restore or restore_session is not None or is_auto_resume_session():
             set_config("restore_session", True)
-            # 如果用户不带参数使用 --restore-session，保持 restore_session 为 None
             # 如果用户指定了文件路径，检查文件是否存在
             if restore_session is not None and restore_session != "":
                 if not os.path.exists(restore_session):
