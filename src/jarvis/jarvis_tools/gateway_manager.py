@@ -1990,7 +1990,7 @@ class GatewayManagerTool:
 
         # 2. 保存 Agent 的会话
         # 构建保存会话的请求
-        save_session_path = f"/api/agents/{agent_id}/sessions/save"
+        save_session_path = f"/api/agent/{agent_id}/sessions/save"
         # 构建 query 参数
         query_params: Dict[str, str] = {}
         if resolved_node_id:
