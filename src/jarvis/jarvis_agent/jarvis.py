@@ -1481,7 +1481,7 @@ def run_cli(
     try:
         agent_manager = AgentManager(
             tool_group=tool_group,
-            restore_session=restore_session,
+            restore_session=True if restore else restore_session,
             use_methodology=False if disable_methodology_analysis else None,
             use_analysis=False if disable_methodology_analysis else None,
             non_interactive=non_interactive,
