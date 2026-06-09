@@ -572,8 +572,10 @@ class AgentManager:
             cmd.append("-q")
 
         # 添加恢复会话参数
-        if restore_session:
-            cmd.extend(["-r", restore_session])
+        if restore_session is True:
+            cmd.append("-r")  # 交互式选择恢复会话
+        elif restore_session:
+            cmd.extend(["-r", restore_session])  # 指定会话文件路径
 
         # 添加非交互模式参数
         if no_interaction_mode:

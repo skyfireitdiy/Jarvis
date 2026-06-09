@@ -469,8 +469,10 @@ def try_switch_to_jca_if_git_repo(
                     args += ["-G", tool_group]
                 if config_file:
                     args += ["-f", config_file]
-                if restore_session:
-                    args += ["--restore-session"]
+                if restore_session is True:
+                    args += ["--restore-session"]  # 交互式选择恢复会话
+                elif restore_session:
+                    args += ["--restore-session", restore_session]  # 指定会话文件路径
                 if task:
                     args += ["-T", task]
                 if quick_mode:
