@@ -38,7 +38,9 @@ class SessionManager:
         self.user_data: Dict[str, Any] = {}
         self.addon_prompt: str = ""
         self.conversation_length: int = 0
-        self.last_restored_session: Optional[str] = None  # 记录最后恢复的会话文件路径
+        self.last_restored_session: Optional[str] = (
+            None  # 记录最后保存或恢复的会话文件路径
+        )
         self.current_session_name: Optional[str] = None  # 当前会话名称
         self.non_interactive: bool = False  # 是否为非交互模式
 
@@ -399,6 +401,8 @@ class SessionManager:
             self._save_task_lists()
             # 清理旧会话文件（最多保留10个）
             self._cleanup_old_sessions(session_dir)
+            # 更新最后保存的会话文件路径
+            self.last_restored_session = session_file
 
         return result
 
