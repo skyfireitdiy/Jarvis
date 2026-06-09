@@ -1226,9 +1226,27 @@ class Agent:
         """Saves the current session state by delegating to the session manager."""
         return self.session.save_session()
 
-    def restore_session(self) -> bool:
-        """Restores the session state by delegating to the session manager."""
-        session_restored = self.session.restore_session()
+    def restore_session(
+        self, restore_session: Optional[Union[bool, str]] = None
+    ) -> bool:
+        """Restores the session state by delegating to the session manager.
+
+        Args:
+            restore_session: 恢复会话的参数。
+                - True: 交互式选择会话文件
+                - str: 指定会话文件路径
+                - None/False: 不恢复
+        """
+        if not restore_session:
+            return False
+
+        if isinstance(restore_session, str):
+            # 指定文件路径恢复
+            session_restored = self.session.restore_session_from_file(restore_session)
+        else:
+            # 交互式选择恢复
+            session_restored = self.session.restore_session()
+
         if session_restored:
             self.first = False
         return session_restored
