@@ -5073,8 +5073,18 @@ def create_app(
                     "error": {"code": "NOT_FOUND", "message": "Group not found"},
                 }
 
-            body = await request.json()
-            agent_id = body.get("agent_id")
+            try:
+                body = await request.json()
+            except Exception:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PARAMS",
+                        "message": "Invalid JSON body",
+                    },
+                }
+
+            agent_id = body.get("agent_id") if body else None
             if not agent_id:
                 return {
                     "success": False,
@@ -5111,8 +5121,18 @@ def create_app(
                     "error": {"code": "NOT_FOUND", "message": "Group not found"},
                 }
 
-            body = await request.json()
-            agent_id = body.get("agent_id")
+            try:
+                body = await request.json()
+            except Exception:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PARAMS",
+                        "message": "Invalid JSON body",
+                    },
+                }
+
+            agent_id = body.get("agent_id") if body else None
             if not agent_id:
                 return {
                     "success": False,
