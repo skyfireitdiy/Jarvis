@@ -1603,8 +1603,10 @@ def cli(
                     )
 
                     # 尝试恢复会话
-                    if restore_session is not None:
-                        if agent.restore_session():
+                    if restore or restore_session is not None:
+                        if agent.restore_session(
+                            restore_session if restore_session else True
+                        ):
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
                             if restored_file:
@@ -1675,8 +1677,14 @@ def cli(
                             PrettyOutput.auto_print(f"⚠️  检测历史会话失败: {e}")
 
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
-                    if restore_session is not None or is_auto_resume_session():
-                        if agent.restore_session():
+                    if (
+                        restore
+                        or restore_session is not None
+                        or is_auto_resume_session()
+                    ):
+                        if agent.restore_session(
+                            restore_session if restore_session else True
+                        ):
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
                             if restored_file:
