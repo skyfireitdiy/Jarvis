@@ -22,7 +22,7 @@ class AgentManager:
     def __init__(
         self,
         tool_group: Optional[str] = None,
-        restore_session: bool = False,
+        restore_session: Optional[str] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         multiline_inputer: Optional[Callable[[str], str]] = None,

@@ -436,7 +436,7 @@ def try_switch_to_jca_if_git_repo(
     llm_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
-    restore_session: bool,
+    restore_session: Optional[str],
     task: Optional[str],
     keep_jvs: bool = False,
     quick_mode: bool = False,
@@ -822,11 +822,11 @@ def run_cli(
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="自定义配置文件路径"
     ),
-    restore_session: bool = typer.Option(
-        False,
+    restore_session: Optional[str] = typer.Option(
+        None,
         "-r",
         "--restore-session",
-        help="从 .jarvis/saved_session.json 恢复会话",
+        help="恢复会话。不带参数时从默认路径恢复，带参数时从指定文件恢复",
     ),
     edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
     share_methodology: bool = typer.Option(
@@ -1151,9 +1151,14 @@ def run_cli(
         from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
         auto_resume_result = is_auto_resume_session()
-        if restore_session or auto_resume_result:
+        if restore_session is not None or auto_resume_result:
             set_config("restore_session", True)
-            restore_session = True  # 更新参数值以匹配配置
+            # 如果用户不带参数使用 --restore-session，保持 restore_session 为 None
+            # 如果用户指定了文件路径，检查文件是否存在
+            if restore_session is not None and restore_session != "":
+                if not os.path.exists(restore_session):
+                    PrettyOutput.auto_print(f"❌ 会话文件不存在: {restore_session}")
+                    return
     except Exception:
         # 静默忽略异常，不影响主流程
         pass
