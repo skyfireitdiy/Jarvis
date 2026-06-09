@@ -2732,7 +2732,7 @@ def create_app(
             additional_args = request.get("additional_args")
             worktree = bool(request.get("worktree", False))
             quick_mode = bool(request.get("quick_mode", False))
-            restore_session = bool(request.get("restore_session", False))
+            restore_session = request.get("restore_session")
             no_interaction_mode = bool(request.get("no_interaction_mode", False))
             proxy_node = request.get("proxy_node")
             target_node_id = str(request.get("node_id") or "").strip()
