@@ -4,6 +4,7 @@
 from typing import Callable
 from typing import List
 from typing import Optional
+from typing import Union
 
 import typer
 
@@ -22,7 +23,7 @@ class AgentManager:
     def __init__(
         self,
         tool_group: Optional[str] = None,
-        restore_session: Optional[str] = None,
+        restore_session: Optional[Union[bool, str]] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
         multiline_inputer: Optional[Callable[[str], str]] = None,
@@ -106,7 +107,7 @@ class AgentManager:
 
         # 尝试恢复会话
         if self.restore_session:
-            if self.agent.restore_session():
+            if self.agent.restore_session(self.restore_session):
                 PrettyOutput.auto_print("✅ 会话已成功恢复。")
             else:
                 PrettyOutput.auto_print("⚠️ 无法恢复会话。")
