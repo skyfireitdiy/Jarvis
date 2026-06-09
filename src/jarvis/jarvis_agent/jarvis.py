@@ -1411,6 +1411,9 @@ def run_cli(
                         jglobals.input_buffer.append(message)
                         delivered = "buffered"
 
+                    # 打印收到的消息到终端
+                    PrettyOutput.auto_print(f"[收到消息] {message}")
+
                     return {
                         "success": True,
                         "data": {
