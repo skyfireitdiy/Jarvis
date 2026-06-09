@@ -28,7 +28,7 @@ def load_config(config_path: str) -> dict[str, Any]:
     config_path = os.path.expanduser(config_path)
 
     if not os.path.exists(config_path):
-        PrettyOutput.auto_print(f"⚠️ 配置文件 {config_path} 不存在，使用默认配置")
+        PrettyOutput.auto_print(f"⚠️ 配置文件不存在: {config_path}")
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -58,6 +58,12 @@ def cli(
         "--non-interactive",
         help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
+    restore_session: Optional[str] = typer.Option(
+        None,
+        "-r",
+        "--restore-session",
+        help="恢复会话的主文件路径",
+    ),
 ) -> None:
     """Main entry point for Jarvis agent"""
     # 非交互模式要求从命令行传入任务
@@ -84,7 +90,6 @@ def cli(
     config = load_config(agent_definition) if agent_definition else {}
 
     # Override config with command-line arguments if provided
-
     if llm_group:
         config["llm_group"] = llm_group
 
@@ -94,6 +99,22 @@ def cli(
         if non_interactive:
             config["non_interactive"] = True
         agent = Agent(**config)
+
+        # 会话恢复逻辑
+        if restore_session is not None:
+            # 展开路径中的 ~ 符号
+            restore_session = os.path.expanduser(restore_session)
+            # 检查文件是否存在
+            if not os.path.exists(restore_session):
+                PrettyOutput.auto_print(f"❌ 会话文件不存在: {restore_session}")
+                raise typer.Exit(code=1)
+            # 调用会话恢复方法
+            try:
+                agent.session.restore_session_from_file(restore_session)
+                PrettyOutput.auto_print(f"✅ 会话已从文件恢复: {restore_session}")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 会话恢复失败: {str(e)}")
+                raise typer.Exit(code=1)
 
         # Run agent with initial task if specified
         if task:

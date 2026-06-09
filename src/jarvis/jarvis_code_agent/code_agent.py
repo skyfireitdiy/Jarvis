@@ -1057,11 +1057,11 @@ def cli(
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
     ),
-    restore_session: bool = typer.Option(
-        False,
+    restore_session: Optional[str] = typer.Option(
+        None,
         "-r",
         "--restore-session",
-        help="启动时恢复会话",
+        help="恢复会话。不带参数时从默认路径恢复，带参数时从指定文件恢复",
     ),
     prefix: str = typer.Option(
         "",
@@ -1443,8 +1443,14 @@ def cli(
             set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
-        if restore_session or is_auto_resume_session():
+        if restore_session is not None or is_auto_resume_session():
             set_config("restore_session", True)
+            # 如果用户不带参数使用 --restore-session，保持 restore_session 为 None
+            # 如果用户指定了文件路径，检查文件是否存在
+            if restore_session is not None and restore_session != "":
+                if not os.path.exists(restore_session):
+                    PrettyOutput.auto_print(f"❌ 会话文件不存在: {restore_session}")
+                    return
         if print_prompt:
             set_config("print_prompt", True)
     except Exception:
@@ -1555,7 +1561,7 @@ def cli(
                     )
 
                     # 尝试恢复会话
-                    if restore_session:
+                    if restore_session is not None:
                         if agent.restore_session():
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
@@ -1627,7 +1633,7 @@ def cli(
                             PrettyOutput.auto_print(f"⚠️  检测历史会话失败: {e}")
 
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
-                    if restore_session or is_auto_resume_session():
+                    if restore_session is not None or is_auto_resume_session():
                         if agent.restore_session():
                             # 显示实际恢复的session文件名
                             restored_file = agent.session.last_restored_session
