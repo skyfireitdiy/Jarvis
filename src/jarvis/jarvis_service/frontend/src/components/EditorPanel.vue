@@ -73,9 +73,9 @@
         <div v-if="tabs.length === 0" class="editor-placeholder">
           <div class="editor-placeholder-icon">📝</div>
           <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
-          <div class="editor-placeholder-text">支持 Monaco 语法高亮、代码折叠、多标签切换与保存。</div>
+          <div class="editor-placeholder-text">支持 CodeMirror 6 语法高亮、代码折叠、多标签切换与保存。</div>
         </div>
-        <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
+        <div v-else ref="editorContainerRef" class="editor-codemirror-container"></div>
       </div>
     </div>
     <div
@@ -382,7 +382,7 @@ defineExpose({
   max-width: 320px;
 }
 
-.editor-monaco-container {
+.editor-codemirror-container {
   flex: 1;
   min-height: 0;
   overflow: hidden;

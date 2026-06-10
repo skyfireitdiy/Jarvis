@@ -721,7 +721,27 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
-import * as monaco from 'monaco-editor'
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialChars, drawSelection, rectangularSelection, crosshairCursor, placeholder } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { javascript } from '@codemirror/lang-javascript'
+import { python } from '@codemirror/lang-python'
+import { json } from '@codemirror/lang-json'
+import { html } from '@codemirror/lang-html'
+import { css } from '@codemirror/lang-css'
+import { markdown } from '@codemirror/lang-markdown'
+import { xml } from '@codemirror/lang-xml'
+import { sql } from '@codemirror/lang-sql'
+import { rust } from '@codemirror/lang-rust'
+import { cpp } from '@codemirror/lang-cpp'
+import { java } from '@codemirror/lang-java'
+import { go } from '@codemirror/lang-go'
+import { php } from '@codemirror/lang-php'
+import { yaml } from '@codemirror/lang-yaml'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -1070,6 +1090,33 @@ function getLanguageFromFilename(filename) {
     'log': 'plaintext'
   }
   return langMap[ext] || 'plaintext'
+}
+
+// CodeMirror 6 语言扩展映射
+function getLanguageExtension(language) {
+  const extMap = {
+    'javascript': javascript,
+    'typescript': javascript,
+    'python': python,
+    'json': json,
+    'html': html,
+    'css': css,
+    'markdown': markdown,
+    'xml': xml,
+    'sql': sql,
+    'rust': rust,
+    'cpp': cpp,
+    'c': cpp,
+    'java': java,
+    'go': go,
+    'php': php,
+    'yaml': yaml,
+    'vue': xml,
+    'scss': css,
+    'less': css,
+  }
+  const ext = extMap[language]
+  return ext ? ext() : []
 }
 
 // 认证和连接配置
@@ -1440,7 +1487,7 @@ const editorPanelInteraction = ref({
 const editorPanelRef = ref(null)
 const editorContainerRef = computed(() => editorPanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
-const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), monacoEditor: null }]
+const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), cmEditorView: null }]
 const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
 
 // 保持向后兼容的计算属性
@@ -1455,8 +1502,8 @@ const activeEditorTabPath = computed(() => {
 const activeEditorSession = computed(() => {
   return editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value) || null
 })
-const editorModels = new Map()
-let monacoEditor = null
+const editorModels = new Map() // path -> { state: EditorState, content: string }
+let cmEditorView = null // CodeMirror 6 EditorView instance
 let editorFileHeartbeatTimer = null
 const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
@@ -1668,7 +1715,7 @@ function toggleEditorMaximize() {
     isEditorMaximized.value = true
   }
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -1884,50 +1931,110 @@ function markEditorTabExternalModified(path, value) {
   }
 }
 
-function ensureMonacoEditor() {
-  if (monacoEditor || !editorContainerRef.value) return
+function ensureCodeMirrorEditor() {
+  if (cmEditorView || !editorContainerRef.value) return
 
-  monacoEditor = monaco.editor.create(editorContainerRef.value, {
-    value: '',
-    language: 'plaintext',
-    theme: 'vs-dark',
-    automaticLayout: true,
-    minimap: { enabled: false },
-    folding: true,
-    scrollBeyondLastLine: false,
-    fontSize: 13,
-    tabSize: 2,
-    wordWrap: 'off',
-    renderWhitespace: 'selection',
-    readOnly: !isEditorEditable.value,
+  const updateListener = EditorView.updateListener.of((update) => {
+    if (update.docChanged) {
+      const path = activeEditorTabPath.value
+      if (!path) return
+      const tab = getEditorTabByPath(path)
+      if (!tab) return
+      tab.content = update.state.doc.toString()
+      tab.isDirty = tab.content !== tab.originalContent
+    }
   })
 
-  monacoEditor.onDidChangeModel(() => {
-    const model = monacoEditor.getModel()
-    if (!model) return
-    const path = model.uri.path
-    const tab = getEditorTabByPath(path)
-    if (!tab) return
-    tab.content = model.getValue()
-    tab.isDirty = tab.content !== tab.originalContent
+  cmEditorView = new EditorView({
+    state: EditorState.create({
+      doc: '',
+      extensions: [
+        lineNumbers(),
+        highlightActiveLine(),
+        highlightSpecialChars(),
+        drawSelection(),
+        rectangularSelection(),
+        crosshairCursor(),
+        syntaxHighlighting(defaultHighlightStyle),
+        bracketMatching(),
+        closeBrackets(),
+        indentOnInput(),
+        foldGutter(),
+        highlightSelectionMatches(),
+        history(),
+        keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...closeBracketsKeymap,
+          ...searchKeymap,
+          indentWithTab,
+        ]),
+        oneDark,
+        EditorView.editable.of(isEditorEditable.value),
+        EditorState.readOnly.of(!isEditorEditable.value),
+        updateListener,
+      ],
+    }),
+    parent: editorContainerRef.value,
   })
 }
 
-function layoutMonacoEditor() {
-  if (monacoEditor) {
-    monacoEditor.layout()
+function layoutCodeMirrorEditor() {
+  if (cmEditorView) {
+    cmEditorView.requestMeasure()
   }
 }
 
 function activateEditorTab(path) {
   activeEditorTabPath.value = path
-  const model = editorModels.get(path)
-  if (monacoEditor && model) {
-    monacoEditor.setModel(model)
-    monaco.editor.setModelLanguage(model, getLanguageFromFilename(path))
+  const modelData = editorModels.get(path)
+  if (cmEditorView && modelData) {
+    // 切换编辑器内容：通过 dispatch 替换整个 state
+    const language = getLanguageFromFilename(path)
+    const langExt = getLanguageExtension(language)
+    const newState = EditorState.create({
+      doc: modelData.content,
+      extensions: [
+        lineNumbers(),
+        highlightActiveLine(),
+        highlightSpecialChars(),
+        drawSelection(),
+        rectangularSelection(),
+        crosshairCursor(),
+        syntaxHighlighting(defaultHighlightStyle),
+        bracketMatching(),
+        closeBrackets(),
+        indentOnInput(),
+        foldGutter(),
+        highlightSelectionMatches(),
+        history(),
+        keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...closeBracketsKeymap,
+          ...searchKeymap,
+          indentWithTab,
+        ]),
+        oneDark,
+        langExt,
+        EditorView.editable.of(isEditorEditable.value),
+        EditorState.readOnly.of(!isEditorEditable.value),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            const currentPath = activeEditorTabPath.value
+            if (!currentPath) return
+            const tab = getEditorTabByPath(currentPath)
+            if (!tab) return
+            tab.content = update.state.doc.toString()
+            tab.isDirty = tab.content !== tab.originalContent
+          }
+        }),
+      ],
+    })
+    cmEditorView.setState(newState)
     nextTick(() => {
-      layoutMonacoEditor()
-      monacoEditor.focus()
+      layoutCodeMirrorEditor()
+      cmEditorView.focus()
     })
   }
 }
@@ -1984,12 +2091,12 @@ function setEditorSidebarView(view) {
   if (view === 'files') {
     nextTick(() => {
       ensureEditorSidebarFileTree()
-      layoutMonacoEditor()
+      layoutCodeMirrorEditor()
     })
     return
   }
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -2004,7 +2111,7 @@ function toggleEditorSearchSidebar() {
 function closeEditorSidebar() {
   showEditorSidebar.value = false
   nextTick(() => {
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
   })
 }
 
@@ -2069,23 +2176,26 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   // 使用当前Agent的agentId
   await openEditorFile(absolutePath, currentAgentId.value)
   await nextTick()
-  const model = editorModels.get(absolutePath)
-  if (!monacoEditor || !model) {
+  const modelData = editorModels.get(absolutePath)
+  if (!cmEditorView || !modelData) {
     return
   }
 
-  monacoEditor.setModel(model)
-  const column = Number(matchStart || 0) + 1
-  const endColumn = Math.max(column, Number(matchEnd || matchStart || 0) + 1)
-  monacoEditor.revealLineInCenter(Number(lineNumber || 1))
-  monacoEditor.setPosition({ lineNumber: Number(lineNumber || 1), column })
-  monacoEditor.setSelection({
-    startLineNumber: Number(lineNumber || 1),
-    startColumn: column,
-    endLineNumber: Number(lineNumber || 1),
-    endColumn,
+  const line = Number(lineNumber || 1)
+  const col = Number(matchStart || 0) + 1
+  const endCol = Math.max(col, Number(matchEnd || matchStart || 0) + 1)
+
+  // CodeMirror 6: 使用 dispatch 设置选区
+  const doc = cmEditorView.state.doc
+  const lineObj = doc.line(line)
+  const from = lineObj.from + (col - 1)
+  const to = lineObj.from + (endCol - 1)
+
+  cmEditorView.dispatch({
+    selection: { anchor: from, head: to },
+    scrollIntoView: true,
   })
-  monacoEditor.focus()
+  cmEditorView.focus()
 }
 
 async function fetchFileContent(path, agentId = null) {
@@ -2160,9 +2270,15 @@ async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
   tab.externalModified = false
   updateEditorTabFileStat(tab, fileStat)
 
-  const model = editorModels.get(path)
-  if (model && model.getValue() !== content) {
-    model.setValue(content)
+  const modelData = editorModels.get(path)
+  if (modelData && modelData.content !== content) {
+    modelData.content = content
+    // 如果当前激活的标签是这个文件，更新编辑器内容
+    if (activeEditorTabPath.value === path && cmEditorView) {
+      cmEditorView.dispatch({
+        changes: { from: 0, to: cmEditorView.state.doc.length, insert: content },
+      })
+    }
   }
 
   if (showAutoRefreshToast) {
@@ -2264,12 +2380,12 @@ async function openEditorFile(path, agentId = null) {
     updateEditorTabFileStat(tab, fileStat)
     tab.loading = false
 
-    let model = editorModels.get(path)
-    if (!model) {
-      model = monaco.editor.createModel(content, tab.language, monaco.Uri.file(path))
-      editorModels.set(path, model)
+    let modelData = editorModels.get(path)
+    if (!modelData) {
+      modelData = { content, language: tab.language }
+      editorModels.set(path, modelData)
     }
-    model.setValue(content)
+    modelData.content = content
 
     await nextTick()
     // 确保编辑器容器存在（当从无标签状态打开时需要等待DOM更新）
@@ -2278,7 +2394,7 @@ async function openEditorFile(path, agentId = null) {
       await new Promise(resolve => setTimeout(resolve, 50))
       retryCount++
     }
-    ensureMonacoEditor()
+    ensureCodeMirrorEditor()
     activateEditorTab(path)
   } catch (error) {
     tab.loading = false
@@ -2290,8 +2406,8 @@ async function saveEditorTab(path) {
   const tab = getEditorTabByPath(path)
   if (!tab) return
 
-  const model = editorModels.get(path)
-  const content = model ? model.getValue() : tab.content
+  const modelData = editorModels.get(path)
+  const content = modelData ? modelData.content : tab.content
 
   const { host, port } = getGatewayAddress()
   const targetNodeId = getEditorTargetNodeId()
@@ -2331,8 +2447,11 @@ async function saveActiveEditorTab() {
 
 function toggleEditorEditable() {
   isEditorEditable.value = !isEditorEditable.value
-  if (monacoEditor) {
-    monacoEditor.updateOptions({ readOnly: !isEditorEditable.value })
+  if (cmEditorView) {
+    // CodeMirror 6: 通过 dispatch 切换 editable 效果
+    cmEditorView.dispatch({
+      effects: EditorView.editable.reconfigure(isEditorEditable.value),
+    })
   }
 }
 
@@ -2381,7 +2500,7 @@ function createEditorForAgent(agent) {
       tabs: [],
       activeTabPath: null,
       editorModels: new Map(),
-      monacoEditor: null,
+      cmEditorView: null,
       isEditable: false,
       showSidebar: true,
       sidebarView: 'files'
@@ -2417,14 +2536,13 @@ async function closeEditorSession(agentId) {
     if (!confirmed) return
   }
 
-  // 清理 Monaco 模型
-  session.editorModels.forEach(model => model.dispose())
+  // 清理编辑器模型
   session.editorModels.clear()
 
-  // 清理 Monaco 编辑器
-  if (session.monacoEditor) {
-    session.monacoEditor.dispose()
-    session.monacoEditor = null
+  // 清理 CodeMirror 编辑器
+  if (session.cmEditorView) {
+    session.cmEditorView.destroy()
+    session.cmEditorView = null
   }
 
   // 从数组中移除
@@ -2476,9 +2594,8 @@ async function closeEditorTab(path) {
   const wasActive = activeEditorTabPath.value === path
   editorTabs.value.splice(index, 1)
 
-  const model = editorModels.get(path)
-  if (model) {
-    model.dispose()
+  const modelData = editorModels.get(path)
+  if (modelData) {
     editorModels.delete(path)
   }
 
@@ -2488,9 +2605,9 @@ async function closeEditorTab(path) {
       activateEditorTab(nextTab.path)
     } else {
       activeEditorTabPath.value = null
-      if (monacoEditor) {
-        monacoEditor.dispose()
-        monacoEditor = null
+      if (cmEditorView) {
+        cmEditorView.destroy()
+        cmEditorView = null
       }
     }
   }
@@ -8196,7 +8313,7 @@ watch(showEditorPanel, async (visible) => {
     if (activeEditorTabPath.value) {
       activateEditorTab(activeEditorTabPath.value)
     }
-    nextTick(() => layoutMonacoEditor())
+    nextTick(() => layoutCodeMirrorEditor())
   } else {
     stopEditorPanelInteraction()
   }
@@ -8324,7 +8441,7 @@ onMounted(() => {
     saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
-    layoutMonacoEditor()
+    layoutCodeMirrorEditor()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -8417,11 +8534,10 @@ onUnmounted(() => {
   stopEditorFileHeartbeat()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
-  if (monacoEditor) {
-    monacoEditor.dispose()
-    monacoEditor = null
+  if (cmEditorView) {
+    cmEditorView.destroy()
+    cmEditorView = null
   }
-  editorModels.forEach(model => model.dispose())
   editorModels.clear()
 
   // 移除全局键盘事件监听
@@ -9183,7 +9299,7 @@ body::-webkit-scrollbar {
   background: #0d1117;
 }
 
-.editor-monaco-container {
+.editor-codemirror-container {
   width: 100%;
   height: 100%;
 }
