@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import signal
 import socket
 import subprocess
 import uuid
@@ -215,6 +216,7 @@ class AgentManager:
                 cmd,
                 cwd=working_dir,
                 env=env,
+                start_new_session=True,
             )
         except Exception as e:
             raise RuntimeError(f"Failed to start agent: {e}")
@@ -369,6 +371,13 @@ class AgentManager:
                 # 强制杀死进程
                 agent_info.process.kill()
                 agent_info.process.wait()
+        elif agent_info.pid:
+            # 进程对象为 None 时，通过 PID 杀进程
+            try:
+                os.kill(agent_info.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                # 进程已不存在
+                pass
 
         # 取消监控任务
         if agent_info._monitor_task:
@@ -407,16 +416,24 @@ class AgentManager:
         agent_info = self._agents[agent_id]
 
         # 如果正在运行，先停止
-        if agent_info.status == "running" and agent_info.process is not None:
-            agent_info.process.terminate()
+        if agent_info.status == "running":
+            if agent_info.process is not None:
+                agent_info.process.terminate()
 
-            # 等待进程退出（最多 10 秒）
-            try:
-                agent_info.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                # 强制杀死进程
-                agent_info.process.kill()
-                agent_info.process.wait()
+                # 等待进程退出（最多 10 秒）
+                try:
+                    agent_info.process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    # 强制杀死进程
+                    agent_info.process.kill()
+                    agent_info.process.wait()
+            elif agent_info.pid:
+                # 进程对象为 None 时，通过 PID 杀进程
+                try:
+                    os.kill(agent_info.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    # 进程已不存在
+                    pass
 
         # 取消监控任务
         if agent_info._monitor_task:
@@ -611,8 +628,35 @@ class AgentManager:
         if not agent_info:
             return
 
-        # 如果进程对象为 None（恢复的情况），直接返回
+        # 如果进程对象为 None（恢复的情况），通过 PID 轮询检测进程存活
         if agent_info.process is None:
+            if agent_info.pid:
+                try:
+                    while True:
+                        await asyncio.sleep(5)
+                        # 检查进程是否存活
+                        try:
+                            os.kill(agent_info.pid, 0)
+                        except ProcessLookupError:
+                            # 进程已不存在
+                            agent_info.status = "stopped"
+                            self._save_agents()
+                            if self._on_status_change:
+                                self._on_status_change(
+                                    agent_id,
+                                    "stopped",
+                                    {
+                                        "agent_id": agent_id,
+                                        "status": "stopped",
+                                        "message": "Agent process exited (detected by PID polling)",
+                                    },
+                                )
+                            return
+                        except OSError:
+                            # 权限不足，无法检查
+                            await asyncio.sleep(30)
+                except asyncio.CancelledError:
+                    pass
             return
 
         try:
@@ -670,13 +714,16 @@ class AgentManager:
                 )
 
     async def cleanup(self) -> None:
-        """清理所有 Agent。"""
+        """清理所有 Agent（只取消监控任务，不kill进程）。"""
         agent_ids = list(self._agents.keys())
         for agent_id in agent_ids:
-            try:
-                self.stop_agent(agent_id)
-            except Exception:
-                pass
+            agent_info = self._agents.get(agent_id)
+            if agent_info:
+                # 只取消监控任务，不kill进程
+                if agent_info._monitor_task:
+                    agent_info._monitor_task.cancel()
+                agent_info.status = "orphaned"
+            self._save_agents()
 
     async def start_monitoring_for_running_agents(self) -> None:
         """为所有运行中的 Agent 启动监控任务。
