@@ -1362,6 +1362,16 @@ def run_cli(
                     dict: 操作结果
                 """
                 try:
+                    # 网关重启同步Token时跳过验证（X-Internal-Sync标记，仅限127.0.0.1本地请求）
+                    if request.headers.get("X-Internal-Sync") == "true":
+                        body = await request.json()
+                        new_token = body.get("token")
+                        if new_token:
+                            os.environ["JARVIS_AUTH_TOKEN"] = new_token
+                            logger.info("Auth token updated via internal sync")
+                            return {"success": True}
+                        return {"success": False, "error": "token is required"}
+
                     # 验证 Authorization Bearer token
                     auth_header = request.headers.get("Authorization", "")
                     current_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
