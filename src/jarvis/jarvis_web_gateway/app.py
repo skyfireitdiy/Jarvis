@@ -1044,6 +1044,7 @@ def create_app(
                                 await client.post(
                                     f"http://127.0.0.1:{port}/update_token",
                                     json={"token": gateway_token},
+                                    headers={"X-Internal-Sync": "true"},
                                     timeout=5.0
                                 )
                             except Exception:
