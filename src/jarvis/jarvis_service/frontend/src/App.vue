@@ -110,7 +110,7 @@
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'execution' && item.is_finished" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
+          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
             <pre class="terminal-history-content">{{ item.terminal_content || '' }}</pre>
           </div>
