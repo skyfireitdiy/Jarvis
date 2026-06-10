@@ -198,6 +198,13 @@ BUILTIN_COMMANDS = [
     ("Init", "初始化项目综述"),
     ("TestCase", "生成需求测试用例"),
     ("QuickConfig", "快速配置LLM平台"),
+    ("LLMAdd", "添加LLM配置"),
+    ("LLMDelete", "删除LLM配置"),
+    ("LLMUpdate", "更新LLM配置"),
+    ("LLMGroupAdd", "添加模型组"),
+    ("LLMGroupDelete", "删除模型组"),
+    ("LLMGroupUpdate", "更新模型组"),
+    ("LLMGroupSet", "设置当前模型组"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
