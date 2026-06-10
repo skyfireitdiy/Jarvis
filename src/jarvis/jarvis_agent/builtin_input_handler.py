@@ -256,6 +256,69 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 快速配置失败: {e}")
             return "", True
+        elif tag == "LLMAdd":
+            from jarvis.jarvis_platform_manager.main import llm_add
+
+            try:
+                llm_add()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 添加LLM配置失败: {e}")
+            return "", True
+        elif tag == "LLMDelete":
+            from jarvis.jarvis_platform_manager.main import llm_delete
+
+            try:
+                llm_delete()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 删除LLM配置失败: {e}")
+            return "", True
+        elif tag == "LLMUpdate":
+            from jarvis.jarvis_platform_manager.main import llm_update
+
+            try:
+                llm_update()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 更新LLM配置失败: {e}")
+            return "", True
+        elif tag == "LLMGroupAdd":
+            from jarvis.jarvis_platform_manager.main import group_add
+
+            try:
+                group_add()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 添加模型组失败: {e}")
+            return "", True
+        elif tag == "LLMGroupDelete":
+            from jarvis.jarvis_platform_manager.main import group_delete
+
+            try:
+                group_delete()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 删除模型组失败: {e}")
+            return "", True
+        elif tag == "LLMGroupUpdate":
+            from jarvis.jarvis_platform_manager.main import group_update
+
+            try:
+                group_update()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 更新模型组失败: {e}")
+            return "", True
+        elif tag == "LLMGroupSet":
+            from jarvis.jarvis_platform_manager.main import group_set
+
+            try:
+                group_set()
+            except Exception as e:
+                if "Exit" not in str(type(e).__name__):
+                    PrettyOutput.auto_print(f"❌ 设置模型组失败: {e}")
+            return "", True
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)
