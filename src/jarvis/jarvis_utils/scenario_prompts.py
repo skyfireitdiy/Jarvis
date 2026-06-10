@@ -202,7 +202,7 @@ def classify_user_request(
     """
     if difficulty_descriptions is None:
         difficulty_descriptions = {
-            "easy": "简单问答、单步操作、明确的小任务",
+            "easy": "简单问答、单步操作、明确的小任务（注意：如果涉及代码修改，任务难度至少为medium，不能评为easy）",
             "medium": "需要多步操作、需要理解上下文、涉及一定复杂度",
             "hard": "需要深度分析、多维度综合、需要专业知识和深入思考",
         }
