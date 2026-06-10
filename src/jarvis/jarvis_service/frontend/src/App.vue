@@ -722,7 +722,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialChars, drawSelection, rectangularSelection, crosshairCursor, placeholder } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
@@ -1505,6 +1505,9 @@ const activeEditorSession = computed(() => {
 const editorModels = new Map() // path -> { state: EditorState, content: string }
 let cmEditorView = null // CodeMirror 6 EditorView instance
 let editorFileHeartbeatTimer = null
+// Compartment 实例用于动态重配置编辑器的可编辑状态
+const editableCompartment = new Compartment()
+const readOnlyCompartment = new Compartment()
 const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const globalSearchQuery = ref('')
@@ -1970,8 +1973,8 @@ function ensureCodeMirrorEditor() {
           indentWithTab,
         ]),
         oneDark,
-        EditorView.editable.of(isEditorEditable.value),
-        EditorState.readOnly.of(!isEditorEditable.value),
+        editableCompartment.of(EditorView.editable.of(isEditorEditable.value)),
+        readOnlyCompartment.of(EditorState.readOnly.of(!isEditorEditable.value)),
         updateListener,
       ],
     }),
@@ -2017,8 +2020,8 @@ function activateEditorTab(path) {
         ]),
         oneDark,
         langExt,
-        EditorView.editable.of(isEditorEditable.value),
-        EditorState.readOnly.of(!isEditorEditable.value),
+        editableCompartment.of(EditorView.editable.of(isEditorEditable.value)),
+        readOnlyCompartment.of(EditorState.readOnly.of(!isEditorEditable.value)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             const currentPath = activeEditorTabPath.value
@@ -2448,11 +2451,11 @@ async function saveActiveEditorTab() {
 function toggleEditorEditable() {
   isEditorEditable.value = !isEditorEditable.value
   if (cmEditorView) {
-    // CodeMirror 6: 通过 dispatch 同时切换 editable 和 readOnly 效果
+    // CodeMirror 6: 通过 compartment 的 reconfigure 方法动态切换 editable 和 readOnly
     cmEditorView.dispatch({
       effects: [
-        EditorView.editable.reconfigure(isEditorEditable.value),
-        EditorState.readOnly.reconfigure(!isEditorEditable.value),
+        editableCompartment.reconfigure(EditorView.editable.of(isEditorEditable.value)),
+        readOnlyCompartment.reconfigure(EditorState.readOnly.of(!isEditorEditable.value)),
       ],
     })
   }
@@ -2608,6 +2611,7 @@ async function closeEditorTab(path) {
       activateEditorTab(nextTab.path)
     } else {
       activeEditorTabPath.value = null
+      showEditorPanel.value = false
       // 不销毁 cmEditorView，保留编辑器实例和容器 DOM，
       // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
       // 后续打开文件时无法重新创建编辑器。
