@@ -182,11 +182,12 @@ def run_quick_config():
 
     # 选择模型逻辑
     if len(models) > 1:
-        console.print("[bold]可用模型列表:[/]")
-        for i, model in enumerate(models, 1):
-            console.print(f"  {i}. {model}")
         manual_input_option = len(models) + 1
-        console.print(f"  {manual_input_option}. 手动输入模型名称")
+        table_lines = ["| 序号 | 模型名称 |", "|------|----------|"]
+        for i, model in enumerate(models, 1):
+            table_lines.append(f"| {i} | {model} |")
+        table_lines.append(f"| {manual_input_option} | 手动输入模型名称 |")
+        PrettyOutput.print_markdown("\n".join(table_lines), title="可用模型列表")
 
         configure_all = user_confirm("是否配置所有模型？", default=False)
         if configure_all:
@@ -283,9 +284,12 @@ def run_quick_config():
         PrettyOutput.auto_print(f"💰 Cheap模型: {cheap_model}")
     else:
         # Normal
-        console.print("[bold]请选择 Normal 模型（大多数场景）:[/]")
+        table_lines = ["| 序号 | 模型名称 |", "|------|----------|"]
         for i, model in enumerate(role_candidate_models, 1):
-            console.print(f"  {i}. {model}")
+            table_lines.append(f"| {i} | {model} |")
+        PrettyOutput.print_markdown(
+            "\n".join(table_lines), title="请选择 Normal 模型（大多数场景）"
+        )
         normal_choice = get_single_line_input("请输入 Normal 模型序号:")
         try:
             normal_idx = int(normal_choice.strip()) - 1
@@ -299,9 +303,12 @@ def run_quick_config():
             PrettyOutput.auto_print("❌ 请输入有效的数字序号")
             return
         # Smart
-        console.print("[bold]请选择 Smart 模型（代码生成）:[/]")
+        table_lines = ["| 序号 | 模型名称 |", "|------|----------|"]
         for i, model in enumerate(role_candidate_models, 1):
-            console.print(f"  {i}. {model}")
+            table_lines.append(f"| {i} | {model} |")
+        PrettyOutput.print_markdown(
+            "\n".join(table_lines), title="请选择 Smart 模型（代码生成）"
+        )
         smart_choice = get_single_line_input("请输入 Smart 模型序号:")
         try:
             smart_idx = int(smart_choice.strip()) - 1
@@ -310,14 +317,16 @@ def run_quick_config():
                 PrettyOutput.auto_print(f"🧠 Smart模型: {smart_model}")
             else:
                 PrettyOutput.auto_print(f"❌ 无效的模型序号: {smart_choice}")
-                return
         except ValueError:
             PrettyOutput.auto_print("❌ 请输入有效的数字序号")
             return
         # Cheap
-        console.print("[bold]请选择 Cheap 模型（低要求、大数据量场景）:[/]")
+        table_lines = ["| 序号 | 模型名称 |", "|------|----------|"]
         for i, model in enumerate(role_candidate_models, 1):
-            console.print(f"  {i}. {model}")
+            table_lines.append(f"| {i} | {model} |")
+        PrettyOutput.print_markdown(
+            "\n".join(table_lines), title="请选择 Cheap 模型（低要求、大数据量场景）"
+        )
         cheap_choice = get_single_line_input("请输入 Cheap 模型序号:")
         try:
             cheap_idx = int(cheap_choice.strip()) - 1
