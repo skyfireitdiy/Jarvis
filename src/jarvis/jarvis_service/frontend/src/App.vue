@@ -2448,9 +2448,12 @@ async function saveActiveEditorTab() {
 function toggleEditorEditable() {
   isEditorEditable.value = !isEditorEditable.value
   if (cmEditorView) {
-    // CodeMirror 6: 通过 dispatch 切换 editable 效果
+    // CodeMirror 6: 通过 dispatch 同时切换 editable 和 readOnly 效果
     cmEditorView.dispatch({
-      effects: EditorView.editable.reconfigure(isEditorEditable.value),
+      effects: [
+        EditorView.editable.reconfigure(isEditorEditable.value),
+        EditorState.readOnly.reconfigure(!isEditorEditable.value),
+      ],
     })
   }
 }
@@ -2605,9 +2608,14 @@ async function closeEditorTab(path) {
       activateEditorTab(nextTab.path)
     } else {
       activeEditorTabPath.value = null
+      // 不销毁 cmEditorView，保留编辑器实例和容器 DOM，
+      // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
+      // 后续打开文件时无法重新创建编辑器。
+      // 仅清空内容即可。
       if (cmEditorView) {
-        cmEditorView.destroy()
-        cmEditorView = null
+        cmEditorView.dispatch({
+          changes: { from: 0, to: cmEditorView.state.doc.length, insert: '' },
+        })
       }
     }
   }
