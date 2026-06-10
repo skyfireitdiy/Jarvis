@@ -1006,6 +1006,29 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _parse_function_call_format(content: str) -> list:
+        """解析函数调用格式: 工具名(JSON参数)
+
+        格式示例:
+        read_code({"files": [{"path": "src/file.py"}]})
+        """
+        ret: list = []
+        # 匹配 工具名(JSON对象) 格式，支持跨行JSON
+        pattern = r"(\w+)\s*\(\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})\s*\)"
+        matches = re.finditer(pattern, content, re.DOTALL)
+
+        for match in matches:
+            tool_name = match.group(1)
+            json_str = match.group(2).strip()
+            try:
+                arguments = json_loads(json_str)
+                tool_call = {"name": tool_name, "arguments": arguments}
+                ret.append(tool_call)
+            except Exception:
+                continue
+        return ret
+
+    @staticmethod
     def _parse_xml_tag_format(content: str, existing: list) -> list:
         """解析 XML 标签格式: <name>...</name><arguments>...</arguments>"""
         ret: list = []
@@ -1186,6 +1209,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 1.5. 解析特殊标记格式: <|tool_call_begin|>functions.tool_name:index<|tool_call_argument_begin|>
         ret.extend(ToolRegistry._parse_special_marker_format(content))
+
+        # 1.6. 解析函数调用格式: 工具名(JSON参数)
+        ret.extend(ToolRegistry._parse_function_call_format(content))
 
         # 2.5. 解析 [TOOL_CALL]标记+<arg_key>/<arg_value>标签格式
         ret.extend(ToolRegistry._parse_arg_key_value_format(content, ret))
