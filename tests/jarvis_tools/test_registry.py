@@ -202,3 +202,58 @@ class TestToolRegistry:
         # 单个工具调用时，返回的是 {name, arguments} 字典
         assert result["name"] == "read_code"
         assert result["arguments"] == {"files": [{"path": "test.py"}]}
+
+    def test_parse_tool_name_json_format_basic(self):
+        """测试解析工具名+JSON格式: 工具名\n{JSON参数}"""
+        content = 'read_code\n{"files": [{"path": "test.py"}]}'
+        result = ToolRegistry._parse_tool_name_json_format(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"] == {"files": [{"path": "test.py"}]}
+
+    def test_parse_tool_name_json_format_with_nested_json(self):
+        """测试解析工具名+嵌套JSON格式（两层嵌套）"""
+        content = (
+            'execute_script\n{"interpreter": "bash", "script_content": "echo hello"}'
+        )
+        result = ToolRegistry._parse_tool_name_json_format(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "execute_script"
+        assert result[0]["arguments"] == {
+            "interpreter": "bash",
+            "script_content": "echo hello",
+        }
+
+    def test_parse_xml_parameter_format_basic(self):
+        """测试解析XML参数标签格式: <tool_name><parameter name="key">value</parameter></tool_name>"""
+        content = '<read_code>\n<parameter name="files">[{"path": "test.py"}]</parameter>\n</read_code>'
+        result = ToolRegistry._parse_xml_parameter_format(content, [])
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"] == {"files": [{"path": "test.py"}]}
+
+    def test_parse_xml_parameter_format_multiple_params(self):
+        """测试解析XML参数标签格式: 多个parameter子标签"""
+        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="script_content">echo hello</parameter>\n</execute_script>'
+        result = ToolRegistry._parse_xml_parameter_format(content, [])
+        assert len(result) == 1
+        assert result[0]["name"] == "execute_script"
+        assert result[0]["arguments"]["interpreter"] == "bash"
+        assert result[0]["arguments"]["script_content"] == "echo hello"
+
+    def test_extract_tool_calls_with_tool_name_json_format(self):
+        """测试_extract_tool_calls能正确解析工具名+JSON格式"""
+        content = 'read_code\n{"files": [{"path": "test.py"}]}'
+        result, error, _ = ToolRegistry._extract_tool_calls(content)
+        assert error == ""
+        assert result["name"] == "read_code"
+        assert result["arguments"] == {"files": [{"path": "test.py"}]}
+
+    def test_extract_tool_calls_with_xml_parameter_format(self):
+        """测试_extract_tool_calls能正确解析XML参数标签格式"""
+        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="script_content">grep -n pattern file</parameter>\n</execute_script>'
+        result, error, _ = ToolRegistry._extract_tool_calls(content)
+        assert error == ""
+        assert result["name"] == "execute_script"
+        assert result["arguments"]["interpreter"] == "bash"
+        assert result["arguments"]["script_content"] == "grep -n pattern file"
