@@ -2397,6 +2397,12 @@ async function openEditorFile(path, agentId = null) {
       await new Promise(resolve => setTimeout(resolve, 50))
       retryCount++
     }
+    // 如果 cmEditorView 已不在 DOM 中（tabs 从空变为非空时 v-else 重建了容器），
+    // 需要销毁旧实例并重新创建，否则编辑器无法挂载到新容器。
+    if (cmEditorView && !cmEditorView.dom.isConnected) {
+      cmEditorView.destroy()
+      cmEditorView = null
+    }
     ensureCodeMirrorEditor()
     activateEditorTab(path)
   } catch (error) {
@@ -2611,7 +2617,6 @@ async function closeEditorTab(path) {
       activateEditorTab(nextTab.path)
     } else {
       activeEditorTabPath.value = null
-      showEditorPanel.value = false
       // 不销毁 cmEditorView，保留编辑器实例和容器 DOM，
       // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
       // 后续打开文件时无法重新创建编辑器。
