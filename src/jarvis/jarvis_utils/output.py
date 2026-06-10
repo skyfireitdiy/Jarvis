@@ -1695,8 +1695,8 @@ class PrettyOutput:
         tokens_per_second = (
             response_tokens / generation_time if generation_time > 0 else 0
         )
-        console.print(
-            f"✓ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+        PrettyOutput.auto_print(
+            f"✅ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
         )
 
         # 发送流式结束事件

@@ -15,6 +15,7 @@ from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name, read_text_file
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
@@ -174,9 +175,9 @@ class ContextRecommender:
         # progress_interval = max(1, min(total_files // 20, 10)) if total_files > 0 else 10
 
         if total_files > 0:
-            console.print(f"📁 发现 {total_files} 个代码文件，开始扫描...")
+            PrettyOutput.auto_print(f"📁 发现 {total_files} 个代码文件，开始扫描...")
         else:
-            console.print("⚠️  未发现可扫描的代码文件", style="yellow")
+            PrettyOutput.auto_print("⚠️ 未发现可扫描的代码文件")
             return
 
         # 辅助函数：生成固定宽度的进度字符串（避免残留字符）
@@ -307,14 +308,13 @@ class ContextRecommender:
         try:
             console.print("💾 正在保存符号表缓存...", end="\r")
             self.context_manager.symbol_table.save_cache()
-            console.print("💾 符号表缓存已保存")
+            PrettyOutput.auto_print("💾 符号表缓存已保存")
         except Exception as e:
-            console.print(f"⚠️  保存符号表缓存失败: {e}", style="yellow")
+            PrettyOutput.auto_print(f"⚠️ 保存缓存失败: {e}")
 
         skip_msg = f"，跳过 {files_skipped} 个文件" if files_skipped > 0 else ""
-        console.print(
-            f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件{skip_msg}，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）",
-            style="green",
+        PrettyOutput.auto_print(
+            f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件{skip_msg}，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）"
         )
 
     def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
