@@ -1029,6 +1029,24 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _parse_tool_name_json_format(content: str) -> list:
+        """解析工具名+JSON格式: 工具名\n{JSON参数}（无括号包裹）"""
+        ret: list = []
+        # 匹配 工具名 + 可选空白/换行 + JSON对象（不以左括号开头，区别于函数调用格式）
+        pattern = r"(\w+)\s*\n?\s*(\{(?:[^{}]|\{[^{}]*\})*\})"
+        matches = re.finditer(pattern, content, re.DOTALL)
+        for match in matches:
+            tool_name = match.group(1)
+            json_str = match.group(2).strip()
+            try:
+                arguments = json_loads(json_str)
+                if isinstance(arguments, dict):
+                    ret.append({"name": tool_name, "arguments": arguments})
+            except Exception:
+                continue
+        return ret
+
+    @staticmethod
     def _parse_xml_tag_format(content: str, existing: list) -> list:
         """解析 XML 标签格式: <name>...</name><arguments>...</arguments>"""
         ret: list = []
@@ -1057,6 +1075,39 @@ class ToolRegistry(OutputHandlerProtocol):
                             ret.append(tool_call)
                     except Exception:
                         pass
+        return ret
+
+    @staticmethod
+    def _parse_xml_parameter_format(content: str, existing: list) -> list:
+        """解析 XML 参数标签格式: <tool_name><parameter name="key">value</parameter></tool_name>"""
+        ret: list = []
+        # 匹配 <tag_name> ... </tag_name> 格式，其中内部包含 <parameter name="...">...</parameter> 子标签
+        tag_pattern = r"<(\w+)>\s*(.*?)\s*</\1>"
+        param_pattern = r'<parameter\s+name="(\w+)"\s*>\s*(.*?)\s*</parameter>'
+        for tag_match in re.finditer(tag_pattern, content, re.DOTALL):
+            tool_name = tag_match.group(1)
+            inner_content = tag_match.group(2)
+            # 检查是否包含 parameter 子标签（排除非 parameter 格式的 XML）
+            if "<parameter" not in inner_content:
+                continue
+            arguments: dict = {}
+            for param_match in re.finditer(param_pattern, inner_content, re.DOTALL):
+                param_name = param_match.group(1)
+                param_value = param_match.group(2)
+                # 尝试 JSON 解析，失败则保持字符串
+                try:
+                    param_value = json_loads(param_value)
+                except Exception:
+                    pass
+                arguments[param_name] = param_value
+            if arguments:
+                # 去重
+                already_found = any(
+                    isinstance(ex, dict) and ex.get("name") == tool_name
+                    for ex in existing
+                )
+                if not already_found:
+                    ret.append({"name": tool_name, "arguments": arguments})
         return ret
 
     @staticmethod
@@ -1213,10 +1264,16 @@ class ToolRegistry(OutputHandlerProtocol):
         # 1.6. 解析函数调用格式: 工具名(JSON参数)
         ret.extend(ToolRegistry._parse_function_call_format(content))
 
+        # 1.7. 解析工具名+JSON格式: 工具名\n{JSON参数}（无括号包裹）
+        ret.extend(ToolRegistry._parse_tool_name_json_format(content))
+
         # 2.5. 解析 [TOOL_CALL]标记+<arg_key>/<arg_value>标签格式
         ret.extend(ToolRegistry._parse_arg_key_value_format(content, ret))
         # 2. 解析 XML 标签格式: <name>...</name><arguments>...</arguments>
         ret.extend(ToolRegistry._parse_xml_tag_format(content, ret))
+
+        # 2.2. 解析 XML 参数标签格式: <tool_name><parameter name="key">value</parameter></tool_name>
+        ret.extend(ToolRegistry._parse_xml_parameter_format(content, ret))
 
         # 3. 解析 "工具名 + markdown代码块" 格式
         code_block_results, auto_completed = ToolRegistry._parse_code_block_format(
