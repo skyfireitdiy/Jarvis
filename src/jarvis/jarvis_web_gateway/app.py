@@ -1032,6 +1032,22 @@ def create_app(
         # Startup
         agent_manager.set_event_loop(asyncio.get_running_loop())
         await agent_manager.start_monitoring_for_running_agents()
+        # 同步新Token到所有running状态的Agent
+        gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
+        if gateway_token:
+            async with httpx.AsyncClient() as client:
+                for agent in agent_manager.get_agent_list():
+                    if agent.get("status") == "running":
+                        port = agent.get("port")
+                        if port:
+                            try:
+                                await client.post(
+                                    f"http://127.0.0.1:{port}/update_token",
+                                    json={"token": gateway_token},
+                                    timeout=5.0
+                                )
+                            except Exception:
+                                pass
         if node_config.is_master:
             node_runtime.mark_ready()
             # 启动 Unix Domain Socket 服务器（提供 node_secret 给子节点）
@@ -1042,7 +1058,7 @@ def create_app(
                 child_node_client.start()
         yield
         # Shutdown
-        await agent_manager.cleanup()
+        agent_manager._save_agents()
         await agent_proxy_manager.cleanup()
         terminal_session_manager.cleanup()
         if child_node_client is not None:
