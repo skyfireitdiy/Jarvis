@@ -2526,12 +2526,12 @@ const isCreatingTerminalSession = ref(false)
 
 // 输入控制
 const inputText = ref('')
-const inputMode = ref('multi')
-const inputTip = ref('')
+const inputMode = ref('multi') // 当前显示Agent的输入模式
+const inputRequests = ref(new Map()) // 每个 Agent 的输入请求（key: agentId, value: {tip, mode, preset, request_id}）
+const inputTip = ref('') // 当前显示Agent的输入提示
 const multilineInput = ref(null)
 const singlelineInput = ref(null)
-const lastInputRequest = ref(null) // 保存最后一次的输入请求，用于重连后恢复
-const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent
+const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
 const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
@@ -4172,16 +4172,21 @@ async function fetchAgentStatus(agent) {
 
     // 当前 Agent 连接后根据 execution_status 恢复输入 UI
     if (agent.agent_id === currentAgentId.value) {
+      console.log(`[AGENT STATUS] Restoring UI for agent ${agent.agent_id}, execution_status:`, executionStatus)
       if (executionStatus === 'waiting_single') {
         inputMode.value = 'single'
+        console.log('[AGENT STATUS] Set inputMode to single')
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
+        console.log('[AGENT STATUS] Set inputMode to multi')
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
+        console.log('[AGENT STATUS] waiting_confirm detected, pending_confirm:', pendingConfirm)
         if (pendingConfirm && pendingConfirm.payload) {
           const payload = pendingConfirm.payload
           pendingConfirmAgentId.value = agent.agent_id
+          console.log('[AGENT STATUS] Showing confirm dialog with message:', payload.message)
           showConfirm(
             payload.message || '请确认',
             () => {
@@ -4192,11 +4197,15 @@ async function fetchAgentStatus(agent) {
             },
             payload.default !== undefined ? payload.default : true
           )
+        } else {
+          console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
         }
         inputMode.value = 'multi'
       } else {
         inputMode.value = 'multi'
       }
+    } else {
+      console.log(`[AGENT STATUS] Agent ${agent.agent_id} is not current agent (${currentAgentId.value}), skipping UI restoration`)
     }
     
     console.log(`[AGENT STATUS] Agent ${agent.agent_id} execution_status:`, executionStatus)
@@ -5597,7 +5606,7 @@ async function switchAgent(agent) {
   }
 
   if (agent.agent_id === currentAgentId.value) {
-    console.log('[AGENT] Already on this agent, checking connection...')
+    console.log('[AGENT] Already on this agent, checking connection and local status...')
     const ws = sockets.value.get(agent.agent_id)
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       console.log('[AGENT] WebSocket not connected, reconnecting...')
@@ -5614,7 +5623,34 @@ async function switchAgent(agent) {
         // 不中断流程，让用户看到错误
       }
     } else {
-      console.log('[AGENT] WebSocket already connected, skipping')
+      console.log('[AGENT] WebSocket already connected, checking local status for all interactive modes')
+      // 检查本地记录的状态，如果需要恢复UI则恢复
+      const localStatus = agentStatuses.value.get(agent.agent_id)
+      if (localStatus?.execution_status) {
+        console.log('[AGENT] Local status:', localStatus.execution_status)
+        // 恢复各种需要用户交互的状态
+        if (localStatus.execution_status === 'waiting_confirm') {
+          console.log('[AGENT] Restoring waiting_confirm UI')
+          restoreWaitingConfirmUI(agent.agent_id)
+        } else if (localStatus.execution_status === 'waiting_single' || localStatus.execution_status === 'waiting_multi') {
+          console.log('[AGENT] Restoring waiting_input UI (mode:', localStatus.execution_status + ')')
+          // 从Map中获取该Agent的输入请求
+          const inputRequest = inputRequests.value.get(agent.agent_id)
+          if (inputRequest) {
+            console.log('[AGENT] Found input request in Map, restoring UI')
+            inputTip.value = inputRequest.tip || ''
+            inputMode.value = inputRequest.mode || 'multi'
+            inputText.value = inputText.value || inputRequest.preset || ''
+            pendingInputAgentId.value = agent.agent_id
+            nextTick(() => {
+              const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
+              inputEl?.focus()
+            })
+          } else {
+            console.warn('[AGENT] No input request found in Map for this agent')
+          }
+        }
+      }
     }
     return
   }
@@ -5656,8 +5692,12 @@ async function switchAgent(agent) {
   }
 
   
-  // 清空输入状态
-  lastInputRequest.value = null
+  // 清空当前Agent的输入状态（从Map中删除）
+  const oldAgentId = currentAgentId.value
+  if (oldAgentId) {
+    inputRequests.value.delete(oldAgentId)
+    console.log('[AGENT] Cleared input request for agent', oldAgentId, 'from Map')
+  }
   inputText.value = ''
   inputTip.value = ''
   inputMode.value = 'multi'
@@ -5837,12 +5877,15 @@ function handleMessage(message, agentId = null) {
   // pong 消息处理已移除
   if (type === 'ready') {
 
-    // 恢复之前的输入请求状态
-    if (lastInputRequest.value) {
-      console.log('[ws] Restoring input request from previous session')
-      inputTip.value = lastInputRequest.value.tip || ''
-      inputMode.value = lastInputRequest.value.mode || 'multi'
-      inputText.value = inputText.value || lastInputRequest.value.preset || ''
+    // 恢复当前Agent的输入请求状态（从Map中获取）
+    const currentAgentId = targetAgentId
+    const inputRequest = inputRequests.value.get(currentAgentId)
+    if (inputRequest) {
+      console.log('[ws] Restoring input request for agent', currentAgentId, 'from Map')
+      inputTip.value = inputRequest.tip || ''
+      inputMode.value = inputRequest.mode || 'multi'
+      inputText.value = inputText.value || inputRequest.preset || ''
+      pendingInputAgentId.value = currentAgentId
       nextTick(() => {
         const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
         inputEl?.focus()
@@ -5937,11 +5980,22 @@ function handleMessage(message, agentId = null) {
       return
     }
     
-    // 保存输入请求，用于重连后恢复
-    lastInputRequest.value = payload
-    inputTip.value = payload.tip || ''
-    inputMode.value = payload.mode || 'multi'  // 默认多行
-    inputText.value = payload.preset || inputText.value
+    // 保存输入请求到Map中，用于重连后恢复和Agent切换
+    inputRequests.value.set(targetAgentId, {
+      tip: payload.tip || '',
+      mode: payload.mode || 'multi',
+      preset: payload.preset || '',
+      request_id: payload.request_id
+    })
+    console.log('[ws] Saved input request for agent', targetAgentId, ':', payload.mode)
+    
+    // 如果是当前Agent，更新全局UI状态并显示输入框
+    if (isCurrentAgent(targetAgentId)) {
+      inputTip.value = payload.tip || ''
+      inputMode.value = payload.mode || 'multi'
+      inputText.value = payload.preset || inputText.value
+      pendingInputAgentId.value = targetAgentId
+    }
     
     // 检查是否在底部（用于判断是否需要在显示输入框后滚动）
     const SCROLL_THRESHOLD = 50 // 50px 的容差
@@ -6911,9 +6965,13 @@ function sendInputDirectly(text) {
   }
 
   sendMessageToAgent(message)
-  
-  // 输入框现在是永久显示的，不需要隐藏
-  lastInputRequest.value = null // 清空保存的输入请求
+
+  // 从Map中删除该函数没有agentId参数，使用当前Agent的ID
+  const targetAgentId = currentAgentId.value
+  if (targetAgentId) {
+    inputRequests.value.delete(targetAgentId)
+    console.log('[INPUT] Cleared input request for agent', targetAgentId, 'from Map')
+  }
 }
 
 function sendInputResult(text, requestId, agentId = null) {
@@ -6949,6 +7007,12 @@ function sendInputResult(text, requestId, agentId = null) {
     } else {
       console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
     }
+  }
+  
+  // 从Map中删除该Agent的输入请求（表示已响应）
+  if (targetAgentId) {
+    inputRequests.value.delete(targetAgentId)
+    console.log('[INPUT] Cleared input request for agent', targetAgentId, 'from Map after sending result')
   }
   pendingInputAgentId.value = null
 }

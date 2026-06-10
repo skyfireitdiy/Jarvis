@@ -1,0 +1,14 @@
+{
+  "id": "20260610_131407_616162",
+  "type": "project_long_term",
+  "tags": [
+    "console_print",
+    "PrettyOutput",
+    "auto_print",
+    "print_markdown",
+    "替换完成"
+  ],
+  "content": "已将所有可替换的 console.print() 替换为 PrettyOutput.auto_print() 或 print_markdown()。\n\n**替换统计**:\n- output.py:1698 - ✓→✅ emoji替换\n- llm_context_recommender.py:177/179/310/312/315-318 - 5处直接替换，移除style参数\n- quick_config.py:185-189/286-288/302-304/318-320 - 4组交互式列表替换为Markdown表格+print_markdown()\n\n**保留场景**（不替换）:\n1. ConsoleOutputSink.emit()内部 - 基础设施代码，避免递归\n2. Rich特殊格式控制 - Panel/Syntax/Table/Align.center等\n3. 流式输出 - end=\"\"或end=\"\\r\"参数\n4. 渐变文本 - Text对象+ANSI转义序列\n5. Markdown渲染 - print_markdown()已使用\n6. 错误处理 - console.print_exception()",
+  "created_at": "2026-06-10T13:14:07.616225",
+  "updated_at": "2026-06-10T13:14:07.616234"
+}
