@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -344,7 +345,15 @@ class WebGateway(BaseGateway):
         self._input_registry = input_registry
         self._auth_store = auth_store
         self._terminal_input_registry = terminal_input_registry
-        self._pending_outputs: List[Dict[str, Any]] = []  # 缓存WebSocket连接前的输出
+
+        # 输出缓存：持续缓存所有输出消息（上限500条）
+        self._output_cache: deque = deque(maxlen=500)
+
+        # 输入缓存：区分已发送/未发送
+        self._pending_inputs: List[Dict[str, Any]] = []  # 未发送的输入请求
+        self._sent_inputs: Dict[
+            str, Dict[str, Any]
+        ] = {}  # 已发送但未收到回复：{session_id: message}
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         # 单连接模式，固定使用 default session_id
@@ -366,12 +375,12 @@ class WebGateway(BaseGateway):
             payload["agent_id"] = context["agent_id"]
         message = {"type": "output", "payload": payload}
 
-        if not authorized:
-            # WebSocket连接未建立，缓存消息
-            self._pending_outputs.append(message)
-            return
+        # 持续缓存所有输出消息（无论是否已授权）
+        self._output_cache.append(message)
 
-        self._router.publish(message, session_id=session_id)
+        # 如果已授权，实时发送
+        if authorized:
+            self._router.publish(message, session_id=session_id)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
         # 单连接模式，固定使用 default session_id
@@ -405,6 +414,8 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存输入请求，用于重连后恢复
         self._input_registry.save_input_request(session_id, message)
+        # 追踪已发送的输入请求
+        self._sent_inputs[session_id] = message
 
         # 更新状态为等待输入
         if request.mode == "single":
@@ -426,6 +437,9 @@ class WebGateway(BaseGateway):
 
         # 输入完成，恢复为运行状态
         _update_status("running")
+
+        # 清除已完成的输入请求
+        self._sent_inputs.pop(session_id, None)
 
         return GatewayInputResult(text=text, metadata=metadata)
 
@@ -450,6 +464,9 @@ class WebGateway(BaseGateway):
         self._router.publish(message, session_id=session_id)
         # 保存确认请求，用于重连后恢复
         self._input_registry.save_confirm_request(session_id, message)
+        # 追踪已发送的确认请求（使用特殊key区分input和confirm）
+        confirm_key = f"{session_id}_confirm"
+        self._sent_inputs[confirm_key] = message
 
         # 更新状态为等待确认
         _update_status("waiting_confirm")
@@ -459,6 +476,9 @@ class WebGateway(BaseGateway):
 
         # 确认完成，恢复为运行状态
         _update_status("running")
+
+        # 清除已完成的确认请求
+        self._sent_inputs.pop(confirm_key, None)
 
         return GatewayConfirmResult(confirmed=confirmed, metadata=metadata)
 
@@ -601,11 +621,10 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
-        # 发送缓存的输出消息
-        if self._gateway._pending_outputs:
-            for cached_message in self._gateway._pending_outputs:
+        # 发送缓存的输出消息（全量覆盖）
+        if self._gateway._output_cache:
+            for cached_message in self._gateway._output_cache:
                 await websocket.send_json(cached_message)
-            self._gateway._pending_outputs.clear()
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         if pending_request:
@@ -1045,7 +1064,7 @@ def create_app(
                                     f"http://127.0.0.1:{port}/update_token",
                                     json={"token": gateway_token},
                                     headers={"X-Internal-Sync": "true"},
-                                    timeout=5.0
+                                    timeout=5.0,
                                 )
                             except Exception:
                                 pass
