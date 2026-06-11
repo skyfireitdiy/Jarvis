@@ -6010,6 +6010,11 @@ function handleMessage(message, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
   // pong 消息处理已移除
   if (type === 'ready') {
+    // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    currentOutputs.length = 0
+    allOutputs.value.set(targetAgentId, currentOutputs)
+    console.log('[ws] Cleared output cache for agent', targetAgentId, 'ready to receive full history from backend')
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
     const currentAgentId = targetAgentId
