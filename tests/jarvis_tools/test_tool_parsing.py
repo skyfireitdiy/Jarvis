@@ -19,8 +19,8 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
-        assert "read_code" in result
-        assert result["read_code"]["arguments"]["files"][0]["path"] == "test.py"
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"]["files"][0]["path"] == "test.py"
 
     def test_parse_bare_json_tool_call(self):
         """测试：裸露的 JSON 工具调用（应该被识别）"""
@@ -32,7 +32,7 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
-        assert "read_code" in result
+        assert result[0]["name"] == "read_code"
 
     def test_ignore_json_code_block_without_tool_name(self):
         """测试：单独的 JSON 代码块（不应该被识别）"""
@@ -107,8 +107,8 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
-        assert "edit_file" in result
-        assert result["edit_file"]["arguments"]["files"][0]["file_path"] == "test.py"
+        assert result[0]["name"] == "edit_file"
+        assert result[0]["arguments"]["files"][0]["file_path"] == "test.py"
 
     def test_ignore_incomplete_json_in_code_block(self):
         """测试：代码块中不完整的 JSON（不应该被识别）"""
@@ -172,5 +172,5 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
-        assert "read_code" in result
-        assert result["read_code"]["arguments"]["files"][0]["path"] == "src/main.py"
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"]["files"][0]["path"] == "src/main.py"
