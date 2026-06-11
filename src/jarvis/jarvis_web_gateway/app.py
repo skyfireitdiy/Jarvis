@@ -349,6 +349,9 @@ class WebGateway(BaseGateway):
         # 输出缓存：持续缓存所有输出消息（上限500条）
         self._output_cache: deque = deque(maxlen=500)
 
+        # 输入消息缓存：持续缓存所有用户输入消息（上限500条），用于重连后恢复对话完整性
+        self._input_message_cache: deque = deque(maxlen=500)
+
         # 输入缓存：区分已发送/未发送
         self._pending_inputs: List[Dict[str, Any]] = []  # 未发送的输入请求
         self._sent_inputs: Dict[
@@ -625,6 +628,10 @@ class WebSocketConnectionManager:
         if self._gateway._output_cache:
             for cached_message in self._gateway._output_cache:
                 await websocket.send_json(cached_message)
+        # 发送缓存的输入消息（保持对话顺序）
+        if self._gateway._input_message_cache:
+            for cached_message in self._gateway._input_message_cache:
+                await websocket.send_json(cached_message)
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         if pending_request:
@@ -683,6 +690,8 @@ class WebSocketConnectionManager:
             return
         if message_type == "input_result":
             text = payload.get("text", "")
+            # 缓存用户输入消息，用于重连后恢复对话完整性
+            self._gateway._input_message_cache.append(message)
             # 检查当前是否正在等待输入
             session = self._input_registry.get_or_create(session_id)
             if session.is_waiting_for_input():
