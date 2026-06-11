@@ -1,0 +1,8 @@
+{
+  "id": "20260611_080934_816513",
+  "type": "project_long_term",
+  "tags": ["bug修复", "工具解析", "markdown过滤"],
+  "content": "已修复工具解析器误识别markdown代码块中JSON的bug。修改位置：src/jarvis/jarvis_tools/registry.py的_parse_embedded_json_format方法（1204-1243行）。修复方法：使用正则r'```[\\w]*\\n[\\s\\S]*?```'预扫描所有markdown代码块位置，在遍历{字符时跳过代码块内的JSON。已提交commit e189584，静态检查通过。测试文件：tests/jarvis_tools/test_tool_parsing.py（11个测试用例）。注意：需要重启Jarvis实例才能加载新代码。",
+  "created_at": "2026-06-11T08:09:34.816553",
+  "updated_at": "2026-06-11T08:09:34.816559"
+}
