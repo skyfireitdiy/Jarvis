@@ -1207,14 +1207,33 @@ class ToolRegistry(OutputHandlerProtocol):
         """从全文扫描JSON对象，提取含name+arguments的标准格式"""
         ret: list = []
         used_ranges: list = []
+
+        # 查找所有 markdown 代码块的位置范围
+        markdown_code_blocks: list = []
+        code_block_pattern = r"```[\w]*\n[\s\S]*?```"
+        import re
+
+        for match in re.finditer(code_block_pattern, content):
+            markdown_code_blocks.append((match.start(), match.end()))
+
         for i, ch in enumerate(content):
             if ch == "{":
+                # 检查是否在已使用范围内
                 in_used = False
                 for start, end in used_ranges:
                     if start <= i <= end:
                         in_used = True
                         break
                 if in_used:
+                    continue
+
+                # 检查是否在 markdown 代码块内
+                in_code_block = False
+                for block_start, block_end in markdown_code_blocks:
+                    if block_start <= i <= block_end:
+                        in_code_block = True
+                        break
+                if in_code_block:
                     continue
 
                 json_str, end_pos = extract_json_from_text(content, i)
