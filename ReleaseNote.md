@@ -1,3 +1,57 @@
+### Release Note - v3.1.13 2026-06-10
+#### **🚀 新功能**
+- **🎯 LLM配置管理快捷命令**
+  - **价值标签**：LLM配置管理一键完成，无需记忆复杂命令
+  - **场景标签**：LLM平台配置、模型组管理、快速切换模型
+  - **效果**：新增LLMAdd/LLMDelete/LLMUpdate/LLMGroupAdd/LLMGroupDelete/LLMGroupUpdate/LLMGroupSet 7个内置标签命令，支持在输入中直接触发LLM配置管理操作
+- **🎯 前端编辑器迁移至CodeMirror 6**
+  - **价值标签**：前端包体积大幅减小，支持更多编程语言语法高亮
+  - **场景标签**：Web界面代码编辑、文件查看、多语言支持
+  - **效果**：将前端编辑器从Monaco Editor迁移到CodeMirror 6，移除monaco-editor依赖（约20MB），新增18种语言支持（Python/JS/TS/Go/Rust/C++/Java/PHP/SQL/YAML等），编辑器启动更快、资源占用更少
+- **🎯 网关Token内部同步机制**
+  - **价值标签**：网关重启不中断Agent认证，服务连续性保障
+  - **场景标签**：网关重启、Token更新、多节点部署
+  - **效果**：Agent和CodeAgent新增X-Internal-Sync标记支持，网关重启时通过内部请求同步Token到Agent进程，避免重启后认证失败
+- **🎯 Agent批量管理**
+  - **价值标签**：批量操作Agent，管理效率大幅提升
+  - **场景标签**：Agent清理、批量重生、大规模Agent管理
+  - **效果**：gateway_manager的delete_agent和regenerate_agent操作支持传入agent_id列表进行批量删除和批量重生，返回每个Agent的执行结果
+#### **📌 修复**
+- **🔧 前端终端历史显示条件**
+  - **价值标签**：终端输出显示更准确，无内容时不显示空白区域
+  - **场景标签**：Web界面终端输出、执行结果展示
+  - **效果**：修复App.vue中terminal_history显示条件，增加item.terminal_content非空判断，避免空内容时显示空白终端区域
+- **🔧 前端编辑器容器重建兼容**
+  - **价值标签**：编辑器在tabs切换时稳定工作
+  - **场景标签**：Web界面文件编辑、多标签切换
+  - **效果**：修复tabs从空变为非空时编辑器无法挂载的问题，增加cmEditorView.dom.isConnected检测，在容器重建时销毁旧实例重新创建
+#### **🔧 优化与重构**
+- **🎯 Agent网络知识查询机制完善**
+  - **价值标签**：Agent协作更智能，知识复用更充分
+  - **场景标签**：多Agent协作、知识管理、任务调度
+  - **效果**：intelligent_scheduling.md和knowledge_management.md新增任务开始前强制查询知识库规则，self_evolving_network.md明确主Agent调度前必须先查询知识，知识库Agent新增主动响应查询职责
+- **🎯 工具调用格式解析增强**
+  - **价值标签**：工具调用识别更全面，兼容更多LLM输出格式
+  - **场景标签**：工具调用、指令解析、LLM兼容性
+  - **效果**：registry.py新增_parse_function_call_format（解析`工具名(JSON参数)`格式）和_parse_xml_parameter_format（解析`<tool><parameter name="key">value</parameter></tool>`格式），提升LLM输出解析成功率
+- **🎯 快速配置UI优化**
+  - **价值标签**：模型选择界面更清晰美观
+  - **场景标签**：LLM配置、模型选择、快速配置
+  - **效果**：quick_config.py中模型选择列表从console.print改为PrettyOutput.print_markdown表格显示，提升可读性和视觉一致性
+- **🎯 对话完成提示优化**
+  - **价值标签**：输出风格统一，emoji使用一致
+  - **场景标签**：对话完成、性能统计
+  - **效果**：output.py中对话完成提示从console.print改为PrettyOutput.auto_print，emoji从✓改为✅，与项目其他输出风格保持一致
+- **🎯 任务难度评估优化**
+  - **价值标签**：代码修改任务不再被错误评为easy，确保充分处理
+  - **场景标签**：任务分类、难度评估、代码修改
+  - **效果**：scenario_prompts.py中easy难度描述增加注释说明，涉及代码修改的任务至少评为medium，不能评为easy
+- **🎯 前端输入管理优化**
+  - **价值标签**：多Agent输入状态独立管理，切换Agent恢复正确UI
+  - **场景标签**：Web界面输入、多Agent切换、状态恢复
+  - **效果**：App.vue新增inputRequests Map独立管理每个Agent的输入请求，switchAgent时根据本地状态恢复waiting_confirm/waiting_input等交互UI
+---
+
 ### Release Note - v3.1.12 2026-06-09
 #### **🚀 新功能**
 - **🎯 Agent无损重生**
