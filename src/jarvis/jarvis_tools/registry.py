@@ -1204,11 +1204,17 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _parse_embedded_json_format(content: str) -> list:
-        """从全文扫描JSON对象，提取含name+arguments的标准格式"""
+        """从全文扫描JSON对象，提取含name+arguments的标准格式。
+
+        注意：此方法只处理裸露在文本中的 JSON（不在 markdown 代码块内）。
+        markdown 代码块中的工具调用应该由 _parse_code_block_format 处理（需要前置工具名）。
+        """
         ret: list = []
         used_ranges: list = []
 
         # 查找所有 markdown 代码块的位置范围
+        # 代码块中的内容应该由 _parse_code_block_format 处理（需要工具名前缀）
+        # 或者是示例代码（不应该被识别为工具调用）
         markdown_code_blocks: list = []
         code_block_pattern = r"```[\w]*\n[\s\S]*?```"
         import re
@@ -1227,7 +1233,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 if in_used:
                     continue
 
-                # 检查是否在 markdown 代码块内
+                # 跳过 markdown 代码块中的内容
                 in_code_block = False
                 for block_start, block_end in markdown_code_blocks:
                     if block_start <= i <= block_end:
