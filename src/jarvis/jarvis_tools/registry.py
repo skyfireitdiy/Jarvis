@@ -1143,20 +1143,43 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
-    def _parse_code_block_format(content: str, existing: list) -> Tuple[list, bool]:
-        """解析 工具名 + markdown代码块 格式"""
+    def _parse_code_block_format(
+        content: str, existing: list
+    ) -> Tuple[list, bool, List[Tuple[int, int]]]:
+        """解析 工具名 + markdown代码块 格式
+
+        返回:
+            Tuple[list, bool, List[Tuple[int, int]]]:
+                - 识别的工具调用列表
+                - 是否自动补全
+                - 已识别区域的(start, end)位置列表，用于后续解析器跳过
+        """
         ret: list = []
         auto_completed = False
+        used_ranges: List[Tuple[int, int]] = []
         # 匹配：工具名(独立行) + 换行 + 代码块
-        # 使用负向后查找确保工具名前不是代码块标记
         code_block_pattern = (
             r"(?:^|\n)(?<!```)([a-zA-Z_]\w*)\s*\n```[a-zA-Z]*\n(.*?)\n```"
         )
-        code_block_matches = re.finditer(code_block_pattern, content, re.DOTALL)
+        code_block_matches = list(re.finditer(code_block_pattern, content, re.DOTALL))
 
-        for match in code_block_matches:
+        # 过滤掉重叠的匹配（防止代码块内的语言标识被误识别为工具名）
+        filtered_matches = []
+        for i, match in enumerate(code_block_matches):
             tool_name = match.group(1)
-            code_content = match.group(2).strip()
+            start_pos = match.start()
+
+            # 检查此匹配是否在之前某个匹配的代码块内部
+            is_inside_previous = False
+            for prev_match in code_block_matches[:i]:
+                prev_start = prev_match.start()
+                prev_end = prev_match.end()
+                if prev_start < start_pos < prev_end:
+                    is_inside_previous = True
+                    break
+
+            if is_inside_previous:
+                continue
 
             # 额外检查：如果工具名看起来像语言标识（纯小写，常见语言），跳过
             if tool_name.lower() in [
@@ -1180,6 +1203,14 @@ class ToolRegistry(OutputHandlerProtocol):
                 "tsx",
             ]:
                 continue
+
+            filtered_matches.append(match)
+
+        for match in filtered_matches:
+            tool_name = match.group(1)
+            code_content = match.group(2).strip()
+            # 记录此匹配的区域，用于后续解析器跳过
+            used_ranges.append((match.start(), match.end()))
 
             already_found = False
             for ex in existing:
@@ -1205,27 +1236,40 @@ class ToolRegistry(OutputHandlerProtocol):
             tool_call = {"name": tool_name, "arguments": {"content": code_content}}
             ret.append(tool_call)
             auto_completed = True
-        return ret, auto_completed
+        return ret, auto_completed, used_ranges
 
     @staticmethod
-    def _parse_embedded_json_format(content: str) -> list:
+    def _parse_embedded_json_format(
+        content: str, skip_ranges: Optional[List[Tuple[int, int]]] = None
+    ) -> list:
         """从全文扫描JSON对象，提取含name+arguments的标准格式。
 
         注意：此方法只处理裸露在文本中的 JSON（不在 markdown 代码块内）。
         markdown 代码块中的工具调用应该由 _parse_code_block_format 处理（需要前置工具名）。
+
+        参数:
+            content: 要扫描的文本内容
+            skip_ranges: 需要跳过的区域列表，来自 _parse_code_block_format 的已识别区域
         """
         ret: list = []
         used_ranges: list = []
 
         # 查找所有 markdown 代码块的位置范围
-        # 代码块中的内容应该由 _parse_code_block_format 处理（需要工具名前缀）
-        # 或者是示例代码（不应该被识别为工具调用）
+        # 代码块中的内容不应该被 _parse_embedded_json_format 识别
+        # 带工具名的代码块由 _parse_code_block_format 处理
+        # 单独的代码块是示例代码，不应该被识别为工具调用
         markdown_code_blocks: list = []
+        # 只匹配代码块本身（不包含工具名前缀）
         code_block_pattern = r"```[\w]*\n[\s\S]*?```"
         import re
 
         for match in re.finditer(code_block_pattern, content):
             markdown_code_blocks.append((match.start(), match.end()))
+
+        # 合并所有需要跳过的区域：markdown代码块 + 外部传入的已识别区域
+        all_skip_ranges = list(markdown_code_blocks)
+        if skip_ranges:
+            all_skip_ranges.extend(skip_ranges)
 
         for i, ch in enumerate(content):
             if ch == "{":
@@ -1238,13 +1282,13 @@ class ToolRegistry(OutputHandlerProtocol):
                 if in_used:
                     continue
 
-                # 跳过 markdown 代码块中的内容
-                in_code_block = False
-                for block_start, block_end in markdown_code_blocks:
-                    if block_start <= i <= block_end:
-                        in_code_block = True
+                # 跳过 markdown 代码块中的内容以及已识别区域
+                in_skip_range = False
+                for block_start, block_end in all_skip_ranges:
+                    if block_start <= i < block_end:
+                        in_skip_range = True
                         break
-                if in_code_block:
+                if in_skip_range:
                     continue
 
                 json_str, end_pos = extract_json_from_text(content, i)
@@ -1306,13 +1350,18 @@ class ToolRegistry(OutputHandlerProtocol):
         ret.extend(ToolRegistry._parse_xml_parameter_format(content, ret))
 
         # 3. 解析 "工具名 + markdown代码块" 格式
-        code_block_results, auto_completed = ToolRegistry._parse_code_block_format(
-            content, ret
+        code_block_results, auto_completed, code_block_ranges = (
+            ToolRegistry._parse_code_block_format(content, ret)
         )
         ret.extend(code_block_results)
 
         # 4. 从全文扫描JSON对象，提取含name+arguments的标准格式
-        ret.extend(ToolRegistry._parse_embedded_json_format(content))
+        # 传入已识别的代码块区域，避免重复识别
+        ret.extend(
+            ToolRegistry._parse_embedded_json_format(
+                content, skip_ranges=code_block_ranges
+            )
+        )
 
         # 5. 宽泛提取作为兜底
         if not ret:

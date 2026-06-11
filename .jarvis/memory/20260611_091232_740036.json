@@ -1,0 +1,8 @@
+{
+  "id": "20260611_091232_740036",
+  "type": "project_long_term",
+  "tags": ["工具解析器", "bug修复", "架构问题"],
+  "content": "工具解析器存在根本性架构问题：_parse_code_block_format 和 _parse_embedded_json_format 会重复识别相同内容。已尝试5次修复失败：1) 添加重叠检测 2) 修改代码块正则。根本原因：_parse_embedded_json_format 遍历所有 { 字符提取JSON，即使过滤了代码块位置，仍会误识别语言标识（json/python）为工具名。正确方案需要重构 _extract_tool_calls 架构，让已识别区域被标记并在后续解析中跳过。",
+  "created_at": "2026-06-11T09:12:32.740068",
+  "updated_at": "2026-06-11T09:12:32.740075"
+}
