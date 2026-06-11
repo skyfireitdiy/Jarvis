@@ -1122,6 +1122,39 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _parse_tool_calls_xml_format(content: str) -> list:
+        """解析 <tool_calls><tool_call name="xxx"><parameter name="xxx" string="false">value</parameter></tool_call></tool_calls> 格式"""
+        ret: list = []
+        # 匹配 <tool_calls> ... </tool_calls> 外层容器
+        tc_pattern = r"<tool_calls>\s*(.*?)\s*</tool_calls>"
+        tc_match = re.search(tc_pattern, content, re.DOTALL)
+        if not tc_match:
+            return ret
+        inner = tc_match.group(1)
+        # 匹配 <tool_call name="xxx"> ... </tool_call>
+        tool_call_pattern = r'<tool_call\s+name="(\w+)"\s*>\s*(.*?)\s*</tool_call>'
+        for tc in re.finditer(tool_call_pattern, inner, re.DOTALL):
+            tool_name = tc.group(1)
+            params_content = tc.group(2)
+            arguments: dict = {}
+            # 匹配 <parameter name="xxx" string="true/false">value</parameter>
+            param_pattern = r'<parameter\s+name="(\w+)"(?:\s+string="(true|false)")?\s*>\s*(.*?)\s*</parameter>'
+            for pm in re.finditer(param_pattern, params_content, re.DOTALL):
+                param_name = pm.group(1)
+                is_string = pm.group(2)
+                param_value = pm.group(3)
+                # string="false" 时尝试 JSON 解析
+                if is_string == "false":
+                    try:
+                        param_value = json_loads(param_value)
+                    except Exception:
+                        pass
+                arguments[param_name] = param_value
+            if arguments:
+                ret.append({"name": tool_name, "arguments": arguments})
+        return ret
+
+    @staticmethod
     def _parse_arg_key_value_format(content: str, existing: list) -> list:
         """解析 [TOOL_CALL] 标记 + arg_key/arg_value 标签格式
 
@@ -1367,6 +1400,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 2.2. 解析 XML 参数标签格式: <tool_name><parameter name="key">value</parameter></tool_name>
         ret.extend(ToolRegistry._parse_xml_parameter_format(content, ret))
+
+        # 2.3. 解析 <tool_calls><tool_call name="xxx"><parameter name="xxx" string="false">value</parameter></tool_call></tool_calls> 格式
+        ret.extend(ToolRegistry._parse_tool_calls_xml_format(content))
 
         # 3. 解析 "工具名 + markdown代码块" 格式
         code_block_results, auto_completed, code_block_ranges = (
