@@ -6030,6 +6030,17 @@ function handleMessage(message, agentId = null) {
         inputEl?.focus()
       })
     }
+  } else if (type === 'input_result') {
+    // 重连时后端发送的输入缓存，回显用户输入到聊天窗口
+    const inputText = payload?.text
+    if (inputText && inputText !== '__CTRL_C_PRESSED__') {
+      appendOutput({
+        output_type: 'user_input',
+        agent_name: 'user',
+        text: inputText,
+        lang: 'text',
+      }, targetAgentId)
+    }
   } else if (type === 'output') {
     const outputType = payload?.output_type
     
