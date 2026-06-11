@@ -1,0 +1,12 @@
+{
+  "id": "20260611_000304_667215",
+  "type": "project_long_term",
+  "tags": [
+    "version-release",
+    "v3.1.13",
+    "patch"
+  ],
+  "content": "Jarvis v3.1.13 patch版本发布完成（2026-06-10）。起始commit: 66ec61720abf440333468914aaf50f5eeb249780。ReleaseNote已更新，包含4新功能+2修复+6优化。publish.py patch脚本执行成功，版本号更新为3.1.13，已推送到2个远程仓库（gitee和origin），GitHub Action将自动发布到PyPI。测试结果：857 passed, 0 failed。",
+  "created_at": "2026-06-11T00:03:04.667267",
+  "updated_at": "2026-06-11T00:03:04.667273"
+}
