@@ -275,50 +275,28 @@ class ToolRegistry(OutputHandlerProtocol):
                     return False, f"{err_msg}\n\n{tool_call_help}"
 
             # 处理多个工具调用
-            # 检查是否是多个工具调用的格式（字典的键是工具名称，值是工具调用信息）
-            # 单个工具调用时，返回的是 {"name": ..., "arguments": ...}
-            # 多个工具调用时，返回的是 {tool_name: {"name": ..., "arguments": ...}, ...}
-            if isinstance(tool_calls, dict):
-                # 检查是否是多个工具调用的格式
-                # 判断标准：如果字典的值是字典且包含 "name" 和 "arguments"，则是多个工具调用格式
-                # 否则，如果字典直接包含 "name" 和 "arguments"，则是单个工具调用格式
-                if len(tool_calls) > 1:
-                    # 多个键，检查第一个值是否是工具调用信息字典
-                    first_value = list(tool_calls.values())[0]
-                    if (
-                        isinstance(first_value, dict)
-                        and "name" in first_value
-                        and "arguments" in first_value
-                    ):
-                        # 多个工具调用格式
-                        result = self.handle_multiple_tool_calls(tool_calls, agent)
-                    else:
-                        # 可能是格式错误，尝试作为单个工具调用处理
-                        result = self.handle_tool_calls(tool_calls, agent)
+            # tool_calls 现在是列表格式
+            if isinstance(tool_calls, list):
+                if len(tool_calls) == 0:
+                    result = ""
                 elif len(tool_calls) == 1:
-                    # 单个键，检查值是否是工具调用信息字典
-                    first_value = list(tool_calls.values())[0]
-                    if (
-                        isinstance(first_value, dict)
-                        and "name" in first_value
-                        and "arguments" in first_value
-                    ):
-                        # 多个工具调用格式，但只有一个
-                        result = self.handle_tool_calls(first_value, agent)
-                    elif "name" in tool_calls and "arguments" in tool_calls:
-                        # 单个工具调用格式（直接包含 name 和 arguments）
-                        result = self.handle_tool_calls(tool_calls, agent)
-                    else:
-                        # 向后兼容：尝试作为单个工具调用处理
-                        result = self.handle_tool_calls(tool_calls, agent)
-                elif "name" in tool_calls and "arguments" in tool_calls:
-                    # 单个工具调用格式（直接包含 name 和 arguments，但 len == 0 的情况不应该发生）
-                    result = self.handle_tool_calls(tool_calls, agent)
+                    result = self.handle_tool_calls(tool_calls[0], agent)
                 else:
-                    # 空字典或格式错误
-                    result = self.handle_tool_calls(tool_calls, agent)
+                    # 多个工具调用
+                    tool_calls_dict = {}
+                    for i, tool_call in enumerate(tool_calls):
+                        name = tool_call.get("name", f"unknown_{i}")
+                        # 如果同名工具调用多次，使用索引区分
+                        if name in tool_calls_dict:
+                            base_name = name
+                            index = 1
+                            while f"{base_name}_{index}" in tool_calls_dict:
+                                index += 1
+                            name = f"{base_name}_{index}"
+                        tool_calls_dict[name] = tool_call
+                    result = self.handle_multiple_tool_calls(tool_calls_dict, agent)
             else:
-                # 非字典格式，直接调用 handle_tool_calls
+                # 向后兼容：非列表格式（理论上不应该发生）
                 result = self.handle_tool_calls(tool_calls, agent)
 
             # auto_completed 逻辑已移除（不再需要自动补全标签）
@@ -1169,12 +1147,39 @@ class ToolRegistry(OutputHandlerProtocol):
         """解析 工具名 + markdown代码块 格式"""
         ret: list = []
         auto_completed = False
-        code_block_pattern = r"(?:^|\n)(\w+)\s*\n```[a-zA-Z]*\n(.*?)\n```"
+        # 匹配：工具名(独立行) + 换行 + 代码块
+        # 使用负向后查找确保工具名前不是代码块标记
+        code_block_pattern = (
+            r"(?:^|\n)(?<!```)([a-zA-Z_]\w*)\s*\n```[a-zA-Z]*\n(.*?)\n```"
+        )
         code_block_matches = re.finditer(code_block_pattern, content, re.DOTALL)
 
         for match in code_block_matches:
             tool_name = match.group(1)
             code_content = match.group(2).strip()
+
+            # 额外检查：如果工具名看起来像语言标识（纯小写，常见语言），跳过
+            if tool_name.lower() in [
+                "json",
+                "python",
+                "javascript",
+                "bash",
+                "shell",
+                "yaml",
+                "xml",
+                "html",
+                "css",
+                "sql",
+                "java",
+                "cpp",
+                "c",
+                "go",
+                "rust",
+                "typescript",
+                "jsx",
+                "tsx",
+            ]:
+                continue
 
             already_found = False
             for ex in existing:
@@ -1261,7 +1266,7 @@ class ToolRegistry(OutputHandlerProtocol):
     def _extract_tool_calls(
         content: str,
         agent: Optional[Any] = None,
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
+    ) -> Tuple[List[Dict[str, Any]], str, bool]:
         """从内容中提取工具调用。
 
         参数:
@@ -1269,8 +1274,8 @@ class ToolRegistry(OutputHandlerProtocol):
             agent: 可选的Agent实例，用于在解析失败时调用大模型修复
 
         返回:
-            Tuple[Dict[str, Dict[str, Any]], str, bool]:
-                - 第一个元素是提取的工具调用字典
+            Tuple[List[Dict[str, Any]], str, bool]:
+                - 第一个元素是提取的工具调用列表
                 - 第二个元素是错误消息字符串（成功时为""）
                 - 第三个元素保留为False（不再需要自动补全标签）
 
@@ -1340,30 +1345,13 @@ class ToolRegistry(OutputHandlerProtocol):
                     return ToolRegistry._extract_tool_calls(llm_fixed_content, None)
 
             return (
-                {},
+                [],
                 error_msg,
                 False,
             )
 
-        # 处理解析结果
-        if len(ret) == 0:
-            return {}, "", auto_completed
-        elif len(ret) == 1:
-            return ret[0], "", auto_completed
-        else:
-            # 多个工具调用：构建字典，键为工具名称，值为工具调用信息
-            tool_calls_dict = {}
-            for tool_call in ret:
-                name = tool_call.get("name", "unknown")
-                # 如果同名工具调用多次，使用索引区分
-                if name in tool_calls_dict:
-                    base_name = name
-                    index = 1
-                    while f"{base_name}_{index}" in tool_calls_dict:
-                        index += 1
-                    name = f"{base_name}_{index}"
-                tool_calls_dict[name] = tool_call
-            return tool_calls_dict, "", auto_completed
+        # 统一返回列表格式
+        return ret, "", auto_completed
 
     def register_tool(
         self,
