@@ -816,8 +816,9 @@ class ToolRegistry(OutputHandlerProtocol):
         return None, len(text)
 
     @staticmethod
+    @staticmethod
     def _fuzzy_extract_tool_json(
-        content: str, skip_ranges: Optional[List[Tuple[int, int]]] = None
+        content: str, valid_tool_names: Optional[set] = None
     ) -> List[str]:
         """宽泛提取：从全文中搜索JSON对象，检查是否包含name和arguments字段
 
@@ -825,21 +826,13 @@ class ToolRegistry(OutputHandlerProtocol):
 
         参数:
             content: 要搜索的文本内容
-            skip_ranges: 要跳过的位置范围列表[(start, end), ...]
+            valid_tool_names: 有效的工具名集合，用于验证工具调用
 
         返回:
             List[str]: 提取到的有效工具调用JSON字符串列表
         """
-        if skip_ranges is None:
-            skip_ranges = []
-
         results = []
         for i, ch in enumerate(content):
-            # 检查是否在跳过范围内
-            in_skip_range = any(start <= i < end for start, end in skip_ranges)
-            if in_skip_range:
-                continue
-
             if ch == "{":
                 json_str, end_pos = extract_json_from_text(content, i)
                 if json_str is None:
@@ -852,7 +845,10 @@ class ToolRegistry(OutputHandlerProtocol):
                         and "name" in parsed
                         and "arguments" in parsed
                     ):
-                        results.append(json_str)
+                        # 如果提供了工具名集合，验证name是否是已注册工具
+                        tool_name = parsed.get("name", "")
+                        if valid_tool_names is None or tool_name in valid_tool_names:
+                            results.append(json_str)
                 except Exception:
                     continue
         return results
@@ -1276,38 +1272,19 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _parse_embedded_json_format(
-        content: str, skip_ranges: Optional[List[Tuple[int, int]]] = None
+        content: str, valid_tool_names: Optional[set] = None
     ) -> list:
         """从全文扫描JSON对象，提取含name+arguments的标准格式。
 
-        注意：此方法只处理裸露在文本中的 JSON（不在 markdown 代码块内）。
-        markdown 代码块中的工具调用应该由 _parse_code_block_format 处理（需要前置工具名）。
+        只要JSON格式正确且name是已注册工具，就识别为工具调用（无论是否在代码块内）。
+        这样可以支持代码块内的标准格式工具调用，同时通过工具名验证排除示例数据。
 
         参数:
             content: 要扫描的文本内容
-            skip_ranges: 需要跳过的区域列表，来自 _parse_code_block_format 的已识别区域
+            valid_tool_names: 有效的工具名集合，用于验证name字段
         """
         ret: list = []
         used_ranges: list = []
-
-        # 查找所有 markdown 代码块的位置范围
-        # 代码块中的内容不应该被 _parse_embedded_json_format 识别
-        # 带工具名的代码块由 _parse_code_block_format 处理
-        # 单独的代码块是示例代码，不应该被识别为工具调用
-        markdown_code_blocks: list = []
-        # 只匹配代码块本身（不包含工具名前缀），允许缩进
-        # 使用 ^|\n 锚定行首，捕获组只包含代码块内容（含缩进）
-        code_block_pattern = r"(?:^|\n)(\s*```[\w]*\n[\s\S]*?\n\s*```)"
-        import re
-
-        for match in re.finditer(code_block_pattern, content):
-            # 使用捕获组1的位置，排除前导换行符
-            markdown_code_blocks.append((match.start(1), match.end(1)))
-
-        # 合并所有需要跳过的区域：markdown代码块 + 外部传入的已识别区域
-        all_skip_ranges = list(markdown_code_blocks)
-        if skip_ranges:
-            all_skip_ranges.extend(skip_ranges)
 
         for i, ch in enumerate(content):
             if ch == "{":
@@ -1320,15 +1297,6 @@ class ToolRegistry(OutputHandlerProtocol):
                 if in_used:
                     continue
 
-                # 跳过 markdown 代码块中的内容以及已识别区域
-                in_skip_range = False
-                for block_start, block_end in all_skip_ranges:
-                    if block_start <= i < block_end:
-                        in_skip_range = True
-                        break
-                if in_skip_range:
-                    continue
-
                 json_str, end_pos = extract_json_from_text(content, i)
                 if json_str:
                     try:
@@ -1338,8 +1306,14 @@ class ToolRegistry(OutputHandlerProtocol):
                             and "name" in parsed
                             and "arguments" in parsed
                         ):
-                            ret.append(parsed)
-                            used_ranges.append((i, end_pos))
+                            # 验证name是否是已注册的工具名
+                            tool_name = parsed.get("name")
+                            if (
+                                valid_tool_names is None
+                                or tool_name in valid_tool_names
+                            ):
+                                ret.append(parsed)
+                                used_ranges.append((i, end_pos))
                     except Exception:
                         continue
         return ret
@@ -1393,32 +1367,25 @@ class ToolRegistry(OutputHandlerProtocol):
         )
         ret.extend(code_block_results)
 
-        # 3.5. 扫描所有 markdown 代码块的位置（包括没有工具名前缀的）
-        # 用于后续解析器跳过这些区域，避免误识别代码块内的 JSON
-        all_code_block_ranges: List[Tuple[int, int]] = list(code_block_ranges)
-        # 使用与 _parse_embedded_json_format 相同的正则，匹配所有代码块
-        import re
-
-        code_block_pattern = r"(?:^|\n)(\s*```[\w]*\n[\s\S]*?\n\s*```)"
-        for match in re.finditer(code_block_pattern, content):
-            # 使用捕获组1的位置，排除前导换行符
-            block_range = (match.start(1), match.end(1))
-            # 避免重复添加已记录的范围
-            if block_range not in all_code_block_ranges:
-                all_code_block_ranges.append(block_range)
-
         # 4. 从全文扫描JSON对象，提取含name+arguments的标准格式
-        # 传入已识别的代码块区域，避免重复识别
+        # 通过验证name是否是已注册工具来区分工具调用和示例数据
+        # 获取已注册的工具名集合
+        if agent and hasattr(agent, "registry"):
+            valid_tool_names = set(agent.registry.tools.keys())
+        else:
+            # 没有 agent 时，创建临时 registry 获取默认工具列表
+            temp_registry = ToolRegistry()
+            valid_tool_names = set(temp_registry.tools.keys())
         ret.extend(
             ToolRegistry._parse_embedded_json_format(
-                content, skip_ranges=all_code_block_ranges
+                content, valid_tool_names=valid_tool_names
             )
         )
 
         # 5. 宽泛提取作为兜底
         if not ret:
             fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(
-                content, all_code_block_ranges
+                content, valid_tool_names
             )
             if fuzzy_results:
                 for fuzzy_item in fuzzy_results:
