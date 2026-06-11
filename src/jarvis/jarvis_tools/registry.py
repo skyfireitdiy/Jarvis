@@ -1190,9 +1190,7 @@ class ToolRegistry(OutputHandlerProtocol):
         # - \s*```[a-zA-Z]*\n：代码块开始标记（允许缩进）
         # - (.*?)：代码块内容（捕获组2）
         # - \n\s*```：代码块结束标记（允许缩进）
-        code_block_pattern = (
-            r"(?:^|\n)\s*([a-zA-Z_]\w*)\s*\n\s*```[a-zA-Z]*\n(.*?)\n\s*```"
-        )
+        code_block_pattern = r"(?:^|\n)\s*([a-zA-Z_]\w*)\s*\n\s*```[\w]*\n(.*?)\n\s*```"
         code_block_matches = list(re.finditer(code_block_pattern, content, re.DOTALL))
 
         # 过滤掉重叠的匹配（防止代码块内的语言标识被误识别为工具名）

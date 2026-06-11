@@ -1,0 +1,8 @@
+{
+  "id": "20260611_110850_043991",
+  "type": "project_long_term",
+  "tags": ["工具解析器", "修复完成", "测试通过"],
+  "content": "工具解析器修复完成（2025-01-21）：\n1. 修改文件：src/jarvis/jarvis_tools/registry.py\n2. 核心改动：_parse_embedded_json_format 和 _fuzzy_extract_tool_json 从 skip_ranges 改为 valid_tool_names 参数，通过验证工具名是否在已注册工具列表中来区分真实调用和示例数据\n3. _extract_tool_calls 移除代码块扫描逻辑，改为从 agent.registry.tools.keys() 或临时 ToolRegistry() 获取有效工具名集合\n4. 测试结果：tests/jarvis_tools/test_tool_parsing.py 全部10个用例通过\n5. 新行为：标准格式 {\"name\":\"工具名\",\"arguments\":{...}} 在代码块内也会被识别（只要 name 是已注册工具），未注册工具名不会被误识别\n6. 验证：5种工具调用格式均可正常识别和执行",
+  "created_at": "2026-06-11T11:08:50.044036",
+  "updated_at": "2026-06-11T11:08:50.044043"
+}
