@@ -5121,6 +5121,15 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (parsedMessage.type === "input_result") {
+      // 重连时后端发送的输入缓存，回显用户输入
+      const inputText = String(parsedMessage.payload?.text || "");
+      if (inputText && inputText !== "__CTRL_C_PRESSED__") {
+        this.appendPanelMessage(`我：${inputText}`, "system", agentId);
+      }
+      return;
+    }
+
     if (parsedMessage.type === "input_request") {
       this.withAgentState(agentId, (state) => {
         state.pending_request_id =
