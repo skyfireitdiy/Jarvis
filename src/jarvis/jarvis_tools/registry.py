@@ -218,6 +218,15 @@ class ToolRegistry(OutputHandlerProtocol):
                 if tool_name in response:
                     return True
 
+        # 条件7：直接尝试解析，如果能解析出工具调用则判定为工具调用
+        # 复用 _extract_tool_calls 的完整解析逻辑，避免重复实现
+        try:
+            results, _, _ = ToolRegistry._extract_tool_calls(response, None)
+            if results and any(r.get("name") in self.tools for r in results):
+                return True
+        except Exception:
+            pass
+
         return False
 
     def prompt(self) -> str:
