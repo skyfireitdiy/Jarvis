@@ -51,19 +51,19 @@ class TestToolParsing:
         assert len(result) == 0
 
     def test_ignore_example_in_documentation(self):
-        """测试：文档中的示例（不应该被识别）"""
+        """测试：文档中的示例（不应该被识别）- 使用未注册的工具名"""
         content = """
         ## 工具使用示例
-        
+
         ```json
         {
-            "name": "edit_file",
+            "name": "example_tool_not_registered",
             "arguments": {
                 "files": [{"file_path": "example.py"}]
             }
         }
         ```
-        
+
         以上是工具调用的示例格式。
         """
 
