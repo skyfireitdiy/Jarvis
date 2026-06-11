@@ -816,19 +816,30 @@ class ToolRegistry(OutputHandlerProtocol):
         return None, len(text)
 
     @staticmethod
-    def _fuzzy_extract_tool_json(content: str) -> List[str]:
+    def _fuzzy_extract_tool_json(
+        content: str, skip_ranges: Optional[List[Tuple[int, int]]] = None
+    ) -> List[str]:
         """宽泛提取：从全文中搜索JSON对象，检查是否包含name和arguments字段
 
         兼容不按规范输出标签的模型（如GLM输出<TOOL_CALL>前缀而非标准JSON）
 
         参数:
             content: 要搜索的文本内容
+            skip_ranges: 要跳过的位置范围列表[(start, end), ...]
 
         返回:
             List[str]: 提取到的有效工具调用JSON字符串列表
         """
+        if skip_ranges is None:
+            skip_ranges = []
+
         results = []
         for i, ch in enumerate(content):
+            # 检查是否在跳过范围内
+            in_skip_range = any(start <= i < end for start, end in skip_ranges)
+            if in_skip_range:
+                continue
+
             if ch == "{":
                 json_str, end_pos = extract_json_from_text(content, i)
                 if json_str is None:
@@ -1010,10 +1021,27 @@ class ToolRegistry(OutputHandlerProtocol):
     def _parse_tool_name_json_format(content: str) -> list:
         """解析工具名+JSON格式: 工具名\n{JSON参数}（无括号包裹）"""
         ret: list = []
+
+        # 先提取所有代码块的位置范围，避免误识别代码块内部的语言标识
+        # 允许代码块标记前有空白字符（缩进），使用捕获组只包含代码块本身
+        code_block_ranges = []
+        for match in re.finditer(r"(?:^|\n)(\s*```[\w]*\n[\s\S]*?\n\s*```)", content):
+            # 使用捕获组1的位置，排除前导换行符
+            code_block_ranges.append((match.start(1), match.end(1)))
+
         # 匹配 工具名 + 可选空白/换行 + JSON对象（不以左括号开头，区别于函数调用格式）
         pattern = r"(\w+)\s*\n?\s*(\{(?:[^{}]|\{[^{}]*\})*\})"
         matches = re.finditer(pattern, content, re.DOTALL)
+
         for match in matches:
+            match_start = match.start()
+            # 检查匹配位置是否在代码块内部
+            in_code_block = any(
+                start <= match_start < end for start, end in code_block_ranges
+            )
+            if in_code_block:
+                continue
+
             tool_name = match.group(1)
             json_str = match.group(2).strip()
             try:
@@ -1158,8 +1186,16 @@ class ToolRegistry(OutputHandlerProtocol):
         auto_completed = False
         used_ranges: List[Tuple[int, int]] = []
         # 匹配：工具名(独立行) + 换行 + 代码块
+        # 正则说明：
+        # - (?:^|\n)：工具名前必须是文本开头或换行
+        # - \s*：允许工具名前的缩进
+        # - ([a-zA-Z_]\w*)：工具名（捕获组1）
+        # - \s*\n：工具名后的空白和换行
+        # - \s*```[a-zA-Z]*\n：代码块开始标记（允许缩进）
+        # - (.*?)：代码块内容（捕获组2）
+        # - \n\s*```：代码块结束标记（允许缩进）
         code_block_pattern = (
-            r"(?:^|\n)(?<!```)([a-zA-Z_]\w*)\s*\n```[a-zA-Z]*\n(.*?)\n```"
+            r"(?:^|\n)\s*([a-zA-Z_]\w*)\s*\n\s*```[a-zA-Z]*\n(.*?)\n\s*```"
         )
         code_block_matches = list(re.finditer(code_block_pattern, content, re.DOTALL))
 
@@ -1259,12 +1295,14 @@ class ToolRegistry(OutputHandlerProtocol):
         # 带工具名的代码块由 _parse_code_block_format 处理
         # 单独的代码块是示例代码，不应该被识别为工具调用
         markdown_code_blocks: list = []
-        # 只匹配代码块本身（不包含工具名前缀）
-        code_block_pattern = r"```[\w]*\n[\s\S]*?```"
+        # 只匹配代码块本身（不包含工具名前缀），允许缩进
+        # 使用 ^|\n 锚定行首，捕获组只包含代码块内容（含缩进）
+        code_block_pattern = r"(?:^|\n)(\s*```[\w]*\n[\s\S]*?\n\s*```)"
         import re
 
         for match in re.finditer(code_block_pattern, content):
-            markdown_code_blocks.append((match.start(), match.end()))
+            # 使用捕获组1的位置，排除前导换行符
+            markdown_code_blocks.append((match.start(1), match.end(1)))
 
         # 合并所有需要跳过的区域：markdown代码块 + 外部传入的已识别区域
         all_skip_ranges = list(markdown_code_blocks)
@@ -1355,17 +1393,33 @@ class ToolRegistry(OutputHandlerProtocol):
         )
         ret.extend(code_block_results)
 
+        # 3.5. 扫描所有 markdown 代码块的位置（包括没有工具名前缀的）
+        # 用于后续解析器跳过这些区域，避免误识别代码块内的 JSON
+        all_code_block_ranges: List[Tuple[int, int]] = list(code_block_ranges)
+        # 使用与 _parse_embedded_json_format 相同的正则，匹配所有代码块
+        import re
+
+        code_block_pattern = r"(?:^|\n)(\s*```[\w]*\n[\s\S]*?\n\s*```)"
+        for match in re.finditer(code_block_pattern, content):
+            # 使用捕获组1的位置，排除前导换行符
+            block_range = (match.start(1), match.end(1))
+            # 避免重复添加已记录的范围
+            if block_range not in all_code_block_ranges:
+                all_code_block_ranges.append(block_range)
+
         # 4. 从全文扫描JSON对象，提取含name+arguments的标准格式
         # 传入已识别的代码块区域，避免重复识别
         ret.extend(
             ToolRegistry._parse_embedded_json_format(
-                content, skip_ranges=code_block_ranges
+                content, skip_ranges=all_code_block_ranges
             )
         )
 
         # 5. 宽泛提取作为兜底
         if not ret:
-            fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(content)
+            fuzzy_results = ToolRegistry._fuzzy_extract_tool_json(
+                content, all_code_block_ranges
+            )
             if fuzzy_results:
                 for fuzzy_item in fuzzy_results:
                     try:

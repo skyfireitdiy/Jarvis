@@ -85,8 +85,9 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 2
-        assert "read_code" in result
-        assert "execute_script" in result
+        tool_names = [r["name"] for r in result]
+        assert "read_code" in tool_names
+        assert "execute_script" in tool_names
 
     def test_parse_nested_json_in_code_block(self):
         """测试：代码块中的嵌套 JSON（带工具名应被识别）"""
@@ -136,7 +137,7 @@ class TestToolParsing:
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
-        assert "read_code" in result
+        assert result[0]["name"] == "read_code"
 
     def test_ignore_code_block_with_non_json_content(self):
         """测试：非 JSON 内容的代码块（不应该被识别）"""

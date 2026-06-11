@@ -1,0 +1,8 @@
+{
+  "id": "20260611_104257_671260",
+  "type": "project_long_term",
+  "tags": ["工具解析器", "registry", "测试", "bug修复"],
+  "content": "工具解析器误识别markdown代码块JSON的bug已完全修复，tests/jarvis_tools/test_tool_parsing.py全部10个用例通过。\n\n核心修复（src/jarvis/jarvis_tools/registry.py）：\n1. 三个解析器正则支持缩进代码块：_parse_code_block_format、_parse_tool_name_json_format、_parse_embedded_json_format\n2. _fuzzy_extract_tool_json新增skip_ranges参数，遍历{字符时跳过代码块范围\n3. _extract_tool_calls中独立扫描所有markdown代码块（包括无工具名前缀的），合并范围传给兜底逻辑\n\n关键正则：r'(?:^|\\n)(\\s*```[\\w]*\\n[\\s\\S]*?\\n\\s*```)'（用捕获组排除前导换行符）\n\n测试期望规则：工具名在代码块外的独立行→识别为工具调用；单独代码块（无工具名）→不识别（视为示例）\n\n注意：ToolRegistry._extract_tool_calls返回字典列表[{'name':..,'arguments':..}]，测试断言应检查r['name']而非字符串in结果。",
+  "created_at": "2026-06-11T10:42:57.671288",
+  "updated_at": "2026-06-11T10:42:57.671294"
+}
