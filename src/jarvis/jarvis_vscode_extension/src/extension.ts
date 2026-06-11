@@ -4951,6 +4951,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (parsedMessage.type === "ready") {
+      // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存
+      const agentId = this.panelState.selectedAgentId;
+      if (agentId) {
+        this.withAgentState(agentId, (state) => {
+          state.messages = [];
+        });
+        console.log(
+          "[READY] Cleared message cache for agent",
+          agentId,
+          "ready to receive full history from backend",
+        );
+      }
       this.appendPanelMessage("主通道就绪", "system");
       return;
     }
