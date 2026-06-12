@@ -314,9 +314,12 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     # 1. 验证基础配置是否存在
     if base_config_name not in config.get("llms", {}):
         PrettyOutput.auto_print(f"❌ 基础配置 '{base_config_name}' 不存在")
-        PrettyOutput.auto_print(
-            "可用的配置: " + ", ".join(config.get("llms", {}).keys())
-        )
+        available_llms = sorted(config.get("llms", {}).keys())
+        if available_llms:
+            md_lines = ["## 可用的配置", ""]
+            for llm_name in available_llms:
+                md_lines.append(f"- {llm_name}")
+            PrettyOutput.print_markdown("\n".join(md_lines))
         raise typer.Exit(code=1)
 
     base_llm_config = config["llms"][base_config_name]
@@ -373,17 +376,16 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
             PrettyOutput.auto_print("❌ 未提供模型名称")
             raise typer.Exit(code=0)
 
-    PrettyOutput.auto_print(
-        f"📋 可用模型: {', '.join(models[:10])}{'...' if len(models) > 10 else ''}"
-    )
+    PrettyOutput.auto_print(f"📋 可用模型数量: {len(models)}")
 
     # 4. 选择要添加的模型
     if len(models) > 1:
-        PrettyOutput.auto_print("[bold]可用模型列表:[/]")
+        md_lines = ["## 可用模型列表", "", "| 序号 | 模型名称 |", "|------|----------|"]
         for i, model in enumerate(models, 1):
-            PrettyOutput.auto_print(f"  {i}. {model}")
+            md_lines.append(f"| {i} | {model} |")
         manual_input_option = len(models) + 1
-        PrettyOutput.auto_print(f"  {manual_input_option}. 手动输入模型名称")
+        md_lines.append(f"| {manual_input_option} | 手动输入模型名称 |")
+        PrettyOutput.print_markdown("\n".join(md_lines))
 
         configure_all = user_confirm("是否配置所有模型？", default=False)
 
@@ -428,9 +430,11 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     else:
         selected_models = [models[0]]
 
-    PrettyOutput.auto_print(
-        f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
-    )
+    PrettyOutput.auto_print(f"✅ 已选择 {len(selected_models)} 个模型")
+    md_lines = ["## 已选择的模型", ""]
+    for model in selected_models:
+        md_lines.append(f"- {model}")
+    PrettyOutput.print_markdown("\n".join(md_lines))
 
     # 5. 测试 normal 模型API连通性
     from jarvis.jarvis_utils.quick_config import test_model_connection
@@ -563,14 +567,18 @@ def llm_add() -> None:
 
     if use_batch_mode:
         # 让用户选择基础配置
-        PrettyOutput.auto_print("📋 可用的LLM配置:")
+        md_lines = [
+            "## 可用的LLM配置",
+            "",
+            "| 序号 | 配置名称 | 平台 | 模型 |",
+            "|------|----------|------|------|",
+        ]
         for i, llm_name in enumerate(existing_llms, 1):
             llm_info = config["llms"].get(llm_name, {})
             platform = llm_info.get("platform", "未知")
             model = llm_info.get("model", "未知")
-            PrettyOutput.auto_print(
-                f"  {i}. {llm_name} (平台: {platform}, 模型: {model})"
-            )
+            md_lines.append(f"| {i} | {llm_name} | {platform} | {model} |")
+        PrettyOutput.print_markdown("\n".join(md_lines))
 
         choice = get_single_line_input("请选择基础配置序号: ").strip()
         try:
@@ -989,9 +997,10 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
         raise typer.Exit(code=1)
 
     llm_list: List[str] = sorted(llms.keys())
-    PrettyOutput.auto_print("可用的 LLM 配置:")
+    md_lines = ["## 可用的 LLM 配置", "", "| 序号 | 配置名称 |", "|------|----------|"]
     for i, llm_name in enumerate(llm_list, 1):
-        PrettyOutput.auto_print(f"  {i}. {llm_name}")
+        md_lines.append(f"| {i} | {llm_name} |")
+    PrettyOutput.print_markdown("\n".join(md_lines))
 
     def resolve_llm_choice(prompt: str, allow_empty: bool = False) -> str:
         """解析用户选择，支持序号或名称"""
@@ -1138,9 +1147,10 @@ def group_update(
     PrettyOutput.auto_print(
         f"  当前值 - normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, smart: {group_config.get('smart_llm', 'N/A')}"
     )
-    PrettyOutput.auto_print("可用的 LLM 配置:")
+    md_lines = ["## 可用的 LLM 配置", "", "| 序号 | 配置名称 |", "|------|----------|"]
     for i, llm_name in enumerate(llm_list, 1):
-        PrettyOutput.auto_print(f"  {i}. {llm_name}")
+        md_lines.append(f"| {i} | {llm_name} |")
+    PrettyOutput.print_markdown("\n".join(md_lines))
 
     def resolve_llm_choice(prompt: str) -> str:
         """解析用户选择，支持序号或名称"""
@@ -1282,11 +1292,16 @@ def list_platforms(
                 models = platform_instance.get_model_list()
                 PrettyOutput.auto_print(f"✅ {platform_name}")
                 if models:
+                    md_lines = [
+                        f"## {platform_name} 平台模型列表",
+                        "",
+                        "| 模型名称 | 描述 |",
+                        "|----------|------|",
+                    ]
                     for model_name, description in models:
-                        if description:
-                            PrettyOutput.auto_print(f"  • {model_name} - {description}")
-                        else:
-                            PrettyOutput.auto_print(f"  • {model_name}")
+                        desc = description if description else "-"
+                        md_lines.append(f"| {model_name} | {desc} |")
+                    PrettyOutput.print_markdown("\n".join(md_lines))
                 else:
                     PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
             else:
@@ -1311,11 +1326,16 @@ def list_platforms(
                 models = platform_instance.get_model_list()
                 PrettyOutput.auto_print(f"✅ {platform_name} 平台详情")
                 if models:
+                    md_lines = [
+                        f"## {platform_name} 平台模型列表",
+                        "",
+                        "| 模型名称 | 描述 |",
+                        "|----------|------|",
+                    ]
                     for model_name, description in models:
-                        if description:
-                            PrettyOutput.auto_print(f"  • {model_name} - {description}")
-                        else:
-                            PrettyOutput.auto_print(f"  • {model_name}")
+                        desc = description if description else "-"
+                        md_lines.append(f"| {model_name} | {desc} |")
+                    PrettyOutput.print_markdown("\n".join(md_lines))
                 else:
                     PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
             else:
@@ -1504,13 +1524,16 @@ def role_command(
 
     # 显示可选角色列表
     PrettyOutput.auto_print("✅ 可用角色")
-    output_str = "\n".join(
-        [
-            f"{i}. {role['name']} - {role.get('description', '')}"
-            for i, role in enumerate(config["roles"], 1)
-        ]
-    )
-    PrettyOutput.auto_print(f"ℹ️ {output_str}")
+    md_lines = [
+        "## 可用角色",
+        "",
+        "| 序号 | 角色名称 | 描述 |",
+        "|------|----------|------|",
+    ]
+    for i, role in enumerate(config["roles"], 1):
+        desc = role.get("description", "-")
+        md_lines.append(f"| {i} | {role['name']} | {desc} |")
+    PrettyOutput.print_markdown("\n".join(md_lines))
 
     # 让用户选择角色（优先 fzf，回退编号输入）
     selected_role = None
