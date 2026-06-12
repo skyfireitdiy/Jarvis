@@ -128,6 +128,7 @@ interface ChatPanelState {
   gatewayConnectionStatusText: string;
   gatewayHasConnectionError: boolean;
   connectionLockEnabled: boolean;
+  lastSeq: number;
   restartNodeId?: string;
   restartFrontendService?: boolean;
   isRestartingService?: boolean;
@@ -327,6 +328,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     gatewayConnectionStatusText: "未连接",
     gatewayHasConnectionError: false,
     connectionLockEnabled: false,
+    lastSeq: 0,
   };
   private readonly agentStatuses = new Map<string, AgentStatus>();
   // Code Agent 起始 commit ID：agentId -> commitId
@@ -4672,6 +4674,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         this.gatewayReconnectTimer = undefined;
       }
       this.sendSocketMessage(gatewaySocket, {
+        type: "hello",
+        payload: { last_seq: this.panelState.lastSeq },
+      });
+      this.sendSocketMessage(gatewaySocket, {
         type: "connection_lock",
         payload: { enabled: this.panelState.connectionLockEnabled },
       });
@@ -4950,6 +4956,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    // 更新全局消息序号（去重：只接受序号更大的消息）
+    if (typeof parsedMessage._seq === "number") {
+      if (parsedMessage._seq > this.panelState.lastSeq) {
+        this.panelState.lastSeq = parsedMessage._seq;
+      } else {
+        // 重复或旧消息，跳过处理
+        return;
+      }
+    }
+
     if (parsedMessage.type === "ready") {
       // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存
       const agentId = this.panelState.selectedAgentId;
@@ -5114,6 +5130,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     console.log("[AGENT MSG]", agentId, parsedMessage?.type, parsedMessage);
     if (!parsedMessage) {
       return;
+    }
+
+    // 更新全局消息序号（去重：只接受序号更大的消息）
+    if (typeof parsedMessage._seq === "number") {
+      if (parsedMessage._seq > this.panelState.lastSeq) {
+        this.panelState.lastSeq = parsedMessage._seq;
+      } else {
+        // 重复或旧消息，跳过处理
+        return;
+      }
     }
 
     if (parsedMessage.type === "output") {
