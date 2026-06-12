@@ -1127,7 +1127,7 @@ const auth = ref({
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
-const lastSeq = ref(new Map()) // 按 agent_id 隔离的消息序号，用于重连增量同步
+const lastSeq = ref(0) // 全局消息序号，用于重连增量同步
 
 // Agent 心跳检测相关状态
 const lastPongTime = ref(new Map()) // agentId -> 最后收到 pong 的时间戳
@@ -3438,9 +3438,9 @@ async function connect() {
     // 发送 hello 消息，上报 lastSeq 用于增量同步
     ws.send(JSON.stringify({
       type: 'hello',
-      payload: { last_seq: Object.fromEntries(lastSeq.value) }
+      payload: { last_seq: lastSeq.value }
     }))
-    console.log('[ws] hello sent, last_seq:', Object.fromEntries(lastSeq.value))
+    console.log('[ws] hello sent, last_seq:', lastSeq.value)
 
     // 发送连接锁定设置
     ws.send(JSON.stringify({
@@ -6011,19 +6011,22 @@ function handleMessage(message, agentId = null) {
   if (!message || typeof message !== 'object') return
   const { type, payload } = message
 
-  // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
-  const targetAgentId = agentId || currentAgentId.value
-
-  // 按 agent 隔离的消息序号去重
+  // 更新全局消息序号（去重：只接受序号更大的消息）
   if (message._seq !== undefined && typeof message._seq === 'number') {
-    const agentLastSeq = lastSeq.value.get(targetAgentId) || 0
-    if (message._seq > agentLastSeq) {
-      lastSeq.value.set(targetAgentId, message._seq)
+    if (message._seq > lastSeq.value) {
+      lastSeq.value = message._seq
     } else {
-      console.log('[ws] Skipping duplicate/old message, _seq:', message._seq, 'lastSeq:', agentLastSeq, 'agent:', targetAgentId)
+      // 重复或旧消息，跳过处理
+      console.log('[ws] Skipping duplicate/old message, _seq:', message._seq, 'lastSeq:', lastSeq.value)
       return
     }
   }
+
+  // 调试：记录所有收到的消息类型
+
+
+  // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
+  const targetAgentId = agentId || currentAgentId.value
   // pong 消息处理已移除
   if (type === 'ready') {
     // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存

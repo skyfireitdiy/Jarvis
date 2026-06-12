@@ -128,7 +128,7 @@ interface ChatPanelState {
   gatewayConnectionStatusText: string;
   gatewayHasConnectionError: boolean;
   connectionLockEnabled: boolean;
-  lastSeq: Map<string, number>;
+  lastSeq: number;
   restartNodeId?: string;
   restartFrontendService?: boolean;
   isRestartingService?: boolean;
@@ -328,7 +328,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     gatewayConnectionStatusText: "未连接",
     gatewayHasConnectionError: false,
     connectionLockEnabled: false,
-    lastSeq: new Map(),
+    lastSeq: 0,
   };
   private readonly agentStatuses = new Map<string, AgentStatus>();
   // Code Agent 起始 commit ID：agentId -> commitId
@@ -4675,7 +4675,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       this.sendSocketMessage(gatewaySocket, {
         type: "hello",
-        payload: { last_seq: Object.fromEntries(this.panelState.lastSeq) },
+        payload: { last_seq: this.panelState.lastSeq },
       });
       this.sendSocketMessage(gatewaySocket, {
         type: "connection_lock",
@@ -4956,12 +4956,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // 更新消息序号（按 agent 隔离去重：只接受序号更大的消息）
+    // 更新全局消息序号（去重：只接受序号更大的消息）
     if (typeof parsedMessage._seq === "number") {
-      const agentId = this.panelState.selectedAgentId || "__global__";
-      const lastSeq = this.panelState.lastSeq.get(agentId) || 0;
-      if (parsedMessage._seq > lastSeq) {
-        this.panelState.lastSeq.set(agentId, parsedMessage._seq);
+      if (parsedMessage._seq > this.panelState.lastSeq) {
+        this.panelState.lastSeq = parsedMessage._seq;
       } else {
         // 重复或旧消息，跳过处理
         return;
@@ -5134,11 +5132,10 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // 更新消息序号（按 agent 隔离去重：只接受序号更大的消息）
+    // 更新全局消息序号（去重：只接受序号更大的消息）
     if (typeof parsedMessage._seq === "number") {
-      const lastSeq = this.panelState.lastSeq.get(agentId) || 0;
-      if (parsedMessage._seq > lastSeq) {
-        this.panelState.lastSeq.set(agentId, parsedMessage._seq);
+      if (parsedMessage._seq > this.panelState.lastSeq) {
+        this.panelState.lastSeq = parsedMessage._seq;
       } else {
         // 重复或旧消息，跳过处理
         return;
