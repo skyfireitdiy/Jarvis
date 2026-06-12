@@ -358,9 +358,7 @@ class OpenAIModel(BasePlatform):
             if self.extra_body:
                 api_params["extra_body"] = self.extra_body
 
-            # 如果没有指定 max_tokens，设置为 1M 确保有足够空间处理 reasoning_content
-            if "max_tokens" not in api_params:
-                api_params["max_tokens"] = 4096
+            # 如果没有指定 max_tokens，不设置默认值，让模型使用自身的默认值
 
             response = self.client.chat.completions.create(**api_params)
 
