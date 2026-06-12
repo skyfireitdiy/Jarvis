@@ -5883,11 +5883,9 @@ async function switchAgent(agent) {
   historyOffset.value = 0
   hasMoreHistory.value = true
   
-  // 先加载历史消息，再连接 Agent
-  console.log('[AGENT] Loading history before connecting...')
-  await loadHistoryMessages(false)
-
-  // 连接到目标 Agent（等待连接真正建立）
+  // 先连接 Agent，在收到 ready 事件后再加载历史
+  // 这样可以避免历史消息和 WebSocket 推送的缓存消息重复渲染
+  console.log('[AGENT] Connecting before loading history...')
   try {
     // 切换后立即查询一次状态（即使 WebSocket 未连接）
     console.log('[AGENT] Fetching status after switch...')
@@ -6080,14 +6078,27 @@ function handleMessage(message, agentId = null) {
     console.log('[SYNC] Sent sync_request with seqs:', agent_seqs)
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
-    const currentAgentId = targetAgentId
-    const inputRequest = inputRequests.value.get(currentAgentId)
+    const currentAgentIdLocal = targetAgentId
+    
+    // 清空后重新加载历史消息，避免与 WebSocket 推送的缓存消息重复
+    // 只在切换到当前 Agent 时加载历史
+    // 注意：必须等待历史加载完成，避免与后续 WebSocket 推送的 execution 消息冲突
+    if (targetAgentId === currentAgentId.value) {
+      console.log('[ws] Loading history after ready event for agent:', targetAgentId)
+      // 使用 Promise 确保历史加载完成后再处理后续消息
+      loadHistoryMessages(false).then(() => {
+        console.log('[ws] History loaded successfully for agent:', targetAgentId)
+      }).catch(err => {
+        console.error('[ws] Failed to load history:', err)
+      })
+    }
+    const inputRequest = inputRequests.value.get(currentAgentIdLocal)
     if (inputRequest) {
-      console.log('[ws] Restoring input request for agent', currentAgentId, 'from Map')
+      console.log('[ws] Restoring input request for agent', currentAgentIdLocal, 'from Map')
       inputTip.value = inputRequest.tip || ''
       inputMode.value = inputRequest.mode || 'multi'
       inputText.value = inputText.value || inputRequest.preset || ''
-      pendingInputAgentId.value = currentAgentId
+      pendingInputAgentId.value = currentAgentIdLocal
       nextTick(() => {
         const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
         inputEl?.focus()
@@ -6452,6 +6463,18 @@ function appendOutput(payload, agentId = null) {
 
   // 添加到目标 Agent 的消息列表
   const currentOutputs = allOutputs.value.get(targetAgentId) || []
+
+  // execution 消息去重：如果已存在相同 execution_id，则跳过（避免历史加载和 WebSocket 推送重复）
+  if (outputItem.output_type === 'execution' && outputItem.execution_id) {
+    const duplicate = currentOutputs.find(
+      item => item.output_type === 'execution' && item.execution_id === outputItem.execution_id
+    )
+    if (duplicate) {
+      console.log('[appendOutput] Skipping duplicate execution:', outputItem.execution_id)
+      return
+    }
+  }
+
   currentOutputs.push(outputItem)
 
   // 保存消息到本地存储
