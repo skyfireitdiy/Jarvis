@@ -349,9 +349,6 @@ class WebGateway(BaseGateway):
         # 消息缓存：持续缓存所有消息（输出+输入，上限500条），用于重连后恢复完整对话
         self._message_cache: deque = deque(maxlen=500)
 
-        # 全局消息序号（单调递增），用于增量同步（asyncio 单线程安全）
-        self._message_seq: int = 0
-
         # 输入缓存：区分已发送/未发送
         self._pending_inputs: List[Dict[str, Any]] = []  # 未发送的输入请求
         self._sent_inputs: Dict[
@@ -378,9 +375,7 @@ class WebGateway(BaseGateway):
             payload["agent_id"] = context["agent_id"]
         message = {"type": "output", "payload": payload}
 
-        # 持续缓存所有消息（无论是否已授权），带全局序号
-        self._message_seq += 1
-        message["_seq"] = self._message_seq
+        # 持续缓存所有消息（无论是否已授权）
         self._message_cache.append(message)
 
         # 如果已授权，实时发送
@@ -623,27 +618,13 @@ class WebSocketConnectionManager:
         async with self._connection_state_lock:
             self._active_connections[session_id] = (connection_id, websocket)
         self._input_registry.register_provider(session_id)
-        # 等待前端发送 hello 消息（携带 last_seq），用于增量同步
-        last_seq = 0
-        try:
-            hello_message = await asyncio.wait_for(
-                websocket.receive_json(), timeout=5.0
-            )
-            if hello_message.get("type") == "hello":
-                last_seq = int(hello_message.get("payload", {}).get("last_seq", 0))
-        except (asyncio.TimeoutError, Exception):
-            pass  # 前端未发送 hello，使用 last_seq=0 发送全量
         await websocket.send_json(
-            {
-                "type": "ready",
-                "payload": {"session_id": session_id, "last_seq": last_seq},
-            }
+            {"type": "ready", "payload": {"session_id": session_id}}
         )
-        # 发送缓存的消息（只发送序号大于 last_seq 的，增量同步）
+        # 发送缓存的消息（输出+输入，按时间顺序）
         if self._gateway._message_cache:
             for cached_message in self._gateway._message_cache:
-                if cached_message.get("_seq", 0) > last_seq:
-                    await websocket.send_json(cached_message)
+                await websocket.send_json(cached_message)
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         if pending_request:
@@ -659,8 +640,6 @@ class WebSocketConnectionManager:
             confirm_session.reconnect()
             await websocket.send_json(pending_confirm)
         try:
-            # 如果 hello 消息不是 input_result 等业务消息，进入消息循环
-            # 注意：hello 消息已被消费，不会进入 _handle_message
             while True:
                 message = await websocket.receive_json()
                 await self._handle_message(session_id, message)
@@ -704,9 +683,7 @@ class WebSocketConnectionManager:
             return
         if message_type == "input_result":
             text = payload.get("text", "")
-            # 缓存用户输入消息（带全局序号），用于重连后恢复对话完整性
-            self._gateway._message_seq += 1
-            message["_seq"] = self._gateway._message_seq
+            # 缓存用户输入消息，用于重连后恢复对话完整性
             self._gateway._message_cache.append(message)
             # 检查当前是否正在等待输入
             session = self._input_registry.get_or_create(session_id)
