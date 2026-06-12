@@ -2643,6 +2643,43 @@ async function handleFileTreeNodeClick(agentId, node) {
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
+
+// 消息序号管理：记录每个 agent 的最大消息序号
+const agentLastSeqs = ref(new Map()) // agent_id -> last_seq
+const AGENT_LAST_SEQS_STORAGE_KEY = 'jarvis_agent_last_seqs'
+
+// 从 localStorage 加载消息序号
+function loadAgentLastSeqs() {
+  try {
+    const stored = localStorage.getItem(AGENT_LAST_SEQS_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      agentLastSeqs.value = new Map(Object.entries(parsed))
+    }
+  } catch (error) {
+    console.error('[SYNC] Failed to load agent last seqs:', error)
+  }
+}
+
+// 保存消息序号到 localStorage
+function saveAgentLastSeqs() {
+  try {
+    const obj = Object.fromEntries(agentLastSeqs.value)
+    localStorage.setItem(AGENT_LAST_SEQS_STORAGE_KEY, JSON.stringify(obj))
+  } catch (error) {
+    console.error('[SYNC] Failed to save agent last seqs:', error)
+  }
+}
+
+// 更新 agent 的消息序号
+function updateAgentSeq(agentId, seq) {
+  if (typeof seq !== 'number') return
+  const currentSeq = agentLastSeqs.value.get(agentId) || -1
+  if (seq > currentSeq) {
+    agentLastSeqs.value.set(agentId, seq)
+    saveAgentLastSeqs()
+  }
+}
 const terminalHosts = ref(new Map()) // executionSessionKey -> hostEl
 const terminals = ref([]) // [{ sessionKey, agentId, executionId, terminal, active, hostEl, resizeObserver, lastSize, ended }]
 
@@ -6001,20 +6038,44 @@ function stopAgentListRefresh() {
 
 function handleMessage(message, agentId = null) {
   if (!message || typeof message !== 'object') return
-  const { type, payload } = message
-  
+  const { type, payload, seq } = message
+
   // 调试：记录所有收到的消息类型
 
-  
+
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
+  
+  // 更新消息序号
+  if (typeof seq === 'number') {
+    // 从 payload 中提取 agent_id
+    let msgAgentId = null
+    if (type === 'output' || type === 'input_result') {
+      msgAgentId = payload?.agent_id
+    }
+    
+    if (msgAgentId) {
+      updateAgentSeq(msgAgentId, seq)
+    } else {
+      // 全局消息
+      updateAgentSeq('__global__', seq)
+    }
+  }
   // pong 消息处理已移除
   if (type === 'ready') {
-    // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存
+    // 清空当前 Agent 的消息列表，准备接收后端的增量消息
     const currentOutputs = allOutputs.value.get(targetAgentId) || []
     currentOutputs.length = 0
     allOutputs.value.set(targetAgentId, currentOutputs)
-    console.log('[ws] Cleared output cache for agent', targetAgentId, 'ready to receive full history from backend')
+    console.log('[ws] Cleared output cache for agent', targetAgentId, 'sending sync_request for incremental sync')
+    
+    // 发送增量同步请求
+    const agent_seqs = Object.fromEntries(agentLastSeqs.value)
+    socket.value.send(JSON.stringify({
+      type: 'sync_request',
+      payload: { agent_seqs }
+    }))
+    console.log('[SYNC] Sent sync_request with seqs:', agent_seqs)
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
     const currentAgentId = targetAgentId
@@ -8410,6 +8471,9 @@ onMounted(() => {
   // 启动心跳机制
   heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
   console.log(`[HEARTBEAT] Started with interval ${HEARTBEAT_INTERVAL}ms`)
+
+  // 加载消息序号（用于增量同步）
+  loadAgentLastSeqs()
 
   // 尝试从 localStorage 加载已保存的 token（免登录功能）
   loadSavedToken()
