@@ -199,9 +199,10 @@ class TestToolRegistry:
         content = '<|tool_call_begin|>functions.read_code:0<|tool_call_argument_begin|>{"files": [{"path": "test.py"}]}<|tool_call_end|>'
         result, error, auto_completed = ToolRegistry._extract_tool_calls(content)
         assert error == ""
-        # 单个工具调用时，返回的是 {name, arguments} 字典
-        assert result["name"] == "read_code"
-        assert result["arguments"] == {"files": [{"path": "test.py"}]}
+        # _extract_tool_calls 始终返回列表
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"] == {"files": [{"path": "test.py"}]}
 
     def test_parse_tool_name_json_format_basic(self):
         """测试解析工具名+JSON格式: 工具名\n{JSON参数}"""
@@ -246,14 +247,16 @@ class TestToolRegistry:
         content = 'read_code\n{"files": [{"path": "test.py"}]}'
         result, error, _ = ToolRegistry._extract_tool_calls(content)
         assert error == ""
-        assert result["name"] == "read_code"
-        assert result["arguments"] == {"files": [{"path": "test.py"}]}
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"] == {"files": [{"path": "test.py"}]}
 
     def test_extract_tool_calls_with_xml_parameter_format(self):
         """测试_extract_tool_calls能正确解析XML参数标签格式"""
         content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="script_content">grep -n pattern file</parameter>\n</execute_script>'
         result, error, _ = ToolRegistry._extract_tool_calls(content)
         assert error == ""
-        assert result["name"] == "execute_script"
-        assert result["arguments"]["interpreter"] == "bash"
-        assert result["arguments"]["script_content"] == "grep -n pattern file"
+        assert len(result) == 1
+        assert result[0]["name"] == "execute_script"
+        assert result[0]["arguments"]["interpreter"] == "bash"
+        assert result[0]["arguments"]["script_content"] == "grep -n pattern file"
