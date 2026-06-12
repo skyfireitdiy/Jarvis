@@ -183,6 +183,8 @@ class SubAgentTool:
                         else:
                             modified_messages.append(msg)
                     agent.model.set_messages(modified_messages)
+                    # 已继承父Agent历史记录，跳过首次运行初始化（规则选择等流程）
+                    agent.first = False
                 except Exception:
                     # 设置失败不影响主流程
                     pass
