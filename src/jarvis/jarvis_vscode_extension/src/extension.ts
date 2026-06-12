@@ -332,6 +332,8 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   // Code Agent 起始 commit ID：agentId -> commitId
   private readonly codeAgentStartCommits = new Map<string, string>();
   private readonly agentSockets = new Map<string, WebSocket>();
+  // 消息序号管理：记录每个 agent 的最大消息序号（用于增量同步）
+  private readonly agentLastSeqs = new Map<string, number>(); // agentId -> last_seq
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
   private agentListRefreshTimer: NodeJS.Timeout | undefined;
   // Gateway WebSocket重连相关状态
@@ -425,6 +427,40 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     private readonly globalState: vscode.Memento,
   ) {
     this.restoreSavedConnectionInfo();
+    this.loadAgentLastSeqs();
+  }
+
+  // 从 globalState 加载消息序号
+  private loadAgentLastSeqs(): void {
+    const stored = this.globalState.get<Record<string, number>>(
+      "agentLastSeqs",
+      {},
+    );
+    this.agentLastSeqs.clear();
+    for (const [agentId, seq] of Object.entries(stored)) {
+      this.agentLastSeqs.set(agentId, seq);
+    }
+  }
+
+  // 保存消息序号到 globalState
+  private async saveAgentLastSeqs(): Promise<void> {
+    const obj: Record<string, number> = {};
+    for (const [agentId, seq] of this.agentLastSeqs.entries()) {
+      obj[agentId] = seq;
+    }
+    await this.globalState.update("agentLastSeqs", obj);
+  }
+
+  // 更新并持久化 agent 的消息序号
+  private updateAgentSeq(agentId: string, seq: number): void {
+    const current = this.agentLastSeqs.get(agentId) ?? 0;
+    if (seq > current) {
+      this.agentLastSeqs.set(agentId, seq);
+      // 异步保存，不阻塞消息处理
+      this.saveAgentLastSeqs().catch((err) =>
+        console.error("Failed to save agentLastSeqs:", err),
+      );
+    }
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -4964,6 +5000,21 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         );
       }
       this.appendPanelMessage("主通道就绪", "system");
+
+      // 发送 sync_request，携带所有 agent 的最大序号
+      const agentSeqs: Record<string, number> = {};
+      for (const [aid, seq] of this.agentLastSeqs.entries()) {
+        agentSeqs[aid] = seq;
+      }
+      const syncMessage = {
+        type: "sync_request",
+        payload: {
+          agent_seqs: agentSeqs,
+        },
+      };
+      this.gatewaySocket?.send(JSON.stringify(syncMessage));
+      console.log("[SYNC_REQUEST] Sent:", syncMessage);
+
       return;
     }
     if (parsedMessage.type === "status_update") {
@@ -5114,6 +5165,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     console.log("[AGENT MSG]", agentId, parsedMessage?.type, parsedMessage);
     if (!parsedMessage) {
       return;
+    }
+
+    // 提取并更新消息序号（用于增量同步）
+    if (typeof parsedMessage.seq === "number" && parsedMessage.seq > 0) {
+      this.updateAgentSeq(agentId, parsedMessage.seq);
     }
 
     if (parsedMessage.type === "output") {

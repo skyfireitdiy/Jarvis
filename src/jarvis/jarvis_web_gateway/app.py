@@ -349,6 +349,10 @@ class WebGateway(BaseGateway):
         # 消息缓存：持续缓存所有消息（输出+输入，上限500条），用于重连后恢复完整对话
         self._message_cache: deque = deque(maxlen=500)
 
+        # 消息序号：按 agent_id 维护独立序号序列
+        self._agent_message_sequences: Dict[str, int] = {}  # agent_id -> next_seq
+        self._global_message_sequence: int = 0  # 全局消息（无agent_id）的序号
+
         # 输入缓存：区分已发送/未发送
         self._pending_inputs: List[Dict[str, Any]] = []  # 未发送的输入请求
         self._sent_inputs: Dict[
@@ -373,7 +377,17 @@ class WebGateway(BaseGateway):
         }
         if context.get("agent_id"):
             payload["agent_id"] = context["agent_id"]
-        message = {"type": "output", "payload": payload}
+
+        # 为消息分配序号（按 agent_id 或 global）
+        agent_id = context.get("agent_id")
+        if agent_id:
+            seq = self._agent_message_sequences.get(agent_id, 0)
+            self._agent_message_sequences[agent_id] = seq + 1
+        else:
+            seq = self._global_message_sequence
+            self._global_message_sequence += 1
+
+        message = {"type": "output", "payload": payload, "seq": seq}
 
         # 持续缓存所有消息（无论是否已授权）
         self._message_cache.append(message)
@@ -669,6 +683,56 @@ class WebSocketConnectionManager:
                 f"active_auth_after={session_id in self._auth_store}"
             )
 
+    async def _handle_sync_request(
+        self, session_id: str, agent_seqs: Dict[str, int]
+    ) -> None:
+        """处理增量同步请求，只发送大于客户端 last_seq 的消息"""
+        connection = self._active_connections.get(session_id)
+        if not connection:
+            return
+        _, websocket = connection
+
+        # 过滤消息缓存，只发送增量消息
+        for cached_message in self._gateway._message_cache:
+            if not isinstance(cached_message, dict):
+                continue
+
+            msg_seq = cached_message.get("seq")
+            if msg_seq is None:
+                # 旧消息没有序号，全部发送（向后兼容）
+                await websocket.send_json(cached_message)
+                continue
+
+            # 获取消息的 agent_id
+            msg_type = cached_message.get("type")
+            if msg_type == "output":
+                msg_payload = cached_message.get("payload", {})
+                msg_agent_id = (
+                    msg_payload.get("agent_id")
+                    if isinstance(msg_payload, dict)
+                    else None
+                )
+            elif msg_type == "input_result":
+                msg_payload = cached_message.get("payload", {})
+                msg_agent_id = (
+                    msg_payload.get("agent_id")
+                    if isinstance(msg_payload, dict)
+                    else None
+                )
+            else:
+                msg_agent_id = None
+
+            # 判断是否需要发送
+            if msg_agent_id:
+                last_seq = agent_seqs.get(msg_agent_id, -1)
+                if msg_seq > last_seq:
+                    await websocket.send_json(cached_message)
+            else:
+                # 全局消息（无 agent_id）
+                last_seq = agent_seqs.get("__global__", -1)
+                if msg_seq > last_seq:
+                    await websocket.send_json(cached_message)
+
     async def _handle_message(self, session_id: str, message: Any) -> None:
         if not isinstance(message, dict):
             return
@@ -681,10 +745,25 @@ class WebSocketConnectionManager:
                 f"[WS CONNECTION LOCK] Connection lock {'enabled' if enabled else 'disabled'}"
             )
             return
+        if message_type == "sync_request":
+            # 处理增量同步请求
+            agent_seqs = payload.get("agent_seqs", {})
+            await self._handle_sync_request(session_id, agent_seqs)
+            return
         if message_type == "input_result":
             text = payload.get("text", "")
+            # 为用户输入消息分配序号
+            agent_id = payload.get("agent_id")
+            if agent_id:
+                seq = self._gateway._agent_message_sequences.get(agent_id, 0)
+                self._gateway._agent_message_sequences[agent_id] = seq + 1
+            else:
+                seq = self._gateway._global_message_sequence
+                self._gateway._global_message_sequence += 1
+            message_with_seq = dict(message)
+            message_with_seq["seq"] = seq
             # 缓存用户输入消息，用于重连后恢复对话完整性
-            self._gateway._message_cache.append(message)
+            self._gateway._message_cache.append(message_with_seq)
             # 检查当前是否正在等待输入
             session = self._input_registry.get_or_create(session_id)
             if session.is_waiting_for_input():
