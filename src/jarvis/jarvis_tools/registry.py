@@ -1123,7 +1123,12 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _parse_tool_calls_xml_format(content: str) -> list:
-        """解析 <tool_calls><tool_call name="xxx"><parameter name="xxx" string="false">value</parameter></tool_call></tool_calls> 格式"""
+        """解析 <tool_calls> 包裹的多种 tool_call 格式。
+
+        支持两种子格式：
+        1. <tool_call name="xxx"><parameter name="xxx" string="false">value</parameter></tool_call>
+        2. <tool_call name="xxx">JSON</tool_call>（标签内直接是 JSON 参数）
+        """
         ret: list = []
         # 匹配 <tool_calls> ... </tool_calls> 外层容器
         tc_pattern = r"<tool_calls>\s*(.*?)\s*</tool_calls>"
@@ -1135,9 +1140,18 @@ class ToolRegistry(OutputHandlerProtocol):
         tool_call_pattern = r'<tool_call\s+name="(\w+)"\s*>\s*(.*?)\s*</tool_call>'
         for tc in re.finditer(tool_call_pattern, inner, re.DOTALL):
             tool_name = tc.group(1)
-            params_content = tc.group(2)
+            params_content = tc.group(2).strip()
             arguments: dict = {}
-            # 匹配 <parameter name="xxx" string="true/false">value</parameter>
+            # 先尝试将内部内容作为 JSON 解析（新格式：直接 JSON）
+            if params_content.startswith("{"):
+                try:
+                    arguments = json_loads(params_content)
+                    if isinstance(arguments, dict):
+                        ret.append({"name": tool_name, "arguments": arguments})
+                        continue
+                except Exception:
+                    pass
+            # 回退到 <parameter> 子标签格式（旧格式）
             param_pattern = r'<parameter\s+name="(\w+)"(?:\s+string="(true|false)")?\s*>\s*(.*?)\s*</parameter>'
             for pm in re.finditer(param_pattern, params_content, re.DOTALL):
                 param_name = pm.group(1)
