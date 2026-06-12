@@ -269,7 +269,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import llm_delete
 
             try:
-                llm_delete()
+                llm_delete(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 删除LLM配置失败: {e}")
@@ -278,7 +278,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import llm_update
 
             try:
-                llm_update()
+                llm_update(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 更新LLM配置失败: {e}")
@@ -287,7 +287,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import group_add
 
             try:
-                group_add()
+                group_add(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 添加模型组失败: {e}")
@@ -296,7 +296,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import group_delete
 
             try:
-                group_delete()
+                group_delete(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 删除模型组失败: {e}")
@@ -305,7 +305,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import group_update
 
             try:
-                group_update()
+                group_update(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 更新模型组失败: {e}")
@@ -314,7 +314,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_platform_manager.main import group_set
 
             try:
-                group_set()
+                group_set(name=None)
             except Exception as e:
                 if "Exit" not in str(type(e).__name__):
                     PrettyOutput.auto_print(f"❌ 设置模型组失败: {e}")

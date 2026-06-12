@@ -177,8 +177,25 @@ def llm_show(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择 LLM 配置 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 配置 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：name (platform/model)）
         name = selected_str.split(" (")[0].strip()
 
@@ -232,8 +249,25 @@ def llm_delete(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要删除的 LLM 配置 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 配置 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：name (platform/model)）
         name = selected_str.split(" (")[0].strip()
 
@@ -659,8 +693,25 @@ def llm_update(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要更新的 LLM 配置 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 配置 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：name (platform/model)）
         name = selected_str.split(" (")[0].strip()
 
@@ -812,7 +863,7 @@ def group_show(
     llm_groups = config.get("llm_groups", {})
 
     if not llm_groups:
-        PrettyOutput.auto_print("ℹ️ 没有配置任何模型组")
+        PrettyOutput.auto_print("ℹ 没有配置任何模型组")
         raise typer.Exit(code=1)
 
     # 如果没有指定名称，使用交互式选择
@@ -823,8 +874,25 @@ def group_show(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择模型组 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 模型组 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
         name = selected_str.split(" (")[0].strip()
 
@@ -859,8 +927,25 @@ def group_delete(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要删除的模型组 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 模型组 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
         name = selected_str.split(" (")[0].strip()
 
@@ -1014,8 +1099,25 @@ def group_update(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要更新的模型组 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 模型组 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
         name = selected_str.split(" (")[0].strip()
 
@@ -1108,8 +1210,25 @@ def group_set(
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要设置的模型组 > ")
         if not selected_str:
-            PrettyOutput.auto_print("ℹ️ 已取消")
-            raise typer.Exit(code=0)
+            # fzf 不可用时（如 gateway 模式），回退到编号输入
+            md_lines = ["| 编号 | 模型组 |", "|------|------|"]
+            for i, opt in enumerate(fzf_options, 1):
+                md_lines.append(f"| {i} | {opt} |")
+            PrettyOutput.print_markdown("\n".join(md_lines))
+            choice = get_single_line_input("请输入编号 (0 取消): ").strip()
+            if choice == "0" or not choice:
+                PrettyOutput.auto_print("ℹ 已取消")
+                raise typer.Exit(code=0)
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(fzf_options):
+                    selected_str = fzf_options[idx]
+                else:
+                    PrettyOutput.auto_print("❌ 无效的编号")
+                    raise typer.Exit(code=0)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入")
+                raise typer.Exit(code=0)
         # 从选择的字符串中提取名称（格式：group_name (normal: xxx)）
         name = selected_str.split(" (")[0].strip()
 
