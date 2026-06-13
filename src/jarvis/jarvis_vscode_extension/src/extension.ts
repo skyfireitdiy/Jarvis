@@ -4883,6 +4883,18 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         connectionHandled = true;
         clearTimeout(timeoutId);
         this.agentSockets.set(agentId, agentSocket);
+        
+        // 发送该 Agent 的增量同步请求
+        const lastSeq = this.agentLastSeqs.get(agentId) ?? -1;
+        const syncMessage = {
+          type: "sync_request",
+          payload: {
+            agent_seqs: { [agentId]: lastSeq },
+          },
+        };
+        this.sendSocketMessage(agentSocket, syncMessage);
+        console.log(`[AGENT ${agentId}] Sent sync_request with seq:`, lastSeq);
+        
         this.sendSocketMessage(agentSocket, {
           type: "get_status",
           payload: {},
@@ -4975,48 +4987,16 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      await this.connectAgentSocketWithRetry(agentId, retryCount + 1);
-    });
-  }
-
-  private handleGatewaySocketMessage(rawData: RawData): void {
-    const parsedMessage = parseSocketMessage(rawData);
-    console.log("[GATEWAY MSG]", parsedMessage?.type, parsedMessage);
-    if (!parsedMessage) {
-      return;
-    }
-
     if (parsedMessage.type === "ready") {
-      // 清空当前 Agent 的消息列表，准备接收后端的完整历史缓存
+      // 主连接 ready，不再发送 sync_request（已改为每个 Agent 连接独立 sync）
       const agentId = this.panelState.selectedAgentId;
       if (agentId) {
-        this.withAgentState(agentId, (state) => {
-          state.messages = [];
-        });
-        console.log(
-          "[READY] Cleared message cache for agent",
-          agentId,
-          "ready to receive full history from backend",
-        );
+        console.log("[READY] Main connection ready for agent", agentId);
       }
       this.appendPanelMessage("主通道就绪", "system");
-
-      // 发送 sync_request，携带所有 agent 的最大序号
-      const agentSeqs: Record<string, number> = {};
-      for (const [aid, seq] of this.agentLastSeqs.entries()) {
-        agentSeqs[aid] = seq;
-      }
-      const syncMessage = {
-        type: "sync_request",
-        payload: {
-          agent_seqs: agentSeqs,
-        },
-      };
-      this.gatewaySocket?.send(JSON.stringify(syncMessage));
-      console.log("[SYNC_REQUEST] Sent:", syncMessage);
-
       return;
     }
+
     if (parsedMessage.type === "status_update") {
       const agentId = this.panelState.selectedAgentId;
       if (agentId) {
@@ -5168,7 +5148,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     }
 
     // 提取并更新消息序号（用于增量同步）
-    if (typeof parsedMessage.seq === "number" && parsedMessage.seq > 0) {
+    if (typeof parsedMessage.seq === "number" && parsedMessage.seq >= 0) {
       this.updateAgentSeq(agentId, parsedMessage.seq);
     }
 
