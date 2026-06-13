@@ -259,4 +259,79 @@ class TestToolRegistry:
         assert len(result) == 1
         assert result[0]["name"] == "execute_script"
         assert result[0]["arguments"]["interpreter"] == "bash"
+        assert result[0]["arguments"]["interpreter"] == "bash"
         assert result[0]["arguments"]["script_content"] == "grep -n pattern file"
+
+    # ────────────── _compress_output 测试 ──────────────
+
+    def test_compress_output_empty(self, registry):
+        """测试空字符串和特殊标记直接返回"""
+        assert registry._compress_output("") == ""
+        assert registry._compress_output("<无输出和错误>") == "<无输出和错误>"
+
+    def test_compress_output_blank_lines_collapse(self, registry):
+        """第1层：连续空行>=3折叠为2个"""
+        text = "line1\n\n\n\n\nline2"
+        result = registry._compress_output(text)
+        # 5个空行折叠为2个
+        assert result == "line1\n\n\nline2"
+
+    def test_compress_output_blank_lines_keep(self, registry):
+        """第1层：连续空行<3保持不变"""
+        text = "line1\n\n\nline2"
+        result = registry._compress_output(text)
+        # 2个空行不折叠
+        assert result == "line1\n\n\nline2"
+
+    def test_compress_output_json_compress(self, registry):
+        """第2层：JSON压缩生效（压缩比<70%）"""
+        text = '<stdout>\n{\n  "key": "value",\n  "nested": {\n    "a": 1\n  }\n}\n</stdout>'
+        result = registry._compress_output(text)
+        # 压缩后应变为一行JSON
+        assert "<stdout>" in result
+        assert "</stdout>" in result
+        assert '{"key":"value","nested":{"a":1}}' in result
+        assert '\n  "key"' not in result
+
+    def test_compress_output_json_no_compress(self, registry):
+        """第2层：已紧凑JSON/非JSON/无效JSON不压缩"""
+        # 已紧凑的JSON（压缩比>=70%）
+        compact_text = '<stdout>\n{"a":"b"}\n</stdout>'
+        result = registry._compress_output(compact_text)
+        assert result == compact_text  # 不变
+        # 非JSON文本
+        plain_text = "<stdout>\njust a normal text\n</stdout>"
+        result = registry._compress_output(plain_text)
+        assert result == plain_text  # 不变
+
+    def test_compress_output_repeated_lines(self, registry):
+        """第3层：连续重复行>=4合并"""
+        text = "header\ndata_line\ndata_line\ndata_line\ndata_line\ndata_line\nfooter"
+        result = registry._compress_output(text)
+        lines = result.split("\n")
+        assert lines[0] == "header"
+        assert lines[1] == "data_line"
+        assert "...（以上内容重复 4 次）" in lines[2]
+        assert lines[3] == "footer"
+
+    def test_compress_output_repeated_lines_few(self, registry):
+        """第3层：连续重复行<4不压缩"""
+        text = "a\nb\nb\nb\nc"
+        result = registry._compress_output(text)
+        assert result == text  # 3次重复不压缩
+
+    def test_compress_output_safety_boundary(self, registry):
+        """第4层：超过200行时保留首尾各100行"""
+        lines = [f"line_{i}" for i in range(250)]
+        text = "\n".join(lines)
+        result = registry._compress_output(text)
+        result_lines = result.split("\n")
+        # 检查是否包含折叠标记
+        assert "行已折叠" in result
+        assert "总行数 250" in result
+        # 检查首尾保留
+        assert "line_0" in result_lines[0]
+        assert "line_99" in result_lines[99]
+        # 检查尾部保留
+        assert "line_249" in result_lines[-1]
+        assert "line_150" in result  # 尾部起始行出现在结果中
