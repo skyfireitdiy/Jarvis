@@ -205,6 +205,7 @@ BUILTIN_COMMANDS = [
     ("LLMGroupDelete", "删除模型组"),
     ("LLMGroupUpdate", "更新模型组"),
     ("LLMGroupSet", "设置当前模型组"),
+    ("Shell", "打开Shell终端"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
