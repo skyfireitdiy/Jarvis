@@ -635,10 +635,7 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
         )
-        # 发送缓存的消息（输出+输入，按时间顺序）（仅 Agent 进程发送）
-        if os.environ.get("IS_AGENT_PROCESS") == "1" and self._gateway._message_cache:
-            for cached_message in self._gateway._message_cache:
-                await websocket.send_json(cached_message)
+        # 消息历史通过前端发送 sync_request 按需增量同步，不在连接建立时主动推送
         # 恢复待处理的输入请求
         pending_request = self._input_registry.get_input_request(session_id)
         if pending_request:
