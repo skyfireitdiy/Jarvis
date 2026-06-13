@@ -346,8 +346,8 @@ class WebGateway(BaseGateway):
         self._auth_store = auth_store
         self._terminal_input_registry = terminal_input_registry
 
-        # 消息缓存：持续缓存所有消息（输出+输入，上限500条），用于重连后恢复完整对话
-        self._message_cache: deque = deque(maxlen=500)
+        # 消息缓存：持续缓存所有消息（输出+输入，上限1亿条），用于重连后恢复完整对话
+        self._message_cache: deque = deque(maxlen=100_000_000)
 
         # 消息序号：按 agent_id 维护独立序号序列
         self._agent_message_sequences: Dict[str, int] = {}  # agent_id -> next_seq
