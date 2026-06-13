@@ -4168,7 +4168,6 @@ async function connectToAgent(agent, retryCount = 0) {
 
         // 发送该 Agent 的增量同步请求
         const lastSeq = agentLastSeqs.value.get(agentId) ?? -1
-        console.log(`[SYNC] connectToAgent: agentId=${agentId}, lastSeq=${lastSeq}, all_seqs=`, Object.fromEntries(agentLastSeqs.value))
         const agent_seqs = { [agentId]: lastSeq }
         ws.send(JSON.stringify({
           type: 'sync_request',
@@ -6048,9 +6047,6 @@ function stopAgentListRefresh() {
 
 function handleMessage(message, agentId = null) {
   const { type, payload, seq } = message
-
-  // 调试：记录所有收到的消息
-  console.log(`[MSG] Received: type=${type}, seq=${seq}, payload.agent_id=${payload?.agent_id}, agentId=${agentId}`)
   // 调试：记录所有收到的消息类型
 
 
@@ -6066,14 +6062,13 @@ function handleMessage(message, agentId = null) {
     }
     
     if (msgAgentId) {
-      console.log(`[SYNC] updateAgentSeq: agentId=${msgAgentId}, seq=${seq}, current=${agentLastSeqs.value.get(msgAgentId) ?? -1}`)
       updateAgentSeq(msgAgentId, seq)
     } else {
       // 全局消息
       updateAgentSeq('__global__', seq)
     }
   }
-  // pong 消息处理已移除
+  
   if (type === 'ready') {
     // 清空当前 Agent 的消息列表，准备接收后端的增量消息
     const currentOutputs = allOutputs.value.get(targetAgentId) || []
