@@ -1,0 +1,8 @@
+{
+  "id": "20260613_143527_959718",
+  "type": "project_long_term",
+  "tags": ["输出压缩", "工具输出", "compress_output", "registry"],
+  "content": "在 ToolRegistry 中新增了 _compress_output 方法，对工具输出进行4层压缩：\n1. 空白行折叠：连续空行(>=3)折叠为2个\n2. JSON压缩：检测 <stdout>/<stderr> 标签内的纯JSON内容，compact格式化（仅当压缩比 < 70%时生效）\n3. 重复行压缩：连续4行以上相同内容合并为 `行 + ...（重复N次）`\n4. 行数安全边界：超过200行时保留首尾各100行\n调用位置：handle_tool_calls 中 _format_tool_output 之后立即调用",
+  "created_at": "2026-06-13T14:35:27.959752",
+  "updated_at": "2026-06-13T14:35:27.959758"
+}
