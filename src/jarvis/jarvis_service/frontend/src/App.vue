@@ -4167,7 +4167,8 @@ async function connectToAgent(agent, retryCount = 0) {
         }
 
         // 发送该 Agent 的增量同步请求
-        const lastSeq = agentLastSeqs.value.get(agentId) || -1
+        const lastSeq = agentLastSeqs.value.get(agentId) ?? -1
+        console.log(`[SYNC] connectToAgent: agentId=${agentId}, lastSeq=${lastSeq}, all_seqs=`, Object.fromEntries(agentLastSeqs.value))
         const agent_seqs = { [agentId]: lastSeq }
         ws.send(JSON.stringify({
           type: 'sync_request',
@@ -6046,9 +6047,10 @@ function stopAgentListRefresh() {
 // ========== Agent 管理方法结束 ==========
 
 function handleMessage(message, agentId = null) {
-  if (!message || typeof message !== 'object') return
   const { type, payload, seq } = message
 
+  // 调试：记录所有收到的消息
+  console.log(`[MSG] Received: type=${type}, seq=${seq}, payload.agent_id=${payload?.agent_id}, agentId=${agentId}`)
   // 调试：记录所有收到的消息类型
 
 
@@ -6064,6 +6066,7 @@ function handleMessage(message, agentId = null) {
     }
     
     if (msgAgentId) {
+      console.log(`[SYNC] updateAgentSeq: agentId=${msgAgentId}, seq=${seq}, current=${agentLastSeqs.value.get(msgAgentId) ?? -1}`)
       updateAgentSeq(msgAgentId, seq)
     } else {
       // 全局消息
@@ -6076,15 +6079,7 @@ function handleMessage(message, agentId = null) {
     const currentOutputs = allOutputs.value.get(targetAgentId) || []
     currentOutputs.length = 0
     allOutputs.value.set(targetAgentId, currentOutputs)
-    console.log('[ws] Cleared output cache for agent', targetAgentId, 'sending sync_request for incremental sync')
-    
-    // 发送增量同步请求
-    const agent_seqs = Object.fromEntries(agentLastSeqs.value)
-    socket.value.send(JSON.stringify({
-      type: 'sync_request',
-      payload: { agent_seqs }
-    }))
-    console.log('[SYNC] Sent sync_request with seqs:', agent_seqs)
+    console.log('[ws] Cleared output cache for agent', targetAgentId, '(sync handled by agent connection)')
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
     const currentAgentIdLocal = targetAgentId

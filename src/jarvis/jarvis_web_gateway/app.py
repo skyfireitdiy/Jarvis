@@ -366,6 +366,15 @@ class WebGateway(BaseGateway):
         authorized, _ = self._check_auth(auth_payload)
 
         context = dict(event.context) if event.context else {}
+
+        # Agent 进程自动补充 agent_id
+        if os.environ.get("IS_AGENT_PROCESS") == "1":
+            if not context.get("agent_id"):
+                from jarvis.jarvis_utils import globals as jglobals
+
+                if jglobals.agent_id:
+                    context["agent_id"] = jglobals.agent_id
+
         payload = {
             "text": event.text,
             "output_type": event.output_type,
