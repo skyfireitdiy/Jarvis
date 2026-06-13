@@ -1446,6 +1446,8 @@ def run_cli(
                     return {"success": False, "error": str(e)}
 
             # 将自定义 app 传递给 gateway
+            # 设置环境变量标识 Agent 进程
+            os.environ["IS_AGENT_PROCESS"] = "1"
             config = uvicorn.Config(
                 create_app(custom_app),
                 host="127.0.0.1",
