@@ -4153,20 +4153,28 @@ async function connectToAgent(agent, retryCount = 0) {
           return
         }
         connectionHandled = true
-        
+
         clearTimeout(timeoutId)
         console.log(`[AGENT ${agentId}] Connected to ${url}`)
         agentConnecting.value = false
-        
+
         // 保存连接
         sockets.value.set(agentId, ws)
-        
+
         // 初始化消息记录
         if (!allOutputs.value.has(agentId)) {
           allOutputs.value.set(agentId, [])
         }
-        
-        
+
+        // 发送该 Agent 的增量同步请求
+        const lastSeq = agentLastSeqs.value.get(agentId) || -1
+        const agent_seqs = { [agentId]: lastSeq }
+        ws.send(JSON.stringify({
+          type: 'sync_request',
+          payload: { agent_seqs }
+        }))
+        console.log(`[AGENT ${agentId}] Sent sync_request with seq:`, lastSeq)
+
         // 标记连接已完成（在onclose中用于判断是否需要重试）
         ws._connectionCompleted = true
 
@@ -4175,6 +4183,7 @@ async function connectToAgent(agent, retryCount = 0) {
         // 连接成功，resolve Promise
         resolve(ws)
       }
+
       
       ws.onclose = (event) => {
         // 心跳定时器清理代码已移除
@@ -6113,6 +6122,7 @@ function handleMessage(message, agentId = null) {
         agent_name: 'user',
         text: inputText,
         lang: 'text',
+        seq: seq, // 传递 seq
       }, targetAgentId)
     }
   } else if (type === 'output') {
@@ -6169,8 +6179,8 @@ function handleMessage(message, agentId = null) {
         console.warn('[STREAM] Received end but no streaming message found for agent:', targetAgentId)
       }
     } else {
-      // 普通输出
-      appendOutput(payload, targetAgentId)
+      // 普通输出，传递 seq
+      appendOutput({ ...payload, seq: seq }, targetAgentId)
     }
   } else if (type === 'input_request') {
 
@@ -6475,6 +6485,15 @@ function appendOutput(payload, agentId = null) {
     }
   }
 
+  // seq 去重：如果已存在相同 seq 的消息，则跳过（避免历史加载和 WebSocket 推送重复）
+  if (typeof outputItem.seq === 'number') {
+    const duplicate = currentOutputs.find(item => item.seq === outputItem.seq)
+    if (duplicate) {
+      console.log('[appendOutput] Skipping duplicate seq:', outputItem.seq)
+      return
+    }
+  }
+
   currentOutputs.push(outputItem)
 
   // 保存消息到本地存储
@@ -6495,6 +6514,7 @@ function appendOutput(payload, agentId = null) {
         is_finished: outputItem.is_finished || false,
         terminal_content: outputItem.terminal_content || '',
         execution_chunks: outputItem.execution_chunks || [],
+        seq: outputItem.seq, // 保存 seq
       }
       historyStorage.saveMessage(messageToSave)
     } else {
@@ -6509,6 +6529,7 @@ function appendOutput(payload, agentId = null) {
         non_interactive: outputItem.non_interactive,
         timestamp: outputItem.timestamp,
         context: outputItem.context,
+        seq: outputItem.seq, // 保存 seq
       }
       historyStorage.saveMessage(messageToSave)
     }
