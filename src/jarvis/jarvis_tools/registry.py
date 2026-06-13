@@ -1668,6 +1668,103 @@ class ToolRegistry(OutputHandlerProtocol):
             )
         return output
 
+    def _compress_output(self, output: str) -> str:
+        """对工具输出进行多层次无损/高保真压缩。
+
+        压缩策略（4层）：
+        1. 空白行折叠：连续空行(>=3)折叠为2个
+        2. JSON压缩：检测 <stdout>/<stderr> 标签内的纯JSON内容，compact格式化
+        3. 重复行压缩：连续重复行合并为 `行内容 + ...（重复N次）`
+        4. 行数安全边界：超过阈值(200行)时，保留首尾各100行，中间用摘要标记
+
+        1-3层完全无损，第4层在超过阈值时触发，保留关键结构。
+
+        返回:
+            str: 压缩后的输出内容
+        """
+        if not output or output == "<无输出和错误>":
+            return output
+
+        # 第1层：空白行折叠 - 将连续3个以上的空行折叠为2个
+        lines = output.split("\n")
+        collapsed_lines: list[str] = []
+        empty_count = 0
+        for line in lines:
+            if line.strip() == "":
+                empty_count += 1
+                if empty_count <= 2:
+                    collapsed_lines.append(line)
+            else:
+                empty_count = 0
+                collapsed_lines.append(line)
+        output = "\n".join(collapsed_lines)
+
+        # 第2层：JSON压缩 - 检测标签内的JSON并compact
+        # 匹配 <stdout> 或 <stderr> 标签
+        def _compact_json(match: re.Match) -> str:
+            tag = match.group(1)
+            content = match.group(2)
+            # 尝试解析JSON
+            stripped = content.strip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                try:
+                    parsed = json.loads(stripped)
+                    compact = json.dumps(
+                        parsed, ensure_ascii=False, separators=(",", ":")
+                    )
+                    # 如果压缩后比原始短很多才替换
+                    if len(compact) < len(stripped) * 0.7:
+                        return f"<{tag}>\n{compact}\n</{tag}>"
+                except Exception:
+                    pass
+            return match.group(0)
+
+        output = re.sub(
+            r"<(stdout|stderr)>\n(.*?)\n</\1>", _compact_json, output, flags=re.DOTALL
+        )
+
+        # 第3层：重复行压缩 - 检测连续重复行
+        final_lines = output.split("\n")
+        compressed_lines: list[str] = []
+        i = 0
+        while i < len(final_lines):
+            line = final_lines[i]
+            # 跳过空行
+            if line.strip() == "":
+                compressed_lines.append(line)
+                i += 1
+                continue
+            # 统计连续相同行数
+            repeat_count = 1
+            while (
+                i + repeat_count < len(final_lines)
+                and final_lines[i + repeat_count] == line
+            ):
+                repeat_count += 1
+            if repeat_count >= 4:
+                compressed_lines.append(line)
+                compressed_lines.append(f"  ...（以上内容重复 {repeat_count - 1} 次）")
+                i += repeat_count
+            else:
+                compressed_lines.append(line)
+                i += 1
+        output = "\n".join(compressed_lines)
+
+        # 第4层：行数安全边界 - 超过200行时保留首尾
+        output_lines = output.split("\n")
+        total_lines = len(output_lines)
+        # 设置阈值：200行，超出时保留首尾各100行
+        MAX_LINES = 200
+        HEAD_TAIL_LINES = 100
+        if total_lines > MAX_LINES:
+            head = output_lines[:HEAD_TAIL_LINES]
+            tail = output_lines[-HEAD_TAIL_LINES:]
+            output = "\n".join(head)
+            output += f"\n\n...（中间 {total_lines - HEAD_TAIL_LINES * 2} 行已折叠，总行数 {total_lines}）\n\n"
+            output += "\n".join(tail)
+
+        return output
+
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
             name = tool_call["name"]  # 确保name是str类型
@@ -1836,6 +1933,9 @@ class ToolRegistry(OutputHandlerProtocol):
             output = self._format_tool_output(
                 result["stdout"], result.get("stderr", ""), platform
             )
+
+            # 对输出进行多层次压缩（空白行折叠/JSON压缩/重复行合并/行数安全边界）
+            output = self._compress_output(output)
 
             # 添加执行时间信息供LLM参考
             if elapsed_time > 0:
