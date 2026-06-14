@@ -101,6 +101,18 @@ def test_model_connection(
     return False, "未知的平台类型"
 
 
+def _extract_hostname(base_url: str) -> str:
+    """从 base_url 中提取 hostname，用于生成唯一的模型配置名"""
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(base_url)
+        hostname = parsed.hostname or base_url
+        return hostname.replace(".", "_")
+    except Exception:
+        return base_url.replace(".", "_").replace("/", "_").replace(":", "_")
+
+
 def get_models(platform: str, base_url: str, api_key: str) -> list:
     """获取平台的模型列表"""
     try:
@@ -450,7 +462,10 @@ def run_quick_config():
                 f"✅ 已更新模型配置: {existing_config_name} -> {model}"
             )
             continue
-        model_config_name = f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
+        hostname_part = _extract_hostname(base_url)
+        model_config_name = (
+            f"{config_name}_{hostname_part}_{model.replace('.', '_').replace('-', '_')}"
+        )
         if platform == "openai":
             llm_config_dict = {
                 "openai_api_key": api_key,
