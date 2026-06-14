@@ -206,6 +206,7 @@ BUILTIN_COMMANDS = [
     ("LLMGroupUpdate", "更新模型组"),
     ("LLMGroupSet", "设置当前模型组"),
     ("Shell", "打开Shell终端"),
+    ("SetMaxToken", "设置最大输入Token数"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
