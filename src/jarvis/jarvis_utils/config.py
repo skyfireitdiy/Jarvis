@@ -264,9 +264,17 @@ def get_max_input_token_count() -> int:
     """
     获取模型允许的最大输入token数量。
 
+    优先使用环境变量 JARVIS_MAX_INPUT_TOKEN_COUNT，如果未设置则从模型配置获取。
+
     返回:
         int: 模型能处理的最大输入token数量。
     """
+    env_value = os.environ.get("JARVIS_MAX_INPUT_TOKEN_COUNT")
+    if env_value:
+        try:
+            return int(env_value)
+        except ValueError:
+            pass
     config = _get_resolved_model_config()
     return int(config.get("max_input_token_count", "200000"))
 
