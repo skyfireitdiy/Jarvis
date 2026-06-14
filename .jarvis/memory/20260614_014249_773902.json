@@ -1,0 +1,8 @@
+{
+  "id": "20260614_014249_773902",
+  "type": "project_long_term",
+  "tags": ["架构决策", "WebSocket", "消息缓存", "问题修复"],
+  "content": "## WebSocket 消息缓存架构优化（2024-12）\n\n### 问题\n前端 WebSocket 重连时，缓存消息出现乱序或丢失。\n\n### 根本原因\n**双重缓存冲突**：\n1. `WebGateway._message_cache`（全局，1亿条）\n2. `AgentProxyManager._agent_message_cache`（临时，200条）\n\n前端重连时两个缓存同时推送消息，造成重复、乱序或丢失。\n\n### 解决方案\n**移除 AgentProxyManager 缓存**，完全依赖 WebGateway 全局缓存 + sync_request 增量同步机制。\n\n### 修改文件\n- `src/jarvis/jarvis_web_gateway/agent_proxy_manager.py`\n  - 删除：`_agent_message_cache`、`_agent_cache_limit`、`_agent_cache_lock` 字段\n  - 删除：`_cache_agent_message()`、`_cache_messages_from_agent()`、`_flush_cached_messages()` 方法\n  - 简化：`_forward_messages()` 中的错误处理，移除缓存调用\n  - 简化：`proxy_websocket()` 中前端断开后的处理逻辑\n\n### 新架构流程\n1. Agent 发送消息 → WebGateway.emit_output() 分配序号 → 存入 _message_cache\n2. 前端正常连接：实时接收消息，本地维护 lastSeq\n3. 前端断开：Agent 继续发送，消息持续存入 _message_cache\n4. 前端重连：发送 sync_request{agent_seqs: {agent_id: lastSeq}}\n5. 后端过滤：只发送 seq > lastSeq 的消息\n\n### 优势\n- 单一数据源，消除冲突\n- 全局缓存容量大，不丢消息\n- 逻辑简化，易维护\n- 序号严格递增，保证顺序",
+  "created_at": "2026-06-14T01:42:49.773944",
+  "updated_at": "2026-06-14T01:42:49.773950"
+}
