@@ -69,6 +69,20 @@ class OpenAIModel(BasePlatform):
             self.api_key = os.getenv("OPENAI_API_KEY")
             self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
+        # Normalize api_key to api_keys list for round-robin support
+        # Support: single string, comma-separated string, or list
+        if isinstance(self.api_key, list):
+            self.api_keys = self.api_key
+        elif isinstance(self.api_key, str) and self.api_key:
+            # Support comma-separated keys in string format
+            self.api_keys = [k.strip() for k in self.api_key.split(",") if k.strip()]
+        else:
+            self.api_keys = [self.api_key] if self.api_key else []
+        # Set current api_key to the first one for backward compatibility
+        if self.api_keys:
+            self.api_key = self.api_keys[0]
+        self._api_key_index = 0
+
         # 如果设置了代理节点，将 base_url 转为 Gateway 代理 URL
         if jglobals.proxy_node and jglobals.master_url:
             # 将 base_url 拼接为代理格式
@@ -186,6 +200,22 @@ class OpenAIModel(BasePlatform):
         self.system_message = ""
         self._streaming_disabled: Optional[bool] = None
 
+    def _get_next_api_key(self) -> Optional[str]:
+        """Get next API key using round-robin rotation.
+
+        Returns the next key in the api_keys list, advancing the index.
+        If only one key is available, returns that key without rotation.
+        If no keys are available, returns None.
+        """
+        if not self.api_keys:
+            return None
+        if len(self.api_keys) == 1:
+            return self.api_keys[0]
+        # Round-robin: get next key and advance index
+        key = self.api_keys[self._api_key_index]
+        self._api_key_index = (self._api_key_index + 1) % len(self.api_keys)
+        return key
+
     def set_messages(self, messages: List[Dict[str, Any]]) -> None:
         """替换对话历史
 
@@ -298,6 +328,12 @@ class OpenAIModel(BasePlatform):
         """
         # 记录添加用户消息前的消息列表长度，用于失败时回滚
         messages_before_user = len(self.messages)
+
+        # Rotate API key for round-robin support
+        next_key = self._get_next_api_key()
+        if next_key:
+            self.api_key = next_key
+            self.client.api_key = next_key
 
         try:
             # 处理多模态消息
