@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 import os
-from collections import defaultdict
 from typing import Any, AsyncIterator
 
 import httpx
@@ -75,9 +74,6 @@ class AgentProxyManager:
             timeout=http_timeout,
             follow_redirects=True,
         )
-        self._agent_message_cache: dict[str, list[str]] = defaultdict(list)
-        self._agent_cache_limit = 200
-        self._agent_cache_lock = asyncio.Lock()
 
         logger.info("[PROXY MANAGER] AgentProxyManager initialized")
 
@@ -306,7 +302,7 @@ class AgentProxyManager:
                 await agent_ws.send(auth_message)
                 logger.info(f"[PROXY MANAGER] Sent auth message to agent {agent_id}")
 
-            await self._flush_cached_messages(client_ws, agent_id)
+            # 缓存机制已移除，完全依赖 WebGateway._message_cache 和 sync_request
 
             # 创建双向转发任务
             client_to_agent_task = asyncio.create_task(
@@ -326,17 +322,8 @@ class AgentProxyManager:
                     await agent_to_client_task
                 except asyncio.CancelledError:
                     pass
-
-                try:
-                    await asyncio.wait_for(
-                        self._cache_messages_from_agent(agent_ws, agent_id),
-                        timeout=self._ws_timeout,
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        "[PROXY MANAGER] Timed out while caching agent messages after client disconnect: %s",
-                        agent_id,
-                    )
+                # 缓存机制已移除，Agent 消息会保存在 WebGateway._message_cache
+                # 前端重连后通过 sync_request 自动获取
 
             # 检查转发任务是否有异常
             for task in (client_to_agent_task, agent_to_client_task):
@@ -401,11 +388,10 @@ class AgentProxyManager:
                     except Exception as e:
                         if direction == "agent->client":
                             logger.info(
-                                "[PROXY MANAGER] Client unavailable while forwarding agent message, caching it for %s: %s",
+                                "[PROXY MANAGER] Client unavailable while forwarding agent message for %s: %s. Message will be available via sync_request.",
                                 agent_id,
                                 e,
                             )
-                            await self._cache_agent_message(agent_id, data)
                             return
                         raise
 
@@ -415,64 +401,7 @@ class AgentProxyManager:
             logger.debug(f"[PROXY MANAGER] {direction}: Forward error: {e}")
             raise
 
-    async def _cache_agent_message(self, agent_id: str, message: str) -> None:
-        async with self._agent_cache_lock:
-            cache_bucket = self._agent_message_cache[agent_id]
-            cache_bucket.append(message)
-            if len(cache_bucket) > self._agent_cache_limit:
-                cache_bucket.pop(0)
-            logger.info(
-                "[PROXY MANAGER] Cached agent message for %s, cache_size=%d",
-                agent_id,
-                len(cache_bucket),
-            )
-
-    async def _cache_messages_from_agent(self, agent_ws: Any, agent_id: str) -> None:
-        """在 client 断开后继续消费 agent 消息并写入缓存。"""
-        try:
-            async for message in agent_ws:
-                data = message if isinstance(message, str) else message.decode()
-                logger.info(
-                    "[PROXY MANAGER] Caching agent message after client disconnect for %s: %d bytes",
-                    agent_id,
-                    len(data),
-                )
-                await self._cache_agent_message(agent_id, data)
-        except Exception as e:
-            logger.debug(
-                f"[PROXY MANAGER] Stop caching agent messages for {agent_id}: {e}"
-            )
-
-    async def _flush_cached_messages(self, client_ws: WebSocket, agent_id: str) -> None:
-        async with self._agent_cache_lock:
-            cached_messages = list(self._agent_message_cache.get(agent_id, []))
-            self._agent_message_cache.pop(agent_id, None)
-
-        if not cached_messages:
-            return
-
-        logger.info(
-            "[PROXY MANAGER] Flushing %d cached messages to agent client %s",
-            len(cached_messages),
-            agent_id,
-        )
-        for index, message in enumerate(cached_messages):
-            try:
-                await client_ws.send_text(message)
-            except Exception:
-                remaining_messages = cached_messages[index:]
-                async with self._agent_cache_lock:
-                    cache_bucket = self._agent_message_cache[agent_id]
-                    for pending_message in remaining_messages:
-                        cache_bucket.append(pending_message)
-                    while len(cache_bucket) > self._agent_cache_limit:
-                        cache_bucket.pop(0)
-                logger.warning(
-                    "[PROXY MANAGER] Failed while flushing cached messages for %s, restored %d messages",
-                    agent_id,
-                    len(remaining_messages),
-                )
-                raise
+    # 缓存相关方法已移除，完全依赖 WebGateway._message_cache 和 sync_request 机制
 
     async def cleanup(self) -> None:
         """清理资源。"""
