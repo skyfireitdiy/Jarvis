@@ -1,0 +1,8 @@
+{
+  "id": "20260614_042838_602682",
+  "type": "project_long_term",
+  "tags": ["WebSocket", "重连机制", "消息同步", "架构决策"],
+  "content": "## WebSocket 消息重复和丢失问题修复（2024-12）\n\n### 问题根源\n\n1. **输入消息乱序**：前端发送 input_result 时，payload 中缺少 agent_id，导致后端用全局序号计数器，重连后 sync_request 无法正确过滤\n\n2. **消息重复**：ready 事件触发时，同时执行：\n   - sync_request 增量推送（基于序号从后端缓存）\n   - loadHistoryMessages()（从本地 HTTP 加载）\n   两个数据源包含相同历史消息，造成重复\n\n3. **消息丢失**：ready 事件处理中 `currentOutputs.length = 0` 清空消息列表，清掉了 sync_request 已推送的增量消息\n\n### 修复方案\n\n**核心思路**：完全依赖 sync_request 的序号机制进行增量同步，移除冗余的 loadHistoryMessages() 调用和清空逻辑\n\n**修改内容**（App.vue）：\n\n1. **输入消息携带 agent_id**（commit 1299d68）：\n   - sendInputDirectly(): payload 添加 `agent_id: currentAgentId.value`\n   - sendInputResult(): payload 添加 `agent_id: targetAgentId`\n   \n2. **移除 ready 事件的冗余逻辑**（commit e4787d3）：\n   - 删除 `currentOutputs.length = 0`（第6075行）\n   - 删除 `loadHistoryMessages(false)` 调用（第6088行）\n   - 保留输入请求状态恢复逻辑\n\n### 新流程\n\n1. WebSocket onopen → 发送 sync_request {agent_id: lastSeq}\n2. 后端收到 sync_request → 基于序号推送增量消息（seq > lastSeq）\n3. 前端正常 appendOutput()，不清空，不重复加载\n4. ready 事件 → 仅恢复输入状态，不操作消息列表\n\n### 关键点\n\n- 输入和输出消息共用同一套序号体系（按 agent_id 维度递增）\n- 前端 agentLastSeqs 记录每个 agent 的最大序号，持久化到 localStorage\n- sync_request 是唯一的消息同步机制，loadHistoryMessages() 仅用于首次加载或手动加载更多\n\n### 受影响文件\n\n- `src/jarvis/jarvis_service/frontend/src/App.vue`\n  - sendInputDirectly() (line ~7208)\n  - sendInputResult() (line ~7243)\n  - handleMessage() ready 事件处理 (line ~6072)",
+  "created_at": "2026-06-14T04:28:38.602718",
+  "updated_at": "2026-06-14T04:28:38.602725"
+}
