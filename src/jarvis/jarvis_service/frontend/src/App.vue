@@ -3331,8 +3331,23 @@ async function loadHistoryMessages(prepend = false) {
       // 插入到消息列表开头
       allOutputs.value.set(currentAgentId.value, [...processedMessages, ...currentOutputs])
     } else {
-      // execution 消息现在也保存到历史（含 execution_chunks），直接用历史消息替换
-      allOutputs.value.set(currentAgentId.value, [...processedMessages])
+      // 合并历史消息与现有消息，去重（避免重复）
+      // 现有消息（可能来自 WebSocket 推送）优先级更高，历史消息补充缺失的
+      const merged = [...currentOutputs]
+      const existingIds = new Set()
+      for (const msg of currentOutputs) {
+        if (msg.execution_id) existingIds.add('exec_' + msg.execution_id)
+        if (typeof msg.seq === 'number') existingIds.add('seq_' + msg.seq)
+      }
+      for (const msg of processedMessages) {
+        const execKey = msg.execution_id ? 'exec_' + msg.execution_id : null
+        const seqKey = typeof msg.seq === 'number' ? 'seq_' + msg.seq : null
+        if ((execKey && existingIds.has(execKey)) || (seqKey && existingIds.has(seqKey))) continue
+        merged.push(msg)
+        if (execKey) existingIds.add(execKey)
+        if (seqKey) existingIds.add(seqKey)
+      }
+      allOutputs.value.set(currentAgentId.value, merged)
     }
     
     // 更新偏移量
@@ -5794,12 +5809,8 @@ async function switchAgent(agent) {
       console.log('[AGENT] WebSocket not connected, reconnecting...')
       try {
         await connectToAgent(agent)
-        // 重连成功后加载历史消息
-        const currentOutputs = allOutputs.value.get(agent.agent_id) || []
-        if (currentOutputs.length === 0) {
-          console.log(`[AGENT] Loading history after reconnect`)
-          loadHistoryMessages(false)
-        }
+        // 重连后消息同步完全依赖 sync_request 机制，不再手动加载历史
+        console.log(`[AGENT] Reconnected, sync_request will handle message recovery`)
       } catch (error) {
         console.error(`[AGENT] Failed to reconnect:`, error)
         // 不中断流程，让用户看到错误
