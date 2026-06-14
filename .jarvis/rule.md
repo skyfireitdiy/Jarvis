@@ -1,22 +1,27 @@
 # 项目综述
 
-> 最后更新：2025-12-21 | 变更摘要：更新版本号至3.1.9，补充代码统计数据，完善技术栈细节
+> 最后更新：2025-06-14 | 变更摘要：版本号更新至3.1.14，补充新增模块说明（jarvis_sec/jarvis_lsp/jarvis_smart_shell/jarvis_platform等），更新代码统计，完善CLI命令列表和CI/CD信息
 
 ## 项目概述
 
 **项目名称**: Jarvis AI Assistant  
-**版本**: 3.1.9  
+**版本**: 3.1.14  
 **定位**: 本地运行、开箱即用、可深度定制的 AI 开发助手平台  
-**目标用户**: 个人开发者、工程团队、专项场景用户
+**目标用户**: 个人开发者、工程团队、专项场景用户  
+**仓库**: https://github.com/skyfireitdiy/Jarvis.git
 
 ### 核心能力
 
 - 分析项目结构，生成执行计划
 - 修改代码后自动验证（Git、构建、静态检查、影响分析）
-- 安全扫描与报告聚合
+- 安全扫描与报告聚合（C/Rust安全检查器）
 - C→Rust 迁移流水线
 - 方法论沉淀、记忆分层、规则按需加载
 - 支持 CLI、Web、VSCode 三种访问方式
+- 分布式部署（Master/Child节点模式）
+- LSP语言服务集成
+- 智能Shell交互
+- 多AI平台适配（OpenAI/Anthropic）
 
 ## 技术栈
 
@@ -37,31 +42,63 @@
 - **Websockets**: (WebSocket支持)
 - **HTTPX**: (异步HTTP客户端)
 - **AIOHTTP**: >=3.9.0 (异步HTTP)
+- **psutil**: >=5.9.0 (系统监控)
 
 ### 关键依赖
 
-- **代码解析**: tree-sitter 0.25.2 系列 (支持 JS/TS/Rust/Go/Java/C/C++/Python/HTML/CSS/SQL/YAML/Markdown/Bash 等15+语言)
+- **代码解析**: tree-sitter 0.25.2 系列 (支持 JS/TS/Rust/Go/Java/C/C++/Python/HTML/CSS/SQL/YAML/Markdown/Bash/Ruby/PHP 等15+语言)
 - **终端UI**: prompt_toolkit 3.0.50, pygments 2.19.2, rich 14.2.0, pyte 0.8.2
 - **Web抓取**: playwright 1.48.0, beautifulsoup4, lxml 6.0.0, markdownify
 - **文本处理**: tiktoken 0.7.0, jieba, fuzzywuzzy 0.18.0, python-Levenshtein 0.25.1
 - **代码检查**: ruff, bandit, python-lsp-server>=1.14.0
 - **测试**: pytest, pytest-xdist, pytest-asyncio
-- **其他工具**: colorama 0.4.6, packaging>=24.2, jsonnet>=0.20.0, ddgr, mkdocs-material
+- **文档**: mkdocs-material, mkdocs-git-revision-date-localized-plugin, pymdown-extensions
+- **其他工具**: colorama 0.4.6, packaging>=24.2, jsonnet>=0.20.0, ddgr, ty
+
+### 可选依赖
+
+- **browser**: playwright==1.48.0 (浏览器自动化)
+- **clang16/17/18/19/20/21**: Clang编译器支持 (C→Rust迁移)
+- **tree-sitter-all**: 全部tree-sitter语言解析器（含Ruby/PHP）
 
 ## 代码统计
 
-| 语言   | 文件数 | 代码行数 |
-| ------ | ------ | -------- |
-| Python | 311    | 130,400  |
+| 模块 | 文件数 | 代码行数 |
+| --- | --- | --- |
+| jarvis_agent | 53 | 17,662 |
+| jarvis_code_agent | 60 | 16,968 |
+| jarvis_c2rust | 52 | 18,329 |
+| jarvis_tools | 25 | 14,550 |
+| jarvis_utils | 22 | 14,773 |
+| jarvis_web_gateway | 17 | 11,016 |
+| jarvis_sec | 18 | 11,513 |
+| jarvis_lsp | 8 | 6,287 |
+| jarvis_service | 7 | 2,473 |
+| jarvis_platform | 7 | 2,417 |
+| jarvis_config | 4 | 2,444 |
+| jarvis_platform_manager | 3 | 2,019 |
+| jarvis_browser | 2 | 3,833 |
+| jarvis_gateway | 7 | 907 |
+| jarvis_jck | 4 | 754 |
+| jarvis_memory_organizer | 3 | 1,457 |
+| jarvis_mcp | 4 | 1,467 |
+| jarvis_windows | 2 | 1,683 |
+| jarvis_methodology | 1 | 481 |
+| jarvis_smart_shell | 2 | 458 |
+| jarvis_git_utils | 1 | 574 |
+| jarvis_git_squash | 2 | 76 |
+| jarvis_rules_index | 3 | 255 |
+| jarvis_vscode_extension | 1 | 144 |
+| **合计** | **311** | **132,594** |
 
-> 注：统计范围 src/ 目录下的Python文件
+> 注：统计范围 src/ 目录下的Python文件；测试文件87个
 
 ## 目录结构
 
 ```text
 Jarvis/
 ├── src/jarvis/                    # 核心源码
-│   ├── jarvis_agent/             # 主Agent模块（122KB核心文件）
+│   ├── jarvis_agent/             # 主Agent模块（17,662行）
 │   │   ├── jarvis.py             # Jarvis主类
 │   │   ├── run_loop.py           # 运行循环
 │   │   ├── session_manager.py    # 会话管理
@@ -70,47 +107,175 @@ Jarvis/
 │   │   ├── tool_executor.py      # 工具执行器
 │   │   ├── builtin_input_handler.py  # 内置输入处理
 │   │   ├── prompts.py            # 提示词模板
-│   │   └── language_support_info.py  # 语言支持信息
-│   ├── jarvis_code_agent/        # 代码Agent模块
-│   │   ├── code_agent.py         # 代码Agent核心（76KB）
+│   │   ├── language_support_info.py  # 语言支持信息
+│   │   ├── skill_discovery/      # 技能发现
+│   │   └── language_extractors/   # 语言提取器
+│   ├── jarvis_code_agent/        # 代码Agent模块（16,968行）
+│   │   ├── code_agent.py         # 代码Agent核心
 │   │   ├── code_reviewer.py       # 代码审查
 │   │   ├── code_analyzer/        # 代码分析器
 │   │   ├── diff_visualizer.py    # 差异可视化
 │   │   └── worktree_manager.py   # Git worktree管理
-│   ├── jarvis_tools/             # 工具集（54KB注册器）
-│   │   ├── registry.py            # 工具注册中心
+│   ├── jarvis_tools/             # 工具集（14,550行）
+│   │   ├── registry.py            # 工具注册中心（83KB）
+│   │   ├── task_list_manager.py   # 任务列表管理（107KB）
+│   │   ├── gateway_manager.py     # Agent管理工具（81KB）
+│   │   ├── execute_script.py      # 脚本执行（56KB）
 │   │   ├── edit_file.py           # 文件编辑
-│   │   ├── execute_script.py      # 脚本执行
-│   │   ├── read_code.py           # 代码读取
-│   │   ├── task_list_manager.py   # 任务列表管理（106KB）
-│   │   └── memory.py              # 记忆管理
+│   │   ├── read_code.py           # 代码读取与符号分析
+│   │   ├── memory.py              # 记忆管理
+│   │   ├── virtual_tty.py         # 虚拟终端
+│   │   ├── timer.py               # 定时任务
+│   │   ├── search_web.py          # Web搜索
+│   │   ├── read_webpage.py        # 网页读取
+│   │   ├── symbol_dependency.py   # 符号依赖分析
+│   │   ├── meta_agent.py          # 元代理工具
+│   │   ├── methodology.py         # 方法论管理
+│   │   ├── load_rule.py           # 规则加载
+│   │   ├── auto_select_rule.py    # 自动规则选择
+│   │   ├── add_images.py          # 图片添加
+│   │   └── cli/                   # CLI子命令
+│   ├── jarvis_utils/             # 工具库（14,773行）
+│   │   ├── utils.py               # 通用工具函数（75KB）
+│   │   ├── input.py               # 输入处理（68KB）
+│   │   ├── output.py              # 输出处理（62KB）
+│   │   ├── git_utils.py           # Git工具（52KB）
+│   │   ├── config.py              # 配置管理（39KB）
+│   │   ├── builtin_replace_map.py # 内置替换映射
+│   │   ├── tmux_wrapper.py        # Tmux封装
+│   │   ├── jsonnet_compat.py      # Jsonnet兼容层
+│   │   ├── methodology.py         # 方法论工具
+│   │   ├── quick_config.py         # 快速配置
+│   │   ├── scenario_prompts.py    # 场景提示词
+│   │   ├── embedding.py           # 嵌入计算
+│   │   ├── dialogue_recorder.py   # 对话记录
+│   │   └── globals.py             # 全局状态
+│   ├── jarvis_c2rust/            # C→Rust迁移（18,329行）
+│   ├── jarvis_web_gateway/       # Web网关（11,016行）
+│   │   ├── app.py                 # 主应用（223KB，核心路由）
+│   │   ├── node_manager.py        # 节点管理（87KB）
+│   │   ├── agent_manager.py       # Agent管理
+│   │   ├── agent_proxy_manager.py # Agent代理管理
+│   │   ├── terminal_session_manager.py # 终端会话
+│   │   ├── timer_manager.py       # 定时任务管理
+│   │   ├── node_config.py          # 节点配置
+│   │   ├── node_runtime.py         # 节点运行时
+│   │   ├── node_protocol.py        # 节点协议
+│   │   ├── token_manager.py        # Token管理
+│   │   └── system_info.py          # 系统信息
+│   ├── jarvis_sec/               # 安全扫描（11,513行）
+│   │   ├── cli.py                 # CLI入口
+│   │   ├── clustering.py          # 漏洞聚类（61KB）
+│   │   ├── verification.py        # 验证引擎（45KB）
+│   │   ├── workflow.py            # 工作流
+│   │   ├── analysis.py            # 分析引擎
+│   │   ├── review.py              # 审查逻辑
+│   │   ├── report.py              # 报告生成
+│   │   ├── agents.py              # 安全Agent
+│   │   ├── file_manager.py        # 文件管理
+│   │   ├── utils.py               # 工具函数
+│   │   ├── prompts.py             # 提示词
+│   │   ├── status.py              # 状态管理
+│   │   ├── parsers.py             # 解析器
+│   │   ├── types.py               # 类型定义
+│   │   └── checkers/              # 语言检查器
+│   │       ├── c_checker.py       # C安全检查器（122KB）
+│   │       └── rust_checker.py    # Rust安全检查器（40KB）
+│   ├── jarvis_lsp/               # LSP语言服务（6,287行）
+│   │   ├── client.py              # LSP客户端（66KB）
+│   │   ├── daemon.py              # LSP守护进程（50KB）
+│   │   ├── daemon_client.py       # 守护进程客户端
+│   │   ├── server_manager.py      # 服务器管理
+│   │   ├── cli.py                 # CLI入口
+│   │   ├── config.py              # 配置
+│   │   └── protocol.py            # LSP协议
+│   ├── jarvis_service/           # Web服务模块（2,473行）
+│   │   └── cli.py                 # 服务CLI（67KB）
+│   ├── jarvis_platform/          # AI平台适配（2,417行）
+│   │   ├── base.py                 # 平台基类（33KB）
+│   │   ├── openai.py              # OpenAI适配
+│   │   ├── claude.py              # Claude适配
+│   │   ├── registry.py            # 平台注册
+│   │   ├── content_processor.py   # 内容处理器
+│   │   └── content_types.py       # 内容类型
+│   ├── jarvis_config/            # 配置管理（2,444行）
+│   ├── jarvis_platform_manager/  # 平台管理器（2,019行）
+│   │   ├── main.py                # 主逻辑（60KB）
+│   │   └── service.py             # 服务层
+│   ├── jarvis_browser/           # 浏览器自动化（3,833行）
+│   ├── jarvis_gateway/            # CLI网关（907行）
+│   │   ├── gateway.py             # 网关核心
+│   │   ├── input_bridge.py        # 输入桥接
+│   │   ├── output_bridge.py       # 输出桥接
+│   │   ├── cli_gateway.py        # CLI网关
+│   │   ├── events.py             # 事件定义
+│   │   └── manager.py            # 管理器
+│   ├── jarvis_mcp/                # MCP协议集成（1,467行）
+│   ├── jarvis_memory_organizer/   # 记忆组织器（1,457行）
+│   ├── jarvis_windows/            # Windows支持（1,683行）
+│   ├── jarvis_jck/                # JCK工具（754行）
+│   ├── jarvis_smart_shell/        # 智能Shell（458行）
+│   ├── jarvis_git_utils/         # Git工具（574行）
+│   ├── jarvis_methodology/       # 方法论（481行）
+│   ├── jarvis_git_squash/        # Git压缩（76行）
+│   ├── jarvis_rules_index/       # 规则索引（255行）
 │   ├── jarvis_tui/               # 终端UI模块
-│   ├── jarvis_service/           # Web服务模块
 │   ├── jarvis_vscode_extension/  # VSCode插件
-│   ├── jarvis_browser/           # 浏览器自动化
-│   ├── jarvis_c2rust/            # C→Rust迁移
-│   ├── jarvis_mcp/                # MCP协议集成
-│   ├── jarvis_config/             # 配置管理
-│   └── jarvis_memory_organizer/   # 记忆组织器
-├── tests/                        # 测试目录
-│   ├── jarvis_agent/
-│   ├── jarvis_code_agent/
-│   ├── jarvis_tools/
-│   └── performance/
-├── builtin/rules/                # 内置规则
-│   ├── development_workflow/      # 开发工作流
-│   ├── code_quality/             # 代码质量
-│   ├── security/                 # 安全
-│   └── architecture_design/      # 架构设计
+│   ├── prompts/                  # 提示词模板
+│   ├── scripts/                  # 安装脚本
+│   └── jarvis_data/              # 数据文件
+├── tests/                        # 测试目录（87个文件）
+│   ├── jarvis_agent/             # Agent测试
+│   ├── jarvis_code_agent/        # 代码Agent测试
+│   ├── jarvis_c2rust/            # C→Rust迁移测试
+│   ├── jarvis_config/            # 配置测试
+│   ├── jarvis_git_utils/         # Git工具测试
+│   ├── jarvis_lsp/               # LSP测试
+│   ├── jarvis_mcp/               # MCP测试
+│   ├── jarvis_memory_organizer/  # 记忆组织器测试
+│   ├── jarvis_platform/          # 平台测试
+│   ├── jarvis_platform_manager/  # 平台管理器测试
+│   ├── jarvis_sec/               # 安全扫描测试
+│   ├── jarvis_smart_shell/       # 智能Shell测试
+│   ├── jarvis_tools/             # 工具测试
+│   ├── jarvis_utils/             # 工具库测试
+│   ├── jarvis_web_gateway/       # Web网关测试
+│   ├── performance/              # 性能测试
+│   ├── regression/              # 回归测试
+│   ├── security/                 # 安全测试
+│   └── test_utils/               # 测试工具
+├── builtin/                      # 内置资源
+│   ├── agent/                    # Agent配置模板
+│   ├── prompts/                  # 内置提示词
+│   └── rules/                    # 内置规则
+│       ├── development_workflow/ # 开发工作流
+│       ├── code_quality/         # 代码质量
+│       ├── security/             # 安全
+│       └── architecture_design/  # 架构设计
+├── docs/                         # 文档
+│   ├── jarvis_book/              # Jarvis手册
+│   ├── best_practices/          # 最佳实践
+│   ├── compare/                  # 对比分析
+│   ├── technical/               # 技术文档
+│   └── 用户手册/                 # 用户手册
+├── scripts/                      # 脚本
+├── .github/workflows/            # CI/CD
+│   ├── test.yml                  # 测试流水线
+│   ├── publish.yml               # PyPI发布
+│   ├── docker-publish.yml        # Docker发布
+│   ├── deploy-docs.yml           # 文档部署
+│   └── publish-vscode.yml        # VSCode插件发布
 ├── .jarvis/                      # Jarvis配置目录
-│   ├── rule/                     # 项目规则文件
+│   ├── rule.md                   # 项目综述
+│   ├── config.yaml               # 运行配置
+│   ├── build_validation_config.yaml # 构建验证配置
 │   ├── memory/                   # 记忆存储
 │   ├── sessions/                 # 会话存储
-│   └── symbol_cache/             # 符号缓存
-├── docs/                         # 文档
-├── frontend/                     # 前端代码
-├── pyproject.toml                # 项目配置（版本3.1.9，Python 3.12严格约束）
-├── setup.py                      # 安装脚本
+│   ├── symbol_cache/             # 符号缓存
+│   ├── methodologies/            # 方法论
+│   ├── evolution/                # 演化计划
+│   └── jsec/                     # 安全配置
+├── pyproject.toml                # 项目配置（版本3.1.14）
 ├── Dockerfile                    # Docker镜像
 ├── docker-compose.yml            # Docker编排
 ├── start.sh                      # 启动脚本
@@ -121,49 +286,91 @@ Jarvis/
 
 ### jarvis_agent (主Agent模块)
 
-- **职责**: 核心Agent逻辑、会话管理、规则加载、任务调度
-- **关键文件**:
-  - `jarvis.py`: Jarvis主类，入口点
-  - `run_loop.py`: 主运行循环，处理用户输入
-  - `session_manager.py`: 会话生命周期管理
-  - `rules_manager.py`: 规则加载与匹配
-  - `builtin_input_handler.py`: 内置输入处理逻辑
-- **依赖**: jarvis_tools, jarvis_code_agent
+- **职责**: 核心Agent逻辑、会话管理、规则加载、任务调度、技能发现
+- **关键文件**: `jarvis.py`(主类), `run_loop.py`(运行循环), `session_manager.py`(会话管理), `rules_manager.py`(规则管理), `tool_executor.py`(工具执行器)
+- **依赖**: jarvis_tools, jarvis_code_agent, jarvis_utils
+- **对外接口**: `jarvis`/`jvs` CLI命令, `jarvis-agent`/`ja` CLI命令
 
 ### jarvis_code_agent (代码Agent模块)
 
-- **职责**: 代码修改、审查、构建验证、Lint检查
-- **关键文件**:
-  - `code_agent.py`: 代码Agent核心实现
-  - `code_reviewer.py`: 自动代码审查
-  - `code_agent_build.py`: 构建验证
-  - `code_agent_lint.py`: Lint检查集成
-  - `code_agent_diff.py`: Diff生成与处理
+- **职责**: 代码修改、审查、构建验证、Lint检查、Diff处理
+- **关键文件**: `code_agent.py`(核心), `code_reviewer.py`(审查), `code_analyzer/`(分析器)
 - **依赖**: tree-sitter系列, ruff, bandit
+- **对外接口**: `jarvis-code-agent`/`jca` CLI命令, `jcad`/`jarvis-code-agent-dispatcher` CLI命令
 
 ### jarvis_tools (工具集)
 
-- **职责**: 提供Agent可调用的所有工具
-- **关键文件**:
-  - `registry.py`: 工具注册中心（管理所有工具）
-  - `edit_file.py`: 文件编辑工具
-  - `execute_script.py`: 脚本执行工具
-  - `read_code.py`: 代码读取与符号分析
-  - `task_list_manager.py`: 复杂任务拆分与执行
-  - `memory.py`: 长期/短期记忆管理
-  - `load_rule.py`: 规则加载工具
-  - `symbol_dependency.py`: 符号依赖分析
+- **职责**: 提供Agent可调用的所有工具，工具注册与调度
+- **关键文件**: `registry.py`(注册中心), `task_list_manager.py`(任务管理), `gateway_manager.py`(Agent通信), `execute_script.py`(脚本执行), `edit_file.py`(文件编辑)
+- **依赖**: jarvis_utils, jarvis_web_gateway
+- **对外接口**: `jarvis-tool`/`jt` CLI命令
+
+### jarvis_web_gateway (Web网关)
+
+- **职责**: HTTP/WebSocket服务、Agent管理、节点管理、终端会话、定时任务、Token认证
+- **关键文件**: `app.py`(主应用223KB), `node_manager.py`(节点管理87KB), `agent_manager.py`(Agent管理), `agent_proxy_manager.py`(代理管理)
+- **依赖**: FastAPI, Uvicorn, WebSockets
+- **对外接口**: `jarvis-web-gateway`/`jwg` CLI命令
+
+### jarvis_sec (安全扫描)
+
+- **职责**: C/Rust代码安全漏洞扫描、聚类分析、验证、报告生成
+- **关键文件**: `clustering.py`(漏洞聚类61KB), `verification.py`(验证引擎45KB), `checkers/c_checker.py`(C检查器122KB), `checkers/rust_checker.py`(Rust检查器40KB)
+- **依赖**: tree-sitter-c, tree-sitter-rust
+- **对外接口**: `jarvis-sec`/`jsec` CLI命令
+
+### jarvis_lsp (LSP语言服务)
+
+- **职责**: LSP协议客户端、守护进程管理、代码智能服务
+- **关键文件**: `client.py`(LSP客户端66KB), `daemon.py`(守护进程50KB), `daemon_client.py`(客户端28KB), `server_manager.py`(服务器管理)
+- **依赖**: python-lsp-server>=1.14.0
+- **对外接口**: `jarvis-lsp`/`jlsp` CLI命令
+
+### jarvis_platform (AI平台适配)
+
+- **职责**: 多AI平台统一接口（OpenAI/Anthropic）、内容处理、平台注册
+- **关键文件**: `base.py`(平台基类33KB), `openai.py`(OpenAI适配), `claude.py`(Claude适配), `registry.py`(平台注册)
+- **依赖**: openai==1.78.1, anthropic>=0.40.0
+- **对外接口**: 供jarvis_agent/jarvis_platform_manager调用
+
+### jarvis_c2rust (C→Rust迁移)
+
+- **职责**: C代码到Rust的自动迁移流水线
+- **关键文件**: 模块内52个文件，18,329行代码
+- **依赖**: clang, tree-sitter-c, tree-sitter-rust
+- **对外接口**: `jarvis-c2rust`/`jc2r` CLI命令
+
+### jarvis_utils (工具库)
+
+- **职责**: 通用工具函数、配置管理、Git工具、输入输出处理、全局状态
+- **关键文件**: `utils.py`(75KB), `input.py`(68KB), `output.py`(62KB), `git_utils.py`(52KB), `config.py`(39KB)
+- **依赖**: 被所有模块依赖
+- **对外接口**: `jarvis-quick-config`/`jqc` CLI命令
 
 ### jarvis_service (Web服务)
 
-- **职责**: 提供HTTP API访问方式，支持分布式部署
-- **入口**: `jarvis-service start`
-- **依赖**: FastAPI, Uvicorn, WebSockets
+- **职责**: Web服务启动入口，服务生命周期管理
+- **关键文件**: `cli.py`(服务CLI 67KB)
+- **依赖**: jarvis_web_gateway
+- **对外接口**: `jarvis-service`/`jservice` CLI命令
 
-### jarvis_vscode_extension (VSCode插件)
+### 其他模块
 
-- **职责**: IDE集成，Agent侧边栏、聊天面板、终端
-- **关键文件**: `jarvis_vscode_extension/` 目录
+| 模块 | 职责 | CLI命令 |
+| --- | --- | --- |
+| jarvis_config | 配置管理 | `jcfg` |
+| jarvis_platform_manager | AI平台管理器 | `jpm` |
+| jarvis_browser | 浏览器自动化 | `jb` |
+| jarvis_gateway | CLI网关桥接 | - |
+| jarvis_mcp | MCP协议集成 | - |
+| jarvis_memory_organizer | 记忆组织与整理 | `jmo` |
+| jarvis_smart_shell | 智能Shell交互 | `jss` |
+| jarvis_git_utils | Git提交工具 | `jgc` |
+| jarvis_git_squash | Git压缩合并 | `jgs` |
+| jarvis_methodology | 方法论管理 | `jm` |
+| jarvis_rules_index | 规则索引查询 | `jri` |
+| jarvis_windows | Windows平台支持 | `jw` |
+| jarvis_jck | JCK工具 | - |
 
 ## 代理与节点架构
 
@@ -354,6 +561,72 @@ Jarvis 支持分布式部署，采用 **Master/Child** 节点模式：
 4. **节点认证**：Child 通过 `node_secret` 认证连接 Master，认证成功后 Master 下发 `JARVIS_AUTH_TOKEN`
 5. **登录接口**：`POST /api/auth/login`，验证密码后返回 Token
 
+## 架构特点
+
+### 架构模式
+
+- **插件化架构**：Agent、CodeAgent、Tools三层分离，工具热插拔
+- **分布式部署**：Master/Child节点模式，支持跨节点Agent管理
+- **事件驱动**：WebSocket双向通信，节点间协议消息驱动
+
+### 扩展机制
+
+- **工具系统**：ToolRegistry管理所有工具，支持通过meta_agent动态生成新工具
+- **规则系统**：内置规则与自定义规则共存，auto_select_rule按需加载
+- **平台适配**：jarvis_platform提供统一AI平台接口，registry模式注册新平台
+- **MCP协议**：Model Context Protocol支持外部工具集成
+- **配置驱动**：YAML/JSON配置文件、环境变量、远程配置
+
+### 关键设计模式
+
+- **注册表模式（Registry）**：ToolRegistry、AgentRouteRegistry、PlatformRegistry统一管理可扩展组件
+- **代理模式（Proxy）**：AgentProxyManager实现本地/远程Agent透明代理
+- **观察者模式**：WebSocket连接管理、事件总线
+- **策略模式**：jarvis_platform/base.py定义平台接口，OpenAI/Claude为具体策略
+- **工厂模式**：meta_agent动态创建工具
+- **守护进程模式**：jarvis_lsp/daemon.py管理LSP服务生命周期
+
+### 数据持久化
+
+- **文件存储**：会话（`.jarvis/sessions/`）、记忆（`.jarvis/memory/`）、符号缓存（`.jarvis/symbol_cache/`）
+- **无数据库依赖**：所有数据本地文件存储，零外部依赖
+- **Git集成**：git_utils.py提供完整的Git操作封装
+
+### 异常处理与容错
+
+- **WebSocket重连**：断开时缓存消息，重连后自动刷新
+- **节点心跳保活**：Child节点定期发送心跳，断线自动重连
+- **Agent进程隔离**：Agent运行在独立子进程，崩溃不影响主服务
+- **连接替换保护**：connection_id检查防止新连接被旧连接清理逻辑误删
+
+## CLI命令一览
+
+| 命令 | 别名 | 入口模块 | 用途 |
+| --- | --- | --- | --- |
+| `jarvis` | `jvs` | jarvis_agent.jarvis | 主Agent CLI |
+| `jarvis-agent` | `ja` | jarvis_agent.main | Agent入口 |
+| `jarvis-agent-dispatcher` | `jvsd` | jarvis_agent.jvsd_cli | Agent调度器 |
+| `jarvis-code-agent` | `jca` | jarvis_code_agent.code_agent | 代码Agent |
+| `jarvis-code-agent-dispatcher` | `jcad` | jarvis_code_agent.jcad_cli | 代码Agent调度器 |
+| `jarvis-smart-shell` | `jss` | jarvis_smart_shell.main | 智能Shell |
+| `jarvis-platform-manager` | `jpm` | jarvis_platform_manager.main | 平台管理器 |
+| `jarvis-git-commit` | `jgc` | jarvis_git_utils.git_commiter | Git提交 |
+| `jarvis-git-squash` | `jgs` | jarvis_git_squash.main | Git压缩 |
+| `jarvis-memory-organizer` | `jmo` | jarvis_memory_organizer.memory_organizer | 记忆组织器 |
+| `jarvis-tool` | `jt` | jarvis_tools.cli.main | 工具CLI |
+| `jarvis-methodology` | `jm` | jarvis_methodology.main | 方法论管理 |
+| `jarvis-sec` | `jsec` | jarvis_sec.cli | 安全扫描 |
+| `jarvis-c2rust` | `jc2r` | jarvis_c2rust.cli | C→Rust迁移 |
+| `jarvis-config` | `jcfg` | jarvis_config.cli | 配置管理 |
+| `jarvis-lsp` | `jlsp` | jarvis_lsp.cli | LSP服务 |
+| `jarvis-browser` | `jb` | jarvis_browser.cli | 浏览器自动化 |
+| `jarvis-windows` | `jw` | jarvis_windows.cli | Windows支持 |
+| `jarvis-web-gateway` | `jwg` | jarvis_web_gateway.cli | Web网关 |
+| `jarvis-service` | `jservice` | jarvis_service.cli | Web服务 |
+| `jarvis-quick-config` | `jqc` | jarvis_utils.quick_config | 快速配置 |
+| `jarvis-rules-index` | `jri` | jarvis_rules_index.cli | 规则索引 |
+| `install-playwright` | - | jarvis.scripts.install_playwright | Playwright安装 |
+
 ## 构建与运行
 
 ### 安装
@@ -361,6 +634,8 @@ Jarvis 支持分布式部署，采用 **Master/Child** 节点模式：
 ```bash
 pip install -e .                    # 开发模式安装
 pip install -e ".[browser]"        # 带浏览器支持
+pip install -e ".[clang18]"        # 带Clang编译器支持
+pip install -e ".[tree-sitter-all]" # 全部tree-sitter语言
 ```
 
 ### 运行
@@ -382,17 +657,36 @@ docker-compose up -d
 
 ### 环境要求
 
-- Python: 3.12 (严格要求)
-- 系统: Linux (主要), Windows (部分支持)
+- Python: 3.12 (严格要求，`requires-python = "==3.12.*"`)
+- 系统: Linux (主要), Windows (部分支持，需pywinauto/pywinpty)
 - 可选: Playwright浏览器、Clang编译器
+- 架构限制: tree-sitter/playwright不支持armv6l/armv7l/armv8l/armhf
+
+### Docker支持
+
+- **镜像**: `ghcr.io/skyfireitdiy/jarvis:latest`
+- **基础镜像**: `python:3.12`
+- **工作目录**: `/workspace`
+- **用户**: jarvis(UID 1000)
+- **挂载**: 当前目录→/workspace, ~/.jarvis→/home/jarvis/.jarvis, ~/.gitconfig(只读)
 
 ## 测试
 
 ### 测试框架
 
-- **pytest**: 主测试框架
+- **pytest**: 主测试框架（minversion = "3.1.14"）
 - **pytest-xdist**: 并行测试
 - **pytest-asyncio**: 异步测试支持
+
+### 测试标记
+
+- `slow`: 慢速测试
+- `integration`: 集成测试
+- `unit`: 单元测试
+- `smoke`: 冒烟测试
+- `security`: 安全测试
+- `regression`: 回归测试
+- `monitoring`: 监控测试
 
 ### 运行测试
 
@@ -401,6 +695,8 @@ pytest tests/                        # 运行所有测试
 pytest tests/jarvis_agent/          # 运行特定模块测试
 pytest -n auto                     # 并行运行
 pytest --cov=src/jarvis            # 带覆盖率
+pytest -m "not slow"               # 跳过慢速测试
+pytest -m integration              # 只运行集成测试
 ```
 
 ### 测试目录结构
@@ -409,28 +705,52 @@ pytest --cov=src/jarvis            # 带覆盖率
 tests/
 ├── jarvis_agent/                   # Agent测试
 ├── jarvis_code_agent/              # 代码Agent测试
-├── jarvis_tools/                   # 工具测试
 ├── jarvis_c2rust/                  # C→Rust迁移测试
-├── jarvis_memory_organizer/         # 记忆组织器测试
+├── jarvis_config/                  # 配置测试
+├── jarvis_git_utils/               # Git工具测试
+├── jarvis_lsp/                     # LSP测试
+├── jarvis_mcp/                     # MCP测试
+├── jarvis_memory_organizer/        # 记忆组织器测试
+├── jarvis_platform/                # 平台测试
+├── jarvis_platform_manager/        # 平台管理器测试
+├── jarvis_sec/                     # 安全扫描测试
+├── jarvis_smart_shell/             # 智能Shell测试
+├── jarvis_tools/                   # 工具测试
+├── jarvis_utils/                   # 工具库测试
+├── jarvis_web_gateway/             # Web网关测试
 ├── performance/                    # 性能测试
-├── regression/                     # 回归测试
-└── security/                      # 安全测试
+├── regression/                    # 回归测试
+├── security/                      # 安全测试
+└── test_utils/                    # 测试工具
 ```
+
+## CI/CD
+
+| 工作流 | 文件 | 触发条件 | 用途 |
+| --- | --- | --- | --- |
+| 测试 | `.github/workflows/test.yml` | push/PR到main | 运行pytest |
+| PyPI发布 | `.github/workflows/publish.yml` | 推送v*标签 | 构建并发布到PyPI |
+| Docker发布 | `.github/workflows/docker-publish.yml` | - | 构建并推送Docker镜像到GHCR |
+| 文档部署 | `.github/workflows/deploy-docs.yml` | - | 部署MkDocs文档到GitHub Pages |
+| VSCode插件发布 | `.github/workflows/publish-vscode.yml` | - | 发布VSCode扩展 |
 
 ## 关键配置
 
 ### 配置文件
 
-- `pyproject.toml`: 项目元数据、依赖管理
+- `pyproject.toml`: 项目元数据、依赖管理、CLI入口、pytest配置
+- `.jarvis/config.yaml`: Jarvis运行配置
 - `.jarvis/build_validation_config.yaml`: 构建验证配置
 - `.jarvis/rules/`: 项目规则目录
 - `.jarvis/methodologies/`: 方法论目录
+- `.jarvis/jsec/config.json`: 安全扫描配置
 
 ### 环境变量
 
 - `OPENAI_API_KEY`: OpenAI API密钥
 - `ANTHROPIC_API_KEY`: Anthropic API密钥
 - `JARVIS_MODEL`: 使用的AI模型（默认gpt-4）
+- `JARVIS_AUTH_TOKEN`: Gateway认证Token（服务启动时自动生成）
 - `TERM`: 终端类型
 
 ### AI模型配置
@@ -440,29 +760,4 @@ tests/
 - **OpenAI**: gpt-4, gpt-4-turbo, gpt-3.5-turbo (通过 openai==1.78.1)
 - **Anthropic**: claude-3-opus, claude-3-sonnet, claude-3-haiku (通过 anthropic>=0.40.0)
 - **环境变量**: `JARVIS_MODEL` 指定默认模型（默认gpt-4）
-
-### 可选依赖
-
-- **browser**: playwright==1.48.0 (浏览器自动化)
-- **clang16/17/18/19/20/21**: Clang编译器支持 (C→Rust迁移)
-- **tree-sitter-***: 各语言解析器独立安装选项
-
-## 架构特点
-
-### 模块化设计
-
-- Agent、CodeAgent、Tools三层分离
-- 支持工具热插拔
-- 内置规则与自定义规则共存
-
-### 可扩展性
-
-- MCP (Model Context Protocol) 协议支持
-- 自定义工具可通过 meta_agent 工具生成
-- 支持新平台适配
-
-### 本地优先
-
-- 所有数据本地存储
-- 支持离线工作
-- 无vendor lock-in
+- **平台管理器**: `jpm` 命令管理模型组配置
