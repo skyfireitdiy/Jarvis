@@ -5019,6 +5019,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           state.connection_status_text = `执行状态：${this.getExecutionStatusLabel(state.execution_status)}`;
           state.has_connection_error = false;
         });
+        // 同步更新 agentItems 中对应 agent 的状态，确保界面能及时响应
+        const agentItem = this.agentItems.find((a) => a.id === agentId);
+        if (agentItem) {
+          const execStatus = parsedMessage.payload?.execution_status;
+          if (execStatus === "stopped" || execStatus === "finished") {
+            agentItem.statusClass = "stopped";
+          } else if (execStatus === "running") {
+            agentItem.statusClass = "running";
+          } else if (execStatus === "waiting_multi") {
+            agentItem.statusClass = "waiting_multi";
+          } else if (execStatus === "waiting_single") {
+            agentItem.statusClass = "waiting_single";
+          }
+        }
       }
       this.postPanelState();
       return;
@@ -5111,6 +5125,21 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       const errorMessage = String(
         parsedMessage.payload?.message || "主通道发生未知错误",
       );
+      const errorCode = String(parsedMessage.payload?.code || "");
+      // CONNECTION_LOCKED 需要区分 Gateway 和 Agent 连接
+      if (errorCode === "CONNECTION_LOCKED") {
+        if (!agentId) {
+          // Gateway 连接被抢占：清除 token，防止自动登录循环
+          console.log("[GATEWAY] Gateway connection locked, clearing token");
+          this.handleAuthExpired(errorMessage);
+        } else {
+          // Agent 连接被抢占：这是正常的切换行为，只记录日志
+          console.log(
+            `[GATEWAY] Agent ${agentId} connection locked (normal switch behavior)`,
+          );
+        }
+        return;
+      }
       if (this.isInvalidTokenMessage(errorMessage)) {
         this.handleAuthExpired(errorMessage);
         return;
