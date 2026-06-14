@@ -7208,6 +7208,7 @@ function sendInputDirectly(text) {
     type: 'input_result',
     payload: {
       text: text,
+      agent_id: currentAgentId.value,
     },
   }
 
@@ -7244,6 +7245,7 @@ function sendInputResult(text, requestId, agentId = null) {
     payload: {
       text: text,
       request_id: requestId,
+      agent_id: targetAgentId,
     },
   }
   console.log('[ws] send input_result (from buffer)', message, 'agent:', targetAgentId)
