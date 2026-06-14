@@ -6070,27 +6070,12 @@ function handleMessage(message, agentId = null) {
   }
   
   if (type === 'ready') {
-    // 清空当前 Agent 的消息列表，准备接收后端的增量消息
-    const currentOutputs = allOutputs.value.get(targetAgentId) || []
-    currentOutputs.length = 0
-    allOutputs.value.set(targetAgentId, currentOutputs)
-    console.log('[ws] Cleared output cache for agent', targetAgentId, '(sync handled by agent connection)')
+    // Agent 连接已建立并准备就绪
+    // 消息同步完全依赖 sync_request 机制，不再手动加载历史或清空消息
+    console.log('[ws] Agent ready:', targetAgentId)
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
     const currentAgentIdLocal = targetAgentId
-    
-    // 清空后重新加载历史消息，避免与 WebSocket 推送的缓存消息重复
-    // 只在切换到当前 Agent 时加载历史
-    // 注意：必须等待历史加载完成，避免与后续 WebSocket 推送的 execution 消息冲突
-    if (targetAgentId === currentAgentId.value) {
-      console.log('[ws] Loading history after ready event for agent:', targetAgentId)
-      // 使用 Promise 确保历史加载完成后再处理后续消息
-      loadHistoryMessages(false).then(() => {
-        console.log('[ws] History loaded successfully for agent:', targetAgentId)
-      }).catch(err => {
-        console.error('[ws] Failed to load history:', err)
-      })
-    }
     const inputRequest = inputRequests.value.get(currentAgentIdLocal)
     if (inputRequest) {
       console.log('[ws] Restoring input request for agent', currentAgentIdLocal, 'from Map')
