@@ -978,6 +978,30 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("ℹ️ 用户选择不反馈审查问题")
                 return "", True
 
+        elif tag == "SetMaxToken":
+            # 处理SetMaxToken命令，设置最大输入Token数
+            from jarvis.jarvis_utils.input import get_single_line_input
+
+            value_str = get_single_line_input(
+                "请输入最大输入Token数（<200000则设为200000，0则删除限制）："
+            )
+            if value_str is None:
+                return "", True
+            try:
+                value = int(value_str.strip())
+            except ValueError:
+                PrettyOutput.auto_print("❌ 无效的输入，请输入一个整数")
+                return "", True
+            if value == 0:
+                os.environ.pop("JARVIS_MAX_INPUT_TOKEN_COUNT", None)
+                PrettyOutput.auto_print("✅ 已删除最大输入Token数限制")
+            else:
+                if value < 200000:
+                    value = 200000
+                    PrettyOutput.auto_print("⚠ 输入值小于200000，已自动设置为200000")
+                os.environ["JARVIS_MAX_INPUT_TOKEN_COUNT"] = str(value)
+                PrettyOutput.auto_print(f"✅ 最大输入Token数已设置为 {value}")
+            return "", True
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)
