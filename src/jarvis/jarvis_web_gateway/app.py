@@ -692,21 +692,21 @@ class WebSocketConnectionManager:
     async def _handle_sync_request(
         self, session_id: str, agent_seqs: Dict[str, int]
     ) -> None:
-        """处理增量同步请求，只发送大于客户端 last_seq 的消息"""
+        """处理同步请求，返回消息缓存中该 agent 的所有历史消息"""
         connection = self._active_connections.get(session_id)
         if not connection:
             return
         _, websocket = connection
 
-        # 过滤消息缓存，只发送增量消息
+        # 获取前端请求的 agent_id 列表
+        requested_agent_ids = set(agent_seqs.keys())
+        # 排除 __global__，单独处理
+        requested_agent_ids.discard("__global__")
+        has_global = "__global__" in agent_seqs
+
+        # 遍历消息缓存，发送所有匹配的历史消息
         for cached_message in self._gateway._message_cache:
             if not isinstance(cached_message, dict):
-                continue
-
-            msg_seq = cached_message.get("seq")
-            if msg_seq is None:
-                # 旧消息没有序号，全部发送（向后兼容）
-                await websocket.send_json(cached_message)
                 continue
 
             # 获取消息的 agent_id
@@ -728,16 +728,11 @@ class WebSocketConnectionManager:
             else:
                 msg_agent_id = None
 
-            # 判断是否需要发送
-            if msg_agent_id:
-                last_seq = agent_seqs.get(msg_agent_id, -1)
-                if msg_seq > last_seq:
-                    await websocket.send_json(cached_message)
-            else:
-                # 全局消息（无 agent_id）
-                last_seq = agent_seqs.get("__global__", -1)
-                if msg_seq > last_seq:
-                    await websocket.send_json(cached_message)
+            # 始终发送匹配的消息（前端有 seq 去重逻辑）
+            if msg_agent_id and msg_agent_id in requested_agent_ids:
+                await websocket.send_json(cached_message)
+            elif msg_agent_id is None and has_global:
+                await websocket.send_json(cached_message)
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
         if not isinstance(message, dict):
