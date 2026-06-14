@@ -4883,7 +4883,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         connectionHandled = true;
         clearTimeout(timeoutId);
         this.agentSockets.set(agentId, agentSocket);
-        
+
         // 发送该 Agent 的增量同步请求
         const lastSeq = this.agentLastSeqs.get(agentId) ?? -1;
         const syncMessage = {
@@ -4894,7 +4894,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         };
         this.sendSocketMessage(agentSocket, syncMessage);
         console.log(`[AGENT ${agentId}] Sent sync_request with seq:`, lastSeq);
-        
+
         this.sendSocketMessage(agentSocket, {
           type: "get_status",
           payload: {},
@@ -4986,6 +4986,17 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         );
         return;
       }
+
+      await this.connectAgentSocketWithRetry(agentId, retryCount + 1);
+    });
+  }
+
+  private handleGatewaySocketMessage(rawData: RawData): void {
+    const parsedMessage = parseSocketMessage(rawData);
+    console.log("[GATEWAY MSG]", parsedMessage?.type, parsedMessage);
+    if (!parsedMessage) {
+      return;
+    }
 
     if (parsedMessage.type === "ready") {
       // 主连接 ready，不再发送 sync_request（已改为每个 Agent 连接独立 sync）
@@ -5095,39 +5106,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       }
       return;
     }
-    if (parsedMessage.type === "execution") {
-      // 检查是否是独立终端的输出
-      const executionId = String(
-        parsedMessage.payload?.execution_id || "",
-      ).trim();
-      console.log(
-        "[MAIN SOCKET] execution message:",
-        executionId,
-        "sessions:",
-        Array.from(this.independentTerminalSessions.keys()),
-      );
-      if (executionId.startsWith("terminal_")) {
-        const terminalId = executionId.replace("terminal_", "");
-        const data = String(parsedMessage.payload?.data || "");
-        const encoded = Boolean(parsedMessage.payload?.encoded);
-        console.log(
-          "[INDEPENDENT TERMINAL] output for:",
-          terminalId,
-          "data length:",
-          data.length,
-          "encoded:",
-          encoded,
-        );
-        this.handleIndependentTerminalOutput(terminalId, data, encoded);
-        return;
-      }
-      // 非独立终端的执行输出
-      const agentId = this.panelState.selectedAgentId;
-      if (agentId) {
-        this.handleExecutionPayload(agentId, parsedMessage.payload);
-      }
-      return;
-    }
+
     if (parsedMessage.type === "error") {
       const errorMessage = String(
         parsedMessage.payload?.message || "主通道发生未知错误",
