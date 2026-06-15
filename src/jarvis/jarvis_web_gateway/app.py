@@ -662,7 +662,7 @@ class WebSocketConnectionManager:
         try:
             while True:
                 message = await websocket.receive_json()
-                await self._handle_message(session_id, message)
+                await self._handle_message(session_id, message, websocket)
         except WebSocketDisconnect:
             print(
                 "[WS DISCONNECT] "
@@ -751,7 +751,9 @@ class WebSocketConnectionManager:
             }
         )
 
-    async def _handle_message(self, session_id: str, message: Any) -> None:
+    async def _handle_message(
+        self, session_id: str, message: Any, websocket: WebSocket
+    ) -> None:
         if not isinstance(message, dict):
             return
         message_type = message.get("type")
@@ -781,6 +783,22 @@ class WebSocketConnectionManager:
                 self._gateway._global_message_sequence += 1
             message_with_seq = dict(message)
             message_with_seq["seq"] = seq
+
+            # ➕ 新增：将用户输入作为 output 消息发送回前端，确保前端收到带 seq 的用户输入
+            await websocket.send_json(
+                {
+                    "type": "output",
+                    "payload": {
+                        "output_type": "user_input",
+                        "agent_name": "user",
+                        "text": text,
+                        "lang": "text",
+                        "agent_id": agent_id,
+                    },
+                    "seq": seq,
+                }
+            )
+
             # 缓存用户输入消息，用于重连后恢复对话完整性
             self._gateway._message_cache.append(message_with_seq)
             # 检查当前是否正在等待输入
