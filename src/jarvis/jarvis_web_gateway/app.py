@@ -549,7 +549,7 @@ class WebGateway(BaseGateway):
     def get_execution_input_callback(
         self,
         execution_id: str,
-    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+    ) -> Optional[Callable[[float], Optional[str]]]:
         return self._terminal_input_registry.get_input_callback(execution_id)  # type: ignore[return-value]
 
     def get_execution_resize_callback(
@@ -692,7 +692,7 @@ class WebSocketConnectionManager:
     async def _handle_sync_request(
         self, session_id: str, agent_seqs: Dict[str, int]
     ) -> None:
-        """处理同步请求，返回消息缓存中该 agent 的所有历史消息"""
+        """处理同步请求，一次性返回消息缓存中该 agent 的所有历史消息"""
         connection = self._active_connections.get(session_id)
         if not connection:
             return
@@ -704,7 +704,8 @@ class WebSocketConnectionManager:
         requested_agent_ids.discard("__global__")
         has_global = "__global__" in agent_seqs
 
-        # 遍历消息缓存，发送所有匹配的历史消息
+        # 收集所有匹配的历史消息
+        matched_messages = []
         for cached_message in self._gateway._message_cache:
             if not isinstance(cached_message, dict):
                 continue
@@ -728,11 +729,18 @@ class WebSocketConnectionManager:
             else:
                 msg_agent_id = None
 
-            # 始终发送匹配的消息（前端有 seq 去重逻辑）
             if msg_agent_id and msg_agent_id in requested_agent_ids:
-                await websocket.send_json(cached_message)
+                matched_messages.append(cached_message)
             elif msg_agent_id is None and has_global:
-                await websocket.send_json(cached_message)
+                matched_messages.append(cached_message)
+
+        # 合并为一条 sync_response 消息一次性发送
+        await websocket.send_json(
+            {
+                "type": "sync_response",
+                "payload": {"messages": matched_messages},
+            }
+        )
 
     async def _handle_message(self, session_id: str, message: Any) -> None:
         if not isinstance(message, dict):
