@@ -5002,24 +5002,30 @@ function insertAtPosition(text, position) {
 function insertCompletion(item) {
   const textarea = document.querySelector('.input-wrapper textarea')
   if (!textarea) return
-  
+
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
   const text = textarea.value
 
   recordCompletionSelection(item)
+
+  // 删除@符号及其后的内容（如果有）
+  let deleteStart = completionCursorPos.value
+  if (deleteStart === -1) {
+    deleteStart = start
+  }
   
-  // 在光标位置插入补全（添加单引号包裹）
+  // 在删除@符号的位置插入补全（添加单引号包裹）
   const valueToInsert = `'${item.value}'`
-  const newText = text.substring(0, start) + valueToInsert + text.substring(end)
+  const newText = text.substring(0, deleteStart) + valueToInsert + text.substring(end)
   inputText.value = newText
-  
+
   // 设置新的光标位置
   textarea.value = newText
-  const newCursorPos = start + valueToInsert.length
+  const newCursorPos = deleteStart + valueToInsert.length
   textarea.setSelectionRange(newCursorPos, newCursorPos)
   textarea.focus()
-  
+
   // 关闭弹窗
   showCompletions.value = false
   selectedIndex.value = -1
