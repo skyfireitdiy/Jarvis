@@ -693,8 +693,17 @@ class WebSocketConnectionManager:
         self, session_id: str, agent_seqs: Dict[str, int]
     ) -> None:
         """处理同步请求，一次性返回消息缓存中该 agent 的所有历史消息"""
+        print(
+            f"[SYNC_REQUEST] received session_id={session_id} "
+            f"agent_seqs={agent_seqs} "
+            f"cache_size={len(self._gateway._message_cache)}"
+        )
         connection = self._active_connections.get(session_id)
         if not connection:
+            print(
+                f"[SYNC_REQUEST] NO_ACTIVE_CONNECTION for session_id={session_id}, "
+                f"active_connections={list(self._active_connections.keys())}"
+            )
             return
         _, websocket = connection
 
@@ -744,12 +753,17 @@ class WebSocketConnectionManager:
                     matched_messages.append(cached_message)
 
         # 合并为一条 sync_response 消息一次性发送
+        print(
+            f"[SYNC_REQUEST] sending sync_response with "
+            f"{len(matched_messages)} messages"
+        )
         await websocket.send_json(
             {
                 "type": "sync_response",
                 "payload": {"messages": matched_messages},
             }
         )
+        print("[SYNC_REQUEST] sync_response sent successfully")
 
     async def _handle_message(
         self, session_id: str, message: Any, websocket: WebSocket
@@ -769,7 +783,16 @@ class WebSocketConnectionManager:
             # 处理增量同步请求（仅 Agent 进程处理）
             if os.environ.get("IS_AGENT_PROCESS") == "1":
                 agent_seqs = payload.get("agent_seqs", {})
+                print(
+                    f"[SYNC_REQUEST] dispatching to _handle_sync_request "
+                    f"session_id={session_id} agent_seqs={agent_seqs}"
+                )
                 await self._handle_sync_request(session_id, agent_seqs)
+            else:
+                print(
+                    f"[SYNC_REQUEST] IGNORED (not agent process) "
+                    f"IS_AGENT_PROCESS={os.environ.get('IS_AGENT_PROCESS')}"
+                )
             return
         if message_type == "input_result":
             text = payload.get("text", "")
