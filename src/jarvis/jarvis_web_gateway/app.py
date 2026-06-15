@@ -801,6 +801,8 @@ class WebSocketConnectionManager:
 
             # 缓存用户输入消息，用于重连后恢复对话完整性
             self._gateway._message_cache.append(message_with_seq)
+            # 将带 seq 的用户输入消息发回前端，让前端添加到历史记录
+            self._router.publish(message_with_seq, session_id=session_id)
             # 检查当前是否正在等待输入
             session = self._input_registry.get_or_create(session_id)
             if session.is_waiting_for_input():
