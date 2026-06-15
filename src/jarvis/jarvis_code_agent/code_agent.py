@@ -1466,6 +1466,7 @@ def cli(
                 except Exception as e:
                     return {"success": False, "error": str(e)}
 
+            os.environ["IS_AGENT_PROCESS"] = "1"
             config = uvicorn.Config(
                 create_app(custom_app=custom_app),
                 host="127.0.0.1",
