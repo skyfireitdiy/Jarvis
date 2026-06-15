@@ -1253,7 +1253,17 @@ def switch_model_group(agent: Any) -> bool:
         _print_markdown_table("📋 可用模型组", headers, rows)
         PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
-    choice_names = [group_name for group_name, _, _, _ in groups]
+    # 在fzf模式下显示详细信息，单行输入模式下显示简单名称
+    if fzf_available:
+        # fzf模式下显示详细信息
+        choice_names = [
+            f"{group_name} (Smart: {smart_model}, Normal: {normal_model}, Cheap: {cheap_model})"
+            for group_name, smart_model, normal_model, cheap_model in groups
+        ]
+    else:
+        # 单行输入模式下显示简单名称
+        choice_names = [group_name for group_name, _, _, _ in groups]
+
     selected = get_choice("请选择模型组:", choice_names)
 
     # 处理取消情况（fzf按Esc或输入空字符串）
@@ -1261,7 +1271,24 @@ def switch_model_group(agent: Any) -> bool:
         PrettyOutput.auto_print("🚫 已取消切换")
         return False
 
-    choice_idx = choice_names.index(selected) - 1
+    # 提取选择的模型组名称（移除fzf模式下的详细信息）
+    if fzf_available:
+        # 从详细字符串中提取模型组名称
+        selected_group_name = selected.split(" (")[0]
+    else:
+        selected_group_name = selected
+
+    # 查找选择的模型组索引
+    choice_idx = -1
+    for idx, (group_name, _, _, _) in enumerate(groups):
+        if group_name == selected_group_name:
+            choice_idx = idx
+            break
+
+    if choice_idx == -1:
+        PrettyOutput.auto_print("❌ 选择无效")
+        return False
+
     new_group = groups[choice_idx][0]
 
     # 执行切换逻辑
@@ -1442,9 +1469,27 @@ def switch_model(agent: Any) -> bool:
         _print_markdown_table(f"📋 模型组 '{current_group}' 的可用模型", headers, rows)
         PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
-    choice_names = [
-        f"{type_name}: {model_name}" for _, type_name, model_name in available_models
-    ]
+    # 在fzf模式下显示详细信息，单行输入模式下显示简单名称
+    if fzf_available:
+        # fzf模式下显示详细信息
+        choice_names = []
+        for model_type, type_name, model_name in available_models:
+            # 获取 LLM 配置详情
+            llm_detail = llms_config.get(model_name, {})
+            max_tokens = llm_detail.get("max_input_token_count", "N/A")
+            supports_multimodal = llm_detail.get("llm_config", {}).get(
+                "supports_multimodal", False
+            )
+            choice_names.append(
+                f"{type_name}: {model_name} (多模态: {'✅' if supports_multimodal else '❌'}, 上下文: {max_tokens})"
+            )
+    else:
+        # 单行输入模式下显示简单名称
+        choice_names = [
+            f"{type_name}: {model_name}"
+            for _, type_name, model_name in available_models
+        ]
+
     selected = get_choice("请选择模型:", choice_names)
 
     # 处理取消情况（fzf按Esc或输入空字符串）
@@ -1452,7 +1497,24 @@ def switch_model(agent: Any) -> bool:
         PrettyOutput.auto_print("🚫 已取消切换")
         return False
 
-    choice_idx = choice_names.index(selected) - 1
+    # 提取选择的模型类型名称（移除fzf模式下的详细信息）
+    if fzf_available:
+        # 从详细字符串中提取模型类型名称
+        selected_type_name = selected.split(": ")[0]
+    else:
+        selected_type_name = selected.split(": ")[0]
+
+    # 查找选择的模型索引
+    choice_idx = -1
+    for idx, (model_type, type_name, model_name) in enumerate(available_models):
+        if type_name == selected_type_name:
+            choice_idx = idx
+            break
+
+    if choice_idx == -1:
+        PrettyOutput.auto_print("❌ 选择无效")
+        return False
+
     selected_type, type_name, model_name = available_models[choice_idx]
 
     # 检查是否与当前模型相同
