@@ -453,7 +453,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   // 更新并持久化 agent 的消息序号
   private updateAgentSeq(agentId: string, seq: number): void {
-    const current = this.agentLastSeqs.get(agentId) ?? 0;
+    const current = this.agentLastSeqs.get(agentId) ?? -1;
     if (seq > current) {
       this.agentLastSeqs.set(agentId, seq);
       // 异步保存，不阻塞消息处理
@@ -2185,7 +2185,11 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private async saveMessagesToStorage(
     agentId: string,
-    messages: Array<{ type: string; payload?: Record<string, unknown> }>,
+    messages: Array<{
+      type: string;
+      payload?: Record<string, unknown>;
+      seq?: number;
+    }>,
   ): Promise<void> {
     const allHistory = this.getPersistedAgentChatHistory();
     const existingMessages = Array.isArray(allHistory[agentId])
@@ -2231,10 +2235,33 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       })
       .filter((msg): msg is ChatMessageItem => msg !== null);
 
-    // 合并现有消息和新消息
-    const combinedMessages = [...existingMessages, ...newMessages].slice(
-      -MAX_PERSISTED_MESSAGES_PER_AGENT,
-    );
+    // 按 seq 去重合并：用 Map 建立索引，远程消息覆盖同 seq 的本地消息
+    const seqMap = new Map<number, PersistedChatMessageItem>();
+    for (const msg of existingMessages) {
+      // 使用消息在数组中的位置作为隐式序号（保持兼容）
+      seqMap.set(existingMessages.indexOf(msg), msg);
+    }
+    // 远程消息按 seq 覆盖
+    for (let i = 0; i < newMessages.length; i++) {
+      const remoteSeq = messages[i]?.seq;
+      if (typeof remoteSeq === "number") {
+        seqMap.set(
+          remoteSeq,
+          newMessages[i] as unknown as PersistedChatMessageItem,
+        );
+      } else {
+        // 无 seq 的消息追加到末尾
+        seqMap.set(
+          existingMessages.length + i + 1000000,
+          newMessages[i] as unknown as PersistedChatMessageItem,
+        );
+      }
+    }
+    // 按 key 排序后取最新 N 条
+    const combinedMessages = Array.from(seqMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([, msg]) => msg)
+      .slice(-MAX_PERSISTED_MESSAGES_PER_AGENT);
 
     allHistory[agentId] = combinedMessages;
     await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
