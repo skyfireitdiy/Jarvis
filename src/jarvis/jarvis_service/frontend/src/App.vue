@@ -2645,40 +2645,21 @@ const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> out
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
 
-// 消息序号管理：记录每个 agent 的最大消息序号
-const agentLastSeqs = ref(new Map()) // agent_id -> last_seq
-const AGENT_LAST_SEQS_STORAGE_KEY = 'jarvis_agent_last_seqs'
-
-// 从 localStorage 加载消息序号
-function loadAgentLastSeqs() {
+// 从历史记录中获取指定 agent 的最后一条消息的 seq
+function getAgentLastSeq(agentId) {
   try {
-    const stored = localStorage.getItem(AGENT_LAST_SEQS_STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      agentLastSeqs.value = new Map(Object.entries(parsed))
+    const messages = historyStorage.getHistoryForAgent(agentId)
+    if (messages.length === 0) return -1
+    // 消息已按时间排序，取最后一条有 seq 的消息
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (typeof messages[i].seq === 'number') {
+        return messages[i].seq
+      }
     }
+    return -1
   } catch (error) {
-    console.error('[SYNC] Failed to load agent last seqs:', error)
-  }
-}
-
-// 保存消息序号到 localStorage
-function saveAgentLastSeqs() {
-  try {
-    const obj = Object.fromEntries(agentLastSeqs.value)
-    localStorage.setItem(AGENT_LAST_SEQS_STORAGE_KEY, JSON.stringify(obj))
-  } catch (error) {
-    console.error('[SYNC] Failed to save agent last seqs:', error)
-  }
-}
-
-// 更新 agent 的消息序号
-function updateAgentSeq(agentId, seq) {
-  if (typeof seq !== 'number') return
-  const currentSeq = agentLastSeqs.value.get(agentId) || -1
-  if (seq > currentSeq) {
-    agentLastSeqs.value.set(agentId, seq)
-    saveAgentLastSeqs()
+    console.error('[SYNC] Failed to get last seq for agent:', agentId, error)
+    return -1
   }
 }
 const terminalHosts = ref(new Map()) // executionSessionKey -> hostEl
@@ -4179,7 +4160,7 @@ async function connectToAgent(agent, retryCount = 0) {
         }
 
         // 发送该 Agent 的增量同步请求
-        const lastSeq = agentLastSeqs.value.get(agentId) ?? -1
+        const lastSeq = getAgentLastSeq(agentId)
         const agent_seqs = { [agentId]: lastSeq }
         ws.send(JSON.stringify({
           type: 'sync_request',
@@ -6067,21 +6048,7 @@ function handleMessage(message, agentId = null) {
   // 确定目标 Agent ID：优先使用传入的 agentId，否则使用 currentAgentId
   const targetAgentId = agentId || currentAgentId.value
   
-  // 更新消息序号
-  if (typeof seq === 'number') {
-    // 从 payload 中提取 agent_id
-    let msgAgentId = null
-    if (type === 'output' || type === 'input_result') {
-      msgAgentId = payload?.agent_id
-    }
-    
-    if (msgAgentId) {
-      updateAgentSeq(msgAgentId, seq)
-    } else {
-      // 全局消息
-      updateAgentSeq('__global__', seq)
-    }
-  }
+  // seq 已随消息保存到历史记录中，无需单独维护
   
   if (type === 'ready') {
     // Agent 连接已建立并准备就绪
@@ -7414,6 +7381,7 @@ function confirmClearHistory() {
         // 重置历史加载状态
         historyOffset.value = 0
         hasMoreHistory.value = true
+        // seq 由 getAgentLastSeq() 从历史记录获取，清除历史后自动返回 -1
       } else {
         console.error('[HISTORY] Failed to clear history')
       }
@@ -8539,8 +8507,7 @@ onMounted(() => {
   heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
   console.log(`[HEARTBEAT] Started with interval ${HEARTBEAT_INTERVAL}ms`)
 
-  // 加载消息序号（用于增量同步）
-  loadAgentLastSeqs()
+  // seq 由 getAgentLastSeq() 从历史记录动态获取，无需初始化加载
 
   // 尝试从 localStorage 加载已保存的 token（免登录功能）
   loadSavedToken()
