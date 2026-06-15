@@ -6084,6 +6084,8 @@ function handleMessage(message, agentId = null) {
         }
       }
       // 合并远程消息（远程消息覆盖同 seq 的本地消息）
+      // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
+      const streamAccumulator = new Map() // agent_id -> { streamingMessage, lastSeq }
       for (const rawMsg of messages) {
         // 将 {type, payload, seq} 格式转换为扁平格式 {output_type, text, ..., seq}
         let msg = rawMsg.payload
@@ -6094,11 +6096,62 @@ function handleMessage(message, agentId = null) {
           msg.output_type = 'user_input'
           msg.agent_name = 'user'
         }
+
+        // 处理 stream 消息：合并为一条最终消息
+        const outputType = msg.output_type
+        if (outputType === 'STREAM_START') {
+          const agentId = msg.context?.agent_id || msg.agent_id || targetAgentId
+          streamAccumulator.set(agentId, {
+            output_type: 'STREAM',
+            text: '',
+            lang: 'markdown',
+            agent_name: msg.context?.agent_name || msg.agent_name || '',
+            model_name: msg.context?.model_name || '',
+            timestamp: msg.timestamp || new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            context: msg.context || {},
+            seq: msg.seq,
+          })
+          continue
+        } else if (outputType === 'STREAM_CHUNK') {
+          const agentId = msg.context?.agent_id || msg.agent_id || targetAgentId
+          const acc = streamAccumulator.get(agentId)
+          if (acc) {
+            acc.text += msg.text || ''
+            if (typeof msg.seq === 'number') {
+              acc.seq = msg.seq // 使用最后一个 chunk 的 seq
+            }
+          }
+          continue
+        } else if (outputType === 'STREAM_END') {
+          const agentId = msg.context?.agent_id || msg.agent_id || targetAgentId
+          const acc = streamAccumulator.get(agentId)
+          if (acc) {
+            if (typeof msg.seq === 'number') {
+              acc.seq = msg.seq
+            }
+            if (typeof acc.seq === 'number') {
+              seqMap.set(acc.seq, acc)
+            } else {
+              seqMap.set(`_no_seq_${Date.now()}_${Math.random()}`, acc)
+            }
+            streamAccumulator.delete(agentId)
+          }
+          continue
+        }
+
         if (typeof msg.seq === 'number') {
           seqMap.set(msg.seq, msg)
         } else {
           // 无 seq 的消息直接追加
           seqMap.set(`_no_seq_${Date.now()}_${Math.random()}`, msg)
+        }
+      }
+      // 处理未收到 STREAM_END 的残留流式消息（异常情况）
+      for (const acc of streamAccumulator.values()) {
+        if (typeof acc.seq === 'number') {
+          seqMap.set(acc.seq, acc)
+        } else {
+          seqMap.set(`_no_seq_${Date.now()}_${Math.random()}`, acc)
         }
       }
       // 按 seq 排序后保存
