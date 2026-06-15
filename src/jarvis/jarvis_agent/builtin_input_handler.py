@@ -20,6 +20,7 @@ from jarvis.jarvis_utils.config import (
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import (
     add_additional_completion_dir,
+    get_choice,
     get_single_line_input,
 )
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -1246,26 +1247,18 @@ def switch_model_group(agent: Any) -> bool:
 
     _print_markdown_table("📋 可用模型组", headers, rows)
 
-    # 用户选择（循环直到输入有效）
+    # 用户选择（使用交互式选择器）
     PrettyOutput.auto_print("")
-    while True:
-        choice = get_single_line_input("请输入模型组编号 (0 取消): ").strip()
+    choice_names = [group_name for group_name, _, _, _ in groups]
+    choice_names.insert(0, "🚫 取消")
+    selected = get_choice("请选择模型组:", choice_names)
 
-        if choice == "0":
-            PrettyOutput.auto_print("🚫 已取消切换")
-            return False
+    if selected == "🚫 取消":
+        PrettyOutput.auto_print("🚫 已取消切换")
+        return False
 
-        try:
-            choice_idx = int(choice) - 1
-            if choice_idx < 0 or choice_idx >= len(groups):
-                PrettyOutput.auto_print(f"❌ 无效的编号: {choice}，请重新输入")
-                continue
-
-            new_group = groups[choice_idx][0]
-            break
-        except ValueError:
-            PrettyOutput.auto_print(f"❌ 无效的输入: {choice}，请输入数字")
-            continue
+    choice_idx = choice_names.index(selected) - 1
+    new_group = groups[choice_idx][0]
 
     # 执行切换逻辑
     try:
@@ -1432,26 +1425,20 @@ def switch_model(agent: Any) -> bool:
 
     _print_markdown_table(f"📋 模型组 '{current_group}' 的可用模型", headers, rows)
 
-    # 用户选择（循环直到输入有效）
+    # 用户选择（使用交互式选择器）
     PrettyOutput.auto_print("")
-    while True:
-        choice = get_single_line_input("请输入模型编号 (0 取消): ").strip()
+    choice_names = [
+        f"{type_name}: {model_name}" for _, type_name, model_name in available_models
+    ]
+    choice_names.insert(0, "🚫 取消")
+    selected = get_choice("请选择模型:", choice_names)
 
-        if choice == "0":
-            PrettyOutput.auto_print("🚫 已取消切换")
-            return False
+    if selected == "🚫 取消":
+        PrettyOutput.auto_print("🚫 已取消切换")
+        return False
 
-        try:
-            choice_idx = int(choice) - 1
-            if choice_idx < 0 or choice_idx >= len(available_models):
-                PrettyOutput.auto_print(f"❌ 无效的编号: {choice}，请重新输入")
-                continue
-
-            selected_type, type_name, model_name = available_models[choice_idx]
-            break
-        except ValueError:
-            PrettyOutput.auto_print(f"❌ 无效的输入: {choice}，请输入数字")
-            continue
+    choice_idx = choice_names.index(selected) - 1
+    selected_type, type_name, model_name = available_models[choice_idx]
 
     # 检查是否与当前模型相同
     if selected_type == current_platform_type:
