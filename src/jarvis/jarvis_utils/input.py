@@ -35,7 +35,6 @@ from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.application import Application
 from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.completion import Completer
@@ -48,9 +47,6 @@ from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.key_processor import KeyPressEvent
-from prompt_toolkit.layout.containers import Window
-from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style as PromptStyle
 
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
@@ -786,7 +782,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
     提供一个可滚动的选择列表供用户选择。
 
     CLI模式下优先使用fzf进行快速模糊筛选（如果fzf可用），
-    否则回退到prompt_toolkit全屏应用（支持上/下键导航）。
+    否则回退到单行输入序号方式。
     Gateway模式下打印选项列表+单行输入。
     """
     if not choices:
@@ -830,98 +826,26 @@ def get_choice(tip: str, choices: List[str]) -> str:
         selected = fzf_select(choices, prompt=f"{tip} (输入筛选，Ctrl+C取消): ")
         if selected is not None:
             return selected
-        # fzf 被取消或不可用，回退到 prompt_toolkit
-    except (ImportError, Exception):
-        pass  # fzf模块不可用或其他错误，回退到prompt_toolkit
-
-    # CLI 模式：使用 prompt_toolkit 全屏应用
-    try:
-        terminal_height = os.get_terminal_size().lines
-    except OSError:
-        terminal_height = 25  # 如果无法确定终端大小，则使用默认高度
-
-    # 为提示和缓冲区保留行
-    max_visible_choices = max(5, terminal_height - 4)
-
-    bindings = KeyBindings()
-    selected_index = 0
-    start_index = 0
-
-    @bindings.add("up")
-    def _(event: KeyPressEvent) -> None:
-        nonlocal selected_index, start_index
-        selected_index = (selected_index - 1 + len(choices)) % len(choices)
-        if selected_index < start_index:
-            start_index = selected_index
-        elif selected_index == len(choices) - 1:  # 支持从第一项上翻到最后一项时滚动
-            start_index = max(0, len(choices) - max_visible_choices)
-        event.app.invalidate()
-
-    @bindings.add("down")
-    def _(event: KeyPressEvent) -> None:
-        nonlocal selected_index, start_index
-        selected_index = (selected_index + 1) % len(choices)
-        if selected_index >= start_index + max_visible_choices:
-            start_index = selected_index - max_visible_choices + 1
-        elif selected_index == 0:  # 支持从最后一项下翻到第一项时滚动
-            start_index = 0
-        event.app.invalidate()
-
-    @bindings.add("enter")
-    def _(event: KeyPressEvent) -> None:
-        event.app.exit(result=choices[selected_index])
-
-    def get_prompt_tokens() -> FormattedText:
-        tokens = [("class:question", f"{tip} (使用上下箭头选择, Enter确认)\n")]
-
-        end_index = min(start_index + max_visible_choices, len(choices))
-        visible_choices_slice = choices[start_index:end_index]
-
-        if start_index > 0:
-            tokens.append(("class:indicator", "  ... (更多选项在上方) ...\n"))
-
-        for i, choice in enumerate(visible_choices_slice, start=start_index):
-            if i == selected_index:
-                tokens.append(("class:selected", f"> {choice}\n"))
-            else:
-                tokens.append(("", f"  {choice}\n"))
-
-        if end_index < len(choices):
-            tokens.append(("class:indicator", "  ... (更多选项在下方) ...\n"))
-
-        return FormattedText(tokens)
-
-    style = PromptStyle.from_dict(
-        {
-            "question": "bold",
-            "selected": "bg:#696969 #ffffff",
-            "indicator": "fg:gray",
-        }
-    )
-
-    layout = Layout(
-        container=Window(
-            content=FormattedTextControl(
-                text=get_prompt_tokens,
-                focusable=True,
-                key_bindings=bindings,
-            )
-        )
-    )
-
-    app: Application[Any] = Application(
-        layout=layout,
-        key_bindings=bindings,
-        style=style,
-        mouse_support=False,
-        full_screen=True,
-    )
-
-    try:
-        result = app.run()
-        return result if result is not None else ""
-    except (KeyboardInterrupt, EOFError):
+        # fzf 被用户取消（Esc/Ctrl+C），直接返回空字符串
         return ""
+    except (ImportError, Exception):
+        pass  # fzf模块不可用或其他错误，回退到单行输入
+
+    # CLI 模式：fzf不可用时，使用单行输入序号方式
+    lines = [tip]
+    for i, choice in enumerate(choices, 1):
+        lines.append(f"  {i}. {choice}")
+    PrettyOutput.auto_print("\n".join(lines))
+
+    result = get_single_line_input("请输入选项编号: ", default="1")
+    try:
+        index = int(result.strip()) - 1
+        if 0 <= index < len(choices):
+            return choices[index]
+    except ValueError:
+        pass
+    # 无效输入返回第一个选项作为默认
+    return choices[0]
 
 
 class FileCompleter(Completer):

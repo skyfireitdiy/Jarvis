@@ -1237,18 +1237,22 @@ def switch_model_group(agent: Any) -> bool:
     if not groups:
         return False
 
-    # 显示模型组列表
-    headers = ["编号", "模型组名称", "Smart", "Normal", "Cheap"]
-    rows = []
-    for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(
-        groups, 1
-    ):
-        rows.append([str(idx), group_name, smart_model, normal_model, cheap_model])
+    # 检查fzf是否可用
+    import shutil
 
-    _print_markdown_table("📋 可用模型组", headers, rows)
+    fzf_available = shutil.which("fzf") is not None
 
+    # 显示模型组列表（仅在fzf不可用时打印markdown表格）
+    if not fzf_available:
+        headers = ["编号", "模型组名称", "Smart", "Normal", "Cheap"]
+        rows = []
+        for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(
+            groups, 1
+        ):
+            rows.append([str(idx), group_name, smart_model, normal_model, cheap_model])
+        _print_markdown_table("📋 可用模型组", headers, rows)
+        PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
-    PrettyOutput.auto_print("")
     choice_names = [group_name for group_name, _, _, _ in groups]
     choice_names.insert(0, "🚫 取消")
     selected = get_choice("请选择模型组:", choice_names)
@@ -1403,30 +1407,41 @@ def switch_model(agent: Any) -> bool:
     current_platform_type = get_platform_type_from_agent(agent)
     PrettyOutput.auto_print(f"📌 当前模型类型: {current_platform_type}")
 
+    # 检查fzf是否可用
+    import shutil
+
+    fzf_available = shutil.which("fzf") is not None
+
     # 获取全局配置以获取 LLM 详情
     global_config = _get_global_config()
     llms_config = global_config.get("llms", {})
 
-    # 显示模型列表
-    headers = ["编号", "类型", "模型名称", "多模态", "上下文长度", "状态"]
-    rows = []
-    for idx, (model_type, type_name, model_name) in enumerate(available_models, 1):
-        # 获取 LLM 配置详情
-        llm_detail = llms_config.get(model_name, {})
-        max_tokens = llm_detail.get("max_input_token_count", "N/A")
-        supports_multimodal = llm_detail.get("llm_config", {}).get(
-            "supports_multimodal", False
-        )
-        multimodal_str = "✅" if supports_multimodal else "❌"
-        status = "✓ 当前" if model_type == current_platform_type else ""
-        rows.append(
-            [str(idx), type_name, model_name, multimodal_str, str(max_tokens), status]
-        )
-
-    _print_markdown_table(f"📋 模型组 '{current_group}' 的可用模型", headers, rows)
-
+    # 显示模型列表（仅在fzf不可用时打印markdown表格）
+    if not fzf_available:
+        headers = ["编号", "类型", "模型名称", "多模态", "上下文长度", "状态"]
+        rows = []
+        for idx, (model_type, type_name, model_name) in enumerate(available_models, 1):
+            # 获取 LLM 配置详情
+            llm_detail = llms_config.get(model_name, {})
+            max_tokens = llm_detail.get("max_input_token_count", "N/A")
+            supports_multimodal = llm_detail.get("llm_config", {}).get(
+                "supports_multimodal", False
+            )
+            multimodal_str = "✅" if supports_multimodal else "❌"
+            status = "✓ 当前" if model_type == current_platform_type else ""
+            rows.append(
+                [
+                    str(idx),
+                    type_name,
+                    model_name,
+                    multimodal_str,
+                    str(max_tokens),
+                    status,
+                ]
+            )
+        _print_markdown_table(f"📋 模型组 '{current_group}' 的可用模型", headers, rows)
+        PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
-    PrettyOutput.auto_print("")
     choice_names = [
         f"{type_name}: {model_name}" for _, type_name, model_name in available_models
     ]
