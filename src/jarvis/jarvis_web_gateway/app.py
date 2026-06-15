@@ -704,7 +704,7 @@ class WebSocketConnectionManager:
         requested_agent_ids.discard("__global__")
         has_global = "__global__" in agent_seqs
 
-        # 收集所有匹配的历史消息
+        # 收集所有匹配的历史消息（增量：只返回 seq > lastSeq 的消息）
         matched_messages = []
         for cached_message in self._gateway._message_cache:
             if not isinstance(cached_message, dict):
@@ -729,10 +729,19 @@ class WebSocketConnectionManager:
             else:
                 msg_agent_id = None
 
+            # 检查是否匹配请求的 agent_id
             if msg_agent_id and msg_agent_id in requested_agent_ids:
-                matched_messages.append(cached_message)
+                # 增量过滤：只返回序号大于客户端已有最新序号的消息
+                last_seq = agent_seqs.get(msg_agent_id, -1)
+                msg_seq = cached_message.get("seq", -1)
+                if isinstance(msg_seq, (int, float)) and msg_seq > last_seq:
+                    matched_messages.append(cached_message)
             elif msg_agent_id is None and has_global:
-                matched_messages.append(cached_message)
+                # 全局消息的增量过滤
+                last_seq = agent_seqs.get("__global__", -1)
+                msg_seq = cached_message.get("seq", -1)
+                if isinstance(msg_seq, (int, float)) and msg_seq > last_seq:
+                    matched_messages.append(cached_message)
 
         # 合并为一条 sync_response 消息一次性发送
         await websocket.send_json(

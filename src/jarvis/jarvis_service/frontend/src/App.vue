@@ -6100,13 +6100,36 @@ function handleMessage(message, agentId = null) {
       })
     }
   } else if (type === 'sync_response') {
-    // 处理同步响应，一次性接收多条历史消息
+    // 处理同步响应，一次性接收多条历史消息（增量模式）
     const messages = payload?.messages || []
     console.log('[ws] Received sync_response with', messages.length, 'messages')
-    // 将所有消息保存到本地存储
+    // 与本地历史按 seq 去重合并后保存
     if (messages.length > 0) {
-      historyStorage.saveMessages(messages)
-      console.log('[ws] Saved', messages.length, 'messages to localStorage')
+      // 获取本地已有消息，按 seq 建立索引
+      const localMessages = historyStorage.getHistoryForAgent(targetAgentId)
+      const seqMap = new Map()
+      for (const msg of localMessages) {
+        if (typeof msg.seq === 'number') {
+          seqMap.set(msg.seq, msg)
+        }
+      }
+      // 合并远程消息（远程消息覆盖同 seq 的本地消息）
+      for (const msg of messages) {
+        if (typeof msg.seq === 'number') {
+          seqMap.set(msg.seq, msg)
+        } else {
+          // 无 seq 的消息直接追加
+          seqMap.set(`_no_seq_${Date.now()}_${Math.random()}`, msg)
+        }
+      }
+      // 按 seq 排序后保存
+      const mergedMessages = Array.from(seqMap.values()).sort((a, b) => {
+        const seqA = typeof a.seq === 'number' ? a.seq : 0
+        const seqB = typeof b.seq === 'number' ? b.seq : 0
+        return seqA - seqB
+      })
+      historyStorage.setHistoryForAgent(targetAgentId, mergedMessages)
+      console.log('[ws] Merged', mergedMessages.length, 'messages (local + remote) for agent', targetAgentId)
       // 从本地存储重新加载历史消息
       loadHistoryMessages(false)
     }
