@@ -2464,7 +2464,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    this.appendPanelMessage(`我：${messageText}`, "system", agentId);
+    // ➕ 移除立即回显，等待后端返回带 seq 的用户输入消息
     const pendingRequestId = agentStatus?.pending_request_id;
     agentSocket.send(
       JSON.stringify({
