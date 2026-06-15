@@ -614,9 +614,18 @@ def emit_output(event: OutputEvent) -> None:
     if gateway is None:
         return
 
-    gateway_context = dict(context) if context else None
-    if gateway_context:
-        gateway_context.pop("_gateway_skip", None)
+    gateway_context = dict(context) if context else {}
+    if not gateway_context.get("agent_id"):
+        try:
+            from jarvis.jarvis_utils import globals as jglobals
+
+            if jglobals.agent_id:
+                gateway_context["agent_id"] = jglobals.agent_id
+        except Exception:
+            pass
+    gateway_context.pop("_gateway_skip", None)
+    if not gateway_context:
+        gateway_context = None
 
     try:
         gateway.emit_output(
