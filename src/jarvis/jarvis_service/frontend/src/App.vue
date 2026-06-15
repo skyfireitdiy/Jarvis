@@ -6086,9 +6086,14 @@ function handleMessage(message, agentId = null) {
       // 合并远程消息（远程消息覆盖同 seq 的本地消息）
       for (const rawMsg of messages) {
         // 将 {type, payload, seq} 格式转换为扁平格式 {output_type, text, ..., seq}
-        const msg = rawMsg.payload
+        let msg = rawMsg.payload
           ? { ...rawMsg.payload, seq: rawMsg.seq, type: rawMsg.type }
           : rawMsg
+        // 补充 input_result 消息的显示字段，与实时消息处理保持一致
+        if (rawMsg.type === 'input_result' && !msg.output_type) {
+          msg.output_type = 'user_input'
+          msg.agent_name = 'user'
+        }
         if (typeof msg.seq === 'number') {
           seqMap.set(msg.seq, msg)
         } else {
