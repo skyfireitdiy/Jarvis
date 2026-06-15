@@ -237,6 +237,7 @@ interface PersistedChatMessageItem {
   executionId?: string;
   executionBuffer?: string;
   finished?: boolean;
+  seq?: number;
 }
 
 const SAVED_CONNECTION_INFO_KEY = "jarvis.savedConnectionInfo";
@@ -332,8 +333,6 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
   // Code Agent 起始 commit ID：agentId -> commitId
   private readonly codeAgentStartCommits = new Map<string, string>();
   private readonly agentSockets = new Map<string, WebSocket>();
-  // 消息序号管理：记录每个 agent 的最大消息序号（用于增量同步）
-  private readonly agentLastSeqs = new Map<string, number>(); // agentId -> last_seq
   private readonly agentConnectionAttempts = new Map<string, Promise<void>>();
   private agentListRefreshTimer: NodeJS.Timeout | undefined;
   // Gateway WebSocket重连相关状态
@@ -427,40 +426,22 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     private readonly globalState: vscode.Memento,
   ) {
     this.restoreSavedConnectionInfo();
-    this.loadAgentLastSeqs();
   }
 
-  // 从 globalState 加载消息序号
-  private loadAgentLastSeqs(): void {
-    const stored = this.globalState.get<Record<string, number>>(
-      "agentLastSeqs",
-      {},
-    );
-    this.agentLastSeqs.clear();
-    for (const [agentId, seq] of Object.entries(stored)) {
-      this.agentLastSeqs.set(agentId, seq);
+  // 从持久化历史消息中获取 agent 的最后 seq（用于增量同步）
+  private getAgentLastSeq(agentId: string): number {
+    const allHistory = this.getPersistedAgentChatHistory();
+    const messages = Array.isArray(allHistory[agentId])
+      ? allHistory[agentId]
+      : [];
+    // 倒序遍历找最后一条有 seq 的消息
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const seq = messages[i]?.seq;
+      if (typeof seq === "number") {
+        return seq;
+      }
     }
-  }
-
-  // 保存消息序号到 globalState
-  private async saveAgentLastSeqs(): Promise<void> {
-    const obj: Record<string, number> = {};
-    for (const [agentId, seq] of this.agentLastSeqs.entries()) {
-      obj[agentId] = seq;
-    }
-    await this.globalState.update("agentLastSeqs", obj);
-  }
-
-  // 更新并持久化 agent 的消息序号
-  private updateAgentSeq(agentId: string, seq: number): void {
-    const current = this.agentLastSeqs.get(agentId) ?? -1;
-    if (seq > current) {
-      this.agentLastSeqs.set(agentId, seq);
-      // 异步保存，不阻塞消息处理
-      this.saveAgentLastSeqs().catch((err) =>
-        console.error("Failed to save agentLastSeqs:", err),
-      );
-    }
+    return -1;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -2185,55 +2166,57 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private async saveMessagesToStorage(
     agentId: string,
-    messages: Array<{
-      type: string;
-      payload?: Record<string, unknown>;
-      seq?: number;
-    }>,
+    messages: Array<Record<string, unknown>>,
   ): Promise<void> {
     const allHistory = this.getPersistedAgentChatHistory();
     const existingMessages = Array.isArray(allHistory[agentId])
       ? allHistory[agentId]
       : [];
 
-    // 将sync_response中的消息转换为ChatMessageItem格式
-    const newMessages: ChatMessageItem[] = messages
-      .map((msg) => {
-        const type = msg.type;
-        const payload = msg.payload || {};
+    // 将扁平格式消息转换为 PersistedChatMessageItem（保留 seq）
+    const newMessages: Array<PersistedChatMessageItem & { seq?: number }> =
+      messages
+        .map((msg) => {
+          const type = msg.type as string;
+          const seq = msg.seq as number | undefined;
 
-        // 根据消息类型转换为ChatMessageItem
-        if (type === "output") {
-          return {
-            text: String(payload.text || ""),
-            variant: "output" as const,
-          };
-        } else if (type === "input_result") {
-          return {
-            text: String(payload.text || ""),
-            variant: "system" as const,
-          };
-        } else if (type === "input_request") {
-          return {
-            text: String(payload.prompt || ""),
-            variant: "system" as const,
-          };
-        } else if (type === "error") {
-          return {
-            text: String(payload.error || payload.message || ""),
-            variant: "error" as const,
-          };
-        } else if (type === "execution") {
-          return {
-            text: String(payload.output || payload.text || ""),
-            variant: "execution" as const,
-            executionId: payload.execution_id as string | undefined,
-            finished: payload.finished as boolean | undefined,
-          };
-        }
-        return null;
-      })
-      .filter((msg): msg is ChatMessageItem => msg !== null);
+          // 根据消息类型转换为 PersistedChatMessageItem
+          if (type === "output") {
+            return {
+              text: String(msg.text || ""),
+              variant: "output" as const,
+              seq,
+            };
+          } else if (type === "input_result") {
+            return {
+              text: String(msg.text || ""),
+              variant: "system" as const,
+              seq,
+            };
+          } else if (type === "input_request") {
+            return {
+              text: String(msg.prompt || ""),
+              variant: "system" as const,
+              seq,
+            };
+          } else if (type === "error") {
+            return {
+              text: String(msg.error || msg.message || ""),
+              variant: "error" as const,
+              seq,
+            };
+          } else if (type === "execution") {
+            return {
+              text: String(msg.output || msg.text || ""),
+              variant: "execution" as const,
+              executionId: msg.execution_id as string | undefined,
+              finished: msg.finished as boolean | undefined,
+              seq,
+            };
+          }
+          return null;
+        })
+        .filter((msg): msg is NonNullable<typeof msg> => msg !== null);
 
     // 按 seq 去重合并：用 Map 建立索引，远程消息覆盖同 seq 的本地消息
     const seqMap = new Map<number, PersistedChatMessageItem>();
@@ -4976,7 +4959,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         this.agentSockets.set(agentId, agentSocket);
 
         // 发送该 Agent 的增量同步请求
-        const lastSeq = this.agentLastSeqs.get(agentId) ?? -1;
+        const lastSeq = this.getAgentLastSeq(agentId);
         const syncMessage = {
           type: "sync_request",
           payload: {
@@ -5246,10 +5229,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // 提取并更新消息序号（用于增量同步）
-    if (typeof parsedMessage.seq === "number" && parsedMessage.seq >= 0) {
-      this.updateAgentSeq(agentId, parsedMessage.seq);
-    }
+    // seq 已随消息持久化到历史记录，不再需要独立维护 agentLastSeqs
 
     if (parsedMessage.type === "output") {
       this.handleOutputPayload(agentId, parsedMessage.payload);
@@ -5258,7 +5238,12 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
     if (parsedMessage.type === "sync_response") {
       // 处理同步响应，一次性接收多条历史消息
-      const messages = parsedMessage.payload?.messages || [];
+      // 后端消息格式为 {type, payload, seq}，展开为扁平格式 {type, seq, ...payload}
+      const rawMessages = parsedMessage.payload?.messages || [];
+      const messages = rawMessages.map((msg: Record<string, unknown>) => {
+        const payload = (msg.payload || {}) as Record<string, unknown>;
+        return { ...payload, type: msg.type, seq: msg.seq };
+      });
       console.log(
         "[AGENT SYNC_RESPONSE]",
         agentId,
