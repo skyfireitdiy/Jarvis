@@ -3298,15 +3298,11 @@ async function loadHistoryMessages(prepend = false) {
               msg.terminal_content = '(终端输出未保存或执行被中断)'
             }
           }
-          // 对于最后一条execution：历史记录中的execution必定已完成，强制标记为已完成
+          // 对于最后一条execution：不强制标记为已完成，保留原始状态
+          // 只有在收到后端的tool_stream_end事件时才会标记为已完成
+          // 这样切换回Agent时，如果执行还在进行中，xterm可以正常渲染
           if (isLast && !msg.is_finished) {
-            console.log(`[HISTORY] Last execution ${msg.execution_id} is marked as unfinished, forcing is_finished=true`)
-            msg.is_finished = true
-            // 如果没有terminal_content，添加占位文本
-            if (!msg.terminal_content) {
-              console.log(`[HISTORY] Last execution ${msg.execution_id} has no terminal_content, adding placeholder`)
-              msg.terminal_content = '(终端输出未保存或执行被中断)'
-            }
+            console.log(`[HISTORY] Last execution ${msg.execution_id} is still running, keeping is_finished=false for xterm restoration`)
           }
         }
         const html = renderMessageHtml(msg)
@@ -7507,7 +7503,9 @@ function disposeExecutionTerminal(termInfo) {
   termInfo.fitAddon = null
   termInfo.terminal = null
   termInfo.hostEl = null
-  termInfo.ended = true
+  // 注意：不设置termInfo.ended = true，因为执行可能还在进行中
+  // ended只在收到后端的tool_stream_end事件时设置（见handleToolStreamEnd函数）
+  // 这样切换回Agent时可以从execution_chunks恢复终端内容
 }
 
 function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
