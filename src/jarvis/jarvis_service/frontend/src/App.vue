@@ -7244,8 +7244,6 @@ function submitCompletion() {
 function sendInputDirectly(text) {
   const agentId = currentAgentId.value
   
-
-  
   const message = {
     type: 'input_result',
     payload: {
