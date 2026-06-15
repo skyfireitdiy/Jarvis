@@ -1685,19 +1685,19 @@ class ToolRegistry(OutputHandlerProtocol):
         if not output or output == "<无输出和错误>":
             return output
 
-        # 第1层：空白行折叠 - 将连续3个以上的空行折叠为2个
-        lines = output.split("\n")
-        collapsed_lines: list[str] = []
-        empty_count = 0
-        for line in lines:
-            if line.strip() == "":
-                empty_count += 1
-                if empty_count <= 2:
-                    collapsed_lines.append(line)
-            else:
-                empty_count = 0
-                collapsed_lines.append(line)
-        output = "\n".join(collapsed_lines)
+        # 第1层：空白行折叠 - 已禁用
+        # lines = output.split("\n")
+        # collapsed_lines: list[str] = []
+        # empty_count = 0
+        # for line in lines:
+        #     if line.strip() == "":
+        #         empty_count += 1
+        #         if empty_count <= 2:
+        #             collapsed_lines.append(line)
+        #     else:
+        #         empty_count = 0
+        #         collapsed_lines.append(line)
+        # output = "\n".join(collapsed_lines)
 
         # 第2层：JSON压缩 - 检测标签内的JSON并compact
         # 匹配 <stdout> 或 <stderr> 标签
@@ -1750,18 +1750,18 @@ class ToolRegistry(OutputHandlerProtocol):
                 i += 1
         output = "\n".join(compressed_lines)
 
-        # 第4层：行数安全边界 - 超过200行时保留首尾
-        output_lines = output.split("\n")
-        total_lines = len(output_lines)
-        # 设置阈值：200行，超出时保留首尾各100行
-        MAX_LINES = 200
-        HEAD_TAIL_LINES = 100
-        if total_lines > MAX_LINES:
-            head = output_lines[:HEAD_TAIL_LINES]
-            tail = output_lines[-HEAD_TAIL_LINES:]
-            output = "\n".join(head)
-            output += f"\n\n...（中间 {total_lines - HEAD_TAIL_LINES * 2} 行已折叠，总行数 {total_lines}）\n\n"
-            output += "\n".join(tail)
+        # 第4层：行数安全边界 - 已禁用，由后续上下文截断机制处理
+        # # 超过200行时保留首尾各100行，中间折叠
+        # output_lines = output.split("\n")
+        # total_lines = len(output_lines)
+        # MAX_LINES = 200
+        # HEAD_TAIL_LINES = 100
+        # if total_lines > MAX_LINES:
+        #     head = output_lines[:HEAD_TAIL_LINES]
+        #     tail = output_lines[-HEAD_TAIL_LINES:]
+        #     output = "\n".join(head)
+        #     output += f"\n\n...（中间 {total_lines - HEAD_TAIL_LINES * 2} 行已折叠，总行数 {total_lines}）\n\n"
+        #     output += "\n".join(tail)
 
         return output
 
