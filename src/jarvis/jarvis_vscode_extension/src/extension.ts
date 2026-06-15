@@ -5240,16 +5240,84 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       // 处理同步响应，一次性接收多条历史消息
       // 后端消息格式为 {type, payload, seq}，展开为扁平格式 {type, seq, ...payload}
       const rawMessages = parsedMessage.payload?.messages || [];
-      const messages = rawMessages.map((msg: Record<string, unknown>) => {
+      const flatMessages = rawMessages.map((msg: Record<string, unknown>) => {
         const payload = (msg.payload || {}) as Record<string, unknown>;
         return { ...payload, type: msg.type, seq: msg.seq };
       });
+
+      // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
+      const streamAccumulator = new Map<string, Record<string, unknown>>();
+      const messages: Record<string, unknown>[] = [];
+      for (const msg of flatMessages) {
+        const outputType = msg.output_type as string | undefined;
+        if (outputType === "STREAM_START") {
+          const msgAgentId =
+            ((msg.context as Record<string, unknown> | undefined)
+              ?.agent_id as string) ||
+            (msg.agent_id as string) ||
+            agentId;
+          streamAccumulator.set(msgAgentId, {
+            output_type: "STREAM",
+            text: "",
+            lang: "markdown",
+            agent_name:
+              ((msg.context as Record<string, unknown> | undefined)
+                ?.agent_name as string) ||
+              (msg.agent_name as string) ||
+              "",
+            model_name:
+              ((msg.context as Record<string, unknown> | undefined)
+                ?.model_name as string) || "",
+            timestamp:
+              msg.timestamp ||
+              new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+            context: msg.context || {},
+            seq: msg.seq,
+          });
+          continue;
+        } else if (outputType === "STREAM_CHUNK") {
+          const msgAgentId =
+            ((msg.context as Record<string, unknown> | undefined)
+              ?.agent_id as string) ||
+            (msg.agent_id as string) ||
+            agentId;
+          const acc = streamAccumulator.get(msgAgentId);
+          if (acc) {
+            acc.text = (acc.text as string) + ((msg.text as string) || "");
+            if (typeof msg.seq === "number") {
+              acc.seq = msg.seq;
+            }
+          }
+          continue;
+        } else if (outputType === "STREAM_END") {
+          const msgAgentId =
+            ((msg.context as Record<string, unknown> | undefined)
+              ?.agent_id as string) ||
+            (msg.agent_id as string) ||
+            agentId;
+          const acc = streamAccumulator.get(msgAgentId);
+          if (acc) {
+            if (typeof msg.seq === "number") {
+              acc.seq = msg.seq;
+            }
+            messages.push(acc);
+            streamAccumulator.delete(msgAgentId);
+          }
+          continue;
+        }
+        messages.push(msg);
+      }
+      // 处理未收到 STREAM_END 的残留流式消息（异常情况）
+      for (const acc of streamAccumulator.values()) {
+        messages.push(acc);
+      }
+
       console.log(
         "[AGENT SYNC_RESPONSE]",
         agentId,
         "received",
         messages.length,
-        "messages",
+        "messages (after stream merge)",
       );
       // 将所有消息保存到本地存储
       if (messages.length > 0) {
