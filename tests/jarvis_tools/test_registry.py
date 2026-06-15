@@ -269,19 +269,21 @@ class TestToolRegistry:
         assert registry._compress_output("") == ""
         assert registry._compress_output("<无输出和错误>") == "<无输出和错误>"
 
-    def test_compress_output_blank_lines_collapse(self, registry):
-        """第1层：连续空行>=3折叠为2个"""
-        text = "line1\n\n\n\n\nline2"
-        result = registry._compress_output(text)
-        # 5个空行折叠为2个
-        assert result == "line1\n\n\nline2"
+    # 第1层空白行折叠已禁用
+    # def test_compress_output_blank_lines_collapse(self, registry):
+    #     """第1层：连续空行>=3折叠为2个"""
+    #     text = "line1\n\n\n\n\nline2"
+    #     result = registry._compress_output(text)
+    #     # 5个空行折叠为2个
+    #     assert result == "line1\n\n\nline2"
 
-    def test_compress_output_blank_lines_keep(self, registry):
-        """第1层：连续空行<3保持不变"""
-        text = "line1\n\n\nline2"
-        result = registry._compress_output(text)
-        # 2个空行不折叠
-        assert result == "line1\n\n\nline2"
+    # 第1层空白行折叠已禁用
+    # def test_compress_output_blank_lines_keep(self, registry):
+    #     """第1层：连续空行<3保持不变"""
+    #     text = "line1\n\n\nline2"
+    #     result = registry._compress_output(text)
+    #     # 2个空行不折叠
+    #     assert result == "line1\n\n\nline2"
 
     def test_compress_output_json_compress(self, registry):
         """第2层：JSON压缩生效（压缩比<70%）"""
@@ -320,18 +322,19 @@ class TestToolRegistry:
         result = registry._compress_output(text)
         assert result == text  # 3次重复不压缩
 
-    def test_compress_output_safety_boundary(self, registry):
-        """第4层：超过200行时保留首尾各100行"""
-        lines = [f"line_{i}" for i in range(250)]
-        text = "\n".join(lines)
-        result = registry._compress_output(text)
-        result_lines = result.split("\n")
-        # 检查是否包含折叠标记
-        assert "行已折叠" in result
-        assert "总行数 250" in result
-        # 检查首尾保留
-        assert "line_0" in result_lines[0]
-        assert "line_99" in result_lines[99]
-        # 检查尾部保留
-        assert "line_249" in result_lines[-1]
-        assert "line_150" in result  # 尾部起始行出现在结果中
+    # 第4层行数安全边界已禁用
+    # def test_compress_output_safety_boundary(self, registry):
+    #     """第4层：超过200行时保留首尾各100行"""
+    #     lines = [f"line_{i}" for i in range(250)]
+    #     text = "\n".join(lines)
+    #     result = registry._compress_output(text)
+    #     result_lines = result.split("\n")
+    #     # 检查是否包含折叠标记
+    #     assert "行已折叠" in result
+    #     assert "总行数 250" in result
+    #     # 检查首尾保留
+    #     assert "line_0" in result_lines[0]
+    #     assert "line_99" in result_lines[99]
+    #     # 检查尾部保留
+    #     assert "line_249" in result_lines[-1]
+    #     assert "line_150" in result  # 尾部起始行出现在结果中
