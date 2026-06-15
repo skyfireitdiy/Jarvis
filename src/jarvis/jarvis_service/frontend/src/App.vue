@@ -6099,6 +6099,14 @@ function handleMessage(message, agentId = null) {
         inputEl?.focus()
       })
     }
+  } else if (type === 'sync_response') {
+    // 处理同步响应，一次性接收多条历史消息
+    const messages = payload?.messages || []
+    console.log('[ws] Received sync_response with', messages.length, 'messages')
+    // 逐条处理每条消息
+    messages.forEach(msg => {
+      handleMessage(msg, targetAgentId)
+    })
   } else if (type === 'input_result') {
     // 重连时后端发送的输入缓存，回显用户输入到聊天窗口
     const inputText = payload?.text
