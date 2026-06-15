@@ -543,6 +543,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             # 启动子Agent执行任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
                 from jarvis.jarvis_agent.sub_agent import SubAgentTool
+                from jarvis.jarvis_utils.input import get_multiline_input
 
                 tag_marker = "'<SubAgent>'"
                 tag_index = modified_input.find(tag_marker)
@@ -550,15 +551,20 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     PrettyOutput.auto_print("❌ Agent 命令格式错误")
                     return "", True
 
-                # 提取标签后的任务描述
-                task_desc = modified_input[tag_index + len(tag_marker) :].strip()
-                if not task_desc:
-                    PrettyOutput.auto_print(
-                        "❌ 请提供任务描述，用法：@Agent <任务描述>"
-                    )
+                # 调用多行输入获取任务描述
+                PrettyOutput.auto_print(
+                    "🤖 启动子Agent，请输入任务描述（Ctrl+C 取消）："
+                )
+                try:
+                    task_desc = get_multiline_input("请输入子Agent的任务描述")
+                    if not task_desc:
+                        PrettyOutput.auto_print("⚠️  未输入任务描述，已取消")
+                        return "", True
+                except KeyboardInterrupt:
+                    PrettyOutput.auto_print("⚠️  用户取消输入")
                     return "", True
 
-                PrettyOutput.auto_print(f"🤖 启动子Agent执行任务: {task_desc[:50]}...")
+                PrettyOutput.auto_print(f"🤖 启动子Agent执行任务：{task_desc[:50]}...")
 
                 # 使用 SubAgentTool 创建子Agent
                 sub_agent_tool = SubAgentTool()
@@ -662,16 +668,17 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     )
                 else:
                     stderr = result.get("stderr", "未知错误")
-                    PrettyOutput.auto_print(f"❌ 测试用例生成失败: {stderr}")
+                    PrettyOutput.auto_print(f"❌ 测试用例生成失败：{stderr}")
 
             except Exception as exc:
-                PrettyOutput.auto_print(f"❌ 启动测试用例Agent失败: {str(exc)}")
+                PrettyOutput.auto_print(f"❌ 启动测试用例Agent失败：{str(exc)}")
 
             return "", True
         elif tag == "SubCodeAgent":
             # 启动子CodeAgent执行代码任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
                 from jarvis.jarvis_code_agent.sub_code_agent import SubCodeAgentTool
+                from jarvis.jarvis_utils.input import get_multiline_input
 
                 tag_marker = "'<SubCodeAgent>'"
                 tag_index = modified_input.find(tag_marker)
@@ -679,17 +686,18 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     PrettyOutput.auto_print("❌ SubCodeAgent 命令格式错误")
                     return "", True
 
-                # 提取标签后的任务描述
-                task_desc = modified_input[tag_index + len(tag_marker) :].strip()
-                if not task_desc:
-                    PrettyOutput.auto_print(
-                        "❌ 请提供任务描述，用法：@SubCodeAgent <任务描述>"
-                    )
-                    return "", True
-
+                # 调用多行输入获取任务描述
                 PrettyOutput.auto_print(
-                    f"💻 启动子CodeAgent执行代码任务: {task_desc[:50]}..."
+                    "💻 启动子CodeAgent，请输入任务描述（Ctrl+C 取消）："
                 )
+                try:
+                    task_desc = get_multiline_input("请输入子CodeAgent的任务描述")
+                    if not task_desc:
+                        PrettyOutput.auto_print("⚠️  未输入任务描述，已取消")
+                        return "", True
+                except KeyboardInterrupt:
+                    PrettyOutput.auto_print("⚠️  用户取消输入")
+                    return "", True
 
                 # 使用 SubCodeAgentTool 创建子CodeAgent
                 sub_code_agent_tool = SubCodeAgentTool()
