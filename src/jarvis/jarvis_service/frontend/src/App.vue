@@ -404,11 +404,12 @@
         </div>
         
         <!-- 多行输入框 -->
-        <textarea 
+        <textarea
           v-if="inputMode === 'multi'"
-          v-model="inputText" 
+          v-model="inputText"
           :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
           :disabled="isInputDisabled"
+          @input="handleTextareaInput"
           @keydown="handleTextareaKeydown"
           @paste="handlePaste"
           ref="multilineInput"
@@ -7046,6 +7047,23 @@ function insertTextAtCursor(text) {
   // 更新光标位置
   textarea.selectionStart = textarea.selectionEnd = start + text.length
   textarea.focus()
+}
+
+// 处理 textarea 的输入事件（支持中文输入法）
+function handleTextareaInput(event) {
+  const target = event.target
+  const cursorPosition = target.selectionStart
+  const textBeforeCursor = target.value.substring(0, cursorPosition)
+  
+  // 检测是否刚刚输入了@符号（包括中文输入法）
+  if (textBeforeCursor.endsWith('@')) {
+    // 检查前一个字符是否是@，如果是则说明刚输入了@
+    const lastChar = textBeforeCursor.slice(-1)
+    if (lastChar === '@') {
+      completionCursorPos.value = cursorPosition - 1
+      openCompletions()
+    }
+  }
 }
 
 // 处理 textarea 的键盘事件
