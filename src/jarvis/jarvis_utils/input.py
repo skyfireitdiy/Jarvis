@@ -784,6 +784,10 @@ def get_single_line_input(tip: str, default: str = "") -> str:
 def get_choice(tip: str, choices: List[str]) -> str:
     """
     提供一个可滚动的选择列表供用户选择。
+
+    CLI模式下优先使用fzf进行快速模糊筛选（如果fzf可用），
+    否则回退到prompt_toolkit全屏应用（支持上/下键导航）。
+    Gateway模式下打印选项列表+单行输入。
     """
     if not choices:
         raise ValueError("Choices cannot be empty.")
@@ -818,6 +822,17 @@ def get_choice(tip: str, choices: List[str]) -> str:
             pass
         # 无效输入返回第一个选项作为默认
         return choices[0]
+
+    # CLI 模式：优先尝试使用 fzf
+    try:
+        from jarvis.jarvis_utils.fzf import fzf_select
+
+        selected = fzf_select(choices, prompt=f"{tip} (输入筛选，Ctrl+C取消): ")
+        if selected is not None:
+            return selected
+        # fzf 被取消或不可用，回退到 prompt_toolkit
+    except (ImportError, Exception):
+        pass  # fzf模块不可用或其他错误，回退到prompt_toolkit
 
     # CLI 模式：使用 prompt_toolkit 全屏应用
     try:
