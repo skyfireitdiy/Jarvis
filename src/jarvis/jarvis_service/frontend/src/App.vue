@@ -6103,10 +6103,13 @@ function handleMessage(message, agentId = null) {
     // 处理同步响应，一次性接收多条历史消息
     const messages = payload?.messages || []
     console.log('[ws] Received sync_response with', messages.length, 'messages')
-    // 逐条处理每条消息
-    messages.forEach(msg => {
-      handleMessage(msg, targetAgentId)
-    })
+    // 将所有消息保存到本地存储
+    if (messages.length > 0) {
+      historyStorage.saveMessages(messages)
+      console.log('[ws] Saved', messages.length, 'messages to localStorage')
+      // 从本地存储重新加载历史消息
+      loadHistoryMessages(false)
+    }
   } else if (type === 'input_result') {
     // 重连时后端发送的输入缓存，回显用户输入到聊天窗口
     const inputText = payload?.text

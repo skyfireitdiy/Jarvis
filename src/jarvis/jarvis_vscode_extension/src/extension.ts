@@ -2183,6 +2183,70 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
     await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
   }
 
+  private async saveMessagesToStorage(
+    agentId: string,
+    messages: Array<{ type: string; payload?: Record<string, unknown> }>,
+  ): Promise<void> {
+    const allHistory = this.getPersistedAgentChatHistory();
+    const existingMessages = Array.isArray(allHistory[agentId])
+      ? allHistory[agentId]
+      : [];
+
+    // 将sync_response中的消息转换为ChatMessageItem格式
+    const newMessages: ChatMessageItem[] = messages
+      .map((msg) => {
+        const type = msg.type;
+        const payload = msg.payload || {};
+
+        // 根据消息类型转换为ChatMessageItem
+        if (type === "output") {
+          return {
+            text: String(payload.text || ""),
+            variant: "output" as const,
+          };
+        } else if (type === "input_result") {
+          return {
+            text: String(payload.text || ""),
+            variant: "system" as const,
+          };
+        } else if (type === "input_request") {
+          return {
+            text: String(payload.prompt || ""),
+            variant: "system" as const,
+          };
+        } else if (type === "error") {
+          return {
+            text: String(payload.error || payload.message || ""),
+            variant: "error" as const,
+          };
+        } else if (type === "execution") {
+          return {
+            text: String(payload.output || payload.text || ""),
+            variant: "execution" as const,
+            executionId: payload.execution_id as string | undefined,
+            finished: payload.finished as boolean | undefined,
+          };
+        }
+        return null;
+      })
+      .filter((msg): msg is ChatMessageItem => msg !== null);
+
+    // 合并现有消息和新消息
+    const combinedMessages = [...existingMessages, ...newMessages].slice(
+      -MAX_PERSISTED_MESSAGES_PER_AGENT,
+    );
+
+    allHistory[agentId] = combinedMessages;
+    await this.globalState.update(AGENT_CHAT_HISTORY_KEY, allHistory);
+  }
+
+  private loadAgentHistory(agentId: string): void {
+    // 重新加载持久化的历史消息到UI状态
+    this.loadPersistedAgentHistory(agentId);
+    // 触发UI更新
+    this.postPanelState();
+  }
+
   private startAgentListRefresh(): void {
     this.stopAgentListRefresh();
     this.agentListRefreshTimer = setInterval(() => {
@@ -5175,10 +5239,20 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
         messages.length,
         "messages",
       );
-      // 逐条处理每条消息
-      for (const msg of messages) {
-        this.handleAgentSocketMessage(agentId, msg);
+      // 将所有消息保存到本地存储
+      if (messages.length > 0) {
+        this.saveMessagesToStorage(agentId, messages);
+        console.log(
+          "[AGENT SYNC_RESPONSE]",
+          agentId,
+          "saved",
+          messages.length,
+          "messages to storage",
+        );
+        // 从本地存储重新加载历史消息
+        this.loadAgentHistory(agentId);
       }
+
       return;
     }
 
