@@ -7220,15 +7220,7 @@ function submitCompletion() {
 function sendInputDirectly(text) {
   const agentId = currentAgentId.value
   
-  // 先将用户输入回显到聊天窗口（空消息或完成信号不显示）
-  if (text && text !== '__CTRL_C_PRESSED__') {
-    appendOutput({
-      output_type: 'user_input',
-      agent_name: 'user',
-      text: text,
-      lang: 'text',
-    })
-  }
+
   
   const message = {
     type: 'input_result',
@@ -7251,20 +7243,7 @@ function sendInputDirectly(text) {
 function sendInputResult(text, requestId, agentId = null) {
   const targetAgentId = agentId || pendingInputAgentId.value || currentAgentId.value
   
-  // 先将用户输入回显到聊天窗口
-  console.log('[DEBUG] Buffered input payload:', {
-    output_type: 'user_input',
-    agent_name: 'user',
-    text: text,
-    lang: 'text',
-    agent_id: targetAgentId,
-  })
-  appendOutput({
-    output_type: 'user_input',
-    agent_name: 'user',
-    text: text,
-    lang: 'text',
-  }, targetAgentId)
+
   
   const message = {
     type: 'input_result',
