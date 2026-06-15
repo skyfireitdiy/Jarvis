@@ -1254,10 +1254,10 @@ def switch_model_group(agent: Any) -> bool:
         PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
     choice_names = [group_name for group_name, _, _, _ in groups]
-    choice_names.insert(0, "🚫 取消")
     selected = get_choice("请选择模型组:", choice_names)
 
-    if selected == "🚫 取消":
+    # 处理取消情况（fzf按Esc或输入空字符串）
+    if not selected:
         PrettyOutput.auto_print("🚫 已取消切换")
         return False
 
@@ -1445,10 +1445,10 @@ def switch_model(agent: Any) -> bool:
     choice_names = [
         f"{type_name}: {model_name}" for _, type_name, model_name in available_models
     ]
-    choice_names.insert(0, "🚫 取消")
     selected = get_choice("请选择模型:", choice_names)
 
-    if selected == "🚫 取消":
+    # 处理取消情况（fzf按Esc或输入空字符串）
+    if not selected:
         PrettyOutput.auto_print("🚫 已取消切换")
         return False
 
