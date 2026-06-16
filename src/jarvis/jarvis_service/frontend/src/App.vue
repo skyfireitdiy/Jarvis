@@ -3254,8 +3254,52 @@ async function loadHistoryMessages(prepend = false) {
       scrollPosition = outputList.value.scrollHeight - outputList.value.scrollTop
     }
     
+    // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
+    const streamAccumulator = new Map() // agent_id -> accumulated message
+    const mergedHistoryMessages = []
+    for (const msg of historyMessages) {
+      const outputType = msg.output_type
+      if (outputType === 'STREAM_START') {
+        const msgAgentId = msg.agent_id || currentAgentId.value
+        streamAccumulator.set(msgAgentId, {
+          ...msg,
+          output_type: 'STREAM',
+          text: '',
+          isStreaming: false,
+        })
+        continue
+      } else if (outputType === 'STREAM_CHUNK') {
+        const msgAgentId = msg.agent_id || currentAgentId.value
+        const acc = streamAccumulator.get(msgAgentId)
+        if (acc) {
+          acc.text += msg.text || ''
+          if (typeof msg.seq === 'number') acc.seq = msg.seq
+        } else {
+          // 孤立的 CHUNK（没有 STREAM_START），保留为独立消息
+          mergedHistoryMessages.push(msg)
+        }
+        continue
+      } else if (outputType === 'STREAM_END') {
+        const msgAgentId = msg.agent_id || currentAgentId.value
+        const acc = streamAccumulator.get(msgAgentId)
+        if (acc) {
+          if (typeof msg.seq === 'number') acc.seq = msg.seq
+          mergedHistoryMessages.push(acc)
+          streamAccumulator.delete(msgAgentId)
+        }
+        continue
+      }
+      mergedHistoryMessages.push(msg)
+    }
+    // 处理未收到 STREAM_END 的残留流式消息（异常情况）
+    for (const acc of streamAccumulator.values()) {
+      mergedHistoryMessages.push(acc)
+    }
+    historyMessages.length = 0
+    historyMessages.push(...mergedHistoryMessages)
+
     // 处理每条历史消息
-    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages`)
+    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages (after stream merge)`)
     const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
     if (executionMessages.length > 0) {
       console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))

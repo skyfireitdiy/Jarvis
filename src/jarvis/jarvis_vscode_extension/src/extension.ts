@@ -2115,9 +2115,57 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
 
   private loadPersistedAgentHistory(agentId: string): void {
     const allHistory = this.getPersistedAgentChatHistory();
-    const persistedMessages = Array.isArray(allHistory[agentId])
+    const rawMessages = Array.isArray(allHistory[agentId])
       ? allHistory[agentId]
       : [];
+    if (rawMessages.length === 0) {
+      return;
+    }
+
+    // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
+    const streamAccumulator = new Map<string, Record<string, unknown>>();
+    const persistedMessages: Array<Record<string, unknown>> = [];
+    for (const msg of rawMessages) {
+      const outputType = (msg as Record<string, unknown>).output_type as
+        | string
+        | undefined;
+      if (outputType === "STREAM_START") {
+        streamAccumulator.set(agentId, {
+          ...(msg as Record<string, unknown>),
+          output_type: "STREAM",
+          text: "",
+        });
+        continue;
+      } else if (outputType === "STREAM_CHUNK") {
+        const acc = streamAccumulator.get(agentId);
+        if (acc) {
+          acc.text =
+            (acc.text as string) +
+            String((msg as Record<string, unknown>).text || "");
+          if (typeof (msg as Record<string, unknown>).seq === "number") {
+            acc.seq = (msg as Record<string, unknown>).seq;
+          }
+        } else {
+          persistedMessages.push(msg as Record<string, unknown>);
+        }
+        continue;
+      } else if (outputType === "STREAM_END") {
+        const acc = streamAccumulator.get(agentId);
+        if (acc) {
+          if (typeof (msg as Record<string, unknown>).seq === "number") {
+            acc.seq = (msg as Record<string, unknown>).seq;
+          }
+          persistedMessages.push(acc);
+          streamAccumulator.delete(agentId);
+        }
+        continue;
+      }
+      persistedMessages.push(msg as Record<string, unknown>);
+    }
+    for (const acc of streamAccumulator.values()) {
+      persistedMessages.push(acc);
+    }
+
     if (persistedMessages.length === 0) {
       return;
     }
