@@ -2109,11 +2109,14 @@ def extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str]
     if pos >= len(text):
         return None, pos
 
-    # 检查是否以 { 开头
-    if text[pos] != "{":
+    # 检查是否以 { 或 [ 开头
+    if text[pos] not in ("{", "["):
         return None, pos
 
-    # 使用括号匹配找到完整的JSON对象
+    open_char = text[pos]
+    close_char = "}" if open_char == "{" else "]"
+
+    # 使用括号匹配找到完整的JSON对象/数组
     brace_count = 0
     in_string = False
     escape_next = False
@@ -2135,12 +2138,12 @@ def extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str]
             if char in ('"', "'"):
                 in_string = True
                 string_char = char
-            elif char == "{":
+            elif char == open_char:
                 brace_count += 1
-            elif char == "}":
+            elif char == close_char:
                 brace_count -= 1
                 if brace_count == 0:
-                    # 找到完整的JSON对象
+                    # 找到完整的JSON对象/数组
                     return text[json_start : i + 1], i + 1
         else:
             if char == string_char:
