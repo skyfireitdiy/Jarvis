@@ -1420,9 +1420,10 @@ class Agent:
                 should_add = True
 
         # 更新计数器：如果添加了 addon_prompt，重置计数器；否则递增
+        # 但如果 input_handler 已处理本轮（如执行 shell 命令），跳过计数
         if should_add:
             self._addon_prompt_skip_rounds = 0
-        else:
+        elif not self._last_handler_returned:
             self._addon_prompt_skip_rounds += 1
 
         # 广播添加附加提示后事件（不影响主流程）
