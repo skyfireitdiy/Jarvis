@@ -175,3 +175,34 @@ class TestToolParsing:
         assert len(result) == 1
         assert result[0]["name"] == "read_code"
         assert result[0]["arguments"]["files"][0]["path"] == "src/main.py"
+
+    def test_parse_tool_call_xml_format_with_json_object(self):
+        """测试：<tool_call name="..."> JSON对象格式（应该被识别）"""
+        content = """
+        <tool_call name="read_code">
+        {"files": [{"path": "test.py"}]}
+        </tool_call>
+        """
+
+        result, _, _ = ToolRegistry._extract_tool_calls(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "read_code"
+        assert result[0]["arguments"]["files"][0]["path"] == "test.py"
+
+    def test_parse_tool_call_xml_format_with_json_array(self):
+        """测试：<tool_call name="..."> JSON数组格式（应该被识别）"""
+        content = """
+        <tool_call name="edit_file">
+        [
+            {"file_path": "a.py", "diffs": [{"search": "old", "replace": "new"}]},
+            {"file_path": "b.py", "diffs": [{"search": "x", "replace": "y"}]}
+        ]
+        </tool_call>
+        """
+
+        result, _, _ = ToolRegistry._extract_tool_calls(content)
+        assert len(result) == 1
+        assert result[0]["name"] == "edit_file"
+        assert len(result[0]["arguments"]) == 2
+        assert result[0]["arguments"][0]["file_path"] == "a.py"
+        assert result[0]["arguments"][1]["file_path"] == "b.py"
