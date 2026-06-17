@@ -927,8 +927,15 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _parse_tool_call_format(content: str) -> list:
-        """解析 <tool_call>工具名称 参数JSON 格式"""
+        """解析 <tool_call>工具名称 参数JSON 格式
+
+        支持两种格式:
+        1. <tool_call>工具名 {JSON对象参数}
+        2. <tool_call name="工具名"> [JSON数组参数] </tool_call>
+        """
         ret: list = []
+
+        # 格式1: <tool_call>工具名 {JSON对象参数}
         tool_call_pattern = r"<tool_call>\s*(\w+)\s+"
         matches = re.finditer(tool_call_pattern, content)
 
@@ -947,6 +954,25 @@ class ToolRegistry(OutputHandlerProtocol):
                         ret.append(tool_call)
                     except Exception:
                         continue
+
+        # 格式2: <tool_call name="工具名"> [JSON数组参数] </tool_call>
+        named_pattern = r'<tool_call\s+name="(\w+)"\s*>\s*'
+        for match in re.finditer(named_pattern, content):
+            tool_name = match.group(1)
+            json_start = match.end()
+            while json_start < len(content) and content[json_start].isspace():
+                json_start += 1
+
+            if json_start < len(content) and content[json_start] in ("{", "["):
+                json_str, end_pos = extract_json_from_text(content, json_start)
+                if json_str:
+                    try:
+                        arguments = json_loads(json_str)
+                        tool_call = {"name": tool_name, "arguments": arguments}
+                        ret.append(tool_call)
+                    except Exception:
+                        continue
+
         return ret
 
     @staticmethod
