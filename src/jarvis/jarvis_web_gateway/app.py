@@ -752,6 +752,11 @@ class WebSocketConnectionManager:
                 if isinstance(msg_seq, (int, float)) and msg_seq > last_seq:
                     matched_messages.append(cached_message)
 
+        # 限制最多返回最近30条消息，避免数据量过大
+        MAX_SYNC_MESSAGES = 30
+        if len(matched_messages) > MAX_SYNC_MESSAGES:
+            matched_messages = matched_messages[-MAX_SYNC_MESSAGES:]
+
         # 合并为一条 sync_response 消息一次性发送
         print(
             f"[SYNC_REQUEST] sending sync_response with "
