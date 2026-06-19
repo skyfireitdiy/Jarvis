@@ -1,0 +1,12 @@
+{
+  "id": "20260618_132048_780239",
+  "type": "project_long_term",
+  "tags": [
+    "version-release",
+    "publish",
+    "release-note"
+  ],
+  "content": "版本发布流程（patch）：1) 获取最新tag（git describe --tags --abbrev=0）→ 2) 获取当前日期 → 3) 运行pytest全部通过 → 4) git diff获取代码变更 → 5) 学习ReleaseNote格式 → 6) 生成新版本ReleaseNote并插入文件头部 → 7) 执行 ./scripts/publish.py patch 完成发布。当前最新版本 v3.1.17（2026-06-18），发布脚本自动处理版本号更新、git tag创建和推送。",
+  "created_at": "2026-06-18T13:20:48.780308",
+  "updated_at": "2026-06-18T13:20:48.780314"
+}

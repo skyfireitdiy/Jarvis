@@ -1,0 +1,12 @@
+{
+  "id": "20260618_132048_783210",
+  "type": "project_long_term",
+  "tags": [
+    "version-release",
+    "v3.1.17",
+    "superpowers"
+  ],
+  "content": "v3.1.17 新增了 builtin/rules/superpowers/skills/ 超级技能体系，包含14项开发技能（brainstorming、TDD、代码审查、系统调试、子Agent驱动开发等），同时增强了工具调用格式（支持 <tool_call name=\"工具名\"> 命名格式和JSON数组解析），修复了AddonPrompt计数逻辑。",
+  "created_at": "2026-06-18T13:20:48.783233",
+  "updated_at": "2026-06-18T13:20:48.783238"
+}
