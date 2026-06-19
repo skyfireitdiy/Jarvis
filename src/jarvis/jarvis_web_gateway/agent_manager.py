@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import signal
 import socket
@@ -172,9 +173,20 @@ class AgentManager:
         # 展开工作目录中的 ~ 符号
         working_dir = os.path.expanduser(working_dir)
 
-        # 验证工作目录
+        # 验证工作目录：不存在则尝试创建，创建失败则回退到用户主目录
         if not os.path.isdir(working_dir):
-            raise ValueError(f"Working directory not found: {working_dir}")
+            try:
+                os.makedirs(working_dir, exist_ok=True)
+                logging.getLogger(__name__).info(
+                    f"Created working directory: {working_dir}"
+                )
+            except Exception as e:
+                fallback_dir = os.path.expanduser("~")
+                logging.getLogger(__name__).warning(
+                    f"Failed to create working directory '{working_dir}': {e}. "
+                    f"Falling back to home directory: {fallback_dir}"
+                )
+                working_dir = fallback_dir
 
         # 生成唯一 ID
         agent_id = str(uuid.uuid4())
