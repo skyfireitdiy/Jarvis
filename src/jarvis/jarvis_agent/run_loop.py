@@ -908,7 +908,43 @@ class AgentRunLoop:
                 continue
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
-                return f"Task failed: {str(e)}"
+                from jarvis.jarvis_utils.input import get_multiline_input
+                from jarvis.jarvis_agent.builtin_input_handler import (
+                    builtin_input_handler,
+                )
+
+                while True:
+                    try:
+                        user_input = get_multiline_input(
+                            "⚠ API调用失败，请输入操作（直接回车重试，可输入 '<SwitchModelGroup>'/'<SwitchModel>' 切换模型，Ctrl+C退出）",
+                            print_on_empty=False,
+                        )
+                        if not user_input or not user_input.strip():
+                            # 直接回车 = 用原始prompt重试（ag.session.prompt仍保留着）
+                            ag.run_input_handlers_next_turn = True
+                            break
+                        # 处理用户输入（可能包含特殊标签）
+                        processed_input, need_return = builtin_input_handler(
+                            user_input, ag
+                        )
+                        if need_return:
+                            # 特殊标签已处理（如切换模型），继续让用户输入更多操作或重试
+                            continue
+                        if processed_input and processed_input.strip():
+                            # 非特殊标签内容，作为补充信息
+                            ag.session.addon_prompt = ensure_str(
+                                join_prompts(
+                                    [
+                                        ag.session.addon_prompt,
+                                        f"[API错误恢复] {processed_input.strip()}",
+                                    ]
+                                )
+                            )
+                            ag.run_input_handlers_next_turn = True
+                            break
+                    except (KeyboardInterrupt, EOFError):
+                        return f"Task failed: {str(e)}"
+                continue
 
     def get_git_diff_stat(self) -> str:
         """获取从起始commit到当前commit的git diff统计信息
