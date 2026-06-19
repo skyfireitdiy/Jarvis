@@ -1,0 +1,13 @@
+{
+  "id": "20260619_063639_282005",
+  "type": "project_long_term",
+  "tags": [
+    "gost",
+    "deployment",
+    "tls",
+    "proxy"
+  ],
+  "content": "Gost v3 HTTP+TLS 代理已成功部署在 154.40.44.163:9443。关键配置：systemd 服务以 nobody 运行，ProtectSystem=strict，证书权限 644。根因：key.pem 权限 600 导致 nobody 无法读取，修复为 644 后 systemd 启动成功。之前手动启动的残留进程导致端口冲突，pkill 清理后解决。",
+  "created_at": "2026-06-19T06:36:39.282039",
+  "updated_at": "2026-06-19T06:36:39.282055"
+}
