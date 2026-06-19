@@ -7607,17 +7607,22 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   })
 
   // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
-  termInfo.terminal.onKey(({ domEvent }) => {
-    // Ctrl+Shift+C: 允许终端处理（复制），阻止浏览器打开开发者工具
-    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'C') {
-      domEvent.preventDefault()
-      domEvent.stopPropagation()
+  termInfo.terminal.attachCustomKeyEventHandler((event) => {
+    // Ctrl+Shift+C: 复制选中文本到剪贴板
+    if (event.ctrlKey && event.shiftKey && event.code === 'KeyC') {
+      const selection = termInfo.terminal.getSelection()
+      if (selection) {
+        navigator.clipboard.writeText(selection).catch(err => {
+          console.warn('[terminal] Failed to copy to clipboard:', err)
+        })
+      }
+      return false
     }
-    // Ctrl+Shift+V: 允许终端处理（粘贴），阻止浏览器默认行为
-    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'V') {
-      domEvent.preventDefault()
-      domEvent.stopPropagation()
+    // Ctrl+Shift+V: 粘贴（由 onData 处理，这里阻止浏览器默认行为）
+    if (event.ctrlKey && event.shiftKey && event.code === 'KeyV') {
+      return false
     }
+    return true
   })
   termInfo.terminal.open(el)
 
@@ -7865,17 +7870,22 @@ function initIndependentTerminal(terminalId, el) {
   })
 
   // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
-  session.terminal.onKey(({ domEvent }) => {
-    // Ctrl+Shift+C: 允许终端处理（复制），阻止浏览器打开开发者工具
-    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'C') {
-      domEvent.preventDefault()
-      domEvent.stopPropagation()
+  session.terminal.attachCustomKeyEventHandler((event) => {
+    // Ctrl+Shift+C: 复制选中文本到剪贴板
+    if (event.ctrlKey && event.shiftKey && event.code === 'KeyC') {
+      const selection = session.terminal.getSelection()
+      if (selection) {
+        navigator.clipboard.writeText(selection).catch(err => {
+          console.warn('[independent-terminal] Failed to copy to clipboard:', err)
+        })
+      }
+      return false
     }
-    // Ctrl+Shift+V: 允许终端处理（粘贴），阻止浏览器默认行为
-    if (domEvent.ctrlKey && domEvent.shiftKey && domEvent.key === 'V') {
-      domEvent.preventDefault()
-      domEvent.stopPropagation()
+    // Ctrl+Shift+V: 粘贴（由 onData 处理，这里阻止浏览器默认行为）
+    if (event.ctrlKey && event.shiftKey && event.code === 'KeyV') {
+      return false
     }
+    return true
   })
   session.terminal.open(el)
   
