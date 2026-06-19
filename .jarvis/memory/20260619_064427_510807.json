@@ -1,0 +1,14 @@
+{
+  "id": "20260619_064427_510807",
+  "type": "project_long_term",
+  "tags": [
+    "gost",
+    "deployment",
+    "tls",
+    "proxy",
+    "dpi-bypass"
+  ],
+  "content": "Gost v3 HTTP+TLS 代理部署在 154.40.44.163:8443，用于绕过云厂商 DPI 检测。关键配置：systemd 服务以 nobody 运行，ProtectSystem=strict，证书位于 /etc/gost/certs/（权限 644）。内部端口 8080/1080 仅监听 127.0.0.1。Clash 客户端使用 type: http + tls: true + skip-cert-verify: true 连接 8443。",
+  "created_at": "2026-06-19T06:44:27.510845",
+  "updated_at": "2026-06-19T06:44:27.510852"
+}
