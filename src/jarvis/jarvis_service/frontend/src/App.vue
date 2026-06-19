@@ -6022,7 +6022,10 @@ async function switchAgent(agent) {
       console.log('[AGENT] Fetching status after connection...')
       await fetchAgentStatus(agent)
       
-      // 若历史为空，则检测可恢复的 session（通常是新创建的 Agent）
+      // 会话恢复对话框已禁用（用户反馈莫名弹出列表选择框）
+      // 原逻辑：若历史为空则检测可恢复 session 并弹出 SessionDialog
+      // 如需恢复，取消下方注释即可
+      /*
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
         console.log('[AGENT] No history found, checking for recoverable sessions...')
@@ -6033,7 +6036,6 @@ async function switchAgent(agent) {
           const sessionsData = await sessionsResponse.json()
           if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
             console.log('[AGENT] Found recoverable sessions:', sessionsData.data)
-            // 显示 session 选择对话框
             availableSessions.value = sessionsData.data
             showSessionDialog.value = true
           } else {
@@ -6045,6 +6047,7 @@ async function switchAgent(agent) {
       } else {
         console.log('[AGENT] History already loaded, skipping session detection')
       }
+      */
     } else {
       console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
       // WebSocket 未连接，但已经通过 HTTP 查询了状态
