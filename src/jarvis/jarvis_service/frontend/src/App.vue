@@ -6140,6 +6140,10 @@ function handleMessage(message, agentId = null) {
           : rawMsg
         // 补充 input_result 消息的显示字段，与实时消息处理保持一致
         if (rawMsg.type === 'input_result' && !msg.output_type) {
+          // 过滤 Ctrl+C 哨兵值，不回显到聊天窗口
+          if (msg.text === '__CTRL_C_PRESSED__') {
+            continue
+          }
           msg.output_type = 'user_input'
           msg.agent_name = 'user'
         }
