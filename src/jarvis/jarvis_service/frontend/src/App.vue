@@ -6328,6 +6328,14 @@ function handleMessage(message, agentId = null) {
       inputMode.value = payload.mode || 'multi'
       inputText.value = payload.preset || inputText.value
       pendingInputAgentId.value = targetAgentId
+
+      // 如果编辑器面板和终端面板都没有打开，输入框主动抢占焦点
+      if (!showEditorPanel.value && !showTerminalPanel.value) {
+        nextTick(() => {
+          const inputEl = inputMode.value === 'multi' ? multilineInput.value : singlelineInput.value
+          inputEl?.focus()
+        })
+      }
     }
     
     // 检查是否在底部（用于判断是否需要在显示输入框后滚动）
