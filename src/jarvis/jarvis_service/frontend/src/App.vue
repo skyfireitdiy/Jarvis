@@ -5930,7 +5930,9 @@ async function switchAgent(agent) {
   // 重置历史偏移量和消息状态
   historyOffset.value = 0
   hasMoreHistory.value = true
-  
+  // 立即从本地加载该Agent 的历史消息，避免切换时页面空白
+  loadHistoryMessages(false)
+
   // 先连接 Agent，在收到 ready 事件后再加载历史
   // 这样可以避免历史消息和 WebSocket 推送的缓存消息重复渲染
   console.log('[AGENT] Connecting before loading history...')
