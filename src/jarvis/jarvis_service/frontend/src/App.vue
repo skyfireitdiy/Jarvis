@@ -3258,6 +3258,10 @@ async function loadHistoryMessages(prepend = false) {
     const streamAccumulator = new Map() // agent_id -> accumulated message
     const mergedHistoryMessages = []
     for (const msg of historyMessages) {
+          // 过滤内部控制信号，防止在 UI 中显示
+          if (msg.text === '__CTRL_C_PRESSED__') {
+            continue;
+          }
       const outputType = msg.output_type
       if (outputType === 'STREAM_START') {
         const msgAgentId = msg.agent_id || currentAgentId.value
@@ -6552,6 +6556,10 @@ function renderMessageHtml(payload) {
 }
 
 function appendOutput(payload, agentId = null) {
+  // 过滤内部控制信号，防止在 UI 中显示
+  if (payload?.text === '__CTRL_C_PRESSED__') {
+    return;
+  }
   const html = renderMessageHtml(payload)
   
   // 生成真实时间戳
