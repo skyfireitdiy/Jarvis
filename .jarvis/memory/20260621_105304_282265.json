@@ -1,0 +1,8 @@
+{
+  "id": "20260621_105304_282265",
+  "type": "project_long_term",
+  "tags": ["gpt-oss", "配置", "推理效率"],
+  "content": "GPT-OSS 120B 模型配置：在 ~/.jarvis/config.yaml 的 openai_openai/gpt_oss_120b 配置块中添加了 openai_reasoning_effort: low，用于关闭详细推理过程。配置修改于 2024-12-30 完成。",
+  "created_at": "2026-06-21T10:53:04.282290",
+  "updated_at": "2026-06-21T10:53:04.282294"
+}
