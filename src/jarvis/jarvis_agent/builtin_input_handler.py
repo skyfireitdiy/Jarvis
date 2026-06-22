@@ -324,7 +324,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             # 生成 shell 命令（与 Alt+T 功能相同）
             from jarvis.jarvis_utils.input import _gen_shell_cmd_for_terminal
 
-            return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM", True
+            return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM", False
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)
