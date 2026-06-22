@@ -1,4 +1,4 @@
-### Release Note - v3.1.17 2026-06-18
+### Release Note - v3.1.18 2026-06-22
 
 #### **🚀 新功能**
 - **🎯 超级技能体系（Superpowers）**
