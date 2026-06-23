@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import sys
+import traceback
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from jarvis.jarvis_agent.events import BEFORE_ADDON_PROMPT
 from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_FILTER
 from jarvis.jarvis_agent.events import INTERRUPT_TRIGGERED
 from jarvis.jarvis_agent.events import TASK_COMPLETED
@@ -66,6 +68,9 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import get_addon_prompt_threshold
 from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
+from jarvis.jarvis_utils.config import get_before_tool_call_cb_dirs
+from jarvis.jarvis_utils.config import get_before_model_call_cb_dirs
+from jarvis.jarvis_utils.config import get_summary_cb_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_tool_filter_threshold
@@ -596,6 +601,7 @@ class Agent:
 
         # 动态回调加载
         self._load_after_tool_callbacks()
+        self._load_all_event_callbacks()
 
     def _init_base_attributes(
         self,
@@ -819,6 +825,13 @@ class Agent:
         """初始化事件总线和管理器"""
         # 初始化事件总线（需先于管理器，以便管理器在构造中安全订阅事件）
         self.event_bus = EventBus()
+
+        # Hook/Modifier 机制（独立于 EventBus）
+        # Hook：拦截型，回调返回 False 拦截执行
+        self._before_tool_call_hooks: List[Callable] = []
+        # Modifier：修改型，回调返回修改后的值
+        self._before_model_call_modifiers: List[Callable] = []
+        self._before_summary_modifiers: List[Callable] = []
 
         # 初始化各个功能管理器
         self.memory_manager = MemoryManager(self)  # 记忆管理器：管理长期和短期记忆
@@ -1222,6 +1235,214 @@ class Agent:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 加载回调目录时发生错误: {e}")
 
+    def _load_event_callbacks(
+        self,
+        event_name: str,
+        config_getter: Callable[[], List[str]],
+        callback_names: List[str],
+        target: str = "event_bus",
+    ) -> None:
+        """
+        通用的回调加载方法，支持从配置目录扫描并注册回调。
+
+        参数:
+            event_name: 事件名称（如 BEFORE_TOOL_CALL）
+            config_getter: 配置目录获取函数（如 get_before_tool_call_cb_dirs）
+            callback_names: 回调函数名称列表（优先级从高到低）
+                           例如: ["before_tool_call_cb", "get_before_tool_call_cb", "register_before_tool_call_cb"]
+            target: 回调注册目标，决定回调存储位置：
+                - "event_bus": 注册到 EventBus（通知型，默认）
+                - "hook": 注册到 hooks 列表（拦截型，返回 False 拦截）
+                - "modifier": 注册到 modifiers 列表（修改型，返回修改后的值）
+        """
+        try:
+            dirs = config_getter()
+            if not dirs:
+                return
+            for d in dirs:
+                p_dir = Path(d)
+                if not p_dir.exists() or not p_dir.is_dir():
+                    continue
+                for file_path in p_dir.glob("*.py"):
+                    if file_path.name == "__init__.py":
+                        continue
+                    parent_dir = str(file_path.parent)
+                    added_path = False
+                    try:
+                        if parent_dir not in sys.path:
+                            sys.path.insert(0, parent_dir)
+                            added_path = True
+                        module_name = file_path.stem
+
+                        # 解析文件头部的 requirements 注释
+                        requirements: List[str] = []
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                for line in f:
+                                    line = line.strip()
+                                    if line.startswith("# requirements:"):
+                                        deps_str = line[
+                                            len("# requirements:") :
+                                        ].strip()
+                                        if deps_str:
+                                            requirements = deps_str.split()
+                                        break
+                        except Exception as e:
+                            PrettyOutput.auto_print(
+                                f"⚠️ 解析回调文件依赖失败 [{file_path.name}]: {e}"
+                            )
+
+                        # 安装依赖
+                        if requirements:
+                            PrettyOutput.auto_print(
+                                f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
+                            )
+                            try:
+                                import subprocess
+
+                                result = subprocess.run(
+                                    ["uv", "pip", "install"] + requirements,
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=120,
+                                )
+                                if result.returncode == 0:
+                                    PrettyOutput.auto_print(
+                                        f"✅ 依赖安装成功 [{file_path.name}]"
+                                    )
+                                else:
+                                    PrettyOutput.auto_print(
+                                        f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
+                                    )
+                            except subprocess.TimeoutExpired:
+                                PrettyOutput.auto_print(
+                                    f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
+                                )
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"❌ 依赖安装异常 [{file_path.name}]: {e}"
+                                )
+
+                        module = __import__(module_name)
+                        PrettyOutput.auto_print(
+                            f"📦 从配置文件加载回调文件：{file_path}"
+                        )
+
+                        candidates: List[Callable] = []
+
+                        # 按优先级尝试获取回调
+                        for callback_name in callback_names:
+                            if hasattr(module, callback_name):
+                                obj = getattr(module, callback_name)
+                                if callable(obj):
+                                    try:
+                                        ret = (
+                                            obj()
+                                            if callback_name.startswith(
+                                                ("get_", "register_")
+                                            )
+                                            else obj
+                                        )
+                                        if callable(ret):
+                                            candidates.append(ret)
+                                        elif isinstance(ret, (list, tuple)):
+                                            for c in ret:
+                                                if callable(c):
+                                                    candidates.append(c)
+                                    except Exception as e:
+                                        PrettyOutput.auto_print(
+                                            f"⚠️ 调用工厂方法 {callback_name}() 失败 [{file_path.name}]: {e}"
+                                        )
+
+                        # 根据目标类型注册回调
+                        for cb in candidates:
+                            try:
+                                if target == "hook":
+                                    # Hook：拦截型，注册到 hooks 列表
+                                    if event_name == BEFORE_TOOL_CALL:
+                                        self._before_tool_call_hooks.append(cb)
+                                    # 同时注册到 EventBus 作为通知
+                                    self.event_bus.subscribe(event_name, cb)
+                                elif target == "modifier":
+                                    # Modifier：修改型，注册到 modifiers 列表
+                                    if event_name == BEFORE_MODEL_CALL:
+                                        self._before_model_call_modifiers.append(cb)
+                                    elif event_name == BEFORE_SUMMARY:
+                                        self._before_summary_modifiers.append(cb)
+                                else:
+                                    # Event：通知型，注册到 EventBus
+                                    self.event_bus.subscribe(event_name, cb)
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"⚠️ 注册回调失败 [{file_path.name}]: {e}\n{traceback.format_exc()}"
+                                )
+
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠️ 加载回调文件失败 [{file_path}]: {e}\n{traceback.format_exc()}"
+                        )
+                    finally:
+                        if added_path:
+                            try:
+                                sys.path.remove(parent_dir)
+                            except ValueError:
+                                pass
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 加载 {event_name} 回调目录失败: {e}\n{traceback.format_exc()}"
+            )
+
+    def _load_all_event_callbacks(self) -> None:
+        """
+        加载所有事件回调（包括 before_tool_call、before_model_call、summary 等）。
+        """
+        # 加载 before_tool_call 回调（Hook：拦截型 + Event 通知）
+        self._load_event_callbacks(
+            event_name=BEFORE_TOOL_CALL,
+            config_getter=get_before_tool_call_cb_dirs,
+            callback_names=[
+                "before_tool_call_cb",
+                "get_before_tool_call_cb",
+                "register_before_tool_call_cb",
+            ],
+            target="hook",
+        )
+
+        # 加载 before_model_call 回调（Modifier：修改型）
+        self._load_event_callbacks(
+            event_name=BEFORE_MODEL_CALL,
+            config_getter=get_before_model_call_cb_dirs,
+            callback_names=[
+                "before_model_call_cb",
+                "get_before_model_call_cb",
+                "register_before_model_call_cb",
+            ],
+            target="modifier",
+        )
+
+        # 加载 before_summary 回调（Modifier：修改型）
+        self._load_event_callbacks(
+            event_name=BEFORE_SUMMARY,
+            config_getter=get_summary_cb_dirs,
+            callback_names=[
+                "before_summary_cb",
+                "get_before_summary_cb",
+                "register_before_summary_cb",
+            ],
+            target="modifier",
+        )
+
+        # 加载 after_summary 回调（Event：通知型）
+        self._load_event_callbacks(
+            event_name=AFTER_SUMMARY,
+            config_getter=get_summary_cb_dirs,
+            callback_names=[
+                "after_summary_cb",
+                "get_after_summary_cb",
+                "register_after_summary_cb",
+            ],
+        )
+
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
         return self.session.save_session()
@@ -1342,7 +1563,8 @@ class Agent:
         # 添加附加提示
         message = self._add_addon_prompt(message, need_complete)
 
-        # 调用模型
+        # 广播模型调用前事件（不影响主流程）
+        # 调用模型（_invoke_model 内部会触发 BEFORE_MODEL_CALL Modifier + Event）
         response = self._invoke_model(message)
 
         return response
@@ -1444,7 +1666,17 @@ class Agent:
         if not self.model:
             raise RuntimeError("Model not initialized")
 
-        # 事件：模型调用前
+        # Modifier：调用 before_model_call modifiers（修改型）
+        # 回调返回修改后的 message，用于修改提示词
+        for modifier in self._before_model_call_modifiers:
+            try:
+                result = modifier(agent=self, message=message)
+                if result is not None:
+                    message = result
+            except Exception:
+                pass
+
+        # 事件：模型调用前（通知型）
         try:
             self.event_bus.emit(
                 BEFORE_MODEL_CALL,
@@ -2314,6 +2546,20 @@ class Agent:
             ):
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
             # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
+
+            # Modifier：调用 before_summary modifiers（修改型）
+            # 回调返回修改后的 prompt，用于修改总结提示词
+            for modifier in self._before_summary_modifiers:
+                try:
+                    result = modifier(
+                        agent=self,
+                        prompt=safe_summary_prompt,
+                        auto_completed=auto_completed,
+                    )
+                    if result is not None:
+                        safe_summary_prompt = result
+                except Exception:
+                    pass
 
             # 非关键流程：广播将要生成总结事件（用于日志、监控等）
             try:
