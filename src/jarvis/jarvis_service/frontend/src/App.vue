@@ -4248,6 +4248,14 @@ async function connectToAgent(agent, retryCount = 0) {
         // 如果断开的Agent不是当前活跃的Agent，静默重连（后台Agent需要保持消息接收）
         if (agentId !== currentAgentId.value) {
           console.log(`[AGENT ${agentId}] Background agent disconnected, silently reconnecting...`)
+          // 检查主网关连接状态，如果主网关断开则不重连Agent
+          if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+            console.log(`[AGENT ${agentId}] Gateway disconnected, skipping background agent reconnect`)
+            if (!ws._connectionCompleted) {
+              reject(new Error('Background agent disconnected (gateway offline)'))
+            }
+            return
+          }
           if (retryCount < maxRetries) {
             setTimeout(() => {
               connectToAgent({ agent_id: agentId, name: agentId, node_id: agent?.node_id }, retryCount + 1)
@@ -4262,6 +4270,14 @@ async function connectToAgent(agent, retryCount = 0) {
 
         // 当前Agent断开：自动重连
         console.log(`[AGENT ${agentId}] Current agent disconnected, auto-reconnecting in ${retryDelay}ms...`)
+        // 检查主网关连接状态，如果主网关断开则不重连Agent
+        if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+          console.log(`[AGENT ${agentId}] Gateway disconnected, skipping agent reconnect`)
+          if (!ws._connectionCompleted) {
+            reject(new Error('Agent disconnected (gateway offline)'))
+          }
+          return
+        }
         setTimeout(() => {
           // 检查是否已有新连接，避免重复重连
           const currentWs = sockets.value.get(agentId)
