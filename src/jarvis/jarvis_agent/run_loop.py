@@ -18,8 +18,9 @@ from typing import Optional
 from typing import Union
 
 
+from jarvis.jarvis_agent.events import AFTER_SUMMARY
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
-from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
@@ -407,8 +408,29 @@ class AgentRunLoop:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
             self._git_diff = f"获取git diff失败: {str(e)}"
+        # 广播总结前事件（手动触发总结场景，不影响主流程）
+        # 注意：此场景为用户主动请求总结，auto_completed=False
+        # 与 _complete_task 中的自动总结场景（auto_completed=True）互补
+        try:
+            ag.event_bus.emit(
+                BEFORE_SUMMARY,
+                agent=ag,
+                prompt=current_response,
+                auto_completed=False,
+            )
+        except Exception:
+            pass
         # 直接使用全量总结
         summary_text = ag._summarize_and_clear_history(trigger_reason="手动触发")
+        # 广播总结后事件（手动触发总结场景，不影响主流程）
+        try:
+            ag.event_bus.emit(
+                AFTER_SUMMARY,
+                agent=ag,
+                summary=summary_text,
+            )
+        except Exception:
+            pass
         if summary_text:
             # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
             ag.session.addon_prompt = ensure_str(
@@ -432,16 +454,6 @@ class AgentRunLoop:
                 - 如果需要继续下一轮，返回 (True, None, safe_tool_prompt)
                 - 否则返回 (False, None, safe_tool_prompt) 继续执行后续逻辑
         """
-        # 非关键流程：广播工具调用前事件（用于日志、监控等）
-        try:
-            ag.event_bus.emit(
-                BEFORE_TOOL_CALL,
-                agent=ag,
-                current_response=current_response,
-            )
-        except Exception:
-            pass
-
         try:
             need_return, tool_prompt = ag._call_tools(current_response)
         except KeyboardInterrupt:

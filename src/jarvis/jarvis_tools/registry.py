@@ -1612,6 +1612,21 @@ class ToolRegistry(OutputHandlerProtocol):
                 "stdout": "",
             }
 
+        # Hook：调用 before_tool_call hooks（拦截型）
+        # 任一 hook 返回 False 则拦截工具执行
+        if agent is not None and hasattr(agent, "_before_tool_call_hooks"):
+            for hook in agent._before_tool_call_hooks:
+                try:
+                    if hook(agent=agent, tool_name=name, tool_args=arguments) is False:
+                        return {
+                            "success": False,
+                            "stderr": f"工具 {name} 被 hook 拦截",
+                            "stdout": "",
+                        }
+                except Exception:
+                    # hook 异常不拦截，继续执行
+                    pass
+
         # 根据工具实现声明的协议版本分发调用方式
         try:
             result = None
