@@ -46,6 +46,8 @@ TOOL_FILTERED = "tool_filtered"
 class BeforeToolCallEvent(TypedDict, total=False):
     agent: Any
     current_response: str
+    tool_name: str  # 新增：工具名称
+    tool_args: dict  # 新增：工具参数
 
 
 class AfterToolCallEvent(TypedDict, total=False):

@@ -210,6 +210,30 @@
       },
       "default": []
     },
+    "before_tool_call_cb_dirs": {
+      "type": "array",
+      "description": "工具调用前回调函数实现目录（支持拦截和修改工具参数）",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "before_model_call_cb_dirs": {
+      "type": "array",
+      "description": "模型调用前回调函数实现目录（支持扩展、修改或压缩提示词）",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "summary_cb_dirs": {
+      "type": "array",
+      "description": "总结回调函数实现目录（包括 before_summary 和 after_summary，支持优化总结效果或注入知识）",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "central_methodology_repo": {
       "type": "string",
       "description": "中心方法论仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入方法论加载路径；若为Git URL则会克隆到数据目录后加载。",

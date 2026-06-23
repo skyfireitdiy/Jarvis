@@ -1,0 +1,8 @@
+{
+  "id": "20260623_164017_321612",
+  "type": "project_long_term",
+  "tags": ["架构决策", "Hook-Modifier-Event", "回调框架"],
+  "content": "## Hook/Modifier/Event 三层架构\n\n### 架构设计\n- **Event**（通知型）：注册到 EventBus，异常隔离，不影响主流程。如 AFTER_TOOL_CALL, AFTER_SUMMARY\n- **Hook**（拦截型）：存储在 `agent._before_tool_call_hooks`，返回 False 拦截执行。如 BEFORE_TOOL_CALL\n- **Modifier**（修改型）：存储在 `agent._before_model_call_modifiers` / `agent._before_summary_modifiers`，返回修改后的值。如 BEFORE_MODEL_CALL, BEFORE_SUMMARY\n\n### 关键实现\n1. `_load_event_callbacks` 方法新增 `target` 参数：\"event_bus\"/\"hook\"/\"modifier\"\n2. BEFORE_TOOL_CALL 同时注册到 hooks 列表（拦截）和 EventBus（通知）\n3. BEFORE_MODEL_CALL 注册到 modifiers 列表（修改 message）\n4. BEFORE_SUMMARY 注册到 modifiers 列表（修改 prompt）\n5. Hook 在 `registry.py execute_tool` 中调用，tool_name/tool_args 直接从方法参数获取\n6. Modifier 在 `_invoke_model` 和 `_complete_task` 中调用\n\n### 待优化\n- `generate_summary` 中未集成 BEFORE_SUMMARY Modifier（目前只在 `_complete_task` 中调用）\n- `_handle_summary`（run_loop.py）中的 BEFORE_SUMMARY 只有 EventBus 通知，没有 Modifier",
+  "created_at": "2026-06-23T16:40:17.321663",
+  "updated_at": "2026-06-23T16:40:17.321670"
+}
