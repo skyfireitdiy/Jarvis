@@ -1503,6 +1503,18 @@ class ToolRegistry(OutputHandlerProtocol):
                 False,
             )
 
+        # 过滤掉不存在的工具调用
+        if ret and valid_tool_names:
+            filtered_ret = []
+            for tool_call in ret:
+                tool_name = tool_call.get("name", "")
+                if tool_name in valid_tool_names:
+                    filtered_ret.append(tool_call)
+                else:
+                    # 记录被忽略的工具调用（可选日志）
+                    pass
+            ret = filtered_ret
+
         # 统一返回列表格式
         return ret, "", auto_completed
 
