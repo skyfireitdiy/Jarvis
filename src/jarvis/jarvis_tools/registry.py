@@ -1515,6 +1515,24 @@ class ToolRegistry(OutputHandlerProtocol):
                     pass
             ret = filtered_ret
 
+        # 去重：name和arguments完全一致的工具调用只保留一个
+        if ret:
+            seen = set()
+            deduplicated_ret = []
+            for tool_call in ret:
+                # 使用name和arguments的JSON字符串作为唯一标识
+                tool_name = tool_call.get("name", "")
+                tool_args = tool_call.get("arguments", {})
+                try:
+                    args_key = json.dumps(tool_args, sort_keys=True)
+                except (TypeError, ValueError):
+                    args_key = str(tool_args)
+                unique_key = (tool_name, args_key)
+                if unique_key not in seen:
+                    seen.add(unique_key)
+                    deduplicated_ret.append(tool_call)
+            ret = deduplicated_ret
+
         # 统一返回列表格式
         return ret, "", auto_completed
 
