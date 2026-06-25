@@ -766,7 +766,13 @@ class EditFileNormalTool:
                     )
                 )
 
-                if not success:
+                # 检查是否有成功的 diff（部分成功或完全成功）
+                success_diffs = [dr for dr in diff_results if dr.get("success")]
+                failed_diffs = [dr for dr in diff_results if not dr.get("success")]
+                has_any_success = len(success_diffs) > 0
+
+                if not has_any_success:
+                    # 完全失败：所有 diff 都失败，不写入文件
                     error_msg_parts = []
                     for diff_result in diff_results:
                         if not diff_result.get("success"):
@@ -779,7 +785,7 @@ class EditFileNormalTool:
                         else "处理失败：未知错误"
                     )
 
-                    # 处理失败
+                    # 删除备份文件
                     if backup_path and os.path.exists(backup_path):
                         try:
                             os.remove(backup_path)
@@ -790,8 +796,8 @@ class EditFileNormalTool:
                     overall_success = False
                     continue
 
-                # 编辑成功，继续写入文件
-                result_or_error = result_or_error  # 此时 result_or_error 是新内容
+                # 有成功的 diff（部分成功或完全成功），继续写入文件
+                # result_or_error 此时是新内容
 
                 # 写入文件（失败时回滚）
                 abs_path = os.path.abspath(file_path)
