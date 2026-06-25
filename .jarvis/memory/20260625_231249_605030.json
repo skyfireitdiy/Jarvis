@@ -1,0 +1,8 @@
+{
+  "id": "20260625_231249_605030",
+  "type": "project_long_term",
+  "tags": ["插件配置", "模板变量", "plugin_dir", "jinja2", "功能实现"],
+  "content": "插件配置模板变量功能：支持在插件配置文件中使用{{plugin_dir}}模板变量表示当前插件目录。实现方式：在template_utils.py中新增render_plugin_config_template()函数，在_load_plugin_configs()中加载插件配置后先渲染模板再解析YAML。关键文件：src/jarvis/jarvis_utils/template_utils.py（新增函数）、src/jarvis/jarvis_utils/utils.py（调用渲染函数）。测试覆盖：test_plugin_dir_template_variable、test_plugin_dir_template_in_nested_dict、test_plugin_dir_template_multiple_occurrences三个测试用例验证功能。",
+  "created_at": "2026-06-25T23:12:49.605088",
+  "updated_at": "2026-06-25T23:12:49.605095"
+}
