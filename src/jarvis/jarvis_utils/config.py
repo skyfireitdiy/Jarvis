@@ -196,6 +196,16 @@ def set_llm_group(llm_group: Optional[str]) -> None:
         GLOBAL_CONFIG_DATA["llm_group"] = llm_group
 
 
+def get_plugin_dirs() -> List[str]:
+    """获取插件目录列表
+
+    返回:
+        List[str]: 插件目录路径列表，如果未配置则返回空列表
+    """
+    value = GLOBAL_CONFIG_DATA.get("plugin_dirs", [])
+    return cast(List[str], value)
+
+
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。
