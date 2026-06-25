@@ -1227,6 +1227,8 @@ def load_config() -> None:
                 _ensure_schema_declaration(
                     main_config_dir, main_config_file, content, merged_config
                 )
+                # 加载并合并插件配置，传入配置文件所在目录用于解析相对路径
+                merged_config = _load_plugin_configs(merged_config, main_config_dir)
                 set_global_config_data(merged_config)
                 _process_env_variables(merged_config)
             except Exception:
@@ -1349,9 +1351,130 @@ def _process_env_variables(config_data: Dict[str, Any]) -> None:
         )
 
 
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """深度合并两个字典
+
+    参数:
+        base: 基础字典（低优先级）
+        override: 覆盖字典（高优先级）
+
+    返回:
+        Dict[str, Any]: 合并后的字典
+
+    特点:
+        - 对于嵌套字典，进行递归合并
+        - 对于列表，进行追加（extend）
+        - 对于其他类型，override覆盖base
+        - 不会修改原始字典，返回新字典（使用deepcopy）
+    """
+    import copy
+
+    result = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in result:
+            if isinstance(result[key], dict) and isinstance(value, dict):
+                # 两个都是字典，递归合并
+                result[key] = _deep_merge(result[key], value)
+            elif isinstance(result[key], list) and isinstance(value, list):
+                # 追加合并：override列表在前，base列表在后
+                # 在最终合并时项目列表在前、插件列表在后；在插件间合并时后加载的插件列表在前
+                result[key] = copy.deepcopy(value) + result[key]
+            else:
+                # 其他类型，直接覆盖
+                result[key] = (
+                    copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+                )
+        else:
+            # 新键，直接添加
+            result[key] = (
+                copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+            )
+    return result
+
+
+def _load_plugin_configs(
+    merged_config: Dict[str, Any], config_file_dir: str = None
+) -> Dict[str, Any]:
+    """加载并合并插件配置
+
+    参数:
+        merged_config: 已合并的主配置字典（项目配置）
+        config_file_dir: 配置文件所在目录，用于解析相对路径。默认为当前工作目录。
+
+    返回:
+        Dict[str, Any]: 合并插件配置后的配置字典
+
+    优先级:
+        项目配置 > 插件配置 > 用户全局配置
+        即：merged_config（项目配置）会覆盖 plugin_config（插件配置）
+    """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    # 从配置中读取插件目录列表
+    plugin_dirs = merged_config.get("plugin_dirs", [])
+    if not plugin_dirs:
+        return merged_config
+
+    if not isinstance(plugin_dirs, list):
+        PrettyOutput.auto_print("⚠️ plugin_dirs 配置格式错误，应为列表")
+        return merged_config
+
+    # 确定相对路径的基准目录
+    base_dir = Path(config_file_dir) if config_file_dir else Path(os.getcwd())
+
+    # 先收集所有插件配置，按顺序合并（后加载的覆盖前面的）
+    combined_plugin_config: Dict[str, Any] = {}
+
+    # 遍历每个插件目录，加载配置
+    for plugin_dir in plugin_dirs:
+        if not isinstance(plugin_dir, str):
+            PrettyOutput.auto_print(
+                f"⚠️  plugin_dirs 中的元素不是字符串类型: {plugin_dir}"
+            )
+            continue
+
+        # 支持相对路径和绝对路径
+        plugin_path = Path(plugin_dir)
+        if not plugin_path.is_absolute():
+            # 相对路径，相对于配置文件所在目录
+            plugin_path = base_dir / plugin_path
+
+        # 检查插件目录是否存在
+        if not plugin_path.exists():
+            PrettyOutput.auto_print(f"⚠️  插件目录不存在: {plugin_path}")
+            continue
+
+        # 检查config.yaml文件是否存在
+        plugin_config_file = plugin_path / "config.yaml"
+        if not plugin_config_file.exists():
+            PrettyOutput.auto_print(f"⚠️  插件目录中缺少 config.yaml: {plugin_path}")
+            continue
+
+        try:
+            # 加载插件配置
+            _, plugin_config = _load_config_file(str(plugin_config_file))
+            if isinstance(plugin_config, dict):
+                # 合并插件配置：后加载的插件覆盖前面的
+                combined_plugin_config = _deep_merge(
+                    combined_plugin_config, plugin_config
+                )
+                PrettyOutput.auto_print(f"✅ 已加载插件配置: {plugin_path}")
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠️  插件配置文件格式错误: {plugin_config_file}"
+                )
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 加载插件配置失败 {plugin_path}: {e}")
+
+    # 最后将项目配置与合并后的插件配置合并（项目配置优先）
+    if combined_plugin_config:
+        merged_config = _deep_merge(combined_plugin_config, merged_config)
+
+    return merged_config
+
+
 def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
     """加载并处理配置文件
-
     功能：
     1. 读取配置文件
     2. 确保schema声明存在
@@ -1367,6 +1490,9 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
     try:
         content, config_data = _load_config_file(config_file)
         _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
+        # 加载并合并插件配置，传入配置文件所在目录用于解析相对路径
+        config_file_dir = str(Path(config_file).parent)
+        config_data = _load_plugin_configs(config_data, config_file_dir)
         set_global_config_data(config_data)
         _process_env_variables(config_data)
     except Exception:

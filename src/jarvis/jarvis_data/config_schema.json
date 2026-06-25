@@ -86,6 +86,14 @@
       },
       "default": {}
     },
+    "plugin_dirs": {
+      "type": "array",
+      "description": "插件目录路径列表，每个目录应包含config.yaml文件。插件配置会合并到主配置中，优先级：项目配置 > 插件配置 > 用户全局配置",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "git_commit_prompt": {
       "type": "string",
       "description": "Git提交信息生成提示模板",
