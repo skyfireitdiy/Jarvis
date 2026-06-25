@@ -876,8 +876,9 @@ class EditFileNormalTool:
                                 # 简化错误信息显示（每行错误缩进显示）
                                 for line in error.split("\n"):
                                     all_results.append(f"   ❌ Diff #{idx}: {line}")
+                        encoding_info = detected_encoding or "utf-8"
                         successful_files.append(
-                            file_path
+                            (file_path, encoding_info)
                         )  # 仍然算作成功文件（部分成功也算成功）
                         # 部分成功时，不将文件添加到 failed_files，因为文件已成功写入
                         # 但需要将整体操作标记为失败

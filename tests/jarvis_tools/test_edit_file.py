@@ -395,11 +395,10 @@ def multiply(x, y):
             or "未找到精确匹配" in result["stderr"]
             or "未找到可匹配的文本" in result["stderr"]
         )
-        # 当前实现下，当同一文件的后续 diff 失败时，不会写入前面成功的内存修改
+        # 部分成功实现：当同一文件的后续 diff 失败时，前面成功的 diff 仍会写入文件
         with open(temp_file, "r", encoding="utf-8") as f:
             content = f.read()
-            assert "def add(a, b, c=0):" not in content
-            assert "def add(a, b):" in content
+            assert "def add(a, b, c=0):" in content  # 第一个成功的 diff 应该被写入
 
     def test_invalid_args_missing_files(self, tool):
         """测试缺少 files 参数"""
@@ -916,8 +915,6 @@ class TestEditFileEncoding:
                 os.remove(temp_path)
             if os.path.exists(temp_path + ".bak"):
                 os.remove(temp_path + ".bak")
-
-
 
     def test_encoding_detection_with_bom(self, tool):
         """测试带 BOM 的 UTF-8 文件处理"""
