@@ -10,6 +10,7 @@ from typing import Optional
 from typing import Union
 
 from rich import box
+from rich.color import Color
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -17,6 +18,15 @@ from rich.table import Table
 from rich.text import Text
 
 from jarvis.jarvis_utils.output import emit_output, OutputType
+
+
+class CustomSyntax(Syntax):
+    """自定义 Syntax 类，覆盖行号颜色为 grey58"""
+
+    def _get_line_numbers_color(self, blend: float = 0.3) -> Color:
+        """返回固定的 grey58 颜色，与时间戳颜色保持一致"""
+        return Color.parse("grey58")
+
 
 LANGUAGE_EXTENSION_MAPPING = {
     "py": "python",
@@ -377,8 +387,8 @@ class DiffVisualizer:
         if not diff_text.strip():
             return
 
-        # 使用 Rich 的 diff 语法高亮
-        syntax = Syntax(
+        # 使用自定义的 Syntax 类，行号颜色为 grey58
+        syntax = CustomSyntax(
             diff_text,
             "diff",
             theme=theme,
