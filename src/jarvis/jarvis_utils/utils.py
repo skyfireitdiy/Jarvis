@@ -1451,8 +1451,22 @@ def _load_plugin_configs(
             continue
 
         try:
-            # 加载插件配置
-            _, plugin_config = _load_config_file(str(plugin_config_file))
+            # 读取插件配置文件原始内容
+            with open(plugin_config_file, "r", encoding="utf-8") as f:
+                config_content = f.read()
+
+            # 渲染模板变量（如 {{plugin_dir}}）
+            from jarvis.jarvis_utils.template_utils import render_plugin_config_template
+
+            rendered_content = render_plugin_config_template(
+                config_content, str(plugin_path)
+            )
+
+            # 解析YAML
+            import yaml
+
+            plugin_config = yaml.safe_load(rendered_content)
+
             if isinstance(plugin_config, dict):
                 # 合并插件配置：后加载的插件覆盖前面的
                 combined_plugin_config = _deep_merge(

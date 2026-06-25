@@ -342,3 +342,82 @@ class TestConfigPriority:
         # 应跳过无效项，加载有效项
         assert result["model"] == "test-model"
         assert result["valid_key"] == "valid_value"  # 有效插件配置已加载
+
+    def test_plugin_dir_template_variable(self, tmp_path):
+        """测试插件配置中的 {{plugin_dir}} 模板变量"""
+        # 创建临时插件目录
+        plugin_dir = tmp_path / "my_plugin"
+        plugin_dir.mkdir()
+
+        # 创建包含 {{plugin_dir}} 变量的配置文件
+        config_content = """model: plugin-model
+tool_load_dirs:
+  - {{plugin_dir}}/tools
+data_path: {{plugin_dir}}/data
+"""
+        config_file = plugin_dir / "config.yaml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        # 测试加载
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+        result = _load_plugin_configs(base_config)
+
+        # 验证模板变量已正确渲染
+        expected_path = str(plugin_dir)
+        assert result["model"] == "plugin-model"
+        assert result["tool_load_dirs"] == [f"{expected_path}/tools"]
+        assert result["data_path"] == f"{expected_path}/data"
+
+    def test_plugin_dir_template_in_nested_dict(self, tmp_path):
+        """测试嵌套字典中的 {{plugin_dir}} 模板变量"""
+        # 创建临时插件目录
+        plugin_dir = tmp_path / "nested_plugin"
+        plugin_dir.mkdir()
+
+        # 创建包含嵌套字典的配置文件
+        config_content = """model: plugin-model
+llm:
+  model: nested-model
+  cache_dir: {{plugin_dir}}/cache
+  tools:
+    path: {{plugin_dir}}/tools
+"""
+        config_file = plugin_dir / "config.yaml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        # 测试加载
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+        result = _load_plugin_configs(base_config)
+
+        # 验证嵌套字典中的模板变量已正确渲染
+        expected_path = str(plugin_dir)
+        assert result["llm"]["cache_dir"] == f"{expected_path}/cache"
+        assert result["llm"]["tools"]["path"] == f"{expected_path}/tools"
+
+    def test_plugin_dir_template_multiple_occurrences(self, tmp_path):
+        """测试配置中多次使用 {{plugin_dir}} 模板变量"""
+        # 创建临时插件目录
+        plugin_dir = tmp_path / "multi_plugin"
+        plugin_dir.mkdir()
+
+        # 创建多次使用 {{plugin_dir}} 的配置文件
+        config_content = """model: plugin-model
+path1: {{plugin_dir}}/path1
+path2: {{plugin_dir}}/path2
+path3: {{plugin_dir}}/path3
+"""
+        config_file = plugin_dir / "config.yaml"
+        with open(config_file, "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        # 测试加载
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+        result = _load_plugin_configs(base_config)
+
+        # 验证所有模板变量都已正确渲染
+        expected_path = str(plugin_dir)
+        assert result["path1"] == f"{expected_path}/path1"
+        assert result["path2"] == f"{expected_path}/path2"
+        assert result["path3"] == f"{expected_path}/path3"
