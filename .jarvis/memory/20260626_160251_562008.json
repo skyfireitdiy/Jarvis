@@ -1,0 +1,17 @@
+{
+  "id": "20260626_160251_562008",
+  "type": "project_long_term",
+  "tags": [
+    "项目数据库",
+    "跨文件分析",
+    "SQLite",
+    "Schema设计",
+    "数据收集器",
+    "tree-sitter",
+    "workflow集成",
+    "已完成"
+  ],
+  "content": "## 项目级数据库实现完成\n\n### 完成状态\n- 数据库Schema设计完成（7张表+12个索引）\n- 数据收集器实现完成（tree-sitter提取+正则表达式回退）\n- workflow集成完成（数据库构建流程）\n- 静态检查全部通过（ruff check）\n\n### 核心功能\n1. **数据库Schema**：\n   - files：文件元数据（路径、哈希、修改时间）\n   - symbols：符号表（函数、变量、类型定义）\n   - call_graph：调用关系图（caller、callee、调用位置）\n   - data_flow：数据流图（变量定义、使用位置）\n   - pointer_states：指针状态追踪（ALLOCATED、FREED、NULLIFIED）\n   - type_info：类型信息（struct、union、enum、typedef）\n   - analysis_cache：分析结果缓存\n\n2. **数据收集器**：\n   - tree-sitter优先解析（精确提取）\n   - 正则表达式回退方案（覆盖基本需求）\n   - 批量操作接口（提高性能）\n\n3. **workflow集成**：\n   - direct_scan函数集成数据库构建\n   - build_database参数控制（默认True）\n   - 数据库统计信息返回\n\n### 关键文件\n- src/jarvis/jarvis_sec/project_database.py（795行）\n  - ProjectDatabase类：数据库管理器\n  - 6个dataclass：FileInfo、SymbolInfo、CallRelation、DataFlowNode、PointerStateRecord、TypeInfo\n  - 批量操作接口：batch_insert_symbols、batch_insert_call_graph等\n\n- src/jarvis/jarvis_sec/data_collector.py（920行）\n  - DataCollector类：数据收集器\n  - tree-sitter解析：提取符号、调用关系、数据流\n  - 正则表达式回退：覆盖基本提取\n\n- src/jarvis/jarvis_sec/workflow.py（已修改）\n  - 第130-285行：集成数据库构建\n  - build_database参数：控制是否构建数据库\n\n### 数据库路径\n- 项目根目录/.jarvis/analysis.db\n\n### 索引优化\n- symbols_name、symbols_file、symbols_kind\n- call_graph_caller、call_graph_callee、call_graph_caller_file\n- data_flow_var、data_flow_file\n- pointer_states_var、pointer_states_file\n- type_info_name、type_info_file\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过（ruff format）\n- Git提交成功（4341a7e、e5b95e5、7ed7749）\n- 数据库初始化成功\n- 数据收集功能正常\n\n### 下一步\n- P1：增量更新机制（文件修改后只更新相关数据）\n- P1：跨文件分析接口（提供查询接口供分析器使用）\n- P2：性能优化（大数据量时的查询优化）\n- P2：缓存机制（分析结果缓存复用）\n\n### 技术栈\n- Python 3.12\n- SQLite3（数据库存储）\n- tree-sitter 0.25.2（代码解析）\n- tree-sitter-c/tree-sitter-cpp（C/C++解析器）",
+  "created_at": "2026-06-26T16:02:51.562053",
+  "updated_at": "2026-06-26T16:02:51.562061"
+}
