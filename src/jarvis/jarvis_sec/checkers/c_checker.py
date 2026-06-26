@@ -1898,6 +1898,12 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
 
     # 收集静态/全局变量和常量字符串指针（通常已确保非空）
     safe_vars: set[str] = set()
+    # 收集栈数组变量（栈数组不可能为NULL）
+    stack_arrays: set[str] = set()
+    # 栈数组声明模式：类型 变量名[大小]
+    re_stack_array = re.compile(
+        r"\b(char|int|long|short|void|unsigned|signed|float|double|size_t|ssize_t|uint\d*_t|int\d*_t)\s+(?:\*\s*)*([A-Za-z_]\w*)\s*\["
+    )
     for line in lines:
         m_static = re_static_global.search(line)
         if m_static:
@@ -1905,6 +1911,10 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
         m_const = re_const_str.search(line)
         if m_const:
             safe_vars.add(m_const.group(1))
+        # 检测栈数组声明
+        m_array = re_stack_array.search(line)
+        if m_array:
+            stack_arrays.add(m_array.group(2))
 
     def _is_just_allocated(var: str, lines: Sequence[str], line_no: int) -> bool:
         """检查变量是否刚分配成功（前1-2行有malloc/new等分配函数）"""
