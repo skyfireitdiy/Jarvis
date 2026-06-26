@@ -429,6 +429,9 @@ def _has_null_check_around(
     - if (ptr) / if (!ptr)
     - if (ptr == NULL/0) / if (NULL/0 == ptr)
     - 断言/检查宏：assert(ptr)、assert(ptr != NULL)、BUG_ON(!ptr)、WARN_ON(!ptr)、CHECK/ENSURE 等
+    - 提前返回：if (!ptr) return ... / if (ptr == NULL) return ...
+    - 错误处理跳转：if (!ptr) goto error; / if (ptr == NULL) goto fail;
+    - 循环条件：while (ptr && ...) / for (...; ptr && ...; ...)
     """
     for i, s in _window(lines, line_no, before=radius, after=radius):
         # 直接真假判断
@@ -446,6 +449,17 @@ def _has_null_check_around(
             rf"\b(assert|BUG_ON|WARN_ON|CHECK|ENSURE)\s*\(\s*(!\s*)?{re.escape(var)}(\s*(==|!=)\s*(NULL|0))?\s*\)",
             s,
         ):
+            return True
+        # 提前返回防御：if (!ptr) return ... / if (ptr == NULL) return ...
+        if re.search(rf"\bif\s*\([^)]*{re.escape(var)}[^)]*\)\s*\breturn\b", s):
+            return True
+        # 错误处理跳转：if (!ptr) goto error; / if (ptr == NULL) goto fail;
+        if re.search(rf"\bif\s*\([^)]*{re.escape(var)}[^)]*\)\s*\bgoto\b", s):
+            return True
+        # 循环条件检查：while (ptr && ...) / for (...; ptr && ...; ...)
+        if re.search(rf"\bwhile\s*\([^)]*{re.escape(var)}[^)]*\)", s):
+            return True
+        if re.search(rf"\bfor\s*\([^)]*{re.escape(var)}[^)]*\)", s):
             return True
     return False
 
@@ -586,29 +600,72 @@ def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
+    # 检测 realloc 调用但未赋值回原指针的情况
+    realloc_call_pattern = re.compile(
+        r"realloc\s*\(\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE
+    )
     for idx, s in enumerate(lines, start=1):
-        m = RE_REALLOC_ASSIGN_BACK.search(s)
-        if not m:
-            continue
-        var = m.group(1)
-        conf = 0.8
-        # 如果附近未见错误处理/NULL检查，置信度更高
-        if not _has_null_check_around(var, lines, idx, radius=3):
-            conf += 0.1
-        issues.append(
-            Issue(
-                language="c/cpp",
-                category="memory_mgmt",
-                pattern="realloc_overwrite",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description=f"realloc 直接覆盖原指针 {var}，若失败将导致原内存泄漏。",
-                suggestion="使用临时指针接收 realloc 返回值，判空成功后再赋值回原指针。",
-                confidence=min(conf, 0.95),
-                severity=_severity_from_confidence(conf, "memory_mgmt"),
+        # 检测 realloc(p, size) 但没有赋值回的情况
+        m = realloc_call_pattern.search(s)
+        if m:
+            var = m.group(1)
+            # 检查是否有赋值操作（p = realloc(p, ...) 或 tmp = realloc(p, ...)）
+            # 如果行中没有 = 或者 = 不在 realloc 之前，则认为未赋值回
+            has_assign = False
+            if "=" in s:
+                # 检查是否是 p = realloc(p, ...) 形式
+                assign_match = re.search(
+                    rf"\b{re.escape(var)}\s*=\s*realloc", s, re.IGNORECASE
+                )
+                if assign_match:
+                    has_assign = True
+                # 或者是 tmp = realloc(p, ...) 形式（有临时变量接收）
+                else:
+                    tmp_assign_match = re.search(
+                        r"\b([A-Za-z_]\w*)\s*=\s*realloc", s, re.IGNORECASE
+                    )
+                    if tmp_assign_match:
+                        has_assign = True
+
+            if not has_assign:
+                # realloc 调用但未赋值回，可能导致内存泄漏或使用已释放内存
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="memory_mgmt",
+                        pattern="realloc_assign_back",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"realloc 调用但未将结果赋值回指针 {var}，可能导致内存泄漏或使用已释放内存。",
+                        suggestion="使用临时指针接收 realloc 返回值，判空成功后再赋值回原指针。",
+                        confidence=0.75,
+                        severity="high",
+                    )
+                )
+
+        # 检测 realloc 直接覆盖原指针的情况（p = realloc(p, ...)）
+        m2 = RE_REALLOC_ASSIGN_BACK.search(s)
+        if m2:
+            var = m2.group(1)
+            conf = 0.8
+            # 如果附近未见错误处理/NULL检查，置信度更高
+            if not _has_null_check_around(var, lines, idx, radius=3):
+                conf += 0.1
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="realloc_assign_back",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"realloc 直接覆盖原指针 {var}，若失败将导致原内存泄漏。",
+                    suggestion="使用临时指针接收 realloc 返回值，判空成功后再赋值回原指针。",
+                    confidence=min(conf, 0.95),
+                    severity=_severity_from_confidence(conf, "memory_mgmt"),
+                )
             )
-        )
     return issues
 
 
@@ -1357,6 +1414,36 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
                 return True
         return False
 
+    # 预编译安全上下文检测的正则表达式
+    re_malloc_like = re.compile(
+        r"\b(malloc|calloc|realloc|new|kmalloc|vmalloc|kzalloc)\b"
+    )
+    re_static_global = re.compile(r"^\s*(static|extern)\s+.*\b([A-Za-z_]\w*)\b")
+    re_const_str = re.compile(r"\bconst\s+char\s*\*\s*([A-Za-z_]\w*)\b")
+
+    # 收集静态/全局变量和常量字符串指针（通常已确保非空）
+    safe_vars: set[str] = set()
+    for line in lines:
+        m_static = re_static_global.search(line)
+        if m_static:
+            safe_vars.add(m_static.group(2))
+        m_const = re_const_str.search(line)
+        if m_const:
+            safe_vars.add(m_const.group(1))
+
+    def _is_just_allocated(var: str, lines: Sequence[str], line_no: int) -> bool:
+        """检查变量是否刚分配成功（前1-2行有malloc/new等分配函数）"""
+        for offset in range(1, 3):  # 检查前1-2行
+            prev_idx = line_no - offset
+            if prev_idx < 1 or prev_idx > len(lines):
+                continue
+            prev_line = lines[prev_idx - 1]
+            # 检查是否有分配函数调用，且变量名出现在赋值左侧
+            if re_malloc_like.search(prev_line):
+                if re.search(rf"\b{re.escape(var)}\s*=", prev_line):
+                    return True
+        return False
+
     for idx, s in enumerate(lines, start=1):
         vars_hit: List[str] = []
         # '->' 访问几乎必为解引用
@@ -1386,6 +1473,12 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
             vars_hit.append(var)
         for v in set(vars_hit):
             if v == "this":  # C++ 成员函数中 this-> 通常不应视为空指针
+                continue
+            # 跳过静态/全局变量（通常在初始化时已确保非空）
+            if v in safe_vars:
+                continue
+            # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
+            if _is_just_allocated(v, lines, idx):
                 continue
             if not _has_null_check_around(v, lines, idx, radius=3):
                 issues.append(
@@ -1762,6 +1855,21 @@ def _rule_open_permissive_perms(lines: Sequence[str], relpath: str) -> List[Issu
         m = RE_OPEN_PERMISSIVE.search(s)
         if m:
             mode = m.group(1)
+            # 只报告过宽权限（0666、0777等），安全权限（0600、0640等）不报告
+            # 过宽权限：其他用户有读/写/执行权限
+            try:
+                mode_val = int(mode, 8)
+                # 检查是否有其他用户权限（group或other有写/执行权限）
+                has_group_write = (mode_val & 0o020) != 0  # group write
+                has_other_write = (mode_val & 0o002) != 0  # other write
+                has_other_read = (mode_val & 0o004) != 0  # other read
+                # 过宽权限：其他用户有写权限，或other有读权限
+                is_permissive = has_group_write or has_other_write or has_other_read
+                if not is_permissive:
+                    continue  # 安全权限，跳过
+            except ValueError:
+                # 无法解析，保守处理：继续报告
+                pass
             issues.append(
                 Issue(
                     language="c/cpp",
@@ -2046,21 +2154,53 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
-        if RE_GETENV.search(s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="input_validation",
-                    pattern="getenv_unchecked",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="读取环境变量后未见显式校验，可能被用于构造路径/命令等引入安全风险。",
-                    suggestion="对白名单键进行读取；对取值执行格式/长度/字符集校验；避免直接拼接为命令/路径。",
-                    confidence=0.55,
-                    severity="medium",
-                )
+        m = RE_GETENV.search(s)
+        if not m:
+            continue
+
+        # 检查是否有if判断（检查返回值是否为NULL）
+        # 获取变量名（如果有赋值）
+        var_name = None
+        assign_match = re.search(r"\b([A-Za-z_]\w*)\s*=\s*getenv\s*\(", s)
+        if assign_match:
+            var_name = assign_match.group(1)
+
+        # 检查后续几行是否有if判断
+        has_check = False
+        if var_name:
+            # 检查后续5行是否有对该变量的if判断
+            for j in range(idx, min(idx + 5, len(lines))):
+                check_line = lines[j]
+                # 检查 if (var == NULL) 或 if (var != NULL) 或 if (!var) 等
+                if re.search(
+                    rf"\bif\s*\([^)]*\b{re.escape(var_name)}\b[^)]*\)", check_line
+                ):
+                    has_check = True
+                    break
+                # 检查 if (!var) 或 if (var)
+                if re.search(
+                    rf"\bif\s*\(\s*!?\s*{re.escape(var_name)}\s*\)", check_line
+                ):
+                    has_check = True
+                    break
+
+        if has_check:
+            continue  # 有检查，跳过
+
+        issues.append(
+            Issue(
+                language="c/cpp",
+                category="input_validation",
+                pattern="getenv_unchecked",
+                file=relpath,
+                line=idx,
+                evidence=_strip_line(s),
+                description="读取环境变量后未见显式校验，可能被用于构造路径/命令等引入安全风险。",
+                suggestion="对白名单键进行读取；对取值执行格式/长度/字符集校验；避免直接拼接为命令/路径。",
+                confidence=0.55,
+                severity="medium",
             )
+        )
     return issues
 
 
@@ -2071,13 +2211,15 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    检测 new[]/delete[] 和 new/delete 的匹配问题：
+    检测 new/delete 与 malloc/free 的跨API不匹配问题：
     - new[] 必须用 delete[] 释放
-    - new 必须用 delete 释放（不能用 delete[]）
+    - new 必须用 delete 释放（不能用 delete[] 或 free）
+    - malloc 必须用 free 释放（不能用 delete）
     """
     issues: List[Issue] = []
     new_array_vars: dict[str, int] = {}  # var -> line_no
     new_vars: dict[str, int] = {}  # var -> line_no
+    malloc_vars: dict[str, int] = {}  # var -> line_no
 
     # 收集 new[] 和 new 的分配
     for idx, s in enumerate(lines, start=1):
@@ -2096,7 +2238,13 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
             var = m_new.group(1)
             new_vars[var] = idx
 
-    # 检查 delete[] 和 delete 的使用
+        # malloc 分配
+        m_malloc = RE_MALLOC_ASSIGN.search(s)
+        if m_malloc:
+            var = m_malloc.group(1)
+            malloc_vars[var] = idx
+
+    # 检查 delete[]、delete、free 的使用
     for idx, s in enumerate(lines, start=1):
         # delete[] 使用
         if RE_DELETE_ARRAY.search(s):
@@ -2110,12 +2258,28 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                         Issue(
                             language="c/cpp",
                             category="memory_mgmt",
-                            pattern="delete_array_mismatch",
+                            pattern="new_delete_mismatch",
                             file=relpath,
                             line=idx,
                             evidence=_strip_line(s),
                             description="使用 delete[] 释放由 new 分配的内存（非数组），存在未定义行为风险。",
                             suggestion="new 分配的内存应使用 delete 释放；new[] 分配的内存应使用 delete[] 释放。",
+                            confidence=0.85,
+                            severity="high",
+                        )
+                    )
+                if var in malloc_vars:
+                    # 用 delete[] 释放了 malloc 分配的内存
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="new_delete_mismatch",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description="使用 delete[] 释放由 malloc 分配的内存，存在未定义行为风险。",
+                            suggestion="malloc 分配的内存应使用 free 释放；new 分配的内存应使用 delete 释放。",
                             confidence=0.85,
                             severity="high",
                         )
@@ -2132,7 +2296,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                         Issue(
                             language="c/cpp",
                             category="memory_mgmt",
-                            pattern="delete_mismatch",
+                            pattern="new_delete_mismatch",
                             file=relpath,
                             line=idx,
                             evidence=_strip_line(s),
@@ -2142,6 +2306,59 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                             severity="high",
                         )
                     )
+                if var in malloc_vars:
+                    # 用 delete 释放了 malloc 分配的内存
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="new_delete_mismatch",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description="使用 delete 释放由 malloc 分配的内存，存在未定义行为风险。",
+                            suggestion="malloc 分配的内存应使用 free 释放；new 分配的内存应使用 delete 释放。",
+                            confidence=0.85,
+                            severity="high",
+                        )
+                    )
+
+        # free 使用
+        m_free = RE_FREE_VAR.search(s)
+        if m_free:
+            var = m_free.group(1)
+            if var in new_vars:
+                # 用 free 释放了 new 分配的内存
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="memory_mgmt",
+                        pattern="new_delete_mismatch",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="使用 free 释放由 new 分配的内存，存在未定义行为风险。",
+                        suggestion="new 分配的内存应使用 delete 释放；malloc 分配的内存应使用 free 释放。",
+                        confidence=0.85,
+                        severity="high",
+                    )
+                )
+            if var in new_array_vars:
+                # 用 free 释放了 new[] 分配的内存
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="memory_mgmt",
+                        pattern="new_delete_mismatch",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="使用 free 释放由 new[] 分配的数组内存，存在未定义行为风险。",
+                        suggestion="new[] 分配的内存应使用 delete[] 释放；malloc 分配的内存应使用 free 释放。",
+                        confidence=0.85,
+                        severity="high",
+                    )
+                )
 
     return issues
 
@@ -2706,12 +2923,16 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 shared_vars.add(var)
 
         # 检测全局变量声明（文件作用域）
-        if idx == 1 or (idx > 1 and _safe_line(lines, idx - 1).strip().endswith("}")):
-            # 可能是文件作用域的变量
+        # 改进：检查是否在函数外部（行首没有缩进，且不在函数体内）
+        # 简化判断：行首没有空格/制表符的变量声明，且不是函数参数
+        if not s.startswith(" ") and not s.startswith("\t"):
+            # 可能是文件作用域的变量声明
             m_global = re.search(r"^[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)\s*[=;]", s)
             if m_global and "const" not in s.lower() and "static" not in s.lower():
-                var = m_global.group(1)
-                shared_vars.add(var)
+                # 排除函数声明（检查是否有括号）
+                if "(" not in s:
+                    var = m_global.group(1)
+                    shared_vars.add(var)
 
         # 检测线程创建
         if RE_PTHREAD_CREATE.search(s) or RE_STD_THREAD.search(s):
@@ -2783,32 +3004,44 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
 
             # 如果未检测到锁保护，且是写操作，风险更高
             if not has_lock or (lock_line and unlocked):
-                conf = 0.6
-                if is_write:
-                    conf += 0.15
-                if var in volatile_vars:
-                    # volatile 不能保证线程安全，但可能被误用
-                    conf += 0.1
+                # 优化：只对明确的写操作报告，读操作大幅降低置信度
+                if not is_write:
+                    # 纯读操作在没有锁的情况下风险较低，跳过报告
+                    # 除非是 volatile 变量（可能被误用）
+                    if var not in volatile_vars:
+                        continue
+                    conf = 0.4  # volatile 读操作，低置信度
+                else:
+                    conf = 0.6
+                    if var in volatile_vars:
+                        # volatile 不能保证线程安全，但可能被误用
+                        conf += 0.1
 
                 # 检查是否在函数参数中（可能是局部变量，降低风险）
                 if "(" in s and ")" in s:
                     # 可能是函数调用参数，降低置信度
                     conf -= 0.1
 
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="concurrency",
-                        pattern="data_race_suspect",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"共享变量 {var} 在多线程环境下访问但未见明确的锁保护，可能存在数据竞争风险。",
-                        suggestion="使用互斥锁保护共享变量访问；或使用原子操作（std::atomic）进行无锁编程；注意 volatile 不能保证线程安全。",
-                        confidence=min(conf, 0.85),
-                        severity="high" if conf >= 0.7 else "medium",
+                # 进一步降低置信度：如果附近有锁，即使不在临界区内，也可能有其他保护机制
+                if has_lock and (lock_line and unlocked):
+                    conf -= 0.15  # 有锁但已解锁，可能是有意设计
+
+                # 只报告置信度足够高的问题
+                if conf >= 0.5:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="concurrency",
+                            pattern="data_race_suspect",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"共享变量 {var} 在多线程环境下访问但未见明确的锁保护，可能存在数据竞争风险。",
+                            suggestion="使用互斥锁保护共享变量访问；或使用原子操作（std::atomic）进行无锁编程；注意 volatile 不能保证线程安全。",
+                            confidence=min(conf, 0.85),
+                            severity="high" if conf >= 0.7 else "medium",
+                        )
                     )
-                )
 
     # 检测 volatile 的误用（volatile 不能保证线程安全）
     for idx, s in enumerate(lines, start=1):

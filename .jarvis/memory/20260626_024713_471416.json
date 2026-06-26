@@ -1,0 +1,8 @@
+{
+  "id": "20260626_024713_471416",
+  "type": "project_long_term",
+  "tags": ["启发式扫描优化", "测试数据集", "已完成"],
+  "content": "## 启发式规则测试数据集创建完成\n\n### 完成状态\n- 测试数据文件：66个（.c/.cpp文件）\n- 规则目录：38个（每个规则一个目录）\n- README文档：完整的规则列表和使用说明\n\n### 测试数据集覆盖范围\n已为以下规则创建测试数据集（正例+反例）：\n- possible_null_deref（8个文件）\n- data_race_suspect（4个文件）\n- unsafe_api（3个文件）\n- malloc_no_null_check（2个文件）\n- format_string（2个文件）\n- uaf_suspect（2个文件）\n- double_free（1个文件）\n- command_execution（2个文件）\n- alloc_size_overflow（2个文件）\n- scanf_no_width（2个文件）\n- insecure_tmpfile（2个文件）\n- atoi_family（1个文件）\n- rand_insecure（1个文件）\n- strtok_nonreentrant（1个文件）\n- pthread_returns_unchecked（2个文件）\n- thread_leak_no_join（2个文件）\n- deadlock_patterns（1个文件）\n- uninitialized_ptr_use（1个文件）\n- smart_ptr_cycle（1个文件）\n- smart_ptr_get_unsafe（1个文件）\n- new_delete_mismatch（2个文件）\n- reinterpret_cast_unsafe（1个文件）\n- const_cast_unsafe（1个文件）\n- missing_virtual_dtor（1个文件）\n- move_after_use（1个文件）\n- uncaught_exception（1个文件）\n- vector_string_bounds_check（2个文件）\n- strncpy_no_nullterm（1个文件）\n- realloc_assign_back（2个文件）\n- function_return_ptr_no_check（1个文件）\n- unchecked_io（2个文件）\n- alloca_unbounded（1个文件）\n- vla_usage（1个文件）\n- cond_wait_no_loop（2个文件）\n- inet_legacy（1个文件）\n- time_apis_not_threadsafe（2个文件）\n- getenv_unchecked（2个文件）\n- open_permissive_perms（2个文件）\n\n### 文件命名规范\n- 正例：positive_*.c / positive_*.cpp（应该检测到）\n- 反例：negative_*.c / negative_*.cpp（不应该检测到）\n\n### 关键文件路径\n- 测试数据集目录：tests/jarvis_sec/datasets/\n- README文档：tests/jarvis_sec/datasets/README.md\n\n### 验证方法\n可使用 analyze_c_cpp_text 函数对每个测试文件进行验证，确保规则准确性。\n\n### 任务完成\n阶段2：为每个启发式规则补充测试数据集 - 已完成",
+  "created_at": "2026-06-26T02:47:13.471460",
+  "updated_at": "2026-06-26T02:47:13.471466"
+}

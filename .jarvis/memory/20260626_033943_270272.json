@@ -1,0 +1,8 @@
+{
+  "id": "20260626_033943_270272",
+  "type": "project_long_term",
+  "tags": ["启发式扫描优化", "自动化测试", "已完成"],
+  "content": "## 启发式规则自动化测试创建完成\n\n### 测试框架\n- 文件：`tests/jarvis_sec/test_checkers.py`\n- 新增测试函数：\n  - `test_dataset_positive_cases()`：验证正例能被检测到\n  - `test_dataset_negative_cases()`：验证反例不会产生误报\n\n### 测试结果（首次运行）\n- 正例检测成功率：76.09%（35/46通过）\n- 反例误报率：25%（5/20误报）\n\n### 失败的正例（11个）\n1. smart_ptr_cycle - 未实现\n2. missing_virtual_dtor - 未实现\n3. deadlock_patterns - 未实现\n4. uaf_suspect - 检测到其他问题\n5. move_after_use - 未实现\n6. smart_ptr_get_unsafe - 未实现\n7. realloc_assign_back - 未实现\n8. time_apis_not_threadsafe - 未实现\n9. uninitialized_ptr_use - 检测到其他问题\n10. new_delete_mismatch - 未实现\n\n### 误报的反例（5个）\n1. data_race_suspect - 读操作误报\n2. getenv_unchecked - 有检查仍误报\n3. unchecked_io - 有检查仍误报\n4. malloc_no_null_check - 有检查仍误报\n5. open_permissive_perms - 0600权限误报\n\n### 运行测试\n```bash\npytest tests/jarvis_sec/test_checkers.py::test_dataset_positive_cases tests/jarvis_sec/test_checkers.py::test_dataset_negative_cases -v\n```\n\n### 后续优化方向\n1. 实现缺失的规则（smart_ptr_cycle、missing_virtual_dtor等）\n2. 优化误报规则（data_race_suspect、getenv_unchecked等）\n3. 调整测试数据集使其更准确",
+  "created_at": "2026-06-26T03:39:43.270315",
+  "updated_at": "2026-06-26T03:39:43.270322"
+}
