@@ -8,7 +8,7 @@ Joern是一个开源（Apache 2.0许可）的代码分析平台，支持C/C++等
 import subprocess
 import tempfile
 import os
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 
 from .taint_analyzer import (
     TaintAnalyzer,
@@ -17,6 +17,9 @@ from .taint_analyzer import (
     TaintSink,
     TaintAnalyzerFactory,
 )
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
 
 
 class JoernAnalyzer(TaintAnalyzer):
@@ -27,14 +30,16 @@ class JoernAnalyzer(TaintAnalyzer):
     支持C/C++等多种语言。
     """
 
-    def __init__(self, joern_path: str = "joern"):
+    def __init__(self, joern_path: str = "joern", database: Optional["ProjectDatabase"] = None):
         """
         初始化Joern分析器
 
         Args:
             joern_path: Joern CLI工具路径，默认为"joern"（假设在PATH中）
+            database: 项目数据库实例（可选）
         """
         self.joern_path = joern_path
+        self.database = database
         self._check_joern_available()
 
     def _check_joern_available(self) -> bool:
@@ -115,17 +120,25 @@ class JoernAnalyzer(TaintAnalyzer):
         except (IOError, OSError):
             return []
 
-    def analyze(self, source_code: str, file_path: str = "") -> List[TaintPath]:
+    def analyze(
+        self,
+        source_code: str,
+        file_path: str = "",
+        database: Optional["ProjectDatabase"] = None,
+    ) -> List[TaintPath]:
         """
         分析源代码中的污点传播路径
 
         Args:
             source_code: 源代码内容
             file_path: 源代码文件路径
+            database: 项目数据库实例（可选，覆盖初始化时的设置）
 
         Returns:
             List[TaintPath]: 检测到的污点传播路径列表
         """
+        # 使用传入的database或初始化时的database
+        db = database or self.database
         # 创建临时工作目录
         with tempfile.TemporaryDirectory() as tmpdir:
             # 写入源代码文件
@@ -157,7 +170,13 @@ class JoernAnalyzer(TaintAnalyzer):
                 return []
 
             # 执行污点分析
-            return self._run_taint_analysis(cpg_file, self.sources, self.sinks)
+            paths = self._run_taint_analysis(cpg_file, self.sources, self.sinks)
+
+            # 如果提供了数据库，增强污点分析结果
+            if db is not None and file_path:
+                paths = self._enhance_with_database(paths, db, file_path)
+
+            return paths
 
     def _run_taint_analysis(
         self, cpg_file: str, sources: List[TaintSource], sinks: List[TaintSink]
