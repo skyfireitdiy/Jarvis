@@ -1371,6 +1371,34 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
                 return True
         return False
 
+    # 预编译安全上下文检测的正则表达式
+    re_malloc_like = re.compile(r"\b(malloc|calloc|realloc|new|kmalloc|vmalloc|kzalloc)\b")
+    re_static_global = re.compile(r"^\s*(static|extern)\s+.*\b([A-Za-z_]\w*)\b")
+    re_const_str = re.compile(r"\bconst\s+char\s*\*\s*([A-Za-z_]\w*)\b")
+    
+    # 收集静态/全局变量和常量字符串指针（通常已确保非空）
+    safe_vars: set[str] = set()
+    for line in lines:
+        m_static = re_static_global.search(line)
+        if m_static:
+            safe_vars.add(m_static.group(2))
+        m_const = re_const_str.search(line)
+        if m_const:
+            safe_vars.add(m_const.group(1))
+    
+    def _is_just_allocated(var: str, lines: Sequence[str], line_no: int) -> bool:
+        """检查变量是否刚分配成功（前1-2行有malloc/new等分配函数）"""
+        for offset in range(1, 3):  # 检查前1-2行
+            prev_idx = line_no - offset
+            if prev_idx < 1 or prev_idx > len(lines):
+                continue
+            prev_line = lines[prev_idx - 1]
+            # 检查是否有分配函数调用，且变量名出现在赋值左侧
+            if re_malloc_like.search(prev_line):
+                if re.search(rf"\b{re.escape(var)}\s*=", prev_line):
+                    return True
+        return False
+    
     for idx, s in enumerate(lines, start=1):
         vars_hit: List[str] = []
         # '->' 访问几乎必为解引用
@@ -1400,6 +1428,12 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
             vars_hit.append(var)
         for v in set(vars_hit):
             if v == "this":  # C++ 成员函数中 this-> 通常不应视为空指针
+                continue
+            # 跳过静态/全局变量（通常在初始化时已确保非空）
+            if v in safe_vars:
+                continue
+            # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
+            if _is_just_allocated(v, lines, idx):
                 continue
             if not _has_null_check_around(v, lines, idx, radius=3):
                 issues.append(
