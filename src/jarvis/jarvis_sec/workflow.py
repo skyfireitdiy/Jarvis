@@ -23,6 +23,8 @@ from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_sec.checkers import analyze_c_files
 from jarvis.jarvis_sec.checkers import analyze_rust_files
 from jarvis.jarvis_sec.types import Issue
+from jarvis.jarvis_sec.project_database import ProjectDatabase
+from jarvis.jarvis_sec.data_collector import DataCollector
 
 # ---------------------------
 # 数据结构
@@ -128,10 +130,18 @@ def direct_scan(
     entry_path: str,
     languages: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
+    build_database: bool = True,
 ) -> Dict[str, Any]:
     """
     直扫基线：对 C/C++/Rust 进行启发式扫描，输出结构化 JSON。
     - 改进：委派至模块化检查器（oh_sec.checkers），统一规则与置信度模型。
+    - 新增：构建项目级数据库，支持跨文件分析。
+
+    Args:
+        entry_path: 项目根目录路径
+        languages: 语言列表（默认c, cpp, h, hpp, rs）
+        exclude_dirs: 排除目录列表
+        build_database: 是否构建数据库（默认True）
     """
     base = Path(entry_path).resolve()
     # 计算实际使用的排除目录列表
@@ -211,6 +221,39 @@ def direct_scan(
     c_files: List[Path] = [p for p in files if p.suffix.lower() in c_like_exts]
     r_files: List[Path] = [p for p in files if p.suffix.lower() in rust_exts]
 
+    # 构建项目级数据库
+    database = None
+    if build_database:
+        try:
+            PrettyOutput.auto_print("[jarvis-sec] 开始构建项目级数据库...")
+            database = ProjectDatabase(str(base))
+            collector = DataCollector(database)
+
+            # 分析C/C++文件
+            if c_files:
+                c_file_paths = [str(base / p) for p in c_files]
+                PrettyOutput.auto_print(f"[jarvis-sec] 分析 {len(c_file_paths)} 个C/C++文件...")
+                collector.analyze_files_batch(c_file_paths, 'c')
+
+            # 分析Rust文件
+            if r_files:
+                r_file_paths = [str(base / p) for p in r_files]
+                PrettyOutput.auto_print(f"[jarvis-sec] 分析 {len(r_file_paths)} 个Rust文件...")
+                collector.analyze_files_batch(r_file_paths, 'rust')
+
+            # 打印数据库统计信息
+            stats = database.get_statistics()
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 数据库构建完成: "
+                f"{stats['files_count']}个文件, "
+                f"{stats['symbols_count']}个符号, "
+                f"{stats['call_relations_count']}个调用关系, "
+                f"{stats['data_flow_nodes_count']}个数据流节点"
+            )
+        except Exception as e:
+            PrettyOutput.auto_print(f"[jarvis-sec] 数据库构建失败: {e}")
+            database = None
+
     # 调用检查器（保持相对路径，基于 base_path 解析）
     issues_c = analyze_c_files(str(base), [str(p) for p in c_files]) if c_files else []
     issues_r = (
@@ -242,6 +285,7 @@ def direct_scan(
     result = {
         "summary": summary,
         "issues": [asdict(i) for i in issues],
+        "database_stats": database.get_statistics() if database else None,
     }
     return result
 
