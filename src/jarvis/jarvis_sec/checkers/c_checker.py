@@ -3928,6 +3928,191 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_toctou_race(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
+    issues.extend(_rule_use_after_free(mlines, relpath))
+    
+    # 使用数据流分析过滤误报
+    filtered_issues = _filter_issues_with_data_flow(issues, data_flow_analyzer, data_flow_result, lines)
+    return filtered_issues
+
+
+def _filter_issues_with_data_flow(
+    issues: List[Issue],
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str]
+) -> List[Issue]:
+    """
+    使用数据流分析过滤误报
+    
+    Args:
+        issues: 启发式扫描发现的问题列表
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+        
+    Returns:
+        List[Issue]: 过滤后的问题列表
+    """
+    filtered_issues = []
+    
+    for issue in issues:
+        # 检查是否为误报
+        if _is_false_positive(issue, analyzer, dataflow_result, lines):
+            continue
+        filtered_issues.append(issue)
+    
+    return filtered_issues
+
+
+def _is_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str]
+) -> bool:
+    """
+    判断问题是否为误报
+    
+    Args:
+        issue: 问题对象
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+        
+    Returns:
+        bool: 是否为误报
+    """
+    issue_type = issue.rule
+    line_num = issue.line
+    
+    # UAF误报过滤：free后置NULL的安全模式
+    if issue_type in ["use_after_free_suspect", "use_after_free"]:
+        return _is_uaf_false_positive(issue, analyzer, dataflow_result, lines)
+    
+    # Double Free误报过滤：检查是否有保护机制
+    if issue_type in ["double_free", "double_free_suspect"]:
+        return _is_double_free_false_positive(issue, analyzer, dataflow_result, lines)
+    
+    # 整数溢出误报过滤：检查是否有溢出检查
+    if issue_type == "integer_overflow":
+        return _is_integer_overflow_false_positive(issue, analyzer, dataflow_result, lines)
+    
+    return False
+
+
+def _is_uaf_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str]
+) -> bool:
+    """
+    判断UAF是否为误报
+    
+    检查逻辑：
+    1. free后是否置NULL
+    2. 是否有NULL检查保护
+    """
+    line_num = issue.line
+    
+    # 从问题消息中提取变量名
+    var_name = _extract_variable_name(issue.msg)
+    if not var_name:
+        return False
+    
+    # 检查变量访问是否安全
+    if analyzer.is_safe_access(var_name, line_num, dataflow_result):
+        return True
+    
+    return False
+
+
+def _is_double_free_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str]
+) -> bool:
+    """
+    判断Double Free是否为误报
+    
+    检查逻辑：
+    1. 第一次free后是否置NULL
+    2. 第二次free前是否有NULL检查
+    """
+    line_num = issue.line
+    var_name = _extract_variable_name(issue.msg)
+    
+    if not var_name:
+        return False
+    
+    # 检查变量状态
+    if var_name in dataflow_result.pointer_states:
+        pointer_info = dataflow_result.pointer_states[var_name]
+        
+        # 如果变量被置NULL，检查是否有NULL检查
+        if pointer_info.state == PointerState.NULLIFIED:
+            if var_name in dataflow_result.null_checks:
+                # 检查NULL检查是否在当前行之前
+                for check_line in dataflow_result.null_checks[var_name]:
+                    if check_line < line_num:
+                        return True
+    
+    return False
+
+
+def _is_integer_overflow_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str]
+) -> bool:
+    """
+    判断整数溢出是否为误报
+    
+    检查逻辑：
+    1. 是否有溢出检查（if条件）
+    2. 是否使用了安全函数（如calloc）
+    """
+    line_num = issue.line
+    
+    # 检查后续几行是否有溢出检查
+    for i in range(line_num, min(line_num + 5, len(lines))):
+        line = lines[i] if i < len(lines) else ""
+        # 检查是否有溢出检查
+        if re.search(r'if\s*\(.*[<>].*\)', line):
+            return True
+        # 检查是否使用了安全函数
+        if 'calloc' in line or 'reallocarray' in line:
+            return True
+    
+    return False
+
+
+def _extract_variable_name(msg: str) -> Optional[str]:
+    """
+    从问题消息中提取变量名
+    
+    Args:
+        msg: 问题消息
+        
+    Returns:
+        Optional[str]: 变量名（如果找到）
+    """
+    # 尝试匹配常见的变量名模式
+    patterns = [
+        r'variable\s+`(\w+)`',
+        r'pointer\s+`(\w+)`',
+        r'`(\w+)`\s+is',
+        r'`(\w+)`\s+after',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, msg)
+        if match:
+            return match.group(1)
+    
+    return None
     issues.extend(_rule_atoi_family(mlines, relpath))
     issues.extend(_rule_rand_insecure(mlines, relpath))
     issues.extend(_rule_strtok_nonreentrant(mlines, relpath))
