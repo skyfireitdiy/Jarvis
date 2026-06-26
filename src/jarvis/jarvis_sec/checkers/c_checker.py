@@ -1736,6 +1736,62 @@ def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    整数溢出检测：
+    - 检测乘法/加法表达式作为malloc/calloc/realloc参数
+    - 检测可能导致缓冲区分配不足的整数溢出风险
+    """
+    issues: List[Issue] = []
+    
+    # 内存分配函数模式
+    alloc_pattern = re.compile(r'\b(malloc|calloc|realloc)\s*\(')
+    
+    # 检测乘法或加法表达式
+    mul_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)')
+    add_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)')
+    
+    for idx, s in enumerate(lines, start=1):
+        if alloc_pattern.search(s):
+            # 检测乘法溢出
+            mul_match = mul_pattern.search(s)
+            if mul_match:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="arithmetic",
+                        pattern="integer_overflow",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"检测到乘法表达式 '{mul_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                        suggestion="使用安全整数运算函数（如 size_mul_overflow）或添加溢出检查，确保分配大小正确。",
+                        confidence=0.7,
+                        severity="high",
+                    )
+                )
+            
+            # 检测加法溢出
+            add_match = add_pattern.search(s)
+            if add_match:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="arithmetic",
+                        pattern="integer_overflow",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"检测到加法表达式 '{add_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                        suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
+                        confidence=0.65,
+                        severity="medium",
+                    )
+                )
+    
+    return issues
+
+
 def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
