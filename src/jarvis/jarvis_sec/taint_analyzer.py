@@ -361,6 +361,25 @@ FREE_SINKS = [
     ),
 ]
 
+# 内存分配源（malloc_null_check）
+ALLOC_SOURCES = [
+    TaintSource("malloc", "memory_alloc", "分配内存", ["malloc"]),
+    TaintSource("calloc", "memory_alloc", "分配内存", ["calloc"]),
+    TaintSource("realloc", "memory_alloc", "重新分配内存", ["realloc"]),
+    TaintSource("new", "memory_alloc", "创建对象", ["new"]),
+]
+
+# NULL检查汇（用于检测malloc后是否有NULL检查）
+NULL_CHECK_SINKS = [
+    TaintSink(
+        "null_check",
+        "null_check",
+        TaintSeverity.LOW,
+        "NULL检查",
+        ["if", "while", "?"],
+    ),
+]
+
 # ============================================================================
 # 预定义规则库
 # ============================================================================
@@ -421,6 +440,22 @@ TAINT_RULES: Dict[str, TaintRule] = {
         [],  # 无净化函数
         TaintSeverity.CRITICAL,
         "Double Free：同一内存被重复释放",
+    ),
+    "malloc_null_check": TaintRule(
+        "malloc_null_check",
+        ALLOC_SOURCES,
+        DEREF_SINKS,  # 分配后直接解引用，未检查NULL
+        ["if", "while", "?"],  # NULL检查作为净化
+        TaintSeverity.HIGH,
+        "内存分配后未检查NULL：分配结果直接使用未检查是否成功",
+    ),
+    "null_deref": TaintRule(
+        "null_deref",
+        USER_INPUT_SOURCES + ALLOC_SOURCES,
+        DEREF_SINKS,
+        ["if", "while", "?"],  # NULL检查作为净化
+        TaintSeverity.HIGH,
+        "空指针解引用：可能为NULL的指针被直接解引用",
     ),
 }
 
