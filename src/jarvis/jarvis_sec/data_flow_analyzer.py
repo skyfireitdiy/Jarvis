@@ -11,10 +11,13 @@
 """
 
 import re
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from enum import Enum
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
 
 # tree-sitter依赖（已在pyproject.toml中配置）
 try:
@@ -102,13 +105,21 @@ class DataFlowAnalyzer:
         except Exception:
             self.cpp_parser = None
 
-    def analyze_code(self, code: str, is_cpp: bool = False) -> DataFlowResult:
+    def analyze_code(
+        self,
+        code: str,
+        is_cpp: bool = False,
+        database: Optional["ProjectDatabase"] = None,
+        file_path: Optional[str] = None,
+    ) -> DataFlowResult:
         """
         分析代码，返回数据流分析结果
 
         Args:
             code: 源代码
             is_cpp: 是否为C++代码
+            database: 项目数据库实例（可选）
+            file_path: 文件路径（可选，用于数据库查询）
 
         Returns:
             DataFlowResult: 数据流分析结果
@@ -134,6 +145,10 @@ class DataFlowAnalyzer:
         except Exception:
             # 解析失败，回退到正则表达式
             return self._analyze_with_regex(code, result)
+
+        # 如果提供了数据库，进行跨文件分析
+        if database is not None and file_path is not None:
+            self._enhance_with_database(result, database, file_path)
 
         return result
 
