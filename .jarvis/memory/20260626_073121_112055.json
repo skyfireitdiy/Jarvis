@@ -1,0 +1,8 @@
+{
+  "id": "20260626_073121_112055",
+  "type": "project_long_term",
+  "tags": ["污点分析", "架构决策", "安全检测", "回退机制"],
+  "content": "污点分析集成架构：优先执行污点分析，失败时回退到启发式规则。实现模式：在规则函数开头调用taint_analyzer.analyze_with_best_analyzer()，有结果则转换为Issue返回，无结果则执行原有启发式逻辑。已集成规则：_rule_uaf_suspect、_rule_format_string、_rule_command_execution。",
+  "created_at": "2026-06-26T07:31:21.112093",
+  "updated_at": "2026-06-26T07:31:21.112099"
+}

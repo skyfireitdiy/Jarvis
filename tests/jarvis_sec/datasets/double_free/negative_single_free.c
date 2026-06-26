@@ -1,5 +1,5 @@
-// Double Free正例：同一内存释放两次
-// 应该检测到：同一指针被释放两次
+// Double Free反例：正确释放一次
+// 不应该检测到：内存只释放一次
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,12 +16,11 @@ int main(int argc, char *argv[]) {
   strcpy(buffer, "Hello, World!");
   printf("Buffer: %s\n", buffer);
 
-  // 第一次释放
+  // 正确：只释放一次
   free(buffer);
 
-  // Double Free：第二次释放同一内存
-  // 应该检测到double free
-  free(buffer); // 错误：重复释放
+  // 设置为NULL防止悬空指针
+  buffer = NULL;
 
   return 0;
 }
