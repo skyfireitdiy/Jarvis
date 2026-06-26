@@ -1,0 +1,8 @@
+{
+  "id": "20260626_075848_390385",
+  "type": "project_long_term",
+  "tags": ["污点分析", "启发式规则重写", "第二批"],
+  "content": "## 第二批启发式规则污点分析重写完成\n\n### 已完成工作\n1. **新增污点源和汇**（taint_analyzer.py）\n   - ALLOC_SOURCES：malloc/calloc/realloc/new分配源\n   - NULL_CHECK_SINKS：NULL检查汇\n\n2. **新增污点规则**（taint_analyzer.py）\n   - malloc_null_check：内存分配后未检查NULL\n   - null_deref：空指针解引用\n\n3. **修改启发式规则**（c_checker.py）\n   - _rule_double_free_and_free_non_heap：集成double_free污点规则\n   - _rule_malloc_no_null_check：集成malloc_null_check污点规则\n   - _rule_possible_null_deref：集成null_deref污点规则\n\n### 测试结果\n- 启发式扫描测试：100%通过（8/8）\n- 污点分析测试：100%通过（8/8）\n\n### 关键文件\n- src/jarvis/jarvis_sec/taint_analyzer.py（新增ALLOC_SOURCES、NULL_CHECK_SINKS、malloc_null_check、null_deref规则）\n- src/jarvis/jarvis_sec/checkers/c_checker.py（3个规则函数集成污点分析）",
+  "created_at": "2026-06-26T07:58:48.390424",
+  "updated_at": "2026-06-26T07:58:48.390430"
+}

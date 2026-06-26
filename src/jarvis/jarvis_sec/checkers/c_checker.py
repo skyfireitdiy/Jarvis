@@ -673,7 +673,45 @@ def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]
 
 
 def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测内存分配后未检查NULL的情况。
+    说明：优先使用污点分析，失败时回退到启发式实现。
+    """
     issues: List[Issue] = []
+
+    # 优先尝试污点分析
+    try:
+        import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
+
+        analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
+        if analyzer and analyzer.is_available():
+            code = "\n".join(lines)
+            rule = taint_analyzer.get_rule("malloc_null_check")
+            if rule:
+                taint_paths = rule.check(analyzer, code, relpath)
+                for path in taint_paths:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="alloc_no_null_check",
+                            file=relpath,
+                            line=path.line_number,
+                            evidence=path.code_snippet,
+                            description=path.description,
+                            suggestion="在使用前检查分配结果是否为 NULL，并在错误路径上释放已获取的资源。",
+                            confidence=0.9,
+                            severity="high",
+                        )
+                    )
+            # 污点分析成功，返回结果
+            if issues:
+                return issues
+        # 污点分析不可用，回退到启发式检测
+    except Exception:
+        pass
+
+    # 启发式检测（回退方案）
     for idx, s in enumerate(lines, start=1):
         for pat in (RE_MALLOC_ASSIGN, RE_CALLOC_ASSIGN, RE_NEW_ASSIGN):
             m = pat.search(s)
@@ -1471,15 +1509,49 @@ def _rule_alloc_size_overflow(lines: Sequence[str], relpath: str) -> List[Issue]
 
 def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    启发式检测空指针解引用：
+    检测空指针解引用：
     - 出现 p->... 或 *p 访问，且邻近未见明显的 NULL 检查。
     - 出现 arr[...] 数组访问，且邻近未见明显的 NULL 检查。
-    注：可能存在误报，需结合上下文确认。
+    说明：优先使用污点分析，失败时回退到启发式实现。
     准确性优化：
     - 对于 *p 的检测，引入上下文判定，尽量排除乘法表达式 a * p 的误报
      （仅当 * 出现在典型解引用上下文，如行首/括号后/逗号后/赋值号后/分号后/冒号后/方括号后/逻辑非/取地址/另一解引用后）
     """
     issues: List[Issue] = []
+
+    # 优先尝试污点分析
+    try:
+        import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
+
+        analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
+        if analyzer and analyzer.is_available():
+            code = "\n".join(lines)
+            rule = taint_analyzer.get_rule("null_deref")
+            if rule:
+                taint_paths = rule.check(analyzer, code, relpath)
+                for path in taint_paths:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="possible_null_deref",
+                            file=relpath,
+                            line=path.line_number,
+                            evidence=path.code_snippet,
+                            description=path.description,
+                            suggestion="在使用指针前检查是否为 NULL，避免空指针解引用。",
+                            confidence=0.85,
+                            severity="high",
+                        )
+                    )
+            # 污点分析成功，返回结果
+            if issues:
+                return issues
+        # 污点分析不可用，回退到启发式检测
+    except Exception:
+        pass
+
+    # 启发式检测（回退方案）
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
     re_star = re.compile(r"(?<!\w)\*\s*([A-Za-z_]\w*)\b")
     # 新增：检测数组访问 arr[...]，排除类型声明中的数组声明
@@ -1770,9 +1842,39 @@ def _rule_double_free_and_free_non_heap(
     检测：
     - double_free：同一指针在未重新赋值/置空情况下被重复 free
     - free_non_heap：free(&x) 或 free("literal") 等明显非堆内存释放
-    说明：启发式实现，复杂场景可能仍需人工确认。
+    说明：优先使用污点分析，失败时回退到启发式实现。
     """
     issues: List[Issue] = []
+
+    # 优先尝试污点分析
+    try:
+        import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
+
+        analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
+        if analyzer and analyzer.is_available():
+            code = "\n".join(lines)
+            rule = taint_analyzer.get_rule("double_free")
+            if rule:
+                taint_paths = rule.check(analyzer, code, relpath)
+                for path in taint_paths:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="double_free",
+                            file=relpath,
+                            line=path.line_number,
+                            evidence=path.code_snippet,
+                            description=path.description,
+                            suggestion="free 后将指针置 NULL；确保每块内存仅释放一次；理清所有权与释放路径。",
+                            confidence=0.9,
+                            severity="high",
+                        )
+                    )
+            # 污点分析成功，继续检查free_non_heap
+        # 污点分析不可用，回退到启发式检测
+    except Exception:
+        pass
     last_free_line: dict[str, int] = {}
     last_assign_line: dict[str, int] = {}
 
