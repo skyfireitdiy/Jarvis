@@ -3773,6 +3773,8 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_sql_injection(lines, relpath))
     issues.extend(_rule_memory_leak(lines, relpath))
     issues.extend(_rule_path_traversal(lines, relpath))
+    # 新增规则：整数溢出
+    issues.extend(_rule_integer_overflow(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
     issues.extend(_rule_atoi_family(mlines, relpath))
