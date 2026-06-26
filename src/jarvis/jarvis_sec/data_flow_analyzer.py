@@ -1016,7 +1016,7 @@ class DataFlowAnalyzer:
     def _enhance_with_database(
         self,
         result: DataFlowResult,
-        database: ProjectDatabase,
+        database: "ProjectDatabase",
         file_path: str,
     ) -> None:
         """
