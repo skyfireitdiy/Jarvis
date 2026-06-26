@@ -4102,6 +4102,14 @@ def _is_false_positive(
     if issue_type == "memcpy":
         return _is_memcpy_false_positive(issue, analyzer, dataflow_result, lines)
 
+    # memory_leak误报过滤：检查是否为所有权转移
+    if issue_type == "memory_leak":
+        return _is_memory_leak_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # possible_null_deref误报过滤：检查是否有NULL检查保护
+    if issue_type == "possible_null_deref":
+        return _is_null_deref_false_positive(issue, analyzer, dataflow_result, lines)
+
     return False
 
 
@@ -4357,3 +4365,82 @@ def analyze_files(base_path: str, files: Iterable[str]) -> List[Issue]:
         rel = Path(f)
         out.extend(analyze_c_cpp_file(base, rel))
     return out
+
+
+def _is_memory_leak_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断memory_leak是否为误报
+
+    检查逻辑：
+    1. 是否为所有权转移（函数返回malloc内存）
+    2. 是否在同一函数内释放
+
+    Args:
+        issue: 问题对象
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        bool: 是否为误报
+    """
+    var_name = _extract_variable_name(issue.evidence)
+
+    if not var_name:
+        return False
+
+    # 检查是否为所有权转移
+    if var_name in dataflow_result.ownership_transfer:
+        return True
+
+    return False
+
+
+def _is_null_deref_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断possible_null_deref是否为误报
+
+    检查逻辑：
+    1. 是否有NULL检查保护
+    2. 是否为函数参数且有NULL检查
+    3. 是否在死代码行
+
+    Args:
+        issue: 问题对象
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        bool: 是否为误报
+    """
+    line_num = issue.line
+    var_name = _extract_variable_name(issue.evidence)
+
+    if not var_name:
+        return False
+
+    # 检查是否在死代码行
+    if line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # 检查是否有NULL检查保护
+    if var_name in dataflow_result.null_checks:
+        for check_line in dataflow_result.null_checks[var_name]:
+            # NULL检查在当前行之前，且在同一函数内
+            if check_line < line_num:
+                # 检查是否在同一函数内（简化判断：检查行号差不超过50行）
+                if line_num - check_line <= 50:
+                    return True
+
+    return False

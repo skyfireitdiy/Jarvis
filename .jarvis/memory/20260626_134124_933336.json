@@ -1,0 +1,15 @@
+{
+  "id": "20260626_134124_933336",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "heuristic",
+    "cross_function",
+    "memory_safety",
+    "test_results",
+    "false_positive"
+  ],
+  "content": "## 跨函数内存安全测试结果分析\n\n### 测试用例位置\n`tests/jarvis_sec/datasets/cross_function/`\n\n### 正例检测结果（通过）\n1. **positive_cross_func_uaf.c**: 检测到UAF ✅\n2. **positive_cross_func_double_free.c**: 检测到Double Free ✅\n3. **positive_cross_func_memleak.c**: 检测到内存泄漏 ✅\n4. **positive_complex_cross_uaf.c**: 检测到9个问题 ✅\n\n### 反例误报问题（需修复）\n\n#### 1. negative_cross_func_safe_free.c (5个误报)\n- **strcpy误报** (line 21): 对有NULL检查的strcpy误报\n- **memory_leak误报** (line 5): 对有返回值检查的malloc误报泄漏\n- **possible_null_deref误报** (lines 13-15): 对有NULL检查的free误报\n\n根因分析:\n- create_buffer()返回buf，调用者检查了返回值\n- safe_free_buffer()有完整的NULL检查\n- use_buffer()有NULL检查后才调用strcpy\n\n#### 2. negative_ownership_transfer.c (2个误报)\n- **memory_leak误报** (line 4): 对所有权转移模式误报\n- **possible_null_deref误报** (line 17): 对有NULL检查的数组访问误报\n\n根因分析:\n- create_data()返回内存，所有权转移给调用者\n- process_and_free()负责释放，这是正确的所有权转移模式\n- data数组访问前有NULL检查\n\n#### 3. negative_conditional_free.c (3个误报)\n- **possible_null_deref误报** (lines 8-9): 对条件释放中的free误报\n- **possible_null_deref误报** (line 27): 对有NULL检查的数据访问误报\n\n根因分析:\n- maybe_free()有完整的NULL检查\n- main()中data使用前有NULL检查\n\n### 需要改进的检测能力\n1. **所有权转移识别**: 函数返回malloc内存，调用者负责释放\n2. **跨函数NULL检查追踪**: 函数参数有NULL检查，调用者传入前已检查\n3. **条件释放识别**: free在条件分支中，且有置NULL操作\n4. **返回值检查追踪**: malloc返回值检查后，不应报告泄漏",
+  "created_at": "2026-06-26T13:41:24.933406",
+  "updated_at": "2026-06-26T13:41:24.933413"
+}
