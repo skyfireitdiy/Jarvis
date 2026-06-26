@@ -113,9 +113,116 @@ class JoernAnalyzer(TaintAnalyzer):
         Returns:
             List[TaintPath]: 检测到的污点传播路径列表
         """
-        # TODO: 实现基于Joern的污点分析
-        # 当前返回空列表，等待完整实现
-        return []
+        taint_paths = []
+
+        # 为每个污点源和汇生成查询
+        for source in sources:
+            for sink in sinks:
+                # 生成Joern查询脚本
+                query_script = self._generate_taint_query(source, sink)
+
+                # 执行查询
+                try:
+                    result = subprocess.run(
+                        [
+                            self.joern_path,
+                            "--script",
+                            "query",
+                            "--param",
+                            f"cpgFile={cpg_file}",
+                            "--param",
+                            f"query={query_script}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+
+                    if result.returncode == 0:
+                        # 解析结果
+                        paths = self._parse_joern_output(result.stdout, source, sink)
+                        taint_paths.extend(paths)
+
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    # 查询失败时继续下一个
+                    continue
+
+        return taint_paths
+
+    def _generate_taint_query(self, source: TaintSource, sink: TaintSink) -> str:
+        """
+        生成Joern污点分析查询脚本
+
+        Args:
+            source: 污点源
+            sink: 污点汇
+
+        Returns:
+            str: Joern查询脚本
+        """
+        # 构建源查询（匹配函数调用或参数）
+        source_patterns = "|".join(source.patterns)
+        source_query = f'cpg.call.name("{source_patterns}").argument'
+
+        # 构建汇查询（匹配函数调用）
+        sink_patterns = "|".join(sink.patterns)
+        sink_query = f'cpg.call.name("{sink_patterns}").argument'
+
+        # 生成reachableByFlows查询
+        query = f"""def source = {source_query}
+def sink = {sink_query}
+sink.reachableByFlows(source).l"""
+
+        return query
+
+    def _parse_joern_output(
+        self, output: str, source: TaintSource, sink: TaintSink
+    ) -> List[TaintPath]:
+        """
+        解析Joern输出结果
+
+        Args:
+            output: Joern输出字符串
+            source: 污点源
+            sink: 污点汇
+
+        Returns:
+            List[TaintPath]: 解析出的污点路径列表
+        """
+        paths = []
+
+        # Joern输出格式示例:
+        # ┌─────────────────┬────────────────────────────┬──────────┬──────┬─────┐
+        # │nodeType         │tracked                     │lineNumber│method│file │
+        # ├─────────────────┼────────────────────────────┼──────────┼──────┼─────┤
+        # │MethodParameterIn│main(int argc, char *argv[])│5         │main  │X42.c│
+        # │Call             │strcmp(argv[1], "42")       │6         │main  │X42.c│
+        # └─────────────────┴────────────────────────────┴──────────┴──────┴─────┘
+
+        # 简单解析：查找包含lineNumber的行
+        lines = output.split("\n")
+        for line in lines:
+            if "lineNumber" in line or "line" in line.lower():
+                # 尝试提取行号
+                import re
+
+                line_match = re.search(r"lineNumber[=\s]+(\d+)", line)
+                if line_match:
+                    line_number = int(line_match.group(1))
+
+                    # 创建污点路径
+                    path = TaintPath(
+                        source=source.name,
+                        sink=sink.name,
+                        path=[source.name, sink.name],
+                        confidence=0.8,  # 基于Joern分析的置信度
+                        severity=sink.severity,
+                        description=f"污点从 {source.name} 传播到 {sink.name}",
+                        line_number=line_number,
+                    )
+                    paths.append(path)
+
+        return paths
 
 
 # 注册到工厂
