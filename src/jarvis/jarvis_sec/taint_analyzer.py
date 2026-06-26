@@ -380,6 +380,56 @@ NULL_CHECK_SINKS = [
     ),
 ]
 
+# realloc返回值汇（用于检测realloc返回值是否被使用）
+REALLOC_USE_SINKS = [
+    TaintSink(
+        "realloc_use",
+        "realloc_use",
+        TaintSeverity.HIGH,
+        "realloc返回值使用",
+        ["=", "return"],
+    ),
+]
+
+# IO返回值检查汇（用于检测IO函数返回值是否被检查）
+IO_CHECK_SINKS = [
+    TaintSink(
+        "io_check",
+        "io_check",
+        TaintSeverity.LOW,
+        "IO返回值检查",
+        ["if", "while", "<", ">", "==", "!=", "<=", ">="],
+    ),
+]
+
+# getenv返回值检查汇（用于检测getenv返回值是否被检查NULL）
+GETENV_CHECK_SINKS = [
+    TaintSink(
+        "getenv_check",
+        "getenv_check",
+        TaintSeverity.LOW,
+        "getenv返回值检查",
+        ["if", "while", "NULL", "0"],
+    ),
+]
+
+# realloc源（realloc返回值）
+REALLOC_SOURCES = [
+    TaintSource("realloc", "realloc_return", "realloc返回值", ["realloc"]),
+]
+
+# IO函数源（IO返回值）
+IO_SOURCES = [
+    TaintSource("read", "io_return", "读取返回值", ["read", "fread", "recv"]),
+    TaintSource("write", "io_return", "写入返回值", ["write", "fwrite", "send"]),
+    TaintSource("fopen", "io_return", "打开文件返回值", ["fopen", "open"]),
+]
+
+# getenv源（getenv返回值）
+GETENV_SOURCES = [
+    TaintSource("getenv", "getenv_return", "getenv返回值", ["getenv"]),
+]
+
 # ============================================================================
 # 预定义规则库
 # ============================================================================
@@ -456,6 +506,30 @@ TAINT_RULES: Dict[str, TaintRule] = {
         ["if", "while", "?"],  # NULL检查作为净化
         TaintSeverity.HIGH,
         "空指针解引用：可能为NULL的指针被直接解引用",
+    ),
+    "realloc_assign_back": TaintRule(
+        "realloc_assign_back",
+        REALLOC_SOURCES,
+        REALLOC_USE_SINKS,
+        [],  # 无净化函数
+        TaintSeverity.HIGH,
+        "realloc返回值未使用：realloc返回值未赋值回原指针可能导致内存泄漏",
+    ),
+    "unchecked_io": TaintRule(
+        "unchecked_io",
+        IO_SOURCES,
+        IO_CHECK_SINKS,
+        [],  # 无净化函数
+        TaintSeverity.MEDIUM,
+        "IO返回值未检查：IO函数返回值未检查可能导致错误处理缺失",
+    ),
+    "getenv_unchecked": TaintRule(
+        "getenv_unchecked",
+        GETENV_SOURCES,
+        GETENV_CHECK_SINKS,
+        [],  # 无净化函数
+        TaintSeverity.MEDIUM,
+        "getenv返回值未检查：getenv返回值未检查NULL可能导致空指针解引用",
     ),
 }
 
