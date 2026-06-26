@@ -43,6 +43,16 @@ from jarvis.jarvis_sec.data_flow_analyzer import (
 )
 
 # ---------------------------
+# 辅助函数
+# ---------------------------
+
+
+def _is_cpp_file(file_path: str) -> bool:
+    """判断文件是否为C++文件"""
+    return file_path.lower().endswith((".cpp", ".cxx", ".cc", ".hpp", ".hxx", ".hh"))
+
+
+# ---------------------------
 # 规则库（正则表达式）
 # ---------------------------
 
