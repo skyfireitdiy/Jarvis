@@ -25,8 +25,8 @@ import sqlite3
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -37,9 +37,11 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # 数据结构定义
 # ============================================================================
 
+
 @dataclass
 class FileInfo:
     """文件信息"""
+
     path: str
     hash: str  # 文件内容哈希
     last_modified: datetime
@@ -50,6 +52,7 @@ class FileInfo:
 @dataclass
 class SymbolInfo:
     """符号信息"""
+
     name: str
     kind: str  # function, variable, type, parameter, etc.
     file_path: str
@@ -64,6 +67,7 @@ class SymbolInfo:
 @dataclass
 class CallRelation:
     """调用关系"""
+
     caller_name: str
     caller_file: str
     caller_line: int
@@ -76,6 +80,7 @@ class CallRelation:
 @dataclass
 class DataFlowNode:
     """数据流节点"""
+
     var_name: str
     file_path: str
     line: int
@@ -87,6 +92,7 @@ class DataFlowNode:
 @dataclass
 class PointerStateRecord:
     """指针状态记录"""
+
     var_name: str
     file_path: str
     line: int
@@ -99,6 +105,7 @@ class PointerStateRecord:
 @dataclass
 class TypeInfo:
     """类型信息"""
+
     type_name: str
     kind: str  # struct, union, enum, typedef, class
     file_path: str
@@ -112,6 +119,7 @@ class TypeInfo:
 # 数据库管理器
 # ============================================================================
 
+
 class ProjectDatabase:
     """项目级数据库管理器"""
 
@@ -124,7 +132,9 @@ class ProjectDatabase:
             db_path: 数据库文件路径（默认为项目根目录下的.jarvis/analysis.db）
         """
         self.project_path = Path(project_path).resolve()
-        self.db_path = Path(db_path) if db_path else self.project_path / ".jarvis" / "analysis.db"
+        self.db_path = (
+            Path(db_path) if db_path else self.project_path / ".jarvis" / "analysis.db"
+        )
 
         # 确保数据库目录存在
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,21 +259,47 @@ class ProjectDatabase:
             """)
 
             # 创建索引优化查询性能
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_graph_caller ON call_graph(caller_name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_graph_callee ON call_graph(callee_name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_graph_caller_file ON call_graph(caller_file)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_data_flow_var ON data_flow(var_name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_data_flow_file ON data_flow(file_path)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pointer_states_var ON pointer_states(var_name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pointer_states_file ON pointer_states(file_path)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_type_info_name ON type_info(type_name)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_type_info_file ON type_info(file_path)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_call_graph_caller ON call_graph(caller_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_call_graph_callee ON call_graph(callee_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_call_graph_caller_file ON call_graph(caller_file)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_data_flow_var ON data_flow(var_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_data_flow_file ON data_flow(file_path)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pointer_states_var ON pointer_states(var_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pointer_states_file ON pointer_states(file_path)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_type_info_name ON type_info(type_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_type_info_file ON type_info(file_path)"
+            )
 
             conn.commit()
-            PrettyOutput.auto_print(f"[ProjectDatabase] 数据库初始化完成: {self.db_path}")
+            PrettyOutput.auto_print(
+                f"[ProjectDatabase] 数据库初始化完成: {self.db_path}"
+            )
 
     @contextmanager
     def _get_connection(self):
@@ -283,10 +319,19 @@ class ProjectDatabase:
         """添加文件记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO files (path, hash, last_modified, language, line_count)
                 VALUES (?, ?, ?, ?, ?)
-            """, (file_info.path, file_info.hash, file_info.last_modified, file_info.language, file_info.line_count))
+            """,
+                (
+                    file_info.path,
+                    file_info.hash,
+                    file_info.last_modified,
+                    file_info.language,
+                    file_info.line_count,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -311,11 +356,18 @@ class ProjectDatabase:
             cursor = conn.cursor()
             # 删除关联数据
             cursor.execute("DELETE FROM symbols WHERE file_path = ?", (file_path,))
-            cursor.execute("DELETE FROM call_graph WHERE caller_file = ? OR callee_file = ?", (file_path, file_path))
+            cursor.execute(
+                "DELETE FROM call_graph WHERE caller_file = ? OR callee_file = ?",
+                (file_path, file_path),
+            )
             cursor.execute("DELETE FROM data_flow WHERE file_path = ?", (file_path,))
-            cursor.execute("DELETE FROM pointer_states WHERE file_path = ?", (file_path,))
+            cursor.execute(
+                "DELETE FROM pointer_states WHERE file_path = ?", (file_path,)
+            )
             cursor.execute("DELETE FROM type_info WHERE file_path = ?", (file_path,))
-            cursor.execute("DELETE FROM analysis_cache WHERE file_path = ?", (file_path,))
+            cursor.execute(
+                "DELETE FROM analysis_cache WHERE file_path = ?", (file_path,)
+            )
             cursor.execute("DELETE FROM files WHERE path = ?", (file_path,))
             conn.commit()
             return True
@@ -332,7 +384,7 @@ class ProjectDatabase:
         file_record = self.get_file(file_path)
         if not file_record:
             return True  # 文件不存在，视为变化
-        return file_record['hash'] != new_hash
+        return file_record["hash"] != new_hash
 
     # ============================================================================
     # 符号管理
@@ -342,11 +394,23 @@ class ProjectDatabase:
         """添加符号记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, type_name, scope, is_external)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (symbol.name, symbol.kind, symbol.file_path, symbol.line_start, symbol.line_end,
-                  symbol.signature, symbol.type_name, symbol.scope, symbol.is_external))
+            """,
+                (
+                    symbol.name,
+                    symbol.kind,
+                    symbol.file_path,
+                    symbol.line_start,
+                    symbol.line_end,
+                    symbol.signature,
+                    symbol.type_name,
+                    symbol.scope,
+                    symbol.is_external,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -354,20 +418,40 @@ class ProjectDatabase:
         """批量添加符号记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.executemany("""
+            cursor.executemany(
+                """
                 INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, type_name, scope, is_external)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [(s.name, s.kind, s.file_path, s.line_start, s.line_end,
-                   s.signature, s.type_name, s.scope, s.is_external) for s in symbols])
+            """,
+                [
+                    (
+                        s.name,
+                        s.kind,
+                        s.file_path,
+                        s.line_start,
+                        s.line_end,
+                        s.signature,
+                        s.type_name,
+                        s.scope,
+                        s.is_external,
+                    )
+                    for s in symbols
+                ],
+            )
             conn.commit()
             return len(symbols)
 
-    def get_symbol(self, name: str, file_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_symbol(
+        self, name: str, file_path: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """获取符号记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if file_path:
-                cursor.execute("SELECT * FROM symbols WHERE name = ? AND file_path = ?", (name, file_path))
+                cursor.execute(
+                    "SELECT * FROM symbols WHERE name = ? AND file_path = ?",
+                    (name, file_path),
+                )
             else:
                 cursor.execute("SELECT * FROM symbols WHERE name = ? LIMIT 1", (name,))
             row = cursor.fetchone()
@@ -377,23 +461,28 @@ class ProjectDatabase:
         """获取文件的所有符号"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM symbols WHERE file_path = ? ORDER BY line_start", (file_path,))
+            cursor.execute(
+                "SELECT * FROM symbols WHERE file_path = ? ORDER BY line_start",
+                (file_path,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_symbols_by_kind(self, kind: str) -> List[Dict[str, Any]]:
         """获取指定类型的所有符号"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM symbols WHERE kind = ? ORDER BY name", (kind,))
+            cursor.execute(
+                "SELECT * FROM symbols WHERE kind = ? ORDER BY name", (kind,)
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_functions(self) -> List[Dict[str, Any]]:
         """获取所有函数符号"""
-        return self.get_symbols_by_kind('function')
+        return self.get_symbols_by_kind("function")
 
     def get_variables(self) -> List[Dict[str, Any]]:
         """获取所有变量符号"""
-        return self.get_symbols_by_kind('variable')
+        return self.get_symbols_by_kind("variable")
 
     def delete_symbols_by_file(self, file_path: str) -> int:
         """删除文件的所有符号"""
@@ -411,11 +500,21 @@ class ProjectDatabase:
         """添加调用关系"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO call_graph (caller_name, caller_file, caller_line, callee_name, callee_file, callee_line, call_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (call.caller_name, call.caller_file, call.caller_line,
-                  call.callee_name, call.callee_file, call.callee_line, call.call_type))
+            """,
+                (
+                    call.caller_name,
+                    call.caller_file,
+                    call.caller_line,
+                    call.callee_name,
+                    call.callee_file,
+                    call.callee_line,
+                    call.call_type,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -423,11 +522,24 @@ class ProjectDatabase:
         """批量添加调用关系"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.executemany("""
+            cursor.executemany(
+                """
                 INSERT INTO call_graph (caller_name, caller_file, caller_line, callee_name, callee_file, callee_line, call_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, [(c.caller_name, c.caller_file, c.caller_line,
-                   c.callee_name, c.callee_file, c.callee_line, c.call_type) for c in calls])
+            """,
+                [
+                    (
+                        c.caller_name,
+                        c.caller_file,
+                        c.caller_line,
+                        c.callee_name,
+                        c.callee_file,
+                        c.callee_line,
+                        c.call_type,
+                    )
+                    for c in calls
+                ],
+            )
             conn.commit()
             return len(calls)
 
@@ -435,23 +547,34 @@ class ProjectDatabase:
         """获取调用指定函数的所有调用者"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT * FROM call_graph WHERE callee_name = ? ORDER BY caller_file, caller_line
-            """, (callee_name,))
+            """,
+                (callee_name,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_callees(self, caller_name: str, caller_file: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_callees(
+        self, caller_name: str, caller_file: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """获取指定函数调用的所有函数"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if caller_file:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM call_graph WHERE caller_name = ? AND caller_file = ? ORDER BY caller_line
-                """, (caller_name, caller_file))
+                """,
+                    (caller_name, caller_file),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM call_graph WHERE caller_name = ? ORDER BY caller_file, caller_line
-                """, (caller_name,))
+                """,
+                    (caller_name,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_call_graph(self) -> List[Dict[str, Any]]:
@@ -477,10 +600,20 @@ class ProjectDatabase:
         """添加数据流节点"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (node.var_name, node.file_path, node.line, node.node_type, node.scope, node.value_source))
+            """,
+                (
+                    node.var_name,
+                    node.file_path,
+                    node.line,
+                    node.node_type,
+                    node.scope,
+                    node.value_source,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -488,50 +621,82 @@ class ProjectDatabase:
         """批量添加数据流节点"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.executemany("""
+            cursor.executemany(
+                """
                 INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, [(n.var_name, n.file_path, n.line, n.node_type, n.scope, n.value_source) for n in nodes])
+            """,
+                [
+                    (
+                        n.var_name,
+                        n.file_path,
+                        n.line,
+                        n.node_type,
+                        n.scope,
+                        n.value_source,
+                    )
+                    for n in nodes
+                ],
+            )
             conn.commit()
             return len(nodes)
 
-    def get_def_sites(self, var_name: str, scope: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_def_sites(
+        self, var_name: str, scope: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """获取变量的定义位置"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if scope:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM data_flow WHERE var_name = ? AND node_type = 'def' AND scope = ?
                     ORDER BY file_path, line
-                """, (var_name, scope))
+                """,
+                    (var_name, scope),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM data_flow WHERE var_name = ? AND node_type = 'def'
                     ORDER BY file_path, line
-                """, (var_name,))
+                """,
+                    (var_name,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_use_sites(self, var_name: str, scope: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_use_sites(
+        self, var_name: str, scope: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """获取变量的使用位置"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if scope:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM data_flow WHERE var_name = ? AND node_type = 'use' AND scope = ?
                     ORDER BY file_path, line
-                """, (var_name, scope))
+                """,
+                    (var_name, scope),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM data_flow WHERE var_name = ? AND node_type = 'use'
                     ORDER BY file_path, line
-                """, (var_name,))
+                """,
+                    (var_name,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_data_flow_by_file(self, file_path: str) -> List[Dict[str, Any]]:
         """获取文件的所有数据流节点"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM data_flow WHERE file_path = ? ORDER BY line", (file_path,))
+            cursor.execute(
+                "SELECT * FROM data_flow WHERE file_path = ? ORDER BY line",
+                (file_path,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def delete_data_flow_by_file(self, file_path: str) -> int:
@@ -550,11 +715,21 @@ class ProjectDatabase:
         """添加指针状态记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO pointer_states (var_name, file_path, line, state, scope, allocator, deallocator)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (state.var_name, state.file_path, state.line, state.state,
-                  state.scope, state.allocator, state.deallocator))
+            """,
+                (
+                    state.var_name,
+                    state.file_path,
+                    state.line,
+                    state.state,
+                    state.scope,
+                    state.allocator,
+                    state.deallocator,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -562,41 +737,67 @@ class ProjectDatabase:
         """批量添加指针状态记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.executemany("""
+            cursor.executemany(
+                """
                 INSERT INTO pointer_states (var_name, file_path, line, state, scope, allocator, deallocator)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, [(s.var_name, s.file_path, s.line, s.state,
-                   s.scope, s.allocator, s.deallocator) for s in states])
+            """,
+                [
+                    (
+                        s.var_name,
+                        s.file_path,
+                        s.line,
+                        s.state,
+                        s.scope,
+                        s.allocator,
+                        s.deallocator,
+                    )
+                    for s in states
+                ],
+            )
             conn.commit()
             return len(states)
 
-    def get_pointer_states(self, var_name: str, file_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_pointer_states(
+        self, var_name: str, file_path: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """获取指针的状态历史"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             if file_path:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM pointer_states WHERE var_name = ? AND file_path = ?
                     ORDER BY line
-                """, (var_name, file_path))
+                """,
+                    (var_name, file_path),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM pointer_states WHERE var_name = ? ORDER BY file_path, line
-                """, (var_name,))
+                """,
+                    (var_name,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_pointer_states_by_file(self, file_path: str) -> List[Dict[str, Any]]:
         """获取文件的所有指针状态"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM pointer_states WHERE file_path = ? ORDER BY line", (file_path,))
+            cursor.execute(
+                "SELECT * FROM pointer_states WHERE file_path = ? ORDER BY line",
+                (file_path,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def delete_pointer_states_by_file(self, file_path: str) -> int:
         """删除文件的所有指针状态"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM pointer_states WHERE file_path = ?", (file_path,))
+            cursor.execute(
+                "DELETE FROM pointer_states WHERE file_path = ?", (file_path,)
+            )
             conn.commit()
             return cursor.rowcount
 
@@ -609,11 +810,21 @@ class ProjectDatabase:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             members_json = json.dumps(type_info.members) if type_info.members else None
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO type_info (type_name, kind, file_path, line_start, line_end, definition, members)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (type_info.type_name, type_info.kind, type_info.file_path,
-                  type_info.line_start, type_info.line_end, type_info.definition, members_json))
+            """,
+                (
+                    type_info.type_name,
+                    type_info.kind,
+                    type_info.file_path,
+                    type_info.line_start,
+                    type_info.line_end,
+                    type_info.definition,
+                    members_json,
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -621,12 +832,25 @@ class ProjectDatabase:
         """批量添加类型信息"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            data = [(t.type_name, t.kind, t.file_path, t.line_start, t.line_end,
-                    t.definition, json.dumps(t.members) if t.members else None) for t in type_infos]
-            cursor.executemany("""
+            data = [
+                (
+                    t.type_name,
+                    t.kind,
+                    t.file_path,
+                    t.line_start,
+                    t.line_end,
+                    t.definition,
+                    json.dumps(t.members) if t.members else None,
+                )
+                for t in type_infos
+            ]
+            cursor.executemany(
+                """
                 INSERT INTO type_info (type_name, kind, file_path, line_start, line_end, definition, members)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, data)
+            """,
+                data,
+            )
             conn.commit()
             return len(type_infos)
 
@@ -634,12 +858,14 @@ class ProjectDatabase:
         """获取类型信息"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM type_info WHERE type_name = ? LIMIT 1", (type_name,))
+            cursor.execute(
+                "SELECT * FROM type_info WHERE type_name = ? LIMIT 1", (type_name,)
+            )
             row = cursor.fetchone()
             if row:
                 result = dict(row)
-                if result['members']:
-                    result['members'] = json.loads(result['members'])
+                if result["members"]:
+                    result["members"] = json.loads(result["members"])
                 return result
             return None
 
@@ -647,12 +873,15 @@ class ProjectDatabase:
         """获取文件的所有类型信息"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM type_info WHERE file_path = ? ORDER BY line_start", (file_path,))
+            cursor.execute(
+                "SELECT * FROM type_info WHERE file_path = ? ORDER BY line_start",
+                (file_path,),
+            )
             results = []
             for row in cursor.fetchall():
                 result = dict(row)
-                if result['members']:
-                    result['members'] = json.loads(result['members'])
+                if result["members"]:
+                    result["members"] = json.loads(result["members"])
                 results.append(result)
             return results
 
@@ -668,30 +897,40 @@ class ProjectDatabase:
     # 分析缓存管理
     # ============================================================================
 
-    def cache_analysis_result(self, file_path: str, analysis_type: str, result: Dict[str, Any]) -> int:
+    def cache_analysis_result(
+        self, file_path: str, analysis_type: str, result: Dict[str, Any]
+    ) -> int:
         """缓存分析结果"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             result_json = json.dumps(result)
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO analysis_cache (file_path, analysis_type, result, updated_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (file_path, analysis_type, result_json))
+            """,
+                (file_path, analysis_type, result_json),
+            )
             conn.commit()
             return cursor.lastrowid
 
-    def get_cached_analysis(self, file_path: str, analysis_type: str) -> Optional[Dict[str, Any]]:
+    def get_cached_analysis(
+        self, file_path: str, analysis_type: str
+    ) -> Optional[Dict[str, Any]]:
         """获取缓存的分析结果"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT result, updated_at FROM analysis_cache WHERE file_path = ? AND analysis_type = ?
-            """, (file_path, analysis_type))
+            """,
+                (file_path, analysis_type),
+            )
             row = cursor.fetchone()
             if row:
                 return {
-                    'result': json.loads(row['result']),
-                    'updated_at': row['updated_at']
+                    "result": json.loads(row["result"]),
+                    "updated_at": row["updated_at"],
                 }
             return None
 
@@ -699,7 +938,9 @@ class ProjectDatabase:
         """删除文件的所有缓存分析结果"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM analysis_cache WHERE file_path = ?", (file_path,))
+            cursor.execute(
+                "DELETE FROM analysis_cache WHERE file_path = ?", (file_path,)
+            )
             conn.commit()
             return cursor.rowcount
 
@@ -715,33 +956,35 @@ class ProjectDatabase:
 
             # 文件统计
             cursor.execute("SELECT COUNT(*) FROM files")
-            stats['files_count'] = cursor.fetchone()[0]
+            stats["files_count"] = cursor.fetchone()[0]
 
             # 符号统计
             cursor.execute("SELECT COUNT(*) FROM symbols")
-            stats['symbols_count'] = cursor.fetchone()[0]
+            stats["symbols_count"] = cursor.fetchone()[0]
             cursor.execute("SELECT kind, COUNT(*) FROM symbols GROUP BY kind")
-            stats['symbols_by_kind'] = {row[0]: row[1] for row in cursor.fetchall()}
+            stats["symbols_by_kind"] = {row[0]: row[1] for row in cursor.fetchall()}
 
             # 调用关系统计
             cursor.execute("SELECT COUNT(*) FROM call_graph")
-            stats['call_relations_count'] = cursor.fetchone()[0]
+            stats["call_relations_count"] = cursor.fetchone()[0]
 
             # 数据流统计
             cursor.execute("SELECT COUNT(*) FROM data_flow")
-            stats['data_flow_nodes_count'] = cursor.fetchone()[0]
+            stats["data_flow_nodes_count"] = cursor.fetchone()[0]
 
             # 指针状态统计
             cursor.execute("SELECT COUNT(*) FROM pointer_states")
-            stats['pointer_states_count'] = cursor.fetchone()[0]
+            stats["pointer_states_count"] = cursor.fetchone()[0]
             cursor.execute("SELECT state, COUNT(*) FROM pointer_states GROUP BY state")
-            stats['pointer_states_by_state'] = {row[0]: row[1] for row in cursor.fetchall()}
+            stats["pointer_states_by_state"] = {
+                row[0]: row[1] for row in cursor.fetchall()
+            }
 
             # 类型信息统计
             cursor.execute("SELECT COUNT(*) FROM type_info")
-            stats['type_infos_count'] = cursor.fetchone()[0]
+            stats["type_infos_count"] = cursor.fetchone()[0]
             cursor.execute("SELECT kind, COUNT(*) FROM type_info GROUP BY kind")
-            stats['type_infos_by_kind'] = {row[0]: row[1] for row in cursor.fetchall()}
+            stats["type_infos_by_kind"] = {row[0]: row[1] for row in cursor.fetchall()}
 
             return stats
 
@@ -770,9 +1013,10 @@ class ProjectDatabase:
 # 辅助函数
 # ============================================================================
 
+
 def compute_file_hash(file_path: str) -> str:
     """计算文件内容哈希"""
-    with open(file_path, 'rb') as f:
+    with open(file_path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
 
 
@@ -783,7 +1027,7 @@ def create_file_info(file_path: str, language: str) -> FileInfo:
     last_modified = datetime.fromtimestamp(path_obj.stat().st_mtime)
 
     # 计算行数
-    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         line_count = sum(1 for _ in f)
 
     return FileInfo(
@@ -791,5 +1035,5 @@ def create_file_info(file_path: str, language: str) -> FileInfo:
         hash=hash_value,
         last_modified=last_modified,
         language=language,
-        line_count=line_count
+        line_count=line_count,
     )
