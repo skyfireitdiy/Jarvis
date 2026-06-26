@@ -12,7 +12,6 @@
 
 import re
 from enum import Enum
-from typing import Optional
 from dataclasses import dataclass, field
 
 # tree-sitter依赖（已在pyproject.toml中配置）
