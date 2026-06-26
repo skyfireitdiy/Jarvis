@@ -55,3 +55,68 @@ class JoernAnalyzer(TaintAnalyzer):
             return result.returncode == 0
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
+    
+    def analyze(
+        self,
+        source_code: str,
+        file_path: str,
+        sources: List[TaintSource],
+        sinks: List[TaintSink]
+    ) -> List[TaintPath]:
+        """
+        分析源代码中的污点传播路径
+        
+        Args:
+            source_code: 源代码内容
+            file_path: 源代码文件路径
+            sources: 污点源列表
+            sinks: 污点汇列表
+            
+        Returns:
+            List[TaintPath]: 检测到的污点传播路径列表
+        """
+        # 创建临时工作目录
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 写入源代码文件
+            src_file = os.path.join(tmpdir, os.path.basename(file_path))
+            with open(src_file, "w") as f:
+                f.write(source_code)
+            
+            # 生成CPG
+            cpg_file = os.path.join(tmpdir, "cpg.bin")
+            try:
+                subprocess.run(
+                    [self.joern_path, "--script", "create-cpg", "--param", f"inputPath={src_file}", "--param", f"outputPath={cpg_file}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=True
+                )
+            except subprocess.CalledProcessError:
+                return []
+            except subprocess.TimeoutExpired:
+                return []
+            
+            # 执行污点分析
+            return self._run_taint_analysis(cpg_file, sources, sinks)
+    
+    def _run_taint_analysis(
+        self,
+        cpg_file: str,
+        sources: List[TaintSource],
+        sinks: List[TaintSink]
+    ) -> List[TaintPath]:
+        """
+        执行污点分析
+        
+        Args:
+            cpg_file: CPG文件路径
+            sources: 污点源列表
+            sinks: 污点汇列表
+            
+        Returns:
+            List[TaintPath]: 检测到的污点传播路径列表
+        """
+        # TODO: 实现基于Joern的污点分析
+        # 当前返回空列表，等待完整实现
+        return []
