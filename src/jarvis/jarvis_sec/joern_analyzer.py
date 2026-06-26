@@ -324,11 +324,11 @@ sink.reachableByFlows(source).l"""
             return paths
 
         try:
-            # 获取跨函数调用信息
-            call_graph = database.get_call_graph(file_path)
+            # 获取完整的调用图（方法不接受参数）
+            call_graph = database.get_call_graph()
 
-            # 获取跨文件数据流信息
-            cross_file_flows = database.get_cross_file_data_flows(file_path)
+            # 获取当前文件的数据流节点
+            data_flow_nodes = database.get_data_flow_by_file(file_path)
 
             # 增强每条污点路径
             enhanced_paths = []
@@ -345,12 +345,12 @@ sink.reachableByFlows(source).l"""
                                 enhanced_path, call_info, database
                             )
 
-                # 如果有跨文件数据流，尝试扩展污点路径
-                if cross_file_flows:
-                    for flow in cross_file_flows:
-                        if self._path_involves_flow(path, flow):
-                            enhanced_path = self._extend_path_with_flow(
-                                enhanced_path, flow
+                # 如果有数据流节点，尝试扩展污点路径
+                if data_flow_nodes:
+                    for node in data_flow_nodes:
+                        if self._path_involves_data_node(path, node):
+                            enhanced_path = self._extend_path_with_data_node(
+                                enhanced_path, node
                             )
 
                 enhanced_paths.append(enhanced_path)
@@ -398,36 +398,30 @@ sink.reachableByFlows(source).l"""
             line_number=path.line_number,
         )
 
-    def _path_involves_flow(self, path: TaintPath, flow: dict) -> bool:
-        """检查污点路径是否涉及某个数据流"""
-        source_var = flow.get("source_var", "")
-        target_var = flow.get("target_var", "")
-        return source_var in path.path or target_var in path.path
+    def _path_involves_data_node(self, path: TaintPath, node: dict) -> bool:
+        """检查污点路径是否涉及某个数据流节点"""
+        var_name = node.get("var_name", "")
+        return var_name in path.path
 
-    def _extend_path_with_flow(self, path: TaintPath, flow: dict) -> TaintPath:
-        """扩展污点路径，添加跨文件数据流信息"""
+    def _extend_path_with_data_node(self, path: TaintPath, node: dict) -> TaintPath:
+        """扩展污点路径，添加数据流节点信息"""
         new_path = list(path.path)
 
-        # 添加跨文件数据流节点
-        source_file = flow.get("source_file", "")
-        source_var = flow.get("source_var", "")
-        target_file = flow.get("target_file", "")
-        target_var = flow.get("target_var", "")
+        # 添加数据流节点信息
+        var_name = node.get("var_name", "")
+        node_file = node.get("file_path", "")
+        node_line = node.get("line", 0)
+        node_type = node.get("node_type", "")
 
-        if source_file and source_var:
-            cross_file_source = f"{source_file}:{source_var}"
-            if cross_file_source not in new_path:
-                new_path.insert(0, cross_file_source)
-
-        if target_file and target_var:
-            cross_file_target = f"{target_file}:{target_var}"
-            if cross_file_target not in new_path:
-                new_path.append(cross_file_target)
+        if node_file and var_name:
+            data_node = f"{node_file}:{var_name}@{node_type}"
+            if data_node not in new_path:
+                new_path.append(data_node)
 
         # 更新描述
         new_description = path.description
-        if source_file and target_file:
-            new_description += f" (跨文件流: {source_file} -> {target_file})"
+        if node_file and var_name:
+            new_description += f" (数据流: {var_name}@{node_file}:{node_line})"
 
         return TaintPath(
             source=path.source,
