@@ -464,13 +464,15 @@ def analyze_with_best_analyzer(
 
     # 获取要检查的规则
     if rules:
-        rule_objects = [get_rule(r) for r in rules if get_rule(r)] if rules else get_all_rules()
-
+        rule_objects = [get_rule(r) for r in rules if get_rule(r)]
+    else:
+        rule_objects = get_all_rules()
 
     # 执行检查
     all_paths = []
     for rule in rule_objects:
-        paths = rule.check(analyzer, code, file_path)
-        all_paths.extend(paths)
+        if rule:  # 确保规则不为None
+            paths = rule.check(analyzer, code, file_path)
+            all_paths.extend(paths)
 
     return all_paths
