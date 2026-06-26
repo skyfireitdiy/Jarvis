@@ -1,0 +1,8 @@
+{
+  "id": "20260626_102905_267036",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "整数溢出检测", "已完成"],
+  "content": "## 整数溢出检测完成\n\n### 完成状态\n- 整数溢出检测规则已添加\n- 测试全部通过（8/8）\n\n### 实现细节\n1. **新增_rule_integer_overflow函数**（第1739-1792行）\n2. **检测模式**：\n   - 乘法溢出：检测 `var1 * var2` 作为malloc参数\n   - 加法溢出：检测 `var1 + var2` 或 `var + num` 作为malloc参数\n3. **覆盖函数**：malloc、calloc、realloc\n\n### 验证结果\n- positive_int_overflow.c：检测到3个integer_overflow ✅\n- count * size：检测为乘法溢出 ✅\n- len + 1：检测为加法溢出 ✅\n- 测试通过：8/8 ✅\n\n### 关键文件\n- src/jarvis/jarvis_sec/checkers/c_checker.py（第1739-1792行：_rule_integer_overflow函数，第3777行：规则注册）",
+  "created_at": "2026-06-26T10:29:05.267099",
+  "updated_at": "2026-06-26T10:29:05.267109"
+}

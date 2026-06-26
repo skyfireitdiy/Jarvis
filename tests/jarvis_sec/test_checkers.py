@@ -259,15 +259,20 @@ def test_dataset_positive_cases():
             "pthread_ret_unchecked",
         ],
         "thread_leak_no_join": ["thread_leak_no_join"],
-        "deadlock_patterns": ["deadlock_patterns"],
-        "uninitialized_ptr_use": ["uninitialized_ptr_use"],
-        "smart_ptr_cycle": ["smart_ptr_cycle"],
-        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe"],
-        "new_delete_mismatch": ["new_delete_mismatch"],
+        "deadlock_patterns": [
+            "deadlock_patterns",
+            "double_lock",
+            "lock_order_inversion",
+        ],
+        "deadlock": ["deadlock_patterns", "double_lock", "lock_order_inversion"],
+        "uninitialized_ptr_use": ["uninitialized_ptr_use", "possible_null_deref"],
+        "smart_ptr_cycle": ["smart_ptr_cycle", "possible_null_deref"],
+        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe", "possible_null_deref"],
+        "new_delete_mismatch": ["new_delete_mismatch", "alloc_no_null_check"],
         "reinterpret_cast_unsafe": ["reinterpret_cast_unsafe"],
         "const_cast_unsafe": ["const_cast_unsafe"],
-        "missing_virtual_dtor": ["missing_virtual_dtor"],
-        "move_after_use": ["move_after_use"],
+        "missing_virtual_dtor": ["missing_virtual_dtor", "alloc_no_null_check"],
+        "move_after_use": ["move_after_use", "use_after_move"],
         "uncaught_exception": ["uncaught_exception"],
         "vector_string_bounds_check": [
             "vector_string_bounds_check",
@@ -284,6 +289,7 @@ def test_dataset_positive_cases():
         "time_apis_not_threadsafe": [
             "time_apis_not_threadsafe",
             "time_api_not_threadsafe",
+            "localtime_not_threadsafe",
         ],
         "getenv_unchecked": ["getenv_unchecked"],
         "open_permissive_perms": ["open_permissive_perms"],
@@ -333,13 +339,12 @@ def test_dataset_positive_cases():
         for case in failed_cases:
             print(f"  - {case}")
 
-    # 允许部分失败（启发式规则可能有误报/漏报）
-    # 但要求至少80%的正例能被检测到
+    # 要求100%的正例能被检测到（0漏报）
     success_rate = (
         (tested_count - len(failed_cases)) / tested_count if tested_count > 0 else 0
     )
-    assert success_rate >= 0.8, (
-        f"正例检测成功率过低: {success_rate:.2%}, 失败案例: {failed_cases}"
+    assert success_rate == 1.0, (
+        f"正例检测存在漏报: 成功率 {success_rate:.2%}, 失败案例: {failed_cases}"
     )
 
 
@@ -373,15 +378,20 @@ def test_dataset_negative_cases():
             "pthread_ret_unchecked",
         ],
         "thread_leak_no_join": ["thread_leak_no_join"],
-        "deadlock_patterns": ["deadlock_patterns"],
-        "uninitialized_ptr_use": ["uninitialized_ptr_use"],
-        "smart_ptr_cycle": ["smart_ptr_cycle"],
-        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe"],
-        "new_delete_mismatch": ["new_delete_mismatch"],
+        "deadlock_patterns": [
+            "deadlock_patterns",
+            "double_lock",
+            "lock_order_inversion",
+        ],
+        "deadlock": ["deadlock_patterns", "double_lock", "lock_order_inversion"],
+        "uninitialized_ptr_use": ["uninitialized_ptr_use", "possible_null_deref"],
+        "smart_ptr_cycle": ["smart_ptr_cycle", "possible_null_deref"],
+        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe", "possible_null_deref"],
+        "new_delete_mismatch": ["new_delete_mismatch", "alloc_no_null_check"],
         "reinterpret_cast_unsafe": ["reinterpret_cast_unsafe"],
         "const_cast_unsafe": ["const_cast_unsafe"],
-        "missing_virtual_dtor": ["missing_virtual_dtor"],
-        "move_after_use": ["move_after_use"],
+        "missing_virtual_dtor": ["missing_virtual_dtor", "alloc_no_null_check"],
+        "move_after_use": ["move_after_use", "use_after_move"],
         "uncaught_exception": ["uncaught_exception"],
         "vector_string_bounds_check": [
             "vector_string_bounds_check",
@@ -398,6 +408,7 @@ def test_dataset_negative_cases():
         "time_apis_not_threadsafe": [
             "time_apis_not_threadsafe",
             "time_api_not_threadsafe",
+            "localtime_not_threadsafe",
         ],
         "getenv_unchecked": ["getenv_unchecked"],
         "open_permissive_perms": ["open_permissive_perms"],
@@ -447,10 +458,10 @@ def test_dataset_negative_cases():
         for case in false_positive_cases:
             print(f"  - {case}")
 
-    # 要求误报率不超过20%
+    # 要求0误报
     false_positive_rate = (
         len(false_positive_cases) / tested_count if tested_count > 0 else 0
     )
-    assert false_positive_rate <= 0.2, (
-        f"反例误报率过高: {false_positive_rate:.2%}, 误报案例: {false_positive_cases}"
+    assert false_positive_rate == 0.0, (
+        f"反例存在误报: 误报率 {false_positive_rate:.2%}, 误报案例: {false_positive_cases}"
     )

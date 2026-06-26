@@ -1,0 +1,8 @@
+{
+  "id": "20260626_104313_976515",
+  "type": "project_long_term",
+  "tags": ["jsec", "edge_case_test", "false_positive", "false_negative"],
+  "content": "## 边界测试结果分析\n\n### 误报问题（需修复）\n1. **integer_overflow误报**: 对有完整溢出检查的代码（如 `count <= UINT_MAX / size`）仍报告溢出\n   - 影响文件: negative_safe_overflow_check.c, negative_safe_double_free_pattern.c, negative_safe_free_pattern.c\n   - 根因: 未识别安全的溢出检查模式\n\n2. **strcpy误报**: 对死代码或已置NULL后的安全检查仍报告\n   - 影响文件: negative_safe_free_pattern.c\n   - 根因: 未识别死代码和NULL检查保护\n\n3. **double_free误报**: 对使用标志位保护的安全free模式误报\n   - 影响文件: negative_actually_safe_string.c\n   - 根因: 未识别标志位保护模式\n\n4. **sql_injection误报**: 对静态SQL语句和白名单检查的代码误报\n   - 影响文件: negative_safe_sql_pattern.c\n   - 根因: 未识别静态SQL和白名单模式\n\n### 漏报问题（需修复）\n1. **UAF漏报**: positive_hidden_uaf.c 未检测到释放后使用漏洞\n   - 根因: 未追踪指针别名和free后未置NULL的使用\n\n### 工具问题\n1. **目录扫描失败**: `jsec heuristic <dir>/` 返回0个文件，需检查目录扫描逻辑",
+  "created_at": "2026-06-26T10:43:13.976555",
+  "updated_at": "2026-06-26T10:43:13.976565"
+}

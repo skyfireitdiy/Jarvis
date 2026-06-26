@@ -1,0 +1,8 @@
+{
+  "id": "20260626_103311_806418",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "Bug修复", "已完成", "阶段6"],
+  "content": "## 启发式扫描优化阶段6完成\n\n### 完成状态\n- 所有P0/P1任务已完成\n- 测试全部通过（8/8）\n\n### 完成任务列表\n1. ✅ UAF检测优化（新增函数参数传递检测）\n2. ✅ 整数溢出检测（检测乘法/加法作为malloc参数）\n3. ✅ 硬编码凭证检测（检测敏感变量名和宏定义）\n4. ✅ TOCTOU竞态条件检测（检测access+fopen、lstat+fopen、stat+fopen模式）\n\n### 验证结果\n- UAF检测：positive_uaf_basic.c检测到use_after_free_suspect ✅\n- 整数溢出：positive_int_overflow.c检测到3个integer_overflow ✅\n- 硬编码凭证：positive_hardcoded.c检测到4个hardcoded_credentials ✅\n- TOCTOU竞态：positive_race_tofile.c检测到2个toctou_race ✅\n- 测试通过：8/8 ✅\n\n### 关键文件\n- src/jarvis/jarvis_sec/checkers/c_checker.py\n  - 第968行：UAF检测func_param正则表达式\n  - 第1739-1792行：_rule_integer_overflow函数\n  - 第1794-1850行：_rule_hardcoded_credentials函数\n  - 第1852-1896行：_rule_toctou_race函数\n  - 第3777-3839行：规则注册\n\n### 检测机制\n- UAF：污点分析（优先）+ 启发式回退（正则表达式）\n- 整数溢出：正则表达式检测malloc/calloc/realloc参数中的乘法/加法\n- 硬编码凭证：正则表达式检测敏感变量名和#define宏\n- TOCTOU：正则表达式检测检查函数+使用函数模式\n\n### 下一步\n- 所有P0/P1任务已完成\n- 可进行最终验证和总结",
+  "created_at": "2026-06-26T10:33:11.806473",
+  "updated_at": "2026-06-26T10:33:11.806479"
+}

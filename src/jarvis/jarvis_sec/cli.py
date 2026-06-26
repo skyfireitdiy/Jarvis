@@ -569,7 +569,7 @@ def heuristic(
         for ext in extensions:
             c_files.extend(target_path.rglob(f"*.{ext}"))
 
-        # 排除常见目录
+        # 排除常见目录（但不排除tests目录，因为可能包含测试数据集）
         exclude_dirs = {
             ".git",
             "build",
@@ -582,8 +582,6 @@ def heuristic(
             "vendor",
             "deps",
             "node_modules",
-            "test",
-            "tests",
             "__tests__",
             "spec",
             "testdata",

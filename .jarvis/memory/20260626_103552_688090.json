@@ -1,0 +1,8 @@
+{
+  "id": "20260626_103552_688090",
+  "type": "project_long_term",
+  "tags": ["jsec", "heuristic", "security-scanner", "test-results", "round2"],
+  "content": "## C/C++安全扫描工具第二轮测试结果\n\n### 新增检测能力（第二轮）\n\n| 漏洞类型 | 检测模式 | 类别 | 严重性 |\n|---------|---------|------|--------|\n| UAF（释放后使用） | use_after_free_suspect | memory_mgmt | high |\n| 整数溢出 | integer_overflow | arithmetic | high |\n| 硬编码凭证 | hardcoded_credentials | crypto | medium |\n| TOCTOU竞态条件 | toctou_race | concurrency | medium |\n\n### 测试用例位置\n- UAF: tests/jarvis_sec/datasets/use_after_free/\n- 整数溢出: tests/jarvis_sec/datasets/integer_overflow/\n- 格式化字符串: tests/jarvis_sec/datasets/format_string_vuln/\n- 硬编码凭证: tests/jarvis_sec/datasets/hardcoded_credentials/\n- TOCTOU: tests/jarvis_sec/datasets/race_condition/\n- 不安全库函数: tests/jarvis_sec/datasets/unsafe_library/\n\n### 累计检测能力\n\n第一轮修复：\n- SQL注入 (sql_injection)\n- 内存泄漏 (memory_leak)\n- 路径遍历 (path_traversal)\n- 栈数组识别（误报修复）\n\n第二轮修复：\n- UAF检测\n- 整数溢出检测\n- 硬编码凭证检测\n- TOCTOU竞态条件检测\n\n扫描工具检测能力已覆盖10+种漏洞类型。",
+  "created_at": "2026-06-26T10:35:52.688135",
+  "updated_at": "2026-06-26T10:35:52.688141"
+}

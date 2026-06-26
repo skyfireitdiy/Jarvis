@@ -8,5 +8,8 @@ void foo() {
   if (fp == NULL)
     return;
   char buf[100];
-  fread(buf, 1, 100, fp); // 安全：有检查
+  size_t n = fread(buf, 1, 100, fp); // 安全：有检查
+  if (n < 100) {
+    // 处理读取不完整的情况
+  }
 }

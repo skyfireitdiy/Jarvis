@@ -1,0 +1,8 @@
+{
+  "id": "20260626_123119_816998",
+  "type": "project_long_term",
+  "tags": ["测试修复", "启发式扫描", "准确率验证"],
+  "content": "## 测试用例修复完成\n\n### 修改内容\n\n**文件**：tests/jarvis_sec/test_checkers.py\n\n**修改1**：正例测试要求100%检测率（第337-343行）\n```python\n# 要求100%的正例能被检测到（0漏报）\nassert success_rate == 1.0, (\n    f\"正例检测存在漏报: 成功率 {success_rate:.2%}, 失败案例: {failed_cases}\"\n)\n```\n\n**修改2**：反例测试要求0误报（第449-455行）\n```python\n# 要求0误报\nassert false_positive_rate == 0.0, (\n    f\"反例存在误报: 误报率 {false_positive_rate:.2%}, 误报案例: {false_positive_cases}\"\n)\n```\n\n### 测试结果\n\n**正例测试**：\n- 共测试46个文件\n- 失败8个（漏报率17.4%）\n- 失败案例：\n  - positive_shared_ptr_cycle.cpp\n  - positive_missing_virtual_dtor.cpp\n  - positive_recursive_lock.c\n  - positive_move_then_use.cpp\n  - positive_get_stored.cpp\n  - positive_time_no_threadsafe.c\n  - positive_uninitialized_ptr.c\n  - positive_malloc_with_delete.cpp\n\n**反例测试**：\n- 共测试22个文件\n- 误报4个（误报率18.2%）\n- 误报案例：\n  - negative_read_no_lock.c\n  - negative_fopen_with_check.c\n  - negative_realloc_with_assign.c\n  - negative_with_check.c\n\n### 关键发现\n\n**edge_cases目录不在测试范围内**：\n- 测试只扫描 `datasets/` 下的直接子目录\n- edge_cases目录在 `datasets/edge_cases/` 下\n- 需要单独添加edge_cases测试\n\n### 下一步\n\n1. 修复8个正例漏报问题\n2. 修复4个反例误报问题\n3. 添加edge_cases目录测试",
+  "created_at": "2026-06-26T12:31:19.817051",
+  "updated_at": "2026-06-26T12:31:19.817058"
+}
