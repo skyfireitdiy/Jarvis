@@ -90,7 +90,7 @@ class JoernAnalyzer(TaintAnalyzer):
                 return []
             
             # 执行污点分析
-            return self._run_taint_analysis(cpg_file, sources, sinks)
+            return self._run_taint_analysis(cpg_file, self.sources, self.sinks)
     
     def _run_taint_analysis(
         self,
