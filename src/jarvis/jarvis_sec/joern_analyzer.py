@@ -112,3 +112,7 @@ class JoernAnalyzer(TaintAnalyzer):
         # TODO: 实现基于Joern的污点分析
         # 当前返回空列表，等待完整实现
         return []
+
+
+# 注册到工厂
+TaintAnalyzerFactory.register("joern", JoernAnalyzer)
