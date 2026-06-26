@@ -943,6 +943,7 @@ def run_cli(
     ),
     keep_jvs: bool = typer.Option(
         False,
+        "-k",
         "--keep-jvs",
         help="禁止自动切换到代码开发模式（jca），保持使用通用代理（jvs）",
     ),
