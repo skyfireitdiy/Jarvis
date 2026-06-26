@@ -1,0 +1,8 @@
+{
+  "id": "20260626_092450_520827",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "heuristic命令", "代码恢复", "完成"],
+  "content": "## 启发式扫描代码恢复完成\n\n### 恢复内容\n1. **heuristic命令**：已从commit 4705dc644恢复到cli.py\n2. **测试数据集**：buffer_overflow和sql_injection已恢复\n3. **语法错误修复**：c_checker.py第1099行字符串转义错误已修复\n\n### 验证结果\n- heuristic命令可用：✅\n- 测试通过：8/8 ✅\n- 静态检查通过：✅\n- 测试数据集完整：✅\n\n### 关键文件\n- src/jarvis/jarvis_sec/cli.py（heuristic命令）\n- src/jarvis/jarvis_sec/checkers/c_checker.py（语法修复）\n- tests/jarvis_sec/datasets/（测试数据集）\n\n### 使用方式\n```bash\n# 扫描单个文件\njsec heuristic ./src/main.c\n\n# 扫描目录\njsec heuristic ./src --format markdown\n\n# 保存到文件\njsec heuristic ./src --output report.json\n```",
+  "created_at": "2026-06-26T09:24:50.520876",
+  "updated_at": "2026-06-26T09:24:50.520888"
+}
