@@ -1792,6 +1792,68 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    硬编码凭证检测：
+    - 检测敏感变量名（password、key、secret、token等）
+    - 检测硬编码的敏感字符串
+    """
+    issues: List[Issue] = []
+    
+    # 敏感变量名模式（不区分大小写）
+    sensitive_vars = re.compile(
+        r'\b(password|passwd|pwd|secret|key|token|api_key|apikey|auth|credential|private_key|access_key)\b',
+        re.IGNORECASE
+    )
+    
+    # 字符串赋值模式
+    string_assign = re.compile(r'\b(char\s*\*|const\s+char\s*\*|char\s+\w+\s*\[)\s*\w+\s*=\s*"([^"]{8,})"')
+    
+    # #define 模式
+    define_pattern = re.compile(r'#define\s+\w*(SECRET|KEY|PASSWORD|TOKEN)\w*\s+"([^"]+)"', re.IGNORECASE)
+    
+    for idx, s in enumerate(lines, start=1):
+        # 检测敏感变量名赋值
+        if sensitive_vars.search(s) and '=' in s and '"' in s:
+            # 提取字符串内容
+            str_match = re.search(r'"([^"]{4,})"', s)
+            if str_match:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="crypto",
+                        pattern="hardcoded_credentials",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"检测到硬编码凭证：变量名包含敏感关键词，且赋值为硬编码字符串。",
+                        suggestion="使用环境变量、配置文件或密钥管理系统存储敏感信息，避免硬编码。",
+                        confidence=0.75,
+                        severity="high",
+                    )
+                )
+        
+        # 检测 #define 中的敏感信息
+        define_match = define_pattern.search(s)
+        if define_match:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="crypto",
+                    pattern="hardcoded_credentials",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"检测到宏定义中的硬编码凭证：{define_match.group(1)}",
+                    suggestion="使用环境变量或配置文件存储敏感信息，避免硬编码。",
+                    confidence=0.8,
+                    severity="high",
+                )
+            )
+    
+    return issues
+
+
 def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
