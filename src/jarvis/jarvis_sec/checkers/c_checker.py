@@ -602,7 +602,40 @@ def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 
 def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测realloc返回值未使用的情况（污点分析 + 启发式回退）。
+    - 优先使用污点分析检测realloc返回值是否被使用
+    - 若污点分析不可用，回退到启发式检测
+    """
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["realloc_assign_back"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="realloc_assign_back_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or "realloc返回值未使用",
+                    description=path.description
+                    or "realloc返回值未赋值回原指针，可能导致内存泄漏或使用已释放内存",
+                    suggestion="使用临时指针接收realloc返回值，判空成功后再赋值回原指针",
+                    confidence=path.confidence,
+                    severity="high",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
     # 检测 realloc 调用但未赋值回原指针的情况
     realloc_call_pattern = re.compile(
         r"realloc\s*\(\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE
@@ -939,7 +972,40 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 
 def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测IO返回值未检查的情况（污点分析 + 启发式回退）。
+    - 优先使用污点分析检测IO返回值是否被检查
+    - 若污点分析不可用，回退到启发式检测
+    """
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["unchecked_io"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="error_handling",
+                    pattern="unchecked_io_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or "IO返回值未检查",
+                    description=path.description
+                    or "IO函数返回值未检查，可能导致错误处理缺失",
+                    suggestion="检查返回值/errno；在错误路径上释放资源",
+                    confidence=path.confidence,
+                    severity="medium",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
     for idx, s in enumerate(lines, start=1):
         # 排除预处理与声明
         t = s.lstrip()
@@ -2347,9 +2413,39 @@ def _rule_time_apis_not_threadsafe(lines: Sequence[str], relpath: str) -> List[I
 
 def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    检测 getenv 使用（环境变量未校验可能导致配置/路径/命令注入风险）。
+    检测getenv返回值未检查的情况（污点分析 + 启发式回退）。
+    - 优先使用污点分析检测getenv返回值是否被检查NULL
+    - 若污点分析不可用，回退到启发式检测
     """
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["getenv_unchecked"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="input_validation",
+                    pattern="getenv_unchecked_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or "getenv返回值未检查",
+                    description=path.description
+                    or "getenv返回值未检查NULL，可能导致空指针解引用",
+                    suggestion="对白名单键进行读取；对取值执行格式/长度/字符集校验；避免直接拼接为命令/路径",
+                    confidence=path.confidence,
+                    severity="medium",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
     for idx, s in enumerate(lines, start=1):
         m = RE_GETENV.search(s)
         if not m:
