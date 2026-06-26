@@ -56,21 +56,13 @@ class JoernAnalyzer(TaintAnalyzer):
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
     
-    def analyze(
-        self,
-        source_code: str,
-        file_path: str,
-        sources: List[TaintSource],
-        sinks: List[TaintSink]
-    ) -> List[TaintPath]:
+    def analyze(self, source_code: str, file_path: str = "") -> List[TaintPath]:
         """
         分析源代码中的污点传播路径
         
         Args:
             source_code: 源代码内容
             file_path: 源代码文件路径
-            sources: 污点源列表
-            sinks: 污点汇列表
             
         Returns:
             List[TaintPath]: 检测到的污点传播路径列表
