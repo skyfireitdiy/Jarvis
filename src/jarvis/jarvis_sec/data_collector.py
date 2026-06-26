@@ -14,7 +14,7 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -30,7 +30,6 @@ except ImportError:
 
 from .project_database import (
     ProjectDatabase,
-    FileInfo,
     SymbolInfo,
     CallRelation,
     DataFlowNode,
