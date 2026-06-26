@@ -32,7 +32,7 @@ from jarvis.jarvis_sec.types import Issue
 import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
 
 # 数据流分析器（用于误报过滤）
-from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer
+from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer, DataFlowResult, PointerState
 
 # ---------------------------
 # 规则库（正则表达式）
@@ -3928,7 +3928,6 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_toctou_race(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
-    issues.extend(_rule_use_after_free(mlines, relpath))
     
     # 使用数据流分析过滤误报
     filtered_issues = _filter_issues_with_data_flow(issues, data_flow_analyzer, data_flow_result, lines)
@@ -3982,7 +3981,7 @@ def _is_false_positive(
     Returns:
         bool: 是否为误报
     """
-    issue_type = issue.rule
+    issue_type = issue.pattern
     line_num = issue.line
     
     # UAF误报过滤：free后置NULL的安全模式
