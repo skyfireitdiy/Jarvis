@@ -979,6 +979,7 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 deref_arrow.search(sj)
                 or deref_star.search(sj)
                 or deref_index.search(sj)
+                or func_param.search(sj)  # 检测作为函数参数传递
             ):
                 uaf_evidence_line = j
                 break
