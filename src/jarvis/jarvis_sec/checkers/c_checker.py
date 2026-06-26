@@ -429,6 +429,9 @@ def _has_null_check_around(
     - if (ptr) / if (!ptr)
     - if (ptr == NULL/0) / if (NULL/0 == ptr)
     - 断言/检查宏：assert(ptr)、assert(ptr != NULL)、BUG_ON(!ptr)、WARN_ON(!ptr)、CHECK/ENSURE 等
+    - 提前返回：if (!ptr) return ... / if (ptr == NULL) return ...
+    - 错误处理跳转：if (!ptr) goto error; / if (ptr == NULL) goto fail;
+    - 循环条件：while (ptr && ...) / for (...; ptr && ...; ...)
     """
     for i, s in _window(lines, line_no, before=radius, after=radius):
         # 直接真假判断
@@ -446,6 +449,17 @@ def _has_null_check_around(
             rf"\b(assert|BUG_ON|WARN_ON|CHECK|ENSURE)\s*\(\s*(!\s*)?{re.escape(var)}(\s*(==|!=)\s*(NULL|0))?\s*\)",
             s,
         ):
+            return True
+        # 提前返回防御：if (!ptr) return ... / if (ptr == NULL) return ...
+        if re.search(rf"\bif\s*\([^)]*{re.escape(var)}[^)]*\)\s*\breturn\b", s):
+            return True
+        # 错误处理跳转：if (!ptr) goto error; / if (ptr == NULL) goto fail;
+        if re.search(rf"\bif\s*\([^)]*{re.escape(var)}[^)]*\)\s*\bgoto\b", s):
+            return True
+        # 循环条件检查：while (ptr && ...) / for (...; ptr && ...; ...)
+        if re.search(rf"\bwhile\s*\([^)]*{re.escape(var)}[^)]*\)", s):
+            return True
+        if re.search(rf"\bfor\s*\([^)]*{re.escape(var)}[^)]*\)", s):
             return True
     return False
 
