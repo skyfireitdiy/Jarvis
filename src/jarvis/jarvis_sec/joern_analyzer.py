@@ -303,6 +303,142 @@ sink.reachableByFlows(source).l"""
 
         return paths
 
+    def _enhance_with_database(
+        self,
+        paths: List[TaintPath],
+        database: "ProjectDatabase",
+        file_path: str,
+    ) -> List[TaintPath]:
+        """
+        利用数据库增强污点分析结果
+
+        Args:
+            paths: 原始污点路径列表
+            database: 项目数据库实例
+            file_path: 当前文件路径
+
+        Returns:
+            List[TaintPath]: 增强后的污点路径列表
+        """
+        if not paths:
+            return paths
+
+        try:
+            # 获取跨函数调用信息
+            call_graph = database.get_call_graph(file_path)
+
+            # 获取跨文件数据流信息
+            cross_file_flows = database.get_cross_file_data_flows(file_path)
+
+            # 增强每条污点路径
+            enhanced_paths = []
+            for path in paths:
+                enhanced_path = path
+
+                # 如果有调用图信息，尝试扩展污点路径
+                if call_graph:
+                    for call_info in call_graph:
+                        # 检查污点路径是否经过该调用点
+                        if self._path_involves_call(path, call_info):
+                            # 扩展污点路径，添加跨函数信息
+                            enhanced_path = self._extend_path_with_call(
+                                enhanced_path, call_info, database
+                            )
+
+                # 如果有跨文件数据流，尝试扩展污点路径
+                if cross_file_flows:
+                    for flow in cross_file_flows:
+                        if self._path_involves_flow(path, flow):
+                            enhanced_path = self._extend_path_with_flow(
+                                enhanced_path, flow
+                            )
+
+                enhanced_paths.append(enhanced_path)
+
+            return enhanced_paths
+
+        except Exception:
+            # 数据库查询失败时返回原始路径
+            return paths
+
+    def _path_involves_call(self, path: TaintPath, call_info: dict) -> bool:
+        """检查污点路径是否涉及某个调用点"""
+        # 简单实现：检查调用函数名是否在路径中
+        caller_func = call_info.get("caller_function", "")
+        callee_func = call_info.get("callee_function", "")
+        return caller_func in path.path or callee_func in path.path
+
+    def _extend_path_with_call(
+        self, path: TaintPath, call_info: dict, database: "ProjectDatabase"
+    ) -> TaintPath:
+        """扩展污点路径，添加跨函数调用信息"""
+        # 创建新的路径列表
+        new_path = list(path.path)
+
+        # 添加跨函数调用节点
+        callee_file = call_info.get("callee_file", "")
+        callee_func = call_info.get("callee_function", "")
+        if callee_file and callee_func:
+            cross_file_node = f"{callee_file}:{callee_func}"
+            if cross_file_node not in new_path:
+                new_path.append(cross_file_node)
+
+        # 更新描述
+        new_description = path.description
+        if callee_file:
+            new_description += f" (跨函数调用: {callee_func}@{callee_file})"
+
+        return TaintPath(
+            source=path.source,
+            sink=path.sink,
+            path=new_path,
+            confidence=min(path.confidence + 0.1, 1.0),  # 提高置信度
+            severity=path.severity,
+            description=new_description,
+            line_number=path.line_number,
+        )
+
+    def _path_involves_flow(self, path: TaintPath, flow: dict) -> bool:
+        """检查污点路径是否涉及某个数据流"""
+        source_var = flow.get("source_var", "")
+        target_var = flow.get("target_var", "")
+        return source_var in path.path or target_var in path.path
+
+    def _extend_path_with_flow(self, path: TaintPath, flow: dict) -> TaintPath:
+        """扩展污点路径，添加跨文件数据流信息"""
+        new_path = list(path.path)
+
+        # 添加跨文件数据流节点
+        source_file = flow.get("source_file", "")
+        source_var = flow.get("source_var", "")
+        target_file = flow.get("target_file", "")
+        target_var = flow.get("target_var", "")
+
+        if source_file and source_var:
+            cross_file_source = f"{source_file}:{source_var}"
+            if cross_file_source not in new_path:
+                new_path.insert(0, cross_file_source)
+
+        if target_file and target_var:
+            cross_file_target = f"{target_file}:{target_var}"
+            if cross_file_target not in new_path:
+                new_path.append(cross_file_target)
+
+        # 更新描述
+        new_description = path.description
+        if source_file and target_file:
+            new_description += f" (跨文件流: {source_file} -> {target_file})"
+
+        return TaintPath(
+            source=path.source,
+            sink=path.sink,
+            path=new_path,
+            confidence=min(path.confidence + 0.15, 1.0),  # 提高置信度
+            severity=path.severity,
+            description=new_description,
+            line_number=path.line_number,
+        )
+
 
 # 注册到工厂
 TaintAnalyzerFactory.register("joern", JoernAnalyzer)
