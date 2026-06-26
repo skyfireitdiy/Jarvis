@@ -964,6 +964,8 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
         deref_arrow = re.compile(rf"\b{re.escape(var)}\s*->")
         deref_star = re.compile(rf"(?<!\w)\*\s*{re.escape(var)}\b")
         deref_index = re.compile(rf"\b{re.escape(var)}\s*\[")
+        # 检测作为函数参数传递（可能导致UAF）
+        func_param = re.compile(rf"\b(printf|fprintf|sprintf|snprintf|strcpy|strcat|memcpy|memmove|strlen|strcmp|strchr|strstr|gets|fgets|fputs|puts|scanf|fscanf|sscanf)\s*\([^)]*\b{re.escape(var)}\b")
         assign_pat = re.compile(rf"\b{re.escape(var)}\s*=")
 
         for j in range(start, end + 1):
