@@ -153,9 +153,195 @@ def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional
         return None
 
 
+def install_plugin(source_path: str) -> bool:
+    """安装插件到 Jarvis 数据目录
+
+    参数:
+        source_path: 插件源路径，可以是目录或压缩文件（tar/tar.gz/zip）
+
+    返回:
+        bool: 安装成功返回 True，失败返回 False
+
+    功能:
+        1. 校验插件是否包含 config.yaml
+        2. 复制或解压到 ~/.jarvis/plugins/插件名/ 下
+        3. 插件名从 config.yaml 的 name 字段获取，若无则使用目录名/文件名
+    """
+    import os
+    import shutil
+    import tarfile
+    import zipfile
+    import tempfile
+    import yaml
+    from pathlib import Path
+
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    try:
+        source = Path(source_path).resolve()
+
+        if not source.exists():
+            PrettyOutput.auto_print(f"❌ 插件源路径不存在: {source_path}")
+            return False
+
+        # 获取 Jarvis 数据目录下的 plugins 目录
+        data_dir = Path(get_data_dir())
+        plugins_dir = data_dir / "plugins"
+        plugins_dir.mkdir(parents=True, exist_ok=True)
+
+        # 临时目录用于处理压缩文件
+        temp_dir = None
+        plugin_source_dir = None
+
+        # 判断源类型：目录还是文件
+        if source.is_dir():
+            # 直接是目录
+            plugin_source_dir = source
+        elif source.is_file():
+            # 是压缩文件，需要解压
+            # 使用 suffixes 获取完整后缀列表，正确识别 .tar.gz 等复合后缀
+            suffixes = [s.lower() for s in source.suffixes]
+            is_zip = ".zip" in suffixes
+            is_tar = ".tar" in suffixes or ".tgz" in suffixes
+
+            if not is_zip and not is_tar:
+                PrettyOutput.auto_print(
+                    "❌ 不支持的文件格式，仅支持 .tar/.tar.gz/.tgz/.zip"
+                )
+                return False
+
+            # 创建临时目录解压
+            temp_dir = tempfile.mkdtemp(prefix="jarvis_plugin_")
+
+            if is_zip:
+                with zipfile.ZipFile(source, "r") as zf:
+                    zf.extractall(temp_dir)
+            else:  # tar formats (including .tar.gz, .tgz)
+                with tarfile.open(source, "r:*") as tf:
+                    # 使用 filter='data' 防止路径遍历攻击 (CVE-2007-4559)
+                    tf.extractall(temp_dir, filter="data")
+
+            # 解压后，查找包含 config.yaml 的目录
+            extracted_items = list(Path(temp_dir).iterdir())
+            if len(extracted_items) == 1 and extracted_items[0].is_dir():
+                # 只有一个目录，直接使用
+                plugin_source_dir = extracted_items[0]
+            else:
+                # 多个文件/目录，使用临时目录本身
+                plugin_source_dir = Path(temp_dir)
+        else:
+            PrettyOutput.auto_print("❌ 无效的源路径类型")
+            return False
+
+        # 校验是否包含 config.yaml
+        config_file = plugin_source_dir / "config.yaml"
+        if not config_file.exists():
+            PrettyOutput.auto_print("❌ 插件缺少 config.yaml 文件")
+            # 清理临时目录
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+            return False
+
+        # 读取 config.yaml 获取插件名
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_content = yaml.safe_load(f)
+                plugin_name = (
+                    config_content.get("name", None)
+                    if isinstance(config_content, dict)
+                    else None
+                )
+        except Exception:
+            plugin_name = None
+
+        # 如果没有 name 字段，使用源目录名/文件名
+        if not plugin_name:
+            if source.is_dir():
+                plugin_name = source.name
+            else:
+                # 使用文件名（去掉扩展名）
+                plugin_name = source.stem
+                # 如果是 .tar.gz，需要去掉两个扩展名
+                if plugin_name.endswith(".tar"):
+                    plugin_name = plugin_name[:-4]
+
+        # 安全处理：只保留文件名部分，防止路径遍历攻击
+        plugin_name = Path(plugin_name).name
+
+        # 目标安装目录
+        target_dir = plugins_dir / plugin_name
+
+        # 如果目标目录已存在，先删除
+        if target_dir.exists():
+            PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
+            shutil.rmtree(target_dir)
+
+        # 复制插件到目标目录
+        shutil.copytree(plugin_source_dir, target_dir)
+
+        # 清理临时目录
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+        PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
+        return True
+
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 插件安装失败: {str(e)}")
+        # 清理临时目录
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                pass
+        return False
+
+
+def uninstall_plugin(plugin_name: str) -> bool:
+    """
+    卸载插件
+
+    Args:
+        plugin_name: 插件名称
+
+    Returns:
+        bool: 卸载成功返回 True，失败返回 False
+    """
+    from pathlib import Path
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    # 安全处理：只保留文件名部分，防止路径遍历攻击
+    plugin_name = Path(plugin_name).name
+
+    plugins_dir = Path(get_data_dir()) / "plugins"
+    plugin_dir = plugins_dir / plugin_name
+
+    if not plugin_dir.exists():
+        PrettyOutput.auto_print(f"⚠️ 插件不存在: {plugin_name}")
+        return False
+
+    if not plugin_dir.is_dir():
+        PrettyOutput.auto_print(f"⚠️ 插件路径不是目录: {plugin_dir}")
+        return False
+
+    try:
+        import shutil
+
+        shutil.rmtree(plugin_dir)
+        PrettyOutput.auto_print(f"✅ 插件已卸载: {plugin_name}")
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")
+        return False
+
+
 __all__ = [
     "join_prompts",
     "is_auto_complete",
     "normalize_next_action",
     "fix_tool_call_with_llm",
+    "install_plugin",
+    "uninstall_plugin",
 ]
