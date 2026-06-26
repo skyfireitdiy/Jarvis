@@ -948,15 +948,10 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
         start = free_ln + 1
         end = min(len(lines), free_ln + 50)
 
-        # 同/邻近行若有置空，先快速跳过
-        early_null = False
-        for j in range(free_ln, min(len(lines), free_ln + 3) + 1):
-            sj = _safe_line(lines, j)
-            if re.search(rf"\b{re.escape(var)}\s*=\s*(NULL|0)\s*;", sj):
-                early_null = True
-                break
-        if early_null:
-            continue
+        # 注意：不再跳过free后置NULL的情况
+        # 因为即使置NULL，后续代码仍可能通过别名或未检查NULL就使用
+        # 例如：free(ptr); ptr = NULL; char *p = ptr; if (p) strcpy(p, "test");
+        # 这种情况下，ptr已置NULL，但别名p仍可能被误用
 
         reassigned = False
         uaf_evidence_line: Optional[int] = None
