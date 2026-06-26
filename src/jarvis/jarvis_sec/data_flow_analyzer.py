@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 try:
     import tree_sitter_c as tsc
     import tree_sitter_cpp as tscpp
-    from tree_sitter import Language, Parser, Node, Tree
+    from tree_sitter import Language, Parser, Node
     
     TREE_SITTER_AVAILABLE = True
 except ImportError:
