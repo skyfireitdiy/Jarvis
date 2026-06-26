@@ -1851,6 +1851,50 @@ def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issu
     return issues
 
 
+def _rule_toctou_race(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    TOCTOU竞态条件检测：
+    - 检测access+fopen模式
+    - 检测lstat+fopen模式
+    - 检测stat+fopen模式
+    """
+    issues: List[Issue] = []
+    
+    # 检查函数模式
+    check_funcs = ['access', 'lstat', 'stat', 'fstat']
+    
+    # 使用函数模式
+    use_funcs = ['fopen', 'open', 'openat']
+    
+    # 检测模式：检查函数调用后，在几行内出现使用函数调用
+    for idx, s in enumerate(lines, start=1):
+        # 检测检查函数
+        for check_func in check_funcs:
+            if re.search(rf'\b{check_func}\s*\(', s):
+                # 在后续5行内检测使用函数
+                for j in range(idx + 1, min(idx + 6, len(lines) + 1)):
+                    sj = lines[j - 1]
+                    for use_func in use_funcs:
+                        if re.search(rf'\b{use_func}\s*\(', sj):
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="concurrency",
+                                    pattern="toctou_race",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(s),
+                                    description=f"检测到TOCTOU竞态条件：{check_func}检查后立即使用{use_func}，存在竞态窗口。",
+                                    suggestion="使用O_NOFOLLOW标志、fstat检查已打开文件描述符，或使用原子操作避免竞态。",
+                                    confidence=0.7,
+                                    severity="high",
+                                )
+                            )
+                            break
+    
+    return issues
+
+
 def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
