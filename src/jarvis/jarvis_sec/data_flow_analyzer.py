@@ -109,15 +109,15 @@ class DataFlowAnalyzer:
         code = re.sub(r"#define.*$", "", code, flags=re.MULTILINE)
         return code
 
-    def _analyze_ast(self, ast: "c_ast.Node") -> None:
+    def _analyze_ast(self, ast: Any) -> None:
         """分析AST节点"""
         if ast is None:
             return
 
         # 遍历AST（ast.ext是顶层声明列表）
-        if hasattr(ast, 'ext'):
+        if hasattr(ast, 'ext') and ast.ext:
             for node in ast.ext:
-                if isinstance(node, c_ast.FuncDef):
+                if PYCPARSER_AVAILABLE and isinstance(node, c_ast.FuncDef):
                     self._analyze_function(node)
 
     def _analyze_function(self, func: "c_ast.FuncDef") -> None:
