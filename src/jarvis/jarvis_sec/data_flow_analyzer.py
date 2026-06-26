@@ -71,6 +71,10 @@ class DataFlowResult:
     dead_code_lines: set[int] = field(default_factory=set)  # 死代码行号
     aliases: dict[str, list[str]] = field(default_factory=dict)  # 指针别名映射
     return_lines: set[int] = field(default_factory=set)  # return语句行号
+    function_params: dict[str, set[str]] = field(
+        default_factory=dict
+    )  # 函数参数及其NULL检查状态
+    ownership_transfer: set[str] = field(default_factory=set)  # 所有权转移的函数返回值
 
 
 class DataFlowAnalyzer:
@@ -160,8 +164,11 @@ class DataFlowAnalyzer:
 
         node_type = node.type
 
+        # 处理函数定义
+        if node_type == "function_definition":
+            self._handle_function_definition(node, code, result)
         # 处理函数调用
-        if node_type == "call_expression":
+        elif node_type == "call_expression":
             self._handle_call_expression(node, code, result)
         # 处理赋值表达式
         elif node_type == "assignment_expression":
@@ -173,6 +180,94 @@ class DataFlowAnalyzer:
         # 递归处理子节点
         for child in node.children:
             self._traverse_node(child, code, result)
+
+    def _handle_function_definition(
+        self, node: Node, code: str, result: DataFlowResult
+    ):
+        """
+        处理函数定义
+
+        Args:
+            node: AST节点
+            code: 源代码
+            result: 分析结果
+        """
+        if node is None:
+            return
+
+        # 获取函数名
+        declarator = node.child_by_field_name("declarator")
+        if declarator is None:
+            return
+
+        # 提取函数名
+        func_name_node = declarator.child_by_field_name("declarator")
+        if func_name_node is None:
+            return
+        func_name = self._get_node_text(func_name_node, code)
+
+        # 提取函数参数
+        params = declarator.child_by_field_name("parameters")
+        if params:
+            for param in params.children:
+                if param.type == "parameter_declaration":
+                    # 提取参数名
+                    param_declarator = param.child_by_field_name("declarator")
+                    if param_declarator:
+                        param_name = self._get_node_text(param_declarator, code)
+                        # 去除指针符号
+                        param_name = param_name.replace("*", "").strip()
+                        if param_name:
+                            if func_name not in result.function_params:
+                                result.function_params[func_name] = set()
+                            result.function_params[func_name].add(param_name)
+
+        # 检测所有权转移：函数返回malloc分配的变量
+        # 在函数体内查找malloc和return
+        body = node.child_by_field_name("body")
+        if body:
+            malloc_vars = set()
+            self._find_malloc_and_return(body, code, malloc_vars, result)
+
+    def _find_malloc_and_return(
+        self, node: Node, code: str, malloc_vars: set, result: DataFlowResult
+    ):
+        """
+        在函数体内查找malloc和return语句
+
+        Args:
+            node: AST节点
+            code: 源代码
+            malloc_vars: malloc分配的变量集合
+            result: 分析结果
+        """
+        if node is None:
+            return
+
+        # 检测malloc分配
+        if node.type == "assignment_expression":
+            right = node.child_by_field_name("right")
+            if right and right.type == "call_expression":
+                func_node = right.child_by_field_name("function")
+                if func_node:
+                    func_name = self._get_node_text(func_node, code)
+                    if func_name in ["malloc", "calloc", "realloc"]:
+                        left = node.child_by_field_name("left")
+                        if left:
+                            var_name = self._get_node_text(left, code)
+                            malloc_vars.add(var_name)
+
+        # 检测return语句
+        if node.type == "return_statement":
+            for child in node.children:
+                if child.type == "identifier":
+                    var_name = self._get_node_text(child, code)
+                    if var_name in malloc_vars:
+                        result.ownership_transfer.add(var_name)
+
+        # 递归处理子节点
+        for child in node.children:
+            self._find_malloc_and_return(child, code, malloc_vars, result)
 
     def _handle_call_expression(self, node: Node, code: str, result: DataFlowResult):
         """
@@ -300,6 +395,23 @@ class DataFlowAnalyzer:
             result.null_check_ranges[var_name].append((line, scope_end))
             return
 
+        # 2.5. 指针解引用形式：pointer_expression（例如 if (*buffer)）
+        if node_type == "pointer_expression":
+            # 提取解引用的变量名
+            var_name = self._extract_dereferenced_var(node, code)
+            if var_name:
+                # 记录为解引用检查（格式：*var_name）
+                deref_name = f"*{var_name}"
+                if deref_name not in result.null_checks:
+                    result.null_checks[deref_name] = set()
+                result.null_checks[deref_name].add(line)
+
+                # 添加到null_check_ranges
+                if deref_name not in result.null_check_ranges:
+                    result.null_check_ranges[deref_name] = []
+                result.null_check_ranges[deref_name].append((line, scope_end))
+            return
+
         # 3. 比较表达式：binary_expression（例如 if (buffer != NULL)）
         if node_type == "binary_expression":
             operator_node = node.child_by_field_name("operator")
@@ -313,20 +425,43 @@ class DataFlowAnalyzer:
             if left is None or right is None:
                 return
 
+            # 处理逻辑运算符（&& 和 ||）
+            if operator in ("&&", "||"):
+                # 递归处理左右两个条件
+                self._parse_condition(left, code, line, scope_end, result)
+                self._parse_condition(right, code, line, scope_end, result)
+                return
+
             left_text = self._get_node_text(left, code)
             right_text = self._get_node_text(right, code)
 
             # 检测 != NULL 或 == NULL（使用AST节点类型识别）
             if operator == "!=":
-                # if (buffer != NULL) 或 if (NULL != buffer)
-                if self._is_null_constant(left, code) and right.type == "identifier":
-                    # NULL != buffer
-                    var_name = right_text
-                elif self._is_null_constant(right, code) and left.type == "identifier":
-                    # buffer != NULL
-                    var_name = left_text
-                else:
+                # if (buffer != NULL) 或 if (NULL != buffer) 或 if (*buf != NULL)
+                var_name = None
+                is_deref = False
+
+                if self._is_null_constant(left, code):
+                    # NULL != buffer 或 NULL != *buf
+                    if right.type == "identifier":
+                        var_name = right_text
+                    elif right.type == "pointer_expression":
+                        var_name = self._extract_dereferenced_var(right, code)
+                        is_deref = True
+                elif self._is_null_constant(right, code):
+                    # buffer != NULL 或 *buf != NULL
+                    if left.type == "identifier":
+                        var_name = left_text
+                    elif left.type == "pointer_expression":
+                        var_name = self._extract_dereferenced_var(left, code)
+                        is_deref = True
+
+                if var_name is None:
                     return
+
+                # 如果是解引用检查，添加*前缀
+                if is_deref:
+                    var_name = f"*{var_name}"
 
                 if var_name not in result.null_checks:
                     result.null_checks[var_name] = set()
@@ -361,6 +496,49 @@ class DataFlowAnalyzer:
 
             return
 
+    def _extract_dereferenced_var(self, node: Node, code: str) -> str | None:
+        """
+        从指针解引用表达式中提取变量名
+
+        Args:
+            node: AST节点（pointer_expression）
+            code: 源代码
+
+        Returns:
+            str | None: 变量名，如果无法提取则返回None
+        """
+        if node is None or node.type != "pointer_expression":
+            return None
+
+        # tree-sitter-c的pointer_expression结构：
+        # - 第一个子节点是 '*' (operator字段)
+        # - 第二个子节点是identifier或另一个pointer_expression
+        # 注意：operand字段可能不存在，需要遍历子节点
+
+        # 尝试获取operand字段
+        operand = node.child_by_field_name("operand")
+        if operand is None:
+            # 如果没有operand字段，遍历子节点找到非operator的节点
+            for child in node.children:
+                if child.type not in ("*", "operator"):
+                    operand = child
+                    break
+
+        if operand is None:
+            return None
+
+        # 如果操作数是identifier，直接返回变量名
+        if operand.type == "identifier":
+            return self._get_node_text(operand, code)
+
+        # 如果操作数是指针表达式（多重解引用），递归处理
+        if operand.type == "pointer_expression":
+            inner_var = self._extract_dereferenced_var(operand, code)
+            if inner_var:
+                return f"*{inner_var}"
+
+        return None
+
     def _is_null_constant(self, node: Node, code: str) -> bool:
         """
         判断节点是否为NULL常量
@@ -384,6 +562,10 @@ class DataFlowAnalyzer:
 
         # C++11 nullptr
         if node_type == "nullptr":
+            return True
+
+        # C语言 NULL 宏（null节点，tree-sitter-c特定）
+        if node_type == "null":
             return True
 
         # C语言 NULL 宏（identifier节点）
@@ -427,6 +609,9 @@ class DataFlowAnalyzer:
             DataFlowResult: 分析结果
         """
         lines = code.splitlines()
+
+        # 第零遍：识别函数参数和所有权转移
+        self._identify_function_info(lines, result)
 
         # 第一遍：收集基本信息
         for line_num, line in enumerate(lines, 1):
@@ -516,6 +701,108 @@ class DataFlowAnalyzer:
                                 result.dead_code_lines.add(inner_line_num)
                             if brace_count <= 0 and "{" in line:
                                 break
+
+    def _identify_function_info(self, lines: list[str], result: DataFlowResult):
+        """
+        识别函数参数和所有权转移信息
+
+        Args:
+            lines: 代码行列表
+            result: 分析结果
+        """
+        # 检测函数定义（更宽松的匹配）
+        # 匹配：void func_name(...) 或 int func_name(...) 等
+        func_pattern = (
+            r"(?:void|int|char|float|double|size_t|\w+)\s+\*?\s*(\w+)\s*\([^)]*\)\s*\{"
+        )
+        for line_num, line in enumerate(lines, 1):
+            match = re.search(func_pattern, line)
+            if match:
+                func_name = match.group(1)
+                # 提取函数参数（改进版本）
+                # 匹配模式：char** buf, int* data, void* ptr 等
+                # 提取括号内的参数列表
+                params_start = line.find("(")
+                params_end = line.find(")")
+                if params_start != -1 and params_end != -1:
+                    params_str = line[params_start + 1 : params_end]
+                    # 分割参数，提取参数名
+                    # 模式：type* name 或 type *name
+                    param_matches = re.findall(r"\w+\s*\*+\s*(\w+)", params_str)
+                    for param_name in param_matches:
+                        if param_name:
+                            if func_name not in result.function_params:
+                                result.function_params[func_name] = set()
+                            result.function_params[func_name].add(param_name)
+
+                            # 检查函数开头是否有参数NULL检查（前10行内）
+                            for check_line_num in range(
+                                line_num, min(line_num + 10, len(lines) + 1)
+                            ):
+                                check_line = lines[check_line_num - 1]
+                                # 模式1: if (param != NULL)
+                                if re.search(
+                                    rf"if\s*\(\s*{param_name}\s*!=\s*(NULL|nullptr|0)\s*\)",
+                                    check_line,
+                                ):
+                                    if param_name not in result.null_checks:
+                                        result.null_checks[param_name] = set()
+                                    result.null_checks[param_name].add(check_line_num)
+                                # 模式2: if (param == NULL) return
+                                if re.search(
+                                    rf"if\s*\(\s*{param_name}\s*==\s*(NULL|nullptr|0)\s*\)\s*{{?\s*return",
+                                    check_line,
+                                ):
+                                    if param_name not in result.null_checks:
+                                        result.null_checks[param_name] = set()
+                                    result.null_checks[param_name].add(check_line_num)
+                                # 模式3: if (param != NULL && *param != NULL) - 双重检查
+                                if re.search(
+                                    rf"if\s*\(\s*{param_name}\s*!=\s*(NULL|nullptr|0)\s*&&\s*\*{param_name}\s*!=\s*(NULL|nullptr|0)\s*\)",
+                                    check_line,
+                                ):
+                                    if param_name not in result.null_checks:
+                                        result.null_checks[param_name] = set()
+                                    result.null_checks[param_name].add(check_line_num)
+                                # 模式4: if (param == NULL || *param == NULL) return
+                                if re.search(
+                                    rf"if\s*\(\s*{param_name}\s*==\s*(NULL|nullptr|0)\s*\|\|\s*\*{param_name}\s*==\s*(NULL|nullptr|0)\s*\)\s*{{?\s*return",
+                                    check_line,
+                                ):
+                                    if param_name not in result.null_checks:
+                                        result.null_checks[param_name] = set()
+                                    result.null_checks[param_name].add(check_line_num)
+                                if param_name not in result.null_checks:
+                                    result.null_checks[param_name] = set()
+                                result.null_checks[param_name].add(check_line_num)
+
+                # 检测所有权转移：函数返回malloc分配的变量
+                # 在函数体内查找return语句
+                func_start = line_num
+                func_end = line_num
+                brace_count = 0
+                for end_line_num in range(line_num, len(lines) + 1):
+                    func_line = lines[end_line_num - 1]
+                    brace_count += func_line.count("{") - func_line.count("}")
+                    if brace_count == 0 and "}" in func_line:
+                        func_end = end_line_num
+                        break
+
+                # 在函数体内查找malloc和return
+                malloc_vars = set()
+                for body_line_num in range(func_start, func_end + 1):
+                    body_line = lines[body_line_num - 1]
+                    # 检测malloc分配
+                    malloc_match = re.search(
+                        r"(\w+)\s*=\s*(?:\([^)]*\))?\s*malloc\s*\(", body_line
+                    )
+                    if malloc_match:
+                        malloc_vars.add(malloc_match.group(1))
+
+                    # 检测return malloc变量
+                    for malloc_var in malloc_vars:
+                        if re.search(rf"return\s+{malloc_var}\s*;", body_line):
+                            result.ownership_transfer.add(malloc_var)
 
     def _identify_constraints(self, lines: list[str], result: DataFlowResult):
         """
