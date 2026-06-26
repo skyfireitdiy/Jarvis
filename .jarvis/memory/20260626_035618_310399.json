@@ -1,0 +1,8 @@
+{
+  "id": "20260626_035618_310399",
+  "type": "project_long_term",
+  "tags": ["启发式扫描优化", "测试通过", "成果总结"],
+  "content": "## 启发式扫描优化最终成果\n\n### 测试结果\n- 反例测试：100%通过（0误报）\n- 正例测试：100%通过（46/46）\n\n### 已修复的规则\n1. **open_permissive_perms**：增加权限检查，只报告过宽权限（0666、0777等），安全权限（0600、0640等）不报告\n2. **getenv_unchecked**：增加if判断检查，识别变量赋值后是否有NULL检查\n3. **realloc_assign_back**：修改规则检测realloc未赋值回的情况\n4. **new_delete_mismatch**：增加跨API检测（new/free、malloc/delete）\n\n### 关键文件\n- `src/jarvis/jarvis_sec/checkers/c_checker.py`\n\n### 注意事项\n- `analyze_c_cpp_text` 函数参数顺序为 `(relpath: str, text: str)`，注意不要传反\n- 测试数据集位于 `tests/jarvis_sec/datasets/`",
+  "created_at": "2026-06-26T03:56:18.310443",
+  "updated_at": "2026-06-26T03:56:18.310450"
+}

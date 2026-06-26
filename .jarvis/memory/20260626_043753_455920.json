@@ -1,0 +1,8 @@
+{
+  "id": "20260626_043753_455920",
+  "type": "project_long_term",
+  "tags": ["污点分析", "Joern", "集成完成"],
+  "content": "## 污点分析框架集成完成\n\n### 已完成工作\n1. **污点分析框架架构**（src/jarvis/jarvis_sec/taint_analyzer.py）- 静态检查通过\n2. **Joern分析器实现**（src/jarvis/jarvis_sec/joern_analyzer.py）- 静态检查通过\n3. **集成到启发式扫描**（src/jarvis/jarvis_sec/checkers/c_checker.py）- 测试通过\n\n### 集成方式\n- 在c_checker.py中添加可选依赖导入：`import jarvis.jarvis_sec.taint_analyzer as taint_analyzer`\n- 在analyze_c_cpp_text函数中添加污点分析调用\n- 污点分析失败时静默忽略，不影响启发式扫描\n- 将TaintPath转换为Issue对象\n\n### 关键代码位置\n- 导入：c_checker.py第31-36行\n- 调用：c_checker.py第3207-3228行\n\n### 测试结果\n- 正例测试：100%通过（46/46）\n- 反例测试：100%通过（0误报）\n\n### Joern安装要求\nJoern是外部CLI工具，需要单独安装：\n```bash\n# 下载并安装Joern\nwget https://github.com/joernio/joern/releases/latest/download/joern-install.sh\nchmod +x joern-install.sh\n./joern-install.sh --install-dir=/usr/local/bin\n```\n\n### 注意事项\n- 污点分析是可选功能，不影响启发式扫描\n- Joern未安装时，污点分析自动跳过\n- 当前Joern分析器为骨架实现，_run_taint_analysis方法待完善",
+  "created_at": "2026-06-26T04:37:53.455963",
+  "updated_at": "2026-06-26T04:37:53.455969"
+}
