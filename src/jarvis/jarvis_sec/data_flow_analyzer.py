@@ -44,12 +44,26 @@ class PointerInfo:
     
 
 @dataclass
+class ConstraintInfo:
+    """约束条件信息"""
+    var_name: str
+    constraint_type: str  # 'not_null', 'is_null', 'lt', 'gt', 'eq'
+    line: int
+    scope_start: int  # 约束作用范围起始行
+    scope_end: int = -1  # 约束作用范围结束行（-1表示到文件末尾）
+
+
+@dataclass
 class DataFlowResult:
     """数据流分析结果"""
     pointer_states: dict[str, PointerInfo] = field(default_factory=dict)
     safe_accesses: set[int] = field(default_factory=set)  # 安全访问的行号
     unsafe_accesses: set[int] = field(default_factory=set)  # 不安全访问的行号
     null_checks: dict[str, set[int]] = field(default_factory=dict)  # NULL检查位置
+    constraints: list[ConstraintInfo] = field(default_factory=list)  # 约束条件列表
+    dead_code_lines: set[int] = field(default_factory=set)  # 死代码行号
+    aliases: dict[str, list[str]] = field(default_factory=dict)  # 指针别名映射
+    return_lines: set[int] = field(default_factory=set)  # return语句行号
     
 
 class DataFlowAnalyzer:
