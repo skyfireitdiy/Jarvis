@@ -31,6 +31,9 @@ from jarvis.jarvis_sec.types import Issue
 # 污点分析框架（核心依赖）
 import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
 
+# 数据流分析器（用于误报过滤）
+from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer
+
 # ---------------------------
 # 规则库（正则表达式）
 # ---------------------------
