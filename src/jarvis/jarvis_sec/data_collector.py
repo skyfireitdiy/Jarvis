@@ -199,7 +199,9 @@ class DataCollector:
 
         self._traverse_ast(node, code, file_path, result)
 
-    def _traverse_ast(self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str = 'global')
+    def _traverse_ast(
+        self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str = 'global'
+    ):
         """
         递归遍历AST
 
