@@ -1773,8 +1773,20 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
 
     for idx, s in enumerate(lines, start=1):
         if alloc_pattern.search(s):
-            # 检测乘法溢出
-            mul_match = mul_pattern.search(s)
+            # 提取malloc/calloc/realloc参数部分
+            # 例如：malloc(count * size) -> 提取 "count * size"
+            try:
+                # 找到malloc后的括号内容
+                alloc_start = s.index('(') + 1
+                # 找到匹配的右括号（简化处理：找第一个右括号）
+                alloc_end = s.index(')', alloc_start)
+                alloc_arg = s[alloc_start:alloc_end].strip()
+            except (ValueError, IndexError):
+                # 无法提取参数，跳过
+                continue
+
+            # 检测乘法溢出（只在malloc参数中检测）
+            mul_match = mul_pattern.search(alloc_arg)
             if mul_match:
                 var1, var2 = mul_match.group(1), mul_match.group(2)
                 # 检查是否有前置的溢出检查
@@ -1794,8 +1806,8 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
                         )
                     )
 
-            # 检测加法溢出
-            add_match = add_pattern.search(s)
+            # 检测加法溢出（只在malloc参数中检测）
+            add_match = add_pattern.search(alloc_arg)
             if add_match:
                 var1, var2 = add_match.group(1), add_match.group(2)
                 # 检查是否有前置的溢出检查
