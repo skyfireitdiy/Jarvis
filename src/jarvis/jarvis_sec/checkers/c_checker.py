@@ -1743,8 +1743,9 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 内存分配函数模式
     alloc_pattern = re.compile(r'\b(malloc|calloc|realloc)\s*\(')
 
-    # 检测乘法或加法表达式
-    mul_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)')
+    # 检测乘法或加法表达式（排除指针声明）
+    # 乘法模式：var * var，但排除 (type *)var 或 *var（指针声明/解引用）
+    mul_pattern = re.compile(r'(?<![(*])\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)(?!\s*\))')
     add_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)')
 
     # 溢出检查模式（安全模式）
