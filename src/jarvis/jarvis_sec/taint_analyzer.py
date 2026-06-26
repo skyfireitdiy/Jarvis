@@ -333,6 +333,34 @@ MEMORY_SINKS = [
     ),
 ]
 
+# 内存释放（UAF源）
+FREE_SOURCES = [
+    TaintSource("free", "memory_free", "释放内存", ["free"]),
+    TaintSource("delete", "memory_free", "删除对象", ["delete"]),
+]
+
+# 指针解引用（UAF汇）
+DEREF_SINKS = [
+    TaintSink(
+        "pointer_deref",
+        "pointer_access",
+        TaintSeverity.CRITICAL,
+        "指针解引用",
+        ["->", "*", "[]"],
+    ),
+]
+
+# Double Free汇
+FREE_SINKS = [
+    TaintSink(
+        "free",
+        "memory_free",
+        TaintSeverity.CRITICAL,
+        "释放内存",
+        ["free"],
+    ),
+]
+
 # ============================================================================
 # 预定义规则库
 # ============================================================================
@@ -377,6 +405,22 @@ TAINT_RULES: Dict[str, TaintRule] = {
         ["strncpy", "snprintf"],
         TaintSeverity.HIGH,
         "缓冲区溢出：用户输入用于不安全的内存操作",
+    ),
+    "use_after_free": TaintRule(
+        "use_after_free",
+        FREE_SOURCES,
+        DEREF_SINKS,
+        [],  # 无净化函数
+        TaintSeverity.CRITICAL,
+        "Use-After-Free：释放后的内存被解引用使用",
+    ),
+    "double_free": TaintRule(
+        "double_free",
+        FREE_SOURCES,
+        FREE_SINKS,
+        [],  # 无净化函数
+        TaintSeverity.CRITICAL,
+        "Double Free：同一内存被重复释放",
     ),
 }
 
