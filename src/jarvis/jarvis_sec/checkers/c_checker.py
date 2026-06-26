@@ -798,12 +798,43 @@ def _rule_function_return_ptr_no_check(
 
 def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    启发式 UAF（use-after-free）线索检测（准确性优化版）：
-    - 仅在 free(var) 之后的窗口内检测到明显“解引用使用”（v->、*v、v[...）而且在此之前未见重新赋值/置空时告警
+    UAF（use-after-free）检测（污点分析 + 启发式回退）：
+    - 优先使用污点分析检测 free -> 解引用 的污点传播路径
+    - 若污点分析不可用，回退到启发式检测
+    - 启发式：仅在 free(var) 之后的窗口内检测到明显“解引用使用”（v->、*v、v[...）而且在此之前未见重新赋值/置空时告警
     - 忽略 free 后立即将指针置为 NULL/0 的情况
-    说明：仍为启发式，需要结合上下文确认。
     """
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["use_after_free", "double_free"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="use_after_free_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or f"{path.source} -> {path.sink}",
+                    description=path.description
+                    or f"污点分析检测到UAF风险：{path.source} -> {path.sink}",
+                    suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
+                    confidence=path.confidence,
+                    severity="critical"
+                    if path.severity.value == "critical"
+                    else "high",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
     # 收集所有 free(var) 位置
     free_calls: List[Tuple[str, int]] = []
     for idx, s in enumerate(lines, start=1):
@@ -995,6 +1026,34 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
         "QT_TRANSLATE_NOOP",
     )
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["format_string"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="unsafe_usage",
+                    pattern="format_string_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or f"{path.source} -> {path.sink}",
+                    description=path.description
+                    or f"污点分析检测到格式化字符串风险：{path.source} -> {path.sink}",
+                    suggestion="使用常量格式串并对外部输入进行参数化处理；避免将未验证的输入作为格式串。",
+                    confidence=path.confidence,
+                    severity="high",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
 
     def _arg_is_literal(s: str, j: int) -> bool:
         while j < len(s) and s[j].isspace():
@@ -1203,12 +1262,45 @@ def _rule_insecure_tmpfile(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
-    检测命令执行API：system/popen 和 exec* 系列，其中参数不是字面量（可能引入命令注入风险）
+    命令执行漏洞检测（污点分析 + 启发式回退）：
+    - 优先使用污点分析检测用户输入 -> 命令执行函数 的污点传播路径
+    - 若污点分析不可用，回退到启发式检测
+    - 启发式：检测 system/popen 和 exec* 系列，其中参数不是字面量（可能引入命令注入风险）
     准确性优化：
     - exec* 系列仅在第一个参数不是字面量路径时告警
     - 若第一个参数为变量名，向前回看若干行，若检测到该变量被赋值为字面量字符串，则视为较安全用法（跳过）
     """
     issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["command_injection"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="unsafe_usage",
+                    pattern="command_exec_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or f"{path.source} -> {path.sink}",
+                    description=path.description
+                    or f"污点分析检测到命令注入风险：{path.source} -> {path.sink}",
+                    suggestion="避免拼接命令，使用参数化接口或受控白名单；严格校验/转义外部输入。",
+                    confidence=path.confidence,
+                    severity="critical"
+                    if path.severity.value == "critical"
+                    else "high",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
 
     def _arg_is_literal_or_wrapper(s: str, start_idx: int) -> bool:
         # 跳过空白，判断是否直接为字面量

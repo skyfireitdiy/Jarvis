@@ -1,0 +1,8 @@
+{
+  "id": "20260626_070603_462401",
+  "type": "project_long_term",
+  "tags": ["污点分析", "测试数据集", "已完成"],
+  "content": "## 污点分析测试数据集创建完成\n\n### 完成状态\n- 测试数据集目录：7个（taint_* 5个 + memory_leak + double_free）\n- 测试文件总数：66个C源文件\n- 测试结果：100%通过（2/2）\n\n### 测试数据集覆盖范围\n1. **命令注入（taint_command_injection）**\n   - positive_getenv_to_system.c：getenv -> system 污点传播\n   - negative_getenv_sanitized.c：有净化的命令执行\n\n2. **格式化字符串漏洞（taint_format_string）**\n   - positive_user_input_to_printf.c：用户输入 -> printf 污点传播\n   - negative_constant_format.c：常量格式字符串\n\n3. **路径遍历（taint_path_traversal）**\n   - positive_user_input_to_open.c：用户输入 -> open 污点传播\n   - negative_path_sanitized.c：有净化的路径操作\n\n4. **SQL注入（taint_sql_injection）**\n   - positive_user_input_to_sql.c：用户输入 -> SQL拼接 污点传播\n   - negative_sql_parameterized.c：参数化查询\n\n5. **缓冲区溢出（taint_buffer_overflow）**\n   - positive_user_input_to_strcpy.c：用户输入 -> strcpy 污点传播\n   - negative_user_input_to_strncpy.c：使用strncpy限制长度\n\n6. **内存泄漏（memory_leak）**\n   - positive_malloc_no_free.c：malloc后未释放\n\n7. **Double Free（double_free）**\n   - positive_double_free.c：同一内存释放两次\n   - negative_single_free.c：正确释放一次\n\n### 文件命名规范\n- 正例：positive_*.c（应该检测到问题）\n- 反例：negative_*.c（不应该检测到问题）\n\n### 验证结果\n- 启发式扫描测试：100%通过（正例46/46、反例0误报）\n- 污点分析测试：100%通过（8/8）\n- 静态检查：ruff check通过\n\n### 关键文件路径\n- 测试数据集目录：tests/jarvis_sec/datasets/\n- 污点分析测试：tests/jarvis_sec/test_taint_analyzer.py\n- 启发式扫描测试：tests/jarvis_sec/test_checkers.py",
+  "created_at": "2026-06-26T07:06:03.462443",
+  "updated_at": "2026-06-26T07:06:03.462450"
+}

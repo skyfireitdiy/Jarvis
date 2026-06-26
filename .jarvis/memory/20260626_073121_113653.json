@@ -1,0 +1,8 @@
+{
+  "id": "20260626_073121_113653",
+  "type": "project_long_term",
+  "tags": ["污点规则", "UAF", "Double-Free", "定义位置"],
+  "content": "UAF污点规则定义位置：taint_analyzer.py第335-367行定义FREE_SOURCES、DEREF_SINKS、FREE_SINKS；第408-424行定义use_after_free和double_free规则。FREE_SOURCES包含free/delete，DEREF_SINKS包含指针解引用操作（->、*、[]）。",
+  "created_at": "2026-06-26T07:31:21.113676",
+  "updated_at": "2026-06-26T07:31:21.113680"
+}

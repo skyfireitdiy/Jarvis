@@ -55,6 +55,66 @@ class JoernAnalyzer(TaintAnalyzer):
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
+    def is_available(self) -> bool:
+        """
+        检查分析器是否可用
+
+        Returns:
+            bool: True如果Joern已安装并可用
+        """
+        return self._check_joern_available()
+
+    def get_name(self) -> str:
+        """
+        获取分析器名称
+
+        Returns:
+            str: 分析器名称
+        """
+        return "Joern"
+
+    def get_version(self) -> str:
+        """
+        获取分析器版本
+
+        Returns:
+            str: 分析器版本号
+        """
+        try:
+            result = subprocess.run(
+                [self.joern_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                # 解析版本号
+                import re
+
+                match = re.search(r"(\d+\.\d+\.\d+)", result.stdout)
+                if match:
+                    return match.group(1)
+            return "unknown"
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return "unknown"
+
+    def analyze_file(self, file_path: str) -> List[TaintPath]:
+        """
+        分析文件
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            List[TaintPath]: 污点传播路径列表
+        """
+        try:
+            with open(file_path, "r") as f:
+                source_code = f.read()
+            return self.analyze(source_code, file_path)
+        except (IOError, OSError):
+            return []
+
     def analyze(self, source_code: str, file_path: str = "") -> List[TaintPath]:
         """
         分析源代码中的污点传播路径
