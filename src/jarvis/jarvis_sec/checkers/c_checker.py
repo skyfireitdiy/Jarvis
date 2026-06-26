@@ -1962,6 +1962,9 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
             # 跳过静态/全局变量（通常在初始化时已确保非空）
             if v in safe_vars:
                 continue
+            # 跳过栈数组（栈数组不可能为NULL）
+            if v in stack_arrays:
+                continue
             # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
             if _is_just_allocated(v, lines, idx):
                 continue
