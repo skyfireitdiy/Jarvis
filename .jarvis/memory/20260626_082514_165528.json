@@ -1,0 +1,8 @@
+{
+  "id": "20260626_082514_165528",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "命令行入口", "CLI", "jsec"],
+  "content": "## 启发式扫描命令行入口\n\n### 命令名称\n`jsec heuristic`\n\n### 功能特点\n- 快速：纯静态分析，无需LLM调用\n- 全面：覆盖38+启发式规则\n- 精准：集成污点分析，减少误报\n\n### 使用示例\n```bash\n# 扫描单个文件（JSON格式）\njsec heuristic ./src/main.c\n\n# 扫描目录（Markdown格式）\njsec heuristic ./src --format markdown\n\n# 扫描并保存到文件\njsec heuristic ./src --output report.json\n\n# 指定规则过滤\njsec heuristic ./src --rules unsafe_api,buffer_overflow\n```\n\n### 参数说明\n- `target`: 扫描目标（文件或目录路径）\n- `--format, -f`: 输出格式（json/markdown，默认json）\n- `--output, -o`: 输出文件路径（默认输出到终端）\n- `--rules, -r`: 规则过滤（逗号分隔）\n\n### 关键文件\n- `src/jarvis/jarvis_sec/cli.py`（新增heuristic命令）\n\n### 验证状态\n- 静态检查通过（ruff check）\n- 功能验证通过（扫描测试文件成功）",
+  "created_at": "2026-06-26T08:25:14.165582",
+  "updated_at": "2026-06-26T08:25:14.165589"
+}

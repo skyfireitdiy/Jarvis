@@ -1073,14 +1073,27 @@ def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 使用 strncpy/strncat 后未确保目标缓冲区以 NUL 结尾的常见隐患（启发式）
+    # 优化：识别安全的strncpy用法（sizeof(buffer)-1 + 手动终止符）
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
         if RE_STRNCPY.search(s) or RE_STRNCAT.search(s):
+            # 检查是否为安全的strncpy用法
+            # 1. 检查当前行是否使用sizeof(buffer)-1模式
+            safe_sizeof_pattern = re.search(r"sizeof\s*\(\s*\w+\s*\)\s*-\s*1", s)
+            # 2. 检查后续行是否有手动终止符
+            window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=3))
+            has_null_term = re.search(
+                r"\w+\s*\[\s*sizeof\s*\(\s*\w+\s*\)\s*-\s*1\s*\]\s*=\s*'\\0'",
+                window_text,
+            )
+            # 如果是安全用法，跳过报告
+            if safe_sizeof_pattern and has_null_term:
+                continue
+
             conf = 0.55
             # 若邻近窗口未出现手动 '\0' 终止或显式长度-1 等处理，提升风险
-            window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=2))
             if not re.search(
-                r"\\0|'\0'|\"\\0\"|len\s*-\s*1|sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
+                r"\\0|'\\0'|\"\\0\"|len\s*-\s*1|sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
                 window_text,
             ):
                 conf += 0.15
@@ -1093,7 +1106,7 @@ def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]
                     line=idx,
                     evidence=_strip_line(s),
                     description="使用 strncpy/strncat 可能未自动添加 NUL 终止，导致潜在字符串未终止风险。",
-                    suggestion="确保目标缓冲区以 '\\0' 终止（例如手动结尾或采用更安全 API）。",
+                    suggestion="确保目标缓冲区以 '\0' 终止（例如手动结尾或采用更安全 API）。",
                     confidence=min(conf, 0.75),
                     severity=_severity_from_confidence(conf, "buffer_overflow"),
                 )
