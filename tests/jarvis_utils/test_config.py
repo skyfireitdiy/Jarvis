@@ -2,9 +2,16 @@
 """jarvis_utils.config 模块插件功能单元测试"""
 
 import yaml
+import pytest
 
 from jarvis.jarvis_utils.config import get_plugin_dirs, GLOBAL_CONFIG_DATA
 from jarvis.jarvis_utils.utils import _load_plugin_configs
+
+
+@pytest.fixture
+def disable_auto_discover(monkeypatch):
+    """禁用自动发现功能，避免测试时加载真实的 ~/.jarvis/plugins 目录"""
+    monkeypatch.setenv("JARVIS_DISABLE_AUTO_DISCOVER", "1")
 
 
 class TestGetPluginDirs:
@@ -41,6 +48,11 @@ class TestGetPluginDirs:
 
 class TestLoadPluginConfigs:
     """测试 _load_plugin_configs 函数"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, disable_auto_discover):
+        """为所有测试禁用自动发现"""
+        pass
 
     def test_empty_plugin_dirs(self):
         """测试空插件目录列表"""
@@ -154,6 +166,11 @@ class TestLoadPluginConfigs:
 
 class TestConfigPriority:
     """测试配置优先级"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, disable_auto_discover):
+        """为所有测试禁用自动发现"""
+        pass
 
     def test_project_config_priority_over_plugin(self, tmp_path):
         """测试项目配置优先级高于插件配置"""
@@ -421,3 +438,151 @@ path3: {{plugin_dir}}/path3
         assert result["path1"] == f"{expected_path}/path1"
         assert result["path2"] == f"{expected_path}/path2"
         assert result["path3"] == f"{expected_path}/path3"
+
+
+class TestInstallPlugin:
+    """测试 install_plugin 函数"""
+
+    def test_install_from_directory(self, tmp_path, monkeypatch):
+        """测试从目录安装插件"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        # 创建临时插件目录
+        plugin_source = tmp_path / "my_plugin"
+        plugin_source.mkdir()
+
+        # 创建插件配置文件
+        config_content = """name: test-plugin
+model: plugin-model
+tool_load_dirs:
+  - '{{plugin_dir}}/tools'
+"""
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        # Mock 数据目录到临时目录
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 安装插件
+        result = install_plugin(str(plugin_source))
+
+        # 验证安装成功
+        assert result is True
+        # 插件名从 config.yaml 的 name 字段读取
+        assert (test_data_dir / "plugins" / "test-plugin").exists()
+        assert (test_data_dir / "plugins" / "test-plugin" / "config.yaml").exists()
+
+    def test_install_from_zip(self, tmp_path, monkeypatch):
+        """测试从 zip 文件安装插件"""
+        import zipfile
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        # 创建临时插件目录
+        plugin_source = tmp_path / "zip_plugin"
+        plugin_source.mkdir()
+
+        config_content = "name: zip-plugin\nmodel: zip-model\n"
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        # 创建 zip 文件
+        zip_file = tmp_path / "plugin.zip"
+        with zipfile.ZipFile(zip_file, "w") as zf:
+            zf.write(plugin_source / "config.yaml", "config.yaml")
+
+        # Mock 数据目录
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 安装插件
+        result = install_plugin(str(zip_file))
+
+        # 验证安装成功
+        assert result is True
+        assert (test_data_dir / "plugins" / "zip-plugin").exists()
+
+    def test_install_missing_config_yaml(self, tmp_path, monkeypatch):
+        """测试安装缺少 config.yaml 的插件"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        # 创建临时插件目录（无 config.yaml）
+        plugin_source = tmp_path / "invalid_plugin"
+        plugin_source.mkdir()
+        with open(plugin_source / "readme.txt", "w") as f:
+            f.write("This is not a valid plugin")
+
+        # Mock 数据目录
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 安装插件应失败
+        result = install_plugin(str(plugin_source))
+        assert result is False
+
+
+class TestAutoDiscoverPlugins:
+    """测试自动发现插件功能"""
+
+    def test_auto_discover_plugins(self, tmp_path, monkeypatch):
+        """测试自动发现 plugins 目录下的插件"""
+        from jarvis.jarvis_utils.utils import _load_plugin_configs
+
+        # Mock 数据目录
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 创建插件目录
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+
+        plugin1 = plugins_dir / "plugin1"
+        plugin1.mkdir()
+        with open(plugin1 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"model": "plugin1-model", "key1": "value1"}, f)
+
+        plugin2 = plugins_dir / "plugin2"
+        plugin2.mkdir()
+        with open(plugin2 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"model": "plugin2-model", "key2": "value2"}, f)
+
+        # 加载配置（不指定 plugin_dirs）
+        base_config = {}
+        result = _load_plugin_configs(base_config)
+
+        # 验证自动发现的插件已加载
+        # 使用 sorted() 保证字典序遍历，后加载的覆盖前面的，model 应为 plugin2-model
+        assert result["model"] == "plugin2-model"
+        assert result["key1"] == "value1"
+        assert result["key2"] == "value2"
+
+    def test_auto_discover_with_config_dirs(self, tmp_path, monkeypatch):
+        """测试配置指定的插件目录和自动发现的插件目录合并"""
+        from jarvis.jarvis_utils.utils import _load_plugin_configs
+
+        # Mock 数据目录
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 创建配置指定的插件
+        config_plugin = tmp_path / "config_plugin"
+        config_plugin.mkdir()
+        with open(config_plugin / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"model": "config-model", "config_key": "config_value"}, f)
+
+        # 创建自动发现的插件
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        auto_plugin = plugins_dir / "auto_plugin"
+        auto_plugin.mkdir()
+        with open(auto_plugin / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"auto_key": "auto_value"}, f)
+
+        # 加载配置（指定 plugin_dirs）
+        base_config = {"plugin_dirs": [str(config_plugin)]}
+        result = _load_plugin_configs(base_config)
+
+        # 验证两种插件都已加载
+        assert result["model"] == "config-model"  # 配置指定的插件
+        assert result["config_key"] == "config_value"
+        assert result["auto_key"] == "auto_value"  # 自动发现的插件

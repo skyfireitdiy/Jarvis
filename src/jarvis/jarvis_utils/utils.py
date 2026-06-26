@@ -1409,14 +1409,28 @@ def _load_plugin_configs(
         即：merged_config（项目配置）会覆盖 plugin_config（插件配置）
     """
     from jarvis.jarvis_utils.output import PrettyOutput
+    from jarvis.jarvis_utils.config import get_data_dir
+
+    # 自动发现 plugins 目录下的子目录（可通过环境变量 JARVIS_DISABLE_AUTO_DISCOVER 禁用）
+    auto_discovered_dirs = []
+    if not os.environ.get("JARVIS_DISABLE_AUTO_DISCOVER"):
+        data_dir = Path(get_data_dir())
+        plugins_dir = data_dir / "plugins"
+        if plugins_dir.exists() and plugins_dir.is_dir():
+            for item in sorted(plugins_dir.iterdir()):  # 使用字典序保证顺序一致
+                if item.is_dir() and (item / "config.yaml").exists():
+                    auto_discovered_dirs.append(str(item))
 
     # 从配置中读取插件目录列表
     plugin_dirs = merged_config.get("plugin_dirs", [])
-    if not plugin_dirs:
-        return merged_config
 
-    if not isinstance(plugin_dirs, list):
-        PrettyOutput.auto_print("⚠️ plugin_dirs 配置格式错误，应为列表")
+    # 合并自动发现和配置指定的插件目录（配置指定的在前）
+    if isinstance(plugin_dirs, list):
+        all_plugin_dirs = plugin_dirs + auto_discovered_dirs
+    else:
+        all_plugin_dirs = auto_discovered_dirs
+
+    if not all_plugin_dirs:
         return merged_config
 
     # 确定相对路径的基准目录
@@ -1426,7 +1440,7 @@ def _load_plugin_configs(
     combined_plugin_config: Dict[str, Any] = {}
 
     # 遍历每个插件目录，加载配置
-    for plugin_dir in plugin_dirs:
+    for plugin_dir in all_plugin_dirs:
         if not isinstance(plugin_dir, str):
             PrettyOutput.auto_print(
                 f"⚠️  plugin_dirs 中的元素不是字符串类型: {plugin_dir}"
