@@ -1,0 +1,8 @@
+{
+  "id": "20260626_042427_024674",
+  "type": "project_long_term",
+  "tags": ["污点分析框架", "架构设计", "当前进度"],
+  "content": "## 污点分析框架集成进度\n\n### 已完成\n1. **污点分析框架架构**（src/jarvis/jarvis_sec/taint_analyzer.py）\n   - 定义TaintPath、TaintSource、TaintSink数据结构\n   - 定义TaintAnalyzer抽象基类\n   - 定义TaintRule规则类\n   - 预定义5个核心规则：command_injection、format_string、path_traversal、sql_injection、buffer_overflow\n   - 实现TaintAnalyzerFactory工厂模式\n   - 静态检查通过\n\n### 进行中\n2. **Joern分析器实现**（src/jarvis/jarvis_sec/joern_analyzer.py）\n   - 遇到语法问题：heredoc和Python字符串创建方式都有转义问题\n   - 需要采用更简单的方式创建文件\n\n### 待完成\n3. 集成到启发式扫描\n4. 编写测试用例\n\n### 技术栈\n- Joern：Apache 2.0许可，基于CPG的污点分析\n- PhASAR：MIT许可，基于LLVM的深度数据流分析（备选）\n- SVF：GPL许可，指针分析和值流分析（备选）\n\n### 关键文件\n- src/jarvis/jarvis_sec/taint_analyzer.py（已完成）\n- src/jarvis/jarvis_sec/joern_analyzer.py（待修复）",
+  "created_at": "2026-06-26T04:24:27.024704",
+  "updated_at": "2026-06-26T04:24:27.024711"
+}

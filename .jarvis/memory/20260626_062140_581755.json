@@ -1,0 +1,8 @@
+{
+  "id": "20260626_062140_581755",
+  "type": "project_long_term",
+  "tags": ["污点分析", "核心功能", "集成完成"],
+  "content": "## 污点分析从可选改为核心功能\n\n### 完成状态\n- 污点分析已从可选依赖改为核心依赖\n- 移除了TAINT_ANALYZER_AVAILABLE检查\n- 污点分析在analyze_c_cpp_text中作为核心功能集成\n- 测试全部通过（正例100%、反例100%）\n\n### 关键修改\n1. **导入部分**：将可选导入改为必需导入\n2. **调用部分**：移除可选检查，直接调用污点分析\n3. **异常处理**：保持静默忽略，不影响启发式扫描\n\n### 关键文件\n- src/jarvis/jarvis_sec/checkers/c_checker.py（已修改）\n- src/jarvis/jarvis_sec/taint_analyzer.py（污点分析框架）\n- src/jarvis/jarvis_sec/joern_analyzer.py（Joern分析器）\n\n### 验证结果\n- ruff check通过\n- ruff format通过\n- 测试通过（2个测试用例）\n\n### 注意事项\n- 污点分析现在是核心功能，但失败时仍静默忽略\n- 启发式规则保持不变，污点分析提供额外的数据流追踪\n- Joern需要单独安装CLI工具",
+  "created_at": "2026-06-26T06:21:40.581791",
+  "updated_at": "2026-06-26T06:21:40.581797"
+}
