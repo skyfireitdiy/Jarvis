@@ -722,8 +722,13 @@ def get_data_dir() -> str:
     获取Jarvis数据存储目录路径。
 
     返回:
-        str: 数据目录路径，默认为 ~/.jarvis
+        str: 数据目录路径，默认为 ~/.jarvis，可通过环境变量 JARVIS_DATA_DIR 覆盖
     """
+    # 优先使用环境变量
+    env_data_dir = os.environ.get("JARVIS_DATA_DIR")
+    if env_data_dir:
+        return env_data_dir
+    # 默认使用 ~/.jarvis
     return os.path.expanduser("~/.jarvis")
 
 
