@@ -2831,32 +2831,44 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
 
             # 如果未检测到锁保护，且是写操作，风险更高
             if not has_lock or (lock_line and unlocked):
-                conf = 0.6
-                if is_write:
-                    conf += 0.15
-                if var in volatile_vars:
-                    # volatile 不能保证线程安全，但可能被误用
-                    conf += 0.1
+                # 优化：只对明确的写操作报告，读操作大幅降低置信度
+                if not is_write:
+                    # 纯读操作在没有锁的情况下风险较低，跳过报告
+                    # 除非是 volatile 变量（可能被误用）
+                    if var not in volatile_vars:
+                        continue
+                    conf = 0.4  # volatile 读操作，低置信度
+                else:
+                    conf = 0.6
+                    if var in volatile_vars:
+                        # volatile 不能保证线程安全，但可能被误用
+                        conf += 0.1
 
                 # 检查是否在函数参数中（可能是局部变量，降低风险）
                 if "(" in s and ")" in s:
                     # 可能是函数调用参数，降低置信度
                     conf -= 0.1
 
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="concurrency",
-                        pattern="data_race_suspect",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"共享变量 {var} 在多线程环境下访问但未见明确的锁保护，可能存在数据竞争风险。",
-                        suggestion="使用互斥锁保护共享变量访问；或使用原子操作（std::atomic）进行无锁编程；注意 volatile 不能保证线程安全。",
-                        confidence=min(conf, 0.85),
-                        severity="high" if conf >= 0.7 else "medium",
+                # 进一步降低置信度：如果附近有锁，即使不在临界区内，也可能有其他保护机制
+                if has_lock and (lock_line and unlocked):
+                    conf -= 0.15  # 有锁但已解锁，可能是有意设计
+
+                # 只报告置信度足够高的问题
+                if conf >= 0.5:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="concurrency",
+                            pattern="data_race_suspect",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"共享变量 {var} 在多线程环境下访问但未见明确的锁保护，可能存在数据竞争风险。",
+                            suggestion="使用互斥锁保护共享变量访问；或使用原子操作（std::atomic）进行无锁编程；注意 volatile 不能保证线程安全。",
+                            confidence=min(conf, 0.85),
+                            severity="high" if conf >= 0.7 else "medium",
+                        )
                     )
-                )
 
     # 检测 volatile 的误用（volatile 不能保证线程安全）
     for idx, s in enumerate(lines, start=1):
