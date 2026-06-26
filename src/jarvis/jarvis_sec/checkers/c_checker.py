@@ -28,6 +28,13 @@ from typing import Tuple
 
 from jarvis.jarvis_sec.types import Issue
 
+# 污点分析框架（可选依赖）
+try:
+    from jarvis.jarvis_sec.taint_analyzer import TaintAnalyzerFactory
+    TAINT_ANALYZER_AVAILABLE = True
+except ImportError:
+    TAINT_ANALYZER_AVAILABLE = False
+
 # ---------------------------
 # 规则库（正则表达式）
 # ---------------------------
