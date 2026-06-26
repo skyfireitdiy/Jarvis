@@ -31,6 +31,7 @@ from jarvis.jarvis_sec.types import Issue
 # 污点分析框架（可选依赖）
 try:
     import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
+
     TAINT_ANALYZER_AVAILABLE = True
 except ImportError:
     TAINT_ANALYZER_AVAILABLE = False
@@ -3202,7 +3203,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
     # 数据竞争检测
     issues.extend(_rule_data_race_suspect(mlines, relpath))
-    
+
     # 污点分析（可选，需要安装Joern）
     if TAINT_ANALYZER_AVAILABLE:
         try:
@@ -3227,7 +3228,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
         except Exception:
             # 污点分析失败时静默忽略，不影响启发式扫描
             pass
-    
+
     return issues
 
 
