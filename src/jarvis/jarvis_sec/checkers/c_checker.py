@@ -2754,12 +2754,16 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 shared_vars.add(var)
 
         # 检测全局变量声明（文件作用域）
-        if idx == 1 or (idx > 1 and _safe_line(lines, idx - 1).strip().endswith("}")):
-            # 可能是文件作用域的变量
+        # 改进：检查是否在函数外部（行首没有缩进，且不在函数体内）
+        # 简化判断：行首没有空格/制表符的变量声明，且不是函数参数
+        if not s.startswith(' ') and not s.startswith('\t'):
+            # 可能是文件作用域的变量声明
             m_global = re.search(r"^[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)\s*[=;]", s)
             if m_global and "const" not in s.lower() and "static" not in s.lower():
-                var = m_global.group(1)
-                shared_vars.add(var)
+                # 排除函数声明（检查是否有括号）
+                if '(' not in s:
+                    var = m_global.group(1)
+                    shared_vars.add(var)
 
         # 检测线程创建
         if RE_PTHREAD_CREATE.search(s) or RE_STD_THREAD.search(s):
