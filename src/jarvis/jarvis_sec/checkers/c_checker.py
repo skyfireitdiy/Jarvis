@@ -1661,6 +1661,15 @@ def _rule_memory_leak(lines: Sequence[str], relpath: str) -> List[Issue]:
                     # 找到分配行号
                     for i, line in enumerate(func_lines, start=func_start):
                         if alloc_pattern.search(line):
+                            # 提取变量名
+                            var_name = None
+                            match = re.search(
+                                r"\b(\w+)\s*=\s*(?:\([^)]*\))?\s*(?:malloc|calloc|realloc)\s*\(",
+                                line,
+                            )
+                            if match:
+                                var_name = match.group(1)
+
                             issues.append(
                                 Issue(
                                     language="c/cpp",
@@ -1673,6 +1682,7 @@ def _rule_memory_leak(lines: Sequence[str], relpath: str) -> List[Issue]:
                                     suggestion="确保在所有代码路径上释放分配的内存，或使用RAII模式。",
                                     confidence=0.6,
                                     severity="medium",
+                                    var_name=var_name,
                                 )
                             )
                             break
@@ -2206,6 +2216,7 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
                         suggestion="在使用指针前执行 NULL 判定；确保所有返回/赋值路径均进行了合法性检查。",
                         confidence=0.6,
                         severity="high",
+                        var_name=v,
                     )
                 )
     return issues
@@ -4129,7 +4140,7 @@ def _is_uaf_false_positive(
     line_num = issue.line
 
     # 从问题消息中提取变量名
-    var_name = _extract_variable_name(issue.evidence)
+    var_name = _extract_variable_name(issue)
     if not var_name:
         return False
 
@@ -4154,7 +4165,7 @@ def _is_double_free_false_positive(
     2. 第二次free前是否有NULL检查
     """
     line_num = issue.line
-    var_name = _extract_variable_name(issue.evidence)
+    var_name = _extract_variable_name(issue)
 
     if not var_name:
         return False
@@ -4216,7 +4227,7 @@ def _is_strcpy_false_positive(
     2. 是否在死代码中
     """
     line_num = issue.line
-    var_name = _extract_variable_name(issue.evidence)
+    var_name = _extract_variable_name(issue)
 
     if not var_name:
         return False
@@ -4318,16 +4329,24 @@ def _is_memcpy_false_positive(
     return False
 
 
-def _extract_variable_name(msg: str) -> Optional[str]:
+def _extract_variable_name(issue_or_msg: Issue | str) -> Optional[str]:
     """
-    从问题消息中提取变量名
+    从Issue对象或问题消息中提取变量名
 
     Args:
-        msg: 问题消息
+        issue_or_msg: Issue对象或问题消息字符串
 
     Returns:
         Optional[str]: 变量名（如果找到）
     """
+    # 如果传入的是Issue对象，优先使用var_name字段
+    if isinstance(issue_or_msg, Issue):
+        if issue_or_msg.var_name:
+            return issue_or_msg.var_name
+        msg = issue_or_msg.evidence
+    else:
+        msg = issue_or_msg
+
     # 尝试匹配常见的变量名模式
     patterns = [
         r"variable\s+`(\w+)`",
@@ -4340,6 +4359,23 @@ def _extract_variable_name(msg: str) -> Optional[str]:
         match = re.search(pattern, msg)
         if match:
             return match.group(1)
+
+    # 尝试从赋值语句中提取变量名（如：int *data = malloc(...)）
+    match = re.search(
+        r"\b(\w+)\s*=\s*(?:\([^)]*\))?\s*(?:malloc|calloc|realloc)\s*\(", msg
+    )
+    if match:
+        return match.group(1)
+
+    # 尝试从数组访问中提取变量名（如：data[i] = ...）
+    match = re.search(r"\b(\w+)\s*\[", msg)
+    if match:
+        return match.group(1)
+
+    # 尝试从指针解引用中提取变量名（如：*ptr = ...）
+    match = re.search(r"\*\s*(\w+)", msg)
+    if match:
+        return match.group(1)
 
     return None
 
@@ -4389,7 +4425,7 @@ def _is_memory_leak_false_positive(
     Returns:
         bool: 是否为误报
     """
-    var_name = _extract_variable_name(issue.evidence)
+    var_name = _extract_variable_name(issue)
 
     if not var_name:
         return False
@@ -4425,7 +4461,7 @@ def _is_null_deref_false_positive(
         bool: 是否为误报
     """
     line_num = issue.line
-    var_name = _extract_variable_name(issue.evidence)
+    var_name = _extract_variable_name(issue)
 
     if not var_name:
         return False

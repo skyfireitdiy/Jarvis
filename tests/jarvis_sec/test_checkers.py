@@ -353,6 +353,8 @@ def test_dataset_negative_cases():
     datasets_dir = Path(__file__).parent / "datasets"
 
     # 规则名称映射（目录名 -> pattern名，支持多个可能的pattern）
+    # 对于反例测试，我们期望0个问题，所以不需要精确的pattern映射
+    # 只需要知道哪些目录需要测试即可
     rule_mapping = {
         "possible_null_deref": ["possible_null_deref"],
         "data_race_suspect": ["data_race_suspect"],
@@ -412,6 +414,14 @@ def test_dataset_negative_cases():
         ],
         "getenv_unchecked": ["getenv_unchecked"],
         "open_permissive_perms": ["open_permissive_perms"],
+        # 新增cross_function目录
+        "cross_function": [
+            "memory_leak",
+            "possible_null_deref",
+            "uaf_suspect",
+            "use_after_free_suspect",
+            "double_free",
+        ],
     }
 
     tested_count = 0
@@ -424,7 +434,9 @@ def test_dataset_negative_cases():
         rule_name = rule_dir.name
         expected_pattern = rule_mapping.get(rule_name)
         if not expected_pattern:
-            continue
+            # 对于未在rule_mapping中的目录，默认检查所有可能的pattern
+            # 这样可以确保所有反例文件都被测试
+            expected_pattern = ["any"]  # 特殊标记，表示检查是否有任何问题
 
         # 查找所有反例文件
         for test_file in rule_dir.glob("negative_*.c"):
