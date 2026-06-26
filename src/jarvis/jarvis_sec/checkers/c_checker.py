@@ -1806,9 +1806,6 @@ def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issu
         re.IGNORECASE
     )
     
-    # 字符串赋值模式
-    string_assign = re.compile(r'\b(char\s*\*|const\s+char\s*\*|char\s+\w+\s*\[)\s*\w+\s*=\s*"([^"]{8,})"')
-    
     # #define 模式
     define_pattern = re.compile(r'#define\s+\w*(SECRET|KEY|PASSWORD|TOKEN)\w*\s+"([^"]+)"', re.IGNORECASE)
     
@@ -1826,7 +1823,7 @@ def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issu
                         file=relpath,
                         line=idx,
                         evidence=_strip_line(s),
-                        description=f"检测到硬编码凭证：变量名包含敏感关键词，且赋值为硬编码字符串。",
+                        description="检测到硬编码凭证：变量名包含敏感关键词，且赋值为硬编码字符串。",
                         suggestion="使用环境变量、配置文件或密钥管理系统存储敏感信息，避免硬编码。",
                         confidence=0.75,
                         severity="high",
