@@ -1,0 +1,14 @@
+{
+  "id": "20260626_113703_898290",
+  "type": "project_long_term",
+  "tags": [
+    "数据流分析器",
+    "增强功能",
+    "约束条件追踪",
+    "死代码识别",
+    "指针别名追踪"
+  ],
+  "content": "## 数据流分析器增强功能完成\n\n### 完成状态\n- 数据流分析器已增强，新增约束条件追踪、死代码识别、指针别名追踪\n- 测试全部通过（8/8）\n\n### 新增功能\n1. **ConstraintInfo数据类**：约束条件信息（var_name, constraint_type, line, scope_start, scope_end）\n2. **DataFlowResult增强**：添加constraints、dead_code_lines、aliases、return_lines字段\n3. **_identify_dead_code方法**：识别return后的死代码、free后置NULL的死代码\n4. **_identify_constraints方法**：识别if条件中的约束（if (len < 100)、if (ptr != NULL)）\n5. **指针别名追踪**：识别 `char *ptr = buffer` 别名关系\n\n### 关键文件\n- src/jarvis/jarvis_sec/data_flow_analyzer.py（476行）\n  - 第46-56行：ConstraintInfo数据类\n  - 第58-68行：DataFlowResult数据类（已增强）\n  - 第276-320行：_analyze_with_regex方法（已增强）\n  - 第322-368行：_identify_dead_code方法\n  - 第370-410行：_identify_constraints方法\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 测试通过（8/8）\n- 指针状态追踪正常\n- 约束条件识别正常（需增强if语句处理）\n\n### 注意事项\n- tree-sitter解析成功时，约束条件识别需要增强_handle_if_statement方法\n- 正则表达式回退方案已完整实现所有功能\n- 数据流分析器主要用于C代码，C++代码同样支持",
+  "created_at": "2026-06-26T11:37:03.898326",
+  "updated_at": "2026-06-26T11:37:03.898332"
+}

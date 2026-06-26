@@ -1,0 +1,8 @@
+{
+  "id": "20260626_130432_031512",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "Bug修复", "测试通过"],
+  "content": "## 启发式扫描优化完成 - 0误报0漏报达成\n\n### 完成状态\n- 所有测试通过（8/8）\n- 正例测试：45个文件，100%成功率（0漏报）\n- 反例测试：22个文件，0误报\n\n### 修复内容\n1. **RE_MALLOC_ASSIGN正则表达式**：支持带类型转换和不带类型转换的malloc调用\n   - 修改前：`r\"\\b([A-Za-z_]\\w*)\\s*=\\s*malloc\\s*\\(\"`\n   - 修改后：`r\"\\b([A-Za-z_]\\w*)\\s*=\\s*(?:\\([^)]*\\))?\\s*malloc\\s*\\(\"`\n   - 支持匹配：`char *p = malloc(100)` 和 `int *p = (int *)malloc(sizeof(int))`\n\n2. **_rule_move_after_use函数**：修复追踪逻辑，追踪被移动的变量而非接收者\n   - 修改前：追踪 `t = std::move(s)` 中的 `t`\n   - 修改后：追踪 `std::move(s)` 中的 `s`（被移动的变量）\n   - 新增正则表达式：`r'std::move\\s*\\(\\s*([A-Za-z_]\\w*)\\s*\\)'`\n\n### 关键文件\n- src/jarvis/jarvis_sec/checkers/c_checker.py\n  - 第143行：RE_MALLOC_ASSIGN正则表达式（已修复）\n  - 第3320-3370行：_rule_move_after_use函数（已修复）\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 测试通过（8/8）\n- 正例检测率：100%（45/45）\n- 反例误报率：0%（0/22）\n\n### Git提交\n- Commit: 54f46ab（修复RE_MALLOC_ASSIGN正则表达式）",
+  "created_at": "2026-06-26T13:04:32.031545",
+  "updated_at": "2026-06-26T13:04:32.031558"
+}

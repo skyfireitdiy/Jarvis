@@ -1,0 +1,8 @@
+{
+  "id": "20260626_111325_474031",
+  "type": "project_long_term",
+  "tags": ["数据流分析", "tree-sitter", "启发式扫描", "误报过滤"],
+  "content": "## 数据流分析器实现完成\n\n### 技术方案\n- **基于tree-sitter实现**：使用项目已有的tree-sitter-c和tree-sitter-cpp依赖\n- **参考tree-climber项目**：借鉴其CFG构建和数据流分析思路\n- **轻量级实现**：避免引入额外依赖冲突\n\n### 核心功能\n1. **指针状态追踪**：ALLOCATED、FREED、NULLIFIED、UNKNOWN\n2. **控制流分析**：识别free调用、NULL赋值、if条件检查\n3. **误报过滤**：判断变量访问是否安全（free后置NULL、if条件保护）\n\n### 关键文件\n- `src/jarvis/jarvis_sec/data_flow_analyzer.py`（326行）\n  - DataFlowAnalyzer类：数据流分析器\n  - PointerState枚举：指针状态\n  - PointerInfo类：指针信息\n  - DataFlowResult类：分析结果\n  - is_safe_access方法：安全访问判断\n\n### 实现细节\n- **tree-sitter解析**：优先使用AST解析，失败时回退到正则表达式\n- **指针追踪**：识别free(ptr)、ptr=NULL、if(ptr!=NULL)等模式\n- **安全判断**：检查释放后是否置NULL、是否有NULL检查保护\n\n### 测试验证\n- ✅ 静态检查通过（ruff check）\n- ✅ 功能测试通过（free后置NULL的安全模式正确识别）\n\n### 下一步\n- 集成到c_checker.py的analyze_c_cpp_text函数\n- 实现误报过滤逻辑\n- 测试边界用例（negative_safe_free_pattern.c等）",
+  "created_at": "2026-06-26T11:13:25.474067",
+  "updated_at": "2026-06-26T11:13:25.474074"
+}

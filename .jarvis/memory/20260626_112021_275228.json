@@ -1,0 +1,8 @@
+{
+  "id": "20260626_112021_275228",
+  "type": "project_long_term",
+  "tags": ["数据流分析", "误报过滤", "启发式扫描", "已完成"],
+  "content": "## 数据流分析器集成完成\n\n### 完成状态\n- 数据流分析器已集成到启发式扫描\n- 误报过滤逻辑已实现\n- 测试全部通过（8/8）\n\n### 实现细节\n1. **导入部分**：添加DataFlowAnalyzer、DataFlowResult、PointerState导入\n2. **analyze_c_cpp_text函数**：在规则调用后添加数据流分析\n3. **误报过滤函数**：\n   - _filter_issues_with_data_flow：主过滤函数\n   - _is_false_positive：判断是否为误报\n   - _is_uaf_false_positive：UAF误报过滤\n   - _is_double_free_false_positive：Double Free误报过滤\n   - _is_integer_overflow_false_positive：整数溢出误报过滤\n   - _extract_variable_name：从Issue.evidence提取变量名\n\n### 关键文件\n- src/jarvis/jarvis_sec/data_flow_analyzer.py（326行，数据流分析器）\n- src/jarvis/jarvis_sec/checkers/c_checker.py（已集成）\n  - 第35行：导入语句\n  - 第3902-3904行：数据流分析调用\n  - 第3932-3934行：误报过滤调用\n  - 第3937-4053行：误报过滤函数\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 测试通过（8/8）\n- 正例检测率：100%（46/46）\n- 反例误报率：0%\n\n### 检测机制\n- UAF误报过滤：free后置NULL、NULL检查保护\n- Double Free误报过滤：第一次free后置NULL、第二次free前NULL检查\n- 整数溢出误报过滤：溢出检查、安全函数（calloc、reallocarray）\n\n### 注意事项\n- Issue类使用pattern属性而非rule\n- Issue类使用evidence属性而非msg\n- 数据流分析失败时静默忽略，不影响启发式扫描",
+  "created_at": "2026-06-26T11:20:21.275273",
+  "updated_at": "2026-06-26T11:20:21.275279"
+}

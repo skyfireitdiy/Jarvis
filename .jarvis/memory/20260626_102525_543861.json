@@ -1,0 +1,8 @@
+{
+  "id": "20260626_102525_543861",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "UAF检测", "Bug修复", "已完成"],
+  "content": "## UAF检测优化完成\n\n### 完成状态\n- UAF检测已优化，新增函数参数传递检测\n- 测试全部通过（8/8）\n\n### 实现细节\n1. **新增func_param正则表达式**：检测指针作为函数参数传递\n2. **覆盖函数列表**：printf、fprintf、sprintf、snprintf、strcpy、strcat、memcpy、memmove、strlen、strcmp、strchr、strstr、gets、fgets、fputs、puts、scanf、fscanf、sscanf\n3. **检测逻辑**：在free后50行窗口内，检测指针作为上述函数的参数传递\n\n### 关键文件\n- src/jarvis/jarvis_sec/checkers/c_checker.py（第968行：func_param正则表达式，第982行：检测逻辑）\n\n### 验证结果\n- positive_uaf_basic.c：检测到use_after_free_suspect ✅\n- printf(\"%s\\n\", ptr)：被检测为UAF ✅\n- strcpy(ptr, \"world\")：被检测为UAF ✅\n- 测试通过：8/8 ✅\n\n### 检测机制\n- 第一层：污点分析（优先）\n- 第二层：启发式回退（正则表达式）\n- 新增：函数参数传递检测（第968行func_param正则表达式）",
+  "created_at": "2026-06-26T10:25:25.543900",
+  "updated_at": "2026-06-26T10:25:25.543911"
+}

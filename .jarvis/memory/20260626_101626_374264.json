@@ -1,0 +1,14 @@
+{
+  "id": "20260626_101626_374264",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "heuristic",
+    "security-scanner",
+    "test-results",
+    "optimization"
+  ],
+  "content": "## C/C++安全扫描工具(jsec heuristic)优化测试结果\n\n### 最终验证结果（全部通过）\n\n| 测试用例 | 问题类型 | 修复状态 |\n|---------|---------|---------|\n| negative_safe_strncpy.c | 误报 | ✅ 已修复 |\n| positive_concat_query.c | SQL注入漏报 | ✅ 已修复 |\n| positive_malloc_no_free.c | 内存泄漏漏报 | ✅ 已修复 |\n| positive_path_concat.c | 路径遍历漏报 | ✅ 已修复 |\n\n### 新增检测规则\n- sql_injection: 检测SQL语句拼接，识别SELECT/INSERT/UPDATE/DELETE关键词\n- memory_leak: 检测malloc/calloc/realloc后未释放的内存泄漏\n- path_traversal: 检测路径拼接后用于文件操作的风险\n\n### 误报修复\n- 栈数组识别: 区分栈数组(char buffer[100])和指针变量，栈数组不可能为NULL\n- strncpy安全使用: 识别sizeof(buffer)-1长度限制和手动添加NUL终止符\n\n### 测试数据集位置\ntests/jarvis_sec/datasets/",
+  "created_at": "2026-06-26T10:16:26.374396",
+  "updated_at": "2026-06-26T10:16:26.374404"
+}
