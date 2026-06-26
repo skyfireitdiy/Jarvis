@@ -170,7 +170,7 @@ class TaintRule:
         name: str,
         sources: List[TaintSource],
         sinks: List[TaintSink],
-        sanitizers: List[str] = None,
+        sanitizers: Optional[List[str]] = None,
         severity: TaintSeverity = TaintSeverity.HIGH,
         description: str = "",
     ):
@@ -439,7 +439,7 @@ class TaintAnalyzerFactory:
 
 
 def analyze_with_best_analyzer(
-    code: str, rules: List[str] = None, file_path: str = ""
+    code: str, rules: Optional[List[str]] = None, file_path: str = ""
 ) -> List[TaintPath]:
     """
     使用最佳可用分析器进行分析
@@ -464,9 +464,8 @@ def analyze_with_best_analyzer(
 
     # 获取要检查的规则
     if rules:
-        rule_objects = [get_rule(r) for r in rules if get_rule(r)]
-    else:
-        rule_objects = get_all_rules()
+        rule_objects = [get_rule(r) for r in rules if get_rule(r)] if rules else get_all_rules()
+
 
     # 执行检查
     all_paths = []
