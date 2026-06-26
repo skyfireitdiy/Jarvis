@@ -20,6 +20,7 @@ try:
     PYCPARSER_AVAILABLE = True
 except ImportError:
     PYCPARSER_AVAILABLE = False
+    c_ast = None  # type: ignore
 
 
 class PointerState(Enum):
@@ -108,17 +109,18 @@ class DataFlowAnalyzer:
         code = re.sub(r"#define.*$", "", code, flags=re.MULTILINE)
         return code
 
-    def _analyze_ast(self, ast: c_ast.Node) -> None:
+    def _analyze_ast(self, ast: "c_ast.Node") -> None:
         """分析AST节点"""
         if ast is None:
             return
 
-        # 遍历AST
-        for node in ast:
-            if isinstance(node, c_ast.FuncDef):
-                self._analyze_function(node)
+        # 遍历AST（ast.ext是顶层声明列表）
+        if hasattr(ast, 'ext'):
+            for node in ast.ext:
+                if isinstance(node, c_ast.FuncDef):
+                    self._analyze_function(node)
 
-    def _analyze_function(self, func: c_ast.FuncDef) -> None:
+    def _analyze_function(self, func: "c_ast.FuncDef") -> None:
         """分析函数定义"""
         self.current_function = func.decl.name
 
@@ -126,7 +128,7 @@ class DataFlowAnalyzer:
         if func.body:
             self._analyze_compound(func.body)
 
-    def _analyze_compound(self, compound: c_ast.Compound) -> None:
+    def _analyze_compound(self, compound: "c_ast.Compound") -> None:
         """分析复合语句（函数体、if/else块等）"""
         if compound.block_items is None:
             return
@@ -143,7 +145,7 @@ class DataFlowAnalyzer:
             elif isinstance(item, c_ast.Return):
                 self._analyze_return(item)
 
-    def _analyze_declaration(self, decl: c_ast.Decl) -> None:
+    def _analyze_declaration(self, decl: "c_ast.Decl") -> None:
         """分析变量声明"""
         # 检查是否是指针声明
         if self._is_pointer_decl(decl):
@@ -174,7 +176,7 @@ class DataFlowAnalyzer:
                             alias_name
                         ].state
 
-    def _analyze_assignment(self, assign: c_ast.Assignment) -> None:
+    def _analyze_assignment(self, assign: "c_ast.Assignment") -> None:
         """分析赋值语句"""
         var_name = assign.lvalue.name if isinstance(assign.lvalue, c_ast.ID) else None
         if var_name is None:
@@ -209,7 +211,7 @@ class DataFlowAnalyzer:
                     alias_name
                 ].state
 
-    def _analyze_func_call(self, call: c_ast.FuncCall) -> None:
+    def _analyze_func_call(self, call: "c_ast.FuncCall") -> None:
         """分析函数调用"""
         func_name = call.name.name if isinstance(call.name, c_ast.ID) else None
         if func_name is None:
@@ -232,7 +234,7 @@ class DataFlowAnalyzer:
                             ptr_info.state = PointerState.FREED
                             ptr_info.state_line = call.coord.line if call.coord else 0
 
-    def _analyze_if(self, if_node: c_ast.If) -> None:
+    def _analyze_if(self, if_node: "c_ast.If") -> None:
         """分析if语句"""
         # 检查if条件中的NULL检查
         self._check_null_condition(if_node.cond)
@@ -245,13 +247,13 @@ class DataFlowAnalyzer:
         if if_node.iffalse:
             self._analyze_compound(if_node.iffalse)
 
-    def _analyze_return(self, ret: c_ast.Return) -> None:
+    def _analyze_return(self, ret: "c_ast.Return") -> None:
         """分析return语句，标记后续代码为死代码"""
         if ret.coord:
             # 标记return后的代码为死代码（简化实现）
             self.dead_code_lines.add(ret.coord.line)
 
-    def _check_null_condition(self, cond: c_ast.Node) -> None:
+    def _check_null_condition(self, cond: "c_ast.Node") -> None:
         """检查条件中的NULL检查"""
         # 检查 ptr != NULL 或 ptr != 0 或 ptr
         if isinstance(cond, c_ast.BinaryOp):
@@ -276,13 +278,13 @@ class DataFlowAnalyzer:
                     cond.coord.line if cond.coord else 0
                 )
 
-    def _is_pointer_decl(self, decl: c_ast.Decl) -> bool:
+    def _is_pointer_decl(self, decl: "c_ast.Decl") -> bool:
         """检查是否是指针声明"""
         if decl.type is None:
             return False
         return isinstance(decl.type, c_ast.PtrDecl)
 
-    def _is_null_init(self, init: c_ast.Node) -> bool:
+    def _is_null_init(self, init: "c_ast.Node") -> bool:
         """检查是否初始化为NULL"""
         if isinstance(init, c_ast.ID):
             return init.name in ["NULL", "null", "0"]
@@ -290,7 +292,7 @@ class DataFlowAnalyzer:
             return init.value == "0"
         return False
 
-    def _is_null_expr(self, expr: c_ast.Node) -> bool:
+    def _is_null_expr(self, expr: "c_ast.Node") -> bool:
         """检查是否是NULL表达式"""
         if isinstance(expr, c_ast.ID):
             return expr.name in ["NULL", "null", "0"]
