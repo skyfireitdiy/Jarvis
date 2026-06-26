@@ -1013,6 +1013,79 @@ class DataFlowAnalyzer:
 
         return True
 
+    def _enhance_with_database(
+        self,
+        result: DataFlowResult,
+        database: ProjectDatabase,
+        file_path: str,
+    ) -> None:
+        """
+        利用数据库信息增强数据流分析结果
+
+        Args:
+            result: 单文件分析结果
+            database: 项目数据库实例
+            file_path: 当前文件路径
+        """
+        if database is None or not file_path:
+            return
+
+        try:
+            # 1. 跨文件指针状态追踪
+            for var_name, ptr_info in result.pointer_states.items():
+                # 查询数据库中的指针状态
+                db_states = database.find_pointer_states(var_name)
+                if db_states:
+                    # 合并数据库中的指针状态信息
+                    for state_record in db_states:
+                        # 如果数据库中有其他文件的状态信息，更新结果
+                        if state_record.file_path != file_path:
+                            # 添加跨文件的指针状态信息
+                            cross_file_key = f"{state_record.file_path}:{var_name}"
+                            result.pointer_states[cross_file_key] = PointerInfo(
+                                name=var_name,
+                                state=PointerState(state_record.state),
+                                line=state_record.line,
+                                scope=state_record.scope or "global",
+                            )
+
+            # 2. 跨文件数据流分析
+            for var_name in result.pointer_states.keys():
+                # 查询数据库中的变量定义和使用
+                definitions = database.find_variable_definitions(var_name)
+                uses = database.find_variable_uses(var_name)
+
+                # 添加跨文件的定义和使用信息
+                for def_record in definitions:
+                    if def_record.file_path != file_path:
+                        # 记录跨文件定义
+                        cross_def_key = f"{def_record.file_path}:{var_name}@def"
+                        result.pointer_states[cross_def_key] = PointerInfo(
+                            name=var_name,
+                            state=PointerState.UNKNOWN,
+                            line=def_record.line,
+                            scope=def_record.scope or "global",
+                        )
+
+                for use_record in uses:
+                    if use_record.file_path != file_path:
+                        # 记录跨文件使用
+                        cross_use_key = f"{use_record.file_path}:{var_name}@use"
+                        result.pointer_states[cross_use_key] = PointerInfo(
+                            name=var_name,
+                            state=PointerState.UNKNOWN,
+                            line=use_record.line,
+                            scope=use_record.scope or "global",
+                        )
+
+            # 3. 跨文件调用关系分析
+            # 查询当前文件中函数的调用者和被调用者
+            # 这部分信息可以用于污点分析的跨函数追踪
+
+        except Exception:
+            # 数据库查询失败时静默忽略，不影响单文件分析结果
+            pass
+
 
 def analyze_c_cpp_text_with_dataflow(
     relpath: str, text: str
