@@ -276,16 +276,17 @@ class DataFlowAnalyzer:
     def _analyze_with_regex(self, code: str, result: DataFlowResult) -> DataFlowResult:
         """
         使用正则表达式进行数据流分析（回退方案）
-        
+
         Args:
             code: 源代码
             result: 分析结果
-            
+
         Returns:
             DataFlowResult: 分析结果
         """
         lines = code.splitlines()
-        
+
+        # 第一遍：收集基本信息
         for line_num, line in enumerate(lines, 1):
             # 检测free调用
             free_pattern = r'\bfree\s*\(\s*(\w+)\s*\)'
@@ -296,7 +297,7 @@ class DataFlowAnalyzer:
                     state=PointerState.FREED,
                     line=line_num
                 )
-            
+
             # 检测NULL赋值
             null_assign_pattern = r'(\w+)\s*=\s*(NULL|nullptr|0)\s*;'
             for match in re.finditer(null_assign_pattern, line):
@@ -306,7 +307,7 @@ class DataFlowAnalyzer:
                     state=PointerState.NULLIFIED,
                     line=line_num
                 )
-            
+
             # 检测NULL检查
             null_check_pattern = r'if\s*\(\s*(\w+)\s*(!=\s*(NULL|nullptr|0)|==\s*(NULL|nullptr|0))\s*\)'
             for match in re.finditer(null_check_pattern, line):
@@ -314,10 +315,99 @@ class DataFlowAnalyzer:
                 if var_name not in result.null_checks:
                     result.null_checks[var_name] = set()
                 result.null_checks[var_name].add(line_num)
-        
+
+            # 检测指针别名
+            alias_pattern = r'(\w+)\s*\*\s*(\w+)\s*=\s*(\w+)\s*;'
+            for match in re.finditer(alias_pattern, line):
+                alias_name = match.group(2)
+                original_name = match.group(3)
+                if original_name not in result.aliases:
+                    result.aliases[original_name] = []
+                result.aliases[original_name].append(alias_name)
+
+            # 检测return语句
+            if re.search(r'\breturn\b', line):
+                result.return_lines.add(line_num)
+
+        # 第二遍：识别死代码
+        self._identify_dead_code(lines, result)
+
+        # 第三遍：识别约束条件
+        self._identify_constraints(lines, result)
+
         return result
-    
-    def is_safe_access(self, var_name: str, access_line: int, result: DataFlowResult) -> bool:
+
+    def _identify_dead_code(self, lines: list[str], result: DataFlowResult):
+        """
+        识别死代码
+
+        Args:
+            lines: 代码行列表
+            result: 分析结果
+        """
+        # 识别return后的死代码
+        for return_line in result.return_lines:
+            # 查找return后的代码块（直到下一个}）
+            brace_count = 0
+            for line_num in range(return_line + 1, len(lines) + 1):
+                line = lines[line_num - 1]
+                brace_count += line.count('{') - line.count('}')
+                if brace_count < 0:
+                    break
+                result.dead_code_lines.add(line_num)
+
+        # 识别free后置NULL的死代码
+        for var_name, pointer_info in result.pointer_states.items():
+            if pointer_info.state == PointerState.NULLIFIED:
+                # 查找置NULL后的if (var != NULL)块
+                nullified_line = pointer_info.line
+                for line_num in range(nullified_line + 1, len(lines) + 1):
+                    line = lines[line_num - 1]
+                    # 检测if (var != NULL)或if (var)
+                    if re.search(rf'if\s*\(\s*{var_name}\s*(!=\s*(NULL|nullptr|0)|\))', line):
+                        # 标记if块内的代码为死代码
+                        brace_count = 0
+                        for inner_line_num in range(line_num, len(lines) + 1):
+                            inner_line = lines[inner_line_num - 1]
+                            brace_count += inner_line.count('{') - inner_line.count('}')
+                            if inner_line_num > line_num:
+                                result.dead_code_lines.add(inner_line_num)
+                            if brace_count <= 0 and '{' in line:
+                                break
+
+    def _identify_constraints(self, lines: list[str], result: DataFlowResult):
+        """
+        识别约束条件
+
+        Args:
+            lines: 代码行列表
+            result: 分析结果
+        """
+        for line_num, line in enumerate(lines, 1):
+            # 检测if条件中的约束
+            # 例如: if (len < 100)
+            lt_pattern = r'if\s*\(\s*(\w+)\s*<\s*(\w+)\s*\)'
+            for match in re.finditer(lt_pattern, line):
+                var_name = match.group(1)
+                constraint = ConstraintInfo(
+                    var_name=var_name,
+                    constraint_type='lt',
+                    line=line_num,
+                    scope_start=line_num
+                )
+                result.constraints.append(constraint)
+
+            # 检测if (ptr)或if (ptr != NULL)
+            not_null_pattern = r'if\s*\(\s*(\w+)\s*(!=\s*(NULL|nullptr|0)|\))'
+            for match in re.finditer(not_null_pattern, line):
+                var_name = match.group(1)
+                constraint = ConstraintInfo(
+                    var_name=var_name,
+                    constraint_type='not_null',
+                    line=line_num,
+                    scope_start=line_num
+                )
+                result.constraints.append(constraint)
         """
         判断变量访问是否安全
         
