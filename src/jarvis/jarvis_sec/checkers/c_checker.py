@@ -31,6 +31,13 @@ from jarvis.jarvis_sec.types import Issue
 # 污点分析框架（核心依赖）
 import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
 
+# 数据流分析器（用于误报过滤）
+from jarvis.jarvis_sec.data_flow_analyzer import (
+    DataFlowAnalyzer,
+    DataFlowResult,
+    PointerState,
+)
+
 # ---------------------------
 # 规则库（正则表达式）
 # ---------------------------
@@ -65,10 +72,10 @@ RE_EXEC_LIKE = re.compile(
 RE_SCANF_CALL = re.compile(r'\b(?:[fs]?scanf)\s*\(\s*"([^"]*)"', re.IGNORECASE)
 # 线程/锁相关
 RE_PTHREAD_LOCK = re.compile(
-    r"\bpthread_mutex_lock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
+    r"\bpthread_mutex_lock\s*\(\s*&?\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
 )
 RE_PTHREAD_UNLOCK = re.compile(
-    r"\bpthread_mutex_unlock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
+    r"\bpthread_mutex_unlock\s*\(\s*&?\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
 )
 # 其他危险用法相关
 RE_ATOI_FAMILY = re.compile(r"\b(atoi|atol|atoll|atof)\s*\(", re.IGNORECASE)
@@ -137,7 +144,9 @@ RE_GETENV = re.compile(r'\bgetenv\s*\(\s*"[^"]*"\s*\)', re.IGNORECASE)
 RE_REALLOC_ASSIGN_BACK = re.compile(
     r"\b([A-Za-z_]\w*)\s*=\s*realloc\s*\(\s*\1\s*,", re.IGNORECASE
 )
-RE_MALLOC_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*malloc\s*\(", re.IGNORECASE)
+RE_MALLOC_ASSIGN = re.compile(
+    r"\b([A-Za-z_]\w*)\s*=\s*(?:\([^)]*\))?\s*malloc\s*\(", re.IGNORECASE
+)
 RE_CALLOC_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*calloc\s*\(", re.IGNORECASE)
 RE_NEW_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*new\b", re.IGNORECASE)
 RE_DEREF = re.compile(r"(\*|->)\s*[A-Za-z_]\w*|\b[A-Za-z_]\w*\s*\[", re.IGNORECASE)
@@ -782,8 +791,12 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
                 continue
             var = m.group(1)
             # 在后续若干行中存在明显解引用/使用但未见 NULL 检查，提示
-            conf = 0.55
             has_check = _has_null_check_around(var, lines, idx, radius=4)
+            # 如果有NULL检查，跳过
+            if has_check:
+                continue
+
+            conf = 0.55
             # 搜索后续 6 行是否出现变量使用（粗略）
             used = False
             for j, sj in _window(lines, idx, before=0, after=6):
@@ -792,9 +805,9 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
                 if re.search(rf"\b{re.escape(var)}\b(\s*(->|\[|\())", sj):
                     used = True
                     break
-            if used and not has_check:
+            if used:
                 conf += 0.25
-            elif not has_check:
+            else:
                 conf += 0.1
             issues.append(
                 Issue(
@@ -948,15 +961,10 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
         start = free_ln + 1
         end = min(len(lines), free_ln + 50)
 
-        # 同/邻近行若有置空，先快速跳过
-        early_null = False
-        for j in range(free_ln, min(len(lines), free_ln + 3) + 1):
-            sj = _safe_line(lines, j)
-            if re.search(rf"\b{re.escape(var)}\s*=\s*(NULL|0)\s*;", sj):
-                early_null = True
-                break
-        if early_null:
-            continue
+        # 注意：不再跳过free后置NULL的情况
+        # 因为即使置NULL，后续代码仍可能通过别名或未检查NULL就使用
+        # 例如：free(ptr); ptr = NULL; char *p = ptr; if (p) strcpy(p, "test");
+        # 这种情况下，ptr已置NULL，但别名p仍可能被误用
 
         reassigned = False
         uaf_evidence_line: Optional[int] = None
@@ -964,6 +972,10 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
         deref_arrow = re.compile(rf"\b{re.escape(var)}\s*->")
         deref_star = re.compile(rf"(?<!\w)\*\s*{re.escape(var)}\b")
         deref_index = re.compile(rf"\b{re.escape(var)}\s*\[")
+        # 检测作为函数参数传递（可能导致UAF）
+        func_param = re.compile(
+            rf"\b(printf|fprintf|sprintf|snprintf|strcpy|strcat|memcpy|memmove|strlen|strcmp|strchr|strstr|gets|fgets|fputs|puts|scanf|fscanf|sscanf)\s*\([^)]*\b{re.escape(var)}\b"
+        )
         assign_pat = re.compile(rf"\b{re.escape(var)}\s*=")
 
         for j in range(start, end + 1):
@@ -977,6 +989,7 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 deref_arrow.search(sj)
                 or deref_star.search(sj)
                 or deref_index.search(sj)
+                or func_param.search(sj)  # 检测作为函数参数传递
             ):
                 uaf_evidence_line = j
                 break
@@ -1733,6 +1746,218 @@ def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
+def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    整数溢出检测：
+    - 检测乘法/加法表达式作为malloc/calloc/realloc参数
+    - 检测可能导致缓冲区分配不足的整数溢出风险
+    - 优化：识别前置的溢出检查，避免误报
+    """
+    issues: List[Issue] = []
+
+    # 内存分配函数模式
+    alloc_pattern = re.compile(r"\b(malloc|calloc|realloc)\s*\(")
+
+    # 检测乘法或加法表达式（排除指针声明）
+    # 乘法模式：var * var，但排除 (type *)var 或 *var（指针声明/解引用）
+    mul_pattern = re.compile(
+        r"(?<![(*])\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)(?!\s*\))"
+    )
+    add_pattern = re.compile(r"\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)")
+
+    # 溢出检查模式（安全模式）
+    mul_overflow_check = re.compile(
+        r"\b([A-Za-z_]\w*)\s*<=\s*(UINT_MAX|INT_MAX)\s*/\s*([A-Za-z_]\w*)"
+    )
+    add_overflow_check = re.compile(
+        r"\b([A-Za-z_]\w*)\s*(<|<=)\s*(INT_MAX|UINT_MAX)\s*-\s*\d+"
+    )
+
+    def _has_overflow_check(
+        var1: str, var2: str, lines: Sequence[str], upto_idx: int, lookback: int = 10
+    ) -> bool:
+        """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查"""
+        start = max(1, upto_idx - lookback)
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            # 检查乘法溢出检查模式
+            m = mul_overflow_check.search(sj)
+            if m:
+                # 检查是否涉及var1或var2
+                checked_vars = [m.group(1), m.group(3)]
+                if var1 in checked_vars or var2 in checked_vars:
+                    return True
+            # 检查加法溢出检查模式
+            m = add_overflow_check.search(sj)
+            if m:
+                if m.group(1) == var1 or m.group(1) == var2:
+                    return True
+        return False
+
+    for idx, s in enumerate(lines, start=1):
+        if alloc_pattern.search(s):
+            # 提取malloc/calloc/realloc参数部分
+            # 例如：malloc(count * size) -> 提取 "count * size"
+            try:
+                # 找到malloc后的括号内容
+                alloc_start = s.index("(") + 1
+                # 找到匹配的右括号（简化处理：找第一个右括号）
+                alloc_end = s.index(")", alloc_start)
+                alloc_arg = s[alloc_start:alloc_end].strip()
+            except (ValueError, IndexError):
+                # 无法提取参数，跳过
+                continue
+
+            # 检测乘法溢出（只在malloc参数中检测）
+            mul_match = mul_pattern.search(alloc_arg)
+            if mul_match:
+                var1, var2 = mul_match.group(1), mul_match.group(2)
+                # 检查是否有前置的溢出检查
+                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="arithmetic",
+                            pattern="integer_overflow",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"检测到乘法表达式 '{mul_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                            suggestion="使用安全整数运算函数（如 size_mul_overflow）或添加溢出检查，确保分配大小正确。",
+                            confidence=0.7,
+                            severity="high",
+                        )
+                    )
+
+            # 检测加法溢出（只在malloc参数中检测）
+            add_match = add_pattern.search(alloc_arg)
+            if add_match:
+                var1, var2 = add_match.group(1), add_match.group(2)
+                # 检查是否有前置的溢出检查
+                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="arithmetic",
+                            pattern="integer_overflow",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"检测到加法表达式 '{add_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                            suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
+                            confidence=0.65,
+                            severity="medium",
+                        )
+                    )
+
+    return issues
+
+
+def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    硬编码凭证检测：
+    - 检测敏感变量名（password、key、secret、token等）
+    - 检测硬编码的敏感字符串
+    """
+    issues: List[Issue] = []
+
+    # 敏感变量名模式（不区分大小写）
+    sensitive_vars = re.compile(
+        r"\b(password|passwd|pwd|secret|key|token|api_key|apikey|auth|credential|private_key|access_key)\b",
+        re.IGNORECASE,
+    )
+
+    # #define 模式
+    define_pattern = re.compile(
+        r'#define\s+\w*(SECRET|KEY|PASSWORD|TOKEN)\w*\s+"([^"]+)"', re.IGNORECASE
+    )
+
+    for idx, s in enumerate(lines, start=1):
+        # 检测敏感变量名赋值
+        if sensitive_vars.search(s) and "=" in s and '"' in s:
+            # 提取字符串内容
+            str_match = re.search(r'"([^"]{4,})"', s)
+            if str_match:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="crypto",
+                        pattern="hardcoded_credentials",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="检测到硬编码凭证：变量名包含敏感关键词，且赋值为硬编码字符串。",
+                        suggestion="使用环境变量、配置文件或密钥管理系统存储敏感信息，避免硬编码。",
+                        confidence=0.75,
+                        severity="high",
+                    )
+                )
+
+        # 检测 #define 中的敏感信息
+        define_match = define_pattern.search(s)
+        if define_match:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="crypto",
+                    pattern="hardcoded_credentials",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"检测到宏定义中的硬编码凭证：{define_match.group(1)}",
+                    suggestion="使用环境变量或配置文件存储敏感信息，避免硬编码。",
+                    confidence=0.8,
+                    severity="high",
+                )
+            )
+
+    return issues
+
+
+def _rule_toctou_race(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    TOCTOU竞态条件检测：
+    - 检测access+fopen模式
+    - 检测lstat+fopen模式
+    - 检测stat+fopen模式
+    """
+    issues: List[Issue] = []
+
+    # 检查函数模式
+    check_funcs = ["access", "lstat", "stat", "fstat"]
+
+    # 使用函数模式
+    use_funcs = ["fopen", "open", "openat"]
+
+    # 检测模式：检查函数调用后，在几行内出现使用函数调用
+    for idx, s in enumerate(lines, start=1):
+        # 检测检查函数
+        for check_func in check_funcs:
+            if re.search(rf"\b{check_func}\s*\(", s):
+                # 在后续5行内检测使用函数
+                for j in range(idx + 1, min(idx + 6, len(lines) + 1)):
+                    sj = lines[j - 1]
+                    for use_func in use_funcs:
+                        if re.search(rf"\b{use_func}\s*\(", sj):
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="concurrency",
+                                    pattern="toctou_race",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(s),
+                                    description=f"检测到TOCTOU竞态条件：{check_func}检查后立即使用{use_func}，存在竞态窗口。",
+                                    suggestion="使用O_NOFOLLOW标志、fstat检查已打开文件描述符，或使用原子操作避免竞态。",
+                                    confidence=0.7,
+                                    severity="high",
+                                )
+                            )
+                            break
+
+    return issues
+
+
 def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
@@ -1898,6 +2123,12 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
 
     # 收集静态/全局变量和常量字符串指针（通常已确保非空）
     safe_vars: set[str] = set()
+    # 收集栈数组变量（栈数组不可能为NULL）
+    stack_arrays: set[str] = set()
+    # 栈数组声明模式：类型 变量名[大小]
+    re_stack_array = re.compile(
+        r"\b(char|int|long|short|void|unsigned|signed|float|double|size_t|ssize_t|uint\d*_t|int\d*_t)\s+(?:\*\s*)*([A-Za-z_]\w*)\s*\["
+    )
     for line in lines:
         m_static = re_static_global.search(line)
         if m_static:
@@ -1905,6 +2136,10 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
         m_const = re_const_str.search(line)
         if m_const:
             safe_vars.add(m_const.group(1))
+        # 检测栈数组声明
+        m_array = re_stack_array.search(line)
+        if m_array:
+            stack_arrays.add(m_array.group(2))
 
     def _is_just_allocated(var: str, lines: Sequence[str], line_no: int) -> bool:
         """检查变量是否刚分配成功（前1-2行有malloc/new等分配函数）"""
@@ -1951,6 +2186,9 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
                 continue
             # 跳过静态/全局变量（通常在初始化时已确保非空）
             if v in safe_vars:
+                continue
+            # 跳过栈数组（栈数组不可能为NULL）
+            if v in stack_arrays:
                 continue
             # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
             if _is_just_allocated(v, lines, idx):
@@ -3102,14 +3340,19 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
     检测移动后使用的风险：对象被 std::move 后仍被使用。
     """
     issues: List[Issue] = []
-    moved_vars: dict[str, int] = {}  # var -> line_no
+    moved_vars: dict[str, int] = {}  # var -> line_no (被移动的变量)
 
     for idx, s in enumerate(lines, start=1):
-        # 检测 std::move 赋值
+        # 检测 std::move 赋值：提取被移动的变量（std::move(...)中的参数）
         m = RE_MOVE_ASSIGN.search(s)
         if m:
-            var = m.group(1)
-            moved_vars[var] = idx
+            # 从 std::move(...) 中提取被移动的变量名
+            move_match = re.search(
+                r"std::move\s*\(\s*([A-Za-z_]\w*)\s*\)", s, re.IGNORECASE
+            )
+            if move_match:
+                var = move_match.group(1)  # 被移动的变量
+                moved_vars[var] = idx
 
         # 检测移动后的使用
         vars_to_remove: set[str] = set()  # 收集要删除的键，避免在遍历时修改字典
@@ -3496,10 +3739,16 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
             if var in atomic_vars:
                 continue  # 原子变量，通常安全
 
-            # 检测变量访问
+            # 检测变量访问（排除声明行）
             var_pattern = re.compile(rf"\b{re.escape(var)}\b")
             if not var_pattern.search(s):
                 continue
+
+            # 排除变量声明行（行首没有缩进且包含类型声明）
+            if not s.startswith(" ") and not s.startswith("\t"):
+                # 可能是变量声明，检查是否有类型关键字
+                if re.search(r"^[A-Za-z_]\w*(?:\s+\*|\s+)+[A-Za-z_]\w*\s*[=;]", s):
+                    continue  # 跳过变量声明行
 
             # 检查是否是赋值操作
             is_write = RE_VAR_ASSIGN.search(s) and var in s[: s.find("=")]
@@ -3673,6 +3922,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
       以避免注释中的API命中导致的误报。
     - 准确性优化2：对通用 API 扫描使用“字符串内容掩蔽”的副本，避免把字符串里的片段当作代码。
+    - 准确性优化3：使用数据流分析过滤误报（free后置NULL、if条件保护等）。
     """
     pre_text = _strip_if0_blocks(text)
     clean_text = _remove_comments_preserve_strings(pre_text)
@@ -3681,6 +3931,10 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     lines = clean_text.splitlines()
     # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
     mlines = masked_text.splitlines()
+
+    # 数据流分析（用于误报过滤）
+    data_flow_analyzer = DataFlowAnalyzer()
+    data_flow_result = data_flow_analyzer.analyze_code(text)
 
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
@@ -3701,6 +3955,10 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_sql_injection(lines, relpath))
     issues.extend(_rule_memory_leak(lines, relpath))
     issues.extend(_rule_path_traversal(lines, relpath))
+    # 新增规则：整数溢出、硬编码凭证、TOCTOU竞态
+    issues.extend(_rule_integer_overflow(lines, relpath))
+    issues.extend(_rule_hardcoded_credentials(lines, relpath))
+    issues.extend(_rule_toctou_race(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
     issues.extend(_rule_atoi_family(mlines, relpath))
@@ -3758,8 +4016,324 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     except Exception:
         # 污点分析失败时静默忽略，不影响启发式扫描
         pass
+    # 使用数据流分析过滤误报
+    filtered_issues = _filter_issues_with_data_flow(
+        issues, data_flow_analyzer, data_flow_result, lines
+    )
+    return filtered_issues
 
-    return issues
+
+def _filter_issues_with_data_flow(
+    issues: List[Issue],
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> List[Issue]:
+    """
+    使用数据流分析过滤误报
+
+    Args:
+        issues: 启发式扫描发现的问题列表
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        List[Issue]: 过滤后的问题列表
+    """
+    filtered_issues = []
+
+    for issue in issues:
+        # 检查是否为误报
+        if _is_false_positive(issue, analyzer, dataflow_result, lines):
+            continue
+        filtered_issues.append(issue)
+
+    return filtered_issues
+
+
+def _is_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断问题是否为误报
+
+    Args:
+        issue: 问题对象
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        bool: 是否为误报
+    """
+    issue_type = issue.pattern
+
+    # UAF误报过滤：free后置NULL的安全模式
+    if issue_type in ["use_after_free_suspect", "use_after_free"]:
+        return _is_uaf_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # Double Free误报过滤：检查是否有保护机制
+    if issue_type in ["double_free", "double_free_suspect"]:
+        return _is_double_free_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # 整数溢出误报过滤：检查是否有溢出检查
+    if issue_type == "integer_overflow":
+        return _is_integer_overflow_false_positive(
+            issue, analyzer, dataflow_result, lines
+        )
+
+    # strcpy误报过滤：检查是否有NULL检查保护或死代码
+    if issue_type in ["strcpy", "strncpy", "strcat", "strncat"]:
+        return _is_strcpy_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # SQL注入误报过滤：检查是否为静态SQL或参数化查询
+    if issue_type == "sql_injection":
+        return _is_sql_injection_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # 格式化字符串误报过滤：检查是否为常量格式字符串
+    if issue_type == "format_string":
+        return _is_format_string_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # memcpy误报过滤：检查是否有长度检查保护
+    if issue_type == "memcpy":
+        return _is_memcpy_false_positive(issue, analyzer, dataflow_result, lines)
+
+    return False
+
+
+def _is_uaf_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断UAF是否为误报
+
+    检查逻辑：
+    1. free后是否置NULL
+    2. 是否有NULL检查保护
+    """
+    line_num = issue.line
+
+    # 从问题消息中提取变量名
+    var_name = _extract_variable_name(issue.evidence)
+    if not var_name:
+        return False
+
+    # 检查变量访问是否安全
+    if analyzer.is_safe_access(var_name, line_num, dataflow_result):
+        return True
+
+    return False
+
+
+def _is_double_free_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断Double Free是否为误报
+
+    检查逻辑：
+    1. 第一次free后是否置NULL
+    2. 第二次free前是否有NULL检查
+    """
+    line_num = issue.line
+    var_name = _extract_variable_name(issue.evidence)
+
+    if not var_name:
+        return False
+
+    # 检查变量状态
+    if var_name in dataflow_result.pointer_states:
+        pointer_info = dataflow_result.pointer_states[var_name]
+
+        # 如果变量被置NULL，检查是否有NULL检查
+        if pointer_info.state == PointerState.NULLIFIED:
+            if var_name in dataflow_result.null_checks:
+                # 检查NULL检查是否在当前行之前
+                for check_line in dataflow_result.null_checks[var_name]:
+                    if check_line < line_num:
+                        return True
+
+    return False
+
+
+def _is_integer_overflow_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断整数溢出是否为误报
+
+    检查逻辑：
+    1. 是否有溢出检查（if条件）
+    2. 是否使用了安全函数（如calloc）
+    """
+    line_num = issue.line
+
+    # 检查后续几行是否有溢出检查
+    for i in range(line_num, min(line_num + 5, len(lines))):
+        line = lines[i] if i < len(lines) else ""
+        # 检查是否有溢出检查
+        if re.search(r"if\s*\(.*[<>].*\)", line):
+            return True
+        # 检查是否使用了安全函数
+        if "calloc" in line or "reallocarray" in line:
+            return True
+
+    return False
+
+
+def _is_strcpy_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断strcpy类函数是否为误报
+
+    检查逻辑：
+    1. 是否有NULL检查保护
+    2. 是否在死代码中
+    """
+    line_num = issue.line
+    var_name = _extract_variable_name(issue.evidence)
+
+    if not var_name:
+        return False
+
+    # 检查是否在死代码中
+    if line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # 检查是否有NULL检查保护
+    if var_name in dataflow_result.null_checks:
+        for check_line in dataflow_result.null_checks[var_name]:
+            if check_line < line_num:
+                return True
+
+    return False
+
+
+def _is_sql_injection_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断SQL注入是否为误报
+
+    检查逻辑：
+    1. 是否为静态SQL（无变量拼接）
+    2. 是否使用参数化查询（%d, ?）
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    line = lines[line_num - 1]
+
+    # 检查是否为静态SQL（字符串常量）
+    # 匹配 strcpy(query, "SELECT ...") 或 snprintf(query, ..., "SELECT ...")
+    if re.search(r'strcpy\s*\(\s*\w+\s*,\s*"[^"]*"\s*\)', line):
+        return True
+
+    # 检查是否使用参数化查询（%d, ?等）
+    if re.search(r"%[duifsc]", line) or "?" in line:
+        # 但要确保不是字符串拼接（%s）
+        if not re.search(r"sn?printf\s*\([^,]+,\s*[^,]+,\s*\w+\s*\)", line):
+            return True
+
+    return False
+
+
+def _is_format_string_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断格式化字符串漏洞是否为误报
+
+    检查逻辑：
+    1. 是否为常量格式字符串
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    line = lines[line_num - 1]
+
+    # 检查是否为常量格式字符串
+    # 匹配 printf("...", ...) 或 snprintf(buf, size, "...", ...)
+    if re.search(r'(sn)?printf\s*\([^,]*,\s*"[^"]*"', line):
+        return True
+
+    return False
+
+
+def _is_memcpy_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断memcpy是否为误报
+
+    检查逻辑：
+    1. 是否有长度检查保护
+    """
+    line_num = issue.line
+
+    # 检查前5行是否有长度检查
+    for i in range(max(0, line_num - 5), line_num):
+        if i < len(lines):
+            line = lines[i]
+            # 检查是否有长度检查（if (len < size)）
+            if re.search(r"if\s*\(.*[<>].*\)", line):
+                return True
+
+    return False
+
+
+def _extract_variable_name(msg: str) -> Optional[str]:
+    """
+    从问题消息中提取变量名
+
+    Args:
+        msg: 问题消息
+
+    Returns:
+        Optional[str]: 变量名（如果找到）
+    """
+    # 尝试匹配常见的变量名模式
+    patterns = [
+        r"variable\s+`(\w+)`",
+        r"pointer\s+`(\w+)`",
+        r"`(\w+)`\s+is",
+        r"`(\w+)`\s+after",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, msg)
+        if match:
+            return match.group(1)
+
+    return None
 
 
 def analyze_c_cpp_file(base: Path, relpath: Path) -> List[Issue]:
