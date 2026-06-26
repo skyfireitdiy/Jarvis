@@ -3889,6 +3889,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
       以避免注释中的API命中导致的误报。
     - 准确性优化2：对通用 API 扫描使用“字符串内容掩蔽”的副本，避免把字符串里的片段当作代码。
+    - 准确性优化3：使用数据流分析过滤误报（free后置NULL、if条件保护等）。
     """
     pre_text = _strip_if0_blocks(text)
     clean_text = _remove_comments_preserve_strings(pre_text)
@@ -3897,6 +3898,10 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     lines = clean_text.splitlines()
     # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
     mlines = masked_text.splitlines()
+
+    # 数据流分析（用于误报过滤）
+    data_flow_analyzer = DataFlowAnalyzer()
+    data_flow_result = data_flow_analyzer.analyze_code(text)
 
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
