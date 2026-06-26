@@ -3928,7 +3928,61 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_toctou_race(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
-    
+    issues.extend(_rule_atoi_family(mlines, relpath))
+    issues.extend(_rule_rand_insecure(mlines, relpath))
+    issues.extend(_rule_strtok_nonreentrant(mlines, relpath))
+    issues.extend(_rule_open_permissive_perms(mlines, relpath))
+    issues.extend(_rule_alloca_unbounded(mlines, relpath))
+    issues.extend(_rule_vla_usage(mlines, relpath))
+    issues.extend(_rule_pthread_returns_unchecked(mlines, relpath))
+    issues.extend(_rule_cond_wait_no_loop(mlines, relpath))
+    issues.extend(_rule_thread_leak_no_join(mlines, relpath))
+    issues.extend(_rule_inet_legacy(mlines, relpath))
+    issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath))
+    issues.extend(_rule_getenv_unchecked(mlines, relpath))
+    # 复杂语义（使用掩蔽行避免字符串干扰）
+    issues.extend(_rule_uaf_suspect(mlines, relpath))
+    issues.extend(_rule_possible_null_deref(mlines, relpath))
+    issues.extend(_rule_uninitialized_ptr_use(mlines, relpath))
+    issues.extend(_rule_deadlock_patterns(mlines, relpath))
+    # C++ 特定检查规则
+    issues.extend(_rule_new_delete_mismatch(mlines, relpath))
+    issues.extend(_rule_reinterpret_cast_unsafe(mlines, relpath))
+    issues.extend(_rule_const_cast_unsafe(mlines, relpath))
+    issues.extend(_rule_vector_string_bounds_check(mlines, relpath))
+    issues.extend(_rule_missing_virtual_dtor(mlines, relpath))
+    issues.extend(_rule_move_after_use(mlines, relpath))
+    issues.extend(_rule_uncaught_exception(mlines, relpath))
+    issues.extend(_rule_smart_ptr_cycle(mlines, relpath))
+    issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath))
+    # C++ 死锁检测
+    issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
+    # 数据竞争检测
+    issues.extend(_rule_data_race_suspect(mlines, relpath))
+
+    # 污点分析（核心功能）
+    try:
+        analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
+        if analyzer is not None:
+            taint_issues = analyzer.analyze(text, str(relpath))
+            # 将污点分析结果转换为Issue对象
+            for taint_path in taint_issues:
+                issue = Issue(
+                    language="c/cpp",
+                    category="taint-analysis",
+                    pattern="taint-flow",
+                    file=str(relpath),
+                    line=taint_path.line_number,
+                    evidence=f"{taint_path.source} -> {taint_path.sink}",
+                    description=f"Taint flow from {taint_path.source} to {taint_path.sink}",
+                    suggestion="Sanitize input data before use",
+                    confidence=taint_path.confidence,
+                    severity="high" if taint_path.confidence > 0.7 else "medium",
+                )
+                issues.append(issue)
+    except Exception:
+        # 污点分析失败时静默忽略，不影响启发式扫描
+        pass
     # 使用数据流分析过滤误报
     filtered_issues = _filter_issues_with_data_flow(issues, data_flow_analyzer, data_flow_result, lines)
     return filtered_issues
