@@ -1,0 +1,14 @@
+{
+  "id": "20260626_081054_337158",
+  "type": "project_long_term",
+  "tags": [
+    "污点分析",
+    "第三批重写",
+    "realloc_assign_back",
+    "unchecked_io",
+    "getenv_unchecked"
+  ],
+  "content": "## 第三批污点分析规则重写完成\n\n### 已完成工作\n1. **新增污点规则**（taint_analyzer.py）\n   - `realloc_assign_back`：检测realloc返回值未使用\n   - `unchecked_io`：检测IO返回值未检查\n   - `getenv_unchecked`：检测getenv返回值未检查NULL\n\n2. **新增污点源和汇**\n   - REALLOC_SOURCES：realloc返回值\n   - IO_SOURCES：read/write/fopen返回值\n   - GETENV_SOURCES：getenv返回值\n   - REALLOC_USE_SINKS：realloc返回值使用\n   - IO_CHECK_SINKS：IO返回值检查\n   - GETENV_CHECK_SINKS：getenv返回值检查\n\n3. **修改启发式规则**（c_checker.py）\n   - `_rule_realloc_assign_back`：集成污点分析，回退启发式检测\n   - `_rule_unchecked_io`：集成污点分析，回退启发式检测\n   - `_rule_getenv_unchecked`：集成污点分析，回退启发式检测\n\n### 测试结果\n- 16个测试全部通过\n- 静态检查通过（ruff check）\n\n### 关键文件\n- src/jarvis/jarvis_sec/taint_analyzer.py（新增污点规则）\n- src/jarvis/jarvis_sec/checkers/c_checker.py（集成污点分析）",
+  "created_at": "2026-06-26T08:10:54.337191",
+  "updated_at": "2026-06-26T08:10:54.337198"
+}
