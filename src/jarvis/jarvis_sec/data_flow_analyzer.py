@@ -11,6 +11,8 @@
 """
 
 import re
+from typing import Optional
+
 from enum import Enum
 from dataclasses import dataclass, field
 
@@ -204,10 +206,27 @@ class DataFlowAnalyzer:
         func_name_node = declarator.child_by_field_name("declarator")
         if func_name_node is None:
             return
-        func_name = self._get_node_text(func_name_node, code)
 
+        # 处理pointer_declarator包裹function_declarator的情况
+        if func_name_node.type == "function_declarator":
+            # 从function_declarator中提取identifier
+            func_name = None
+            for child in func_name_node.children:
+                if child.type == "identifier":
+                    func_name = self._get_node_text(child, code)
+                    break
+            if func_name is None:
+                return
+        else:
+            func_name = self._get_node_text(func_name_node, code)
         # 提取函数参数
-        params = declarator.child_by_field_name("parameters")
+        # 处理pointer_declarator包裹function_declarator的情况
+        func_declarator = declarator.child_by_field_name("declarator")
+        if func_declarator and func_declarator.type == "function_declarator":
+            params = func_declarator.child_by_field_name("parameters")
+        else:
+            params = declarator.child_by_field_name("parameters")
+
         if params:
             for param in params.children:
                 if param.type == "parameter_declaration":
@@ -244,18 +263,57 @@ class DataFlowAnalyzer:
         if node is None:
             return
 
-        # 检测malloc分配
-        if node.type == "assignment_expression":
+        # 检测malloc分配 - 处理declaration类型
+        if node.type == "declaration":
+            # 查找init_declarator
+            for child in node.children:
+                if child.type == "init_declarator":
+                    # 提取变量名（左侧）
+                    declarator = child.child_by_field_name("declarator")
+                    if declarator:
+                        # 处理pointer_declarator
+                        if declarator.type == "pointer_declarator":
+                            var_declarator = declarator.child_by_field_name(
+                                "declarator"
+                            )
+                            if var_declarator:
+                                var_name = self._get_node_text(var_declarator, code)
+                            else:
+                                var_name = (
+                                    self._get_node_text(declarator, code)
+                                    .replace("*", "")
+                                    .strip()
+                                )
+                        else:
+                            var_name = self._get_node_text(declarator, code)
+
+                        # 查找右侧的值（可能包含cast_expression）
+                        value = child.child_by_field_name("value")
+                        if value:
+                            # 递归查找cast_expression内部的call_expression
+                            call_expr = self._find_call_expression_in_cast(value)
+                            if call_expr:
+                                func_node = call_expr.child_by_field_name("function")
+                                if func_node:
+                                    func_name = self._get_node_text(func_node, code)
+                                    if func_name in ["malloc", "calloc", "realloc"]:
+                                        malloc_vars.add(var_name)
+
+        # 检测malloc分配 - 处理assignment_expression类型
+        elif node.type == "assignment_expression":
             right = node.child_by_field_name("right")
-            if right and right.type == "call_expression":
-                func_node = right.child_by_field_name("function")
-                if func_node:
-                    func_name = self._get_node_text(func_node, code)
-                    if func_name in ["malloc", "calloc", "realloc"]:
-                        left = node.child_by_field_name("left")
-                        if left:
-                            var_name = self._get_node_text(left, code)
-                            malloc_vars.add(var_name)
+            if right:
+                # 递归查找cast_expression内部的call_expression
+                call_expr = self._find_call_expression_in_cast(right)
+                if call_expr:
+                    func_node = call_expr.child_by_field_name("function")
+                    if func_node:
+                        func_name = self._get_node_text(func_node, code)
+                        if func_name in ["malloc", "calloc", "realloc"]:
+                            left = node.child_by_field_name("left")
+                            if left:
+                                var_name = self._get_node_text(left, code)
+                                malloc_vars.add(var_name)
 
         # 检测return语句
         if node.type == "return_statement":
@@ -268,6 +326,31 @@ class DataFlowAnalyzer:
         # 递归处理子节点
         for child in node.children:
             self._find_malloc_and_return(child, code, malloc_vars, result)
+
+    def _find_call_expression_in_cast(self, node: Node) -> Optional[Node]:
+        """
+        在cast_expression中查找call_expression
+
+        Args:
+            node: AST节点
+
+        Returns:
+            Node: 找到的call_expression节点，或None
+        """
+        if node is None:
+            return None
+
+        if node.type == "call_expression":
+            return node
+
+        if node.type == "cast_expression":
+            # 递归查找cast_expression内部的call_expression
+            for child in node.children:
+                result = self._find_call_expression_in_cast(child)
+                if result:
+                    return result
+
+        return None
 
     def _handle_call_expression(self, node: Node, code: str, result: DataFlowResult):
         """
@@ -474,9 +557,40 @@ class DataFlowAnalyzer:
 
             elif operator == "==":
                 # if (buffer == NULL) 或 if (NULL == buffer)
-                # 这种情况条件块内buffer为NULL，else块内buffer不为NULL
-                # 暂不处理，需要反向逻辑
-                pass
+                # 记录NULL检查，用于误报过滤
+                var_name = None
+                is_deref = False
+
+                if self._is_null_constant(left, code):
+                    # NULL == buffer 或 NULL == *buf
+                    if right.type == "identifier":
+                        var_name = right_text
+                    elif right.type == "pointer_expression":
+                        var_name = self._extract_dereferenced_var(right, code)
+                        is_deref = True
+                elif self._is_null_constant(right, code):
+                    # buffer == NULL 或 *buf == NULL
+                    if left.type == "identifier":
+                        var_name = left_text
+                    elif left.type == "pointer_expression":
+                        var_name = self._extract_dereferenced_var(left, code)
+                        is_deref = True
+
+                if var_name is None:
+                    return
+
+                # 如果是解引用检查，添加*前缀
+                if is_deref:
+                    var_name = f"*{var_name}"
+
+                if var_name not in result.null_checks:
+                    result.null_checks[var_name] = set()
+                result.null_checks[var_name].add(line)
+
+                # 添加到null_check_ranges
+                if var_name not in result.null_check_ranges:
+                    result.null_check_ranges[var_name] = []
+                result.null_check_ranges[var_name].append((line, scope_end))
 
             return
 
@@ -595,7 +709,9 @@ class DataFlowAnalyzer:
             return ""
         start_byte = node.start_byte
         end_byte = node.end_byte
-        return code[start_byte:end_byte]
+        # 使用字节切片，避免多字节字符问题
+        code_bytes = bytes(code, "utf8")
+        return code_bytes[start_byte:end_byte].decode("utf8")
 
     def _analyze_with_regex(self, code: str, result: DataFlowResult) -> DataFlowResult:
         """

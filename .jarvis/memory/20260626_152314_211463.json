@@ -1,0 +1,8 @@
+{
+  "id": "20260626_152314_211463",
+  "type": "project_long_term",
+  "tags": ["启发式扫描", "误报过滤", "变量名提取", "Issue类改进"],
+  "content": "## 变量名提取改进方案\n\n### 问题\n使用正则表达式从`issue.evidence`提取变量名存在局限性，可能无法处理复杂代码风格。\n\n### 解决方案\n结合启发式扫描的上下文信息，在检测问题时就记录变量名。\n\n### 实现细节\n1. **Issue类添加var_name字段**：`src/jarvis/jarvis_sec/types.py`添加可选的`var_name: str | None = None`字段\n2. **检测规则记录变量名**：\n   - `_rule_memory_leak`：在检测malloc/calloc/realloc时提取变量名\n   - `_rule_possible_null_deref`：在检测指针解引用时记录变量名`v`\n3. **_extract_variable_name函数改进**：优先使用Issue.var_name字段，回退到正则表达式\n\n### 验证结果\n- 反例测试：47个文件，0误报 ✅\n- 正例测试：49个文件，0漏报 ✅\n- 所有测试通过：8/8 ✅\n\n### 关键文件\n- `src/jarvis/jarvis_sec/types.py`（Issue类定义）\n- `src/jarvis/jarvis_sec/checkers/c_checker.py`（检测规则、误报过滤）\n\n### 优势\n- 最准确：在检测问题时就记录变量名，不依赖事后解析\n- 最可靠：直接从检测逻辑中获取，不受代码风格影响\n- 性能好：不需要额外的解析开销",
+  "created_at": "2026-06-26T15:23:14.211503",
+  "updated_at": "2026-06-26T15:23:14.211509"
+}
