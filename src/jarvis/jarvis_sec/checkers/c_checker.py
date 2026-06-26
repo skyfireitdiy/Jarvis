@@ -3202,6 +3202,28 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
     # 数据竞争检测
     issues.extend(_rule_data_race_suspect(mlines, relpath))
+    
+    # 污点分析（可选，需要安装Joern）
+    if TAINT_ANALYZER_AVAILABLE:
+        try:
+            analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
+            taint_issues = analyzer.analyze(text, str(relpath))
+            # 将污点分析结果转换为Issue对象
+            for path in taint_issues:
+                issue = Issue(
+                    file=str(relpath),
+                    line=path.source.line,
+                    column=path.source.column,
+                    msg=f"Taint flow: {path.source.name} -> {path.sink.name}",
+                    confidence=path.confidence,
+                    severity="high" if path.confidence > 0.7 else "medium",
+                    rule_id="taint_flow",
+                )
+                issues.append(issue)
+        except Exception:
+            # 污点分析失败时静默忽略，不影响启发式扫描
+            pass
+    
     return issues
 
 
