@@ -542,7 +542,9 @@ def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_boundary_funcs(
+    lines: Sequence[str], relpath: str, original_lines: Optional[Sequence[str]] = None
+) -> List[Issue]:
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
         # 跳过预处理行与声明行，避免在 typedef/extern 原型中误报
@@ -577,6 +579,34 @@ def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
         if safe_sizeof:
             # 跳过该条，以提高准确性（避免将安全写法误报为风险）
             continue
+
+        # 若为 strncpy/strncat，检测安全用法模式
+        # 1. 使用 sizeof(buffer)-1 作为长度参数
+        # 2. 手动添加 '\0' 终止符
+        if api.lower() in ("strncpy", "strncat") and args:
+            # 检查是否使用 sizeof(buffer)-1 模式
+            safe_sizeof_pattern = re.search(
+                r"sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
+                args,
+            )
+            # 检查是否手动添加 '\0' 终止符（需要检查后续行）
+            # 使用原始行（original_lines）而不是掩蔽行（lines），因为掩蔽行会将 '\0' 替换为空格
+            has_null_term = False
+            if safe_sizeof_pattern:
+                # 使用原始行检查 '\0' 终止符
+                check_lines = original_lines if original_lines is not None else lines
+                # 检查当前行和后续2行是否有 '\0' 终止符
+                for check_idx in range(idx, min(idx + 3, len(check_lines) + 1)):
+                    check_line = check_lines[check_idx - 1]
+                    if re.search(
+                        r"\w+\s*\[\s*sizeof\s*\(\s*\w+\s*\)\s*-\s*1\s*\]\s*=\s*'\\0'",
+                        check_line,
+                    ):
+                        has_null_term = True
+                        break
+            # 如果是安全用法，跳过告警
+            if safe_sizeof_pattern and has_null_term:
+                continue
 
         # 如果参数中包含 strlen 或 sizeof( *ptr )，提高风险（长度来源不稳定/指针大小）
         if RE_STRLEN_IN_SIZE.search(s) or RE_SIZEOF_PTR.search(s):
@@ -1501,6 +1531,205 @@ def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
                     severity="high",
                 )
             )
+    return issues
+
+
+def _rule_sql_injection(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    SQL注入检测（污点分析 + 启发式回退）：
+    - 优先使用污点分析检测用户输入 -> SQL拼接函数 的污点传播路径
+    - 若污点分析不可用，回退到启发式检测
+    - 启发式：检测 sprintf/snprintf 拼接SQL语句的模式（格式串包含SQL关键字且参数包含用户输入）
+    """
+    issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["sql_injection"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="injection",
+                    pattern="sql_injection_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or f"{path.source} -> {path.sink}",
+                    description=path.description
+                    or f"污点分析检测到SQL注入风险：{path.source} -> {path.sink}",
+                    suggestion="使用参数化查询或预编译语句，避免拼接用户输入到SQL语句。",
+                    confidence=path.confidence,
+                    severity="critical",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
+    # SQL关键字模式（不区分大小写）
+    sql_keywords = ["SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "EXEC", "EXECUTE"]
+    # 检测 sprintf/snprintf 拼接SQL语句
+    for idx, s in enumerate(lines, start=1):
+        # 检测 sprintf/snprintf 调用
+        m = re.search(r"\b(sprintf|snprintf)\s*\(", s)
+        if not m:
+            continue
+        try:
+            # 提取格式串参数（sprintf第2参，snprintf第3参）
+            # 简化处理：检查字符串中是否包含SQL关键字
+            for kw in sql_keywords:
+                if re.search(rf"\b{kw}\b", s, re.IGNORECASE):
+                    # 检查是否有参数（%s, %d等）
+                    if re.search(r"%[sdu]", s):
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="injection",
+                                pattern="sql_injection",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(s),
+                                description="检测到SQL语句拼接，可能存在SQL注入风险。",
+                                suggestion="使用参数化查询或预编译语句，避免拼接用户输入到SQL语句。",
+                                confidence=0.7,
+                                severity="high",
+                            )
+                        )
+                        break
+        except Exception:
+            pass
+    return issues
+
+
+def _rule_memory_leak(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    内存泄漏检测（启发式）：
+    - 检测函数内malloc/calloc/realloc后没有对应的free
+    - 简化处理：只检测函数内是否有配对的分配和释放
+    """
+    issues: List[Issue] = []
+
+    # 分配函数模式
+    alloc_pattern = re.compile(r"\b(malloc|calloc|realloc)\s*\(")
+    # 释放函数模式
+    free_pattern = re.compile(r"\bfree\s*\(")
+
+    # 按函数分块分析
+    func_start = 0
+    in_func = False
+    brace_count = 0
+
+    for idx, s in enumerate(lines, start=1):
+        # 检测函数开始
+        if re.search(r"\)\s*\{", s):
+            if not in_func:
+                func_start = idx
+                in_func = True
+                brace_count = 1
+                continue
+
+        if in_func:
+            brace_count += s.count("{") - s.count("}")
+            if brace_count == 0:
+                # 函数结束，分析函数体
+                func_lines = lines[func_start - 1 : idx]
+                func_text = "\n".join(func_lines)
+
+                # 检查是否有分配
+                has_alloc = alloc_pattern.search(func_text)
+                # 检查是否有释放
+                has_free = free_pattern.search(func_text)
+
+                if has_alloc and not has_free:
+                    # 找到分配行号
+                    for i, line in enumerate(func_lines, start=func_start):
+                        if alloc_pattern.search(line):
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="memory",
+                                    pattern="memory_leak",
+                                    file=relpath,
+                                    line=i,
+                                    evidence=_strip_line(line),
+                                    description="检测到内存分配但未释放，可能存在内存泄漏。",
+                                    suggestion="确保在所有代码路径上释放分配的内存，或使用RAII模式。",
+                                    confidence=0.6,
+                                    severity="medium",
+                                )
+                            )
+                            break
+                in_func = False
+
+    return issues
+
+
+def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    路径遍历检测（污点分析 + 启发式回退）：
+    - 优先使用污点分析检测用户输入 -> 路径拼接函数 的污点传播路径
+    - 若污点分析不可用，回退到启发式检测
+    - 启发式：检测 strcat/strncat 拼接路径的模式
+    """
+    issues: List[Issue] = []
+
+    # 尝试使用污点分析
+    code = "\n".join(lines)
+    taint_paths = taint_analyzer.analyze_with_best_analyzer(
+        code, rules=["path_traversal"], file_path=relpath
+    )
+
+    # 如果污点分析有结果，转换为Issue
+    if taint_paths:
+        for path in taint_paths:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="injection",
+                    pattern="path_traversal_taint",
+                    file=relpath,
+                    line=path.line_number,
+                    evidence=path.code_snippet or f"{path.source} -> {path.sink}",
+                    description=path.description
+                    or f"污点分析检测到路径遍历风险：{path.source} -> {path.sink}",
+                    suggestion="验证用户输入，过滤../等路径遍历字符，使用白名单限制访问路径。",
+                    confidence=path.confidence,
+                    severity="high",
+                )
+            )
+        return issues
+
+    # 污点分析无结果，回退到启发式检测
+    # 路径拼接函数模式
+    path_concat_pattern = re.compile(r"\b(strcat|strncat)\s*\(")
+    # 文件操作函数模式
+    file_op_pattern = re.compile(r"\b(fopen|open|openat)\s*\(")
+
+    # 检测路径拼接后用于文件操作
+    for idx, s in enumerate(lines, start=1):
+        if path_concat_pattern.search(s):
+            # 检查后续几行是否有文件操作
+            for j in range(idx, min(idx + 3, len(lines) + 1)):
+                if file_op_pattern.search(lines[j - 1]):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="injection",
+                            pattern="path_traversal",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description="检测到路径拼接后用于文件操作，可能存在路径遍历风险。",
+                            suggestion="验证用户输入，过滤../等路径遍历字符，使用白名单限制访问路径。",
+                            confidence=0.6,
+                            severity="medium",
+                        )
+                    )
+                    break
     return issues
 
 
@@ -3456,7 +3685,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
     issues.extend(_rule_unsafe_api(mlines, relpath))
-    issues.extend(_rule_boundary_funcs(mlines, relpath))
+    issues.extend(_rule_boundary_funcs(mlines, relpath, lines))
     issues.extend(_rule_realloc_assign_back(mlines, relpath))
     issues.extend(_rule_malloc_no_null_check(mlines, relpath))
     issues.extend(_rule_function_return_ptr_no_check(mlines, relpath))
@@ -3468,6 +3697,10 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     # 其他规则
     issues.extend(_rule_insecure_tmpfile(mlines, relpath))
     issues.extend(_rule_command_execution(mlines, relpath))
+    # 新增规则：SQL注入、内存泄漏、路径遍历
+    issues.extend(_rule_sql_injection(lines, relpath))
+    issues.extend(_rule_memory_leak(lines, relpath))
+    issues.extend(_rule_path_traversal(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
     issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
     issues.extend(_rule_atoi_family(mlines, relpath))
