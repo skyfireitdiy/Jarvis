@@ -976,6 +976,16 @@ def run_cli(
         "--agent-id",
         help="Agent ID，由 Web Gateway 的 AgentManager 分配的唯一标识符",
     ),
+    install_plugin: Optional[str] = typer.Option(
+        None,
+        "--install-plugin",
+        help="安装插件：指定插件目录或压缩文件路径（支持 .tar, .tar.gz, .tgz, .zip）",
+    ),
+    uninstall_plugin: Optional[str] = typer.Option(
+        None,
+        "--uninstall-plugin",
+        help="卸载插件：指定要卸载的插件名称",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -990,6 +1000,30 @@ def run_cli(
     # 处理工具检查参数（原 jck 命令功能）
     if handle_check_mode(check, check_lint, check_build, check_tool_name, check_json):
         return
+
+    # 处理插件安装参数
+    if install_plugin:
+        from jarvis.jarvis_agent.utils import install_plugin as do_install_plugin
+
+        success = do_install_plugin(install_plugin)
+        if success:
+            PrettyOutput.auto_print("✅ 插件安装成功")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("❌ 插件安装失败")
+            raise typer.Exit(code=1)
+
+    # 处理插件卸载参数
+    if uninstall_plugin:
+        from jarvis.jarvis_agent.utils import uninstall_plugin as do_uninstall_plugin
+
+        success = do_uninstall_plugin(uninstall_plugin)
+        if success:
+            PrettyOutput.auto_print(f"✅ 插件 '{uninstall_plugin}' 卸载成功")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(f"❌ 插件 '{uninstall_plugin}' 卸载失败")
+            raise typer.Exit(code=1)
 
     # 处理任务内容：优先从文件读取
     if task and task_file:
