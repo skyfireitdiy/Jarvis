@@ -30,7 +30,7 @@ from jarvis.jarvis_sec.types import Issue
 
 # 污点分析框架（可选依赖）
 try:
-    from jarvis.jarvis_sec.taint_analyzer import TaintAnalyzerFactory
+    import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
     TAINT_ANALYZER_AVAILABLE = True
 except ImportError:
     TAINT_ANALYZER_AVAILABLE = False
