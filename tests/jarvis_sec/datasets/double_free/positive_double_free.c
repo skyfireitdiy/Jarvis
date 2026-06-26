@@ -1,27 +1,10 @@
-// Double Free正例：同一内存释放两次
-// 应该检测到：同一指针被释放两次
-
-#include <stdio.h>
+/*
+ * 正例：重复释放内存
+ * 预期：应该检测到 double_free
+ */
 #include <stdlib.h>
-#include <string.h>
-
-int main(int argc, char *argv[]) {
-  // 分配内存
-  char *buffer = (char *)malloc(256);
-  if (buffer == NULL) {
-    return 1;
-  }
-
-  // 使用内存
-  strcpy(buffer, "Hello, World!");
-  printf("Buffer: %s\n", buffer);
-
-  // 第一次释放
-  free(buffer);
-
-  // Double Free：第二次释放同一内存
-  // 应该检测到double free
-  free(buffer); // 错误：重复释放
-
-  return 0;
+void double_free_example(char *ptr) {
+  free(ptr);
+  // ... 一些代码 ...
+  free(ptr); // 危险：重复释放同一块内存
 }

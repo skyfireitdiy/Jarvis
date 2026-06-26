@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 
 import typer
@@ -488,6 +489,202 @@ def analyze(
     except Exception as e:
         PrettyOutput.auto_print(f"❌ [jsec-analyze] 未知错误: {e}")
         raise typer.Exit(code=1)
+
+
+@app.command("heuristic", help="启发式扫描（快速静态分析）")
+def heuristic(
+    target: str = typer.Argument(..., help="扫描目标（文件或目录路径）"),
+    output_format: str = typer.Option(
+        "json", "--format", "-f", help="输出格式（json/markdown）"
+    ),
+    output_file: Optional[str] = typer.Option(
+        None, "--output", "-o", help="输出文件路径（默认输出到终端）"
+    ),
+    rules: Optional[str] = typer.Option(
+        None,
+        "--rules",
+        "-r",
+        help="规则过滤（逗号分隔，如 unsafe_api,buffer_overflow）",
+    ),
+) -> None:
+    """
+    启发式扫描：快速静态分析，无需LLM，直接输出检测结果。
+
+    特点：
+    - 快速：纯静态分析，无需LLM调用
+    - 全面：覆盖38+启发式规则
+    - 精准：集成污点分析，减少误报
+
+    示例:
+      # 扫描单个文件（JSON格式）
+      jsec heuristic ./src/main.c
+
+      # 扫描目录（Markdown格式）
+      jsec heuristic ./src --format markdown
+
+      # 扫描并保存到文件
+      jsec heuristic ./src --output report.json
+
+      # 指定规则过滤
+      jsec heuristic ./src --rules unsafe_api,buffer_overflow
+    """
+    from pathlib import Path
+    import json
+    from jarvis.jarvis_sec.checkers.c_checker import analyze_c_cpp_file
+
+    target_path = Path(target).resolve()
+
+    # 收集所有Issue
+    all_issues: List[Dict[str, Any]] = []
+
+    # 判断目标是文件还是目录
+    if target_path.is_file():
+        # 扫描单个文件
+        PrettyOutput.auto_print(f"📄 [heuristic] 扫描文件: {target_path}")
+        issues = analyze_c_cpp_file(target_path.parent, Path(target_path.name))
+        for issue in issues:
+            all_issues.append(
+                {
+                    "language": issue.language,
+                    "category": issue.category,
+                    "pattern": issue.pattern,
+                    "file": str(Path(issue.file).resolve()),
+                    "line": issue.line,
+                    "evidence": issue.evidence,
+                    "description": issue.description,
+                    "suggestion": issue.suggestion,
+                    "confidence": issue.confidence,
+                    "severity": issue.severity,
+                }
+            )
+    elif target_path.is_dir():
+        # 扫描目录
+        PrettyOutput.auto_print(f"📁 [heuristic] 扫描目录: {target_path}")
+
+        # 支持的文件扩展名
+        extensions = {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "c++", "h++"}
+
+        # 收集所有C/C++文件
+        c_files = []
+        for ext in extensions:
+            c_files.extend(target_path.rglob(f"*.{ext}"))
+
+        # 排除常见目录
+        exclude_dirs = {
+            ".git",
+            "build",
+            "out",
+            "target",
+            "dist",
+            "bin",
+            "obj",
+            "third_party",
+            "vendor",
+            "deps",
+            "node_modules",
+            "test",
+            "tests",
+            "__tests__",
+            "spec",
+            "testdata",
+        }
+        c_files = [
+            f for f in c_files if not any(excl in f.parts for excl in exclude_dirs)
+        ]
+
+        PrettyOutput.auto_print(f"📊 [heuristic] 发现 {len(c_files)} 个C/C++文件")
+
+        # 批量分析
+        for i, file_path in enumerate(c_files, 1):
+            relpath = file_path.relative_to(target_path)
+            issues = analyze_c_cpp_file(target_path, relpath)
+            for issue in issues:
+                all_issues.append(
+                    {
+                        "language": issue.language,
+                        "category": issue.category,
+                        "pattern": issue.pattern,
+                        "file": str(file_path),
+                        "line": issue.line,
+                        "evidence": issue.evidence,
+                        "description": issue.description,
+                        "suggestion": issue.suggestion,
+                        "confidence": issue.confidence,
+                        "severity": issue.severity,
+                    }
+                )
+            # 进度提示（每10个文件）
+            if i % 10 == 0:
+                PrettyOutput.auto_print(
+                    f"⏳ [heuristic] 已扫描 {i}/{len(c_files)} 个文件"
+                )
+
+        PrettyOutput.auto_print(
+            f"✅ [heuristic] 扫描完成，共扫描 {len(c_files)} 个文件"
+        )
+    else:
+        PrettyOutput.auto_print(f"❌ [heuristic] 目标不存在: {target_path}")
+        raise typer.Exit(code=1)
+
+    # 规则过滤
+    if rules:
+        rule_list = [r.strip() for r in rules.split(",") if r.strip()]
+        all_issues = [issue for issue in all_issues if issue["pattern"] in rule_list]
+        PrettyOutput.auto_print(f"🔍 [heuristic] 规则过滤后: {len(all_issues)} 个问题")
+
+    # 统计信息
+    stats = {
+        "total": len(all_issues),
+        "by_severity": {},
+        "by_category": {},
+        "by_pattern": {},
+    }
+    for issue in all_issues:
+        severity = issue["severity"]
+        category = issue["category"]
+        pattern = issue["pattern"]
+        stats["by_severity"][severity] = stats["by_severity"].get(severity, 0) + 1
+        stats["by_category"][category] = stats["by_category"].get(category, 0) + 1
+        stats["by_pattern"][pattern] = stats["by_pattern"].get(pattern, 0) + 1
+
+    # 输出结果
+    if output_format == "json":
+        result = {
+            "summary": stats,
+            "issues": all_issues,
+        }
+        output_text = json.dumps(result, ensure_ascii=False, indent=2)
+    else:  # markdown
+        lines = ["# 启发式扫描报告\n"]
+        lines.append(f"**扫描目标**: `{target_path}`\n")
+        lines.append(f"**问题总数**: {stats['total']}\n")
+        lines.append("\n## 统计信息\n")
+        lines.append("\n### 按严重程度\n")
+        for sev, count in sorted(stats["by_severity"].items(), key=lambda x: -x[1]):
+            lines.append(f"- **{sev}**: {count}")
+        lines.append("\n### 按类别\n")
+        for cat, count in sorted(stats["by_category"].items(), key=lambda x: -x[1]):
+            lines.append(f"- **{cat}**: {count}")
+        lines.append("\n### 按规则\n")
+        for pattern, count in sorted(stats["by_pattern"].items(), key=lambda x: -x[1]):
+            lines.append(f"- **{pattern}**: {count}")
+        lines.append("\n## 问题列表\n")
+        for i, issue in enumerate(all_issues, 1):
+            lines.append(f"\n### {i}. {issue['pattern']}\n")
+            lines.append(f"- **文件**: `{issue['file']}:{issue['line']}`")
+            lines.append(f"- **严重程度**: {issue['severity']}")
+            lines.append(f"- **置信度**: {issue['confidence']:.2f}")
+            lines.append(f"- **描述**: {issue['description']}")
+            lines.append(f"- **建议**: {issue['suggestion']}")
+            lines.append(f"- **证据**: `{issue['evidence']}`")
+        output_text = "\n".join(lines)
+
+    # 输出到文件或终端
+    if output_file:
+        Path(output_file).write_text(output_text, encoding="utf-8")
+        PrettyOutput.auto_print(f"✅ [heuristic] 报告已保存到: {output_file}")
+    else:
+        PrettyOutput.auto_print(output_text)
 
 
 @app.command("scan", help="执行安全扫描（从配置文件读取）")
