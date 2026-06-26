@@ -1741,54 +1741,90 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
     整数溢出检测：
     - 检测乘法/加法表达式作为malloc/calloc/realloc参数
     - 检测可能导致缓冲区分配不足的整数溢出风险
+    - 优化：识别前置的溢出检查，避免误报
     """
     issues: List[Issue] = []
-    
+
     # 内存分配函数模式
     alloc_pattern = re.compile(r'\b(malloc|calloc|realloc)\s*\(')
-    
+
     # 检测乘法或加法表达式
     mul_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)')
     add_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)')
-    
+
+    # 溢出检查模式（安全模式）
+    overflow_check_patterns = [
+        # 乘法溢出检查: var <= UINT_MAX / var, var <= INT_MAX / var
+        re.compile(r'\b([A-Za-z_]\w*)\s*<=\s*(UINT_MAX|INT_MAX)\s*/\s*([A-Za-z_]\w*)'),
+        # 加法溢出检查: var < INT_MAX - num, var <= INT_MAX - num
+        re.compile(r'\b([A-Za-z_]\w*)\s*(<|<=)\s*(INT_MAX|UINT_MAX)\s*-\s*\d+'),
+    ]
+
+    def _has_overflow_check(var1: str, var2: str, lines: Sequence[str], upto_idx: int, lookback: int = 10) -> bool:
+        """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查"""
+        start = max(1, upto_idx - lookback)
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            # 检查乘法溢出检查模式
+            for pat in overflow_check_patterns[:1]:  # 只检查乘法模式
+                m = pat.search(sj)
+                if m:
+                    # 检查是否涉及var1或var2
+                    checked_vars = [m.group(1), m.group(3)]
+                    if var1 in checked_vars or var2 in checked_vars:
+                        return True
+            # 检查加法溢出检查模式
+            for pat in overflow_check_patterns[1:]:  # 只检查加法模式
+                m = pat.search(sj)
+                if m:
+                    if m.group(1) == var1 or m.group(1) == var2:
+                        return True
+        return False
+
     for idx, s in enumerate(lines, start=1):
         if alloc_pattern.search(s):
             # 检测乘法溢出
             mul_match = mul_pattern.search(s)
             if mul_match:
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="arithmetic",
-                        pattern="integer_overflow",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"检测到乘法表达式 '{mul_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
-                        suggestion="使用安全整数运算函数（如 size_mul_overflow）或添加溢出检查，确保分配大小正确。",
-                        confidence=0.7,
-                        severity="high",
+                var1, var2 = mul_match.group(1), mul_match.group(2)
+                # 检查是否有前置的溢出检查
+                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="arithmetic",
+                            pattern="integer_overflow",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"检测到乘法表达式 '{mul_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                            suggestion="使用安全整数运算函数（如 size_mul_overflow）或添加溢出检查，确保分配大小正确。",
+                            confidence=0.7,
+                            severity="high",
+                        )
                     )
-                )
-            
+
             # 检测加法溢出
             add_match = add_pattern.search(s)
             if add_match:
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="arithmetic",
-                        pattern="integer_overflow",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"检测到加法表达式 '{add_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
-                        suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
-                        confidence=0.65,
-                        severity="medium",
+                var1, var2 = add_match.group(1), add_match.group(2)
+                # 检查是否有前置的溢出检查
+                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="arithmetic",
+                            pattern="integer_overflow",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(s),
+                            description=f"检测到加法表达式 '{add_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
+                            suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
+                            confidence=0.65,
+                            severity="medium",
+                        )
                     )
-                )
-    
+
     return issues
 
 
