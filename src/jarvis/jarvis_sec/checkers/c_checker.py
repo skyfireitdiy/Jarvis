@@ -3210,18 +3210,18 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
             if analyzer is not None:
                 taint_issues = analyzer.analyze(text, str(relpath))
                 # 将污点分析结果转换为Issue对象
-                for path in taint_issues:
+                for taint_path in taint_issues:
                     issue = Issue(
                         language="c/cpp",
                         category="taint-analysis",
                         pattern="taint-flow",
                         file=str(relpath),
-                        line=path.source.line,
-                        evidence=f"{path.source.name} -> {path.sink.name}",
-                        description=f"Taint flow from {path.source.name} to {path.sink.name}",
+                        line=taint_path.line_number,
+                        evidence=f"{taint_path.source} -> {taint_path.sink}",
+                        description=f"Taint flow from {taint_path.source} to {taint_path.sink}",
                         suggestion="Sanitize input data before use",
-                        confidence=path.confidence,
-                        severity="high" if path.confidence > 0.7 else "medium",
+                        confidence=taint_path.confidence,
+                        severity="high" if taint_path.confidence > 0.7 else "medium",
                     )
                     issues.append(issue)
         except Exception:
