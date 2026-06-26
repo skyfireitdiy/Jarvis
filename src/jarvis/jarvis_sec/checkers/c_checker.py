@@ -1748,12 +1748,8 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
     add_pattern = re.compile(r'\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)')
 
     # 溢出检查模式（安全模式）
-    overflow_check_patterns = [
-        # 乘法溢出检查: var <= UINT_MAX / var, var <= INT_MAX / var
-        re.compile(r'\b([A-Za-z_]\w*)\s*<=\s*(UINT_MAX|INT_MAX)\s*/\s*([A-Za-z_]\w*)'),
-        # 加法溢出检查: var < INT_MAX - num, var <= INT_MAX - num
-        re.compile(r'\b([A-Za-z_]\w*)\s*(<|<=)\s*(INT_MAX|UINT_MAX)\s*-\s*\d+'),
-    ]
+    mul_overflow_check = re.compile(r'\b([A-Za-z_]\w*)\s*<=\s*(UINT_MAX|INT_MAX)\s*/\s*([A-Za-z_]\w*)')
+    add_overflow_check = re.compile(r'\b([A-Za-z_]\w*)\s*(<|<=)\s*(INT_MAX|UINT_MAX)\s*-\s*\d+')
 
     def _has_overflow_check(var1: str, var2: str, lines: Sequence[str], upto_idx: int, lookback: int = 10) -> bool:
         """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查"""
@@ -1761,19 +1757,17 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
         for j in range(start, upto_idx):
             sj = _safe_line(lines, j)
             # 检查乘法溢出检查模式
-            for pat in overflow_check_patterns[:1]:  # 只检查乘法模式
-                m = pat.search(sj)
-                if m:
-                    # 检查是否涉及var1或var2
-                    checked_vars = [m.group(1), m.group(3)]
-                    if var1 in checked_vars or var2 in checked_vars:
-                        return True
+            m = mul_overflow_check.search(sj)
+            if m:
+                # 检查是否涉及var1或var2
+                checked_vars = [m.group(1), m.group(3)]
+                if var1 in checked_vars or var2 in checked_vars:
+                    return True
             # 检查加法溢出检查模式
-            for pat in overflow_check_patterns[1:]:  # 只检查加法模式
-                m = pat.search(sj)
-                if m:
-                    if m.group(1) == var1 or m.group(1) == var2:
-                        return True
+            m = add_overflow_check.search(sj)
+            if m:
+                if m.group(1) == var1 or m.group(1) == var2:
+                    return True
         return False
 
     for idx, s in enumerate(lines, start=1):
