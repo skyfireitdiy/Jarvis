@@ -1,0 +1,15 @@
+{
+  "id": "20260626_155830_025288",
+  "type": "project_long_term",
+  "tags": [
+    "数据收集器",
+    "tree-sitter",
+    "符号提取",
+    "调用关系",
+    "数据流",
+    "阶段二完成"
+  ],
+  "content": "## 数据收集器阶段二完成\n\n### 完成状态\n- DataCollector类实现完成\n- 静态检查通过（ruff check）\n\n### 核心功能\n1. **文件分析入口**：\n   - analyze_file：分析单个文件，提取所有数据\n   - analyze_files_batch：批量分析文件\n\n2. **AST提取方法**（基于tree-sitter）：\n   - _extract_from_ast：从AST提取数据\n   - _traverse_ast：递归遍历AST\n   - _handle_function_definition：处理函数定义\n   - _handle_type_definition：处理类型定义\n   - _handle_declaration：处理变量声明\n   - _handle_call_expression：处理函数调用\n   - _handle_assignment：处理赋值表达式\n   - _handle_memory_operation：处理内存操作\n\n3. **正则表达式回退方案**：\n   - _extract_with_regex：tree-sitter不可用时使用正则表达式提取\n   - 提取函数定义、函数调用、malloc/free、struct/union/enum定义\n\n4. **辅助方法**：\n   - _get_node_text：获取节点文本\n   - _get_function_name：获取函数名\n   - _extract_function_params：提取函数参数名\n   - _extract_declarators：提取声明中的变量名和类型\n   - _get_call_target：获取函数调用的目标函数名\n   - _extract_call_arguments：提取函数调用参数\n   - _extract_struct_members：提取struct/union成员\n\n5. **数据保存**：\n   - _save_to_database：批量保存分析结果到数据库\n\n### 关键文件\n- src/jarvis/jarvis_sec/data_collector.py（920行）\n  - DataCollector类：数据收集器\n  - tree-sitter解析：C和C++解析器\n  - 正则表达式回退：完整的回退方案\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过（ruff format）\n- Git提交：e5b95e5\n\n### 下一步\n- 阶段三：集成到扫描流程（修改workflow.py）\n- 阶段四：跨文件分析支持（修改数据流分析器和污点分析器）\n- 阶段五：测试验证",
+  "created_at": "2026-06-26T15:58:30.025332",
+  "updated_at": "2026-06-26T15:58:30.025339"
+}

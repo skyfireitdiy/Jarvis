@@ -1,0 +1,14 @@
+{
+  "id": "20260626_160015_527719",
+  "type": "project_long_term",
+  "tags": [
+    "项目数据库",
+    "跨文件分析",
+    "集成完成",
+    "workflow集成",
+    "阶段三完成"
+  ],
+  "content": "## 项目级数据库实现完成\n\n### 完成状态\n- 数据库Schema设计完成（阶段一）\n- 数据收集器实现完成（阶段二）\n- 集成到扫描流程完成（阶段三）\n- 静态检查全部通过\n\n### 核心功能\n1. **数据库Schema**（7张表）：\n   - files: 文件元数据\n   - symbols: 符号表（函数、变量、类型）\n   - call_graph: 调用关系图\n   - data_flow: 数据流图（Def-Use链）\n   - pointer_states: 指针状态追踪\n   - type_info: 类型信息\n   - analysis_cache: 分析结果缓存\n\n2. **数据收集器**：\n   - 基于tree-sitter提取符号、调用关系、数据流\n   - 正则表达式回退方案\n   - 批量分析接口\n\n3. **集成到扫描流程**：\n   - direct_scan函数新增build_database参数\n   - 自动构建项目级数据库\n   - 返回数据库统计信息\n\n### 关键文件\n- src/jarvis/jarvis_sec/project_database.py（795行）\n  - ProjectDatabase类：数据库管理器\n  - 6个dataclass：数据结构定义\n  - SQLite连接管理：上下文管理器\n\n- src/jarvis/jarvis_sec/data_collector.py（920行）\n  - DataCollector类：数据收集器\n  - tree-sitter解析：C和C++解析器\n  - 正则表达式回退：完整的回退方案\n\n- src/jarvis/jarvis_sec/workflow.py（已修改）\n  - direct_scan函数：集成数据库构建\n  - build_database参数：控制是否构建数据库\n  - 返回database_stats：数据库统计信息\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过（ruff format）\n- Git提交：7ed7749\n\n### 使用方式\n```python\nfrom jarvis.jarvis_sec.workflow import direct_scan\n\n# 扫描项目并构建数据库\nresult = direct_scan('/path/to/project', build_database=True)\n\n# 查看数据库统计信息\nprint(result['database_stats'])\n```\n\n### 数据库位置\n- 默认路径：项目根目录/.jarvis/analysis.db\n- 可自定义路径：ProjectDatabase(project_path, db_path)\n\n### 下一步优化方向\n1. 增量更新机制：文件修改后只更新相关数据\n2. 跨文件分析接口：提供查询接口供分析器使用\n3. 性能优化：大数据量时的查询优化\n4. 缓存机制：分析结果缓存复用",
+  "created_at": "2026-06-26T16:00:15.527755",
+  "updated_at": "2026-06-26T16:00:15.527769"
+}

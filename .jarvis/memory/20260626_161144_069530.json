@@ -1,0 +1,15 @@
+{
+  "id": "20260626_161144_069530",
+  "type": "project_long_term",
+  "tags": [
+    "项目数据库",
+    "增量更新",
+    "跨文件分析",
+    "查询接口",
+    "阶段二完成",
+    "已完成"
+  ],
+  "content": "## 项目级数据库阶段二完成\n\n### 完成状态\n- 增量更新机制实现完成\n- 跨文件分析接口实现完成\n- workflow集成完成\n- 静态检查全部通过（ruff check）\n\n### 核心功能\n\n#### 1. 增量更新机制\n- `update_file(file_path, language, collector)`：增量更新单个文件\n  - 检测文件哈希变化\n  - 删除旧数据\n  - 重新收集数据\n  - 批量插入新数据\n\n- `update_files_batch(file_paths)`：批量增量更新多个文件\n  - 共享数据收集器\n  - 返回更新结果字典\n\n- `sync_files(current_files)`：同步文件列表\n  - 删除不存在的文件\n  - 更新变化的文件\n  - 返回同步统计信息\n\n#### 2. 跨文件分析查询接口\n- `find_symbol_definition(name)`：查找符号定义位置\n- `find_symbol_references(name)`：查找符号所有引用\n- `find_callers(function_name)`：查找函数调用者（跨文件）\n- `find_callees(function_name, file_path)`：查找函数被调用者（跨文件）\n- `trace_pointer_state(var_name, file_path)`：追踪指针状态变化\n- `find_data_flow(var_name, file_path)`：查找变量数据流\n\n#### 3. 跨文件分析方法\n- `analyze_cross_file_uaf(var_name)`：跨文件UAF分析\n  - 追踪指针状态\n  - 查找数据流\n  - 检测释放后使用风险\n\n- `analyze_cross_file_data_flow(var_name)`：跨文件数据流分析\n  - 按文件分组\n  - 构建数据流图\n  - 返回定义-使用链\n\n### 关键文件\n- src/jarvis/jarvis_sec/project_database.py（新增292行）\n  - 第1005-1126行：增量更新机制\n  - 第1128-1418行：跨文件分析查询接口\n\n- src/jarvis/jarvis_sec/workflow.py（已修改）\n  - 第224-259行：集成增量更新机制\n  - 使用sync_files替代全量重建\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过（ruff format）\n- Git提交成功（dd47860、2394046、8d3b87d、f5115d6、a21068b）\n\n### 性能提升\n- 增量更新：只更新变化的文件\n- 文件哈希检测：跳过未变化的文件\n- 批量操作：提高数据插入性能\n\n### 下一步\n- P2：性能优化（大数据量查询优化）\n- P2：缓存机制（分析结果缓存复用）\n- 集成到分析器（data_flow_analyzer、joern_analyzer）",
+  "created_at": "2026-06-26T16:11:44.069573",
+  "updated_at": "2026-06-26T16:11:44.069579"
+}
