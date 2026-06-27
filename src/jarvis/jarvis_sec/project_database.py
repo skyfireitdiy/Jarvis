@@ -129,11 +129,13 @@ class ProjectDatabase:
 
         Args:
             project_path: 项目根目录路径
-            db_path: 数据库文件路径（默认为项目根目录下的.jarvis/analysis.db）
+            db_path: 数据库文件路径（默认为项目根目录下的.jarvis/jsec/analysis.db）
         """
         self.project_path = Path(project_path).resolve()
         self.db_path = (
-            Path(db_path) if db_path else self.project_path / ".jarvis" / "analysis.db"
+            Path(db_path)
+            if db_path
+            else self.project_path / ".jarvis" / "jsec" / "analysis.db"
         )
 
         # 确保数据库目录存在

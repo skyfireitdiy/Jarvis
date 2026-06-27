@@ -1,0 +1,17 @@
+{
+  "name": "basic_cross_file_uaf",
+  "description": "跨文件UAF：分配、使用、释放在不同文件",
+  "difficulty": "easy",
+  "vulnerability_type": "use_after_free",
+  "expected_issues": [
+    {
+      "pattern": "use_after_free_suspect",
+      "file": "main.c",
+      "function": "main",
+      "line": 8
+    }
+  ],
+  "files": ["alloc.c", "use.c", "free.c", "main.c"],
+  "cross_file": true,
+  "tags": ["uaf", "cross-file", "memory-management"]
+}

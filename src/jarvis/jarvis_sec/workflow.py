@@ -258,7 +258,12 @@ def direct_scan(
             database = None
 
     # 调用检查器（保持相对路径，基于 base_path 解析）
-    issues_c = analyze_c_files(str(base), [str(p) for p in c_files]) if c_files else []
+    # 传递数据库实例以支持跨文件分析
+    issues_c = (
+        analyze_c_files(str(base), [str(p) for p in c_files], database=database)
+        if c_files
+        else []
+    )
     issues_r = (
         analyze_rust_files(str(base), [str(p) for p in r_files]) if r_files else []
     )
