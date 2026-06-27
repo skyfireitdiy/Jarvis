@@ -1,0 +1,16 @@
+{
+  "id": "20260627_004259_947269",
+  "type": "project_long_term",
+  "tags": [
+    "项目数据库",
+    "测试修复",
+    "跨文件UAF",
+    "xfail标记",
+    "checker限制",
+    "阶段五完成",
+    "已完成"
+  ],
+  "content": "## 项目级数据库阶段五完成\n\n### 完成状态\n- 跨文件UAF测试修复完成\n- 测试断言修改为检查跨文件UAF检测\n- 添加xfail标记（预期失败）\n- pytest测试通过（xfail标记正确）\n- 静态检查全部通过（ruff check）\n\n### 核心问题\n\n**问题**：跨文件UAF测试用例通过了，但checker没有检测出跨文件UAF\n\n**根因分析**：\n- 当前checker主要进行单文件分析\n- 跨文件UAF检测能力有限\n- 数据库已构建，但checker未利用跨文件信息\n\n**解决方案**：\n- 修改测试断言，检查跨文件UAF检测\n- 添加xfail标记，标记为预期失败\n- 后续增强checker的跨文件分析能力\n\n### 测试修改\n\n**原测试断言**：\n- 检查数据库是否构建\n- 检查数据是否收集\n- 不检查跨文件UAF检测\n\n**新测试断言**：\n- 检查数据库是否构建\n- 检查数据是否收集\n- 检查是否检测到跨文件UAF（use_after_free_suspect）\n- 添加xfail标记（预期失败）\n\n### 关键文件\n- tests/jarvis_sec/test_cross_file_analysis.py（已修改）\n  - 第547行：添加xfail标记\n  - 修改测试断言，检查跨文件UAF检测\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过\n- pytest测试通过（xfail标记正确）\n- Git提交成功\n- 测试断言验证通过\n\n### 关键发现\n- 当前checker主要进行单文件分析，跨文件UAF检测能力有限\n- 数据库已构建，但checker未充分利用跨文件信息\n- 测试框架已验证数据集加载功能\n- xfail标记正确标记了预期失败的测试\n\n### 下一步\n- P1：增强checker的跨文件分析能力，支持跨文件UAF检测\n- P1：实现跨文件指针追踪，追踪指针在不同文件间的状态变化\n- P1：移除xfail标记，验证跨文件分析能力\n- P2：添加更多跨文件分析测试案例（Double Free、数据流、污点传播）\n\n### 技术栈\n- Python 3.12.3\n- SQLite数据库\n- pytest测试框架\n- tree-sitter解析器",
+  "created_at": "2026-06-27T00:42:59.947309",
+  "updated_at": "2026-06-27T00:42:59.947318"
+}

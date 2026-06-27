@@ -1,0 +1,8 @@
+{
+  "id": "20260627_003854_508744",
+  "type": "project_long_term",
+  "tags": ["跨文件UAF", "测试修复", "xfail标记", "checker限制", "已完成"],
+  "content": "## 跨文件UAF测试修复完成\n\n### 问题分析\n- 测试用例通过了，但checker没有检测出跨文件UAF\n- 原因：测试只是验证数据集加载功能，没有强制要求检测到跨文件UAF\n- checker当前不支持跨文件UAF检测（单文件分析）\n\n### 测试数据集\n- tests/jarvis_sec/datasets/cross_file/uaf/basic_cross_file_uaf/\n- alloc.c：分配内存（allocate_memory()）\n- use.c：使用内存（use_memory(ptr)）\n- free.c：释放内存（free_memory(ptr)）\n- main.c：主函数，第13行有UAF（释放后使用）\n\n### metadata期望\n- 检测到use_after_free_suspect在main.c\n- metadata中期望line=8，但实际UAF在第13行\n\n### 修复方案\n- 修改测试用例，添加断言要求检测到跨文件UAF\n- 使用pytest.xfail标记预期失败\n- TODO: 增强checker的跨文件分析能力后，移除xfail标记\n\n### 修改内容\n- tests/jarvis_sec/test_cross_file_analysis.py\n- 第189-192行：添加跨文件UAF检测断言\n- 使用find_issue_by_pattern查找use_after_free_suspect\n- 如果未检测到，使用pytest.xfail标记预期失败\n\n### 验证结果\n- pytest测试通过（xfail）\n- 测试正确标记为预期失败\n- Git提交成功（ad155a0）\n\n### 下一步\n- P1：增强checker的跨文件分析能力\n- P1：实现跨文件UAF检测\n- P1：移除xfail标记，验证跨文件分析能力\n\n### 技术栈\n- Python 3.12.3\n- pytest测试框架\n- checker单文件分析限制",
+  "created_at": "2026-06-27T00:38:54.508777",
+  "updated_at": "2026-06-27T00:38:54.508788"
+}
