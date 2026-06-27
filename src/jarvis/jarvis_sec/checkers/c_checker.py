@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any
+from typing import Dict
 from typing import TYPE_CHECKING
 from typing import Iterable
 from typing import List
@@ -1972,10 +1973,74 @@ def _rule_memory_leak(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
     """
-    内存泄漏检测（启发式）：
-    - 检测函数内malloc/calloc/realloc后没有对应的free
-    - 简化处理：只检测函数内是否有配对的分配和释放
+    内存泄漏检测（基于database的pointer_states）：
+    - 检测ALLOCATED状态但没有对应FREED状态的指针
+    - 使用database的pointer_states表进行精确分析
     """
+    issues: List[Issue] = []
+
+    if database is None:
+        # 无database时回退到正则检测
+        return _rule_memory_leak_regex_fallback(lines, relpath)
+
+    # 从database获取当前文件的pointer_states
+    try:
+        states = database.get_pointer_states_by_file(relpath)
+    except Exception:
+        return _rule_memory_leak_regex_fallback(lines, relpath)
+
+    if not states:
+        return _rule_memory_leak_regex_fallback(lines, relpath)
+
+    # 按变量名分组，检查ALLOCATED但没有FREED的情况
+    var_states: Dict[str, List[Dict[str, Any]]] = {}
+    for state in states:
+        var_name = state.get("var_name", "")
+        if var_name:
+            if var_name not in var_states:
+                var_states[var_name] = []
+            var_states[var_name].append(state)
+
+    # 检查每个变量的状态
+    for var_name, state_list in var_states.items():
+        has_allocated = any(s.get("state") == "ALLOCATED" for s in state_list)
+        has_freed = any(s.get("state") == "FREED" for s in state_list)
+
+        if has_allocated and not has_freed:
+            # 找到第一个ALLOCATED状态的位置
+            for state in state_list:
+                if state.get("state") == "ALLOCATED":
+                    line = state.get("line", 0)
+                    allocator = state.get("allocator", "malloc")
+                    scope = state.get("scope", "")
+
+                    # 获取证据行
+                    evidence = ""
+                    if 0 < line <= len(lines):
+                        evidence = _strip_line(lines[line - 1])
+
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory",
+                            pattern="memory_leak",
+                            file=relpath,
+                            line=line,
+                            evidence=evidence,
+                            description=f"指针 '{var_name}' 在函数 '{scope}' 中通过 {allocator} 分配但未释放，可能存在内存泄漏。",
+                            suggestion="确保在所有代码路径上释放分配的内存，或使用RAII模式。",
+                            confidence=0.8,
+                            severity="medium",
+                            var_name=var_name,
+                        )
+                    )
+                    break  # 每个变量只报告一次
+
+    return issues
+
+
+def _rule_memory_leak_regex_fallback(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """内存泄漏检测的正则回退实现"""
     issues: List[Issue] = []
 
     # 分配函数模式
@@ -2038,6 +2103,7 @@ def _rule_memory_leak(
                                 )
                             )
                             break
+
                 in_func = False
 
     return issues
@@ -2428,6 +2494,20 @@ def _rule_possible_null_deref(
     """
     issues: List[Issue] = []
 
+    # 从database获取null_checks信息（用于误报过滤）
+    db_null_checks: Dict[str, List[int]] = {}
+    if database is not None:
+        try:
+            from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer
+
+            analyzer = DataFlowAnalyzer(database)
+            # 获取当前文件的数据流结果
+            result = analyzer.get_data_flow_result(relpath)
+            if result and result.null_checks:
+                db_null_checks = result.null_checks
+        except Exception:
+            pass
+
     # 优先尝试污点分析
     try:
         import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
@@ -2459,7 +2539,6 @@ def _rule_possible_null_deref(
         # 污点分析不可用，回退到启发式检测
     except Exception:
         pass
-
     # 启发式检测（回退方案）
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
     re_star = re.compile(r"(?<!\w)\*\s*([A-Za-z_]\w*)\b")
@@ -2569,7 +2648,17 @@ def _rule_possible_null_deref(
             # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
             if _is_just_allocated(v, lines, idx):
                 continue
-            if not _has_null_check_around(v, lines, idx, radius=3):
+            # 优先使用database的null_checks，否则回退到正则检测
+            has_null_check = False
+            if db_null_checks and v in db_null_checks:
+                # 检查是否有在当前行之前的null检查
+                for check_line in db_null_checks[v]:
+                    if check_line < idx:
+                        has_null_check = True
+                        break
+            else:
+                has_null_check = _has_null_check_around(v, lines, idx, radius=3)
+            if not has_null_check:
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -2592,10 +2681,101 @@ def _rule_uninitialized_ptr_use(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
     """
-    检测野指针（未初始化指针）使用的简单情形：
-    - 出现形如 `type *p;`（行内不含 '=' 且不含 '('，避免函数指针）后，在后续若干行内出现 p-> 或 *p 访问，
-      且未见 p 的赋值/初始化，则认为可能为野指针解引用。
+    检测野指针（未初始化指针）使用：
+    - 使用database的data_flow表查询变量定义和使用情况
+    - 检测在def后没有赋值就直接use的指针
     """
+    issues: List[Issue] = []
+
+    if database is None:
+        # 无database时回退到正则检测
+        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+
+    # 从database获取当前文件的data_flow
+    try:
+        flow_nodes = database.get_data_flow_by_file(relpath)
+    except Exception:
+        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+
+    if not flow_nodes:
+        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+
+    # 按变量名分组，检查def后是否有赋值
+    var_flows: Dict[str, List[Dict[str, Any]]] = {}
+    for node in flow_nodes:
+        var_name = node.get("var_name", "")
+        if var_name:
+            if var_name not in var_flows:
+                var_flows[var_name] = []
+            var_flows[var_name].append(node)
+
+    # 检查每个变量的数据流
+    for var_name, nodes in var_flows.items():
+        # 按行号排序
+        nodes.sort(key=lambda n: n.get("line", 0))
+
+        # 找到def节点
+        def_line = None
+        for node in nodes:
+            if node.get("node_type") == "def":
+                def_line = node.get("line", 0)
+                break
+
+        if not def_line:
+            continue
+
+        # 检查def后是否有赋值（value_source不为空）或param_in
+        has_init = False
+        first_use_line = None
+        for node in nodes:
+            line = node.get("line", 0)
+            if line <= def_line:
+                continue
+            node_type = node.get("node_type", "")
+            value_source = node.get("value_source", "")
+
+            # 赋值或初始化
+            if node_type == "def" and value_source:
+                has_init = True
+                break
+            # 参数传入也算初始化
+            if node_type == "param_in":
+                has_init = True
+                break
+            # 使用（解引用）
+            if node_type == "use" and not value_source:
+                first_use_line = line
+                break
+
+        if first_use_line and not has_init:
+            # 获取证据行
+            evidence = ""
+            if 0 < first_use_line <= len(lines):
+                evidence = _strip_line(lines[first_use_line - 1])
+
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="wild_pointer_deref",
+                    file=relpath,
+                    line=first_use_line,
+                    evidence=evidence,
+                    description=f"指针 {var_name} 声明后未见初始化即被解引用，可能为野指针使用。",
+                    suggestion="在声明后立即将指针初始化为 NULL，并在使用前进行显式赋值与有效性校验。",
+                    confidence=0.8,
+                    severity="high",
+                    var_name=var_name,
+                )
+            )
+
+    return issues
+
+
+def _rule_uninitialized_ptr_use_regex_fallback(
+    lines: Sequence[str], relpath: str
+) -> List[Issue]:
+    """野指针检测的正则回退实现"""
     issues: List[Issue] = []
     # 收集候选未初始化指针声明
     candidates = []  # (var, decl_line)
