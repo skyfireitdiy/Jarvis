@@ -1,0 +1,29 @@
+{
+  "name": "cross_func_sql_injection",
+  "description": "跨文件SQL注入：用户输入跨文件传播，通过strcat拼接SQL后执行。当前检测器仅能检测到strcpy/strcat不安全API，sql_injection pattern漏报",
+  "difficulty": "medium",
+  "vulnerability_type": "sql_injection",
+  "expected_issues": [
+    {
+      "pattern": "strcpy",
+      "file": "query_builder.c",
+      "function": "build_select_query"
+    },
+    {
+      "pattern": "strcat",
+      "file": "query_builder.c",
+      "function": "build_select_query"
+    }
+  ],
+  "known_gaps": [
+    {
+      "pattern": "sql_injection",
+      "file": "query_builder.c",
+      "function": "build_select_query",
+      "reason": "c_checker仅检测sprintf/snprintf拼接SQL，遗漏strcpy+strcat拼接模式"
+    }
+  ],
+  "files": ["input.c", "query_builder.c", "executor.c", "main.c"],
+  "cross_file": true,
+  "tags": ["sql-injection", "cross-file", "taint", "known-gap"]
+}
