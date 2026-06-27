@@ -8,7 +8,7 @@ Joern是一个开源（Apache 2.0许可）的代码分析平台，支持C/C++等
 import subprocess
 import tempfile
 import os
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 
 from .taint_analyzer import (
     TaintAnalyzer,
@@ -17,6 +17,9 @@ from .taint_analyzer import (
     TaintSink,
     TaintAnalyzerFactory,
 )
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
 
 
 class JoernAnalyzer(TaintAnalyzer):
@@ -27,14 +30,18 @@ class JoernAnalyzer(TaintAnalyzer):
     支持C/C++等多种语言。
     """
 
-    def __init__(self, joern_path: str = "joern"):
+    def __init__(
+        self, joern_path: str = "joern", database: Optional["ProjectDatabase"] = None
+    ):
         """
         初始化Joern分析器
 
         Args:
             joern_path: Joern CLI工具路径，默认为"joern"（假设在PATH中）
+            database: 项目数据库实例（可选）
         """
         self.joern_path = joern_path
+        self.database = database
         self._check_joern_available()
 
     def _check_joern_available(self) -> bool:
@@ -115,17 +122,25 @@ class JoernAnalyzer(TaintAnalyzer):
         except (IOError, OSError):
             return []
 
-    def analyze(self, source_code: str, file_path: str = "") -> List[TaintPath]:
+    def analyze(
+        self,
+        source_code: str,
+        file_path: str = "",
+        database: Optional["ProjectDatabase"] = None,
+    ) -> List[TaintPath]:
         """
         分析源代码中的污点传播路径
 
         Args:
             source_code: 源代码内容
             file_path: 源代码文件路径
+            database: 项目数据库实例（可选，覆盖初始化时的设置）
 
         Returns:
             List[TaintPath]: 检测到的污点传播路径列表
         """
+        # 使用传入的database或初始化时的database
+        db = database or self.database
         # 创建临时工作目录
         with tempfile.TemporaryDirectory() as tmpdir:
             # 写入源代码文件
@@ -157,7 +172,13 @@ class JoernAnalyzer(TaintAnalyzer):
                 return []
 
             # 执行污点分析
-            return self._run_taint_analysis(cpg_file, self.sources, self.sinks)
+            paths = self._run_taint_analysis(cpg_file, self.sources, self.sinks)
+
+            # 如果提供了数据库，增强污点分析结果
+            if db is not None and file_path:
+                paths = self._enhance_with_database(paths, db, file_path)
+
+            return paths
 
     def _run_taint_analysis(
         self, cpg_file: str, sources: List[TaintSource], sinks: List[TaintSink]
@@ -283,6 +304,136 @@ sink.reachableByFlows(source).l"""
                     paths.append(path)
 
         return paths
+
+    def _enhance_with_database(
+        self,
+        paths: List[TaintPath],
+        database: "ProjectDatabase",
+        file_path: str,
+    ) -> List[TaintPath]:
+        """
+        利用数据库增强污点分析结果
+
+        Args:
+            paths: 原始污点路径列表
+            database: 项目数据库实例
+            file_path: 当前文件路径
+
+        Returns:
+            List[TaintPath]: 增强后的污点路径列表
+        """
+        if not paths:
+            return paths
+
+        try:
+            # 获取完整的调用图（方法不接受参数）
+            call_graph = database.get_call_graph()
+
+            # 获取当前文件的数据流节点
+            data_flow_nodes = database.get_data_flow_by_file(file_path)
+
+            # 增强每条污点路径
+            enhanced_paths = []
+            for path in paths:
+                enhanced_path = path
+
+                # 如果有调用图信息，尝试扩展污点路径
+                if call_graph:
+                    for call_info in call_graph:
+                        # 检查污点路径是否经过该调用点
+                        if self._path_involves_call(path, call_info):
+                            # 扩展污点路径，添加跨函数信息
+                            enhanced_path = self._extend_path_with_call(
+                                enhanced_path, call_info, database
+                            )
+
+                # 如果有数据流节点，尝试扩展污点路径
+                if data_flow_nodes:
+                    for node in data_flow_nodes:
+                        if self._path_involves_data_node(path, node):
+                            enhanced_path = self._extend_path_with_data_node(
+                                enhanced_path, node
+                            )
+
+                enhanced_paths.append(enhanced_path)
+
+            return enhanced_paths
+
+        except Exception:
+            # 数据库查询失败时返回原始路径
+            return paths
+
+    def _path_involves_call(self, path: TaintPath, call_info: dict) -> bool:
+        """检查污点路径是否涉及某个调用点"""
+        # 简单实现：检查调用函数名是否在路径中
+        caller_func = call_info.get("caller_function", "")
+        callee_func = call_info.get("callee_function", "")
+        return caller_func in path.path or callee_func in path.path
+
+    def _extend_path_with_call(
+        self, path: TaintPath, call_info: dict, database: "ProjectDatabase"
+    ) -> TaintPath:
+        """扩展污点路径，添加跨函数调用信息"""
+        # 创建新的路径列表
+        new_path = list(path.path)
+
+        # 添加跨函数调用节点
+        callee_file = call_info.get("callee_file", "")
+        callee_func = call_info.get("callee_function", "")
+        if callee_file and callee_func:
+            cross_file_node = f"{callee_file}:{callee_func}"
+            if cross_file_node not in new_path:
+                new_path.append(cross_file_node)
+
+        # 更新描述
+        new_description = path.description
+        if callee_file:
+            new_description += f" (跨函数调用: {callee_func}@{callee_file})"
+
+        return TaintPath(
+            source=path.source,
+            sink=path.sink,
+            path=new_path,
+            confidence=min(path.confidence + 0.1, 1.0),  # 提高置信度
+            severity=path.severity,
+            description=new_description,
+            line_number=path.line_number,
+        )
+
+    def _path_involves_data_node(self, path: TaintPath, node: dict) -> bool:
+        """检查污点路径是否涉及某个数据流节点"""
+        var_name = node.get("var_name", "")
+        return var_name in path.path
+
+    def _extend_path_with_data_node(self, path: TaintPath, node: dict) -> TaintPath:
+        """扩展污点路径，添加数据流节点信息"""
+        new_path = list(path.path)
+
+        # 添加数据流节点信息
+        var_name = node.get("var_name", "")
+        node_file = node.get("file_path", "")
+        node_line = node.get("line", 0)
+        node_type = node.get("node_type", "")
+
+        if node_file and var_name:
+            data_node = f"{node_file}:{var_name}@{node_type}"
+            if data_node not in new_path:
+                new_path.append(data_node)
+
+        # 更新描述
+        new_description = path.description
+        if node_file and var_name:
+            new_description += f" (数据流: {var_name}@{node_file}:{node_line})"
+
+        return TaintPath(
+            source=path.source,
+            sink=path.sink,
+            path=new_path,
+            confidence=min(path.confidence + 0.15, 1.0),  # 提高置信度
+            severity=path.severity,
+            description=new_description,
+            line_number=path.line_number,
+        )
 
 
 # 注册到工厂
