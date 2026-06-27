@@ -381,6 +381,38 @@ TaintAnalyzerFactory.register("builtin", BuiltinDataFlowAnalyzer)
 
 
 @dataclass
+class PointerState:
+    """指针状态追踪"""
+
+    # 指针状态常量
+    ALLOCATED = "ALLOCATED"
+    FREED = "FREED"
+    NULLIFIED = "NULLIFIED"
+    UNKNOWN = "UNKNOWN"
+
+    var_name: str
+    points_to: List[str]  # 指向的变量/内存位置
+    state: str = "UNKNOWN"  # ALLOCATED/FREED/NULLIFIED/UNKNOWN
+    is_null: bool = False  # 是否可能为NULL
+    is_freed: bool = False  # 是否已释放
+    is_tainted: bool = False  # 是否被污染
+    file_path: str = ""
+    line: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "var_name": self.var_name,
+            "points_to": self.points_to,
+            "state": self.state,
+            "is_null": self.is_null,
+            "is_freed": self.is_freed,
+            "is_tainted": self.is_tainted,
+            "file_path": self.file_path,
+            "line": self.line,
+        }
+
+
+@dataclass
 class DataFlowResult:
     """数据流分析结果"""
 
@@ -393,7 +425,8 @@ class DataFlowResult:
     freed_vars: Optional[List[str]] = None  # 已释放的变量列表
     null_checked_vars: Optional[List[str]] = None  # 已检查NULL的变量列表
     dead_code_lines: Optional[List[int]] = None  # 死代码行号列表
-    null_checks: Optional[List[str]] = None  # NULL检查的变量列表
+    null_checks: Optional[Dict[str, List[int]]] = None  # var_name -> [check_lines]
+    pointer_states: Optional[Dict[str, PointerState]] = None  # var_name -> PointerState
 
     def __post_init__(self):
         if self.ownership_transfer is None:
@@ -405,7 +438,9 @@ class DataFlowResult:
         if self.dead_code_lines is None:
             self.dead_code_lines = []
         if self.null_checks is None:
-            self.null_checks = []
+            self.null_checks = {}
+        if self.pointer_states is None:
+            self.pointer_states = {}
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -419,30 +454,9 @@ class DataFlowResult:
             "null_checked_vars": self.null_checked_vars,
             "dead_code_lines": self.dead_code_lines,
             "null_checks": self.null_checks,
-        }
-
-
-@dataclass
-class PointerState:
-    """指针状态追踪"""
-
-    var_name: str
-    points_to: List[str]  # 指向的变量/内存位置
-    is_null: bool = False  # 是否可能为NULL
-    is_freed: bool = False  # 是否已释放
-    is_tainted: bool = False  # 是否被污染
-    file_path: str = ""
-    line: int = 0
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "var_name": self.var_name,
-            "points_to": self.points_to,
-            "is_null": self.is_null,
-            "is_freed": self.is_freed,
-            "is_tainted": self.is_tainted,
-            "file_path": self.file_path,
-            "line": self.line,
+            "pointer_states": {k: v.to_dict() for k, v in self.pointer_states.items()}
+            if self.pointer_states
+            else {},
         }
 
 
@@ -483,6 +497,7 @@ class DataFlowAnalyzer:
         """分析源代码的数据流
 
         兼容c_checker的调用接口。
+        基于database提供精确的数据流分析结果。
 
         Args:
             source_code: 源代码内容
@@ -501,8 +516,72 @@ class DataFlowAnalyzer:
         # 执行污点分析
         taint_paths = self._analyzer.analyze(source_code, file_path)
 
-        # 返回一个默认的DataFlowResult
-        # TODO: 根据实际分析结果填充
+        # 如果有database，构建更完整的结果
+        if self.database and file_path:
+            # 从database获取该文件的所有数据流节点
+            flow_nodes = self.database.get_data_flow_by_file(file_path)
+
+            # 收集所有变量名
+            all_vars = set()
+            for node in flow_nodes:
+                all_vars.add(node.get("var_name", ""))
+
+            # 构建def_sites和use_sites
+            def_sites = [n for n in flow_nodes if n.get("node_type") == "def"]
+            use_sites = [n for n in flow_nodes if n.get("node_type") == "use"]
+
+            # 构建flows_to
+            flows_to = []
+            for use in use_sites:
+                target = use.get("target_var")
+                if target and target not in flows_to:
+                    flows_to.append(target)
+
+            # 构建pointer_states（从所有变量收集）
+            pointer_states: Dict[str, PointerState] = {}
+            for var in all_vars:
+                if not var:
+                    continue
+                ps = self._build_pointer_states(var)
+                pointer_states.update(ps)
+
+            # 构建null_checks
+            null_checks: Dict[str, List[int]] = {}
+            for var in all_vars:
+                if not var:
+                    continue
+                nc = self._build_null_checks(var)
+                for k, v in nc.items():
+                    if k not in null_checks:
+                        null_checks[k] = []
+                    null_checks[k].extend(v)
+
+            # 收集freed_vars和null_checked_vars
+            freed_vars = [v for v, ps in pointer_states.items() if ps.is_freed]
+            null_checked_vars = list(null_checks.keys())
+
+            # 收集ownership_transfer
+            ownership_transfer = []
+            for use in use_sites:
+                if use.get("use_type") == "ownership_transfer":
+                    target = use.get("var_name", "")
+                    if target and target not in ownership_transfer:
+                        ownership_transfer.append(target)
+
+            return DataFlowResult(
+                var_name="",
+                def_sites=def_sites,
+                use_sites=use_sites,
+                flows_to=flows_to,
+                tainted=len(taint_paths) > 0,
+                ownership_transfer=ownership_transfer,
+                freed_vars=freed_vars,
+                null_checked_vars=null_checked_vars,
+                null_checks=null_checks,
+                pointer_states=pointer_states,
+            )
+
+        # 无database时返回基本结果
         return DataFlowResult(
             var_name="",
             def_sites=[],
@@ -539,13 +618,77 @@ class DataFlowAnalyzer:
             if target and target not in flows_to:
                 flows_to.append(target)
 
+        # 从数据库获取指针状态
+        pointer_states = self._build_pointer_states(var_name, scope)
+
+        # 从数据库获取NULL检查信息
+        null_checks = self._build_null_checks(var_name, scope)
+
+        # 检查是否被污染
+        tainted = self.is_tainted(var_name, scope)
+
         return DataFlowResult(
             var_name=var_name,
             def_sites=def_sites,
             use_sites=use_sites,
             flows_to=flows_to,
-            tainted=False,
+            tainted=tainted,
+            pointer_states=pointer_states,
+            null_checks=null_checks,
         )
+
+    def _build_pointer_states(
+        self, var_name: str, scope: str = ""
+    ) -> Dict[str, PointerState]:
+        """从数据库构建指针状态映射"""
+        pointer_states: Dict[str, PointerState] = {}
+
+        if not self.database:
+            return pointer_states
+
+        try:
+            # 查询pointer_states表
+            ptr_records = self.database.get_pointer_states(var_name)
+            for record in ptr_records:
+                pv = record.get("var_name", var_name)
+                state_str = record.get("state", PointerState.UNKNOWN)
+                pointer_states[pv] = PointerState(
+                    var_name=pv,
+                    points_to=[],
+                    state=state_str,
+                    is_null=state_str == PointerState.NULLIFIED,
+                    is_freed=state_str == PointerState.FREED,
+                    file_path=record.get("file_path", ""),
+                    line=record.get("line", 0),
+                )
+        except (AttributeError, Exception):
+            pass
+
+        return pointer_states
+
+    def _build_null_checks(
+        self, var_name: str, scope: str = ""
+    ) -> Dict[str, List[int]]:
+        """从数据库构建NULL检查映射"""
+        null_checks: Dict[str, List[int]] = {}
+
+        if not self.database:
+            return null_checks
+
+        try:
+            # 查询use_sites中NULL检查模式
+            use_sites = self.database.get_use_sites(var_name, scope)
+            for use in use_sites:
+                # 检查是否是NULL检查（if (ptr != NULL) 等）
+                if use.get("use_type") == "null_check":
+                    pv = use.get("var_name", var_name)
+                    if pv not in null_checks:
+                        null_checks[pv] = []
+                    null_checks[pv].append(use.get("line", 0))
+        except (AttributeError, Exception):
+            pass
+
+        return null_checks
 
     def get_pointer_state(
         self, var_name: str, file_path: str = "", line: int = 0
@@ -588,6 +731,47 @@ class DataFlowAnalyzer:
         result = self.get_data_flow_result(var_name, scope)
         if result:
             return result.tainted
+        return False
+
+    def is_safe_access(
+        self,
+        var_name: str,
+        line: int,
+        dataflow_result: Optional["DataFlowResult"] = None,
+    ) -> bool:
+        """检查变量访问是否安全（用于UAF误报过滤）
+
+        检查逻辑：
+        1. free后是否置NULL（NULLIFIED状态）
+        2. 访问前是否有NULL检查保护
+
+        Args:
+            var_name: 变量名
+            line: 访问行号
+            dataflow_result: 数据流分析结果
+
+        Returns:
+            True表示访问安全（误报），False表示可能不安全
+        """
+        if not dataflow_result:
+            return False
+
+        # 检查指针状态：如果free后置NULL，则访问前应有NULL检查
+        if (
+            dataflow_result.pointer_states
+            and var_name in dataflow_result.pointer_states
+        ):
+            ptr_state = dataflow_result.pointer_states[var_name]
+            if ptr_state.state == PointerState.NULLIFIED:
+                # free后置NULL，检查是否有NULL检查保护
+                if (
+                    dataflow_result.null_checks
+                    and var_name in dataflow_result.null_checks
+                ):
+                    for check_line in dataflow_result.null_checks[var_name]:
+                        if check_line < line:
+                            return True  # 有NULL检查保护，安全
+
         return False
 
     def configure_sources(self, sources: List[TaintSource]):

@@ -592,7 +592,10 @@ class TaintAnalyzerFactory:
 
 
 def analyze_with_best_analyzer(
-    code: str, rules: Optional[List[str]] = None, file_path: str = ""
+    code: str,
+    rules: Optional[List[str]] = None,
+    file_path: str = "",
+    database: Optional[Any] = None,
 ) -> List[TaintPath]:
     """
     使用最佳可用分析器进行分析
@@ -601,6 +604,7 @@ def analyze_with_best_analyzer(
         code: 源代码
         rules: 要检查的规则名称列表（None表示所有规则）
         file_path: 文件路径
+        database: 项目数据库实例（可选，传递给builtin分析器）
 
     Returns:
         污点路径列表
@@ -610,8 +614,8 @@ def analyze_with_best_analyzer(
     if not available:
         return []
 
-    # 选择第一个可用分析器
-    analyzer = TaintAnalyzerFactory.create(available[0])
+    # 选择第一个可用分析器，传入database参数
+    analyzer = TaintAnalyzerFactory.create(available[0], database=database)
     if not analyzer:
         return []
 

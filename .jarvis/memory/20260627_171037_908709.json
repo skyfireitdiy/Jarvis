@@ -1,0 +1,8 @@
+{
+  "id": "20260627_171037_908709",
+  "type": "project_long_term",
+  "tags": ["jsec", "架构重构", "进展"],
+  "content": "jsec架构重构进展：\n- P1完成：analyze_with_best_analyzer接受database参数\n- P2完成：14个B类规则签名添加database + analyze_c_cpp_text中21个调用传入database=database\n- P3完成：PointerState添加state/常量、DataFlowResult添加pointer_states/null_checks、DataFlowAnalyzer添加is_safe_access/_build_pointer_states/_build_null_checks、analyze_code增强\n- P4完成：8个C类规则签名添加database参数 + analyze_c_cpp_text中8个调用传入database=database + 3处dataflow_result属性None安全问题修复（_is_double_free_false_positive, _is_strcpy_false_positive, _is_memory_leak_false_positive, _is_null_deref_false_positive）\n- P5待完成：补充数据集驱动测试\n- 29测试通过，静态扫描通过\n- test_dataset_negative_cases失败是修改前就存在的正则误报",
+  "created_at": "2026-06-27T17:10:37.908738",
+  "updated_at": "2026-06-27T17:10:37.908748"
+}
