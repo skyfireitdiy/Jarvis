@@ -462,6 +462,26 @@ class DataCollector:
         )
         result["call_relations"].append(call_relation)
 
+        # 处理free调用
+        if callee_name == "free":
+            args_node = node.child_by_field_name("arguments")
+            if args_node:
+                # 获取free的参数（变量名）
+                for child in args_node.children:
+                    if child.type == "identifier" or child.type == "expression_statement":
+                        var_name = self._get_node_text(child, code)
+                        pointer_state = PointerStateRecord(
+                            var_name=var_name,
+                            file_path=file_path,
+                            line=line,
+                            state="FREED",
+                            scope=scope,
+                            allocator=None,
+                            deallocator="free",
+                        )
+                        result["pointer_states"].append(pointer_state)
+                        break
+
         # 提取参数中的变量使用
         args_node = node.child_by_field_name("arguments")
         if args_node:
@@ -750,7 +770,9 @@ class DataCollector:
             return ""
         start_byte = node.start_byte
         end_byte = node.end_byte
-        return code[start_byte:end_byte]
+        # 使用字节索引，然后解码
+        code_bytes = bytes(code, 'utf-8')
+        return code_bytes[start_byte:end_byte].decode('utf-8', errors='replace')
 
     def _get_function_name(self, node: Node, code: str) -> Optional[str]:
         """

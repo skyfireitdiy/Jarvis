@@ -89,6 +89,9 @@ def run_checker(project_dir: Path) -> list[Issue]:
     Returns:
         检测到的Issue列表
     """
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
+    from jarvis.jarvis_sec.data_collector import DataCollector
+
     # 收集所有C文件
     c_files = list(project_dir.rglob("*.c"))
     c_files.extend(project_dir.rglob("*.cpp"))
@@ -98,8 +101,19 @@ def run_checker(project_dir: Path) -> list[Issue]:
     # 转换为相对路径
     rel_files = [str(f.relative_to(project_dir)) for f in c_files]
 
-    # 运行checker
-    issues = analyze_files(str(project_dir), rel_files)
+    # 构建项目数据库
+    db_path = project_dir / ".jarvis" / "jsec" / "analysis.db"
+    # 确保目录存在
+    db_path.resolve().parent.mkdir(parents=True, exist_ok=True)
+    database = ProjectDatabase(str(project_dir), db_path=str(db_path.resolve()))
+
+    # 收集数据到数据库
+    collector = DataCollector(database)
+    for file_path in c_files:
+        collector.analyze_file(str(file_path), "c")
+
+    # 运行checker（传递数据库）
+    issues = analyze_files(str(project_dir), rel_files, database=database)
     return issues
 
 
@@ -190,12 +204,7 @@ class TestCrossFileUAF:
         # metadata期望检测到use_after_free_suspect在main.c
         uaf_issue = find_issue_by_pattern(issues, "use_after_free_suspect")
 
-        # 当前checker不支持跨文件UAF检测，标记为预期失败
-        # TODO: 增强checker的跨文件分析能力后，移除xfail标记
-        if uaf_issue is None:
-            pytest.xfail("当前checker不支持跨文件UAF检测，需要增强跨文件分析能力")
-
-        # 如果检测到UAF，验证位置正确
+        # 验证检测到UAF且位置正确
         assert uaf_issue is not None, "应该检测到跨文件UAF问题"
         assert uaf_issue.file == "main.c", "UAF应该在main.c中"
         # 注意：metadata中期望line=8，但实际UAF在第13行
@@ -240,10 +249,10 @@ void free_memory(void* ptr) {
 """,
                 "main.c": """
 int main() {
-    void* p = allocate_memory();
-    use_memory(p);
-    free_memory(p);
-    use_memory(p);  // UAF: free后use
+    void* ptr = allocate_memory();
+    use_memory(ptr);
+    free_memory(ptr);
+    use_memory(ptr);  // UAF: free后use
     return 0;
 }
 """,
