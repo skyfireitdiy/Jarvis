@@ -87,6 +87,9 @@ class DataFlowNode:
     node_type: str  # def, use, param_in, param_out, return
     scope: str  # 作用域（函数名）
     value_source: Optional[str] = None  # 值来源（如malloc、参数等）
+    use_type: Optional[str] = (
+        None  # 使用类型（null_check, ownership_transfer, condition等）
+    )
 
 
 @dataclass
@@ -123,23 +126,32 @@ class TypeInfo:
 class ProjectDatabase:
     """项目级数据库管理器"""
 
-    def __init__(self, project_path: str, db_path: Optional[str] = None):
+    def __init__(
+        self, project_path: str, db_path: Optional[str] = None, in_memory: bool = False
+    ):
         """
         初始化数据库管理器
 
         Args:
             project_path: 项目根目录路径
             db_path: 数据库文件路径（默认为项目根目录下的.jarvis/jsec/analysis.db）
+            in_memory: 是否使用内存数据库（用于单文件临时分析）
         """
         self.project_path = Path(project_path).resolve()
-        self.db_path = (
-            Path(db_path)
-            if db_path
-            else self.project_path / ".jarvis" / "jsec" / "analysis.db"
-        )
+        self._in_memory = in_memory
 
-        # 确保数据库目录存在
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        if in_memory:
+            self.db_path = Path(":memory:")
+        else:
+            self.db_path = (
+                Path(db_path)
+                if db_path
+                else self.project_path / ".jarvis" / "jsec" / "analysis.db"
+            )
+
+        # 确保数据库目录存在（非内存模式）
+        if not in_memory:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         # 初始化数据库连接
         self._conn: Optional[sqlite3.Connection] = None
@@ -209,6 +221,7 @@ class ProjectDatabase:
                     node_type TEXT NOT NULL,
                     scope TEXT NOT NULL,
                     value_source TEXT,
+                    use_type TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (file_path) REFERENCES files(path)
                 )
@@ -306,12 +319,19 @@ class ProjectDatabase:
     @contextmanager
     def _get_connection(self):
         """获取数据库连接（上下文管理器）"""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row  # 使用Row工厂，支持字典式访问
-        try:
-            yield conn
-        finally:
-            conn.close()
+        if self._in_memory:
+            # 内存数据库需要保持同一连接，否则数据丢失
+            if self._conn is None:
+                self._conn = sqlite3.connect(":memory:")
+                self._conn.row_factory = sqlite3.Row
+            yield self._conn
+        else:
+            conn = sqlite3.connect(str(self.db_path))
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            finally:
+                conn.close()
 
     # ============================================================================
     # 文件管理
@@ -604,8 +624,8 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source, use_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     node.var_name,
@@ -614,6 +634,7 @@ class ProjectDatabase:
                     node.node_type,
                     node.scope,
                     node.value_source,
+                    node.use_type,
                 ),
             )
             conn.commit()
@@ -625,8 +646,8 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.executemany(
                 """
-                INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO data_flow (var_name, file_path, line, node_type, scope, value_source, use_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
                 [
                     (
@@ -636,6 +657,7 @@ class ProjectDatabase:
                         n.node_type,
                         n.scope,
                         n.value_source,
+                        n.use_type,
                     )
                     for n in nodes
                 ],
