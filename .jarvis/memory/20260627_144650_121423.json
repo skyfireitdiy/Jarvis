@@ -1,0 +1,8 @@
+{
+  "id": "20260627_144650_121423",
+  "type": "project_long_term",
+  "tags": ["data_flow_result", "attributes", "compatibility"],
+  "content": "DataFlowResult必须包含以下属性以兼容c_checker：var_name, def_sites, use_sites, flows_to, tainted, ownership_transfer, freed_vars, null_checked_vars, dead_code_lines, null_checks。所有列表属性使用Optional[List]类型并在__post_init__中初始化为空列表。",
+  "created_at": "2026-06-27T14:46:50.121441",
+  "updated_at": "2026-06-27T14:46:50.121444"
+}

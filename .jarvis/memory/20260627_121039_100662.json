@@ -1,0 +1,8 @@
+{
+  "id": "20260627_121039_100662",
+  "type": "project_long_term",
+  "tags": ["jsec", "test-framework", "directory-scan", "exclusion"],
+  "content": "测试框架目录排除逻辑修复：\n1. 原问题：临时目录在/tmp下被排除，因为tmp在默认排除列表中\n2. 解决方案：_iter_source_files只排除项目入口目录内部的排除目录，不排除系统临时目录等外部路径\n3. 代码位置：workflow.py的_iter_source_files(40~125行)",
+  "created_at": "2026-06-27T12:10:39.100685",
+  "updated_at": "2026-06-27T12:10:39.100690"
+}

@@ -924,16 +924,161 @@ def _rule_function_return_ptr_no_check(
     return issues
 
 
+# 跨文件UAF检测全局去重集合（避免多文件分析时重复报告）
+_cross_file_uaf_seen: set[Tuple[str, int]] = set()
+
+# 跨文件Double Free检测全局去重集合
+_cross_file_double_free_seen: set[Tuple[str, int]] = set()
+
+
+def _detect_cross_file_double_free(
+    database: "ProjectDatabase", relpath: str, lines: Sequence[str]
+) -> List[Issue]:
+    """
+    跨文件Double Free检测：基于调用顺序
+
+    核心原理：
+    在caller的视角下，先调用free_wrapper1后调用free_wrapper2 = Double Free。
+    不依赖变量名匹配，只依赖call_graph中的调用顺序。
+
+    检测逻辑：
+    1. 查询pointer_states中所有FREED状态的指针，得到释放函数名(scope)
+    2. 在call_graph中找谁调用了释放函数(caller)
+    3. 在同一caller中，找free调用行号之后的其他free调用
+    4. 去重并生成Issue
+
+    Args:
+        database: 项目数据库实例
+        relpath: 当前文件相对路径
+        lines: 源代码行列表
+
+    Returns:
+        检测到的跨文件Double Free问题列表
+    """
+    global _cross_file_double_free_seen
+    issues: List[Issue] = []
+
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(database.db_path)
+        cursor = conn.cursor()
+
+        # Step 1: 查询所有FREED状态的指针，得到释放函数名(scope)
+        cursor.execute("""
+            SELECT var_name, file_path, line, scope, deallocator
+            FROM pointer_states
+            WHERE state = 'FREED'
+        """)
+        freed_pointers = cursor.fetchall()
+
+        # Step 2: 收集所有释放函数名
+        free_scopes = set()
+        for (
+            freed_var,
+            freed_file,
+            freed_line,
+            freed_scope,
+            deallocator,
+        ) in freed_pointers:
+            if freed_scope != "global":
+                free_scopes.add(freed_scope)
+
+        # Step 3: 对于每个释放函数，找caller，然后在caller中找连续的释放函数调用
+        for free_scope in free_scopes:
+            # 找谁调用了这个释放函数
+            cursor.execute(
+                """
+                SELECT caller_name, caller_file, caller_line
+                FROM call_graph
+                WHERE callee_name = ? AND caller_name != 'unknown'
+            """,
+                (free_scope,),
+            )
+            callers = cursor.fetchall()
+
+            # Step 4: 在每个caller中，检查是否有多个释放函数调用
+            for caller_name, caller_file, caller_line in callers:
+                # 查找caller中所有调用
+                cursor.execute(
+                    """
+                    SELECT callee_name, caller_line
+                    FROM call_graph
+                    WHERE caller_name = ? AND caller_file = ?
+                    ORDER BY caller_line
+                """,
+                    (caller_name, caller_file),
+                )
+                all_calls = cursor.fetchall()
+
+                # 找出所有释放函数调用
+                free_calls_in_caller = [
+                    (callee, line)
+                    for callee, line in all_calls
+                    if callee in free_scopes
+                ]
+
+                # 如果有多个释放函数调用，报告Double Free
+                if len(free_calls_in_caller) >= 2:
+                    for i in range(len(free_calls_in_caller) - 1):
+                        first_free, first_line = free_calls_in_caller[i]
+                        second_free, second_line = free_calls_in_caller[i + 1]
+
+                        # 去重检查
+                        dedup_key = (caller_file, second_line)
+                        if dedup_key in _cross_file_double_free_seen:
+                            continue
+                        _cross_file_double_free_seen.add(dedup_key)
+
+                        # 生成Issue
+                        try:
+                            from pathlib import PurePath
+
+                            caller_file_rel = str(
+                                PurePath(caller_file).relative_to(
+                                    PurePath(str(database.project_path))
+                                )
+                            )
+                        except ValueError:
+                            caller_file_rel = caller_file.split("/")[-1]
+
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="memory_mgmt",
+                                pattern="double_free",
+                                file=caller_file_rel,
+                                line=second_line,
+                                evidence=f"跨文件Double Free: 在 {caller_file} 中连续调用释放函数 {first_free} (第{first_line}行) 和 {second_free} (第{second_line}行)",
+                                description=f"检测到双重释放风险：{caller_name} 先调用 {first_free}，随后又调用 {second_free}，可能导致Double Free。",
+                                suggestion="free 后将指针置 NULL；确保每块内存仅释放一次；理清所有权与释放路径。",
+                                confidence=0.85,
+                                severity="high",
+                            )
+                        )
+
+        conn.close()
+    except Exception:
+        pass
+
+    return issues
+
+
 def _detect_cross_file_uaf(
     database: "ProjectDatabase", relpath: str, lines: Sequence[str]
 ) -> List[Issue]:
     """
-    跨文件UAF检测：基于数据流分析而非变量名匹配
+    跨文件UAF检测：基于调用顺序而非变量名匹配
+
+    核心原理：
+    在caller的视角下，先调用free_wrapper后调用use_wrapper = UAF。
+    不依赖变量名匹配，只依赖call_graph中的调用顺序。
 
     检测逻辑：
-    1. 查询数据库中所有FREED状态的指针
-    2. 对于每个被释放的指针，通过call_graph追踪其数据流来源
-    3. 检测是否存在跨文件的释放后使用
+    1. 查询pointer_states中所有FREED状态的指针，得到释放函数名(scope)
+    2. 在call_graph中找谁调用了释放函数(caller)
+    3. 在同一caller中，找free调用行号之后的所有调用
+    4. 去重并生成Issue
 
     Args:
         database: 项目数据库实例
@@ -943,94 +1088,141 @@ def _detect_cross_file_uaf(
     Returns:
         检测到的跨文件UAF问题列表
     """
+    global _cross_file_uaf_seen
     issues: List[Issue] = []
 
     try:
-        # 查询所有FREED状态的指针
         import sqlite3
+
         conn = sqlite3.connect(database.db_path)
         cursor = conn.cursor()
-        
-        # 查询所有FREED状态
+
+        # Step 1: 查询所有FREED状态的指针，得到释放函数名(scope)
         cursor.execute("""
             SELECT var_name, file_path, line, scope, deallocator
             FROM pointer_states
             WHERE state = 'FREED'
         """)
         freed_pointers = cursor.fetchall()
-        
-        # 对于每个被释放的指针，追踪其数据流
-        for freed_var, freed_file, freed_line, freed_scope, deallocator in freed_pointers:
-            # 查询该指针的数据流
-            cursor.execute("""
-                SELECT var_name, file_path, line, node_type, scope, value_source
-                FROM data_flow
-                WHERE var_name = ?
-            """, (freed_var,))
-            data_flow = cursor.fetchall()
-            
-            # 查找param_in节点（函数参数）
-            param_in_nodes = [(var, file, line, node_type, scope, src) 
-                            for var, file, line, node_type, scope, src in data_flow 
-                            if node_type == 'param_in']
-            
-            # 对于每个param_in节点，查找调用该函数的实参
-            for param_var, param_file, param_line, param_type, param_scope, param_src in param_in_nodes:
-                # 查询call_graph，找到调用该函数的位置
-                cursor.execute("""
-                    SELECT caller_name, caller_file, caller_line
+
+        # Step 2: 对于每个被释放的指针，追踪调用链
+        for (
+            freed_var,
+            freed_file,
+            freed_line,
+            freed_scope,
+            deallocator,
+        ) in freed_pointers:
+            # 跳过global scope（不是函数内的释放）
+            if freed_scope == "global":
+                continue
+
+            # Step 3: 在call_graph中找谁调用了释放函数
+            cursor.execute(
+                """
+                SELECT caller_name, caller_file, caller_line
+                FROM call_graph
+                WHERE callee_name = ? AND caller_name != 'unknown'
+            """,
+                (freed_scope,),
+            )
+            callers = cursor.fetchall()
+
+            # Step 4: 在每个caller中，找free调用之后的调用
+            for caller_name, caller_file, caller_line in callers:
+                cursor.execute(
+                    """
+                    SELECT callee_name, caller_line
                     FROM call_graph
-                    WHERE callee_name = ?
-                """, (param_scope,))
-                call_sites = cursor.fetchall()
-                
-                # 对于每个调用点，查找实参的数据流
-                for caller_name, caller_file, caller_line in call_sites:
-                    # 查询调用点的实参数据流
-                    cursor.execute("""
-                        SELECT var_name, file_path, line, node_type, scope, value_source
-                        FROM data_flow
-                        WHERE file_path = ? AND line = ? AND node_type = 'use'
-                    """, (caller_file, caller_line))
-                    arg_nodes = cursor.fetchall()
-                    
-                    # 对于每个实参，追踪其后续使用
-                    for arg_var, arg_file, arg_line, arg_type, arg_scope, arg_src in arg_nodes:
-                        # 查询该实参的所有使用节点
-                        cursor.execute("""
-                            SELECT var_name, file_path, line, node_type, scope, value_source
-                            FROM data_flow
-                            WHERE var_name = ? AND node_type = 'use'
-                        """, (arg_var,))
-                        all_uses = cursor.fetchall()
-                        
-                        # 检测跨文件UAF
-                        for use_var, use_file, use_line, use_type, use_scope, use_src in all_uses:
-                            if freed_file != use_file:
-                                # 跨文件UAF：释放和使用在不同文件
-                                # 提取相对路径
-                                use_file_rel = use_file.split("/basic_cross_file_uaf/")[-1] if "/basic_cross_file_uaf/" in use_file else use_file
-                                use_file_rel = use_file_rel.split("/uaf_alloc_use_free/")[-1] if "/uaf_alloc_use_free/" in use_file_rel else use_file_rel
-                                use_file_rel = use_file_rel.split("/uaf_cross_function/")[-1] if "/uaf_cross_function/" in use_file_rel else use_file_rel
-                                
-                                issues.append(
-                                    Issue(
-                                        language="c/cpp",
-                                        category="memory_mgmt",
-                                        pattern="use_after_free_suspect",
-                                        file=use_file_rel,
-                                        line=use_line,
-                                        evidence=f"跨文件UAF: 变量 {freed_var} 在 {freed_file}:{freed_line} 被释放，实参 {arg_var} 在 {use_file}:{use_line} 被使用",
-                                        description=f"变量 {freed_var} 在不同文件间存在释放后使用风险：在 {freed_file} 释放后，实参 {arg_var} 在 {use_file} 被使用。",
-                                        suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
-                                        confidence=0.75,
-                                        severity="high",
-                                    )
-                                )
-        
+                    WHERE caller_name = ? AND caller_file = ? AND caller_line > ?
+                """,
+                    (caller_name, caller_file, caller_line),
+                )
+                post_free_calls = cursor.fetchall()
+
+                # Step 5: free后的调用即为UAF风险（基于调用顺序，不依赖变量名）
+                for callee_name, call_line in post_free_calls:
+                    # 去重检查（使用全局集合）
+                    dedup_key = (caller_file, call_line)
+                    if dedup_key in _cross_file_uaf_seen:
+                        continue
+                    _cross_file_uaf_seen.add(dedup_key)
+
+                    # 生成Issue（使用相对路径）
+                    try:
+                        from pathlib import PurePath
+
+                        caller_file_rel = str(
+                            PurePath(caller_file).relative_to(
+                                PurePath(str(database.project_path))
+                            )
+                        )
+                    except ValueError:
+                        caller_file_rel = caller_file.split("/")[-1]
+
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="use_after_free_suspect",
+                            file=caller_file_rel,
+                            line=call_line,
+                            evidence=f"跨文件UAF: 在 {caller_file}:{caller_line} 调用释放函数 {freed_scope} 后，又在第 {call_line} 调用 {callee_name}",
+                            description=f"检测到释放后使用风险：{caller_name} 先调用 {freed_scope} 释放内存，随后调用 {callee_name} 可能使用已释放的内存。",
+                            suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
+                            confidence=0.8,
+                            severity="high",
+                        )
+                    )
+
+                # Step 6: 检测同一caller中free调用后的变量使用（按scope查，不按变量名查）
+                # 查找caller中free调用行号之后的所有use节点
+                cursor.execute(
+                    """
+                    SELECT var_name, file_path, line
+                    FROM data_flow
+                    WHERE scope = ? AND node_type = 'use' AND line > ?
+                """,
+                    (caller_name, caller_line),
+                )
+                post_free_uses = cursor.fetchall()
+
+                for use_var, use_file, use_line in post_free_uses:
+                    # 去重检查
+                    dedup_key = (use_file, use_line)
+                    if dedup_key in _cross_file_uaf_seen:
+                        continue
+                    _cross_file_uaf_seen.add(dedup_key)
+
+                    # 生成Issue
+                    try:
+                        from pathlib import PurePath
+
+                        use_file_rel = str(
+                            PurePath(use_file).relative_to(
+                                PurePath(str(database.project_path))
+                            )
+                        )
+                    except ValueError:
+                        use_file_rel = use_file.split("/")[-1]
+
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="memory_mgmt",
+                            pattern="use_after_free_suspect",
+                            file=use_file_rel,
+                            line=use_line,
+                            evidence=f"跨函数UAF: 在 {caller_file}:{caller_line} 调用释放函数 {freed_scope} 后，变量 {use_var} 在第 {use_line} 行被使用",
+                            description=f"检测到释放后使用风险：{caller_name} 调用 {freed_scope} 释放内存后，变量 {use_var} 仍被使用。",
+                            suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
+                            confidence=0.75,
+                            severity="high",
+                        )
+                    )
+
         conn.close()
     except Exception:
-        # 数据库查询失败，跳过
         pass
 
     return issues
@@ -2527,13 +2719,14 @@ def _rule_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 
 def _rule_double_free_and_free_non_heap(
-    lines: Sequence[str], relpath: str
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
     """
     检测：
     - double_free：同一指针在未重新赋值/置空情况下被重复 free
     - free_non_heap：free(&x) 或 free("literal") 等明显非堆内存释放
     说明：优先使用污点分析，失败时回退到启发式实现。
+    跨文件分析：利用数据库追踪指针状态，检测跨文件的Double Free风险。
     """
     issues: List[Issue] = []
 
@@ -2626,6 +2819,12 @@ def _rule_double_free_and_free_non_heap(
                             )
                         )
                 last_free_line[var] = idx
+
+    # 跨文件Double Free检测：利用数据库追踪指针状态
+    if database is not None:
+        cross_file_issues = _detect_cross_file_double_free(database, relpath, lines)
+        issues.extend(cross_file_issues)
+
     return issues
 
 
@@ -4116,7 +4315,9 @@ def analyze_c_cpp_text(
     issues.extend(_rule_hardcoded_credentials(lines, relpath))
     issues.extend(_rule_toctou_race(lines, relpath))
     issues.extend(_rule_alloc_size_overflow(mlines, relpath))
-    issues.extend(_rule_double_free_and_free_non_heap(mlines, relpath))
+    issues.extend(
+        _rule_double_free_and_free_non_heap(mlines, relpath, database=database)
+    )
     issues.extend(_rule_atoi_family(mlines, relpath))
     issues.extend(_rule_rand_insecure(mlines, relpath))
     issues.extend(_rule_strtok_nonreentrant(mlines, relpath))

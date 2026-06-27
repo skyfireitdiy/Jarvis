@@ -1,0 +1,8 @@
+{
+  "id": "20260627_121039_099190",
+  "type": "project_long_term",
+  "tags": ["jsec", "data-collector", "condition-expression", "variable-use"],
+  "content": "DataCollector条件表达式变量收集：\n1. 新增_handle_if_statement和_handle_loop_statement方法处理if/while/for语句\n2. _extract_identifiers_from_condition递归提取条件表达式中的所有标识符\n3. 排除常见非变量标识符（NULL, nullptr, true, false, size_t, int, char, void等）\n4. 生成的数据流节点node_type='use', value_source='condition'\n5. 代码位置：data_collector.py第591~673行",
+  "created_at": "2026-06-27T12:10:39.099211",
+  "updated_at": "2026-06-27T12:10:39.099215"
+}

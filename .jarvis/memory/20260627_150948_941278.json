@@ -1,0 +1,8 @@
+{
+  "id": "20260627_150948_941278",
+  "type": "project_long_term",
+  "tags": ["testing", "taint_analyzer", "jarvis_sec", "builtin"],
+  "content": "jarvis_sec taint_analyzer测试要点：\n1. 测试文件：tests/jarvis_sec/test_taint_analyzer.py（14个测试）\n2. BuiltinDataFlowAnalyzer测试覆盖：is_available、list_available含builtin、analyze无DB返回空、analyze_file无DB返回空、analyze_with_best_analyzer返回list、configure sources/sinks/sanitizers\n3. test_checkers.py中test_dataset_negative_cases有已知误报问题（6.38%误报率，3个negative案例），与data_flow_analyzer无关",
+  "created_at": "2026-06-27T15:09:48.941301",
+  "updated_at": "2026-06-27T15:09:48.941306"
+}

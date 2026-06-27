@@ -1,0 +1,8 @@
+{
+  "id": "20260627_144650_119963",
+  "type": "project_long_term",
+  "tags": ["data_flow_analyzer", "builtin", "taint_analysis", "architecture"],
+  "content": "内置DataFlowAnalyzer已实现完成，位于src/jarvis/jarvis_sec/data_flow_analyzer.py。核心类包括：BuiltinDataFlowAnalyzer(继承TaintAnalyzer)、DataFlowAnalyzer(高级封装)、DataFlowResult(数据流结果)、PointerState(指针状态)。已注册到TaintAnalyzerFactory.register(\"builtin\")。关键方法：analyze_code()兼容c_checker调用接口。",
+  "created_at": "2026-06-27T14:46:50.119985",
+  "updated_at": "2026-06-27T14:46:50.119989"
+}
