@@ -1,0 +1,8 @@
+{
+  "id": "20260627_114914_909709",
+  "type": "project_long_term",
+  "tags": ["jarvis-sec", "uaf-detection", "architecture-decision"],
+  "content": "jsec跨文件UAF检测架构决策：\n1. 检测逻辑基于调用顺序（call_graph），不依赖变量名匹配（data_flow var_name）\n2. 核心原理：在caller视角下，先调用free_wrapper后调用use_wrapper = UAF\n3. 检测步骤：pointer_states(FREED) → call_graph(找caller) → call_graph(找free后调用) → 生成Issue\n4. 去重键：(caller_file, call_line)，全局去重集合_cross_file_uaf_seen\n5. 已知限制：DataCollector不收集条件表达式中的变量使用（如if (ptr != NULL)），导致无法检测free后直接使用变量的UAF模式\n6. 路径处理：使用PurePath.relative_to(project_path)转换相对路径，不硬编码目录名",
+  "created_at": "2026-06-27T11:49:14.909765",
+  "updated_at": "2026-06-27T11:49:14.909774"
+}

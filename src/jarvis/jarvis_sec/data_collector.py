@@ -266,6 +266,14 @@ class DataCollector:
         elif node_type in ["malloc_call", "calloc_call", "realloc_call", "free_call"]:
             self._handle_memory_operation(node, code, file_path, result, scope)
 
+        # 处理if语句（提取条件表达式中的变量使用）
+        elif node_type == "if_statement":
+            self._handle_if_statement(node, code, file_path, result, scope)
+
+        # 处理while/for循环（提取条件表达式中的变量使用）
+        elif node_type in ["while_statement", "for_statement"]:
+            self._handle_loop_statement(node, code, file_path, result, scope)
+
         # 递归处理子节点
         for child in node.children:
             self._traverse_ast(child, code, file_path, result, scope)
@@ -468,7 +476,10 @@ class DataCollector:
             if args_node:
                 # 获取free的参数（变量名）
                 for child in args_node.children:
-                    if child.type == "identifier" or child.type == "expression_statement":
+                    if (
+                        child.type == "identifier"
+                        or child.type == "expression_statement"
+                    ):
                         var_name = self._get_node_text(child, code)
                         pointer_state = PointerStateRecord(
                             var_name=var_name,
@@ -579,6 +590,116 @@ class DataCollector:
         # 这个方法主要用于处理独立的内存操作调用
         # 实际的malloc/free通常在赋值表达式中处理
         pass
+
+    def _handle_if_statement(
+        self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理if语句，提取条件表达式中的变量使用
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+        """
+        # 获取条件表达式（parenthesized_expression）
+        condition_node = node.child_by_field_name("condition")
+        if not condition_node:
+            return
+
+        line = node.start_point[0] + 1
+
+        # 递归提取条件表达式中的所有标识符
+        self._extract_identifiers_from_condition(
+            condition_node, code, file_path, result, scope, line
+        )
+
+    def _handle_loop_statement(
+        self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理while/for循环，提取条件表达式中的变量使用
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+        """
+        # 获取条件表达式
+        condition_node = node.child_by_field_name("condition")
+        if not condition_node:
+            return
+
+        line = node.start_point[0] + 1
+
+        # 递归提取条件表达式中的所有标识符
+        self._extract_identifiers_from_condition(
+            condition_node, code, file_path, result, scope, line
+        )
+
+    def _extract_identifiers_from_condition(
+        self,
+        node: Node,
+        code: str,
+        file_path: str,
+        result: Dict[str, Any],
+        scope: str,
+        line: int,
+    ):
+        """
+        递归提取条件表达式中的所有标识符（变量使用）
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+            line: 行号
+        """
+        if node is None:
+            return
+
+        # 如果是标识符，创建数据流节点
+        if node.type == "identifier":
+            var_name = self._get_node_text(node, code)
+            # 排除常见的非变量标识符（如类型名、关键字等）
+            if var_name not in [
+                "NULL",
+                "nullptr",
+                "true",
+                "false",
+                "size_t",
+                "int",
+                "char",
+                "void",
+                "long",
+                "short",
+                "float",
+                "double",
+                "unsigned",
+                "signed",
+            ]:
+                data_flow_node = DataFlowNode(
+                    var_name=var_name,
+                    file_path=file_path,
+                    line=line,
+                    node_type="use",
+                    scope=scope,
+                    value_source="condition",
+                )
+                result["data_flow_nodes"].append(data_flow_node)
+            return
+
+        # 递归处理子节点
+        for child in node.children:
+            self._extract_identifiers_from_condition(
+                child, code, file_path, result, scope, line
+            )
 
     # ============================================================================
     # 正则表达式回退方案
@@ -771,8 +892,8 @@ class DataCollector:
         start_byte = node.start_byte
         end_byte = node.end_byte
         # 使用字节索引，然后解码
-        code_bytes = bytes(code, 'utf-8')
-        return code_bytes[start_byte:end_byte].decode('utf-8', errors='replace')
+        code_bytes = bytes(code, "utf-8")
+        return code_bytes[start_byte:end_byte].decode("utf-8", errors="replace")
 
     def _get_function_name(self, node: Node, code: str) -> Optional[str]:
         """

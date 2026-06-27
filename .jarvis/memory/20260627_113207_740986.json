@@ -1,0 +1,8 @@
+{
+  "id": "20260627_113207_740986",
+  "type": "project_long_term",
+  "tags": ["bug-fix", "uaf-detection", "cross-file-analysis"],
+  "content": "## UAF跨文件检测Bug修复完成\n\n### 问题描述\n原始检测逻辑依赖变量名匹配，导致18434个重复Issue。\n\n### 修复方案\n1. **重写检测逻辑**：从变量名匹配改为调用顺序分析\n   - 找FREED指针 → 找caller → 找free后的调用/变量使用\n2. **添加全局去重**：使用`_cross_file_uaf_seen`集合避免重复报告\n3. **源代码级别检测**：DataCollector未记录条件表达式中的变量使用，添加源代码模式匹配检测\n\n### 测试结果\n- `test_basic_cross_file_uaf_from_dataset` ✅ 通过\n- `test_uaf_cross_function_call` ✅ 通过\n- `test_uaf_alloc_use_free_different_files` ✅ 通过\n\n### 关键代码变更\n- 文件：`src/jarvis/jarvis_sec/checkers/c_checker.py`\n- 函数：`_detect_cross_file_uaf`（第931~1120行）\n- 新增：方法2源代码级别检测（第1069~1120行）",
+  "created_at": "2026-06-27T11:32:07.741009",
+  "updated_at": "2026-06-27T11:32:07.741014"
+}

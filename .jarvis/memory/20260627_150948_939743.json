@@ -1,0 +1,14 @@
+{
+  "id": "20260627_150948_939743",
+  "type": "project_long_term",
+  "tags": [
+    "architecture",
+    "data_flow_analyzer",
+    "taint_analysis",
+    "builtin",
+    "jarvis_sec"
+  ],
+  "content": "BuiltinDataFlowAnalyzer实现要点：\n1. 文件位置：src/jarvis/jarvis_sec/data_flow_analyzer.py（620行）\n2. 类名：BuiltinDataFlowAnalyzer(TaintAnalyzer)，自注册模式：TaintAnalyzerFactory.register('builtin', BuiltinDataFlowAnalyzer) 在模块末尾\n3. 核心方法：analyze(source_code, file_path)->List[TaintPath], analyze_file(file_path)->List[TaintPath], is_available()->True\n4. 数据来源：ProjectDatabase的data_flow/call_graph/pointer_states表\n5. 分析流程：_identify_sources -> _propagate_taint -> _check_sinks -> _check_sanitization\n6. 配置方法：configure_sources(), configure_sinks(), configure_sanitizers()\n7. c_checker.py:39 导入data_flow_analyzer确保注册触发\n8. 无数据库时analyze()返回空列表不报错",
+  "created_at": "2026-06-27T15:09:48.939769",
+  "updated_at": "2026-06-27T15:09:48.939774"
+}

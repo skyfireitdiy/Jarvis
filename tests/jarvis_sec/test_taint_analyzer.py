@@ -212,3 +212,70 @@ def test_taint_analyzer_factory():
     assert len(analyzer.sinks) == 1
     assert analyzer.sources[0].name == "test_source"
     assert analyzer.sinks[0].name == "test_sink"
+
+
+def test_builtin_data_flow_analyzer_is_available():
+    """测试BuiltinDataFlowAnalyzer始终可用"""
+    from jarvis.jarvis_sec.data_flow_analyzer import BuiltinDataFlowAnalyzer
+
+    analyzer = BuiltinDataFlowAnalyzer()
+    assert analyzer.is_available() is True
+    assert analyzer.get_name() == "builtin"
+    assert analyzer.get_version() == "1.0.0"
+
+
+def test_builtin_data_flow_analyzer_registered():
+    """测试builtin后端已注册到工厂"""
+    assert "builtin" in TaintAnalyzerFactory.list_available()
+    analyzer = TaintAnalyzerFactory.create("builtin")
+    assert analyzer is not None
+    assert analyzer.get_name() == "builtin"
+    assert analyzer.is_available() is True
+
+
+def test_builtin_data_flow_analyzer_analyze_no_db():
+    """测试无数据库时analyze返回空列表"""
+    from jarvis.jarvis_sec.data_flow_analyzer import BuiltinDataFlowAnalyzer
+
+    analyzer = BuiltinDataFlowAnalyzer()
+    result = analyzer.analyze("int main() { return 0; }", "test.c")
+    assert result == []
+
+
+def test_builtin_data_flow_analyzer_analyze_file_no_db():
+    """测试无数据库时analyze_file返回空列表"""
+    from jarvis.jarvis_sec.data_flow_analyzer import BuiltinDataFlowAnalyzer
+
+    analyzer = BuiltinDataFlowAnalyzer()
+    result = analyzer.analyze_file("/nonexistent/file.c")
+    assert result == []
+
+
+def test_analyze_with_best_analyzer_returns_result():
+    """测试analyze_with_best_analyzer能返回结果"""
+    from jarvis.jarvis_sec.taint_analyzer import analyze_with_best_analyzer
+
+    result = analyze_with_best_analyzer("int main() { return 0; }", "test.c")
+    # 无数据库时返回空列表，但不应报错
+    assert isinstance(result, list)
+
+
+def test_builtin_data_flow_analyzer_configure():
+    """测试BuiltinDataFlowAnalyzer配置sources/sinks/sanitizers"""
+    from jarvis.jarvis_sec.data_flow_analyzer import BuiltinDataFlowAnalyzer
+
+    analyzer = BuiltinDataFlowAnalyzer()
+    source = TaintSource(name="getenv", category="environment", patterns=["getenv"])
+    sink = TaintSink(
+        name="system",
+        category="command_execution",
+        severity=TaintSeverity.CRITICAL,
+        patterns=["system"],
+    )
+    analyzer.configure_sources([source])
+    analyzer.configure_sinks([sink])
+    analyzer.configure_sanitizers(["sanitize"])
+    assert len(analyzer.sources) == 1
+    assert len(analyzer.sinks) == 1
+    assert analyzer.sources[0].name == "getenv"
+    assert analyzer.sinks[0].name == "system"

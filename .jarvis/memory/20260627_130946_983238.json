@@ -1,0 +1,14 @@
+{
+  "id": "20260627_130946_983238",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "cross_file",
+    "test_framework",
+    "dataset_driven",
+    "completed"
+  ],
+  "content": "jsec跨文件检测测试框架重构完成：\n1. 测试框架从570行硬编码重构为208行数据集驱动自发现模式\n2. discover_all_datasets()自动扫描datasets/cross_file/*/metadata.json\n3. @pytest.mark.parametrize自动生成测试，metadata.expected_issues驱动断言\n4. 6个数据集覆盖4个类别：uaf(3)、double_free(1)、data_flow(1)、taint(1)\n5. 添加新数据集零代码改动：只需创建子目录+metadata.json\n6. 8个测试全部通过\n7. 数据集目录：tests/jarvis_sec/datasets/cross_file/{category}/{case_name}/\n8. metadata.json格式：{name, description, vulnerability_type, cross_file, expected_issues:[{pattern, file}]}",
+  "created_at": "2026-06-27T13:09:46.983263",
+  "updated_at": "2026-06-27T13:09:46.983268"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "null_check_cross_file",
+  "description": "跨文件空指针检查：条件表达式跨文件传播",
+  "difficulty": "easy",
+  "vulnerability_type": "data_flow",
+  "expected_issues": [],
+  "files": ["checker.c", "main.c"],
+  "cross_file": true,
+  "tags": ["data-flow", "cross-file", "null-check"]
+}

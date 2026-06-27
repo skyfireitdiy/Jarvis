@@ -1,0 +1,14 @@
+{
+  "id": "20260627_121039_097676",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "cross-file-detection",
+    "uaf",
+    "double-free",
+    "architecture"
+  ],
+  "content": "跨文件UAF/Double Free检测架构：\n1. 检测逻辑基于调用顺序而非变量名匹配，在caller视角下：先调free_wrapper后调use_wrapper = UAF\n2. 去重键选择(caller_file, call_line)，同一调用点只报告一次\n3. 全局去重集合_cross_file_uaf_seen/_cross_file_double_free_seen避免多文件分析时重复报告\n4. 核心代码位置：c_checker.py的_detect_cross_file_uaf(927~1068行)和_detect_cross_file_double_free(934~1048行)",
+  "created_at": "2026-06-27T12:10:39.097699",
+  "updated_at": "2026-06-27T12:10:39.097704"
+}
