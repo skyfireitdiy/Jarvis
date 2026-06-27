@@ -524,7 +524,9 @@ def _severity_from_confidence(conf: float, base: str) -> str:
 # ---------------------------
 
 
-def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_unsafe_api(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     issues: List[Issue] = []
     is_header = str(relpath).lower().endswith((".h", ".hpp"))
     re_type_kw = re.compile(
@@ -566,7 +568,10 @@ def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
 
 
 def _rule_boundary_funcs(
-    lines: Sequence[str], relpath: str, original_lines: Optional[Sequence[str]] = None
+    lines: Sequence[str],
+    relpath: str,
+    original_lines: Optional[Sequence[str]] = None,
+    database: Optional["ProjectDatabase"] = None,
 ) -> List[Issue]:
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
@@ -654,7 +659,9 @@ def _rule_boundary_funcs(
     return issues
 
 
-def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_realloc_assign_back(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测realloc返回值未使用的情况（污点分析 + 启发式回退）。
     - 优先使用污点分析检测realloc返回值是否被使用
@@ -665,7 +672,7 @@ def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["realloc_assign_back"], file_path=relpath
+        code, rules=["realloc_assign_back"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -758,7 +765,9 @@ def _rule_realloc_assign_back(lines: Sequence[str], relpath: str) -> List[Issue]
     return issues
 
 
-def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_malloc_no_null_check(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测内存分配后未检查NULL的情况。
     说明：优先使用污点分析，失败时回退到启发式实现。
@@ -841,7 +850,7 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
 
 
 def _rule_function_return_ptr_no_check(
-    lines: Sequence[str], relpath: str
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
     """
     检测函数返回指针后未检查 NULL 就直接使用的情况。
@@ -1244,7 +1253,10 @@ def _rule_uaf_suspect(
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["use_after_free", "double_free"], file_path=relpath
+        code,
+        rules=["use_after_free", "double_free"],
+        file_path=relpath,
+        database=database,
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -1340,7 +1352,9 @@ def _rule_uaf_suspect(
     return issues
 
 
-def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_unchecked_io(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测IO返回值未检查的情况（污点分析 + 启发式回退）。
     - 优先使用污点分析检测IO返回值是否被检查
@@ -1351,7 +1365,7 @@ def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["unchecked_io"], file_path=relpath
+        code, rules=["unchecked_io"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -1440,7 +1454,9 @@ def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_strncpy_no_nullterm(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     # 使用 strncpy/strncat 后未确保目标缓冲区以 NUL 结尾的常见隐患（启发式）
     # 优化：识别安全的strncpy用法（sizeof(buffer)-1 + 手动终止符）
     issues: List[Issue] = []
@@ -1492,7 +1508,9 @@ def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]
 # ---------------------------
 
 
-def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_format_string(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测格式化字符串漏洞：printf/sprintf/snprintf/vsprintf/vsnprintf 的格式参数不是字面量；
     fprintf 的第二个参数不是字面量。
@@ -1516,7 +1534,7 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["format_string"], file_path=relpath
+        code, rules=["format_string"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -1722,7 +1740,9 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_insecure_tmpfile(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_insecure_tmpfile(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测不安全临时文件API：tmpnam/tempnam/mktemp
     """
@@ -1746,7 +1766,9 @@ def _rule_insecure_tmpfile(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_command_execution(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     命令执行漏洞检测（污点分析 + 启发式回退）：
     - 优先使用污点分析检测用户输入 -> 命令执行函数 的污点传播路径
@@ -1761,7 +1783,7 @@ def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["command_injection"], file_path=relpath
+        code, rules=["command_injection"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -1873,7 +1895,9 @@ def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_sql_injection(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_sql_injection(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     SQL注入检测（污点分析 + 启发式回退）：
     - 优先使用污点分析检测用户输入 -> SQL拼接函数 的污点传播路径
@@ -1885,7 +1909,7 @@ def _rule_sql_injection(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["sql_injection"], file_path=relpath
+        code, rules=["sql_injection"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -1944,7 +1968,9 @@ def _rule_sql_injection(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_memory_leak(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_memory_leak(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     内存泄漏检测（启发式）：
     - 检测函数内malloc/calloc/realloc后没有对应的free
@@ -2017,7 +2043,9 @@ def _rule_memory_leak(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_path_traversal(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     路径遍历检测（污点分析 + 启发式回退）：
     - 优先使用污点分析检测用户输入 -> 路径拼接函数 的污点传播路径
@@ -2029,7 +2057,7 @@ def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["path_traversal"], file_path=relpath
+        code, rules=["path_traversal"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -2082,7 +2110,9 @@ def _rule_path_traversal(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_integer_overflow(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     整数溢出检测：
     - 检测乘法/加法表达式作为malloc/calloc/realloc参数
@@ -2189,7 +2219,9 @@ def _rule_integer_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_hardcoded_credentials(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     硬编码凭证检测：
     - 检测敏感变量名（password、key、secret、token等）
@@ -2250,7 +2282,9 @@ def _rule_hardcoded_credentials(lines: Sequence[str], relpath: str) -> List[Issu
     return issues
 
 
-def _rule_toctou_race(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_toctou_race(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     TOCTOU竞态条件检测：
     - 检测access+fopen模式
@@ -2294,7 +2328,9 @@ def _rule_toctou_race(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_scanf_no_width(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 scanf/sscanf/fscanf 使用 %s 但未指定最大宽度，存在缓冲区溢出风险。
     仅对格式串直接字面量的情况进行粗略检查。
@@ -2336,7 +2372,9 @@ def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_alloc_size_overflow(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_alloc_size_overflow(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测分配大小可能溢出的简单情形：malloc/calloc/realloc 形参存在乘法表达式且未显式使用 sizeof。
     该规则为启发式，需人工确认。
@@ -2376,7 +2414,9 @@ def _rule_alloc_size_overflow(lines: Sequence[str], relpath: str) -> List[Issue]
 # ---------------------------
 
 
-def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_possible_null_deref(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测空指针解引用：
     - 出现 p->... 或 *p 访问，且邻近未见明显的 NULL 检查。
@@ -2548,7 +2588,9 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
     return issues
 
 
-def _rule_uninitialized_ptr_use(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_uninitialized_ptr_use(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测野指针（未初始化指针）使用的简单情形：
     - 出现形如 `type *p;`（行内不含 '=' 且不含 '('，避免函数指针）后，在后续若干行内出现 p-> 或 *p 访问，
@@ -2610,7 +2652,9 @@ def _rule_uninitialized_ptr_use(lines: Sequence[str], relpath: str) -> List[Issu
     return issues
 
 
-def _rule_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_deadlock_patterns(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测常见死锁风险：
     - 双重加锁：同一互斥量在未解锁情况下再次加锁
@@ -3079,7 +3123,9 @@ def _rule_vla_usage(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_pthread_returns_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_pthread_returns_unchecked(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 pthread 常见接口的返回值未检查的情形（同/后一两行缺少 if/比较判断）。
     """
@@ -3108,7 +3154,9 @@ def _rule_pthread_returns_unchecked(lines: Sequence[str], relpath: str) -> List[
     return issues
 
 
-def _rule_cond_wait_no_loop(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_cond_wait_no_loop(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 pthread_cond_wait 未在 while 循环中使用（防止虚假唤醒）。
     准确性优化：
@@ -3146,7 +3194,9 @@ def _rule_cond_wait_no_loop(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_thread_leak_no_join(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_thread_leak_no_join(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测创建线程后未 join/detach 的可能线程泄漏。
     """
@@ -3235,7 +3285,9 @@ def _rule_time_apis_not_threadsafe(lines: Sequence[str], relpath: str) -> List[I
     return issues
 
 
-def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_getenv_unchecked(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测getenv返回值未检查的情况（污点分析 + 启发式回退）。
     - 优先使用污点分析检测getenv返回值是否被检查NULL
@@ -3246,7 +3298,7 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
     # 尝试使用污点分析
     code = "\n".join(lines)
     taint_paths = taint_analyzer.analyze_with_best_analyzer(
-        code, rules=["getenv_unchecked"], file_path=relpath
+        code, rules=["getenv_unchecked"], file_path=relpath, database=database
     )
 
     # 如果污点分析有结果，转换为Issue
@@ -3679,7 +3731,9 @@ def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue
     return issues
 
 
-def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_move_after_use(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测移动后使用的风险：对象被 std::move 后仍被使用。
     """
@@ -3777,7 +3831,9 @@ def _rule_uncaught_exception(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_smart_ptr_cycle(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测智能指针可能的循环引用问题（启发式）。
     注意：完全检测循环引用需要图分析，这里仅做简单启发式检测。
@@ -3836,7 +3892,9 @@ def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_cpp_deadlock_patterns(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 C++ 标准库（std::mutex）相关的死锁风险：
     - 双重加锁：同一 mutex 在未解锁情况下再次加锁
@@ -4012,7 +4070,9 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
     return issues
 
 
-def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_data_race_suspect(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测可能的数据竞争（data race）风险：
     - 共享变量（全局/静态变量）在多线程环境下未受保护访问
@@ -4286,35 +4346,74 @@ def analyze_c_cpp_text(
     mlines = masked_text.splitlines()
 
     # 数据流分析（用于误报过滤）
+    # 如果没有database，创建临时内存database并用DataCollector收集数据
+    _temp_database = None
+    _db_file_path = relpath  # 用于查询database的文件路径
+    if database is None:
+        try:
+            from jarvis.jarvis_sec.project_database import ProjectDatabase
+            from jarvis.jarvis_sec.data_collector import DataCollector
+
+            _temp_database = ProjectDatabase(".", in_memory=True)
+            collector = DataCollector(_temp_database)
+            lang = "cpp" if _is_cpp_file(relpath) else "c"
+            # 写入临时文件供DataCollector分析
+            import tempfile
+            import os
+
+            _tmp_dir = tempfile.mkdtemp(prefix="jsec_")
+            _tmp_file = os.path.join(_tmp_dir, os.path.basename(relpath))
+            with open(_tmp_file, "w", encoding="utf-8") as f:
+                f.write(text)
+            collector.analyze_file(_tmp_file, lang)
+            # 使用临时文件的完整路径查询database
+            _db_file_path = _tmp_file
+            # 清理临时文件（延迟清理，database查询完成后才清理）
+            database = _temp_database
+        except Exception:
+            pass  # 创建失败时继续使用空database
+
     data_flow_analyzer = DataFlowAnalyzer()
     data_flow_result = data_flow_analyzer.analyze_code(
-        text, is_cpp=_is_cpp_file(relpath), database=database, file_path=relpath
+        text, is_cpp=_is_cpp_file(relpath), database=database, file_path=_db_file_path
     )
+
+    # 清理临时文件和目录
+    if _temp_database is not None:
+        try:
+            import os
+
+            os.unlink(_tmp_file)
+            os.rmdir(_tmp_dir)
+        except (OSError, NameError):
+            pass
 
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
-    issues.extend(_rule_unsafe_api(mlines, relpath))
-    issues.extend(_rule_boundary_funcs(mlines, relpath, lines))
-    issues.extend(_rule_realloc_assign_back(mlines, relpath))
-    issues.extend(_rule_malloc_no_null_check(mlines, relpath))
-    issues.extend(_rule_function_return_ptr_no_check(mlines, relpath))
-    issues.extend(_rule_unchecked_io(mlines, relpath))
+    issues.extend(_rule_unsafe_api(mlines, relpath, database=database))
+    issues.extend(_rule_boundary_funcs(mlines, relpath, lines, database=database))
+    issues.extend(_rule_realloc_assign_back(mlines, relpath, database=database))
+    issues.extend(_rule_malloc_no_null_check(mlines, relpath, database=database))
+    issues.extend(
+        _rule_function_return_ptr_no_check(mlines, relpath, database=database)
+    )
+    issues.extend(_rule_unchecked_io(mlines, relpath, database=database))
     # 需要字符串字面量信息的规则（使用原始行）
-    issues.extend(_rule_strncpy_no_nullterm(lines, relpath))
-    issues.extend(_rule_format_string(lines, relpath))
-    issues.extend(_rule_scanf_no_width(lines, relpath))
+    issues.extend(_rule_strncpy_no_nullterm(lines, relpath, database=database))
+    issues.extend(_rule_format_string(lines, relpath, database=database))
+    issues.extend(_rule_scanf_no_width(lines, relpath, database=database))
     # 其他规则
-    issues.extend(_rule_insecure_tmpfile(mlines, relpath))
-    issues.extend(_rule_command_execution(mlines, relpath))
+    issues.extend(_rule_insecure_tmpfile(mlines, relpath, database=database))
+    issues.extend(_rule_command_execution(mlines, relpath, database=database))
     # 新增规则：SQL注入、内存泄漏、路径遍历
-    issues.extend(_rule_sql_injection(lines, relpath))
-    issues.extend(_rule_memory_leak(lines, relpath))
-    issues.extend(_rule_path_traversal(lines, relpath))
+    issues.extend(_rule_sql_injection(lines, relpath, database=database))
+    issues.extend(_rule_memory_leak(lines, relpath, database=database))
+    issues.extend(_rule_path_traversal(lines, relpath, database=database))
     # 新增规则：整数溢出、硬编码凭证、TOCTOU竞态
-    issues.extend(_rule_integer_overflow(lines, relpath))
-    issues.extend(_rule_hardcoded_credentials(lines, relpath))
-    issues.extend(_rule_toctou_race(lines, relpath))
-    issues.extend(_rule_alloc_size_overflow(mlines, relpath))
+    issues.extend(_rule_integer_overflow(lines, relpath, database=database))
+    issues.extend(_rule_hardcoded_credentials(lines, relpath, database=database))
+    issues.extend(_rule_toctou_race(lines, relpath, database=database))
+    issues.extend(_rule_alloc_size_overflow(mlines, relpath, database=database))
     issues.extend(
         _rule_double_free_and_free_non_heap(mlines, relpath, database=database)
     )
@@ -4324,31 +4423,31 @@ def analyze_c_cpp_text(
     issues.extend(_rule_open_permissive_perms(mlines, relpath))
     issues.extend(_rule_alloca_unbounded(mlines, relpath))
     issues.extend(_rule_vla_usage(mlines, relpath))
-    issues.extend(_rule_pthread_returns_unchecked(mlines, relpath))
-    issues.extend(_rule_cond_wait_no_loop(mlines, relpath))
-    issues.extend(_rule_thread_leak_no_join(mlines, relpath))
+    issues.extend(_rule_pthread_returns_unchecked(mlines, relpath, database=database))
+    issues.extend(_rule_cond_wait_no_loop(mlines, relpath, database=database))
+    issues.extend(_rule_thread_leak_no_join(mlines, relpath, database=database))
     issues.extend(_rule_inet_legacy(mlines, relpath))
     issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath))
-    issues.extend(_rule_getenv_unchecked(mlines, relpath))
+    issues.extend(_rule_getenv_unchecked(mlines, relpath, database=database))
     # 复杂语义（使用掩蔽行避免字符串干扰）
     issues.extend(_rule_uaf_suspect(mlines, relpath, database=database))
-    issues.extend(_rule_possible_null_deref(mlines, relpath))
-    issues.extend(_rule_uninitialized_ptr_use(mlines, relpath))
-    issues.extend(_rule_deadlock_patterns(mlines, relpath))
+    issues.extend(_rule_possible_null_deref(mlines, relpath, database=database))
+    issues.extend(_rule_uninitialized_ptr_use(mlines, relpath, database=database))
+    issues.extend(_rule_deadlock_patterns(mlines, relpath, database=database))
     # C++ 特定检查规则
     issues.extend(_rule_new_delete_mismatch(mlines, relpath))
     issues.extend(_rule_reinterpret_cast_unsafe(mlines, relpath))
     issues.extend(_rule_const_cast_unsafe(mlines, relpath))
     issues.extend(_rule_vector_string_bounds_check(mlines, relpath))
     issues.extend(_rule_missing_virtual_dtor(mlines, relpath))
-    issues.extend(_rule_move_after_use(mlines, relpath))
+    issues.extend(_rule_move_after_use(mlines, relpath, database=database))
     issues.extend(_rule_uncaught_exception(mlines, relpath))
-    issues.extend(_rule_smart_ptr_cycle(mlines, relpath))
+    issues.extend(_rule_smart_ptr_cycle(mlines, relpath, database=database))
     issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath))
     # C++ 死锁检测
-    issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath))
+    issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath, database=database))
     # 数据竞争检测
-    issues.extend(_rule_data_race_suspect(mlines, relpath))
+    issues.extend(_rule_data_race_suspect(mlines, relpath, database=database))
 
     # 污点分析（核心功能）
     try:
@@ -4517,12 +4616,12 @@ def _is_double_free_false_positive(
         return False
 
     # 检查变量状态
-    if var_name in dataflow_result.pointer_states:
+    if dataflow_result.pointer_states and var_name in dataflow_result.pointer_states:
         pointer_info = dataflow_result.pointer_states[var_name]
 
         # 如果变量被置NULL，检查是否有NULL检查
         if pointer_info.state == PointerState.NULLIFIED:
-            if var_name in dataflow_result.null_checks:
+            if dataflow_result.null_checks and var_name in dataflow_result.null_checks:
                 # 检查NULL检查是否在当前行之前
                 for check_line in dataflow_result.null_checks[var_name]:
                     if check_line < line_num:
@@ -4579,11 +4678,11 @@ def _is_strcpy_false_positive(
         return False
 
     # 检查是否在死代码中
-    if line_num in dataflow_result.dead_code_lines:
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
         return True
 
     # 检查是否有NULL检查保护
-    if var_name in dataflow_result.null_checks:
+    if dataflow_result.null_checks and var_name in dataflow_result.null_checks:
         for check_line in dataflow_result.null_checks[var_name]:
             if check_line < line_num:
                 return True
@@ -4723,6 +4822,11 @@ def _extract_variable_name(issue_or_msg: Issue | str) -> Optional[str]:
     if match:
         return match.group(1)
 
+    # 尝试从函数调用第一个参数中提取变量名（如：strcpy(buf, ...)、memcpy(data, ...）
+    match = re.search(r"\b\w+\s*\(\s*(\w+)\s*,", msg)
+    if match:
+        return match.group(1)
+
     return None
 
 
@@ -4795,7 +4899,10 @@ def _is_memory_leak_false_positive(
         return False
 
     # 检查是否为所有权转移
-    if var_name in dataflow_result.ownership_transfer:
+    if (
+        dataflow_result.ownership_transfer
+        and var_name in dataflow_result.ownership_transfer
+    ):
         return True
 
     return False
@@ -4831,11 +4938,11 @@ def _is_null_deref_false_positive(
         return False
 
     # 检查是否在死代码行
-    if line_num in dataflow_result.dead_code_lines:
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
         return True
 
     # 检查是否有NULL检查保护
-    if var_name in dataflow_result.null_checks:
+    if dataflow_result.null_checks and var_name in dataflow_result.null_checks:
         for check_line in dataflow_result.null_checks[var_name]:
             # NULL检查在当前行之前，且在同一函数内
             if check_line < line_num:

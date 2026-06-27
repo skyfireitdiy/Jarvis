@@ -1,0 +1,8 @@
+{
+  "id": "20260627_174812_057005",
+  "type": "project_long_term",
+  "tags": ["jsec", "架构重构", "进展"],
+  "content": "jsec架构重构P1-P4全部完成，P5待完成：\n- P1: analyze_with_best_analyzer接受database参数\n- P2: 14个B类规则签名添加database + analyze_c_cpp_text中21个调用传入database\n- P3: PointerState添加state/常量、DataFlowResult添加pointer_states/null_checks、DataFlowAnalyzer添加is_safe_access/_build_pointer_states/_build_null_checks、analyze_code增强\n- P4: 8个C类规则签名添加database参数 + analyze_c_cpp_text中8个调用传入database=database + 3处dataflow_result属性None安全修复\n- P5: 补充数据集驱动测试（待完成）\n- strcpy误报修复：_extract_variable_name添加函数调用第一个参数提取模式 r\"\\b\\w+\\s*\\(\\s*(\\w+)\\s*,\"\n- 3个negative case误报全部消除\n- 30个测试全部通过，静态扫描通过\n- 关键文件：c_checker.py(~4886行), data_collector.py, data_flow_analyzer.py, project_database.py, taint_analyzer.py",
+  "created_at": "2026-06-27T17:48:12.057024",
+  "updated_at": "2026-06-27T17:48:12.057032"
+}

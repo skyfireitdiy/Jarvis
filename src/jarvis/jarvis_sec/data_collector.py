@@ -274,6 +274,10 @@ class DataCollector:
         elif node_type in ["while_statement", "for_statement"]:
             self._handle_loop_statement(node, code, file_path, result, scope)
 
+        # 处理return语句（检测所有权转移）
+        elif node_type == "return_statement":
+            self._handle_return_statement(node, code, file_path, result, scope)
+
         # 递归处理子节点
         for child in node.children:
             self._traverse_ast(child, code, file_path, result, scope)
@@ -641,6 +645,56 @@ class DataCollector:
             condition_node, code, file_path, result, scope, line
         )
 
+    def _handle_return_statement(
+        self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理return语句，检测所有权转移
+
+        检测模式：
+        - return malloc_ptr;  // 函数返回分配的内存，所有权转移给调用者
+        - return ptr;         // 返回指针变量
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+        """
+        line = node.start_point[0] + 1
+
+        # 查找return语句中的标识符
+        for child in node.children:
+            if child.type == "identifier":
+                var_name = self._get_node_text(child, code)
+                # 创建ownership_transfer类型的数据流节点
+                data_flow_node = DataFlowNode(
+                    var_name=var_name,
+                    file_path=file_path,
+                    line=line,
+                    node_type="use",
+                    scope=scope,
+                    value_source="return",
+                    use_type="ownership_transfer",
+                )
+                result["data_flow_nodes"].append(data_flow_node)
+            elif child.type == "call_expression":
+                # return malloc(...); 直接返回分配结果
+                call_name = self._get_call_target(child, code)
+                if call_name in ["malloc", "calloc", "realloc"]:
+                    # 返回分配结果，所有权转移
+                    data_flow_node = DataFlowNode(
+                        var_name=f"__return_{call_name}",
+                        file_path=file_path,
+                        line=line,
+                        node_type="use",
+                        scope=scope,
+                        value_source="return",
+                        use_type="ownership_transfer",
+                    )
+                    result["data_flow_nodes"].append(data_flow_node)
+
     def _extract_identifiers_from_condition(
         self,
         node: Node,
@@ -651,7 +705,13 @@ class DataCollector:
         line: int,
     ):
         """
-        递归提取条件表达式中的所有标识符（变量使用）
+        递归提取条件表达式中的所有标识符（变量使用），并检测NULL检查模式
+
+        检测的NULL检查模式：
+        - if (ptr != NULL) / if (ptr != nullptr)
+        - if (ptr == NULL) / if (ptr == nullptr)
+        - if (ptr) / if (!ptr)
+        - if (ptr != NULL && ...) / if (ptr == NULL || ...)
 
         Args:
             node: AST节点
@@ -664,10 +724,23 @@ class DataCollector:
         if node is None:
             return
 
-        # 如果是标识符，创建数据流节点
-        if node.type == "identifier":
+        # 检测NULL检查模式：在二元表达式中检测 ptr == NULL / ptr != NULL
+        if node.type == "binary_expression":
+            self._detect_null_check_in_binary(
+                node, code, file_path, result, scope, line
+            )
+        # 检测一元取反模式：!ptr
+        elif node.type == "unary_expression":
+            op_node = node.child_by_field_name("operator")
+            if op_node and self._get_node_text(op_node, code) == "!":
+                arg_node = node.child_by_field_name("argument")
+                if arg_node and arg_node.type == "identifier":
+                    var_name = self._get_node_text(arg_node, code)
+                    self._add_null_check_node(var_name, file_path, line, scope, result)
+        # 检测单独标识符作为条件：if (ptr)
+        elif node.type == "identifier":
             var_name = self._get_node_text(node, code)
-            # 排除常见的非变量标识符（如类型名、关键字等）
+            # 排除常见的非变量标识符
             if var_name not in [
                 "NULL",
                 "nullptr",
@@ -684,6 +757,8 @@ class DataCollector:
                 "unsigned",
                 "signed",
             ]:
+                # 检查父节点是否是条件表达式（if/while的条件）
+                # 如果标识符直接作为条件，也是一种NULL检查
                 data_flow_node = DataFlowNode(
                     var_name=var_name,
                     file_path=file_path,
@@ -691,6 +766,7 @@ class DataCollector:
                     node_type="use",
                     scope=scope,
                     value_source="condition",
+                    use_type="null_check",
                 )
                 result["data_flow_nodes"].append(data_flow_node)
             return
@@ -700,6 +776,59 @@ class DataCollector:
             self._extract_identifiers_from_condition(
                 child, code, file_path, result, scope, line
             )
+
+    def _detect_null_check_in_binary(
+        self,
+        node: Node,
+        code: str,
+        file_path: str,
+        result: Dict[str, Any],
+        scope: str,
+        line: int,
+    ):
+        """检测二元表达式中的NULL检查模式（ptr == NULL, ptr != NULL等）"""
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        op_node = node.child_by_field_name("operator")
+
+        if not left or not right or not op_node:
+            return
+
+        op = self._get_node_text(op_node, code)
+        if op not in ("==", "!="):
+            return
+
+        left_text = self._get_node_text(left, code).strip()
+        right_text = self._get_node_text(right, code).strip()
+
+        # 检测 ptr == NULL / ptr != NULL
+        null_literals = {"NULL", "nullptr", "0"}
+        if right_text in null_literals and left.type == "identifier":
+            var_name = left_text
+            self._add_null_check_node(var_name, file_path, line, scope, result)
+        elif left_text in null_literals and right.type == "identifier":
+            var_name = right_text
+            self._add_null_check_node(var_name, file_path, line, scope, result)
+
+    def _add_null_check_node(
+        self,
+        var_name: str,
+        file_path: str,
+        line: int,
+        scope: str,
+        result: Dict[str, Any],
+    ):
+        """添加一个null_check类型的数据流节点"""
+        data_flow_node = DataFlowNode(
+            var_name=var_name,
+            file_path=file_path,
+            line=line,
+            node_type="use",
+            scope=scope,
+            value_source="condition",
+            use_type="null_check",
+        )
+        result["data_flow_nodes"].append(data_flow_node)
 
     # ============================================================================
     # 正则表达式回退方案
