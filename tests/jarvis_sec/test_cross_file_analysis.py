@@ -186,10 +186,20 @@ class TestCrossFileUAF:
         assert metadata["cross_file"] is True
         assert "uaf" in metadata["tags"]
 
-        # 注意：当前checker可能不支持跨文件UAF检测
-        # 这个测试主要用于验证数据集加载和测试框架
-        # 如果检测到UAF，则说明checker支持跨文件分析
-        # 如果没有检测到，则需要增强checker的跨文件分析能力
+        # 验证跨文件UAF检测能力
+        # metadata期望检测到use_after_free_suspect在main.c
+        uaf_issue = find_issue_by_pattern(issues, "use_after_free_suspect")
+
+        # 当前checker不支持跨文件UAF检测，标记为预期失败
+        # TODO: 增强checker的跨文件分析能力后，移除xfail标记
+        if uaf_issue is None:
+            pytest.xfail("当前checker不支持跨文件UAF检测，需要增强跨文件分析能力")
+
+        # 如果检测到UAF，验证位置正确
+        assert uaf_issue is not None, "应该检测到跨文件UAF问题"
+        assert uaf_issue.file == "main.c", "UAF应该在main.c中"
+        # 注意：metadata中期望line=8，但实际UAF在第13行
+        # metadata可能有误，实际检测位置应该是第13行
 
     def test_uaf_alloc_use_free_different_files(self, temp_test_dir):
         """测试：分配、使用、释放在不同文件
