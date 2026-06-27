@@ -1,0 +1,8 @@
+{
+  "id": "20260628_003554_137094",
+  "type": "project_long_term",
+  "tags": ["jsec", "架构重构", "P13完成", "漏报修复"],
+  "content": "P13完成：4类新漏报漏洞修复\n1. sscanf/fscanf %s无宽度：新增RE_SCANF_CALL_ARG2正则匹配sscanf/fscanf第2参数格式串，修改_rule_scanf_no_width fallback路径\n2. signal handler不安全函数：新增_rule_signal_handler_unsafe规则，检测signal()注册的handler函数体内非async-signal-safe函数调用（printf/malloc/free/fprintf/exit/strerror等）\n3. 权限操作未检查：新增RE_PRIV_API(setuid/setgid/chown/chmod)，扩展_rule_unchecked_io\n4. 网络IO未检查：新增RE_NET_API(recv/send/connect/accept)，扩展_rule_unchecked_io\n- 33个pytest测试全部通过\n- c_checker.py约6989行\n- 关键正则位置：RE_SCANF_CALL_ARG2(93行), RE_PRIV_API(76-81行), RE_NET_API(82-87行)\n- 关键规则位置：_rule_signal_handler_unsafe(3343-3440行)",
+  "created_at": "2026-06-28T00:35:54.137119",
+  "updated_at": "2026-06-28T00:35:54.137129"
+}

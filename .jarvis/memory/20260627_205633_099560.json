@@ -1,0 +1,8 @@
+{
+  "id": "20260627_205633_099560",
+  "type": "project_long_term",
+  "tags": ["jsec", "vulnerability-gaps", "false-negative", "todo"],
+  "content": "jsec待修复9个漏报漏洞（测试用例已创建于vulnerability_gaps/目录）：\n1. SQL注入strcat拼接(P0) - _rule_sql_injection\n2. syslog格式串(P0) - _rule_format_string\n3. snprintf路径遍历(P0) - _rule_path_traversal\n4. Windows ShellExecute(P1) - _rule_command_execution\n5. exec*第二参数(P1) - _rule_command_execution\n6. err/warn格式串(P1) - _rule_format_string\n7. TOCTOU超5行(P1) - _rule_toctou_race\n8. getenv直接传函数(P1) - _rule_getenv_unchecked\n9. 整数溢出间接乘法(P1) - _rule_integer_overflow",
+  "created_at": "2026-06-27T20:56:33.099580",
+  "updated_at": "2026-06-27T20:56:33.099584"
+}

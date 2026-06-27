@@ -1,0 +1,8 @@
+{
+  "id": "20260627_224442_601561",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "security-audit", "c_checker", "fix-verified"],
+  "content": "c_checker规则漏报修复验证结果（2026-06-28）：\n\n## 漏报修复验证：9/9 ✅\n1. ✅ SQL注入-strcat拼接：检测到2个sql_injection问题\n2. ✅ 命令执行-ShellExecute：检测到3个command_exec问题\n3. ✅ 命令执行-exec*第二参数：检测到1个command_exec问题\n4. ✅ 格式化字符串-syslog：检测到3个format_string问题\n5. ✅ 格式化字符串-err/errx：检测到3个format_string问题\n6. ✅ 路径遍历-snprintf拼接：检测到2个path_traversal问题\n7. ✅ TOCTOU-超5行窗口：检测到4个toctou_race问题\n8. ✅ getenv直接传函数：检测到3个getenv_unchecked问题\n9. ✅ 整数溢出-间接乘法：检测到6个integer_overflow问题\n\n## 误报安全性验证：3/3 ✅\n1. ✅ malloc+assert检查：无误报\n2. ✅ password_length变量名：无误报\n3. ✅ free后赋值NULL：无误报\n\n## pytest回归：33 passed, 0 failed ✅\n\n## 代码修改摘要（c_checker.py 584行diff）\n- RE_PRINTF_LIKE: 增加syslog/vsyslog/err/errx/warn/warnx\n- RE_SHELLEXECUTE: 新增Windows ShellExecute API正则\n- _rule_format_string: 增加syslog/err/errx/warn/warnx格式串参数映射\n- _rule_command_execution: 增加ShellExecute检测+exec*第二参数检测\n- _rule_sql_injection: 增加strcpy+strcat拼接检测+SQL执行函数检测\n- _rule_path_traversal: 增加snprintf/sprintf路径拼接检测，窗口从3行扩到10行\n- _rule_toctou_race: 窗口从5行扩大到15行\n- _rule_getenv_unchecked: 增加getenv直接传函数参数检测\n- _rule_integer_overflow: 增加间接乘法溢出检测（变量由乘法赋值后传malloc）\n- _rule_hardcoded_credentials: 修复database查询逻辑",
+  "created_at": "2026-06-27T22:44:42.601588",
+  "updated_at": "2026-06-27T22:44:42.601594"
+}

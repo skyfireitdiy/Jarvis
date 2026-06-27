@@ -1,0 +1,8 @@
+{
+  "id": "20260627_204809_277127",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "security-audit", "vulnerability-gaps", "c_checker"],
+  "content": "jarvis_sec c_checker规则漏洞审计成果（已验证）：\n\n## 确认漏报漏洞（9/10个已验证）\n1. SQL注入-strcat拼接SQL：_rule_sql_injection仅检测sprintf/snprintf，遗漏strcpy+strcat拼接\n2. 命令执行-ShellExecute：_rule_command_execution未覆盖Windows API\n3. 命令执行-exec*第二参数：仅检查第一个参数，execlp(\"ls\", user_input)漏报\n4. 格式化字符串-syslog：_rule_format_string未覆盖syslog()格式串参数\n5. 格式化字符串-err/errx：未覆盖BSD错误函数格式串\n6. 路径遍历-snprintf拼接：_rule_path_traversal仅检测strcat+fopen 3行窗口\n7. TOCTOU-超5行窗口：_rule_toctou_race窗口过小\n8. getenv直接传函数：_rule_getenv_unchecked未覆盖getenv返回值直接传参模式\n9. 整数溢出-间接乘法：乘法结果先赋值变量再传malloc漏报\n\n## 误报安全（4/4个已验证）\n1. malloc+assert检查：不应误报为alloc_no_null_check\n2. password_length变量名：不应误报为hardcoded_credentials\n3. free后赋值NULL：不应误报为UAF\n\n## 测试用例位置\n- 漏报用例：tests/jarvis_sec/datasets/vulnerability_gaps/（7个子目录）\n- 误报用例：tests/jarvis_sec/datasets/对应目录/negative_*.c\n- 跨文件用例：tests/jarvis_sec/datasets/cross_file/{sql_injection,path_traversal,format_string}/\n- pytest结果：33 passed, 0 failed",
+  "created_at": "2026-06-27T20:48:09.277168",
+  "updated_at": "2026-06-27T20:48:09.277173"
+}

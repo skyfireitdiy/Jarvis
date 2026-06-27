@@ -1,0 +1,8 @@
+{
+  "id": "20260627_234603_801826",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "security-audit", "c_checker", "phase5", "new-gaps"],
+  "content": "阶段5：构造贴近实战测试用例 - 新发现4类漏报\n\n## 新发现漏报（4类，2026-06-28验证）\n1. sscanf/fscanf %s无宽度限制：RE_SCANF_CALL只匹配scanf第1参数格式，sscanf/fscanf格式串是第2参数无法匹配\n2. signal handler不安全函数：c_checker无此规则，POSIX要求handler只调用async-signal-safe函数\n3. 权限操作未检查返回值：RE_IO_API不含setuid/setgid/chown/chmod等\n4. 网络IO未检查返回值：RE_IO_API不含recv/send/connect/accept等\n\n## 新增测试用例文件（8个）\n- tests/jarvis_sec/datasets/vulnerability_gaps/sscanf_no_width/{positive,negative}_*.c\n- tests/jarvis_sec/datasets/vulnerability_gaps/signal_handler_unsafe/{positive,negative}_*.c\n- tests/jarvis_sec/datasets/vulnerability_gaps/privilege_op_unchecked/{positive,negative}_*.c\n- tests/jarvis_sec/datasets/vulnerability_gaps/recv_unchecked/{positive,negative}_*.c\n\n## 修复请求已发送\n- 规则开发Agent ID: f0000a52-207d-4962-b912-4c65de02ec5d\n- 等待修复完成后验证\n\n## 之前已修复漏报（9/9 ✅）\nSQL注入-strcat、命令执行-ShellExecute、命令执行-exec*第二参数、格式化字符串-syslog、格式化字符串-err/errx、路径遍历-snprintf、TOCTOU-超5行窗口、getenv直接传函数、整数溢出-间接乘法",
+  "created_at": "2026-06-27T23:46:03.801853",
+  "updated_at": "2026-06-27T23:46:03.801857"
+}

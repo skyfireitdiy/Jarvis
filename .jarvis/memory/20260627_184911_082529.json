@@ -1,0 +1,8 @@
+{
+  "id": "20260627_184911_082529",
+  "type": "project_long_term",
+  "tags": ["checker-refactor", "database-driven", "jsec", "progress"],
+  "content": "jsec正则规则改造进度：\n- P1-P5完成：analyze_with_best_analyzer接受database参数、PointerState/DataFlowResult增强、negative case误报消除\n- P6完成：8个无db规则添加database参数\n- P7完成：3个内存安全类规则改造（_rule_memory_leak/_rule_possible_null_deref/_rule_uninitialized_ptr_use）\n- P8完成：3个空指针检查类规则改造（_rule_malloc_no_null_check/_rule_function_return_ptr_no_check/_rule_getenv_unchecked）\n- 当前状态：46个规则中约17个已改造，约32个仍用正则\n- 改造模式：优先database查询，无数据时回退到正则fallback函数",
+  "created_at": "2026-06-27T18:49:11.082573",
+  "updated_at": "2026-06-27T18:49:11.082582"
+}

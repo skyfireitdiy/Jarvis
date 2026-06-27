@@ -1,0 +1,8 @@
+{
+  "id": "20260628_004040_147080",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "phase5", "batch2-verified", "c_checker"],
+  "content": "c_checker第二批漏报修复验证结果（2026-06-28）：\n\n## 第二批漏报修复验证：4/4 ✅\n1. ✅ sscanf/fscanf %s无宽度：检测到2个scanf_%s_no_width问题\n2. ✅ signal handler不安全函数：检测到2个signal_handler_unsafe_func问题（printf+exit）\n3. ✅ 权限操作未检查返回值：检测到1个unchecked_privilege_op问题（setuid/chown）\n4. ✅ 网络IO未检查返回值：检测到1个unchecked_network_io问题（recv/send）\n\n## 误报安全性验证：4/4 ✅\n1. ✅ sscanf有宽度限制：无误报\n2. ✅ setuid已检查返回值：无误报\n3. ✅ recv已检查返回值：无误报\n4. ✅ signal handler只调用安全函数：无误报\n\n## pytest回归：33 passed, 0 failed ✅\n\n## 累计修复验证：13/13 ✅\n- 第一批9个漏报 + 第二批4个漏报 = 13个全部修复验证通过\n- 误报安全：7/7全部通过（第一批3个+第二批4个）\n\n## 新增规则/正则\n- RE_SCANF_CALL_ARG2：匹配sscanf/fscanf第2参数格式串\n- _rule_signal_handler_unsafe：检测handler中非async-signal-safe函数\n- ASYNC_SIGNAL_UNSAFE_FUNCS：不安全函数集合\n- unchecked_privilege_op：setuid/setgid/chown/chmod等权限操作未检查返回值\n- unchecked_network_io：recv/send/connect/accept等网络IO未检查返回值",
+  "created_at": "2026-06-28T00:40:40.147114",
+  "updated_at": "2026-06-28T00:40:40.147119"
+}

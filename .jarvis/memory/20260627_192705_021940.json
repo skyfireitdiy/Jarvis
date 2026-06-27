@@ -1,0 +1,8 @@
+{
+  "id": "20260627_192705_021940",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker", "refactor", "progress"],
+  "content": "jsec规则改造进度：\n\n已改造: 24个规则\n待改造: 22个规则\n\n本次新增改造规则：\n1. _rule_insecure_tmpfile - call_graph查询tmpnam/tempnam/mktemp\n2. _rule_atoi_family - call_graph查询atoi/atol/atoll/atof\n3. _rule_rand_insecure - call_graph查询rand/srand/random\n4. _rule_strtok_nonreentrant - call_graph查询strtok\n5. _rule_time_apis_not_threadsafe - call_graph查询asctime/ctime/localtime/gmtime\n6. _rule_inet_legacy - call_graph查询inet_addr/inet_aton/inet_ntoa\n7. _rule_alloca_unbounded - call_graph查询alloca/__builtin_alloca\n\n测试结果：8个test_checkers.py测试全部通过",
+  "created_at": "2026-06-27T19:27:05.021968",
+  "updated_at": "2026-06-27T19:27:05.021977"
+}

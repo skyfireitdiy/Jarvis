@@ -1,0 +1,24 @@
+{
+  "name": "cross_func_path_traversal",
+  "description": "跨文件路径遍历：用户输入跨文件传播，通过snprintf拼接路径后打开文件。当前检测器仅能检测到strcat不安全API，path_traversal pattern漏报",
+  "difficulty": "medium",
+  "vulnerability_type": "path_traversal",
+  "expected_issues": [
+    {
+      "pattern": "strcat",
+      "file": "path_builder.c",
+      "function": "append_subdir"
+    }
+  ],
+  "known_gaps": [
+    {
+      "pattern": "path_traversal",
+      "file": "path_builder.c",
+      "function": "build_path",
+      "reason": "c_checker仅检测strcat/strncat+fopen的3行窗口，遗漏snprintf拼接路径模式"
+    }
+  ],
+  "files": ["input.c", "path_builder.c", "file_opener.c", "main.c"],
+  "cross_file": true,
+  "tags": ["path-traversal", "cross-file", "taint", "known-gap"]
+}

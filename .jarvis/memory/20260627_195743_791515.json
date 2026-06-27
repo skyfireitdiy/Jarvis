@@ -1,0 +1,8 @@
+{
+  "id": "20260627_195743_791515",
+  "type": "project_long_term",
+  "tags": ["jsec", "rule-refactoring", "deadlock-detection"],
+  "content": "jsec规则改造进度更新：\n\n已改造: 31个规则\n待改造: 15个规则\n\n本次新增改造规则：\n1. _rule_integer_overflow - call_graph查询malloc/calloc/realloc调用\n2. _rule_toctou_race - call_graph查询access/stat/fopen/open调用\n3. _rule_deadlock_patterns - call_graph查询pthread_mutex_lock/unlock调用\n4. _rule_thread_leak_no_join - call_graph查询pthread_create/join/detach调用\n\n关键修复：\n1. call_graph数据去重：按(callee_name, caller_line)去重，避免重复处理\n2. 跨函数锁顺序反转检测：检测全局的锁顺序反转，如果存在(A,B)和(B,A)两个顺序，则报告lock_order_inversion\n\n测试结果：8个test_checkers.py测试全部通过",
+  "created_at": "2026-06-27T19:57:43.791542",
+  "updated_at": "2026-06-27T19:57:43.791551"
+}

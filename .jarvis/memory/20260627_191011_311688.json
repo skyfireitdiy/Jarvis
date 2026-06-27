@@ -1,0 +1,8 @@
+{
+  "id": "20260627_191011_311688",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker-refactor", "database-driven"],
+  "content": "jsec缓冲区类规则改造完成：\n1. _rule_boundary_funcs - 使用call_graph表查询memcpy/memmove/strncpy/strncat调用\n2. _rule_strncpy_no_nullterm - 使用call_graph表查询strncpy/strncat调用\n3. _rule_scanf_no_width - 使用call_graph表查询scanf/sscanf/fscanf调用\n4. _rule_alloc_size_overflow - 使用call_graph表查询malloc/calloc/realloc调用\n\n改造模式：优先database查询，无数据时回退到正则fallback函数\n路径匹配：使用os.path.basename匹配，因为database可能存储临时文件路径",
+  "created_at": "2026-06-27T19:10:11.311727",
+  "updated_at": "2026-06-27T19:10:11.311737"
+}

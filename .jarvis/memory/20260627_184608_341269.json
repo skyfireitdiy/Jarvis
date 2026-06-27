@@ -1,0 +1,8 @@
+{
+  "id": "20260627_184608_341269",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker-refactor", "database-driven"],
+  "content": "jsec正则规则改造进度P8：\n- 改造3个空指针检查类规则使用database驱动检测\n- _rule_malloc_no_null_check: 使用DataFlowAnalyzer.analyze_code获取null_checks\n- _rule_function_return_ptr_no_check: 使用pointer_states检测函数返回指针\n- _rule_getenv_unchecked: 使用null_checks + _has_null_check_around二次确认\n- 剩余正则规则: 36个（含fallback函数）\n- 已改造规则: 15个\n- 30个测试全部通过",
+  "created_at": "2026-06-27T18:46:08.341297",
+  "updated_at": "2026-06-27T18:46:08.341306"
+}

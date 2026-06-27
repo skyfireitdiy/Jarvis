@@ -1,0 +1,8 @@
+{
+  "id": "20260627_205633_097962",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker-refactor", "database-driven", "progress"],
+  "content": "jsec正则规则改造完成状态：P1-P11全部完成，923测试通过。改造模式：优先database查询（call_graph/pointer_states/null_checks/data_flow表），无数据时回退到正则fallback函数。关键文件：c_checker.py(~6500行)",
+  "created_at": "2026-06-27T20:56:33.098008",
+  "updated_at": "2026-06-27T20:56:33.098019"
+}
