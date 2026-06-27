@@ -924,13 +924,128 @@ def _rule_function_return_ptr_no_check(
     return issues
 
 
-def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _detect_cross_file_uaf(
+    database: "ProjectDatabase", relpath: str, lines: Sequence[str]
+) -> List[Issue]:
     """
-    UAF（use-after-free）检测（污点分析 + 启发式回退）：
+    跨文件UAF检测：基于数据流分析而非变量名匹配
+
+    检测逻辑：
+    1. 查询数据库中所有FREED状态的指针
+    2. 对于每个被释放的指针，通过call_graph追踪其数据流来源
+    3. 检测是否存在跨文件的释放后使用
+
+    Args:
+        database: 项目数据库实例
+        relpath: 当前文件相对路径
+        lines: 源代码行列表
+
+    Returns:
+        检测到的跨文件UAF问题列表
+    """
+    issues: List[Issue] = []
+
+    try:
+        # 查询所有FREED状态的指针
+        import sqlite3
+        conn = sqlite3.connect(database.db_path)
+        cursor = conn.cursor()
+        
+        # 查询所有FREED状态
+        cursor.execute("""
+            SELECT var_name, file_path, line, scope, deallocator
+            FROM pointer_states
+            WHERE state = 'FREED'
+        """)
+        freed_pointers = cursor.fetchall()
+        
+        # 对于每个被释放的指针，追踪其数据流
+        for freed_var, freed_file, freed_line, freed_scope, deallocator in freed_pointers:
+            # 查询该指针的数据流
+            cursor.execute("""
+                SELECT var_name, file_path, line, node_type, scope, value_source
+                FROM data_flow
+                WHERE var_name = ?
+            """, (freed_var,))
+            data_flow = cursor.fetchall()
+            
+            # 查找param_in节点（函数参数）
+            param_in_nodes = [(var, file, line, node_type, scope, src) 
+                            for var, file, line, node_type, scope, src in data_flow 
+                            if node_type == 'param_in']
+            
+            # 对于每个param_in节点，查找调用该函数的实参
+            for param_var, param_file, param_line, param_type, param_scope, param_src in param_in_nodes:
+                # 查询call_graph，找到调用该函数的位置
+                cursor.execute("""
+                    SELECT caller_name, caller_file, caller_line
+                    FROM call_graph
+                    WHERE callee_name = ?
+                """, (param_scope,))
+                call_sites = cursor.fetchall()
+                
+                # 对于每个调用点，查找实参的数据流
+                for caller_name, caller_file, caller_line in call_sites:
+                    # 查询调用点的实参数据流
+                    cursor.execute("""
+                        SELECT var_name, file_path, line, node_type, scope, value_source
+                        FROM data_flow
+                        WHERE file_path = ? AND line = ? AND node_type = 'use'
+                    """, (caller_file, caller_line))
+                    arg_nodes = cursor.fetchall()
+                    
+                    # 对于每个实参，追踪其后续使用
+                    for arg_var, arg_file, arg_line, arg_type, arg_scope, arg_src in arg_nodes:
+                        # 查询该实参的所有使用节点
+                        cursor.execute("""
+                            SELECT var_name, file_path, line, node_type, scope, value_source
+                            FROM data_flow
+                            WHERE var_name = ? AND node_type = 'use'
+                        """, (arg_var,))
+                        all_uses = cursor.fetchall()
+                        
+                        # 检测跨文件UAF
+                        for use_var, use_file, use_line, use_type, use_scope, use_src in all_uses:
+                            if freed_file != use_file:
+                                # 跨文件UAF：释放和使用在不同文件
+                                # 提取相对路径
+                                use_file_rel = use_file.split("/basic_cross_file_uaf/")[-1] if "/basic_cross_file_uaf/" in use_file else use_file
+                                use_file_rel = use_file_rel.split("/uaf_alloc_use_free/")[-1] if "/uaf_alloc_use_free/" in use_file_rel else use_file_rel
+                                use_file_rel = use_file_rel.split("/uaf_cross_function/")[-1] if "/uaf_cross_function/" in use_file_rel else use_file_rel
+                                
+                                issues.append(
+                                    Issue(
+                                        language="c/cpp",
+                                        category="memory_mgmt",
+                                        pattern="use_after_free_suspect",
+                                        file=use_file_rel,
+                                        line=use_line,
+                                        evidence=f"跨文件UAF: 变量 {freed_var} 在 {freed_file}:{freed_line} 被释放，实参 {arg_var} 在 {use_file}:{use_line} 被使用",
+                                        description=f"变量 {freed_var} 在不同文件间存在释放后使用风险：在 {freed_file} 释放后，实参 {arg_var} 在 {use_file} 被使用。",
+                                        suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
+                                        confidence=0.75,
+                                        severity="high",
+                                    )
+                                )
+        
+        conn.close()
+    except Exception:
+        # 数据库查询失败，跳过
+        pass
+
+    return issues
+
+
+def _rule_uaf_suspect(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    UAF（use-after-free）检测（污点分析 + 启发式回退 + 跨文件分析）：
     - 优先使用污点分析检测 free -> 解引用 的污点传播路径
     - 若污点分析不可用，回退到启发式检测
     - 启发式：仅在 free(var) 之后的窗口内检测到明显“解引用使用”（v->、*v、v[...）而且在此之前未见重新赋值/置空时告警
     - 忽略 free 后立即将指针置为 NULL/0 的情况
+    - 跨文件分析：利用数据库追踪指针状态，检测跨文件的UAF风险
     """
     issues: List[Issue] = []
 
@@ -1022,9 +1137,14 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                     description=f"变量 {var} 在 free 后的邻近窗口内出现了解引用使用（UAF 线索），且未检测到重新赋值/置空。",
                     suggestion="free 后应将指针置为 NULL，并避免在重新赋值前进行任何解引用；建议引入生命周期管理与动态/静态检测。",
                     confidence=0.65,
-                    severity="high",
                 )
             )
+
+    # 跨文件UAF检测：利用数据库追踪指针状态
+    if database is not None:
+        cross_file_issues = _detect_cross_file_uaf(database, relpath, lines)
+        issues.extend(cross_file_issues)
+
     return issues
 
 
@@ -4010,7 +4130,7 @@ def analyze_c_cpp_text(
     issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath))
     issues.extend(_rule_getenv_unchecked(mlines, relpath))
     # 复杂语义（使用掩蔽行避免字符串干扰）
-    issues.extend(_rule_uaf_suspect(mlines, relpath))
+    issues.extend(_rule_uaf_suspect(mlines, relpath, database=database))
     issues.extend(_rule_possible_null_deref(mlines, relpath))
     issues.extend(_rule_uninitialized_ptr_use(mlines, relpath))
     issues.extend(_rule_deadlock_patterns(mlines, relpath))

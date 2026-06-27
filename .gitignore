@@ -171,3 +171,4 @@ site
 
 src/jarvis/jarvis_vscode_extension/media/chatPanel.js
 .jarvis/symbol_table.db
+tests/jarvis_sec/datasets/cross_file/uaf/basic_cross_file_uaf/.jarvis/jsec/analysis.db
