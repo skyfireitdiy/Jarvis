@@ -1,0 +1,16 @@
+{
+  "id": "20260627_003238_296179",
+  "type": "project_long_term",
+  "tags": [
+    "项目数据库",
+    "测试用例",
+    "跨文件分析",
+    "测试框架",
+    "测试数据集",
+    "阶段四完成",
+    "已完成"
+  ],
+  "content": "## 项目级数据库阶段四完成\n\n### 完成状态\n- 数据库路径修改为.jarvis/jsec/（与jsec数据保存位置一致）\n- 跨文件分析测试框架创建完成（test_cross_file_analysis.py）\n- 测试数据集创建完成（tests/jarvis_sec/datasets/cross_file/）\n- 静态检查全部通过（ruff check）\n- pytest测试通过\n\n### 核心功能\n\n**1. 数据库路径修改**：\n- 原路径：项目根目录/.jarvis/analysis.db\n- 新路径：项目根目录/.jarvis/jsec/analysis.db\n- 与jsec数据保存位置一致\n\n**2. 跨文件分析测试框架**：\n- 文件：tests/jarvis_sec/test_cross_file_analysis.py（530行）\n- 支持从数据集加载测试案例\n- 支持临时创建测试案例\n- 使用metadata.json描述测试信息\n- 验证数据集加载功能\n\n**3. 测试数据集**：\n- 目录：tests/jarvis_sec/datasets/cross_file/uaf/basic_cross_file_uaf/\n- 文件：\n  - allocator.c：内存分配函数\n  - user.c：使用已释放内存（UAF）\n  - metadata.json：测试案例描述\n- 测试场景：跨文件Use-After-Free\n\n**4. 测试结果**：\n- 测试框架验证通过\n- 数据集加载功能正常\n- Checker检测到2个问题（possible_null_deref、alloc_no_null_check）\n- 跨文件UAF检测能力有限（需后续增强）\n\n### 关键文件\n- src/jarvis/jarvis_sec/project_database.py（已修改）\n  - 数据库路径修改为.jarvis/jsec/\n- tests/jarvis_sec/test_cross_file_analysis.py（新增530行）\n  - 跨文件分析测试框架\n- tests/jarvis_sec/datasets/cross_file/uaf/basic_cross_file_uaf/（新增目录）\n  - 测试数据集\n\n### 验证结果\n- 静态检查通过（ruff check）\n- 格式化通过\n- pytest测试通过\n- Git提交成功（2cf8f53等）\n- 测试框架验证通过\n- 数据集加载功能验证通过\n\n### 关键发现\n- 当前checker主要进行单文件分析，跨文件UAF检测能力有限\n- 测试框架支持从数据集目录加载测试案例\n- 测试数据集应放在tests/jarvis_sec/datasets/目录下\n\n### 下一步\n- P2：增强checker的跨文件分析能力，支持跨文件UAF检测\n- P2：添加更多跨文件分析测试案例（Double Free、数据流、污点传播）\n- P2：性能优化和缓存机制实现\n\n### 技术栈\n- Python 3.12.3\n- SQLite数据库\n- pytest测试框架\n- tree-sitter解析器",
+  "created_at": "2026-06-27T00:32:38.296218",
+  "updated_at": "2026-06-27T00:32:38.296227"
+}

@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any
+from typing import TYPE_CHECKING
 from typing import Iterable
 from typing import List
 from typing import Optional
@@ -27,6 +28,9 @@ from typing import Sequence
 from typing import Tuple
 
 from jarvis.jarvis_sec.types import Issue
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
 
 # 污点分析框架（核心依赖）
 import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
@@ -37,6 +41,16 @@ from jarvis.jarvis_sec.data_flow_analyzer import (
     DataFlowResult,
     PointerState,
 )
+
+# ---------------------------
+# 辅助函数
+# ---------------------------
+
+
+def _is_cpp_file(file_path: str) -> bool:
+    """判断文件是否为C++文件"""
+    return file_path.lower().endswith((".cpp", ".cxx", ".cc", ".hpp", ".hxx", ".hh"))
+
 
 # ---------------------------
 # 规则库（正则表达式）
@@ -3927,13 +3941,22 @@ def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue
     return issues
 
 
-def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
+def analyze_c_cpp_text(
+    relpath: str,
+    text: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
     """
     基于提供的文本进行 C/C++ 启发式分析。
     - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
       以避免注释中的API命中导致的误报。
     - 准确性优化2：对通用 API 扫描使用“字符串内容掩蔽”的副本，避免把字符串里的片段当作代码。
     - 准确性优化3：使用数据流分析过滤误报（free后置NULL、if条件保护等）。
+
+    Args:
+        relpath: 相对文件路径
+        text: 源代码文本
+        database: 项目数据库实例（可选）
     """
     pre_text = _strip_if0_blocks(text)
     clean_text = _remove_comments_preserve_strings(pre_text)
@@ -3945,7 +3968,9 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
 
     # 数据流分析（用于误报过滤）
     data_flow_analyzer = DataFlowAnalyzer()
-    data_flow_result = data_flow_analyzer.analyze_code(text)
+    data_flow_result = data_flow_analyzer.analyze_code(
+        text, is_cpp=_is_cpp_file(relpath), database=database, file_path=relpath
+    )
 
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
@@ -4380,26 +4405,44 @@ def _extract_variable_name(issue_or_msg: Issue | str) -> Optional[str]:
     return None
 
 
-def analyze_c_cpp_file(base: Path, relpath: Path) -> List[Issue]:
+def analyze_c_cpp_file(
+    base: Path,
+    relpath: Path,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
     """
     从磁盘读取文件进行分析。
+
+    Args:
+        base: 基础路径
+        relpath: 相对路径
+        database: 项目数据库实例（可选）
     """
     try:
         text = (base / relpath).read_text(errors="ignore")
     except Exception:
         return []
-    return analyze_c_cpp_text(str(relpath), text)
+    return analyze_c_cpp_text(str(relpath), text, database=database)
 
 
-def analyze_files(base_path: str, files: Iterable[str]) -> List[Issue]:
+def analyze_files(
+    base_path: str,
+    files: Iterable[str],
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
     """
     批量分析文件，相对路径相对于 base_path。
+
+    Args:
+        base_path: 基础路径
+        files: 文件列表
+        database: 项目数据库实例（可选）
     """
     base = Path(base_path).resolve()
     out: List[Issue] = []
     for f in files:
         rel = Path(f)
-        out.extend(analyze_c_cpp_file(base, rel))
+        out.extend(analyze_c_cpp_file(base, rel, database=database))
     return out
 
 

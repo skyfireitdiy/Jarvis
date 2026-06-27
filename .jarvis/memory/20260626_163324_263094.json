@@ -1,0 +1,8 @@
+{
+  "id": "20260626_163324_263094",
+  "type": "project_long_term",
+  "tags": ["jarvis-sec", "database", "integration", "phase3"],
+  "content": "项目级数据库阶段三集成完成：\n\n1. data_flow_analyzer.py集成：\n   - 添加database和file_path参数到analyze_code方法\n   - 实现_enhance_with_database方法，利用数据库查询跨文件指针状态和数据流信息\n   - 使用TYPE_CHECKING避免循环依赖\n\n2. joern_analyzer.py集成：\n   - 添加database参数到__init__和analyze方法\n   - 实现_enhance_with_database方法，利用调用图和数据流节点增强污点分析\n   - 支持跨函数调用和跨文件数据流追踪\n\n3. c_checker.py集成：\n   - 添加database参数到analyze_files、analyze_c_cpp_file、analyze_c_cpp_text函数\n   - 传递database参数给DataFlowAnalyzer\n   - 添加_is_cpp_file辅助函数判断文件类型\n\n4. workflow.py集成：\n   - 在direct_scan函数中创建ProjectDatabase实例\n   - 传递database实例给analyze_c_files\n\n关键设计决策：\n- 使用Optional参数保持向后兼容性\n- 数据库不可用时静默回退到单文件分析\n- 使用TYPE_CHECKING和字符串类型注解避免循环依赖\n- 跨文件标识格式：file_path:var_name",
+  "created_at": "2026-06-26T16:33:24.263137",
+  "updated_at": "2026-06-26T16:33:24.263144"
+}
