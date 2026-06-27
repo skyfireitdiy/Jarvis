@@ -1,0 +1,8 @@
+{
+  "id": "20260627_180542_743810",
+  "type": "project_long_term",
+  "tags": ["jsec", "regex", "checker", "statistics"],
+  "content": "jsec正则规则统计（2025-01-14）：\n- 🔴正则+✅db: 35个（已有database参数，内部仍用正则）\n- 🔴正则+❌无db: 0个（已清零）\n- 🟢无正则: 11个\n下一步：改造35个正则+db规则的内部逻辑，将正则替换为database查询。优先内存安全类（uaf/double_free/memory_leak/null_deref），次优空指针检查类（malloc_null_check/return_ptr_check）。",
+  "created_at": "2026-06-27T18:05:42.743827",
+  "updated_at": "2026-06-27T18:05:42.743830"
+}
