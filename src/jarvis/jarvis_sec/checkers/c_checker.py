@@ -3046,7 +3046,9 @@ def _rule_open_permissive_perms(lines: Sequence[str], relpath: str) -> List[Issu
 # ---------------------------
 
 
-def _rule_alloca_unbounded(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_alloca_unbounded(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测 alloca 使用非常量/未受控大小，可能导致栈耗尽或崩溃。
     仅在参数非纯数字常量、且不含 sizeof 时告警。
@@ -3083,7 +3085,9 @@ def _rule_alloca_unbounded(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_vla_usage(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_vla_usage(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测可变长度数组（VLA）使用：声明中使用变量/表达式作为数组长度。
     仅在长度非纯数字常量时提示。
@@ -3260,7 +3264,9 @@ def _rule_inet_legacy(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_time_apis_not_threadsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_time_apis_not_threadsafe(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测 asctime/ctime/localtime/gmtime 非线程安全接口（非 *_r）。
     """
@@ -3378,7 +3384,9 @@ def _rule_getenv_unchecked(
 # ---------------------------
 
 
-def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_new_delete_mismatch(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测 new/delete 与 malloc/free 的跨API不匹配问题：
     - new[] 必须用 delete[] 释放
@@ -3560,7 +3568,9 @@ def _rule_reinterpret_cast_unsafe(lines: Sequence[str], relpath: str) -> List[Is
     return issues
 
 
-def _rule_const_cast_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_const_cast_unsafe(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测 const_cast 的不安全使用（移除 const 修饰符可能导致未定义行为）。
     """
@@ -3588,7 +3598,9 @@ def _rule_const_cast_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
     return issues
 
 
-def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_vector_string_bounds_check(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测 vector 和 string 的越界访问（使用 [] 而非 .at()）。
     启发式：检测 [] 访问，若附近未见边界检查，则提示风险。
@@ -3667,7 +3679,9 @@ def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List
     return issues
 
 
-def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_missing_virtual_dtor(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测基类缺少虚析构函数的问题。
     启发式：检测 class 声明，若存在虚函数但析构函数非虚，则提示。
@@ -4275,7 +4289,9 @@ def _rule_data_race_suspect(
     return issues
 
 
-def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_smart_ptr_get_unsafe(
+    lines: Sequence[str], relpath: str, database: Optional[ProjectDatabase] = None
+) -> List[Issue]:
     """
     检测智能指针的 .get() 方法不安全使用（返回的原始指针可能悬空）。
     """
@@ -4421,13 +4437,13 @@ def analyze_c_cpp_text(
     issues.extend(_rule_rand_insecure(mlines, relpath))
     issues.extend(_rule_strtok_nonreentrant(mlines, relpath))
     issues.extend(_rule_open_permissive_perms(mlines, relpath))
-    issues.extend(_rule_alloca_unbounded(mlines, relpath))
-    issues.extend(_rule_vla_usage(mlines, relpath))
+    issues.extend(_rule_alloca_unbounded(mlines, relpath, database=database))
+    issues.extend(_rule_vla_usage(mlines, relpath, database=database))
     issues.extend(_rule_pthread_returns_unchecked(mlines, relpath, database=database))
     issues.extend(_rule_cond_wait_no_loop(mlines, relpath, database=database))
     issues.extend(_rule_thread_leak_no_join(mlines, relpath, database=database))
     issues.extend(_rule_inet_legacy(mlines, relpath))
-    issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath))
+    issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath, database=database))
     issues.extend(_rule_getenv_unchecked(mlines, relpath, database=database))
     # 复杂语义（使用掩蔽行避免字符串干扰）
     issues.extend(_rule_uaf_suspect(mlines, relpath, database=database))
@@ -4435,15 +4451,15 @@ def analyze_c_cpp_text(
     issues.extend(_rule_uninitialized_ptr_use(mlines, relpath, database=database))
     issues.extend(_rule_deadlock_patterns(mlines, relpath, database=database))
     # C++ 特定检查规则
-    issues.extend(_rule_new_delete_mismatch(mlines, relpath))
+    issues.extend(_rule_new_delete_mismatch(mlines, relpath, database=database))
     issues.extend(_rule_reinterpret_cast_unsafe(mlines, relpath))
-    issues.extend(_rule_const_cast_unsafe(mlines, relpath))
-    issues.extend(_rule_vector_string_bounds_check(mlines, relpath))
-    issues.extend(_rule_missing_virtual_dtor(mlines, relpath))
+    issues.extend(_rule_const_cast_unsafe(mlines, relpath, database=database))
+    issues.extend(_rule_vector_string_bounds_check(mlines, relpath, database=database))
+    issues.extend(_rule_missing_virtual_dtor(mlines, relpath, database=database))
     issues.extend(_rule_move_after_use(mlines, relpath, database=database))
     issues.extend(_rule_uncaught_exception(mlines, relpath))
     issues.extend(_rule_smart_ptr_cycle(mlines, relpath, database=database))
-    issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath))
+    issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath, database=database))
     # C++ 死锁检测
     issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath, database=database))
     # 数据竞争检测

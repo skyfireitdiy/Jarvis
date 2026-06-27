@@ -1,0 +1,8 @@
+{
+  "id": "20260627_180542_742307",
+  "type": "project_long_term",
+  "tags": ["jsec", "architecture", "refactoring", "database"],
+  "content": "jsec架构重构P1-P6全部完成：\n1. P1: analyze_with_best_analyzer接受database参数\n2. P2: 14个B类规则签名添加database + 21个调用传入database\n3. P3: PointerState添加state/常量、DataFlowResult添加pointer_states/null_checks、DataFlowAnalyzer添加is_safe_access/_build_pointer_states/_build_null_checks\n4. P4: 8个C类规则签名添加database + 8个调用传入database\n5. P5: 3个negative case误报消除 + _extract_variable_name修复strcpy误报\n6. P6: 8个无db规则添加database参数（_rule_alloca_unbounded, _rule_vla_usage, _rule_time_apis_not_threadsafe, _rule_new_delete_mismatch, _rule_const_cast_unsafe, _rule_vector_string_bounds_check, _rule_missing_virtual_dtor, _rule_smart_ptr_get_unsafe）\n当前状态：46个规则中，35个正则+db，0个正则+无db，11个无正则。30测试通过。",
+  "created_at": "2026-06-27T18:05:42.742333",
+  "updated_at": "2026-06-27T18:05:42.742343"
+}
