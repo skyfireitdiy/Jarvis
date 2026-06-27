@@ -106,9 +106,12 @@ def _iter_source_files(
     for p in entry.rglob("*"):
         if not p.is_file():
             continue
-        # 目录排除（任意祖先包含即排除）
+        # 目录排除（仅排除项目入口目录内部的排除目录）
         skip = False
         for parent in p.parents:
+            # 只检查项目入口目录内部的目录，不排除系统临时目录等外部路径
+            if parent == entry:
+                break  # 到达项目入口目录，停止检查
             if parent.name in excludes:
                 skip = True
                 break

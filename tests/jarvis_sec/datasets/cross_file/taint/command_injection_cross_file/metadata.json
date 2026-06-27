@@ -1,0 +1,16 @@
+{
+  "name": "command_injection_cross_file",
+  "description": "跨文件命令注入：用户输入跨文件传播到system()调用",
+  "vulnerability_type": "taint",
+  "cross_file": true,
+  "expected_issues": [
+    {
+      "pattern": "command_exec",
+      "file": "exec.c"
+    },
+    {
+      "pattern": "sprintf",
+      "file": "process.c"
+    }
+  ]
+}

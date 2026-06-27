@@ -1,0 +1,16 @@
+{
+  "name": "cross_function_double_free",
+  "description": "跨函数Double Free：通过包装函数重复释放",
+  "difficulty": "easy",
+  "vulnerability_type": "double_free",
+  "expected_issues": [
+    {
+      "pattern": "double_free",
+      "file": "main.c",
+      "line": 5
+    }
+  ],
+  "files": ["memory_ops.c", "main.c"],
+  "cross_file": true,
+  "tags": ["double-free", "cross-file", "wrapper"]
+}
