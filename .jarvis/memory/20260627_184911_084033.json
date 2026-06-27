@@ -1,0 +1,8 @@
+{
+  "id": "20260627_184911_084033",
+  "type": "project_long_term",
+  "tags": ["database-driven", "data-flow", "jsec", "pattern"],
+  "content": "jsec database驱动检测模式：\n1. pointer_states表：跟踪ALLOCATED/FREED/NULLIFIED状态，用于内存泄漏、UAF检测\n2. null_checks表：记录空指针检查位置，用于误报过滤\n3. data_flow表：记录变量定义和使用，用于未初始化检测\n4. 改造原则：优先database查询，无数据时回退到正则fallback\n5. 关键方法：DataFlowAnalyzer.analyze_code()返回DataFlowResult包含pointer_states和null_checks",
+  "created_at": "2026-06-27T18:49:11.084051",
+  "updated_at": "2026-06-27T18:49:11.084054"
+}

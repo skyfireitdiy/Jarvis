@@ -1,0 +1,8 @@
+{
+  "id": "20260627_214057_572903",
+  "type": "project_long_term",
+  "tags": ["jsec", "漏报修复", "技术方案"],
+  "content": "漏报修复技术方案：\n1. 类型转换干扰：malloc参数提取需从函数名位置找括号，避免(int*)类型转换干扰\n2. TOCTOU窗口同步：需同时修改_rule_toctou_race和_rule_toctou_race_from_calls两个函数\n3. getenv直接传参：需检测func(getenv(\"KEY\"))模式，不仅是var=getenv()赋值模式\n4. 间接乘法溢出：需追踪变量赋值中的乘法，检测该变量是否传递给malloc",
+  "created_at": "2026-06-27T21:40:57.572919",
+  "updated_at": "2026-06-27T21:40:57.572923"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260627_192210_807221",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker", "refactor", "call_graph"],
+  "content": "jsec规则改造进度更新：\n\n已改造规则（新增5个）：\n1. _rule_insecure_tmpfile - 使用call_graph查询tmpnam/tempnam/mktemp\n2. _rule_atoi_family - 使用call_graph查询atoi/atol/atoll/atof\n3. _rule_rand_insecure - 使用call_graph查询rand/srand/random\n4. _rule_strtok_nonreentrant - 使用call_graph查询strtok\n5. _rule_time_apis_not_threadsafe - 使用call_graph查询asctime/ctime/localtime/gmtime\n\n改造模式：优先database查询call_graph表，无数据时回退到正则fallback\n路径匹配：使用os.path.basename匹配\n\n测试结果：8个test_checkers.py测试全部通过",
+  "created_at": "2026-06-27T19:22:10.807248",
+  "updated_at": "2026-06-27T19:22:10.807257"
+}

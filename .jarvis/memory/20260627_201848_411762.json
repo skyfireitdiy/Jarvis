@@ -1,0 +1,8 @@
+{
+  "id": "20260627_201848_411762",
+  "type": "project_long_term",
+  "tags": ["architecture", "jsec", "checker", "data-flow", "taint-analysis"],
+  "content": "jsec checker架构重构完成：所有规则采用database优先查询模式，无数据时回退到正则fallback。核心改造模式：1) 使用database.get_call_graph()查询函数调用；2) 使用database.get_data_flow_by_file()查询数据流；3) 使用污点分析器TaintAnalyzer进行复杂分析。关键文件：src/jarvis/jarvis_sec/checkers/c_checker.py",
+  "created_at": "2026-06-27T20:18:48.411802",
+  "updated_at": "2026-06-27T20:18:48.411813"
+}

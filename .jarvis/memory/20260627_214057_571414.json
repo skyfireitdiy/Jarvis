@@ -1,0 +1,8 @@
+{
+  "id": "20260627_214057_571414",
+  "type": "project_long_term",
+  "tags": ["jsec", "c_checker", "漏报修复", "代码位置"],
+  "content": "c_checker.py关键修改位置：\n- _rule_format_string: L78-81（正则定义），L1956-1962（参数映射）\n- _rule_command_execution: L83-90（正则定义），L2218-2285（ShellExecute+exec*检测）\n- _rule_sql_injection: L2257-2368（启发式检测）\n- _rule_path_traversal: L2549-2614（启发式检测）\n- _rule_toctou_race: L3057-3065（窗口扩大），L3130-3156（窗口扩大）\n- _rule_getenv_unchecked: L5035-5078（直接传参检测）\n- _rule_integer_overflow: L2733-2752（参数提取修复），L2780-2815（间接乘法检测）",
+  "created_at": "2026-06-27T21:40:57.571437",
+  "updated_at": "2026-06-27T21:40:57.571446"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "cross_func_format_string",
+  "description": "跨文件格式化字符串：用户输入跨文件传播，作为syslog/printf格式串使用。printf格式串可被检测，syslog/err格式串漏报",
+  "difficulty": "medium",
+  "vulnerability_type": "format_string",
+  "expected_issues": [
+    {
+      "pattern": "format_string",
+      "file": "logger.c",
+      "function": "print_formatted"
+    }
+  ],
+  "known_gaps": [
+    {
+      "pattern": "format_string",
+      "file": "logger.c",
+      "function": "log_message",
+      "reason": "c_checker未覆盖syslog格式串参数检查"
+    },
+    {
+      "pattern": "format_string",
+      "file": "logger.c",
+      "function": "fatal_error",
+      "reason": "c_checker未覆盖err/errx格式串参数检查"
+    }
+  ],
+  "files": ["input.c", "logger.c", "main.c"],
+  "cross_file": true,
+  "tags": ["format-string", "cross-file", "taint", "known-gap"]
+}

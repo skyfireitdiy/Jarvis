@@ -1,0 +1,8 @@
+{
+  "id": "20260628_003106_063256",
+  "type": "project_long_term",
+  "tags": ["jsec", "测试用例", "vulnerability_gaps", "漏报测试"],
+  "content": "jsec漏报测试用例目录结构：tests/jarvis_sec/datasets/vulnerability_gaps/下按漏洞类型组织，每个类型包含positive_xxx.c（应检测到）和negative_xxx.c（不应检测到）。测试验证需检查：1) positive检测数量；2) negative误报数量（应为0）；3) pytest测试通过。",
+  "created_at": "2026-06-28T00:31:06.063290",
+  "updated_at": "2026-06-28T00:31:06.063295"
+}

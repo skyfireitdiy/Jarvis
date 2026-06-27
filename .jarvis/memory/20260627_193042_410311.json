@@ -1,0 +1,8 @@
+{
+  "id": "20260627_193042_410311",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker", "refactor", "progress"],
+  "content": "jsec规则改造进度更新：\n\n已改造: 26个规则\n待改造: 20个规则\n\n本次新增改造规则：\n1. _rule_cond_wait_no_loop - call_graph查询pthread_cond_wait\n2. _rule_open_permissive_perms - call_graph查询open/fopen\n\n待改造规则分类：\n- 需要数据流分析: _rule_memory_leak, _rule_integer_overflow, _rule_uninitialized_ptr_use, _rule_deadlock_patterns\n- 需要复杂启发式: _rule_toctou_race, _rule_thread_leak_no_join, _rule_pthread_returns_unchecked\n- C++语法检测: _rule_vla_usage, _rule_new_delete_mismatch, _rule_reinterpret_cast_unsafe, _rule_const_cast_unsafe, _rule_vector_string_bounds_check, _rule_missing_virtual_dtor, _rule_move_after_use, _rule_uncaught_exception, _rule_smart_ptr_cycle, _rule_cpp_deadlock_patterns, _rule_data_race_suspect, _rule_smart_ptr_get_unsafe\n- 模式匹配: _rule_hardcoded_credentials\n\n测试结果：8个test_checkers.py测试全部通过",
+  "created_at": "2026-06-27T19:30:42.410348",
+  "updated_at": "2026-06-27T19:30:42.410358"
+}

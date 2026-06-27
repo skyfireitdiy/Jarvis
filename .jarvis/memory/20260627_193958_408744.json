@@ -1,0 +1,8 @@
+{
+  "id": "20260627_193958_408744",
+  "type": "project_long_term",
+  "tags": ["jsec", "checker", "refactor", "progress"],
+  "content": "jsec规则改造进度更新：\n\n已改造: 29个规则\n待改造: 17个规则\n\n本次新增改造规则：\n1. _rule_integer_overflow - call_graph查询malloc/calloc/realloc调用，分析参数中的乘法/加法表达式\n2. _rule_toctou_race - call_graph查询access/stat/fopen/open调用，检测TOCTOU竞态条件\n\n改造模式：优先database查询call_graph表，无数据时回退到正则fallback\n路径匹配：使用os.path.basename匹配\n\n测试结果：8个test_checkers.py测试全部通过\n\n待改造规则分类：\n- 需要提取参数变量名: _rule_deadlock_patterns, _rule_thread_leak_no_join, _rule_new_delete_mismatch\n- C++语法检测: _rule_vla_usage, _rule_reinterpret_cast_unsafe, _rule_const_cast_unsafe, _rule_vector_string_bounds_check, _rule_missing_virtual_dtor, _rule_move_after_use, _rule_uncaught_exception, _rule_smart_ptr_cycle, _rule_cpp_deadlock_patterns, _rule_data_race_suspect, _rule_smart_ptr_get_unsafe\n- 模式匹配: _rule_hardcoded_credentials",
+  "created_at": "2026-06-27T19:39:58.408771",
+  "updated_at": "2026-06-27T19:39:58.408779"
+}

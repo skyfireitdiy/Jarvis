@@ -1,0 +1,14 @@
+{
+  "id": "20260628_003106_060261",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "c_checker",
+    "signal_handler",
+    "async-signal-safe",
+    "漏报修复"
+  ],
+  "content": "jsec c_checker signal handler检测方案：检测signal(sig, handler)注册的handler函数体内非async-signal-safe函数调用。ASYNC_SIGNAL_UNSAFE_FUNCS包含printf/fprintf/malloc/free/exit等。检测逻辑：1) 找signal()调用提取handler名；2) 找handler函数定义体；3) 检查函数体内不安全函数调用。测试用例必须包含signal()注册调用。",
+  "created_at": "2026-06-28T00:31:06.060293",
+  "updated_at": "2026-06-28T00:31:06.060298"
+}

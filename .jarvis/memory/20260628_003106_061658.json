@@ -1,0 +1,15 @@
+{
+  "id": "20260628_003106_061658",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "c_checker",
+    "unchecked_io",
+    "权限操作",
+    "网络IO",
+    "漏报修复"
+  ],
+  "content": "jsec c_checker权限/网络IO检测扩展方案：新增RE_PRIV_API匹配setuid/setgid/chown/chmod等权限函数，新增RE_NET_API匹配recv/send/connect/accept等网络函数。在_rule_unchecked_io的fallback中增加检测，根据api_type设置不同描述：privilege类型置信度0.80，network类型置信度0.75，pattern分别为unchecked_privilege_op和unchecked_network_io。",
+  "created_at": "2026-06-28T00:31:06.061700",
+  "updated_at": "2026-06-28T00:31:06.061706"
+}
