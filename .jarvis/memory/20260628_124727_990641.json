@@ -1,0 +1,8 @@
+{
+  "id": "20260628_124727_990641",
+  "type": "project_long_term",
+  "tags": ["jsec", "正则回退移除", "P15"],
+  "content": "P15-4完成：已移除所有正则回退逻辑。修改的函数包括：_rule_weak_crypto, _rule_deadlock_patterns, _rule_rand_insecure, _rule_strtok_nonreentrant, _rule_open_permissive_perms, _rule_alloca_unbounded, _rule_atoi_family, _rule_pthread_returns_unchecked, _rule_cond_wait_no_loop, _rule_inet_legacy, _rule_time_apis_not_threadsafe, _rule_thread_leak_no_join等。所有negative测试通过（无误报）。commit: 409fc2a",
+  "created_at": "2026-06-28T12:47:27.990681",
+  "updated_at": "2026-06-28T12:47:27.990691"
+}

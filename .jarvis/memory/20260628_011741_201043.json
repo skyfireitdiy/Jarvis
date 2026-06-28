@@ -1,0 +1,8 @@
+{
+  "id": "20260628_011741_201043",
+  "type": "project_long_term",
+  "tags": ["jsec", "P14", "CWE规则", "完成"],
+  "content": "P14完成：修复7个CWE规则漏洞（5个漏报+2个误报）\n1. CWE-327弱加密：新增_rule_weak_crypto，RE_WEAK_CRYPTO正则匹配DES/RC4/MD5/SHA1/BF API，database优先+正则回退\n2. CWE-457未初始化变量：新增_rule_uninitialized_var，检测type var;后条件分支内赋值但外部使用（缩进比较）\n3. CWE-195有符号转无符号：新增_rule_signed_to_unsigned，检测(size_t)/(unsigned)var显式转换，排除转换前有if(var<0)检查\n4. CWE-369除零错误：新增_rule_divide_by_zero，检测a/b中b为变量且无零检查，排除常量非零除数\n5. CWE-733编译器优化：新增_rule_compiler_security_check，检测指针NULL检查但未声明volatile\n6. CWE-190误报修复：_rule_alloc_size_overflow添加溢出检查过滤（INT_MAX/SIZE_MAX检查）\n7. CWE-170误报修复：_rule_strncpy_no_nullterm添加显式NULL终止过滤（dest[N-1]='\\0'模式）\n- 5个新规则在analyze_c_cpp_text中注册\n- 33个pytest测试全部通过，12个数据集测试全部通过\n- c_checker.py约7590行",
+  "created_at": "2026-06-28T01:17:41.201072",
+  "updated_at": "2026-06-28T01:17:41.201080"
+}

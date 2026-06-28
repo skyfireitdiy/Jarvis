@@ -1,0 +1,8 @@
+{
+  "id": "20260628_004834_543159",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "phase5", "batch3-pending", "cwe-classic"],
+  "content": "c_checker第三批漏报/误报修复请求（基于经典CWE漏洞测试，2026-06-28）：\n\n## 经典CWE漏洞测试结果：13/21检测正确，5漏报，3误报\n\n### 漏报（5个，已发送修复请求）\n1. CWE-327: 弱加密算法(DES/RC4/MD5) - 无检测规则\n2. CWE-457: 未初始化变量 - 仅检测指针不检测普通变量\n3. CWE-195: 有符号到无符号转换 - 无检测规则\n4. CWE-369: 除零错误 - 无检测规则\n5. CWE-733: 编译器优化移除安全检查 - 无检测规则\n\n### 误报（2个，已发送修复请求）\n6. CWE-190: alloc_size_overflow误报 - 有溢出检查的malloc仍被报\n7. CWE-170: strncpy/strncat误报 - 有显式NULL终止仍被报\n\n### 检测正确的CWE（13个）\nCWE-120(gets), CWE-134(格式化字符串), CWE-78(命令注入), CWE-416(UAF), CWE-415(double free), CWE-476(NULL解引用), CWE-190(整数溢出-有误报), CWE-367(TOCTOU), CWE-22(路径遍历), CWE-377(不安全临时文件), CWE-338(不安全随机数), CWE-732(过宽权限), CWE-676(危险函数), CWE-401(内存泄漏)\n\n### 测试用例位置\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe327_weak_crypto/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe457_uninitialized_var/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe195_signed_to_unsigned/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe369_divide_by_zero/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe733_compiler_security/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe190_fp_safe_check/\n- tests/jarvis_sec/datasets/vulnerability_gaps/cwe170_strncpy_nullterm_fp/\n\n### 规则开发Agent ID: f0000a52-207d-4962-b912-4c65de02ec5d\n### 状态：修复请求已发送，等待完成",
+  "created_at": "2026-06-28T00:48:34.543190",
+  "updated_at": "2026-06-28T00:48:34.543195"
+}

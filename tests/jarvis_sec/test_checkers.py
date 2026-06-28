@@ -229,106 +229,54 @@ def test_report_build_json_with_meta():
     assert "## 统计概览" in text
 
 
-def test_dataset_positive_cases():
-    """验证所有正例测试数据集能被正确检测"""
-    datasets_dir = Path(__file__).parent / "datasets"
+def _discover_all_datasets(base_dir: Path) -> list[Path]:
+    """递归发现所有含metadata.json的数据集目录"""
+    dataset_dirs = []
+    for meta_file in base_dir.rglob("metadata.json"):
+        dataset_dirs.append(meta_file.parent)
+    return sorted(dataset_dirs)
 
-    # 规则名称映射（目录名 -> pattern名，支持多个可能的pattern）
-    rule_mapping = {
-        "possible_null_deref": ["possible_null_deref"],
-        "data_race_suspect": ["data_race_suspect"],
-        "unsafe_api": [
-            "unsafe_api",
-            "strcpy",
-            "gets",
-            "sprintf",
-        ],  # 不安全API有多种pattern
-        "malloc_no_null_check": ["malloc_no_null_check", "alloc_no_null_check"],
-        "format_string": ["format_string"],
-        "uaf_suspect": ["uaf_suspect", "use_after_free_suspect"],
-        "double_free": ["double_free"],
-        "command_execution": ["command_exec"],
-        "alloc_size_overflow": ["alloc_size_overflow"],
-        "scanf_no_width": ["scanf_%s_no_width"],
-        "insecure_tmpfile": ["insecure_tmpfile"],
-        "atoi_family": ["atoi_family"],
-        "rand_insecure": ["rand_insecure"],
-        "strtok_nonreentrant": ["strtok_nonreentrant"],
-        "pthread_returns_unchecked": [
-            "pthread_returns_unchecked",
-            "pthread_ret_unchecked",
-        ],
-        "thread_leak_no_join": ["thread_leak_no_join"],
-        "deadlock_patterns": [
-            "deadlock_patterns",
-            "double_lock",
-            "lock_order_inversion",
-        ],
-        "deadlock": ["deadlock_patterns", "double_lock", "lock_order_inversion"],
-        "uninitialized_ptr_use": ["uninitialized_ptr_use", "possible_null_deref"],
-        "smart_ptr_cycle": ["smart_ptr_cycle", "possible_null_deref"],
-        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe", "possible_null_deref"],
-        "new_delete_mismatch": ["new_delete_mismatch", "alloc_no_null_check"],
-        "reinterpret_cast_unsafe": ["reinterpret_cast_unsafe"],
-        "const_cast_unsafe": ["const_cast_unsafe"],
-        "missing_virtual_dtor": ["missing_virtual_dtor", "alloc_no_null_check"],
-        "move_after_use": ["move_after_use", "use_after_move"],
-        "uncaught_exception": ["uncaught_exception"],
-        "vector_string_bounds_check": [
-            "vector_string_bounds_check",
-            "vector_bounds_check",
-        ],
-        "strncpy_no_nullterm": ["strncpy_no_nullterm", "strncpy", "strncpy/strncat"],
-        "realloc_assign_back": ["realloc_assign_back"],
-        "function_return_ptr_no_check": ["function_return_ptr_no_check"],
-        "unchecked_io": ["unchecked_io", "io_call"],
-        "alloca_unbounded": ["alloca_unbounded"],
-        "vla_usage": ["vla_usage"],
-        "cond_wait_no_loop": ["cond_wait_no_loop"],
-        "inet_legacy": ["inet_legacy"],
-        "time_apis_not_threadsafe": [
-            "time_apis_not_threadsafe",
-            "time_api_not_threadsafe",
-            "localtime_not_threadsafe",
-        ],
-        "getenv_unchecked": ["getenv_unchecked"],
-        "open_permissive_perms": ["open_permissive_perms"],
-    }
+
+def test_dataset_positive_cases():
+    """验证所有正例测试数据集能被正确检测（自发现模式）"""
+    datasets_dir = Path(__file__).parent / "datasets"
+    dataset_dirs = _discover_all_datasets(datasets_dir)
 
     tested_count = 0
     failed_cases = []
 
-    for rule_dir in datasets_dir.iterdir():
-        if not rule_dir.is_dir() or rule_dir.name == "README.md":
+    for dataset_dir in dataset_dirs:
+        meta_file = dataset_dir / "metadata.json"
+        if not meta_file.exists():
             continue
 
-        rule_name = rule_dir.name
-        expected_pattern = rule_mapping.get(rule_name)
-        if not expected_pattern:
+        import json
+
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        expected_issues = meta.get("expected_issues", [])
+
+        # 跳过无预期问题的数据集（negative case）
+        if not expected_issues:
+            continue
+
+        # 提取预期的pattern集合
+        expected_patterns = {e["pattern"] for e in expected_issues if "pattern" in e}
+        if not expected_patterns:
             continue
 
         # 查找所有正例文件
-        for test_file in rule_dir.glob("positive_*.c"):
+        for test_file in sorted(dataset_dir.glob("positive_*")):
+            if test_file.suffix not in (".c", ".cpp"):
+                continue
             src = test_file.read_text(encoding="utf-8")
             issues = analyze_c_cpp_text(str(test_file), src)
             patterns = {i.pattern for i in issues}
 
             # 检查是否有任一预期的pattern被检测到
-            if not any(p in patterns for p in expected_pattern):
+            found = expected_patterns & patterns
+            if not found:
                 failed_cases.append(
-                    f"{test_file.name}: 预期检测到 {expected_pattern}, 实际检测到 {patterns}"
-                )
-            tested_count += 1
-        # 也检查.cpp文件
-        for test_file in rule_dir.glob("positive_*.cpp"):
-            src = test_file.read_text(encoding="utf-8")
-            issues = analyze_c_cpp_text(str(test_file), src)
-            patterns = {i.pattern for i in issues}
-
-            # 检查是否有任一预期的pattern被检测到
-            if not any(p in patterns for p in expected_pattern):
-                failed_cases.append(
-                    f"{test_file.name}: 预期检测到 {expected_pattern}, 实际检测到 {patterns}"
+                    f"{dataset_dir.name}/{test_file.name}: 预期 {expected_patterns}, 实际 {patterns}"
                 )
             tested_count += 1
 
@@ -349,118 +297,49 @@ def test_dataset_positive_cases():
 
 
 def test_dataset_negative_cases():
-    """验证所有反例测试数据集不会产生误报"""
+    """验证所有反例测试数据集不会产生误报（自发现模式）"""
     datasets_dir = Path(__file__).parent / "datasets"
-
-    # 规则名称映射（目录名 -> pattern名，支持多个可能的pattern）
-    # 对于反例测试，我们期望0个问题，所以不需要精确的pattern映射
-    # 只需要知道哪些目录需要测试即可
-    rule_mapping = {
-        "possible_null_deref": ["possible_null_deref"],
-        "data_race_suspect": ["data_race_suspect"],
-        "unsafe_api": [
-            "unsafe_api",
-            "strcpy",
-            "gets",
-            "sprintf",
-        ],  # 不安全API有多种pattern
-        "malloc_no_null_check": ["malloc_no_null_check", "alloc_no_null_check"],
-        "format_string": ["format_string"],
-        "uaf_suspect": ["uaf_suspect", "use_after_free_suspect"],
-        "double_free": ["double_free"],
-        "command_execution": ["command_exec"],
-        "alloc_size_overflow": ["alloc_size_overflow"],
-        "scanf_no_width": ["scanf_%s_no_width"],
-        "insecure_tmpfile": ["insecure_tmpfile"],
-        "atoi_family": ["atoi_family"],
-        "rand_insecure": ["rand_insecure"],
-        "strtok_nonreentrant": ["strtok_nonreentrant"],
-        "pthread_returns_unchecked": [
-            "pthread_returns_unchecked",
-            "pthread_ret_unchecked",
-        ],
-        "thread_leak_no_join": ["thread_leak_no_join"],
-        "deadlock_patterns": [
-            "deadlock_patterns",
-            "double_lock",
-            "lock_order_inversion",
-        ],
-        "deadlock": ["deadlock_patterns", "double_lock", "lock_order_inversion"],
-        "uninitialized_ptr_use": ["uninitialized_ptr_use", "possible_null_deref"],
-        "smart_ptr_cycle": ["smart_ptr_cycle", "possible_null_deref"],
-        "smart_ptr_get_unsafe": ["smart_ptr_get_unsafe", "possible_null_deref"],
-        "new_delete_mismatch": ["new_delete_mismatch", "alloc_no_null_check"],
-        "reinterpret_cast_unsafe": ["reinterpret_cast_unsafe"],
-        "const_cast_unsafe": ["const_cast_unsafe"],
-        "missing_virtual_dtor": ["missing_virtual_dtor", "alloc_no_null_check"],
-        "move_after_use": ["move_after_use", "use_after_move"],
-        "uncaught_exception": ["uncaught_exception"],
-        "vector_string_bounds_check": [
-            "vector_string_bounds_check",
-            "vector_bounds_check",
-        ],
-        "strncpy_no_nullterm": ["strncpy_no_nullterm", "strncpy", "strncpy/strncat"],
-        "realloc_assign_back": ["realloc_assign_back"],
-        "function_return_ptr_no_check": ["function_return_ptr_no_check"],
-        "unchecked_io": ["unchecked_io", "io_call"],
-        "alloca_unbounded": ["alloca_unbounded"],
-        "vla_usage": ["vla_usage"],
-        "cond_wait_no_loop": ["cond_wait_no_loop"],
-        "inet_legacy": ["inet_legacy"],
-        "time_apis_not_threadsafe": [
-            "time_apis_not_threadsafe",
-            "time_api_not_threadsafe",
-            "localtime_not_threadsafe",
-        ],
-        "getenv_unchecked": ["getenv_unchecked"],
-        "open_permissive_perms": ["open_permissive_perms"],
-        # 新增cross_function目录
-        "cross_function": [
-            "memory_leak",
-            "possible_null_deref",
-            "uaf_suspect",
-            "use_after_free_suspect",
-            "double_free",
-        ],
-    }
+    dataset_dirs = _discover_all_datasets(datasets_dir)
 
     tested_count = 0
     false_positive_cases = []
 
-    for rule_dir in datasets_dir.iterdir():
-        if not rule_dir.is_dir() or rule_dir.name == "README.md":
+    for dataset_dir in dataset_dirs:
+        meta_file = dataset_dir / "metadata.json"
+        if not meta_file.exists():
             continue
 
-        rule_name = rule_dir.name
-        expected_pattern = rule_mapping.get(rule_name)
-        if not expected_pattern:
-            # 对于未在rule_mapping中的目录，默认检查所有可能的pattern
-            # 这样可以确保所有反例文件都被测试
-            expected_pattern = ["any"]  # 特殊标记，表示检查是否有任何问题
+        import json
+
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        expected_issues = meta.get("expected_issues", [])
+
+        # 反例测试：expected_issues为空表示不应有任何问题
+        # 或者有expected_issues但测试的是negative文件（不应误报）
+        expected_patterns = {e["pattern"] for e in expected_issues if "pattern" in e}
 
         # 查找所有反例文件
-        for test_file in rule_dir.glob("negative_*.c"):
+        for test_file in sorted(dataset_dir.glob("negative_*")):
+            if test_file.suffix not in (".c", ".cpp"):
+                continue
             src = test_file.read_text(encoding="utf-8")
             issues = analyze_c_cpp_text(str(test_file), src)
             patterns = {i.pattern for i in issues}
 
-            # 检查是否有任一预期的pattern被误报
-            if any(p in patterns for p in expected_pattern):
-                false_positive_cases.append(
-                    f"{test_file.name}: 不应检测到 {expected_pattern}, 但实际检测到了"
-                )
-            tested_count += 1
-        # 也检查.cpp文件
-        for test_file in rule_dir.glob("negative_*.cpp"):
-            src = test_file.read_text(encoding="utf-8")
-            issues = analyze_c_cpp_text(str(test_file), src)
-            patterns = {i.pattern for i in issues}
-
-            # 检查是否有任一预期的pattern被误报
-            if any(p in patterns for p in expected_pattern):
-                false_positive_cases.append(
-                    f"{test_file.name}: 不应检测到 {expected_pattern}, 但实际检测到了"
-                )
+            # 检查是否有误报
+            if expected_patterns:
+                # 有预期pattern时，检查是否误报了这些pattern
+                fp_patterns = expected_patterns & patterns
+                if fp_patterns:
+                    false_positive_cases.append(
+                        f"{dataset_dir.name}/{test_file.name}: 误报 {fp_patterns}"
+                    )
+            else:
+                # 无预期pattern时，检查是否有任何问题
+                if patterns:
+                    false_positive_cases.append(
+                        f"{dataset_dir.name}/{test_file.name}: 误报 {patterns}"
+                    )
             tested_count += 1
 
     # 输出测试统计

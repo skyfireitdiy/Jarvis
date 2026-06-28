@@ -1,0 +1,16 @@
+{
+  "name": "integer_overflow",
+  "description": "integer_overflow test dataset",
+  "vulnerability_type": "integer_overflow",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "integer_overflow",
+      "file": "positive_int_overflow.c"
+    },
+    {
+      "pattern": "alloc_size_overflow",
+      "file": "positive_int_overflow.c"
+    }
+  ]
+}

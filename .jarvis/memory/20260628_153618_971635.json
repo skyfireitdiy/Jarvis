@@ -1,0 +1,8 @@
+{
+  "id": "20260628_153618_971635",
+  "type": "project_long_term",
+  "tags": ["DataCollector", "C++", "构造函数", "ifstream"],
+  "content": "DataCollector._handle_declaration方法添加了对C++流对象构造函数声明（如std::ifstream ifs(path)）的识别。当类型节点是std::ifstream/std::ofstream/std::fstream时，会创建一个call_type='constructor'的调用关系记录，用于TOCTOU竞态条件检测。",
+  "created_at": "2026-06-28T15:36:18.971660",
+  "updated_at": "2026-06-28T15:36:18.971663"
+}

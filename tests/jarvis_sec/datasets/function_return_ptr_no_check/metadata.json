@@ -1,0 +1,12 @@
+{
+  "name": "function_return_ptr_no_check",
+  "description": "function_return_ptr_no_check test dataset",
+  "vulnerability_type": "function_return_ptr_no_check",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "function_return_ptr_no_check",
+      "file": "positive_return_ptr_no_check.c"
+    }
+  ]
+}

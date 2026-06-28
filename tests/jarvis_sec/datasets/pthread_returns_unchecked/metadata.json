@@ -1,0 +1,16 @@
+{
+  "name": "pthread_returns_unchecked",
+  "description": "pthread_returns_unchecked test dataset",
+  "vulnerability_type": "pthread_returns_unchecked",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "pthread_returns_unchecked",
+      "file": "positive_pthread_create_unchecked.c"
+    },
+    {
+      "pattern": "pthread_ret_unchecked",
+      "file": "positive_pthread_create_unchecked.c"
+    }
+  ]
+}

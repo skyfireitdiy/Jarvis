@@ -1,0 +1,12 @@
+{
+  "name": "taint_buffer_overflow",
+  "description": "taint_buffer_overflow test dataset",
+  "vulnerability_type": "buffer_overflow",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "strcpy",
+      "file": "positive_user_input_to_strcpy.c"
+    }
+  ]
+}

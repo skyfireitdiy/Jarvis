@@ -1,0 +1,16 @@
+{
+  "name": "uninitialized_ptr_use",
+  "description": "uninitialized_ptr_use test dataset",
+  "vulnerability_type": "uninitialized_ptr_use",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "uninitialized_ptr_use",
+      "file": "positive_uninitialized_ptr.c"
+    },
+    {
+      "pattern": "possible_null_deref",
+      "file": "positive_uninitialized_ptr.c"
+    }
+  ]
+}

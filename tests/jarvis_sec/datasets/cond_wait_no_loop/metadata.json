@@ -1,0 +1,12 @@
+{
+  "name": "cond_wait_no_loop",
+  "description": "cond_wait_no_loop test dataset",
+  "vulnerability_type": "cond_wait_no_loop",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "cond_wait_no_loop",
+      "file": "positive_cond_wait_no_loop.c"
+    }
+  ]
+}

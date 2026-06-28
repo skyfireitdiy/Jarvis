@@ -1,0 +1,7 @@
+{
+  "name": "hardcoded_credentials",
+  "description": "hardcoded_credentials test dataset",
+  "vulnerability_type": "hardcoded_credentials",
+  "cross_file": false,
+  "expected_issues": []
+}

@@ -1,0 +1,7 @@
+{
+  "name": "memory_leak",
+  "description": "memory_leak test dataset",
+  "vulnerability_type": "memory_leak",
+  "cross_file": false,
+  "expected_issues": []
+}

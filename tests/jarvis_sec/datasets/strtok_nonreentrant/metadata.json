@@ -1,0 +1,12 @@
+{
+  "name": "strtok_nonreentrant",
+  "description": "strtok_nonreentrant test dataset",
+  "vulnerability_type": "strtok_nonreentrant",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "strtok_nonreentrant",
+      "file": "positive_strtok.c"
+    }
+  ]
+}

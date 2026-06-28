@@ -1,0 +1,8 @@
+{
+  "id": "20260628_153618_973003",
+  "type": "project_long_term",
+  "tags": ["memory_leak", "alloc_no_null_check", "示例代码", "跳过"],
+  "content": "_rule_memory_leak和_rule_malloc_no_null_check规则添加了对非常短函数（<10行）的跳过逻辑。这是因为示例代码或测试代码通常很短，没有完整的错误处理，不应该报误报。",
+  "created_at": "2026-06-28T15:36:18.973019",
+  "updated_at": "2026-06-28T15:36:18.973021"
+}

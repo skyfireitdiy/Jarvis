@@ -1,0 +1,16 @@
+{
+  "name": "unchecked_io",
+  "description": "unchecked_io test dataset",
+  "vulnerability_type": "unchecked_io",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unchecked_io",
+      "file": "positive_fopen_no_check.c"
+    },
+    {
+      "pattern": "io_call",
+      "file": "positive_fopen_no_check.c"
+    }
+  ]
+}

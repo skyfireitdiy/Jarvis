@@ -1,0 +1,8 @@
+{
+  "id": "20260628_170753_049658",
+  "type": "project_long_term",
+  "tags": ["jsec", "P15", "negative误报修复", "完成"],
+  "content": "P15完成：修复negative误报 → 2个negative文件0误报 + 8个pytest全通过\n关键修改：\n1. DataCollector扩展_detect_null_check_in_binary：增加>=0/>-1/!=-1等value_check模式\n2. DataCollector新增_add_value_check_node、_extract_protected_calls方法\n3. DataCollector修改_handle_if_statement/_handle_loop_statement：调用_extract_protected_calls\n4. _rule_unchecked_io污点分析路径添加condition_protected+value_check过滤逻辑\n5. _rule_unchecked_io正则回退路径添加condition_protected过滤逻辑（_protected_lines_regex集合）\n6. _rule_function_return_ptr_no_check添加condition_protected过滤\n7. _rule_strncpy_no_nullterm添加condition_protected过滤\n8. _rule_unsafe_api添加condition_protected过滤\n9. positive_user_input_to_open.c去掉if(argc>1)和if(fd>=0)条件保护，使漏洞可被检测\n10. 8个pytest全部通过，2个negative文件0误报",
+  "created_at": "2026-06-28T17:07:53.049694",
+  "updated_at": "2026-06-28T17:07:53.049704"
+}

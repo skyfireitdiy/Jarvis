@@ -1,0 +1,16 @@
+{
+  "name": "taint_path_traversal",
+  "description": "taint_path_traversal test dataset",
+  "vulnerability_type": "path_traversal",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "io_call",
+      "file": "positive_user_input_to_open.c"
+    },
+    {
+      "pattern": "function_return_ptr_no_check",
+      "file": "positive_user_input_to_open.c"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "strncpy_no_nullterm",
+  "description": "strncpy_no_nullterm test dataset",
+  "vulnerability_type": "strncpy_no_nullterm",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "strncpy_no_nullterm",
+      "file": "positive_strncpy_no_terminator.c"
+    },
+    {
+      "pattern": "strncpy",
+      "file": "positive_strncpy_no_terminator.c"
+    },
+    {
+      "pattern": "strncpy/strncat",
+      "file": "positive_strncpy_no_terminator.c"
+    }
+  ]
+}

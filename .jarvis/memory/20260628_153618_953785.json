@@ -1,0 +1,8 @@
+{
+  "id": "20260628_153618_953785",
+  "type": "project_long_term",
+  "tags": ["P15", "误报修复", "vulnerability_gaps", "完成"],
+  "content": "P15-5误报修复完成：已修复所有5个误报（cwe401_unique_ptr、cwe843_dynamic_cast_safe、cwe129_bounds_check、cwe775_fclose_check、cwe680_overflow_check）。关键修改：1) 模板参数中的数组访问跳过（make_unique<int[]>）；2) condition_clause节点类型识别（if(d)）；3) 函数参数跳过NULL检查；4) fclose不需要检查返回值；5) 跳过非常短的函数（<10行）的memory_leak和alloc_no_null_check检测；6) DataCollector添加对std::ifstream/std::ofstream构造函数声明的识别。",
+  "created_at": "2026-06-28T15:36:18.953818",
+  "updated_at": "2026-06-28T15:36:18.953827"
+}

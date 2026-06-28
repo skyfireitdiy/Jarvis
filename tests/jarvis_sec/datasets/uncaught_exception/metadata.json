@@ -1,0 +1,12 @@
+{
+  "name": "uncaught_exception",
+  "description": "uncaught_exception test dataset",
+  "vulnerability_type": "uncaught_exception",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "uncaught_exception",
+      "file": "positive_throw_no_catch.cpp"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "unsafe_library",
+  "description": "unsafe_library test dataset",
+  "vulnerability_type": "unsafe_api",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "getenv_unchecked",
+      "file": "positive_unsafe_funcs.c"
+    },
+    {
+      "pattern": "function_return_ptr_no_check",
+      "file": "positive_unsafe_funcs.c"
+    },
+    {
+      "pattern": "time_api_not_threadsafe",
+      "file": "positive_unsafe_funcs.c"
+    },
+    {
+      "pattern": "scanf_%s_no_width",
+      "file": "positive_unsafe_funcs.c"
+    },
+    {
+      "pattern": "strtok_nonreentrant",
+      "file": "positive_unsafe_funcs.c"
+    },
+    {
+      "pattern": "rand_insecure",
+      "file": "positive_unsafe_funcs.c"
+    }
+  ]
+}

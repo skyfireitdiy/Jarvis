@@ -1,0 +1,8 @@
+{
+  "id": "20260628_114410_793016",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "phase7", "batch4-eval", "cwe-coverage"],
+  "content": "第四批CWE覆盖度评估结果（C+C++共29个CWE测试）：\n\n## 总体: 24/29检测到(82%), 5漏报, 11有误报\n\n## 漏报清单(5个)\n1. CWE-468: Pointer Arithmetic - 指针减法除以sizeof\n2. CWE-667: 死锁风险 - mutex不同顺序获取\n3. CWE-367: TOCTOU-C++ - C++文件检查与使用(access+ifstream)\n4. CWE-783: 赋值vs比较 - if(x=0)运算符优先级\n5. CWE-457: 未初始化成员变量 - C++类成员未初始化\n\n## 误报清单(11个)\nCWE-680(negative有integer_overflow), CWE-763(negative有new_delete_mismatch), CWE-843(negative有误报), CWE-401(negative有误报), CWE-762(negative有误报), CWE-562(negative有strcpy误报), CWE-775(negative有误报), CWE-665(negative有missing_virtual_dtor), CWE-908(negative有误报), CWE-824(negative有误报), CWE-129(negative有误报)\n\n## 检测质量分析\n- 专门规则(高): new_delete_mismatch, reinterpret_cast_unsafe, possible_null_deref, integer_overflow, memcpy, missing_virtual_dtor\n- 非专门(低): io_call, compiler_security_check, alloc_no_null_check, scanf_%s_no_width, strcpy - 检测到其他问题而非目标CWE\n\n## C语言CWE(8个): 7/8检测到\n## C++ CWE第一批(11个): 9/11检测到\n## C++ CWE第二批(10个): 8/10检测到\n\n## 累计(含前三批): 18漏报已修复+5新漏报=23漏报待修, 9误报已修复+11新误报=20误报待修",
+  "created_at": "2026-06-28T11:44:10.793041",
+  "updated_at": "2026-06-28T11:44:10.793045"
+}

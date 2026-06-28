@@ -1,0 +1,24 @@
+{
+  "name": "uaf_suspect",
+  "description": "uaf_suspect test dataset",
+  "vulnerability_type": "uaf_suspect",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "uaf_suspect",
+      "file": "positive_free_then_pass.c"
+    },
+    {
+      "pattern": "use_after_free_suspect",
+      "file": "positive_free_then_pass.c"
+    },
+    {
+      "pattern": "uaf_suspect",
+      "file": "positive_free_then_use.c"
+    },
+    {
+      "pattern": "use_after_free_suspect",
+      "file": "positive_free_then_use.c"
+    }
+  ]
+}

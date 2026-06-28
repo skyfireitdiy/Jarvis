@@ -1,0 +1,16 @@
+{
+  "name": "vector_string_bounds_check",
+  "description": "vector_string_bounds_check test dataset",
+  "vulnerability_type": "vector_string_bounds_check",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "vector_string_bounds_check",
+      "file": "positive_vector_no_check.cpp"
+    },
+    {
+      "pattern": "vector_bounds_check",
+      "file": "positive_vector_no_check.cpp"
+    }
+  ]
+}

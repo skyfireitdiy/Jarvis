@@ -1,0 +1,12 @@
+{
+  "name": "race_condition",
+  "description": "race_condition test dataset",
+  "vulnerability_type": "data_race_suspect",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "toctou_race",
+      "file": "positive_race_tofile.c"
+    }
+  ]
+}
