@@ -1,0 +1,12 @@
+{
+  "name": "getenv_unchecked",
+  "description": "getenv_unchecked test dataset",
+  "vulnerability_type": "getenv_unchecked",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "getenv_unchecked",
+      "file": "positive_getenv_no_check.c"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "data_race_suspect",
+  "description": "data_race_suspect test dataset",
+  "vulnerability_type": "data_race_suspect",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "data_race_suspect",
+      "file": "positive_write_no_lock.c"
+    }
+  ]
+}

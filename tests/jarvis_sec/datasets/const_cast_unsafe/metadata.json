@@ -1,0 +1,12 @@
+{
+  "name": "const_cast_unsafe",
+  "description": "const_cast_unsafe test dataset",
+  "vulnerability_type": "const_cast_unsafe",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "const_cast_unsafe",
+      "file": "positive_const_cast_remove.cpp"
+    }
+  ]
+}

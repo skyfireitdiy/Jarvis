@@ -1,0 +1,16 @@
+{
+  "name": "use_after_free",
+  "description": "use_after_free test dataset",
+  "vulnerability_type": "uaf_suspect",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "uaf_suspect",
+      "file": "positive_uaf_basic.c"
+    },
+    {
+      "pattern": "use_after_free_suspect",
+      "file": "positive_uaf_basic.c"
+    }
+  ]
+}

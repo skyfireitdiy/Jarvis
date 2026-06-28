@@ -1,0 +1,12 @@
+{
+  "name": "double_free",
+  "description": "double_free test dataset",
+  "vulnerability_type": "double_free",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "double_free",
+      "file": "positive_double_free.c"
+    }
+  ]
+}

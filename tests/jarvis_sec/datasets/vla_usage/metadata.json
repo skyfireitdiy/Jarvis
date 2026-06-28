@@ -1,0 +1,12 @@
+{
+  "name": "vla_usage",
+  "description": "vla_usage test dataset",
+  "vulnerability_type": "vla_usage",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "vla_usage",
+      "file": "positive_vla.c"
+    }
+  ]
+}

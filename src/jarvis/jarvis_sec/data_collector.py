@@ -442,6 +442,49 @@ class DataCollector:
             )
             result["data_flow_nodes"].append(data_flow_node)
 
+        # 检查声明中是否包含内存分配调用（如 char *p = malloc(100)）
+        self._check_init_declarator_for_allocation(node, code, file_path, result, scope)
+
+        # 检查是否是C++流对象构造函数声明（如 std::ifstream ifs(path)）
+        # 这需要识别为调用关系
+        type_node = node.child_by_field_name("type")
+        if type_node:
+            type_text = self._get_node_text(type_node, code)
+            # 检查是否是std::ifstream/std::ofstream/std::fstream
+            if type_text in [
+                "std::ifstream",
+                "std::ofstream",
+                "std::fstream",
+                "ifstream",
+                "ofstream",
+                "fstream",
+            ]:
+                # 获取变量名和参数
+                declarator_node = node.child_by_field_name("declarator")
+                if declarator_node:
+                    # 获取变量名
+                    var_name = None
+                    for child in declarator_node.children:
+                        if child.type == "identifier":
+                            var_name = self._get_node_text(child, code)
+                            break
+
+                    if var_name:
+                        line = node.start_point[0] + 1
+                        # 创建调用关系（将构造函数声明视为调用）
+                        call_relation = CallRelation(
+                            caller_name=scope if scope != "global" else "unknown",
+                            caller_file=file_path,
+                            caller_line=line,
+                            callee_name=type_text.split("::")[-1]
+                            if "::" in type_text
+                            else type_text,  # 提取基本名称
+                            callee_file=None,
+                            callee_line=None,
+                            call_type="constructor",
+                        )
+                        result["call_relations"].append(call_relation)
+
     def _handle_call_expression(
         self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
     ):
@@ -599,7 +642,7 @@ class DataCollector:
         self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
     ):
         """
-        处理if语句，提取条件表达式中的变量使用
+        处理if语句，提取条件表达式中的变量使用，并记录consequence块内的受保护调用
 
         Args:
             node: AST节点
@@ -620,11 +663,18 @@ class DataCollector:
             condition_node, code, file_path, result, scope, line
         )
 
+        # 提取consequence块内的调用，标记为condition_protected
+        consequence_node = node.child_by_field_name("consequence")
+        if consequence_node:
+            self._extract_protected_calls(
+                consequence_node, code, file_path, result, scope
+            )
+
     def _handle_loop_statement(
         self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
     ):
         """
-        处理while/for循环，提取条件表达式中的变量使用
+        处理while/for循环，提取条件表达式中的变量使用，并记录body块内的受保护调用
 
         Args:
             node: AST节点
@@ -644,6 +694,11 @@ class DataCollector:
         self._extract_identifiers_from_condition(
             condition_node, code, file_path, result, scope, line
         )
+
+        # 提取body块内的调用，标记为condition_protected
+        body_node = node.child_by_field_name("body")
+        if body_node:
+            self._extract_protected_calls(body_node, code, file_path, result, scope)
 
     def _handle_return_statement(
         self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
@@ -738,6 +793,8 @@ class DataCollector:
                     var_name = self._get_node_text(arg_node, code)
                     self._add_null_check_node(var_name, file_path, line, scope, result)
         # 检测单独标识符作为条件：if (ptr)
+        # 注意：只有当标识符直接作为整个条件时才是NULL检查
+        # 例如 if (ptr) 是NULL检查，但 if (idx >= 0) 中的 idx 不是NULL检查
         elif node.type == "identifier":
             var_name = self._get_node_text(node, code)
             # 排除常见的非变量标识符
@@ -757,18 +814,33 @@ class DataCollector:
                 "unsigned",
                 "signed",
             ]:
-                # 检查父节点是否是条件表达式（if/while的条件）
-                # 如果标识符直接作为条件，也是一种NULL检查
-                data_flow_node = DataFlowNode(
-                    var_name=var_name,
-                    file_path=file_path,
-                    line=line,
-                    node_type="use",
-                    scope=scope,
-                    value_source="condition",
-                    use_type="null_check",
-                )
-                result["data_flow_nodes"].append(data_flow_node)
+                # 检查父节点类型，判断是否是真正的NULL检查
+                # 只有当标识符直接作为条件（parenthesized_expression或condition_clause的直接子节点）时
+                # 才是NULL检查
+                parent = node.parent
+                if parent and parent.type in [
+                    "parenthesized_expression",
+                    "condition_clause",
+                ]:
+                    # 检查父节点的父节点是否是if/while的条件
+                    grandparent = parent.parent
+                    if grandparent and grandparent.type in [
+                        "if_statement",
+                        "while_statement",
+                    ]:
+                        # 标识符直接作为条件，是NULL检查
+                        data_flow_node = DataFlowNode(
+                            var_name=var_name,
+                            file_path=file_path,
+                            line=line,
+                            node_type="use",
+                            scope=scope,
+                            value_source="condition",
+                            use_type="null_check",
+                        )
+                        result["data_flow_nodes"].append(data_flow_node)
+                # 其他情况（如 idx >= 0 中的 idx）不标记为null_check
+                # 避免误报
             return
 
         # 递归处理子节点
@@ -786,7 +858,11 @@ class DataCollector:
         scope: str,
         line: int,
     ):
-        """检测二元表达式中的NULL检查模式（ptr == NULL, ptr != NULL等）"""
+        """检测二元表达式中的NULL检查和值检查模式
+
+        NULL检查：ptr == NULL, ptr != NULL
+        值检查：fd >= 0, fd > -1, fd != -1, fd < 0 等
+        """
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
         op_node = node.child_by_field_name("operator")
@@ -795,20 +871,30 @@ class DataCollector:
             return
 
         op = self._get_node_text(op_node, code)
-        if op not in ("==", "!="):
-            return
-
         left_text = self._get_node_text(left, code).strip()
         right_text = self._get_node_text(right, code).strip()
 
         # 检测 ptr == NULL / ptr != NULL
         null_literals = {"NULL", "nullptr", "0"}
-        if right_text in null_literals and left.type == "identifier":
-            var_name = left_text
-            self._add_null_check_node(var_name, file_path, line, scope, result)
-        elif left_text in null_literals and right.type == "identifier":
-            var_name = right_text
-            self._add_null_check_node(var_name, file_path, line, scope, result)
+        if op in ("==", "!="):
+            if right_text in null_literals and left.type == "identifier":
+                var_name = left_text
+                self._add_null_check_node(var_name, file_path, line, scope, result)
+            elif left_text in null_literals and right.type == "identifier":
+                var_name = right_text
+                self._add_null_check_node(var_name, file_path, line, scope, result)
+
+        # 检测值检查：var >= 0, var > -1, var != -1, var < 0 等
+        # 这些是IO返回值/错误码的有效性检查
+        value_check_ops = {">=", "<=", "!=", "==", "<", ">"}
+        value_check_constants = {"0", "-1", "1", "EOF"}
+        if op in value_check_ops:
+            if right_text in value_check_constants and left.type == "identifier":
+                var_name = left_text
+                self._add_value_check_node(var_name, file_path, line, scope, result)
+            elif left_text in value_check_constants and right.type == "identifier":
+                var_name = right_text
+                self._add_value_check_node(var_name, file_path, line, scope, result)
 
     def _add_null_check_node(
         self,
@@ -829,6 +915,64 @@ class DataCollector:
             use_type="null_check",
         )
         result["data_flow_nodes"].append(data_flow_node)
+
+    def _add_value_check_node(
+        self,
+        var_name: str,
+        file_path: str,
+        line: int,
+        scope: str,
+        result: Dict[str, Any],
+    ):
+        """添加一个value_check类型的数据流节点（如 fd >= 0, fd != -1 等）"""
+        data_flow_node = DataFlowNode(
+            var_name=var_name,
+            file_path=file_path,
+            line=line,
+            node_type="use",
+            scope=scope,
+            value_source="condition",
+            use_type="value_check",
+        )
+        result["data_flow_nodes"].append(data_flow_node)
+
+    def _extract_protected_calls(
+        self,
+        block_node: Node,
+        code: str,
+        file_path: str,
+        result: Dict[str, Any],
+        scope: str,
+    ):
+        """提取if/while/for的consequence/body块内的调用，标记为condition_protected
+
+        这些调用受条件保护，在误报过滤时可以排除。
+        记录方式：为每个调用创建一个data_flow_node，use_type="condition_protected"。
+        """
+
+        def _find_calls(node: Node, calls: list):
+            if node.type == "call_expression":
+                func_node = node.child_by_field_name("function")
+                if func_node:
+                    func_name = self._get_node_text(func_node, code)
+                    call_line = node.start_point[0] + 1
+                    calls.append((func_name, call_line))
+            for child in node.children:
+                _find_calls(child, calls)
+
+        calls = []
+        _find_calls(block_node, calls)
+        for func_name, call_line in calls:
+            data_flow_node = DataFlowNode(
+                var_name=func_name,
+                file_path=file_path,
+                line=call_line,
+                node_type="use",
+                scope=scope,
+                value_source="condition_protected",
+                use_type="condition_protected",
+            )
+            result["data_flow_nodes"].append(data_flow_node)
 
     # ============================================================================
     # 正则表达式回退方案
@@ -1264,3 +1408,68 @@ class DataCollector:
             f"{len(result['call_relations'])}个调用关系, "
             f"{len(result['data_flow_nodes'])}个数据流节点"
         )
+
+    def _check_init_declarator_for_allocation(
+        self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        检查声明中是否包含内存分配调用（如 char *p = malloc(100)）
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+        """
+        # 遍历声明节点的子节点，查找init_declarator
+        for child in node.children:
+            if child.type == "init_declarator":
+                # 获取声明变量名
+                declarator = child.child_by_field_name("declarator")
+                if not declarator:
+                    continue
+
+                # 处理指针声明符（如 char *p）
+                var_name = None
+                if declarator.type == "pointer_declarator":
+                    for subchild in declarator.children:
+                        if subchild.type == "identifier":
+                            var_name = self._get_node_text(subchild, code)
+                            break
+                elif declarator.type == "identifier":
+                    var_name = self._get_node_text(declarator, code)
+
+                if not var_name:
+                    continue
+
+                # 检查初始化表达式是否为函数调用
+                init_value = child.child_by_field_name("value")
+                if init_value and init_value.type == "call_expression":
+                    call_name = self._get_call_target(init_value, code)
+                    line = node.start_point[0] + 1
+
+                    # 检查是否为内存分配函数
+                    if call_name in ["malloc", "calloc", "realloc", "new"]:
+                        pointer_state = PointerStateRecord(
+                            var_name=var_name,
+                            file_path=file_path,
+                            line=line,
+                            state="ALLOCATED",
+                            scope=scope,
+                            allocator=call_name,
+                            deallocator=None,
+                        )
+                        result["pointer_states"].append(pointer_state)
+                    else:
+                        # 非内存分配函数调用，记录为UNKNOWN状态
+                        pointer_state = PointerStateRecord(
+                            var_name=var_name,
+                            file_path=file_path,
+                            line=line,
+                            state="UNKNOWN",
+                            scope=scope,
+                            allocator=None,
+                            deallocator=None,
+                        )
+                        result["pointer_states"].append(pointer_state)

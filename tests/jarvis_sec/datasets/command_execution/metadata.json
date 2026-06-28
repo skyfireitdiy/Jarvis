@@ -1,0 +1,16 @@
+{
+  "name": "command_execution",
+  "description": "command_execution test dataset",
+  "vulnerability_type": "command_exec",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "command_exec",
+      "file": "positive_popen_call.c"
+    },
+    {
+      "pattern": "command_exec",
+      "file": "positive_system_call.c"
+    }
+  ]
+}

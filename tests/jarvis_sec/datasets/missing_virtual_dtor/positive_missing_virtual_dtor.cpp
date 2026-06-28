@@ -4,13 +4,14 @@
  */
 class Base {
 public:
+  virtual void foo() {} // 虚函数，但析构函数非虚
   ~Base() {}
 };
 class Derived : public Base {
 public:
   ~Derived() {}
 };
-void foo() {
+void bar() {
   Base *b = new Derived();
   delete b; // 真实风险：缺少虚析构函数
 }

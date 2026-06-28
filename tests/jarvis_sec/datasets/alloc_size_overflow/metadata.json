@@ -1,0 +1,12 @@
+{
+  "name": "alloc_size_overflow",
+  "description": "alloc_size_overflow test dataset",
+  "vulnerability_type": "alloc_size_overflow",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "alloc_size_overflow",
+      "file": "positive_multiplication_in_malloc.c"
+    }
+  ]
+}

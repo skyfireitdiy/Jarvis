@@ -1,0 +1,24 @@
+{
+  "name": "new_delete_mismatch",
+  "description": "new_delete_mismatch test dataset",
+  "vulnerability_type": "new_delete_mismatch",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "new_delete_mismatch",
+      "file": "positive_malloc_with_delete.cpp"
+    },
+    {
+      "pattern": "alloc_no_null_check",
+      "file": "positive_malloc_with_delete.cpp"
+    },
+    {
+      "pattern": "new_delete_mismatch",
+      "file": "positive_new_with_free.cpp"
+    },
+    {
+      "pattern": "alloc_no_null_check",
+      "file": "positive_new_with_free.cpp"
+    }
+  ]
+}

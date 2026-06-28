@@ -1,0 +1,12 @@
+{
+  "name": "sql_injection",
+  "description": "sql_injection test dataset",
+  "vulnerability_type": "sql_injection",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "sql_injection",
+      "file": "positive_concat_query.c"
+    }
+  ]
+}

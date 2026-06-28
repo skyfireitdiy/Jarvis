@@ -1,0 +1,16 @@
+{
+  "name": "smart_ptr_get_unsafe",
+  "description": "smart_ptr_get_unsafe test dataset",
+  "vulnerability_type": "smart_ptr_get_unsafe",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "smart_ptr_get_unsafe",
+      "file": "positive_get_stored.cpp"
+    },
+    {
+      "pattern": "possible_null_deref",
+      "file": "positive_get_stored.cpp"
+    }
+  ]
+}

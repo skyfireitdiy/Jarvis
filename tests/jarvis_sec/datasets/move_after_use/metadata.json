@@ -1,0 +1,16 @@
+{
+  "name": "move_after_use",
+  "description": "move_after_use test dataset",
+  "vulnerability_type": "move_after_use",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "move_after_use",
+      "file": "positive_move_then_use.cpp"
+    },
+    {
+      "pattern": "use_after_move",
+      "file": "positive_move_then_use.cpp"
+    }
+  ]
+}

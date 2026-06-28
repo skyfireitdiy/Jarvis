@@ -1,0 +1,16 @@
+{
+  "name": "missing_virtual_dtor",
+  "description": "missing_virtual_dtor test dataset",
+  "vulnerability_type": "missing_virtual_dtor",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "missing_virtual_dtor",
+      "file": "positive_missing_virtual_dtor.cpp"
+    },
+    {
+      "pattern": "alloc_no_null_check",
+      "file": "positive_missing_virtual_dtor.cpp"
+    }
+  ]
+}

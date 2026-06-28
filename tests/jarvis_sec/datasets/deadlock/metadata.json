@@ -1,0 +1,56 @@
+{
+  "name": "deadlock",
+  "description": "deadlock test dataset",
+  "vulnerability_type": "deadlock_patterns",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "deadlock_patterns",
+      "file": "positive_ab_ba_deadlock.c"
+    },
+    {
+      "pattern": "double_lock",
+      "file": "positive_ab_ba_deadlock.c"
+    },
+    {
+      "pattern": "lock_order_inversion",
+      "file": "positive_ab_ba_deadlock.c"
+    },
+    {
+      "pattern": "deadlock_patterns",
+      "file": "positive_condvar_deadlock.c"
+    },
+    {
+      "pattern": "double_lock",
+      "file": "positive_condvar_deadlock.c"
+    },
+    {
+      "pattern": "lock_order_inversion",
+      "file": "positive_condvar_deadlock.c"
+    },
+    {
+      "pattern": "deadlock_patterns",
+      "file": "positive_cross_function_deadlock.c"
+    },
+    {
+      "pattern": "double_lock",
+      "file": "positive_cross_function_deadlock.c"
+    },
+    {
+      "pattern": "lock_order_inversion",
+      "file": "positive_cross_function_deadlock.c"
+    },
+    {
+      "pattern": "deadlock_patterns",
+      "file": "positive_nested_lock_deadlock.c"
+    },
+    {
+      "pattern": "double_lock",
+      "file": "positive_nested_lock_deadlock.c"
+    },
+    {
+      "pattern": "lock_order_inversion",
+      "file": "positive_nested_lock_deadlock.c"
+    }
+  ]
+}
