@@ -1,0 +1,12 @@
+{
+  "name": "toctou_race",
+  "description": "toctou_race test dataset",
+  "vulnerability_type": "toctou_race",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "toctou_race",
+      "file": "positive_access_open.c"
+    }
+  ]
+}

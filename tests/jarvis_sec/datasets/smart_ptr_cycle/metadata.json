@@ -1,0 +1,7 @@
+{
+  "name": "smart_ptr_cycle",
+  "description": "smart_ptr_cycle test dataset",
+  "vulnerability_type": "smart_ptr_cycle",
+  "cross_file": false,
+  "expected_issues": []
+}

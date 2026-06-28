@@ -1,0 +1,12 @@
+{
+  "name": "thread_leak_no_join",
+  "description": "thread_leak_no_join test dataset",
+  "vulnerability_type": "thread_leak_no_join",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "thread_leak_no_join",
+      "file": "positive_thread_no_join.c"
+    }
+  ]
+}

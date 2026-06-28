@@ -1,0 +1,12 @@
+{
+  "name": "realloc_assign_back",
+  "description": "realloc_assign_back test dataset",
+  "vulnerability_type": "realloc_assign_back",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "realloc_assign_back",
+      "file": "positive_realloc_no_assign.c"
+    }
+  ]
+}

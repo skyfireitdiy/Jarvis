@@ -1,0 +1,16 @@
+{
+  "name": "buffer_overflow",
+  "description": "buffer_overflow test dataset",
+  "vulnerability_type": "buffer_overflow",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "gets",
+      "file": "positive_gets_usage.c"
+    },
+    {
+      "pattern": "strcpy",
+      "file": "positive_strcpy_overflow.c"
+    }
+  ]
+}

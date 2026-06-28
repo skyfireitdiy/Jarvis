@@ -1,0 +1,12 @@
+{
+  "name": "format_string_vuln",
+  "description": "format_string_vuln test dataset",
+  "vulnerability_type": "format_string",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "format_string",
+      "file": "positive_format_string.c"
+    }
+  ]
+}

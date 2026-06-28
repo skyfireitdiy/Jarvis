@@ -1,0 +1,16 @@
+{
+  "name": "insecure_tmpfile",
+  "description": "insecure_tmpfile test dataset",
+  "vulnerability_type": "insecure_tmpfile",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "insecure_tmpfile",
+      "file": "positive_mktemp.c"
+    },
+    {
+      "pattern": "insecure_tmpfile",
+      "file": "positive_tmpnam.c"
+    }
+  ]
+}

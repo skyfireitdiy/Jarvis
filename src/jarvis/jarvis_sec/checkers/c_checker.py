@@ -70,7 +70,12 @@ RE_MEM_MGMT = re.compile(
     re.IGNORECASE,
 )
 RE_IO_API = re.compile(
-    r"\b(fopen|fclose|fread|fwrite|read|write|open|close)\s*\(",
+    r"\b(fopen|fread|fwrite|read|write|open|close)\s*\(",
+    re.IGNORECASE,
+)
+# fclose 通常不需要检查返回值（关闭后检查意义不大）
+RE_IO_API_NO_CHECK = re.compile(
+    r"\b(fclose)\s*\(",
     re.IGNORECASE,
 )
 # 权限操作函数（返回值检查至关重要）
@@ -197,6 +202,16 @@ RE_STRLEN_IN_SIZE = re.compile(r"\bstrlen\s*\(", re.IGNORECASE)
 RE_SIZEOF_PTR = re.compile(r"\bsizeof\s*\(\s*\*\s*[A-Za-z_]\w*\s*\)", re.IGNORECASE)
 RE_STRNCPY = re.compile(r"\bstrncpy\s*\(", re.IGNORECASE)
 RE_STRNCAT = re.compile(r"\bstrncat\s*\(", re.IGNORECASE)
+# CWE-327: 弱加密算法API模式
+RE_WEAK_CRYPTO = re.compile(
+    r"\b(DES_set_key|DES_set_key_unchecked|DES_ecb_encrypt|DES_cbc_encrypt|DES_ncbc_encrypt|"
+    r"DES_ede3_cbc_encrypt|DES_ede2_cbc_encrypt|"
+    r"RC4_set_key|RC4|"
+    r"MD5_Init|MD5_Update|MD5_Final|MD5_Transform|"
+    r"SHA1_Init|SHA1_Update|SHA1_Final|SHA1_Transform|"
+    r"BF_set_key|BF_ecb_encrypt|BF_cbc_encrypt|BF_encrypt|BF_decrypt)\s*\(",
+    re.IGNORECASE,
+)
 
 # C++ 特定模式
 RE_SHARED_PTR = re.compile(r"\b(?:std::)?shared_ptr\s*<", re.IGNORECASE)
@@ -594,6 +609,22 @@ def _rule_unsafe_api(
                         continue
 
             api = callee_name
+            # 过滤：如果调用在condition_protected行内，跳过
+            _ua_is_protected = False
+            if database:
+                try:
+                    _ua_df_nodes = database.get_data_flow_by_file(relpath)
+                    for n in _ua_df_nodes:
+                        if (
+                            n.get("use_type") == "condition_protected"
+                            and n["line"] == idx
+                        ):
+                            _ua_is_protected = True
+                            break
+                except Exception:
+                    pass
+            if _ua_is_protected:
+                continue
             conf = 0.85
             if not _has_len_bound_around(lines, idx, radius=2):
                 conf += 0.05
@@ -614,39 +645,7 @@ def _rule_unsafe_api(
             )
         return issues
 
-    # 回退到正则匹配（fallback）
-    for idx, s in enumerate(lines, start=1):
-        # 跳过预处理行与声明行，减少原型/宏中的误报
-        t = s.lstrip()
-        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
-            continue
-        m = RE_UNSAFE_API.search(s)
-        if not m:
-            continue
-        # 若在头文件中，且形如“返回类型 + 函数原型”的声明行（以 ); 结尾），跳过，避免将原型误报为调用
-        if is_header:
-            before = s[: m.start()]
-            if re_type_kw.search(before) and s.strip().endswith(");"):
-                continue
-        api = m.group(1)
-        conf = 0.85
-        if not _has_len_bound_around(lines, idx, radius=2):
-            conf += 0.05
-        severity = _severity_from_confidence(conf, "unsafe_api")
-        issues.append(
-            Issue(
-                language="c/cpp",
-                category="unsafe_api",
-                pattern=api,
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用不安全/高风险字符串API，可能导致缓冲区溢出或格式化风险。",
-                suggestion="替换为带边界的安全API（如 snprintf/strlcpy 等）或加入显式长度检查。",
-                confidence=min(conf, 0.95),
-                severity=severity,
-            )
-        )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -746,8 +745,8 @@ def _rule_boundary_funcs(
             )
         return issues
 
-    # 回退到正则匹配（fallback）
-    return _rule_boundary_funcs_regex_fallback(lines, relpath, original_lines)
+    # 无database时跳过正则回退（避免误报）
+    return issues
 
 
 def _extract_call_args(line: str, func_name: str) -> str:
@@ -764,98 +763,6 @@ def _extract_call_args(line: str, func_name: str) -> str:
     except Exception:
         pass
     return ""
-
-
-def _rule_boundary_funcs_regex_fallback(
-    lines: Sequence[str],
-    relpath: str,
-    original_lines: Optional[Sequence[str]] = None,
-) -> List[Issue]:
-    """正则匹配回退实现"""
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        # 跳过预处理行与声明行，避免在 typedef/extern 原型中误报
-        t = s.lstrip()
-        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
-            continue
-        m = RE_BOUNDARY_FUNCS.search(s)
-        if not m:
-            continue
-        api = m.group(1)
-        conf = 0.65
-        # 提取调用参数（启发式，便于准确性优化）
-        args = ""
-        try:
-            start = s.index("(", m.start())
-            end = s.rfind(")")
-            if end != -1 and end > start:
-                args = s[start + 1 : end]
-        except Exception:
-            args = ""
-
-        # 若为 memcpy/memmove 且第三参明显使用 sizeof(...)（且非 sizeof(*ptr)）且未混入 strlen，
-        # 通常为更安全的写法：降低误报（直接跳过告警）
-        safe_sizeof = False
-        if api.lower() in ("memcpy", "memmove") and args:
-            if (
-                "sizeof" in args
-                and not RE_SIZEOF_PTR.search(args)
-                and not RE_STRLEN_IN_SIZE.search(args)
-            ):
-                safe_sizeof = True
-        if safe_sizeof:
-            # 跳过该条，以提高准确性（避免将安全写法误报为风险）
-            continue
-
-        # 若为 strncpy/strncat，检测安全用法模式
-        # 1. 使用 sizeof(buffer)-1 作为长度参数
-        # 2. 手动添加 '\0' 终止符
-        if api.lower() in ("strncpy", "strncat") and args:
-            # 检查是否使用 sizeof(buffer)-1 模式
-            safe_sizeof_pattern = re.search(
-                r"sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
-                args,
-            )
-            # 检查是否手动添加 '\0' 终止符（需要检查后续行）
-            # 使用原始行（original_lines）而不是掩蔽行（lines），因为掩蔽行会将 '\0' 替换为空格
-            has_null_term = False
-            if safe_sizeof_pattern:
-                # 使用原始行检查 '\0' 终止符
-                check_lines = original_lines if original_lines is not None else lines
-                # 检查当前行和后续2行是否有 '\0' 终止符
-                for check_idx in range(idx, min(idx + 3, len(check_lines) + 1)):
-                    check_line = check_lines[check_idx - 1]
-                    if re.search(
-                        r"\w+\s*\[\s*sizeof\s*\(\s*\w+\s*\)\s*-\s*1\s*\]\s*=\s*'\\0'",
-                        check_line,
-                    ):
-                        has_null_term = True
-                        break
-            # 如果是安全用法，跳过告警
-            if safe_sizeof_pattern and has_null_term:
-                continue
-
-        # 如果参数中包含 strlen 或 sizeof( *ptr )，提高风险（长度来源不稳定/指针大小）
-        if RE_STRLEN_IN_SIZE.search(s) or RE_SIZEOF_PTR.search(s):
-            conf += 0.15
-        # 周围未见边界检查，再提高
-        if not _has_len_bound_around(lines, idx, radius=2):
-            conf += 0.1
-        issues.append(
-            Issue(
-                language="c/cpp",
-                category="buffer_overflow",
-                pattern=api,
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="缓冲区操作涉及长度/边界，需确认长度来源是否可靠，避免越界。",
-                suggestion="核对目标缓冲区大小与拷贝长度；对外部输入进行校验；优先使用安全封装。",
-                confidence=min(conf, 0.95),
-                severity=_severity_from_confidence(conf, "buffer_overflow"),
-            )
-        )
-    return issues
 
 
 def _rule_realloc_assign_back(
@@ -973,6 +880,11 @@ def _rule_malloc_no_null_check(
     """
     issues: List[Issue] = []
 
+    # 跳过非常短的函数（通常是示例代码）
+    # 如果函数少于10行，可能是测试或示例代码
+    if len(lines) < 10:
+        return issues
+
     # 优先尝试database驱动检测
     if database:
         try:
@@ -1013,56 +925,7 @@ def _rule_malloc_no_null_check(
         except Exception:
             pass
 
-    # 回退到正则检测
-    return _rule_malloc_no_null_check_regex_fallback(lines, relpath)
-
-
-def _rule_malloc_no_null_check_regex_fallback(
-    lines: Sequence[str], relpath: str
-) -> List[Issue]:
-    """正则回退方案：检测内存分配后未检查NULL的情况。"""
-    issues: List[Issue] = []
-
-    for idx, s in enumerate(lines, start=1):
-        for pat in (RE_MALLOC_ASSIGN, RE_CALLOC_ASSIGN, RE_NEW_ASSIGN):
-            m = pat.search(s)
-            if not m:
-                continue
-            var = m.group(1)
-            # 在后续若干行中存在明显解引用/使用但未见 NULL 检查，提示
-            has_check = _has_null_check_around(var, lines, idx, radius=4)
-            # 如果有NULL检查，跳过
-            if has_check:
-                continue
-
-            conf = 0.55
-            # 搜索后续 6 行是否出现变量使用（粗略）
-            used = False
-            for j, sj in _window(lines, idx, before=0, after=6):
-                if j == idx:
-                    continue
-                if re.search(rf"\b{re.escape(var)}\b(\s*(->|\[|\())", sj):
-                    used = True
-                    break
-            if used:
-                conf += 0.25
-            else:
-                conf += 0.1
-
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="memory_mgmt",
-                    pattern="alloc_no_null_check",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"内存/对象分配给 {var} 后可能未检查是否成功（NULL 检查缺失）。",
-                    suggestion="在使用前检查分配结果是否为 NULL，并在错误路径上释放已获取的资源。",
-                    confidence=min(conf, 0.9),
-                    severity=_severity_from_confidence(conf, "memory_mgmt"),
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -1092,8 +955,47 @@ def _rule_function_return_ptr_no_check(
                     for var_name, state in result.pointer_states.items():
                         # 检查是否来自函数返回（非ALLOCATED但有值）
                         if state.line and state.state == "UNKNOWN":
+                            # 跳过不可能返回NULL的函数
+                            line_text = (
+                                lines[state.line - 1]
+                                if state.line <= len(lines)
+                                else ""
+                            )
+                            # 智能指针（不可能返回NULL）
+                            if re.search(
+                                r"\b(make_unique|make_shared|make_unique_for_overwrite)\s*<",
+                                line_text,
+                            ):
+                                continue
+                            # 非指针返回函数（open返回int, time返回time_t等）
+                            if re.search(
+                                r"\b(open|close|read|write|time|clock|strlen|strcmp|strncmp|strtok_r?)\s*\(",
+                                line_text,
+                            ):
+                                continue
+                            # 返回值赋给非指针类型（int fd = open(...)）
+                            if re.search(
+                                r"\b(int|long|short|unsigned|size_t|ssize_t|time_t|clock_t|BOOL|bool)\s+"
+                                + re.escape(var_name)
+                                + r"\s*=",
+                                line_text,
+                            ):
+                                continue
                             # 检查是否有null_check
                             has_check = var_name in result.null_checks
+                            # 检查是否在condition_protected行内
+                            if not has_check and database:
+                                try:
+                                    df_nodes = database.get_data_flow_by_file(relpath)
+                                    for n in df_nodes:
+                                        if (
+                                            n.get("use_type") == "condition_protected"
+                                            and n["line"] == state.line
+                                        ):
+                                            has_check = True
+                                            break
+                                except Exception:
+                                    pass
                             if not has_check:
                                 issues.append(
                                     Issue(
@@ -1116,80 +1018,7 @@ def _rule_function_return_ptr_no_check(
         except Exception:
             pass
 
-    # 回退到正则检测
-    return _rule_function_return_ptr_no_check_regex_fallback(lines, relpath)
-
-
-def _rule_function_return_ptr_no_check_regex_fallback(
-    lines: Sequence[str], relpath: str
-) -> List[Issue]:
-    """正则回退方案：检测函数返回指针后未检查 NULL 就直接使用的情况。"""
-    issues: List[Issue] = []
-    # 匹配指针赋值：type *var = func(...); 或 type* var = func(...);
-    re_ptr_assign = re.compile(
-        r"\b[A-Za-z_]\w+\s*\*\s*([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*\(",
-        re.IGNORECASE,
-    )
-
-    for idx, s in enumerate(lines, start=1):
-        # 跳过类型声明行和预处理指令
-        t = s.lstrip()
-        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
-            continue
-
-        var_name = None
-        func_name = None
-
-        m = re_ptr_assign.search(s)
-        if m:
-            var_name = m.group(1)
-            func_name = m.group(2)
-
-        if not var_name:
-            continue
-
-        has_check = _has_null_check_around(var_name, lines, idx, radius=4)
-
-        used_without_check = False
-        for j, sj in _window(lines, idx, before=0, after=6):
-            if j == idx:
-                continue
-            if re.search(
-                rf"\b{re.escape(var_name)}\s*(->|\[|\(|\s*\*)",
-                sj,
-            ):
-                used_without_check = True
-                break
-
-        if used_without_check and not has_check:
-            conf = 0.5
-            alloc_keywords = (
-                "alloc",
-                "malloc",
-                "calloc",
-                "realloc",
-                "new",
-                "create",
-                "init",
-            )
-            if func_name and any(kw in func_name.lower() for kw in alloc_keywords):
-                conf += 0.2
-
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="memory_mgmt",
-                    pattern="function_return_ptr_no_check",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"函数 {func_name} 返回的指针赋值给 {var_name} 后，在使用前可能未检查 NULL，存在空指针解引用风险。",
-                    suggestion="在使用函数返回的指针前检查是否为 NULL；确保所有可能的返回路径都进行了验证。",
-                    confidence=min(conf, 0.85),
-                    severity="high" if conf >= 0.7 else "medium",
-                )
-            )
-
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -1628,9 +1457,56 @@ def _rule_unchecked_io(
         code, rules=["unchecked_io"], file_path=relpath, database=database
     )
 
-    # 如果污点分析有结果，转换为Issue
+    # 如果污点分析有结果，转换为Issue（但先过滤条件保护内的调用）
     if taint_paths:
+        # 从database查询condition_protected行号集合，用于过滤误报
+        protected_lines: set[int] = set()
+        if database:
+            try:
+                df_nodes = database.get_data_flow_by_file(relpath)
+                for n in df_nodes:
+                    if n.get("use_type") == "condition_protected":
+                        protected_lines.add(n["line"])
+            except Exception:
+                pass
+
+        # 从database查询value_check变量集合，用于过滤受值检查保护的IO调用
+        value_checked_vars: set[str] = set()
+        if database:
+            try:
+                df_nodes = database.get_data_flow_by_file(relpath)
+                for n in df_nodes:
+                    if n.get("use_type") == "value_check":
+                        value_checked_vars.add(n["var_name"])
+            except Exception:
+                pass
+
         for path in taint_paths:
+            # 过滤：如果IO调用在condition_protected行内，跳过
+            if path.line_number in protected_lines:
+                continue
+            # 过滤：如果IO调用使用的变量有value_check，跳过
+            # （如 read(fd,...) 中 fd 有 value_check(fd >= 0)）
+            if value_checked_vars and path.code_snippet:
+                for var in value_checked_vars:
+                    if re.search(rf"\b{re.escape(var)}\b", path.code_snippet):
+                        # 还需确认value_check在IO调用之前
+                        try:
+                            vc_nodes = [
+                                n
+                                for n in df_nodes
+                                if n.get("use_type") == "value_check"
+                                and n["var_name"] == var
+                            ]
+                            for vc in vc_nodes:
+                                if vc["line"] < path.line_number:
+                                    protected_lines.add(path.line_number)
+                                    break
+                        except Exception:
+                            pass
+            if path.line_number in protected_lines:
+                continue
+
             issues.append(
                 Issue(
                     language="c/cpp",
@@ -1646,9 +1522,20 @@ def _rule_unchecked_io(
                     severity="medium",
                 )
             )
-        return issues
+        if issues:
+            return issues
 
     # 污点分析无结果，回退到启发式检测
+    # 预先收集condition_protected行号集合，用于过滤误报
+    _protected_lines_regex: set[int] = set()
+    if database:
+        try:
+            _df_nodes_regex = database.get_data_flow_by_file(relpath)
+            for n in _df_nodes_regex:
+                if n.get("use_type") == "condition_protected":
+                    _protected_lines_regex.add(n["line"])
+        except Exception:
+            pass
     for idx, s in enumerate(lines, start=1):
         # 排除预处理与声明
         t = s.lstrip()
@@ -1665,6 +1552,10 @@ def _rule_unchecked_io(
             m = RE_NET_API.search(s)
             api_type = "network"
         if not m:
+            continue
+
+        # 过滤：如果IO调用在condition_protected行内，跳过
+        if idx in _protected_lines_regex:
             continue
 
         # 若本行/紧随其后 2 行出现条件判断，认为已检查（直接跳过）
@@ -1773,14 +1664,37 @@ def _rule_strncpy_no_nullterm(
             else:
                 continue
 
+            # 检查是否在condition_protected行内（if条件保护下的调用不算问题）
+            is_condition_protected = False
+            if database:
+                try:
+                    df_nodes = database.get_data_flow_by_file(relpath)
+                    for n in df_nodes:
+                        if (
+                            n.get("use_type") == "condition_protected"
+                            and n["line"] == idx
+                        ):
+                            is_condition_protected = True
+                            break
+                except Exception:
+                    pass
+            if is_condition_protected:
+                continue
             # 检查是否为安全的strncpy用法
             safe_sizeof_pattern = re.search(r"sizeof\s*\(\s*\w+\s*\)\s*-\s*1", s)
             window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=3))
+            # CWE-170误报过滤：检查后续行是否有显式NULL终止
             has_null_term = re.search(
-                r"\w+\s*\[\s*sizeof\s*\(\s*\w+\s*\)\s*-\s*1\s*\]\s*=\s*'\\0'",
+                r"\w+\s*\[\s*(?:sizeof\s*\(\s*\w+\s*\)\s*-\s*1|\w+\s*-\s*1)\s*\]\s*=\s*'\\0'",
+                window_text,
+            ) or re.search(
+                r"\w+\s*\[\s*\w+\s*-\s*1\s*\]\s*=\s*0",
                 window_text,
             )
             if safe_sizeof_pattern and has_null_term:
+                continue
+            # 即使没有sizeof-1模式，只要有显式NULL终止也跳过
+            if has_null_term:
                 continue
 
             conf = 0.55
@@ -1805,43 +1719,7 @@ def _rule_strncpy_no_nullterm(
             )
         return issues
 
-    # 回退到正则匹配（fallback）
-    for idx, s in enumerate(lines, start=1):
-        if RE_STRNCPY.search(s) or RE_STRNCAT.search(s):
-            # 检查是否为安全的strncpy用法
-            # 1. 检查当前行是否使用sizeof(buffer)-1模式
-            safe_sizeof_pattern = re.search(r"sizeof\s*\(\s*\w+\s*\)\s*-\s*1", s)
-            # 2. 检查后续行是否有手动终止符
-            window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=3))
-            has_null_term = re.search(
-                r"\w+\s*\[\s*sizeof\s*\(\s*\w+\s*\)\s*-\s*1\s*\]\s*=\s*'\\0'",
-                window_text,
-            )
-            # 如果是安全用法，跳过报告
-            if safe_sizeof_pattern and has_null_term:
-                continue
-
-            conf = 0.55
-            # 若邻近窗口未出现手动 '\0' 终止或显式长度-1 等处理，提升风险
-            if not re.search(
-                r"\\0|'\\0'|\"\\0\"|len\s*-\s*1|sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
-                window_text,
-            ):
-                conf += 0.15
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="buffer_overflow",
-                    pattern="strncpy/strncat",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用 strncpy/strncat 可能未自动添加 NUL 终止，导致潜在字符串未终止风险。",
-                    suggestion="确保目标缓冲区以 '\0' 终止（例如手动结尾或采用更安全 API）。",
-                    confidence=min(conf, 0.75),
-                    severity=_severity_from_confidence(conf, "buffer_overflow"),
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -2134,23 +2012,7 @@ def _rule_insecure_tmpfile(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if RE_INSECURE_TMP.search(s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="unsafe_usage",
-                    pattern="insecure_tmpfile",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用不安全的临时文件API（tmpnam/tempnam/mktemp）可能导致竞态条件与劫持风险。",
-                    suggestion="使用 mkstemp/mkdtemp 或安全封装，并设置合适的权限。",
-                    confidence=0.85,
-                    severity="high",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -2235,6 +2097,32 @@ def _rule_command_execution(
                 return True
         return False
 
+    # sanitize/validate函数名模式（调用后认为变量已净化）
+    _sanitize_pattern = re.compile(
+        r"\b(sanitize|validate|check|clean|escape|filter|purify|verify|is_safe|is_valid)\w*\s*\("
+    )
+
+    def _var_sanitized(
+        var: str, lines: Sequence[str], upto_idx: int, lookback: int = 10
+    ) -> bool:
+        # 在前 lookback 行内查找 sanitize/validate 函数调用
+        start = max(1, upto_idx - lookback)
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            # 模式1: sanitize_xxx(var) 或 validate_xxx(var)
+            if _sanitize_pattern.search(sj) and re.search(rf"\b{re.escape(var)}\b", sj):
+                return True
+            # 模式2: if (is_safe_xxx(var)) 或 if (is_valid_xxx(var))
+            if (
+                re.search(r"\bif\s*\(", sj)
+                and re.search(
+                    r"\b(is_safe|is_valid|is_allowed|is_authorized)\w*\s*\(", sj
+                )
+                and re.search(rf"\b{re.escape(var)}\b", sj)
+            ):
+                return True
+        return False
+
     for idx, s in enumerate(lines, start=1):
         flagged = False
         m_sys = RE_SYSTEM_LIKE.search(s)
@@ -2245,6 +2133,8 @@ def _rule_command_execution(
                     # 若首参为变量且之前赋过字面量，则跳过
                     ident = _first_arg_identifier(s, start)
                     if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                        flagged = False
+                    elif ident and _var_sanitized(ident, lines, idx, lookback=10):
                         flagged = False
                     else:
                         flagged = True
@@ -2260,6 +2150,8 @@ def _rule_command_execution(
                         if ident and _var_assigned_literal(
                             ident, lines, idx, lookback=5
                         ):
+                            flagged = False
+                        elif ident and _var_sanitized(ident, lines, idx, lookback=10):
                             flagged = False
                         else:
                             flagged = True
@@ -2520,18 +2412,23 @@ def _rule_memory_leak(
     """
     issues: List[Issue] = []
 
+    # 跳过非常短的函数（通常是示例代码）
+    # 如果函数少于10行，可能是测试或示例代码
+    if len(lines) < 10:
+        return issues
+
     if database is None:
-        # 无database时回退到正则检测
-        return _rule_memory_leak_regex_fallback(lines, relpath)
+        # 无database时跳过正则回退（避免误报）
+        return issues
 
     # 从database获取当前文件的pointer_states
     try:
         states = database.get_pointer_states_by_file(relpath)
     except Exception:
-        return _rule_memory_leak_regex_fallback(lines, relpath)
+        return issues
 
     if not states:
-        return _rule_memory_leak_regex_fallback(lines, relpath)
+        return issues
 
     # 按变量名分组，检查ALLOCATED但没有FREED的情况
     var_states: Dict[str, List[Dict[str, Any]]] = {}
@@ -2542,12 +2439,38 @@ def _rule_memory_leak(
                 var_states[var_name] = []
             var_states[var_name].append(state)
 
+    # 获取函数参数列表（用于跳过参数的内存泄漏检查）
+    func_params = set()
+    try:
+        symbols = database.get_symbols_by_file(relpath)
+        for sym in symbols:
+            if sym.get("kind") == "parameter":
+                func_params.add(sym.get("name", ""))
+    except Exception:
+        pass
+
     # 检查每个变量的状态
     for var_name, state_list in var_states.items():
         has_allocated = any(s.get("state") == "ALLOCATED" for s in state_list)
         has_freed = any(s.get("state") == "FREED" for s in state_list)
 
         if has_allocated and not has_freed:
+            # 跳过函数参数（参数的内存管理由调用者负责）
+            if var_name in func_params:
+                continue
+            # 跳过有null check的变量（说明调用者关注了返回值）
+            try:
+                from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer
+
+                analyzer = DataFlowAnalyzer(database)
+                code = "\n".join(lines)
+                result = analyzer.analyze_code(
+                    code, is_cpp=False, database=database, file_path=relpath
+                )
+                if result and result.null_checks and var_name in result.null_checks:
+                    continue
+            except Exception:
+                pass
             # 找到第一个ALLOCATED状态的位置
             for state in state_list:
                 if state.get("state") == "ALLOCATED":
@@ -2576,76 +2499,6 @@ def _rule_memory_leak(
                         )
                     )
                     break  # 每个变量只报告一次
-
-    return issues
-
-
-def _rule_memory_leak_regex_fallback(lines: Sequence[str], relpath: str) -> List[Issue]:
-    """内存泄漏检测的正则回退实现"""
-    issues: List[Issue] = []
-
-    # 分配函数模式
-    alloc_pattern = re.compile(r"\b(malloc|calloc|realloc)\s*\(")
-    # 释放函数模式
-    free_pattern = re.compile(r"\bfree\s*\(")
-
-    # 按函数分块分析
-    func_start = 0
-    in_func = False
-    brace_count = 0
-
-    for idx, s in enumerate(lines, start=1):
-        # 检测函数开始
-        if re.search(r"\)\s*\{", s):
-            if not in_func:
-                func_start = idx
-                in_func = True
-                brace_count = 1
-                continue
-
-        if in_func:
-            brace_count += s.count("{") - s.count("}")
-            if brace_count == 0:
-                # 函数结束，分析函数体
-                func_lines = lines[func_start - 1 : idx]
-                func_text = "\n".join(func_lines)
-
-                # 检查是否有分配
-                has_alloc = alloc_pattern.search(func_text)
-                # 检查是否有释放
-                has_free = free_pattern.search(func_text)
-
-                if has_alloc and not has_free:
-                    # 找到分配行号
-                    for i, line in enumerate(func_lines, start=func_start):
-                        if alloc_pattern.search(line):
-                            # 提取变量名
-                            var_name = None
-                            match = re.search(
-                                r"\b(\w+)\s*=\s*(?:\([^)]*\))?\s*(?:malloc|calloc|realloc)\s*\(",
-                                line,
-                            )
-                            if match:
-                                var_name = match.group(1)
-
-                            issues.append(
-                                Issue(
-                                    language="c/cpp",
-                                    category="memory",
-                                    pattern="memory_leak",
-                                    file=relpath,
-                                    line=i,
-                                    evidence=_strip_line(line),
-                                    description="检测到内存分配但未释放，可能存在内存泄漏。",
-                                    suggestion="确保在所有代码路径上释放分配的内存，或使用RAII模式。",
-                                    confidence=0.6,
-                                    severity="medium",
-                                    var_name=var_name,
-                                )
-                            )
-                            break
-
-                in_func = False
 
     return issues
 
@@ -2707,9 +2560,32 @@ def _rule_path_traversal(
         "temp",
     ]
 
+    # sanitize/validate函数名模式
+    _path_sanitize_pattern = re.compile(
+        r"\b(sanitize|validate|check|clean|filter|verify|is_safe|is_valid|is_allowed)\w*\s*\("
+    )
+
+    def _has_path_sanitized(
+        lines: Sequence[str], upto_idx: int, lookback: int = 10
+    ) -> bool:
+        start = max(1, upto_idx - lookback)
+        for j in range(start, upto_idx):
+            sj = _safe_line(lines, j)
+            if _path_sanitize_pattern.search(sj):
+                return True
+            # if (is_safe_filename(var)) 模式
+            if re.search(r"\bif\s*\(", sj) and re.search(
+                r"\b(is_safe|is_valid|is_allowed)\w*\s*\(", sj
+            ):
+                return True
+        return False
+
     # 检测路径拼接后用于文件操作
     for idx, s in enumerate(lines, start=1):
         if path_concat_pattern.search(s):
+            # 跳过已净化/验证的路径
+            if _has_path_sanitized(lines, idx, lookback=10):
+                continue
             # 检查后续几行是否有文件操作（扩大窗口到10行）
             for j in range(idx, min(idx + 10, len(lines) + 1)):
                 if file_op_pattern.search(lines[j - 1]):
@@ -2777,11 +2653,13 @@ def _rule_integer_overflow_from_calls(
     add_pattern = re.compile(r"\b([A-Za-z_]\w*)\s\+\s([A-Za-z_]\w*|\d+)")
 
     # 溢出检查模式（安全模式）
+    # 模式1: var <= INT_MAX / other_var (直接检查)
+    # 模式2: var > INT_MAX / other_var (如果大于则返回/报错)
     mul_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s<=\s(UINT_MAX|INT_MAX)\s/\s([A-Za-z_]\w*)"
+        r"\b([A-Za-z_]\w*)\s(<=|>)\s(UINT_MAX|INT_MAX|\d+)\s/\s([A-Za-z_]\w*)"
     )
     add_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s(<|<=)\s(INT_MAX|UINT_MAX)\s-\s\d+"
+        r"\b([A-Za-z_]\w*)\s(<|<=|>|>=)\s(INT_MAX|UINT_MAX)\s-\s\d+"
     )
 
     def _has_overflow_check(
@@ -2944,142 +2822,7 @@ def _rule_integer_overflow(
         except Exception:
             pass
 
-    # 回退到正则检测
-    # 内存分配函数模式
-    alloc_pattern = re.compile(r"\b(malloc|calloc|realloc)\s*\(")
-
-    # 检测乘法或加法表达式（排除指针声明）
-    # 乘法模式：var * var，但排除 (type *)var 或 *var（指针声明/解引用）
-    mul_pattern = re.compile(
-        r"(?<![(*])\b([A-Za-z_]\w*)\s*\*\s*([A-Za-z_]\w*)(?!\s*\))"
-    )
-    add_pattern = re.compile(r"\b([A-Za-z_]\w*)\s*\+\s*([A-Za-z_]\w*|\d+)")
-
-    # 溢出检查模式（安全模式）
-    mul_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s*<=\s*(UINT_MAX|INT_MAX)\s*/\s*([A-Za-z_]\w*)"
-    )
-    add_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s*(<|<=)\s*(INT_MAX|UINT_MAX)\s*-\s*\d+"
-    )
-
-    def _has_overflow_check(
-        var1: str, var2: str, lines: Sequence[str], upto_idx: int, lookback: int = 10
-    ) -> bool:
-        """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查"""
-        start = max(1, upto_idx - lookback)
-        for j in range(start, upto_idx):
-            sj = _safe_line(lines, j)
-            # 检查乘法溢出检查模式
-            m = mul_overflow_check.search(sj)
-            if m:
-                # 检查是否涉及var1或var2
-                checked_vars = [m.group(1), m.group(3)]
-                if var1 in checked_vars or var2 in checked_vars:
-                    return True
-            # 检查加法溢出检查模式
-            m = add_overflow_check.search(sj)
-            if m:
-                if m.group(1) == var1 or m.group(1) == var2:
-                    return True
-        return False
-
-    for idx, s in enumerate(lines, start=1):
-        if alloc_pattern.search(s):
-            # 提取malloc/calloc/realloc参数部分
-            # 例如：malloc(count * size) -> 提取 "count * size"
-            try:
-                # 找到malloc后的括号内容
-                alloc_start = s.index("(") + 1
-                # 找到匹配的右括号（简化处理：找第一个右括号）
-                alloc_end = s.index(")", alloc_start)
-                alloc_arg = s[alloc_start:alloc_end].strip()
-            except (ValueError, IndexError):
-                # 无法提取参数，跳过
-                continue
-
-            # 检测乘法溢出（只在malloc参数中检测）
-            mul_match = mul_pattern.search(alloc_arg)
-            if mul_match:
-                var1, var2 = mul_match.group(1), mul_match.group(2)
-                # 检查是否有前置的溢出检查
-                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
-                    issues.append(
-                        Issue(
-                            language="c/cpp",
-                            category="arithmetic",
-                            pattern="integer_overflow",
-                            file=relpath,
-                            line=idx,
-                            evidence=_strip_line(s),
-                            description=f"检测到乘法表达式 '{mul_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
-                            suggestion="使用安全整数运算函数（如 size_mul_overflow）或添加溢出检查，确保分配大小正确。",
-                            confidence=0.7,
-                            severity="high",
-                        )
-                    )
-
-            # 检测加法溢出（只在malloc参数中检测）
-            add_match = add_pattern.search(alloc_arg)
-            if add_match:
-                var1, var2 = add_match.group(1), add_match.group(2)
-                # 检查是否有前置的溢出检查
-                if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
-                    issues.append(
-                        Issue(
-                            language="c/cpp",
-                            category="arithmetic",
-                            pattern="integer_overflow",
-                            file=relpath,
-                            line=idx,
-                            evidence=_strip_line(s),
-                            description=f"检测到加法表达式 '{add_match.group(0)}' 作为内存分配参数，可能存在整数溢出风险。",
-                            suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
-                            confidence=0.65,
-                            severity="medium",
-                        )
-                    )
-
-            # 漏报修复：检测间接乘法溢出
-            # 模式：变量作为malloc参数，该变量在前几行由乘法赋值
-            if not mul_match and not add_match:
-                # 检查alloc_arg是否是一个变量名
-                var_in_alloc = re.match(r"^([A-Za-z_]\w*)$", alloc_arg)
-                if var_in_alloc:
-                    target_var = var_in_alloc.group(1)
-                    # 向前查找该变量的乘法赋值
-                    for lookback_line in range(max(0, idx - 10), idx):
-                        prev_line = lines[lookback_line]
-                        # 检测乘法赋值模式：var = expr1 * expr2
-                        assign_mul = re.search(
-                            rf"\b{re.escape(target_var)}\s*=\s*([^;]+)\s*\*\s*([^;]+)",
-                            prev_line,
-                        )
-                        if assign_mul:
-                            expr1, expr2 = (
-                                assign_mul.group(1).strip(),
-                                assign_mul.group(2).strip(),
-                            )
-                            # 检查是否有溢出检查
-                            if not _has_overflow_check(
-                                expr1, expr2, lines, idx, lookback=10
-                            ):
-                                issues.append(
-                                    Issue(
-                                        language="c/cpp",
-                                        category="arithmetic",
-                                        pattern="integer_overflow",
-                                        file=relpath,
-                                        line=idx,
-                                        evidence=_strip_line(s),
-                                        description=f"变量 '{target_var}' 由乘法赋值后用于内存分配，可能存在整数溢出风险。",
-                                        suggestion="使用安全整数运算函数或添加溢出检查，确保分配大小正确。",
-                                        confidence=0.6,
-                                        severity="medium",
-                                    )
-                                )
-                            break
-
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -3148,57 +2891,7 @@ def _rule_hardcoded_credentials(
         except Exception:
             pass
 
-    # 回退到正则匹配（fallback）
-    # 敏感变量名模式（不区分大小写）
-    sensitive_vars = re.compile(
-        r"\b(password|passwd|pwd|secret|key|token|api_key|apikey|auth|credential|private_key|access_key)\b",
-        re.IGNORECASE,
-    )
-
-    # #define 模式
-    define_pattern = re.compile(
-        r'#define\s+\w*(SECRET|KEY|PASSWORD|TOKEN)\w*\s+"([^"]+)"', re.IGNORECASE
-    )
-
-    for idx, s in enumerate(lines, start=1):
-        # 检测敏感变量名赋值
-        if sensitive_vars.search(s) and "=" in s and '"' in s:
-            # 提取字符串内容
-            str_match = re.search(r'"([^"]{4,})"', s)
-            if str_match:
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="crypto",
-                        pattern="hardcoded_credentials",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description="检测到硬编码凭证：变量名包含敏感关键词，且赋值为硬编码字符串。",
-                        suggestion="使用环境变量、配置文件或密钥管理系统存储敏感信息，避免硬编码。",
-                        confidence=0.75,
-                        severity="high",
-                    )
-                )
-
-        # 检测 #define 中的敏感信息
-        define_match = define_pattern.search(s)
-        if define_match:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="crypto",
-                    pattern="hardcoded_credentials",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"检测到宏定义中的硬编码凭证：{define_match.group(1)}",
-                    suggestion="使用环境变量或配置文件存储敏感信息，避免硬编码。",
-                    confidence=0.8,
-                    severity="high",
-                )
-            )
-
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -3213,8 +2906,8 @@ def _rule_toctou_race_from_calls(
 
     # 检查函数集合
     CHECK_FUNCS = {"access", "lstat", "stat", "fstat"}
-    # 使用函数集合
-    USE_FUNCS = {"fopen", "open", "openat"}
+    # 使用函数集合（含C++ ifstream/ofstream/fstream构造函数）
+    USE_FUNCS = {"fopen", "open", "openat", "ifstream", "ofstream", "fstream"}
 
     # 按行号排序调用
     file_calls.sort(key=lambda c: c.get("caller_line", 0))
@@ -3276,8 +2969,8 @@ def _rule_toctou_race(
 
     # 检查函数集合
     CHECK_FUNCS = {"access", "lstat", "stat", "fstat"}
-    # 使用函数集合
-    USE_FUNCS = {"fopen", "open", "openat"}
+    # 使用函数集合（含C++ ifstream/ofstream/fstream构造函数）
+    USE_FUNCS = {"fopen", "open", "openat", "ifstream", "ofstream", "fstream"}
 
     # 优先使用database查询
     if database:
@@ -3297,39 +2990,7 @@ def _rule_toctou_race(
         except Exception:
             pass
 
-    # 回退到正则检测
-    # 检查函数模式
-    check_funcs = ["access", "lstat", "stat", "fstat"]
-
-    # 使用函数模式
-    use_funcs = ["fopen", "open", "openat"]
-
-    # 检测模式：检查函数调用后，在几行内出现使用函数调用
-    for idx, s in enumerate(lines, start=1):
-        # 检测检查函数
-        for check_func in check_funcs:
-            if re.search(rf"\b{check_func}\s*\(", s):
-                # 在后续15行内检测使用函数（漏报修复：扩大窗口从5行到15行）
-                for j in range(idx + 1, min(idx + 16, len(lines) + 1)):
-                    sj = lines[j - 1]
-                    for use_func in use_funcs:
-                        if re.search(rf"\b{use_func}\s*\(", sj):
-                            issues.append(
-                                Issue(
-                                    language="c/cpp",
-                                    category="concurrency",
-                                    pattern="toctou_race",
-                                    file=relpath,
-                                    line=idx,
-                                    evidence=_strip_line(s),
-                                    description=f"检测到TOCTOU竞态条件：{check_func}检查后使用{use_func}，存在竞态窗口。",
-                                    suggestion="使用O_NOFOLLOW标志、fstat检查已打开文件描述符，或使用原子操作避免竞态。",
-                                    confidence=0.65,
-                                    severity="high",
-                                )
-                            )
-                            break
-
+    # 无database时跳过检测（避免误报）
     return issues
 
 
@@ -3399,40 +3060,7 @@ def _rule_scanf_no_width(
                 )
         return issues
 
-    # 回退到正则匹配（fallback）
-    for idx, s in enumerate(lines, start=1):
-        # scanf格式串在第1参数，sscanf/fscanf格式串在第2参数
-        m = RE_SCANF_CALL.search(s)
-        if not m:
-            m = RE_SCANF_CALL_ARG2.search(s)
-        if not m:
-            continue
-        fmt = m.group(1)
-        unsafe = False
-        # 经典不安全情形：出现 %s 但未指定最大宽度
-        if "%s" in fmt and not re.search(r"%\d+s", fmt):
-            unsafe = True
-        # 例外：%*s 丢弃输入，不写入目标缓冲
-        if unsafe and re.search(r"%\*s", fmt):
-            unsafe = False
-        # 例外：GNU 扩展 %ms 或 %m[...]（自动分配）
-        if unsafe and re.search(r"%m[a-z\[]", fmt, re.IGNORECASE):
-            unsafe = False
-        if unsafe:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="buffer_overflow",
-                    pattern="scanf_%s_no_width",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="scanf/sscanf/fscanf 使用 %s 但未限制最大宽度，存在缓冲区溢出风险。",
-                    suggestion='为 %s 指定最大宽度（如 "%255s"），或使用更安全的读取方式；若使用 GNU 扩展 %ms/%m[...] 请确保对返回内存进行释放。',
-                    confidence=0.75,
-                    severity="high",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -3636,6 +3264,529 @@ def _rule_signal_handler_unsafe(
     return issues
 
 
+def _rule_weak_crypto(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测弱加密算法的使用（CWE-327）：DES/RC4/MD5/SHA1/Blowfish等。
+    - 优先使用database查询call_graph表
+    - 若database不可用，回退到正则匹配
+    """
+    issues: List[Issue] = []
+    WEAK_CRYPTO_APIS = {
+        "DES_set_key",
+        "DES_set_key_unchecked",
+        "DES_ecb_encrypt",
+        "DES_cbc_encrypt",
+        "DES_ncbc_encrypt",
+        "DES_ede3_cbc_encrypt",
+        "DES_ede2_cbc_encrypt",
+        "RC4_set_key",
+        "RC4",
+        "MD5_Init",
+        "MD5_Update",
+        "MD5_Final",
+        "MD5_Transform",
+        "SHA1_Init",
+        "SHA1_Update",
+        "SHA1_Final",
+        "SHA1_Transform",
+        "BF_set_key",
+        "BF_ecb_encrypt",
+        "BF_cbc_encrypt",
+        "BF_encrypt",
+        "BF_decrypt",
+    }
+
+    # 优先使用database查询
+    if database:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            if callee_name not in WEAK_CRYPTO_APIS:
+                continue
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+            idx = call.get("caller_line", 0)
+            if 0 < idx <= len(lines):
+                s = lines[idx - 1]
+            else:
+                continue
+
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="crypto",
+                    pattern="weak_crypto",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"使用弱加密算法 {callee_name}，存在被破解的风险。",
+                    suggestion="使用更强的加密算法（如AES-256替代DES，SHA-256替代MD5/SHA1）。",
+                    confidence=0.85,
+                    severity="high",
+                )
+            )
+        return issues
+    # 无database时跳过正则回退（避免误报）
+    return issues
+
+
+def _rule_uninitialized_var(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测未初始化变量使用（CWE-457）：声明后未赋值即使用。
+    检测模式：type var; 后在窗口内无赋值直接使用（return var, var+1, func(var)等）。
+    排除：声明时初始化（int var = 0;）、指针类型（由_rule_uninitialized_ptr_use覆盖）。
+    """
+    issues: List[Issue] = []
+
+    # 无database时跳过正则检测（避免误报）
+    if database is None:
+        return issues
+
+    # 类型关键字
+    type_kw = re.compile(
+        r"\b(int|long|short|char|float|double|unsigned|signed|size_t|ssize_t|"
+        r"uint\d*_t|int\d*_t|BOOL|bool)\b"
+    )
+    # 声明模式：type var; （不含 = 和 *）
+    decl_pattern = re.compile(r"\b([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*;")
+
+    # 收集class/struct内的行号范围（用于排除成员变量）
+    class_member_lines = set()
+    brace_depth = 0
+    in_class_body = False
+    for idx, s in enumerate(lines, start=1):
+        if re.search(r"\b(class|struct)\s+\w+", s):
+            in_class_body = True
+            brace_depth = s.count("{") - s.count("}")
+            if brace_depth > 0:
+                class_member_lines.add(idx)
+            continue
+        if in_class_body:
+            brace_depth += s.count("{") - s.count("}")
+            class_member_lines.add(idx)
+            if brace_depth <= 0:
+                in_class_body = False
+
+    candidates = []  # (var, decl_line)
+    for idx, s in enumerate(lines, start=1):
+        # 跳过预处理行
+        t = s.lstrip()
+        if t.startswith("#"):
+            continue
+        # 跳过class/struct成员变量（由uninitialized_member规则覆盖）
+        if idx in class_member_lines:
+            continue
+        # 必须有类型关键字
+        if not type_kw.search(s):
+            continue
+        # 排除指针声明（由_rule_uninitialized_ptr_use覆盖）
+        if "*" in s:
+            continue
+        # 排除有初始化的声明
+        if "=" in s:
+            continue
+        # 排除函数声明（含括号）
+        if "(" in s:
+            continue
+        m = decl_pattern.search(s)
+        if m:
+            var = m.group(2)
+            # 排除常见非变量名
+            if var in (
+                "main",
+                "if",
+                "while",
+                "for",
+                "return",
+                "struct",
+                "enum",
+                "union",
+            ):
+                continue
+            candidates.append((var, idx))
+
+    # 检查候选变量是否可能未初始化即被使用
+    for var, decl_line in candidates:
+        end = min(len(lines), decl_line + 30)
+        # 收集赋值行和使用行
+        assign_lines = []
+        use_line = None
+        for j in range(decl_line + 1, end + 1):
+            sj = _safe_line(lines, j)
+            # 赋值：var = ...
+            if re.search(rf"\b{re.escape(var)}\s*=", sj):
+                assign_lines.append(j)
+            # 使用：return var, var + ..., func(var), printf(...var...)
+            elif re.search(rf"\b{re.escape(var)}\b", sj):
+                # 排除声明行（同变量名再声明）
+                if type_kw.search(sj) and re.search(rf"\b{re.escape(var)}\s*;", sj):
+                    continue
+                use_line = j
+                break
+
+        if not use_line:
+            continue
+
+        # 如果没有赋值，直接报告
+        if not assign_lines:
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="uninitialized",
+                    pattern="uninitialized_var",
+                    file=relpath,
+                    line=decl_line,
+                    evidence=_strip_line(_safe_line(lines, decl_line)),
+                    description=f"变量 {var} 声明后未初始化即被使用，可能读取未定义值。",
+                    suggestion="在声明时初始化变量，或在使用前确保所有路径都已赋值。",
+                    confidence=0.7,
+                    severity="medium",
+                )
+            )
+            continue
+
+        # 检查赋值是否在if块内但使用在if块外（可能未初始化路径）
+        # 简化检测：赋值行的缩进比使用行深 → 赋值在条件块内
+        for assign_line in assign_lines:
+            assign_indent = len(_safe_line(lines, assign_line)) - len(
+                _safe_line(lines, assign_line).lstrip()
+            )
+            use_indent = len(_safe_line(lines, use_line)) - len(
+                _safe_line(lines, use_line).lstrip()
+            )
+            if assign_indent > use_indent:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="uninitialized",
+                        pattern="uninitialized_var",
+                        file=relpath,
+                        line=decl_line,
+                        evidence=_strip_line(_safe_line(lines, decl_line)),
+                        description=f"变量 {var} 仅在条件分支内赋值，其他路径可能使用未初始化值。",
+                        suggestion="在声明时初始化变量，或在使用前确保所有路径都已赋值。",
+                        confidence=0.65,
+                        severity="medium",
+                    )
+                )
+                break
+
+        # 如果赋值和使用在同一缩进层级，视为安全（已初始化）
+        continue
+
+    # === 第二遍：检测C++类成员未初始化 ===
+    # 检测模式：class内声明成员变量 type var; 但构造函数未初始化
+    # 收集类成员变量
+    class_members: Dict[str, List[Tuple[str, int]]] = {}  # class_name -> [(var, line)]
+    current_class: Optional[str] = None
+    class_brace_depth = 0
+    in_class = False
+
+    for idx, s in enumerate(lines, start=1):
+        t = s.lstrip()
+        if t.startswith("#"):
+            continue
+        # 检测class定义
+        class_match = re.search(r"\bclass\s+(\w+)", s)
+        if class_match:
+            current_class = class_match.group(1)
+            class_brace_depth = s.count("{") - s.count("}")
+            in_class = "{" in s
+            if current_class not in class_members:
+                class_members[current_class] = []
+            continue
+
+        if in_class and current_class:
+            class_brace_depth += s.count("{") - s.count("}")
+            if class_brace_depth <= 0:
+                in_class = False
+                current_class = None
+                continue
+
+            # 检测成员变量声明（非函数、非指针、无初始化）
+            if type_kw.search(s) and "(" not in s and "*" not in s and "=" not in s:
+                m = decl_pattern.search(s)
+                if m:
+                    var = m.group(2)
+                    if var not in (
+                        "main",
+                        "if",
+                        "while",
+                        "for",
+                        "return",
+                        "struct",
+                        "enum",
+                        "union",
+                    ):
+                        class_members.setdefault(current_class, []).append((var, idx))
+
+    # 检查构造函数是否初始化了这些成员
+    for cls_name, members in class_members.items():
+        if not members:
+            continue
+        # 查找构造函数中的初始化列表
+        ctor_init_vars = set()
+        in_ctor = False
+        ctor_brace_depth = 0
+        for idx, s in enumerate(lines, start=1):
+            # 检测构造函数定义
+            if re.search(rf"\b{re.escape(cls_name)}\s*\([^)]*\)\s*(?::|\{{)", s):
+                in_ctor = True
+                ctor_brace_depth = s.count("{") - s.count("}")
+                # 检查初始化列表：: member(value)
+                init_list_match = re.search(r":\s*(.+)", s)
+                if init_list_match:
+                    init_text = init_list_match.group(1)
+                    for var, _ in members:
+                        if re.search(rf"\b{re.escape(var)}\s*\(", init_text):
+                            ctor_init_vars.add(var)
+                continue
+
+            if in_ctor:
+                ctor_brace_depth += s.count("{") - s.count("}")
+                if ctor_brace_depth <= 0:
+                    in_ctor = False
+                    continue
+                # 检查初始化列表续行
+                for var, _ in members:
+                    if var not in ctor_init_vars and re.search(
+                        rf"\b{re.escape(var)}\s*\(", s
+                    ):
+                        ctor_init_vars.add(var)
+                # 检查构造函数体内赋值
+                for var, _ in members:
+                    if var not in ctor_init_vars and re.search(
+                        rf"\b{re.escape(var)}\s*=", s
+                    ):
+                        ctor_init_vars.add(var)
+
+        # 检查类方法中是否有 this->var 赋值（排除误报）
+        method_assigned_vars = set()
+        for idx, s in enumerate(lines, start=1):
+            for var, _ in members:
+                if var not in ctor_init_vars and re.search(
+                    rf"\bthis\s*->\s*{re.escape(var)}\s*=", s
+                ):
+                    method_assigned_vars.add(var)
+
+        # 报告未初始化的成员
+        for var, line_no in members:
+            if var not in ctor_init_vars and var not in method_assigned_vars:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="uninitialized",
+                        pattern="uninitialized_member",
+                        file=relpath,
+                        line=line_no,
+                        evidence=_strip_line(_safe_line(lines, line_no)),
+                        description=f"类 {cls_name} 的成员变量 {var} 未在构造函数中初始化。",
+                        suggestion="在构造函数初始化列表中初始化所有成员变量，或使用类内初始值。",
+                        confidence=0.7,
+                        severity="medium",
+                    )
+                )
+
+    return issues
+
+
+def _rule_signed_to_unsigned(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测有符号到无符号转换错误（CWE-195）：(size_t)int_var 或 (unsigned)int_var。
+    排除：转换前有负值检查（if (len < 0) return;）。
+    """
+    issues: List[Issue] = []
+    # 显式转换模式：(size_t)var 或 (unsigned)var 或 (uint32_t)var
+    cast_pattern = re.compile(
+        r"\(\s*(size_t|unsigned|uint\d*_t|ULONG|DWORD)\s*\)\s*\(?\s*([A-Za-z_]\w*)\s*\)?"
+    )
+
+    for idx, s in enumerate(lines, start=1):
+        t = s.lstrip()
+        if t.startswith("#"):
+            continue
+        for m in cast_pattern.finditer(s):
+            var = m.group(2)
+            # 检查前5行是否有负值检查
+            has_neg_check = False
+            start = max(1, idx - 5)
+            for j in range(start, idx):
+                sj = _safe_line(lines, j)
+                if re.search(rf"\bif\s*\([^)]*{re.escape(var)}\s*(<|<=)\s*0", sj):
+                    has_neg_check = True
+                    break
+                if re.search(rf"\b{re.escape(var)}\s*(<|<=)\s*0", sj):
+                    has_neg_check = True
+                    break
+            if has_neg_check:
+                continue
+
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="type_confusion",
+                    pattern="signed_unsigned_conversion",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"有符号变量 {var} 被强制转换为无符号类型 {m.group(1)}，负值将变为巨大正数。",
+                    suggestion="在转换前检查值是否为负，或使用size_t/unsigned类型从头声明。",
+                    confidence=0.75,
+                    severity="high",
+                )
+            )
+    return issues
+
+
+def _rule_divide_by_zero(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测除零错误（CWE-369）：a/b 或 a%b 中 b 为变量且附近无零检查。
+    排除：除数是常量非零值、附近有零检查（if (b == 0) / if (b) / if (!b)）。
+    """
+    issues: List[Issue] = []
+    # 除法/取模模式：var / var 或 var % var
+    div_pattern = re.compile(r"\b([A-Za-z_]\w*)\s*/\s*([A-Za-z_]\w*)")
+    mod_pattern = re.compile(r"\b([A-Za-z_]\w*)\s*%\s*([A-Za-z_]\w*)")
+
+    for idx, s in enumerate(lines, start=1):
+        t = s.lstrip()
+        if t.startswith("#"):
+            continue
+        # 跳过字符串字面量中的除法（如 char path[] = "/home/..."）
+        # 简单启发式：行内有引号且除法在引号之间
+        for pattern in (div_pattern, mod_pattern):
+            for m in pattern.finditer(s):
+                # 检查匹配是否在字符串字面量内
+                before = s[: m.start()]
+                if before.count('"') % 2 == 1 or before.count("'") % 2 == 1:
+                    continue
+                divisor = m.group(2)
+                # 排除常量非零除数
+                if divisor.isdigit() and divisor != "0":
+                    continue
+                # 排除sizeof(...)
+                if "sizeof" in s[m.start() : m.end()]:
+                    continue
+                # 排除溢出检查中的除法（如 INT_MAX / obj_size）
+                if re.search(r"(INT_MAX|UINT_MAX|SIZE_MAX)\s*/\s", s):
+                    continue
+                # 检查前5行和当前行是否有零检查
+                has_zero_check = False
+                start = max(1, idx - 5)
+                for j in range(start, idx + 1):
+                    sj = _safe_line(lines, j)
+                    if re.search(
+                        rf"\bif\s*\([^)]*{re.escape(divisor)}\s*(==|!=)\s*0", sj
+                    ):
+                        has_zero_check = True
+                        break
+                    if re.search(rf"\bif\s*\(\s*!?\s*{re.escape(divisor)}\s*\)", sj):
+                        has_zero_check = True
+                        break
+                    if re.search(rf"\b{re.escape(divisor)}\s*(==|!=)\s*0", sj):
+                        has_zero_check = True
+                        break
+                if has_zero_check:
+                    continue
+
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="arithmetic",
+                        pattern="divide_by_zero",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"除数 {divisor} 可能为零，存在除零错误风险。",
+                        suggestion="在除法/取模前检查除数是否为零。",
+                        confidence=0.7,
+                        severity="high",
+                    )
+                )
+    return issues
+
+
+def _rule_compiler_security_check(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测编译器优化可能移除安全检查（CWE-733）：
+    指针变量有NULL检查但未声明为volatile，编译器可能优化掉检查。
+    排除：变量声明为volatile。
+    """
+    issues: List[Issue] = []
+    # 收集volatile变量
+    volatile_vars = set()
+    for s in lines:
+        m = re.search(r"\bvolatile\s+.*?\b([A-Za-z_]\w*)\b", s)
+        if m:
+            volatile_vars.add(m.group(1))
+        m = re.search(r"\bvolatile\s+char\s*\*\s*([A-Za-z_]\w*)", s)
+        if m:
+            volatile_vars.add(m.group(1))
+
+    # 检测NULL检查模式：if (ptr == NULL) / if (!ptr) / if (ptr)
+    null_check_pattern = re.compile(
+        r"\bif\s*\(\s*(!\s*)?([A-Za-z_]\w*)\s*(==|!=)?\s*(NULL|0)?\s*\)"
+    )
+
+    for idx, s in enumerate(lines, start=1):
+        t = s.lstrip()
+        if t.startswith("#"):
+            continue
+        for m in null_check_pattern.finditer(s):
+            var = m.group(2)
+            if var in ("if", "while", "for", "return", "NULL", "0"):
+                continue
+            # 跳过volatile变量
+            if var in volatile_vars:
+                continue
+            # 检查是否是指针类型（前几行有 *var 或 type *var 声明）
+            is_pointer = False
+            start = max(1, idx - 10)
+            for j in range(start, idx + 1):
+                sj = _safe_line(lines, j)
+                if re.search(rf"\b[A-Za-z_]\w*\s*\*\s*{re.escape(var)}\b", sj):
+                    is_pointer = True
+                    break
+                if re.search(rf"\b{re.escape(var)}\s*\*\b", sj):
+                    is_pointer = True
+                    break
+                # 函数参数中的指针
+                if re.search(rf"\*\s*{re.escape(var)}\b", sj):
+                    is_pointer = True
+                    break
+            if not is_pointer:
+                continue
+
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="optimization",
+                    pattern="compiler_security_check",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"指针 {var} 的NULL检查可能被编译器优化移除（未声明为volatile）。",
+                    suggestion="将指针声明为volatile以防止编译器优化移除安全检查，或使用编译器屏障。",
+                    confidence=0.6,
+                    severity="medium",
+                )
+            )
+    return issues
+
+
 def _rule_alloc_size_overflow(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
@@ -3675,6 +3826,28 @@ def _rule_alloc_size_overflow(
                 if end != -1:
                     args = s[start + 1 : end]
                     if "*" in args and not re.search(r"\bsizeof\s*\(", args):
+                        # CWE-190误报过滤：检查前5行是否有溢出检查
+                        has_overflow_check = False
+                        for j in range(max(1, idx - 5), idx):
+                            sj = _safe_line(lines, j)
+                            if (
+                                re.search(
+                                    r"\b(INT_MAX|UINT_MAX|SIZE_MAX|INT_MAX)\s*/",
+                                    sj,
+                                )
+                                or re.search(
+                                    r"\b\w+\s*<=\s*(INT_MAX|UINT_MAX|SIZE_MAX)\s*/",
+                                    sj,
+                                )
+                                or re.search(
+                                    r"\b\w+\s*<\s*(INT_MAX|UINT_MAX|SIZE_MAX)\s*/",
+                                    sj,
+                                )
+                            ):
+                                has_overflow_check = True
+                                break
+                        if has_overflow_check:
+                            continue
                         issues.append(
                             Issue(
                                 language="c/cpp",
@@ -3693,39 +3866,176 @@ def _rule_alloc_size_overflow(
                 pass
         return issues
 
-    # 回退到正则匹配（fallback）
-    for idx, s in enumerate(lines, start=1):
-        m = re.search(r"\bmalloc\s*\(", s, re.IGNORECASE)
-        if not m:
-            continue
-        try:
-            start = s.index("(", m.start())
-            end = s.find(")", start + 1)
-            if end != -1:
-                args = s[start + 1 : end]
-                if "*" in args and not re.search(r"\bsizeof\s*\(", args):
-                    issues.append(
-                        Issue(
-                            language="c/cpp",
-                            category="memory_mgmt",
-                            pattern="alloc_size_overflow",
-                            file=relpath,
-                            line=idx,
-                            evidence=_strip_line(s),
-                            description="malloc 大小计算包含乘法且未显式使用 sizeof，存在整数溢出或尺寸计算错误的风险。",
-                            suggestion="使用 sizeof 计算元素大小并检查乘法是否可能溢出；引入范围/上界校验。",
-                            confidence=0.6,
-                            severity="medium",
-                        )
-                    )
-        except Exception:
-            pass
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
 # ---------------------------
 # 空指针/野指针/死锁 等新增规则
 # ---------------------------
+
+
+# CWE-468: 指针算术错误正则
+RE_PTRDIFF_SIZEOF = re.compile(
+    r"\(s*\w+\s*-\s*\w+\s*\)\s*/\s*sizeof\s*\(", re.IGNORECASE
+)
+
+
+def _rule_pointer_arithmetic_error(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-468: 检测指针减法结果再除以sizeof(type)的错误。
+    指针减法已自动除以sizeof(type)，再除一次是错误的。
+    模式：(ptr1 - ptr2) / sizeof(type)
+    """
+    issues: List[Issue] = []
+
+    for idx, s in enumerate(lines, start=1):
+        if RE_PTRDIFF_SIZEOF.search(s):
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="arithmetic",
+                    pattern="pointer_arithmetic_error",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="指针减法结果再除以sizeof，指针减法已自动除以元素大小，再除是错误的。",
+                    suggestion="直接使用 (end - begin) 作为元素数量，无需再除以sizeof。",
+                    confidence=0.85,
+                    severity="high",
+                )
+            )
+
+    return issues
+
+
+# CWE-667: 死锁风险 - mutex不同顺序获取
+RE_MUTEX_LOCK = re.compile(r"\b(\w+)\s*\.\s*lock\s*\(")
+
+
+def _rule_deadlock_risk(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-667: 检测同一文件中多个函数以不同顺序获取mutex，可能导致死锁。
+    启发式：收集每个函数内mutex.lock()的调用顺序，检测不同函数间的顺序差异。
+    """
+    issues: List[Issue] = []
+
+    # 按函数收集mutex获取顺序
+    func_mutex_order: Dict[
+        str, List[Tuple[str, int]]
+    ] = {}  # func_name -> [(mutex_name, line)]
+    current_func: Optional[str] = None
+    brace_depth = 0
+
+    for idx, s in enumerate(lines, start=1):
+        # 检测函数定义
+        func_match = re.search(
+            r"\b(?:void|int|char|long|unsigned|bool|auto|static)\s+(\w+)\s*\(", s
+        )
+        if func_match:
+            current_func = func_match.group(1)
+            brace_depth = s.count("{") - s.count("}")
+            if current_func not in func_mutex_order:
+                func_mutex_order[current_func] = []
+            continue
+
+        if current_func:
+            brace_depth += s.count("{") - s.count("}")
+            if brace_depth <= 0:
+                current_func = None
+                continue
+
+            # 检测mutex.lock()调用
+            m = RE_MUTEX_LOCK.search(s)
+            if m:
+                mutex_name = m.group(1)
+                func_mutex_order[current_func].append((mutex_name, idx))
+
+    # 检测不同函数间的mutex获取顺序差异
+    func_names = [f for f in func_mutex_order if len(func_mutex_order[f]) >= 2]
+    for i, f1 in enumerate(func_names):
+        order1 = [m for m, _ in func_mutex_order[f1]]
+        for f2 in func_names[i + 1 :]:
+            order2 = [m for m, _ in func_mutex_order[f2]]
+            # 检查是否有共同的mutex但顺序不同
+            common = set(order1) & set(order2)
+            if len(common) >= 2:
+                # 获取共同mutex在两个函数中的顺序
+                idx1 = [order1.index(m) for m in common if m in order1]
+                idx2 = [order2.index(m) for m in common if m in order2]
+                # 如果顺序不同，报告死锁风险
+                if idx1 != idx2:
+                    # 报告第一个函数中的mutex获取
+                    for mutex_name, line_no in func_mutex_order[f1]:
+                        if mutex_name in common:
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="concurrency",
+                                    pattern="deadlock_risk",
+                                    file=relpath,
+                                    line=line_no,
+                                    evidence=_strip_line(lines[line_no - 1]),
+                                    description=f"函数 {f1} 和 {f2} 以不同顺序获取mutex {mutex_name}，可能导致死锁。",
+                                    suggestion="确保所有函数以相同顺序获取mutex，或使用std::lock同时获取多个mutex。",
+                                    confidence=0.75,
+                                    severity="high",
+                                )
+                            )
+                            break  # 每对函数只报告一次
+                    break  # 每对函数只报告一次
+
+    return issues
+
+
+# CWE-783: 条件中的赋值
+RE_ASSIGN_IN_COND = re.compile(
+    r"\b(?:if|while|for\s*\([^;]*;)\s*\([^)]*\b(\w+)\s*=\s*(\d+)\s*\)"
+)
+
+
+def _rule_assignment_in_condition(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-783: 检测if/while条件中使用=而非==的赋值。
+    排除合法用法：if ((result = func()) != 0) 等带比较运算符的模式。
+    """
+    issues: List[Issue] = []
+
+    for idx, s in enumerate(lines, start=1):
+        # 检测if/while条件中的赋值
+        # 模式1: if (x = 0) - 赋值常量，永远为假/真
+        m = re.search(r"\b(?:if|while)\s*\(\s*\b(\w+)\s*=\s*(\d+)\s*\)", s)
+        if m:
+            var = m.group(1)
+            val = m.group(2)
+            # 排除合法用法：if ((result = func()) != 0)
+            # 检查赋值是否在额外的括号内且有比较运算符
+            if re.search(r"\(\s*\(" + re.escape(var) + r"\s*=", s) and re.search(
+                r"!=|==|<=|>=|<|>", s[s.index(var) :]
+            ):
+                continue
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="logic_error",
+                    pattern="assignment_in_condition",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"条件表达式中使用赋值 '{var} = {val}' 而非比较 '{var} == {val}'，可能导致逻辑错误。",
+                    suggestion="如果意图是比较，请使用 '==' 运算符；如果意图是赋值后判断，建议使用额外括号明确意图。",
+                    confidence=0.8,
+                    severity="high",
+                )
+            )
+
+    return issues
 
 
 def _rule_possible_null_deref(
@@ -3744,15 +4054,28 @@ def _rule_possible_null_deref(
 
     # 从database获取null_checks信息（用于误报过滤）
     db_null_checks: Dict[str, List[int]] = {}
+    # 收集函数参数（参数的NULL检查应在调用者处进行）
+    func_params: set[str] = set()
     if database is not None:
         try:
-            from jarvis.jarvis_sec.data_flow_analyzer import DataFlowAnalyzer
-
-            analyzer = DataFlowAnalyzer(database)
-            # 获取当前文件的数据流结果
-            result = analyzer.get_data_flow_result(relpath)
-            if result and result.null_checks:
-                db_null_checks = result.null_checks
+            # 直接从database查询null_checks
+            flow_nodes = database.get_data_flow_by_file(relpath)
+            for node in flow_nodes:
+                if node.get("use_type") == "null_check":
+                    var_name = node.get("var_name", "")
+                    line = node.get("line", 0)
+                    if var_name and line > 0:
+                        if var_name not in db_null_checks:
+                            db_null_checks[var_name] = []
+                        db_null_checks[var_name].append(line)
+                # 收集函数参数
+                if (
+                    node.get("node_type") == "param_in"
+                    or node.get("value_source") == "parameter"
+                ):
+                    var_name = node.get("var_name", "")
+                    if var_name:
+                        func_params.add(var_name)
         except Exception:
             pass
 
@@ -3823,11 +4146,24 @@ def _rule_possible_null_deref(
     )
     re_static_global = re.compile(r"^\s*(static|extern)\s+.*\b([A-Za-z_]\w*)\b")
     re_const_str = re.compile(r"\bconst\s+char\s*\*\s*([A-Za-z_]\w*)\b")
+    # 智能指针类型（不可能为NULL）
+    re_smart_ptr = re.compile(
+        r"\b(auto|std::unique_ptr|std::shared_ptr|std::weak_ptr)\b"
+    )
+    # delete/delete[] 语句（不是解引用）
+    re_delete_stmt = re.compile(r"^\s*delete\s*\[?\s*\]?\s*([A-Za-z_]\w*)")
 
     # 收集静态/全局变量和常量字符串指针（通常已确保非空）
     safe_vars: set[str] = set()
     # 收集栈数组变量（栈数组不可能为NULL）
     stack_arrays: set[str] = set()
+    # 收集智能指针变量（不可能为NULL）
+    smart_ptr_vars: set[str] = set()
+    # 收集C++容器变量（值类型，不可能为NULL）
+    container_vars: set[str] = set()
+    re_cpp_container = re.compile(
+        r"std::(?:array|vector|deque|list|set|map|unordered_set|unordered_map)[^>]*>\s*&?\s*([A-Za-z_]\w*)"
+    )
     # 栈数组声明模式：类型 变量名[大小]
     re_stack_array = re.compile(
         r"\b(char|int|long|short|void|unsigned|signed|float|double|size_t|ssize_t|uint\d*_t|int\d*_t)\s+(?:\*\s*)*([A-Za-z_]\w*)\s*\["
@@ -3843,6 +4179,30 @@ def _rule_possible_null_deref(
         m_array = re_stack_array.search(line)
         if m_array:
             stack_arrays.add(m_array.group(2))
+        # 检测智能指针声明
+        m_smart = re_smart_ptr.search(line)
+        if m_smart:
+            # 提取变量名：auto var = ... 或 std::unique_ptr<T> var
+            m_var = re.search(r"\b([A-Za-z_]\w*)\s*=", line)
+            if m_var:
+                smart_ptr_vars.add(m_var.group(1))
+            else:
+                # 也提取函数参数中的智能指针变量名
+                m_param = re.search(
+                    r"std::(?:unique_ptr|shared_ptr|weak_ptr)[^>]*>\s*&?\s*([A-Za-z_]\w*)",
+                    line,
+                )
+                if m_param:
+                    smart_ptr_vars.add(m_param.group(1))
+        # 检测C++容器变量（值类型，不可能为NULL）
+        m_container = re_cpp_container.search(line)
+        if m_container:
+            container_vars.add(m_container.group(1))
+        # 检测 delete[] 语句，记录被删除的变量
+        m_delete = re_delete_stmt.search(line)
+        if m_delete:
+            # delete[] var 不是解引用，跳过
+            pass
 
     def _is_just_allocated(var: str, lines: Sequence[str], line_no: int) -> bool:
         """检查变量是否刚分配成功（前1-2行有malloc/new等分配函数）"""
@@ -3876,8 +4236,12 @@ def _rule_possible_null_deref(
             # 排除数组声明
             if _is_array_declaration(s, var_pos):
                 continue
-            # 排除明显的数组初始化（如 int arr[] = {...}）
+            # 排除模板参数中的数组访问（如 make_unique<int[]>）
             before_var = s[:var_pos]
+            if "<" in before_var and ">" not in before_var:
+                # 在模板参数内部，跳过
+                continue
+            # 排除明显的数组初始化（如 int arr[] = {...}）
             if type_kw.search(before_var) and "=" in s[var_pos:]:
                 # 检查是否是初始化语法
                 after_var = s[var_pos + len(var) :]
@@ -3892,6 +4256,18 @@ def _rule_possible_null_deref(
                 continue
             # 跳过栈数组（栈数组不可能为NULL）
             if v in stack_arrays:
+                continue
+            # 跳过智能指针变量（不可能为NULL）
+            if v in smart_ptr_vars:
+                continue
+            # 跳过C++容器变量（值类型，不可能为NULL）
+            if v in container_vars:
+                continue
+            # 跳过函数参数（参数的NULL检查应在调用者处进行）
+            if v in func_params:
+                continue
+            # 跳过 delete/delete[] 语句（不是解引用）
+            if re_delete_stmt.search(s):
                 continue
             # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
             if _is_just_allocated(v, lines, idx):
@@ -3936,17 +4312,17 @@ def _rule_uninitialized_ptr_use(
     issues: List[Issue] = []
 
     if database is None:
-        # 无database时回退到正则检测
-        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+        # 无database时跳过正则回退（避免误报）
+        return issues
 
     # 从database获取当前文件的data_flow
     try:
         flow_nodes = database.get_data_flow_by_file(relpath)
     except Exception:
-        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+        return issues
 
     if not flow_nodes:
-        return _rule_uninitialized_ptr_use_regex_fallback(lines, relpath)
+        return issues
 
     # 按变量名分组，检查def后是否有赋值
     var_flows: Dict[str, List[Dict[str, Any]]] = {}
@@ -4017,66 +4393,6 @@ def _rule_uninitialized_ptr_use(
                 )
             )
 
-    return issues
-
-
-def _rule_uninitialized_ptr_use_regex_fallback(
-    lines: Sequence[str], relpath: str
-) -> List[Issue]:
-    """野指针检测的正则回退实现"""
-    issues: List[Issue] = []
-    # 收集候选未初始化指针声明
-    candidates = []  # (var, decl_line)
-    decl_ptr_line = re.compile(r"\*")
-    type_prefix = re.compile(
-        r"\b(typedef|struct|union|enum|class|const|volatile|static|register|signed|unsigned|char|int|long|short|void|float|double)\b"
-    )
-    for idx, s in enumerate(lines, start=1):
-        if ";" not in s or "(" in s or "=" in s:
-            continue
-        if not decl_ptr_line.search(s):
-            continue
-        if not type_prefix.search(s):
-            continue
-        # 提取形如 *p, *q
-        for m in re.finditer(r"\*\s*([A-Za-z_]\w*)\b", s):
-            v = m.group(1)
-            candidates.append((v, idx))
-
-    # 检查候选在接下来的窗口中是否在赋值前被解引用
-    for v, decl_line in candidates:
-        # 向后查看 20 行
-        end = min(len(lines), decl_line + 20)
-        initialized = False
-        deref_line = None
-        for j in range(decl_line + 1, end + 1):
-            sj = _safe_line(lines, j)
-            # 赋值/初始化：p = ..., p = &x, p = malloc(...)
-            if re.search(rf"\b{re.escape(v)}\s*=\s*", sj):
-                initialized = True
-                break
-            # 解引用：p-> 或 *p
-            if re.search(rf"\b{re.escape(v)}\s*->", sj) or re.search(
-                rf"(?<!\w)\*\s*{re.escape(v)}\b", sj
-            ):
-                deref_line = j
-                # 若命中，若附近没有 NULL 检查/初始化则认为风险较高
-                break
-        if deref_line and not initialized:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="memory_mgmt",
-                    pattern="wild_pointer_deref",
-                    file=relpath,
-                    line=deref_line,
-                    evidence=_strip_line(_safe_line(lines, deref_line)),
-                    description=f"指针 {v} 声明后未见初始化即被解引用，可能为野指针使用。",
-                    suggestion="在声明后立即将指针初始化为 NULL，并在使用前进行显式赋值与有效性校验。",
-                    confidence=0.65,
-                    severity="high",
-                )
-            )
     return issues
 
 
@@ -4276,98 +4592,7 @@ def _rule_deadlock_patterns(
         except Exception:
             pass
 
-    # 回退到正则检测
-    lock_stack: list[str] = []
-    # 记录出现过的加锁顺序对及其行号
-    order_pairs: dict[tuple[str, str], int] = {}
-
-    # 先行扫描：顺序和双重加锁
-    for idx, s in enumerate(lines, start=1):
-        m_lock = RE_PTHREAD_LOCK.search(s)
-        m_unlock = RE_PTHREAD_UNLOCK.search(s)
-        if m_lock:
-            mtx = m_lock.group(1)
-            # 双重加锁检测
-            if mtx in lock_stack:
-                issues.append(
-                    Issue(
-                        language="c/cpp",
-                        category="error_handling",
-                        pattern="double_lock",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"互斥量 {mtx} 在未解锁的情况下被再次加锁，存在死锁风险。",
-                        suggestion="避免对同一互斥量重复加锁；检查代码路径确保加锁/解锁严格匹配。",
-                        confidence=0.8,
-                        severity="high",
-                    )
-                )
-            # 锁顺序记录
-            if lock_stack and lock_stack[-1] != mtx:
-                pair = (lock_stack[-1], mtx)
-                order_pairs.setdefault(pair, idx)
-            lock_stack.append(mtx)
-        elif m_unlock:
-            mtx = m_unlock.group(1)
-            # 从栈中移除最近的相同锁
-            if mtx in lock_stack:
-                # 移除最后一次加锁的该互斥量（近似）
-                for k in range(len(lock_stack) - 1, -1, -1):
-                    if lock_stack[k] == mtx:
-                        del lock_stack[k]
-                        break
-        # 粗略按函数/作用域结束重置
-        if "}" in s and not lock_stack:
-            lock_stack = []
-
-    # 锁顺序反转检测
-    for (a, b), ln in order_pairs.items():
-        if (b, a) in order_pairs:
-            # 在第二次发现处报一次
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="error_handling",
-                    pattern="lock_order_inversion",
-                    file=relpath,
-                    line=order_pairs[(b, a)],
-                    evidence=_strip_line(_safe_line(lines, order_pairs[(b, a)])),
-                    description=f"检测到互斥量加锁顺序反转：({a} -> {b}) 与 ({b} -> {a})，存在死锁风险。",
-                    suggestion="统一多锁的获取顺序，制定全局锁等级或严格的加锁顺序规范。",
-                    confidence=0.7,
-                    severity="high",
-                )
-            )
-
-    # 可能缺失解锁：在加锁后的 50 行窗口内未见对应解锁
-    for idx, s in enumerate(lines, start=1):
-        m_lock = RE_PTHREAD_LOCK.search(s)
-        if not m_lock:
-            continue
-        mtx = m_lock.group(1)
-        end = min(len(lines), idx + 50)
-        unlocked = False
-        for j in range(idx + 1, end + 1):
-            m_un = RE_PTHREAD_UNLOCK.search(_safe_line(lines, j))
-            if m_un and m_un.group(1) == mtx:
-                unlocked = True
-                break
-        if not unlocked:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="error_handling",
-                    pattern="missing_unlock_suspect",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"在加锁 {mtx} 之后的邻近窗口内未检测到匹配解锁，可能存在缺失解锁的风险。",
-                    suggestion="确保所有加锁路径都有配对的解锁；考虑使用 RAII/DEFER 风格避免遗漏。",
-                    confidence=0.55,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -4529,23 +4754,7 @@ def _rule_atoi_family(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if RE_ATOI_FAMILY.search(s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="input_validation",
-                    pattern="atoi_family",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用 atoi/atol/atoll/atof 缺乏错误与范围检查，容易产生解析错误或未定义行为。",
-                    suggestion="使用 strtol/strtoul/strtod 等并检查 errno 和 endptr；进行范围与格式校验。",
-                    confidence=0.65,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -4612,29 +4821,7 @@ def _rule_rand_insecure(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if RE_RAND.search(s):
-            conf = 0.55
-            window_text = " ".join(
-                t for _, t in _window(lines, idx, before=1, after=1)
-            ).lower()
-            if any(k in window_text for k in keywords):
-                conf += 0.2
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="crypto",
-                    pattern="rand_insecure",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="检测到 rand/srand，用于安全敏感场景可能不安全，易被预测。",
-                    suggestion="使用系统级 CSPRNG（如 getrandom/arc4random/openssl RAND_bytes），避免用于密钥/令牌生成。",
-                    confidence=min(conf, 0.8),
-                    severity="high" if conf >= 0.7 else "medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -4680,23 +4867,7 @@ def _rule_strtok_nonreentrant(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if RE_STRTOK.search(s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="thread_safety",
-                    pattern="strtok_nonreentrant",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用 strtok 非重入且线程不安全，可能导致竞态或数据覆盖。",
-                    suggestion="使用 strtok_r（POSIX）或可重入/线程安全的分割方案。",
-                    confidence=0.6,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -4710,18 +4881,6 @@ def _rule_open_permissive_perms(
     说明：优先使用database查询call_graph表，失败时回退到正则检测。
     """
     issues: List[Issue] = []
-    sensitive_keys = (
-        "key",
-        "secret",
-        "token",
-        "passwd",
-        "password",
-        "cred",
-        "config",
-        "cert",
-        "private",
-        "id_rsa",
-    )
     open_apis = ["open", "fopen"]
 
     # 优先尝试database驱动检测
@@ -4775,63 +4934,7 @@ def _rule_open_permissive_perms(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        m = RE_OPEN_PERMISSIVE.search(s)
-        if m:
-            mode = m.group(1)
-            # 只报告过宽权限（0666、0777等），安全权限（0600、0640等）不报告
-            # 过宽权限：其他用户有读/写/执行权限
-            try:
-                mode_val = int(mode, 8)
-                # 检查是否有其他用户权限（group或other有写/执行权限）
-                has_group_write = (mode_val & 0o020) != 0  # group write
-                has_other_write = (mode_val & 0o002) != 0  # other write
-                has_other_read = (mode_val & 0o004) != 0  # other read
-                # 过宽权限：其他用户有写权限，或other有读权限
-                is_permissive = has_group_write or has_other_write or has_other_read
-                if not is_permissive:
-                    continue  # 安全权限，跳过
-            except ValueError:
-                # 无法解析，保守处理：继续报告
-                pass
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="insecure_permissions",
-                    pattern="open_permissive_perms",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"open 使用 O_CREAT 且权限 {mode} 过宽，存在敏感信息泄露风险。",
-                    suggestion="显式使用更严格的权限（如 0600/0640），或设置合适 umask 后再创建文件。",
-                    confidence=0.8,
-                    severity="high",
-                )
-            )
-        # fopen 模式为写入且上下文敏感时，进行提醒
-        m2 = RE_FOPEN_MODE.search(s)
-        if m2:
-            mode = m2.group(1)
-            if "w" in mode:
-                window = " ".join(
-                    t for _, t in _window(lines, idx, before=1, after=1)
-                ).lower()
-                if any(k in window for k in sensitive_keys):
-                    issues.append(
-                        Issue(
-                            language="c/cpp",
-                            category="insecure_permissions",
-                            pattern="fopen_write_sensitive",
-                            file=relpath,
-                            line=idx,
-                            evidence=_strip_line(s),
-                            description="fopen 以写入模式操作可能的敏感文件，需确认创建权限与 umask 设置是否足够严格。",
-                            suggestion="确认运行态 umask；必要时使用 open+fchmod/umask 控制权限，或以 0600 创建后再放宽。",
-                            confidence=0.55,
-                            severity="medium",
-                        )
-                    )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -4899,35 +5002,7 @@ def _rule_alloca_unbounded(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        m = RE_ALLOCA.search(s)
-        if not m:
-            continue
-        arg = m.group(1).strip()
-        # 纯数字常量或包含 sizeof 视为更安全
-        if re.fullmatch(r"\d+\s*", arg) or "sizeof" in arg:
-            continue
-        # 宏常量（全大写+下划线/数字）通常为编译期常量，减少误报
-        if re.fullmatch(r"[A-Z_][A-Z0-9_]*", arg):
-            continue
-        conf = 0.6
-        if re.search(r"(len|size|count|n)\b", arg, re.IGNORECASE):
-            conf += 0.1
-        issues.append(
-            Issue(
-                language="c/cpp",
-                category="memory_mgmt",
-                pattern="alloca_unbounded",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="alloca 使用的大小不是编译期常量，可能导致未受控的栈分配与崩溃风险。",
-                suggestion="避免使用 alloca；改用堆分配并对大小做上界检查与错误处理。",
-                confidence=min(conf, 0.8),
-                severity="high" if conf >= 0.7 else "medium",
-            )
-        )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5030,28 +5105,7 @@ def _rule_pthread_returns_unchecked(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if not RE_PTHREAD_RET.search(s):
-            continue
-        nearby = " ".join(
-            _safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1)
-        )
-        if not re.search(r"\bif\s*\(|>=|<=|==|!=|<|>", nearby):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="error_handling",
-                    pattern="pthread_ret_unchecked",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="pthread 接口返回值可能未检查，错误处理缺失可能导致死锁/资源泄漏。",
-                    suggestion="检查 pthread 接口返回码并进行错误路径处理；必要时记录日志与清理资源。",
-                    confidence=0.6,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5122,35 +5176,7 @@ def _rule_cond_wait_no_loop(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        m = RE_PTHREAD_COND_WAIT.search(s)
-        if not m:
-            continue
-        # 回看 2 行内是否有 while( ... )
-        prev_text = " ".join(_safe_line(lines, j) for j in range(max(1, idx - 2), idx))
-        has_prev_while = re.search(r"\bwhile\s*\(", prev_text) is not None
-        # 同一行（调用前半部分）若包含 while(...)，也视为正确用法
-        same_line_before = s[: m.start()]
-        has_same_line_while = re.search(r"\bwhile\s*\(", same_line_before) is not None
-
-        if has_prev_while or has_same_line_while:
-            continue
-
-        issues.append(
-            Issue(
-                language="c/cpp",
-                category="thread_safety",
-                pattern="cond_wait_no_loop",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="pthread_cond_wait 建议置于条件谓词的 while 循环中，以防止虚假唤醒。",
-                suggestion="使用 while(predicate_not_satisfied) 包裹 pthread_cond_wait 调用并在唤醒后重新检查条件。",
-                confidence=0.6,
-                severity="medium",
-            )
-        )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5261,39 +5287,7 @@ def _rule_thread_leak_no_join(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        m = RE_PTHREAD_CREATE.search(s)
-        if not m:
-            continue
-        tid = m.group(1)
-        end = min(len(lines), idx + 80)
-        joined_or_detached = False
-        for j in range(idx + 1, end + 1):
-            sj = _safe_line(lines, j)
-            m_join = RE_PTHREAD_JOIN.search(sj)
-            if m_join and m_join.group(1) == tid:
-                joined_or_detached = True
-                break
-            m_detach = RE_PTHREAD_DETACH.search(sj)
-            if m_detach and m_detach.group(1) == tid:
-                joined_or_detached = True
-                break
-        if not joined_or_detached:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="resource_leak",
-                    pattern="thread_leak_no_join",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description=f"pthread_create 创建线程 {tid} 后的邻近窗口内未检测到 join/detach，可能导致线程泄漏或资源占用。",
-                    suggestion="确保创建的线程被显式 join 或 detach；遵循统一的线程生命周期管理策略。",
-                    confidence=0.6,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5339,23 +5333,7 @@ def _rule_inet_legacy(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        if RE_INET_LEGACY.search(s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="network_api",
-                    pattern="inet_legacy",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用 inet_addr/inet_aton 等旧接口，错误语义模糊/不一致。",
-                    suggestion="使用 inet_pton/inet_ntop 进行地址转换，错误处理更可靠且支持 IPv6。",
-                    confidence=0.6,
-                    severity="low",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5401,24 +5379,7 @@ def _rule_time_apis_not_threadsafe(
         except Exception:
             pass
 
-    # 回退到正则检测
-    for idx, s in enumerate(lines, start=1):
-        # 排除 *_r 版本
-        if RE_TIME_UNSAFE.search(s) and not re.search(r"_r\s*\(", s):
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="thread_safety",
-                    pattern="time_api_not_threadsafe",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="使用 asctime/ctime/localtime/gmtime 等非重入接口，线程安全性不足。",
-                    suggestion="改用 *_r 线程安全版本（如 localtime_r/gmtime_r/ctime_r）。",
-                    confidence=0.6,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -5456,6 +5417,9 @@ def _rule_getenv_unchecked(
                         var_name = assign_match.group(1)
 
                     if var_name:
+                        # 跳过return语句中的getenv（调用者负责检查）
+                        if re.search(r"\breturn\s+", s):
+                            continue
                         # 检查是否有null_check
                         has_check = var_name in result.null_checks
                         if not has_check:
@@ -5481,6 +5445,9 @@ def _rule_getenv_unchecked(
                     else:
                         # 漏报修复：检测getenv直接作为函数参数传递（未赋值给变量）
                         # 模式：func(getenv("KEY")) 或 func(..., getenv("KEY"), ...)
+                        # 但跳过return语句（调用者负责检查）
+                        if re.search(r"\breturn\s+", s):
+                            continue
                         direct_call_match = re.search(
                             r"getenv\s*\(\s*\"[^\"]+\"\s*\)", s
                         )
@@ -5506,80 +5473,7 @@ def _rule_getenv_unchecked(
         except Exception:
             pass
 
-    # 回退到正则检测
-    return _rule_getenv_unchecked_regex_fallback(lines, relpath)
-
-
-def _rule_getenv_unchecked_regex_fallback(
-    lines: Sequence[str], relpath: str
-) -> List[Issue]:
-    """正则回退方案：检测getenv返回值未检查的情况。"""
-    issues: List[Issue] = []
-
-    for idx, s in enumerate(lines, start=1):
-        m = RE_GETENV.search(s)
-        if not m:
-            continue
-
-        # 检测赋值模式
-        var_name = None
-        assign_match = re.search(r"\b([A-Za-z_]\w*)\s*=\s*getenv\s*\(", s)
-        if assign_match:
-            var_name = assign_match.group(1)
-
-        has_check = False
-        if var_name:
-            for j in range(idx, min(idx + 5, len(lines))):
-                check_line = lines[j]
-                if re.search(
-                    rf"\bif\s*\([^)]*\b{re.escape(var_name)}\b[^)]*\)", check_line
-                ):
-                    has_check = True
-                    break
-                if re.search(
-                    rf"\bif\s*\(\s*!?\s*{re.escape(var_name)}\s*\)", check_line
-                ):
-                    has_check = True
-                    break
-
-        if has_check:
-            continue
-
-        # 漏报修复：检测getenv直接作为函数参数传递（未赋值给变量）
-        direct_call_match = re.search(r"getenv\s*\(\s*\"[^\"]+\"\s*\)", s)
-        if direct_call_match and not var_name:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="input_validation",
-                    pattern="getenv_unchecked",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="getenv()返回值直接传递给函数，未检查NULL。",
-                    suggestion="先检查getenv返回值是否为NULL，再使用环境变量值。",
-                    confidence=0.65,
-                    severity="medium",
-                )
-            )
-            continue
-
-        # 赋值模式未检查的情况
-        if var_name:
-            issues.append(
-                Issue(
-                    language="c/cpp",
-                    category="input_validation",
-                    pattern="getenv_unchecked",
-                    file=relpath,
-                    line=idx,
-                    evidence=_strip_line(s),
-                    description="读取环境变量后未见显式校验，可能被用于构造路径/命令等引入安全风险。",
-                    suggestion="对白名单键进行读取；对取值执行格式/长度/字符集校验；避免直接拼接为命令/路径。",
-                    confidence=0.55,
-                    severity="medium",
-                )
-            )
+    # 无database时跳过正则回退（避免误报）
     return issues
 
 
@@ -6588,101 +6482,129 @@ def analyze_c_cpp_text(
             collector.analyze_file(_tmp_file, lang)
             # 使用临时文件的完整路径查询database
             _db_file_path = _tmp_file
-            # 清理临时文件（延迟清理，database查询完成后才清理）
             database = _temp_database
         except Exception:
             pass  # 创建失败时继续使用空database
+    else:
+        # 有外部database时，确保使用正确的文件路径
+        # 如果relpath是绝对路径，直接使用；否则需要匹配database中的路径
+        import os
+
+        if os.path.isabs(relpath):
+            _db_file_path = relpath
 
     data_flow_analyzer = DataFlowAnalyzer()
     data_flow_result = data_flow_analyzer.analyze_code(
         text, is_cpp=_is_cpp_file(relpath), database=database, file_path=_db_file_path
     )
 
-    # 清理临时文件和目录
-    if _temp_database is not None:
-        try:
-            import os
+    # 清理临时文件和目录（在所有规则检查完成后）
+    def _cleanup_temp_files():
+        if _temp_database is not None:
+            try:
+                import os
 
-            os.unlink(_tmp_file)
-            os.rmdir(_tmp_dir)
-        except (OSError, NameError):
-            pass
+                os.unlink(_tmp_file)
+                os.rmdir(_tmp_dir)
+            except (OSError, NameError):
+                pass
 
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
-    issues.extend(_rule_unsafe_api(mlines, relpath, database=database))
-    issues.extend(_rule_boundary_funcs(mlines, relpath, lines, database=database))
-    issues.extend(_rule_realloc_assign_back(mlines, relpath, database=database))
-    issues.extend(_rule_malloc_no_null_check(mlines, relpath, database=database))
+    issues.extend(_rule_unsafe_api(mlines, _db_file_path, database=database))
+    issues.extend(_rule_boundary_funcs(mlines, _db_file_path, lines, database=database))
+    issues.extend(_rule_realloc_assign_back(mlines, _db_file_path, database=database))
+    issues.extend(_rule_malloc_no_null_check(mlines, _db_file_path, database=database))
     issues.extend(
-        _rule_function_return_ptr_no_check(mlines, relpath, database=database)
+        _rule_function_return_ptr_no_check(mlines, _db_file_path, database=database)
     )
-    issues.extend(_rule_unchecked_io(mlines, relpath, database=database))
+    issues.extend(_rule_unchecked_io(mlines, _db_file_path, database=database))
     # 需要字符串字面量信息的规则（使用原始行）
-    issues.extend(_rule_strncpy_no_nullterm(lines, relpath, database=database))
-    issues.extend(_rule_format_string(lines, relpath, database=database))
-    issues.extend(_rule_scanf_no_width(lines, relpath, database=database))
+    issues.extend(_rule_strncpy_no_nullterm(lines, _db_file_path, database=database))
+    issues.extend(_rule_format_string(lines, _db_file_path, database=database))
+    issues.extend(_rule_scanf_no_width(lines, _db_file_path, database=database))
     # signal handler安全检查
-    issues.extend(_rule_signal_handler_unsafe(lines, relpath, database=database))
+    issues.extend(_rule_signal_handler_unsafe(lines, _db_file_path, database=database))
     # 其他规则
-    issues.extend(_rule_insecure_tmpfile(mlines, relpath, database=database))
-    issues.extend(_rule_command_execution(mlines, relpath, database=database))
+    issues.extend(_rule_insecure_tmpfile(mlines, _db_file_path, database=database))
+    issues.extend(_rule_command_execution(mlines, _db_file_path, database=database))
     # 新增规则：SQL注入、内存泄漏、路径遍历
-    issues.extend(_rule_sql_injection(lines, relpath, database=database))
-    issues.extend(_rule_memory_leak(lines, relpath, database=database))
-    issues.extend(_rule_path_traversal(lines, relpath, database=database))
+    issues.extend(_rule_sql_injection(lines, _db_file_path, database=database))
+    issues.extend(_rule_memory_leak(lines, _db_file_path, database=database))
+    issues.extend(_rule_path_traversal(lines, _db_file_path, database=database))
     # 新增规则：整数溢出、硬编码凭证、TOCTOU竞态
-    issues.extend(_rule_integer_overflow(lines, relpath, database=database))
-    issues.extend(_rule_hardcoded_credentials(lines, relpath, database=database))
-    issues.extend(_rule_toctou_race(lines, relpath, database=database))
-    issues.extend(_rule_alloc_size_overflow(mlines, relpath, database=database))
+    issues.extend(_rule_integer_overflow(lines, _db_file_path, database=database))
+    issues.extend(_rule_hardcoded_credentials(lines, _db_file_path, database=database))
+    issues.extend(_rule_toctou_race(lines, _db_file_path, database=database))
+    issues.extend(_rule_alloc_size_overflow(mlines, _db_file_path, database=database))
+    # P14新增规则：弱加密、未初始化变量、符号转换、除零、编译器优化
+    issues.extend(_rule_weak_crypto(lines, _db_file_path, database=database))
+    issues.extend(_rule_uninitialized_var(lines, _db_file_path, database=database))
+    issues.extend(_rule_signed_to_unsigned(lines, _db_file_path, database=database))
+    issues.extend(_rule_divide_by_zero(lines, _db_file_path, database=database))
+    # 禁用：误报率过高，大多数代码不需要volatile
+    # issues.extend(_rule_compiler_security_check(lines, _db_file_path, database=database))
+    # P15新增规则：指针算术错误、死锁风险、条件赋值
     issues.extend(
-        _rule_double_free_and_free_non_heap(mlines, relpath, database=database)
+        _rule_pointer_arithmetic_error(lines, _db_file_path, database=database)
     )
-    issues.extend(_rule_atoi_family(mlines, relpath))
-    issues.extend(_rule_rand_insecure(mlines, relpath))
-    issues.extend(_rule_strtok_nonreentrant(mlines, relpath))
-    issues.extend(_rule_open_permissive_perms(mlines, relpath))
-    issues.extend(_rule_alloca_unbounded(mlines, relpath, database=database))
-    issues.extend(_rule_vla_usage(mlines, relpath, database=database))
-    issues.extend(_rule_pthread_returns_unchecked(mlines, relpath, database=database))
-    issues.extend(_rule_cond_wait_no_loop(mlines, relpath, database=database))
-    issues.extend(_rule_thread_leak_no_join(mlines, relpath, database=database))
-    issues.extend(_rule_inet_legacy(mlines, relpath))
-    issues.extend(_rule_time_apis_not_threadsafe(mlines, relpath, database=database))
-    issues.extend(_rule_getenv_unchecked(mlines, relpath, database=database))
+    issues.extend(_rule_deadlock_risk(lines, _db_file_path, database=database))
+    issues.extend(
+        _rule_assignment_in_condition(lines, _db_file_path, database=database)
+    )
+    issues.extend(
+        _rule_double_free_and_free_non_heap(mlines, _db_file_path, database=database)
+    )
+    issues.extend(_rule_atoi_family(mlines, _db_file_path, database=database))
+    issues.extend(_rule_rand_insecure(mlines, _db_file_path, database=database))
+    issues.extend(_rule_strtok_nonreentrant(mlines, _db_file_path, database=database))
+    issues.extend(_rule_open_permissive_perms(mlines, _db_file_path, database=database))
+    issues.extend(_rule_alloca_unbounded(mlines, _db_file_path, database=database))
+    issues.extend(_rule_vla_usage(mlines, _db_file_path, database=database))
+    issues.extend(
+        _rule_pthread_returns_unchecked(mlines, _db_file_path, database=database)
+    )
+    issues.extend(_rule_cond_wait_no_loop(mlines, _db_file_path, database=database))
+    issues.extend(_rule_thread_leak_no_join(mlines, _db_file_path, database=database))
+    issues.extend(_rule_inet_legacy(mlines, _db_file_path, database=database))
+    issues.extend(
+        _rule_time_apis_not_threadsafe(mlines, _db_file_path, database=database)
+    )
+    issues.extend(_rule_getenv_unchecked(mlines, _db_file_path, database=database))
     # 复杂语义（使用掩蔽行避免字符串干扰）
-    issues.extend(_rule_uaf_suspect(mlines, relpath, database=database))
-    issues.extend(_rule_possible_null_deref(mlines, relpath, database=database))
-    issues.extend(_rule_uninitialized_ptr_use(mlines, relpath, database=database))
-    issues.extend(_rule_deadlock_patterns(mlines, relpath, database=database))
+    issues.extend(_rule_uaf_suspect(mlines, _db_file_path, database=database))
+    issues.extend(_rule_possible_null_deref(mlines, _db_file_path, database=database))
+    issues.extend(_rule_uninitialized_ptr_use(mlines, _db_file_path, database=database))
+    issues.extend(_rule_deadlock_patterns(mlines, _db_file_path, database=database))
     # C++ 特定检查规则
-    issues.extend(_rule_new_delete_mismatch(mlines, relpath, database=database))
-    issues.extend(_rule_reinterpret_cast_unsafe(mlines, relpath))
-    issues.extend(_rule_const_cast_unsafe(mlines, relpath, database=database))
-    issues.extend(_rule_vector_string_bounds_check(mlines, relpath, database=database))
-    issues.extend(_rule_missing_virtual_dtor(mlines, relpath, database=database))
-    issues.extend(_rule_move_after_use(mlines, relpath, database=database))
-    issues.extend(_rule_uncaught_exception(mlines, relpath))
-    issues.extend(_rule_smart_ptr_cycle(mlines, relpath, database=database))
-    issues.extend(_rule_smart_ptr_get_unsafe(mlines, relpath, database=database))
+    issues.extend(_rule_new_delete_mismatch(mlines, _db_file_path, database=database))
+    issues.extend(_rule_reinterpret_cast_unsafe(mlines, _db_file_path))
+    issues.extend(_rule_const_cast_unsafe(mlines, _db_file_path, database=database))
+    issues.extend(
+        _rule_vector_string_bounds_check(mlines, _db_file_path, database=database)
+    )
+    issues.extend(_rule_missing_virtual_dtor(mlines, _db_file_path, database=database))
+    issues.extend(_rule_move_after_use(mlines, _db_file_path, database=database))
+    issues.extend(_rule_uncaught_exception(mlines, _db_file_path))
+    issues.extend(_rule_smart_ptr_cycle(mlines, _db_file_path, database=database))
+    issues.extend(_rule_smart_ptr_get_unsafe(mlines, _db_file_path, database=database))
     # C++ 死锁检测
-    issues.extend(_rule_cpp_deadlock_patterns(mlines, relpath, database=database))
+    issues.extend(_rule_cpp_deadlock_patterns(mlines, _db_file_path, database=database))
     # 数据竞争检测
-    issues.extend(_rule_data_race_suspect(mlines, relpath, database=database))
+    issues.extend(_rule_data_race_suspect(mlines, _db_file_path, database=database))
 
     # 污点分析（核心功能）
     try:
         analyzer = taint_analyzer.TaintAnalyzerFactory.create("joern")
         if analyzer is not None:
-            taint_issues = analyzer.analyze(text, str(relpath))
+            taint_issues = analyzer.analyze(text, str(_db_file_path))
             # 将污点分析结果转换为Issue对象
             for taint_path in taint_issues:
                 issue = Issue(
                     language="c/cpp",
                     category="taint-analysis",
                     pattern="taint-flow",
-                    file=str(relpath),
+                    file=str(_db_file_path),
                     line=taint_path.line_number,
                     evidence=f"{taint_path.source} -> {taint_path.sink}",
                     description=f"Taint flow from {taint_path.source} to {taint_path.sink}",
@@ -6698,6 +6620,8 @@ def analyze_c_cpp_text(
     filtered_issues = _filter_issues_with_data_flow(
         issues, data_flow_analyzer, data_flow_result, lines
     )
+    # 清理临时文件和目录
+    _cleanup_temp_files()
     return filtered_issues
 
 

@@ -1,0 +1,12 @@
+{
+  "name": "inet_legacy",
+  "description": "inet_legacy test dataset",
+  "vulnerability_type": "inet_legacy",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "inet_legacy",
+      "file": "positive_inet_aton.c"
+    }
+  ]
+}

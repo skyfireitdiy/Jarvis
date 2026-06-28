@@ -1,0 +1,12 @@
+{
+  "name": "scanf_no_width",
+  "description": "scanf_no_width test dataset",
+  "vulnerability_type": "scanf_%s_no_width",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "scanf_%s_no_width",
+      "file": "positive_scanf_s_no_width.c"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "cross_function",
+  "description": "cross_function test dataset",
+  "vulnerability_type": "memory_leak",
+  "cross_file": false,
+  "expected_issues": []
+}

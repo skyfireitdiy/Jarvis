@@ -1,0 +1,56 @@
+{
+  "name": "unsafe_api",
+  "description": "unsafe_api test dataset",
+  "vulnerability_type": "unsafe_api",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unsafe_api",
+      "file": "positive_gets.c"
+    },
+    {
+      "pattern": "strcpy",
+      "file": "positive_gets.c"
+    },
+    {
+      "pattern": "gets",
+      "file": "positive_gets.c"
+    },
+    {
+      "pattern": "sprintf",
+      "file": "positive_gets.c"
+    },
+    {
+      "pattern": "unsafe_api",
+      "file": "positive_sprintf.c"
+    },
+    {
+      "pattern": "strcpy",
+      "file": "positive_sprintf.c"
+    },
+    {
+      "pattern": "gets",
+      "file": "positive_sprintf.c"
+    },
+    {
+      "pattern": "sprintf",
+      "file": "positive_sprintf.c"
+    },
+    {
+      "pattern": "unsafe_api",
+      "file": "positive_strcpy.c"
+    },
+    {
+      "pattern": "strcpy",
+      "file": "positive_strcpy.c"
+    },
+    {
+      "pattern": "gets",
+      "file": "positive_strcpy.c"
+    },
+    {
+      "pattern": "sprintf",
+      "file": "positive_strcpy.c"
+    }
+  ]
+}

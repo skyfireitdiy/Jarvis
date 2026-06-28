@@ -1,0 +1,20 @@
+{
+  "name": "deadlock_patterns",
+  "description": "deadlock_patterns test dataset",
+  "vulnerability_type": "deadlock_patterns",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "deadlock_patterns",
+      "file": "positive_recursive_lock.c"
+    },
+    {
+      "pattern": "double_lock",
+      "file": "positive_recursive_lock.c"
+    },
+    {
+      "pattern": "lock_order_inversion",
+      "file": "positive_recursive_lock.c"
+    }
+  ]
+}

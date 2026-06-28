@@ -1,0 +1,7 @@
+{
+  "name": "malloc_no_null_check",
+  "description": "malloc_no_null_check test dataset",
+  "vulnerability_type": "malloc_no_null_check",
+  "cross_file": false,
+  "expected_issues": []
+}

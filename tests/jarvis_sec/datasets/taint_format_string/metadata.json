@@ -1,0 +1,12 @@
+{
+  "name": "taint_format_string",
+  "description": "taint_format_string test dataset",
+  "vulnerability_type": "format_string",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "format_string",
+      "file": "positive_user_input_to_printf.c"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260628_112820_923856",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "phase6-complete", "batch3-verified", "cwe-classic"],
+  "content": "c_checker第三批漏报/误报修复验证结果（2026-06-28）：\n\n## 第三批漏报修复验证：5/5 ✅\n1. ✅ CWE-327 弱加密算法：检测到4个weak_crypto问题\n2. ✅ CWE-457 未初始化变量：检测到1个uninitialized_var问题\n3. ✅ CWE-195 有符号转无符号：检测到1个signed_unsigned_conversion问题（注意pattern名是signed_unsigned_conversion不是signed_to_unsigned）\n4. ✅ CWE-369 除零错误：检测到1个divide_by_zero问题\n5. ✅ CWE-733 编译器优化移除安全检查：检测到1个compiler_security_check问题\n\n## 误报安全性验证：2/2 ✅\n1. ✅ CWE-190: 有溢出检查的malloc无误报alloc_size_overflow\n2. ✅ CWE-170: 有显式NULL终止的strncpy无误报strncpy_no_nullterm\n\n## pytest回归：33 passed, 0 failed ✅\n\n## 累计修复验证：18/18漏报 ✅，9/9误报安全 ✅\n- 第一批9个 + 第二批4个 + 第三批5个 = 18个漏报全部修复验证通过\n- 误报安全：第一批3个+第二批4个+第三批2个 = 9个全部通过\n\n## 新增规则\n- _rule_weak_crypto (line 3663): DES/RC4/MD5/SHA1弱加密检测\n- _rule_uninitialized_var (line 3739): 未初始化变量检测\n- _rule_signed_to_unsigned (line 3851): 有符号转无符号转换检测（pattern=signed_unsigned_conversion）\n- _rule_divide_by_zero (line 3901): 除零错误检测\n- _rule_compiler_security_check (line 3960): 编译器优化移除安全检查检测\n\n## 误报修复\n- alloc_size_overflow: 检查附近溢出检查模式\n- strncpy_no_nullterm: 检查后续显式NULL终止\n\n## c_checker.py行数：7175→7590（+415行）\n\n## 经典CWE覆盖度测试最终结果：18/21检测正确（13原有+5新增），2误报已修复",
+  "created_at": "2026-06-28T11:28:20.923887",
+  "updated_at": "2026-06-28T11:28:20.923891"
+}

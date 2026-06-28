@@ -1,0 +1,12 @@
+{
+  "name": "atoi_family",
+  "description": "atoi_family test dataset",
+  "vulnerability_type": "atoi_family",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "atoi_family",
+      "file": "positive_atoi.c"
+    }
+  ]
+}

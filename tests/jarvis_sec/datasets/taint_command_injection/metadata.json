@@ -1,0 +1,12 @@
+{
+  "name": "taint_command_injection",
+  "description": "taint_command_injection test dataset",
+  "vulnerability_type": "command_exec",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "command_exec",
+      "file": "positive_getenv_to_system.c"
+    }
+  ]
+}

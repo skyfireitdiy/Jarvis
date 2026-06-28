@@ -1,0 +1,12 @@
+{
+  "name": "open_permissive_perms",
+  "description": "open_permissive_perms test dataset",
+  "vulnerability_type": "open_permissive_perms",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "open_permissive_perms",
+      "file": "positive_open_0777.c"
+    }
+  ]
+}

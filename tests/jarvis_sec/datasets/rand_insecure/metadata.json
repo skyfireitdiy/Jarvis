@@ -1,0 +1,12 @@
+{
+  "name": "rand_insecure",
+  "description": "rand_insecure test dataset",
+  "vulnerability_type": "rand_insecure",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "rand_insecure",
+      "file": "positive_rand.c"
+    }
+  ]
+}

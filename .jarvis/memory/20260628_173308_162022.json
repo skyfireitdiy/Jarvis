@@ -1,0 +1,8 @@
+{
+  "id": "20260628_173308_162022",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "phase7", "batch4-fp-fix", "cwe-coverage"],
+  "content": "c_checker第四批误报修复验证结果（2026-06-28）：\n\n## 第四批误报修复验证：3/3 ✅\n1. ✅ CWE-680: mul_overflow_check正则扩展匹配数字字面量(2147483647等)，有溢出检查的malloc不再误报integer_overflow\n2. ✅ CWE-908: smart_ptr_vars增加函数参数模式提取，std::unique_ptr<T>& data参数中的data被正确识别为智能指针\n3. ✅ CWE-129: 新增container_vars集合，std::array/vector等C++容器变量被排除，不再误报possible_null_deref\n\n## 第四批漏报修复验证：5/5 ✅\n1. ✅ CWE-468: pointer_arithmetic_error\n2. ✅ CWE-667: deadlock_risk\n3. ✅ CWE-367: TOCTOU-C++ (access+ifstream) - RE_OPEN_FILE扩展包含ifstream\n4. ✅ CWE-783: assignment_in_condition\n5. ✅ CWE-457: uninitialized_member\n\n## pytest回归：33 passed, 0 failed ✅\n## 回退验证：5/5通过（CWE-367/SQL注入/弱加密/malloc+assert/free+NULL）\n\n## 累计修复验证：23/23漏报 ✅，12/12误报 ✅\n- 第一批9漏报+3误报\n- 第二批4漏报+4误报\n- 第三批5漏报+2误报\n- 第四批5漏报+3误报\n\n## 修复根因总结\n- CWE-680: mul_overflow_check正则只匹配INT_MAX/UINT_MAX宏，不匹配数字字面量 → 扩展为UINT_MAX|INT_MAX|\\d+\n- CWE-908: smart_ptr_vars只检测局部变量声明(=赋值)，不检测函数参数 → 增加参数模式提取\n- CWE-129: std::array是值类型不可能为NULL，但re_array_access把arr[idx]当指针解引用 → 新增container_vars排除集",
+  "created_at": "2026-06-28T17:33:08.162046",
+  "updated_at": "2026-06-28T17:33:08.162050"
+}

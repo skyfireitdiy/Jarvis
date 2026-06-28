@@ -1,0 +1,20 @@
+{
+  "name": "time_apis_not_threadsafe",
+  "description": "time_apis_not_threadsafe test dataset",
+  "vulnerability_type": "time_apis_not_threadsafe",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "time_apis_not_threadsafe",
+      "file": "positive_localtime_no_threadsafe.c"
+    },
+    {
+      "pattern": "time_api_not_threadsafe",
+      "file": "positive_localtime_no_threadsafe.c"
+    },
+    {
+      "pattern": "localtime_not_threadsafe",
+      "file": "positive_localtime_no_threadsafe.c"
+    }
+  ]
+}

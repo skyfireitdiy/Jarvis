@@ -1,0 +1,12 @@
+{
+  "name": "alloca_unbounded",
+  "description": "alloca_unbounded test dataset",
+  "vulnerability_type": "alloca_unbounded",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "alloca_unbounded",
+      "file": "positive_alloca_variable_size.c"
+    }
+  ]
+}
