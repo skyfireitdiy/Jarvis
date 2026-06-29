@@ -268,7 +268,9 @@ def direct_scan(
         else []
     )
     issues_r = (
-        analyze_rust_files(str(base), [str(p) for p in r_files]) if r_files else []
+        analyze_rust_files(str(base), [str(p) for p in r_files], database=database)
+        if r_files
+        else []
     )
     issues: List[Issue] = issues_c + issues_r
 

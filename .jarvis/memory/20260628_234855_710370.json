@@ -1,0 +1,8 @@
+{
+  "id": "20260628_234855_710370",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "interface", "backward_compatible"],
+  "content": "analyze_rust_text接口签名：(relpath: str, text: str, database: Optional[ProjectDatabase] = None) -> List[Issue]。database参数可选，保持向后兼容。无database时返回空列表，内部自动创建临时database。",
+  "created_at": "2026-06-28T23:48:55.710389",
+  "updated_at": "2026-06-28T23:48:55.710393"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260628_234855_711753",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "false_positive_filtering", "data_flow"],
+  "content": "Rust误报过滤函数实现：_is_unsafe_false_positive（检查SAFETY注释、死代码）、_is_unwrap_false_positive（检查is_ok/is_err、if let/match上下文）、_is_panic_false_positive（检查测试上下文、assert宏）、_is_raw_pointer_false_positive、_is_transmute_false_positive、_is_get_unchecked_false_positive（检查边界检查）、_is_pointer_arithmetic_false_positive、_is_unsafe_mem_ops_false_positive、_is_from_raw_parts_false_positive。",
+  "created_at": "2026-06-28T23:48:55.711769",
+  "updated_at": "2026-06-28T23:48:55.711771"
+}
