@@ -64,6 +64,10 @@ description: "无法明确归类到以上场景的其他通用任务"
 - **准备阶段（A→R→C）灵活**：ANALYZE 必需；RULE 和 COLLECT 可根据需要选择性执行或调整顺序；简单任务可跳过 RULE/COLLECT
 - **执行阶段（H→E→R）强制顺序**：HYPOTHESIZE → EXECUTE → REVIEW 必须按顺序执行，禁止跳过
 
+## 子Agent使用指导
+
+**sub_agent 工具**：创建子Agent执行独立任务，**核心用途是避免污染主Agent上下文**。适用于方案确认后的独立任务执行、信息收集等场景。子Agent完成后返回结果摘要，主Agent验收即可。
+
 ## 执行规则
 
 1. **单次操作**: 每个响应只含一个工具调用
