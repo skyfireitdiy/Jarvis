@@ -1,0 +1,12 @@
+{
+  "name": "rust_unwrap_false_positive",
+  "description": "Rust unwrap false positive test dataset - match in nearby lines causes unwrap to be incorrectly filtered",
+  "vulnerability_type": "false_positive",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unwrap",
+      "file": "positive_unwrap_fp.rs"
+    }
+  ]
+}

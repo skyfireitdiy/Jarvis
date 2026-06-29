@@ -3,7 +3,8 @@ sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
 
 约定：
-- 必填参数：task, name, background
+- 必填参数：task, name
+- 可选参数：background
 - 可选参数：summary_prompt
 - 子Agent继承父Agent的对话历史，无需指定system_prompt
 - 工具集：默认使用系统工具集（无需传入 use_tools）
@@ -94,8 +95,6 @@ class SubAgentTool:
             errors = []
             if not agent_name:
                 errors.append("name 不能为空")
-            if not background:
-                errors.append("background 不能为空")
 
             if errors:
                 return {

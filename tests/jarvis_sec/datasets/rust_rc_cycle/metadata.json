@@ -1,0 +1,12 @@
+{
+  "name": "rust_rc_cycle",
+  "description": "Rust Rc reference cycle memory leak test dataset - checker cannot detect reference cycles",
+  "vulnerability_type": "rc_cycle",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "rc_cycle",
+      "file": "positive_rc_cycle.rs"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "rust_into_raw_leak",
+  "description": "Rust into_raw without from_raw memory leak test dataset - RE_INTO_RAW defined but never used in rules",
+  "vulnerability_type": "into_raw_leak",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "into_raw_leak",
+      "file": "positive_into_raw_no_from_raw.rs"
+    }
+  ]
+}

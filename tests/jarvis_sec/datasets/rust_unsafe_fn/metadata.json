@@ -1,0 +1,12 @@
+{
+  "name": "rust_unsafe_fn",
+  "description": "Rust unsafe fn declaration test dataset - checker only detects unsafe blocks, not unsafe fn declarations",
+  "vulnerability_type": "unsafe_fn",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unsafe_fn",
+      "file": "positive_unsafe_fn.rs"
+    }
+  ]
+}

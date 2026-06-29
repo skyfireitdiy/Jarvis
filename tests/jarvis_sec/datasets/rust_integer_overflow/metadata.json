@@ -1,0 +1,12 @@
+{
+  "name": "rust_integer_overflow",
+  "description": "Rust integer overflow/underflow test dataset - checker cannot detect this vulnerability",
+  "vulnerability_type": "integer_overflow",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "integer_overflow",
+      "file": "positive_integer_overflow.rs"
+    }
+  ]
+}
