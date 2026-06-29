@@ -590,7 +590,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                     if user_confirm(
                         "是否将子Agent的结果反馈给当前Agent？",
-                        default=False,
+                        default=True,
                     ):
                         # 将结果作为提示词返回给当前Agent处理
                         return (
@@ -723,7 +723,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                     if user_confirm(
                         "是否将子CodeAgent的结果反馈给当前Agent？",
-                        default=False,
+                        default=True,
                     ):
                         # 将结果作为提示词返回给当前Agent处理
                         return (
