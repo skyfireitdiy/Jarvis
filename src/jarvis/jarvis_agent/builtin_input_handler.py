@@ -542,7 +542,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "SubAgent":
             # 启动子Agent执行任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
-                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+                from jarvis.jarvis_tools.sub_agent import SubAgentTool
                 from jarvis.jarvis_utils.input import get_multiline_input
 
                 tag_marker = "'<SubAgent>'"
@@ -611,7 +611,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Init":
             # 启动子Agent分析项目并生成.jarvis/rule.md项目综述文件
             try:
-                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+                from jarvis.jarvis_tools.sub_agent import SubAgentTool
 
                 PrettyOutput.auto_print("🚀 启动子Agent分析项目并生成项目综述...")
 
@@ -644,7 +644,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "TestCase":
             # 启动子Agent分析项目需求并生成文本化测试用例
             try:
-                from jarvis.jarvis_agent.sub_agent import SubAgentTool
+                from jarvis.jarvis_tools.sub_agent import SubAgentTool
 
                 PrettyOutput.auto_print("🚀 启动子Agent分析项目需求并生成测试用例...")
 
@@ -677,7 +677,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "SubCodeAgent":
             # 启动子CodeAgent执行代码任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
-                from jarvis.jarvis_code_agent.sub_code_agent import SubCodeAgentTool
+                from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
                 from jarvis.jarvis_utils.input import get_multiline_input
 
                 tag_marker = "'<SubCodeAgent>'"
@@ -989,8 +989,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
         elif tag == "SetMaxToken":
             # 处理SetMaxToken命令，设置最大输入Token数
-            from jarvis.jarvis_utils.input import get_single_line_input
-
             value_str = get_single_line_input(
                 "请输入最大输入Token数（<200000则设为200000，0则删除限制）："
             )
