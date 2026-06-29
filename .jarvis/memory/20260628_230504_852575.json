@@ -1,0 +1,8 @@
+{
+  "id": "20260628_230504_852575",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "database-driven", "refactor", "verification"],
+  "content": "rust_checker error_handling规则重构验证结果（2025-06）：\n1. _rule_unwrap_expect：已通过call_graph查询实现，无正则回退 ✅\n2. _rule_ignore_result：已通过data_flow查询实现，无正则回退 ✅\n3. _rule_panic_unreachable：使用call_graph查询而非预期的symbols查询 ❌（功能正确但与预期不符）\n4. _rule_refcell_borrow：在database路径中使用了re.search正则（第1225行），违反无正则回退约束 ❌\n\n待修复：\n- _rule_refcell_borrow需将re.search替换为database查询（如call_graph的caller_name/object_name字段关联RefCell变量与borrow调用）\n- _rule_panic_unreachable如需严格按预期，应改用symbols查询，但call_graph在语义上更合理",
+  "created_at": "2026-06-28T23:05:04.852608",
+  "updated_at": "2026-06-28T23:05:04.852614"
+}

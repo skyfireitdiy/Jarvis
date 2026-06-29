@@ -1,0 +1,12 @@
+{
+  "name": "rust_unsafe_usage",
+  "description": "Rust unsafe block usage test dataset",
+  "vulnerability_type": "unsafe",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unsafe",
+      "file": "positive_unsafe_block.rs"
+    }
+  ]
+}

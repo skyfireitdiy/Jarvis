@@ -1,0 +1,12 @@
+{
+  "name": "rust_panic_usage",
+  "description": "Rust panic!/unreachable! usage test dataset",
+  "vulnerability_type": "panic/unreachable",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "panic/unreachable",
+      "file": "positive_panic_usage.rs"
+    }
+  ]
+}

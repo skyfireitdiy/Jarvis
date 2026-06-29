@@ -27,6 +27,15 @@ try:
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     TREE_SITTER_AVAILABLE = False
+    Node = None  # 类型回退
+
+# Rust解析器
+try:
+    import tree_sitter_rust as tsrust
+
+    TREE_SITTER_RUST_AVAILABLE = True
+except ImportError:
+    TREE_SITTER_RUST_AVAILABLE = False
 
 from .project_database import (
     ProjectDatabase,
@@ -62,6 +71,7 @@ class DataCollector:
             )
             self.c_parser = None
             self.cpp_parser = None
+            self.rust_parser = None
             return
 
         # 初始化C和C++解析器
@@ -79,6 +89,17 @@ class DataCollector:
             PrettyOutput.auto_print(f"[DataCollector] C++解析器初始化失败: {e}")
             self.cpp_parser = None
 
+        # 初始化Rust解析器
+        if TREE_SITTER_RUST_AVAILABLE:
+            try:
+                self.rust_language = Language(tsrust.language())
+                self.rust_parser = Parser(self.rust_language)
+            except Exception as e:
+                PrettyOutput.auto_print(f"[DataCollector] Rust解析器初始化失败: {e}")
+                self.rust_parser = None
+        else:
+            self.rust_parser = None
+
     # ============================================================================
     # 文件分析入口
     # ============================================================================
@@ -89,7 +110,7 @@ class DataCollector:
 
         Args:
             file_path: 文件路径
-            language: 语言类型（c, cpp）
+            language: 语言类型（c, cpp, rust）
 
         Returns:
             分析结果字典
@@ -119,7 +140,11 @@ class DataCollector:
         file_info = create_file_info(file_path, language)
         self.database.add_file(file_info)
 
-        # 使用tree-sitter解析
+        # 根据语言选择解析器
+        if language == "rust":
+            return self._analyze_rust_file(file_path, code, result)
+
+        # 使用tree-sitter解析C/C++
         if TREE_SITTER_AVAILABLE and (self.c_parser or self.cpp_parser):
             parser = self.cpp_parser if language in ["cpp", "c++"] else self.c_parser
             if parser:
@@ -185,6 +210,131 @@ class DataCollector:
         )
 
         return total_result
+
+    # ============================================================================
+    # Rust AST提取方法
+    # ============================================================================
+
+    def _analyze_rust_file(
+        self, file_path: str, code: str, result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        分析Rust文件
+
+        Args:
+            file_path: 文件路径
+            code: 源代码
+            result: 结果字典
+
+        Returns:
+            分析结果字典
+        """
+        if not self.rust_parser:
+            PrettyOutput.auto_print("[DataCollector] Rust解析器不可用")
+            return result
+
+        try:
+            tree = self.rust_parser.parse(bytes(code, "utf8"))
+            self._extract_rust_from_ast(tree.root_node, code, file_path, result)
+        except Exception as e:
+            PrettyOutput.auto_print(f"[DataCollector] Rust AST解析失败: {e}")
+
+        # 保存到数据库
+        self._save_to_database(file_path, result)
+
+        return result
+
+    def _extract_rust_from_ast(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        从Rust AST提取数据
+
+        Args:
+            node: AST根节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+        """
+        if node is None:
+            return
+
+        self._traverse_rust_ast(node, code, file_path, result)
+
+    def _traverse_rust_ast(
+        self,
+        node,
+        code: str,
+        file_path: str,
+        result: Dict[str, Any],
+        scope: str = "global",
+    ):
+        """
+        递归遍历Rust AST
+
+        Args:
+            node: AST节点
+            code: 源代码
+            file_path: 文件路径
+            result: 结果字典
+            scope: 当前作用域
+        """
+        if node is None or node.type is None:
+            return
+
+        node_type = node.type
+
+        # 处理函数定义
+        if node_type == "function_item":
+            self._handle_rust_function_definition(node, code, file_path, result)
+            # 进入函数作用域
+            func_name = self._get_rust_function_name(node, code)
+            new_scope = func_name if func_name else scope
+            # 注意：不单独遍历body，由最后的for child递归统一处理
+            # 但需要传递new_scope给子节点
+            for child in node.children:
+                self._traverse_rust_ast(child, code, file_path, result, new_scope)
+            return  # 已递归子节点，跳过最后的for child
+
+        # 处理结构体定义
+        elif node_type == "struct_item":
+            self._handle_rust_struct_definition(node, code, file_path, result)
+
+        # 处理枚举定义
+        elif node_type == "enum_item":
+            self._handle_rust_enum_definition(node, code, file_path, result)
+
+        # 处理impl块
+        elif node_type == "impl_item":
+            self._handle_rust_impl_block(node, code, file_path, result)
+
+        # 处理extern块
+        elif node_type == "extern_mod":
+            self._handle_rust_extern_block(node, code, file_path, result)
+
+        # 处理unsafe块
+        elif node_type == "unsafe_block":
+            self._handle_rust_unsafe_block(node, code, file_path, result, scope)
+
+        # 处理let声明（变量绑定）
+        elif node_type == "let_declaration":
+            self._handle_rust_let_declaration(node, code, file_path, result, scope)
+
+        # 处理函数调用
+        elif node_type == "call_expression":
+            self._handle_rust_call_expression(node, code, file_path, result, scope)
+
+        # 处理方法调用
+        elif node_type == "method_call_expression":
+            self._handle_rust_method_call(node, code, file_path, result, scope)
+
+        # 处理宏调用
+        elif node_type == "macro_invocation":
+            self._handle_rust_macro_invocation(node, code, file_path, result, scope)
+
+        # 递归处理子节点
+        for child in node.children:
+            self._traverse_rust_ast(child, code, file_path, result, scope)
 
     # ============================================================================
     # AST提取方法
@@ -1473,3 +1623,488 @@ class DataCollector:
                             deallocator=None,
                         )
                         result["pointer_states"].append(pointer_state)
+
+    # ============================================================================
+    # Rust AST处理方法
+    # ============================================================================
+
+    def _handle_rust_function_definition(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        处理Rust函数定义
+        """
+        func_name = self._get_rust_function_name(node, code)
+        if not func_name:
+            return
+
+        signature = self._get_node_text(node, code)
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+
+        # 检查是否是unsafe函数
+        is_unsafe = False
+        for child in node.children:
+            if child.type == "unsafe" or (
+                child.type == "identifier"
+                and self._get_node_text(child, code) == "unsafe"
+            ):
+                is_unsafe = True
+                break
+
+        symbol = SymbolInfo(
+            name=func_name,
+            kind="function",
+            file_path=file_path,
+            line_start=line_start,
+            line_end=line_end,
+            signature=signature,
+            scope="global",
+            is_external=False,
+        )
+        result["symbols"].append(symbol)
+
+        if is_unsafe:
+            unsafe_symbol = SymbolInfo(
+                name=f"__unsafe_fn__{func_name}",
+                kind="unsafe_block",
+                file_path=file_path,
+                line_start=line_start,
+                line_end=line_end,
+                signature=f"unsafe fn {func_name}",
+                scope="global",
+                is_external=False,
+            )
+            result["symbols"].append(unsafe_symbol)
+
+        params = self._extract_rust_function_params(node, code)
+        for param in params:
+            param_node = DataFlowNode(
+                var_name=param,
+                file_path=file_path,
+                line=line_start,
+                node_type="param_in",
+                scope=func_name,
+                value_source="parameter",
+            )
+            result["data_flow_nodes"].append(param_node)
+
+    def _handle_rust_struct_definition(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        处理Rust结构体定义
+        """
+        name_node = node.child_by_field_name("name")
+        if not name_node:
+            return
+
+        struct_name = self._get_node_text(name_node, code)
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+
+        members = []
+        body_node = node.child_by_field_name("body")
+        if body_node:
+            for child in body_node.children:
+                if child.type == "field_declaration":
+                    field_name_node = child.child_by_field_name("name")
+                    field_type_node = child.child_by_field_name("type")
+                    if field_name_node and field_type_node:
+                        members.append(
+                            {
+                                "name": self._get_node_text(field_name_node, code),
+                                "type": self._get_node_text(field_type_node, code),
+                            }
+                        )
+
+        type_info = TypeInfo(
+            type_name=struct_name,
+            kind="struct",
+            file_path=file_path,
+            line_start=line_start,
+            line_end=line_end,
+            definition=self._get_node_text(node, code),
+            members=members,
+        )
+        result["type_infos"].append(type_info)
+
+    def _handle_rust_enum_definition(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        处理Rust枚举定义
+        """
+        name_node = node.child_by_field_name("name")
+        if not name_node:
+            return
+
+        enum_name = self._get_node_text(name_node, code)
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+
+        type_info = TypeInfo(
+            type_name=enum_name,
+            kind="enum",
+            file_path=file_path,
+            line_start=line_start,
+            line_end=line_end,
+            definition=self._get_node_text(node, code),
+            members=[],
+        )
+        result["type_infos"].append(type_info)
+
+    def _handle_rust_impl_block(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        处理Rust impl块
+        """
+        is_unsafe = False
+        for child in node.children:
+            if child.type == "unsafe" or (
+                child.type == "identifier"
+                and self._get_node_text(child, code) == "unsafe"
+            ):
+                is_unsafe = True
+                break
+
+        if is_unsafe:
+            line_start = node.start_point[0] + 1
+            line_end = node.end_point[0] + 1
+            type_node = node.child_by_field_name("type")
+            type_name = self._get_node_text(type_node, code) if type_node else "unknown"
+
+            unsafe_symbol = SymbolInfo(
+                name=f"__unsafe_impl__{type_name}",
+                kind="unsafe_block",
+                file_path=file_path,
+                line_start=line_start,
+                line_end=line_end,
+                signature=f"unsafe impl {type_name}",
+                scope="global",
+                is_external=False,
+            )
+            result["symbols"].append(unsafe_symbol)
+
+    def _handle_rust_extern_block(
+        self, node, code: str, file_path: str, result: Dict[str, Any]
+    ):
+        """
+        处理Rust extern块
+        """
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+
+        abi = "C"
+        for child in node.children:
+            if child.type == "string_literal":
+                abi = self._get_node_text(child, code).strip('"')
+                break
+
+        extern_symbol = SymbolInfo(
+            name=f"__extern_block__{abi}",
+            kind="extern_block",
+            file_path=file_path,
+            line_start=line_start,
+            line_end=line_end,
+            signature=f'extern "{abi}"',
+            scope="global",
+            is_external=True,
+        )
+        result["symbols"].append(extern_symbol)
+
+    def _handle_rust_unsafe_block(
+        self, node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理Rust unsafe块
+        """
+        line_start = node.start_point[0] + 1
+        line_end = node.end_point[0] + 1
+
+        unsafe_symbol = SymbolInfo(
+            name=f"__unsafe_block__{line_start}",
+            kind="unsafe_block",
+            file_path=file_path,
+            line_start=line_start,
+            line_end=line_end,
+            signature="unsafe { ... }",
+            scope=scope,
+            is_external=False,
+        )
+        result["symbols"].append(unsafe_symbol)
+
+    def _handle_rust_let_declaration(
+        self, node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理Rust let声明
+        """
+        # tree-sitter-rust中let_declaration的变量名不是"name"字段，
+        # 而是identifier子节点（在mutable_specifier之后）
+        name_node = node.child_by_field_name("name")
+        if not name_node:
+            # 回退：查找identifier子节点（跳过let/mutable_specifier）
+            for child in node.children:
+                if child.type == "identifier":
+                    name_node = child
+                    break
+        if not name_node:
+            return
+
+        var_name = self._get_node_text(name_node, code)
+        line = node.start_point[0] + 1
+
+        type_node = node.child_by_field_name("type")
+        type_name = self._get_node_text(type_node, code) if type_node else None
+
+        symbol = SymbolInfo(
+            name=var_name,
+            kind="variable",
+            file_path=file_path,
+            line_start=line,
+            line_end=line,
+            type_name=type_name,
+            scope=scope,
+            is_external=False,
+        )
+        result["symbols"].append(symbol)
+
+        data_flow_node = DataFlowNode(
+            var_name=var_name,
+            file_path=file_path,
+            line=line,
+            node_type="def",
+            scope=scope,
+            value_source="let_binding",
+        )
+        result["data_flow_nodes"].append(data_flow_node)
+
+        if type_name and ("*mut" in type_name or "*const" in type_name):
+            pointer_state = PointerStateRecord(
+                var_name=var_name,
+                file_path=file_path,
+                line=line,
+                state="RAW_POINTER",
+                scope=scope,
+                allocator=None,
+                deallocator=None,
+            )
+            result["pointer_states"].append(pointer_state)
+
+        # 检测type_cast_expression中的pointer_type（如 &mut num as *mut i32）
+        if not type_name or ("*mut" not in type_name and "*const" not in type_name):
+            value_node = node.child_by_field_name("value")
+            if value_node and value_node.type == "type_cast_expression":
+                # 遍历type_cast_expression子节点查找pointer_type
+                for child in value_node.children:
+                    if child.type == "pointer_type":
+                        pointer_state = PointerStateRecord(
+                            var_name=var_name,
+                            file_path=file_path,
+                            line=line,
+                            state="RAW_POINTER",
+                            scope=scope,
+                            allocator=None,
+                            deallocator=None,
+                        )
+                        result["pointer_states"].append(pointer_state)
+                        break
+
+        value_node = node.child_by_field_name("value")
+        if value_node and value_node.type == "call_expression":
+            call_name = self._get_rust_call_target(value_node, code)
+            if call_name:
+                call_relation = CallRelation(
+                    caller_name=scope if scope != "global" else "unknown",
+                    caller_file=file_path,
+                    caller_line=line,
+                    callee_name=call_name,
+                    callee_file=None,
+                    callee_line=None,
+                    call_type="direct",
+                )
+                result["call_relations"].append(call_relation)
+
+    def _handle_rust_call_expression(
+        self, node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理Rust函数调用
+        """
+        callee_name = self._get_rust_call_target(node, code)
+        if not callee_name:
+            return
+
+        line = node.start_point[0] + 1
+
+        call_relation = CallRelation(
+            caller_name=scope if scope != "global" else "unknown",
+            caller_file=file_path,
+            caller_line=line,
+            callee_name=callee_name,
+            callee_file=None,
+            callee_line=None,
+            call_type="direct",
+        )
+        result["call_relations"].append(call_relation)
+
+        args_node = node.child_by_field_name("arguments")
+        if args_node:
+            self._extract_rust_call_arguments(
+                args_node, code, file_path, result, scope, line
+            )
+
+    def _handle_rust_method_call(
+        self, node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理Rust方法调用
+        """
+        method_node = node.child_by_field_name("method")
+        if not method_node:
+            return
+
+        method_name = self._get_node_text(method_node, code)
+        line = node.start_point[0] + 1
+
+        object_node = node.child_by_field_name("object")
+        object_name = self._get_node_text(object_node, code) if object_node else None
+
+        call_relation = CallRelation(
+            caller_name=scope if scope != "global" else "unknown",
+            caller_file=file_path,
+            caller_line=line,
+            callee_name=method_name,
+            callee_file=None,
+            callee_line=None,
+            call_type="method",
+        )
+        result["call_relations"].append(call_relation)
+
+        if method_name in ["unwrap", "expect"]:
+            data_flow_node = DataFlowNode(
+                var_name=object_name if object_name else "__unknown__",
+                file_path=file_path,
+                line=line,
+                node_type="use",
+                scope=scope,
+                value_source="method_call",
+                use_type="unwrap",
+            )
+            result["data_flow_nodes"].append(data_flow_node)
+
+    def _handle_rust_macro_invocation(
+        self, node, code: str, file_path: str, result: Dict[str, Any], scope: str
+    ):
+        """
+        处理Rust宏调用
+        """
+        # tree-sitter-rust中macro_invocation的宏名不是"name"字段，
+        # 而是第一个identifier子节点
+        macro_name_node = node.child_by_field_name("name")
+        if not macro_name_node:
+            # 回退：查找第一个identifier子节点
+            for child in node.children:
+                if child.type == "identifier":
+                    macro_name_node = child
+                    break
+        if not macro_name_node:
+            return
+
+        macro_name = self._get_node_text(macro_name_node, code)
+        line = node.start_point[0] + 1
+
+        call_relation = CallRelation(
+            caller_name=scope if scope != "global" else "unknown",
+            caller_file=file_path,
+            caller_line=line,
+            callee_name=f"{macro_name}!",
+            callee_file=None,
+            callee_line=None,
+            call_type="macro",
+        )
+        result["call_relations"].append(call_relation)
+
+        if macro_name in ["panic", "unreachable"]:
+            data_flow_node = DataFlowNode(
+                var_name=macro_name,
+                file_path=file_path,
+                line=line,
+                node_type="use",
+                scope=scope,
+                value_source="macro",
+                use_type="panic",
+            )
+            result["data_flow_nodes"].append(data_flow_node)
+
+    # ============================================================================
+    # Rust辅助方法
+    # ============================================================================
+
+    def _get_rust_function_name(self, node, code: str) -> Optional[str]:
+        """
+        获取Rust函数名
+        """
+        name_node = node.child_by_field_name("name")
+        if name_node:
+            return self._get_node_text(name_node, code)
+        return None
+
+    def _extract_rust_function_params(self, node, code: str) -> List[str]:
+        """
+        提取Rust函数参数名
+        """
+        params = []
+        params_node = node.child_by_field_name("parameters")
+        if params_node:
+            for child in params_node.children:
+                if child.type == "parameter":
+                    name_node = child.child_by_field_name("name")
+                    if name_node:
+                        params.append(self._get_node_text(name_node, code))
+                elif child.type == "self_parameter":
+                    params.append("self")
+        return params
+
+    def _get_rust_call_target(self, node, code: str) -> Optional[str]:
+        """
+        获取Rust函数调用的目标函数名
+        """
+        func_node = node.child_by_field_name("function")
+        if func_node:
+            if func_node.type == "identifier":
+                return self._get_node_text(func_node, code)
+            elif func_node.type == "scoped_identifier":
+                return self._get_node_text(func_node, code)
+            elif func_node.type == "field_expression":
+                field_node = func_node.child_by_field_name("field")
+                if field_node:
+                    return self._get_node_text(field_node, code)
+        return None
+
+    def _extract_rust_call_arguments(
+        self,
+        args_node,
+        code: str,
+        file_path: str,
+        result: Dict[str, Any],
+        scope: str,
+        line: int,
+    ):
+        """
+        提取Rust函数调用参数中的变量使用
+        """
+        for child in args_node.children:
+            if child.type == "identifier":
+                var_name = self._get_node_text(child, code)
+                data_flow_node = DataFlowNode(
+                    var_name=var_name,
+                    file_path=file_path,
+                    line=line,
+                    node_type="use",
+                    scope=scope,
+                    value_source="call_argument",
+                )
+                result["data_flow_nodes"].append(data_flow_node)

@@ -1,0 +1,8 @@
+{
+  "id": "20260628_230504_854101",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "database-driven", "pattern"],
+  "content": "rust_checker database驱动重构模式：\n- 无database时返回空列表（if database is None: return issues）\n- call_graph查询：database.get_call_graph()，通过callee_name过滤目标函数\n- data_flow查询：database.get_data_flow_by_file(relpath)，通过var_name过滤绑定模式\n- symbols查询：database.get_symbols_by_file(relpath)，通过type字段过滤类型\n- 关联查询：先从symbols获取变量集合，再从call_graph获取调用，需避免用re.search做关联（应通过database字段如caller_name关联）",
+  "created_at": "2026-06-28T23:05:04.854122",
+  "updated_at": "2026-06-28T23:05:04.854126"
+}

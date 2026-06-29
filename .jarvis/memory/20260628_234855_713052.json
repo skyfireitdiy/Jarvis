@@ -1,0 +1,8 @@
+{
+  "id": "20260628_234855_713052",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "taint_analysis", "rules"],
+  "content": "Rust污点规则定义：污点源（RUST_USER_INPUT_SOURCES、RUST_NETWORK_SOURCES、RUST_FILE_SOURCES、RUST_FFI_SOURCES、RUST_UNSAFE_SOURCES）、污点汇（RUST_COMMAND_SINKS、RUST_FILE_SINKS、RUST_MEMORY_SINKS、RUST_FORMAT_SINKS、RUST_PANIC_SINKS、RUST_ERROR_IGNORE_SINKS）、污点规则（rust_command_injection、rust_path_traversal、rust_format_string、rust_memory_safety、rust_panic_usage、rust_error_ignore）。",
+  "created_at": "2026-06-28T23:48:55.713067",
+  "updated_at": "2026-06-28T23:48:55.713070"
+}

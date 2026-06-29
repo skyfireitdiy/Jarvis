@@ -1,0 +1,12 @@
+{
+  "name": "rust_forget",
+  "description": "Rust mem::forget usage test dataset",
+  "vulnerability_type": "mem::forget",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "mem::forget",
+      "file": "positive_forget.rs"
+    }
+  ]
+}

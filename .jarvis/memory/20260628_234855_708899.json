@@ -1,0 +1,8 @@
+{
+  "id": "20260628_234855_708899",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "architecture", "database_driven"],
+  "content": "Rust安全检查器架构模式：database查询优先 → DataFlowAnalyzer分析 → taint_analyzer污点传播 → 误报过滤。所有规则函数签名：def _rule_xxx(lines, relpath, database=None) -> List[Issue]。入口函数逻辑：无database时创建临时ProjectDatabase → DataCollector收集数据 → 执行规则 → 过滤误报 → 清理临时文件。",
+  "created_at": "2026-06-28T23:48:55.708919",
+  "updated_at": "2026-06-28T23:48:55.708925"
+}

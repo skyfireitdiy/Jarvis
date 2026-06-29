@@ -431,6 +431,168 @@ GETENV_SOURCES = [
 ]
 
 # ============================================================================
+# Rust特定污点源
+# ============================================================================
+
+# Rust用户输入源
+RUST_USER_INPUT_SOURCES = [
+    TaintSource(
+        "stdin",
+        "user_input",
+        "从标准输入读取",
+        ["stdin", "io::stdin", "std::io::stdin"],
+    ),
+    TaintSource(
+        "read_line", "user_input", "读取一行输入", ["read_line", "read_to_string"]
+    ),
+    TaintSource(
+        "args", "command_line", "命令行参数", ["args", "env::args", "std::env::args"]
+    ),
+    TaintSource("var", "environment", "环境变量", ["var", "env::var", "std::env::var"]),
+    TaintSource(
+        "vars", "environment", "所有环境变量", ["vars", "env::vars", "std::env::vars"]
+    ),
+]
+
+# Rust网络输入源
+RUST_NETWORK_SOURCES = [
+    TaintSource(
+        "tcp_read", "network", "TCP读取", ["TcpStream::read", "read", "read_exact"]
+    ),
+    TaintSource("udp_recv", "network", "UDP接收", ["recv", "recv_from"]),
+    TaintSource(
+        "http_request", "network", "HTTP请求体", ["body", "into_body", "bytes"]
+    ),
+]
+
+# Rust文件输入源
+RUST_FILE_SOURCES = [
+    TaintSource(
+        "file_read", "file", "文件读取", ["File::open", "read_to_string", "read_to_end"]
+    ),
+    TaintSource("fs_read", "file", "文件系统读取", ["fs::read", "fs::read_to_string"]),
+]
+
+# Rust FFI输入源（从C代码传入的数据）
+RUST_FFI_SOURCES = [
+    TaintSource(
+        "ffi_ptr",
+        "ffi",
+        "FFI指针数据",
+        ["from_raw", "from_raw_parts", "CStr::from_ptr"],
+    ),
+    TaintSource(
+        "ffi_cstring", "ffi", "FFI字符串", ["CString::from_raw", "CStr::from_ptr"]
+    ),
+]
+
+# Rust unsafe块输出源
+RUST_UNSAFE_SOURCES = [
+    TaintSource("unsafe_deref", "unsafe_op", "unsafe解引用", ["deref", "*"]),
+    TaintSource(
+        "unsafe_cast", "unsafe_op", "unsafe类型转换", ["transmute", "from_raw_parts"]
+    ),
+]
+
+# ============================================================================
+# Rust特定污点汇
+# ============================================================================
+
+# Rust命令执行汇
+RUST_COMMAND_SINKS = [
+    TaintSink(
+        "Command::new",
+        "command_execution",
+        TaintSeverity.CRITICAL,
+        "执行系统命令",
+        ["Command::new", "process::Command", "std::process::Command"],
+    ),
+    TaintSink(
+        "output",
+        "command_execution",
+        TaintSeverity.CRITICAL,
+        "获取命令输出",
+        ["output", "status", "spawn"],
+    ),
+]
+
+# Rust文件操作汇
+RUST_FILE_SINKS = [
+    TaintSink(
+        "File::create",
+        "file_operation",
+        TaintSeverity.HIGH,
+        "创建文件",
+        ["File::create", "OpenOptions::new", "fs::write"],
+    ),
+    TaintSink(
+        "fs::remove",
+        "file_operation",
+        TaintSeverity.HIGH,
+        "删除文件",
+        ["fs::remove_file", "fs::remove_dir"],
+    ),
+    TaintSink(
+        "fs::copy",
+        "file_operation",
+        TaintSeverity.MEDIUM,
+        "复制文件",
+        ["fs::copy", "fs::rename"],
+    ),
+]
+
+# Rust内存操作汇
+RUST_MEMORY_SINKS = [
+    TaintSink(
+        "write",
+        "memory_operation",
+        TaintSeverity.HIGH,
+        "内存写入",
+        ["write", "write_bytes", "copy", "copy_nonoverlapping"],
+    ),
+    TaintSink(
+        "from_raw_parts",
+        "memory_operation",
+        TaintSeverity.HIGH,
+        "从原始指针构造",
+        ["from_raw_parts", "from_raw_parts_mut", "from_raw"],
+    ),
+]
+
+# Rust格式化字符串汇
+RUST_FORMAT_SINKS = [
+    TaintSink(
+        "format!",
+        "format_string",
+        TaintSeverity.MEDIUM,
+        "格式化字符串",
+        ["format!", "print!", "println!", "eprint!", "eprintln!"],
+    ),
+]
+
+# Rust panic汇（可能导致状态不一致）
+RUST_PANIC_SINKS = [
+    TaintSink(
+        "panic!",
+        "panic",
+        TaintSeverity.MEDIUM,
+        "panic终止程序",
+        ["panic!", "unreachable!", "todo!", "unimplemented!"],
+    ),
+]
+
+# Rust错误忽略汇（let _ = ...）
+RUST_ERROR_IGNORE_SINKS = [
+    TaintSink(
+        "let _",
+        "error_ignore",
+        TaintSeverity.MEDIUM,
+        "忽略错误结果",
+        ["let _", "drop"],
+    ),
+]
+
+# ============================================================================
 # 预定义规则库
 # ============================================================================
 
@@ -530,6 +692,57 @@ TAINT_RULES: Dict[str, TaintRule] = {
         [],  # 无净化函数
         TaintSeverity.MEDIUM,
         "getenv返回值未检查：getenv返回值未检查NULL可能导致空指针解引用",
+    ),
+    # ============================================================================
+    # Rust特定污点规则
+    # ============================================================================
+    "rust_command_injection": TaintRule(
+        "rust_command_injection",
+        RUST_USER_INPUT_SOURCES + RUST_NETWORK_SOURCES,
+        RUST_COMMAND_SINKS,
+        ["shlex::split", "shell_words::split"],  # Rust命令净化
+        TaintSeverity.CRITICAL,
+        "Rust命令注入：用户输入直接用于执行系统命令",
+    ),
+    "rust_path_traversal": TaintRule(
+        "rust_path_traversal",
+        RUST_USER_INPUT_SOURCES + RUST_NETWORK_SOURCES,
+        RUST_FILE_SINKS,
+        ["Path::canonicalize", "PathBuf::canonicalize"],  # Rust路径净化
+        TaintSeverity.HIGH,
+        "Rust路径遍历：用户输入用于文件路径操作",
+    ),
+    "rust_format_string": TaintRule(
+        "rust_format_string",
+        RUST_USER_INPUT_SOURCES,
+        RUST_FORMAT_SINKS,
+        [],
+        TaintSeverity.MEDIUM,
+        "Rust格式化字符串：用户输入用作格式化字符串",
+    ),
+    "rust_memory_safety": TaintRule(
+        "rust_memory_safety",
+        RUST_FFI_SOURCES + RUST_UNSAFE_SOURCES,
+        RUST_MEMORY_SINKS,
+        [],
+        TaintSeverity.HIGH,
+        "Rust内存安全：FFI/unsafe数据用于内存操作",
+    ),
+    "rust_panic_usage": TaintRule(
+        "rust_panic_usage",
+        RUST_USER_INPUT_SOURCES,
+        RUST_PANIC_SINKS,
+        [],
+        TaintSeverity.MEDIUM,
+        "Rust panic使用：用户输入可能导致panic",
+    ),
+    "rust_error_ignore": TaintRule(
+        "rust_error_ignore",
+        RUST_USER_INPUT_SOURCES + RUST_NETWORK_SOURCES,
+        RUST_ERROR_IGNORE_SINKS,
+        [],
+        TaintSeverity.MEDIUM,
+        "Rust错误忽略：可能忽略错误结果",
     ),
 }
 

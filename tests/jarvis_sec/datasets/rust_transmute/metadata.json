@@ -1,0 +1,12 @@
+{
+  "name": "rust_transmute",
+  "description": "Rust mem::transmute usage test dataset",
+  "vulnerability_type": "mem::transmute",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "mem::transmute",
+      "file": "positive_transmute.rs"
+    }
+  ]
+}

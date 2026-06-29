@@ -20,10 +20,24 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Sequence
 from typing import Tuple
+from typing import TYPE_CHECKING
 
 from jarvis.jarvis_sec.types import Issue
+
+if TYPE_CHECKING:
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
+
+# 污点分析框架（核心依赖）
+import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
+
+# 数据流分析器（用于误报过滤）
+from jarvis.jarvis_sec.data_flow_analyzer import (
+    DataFlowAnalyzer,
+    DataFlowResult,
+)
 
 # ---------------------------
 # 规则库（正则表达式）
@@ -501,513 +515,1154 @@ def _severity_from_confidence(conf: float) -> str:
 # ---------------------------
 
 
-def _rule_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        # 避免对 unsafe impl 重复上报，由专门规则处理
-        if not RE_UNSAFE.search(s) or RE_UNSAFE_IMPL.search(s):
-            continue
-        conf = 0.8
-        if _has_safety_comment_around(lines, idx, radius=5):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="unsafe",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="存在 unsafe 代码块/标识，需证明内存/别名/生命周期安全性。",
-                suggestion="将不安全操作封装在最小作用域内，并提供 SAFETY 注释说明前置条件与不变式。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_raw_pointer(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_RAW_PTR.search(s):
-            continue
-        conf = 0.75
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.9, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="raw_pointer",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="出现原始指针（*mut/*const），可能绕过借用/生命周期检查，带来未定义行为风险。",
-                suggestion="优先使用引用/智能指针；必须使用原始指针时，严格证明无别名、对齐与生命周期安全。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_transmute(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_TRANSMUTE.search(s):
-            continue
-        conf = 0.85
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        conf = max(0.6, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="mem::transmute",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 mem::transmute 进行类型转换，若未严格保证布局/对齐/生命周期，将导致未定义行为。",
-                suggestion="避免使用 transmute，优先采用安全转换或 bytemuck 等受审计抽象；必须使用时严格注明不变式。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_maybe_uninit(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_unsafe(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
-    MaybeUninit + assume_init 组合常见于优化/FFI，需特别小心初始化与有效性。
+    检测unsafe块使用。
+    - 优先使用database查询symbols表获取unsafe_block类型的符号
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_MAYBE_UNINIT.search(s) or RE_ASSUME_INIT.search(s)):
-            continue
-        conf = 0.7
-        # 若在邻近几行同时出现 MaybeUninit 与 assume_init，风险更高
-        win_text = " ".join(t for _, t in _window(lines, idx, before=3, after=3))
-        if RE_MAYBE_UNINIT.search(win_text) and RE_ASSUME_INIT.search(win_text):
-            conf += 0.1
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.9, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="MaybeUninit/assume_init",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 MaybeUninit/assume_init 需保证正确初始化与读取顺序，否则可能导致未定义行为。",
-                suggestion="确保初始化前不读取；使用更安全的构造函数；在 SAFETY 注释中说明前置条件。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        symbols = database.get_symbols_by_file(relpath)
+        for symbol in symbols:
+            if symbol.get("kind") != "unsafe_block":
+                continue
+            # unsafe impl Send/Sync由_rule_unsafe_impl专门处理，此处跳过
+            if "__unsafe_impl__" in symbol.get("name", ""):
+                continue
+
+            line_start = symbol.get("line_start", 0)
+            if line_start <= 0 or line_start > len(lines):
+                continue
+
+            s = lines[line_start - 1]
+            # SAFETY注释：直接过滤，不报告
+            if _has_safety_comment_around(lines, line_start, radius=5):
+                continue
+            conf = 0.8
+            if _in_test_context(lines, line_start):
+                conf -= 0.05
+            conf = max(0.5, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="unsafe",
+                    file=relpath,
+                    line=line_start,
+                    evidence=_strip_line(s),
+                    description="存在 unsafe 代码块/标识，需证明内存/别名/生命周期安全性。",
+                    suggestion="将不安全操作封装在最小作用域内，并提供 SAFETY 注释说明前置条件与不变式。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_unwrap_expect(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_UNWRAP.search(s) or RE_EXPECT.search(s)):
-            continue
-        conf = 0.65
-        if _in_test_context(lines, idx):
-            conf -= 0.1
-        conf = max(0.45, min(0.8, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="error_handling",
-                pattern="unwrap/expect",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="直接 unwrap/expect 可能在错误条件下 panic，缺少健壮的错误处理路径。",
-                suggestion="使用 ? 传播错误或 match 显式处理；为关键路径提供错误上下文与恢复策略。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_extern_c(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_EXTERN_C.search(s):
-            continue
-        conf = 0.7
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.85, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="ffi",
-                pattern='extern "C"',
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="FFI 边界需要确保指针有效性、长度/对齐、生命周期、线程安全等约束，否则可能产生未定义行为。",
-                suggestion="在 FFI 边界进行严格的参数校验与安全封装；在 SAFETY 注释中记录不变式与约束。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_unsafe_impl(lines: Sequence[str], relpath: str) -> List[Issue]:
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_UNSAFE_IMPL.search(s):
-            continue
-        conf = 0.8
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        conf = max(0.6, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="concurrency",
-                pattern="unsafe_impl_Send_or_Sync",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="手写 unsafe impl Send/Sync 可能破坏并发内存模型保证，带来数据竞争风险。",
-                suggestion="避免手写 unsafe impl；必要时严格证明线程安全前置条件并最小化不安全区域。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
-
-
-def _rule_ignore_result(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_raw_pointer(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
-    启发式：使用 let _ = xxx; 或 .ok() 等可能忽略错误。
-    该规则误报可能较高，因此置信度较低。
+    检测原始指针（*mut/*const）使用。
+    - 优先使用database查询pointer_states表获取RAW_POINTER状态的指针
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_LET_UNDERSCORE.search(s) or RE_MATCH_IGNORE_ERR.search(s)):
-            continue
-        conf = 0.55
-        if _in_test_context(lines, idx):
-            conf -= 0.1
-        conf = max(0.4, min(0.7, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="error_handling",
-                pattern="ignored_result",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="可能忽略了返回的错误结果，导致失败未被处理。",
-                suggestion="显式处理 Result（? 传播或 match），确保错误路径涵盖资源回收与日志记录。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        pointer_states = database.get_pointer_states_by_file(relpath)
+        for state in pointer_states:
+            if state.get("state") != "RAW_POINTER":
+                continue
+
+            line = state.get("line", 0)
+            if line <= 0 or line > len(lines):
+                continue
+
+            var_name = state.get("var_name", "")
+            s = lines[line - 1]
+            # SAFETY注释：直接过滤，不报告
+            if _has_safety_comment_around(lines, line, radius=5):
+                continue
+            conf = 0.75
+            if _in_test_context(lines, line):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="raw_pointer",
+                    file=relpath,
+                    line=line,
+                    evidence=_strip_line(s),
+                    description=f"出现原始指针 {var_name}（*mut/*const），可能绕过借用/生命周期检查，带来未定义行为风险。",
+                    suggestion="优先使用引用/智能指针；必须使用原始指针时，严格证明无别名、对齐与生命周期安全。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_forget(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_transmute(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测mem::transmute调用。
+    - 优先使用database查询call_graph表获取transmute调用
+    - 无database时返回空列表
+    """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_FORGET.search(s):
-            continue
-        conf = 0.75
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.9, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="resource_management",
-                pattern="mem::forget",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 mem::forget 会跳过 Drop 导致资源泄漏，若错误使用可能破坏不变式或造成泄漏。",
-                suggestion="避免无必要的 mem::forget；如需抑制 Drop，优先使用 ManuallyDrop 或设计更安全的所有权转移。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            if callee_name not in [
+                "transmute",
+                "mem::transmute",
+                "std::mem::transmute",
+            ]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.85
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="mem::transmute",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 mem::transmute 进行类型转换，若未严格保证布局/对齐/生命周期，将导致未定义行为。",
+                    suggestion="避免使用 transmute，优先采用安全转换或 bytemuck 等受审计抽象；必须使用时严格注明不变式。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_get_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_maybe_uninit(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测MaybeUninit/assume_init使用。
+    - 优先使用database查询call_graph表获取相关调用
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        maybe_uninit_calls = []
+        assume_init_calls = []
+
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            if callee_name in ["MaybeUninit", "maybe_uninit", "std::mem::MaybeUninit"]:
+                maybe_uninit_calls.append(call)
+            elif callee_name in ["assume_init", "maybe_uninit_assume_init"]:
+                assume_init_calls.append(call)
+
+        # 处理MaybeUninit调用
+        for call in maybe_uninit_calls:
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.7
+            # 检查附近是否有assume_init
+            for assume_call in assume_init_calls:
+                assume_line = assume_call.get("caller_line", 0)
+                if abs(assume_line - idx) <= 3:
+                    conf += 0.1
+                    break
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="MaybeUninit/assume_init",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 MaybeUninit/assume_init 需保证正确初始化与读取顺序，否则可能导致未定义行为。",
+                    suggestion="确保初始化前不读取；使用更安全的构造函数；在 SAFETY 注释中说明前置条件。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+
+        # 处理assume_init调用
+        for call in assume_init_calls:
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            # 避免重复报告（如果已经在MaybeUninit附近报告过）
+            already_reported = False
+            for issue in issues:
+                if abs(issue.line - idx) <= 3:
+                    already_reported = True
+                    break
+            if already_reported:
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.7
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="MaybeUninit/assume_init",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 assume_init 需保证正确初始化，否则可能导致未定义行为。",
+                    suggestion="确保初始化前不读取；使用更安全的构造函数；在 SAFETY 注释中说明前置条件。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_unwrap_expect(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测unwrap/expect调用。
+    - 优先使用database查询call_graph表获取unwrap/expect调用
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配unwrap和expect方法调用
+            if callee_name not in ["unwrap", "expect"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.65
+            if _in_test_context(lines, idx):
+                conf -= 0.1
+            conf = max(0.45, min(0.8, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="error_handling",
+                    pattern="unwrap/expect",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="直接 unwrap/expect 可能在错误条件下 panic，缺少健壮的错误处理路径。",
+                    suggestion="使用 ? 传播错误或 match 显式处理；为关键路径提供错误上下文与恢复策略。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_extern_c(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测extern "C"声明。
+    - 优先使用database查询symbols表获取extern块
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        symbols = database.get_symbols_by_file(relpath)
+        for symbol in symbols:
+            # 检测extern块（kind='extern_block'或name包含'extern'）
+            kind = symbol.get("kind", "")
+            name = symbol.get("name", "")
+            if kind != "extern_block" and "extern" not in name.lower():
+                continue
+
+            line_start = symbol.get("line_start", 0)
+            if line_start <= 0 or line_start > len(lines):
+                continue
+
+            s = lines[line_start - 1]
+            conf = 0.7
+            if _has_safety_comment_around(lines, line_start):
+                conf -= 0.05
+            conf = max(0.5, min(0.85, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="ffi",
+                    pattern='extern "C"',
+                    file=relpath,
+                    line=line_start,
+                    evidence=_strip_line(s),
+                    description="FFI 边界需要确保指针有效性、长度/对齐、生命周期、线程安全等约束，否则可能产生未定义行为。",
+                    suggestion="在 FFI 边界进行严格的参数校验与安全封装；在 SAFETY 注释中记录不变式与约束。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_unsafe_impl(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测unsafe impl Send/Sync。
+    - 优先使用database查询symbols表获取unsafe impl定义
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        symbols = database.get_symbols_by_file(relpath)
+        for symbol in symbols:
+            # 检测unsafe impl Send/Sync
+            kind = symbol.get("kind", "")
+            name = symbol.get("name", "")
+            # DataCollector可能存为kind='impl'或kind='unsafe_block'(name含__unsafe_impl__)
+            if kind == "impl":
+                # 检查是否是Send或Sync的impl
+                if "Send" not in name and "Sync" not in name:
+                    continue
+                # 检查是否是unsafe impl
+                is_unsafe = symbol.get("is_unsafe", False) or "unsafe" in name.lower()
+                if not is_unsafe:
+                    continue
+            elif kind == "unsafe_block" and "__unsafe_impl__" in name:
+                # DataCollector将unsafe impl存为unsafe_block，name格式: __unsafe_impl__TypeName
+                # 需要从源码行检查是否是Send/Sync
+                line_start = symbol.get("line_start", 0)
+                if line_start <= 0 or line_start > len(lines):
+                    continue
+                s = lines[line_start - 1]
+                if "Send" not in s and "Sync" not in s:
+                    continue
+            else:
+                continue
+
+            line_start = symbol.get("line_start", 0)
+            if line_start <= 0 or line_start > len(lines):
+                continue
+
+            s = lines[line_start - 1]
+            conf = 0.8
+            if _has_safety_comment_around(lines, line_start):
+                conf -= 0.1
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="concurrency",
+                    pattern="unsafe_impl_Send_or_Sync",
+                    file=relpath,
+                    line=line_start,
+                    evidence=_strip_line(s),
+                    description="手写 unsafe impl Send/Sync 可能破坏并发内存模型保证，带来数据竞争风险。",
+                    suggestion="避免手写 unsafe impl；必要时严格证明线程安全前置条件并最小化不安全区域。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_ignore_result(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测let _ = xxx忽略结果。
+    - 优先使用database查询data_flow表获取let _绑定信息
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        # 查询data_flow表获取let _绑定
+        data_flows = database.get_data_flow_by_file(relpath)
+        for flow in data_flows:
+            # 检测let _绑定模式（忽略结果）
+            var_name = flow.get("var_name", "")
+            if var_name != "_":
+                continue
+
+            line = flow.get("line", 0)
+            if line <= 0 or line > len(lines):
+                continue
+
+            s = lines[line - 1]
+            conf = 0.55
+            if _in_test_context(lines, line):
+                conf -= 0.1
+            conf = max(0.4, min(0.7, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="error_handling",
+                    pattern="ignored_result",
+                    file=relpath,
+                    line=line,
+                    evidence=_strip_line(s),
+                    description="可能忽略了返回的错误结果，导致失败未被处理。",
+                    suggestion="显式处理 Result（? 传播或 match），确保错误路径涵盖资源回收与日志记录。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_forget(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测 mem::forget 的使用，会跳过 Drop 导致资源泄漏。
+    - 优先使用database查询call_graph表获取mem::forget调用
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配mem::forget调用
+            if callee_name not in ["mem::forget", "forget"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.75
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="resource_management",
+                    pattern="mem::forget",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 mem::forget 会跳过 Drop 导致资源泄漏，若错误使用可能破坏不变式或造成泄漏。",
+                    suggestion="避免无必要的 mem::forget；如需抑制 Drop，优先使用 ManuallyDrop 或设计更安全的所有权转移。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_get_unchecked(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 get_unchecked/get_unchecked_mut 的使用，这些方法绕过边界检查。
+    - 优先使用database查询call_graph表获取get_unchecked/get_unchecked_mut调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_GET_UNCHECKED.search(s) or RE_GET_UNCHECKED_MUT.search(s)):
-            continue
-        conf = 0.8
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.6, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="get_unchecked",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 get_unchecked/get_unchecked_mut 绕过边界检查，若索引无效将导致未定义行为。",
-                suggestion="优先使用安全的索引方法（[] 或 get）；必须使用 get_unchecked 时，在 SAFETY 注释中证明索引有效性。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配get_unchecked/get_unchecked_mut调用
+            if callee_name not in ["get_unchecked", "get_unchecked_mut"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.8
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="get_unchecked",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 get_unchecked/get_unchecked_mut 绕过边界检查，若索引无效将导致未定义行为。",
+                    suggestion="优先使用安全的索引方法（[] 或 get）；必须使用 get_unchecked 时，在 SAFETY 注释中证明索引有效性。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_pointer_arithmetic(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_pointer_arithmetic(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测指针算术操作（offset/add），这些操作可能产生无效指针。
+    - 优先使用database查询call_graph表获取offset/add调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_OFFSET.search(s) or RE_ADD.search(s)):
-            continue
-        conf = 0.75
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.9, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="pointer_arithmetic",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 offset/add 进行指针算术，若计算结果超出有效范围将导致未定义行为。",
-                suggestion="确保指针算术结果在有效对象边界内；使用 slice 等安全抽象替代原始指针算术。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配offset/add调用（指针算术）
+            if callee_name not in [
+                "offset",
+                "add",
+                "sub",
+                "wrapping_offset",
+                "wrapping_add",
+                "wrapping_sub",
+            ]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.75
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="pointer_arithmetic",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 offset/add 进行指针算术，若计算结果超出有效范围将导致未定义行为。",
+                    suggestion="确保指针算术结果在有效对象边界内；使用 slice 等安全抽象替代原始指针算术。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_unsafe_mem_ops(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_unsafe_mem_ops(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测不安全的内存操作（copy_nonoverlapping/copy/write/read）。
+    - 优先使用database查询call_graph表获取不安全内存操作调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (
-            RE_COPY_NONOVERLAPPING.search(s)
-            or RE_COPY.search(s)
-            or RE_WRITE.search(s)
-            or RE_READ.search(s)
-        ):
-            continue
-        # 检查是否在 unsafe 块中
-        window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
-        if "unsafe" not in window_text.lower():
-            continue  # 这些函数必须在 unsafe 块中使用
 
-        conf = 0.8
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.6, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="unsafe_mem_ops",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用不安全的内存操作（copy/copy_nonoverlapping/write/read），需确保指针有效性、对齐与重叠检查。",
-                suggestion="优先使用安全的复制方法；必须使用时，在 SAFETY 注释中证明指针有效性、对齐与边界条件。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配不安全内存操作
+            unsafe_mem_ops = [
+                "copy_nonoverlapping",
+                "copy",
+                "write",
+                "read",
+                "write_bytes",
+                "read_volatile",
+                "write_volatile",
+                "read_unaligned",
+                "write_unaligned",
+            ]
+            if callee_name not in unsafe_mem_ops:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.8
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="unsafe_mem_ops",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用不安全的内存操作（copy/copy_nonoverlapping/write/read），需确保指针有效性、对齐与重叠检查。",
+                    suggestion="优先使用安全的复制方法；必须使用时，在 SAFETY 注释中证明指针有效性、对齐与边界条件。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_from_raw_parts(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_from_raw_parts(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 from_raw_parts/from_raw 等不安全构造函数。
+    - 优先使用database查询call_graph表获取from_raw_parts/from_raw调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_FROM_RAW_PARTS.search(s) or RE_FROM_RAW.search(s)):
-            continue
-        conf = 0.85
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.6, min(0.95, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="from_raw_parts/from_raw",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 from_raw_parts/from_raw 从原始指针构造，需确保指针有效性、对齐与生命周期安全。",
-                suggestion="优先使用安全的构造函数；必须使用时，在 SAFETY 注释中证明所有前置条件（有效性/对齐/生命周期）。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配from_raw_parts/from_raw调用
+            if callee_name not in ["from_raw_parts", "from_raw_parts_mut", "from_raw"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.85
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="from_raw_parts/from_raw",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 from_raw_parts/from_raw 从原始指针构造，需确保指针有效性、对齐与生命周期安全。",
+                    suggestion="优先使用安全的构造函数；必须使用时，在 SAFETY 注释中证明所有前置条件（有效性/对齐/生命周期）。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_manually_drop(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_manually_drop(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 ManuallyDrop 的使用，需要手动管理 Drop。
+    - 优先使用database查询symbols表获取ManuallyDrop类型使用
+    - 优先使用database查询call_graph表获取ManuallyDrop::new/drop调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not RE_MANUALLY_DROP.search(s):
-            continue
-        conf = 0.7
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.85, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="resource_management",
-                pattern="ManuallyDrop",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 ManuallyDrop 需要手动管理 Drop，若使用不当可能导致资源泄漏或双重释放。",
-                suggestion="确保 ManuallyDrop 包装的对象在适当时候手动调用 drop；在 SAFETY 注释中说明生命周期管理策略。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
 
+    if database is None:
+        return issues
 
-def _rule_panic_unreachable(lines: Sequence[str], relpath: str) -> List[Issue]:
-    """
-    检测 panic!/unreachable! 的使用，可能导致程序崩溃。
-    """
-    issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_PANIC.search(s) or RE_UNREACHABLE.search(s)):
-            continue
-        conf = 0.6
-        if _in_test_context(lines, idx):
-            conf -= 0.15  # 测试中 panic 更常见
-        if "assert" in s.lower():
-            conf -= 0.1  # assert! 宏中的 panic 通常可接受
-        conf = max(0.4, min(0.75, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="error_handling",
-                pattern="panic/unreachable",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 panic!/unreachable! 可能导致程序崩溃，缺少优雅的错误处理。",
-                suggestion="优先使用 Result 类型进行错误处理；仅在确实不可恢复的情况下使用 panic。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
-            )
-        )
-    return issues
+    try:
+        import os
 
+        # 先查询call_graph表，检测是否有ManuallyDrop::drop调用（正确清理）
+        call_graph = database.get_call_graph()
+        has_manually_drop_cleanup = False
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            if callee_name == "ManuallyDrop::drop":
+                caller_file = call.get("caller_file", "")
+                if os.path.basename(caller_file) == os.path.basename(relpath):
+                    has_manually_drop_cleanup = True
+                    break
 
-def _rule_refcell_borrow(lines: Sequence[str], relpath: str) -> List[Issue]:
-    """
-    检测 RefCell 的使用，运行时借用检查可能 panic。
-    """
-    issues: List[Issue] = []
-    refcell_vars: set[str] = set()
+        # 查询symbols表获取ManuallyDrop类型使用
+        symbols = database.get_symbols_by_file(relpath)
+        for sym in symbols:
+            type_name = sym.get("type", "")
+            if "ManuallyDrop" not in type_name:
+                continue
 
-    # 收集 RefCell 变量
-    for idx, s in enumerate(lines, start=1):
-        if RE_REFCELL.search(s):
-            # 简单提取变量名
-            m = re.search(r"\bRefCell\s*<[^>]+>\s*([A-Za-z_]\w*)", s, re.IGNORECASE)
-            if m:
-                refcell_vars.add(m.group(1))
+            idx = sym.get("line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
 
-    # 检测 borrow/borrow_mut 的使用
-    for idx, s in enumerate(lines, start=1):
-        for var in refcell_vars:
-            if re.search(rf"\b{re.escape(var)}\s*\.borrow\s*\(", s, re.IGNORECASE):
-                conf = 0.55
-                # 检查是否有 try_borrow（更安全）
-                if "try_borrow" in s.lower():
-                    continue
-                if _in_test_context(lines, idx):
-                    conf -= 0.1
-                conf = max(0.4, min(0.7, conf))
-                issues.append(
-                    Issue(
-                        language="rust",
-                        category="error_handling",
-                        pattern="RefCell_borrow",
-                        file=relpath,
-                        line=idx,
-                        evidence=_strip_line(s),
-                        description=f"RefCell {var} 使用 borrow/borrow_mut 可能在运行时 panic（借用冲突）。",
-                        suggestion="考虑使用 try_borrow/try_borrow_mut 返回 Result，或使用 Mutex/RwLock 进行编译时检查。",
-                        confidence=conf,
-                        severity=_severity_from_confidence(conf),
-                    )
+            # 如果有ManuallyDrop::drop调用，说明正确清理了，跳过
+            if has_manually_drop_cleanup:
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.7
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.85, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="resource_management",
+                    pattern="ManuallyDrop",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 ManuallyDrop 需要手动管理 Drop，若使用不当可能导致资源泄漏或双重释放。",
+                    suggestion="确保 ManuallyDrop 包装的对象在适当时候手动调用 drop；在 SAFETY 注释中说明生命周期管理策略。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
                 )
-                break  # 每行只报告一次
+            )
+
+        # 查询call_graph表获取ManuallyDrop::new调用（仅报告new，不报告drop）
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 只匹配ManuallyDrop::new，不匹配ManuallyDrop::drop
+            if callee_name != "ManuallyDrop::new":
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            # 如果有ManuallyDrop::drop调用，说明正确清理了，跳过
+            if has_manually_drop_cleanup:
+                continue
+
+            # 避免重复报告
+            if any(i.line == idx for i in issues):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.7
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.85, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="resource_management",
+                    pattern="ManuallyDrop",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 ManuallyDrop 需要手动管理 Drop，若使用不当可能导致资源泄漏或双重释放。",
+                    suggestion="确保 ManuallyDrop 包装的对象在适当时候手动调用 drop；在 SAFETY 注释中说明生命周期管理策略。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_ffi_cstring(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_panic_unreachable(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
-    检测 FFI 中 CString/CStr 的使用，需要确保正确转换与生命周期。
+    检测panic!/unreachable!宏调用。
+    - 优先使用database查询call_graph表获取panic!/unreachable!调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_CSTRING.search(s) or RE_CSTR.search(s)):
-            continue
-        # 检查是否在 FFI 上下文中
-        window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
-        if RE_EXTERN_C.search(window_text) or "ffi" in window_text.lower():
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配panic!和unreachable!宏调用
+            if callee_name not in ["panic!", "unreachable!"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.6
+            if _in_test_context(lines, idx):
+                conf -= 0.15  # 测试中 panic 更常见
+            if "assert" in s.lower():
+                conf -= 0.1  # assert! 宏中的 panic 通常可接受
+            conf = max(0.4, min(0.75, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="error_handling",
+                    pattern="panic/unreachable",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 panic!/unreachable! 可能导致程序崩溃，缺少优雅的错误处理。",
+                    suggestion="优先使用 Result 类型进行错误处理；仅在确实不可恢复的情况下使用 panic。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_refcell_borrow(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测RefCell的borrow/borrow_mut使用。
+    - 优先使用database查询symbols表获取RefCell变量定义
+    - 优先使用database查询call_graph表获取borrow/borrow_mut调用
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        # 查询symbols表获取RefCell变量
+        symbols = database.get_symbols_by_file(relpath)
+        refcell_vars: set[str] = set()
+        for symbol in symbols:
+            # 检测RefCell类型变量
+            type_info = symbol.get("type", "")
+            if "RefCell" in type_info:
+                var_name = symbol.get("name", "")
+                if var_name:
+                    refcell_vars.add(var_name)
+
+        # 查询call_graph表获取borrow/borrow_mut调用
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配borrow和borrow_mut方法调用
+            if callee_name not in ["borrow", "borrow_mut"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            # 通过caller_name字段检查是否是RefCell变量的borrow
+            # caller_name格式可能是"var.borrow"或"borrow"
+            caller_name = call.get("caller_name", "")
+            is_refcell_borrow = False
+            for var in refcell_vars:
+                # 使用字符串匹配而非正则表达式
+                if (
+                    caller_name == var
+                    or f"{var}.borrow" in caller_name
+                    or f"{var}.borrow_mut" in caller_name
+                ):
+                    is_refcell_borrow = True
+                    break
+
+            if not is_refcell_borrow:
+                continue
+
+            # 检查是否有try_borrow（更安全）
+            if "try_borrow" in s.lower():
+                continue
+
+            conf = 0.55
+            if _in_test_context(lines, idx):
+                conf -= 0.1
+            conf = max(0.4, min(0.7, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="error_handling",
+                    pattern="RefCell_borrow",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="RefCell 使用 borrow/borrow_mut 可能在运行时 panic（借用冲突）。",
+                    suggestion="考虑使用 try_borrow/try_borrow_mut 返回 Result，或使用 Mutex/RwLock 进行编译时检查。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_ffi_cstring(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测FFI中CString/CStr的使用。
+    - 优先使用database查询call_graph表获取CString/CStr调用
+    - 通过symbols表检查是否在FFI上下文中
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        # 查询call_graph表获取CString/CStr调用
+        call_graph = database.get_call_graph()
+        # 查询symbols表检查FFI上下文
+        symbols = database.get_symbols_by_file(relpath)
+        has_ffi_context = False
+        for symbol in symbols:
+            kind = symbol.get("kind", "")
+            name = symbol.get("name", "")
+            if (
+                kind == "extern_block"
+                or "extern" in name.lower()
+                or "ffi" in name.lower()
+            ):
+                has_ffi_context = True
+                break
+
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配CString和CStr调用
+            if callee_name not in ["CString", "CStr", "CString::new", "CStr::from_ptr"]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            # 检查是否在FFI上下文中（通过caller_name或附近symbols）
+            caller_name = call.get("caller_name", "")
+            in_ffi = (
+                has_ffi_context
+                or "ffi" in caller_name.lower()
+                or "extern" in caller_name.lower()
+            )
+
+            if not in_ffi:
+                continue
+
+            s = lines[idx - 1]
             conf = 0.65
             if _has_safety_comment_around(lines, idx):
                 conf -= 0.1
             conf = max(0.5, min(0.8, conf))
+
             issues.append(
                 Issue(
                     language="rust",
@@ -1022,37 +1677,74 @@ def _rule_ffi_cstring(lines: Sequence[str], relpath: str) -> List[Issue]:
                     severity=_severity_from_confidence(conf),
                 )
             )
+    except Exception:
+        pass
+
     return issues
 
 
-def _rule_uninit_zeroed(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_uninit_zeroed(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     检测 uninit/zeroed 的使用，未初始化内存访问风险。
+    - 优先使用database查询call_graph表获取uninit/zeroed调用
+    - 无database时返回空列表
     """
     issues: List[Issue] = []
-    for idx, s in enumerate(lines, start=1):
-        if not (RE_UNINIT.search(s) or RE_ZEROED.search(s)):
-            continue
-        conf = 0.75
-        if _has_safety_comment_around(lines, idx):
-            conf -= 0.1
-        if _in_test_context(lines, idx):
-            conf -= 0.05
-        conf = max(0.5, min(0.9, conf))
-        issues.append(
-            Issue(
-                language="rust",
-                category="unsafe_usage",
-                pattern="uninit/zeroed",
-                file=relpath,
-                line=idx,
-                evidence=_strip_line(s),
-                description="使用 uninit/zeroed 创建未初始化内存，若在初始化前读取将导致未定义行为。",
-                suggestion="确保在使用前完成初始化；优先使用 MaybeUninit 进行更安全的未初始化内存管理。",
-                confidence=conf,
-                severity=_severity_from_confidence(conf),
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配uninit/zeroed调用
+            if callee_name not in [
+                "uninit",
+                "zeroed",
+                "mem::uninitialized",
+                "MaybeUninit::uninit",
+                "MaybeUninit::zeroed",
+            ]:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.75
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="uninit/zeroed",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="使用 uninit/zeroed 创建未初始化内存，若在初始化前读取将导致未定义行为。",
+                    suggestion="确保在使用前完成初始化；优先使用 MaybeUninit 进行更安全的未初始化内存管理。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
             )
-        )
+    except Exception:
+        pass
+
     return issues
 
 
@@ -1061,48 +1753,491 @@ def _rule_uninit_zeroed(lines: Sequence[str], relpath: str) -> List[Issue]:
 # ---------------------------
 
 
-def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
+def analyze_rust_text(
+    relpath: str,
+    text: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
     """
     基于提供的文本进行 Rust 启发式分析。
     - 准确性优化：在启发式匹配前移除注释（保留字符串/字符字面量），
       以避免注释中的API命中导致的误报。
     - 准确性优化2：对通用 API 扫描使用"字符串内容掩蔽"的副本，避免把字符串里的片段当作代码。
+    - 准确性优化3：使用数据流分析过滤误报。
+    - Database驱动：优先使用database查询，无database时创建临时database。
+
+    Args:
+        relpath: 相对文件路径
+        text: 源代码文本
+        database: 项目数据库实例（可选）
     """
     clean_text = _remove_comments_preserve_strings(text)
     masked_text = _mask_strings_preserve_len(clean_text)
-    # 原始行：保留字符串内容，供需要解析字面量的规则使用
-    clean_text.splitlines()
+    # 原始行：保留注释和字符串内容，供SAFETY注释检查等使用
+    lines = text.splitlines()
     # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
     mlines = masked_text.splitlines()
 
+    # 数据流分析（用于误报过滤）
+    # 如果没有database，创建临时内存database并用DataCollector收集数据
+    _temp_database = None
+    _db_file_path = relpath  # 用于查询database的文件路径
+    if database is None:
+        try:
+            from jarvis.jarvis_sec.project_database import ProjectDatabase
+            from jarvis.jarvis_sec.data_collector import DataCollector
+
+            _temp_database = ProjectDatabase(".", in_memory=True)
+            collector = DataCollector(_temp_database)
+            # 写入临时文件供DataCollector分析
+            import tempfile
+            import os
+
+            _tmp_dir = tempfile.mkdtemp(prefix="jsec_rust_")
+            _tmp_file = os.path.join(_tmp_dir, os.path.basename(relpath))
+            with open(_tmp_file, "w", encoding="utf-8") as f:
+                f.write(text)
+            collector.analyze_file(_tmp_file, "rust")
+            # 使用临时文件的完整路径查询database
+            _db_file_path = _tmp_file
+            database = _temp_database
+        except Exception:
+            pass  # 创建失败时继续使用空database
+    else:
+        # 有外部database时，确保使用正确的文件路径
+        import os
+
+        if os.path.isabs(relpath):
+            _db_file_path = relpath
+
+    data_flow_analyzer = DataFlowAnalyzer()
+    data_flow_result = data_flow_analyzer.analyze_code(
+        text, is_cpp=False, database=database, file_path=_db_file_path
+    )
+
+    # 清理临时文件和目录（在所有规则检查完成后）
+    def _cleanup_temp_files():
+        if _temp_database is not None:
+            try:
+                import os
+
+                os.unlink(_tmp_file)
+                os.rmdir(_tmp_dir)
+            except (OSError, NameError):
+                pass
+
     issues: List[Issue] = []
     # 通用 API/关键字匹配（使用掩蔽行）
-    issues.extend(_rule_unsafe(mlines, relpath))
-    issues.extend(_rule_raw_pointer(mlines, relpath))
-    issues.extend(_rule_transmute(mlines, relpath))
-    issues.extend(_rule_forget(mlines, relpath))
-    issues.extend(_rule_maybe_uninit(mlines, relpath))
+    issues.extend(_rule_unsafe(lines, _db_file_path, database=database))
+    issues.extend(_rule_raw_pointer(lines, _db_file_path, database=database))
+    issues.extend(_rule_transmute(mlines, _db_file_path, database=database))
+    issues.extend(_rule_forget(mlines, _db_file_path, database=database))
+    issues.extend(_rule_maybe_uninit(mlines, _db_file_path, database=database))
     # 错误处理
-    issues.extend(_rule_unwrap_expect(mlines, relpath))
-    issues.extend(_rule_ignore_result(mlines, relpath))
-    issues.extend(_rule_panic_unreachable(mlines, relpath))
+    issues.extend(_rule_unwrap_expect(mlines, _db_file_path, database=database))
+    issues.extend(_rule_ignore_result(mlines, _db_file_path, database=database))
+    issues.extend(_rule_panic_unreachable(mlines, _db_file_path, database=database))
     # FFI 相关
-    issues.extend(_rule_extern_c(mlines, relpath))
-    issues.extend(_rule_ffi_cstring(mlines, relpath))
+    issues.extend(_rule_extern_c(mlines, _db_file_path, database=database))
+    issues.extend(_rule_ffi_cstring(mlines, _db_file_path, database=database))
     # 并发相关
-    issues.extend(_rule_unsafe_impl(mlines, relpath))
-    issues.extend(_rule_refcell_borrow(mlines, relpath))
+    issues.extend(_rule_unsafe_impl(mlines, _db_file_path, database=database))
+    issues.extend(_rule_refcell_borrow(mlines, _db_file_path, database=database))
     # 内存操作相关
-    issues.extend(_rule_get_unchecked(mlines, relpath))
-    issues.extend(_rule_pointer_arithmetic(mlines, relpath))
-    issues.extend(_rule_unsafe_mem_ops(mlines, relpath))
-    issues.extend(_rule_from_raw_parts(mlines, relpath))
-    issues.extend(_rule_manually_drop(mlines, relpath))
-    issues.extend(_rule_uninit_zeroed(mlines, relpath))
-    return issues
+    issues.extend(_rule_get_unchecked(mlines, _db_file_path, database=database))
+    issues.extend(_rule_pointer_arithmetic(mlines, _db_file_path, database=database))
+    issues.extend(_rule_unsafe_mem_ops(mlines, _db_file_path, database=database))
+    issues.extend(_rule_from_raw_parts(mlines, _db_file_path, database=database))
+    issues.extend(_rule_manually_drop(mlines, _db_file_path, database=database))
+    issues.extend(_rule_uninit_zeroed(mlines, _db_file_path, database=database))
+
+    # 污点分析（核心功能）
+    try:
+        taint_paths = taint_analyzer.analyze_with_best_analyzer(
+            text, rules=None, file_path=str(_db_file_path), database=database
+        )
+        # 将污点分析结果转换为Issue对象
+        for taint_path in taint_paths:
+            issue = Issue(
+                language="rust",
+                category="taint-analysis",
+                pattern="taint-flow",
+                file=str(_db_file_path),
+                line=taint_path.line_number,
+                evidence=f"{taint_path.source} -> {taint_path.sink}",
+                description=f"Taint flow from {taint_path.source} to {taint_path.sink}",
+                suggestion="Sanitize input data before use",
+                confidence=taint_path.confidence,
+                severity="high" if taint_path.confidence > 0.7 else "medium",
+            )
+            issues.append(issue)
+    except Exception:
+        # 污点分析失败时静默忽略，不影响启发式扫描
+        pass
+
+    # 使用数据流分析过滤误报
+    filtered_issues = _filter_issues_with_data_flow(
+        issues, data_flow_analyzer, data_flow_result, lines
+    )
+
+    # 清理临时文件和目录
+    _cleanup_temp_files()
+
+    return filtered_issues
 
 
-def analyze_rust_file(base: Path, relpath: Path) -> List[Issue]:
+def _filter_issues_with_data_flow(
+    issues: List[Issue],
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> List[Issue]:
+    """
+    使用数据流分析过滤误报
+
+    Args:
+        issues: 启发式扫描发现的问题列表
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        List[Issue]: 过滤后的问题列表
+    """
+    filtered_issues = []
+
+    for issue in issues:
+        # 检查是否为误报
+        if _is_false_positive(issue, analyzer, dataflow_result, lines):
+            continue
+        filtered_issues.append(issue)
+
+    return filtered_issues
+
+
+def _is_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断问题是否为误报
+
+    Args:
+        issue: 问题对象
+        analyzer: 数据流分析器
+        dataflow_result: 数据流分析结果
+        lines: 源代码行列表
+
+    Returns:
+        bool: 是否为误报
+    """
+    issue_type = issue.pattern
+
+    # unsafe误报过滤：检查是否有SAFETY注释
+    if issue_type == "unsafe":
+        return _is_unsafe_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # unwrap/expect误报过滤：检查是否有错误处理上下文
+    if issue_type in ["unwrap/expect", "unwrap", "expect"]:
+        return _is_unwrap_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # panic误报过滤：检查是否在测试上下文或assert中
+    if issue_type in ["panic/unreachable", "panic!", "unreachable!"]:
+        return _is_panic_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # 原始指针误报过滤：检查是否有SAFETY注释证明安全性
+    if issue_type == "raw_pointer":
+        return _is_raw_pointer_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # transmute误报过滤：检查是否有SAFETY注释
+    if issue_type == "mem::transmute":
+        return _is_transmute_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # get_unchecked误报过滤：检查是否有边界检查或SAFETY注释
+    if issue_type == "get_unchecked":
+        return _is_get_unchecked_false_positive(issue, analyzer, dataflow_result, lines)
+
+    # 指针算术误报过滤：检查是否有SAFETY注释
+    if issue_type == "pointer_arithmetic":
+        return _is_pointer_arithmetic_false_positive(
+            issue, analyzer, dataflow_result, lines
+        )
+
+    # 内存操作误报过滤：检查是否有SAFETY注释
+    if issue_type == "unsafe_mem_ops":
+        return _is_unsafe_mem_ops_false_positive(
+            issue, analyzer, dataflow_result, lines
+        )
+
+    # from_raw_parts误报过滤：检查是否有SAFETY注释
+    if issue_type == "from_raw_parts/from_raw":
+        return _is_from_raw_parts_false_positive(
+            issue, analyzer, dataflow_result, lines
+        )
+
+    # 默认不过滤
+    return False
+
+
+def _is_unsafe_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断unsafe块是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    2. 是否在测试上下文中
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # SAFETY注释已在规则函数中处理，此处检查数据流分析结果
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    return False
+
+
+def _is_unwrap_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断unwrap/expect是否为误报
+
+    检查逻辑：
+    1. 是否在测试上下文中
+    2. 是否有前置的is_ok/is_err检查
+    3. 是否在if let/match上下文中
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # 检查前5行是否有is_ok/is_err检查
+    for i in range(max(0, line_num - 5), line_num):
+        if i < len(lines):
+            line = lines[i]
+            if (
+                "is_ok" in line
+                or "is_err" in line
+                or "is_some" in line
+                or "is_none" in line
+            ):
+                return True
+
+    # 检查是否在if let或match上下文中
+    for i in range(max(0, line_num - 3), min(len(lines), line_num + 3)):
+        line = lines[i]
+        if "if let" in line or "match" in line:
+            return True
+
+    return False
+
+
+def _is_panic_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断panic!/unreachable!是否为误报
+
+    检查逻辑：
+    1. 是否在测试上下文中
+    2. 是否在assert宏中
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    line = lines[line_num - 1]
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # 检查是否在assert宏中（assert!、assert_eq!、assert_ne!等）
+    if "assert" in line.lower():
+        return True
+
+    # 检查是否在测试函数中（通过检查函数定义上下文）
+    for i in range(max(0, line_num - 20), line_num):
+        if i < len(lines):
+            line = lines[i]
+            if "#[test]" in line or "#[cfg(test)]" in line:
+                return True
+
+    return False
+
+
+def _is_raw_pointer_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断原始指针使用是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    2. 是否在FFI边界（extern块中）
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # SAFETY注释已在规则函数中处理
+    return False
+
+
+def _is_transmute_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断transmute是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    return False
+
+
+def _is_get_unchecked_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断get_unchecked是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明索引有效性
+    2. 是否有前置的边界检查
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    # 检查前5行是否有边界检查
+    for i in range(max(0, line_num - 5), line_num):
+        if i < len(lines):
+            line = lines[i]
+            if "<" in line or ">" in line or "<=" in line or ">=" in line:
+                if "len" in line or "size" in line or "length" in line:
+                    return True
+
+    return False
+
+
+def _is_pointer_arithmetic_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断指针算术是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    return False
+
+
+def _is_unsafe_mem_ops_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断不安全内存操作是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    return False
+
+
+def _is_from_raw_parts_false_positive(
+    issue: Issue,
+    analyzer: DataFlowAnalyzer,
+    dataflow_result: DataFlowResult,
+    lines: List[str],
+) -> bool:
+    """
+    判断from_raw_parts是否为误报
+
+    检查逻辑：
+    1. 是否有SAFETY注释证明安全性
+    """
+    line_num = issue.line
+    if line_num <= 0 or line_num > len(lines):
+        return False
+
+    # 检查是否在死代码中
+    if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
+        return True
+
+    return False
+
+
+def analyze_rust_file(
+    base: Path, relpath: Path, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
     """
     从磁盘读取文件进行分析。
     """
@@ -1110,10 +2245,14 @@ def analyze_rust_file(base: Path, relpath: Path) -> List[Issue]:
         text = (base / relpath).read_text(errors="ignore")
     except Exception:
         return []
-    return analyze_rust_text(str(relpath), text)
+    return analyze_rust_text(str(relpath), text, database=database)
 
 
-def analyze_rust_files(base_path: str, relative_paths: List[str]) -> List[Issue]:
+def analyze_rust_files(
+    base_path: str,
+    relative_paths: List[str],
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
     """
     批量分析文件，相对路径相对于 base_path。
     """
@@ -1122,5 +2261,5 @@ def analyze_rust_files(base_path: str, relative_paths: List[str]) -> List[Issue]
     for f in relative_paths:
         p = Path(f)
         if p.suffix.lower() == ".rs":
-            out.extend(analyze_rust_file(base, p))
+            out.extend(analyze_rust_file(base, p, database=database))
     return out
