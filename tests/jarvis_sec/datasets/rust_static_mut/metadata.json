@@ -1,0 +1,12 @@
+{
+  "name": "rust_static_mut",
+  "description": "Rust static mut data race test dataset - checker detects unsafe block but not static mut specifically",
+  "vulnerability_type": "static_mut",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "static_mut",
+      "file": "positive_static_mut.rs"
+    }
+  ]
+}

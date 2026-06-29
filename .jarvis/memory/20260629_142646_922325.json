@@ -1,0 +1,13 @@
+{
+  "id": "20260629_142646_922325",
+  "type": "project_long_term",
+  "tags": [
+    "rust_checker",
+    "generalization_test",
+    "data_flow",
+    "taint_analysis"
+  ],
+  "content": "rust_checker泛化性测试结果（2026-06-29第二轮）：\n\n12个泛化性反例测试中4个FAIL：\n1. integer_overflow_general ❌ - 只检测wrapping_*调用，不检测普通+/-/*溢出，需数据流分析\n2. unsafe_fn_general ❌ - 依赖database symbols但DataCollector不提取unsafe fn属性，应改用正则匹配\n3. static_mut_general ❌ - 依赖database symbols但DataCollector不提取static mut属性，应改用正则匹配\n4. command_injection_cross_fn ❌ - 污点分析完全无法追踪跨函数数据流，需实现真正的污点传播分析\n\n8个PASS：as_cast_general, into_raw_cross_fn, unchecked_math_general, rc_cycle_general, get_unchecked_general, manually_drop_general, unwrap_match_general, unwrap_is_some_general\n\n核心问题：规则过度依赖database查询但DataCollector信息不完整，缺乏数据流分析和污点传播分析能力\n\n已通知规则开发Agent(a6a66ab6)修复，要求：\n1. unsafe_fn/static_mut改为正则匹配\n2. integer_overflow需要数据流分析追踪变量类型和运算\n3. command_injection需要真正的污点传播分析（source->propagation->sink）\n4. as_cast_truncation需要类型信息辅助判断安全/危险转换",
+  "created_at": "2026-06-29T14:26:46.922356",
+  "updated_at": "2026-06-29T14:26:46.922362"
+}

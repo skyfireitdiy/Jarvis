@@ -1,0 +1,8 @@
+{
+  "id": "20260629_144944_520859",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "integer_overflow"],
+  "content": "rust_checker的_rule_integer_overflow规则修复：排除指针算术的逻辑改为只排除.offset/.add方法调用，避免误排除普通加法运算。正则模式r'\\b(\\w+)\\s*([+\\-*])\\s*(\\w+)\\b'正确匹配+/-*运算符。",
+  "created_at": "2026-06-29T14:49:44.520874",
+  "updated_at": "2026-06-29T14:49:44.520876"
+}

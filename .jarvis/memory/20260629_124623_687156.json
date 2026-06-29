@@ -1,0 +1,14 @@
+{
+  "id": "20260629_124623_687156",
+  "type": "project_long_term",
+  "tags": [
+    "rust_checker",
+    "dataset",
+    "test_results",
+    "false_negative",
+    "false_positive"
+  ],
+  "content": "rust_checker测试数据集创建完成（12个新数据集，24个测试文件全部通过验证）。\n\n假阴性数据集（8个）：\n1. rust_integer_overflow - release模式溢出无检测，positive检出0\n2. rust_unsafe_fn - 只报unsafe块不报unsafe fn，positive检出unsafe pattern\n3. rust_as_cast_truncation - RE_AS_CAST未使用，positive检出0\n4. rust_into_raw_leak - RE_INTO_RAW未使用，positive只检出unwrap\n5. rust_static_mut - 只报unsafe块不报static_mut，positive检出unsafe pattern\n6. rust_unchecked_math - 只报unsafe块不报unchecked_add等，positive检出unsafe pattern\n7. rust_rc_cycle - Rc循环引用无检测，positive检出0\n8. rust_command_injection_fn - taint-flow检测失败，positive只检出unwrap\n9. rust_get_unchecked_duplicate(改为假阴性) - 只报unsafe不报get_unchecked，positive检出unsafe pattern\n\n误报数据集（3个）：\n1. rust_manually_drop_false_positive - ManuallyDrop::drop存在则所有ManuallyDrop都不报，positive未报泄漏\n2. rust_unwrap_false_positive - match在附近3行内就过滤unwrap，positive检出0\n3. rust_unwrap_is_some_false_positive - is_some检查不同变量也过滤，positive检出0\n\n数据集路径：/home/wangmaobin/Jarvis/tests/jarvis_sec/datasets/\nChecker源码：/home/wangmaobin/Jarvis/src/jarvis/jarvis_sec/checkers/rust_checker.py\nIssue对象属性：language, category, pattern, file, line, evidence, description, suggestion, confidence, severity, var_name\nanalyze_rust_text签名：(relpath: str, text: str, database=None) -> List[Issue]",
+  "created_at": "2026-06-29T12:46:23.687187",
+  "updated_at": "2026-06-29T12:46:23.687192"
+}

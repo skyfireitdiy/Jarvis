@@ -1683,6 +1683,621 @@ def _rule_ffi_cstring(
     return issues
 
 
+def _rule_integer_overflow(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测整数溢出风险。
+    - 直接从源码检测算术运算（+、-、*）
+    - 排除已使用checked_/saturating_的情况
+    - 排除常量计算（如 1 + 2）
+    """
+    issues: List[Issue] = []
+    import re
+
+    # 匹配算术运算：变量 + 变量、变量 * 变量、变量 - 变量
+    # 排除常量计算（纯数字）、checked_/saturating_方法调用
+    arithmetic_pattern = re.compile(r"\b(\w+)\s*([+\-*])\s*(\w+)\b")
+
+    # 排除模式：常量计算、方法调用
+    constant_pattern = re.compile(r"^\d+$")
+    safe_method_pattern = re.compile(
+        r"\b(checked_|saturating_|wrapping_|overflowing_)(add|sub|mul)"
+    )
+
+    for idx, line in enumerate(lines, 1):
+        # 跳过注释行
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        # 检查是否有安全方法调用
+        if safe_method_pattern.search(line):
+            continue
+
+        # 查找算术运算
+        for match in arithmetic_pattern.finditer(line):
+            left, op, right = match.groups()
+
+            # 排除常量计算
+            if constant_pattern.match(left) and constant_pattern.match(right):
+                continue
+
+            # 排除指针算术（已有专门规则）
+            # 只排除方法调用形式的指针算术（如 .offset(n)、.add(n)）
+            if ".offset" in line or ".add" in line:
+                continue
+
+            conf = 0.6
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.1
+            conf = max(0.4, min(0.8, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="integer_overflow",
+                    pattern="integer_overflow",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description=f"整数溢出风险：'{left} {op} {right}' 在release模式下可能溢出wrap。",
+                    suggestion="使用checked_add/saturating_add等安全方法，或在SAFETY注释中证明溢出不可能发生。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+            break  # 每行只报告一次
+
+    return issues
+
+
+def _rule_unsafe_fn(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测unsafe fn声明。
+    - 直接从源码检测 unsafe fn 声明模式
+    - 不依赖database（DataCollector不提取is_unsafe属性）
+    """
+    issues: List[Issue] = []
+    import re
+
+    # 匹配 unsafe fn 声明
+    unsafe_fn_pattern = re.compile(r"\bunsafe\s+fn\s+(\w+)")
+
+    for idx, line in enumerate(lines, 1):
+        # 跳过注释行
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        match = unsafe_fn_pattern.search(line)
+        if match:
+            # 有SAFETY注释时跳过，不报告
+            if _has_safety_comment_around(lines, idx):
+                continue
+
+            fn_name = match.group(1)
+            conf = 0.75
+            conf = max(0.5, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="unsafe_fn",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description=f"unsafe fn '{fn_name}' 声明需要调用者保证安全性，应在SAFETY注释中说明前置条件。",
+                    suggestion="在SAFETY注释中明确说明调用者需要满足的安全条件；考虑使用安全API替代。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+
+    return issues
+
+
+def _rule_as_cast(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测as类型转换可能导致的数据截断。
+    - 直接从源码检测 as 类型转换
+    - 从函数签名和let声明推断变量类型
+    - 区分拓宽转换（安全）和截断转换（危险）
+    - 只报告危险的类型转换
+    """
+    issues: List[Issue] = []
+    import re
+
+    # 类型大小映射（位数）
+    type_sizes = {
+        "u8": 8,
+        "i8": 8,
+        "u16": 16,
+        "i16": 16,
+        "u32": 32,
+        "i32": 32,
+        "u64": 64,
+        "i64": 64,
+        "u128": 128,
+        "i128": 128,
+        "usize": 64,
+        "isize": 64,  # 假设64位系统
+    }
+
+    # ---- 第1步：构建变量类型映射 ----
+    var_types: dict = {}
+
+    # 从函数签名提取参数类型：fn foo(x: u64, y: i32)
+    fn_param_pattern = re.compile(r"fn\s+\w+[^)]*\(([^)]*)\)")
+    param_type_pattern = re.compile(r"(\w+)\s*:\s*(u\d+|i\d+|usize|isize)")
+    for line in lines:
+        for fn_match in fn_param_pattern.finditer(line):
+            params_str = fn_match.group(1)
+            for pm in param_type_pattern.finditer(params_str):
+                var_types[pm.group(1)] = pm.group(2)
+
+    # 从let声明提取变量类型：let x: u64 = ...
+    let_type_pattern = re.compile(r"let\s+(mut\s+)?(\w+)\s*:\s*(u\d+|i\d+|usize|isize)")
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+        m = let_type_pattern.search(line)
+        if m:
+            var_types[m.group(2)] = m.group(3)
+
+    # ---- 第2步：检测as类型转换 ----
+    cast_pattern = re.compile(r"(\w+)\s+as\s+(u\d+|i\d+|usize|isize)")
+
+    for idx, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        for match in cast_pattern.finditer(line):
+            var_name = match.group(1)
+            target_type = match.group(2)
+
+            source_type = var_types.get(var_name, None)
+            src_size = type_sizes.get(source_type, 0) if source_type else 0
+            tgt_size = type_sizes.get(target_type, 0)
+
+            is_dangerous = False
+            desc = ""
+
+            if src_size > 0 and tgt_size > 0 and source_type:
+                if src_size > tgt_size:
+                    is_dangerous = True
+                    desc = f"truncation from {source_type}({src_size}bit) to {target_type}({tgt_size}bit)"
+                elif (
+                    src_size == tgt_size
+                    and source_type.startswith("i")
+                    and target_type.startswith("u")
+                ):
+                    is_dangerous = True
+                    desc = f"sign change from {source_type} to {target_type}"
+            else:
+                # Unknown source type: only report for very small targets
+                if target_type in ["u8", "i8"]:
+                    is_dangerous = True
+                    desc = (
+                        f"potential truncation to {target_type} (unknown source type)"
+                    )
+
+            if is_dangerous:
+                conf = 0.65
+                if _has_safety_comment_around(lines, idx):
+                    conf -= 0.1
+                conf = max(0.45, min(0.85, conf))
+
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="type_safety",
+                        pattern="as_cast_truncation",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(line),
+                        description=f"as类型转换可能导致数据截断或符号问题（{desc}）。",
+                        suggestion="使用TryFrom/TryInto进行安全转换；必须使用as时，在SAFETY注释中证明值范围安全。",
+                        confidence=conf,
+                        severity=_severity_from_confidence(conf),
+                    )
+                )
+                break
+
+    return issues
+
+
+def _rule_into_raw(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测into_raw调用是否有配对的from_raw。
+    - 优先使用database查询call_graph表
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+
+        # 收集所有into_raw和from_raw调用
+        into_raw_calls = []
+        has_from_raw = False
+
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            if "into_raw" in callee_name:
+                into_raw_calls.append(call)
+            elif "from_raw" in callee_name:
+                has_from_raw = True
+
+        # 如果没有from_raw配对，报告所有into_raw调用
+        if not has_from_raw:
+            for call in into_raw_calls:
+                idx = call.get("caller_line", 0)
+                if idx <= 0 or idx > len(lines):
+                    continue
+
+                s = lines[idx - 1]
+                conf = 0.7
+                if _has_safety_comment_around(lines, idx):
+                    conf -= 0.1
+                conf = max(0.5, min(0.85, conf))
+
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="resource_management",
+                        pattern="into_raw_leak",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description="into_raw调用后没有配对的from_raw，可能导致内存泄漏。",
+                        suggestion="确保在适当时候调用from_raw回收内存；或使用ManuallyDrop明确表示有意泄漏。",
+                        confidence=conf,
+                        severity=_severity_from_confidence(conf),
+                    )
+                )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_static_mut(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测static mut全局可变状态。
+    - 直接从源码检测 static mut 声明模式
+    - 不依赖database（DataCollector不提取static的mut属性）
+    """
+    issues: List[Issue] = []
+    import re
+
+    # 匹配 static mut 声明
+    static_mut_pattern = re.compile(r"\bstatic\s+mut\s+(\w+)")
+
+    for idx, line in enumerate(lines, 1):
+        # 跳过注释行
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        match = static_mut_pattern.search(line)
+        if match:
+            var_name = match.group(1)
+            conf = 0.75
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            conf = max(0.55, min(0.9, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="concurrency",
+                    pattern="static_mut",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description=f"static mut '{var_name}' 全局可变状态在多线程环境下可能导致数据竞争。",
+                    suggestion="使用Mutex/RwLock/Atomic类型替代static mut；或使用thread_local。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+
+    return issues
+
+
+def _rule_unchecked_math(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测unchecked_add/sub/mul等不安全数学操作。
+    - 优先使用database查询call_graph表
+    - 无database时返回空列表
+    """
+    issues: List[Issue] = []
+
+    if database is None:
+        return issues
+
+    try:
+        import os
+
+        call_graph = database.get_call_graph()
+        for call in call_graph:
+            callee_name = call.get("callee_name", "")
+            # 匹配unchecked数学操作
+            unchecked_ops = [
+                "unchecked_add",
+                "unchecked_sub",
+                "unchecked_mul",
+                "unchecked_shl",
+                "unchecked_shr",
+                "unchecked_div",
+                "unchecked_rem",
+                "unchecked_neg",
+            ]
+            if callee_name not in unchecked_ops:
+                continue
+
+            caller_file = call.get("caller_file", "")
+            if os.path.basename(caller_file) != os.path.basename(relpath):
+                continue
+
+            idx = call.get("caller_line", 0)
+            if idx <= 0 or idx > len(lines):
+                continue
+
+            s = lines[idx - 1]
+            conf = 0.8
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            if _in_test_context(lines, idx):
+                conf -= 0.05
+            conf = max(0.6, min(0.95, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="unsafe_usage",
+                    pattern="unchecked_math",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description="unchecked数学操作在溢出时会导致未定义行为。",
+                    suggestion="确保操作数不会溢出；在SAFETY注释中证明值范围安全。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+    except Exception:
+        pass
+
+    return issues
+
+
+def _rule_rc_cycle(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测Rc引用循环风险。
+    - 直接从源码检测Rc<RefCell<...>>类型
+    - 检测可能形成循环引用的结构
+    """
+    issues: List[Issue] = []
+
+    import re
+
+    # 检测Rc<RefCell<...>>类型
+    rc_refcell_pattern = re.compile(r"Rc<RefCell<")
+
+    for idx, line in enumerate(lines, 1):
+        # 跳过注释行
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        # 检测Rc<RefCell<...>>类型
+        if rc_refcell_pattern.search(line):
+            conf = 0.55
+            if _has_safety_comment_around(lines, idx):
+                conf -= 0.1
+            conf = max(0.4, min(0.75, conf))
+
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="memory_leak",
+                    pattern="rc_cycle",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description="Rc<RefCell<...>>可能形成引用循环导致内存泄漏。",
+                    suggestion="考虑使用Weak打破循环；或使用Arc<Mutex>配合手动管理生命周期。",
+                    confidence=conf,
+                    severity=_severity_from_confidence(conf),
+                )
+            )
+
+    return issues
+
+
+def _rule_command_injection(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测命令注入风险（简化污点分析）。
+    - 检测用户输入（stdin、args、env）流向 Command::new/.arg()
+    - 支持跨函数污点传播
+    - 基于正则匹配的简化实现，不依赖database
+    """
+    issues: List[Issue] = []
+    import re
+
+    # 污点源模式：stdin、args、env
+    source_patterns = [
+        re.compile(r"io::stdin\(\)|stdin\(\)"),
+        re.compile(r"\.lines\(\)"),
+        re.compile(r"env::args\(\)|std::env::args"),
+        re.compile(r"env::var\(|std::env::var"),
+    ]
+
+    # 污点汇模式：Command::new、.arg()
+    sink_pattern = re.compile(r"Command::new|\.arg\(")
+
+    # ---- 第1步：识别返回污点的函数 ----
+    tainted_functions = set()
+    fn_pattern = re.compile(r"fn\s+(\w+)\s*[<(]")
+    fn_start = -1
+    fn_name = None
+    fn_body_lines = []
+
+    for idx, line in enumerate(lines, 1):
+        # 检测函数开始
+        fn_match = fn_pattern.search(line)
+        if fn_match:
+            # 保存上一个函数
+            if fn_name and fn_body_lines:
+                # 检查函数体是否包含污点源
+                fn_body = "\n".join(fn_body_lines)
+                for pattern in source_patterns:
+                    if pattern.search(fn_body):
+                        # 检查是否有返回值（简单判断：函数签名有 -> 或函数体有隐式返回）
+                        if "->" in lines[fn_start - 1] or any(
+                            ln.strip() and not ln.strip().startswith("//")
+                            for ln in fn_body_lines[-3:]
+                        ):
+                            tainted_functions.add(fn_name)
+                            break
+            # 开始新函数
+            fn_name = fn_match.group(1)
+            fn_start = idx
+            fn_body_lines = []
+        elif fn_start > 0:
+            # 收集函数体（遇到下一个fn停止）
+            if not fn_pattern.search(line):
+                fn_body_lines.append(line)
+            else:
+                # 新函数开始，处理上一个函数
+                if fn_name and fn_body_lines:
+                    fn_body = "\n".join(fn_body_lines)
+                    for pattern in source_patterns:
+                        if pattern.search(fn_body):
+                            if "->" in lines[fn_start - 1] or any(
+                                ln.strip() and not ln.strip().startswith("//")
+                                for ln in fn_body_lines[-3:]
+                            ):
+                                tainted_functions.add(fn_name)
+                                break
+                new_match = fn_pattern.search(line)
+                fn_name = new_match.group(1) if new_match else None
+                fn_start = idx
+                fn_body_lines = []
+
+    # 处理最后一个函数
+    if fn_name and fn_body_lines:
+        fn_body = "\n".join(fn_body_lines)
+        for pattern in source_patterns:
+            if pattern.search(fn_body):
+                if "->" in lines[fn_start - 1] or any(
+                    ln.strip() and not ln.strip().startswith("//")
+                    for ln in fn_body_lines[-3:]
+                ):
+                    tainted_functions.add(fn_name)
+                    break
+
+    # ---- 第2步：查找污点源变量 ----
+    tainted_vars = set()
+    for idx, line in enumerate(lines, 1):
+        # 检测污点源赋值：let user_input = stdin...
+        if "let " in line:
+            # 直接污点源
+            for pattern in source_patterns:
+                if pattern.search(line):
+                    match = re.search(r"let\s+(mut\s+)?(\w+)", line)
+                    if match:
+                        tainted_vars.add(match.group(2))
+
+            # 污点函数调用：let input = get_user_input()
+            for func_name in tainted_functions:
+                if func_name + "(" in line or func_name + "::" in line:
+                    match = re.search(r"let\s+(mut\s+)?(\w+)", line)
+                    if match:
+                        tainted_vars.add(match.group(2))
+
+    # ---- 第3步：追踪变量赋值传播 ----
+    # 多轮传播直到收敛
+    for _ in range(3):  # 最多3轮
+        new_vars = set()
+        for idx, line in enumerate(lines, 1):
+            if "let " in line:
+                # 检查是否赋值了污点变量：let other = tainted.clone()
+                for var in tainted_vars:
+                    if var in line:
+                        match = re.search(r"let\s+(mut\s+)?(\w+)", line)
+                        if match and match.group(2) != var:
+                            new_vars.add(match.group(2))
+        if new_vars <= tainted_vars:
+            break
+        tainted_vars.update(new_vars)
+
+    # 如果没有找到污点源，直接返回
+    if not tainted_vars:
+        return issues
+
+    # ---- 第4步：查找污点汇使用 ----
+    for idx, line in enumerate(lines, 1):
+        if sink_pattern.search(line):
+            # 检查是否使用了污点变量
+            for var in tainted_vars:
+                if f"&{var}" in line or f"{var}" in line:
+                    conf = 0.75
+                    if _has_safety_comment_around(lines, idx):
+                        conf -= 0.1
+                    if _in_test_context(lines, idx):
+                        conf -= 0.1
+                    conf = max(0.5, min(0.9, conf))
+
+                    issues.append(
+                        Issue(
+                            language="rust",
+                            category="taint-analysis",
+                            pattern="taint-flow",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description=f"命令注入风险：用户输入 '{var}' 直接用于命令执行",
+                            suggestion="使用shlex::split或shell_words::split净化用户输入，或使用参数化命令执行",
+                            confidence=conf,
+                            severity="critical",
+                        )
+                    )
+                    break  # 避免重复报告
+
+    return issues
+
+
 def _rule_uninit_zeroed(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
@@ -1850,6 +2465,16 @@ def analyze_rust_text(
     issues.extend(_rule_from_raw_parts(mlines, _db_file_path, database=database))
     issues.extend(_rule_manually_drop(mlines, _db_file_path, database=database))
     issues.extend(_rule_uninit_zeroed(mlines, _db_file_path, database=database))
+    # 新增规则
+    issues.extend(_rule_integer_overflow(mlines, _db_file_path, database=database))
+    issues.extend(_rule_unsafe_fn(mlines, _db_file_path, database=database))
+    issues.extend(_rule_as_cast(mlines, _db_file_path, database=database))
+    issues.extend(_rule_into_raw(mlines, _db_file_path, database=database))
+    issues.extend(_rule_static_mut(mlines, _db_file_path, database=database))
+    issues.extend(_rule_unchecked_math(mlines, _db_file_path, database=database))
+    issues.extend(_rule_rc_cycle(mlines, _db_file_path, database=database))
+    # 污点分析规则
+    issues.extend(_rule_command_injection(mlines, _db_file_path, database=database))
 
     # 污点分析（核心功能）
     try:
@@ -2017,8 +2642,8 @@ def _is_unwrap_false_positive(
 
     检查逻辑：
     1. 是否在测试上下文中
-    2. 是否有前置的is_ok/is_err检查
-    3. 是否在if let/match上下文中
+    2. 是否在if let Some/Ok分支内（unwrap的变量与if let匹配的变量相同）
+    3. 是否在match Some/Ok分支内（unwrap的变量与match匹配的变量相同）
     """
     line_num = issue.line
     if line_num <= 0 or line_num > len(lines):
@@ -2028,23 +2653,65 @@ def _is_unwrap_false_positive(
     if dataflow_result.dead_code_lines and line_num in dataflow_result.dead_code_lines:
         return True
 
-    # 检查前5行是否有is_ok/is_err检查
-    for i in range(max(0, line_num - 5), line_num):
-        if i < len(lines):
-            line = lines[i]
-            if (
-                "is_ok" in line
-                or "is_err" in line
-                or "is_some" in line
-                or "is_none" in line
-            ):
-                return True
+    # 获取unwrap调用的变量名
+    import re
 
-    # 检查是否在if let或match上下文中
-    for i in range(max(0, line_num - 3), min(len(lines), line_num + 3)):
+    unwrap_line = lines[line_num - 1]
+    # 提取变量名：xxx.unwrap() 或 xxx.expect()
+    var_match = re.search(r"(\w+)\.unwrap\(\)", unwrap_line)
+    if not var_match:
+        var_match = re.search(r"(\w+)\.expect\(\)", unwrap_line)
+    unwrap_var = var_match.group(1) if var_match else None
+
+    # 检查是否在if let Some/Ok分支内
+    # 向上查找if let Some(var) 或 if let Ok(var) 结构
+    for i in range(max(0, line_num - 15), line_num):
+        if i >= len(lines):
+            continue
         line = lines[i]
-        if "if let" in line or "match" in line:
-            return True
+        # 检查 if let Some(var) = unwrap_var 或 if let Ok(var) = unwrap_var
+        if "if let" in line:
+            # 提取if let中的变量名
+            let_match = re.search(r"if let Some\((\w+)\)\s*=\s*(\w+)", line)
+            if let_match:
+                bound_var = let_match.group(1)  # Some中的变量
+                source_var = let_match.group(2)  # 源变量
+                # 检查unwrap是否使用源变量或绑定变量
+                if unwrap_var == source_var or unwrap_var == bound_var:
+                    # 检查unwrap是否在if let块内（通过缩进判断）
+                    if_indent = len(line) - len(line.lstrip())
+                    unwrap_indent = len(unwrap_line) - len(unwrap_line.lstrip())
+                    if unwrap_indent > if_indent:
+                        return True
+            else:
+                let_match = re.search(r"if let Ok\((\w+)\)\s*=\s*(\w+)", line)
+                if let_match:
+                    bound_var = let_match.group(1)
+                    source_var = let_match.group(2)
+                    if unwrap_var == source_var or unwrap_var == bound_var:
+                        if_indent = len(line) - len(line.lstrip())
+                        unwrap_indent = len(unwrap_line) - len(unwrap_line.lstrip())
+                        if unwrap_indent > if_indent:
+                            return True
+
+    # 检查是否在match Some/Ok分支内
+    # 向上查找match结构
+    for i in range(max(0, line_num - 20), line_num):
+        if i >= len(lines):
+            continue
+        line = lines[i]
+        if "match" in line and unwrap_var and unwrap_var in line:
+            # 找到match unwrap_var的结构
+            # 检查unwrap是否在Some/Ok分支内
+            for j in range(i + 1, line_num):
+                check_line = lines[j]
+                # 检查Some分支
+                if re.search(r"Some\((\w+)\)\s*=>", check_line):
+                    # unwrap在Some分支内
+                    return True
+                # 检查Ok分支
+                if re.search(r"Ok\((\w+)\)\s*=>", check_line):
+                    return True
 
     return False
 

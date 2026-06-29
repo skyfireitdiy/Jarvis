@@ -1,0 +1,8 @@
+{
+  "id": "20260629_144944_517176",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "command_injection", "taint_analysis"],
+  "content": "rust_checker新增_rule_command_injection规则：基于正则匹配的简化污点分析，检测stdin/args/env流向Command::new/.arg()的命令注入风险。不依赖database，直接匹配源码模式。",
+  "created_at": "2026-06-29T14:49:44.517210",
+  "updated_at": "2026-06-29T14:49:44.517217"
+}

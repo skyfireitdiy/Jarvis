@@ -1,0 +1,8 @@
+{
+  "id": "20260629_141759_107685",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "rule_functions", "database_driven"],
+  "content": "rust_checker新增规则函数：_rule_integer_overflow（wrapping操作）、_rule_unsafe_fn（unsafe fn声明）、_rule_as_cast（as类型截断）、_rule_into_raw（into_raw无配对from_raw）、_rule_static_mut（static mut全局可变）、_rule_unchecked_math（unchecked数学操作）、_rule_rc_cycle（Rc<RefCell>循环）。这些规则直接从源码检测，不依赖database。",
+  "created_at": "2026-06-29T14:17:59.107739",
+  "updated_at": "2026-06-29T14:17:59.107751"
+}
