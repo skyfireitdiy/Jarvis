@@ -1,0 +1,12 @@
+{
+  "name": "rust_raw_pointer",
+  "description": "Rust raw pointer usage test dataset",
+  "vulnerability_type": "raw_pointer",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "raw_pointer",
+      "file": "positive_raw_pointer.rs"
+    }
+  ]
+}

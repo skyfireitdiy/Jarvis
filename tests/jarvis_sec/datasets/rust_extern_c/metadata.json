@@ -1,0 +1,12 @@
+{
+  "name": "rust_extern_c",
+  "description": "Rust extern C FFI test dataset",
+  "vulnerability_type": "extern_c",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "extern_c",
+      "file": "positive_extern_c.rs"
+    }
+  ]
+}

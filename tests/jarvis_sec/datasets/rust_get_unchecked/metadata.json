@@ -1,0 +1,12 @@
+{
+  "name": "rust_get_unchecked",
+  "description": "Rust get_unchecked usage test dataset",
+  "vulnerability_type": "get_unchecked",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "get_unchecked",
+      "file": "positive_get_unchecked.rs"
+    }
+  ]
+}

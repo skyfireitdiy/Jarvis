@@ -1,0 +1,12 @@
+{
+  "name": "rust_command_injection",
+  "description": "Rust command injection test dataset",
+  "vulnerability_type": "command_injection",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "taint-flow",
+      "file": "positive_command_injection.rs"
+    }
+  ]
+}

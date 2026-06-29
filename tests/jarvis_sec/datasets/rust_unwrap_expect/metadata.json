@@ -1,0 +1,12 @@
+{
+  "name": "rust_unwrap_expect",
+  "description": "Rust unwrap/expect usage test dataset",
+  "vulnerability_type": "unwrap/expect",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unwrap/expect",
+      "file": "positive_unwrap_usage.rs"
+    }
+  ]
+}

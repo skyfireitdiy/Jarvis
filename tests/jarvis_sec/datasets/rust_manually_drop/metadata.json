@@ -1,0 +1,12 @@
+{
+  "name": "rust_manually_drop",
+  "description": "Rust ManuallyDrop usage test dataset",
+  "vulnerability_type": "ManuallyDrop",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "ManuallyDrop",
+      "file": "positive_manually_drop.rs"
+    }
+  ]
+}
