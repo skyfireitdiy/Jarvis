@@ -2298,6 +2298,166 @@ def _rule_command_injection(
     return issues
 
 
+def _rule_toctou_race(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    检测TOCTOU (Time-of-Check to Time-of-Use) 竞态条件漏洞。
+    - 检测文件系统操作中检查与使用之间的竞态窗口
+    - 典型模式：exists()后read()、is_dir()后create()等
+    - CWE-362: Race Condition
+    """
+    issues: List[Issue] = []
+    import re
+
+    # TOCTOU检查模式：检查操作后跟随使用操作
+    # 模式1: path.exists() 后跟 fs::read/write/open
+    # 模式2: path.is_dir()/is_file() 后跟文件操作
+    # 模式3: fs::metadata() 后跟文件操作
+
+    check_patterns = [
+        (re.compile(r"\.exists\(\)"), "exists check"),
+        (re.compile(r"\.is_dir\(\)"), "is_dir check"),
+        (re.compile(r"\.is_file\(\)"), "is_file check"),
+        (re.compile(r"\.metadata\(\)"), "metadata check"),
+        (re.compile(r"fs::metadata|path\.metadata"), "metadata check"),
+    ]
+
+    use_patterns = [
+        re.compile(r"fs::read|fs::write|fs::File::open|fs::File::create"),
+        re.compile(r"\.read_to_string|\.read_to_end"),
+        re.compile(r"OpenOptions::new"),
+    ]
+
+    # 按函数分析，检测检查和使用在同一函数中但不在同一语句的情况
+    fn_pattern = re.compile(r"fn\s+(\w+)\s*[<(]")
+    fn_start = -1
+    fn_name = None
+    fn_body_lines = []
+    fn_body_start = 0
+
+    for idx, line in enumerate(lines, 1):
+        fn_match = fn_pattern.search(line)
+        if fn_match:
+            # 分析上一个函数
+            if fn_name and len(fn_body_lines) > 0:
+                _analyze_toctou_in_function(
+                    lines,
+                    fn_body_start,
+                    fn_body_lines,
+                    check_patterns,
+                    use_patterns,
+                    relpath,
+                    issues,
+                )
+            # 开始新函数
+            fn_name = fn_match.group(1)
+            fn_start = idx
+            fn_body_lines = []
+            fn_body_start = idx
+        elif fn_start > 0:
+            if not fn_pattern.search(line):
+                fn_body_lines.append((idx, line))
+            else:
+                # 新函数开始
+                if fn_name and len(fn_body_lines) > 0:
+                    _analyze_toctou_in_function(
+                        lines,
+                        fn_body_start,
+                        fn_body_lines,
+                        check_patterns,
+                        use_patterns,
+                        relpath,
+                        issues,
+                    )
+                new_match = fn_pattern.search(line)
+                fn_name = new_match.group(1) if new_match else None
+                fn_start = idx
+                fn_body_lines = []
+                fn_body_start = idx
+
+    # 处理最后一个函数
+    if fn_name and len(fn_body_lines) > 0:
+        _analyze_toctou_in_function(
+            lines,
+            fn_body_start,
+            fn_body_lines,
+            check_patterns,
+            use_patterns,
+            relpath,
+            issues,
+        )
+
+    return issues
+
+
+def _analyze_toctou_in_function(
+    lines: Sequence[str],
+    fn_start: int,
+    fn_body_lines: List[Tuple[int, str]],
+    check_patterns: List,
+    use_patterns: List,
+    relpath: str,
+    issues: List[Issue],
+) -> None:
+    """分析函数体中的TOCTOU模式"""
+
+    # 查找检查操作的位置
+    check_positions = []
+    for line_no, line in fn_body_lines:
+        for pattern, check_name in check_patterns:
+            if pattern.search(line):
+                # 检查是否在if条件中
+                if "if " in line or "if(" in line:
+                    check_positions.append((line_no, check_name, line))
+                    break
+
+    # 如果没有检查操作，直接返回
+    if not check_positions:
+        return
+
+    # 查找使用操作的位置
+    use_positions = []
+    for line_no, line in fn_body_lines:
+        for pattern in use_patterns:
+            if pattern.search(line):
+                use_positions.append((line_no, line))
+                break
+
+    # 检查是否存在TOCTOU模式：检查操作后跟随使用操作
+    for check_line, check_name, check_content in check_positions:
+        for use_line, use_content in use_positions:
+            # 使用操作在检查操作之后（不在同一行）
+            if use_line > check_line:
+                # 检查是否有安全措施（如create_new原子操作）
+                if "create_new" in use_content or "O_EXCL" in use_content:
+                    continue
+
+                # 检查是否有SAFETY注释
+                conf = 0.7
+                if _has_safety_comment_around(lines, use_line):
+                    conf -= 0.15
+                if _in_test_context(lines, use_line):
+                    conf -= 0.1
+                conf = max(0.5, min(0.85, conf))
+
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="concurrency",
+                        pattern="toctou_race",
+                        file=relpath,
+                        line=use_line,
+                        evidence=_strip_line(use_content),
+                        description=f"TOCTOU竞态条件：{check_name}后进行文件操作，存在竞态窗口",
+                        suggestion="使用原子操作（如create_new）或文件描述符避免竞态条件",
+                        confidence=conf,
+                        severity="medium",
+                    )
+                )
+                break  # 每个检查操作只报告一次
+
+
 def _rule_uninit_zeroed(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
@@ -2475,6 +2635,8 @@ def analyze_rust_text(
     issues.extend(_rule_rc_cycle(mlines, _db_file_path, database=database))
     # 污点分析规则
     issues.extend(_rule_command_injection(mlines, _db_file_path, database=database))
+    # TOCTOU竞态条件
+    issues.extend(_rule_toctou_race(lines, _db_file_path, database=database))
 
     # 污点分析（核心功能）
     try:
