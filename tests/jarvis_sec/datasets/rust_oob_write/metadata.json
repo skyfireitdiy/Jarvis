@@ -1,0 +1,13 @@
+{
+  "name": "rust_oob_write",
+  "description": "CWE-787: Out-of-bounds Write - Buffer Overflow via FFI",
+  "vulnerability_type": "memory_safety",
+  "cwe": "CWE-787",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "oob_write",
+      "file": "positive_oob_write.rs"
+    }
+  ]
+}

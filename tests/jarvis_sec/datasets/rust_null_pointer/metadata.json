@@ -1,0 +1,13 @@
+{
+  "name": "rust_null_pointer",
+  "description": "CWE-476: NULL Pointer Dereference - FFI without NULL check",
+  "vulnerability_type": "memory_safety",
+  "cwe": "CWE-476",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "null_pointer_deref",
+      "file": "positive_null_deref.rs"
+    }
+  ]
+}

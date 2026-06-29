@@ -1,0 +1,8 @@
+{
+  "id": "20260629_201806_409364",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "security", "cwe", "toctou"],
+  "content": "Rust checker新增TOCTOU竞态条件检测规则(_rule_toctou_race)，检测path.exists()、is_dir()、is_file()、metadata()等检查操作后跟随fs::write、fs::read、fs::File::open等使用操作的竞态窗口。规则位于src/jarvis/jarvis_sec/checkers/rust_checker.py，pattern为toctou_race。",
+  "created_at": "2026-06-29T20:18:06.409384",
+  "updated_at": "2026-06-29T20:18:06.409391"
+}

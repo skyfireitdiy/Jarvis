@@ -1,0 +1,13 @@
+{
+  "name": "rust_dos_panic",
+  "description": "CWE-400: DoS via Panic - Uncontrolled Resource Consumption",
+  "vulnerability_type": "denial_of_service",
+  "cwe": "CWE-400",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "dos_panic",
+      "file": "positive_dos.rs"
+    }
+  ]
+}
