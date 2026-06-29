@@ -1,0 +1,8 @@
+{
+  "id": "20260629_141759_109472",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "false_positive_filter", "unwrap"],
+  "content": "unwrap误报过滤逻辑改进：检查unwrap是否在if let Some/Ok分支内，通过缩进判断代码块边界；检查match Some/Ok分支内是否包含unwrap。不再简单检查附近有is_some就过滤。",
+  "created_at": "2026-06-29T14:17:59.109504",
+  "updated_at": "2026-06-29T14:17:59.109509"
+}

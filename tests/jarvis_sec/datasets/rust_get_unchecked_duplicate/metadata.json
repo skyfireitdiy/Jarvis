@@ -1,0 +1,12 @@
+{
+  "name": "rust_get_unchecked_no_specific_detection",
+  "description": "Rust get_unchecked not specifically detected - checker only reports unsafe block, not get_unchecked as a distinct pattern",
+  "vulnerability_type": "get_unchecked",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "get_unchecked",
+      "file": "positive_get_unchecked.rs"
+    }
+  ]
+}

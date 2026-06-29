@@ -1,0 +1,12 @@
+{
+  "name": "rust_unwrap_is_some_false_positive",
+  "description": "Rust unwrap is_some false positive test dataset - is_some check on different variable causes incorrect filtering",
+  "vulnerability_type": "false_positive",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unwrap",
+      "file": "positive_is_some_fp.rs"
+    }
+  ]
+}

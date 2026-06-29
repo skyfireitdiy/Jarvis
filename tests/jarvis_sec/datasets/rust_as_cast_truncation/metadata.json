@@ -1,0 +1,12 @@
+{
+  "name": "rust_as_cast_truncation",
+  "description": "Rust as-cast truncation test dataset - RE_AS_CAST defined but never used in rules",
+  "vulnerability_type": "as_cast_truncation",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "as_cast_truncation",
+      "file": "positive_as_cast.rs"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "rust_manually_drop_false_positive",
+  "description": "Rust ManuallyDrop false positive test dataset - if any ManuallyDrop::drop exists in file, ALL ManuallyDrop usages are suppressed",
+  "vulnerability_type": "false_positive",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "ManuallyDrop",
+      "file": "positive_manually_drop_fp.rs"
+    }
+  ]
+}

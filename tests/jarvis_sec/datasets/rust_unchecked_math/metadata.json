@@ -1,0 +1,12 @@
+{
+  "name": "rust_unchecked_math",
+  "description": "Rust unchecked math operations test dataset - unchecked_add/unchecked_sub etc bypass overflow checks",
+  "vulnerability_type": "unchecked_math",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unchecked_math",
+      "file": "positive_unchecked_math.rs"
+    }
+  ]
+}
