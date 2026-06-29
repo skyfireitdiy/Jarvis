@@ -1,0 +1,13 @@
+{
+  "name": "rust_oob_read",
+  "description": "CWE-125: Out-of-bounds Read - unsafe code bypassing bounds checks",
+  "vulnerability_type": "memory_safety",
+  "cwe": "CWE-125",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "unsafe_ptr_read",
+      "file": "positive_oob_read.rs"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260629_201806_450703",
+  "type": "project_long_term",
+  "tags": ["test_dataset", "rust", "cwe", "structure"],
+  "content": "Rust安全测试数据集结构：每个CWE漏洞包含metadata.json（name、description、cwe、expected_issues）+ positive_*.rs（漏洞代码）+ negative_*.rs（安全代码）。测试文件位于tests/jarvis_sec/datasets/rust_*/目录。",
+  "created_at": "2026-06-29T20:18:06.450737",
+  "updated_at": "2026-06-29T20:18:06.450742"
+}

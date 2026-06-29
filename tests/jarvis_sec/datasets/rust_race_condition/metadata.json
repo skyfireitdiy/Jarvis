@@ -1,0 +1,13 @@
+{
+  "name": "rust_race_condition",
+  "description": "CWE-362: Race Condition (TOCTOU) - Time-of-Check to Time-of-Use",
+  "vulnerability_type": "concurrency",
+  "cwe": "CWE-362",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "toctou_race",
+      "file": "positive_toctou.rs"
+    }
+  ]
+}

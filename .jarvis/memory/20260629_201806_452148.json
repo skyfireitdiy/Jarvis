@@ -1,0 +1,8 @@
+{
+  "id": "20260629_201806_452148",
+  "type": "project_long_term",
+  "tags": ["cwe", "rust", "vulnerability_types"],
+  "content": "已创建的Rust CWE测试数据集：CWE-125(越界读取rust_oob_read)、CWE-476(空指针解引用rust_null_pointer)、CWE-362(竞态条件rust_race_condition)、CWE-400(DoS via Panic rust_dos_panic)、CWE-787(越界写入rust_oob_write)。",
+  "created_at": "2026-06-29T20:18:06.452170",
+  "updated_at": "2026-06-29T20:18:06.452173"
+}
