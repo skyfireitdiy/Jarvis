@@ -987,6 +987,11 @@ def run_cli(
         "--uninstall-plugin",
         help="卸载插件：指定要卸载的插件名称",
     ),
+    list_plugins_flag: bool = typer.Option(
+        False,
+        "--list-plugins",
+        help="列出所有已安装的插件",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1025,6 +1030,13 @@ def run_cli(
         else:
             PrettyOutput.auto_print(f"❌ 插件 '{uninstall_plugin}' 卸载失败")
             raise typer.Exit(code=1)
+
+    # 处理列出插件参数
+    if list_plugins_flag:
+        from jarvis.jarvis_agent.utils import list_plugins as do_list_plugins
+
+        do_list_plugins()
+        raise typer.Exit(code=0)
 
     # 处理任务内容：优先从文件读取
     if task and task_file:
