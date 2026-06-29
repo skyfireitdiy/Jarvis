@@ -298,6 +298,61 @@ def install_plugin(source_path: str) -> bool:
         return False
 
 
+def list_plugins() -> None:
+    """
+    列出所有已安装的插件
+
+    功能:
+        扫描 ~/.jarvis/plugins/ 目录，读取每个插件的 config.yaml
+        并格式化输出插件信息（名称、描述、版本等）
+    """
+    from pathlib import Path
+    import yaml
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    plugins_dir = Path(get_data_dir()) / "plugins"
+
+    if not plugins_dir.exists():
+        PrettyOutput.auto_print("📦 未安装任何插件")
+        return
+
+    # 获取所有插件目录
+    plugin_dirs = [d for d in plugins_dir.iterdir() if d.is_dir()]
+
+    if not plugin_dirs:
+        PrettyOutput.auto_print("📦 未安装任何插件")
+        return
+
+    PrettyOutput.auto_print(f"📦 已安装的插件 ({len(plugin_dirs)}个):\n")
+
+    for plugin_dir in sorted(plugin_dirs):
+        config_file = plugin_dir / "config.yaml"
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
+                    if isinstance(config, dict):
+                        name = config.get("name", plugin_dir.name)
+                        description = config.get("description", "无描述")
+                        version = config.get("version", "未知版本")
+                        PrettyOutput.auto_print(f"  • {name} (v{version})")
+                        PrettyOutput.auto_print(f"    {description}")
+                        PrettyOutput.auto_print("")
+                    else:
+                        PrettyOutput.auto_print(f"  • {plugin_dir.name}")
+                        PrettyOutput.auto_print("    配置文件格式错误")
+                        PrettyOutput.auto_print("")
+            except Exception as e:
+                PrettyOutput.auto_print(f"  • {plugin_dir.name}")
+                PrettyOutput.auto_print(f"    读取配置失败: {str(e)}")
+                PrettyOutput.auto_print("")
+        else:
+            PrettyOutput.auto_print(f"  • {plugin_dir.name}")
+            PrettyOutput.auto_print("    ⚠️ 缺少 config.yaml")
+            PrettyOutput.auto_print("")
+
+
 def uninstall_plugin(plugin_name: str) -> bool:
     """
     卸载插件
