@@ -41,24 +41,19 @@ class SubAgentTool:
             },
             "name": {
                 "type": "string",
-                "description": "子Agent名称（必填）",
+                "description": "子Agent名称（可选，用于标识和区分不同的子Agent）",
             },
             "background": {
                 "type": "string",
-                "description": "任务背景与已知信息（必填，将与任务一并提供给子Agent）",
+                "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
             },
-            "summary_prompt": {
+            "goal": {
                 "type": "string",
-                "description": "覆盖子Agent的总结提示词（可选，不传则使用默认总结提示词）",
-            },
-            "non_interactive": {
-                "type": "boolean",
-                "description": "是否启用无交互模式（可选，默认继承父Agent或系统默认）",
+                "description": "子任务的目标描述（可选，用于明确子Agent的执行目标）",
             },
         },
         "required": [
             "task",
-            "name",
         ],
     }
 
@@ -81,27 +76,26 @@ class SubAgentTool:
 
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()
-            enhanced_task = (
-                f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
-            )
+            goal: str = str(args.get("goal", "")).strip()
+
+            # 组合任务内容
+            task_parts = []
+            if background:
+                task_parts.append(f"背景信息:\n{background}")
+            task_parts.append(f"任务:\n{task}")
+            if goal:
+                task_parts.append(f"目标:\n{goal}")
+            enhanced_task = "\n\n".join(task_parts)
 
             # 不继承父Agent，所有关键参数必须由调用方显式提供
             need_summary = True
 
-            # 读取并校验必填参数（system_prompt 已移除，子Agent继承父Agent历史）
-            summary_prompt = str(args.get("summary_prompt", "")).strip() or None
+            # 读取子Agent名称
             agent_name = str(args.get("name", "")).strip()
 
-            errors = []
+            # 如果未提供名称，使用默认名称
             if not agent_name:
-                errors.append("name 不能为空")
-
-            if errors:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "; ".join(errors),
-                }
+                agent_name = "SubAgent"
 
             # 基于父 Agent（如有）继承部分配置后创建子 Agent
             parent_agent = args.get("agent", None)
@@ -142,7 +136,6 @@ class SubAgentTool:
             agent = Agent(
                 name=agent_name,
                 description="Temporary sub agent for executing a subtask",
-                summary_prompt=summary_prompt,
                 auto_complete=True,
                 use_tools=None,
                 execute_tool_confirm=parent_execute_tool_confirm,
