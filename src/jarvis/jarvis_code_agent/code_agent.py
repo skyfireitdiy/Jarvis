@@ -254,6 +254,7 @@ class CodeAgent(Agent):
             "symbol_dependency",  # 符号依赖查询工具
             "add_images",  # 添加图片到对话上下文工具
             "gateway_manager",  # Gateway 管理工具（Agent 通信、节点管理、模型组查询等）
+            "sub_code_agent",  # 子代码Agent工具，用于创建子Agent执行独立任务
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
