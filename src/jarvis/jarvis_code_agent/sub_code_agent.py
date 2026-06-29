@@ -41,6 +41,10 @@ class SubCodeAgentTool:
                 "type": "string",
                 "description": "子Agent的名称（可选，用于标识和区分不同的子Agent）",
             },
+            "goal": {
+                "type": "string",
+                "description": "子任务的目标描述（可选，用于明确子Agent的执行目标）",
+            },
         },
         "required": ["task"],
     }
@@ -64,9 +68,16 @@ class SubCodeAgentTool:
 
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()
-            enhanced_task = (
-                f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
-            )
+            goal: str = str(args.get("goal", "")).strip()
+
+            # 组合任务内容
+            task_parts = []
+            if background:
+                task_parts.append(f"背景信息:\n{background}")
+            task_parts.append(f"任务:\n{task}")
+            if goal:
+                task_parts.append(f"目标:\n{goal}")
+            enhanced_task = "\n\n".join(task_parts)
 
             # 读取子 Agent 名称（可选）
             agent_name: str = str(args.get("name", "")).strip()
