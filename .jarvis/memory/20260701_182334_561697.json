@@ -1,0 +1,8 @@
+{
+  "id": "20260701_182334_561697",
+  "type": "project_long_term",
+  "tags": ["rust_checker", "patterns", "jarvis_sec"],
+  "content": "## Rust_checker已覆盖pattern（26个）\n\n1. unsafe - unsafe块\n2. raw_pointer - 原始指针\n3. mem::transmute - 类型转换\n4. MaybeUninit/assume_init - 未初始化内存\n5. unwrap/expect - 可能panic\n6. extern \"C\" - FFI声明\n7. unsafe_impl_Send_or_Sync - 不安全的Send/Sync实现\n8. ignored_result - 忽略Result\n9. mem::forget - 内存泄漏\n10. get_unchecked - 未检查索引\n11. pointer_arithmetic - 指针算术\n12. unsafe_mem_ops - unsafe内存操作\n13. from_raw_parts/from_raw - 原始指针重构\n14. ManuallyDrop - 手动drop控制\n15. panic/unreachable - panic调用\n16. RefCell_borrow - RefCell借用冲突\n17. CString/CStr - FFI字符串\n18. integer_overflow - 整数溢出\n19. unsafe_fn - unsafe函数\n20. as_cast_truncation - 类型截断\n21. into_raw_leak - 内存泄漏\n22. static_mut - 静态可变变量\n23. unchecked_math - 未检查数学运算\n24. rc_cycle - Rc循环引用\n25. taint-flow - 命令注入污点流\n26. toctou_race - TOCTOU竞态\n27. uninit/zeroed - 未初始化/零初始化",
+  "created_at": "2026-07-01T18:23:34.561726",
+  "updated_at": "2026-07-01T18:23:34.561731"
+}

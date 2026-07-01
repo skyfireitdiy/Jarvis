@@ -84,6 +84,48 @@ RE_PRIV_API = re.compile(
     r"chown|lchown|fchown|chmod|fchmod|fchmodat)\s*\(",
     re.IGNORECASE,
 )
+# 反序列化相关函数（CWE-502）
+RE_DESERIALIZE_API = re.compile(
+    r"\b(json_loads|json_load|yaml_load|pickle_loads|pickle_load|"
+    r"protobuf_decode|msgpack_unpack|cbor_decode|xml_parse|"
+    r"unserialize|deserialize|decode)\s*\(",
+    re.IGNORECASE,
+)
+
+# SSRF相关函数（CWE-918）
+RE_SSRF_API = re.compile(
+    r"\b(curl_easy_setopt|curl_easy_init|wget|system|popen)\b",
+    re.IGNORECASE,
+)
+
+# SSRF URL参数
+RE_SSRF_URL_PARAM = re.compile(r"CURLOPT_URL")
+
+# SSRF校验函数
+RE_SSRF_VALIDATE = re.compile(
+    r"\b(is_url_allowed|is_domain_allowed|validate_url|check_url|"
+    r"url_whitelist|is_safe_url|verify_url|sanitize_url|is_valid_url)\b",
+    re.IGNORECASE,
+)
+
+# 资源消耗相关函数（CWE-400）
+RE_RESOURCE_API = re.compile(
+    r"\b(malloc|calloc|realloc|alloca|new)\s*\(",
+    re.IGNORECASE,
+)
+
+# 资源限制常量
+RE_RESOURCE_LIMIT = re.compile(
+    r"\b(MAX_|max_|LIMIT_|limit_|BOUND_|bound_)\w*\b",
+    re.IGNORECASE,
+)
+
+# 递归函数检测
+RE_RECURSIVE_CALL = re.compile(
+    r"\b(fibonacci|traverse|recurse|recursive)\b",
+    re.IGNORECASE,
+)
+
 # 网络IO函数（返回值检查至关重要）
 RE_NET_API = re.compile(
     r"\b(recv|send|recvfrom|sendto|recvmsg|sendmsg|"
@@ -6498,6 +6540,375 @@ def _rule_smart_ptr_get_unsafe(
     return issues
 
 
+def _rule_deserialization(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-502: 反序列化不可信数据检测
+    检测点：
+    - 反序列化不可信数据（pickle、yaml、json等）
+    - 缺少类型校验
+    - 缺少大小限制
+    """
+    issues: List[Issue] = []
+
+    # 反序列化函数模式
+    deserialize_funcs = [
+        "json_loads",
+        "json_load",
+        "yaml_load",
+        "pickle_loads",
+        "pickle_load",
+        "protobuf_decode",
+        "msgpack_unpack",
+        "cbor_decode",
+        "xml_parse",
+        "unserialize",
+        "deserialize",
+        "decode",
+    ]
+
+    # 检测反序列化函数调用
+    for idx, line in enumerate(lines, start=1):
+        # 检测反序列化函数调用
+        for func in deserialize_funcs:
+            if re.search(rf"\b{func}\s*\(", line, re.IGNORECASE):
+                # 检查是否有类型校验（向前回看5行和向后查看10行）
+                has_type_check = False
+                lookback_lines = lines[max(0, idx - 6) : idx]
+                lookahead_lines = lines[idx : min(len(lines), idx + 10)]
+
+                # 检查前面的类型校验
+                for prev_line in lookback_lines:
+                    if re.search(
+                        r"\b(json_is_|validate|check|verify|whitelist|schema)",
+                        prev_line,
+                        re.IGNORECASE,
+                    ):
+                        has_type_check = True
+                        break
+
+                # 检查后面的类型校验
+                if not has_type_check:
+                    for next_line in lookahead_lines:
+                        if re.search(
+                            r"\b(json_is_|validate|check|verify|whitelist|schema)",
+                            next_line,
+                            re.IGNORECASE,
+                        ):
+                            has_type_check = True
+                            break
+
+                # 检查是否有大小限制
+                has_size_limit = False
+                for prev_line in lookback_lines:
+                    if re.search(
+                        r"\b(max|limit|bound|size|depth)\b", prev_line, re.IGNORECASE
+                    ):
+                        has_size_limit = True
+                        break
+
+                # 检查后面的大小限制
+                if not has_size_limit:
+                    for next_line in lookahead_lines:
+                        if re.search(
+                            r"\b(max|limit|bound|size|depth)\b",
+                            next_line,
+                            re.IGNORECASE,
+                        ):
+                            has_size_limit = True
+                            break
+
+                # 如果没有类型校验和大小限制，报告漏洞
+                if not has_type_check and not has_size_limit:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="deserialization",
+                            pattern="deserialization_untrusted",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description=f"反序列化函数 {func} 调用缺少类型校验和大小限制，可能导致反序列化漏洞",
+                            suggestion="使用安全的反序列化方法，添加类型校验和大小限制，避免反序列化不可信数据",
+                            confidence=0.7,
+                            severity="high",
+                        )
+                    )
+
+    return issues
+
+
+def _rule_ssrf(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-918: 服务端请求伪造（SSRF）检测
+    检测点：
+    - 用户输入直接用于URL构造
+    - libcurl未验证目标地址
+    - 缺少URL白名单校验
+    """
+    issues: List[Issue] = []
+
+    # 检测curl_easy_setopt设置URL
+    for idx, line in enumerate(lines, start=1):
+        # 检测CURLOPT_URL设置
+        if re.search(r"CURLOPT_URL", line, re.IGNORECASE):
+            # 检查是否有URL校验（向前回看15行和向后查看10行）
+            has_url_validation = False
+            lookback_lines = lines[max(0, idx - 16) : idx]
+            lookahead_lines = lines[idx : min(len(lines), idx + 10)]
+
+            # 检查前面的URL校验
+            for prev_line in lookback_lines:
+                if RE_SSRF_VALIDATE.search(prev_line):
+                    has_url_validation = True
+                    break
+
+            # 检查后面的URL校验
+            if not has_url_validation:
+                for next_line in lookahead_lines:
+                    if RE_SSRF_VALIDATE.search(next_line):
+                        has_url_validation = True
+                        break
+
+            # 如果没有URL校验，报告漏洞
+            if not has_url_validation:
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="ssrf",
+                        pattern="ssrf_url_validation",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(line),
+                        description="curl_easy_setopt设置CURLOPT_URL时缺少URL校验，可能导致SSRF漏洞",
+                        suggestion="添加URL白名单校验，限制协议为HTTPS，禁止访问内部IP地址",
+                        confidence=0.7,
+                        severity="high",
+                    )
+                )
+
+        # 检测snprintf构造URL命令
+        if re.search(r"\b(snprintf|sprintf)\s*\(", line, re.IGNORECASE):
+            # 检查是否构造wget/curl命令
+            if re.search(r"(wget|curl)\s+.*%s", line, re.IGNORECASE):
+                # 检查是否有URL校验
+                has_url_validation = False
+                lookback_lines = lines[max(0, idx - 16) : idx]
+
+                for prev_line in lookback_lines:
+                    if RE_SSRF_VALIDATE.search(prev_line):
+                        has_url_validation = True
+                        break
+
+                if not has_url_validation:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="ssrf",
+                            pattern="ssrf_command_construction",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description="使用snprintf/sprintf构造包含用户输入的URL命令，可能导致SSRF和命令注入漏洞",
+                            suggestion="避免使用snprintf/sprintf构造URL命令，使用安全的HTTP库并添加URL校验",
+                            confidence=0.8,
+                            severity="critical",
+                        )
+                    )
+
+        # 检测system/wget/popen执行URL命令
+        if re.search(r"\b(system|popen)\s*\(", line, re.IGNORECASE):
+            # 检查是否包含URL相关变量
+            if re.search(r"(wget|curl|http|url)", line, re.IGNORECASE):
+                # 检查是否有URL校验
+                has_url_validation = False
+                lookback_lines = lines[max(0, idx - 16) : idx]
+
+                for prev_line in lookback_lines:
+                    if RE_SSRF_VALIDATE.search(prev_line):
+                        has_url_validation = True
+                        break
+
+                if not has_url_validation:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="ssrf",
+                            pattern="ssrf_command_injection",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description="使用system/popen执行包含用户输入的URL命令，可能导致SSRF和命令注入漏洞",
+                            suggestion="避免使用system/popen执行URL命令，使用安全的HTTP库并添加URL校验",
+                            confidence=0.8,
+                            severity="critical",
+                        )
+                    )
+
+    return issues
+
+
+def _rule_resource_consumption(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> List[Issue]:
+    """
+    CWE-400: 资源消耗失控检测
+    检测点：
+    - 循环次数由用户输入控制无上限
+    - 内存分配大小未校验
+    - 递归深度无限制
+    """
+    issues: List[Issue] = []
+
+    # 检测循环次数由用户输入控制
+    for idx, line in enumerate(lines, start=1):
+        # 检测for循环
+        if re.search(r"\bfor\s*\(", line):
+            # 检查是否有用户输入变量控制循环次数
+            if re.search(
+                r"\bfor\s*\([^;]*;\s*[^<]*<\s*(count|size|n|num|len|length)\s*;",
+                line,
+                re.IGNORECASE,
+            ):
+                # 检查是否有上限检查（向前回看10行）
+                has_limit_check = False
+                lookback_lines = lines[max(0, idx - 11) : idx]
+
+                for prev_line in lookback_lines:
+                    if RE_RESOURCE_LIMIT.search(prev_line) or re.search(
+                        r"\b(if|MAX|LIMIT|BOUND)\b", prev_line, re.IGNORECASE
+                    ):
+                        has_limit_check = True
+                        break
+
+                if not has_limit_check:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="resource_consumption",
+                            pattern="unbounded_loop",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description="循环次数由用户输入控制且无上限检查，可能导致资源耗尽DoS攻击",
+                            suggestion="添加循环次数上限检查，限制最大迭代次数",
+                            confidence=0.6,
+                            severity="medium",
+                        )
+                    )
+
+        # 检测内存分配大小未校验
+        if RE_RESOURCE_API.search(line):
+            # 检查是否有大小变量，且变量名暗示来自用户输入或外部
+            # 只检测明确来自用户输入的变量：user_input, input, argv, argc, req, request等
+            user_input_patterns = [
+                r"\b(user_input|user_size|input_size|req_size|request_size)\s*\)",
+                r"malloc\s*\(\s*(atoi|atol|strtol|strtoul)\s*\(",  # malloc(atoi(...))
+                r"malloc\s*\(\s*\w+\s*\*\s*\w+\s*\)",  # malloc(n * size) 乘法
+            ]
+            is_user_controlled = False
+            for pattern in user_input_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    is_user_controlled = True
+                    break
+
+            if is_user_controlled:
+                # 检查是否有大小限制检查（向前回看10行）
+                has_size_check = False
+                lookback_lines = lines[max(0, idx - 11) : idx]
+
+                for prev_line in lookback_lines:
+                    if RE_RESOURCE_LIMIT.search(prev_line) or re.search(
+                        r"\b(if|MAX|LIMIT|BOUND|size.*>|size.*<)\b",
+                        prev_line,
+                        re.IGNORECASE,
+                    ):
+                        has_size_check = True
+                        break
+
+                if not has_size_check:
+                    issues.append(
+                        Issue(
+                            language="c/cpp",
+                            category="resource_consumption",
+                            pattern="unbounded_allocation",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description="内存分配大小由用户输入控制且无上限检查，可能导致内存耗尽DoS攻击",
+                            suggestion="添加分配大小上限检查，限制最大分配大小",
+                            confidence=0.6,
+                            severity="medium",
+                        )
+                    )
+
+        # 检测递归深度无限制
+        # 匹配函数定义：返回类型 + 函数名 + 参数列表 + {
+        if re.search(
+            r"\b(void|int|char|float|double|long|short|unsigned|signed|static|inline)\s+\w+\s*\([^)]*\)\s*\{",
+            line,
+        ):
+            # 检查函数名是否在函数体内被调用（递归）
+            func_match = re.search(r"\b(\w+)\s*\([^)]*\)\s*\{", line)
+            if func_match:
+                func_name = func_match.group(1)
+                # 向后查看函数体是否包含递归调用
+                # 注意：idx从1开始，Python列表索引从0开始
+                # 使用括号匹配来确定函数体范围
+                brace_count = line.count("{") - line.count("}")
+                func_body_lines = []
+                for i in range(idx, min(len(lines), idx + 50)):
+                    func_body_lines.append(lines[i])
+                    brace_count += lines[i].count("{") - lines[i].count("}")
+                    if brace_count == 0:
+                        break
+
+                # 只在函数体内检测递归调用
+                for next_line in func_body_lines:
+                    if re.search(rf"\b{func_name}\s*\(", next_line):
+                        # 检查是否有深度限制检查
+                        has_depth_check = False
+                        lookback_lines = lines[max(0, idx - 11) : idx]
+
+                        for prev_line in lookback_lines:
+                            if RE_RESOURCE_LIMIT.search(prev_line) or re.search(
+                                r"\b(depth|MAX|LIMIT)\b", prev_line, re.IGNORECASE
+                            ):
+                                has_depth_check = True
+                                break
+
+                        # 检查函数体内是否有深度检查
+                        if not has_depth_check:
+                            for check_line in func_body_lines:
+                                if re.search(
+                                    r"\b(depth|MAX|LIMIT)\b", check_line, re.IGNORECASE
+                                ):
+                                    has_depth_check = True
+                                    break
+
+                        if not has_depth_check:
+                            issues.append(
+                                Issue(
+                                    language="c/cpp",
+                                    category="resource_consumption",
+                                    pattern="unbounded_recursion",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(line),
+                                    description="递归函数缺少深度限制，可能导致栈溢出DoS攻击",
+                                    suggestion="添加递归深度限制，或改用迭代实现",
+                                    confidence=0.6,
+                                    severity="medium",
+                                )
+                            )
+                        break
+
+    return issues
+
+
 def analyze_c_cpp_text(
     relpath: str,
     text: str,
@@ -6656,6 +7067,12 @@ def analyze_c_cpp_text(
     issues.extend(_rule_cpp_deadlock_patterns(mlines, _db_file_path, database=database))
     # 数据竞争检测
     issues.extend(_rule_data_race_suspect(mlines, _db_file_path, database=database))
+    # CWE-502: 反序列化漏洞检测
+    issues.extend(_rule_deserialization(lines, _db_file_path, database=database))
+    # CWE-918: SSRF漏洞检测
+    issues.extend(_rule_ssrf(lines, _db_file_path, database=database))
+    # CWE-400: 资源消耗失控检测
+    issues.extend(_rule_resource_consumption(lines, _db_file_path, database=database))
 
     # 污点分析（核心功能）
     try:

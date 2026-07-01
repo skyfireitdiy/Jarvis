@@ -1,0 +1,8 @@
+{
+  "id": "20260701_182334_560068",
+  "type": "project_long_term",
+  "tags": ["cwe_top25", "2024", "security", "jarvis_sec"],
+  "content": "## CWE Top 25 2024完整列表（MITRE官方）\n\n| Rank | CWE-ID | Name | Score |\n|------|---------|------|-------|\n| 1 | CWE-79 | XSS (Cross-site Scripting) | 56.92 |\n| 2 | CWE-787 | Out-of-bounds Write (Buffer Overflow) | 45.20 |\n| 3 | CWE-89 | SQL Injection | 35.88 |\n| 4 | CWE-352 | CSRF | 19.57 |\n| 5 | CWE-22 | Path Traversal | 12.74 |\n| 6 | CWE-125 | Out-of-bounds Read | 11.42 |\n| 7 | CWE-78 | OS Command Injection | 11.30 |\n| 8 | CWE-416 | Use After Free | 10.19 |\n| 9 | CWE-862 | Missing Authorization | 10.11 |\n| 10 | CWE-434 | Unrestricted File Upload | 10.03 |\n| 11 | CWE-94 | Code Injection | 7.13 |\n| 12 | CWE-20 | Improper Input Validation | 6.78 |\n| 13 | CWE-77 | Command Injection | 6.74 |\n| 14 | CWE-287 | Improper Authentication | 5.94 |\n| 15 | CWE-269 | Improper Privilege Management | 5.22 |\n| 16 | CWE-502 | Deserialization of Untrusted Data | 5.07 |\n| 17 | CWE-200 | Exposure of Sensitive Information | 5.07 |\n| 18 | CWE-863 | Incorrect Authorization | 4.05 |\n| 19 | CWE-918 | SSRF | 4.05 |\n| 20 | CWE-119 | Buffer Bounds Error | 3.69 |\n| 21 | CWE-476 | NULL Pointer Dereference | 3.58 |\n| 22 | CWE-798 | Hard-coded Credentials | 3.46 |\n| 23 | CWE-190 | Integer Overflow | 3.37 |\n| 24 | CWE-400 | Uncontrolled Resource Consumption | 3.23 |\n| 25 | CWE-306 | Missing Authentication | 2.73 |",
+  "created_at": "2026-07-01T18:23:34.560117",
+  "updated_at": "2026-07-01T18:23:34.560122"
+}

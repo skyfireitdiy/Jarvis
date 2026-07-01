@@ -1,0 +1,8 @@
+{
+  "id": "20260701_193218_769795",
+  "type": "project_long_term",
+  "tags": ["cwe", "security_checker", "detection_pattern", "rust", "c"],
+  "content": "CWE漏洞检测规则开发模式总结：\n\n1. **SQL注入检测(CWE-89)**：检测format!和字符串拼接构造SQL，排除参数化查询($1占位符、.bind())\n\n2. **路径遍历检测(CWE-22)**：检测PathBuf::from/push用户输入、format!构造路径，检查是否有canonicalize校验\n\n3. **硬编码凭证检测(CWE-798)**：检测const/static/let变量名包含敏感关键字(password/secret/key/token)且赋值为字符串字面量\n\n4. **非安全随机数检测(CWE-338)**：检测seed_from_u64固定种子、SmallRng非加密安全RNG、thread_rng用于安全目的\n\n5. **Secret未zeroize检测(CWE-226)**：检测敏感变量未使用Zeroizing包装或未调用.zeroize()\n\n6. **Debug泄露secret检测(CWE-532)**：检测#[derive(Debug)]在包含敏感字段的struct上\n\n7. **Async安全问题检测(CWE-1031)**：检测async函数中使用std::fs、std::thread::sleep、std::net阻塞操作\n\n8. **资源消耗检测(CWE-400)**：循环检测用户输入控制循环次数、内存分配检测malloc(atoi(...))、递归检测使用括号匹配确定函数体范围\n\n关键文件：src/jarvis/jarvis_sec/checkers/rust_checker.py, src/jarvis/jarvis_sec/checkers/c_checker.py",
+  "created_at": "2026-07-01T19:32:18.769830",
+  "updated_at": "2026-07-01T19:32:18.769835"
+}

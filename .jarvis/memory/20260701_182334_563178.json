@@ -1,0 +1,8 @@
+{
+  "id": "20260701_182334_563178",
+  "type": "project_long_term",
+  "tags": ["rust_security", "vulnerabilities", "jarvis_sec"],
+  "content": "## Rust特有安全漏洞类型（Rust Security Handbook）\n\n### 1. 类型安全问题\n- 参数顺序混淆（primitive u64参数可互换）\n- Newtype模式缺失\n\n### 2. 错误处理问题\n- unwrap()导致DoS\n- panic!在async上下文\n- 缺少Cancellation Safety\n\n### 3. 整数算术问题\n- silent overflow in release mode\n- checked/saturating/wrapping算术选择\n- 浮点精度问题\n\n### 4. 密码学问题\n- 非密码学安全随机数（StdRng seed_from_u64）\n- Secret未zeroize\n- Debug trait泄露secret\n- Timing attack（非constant-time比较）\n\n### 5. 异步安全问题\n- Blocking operation in async context\n- Lock across await deadlock\n- Cancellation unsafe state update\n\n### 6. Web3/智能合约问题\n- Missing signer check\n- PDA verification缺失\n- Non-deterministic behavior（SystemTime::now）\n\n### 7. unsafe代码问题\n- 缺少Safety文档\n- FFI边界验证缺失",
+  "created_at": "2026-07-01T18:23:34.563203",
+  "updated_at": "2026-07-01T18:23:34.563206"
+}

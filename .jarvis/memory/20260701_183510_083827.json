@@ -1,0 +1,8 @@
+{
+  "id": "20260701_183510_083827",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "test_dataset", "cwe", "rust", "phase8"],
+  "content": "## 新CWE漏洞测试数据集创建完成（阶段8）\n\n### 数据集统计\n- **C/C++数据集**：3个目录，9个文件\n  - cwe502_deserialization: 2 positive + 1 negative\n  - cwe918_ssrf: 2 positive + 1 negative\n  - cwe400_resource_consumption: 2 positive + 1 negative\n\n- **Rust数据集**：7个目录，21个文件\n  - rust_sql_injection: 2 positive + 1 negative\n  - rust_path_traversal: 2 positive + 1 negative\n  - rust_hardcoded_credentials: 2 positive + 1 negative\n  - rust_insecure_random: 2 positive + 1 negative\n  - rust_secret_no_zeroize: 2 positive + 1 negative\n  - rust_debug_leak_secret: 2 positive + 1 negative\n  - rust_async_safety: 2 positive + 1 negative\n\n### 总计\n- 10个漏洞类型目录\n- 30个测试用例文件（20 positive + 10 negative）\n\n### 目录位置\ntests/jarvis_sec/datasets/vulnerability_gaps/",
+  "created_at": "2026-07-01T18:35:10.083853",
+  "updated_at": "2026-07-01T18:35:10.083858"
+}

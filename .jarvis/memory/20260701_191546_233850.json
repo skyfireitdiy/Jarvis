@@ -1,0 +1,8 @@
+{
+  "id": "20260701_191546_233850",
+  "type": "project_long_term",
+  "tags": ["cwe-400", "resource-consumption", "detection-rule", "c-checker"],
+  "content": "CWE-400资源消耗失控检测规则开发完成。关键实现：1) 循环检测：检测for循环中用户输入变量控制循环次数，向前回看10行检查是否有上限；2) 内存分配检测：检测malloc(atoi(...))、malloc(n*size)等用户输入控制的分配，使用更精确的用户输入模式匹配避免误报；3) 递归检测：使用括号匹配确定函数体范围，只在函数体内检测递归调用，避免跨函数调用误报。文件：src/jarvis/jarvis_sec/checkers/c_checker.py，函数：_rule_resource_consumption（第6733-6860行）。",
+  "created_at": "2026-07-01T19:15:46.233881",
+  "updated_at": "2026-07-01T19:15:46.233887"
+}
