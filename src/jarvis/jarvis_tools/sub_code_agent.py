@@ -165,6 +165,16 @@ class SubCodeAgentTool:
             except Exception:
                 rule_names = None
 
+            # 继承父 Agent 的非交互模式设置
+            parent_non_interactive = None
+            try:
+                if parent_agent is not None:
+                    parent_non_interactive = getattr(
+                        parent_agent, "non_interactive", None
+                    )
+            except Exception:
+                parent_non_interactive = None
+
             # 自动禁用review功能
             disable_review = True
 
@@ -175,7 +185,9 @@ class SubCodeAgentTool:
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,
-                    non_interactive=True,
+                    non_interactive=parent_non_interactive
+                    if parent_non_interactive is not None
+                    else True,
                     rule_names=rule_names,
                     disable_review=disable_review,
                     auto_complete=True,
