@@ -2652,32 +2652,95 @@ def _rule_integer_overflow_from_calls(
     mul_pattern = re.compile(r"(?<![(*])\b([A-Za-z_]\w*)\s\*\s([A-Za-z_]\w*)(?!\s\))")
     add_pattern = re.compile(r"\b([A-Za-z_]\w*)\s\+\s([A-Za-z_]\w*|\d+)")
 
-    # 溢出检查模式（安全模式）
-    # 模式1: var <= INT_MAX / other_var (直接检查)
-    # 模式2: var > INT_MAX / other_var (如果大于则返回/报错)
+    # 溢出检查模式（安全模式）- 泛化版本
+    # 模式1: var <= MAX / other_var (直接检查)
+    # 模式2: var > MAX / other_var (如果大于则返回/报错)
+    # 模式3: var <= MAX - other_var (加法检查)
+    # 支持多种MAX常量：INT_MAX, UINT_MAX, SIZE_MAX, SSIZE_MAX, LONG_MAX等
+    # 使用非捕获组(?:...)避免分组索引错乱
+    MAX_CONSTANTS = r"(?:UINT_MAX|INT_MAX|SIZE_MAX|SSIZE_MAX|LONG_MAX|ULONG_MAX|LLONG_MAX|ULLONG_MAX|INT8_MAX|INT16_MAX|INT32_MAX|INT64_MAX|UINT8_MAX|UINT16_MAX|UINT32_MAX|UINT64_MAX|\d+)"
+
     mul_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s(<=|>)\s(UINT_MAX|INT_MAX|\d+)\s/\s([A-Za-z_]\w*)"
+        rf"\b([A-Za-z_]\w*)\s(<=|<|>|>=)\s{MAX_CONSTANTS}\s/\s([A-Za-z_]\w*)"
     )
     add_overflow_check = re.compile(
-        r"\b([A-Za-z_]\w*)\s(<|<=|>|>=)\s(INT_MAX|UINT_MAX)\s-\s\d+"
+        rf"\b([A-Za-z_]\w*)\s(<|<=|>|>=)\s{MAX_CONSTANTS}\s-\s([A-Za-z_]\w*|\d+)"
+    )
+
+    # 新增：条件语句中的溢出检查（if/while语句）
+    # 模式：if (count > 0 && elem_size > 0 && count <= SIZE_MAX / elem_size)
+    conditional_overflow_check = re.compile(
+        rf"\b(if|while)\s*\([^)]*([A-Za-z_]\w*)\s(<=|<)\s{MAX_CONSTANTS}\s/\s([A-Za-z_]\w*)[^)]*\)"
+    )
+
+    # 新增：变量比较检查（更通用的模式）
+    # 模式：count <= SIZE_MAX / elem_size 或 base_size <= SIZE_MAX - extra
+    generic_div_check = re.compile(
+        rf"([A-Za-z_]\w*)\s(<=|<|>|>=)\s{MAX_CONSTANTS}\s/\s([A-Za-z_]\w*)"
+    )
+    generic_sub_check = re.compile(
+        rf"([A-Za-z_]\w*)\s(<=|<|>|>=)\s{MAX_CONSTANTS}\s-\s([A-Za-z_]\w*|\d+)"
     )
 
     def _has_overflow_check(
         var1: str, var2: str, lines: Sequence[str], upto_idx: int, lookback: int = 10
     ) -> bool:
-        """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查"""
+        """检查在前lookback行内是否有针对var1*var2或var1+var2的溢出检查
+
+        泛化版本：支持多种MAX常量和检查模式
+        """
         start = max(1, upto_idx - lookback)
         for j in range(start, upto_idx):
             sj = _safe_line(lines, j)
+
+            # 检查乘法溢出检查模式
             m = mul_overflow_check.search(sj)
             if m:
-                checked_vars = [m.group(1), m.group(3)]
-                if var1 in checked_vars or var2 in checked_vars:
+                checked_var = m.group(1)
+                divisor_var = m.group(3)
+                # 检查是否涉及var1或var2
+                if checked_var == var1 or checked_var == var2:
                     return True
+                if divisor_var == var1 or divisor_var == var2:
+                    return True
+
+            # 检查加法溢出检查模式
             m = add_overflow_check.search(sj)
             if m:
-                if m.group(1) == var1 or m.group(1) == var2:
+                checked_var = m.group(1)
+                if checked_var == var1 or checked_var == var2:
                     return True
+
+            # 检查条件语句中的溢出检查
+            m = conditional_overflow_check.search(sj)
+            if m:
+                checked_var = m.group(2)
+                divisor_var = m.group(4)
+                if checked_var == var1 or checked_var == var2:
+                    return True
+                if divisor_var == var1 or divisor_var == var2:
+                    return True
+
+            # 检查通用除法检查模式
+            m = generic_div_check.search(sj)
+            if m:
+                checked_var = m.group(1)
+                divisor_var = m.group(3)
+                if checked_var == var1 or checked_var == var2:
+                    return True
+                if divisor_var == var1 or divisor_var == var2:
+                    return True
+
+            # 检查通用减法检查模式
+            m = generic_sub_check.search(sj)
+            if m:
+                checked_var = m.group(1)
+                sub_var = m.group(3)
+                if checked_var == var1 or checked_var == var2:
+                    return True
+                if sub_var == var1 or sub_var == var2:
+                    return True
+
         return False
 
     for call in alloc_calls:
@@ -2765,9 +2828,10 @@ def _rule_integer_overflow_from_calls(
                             assign_mul.group(1).strip(),
                             assign_mul.group(2).strip(),
                         )
-                        # 检查是否有溢出检查
+                        # 检查是否有溢出检查（增加lookback范围以覆盖if条件）
+                        # 关键优化：if条件中的溢出检查对if块内部有效
                         if not _has_overflow_check(
-                            expr1, expr2, lines, idx, lookback=10
+                            expr1, expr2, lines, idx, lookback=15
                         ):
                             issues.append(
                                 Issue(

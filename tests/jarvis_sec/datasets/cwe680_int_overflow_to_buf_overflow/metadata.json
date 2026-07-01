@@ -1,0 +1,17 @@
+{
+  "name": "cwe680_int_overflow_to_buf_overflow",
+  "description": "CWE-680: Integer Overflow to Buffer Overflow - 整数溢出导致缓冲区溢出",
+  "vulnerability_type": "integer_overflow_to_buffer_overflow",
+  "cwe": "CWE-680",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "integer_overflow",
+      "file": "positive_int_overflow_to_buf_overflow.c"
+    },
+    {
+      "pattern": "alloc_size_overflow",
+      "file": "positive_int_overflow_to_buf_overflow.c"
+    }
+  ]
+}

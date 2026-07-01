@@ -1,0 +1,14 @@
+{
+  "id": "20260701_181204_190393",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_sec",
+    "c_checker",
+    "integer_overflow",
+    "optimization",
+    "regex"
+  ],
+  "content": "integer_overflow检测器优化方案：1. 泛化MAX常量识别，使用非捕获组(?:...)避免正则分组错乱，支持SIZE_MAX/INT_MAX/UINT_MAX等16种常量；2. 新增条件语句溢出检查模式识别；3. 增加lookback范围从10行到15行以覆盖if条件检查；4. 关键发现：条件语句中的溢出检查对if块内部有效。修改位置：src/jarvis/jarvis_sec/checkers/c_checker.py:2652-2750",
+  "created_at": "2026-07-01T18:12:04.190430",
+  "updated_at": "2026-07-01T18:12:04.190435"
+}
