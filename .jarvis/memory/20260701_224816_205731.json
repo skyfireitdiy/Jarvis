@@ -1,0 +1,12 @@
+{
+  "id": "20260701_224816_205731",
+  "type": "project_long_term",
+  "tags": [
+    "releasenote",
+    "format",
+    "template"
+  ],
+  "content": "Jarvis项目ReleaseNote.md格式规范：标题格式为'### Release Note - vX.Y.Z YYYY-MM-DD'，内容包含'#### **🚀 新功能**'和'#### **🔧 优化与重构**'两个主要章节，每个功能项使用'- **🎯 功能名称**'格式，包含价值标签、场景标签、效果三个子项，版本之间用'---'分隔",
+  "created_at": "2026-07-01T22:48:16.205764",
+  "updated_at": "2026-07-01T22:48:16.205767"
+}

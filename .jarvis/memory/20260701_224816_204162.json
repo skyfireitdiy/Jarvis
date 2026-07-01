@@ -1,0 +1,12 @@
+{
+  "id": "20260701_224816_204162",
+  "type": "project_long_term",
+  "tags": [
+    "version",
+    "release",
+    "publish"
+  ],
+  "content": "Jarvis项目版本发布流程：1) 获取最新版本号 git describe --tags --abbrev=0；2) 运行pytest测试确保通过；3) 获取代码变更统计 git diff --stat；4) 分析变更内容获取新增规则函数；5) 更新ReleaseNote.md（格式：### Release Note - vX.Y.Z YYYY-MM-DD）；6) 执行发布脚本 ./scripts/publish.py patch/minor/major；7) 验证发布结果 git tag -l 和 git log -1",
+  "created_at": "2026-07-01T22:48:16.204210",
+  "updated_at": "2026-07-01T22:48:16.204215"
+}
