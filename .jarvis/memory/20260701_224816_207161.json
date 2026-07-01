@@ -1,0 +1,12 @@
+{
+  "id": "20260701_224816_207161",
+  "type": "project_long_term",
+  "tags": [
+    "security",
+    "checker",
+    "rules"
+  ],
+  "content": "Jarvis安全扫描器规则位置：C/C++检查器在src/jarvis/jarvis_sec/checkers/c_checker.py，Rust检查器在src/jarvis/jarvis_sec/checkers/rust_checker.py，规则函数命名格式为_rule_xxx，测试数据集在tests/jarvis_sec/datasets/vulnerability_gaps/目录",
+  "created_at": "2026-07-01T22:48:16.207180",
+  "updated_at": "2026-07-01T22:48:16.207183"
+}
