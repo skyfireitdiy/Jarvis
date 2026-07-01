@@ -203,6 +203,10 @@ BUILTIN_COMMANDS = [
     ("LLMGroupSet", "设置当前模型组"),
     ("Shell", "打开Shell终端"),
     ("SetMaxToken", "设置最大输入Token数"),
+    # C2Rust 命令
+    ("C2RustConfig", "C2Rust配置管理"),
+    ("C2RustRun", "C2Rust运行迁移"),
+    ("C2RustVerify", "C2Rust验证功能对齐"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
