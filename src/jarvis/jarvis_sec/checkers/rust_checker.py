@@ -2637,6 +2637,20 @@ def analyze_rust_text(
     issues.extend(_rule_command_injection(mlines, _db_file_path, database=database))
     # TOCTOU竞态条件
     issues.extend(_rule_toctou_race(lines, _db_file_path, database=database))
+    # SQL注入
+    issues.extend(_rule_sql_injection(lines, _db_file_path, database=database))
+    # 路径遍历
+    issues.extend(_rule_path_traversal(lines, _db_file_path, database=database))
+    # 硬编码凭证
+    issues.extend(_rule_hardcoded_credentials(lines, _db_file_path, database=database))
+    # 非安全随机数
+    issues.extend(_rule_insecure_random(lines, _db_file_path, database=database))
+    # Secret未zeroize
+    issues.extend(_rule_secret_no_zeroize(lines, _db_file_path, database=database))
+    # Debug泄露secret
+    issues.extend(_rule_debug_leak_secret(lines, _db_file_path, database=database))
+    # Async安全问题
+    issues.extend(_rule_async_safety(lines, _db_file_path, database=database))
 
     # 污点分析（核心功能）
     try:
@@ -3062,6 +3076,732 @@ def _is_from_raw_parts_false_positive(
         return True
 
     return False
+
+
+def _rule_sql_injection(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-89: SQL注入检测
+    检测点：
+    - format! 构造SQL查询
+    - 字符串拼接构造SQL
+    - 动态ORDER BY/IN clause
+    """
+    issues: List[Issue] = []
+
+    # SQL关键字模式
+    sql_keywords = [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "FROM",
+        "WHERE",
+        "ORDER BY",
+        "GROUP BY",
+        "HAVING",
+        "LIMIT",
+        "OFFSET",
+        "IN",
+    ]
+
+    for idx, line in enumerate(lines, start=1):
+        # 检测format!构造SQL
+        if "format!(" in line:
+            # 检查是否包含SQL关键字
+            line_upper = line.upper()
+            for keyword in sql_keywords:
+                if keyword in line_upper:
+                    # 检查是否有参数化查询的安全措施
+                    has_safe_pattern = False
+                    # 检查是否使用$1, $2等参数化占位符
+                    if re.search(r"\$\d+", line):
+                        has_safe_pattern = True
+                    # 检查是否在sqlx::query_as!等安全宏中
+                    if "sqlx::query_as!" in line or "sqlx::query!" in line:
+                        has_safe_pattern = True
+
+                    if not has_safe_pattern:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="sql_injection",
+                                pattern="format_sql_injection",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(line),
+                                description="使用format!构造SQL查询，可能导致SQL注入攻击",
+                                suggestion="使用参数化查询（sqlx::query_as!或.bind()）替代字符串拼接",
+                                confidence=0.7,
+                                severity="high",
+                            )
+                        )
+                    break
+
+        # 检测字符串拼接构造SQL
+        if ".to_string()" in line or "+ " in line:
+            line_upper = line.upper()
+            for keyword in sql_keywords:
+                if keyword in line_upper:
+                    # 检查是否是安全的参数化查询
+                    has_safe_pattern = False
+                    if ".bind(" in line or "sqlx::query_as!" in line:
+                        has_safe_pattern = True
+
+                    if not has_safe_pattern:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="sql_injection",
+                                pattern="concat_sql_injection",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(line),
+                                description="字符串拼接构造SQL查询，可能导致SQL注入攻击",
+                                suggestion="使用参数化查询（.bind()）替代字符串拼接",
+                                confidence=0.6,
+                                severity="high",
+                            )
+                        )
+                    break
+
+    return issues
+
+
+def _rule_path_traversal(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-22: 路径遍历检测
+    检测点：
+    - PathBuf::from(user_input)
+    - path.push(user_input)
+    - format!构造文件路径
+    - 字符串拼接构造文件路径
+    """
+    issues: List[Issue] = []
+
+    for idx, line in enumerate(lines, start=1):
+        # 检测PathBuf::from(user_input)
+        if "PathBuf::from(" in line:
+            # 检查是否有canonicalize校验
+            has_canonicalize = False
+            # 向后查看5行
+            for i in range(idx, min(len(lines) + 1, idx + 5)):
+                if "canonicalize" in lines[i - 1]:
+                    has_canonicalize = True
+                    break
+
+            if not has_canonicalize:
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="path_traversal",
+                        pattern="pathbuf_from_user_input",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(line),
+                        description="PathBuf::from直接使用用户输入，可能导致路径遍历攻击",
+                        suggestion="使用canonicalize()规范化路径并验证路径是否在预期目录内",
+                        confidence=0.6,
+                        severity="high",
+                    )
+                )
+
+        # 检测path.push(user_input)
+        if ".push(" in line and "PathBuf" in line:
+            # 检查是否有canonicalize校验
+            has_canonicalize = False
+            for i in range(max(0, idx - 5), min(len(lines), idx + 5)):
+                if "canonicalize" in lines[i]:
+                    has_canonicalize = True
+                    break
+
+            if not has_canonicalize:
+                issues.append(
+                    Issue(
+                        language="rust",
+                        category="path_traversal",
+                        pattern="path_push_user_input",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(line),
+                        description="path.push()添加用户输入到路径，可能导致路径遍历攻击",
+                        suggestion="验证输入不包含..或使用canonicalize()规范化路径",
+                        confidence=0.6,
+                        severity="high",
+                    )
+                )
+
+        # 检测format!构造文件路径
+        if "format!(" in line:
+            # 检查是否包含文件路径关键字
+            path_indicators = [
+                "/",
+                "path",
+                "file",
+                "dir",
+                "config",
+                "data",
+                "tmp",
+                "var",
+                "etc",
+            ]
+            has_path_indicator = any(
+                indicator in line.lower() for indicator in path_indicators
+            )
+
+            if has_path_indicator:
+                # 检查是否有canonicalize或starts_with校验
+                has_validation = False
+                for i in range(max(0, idx - 5), min(len(lines), idx + 5)):
+                    if "canonicalize" in lines[i] or "starts_with" in lines[i]:
+                        has_validation = True
+                        break
+
+                if not has_validation:
+                    issues.append(
+                        Issue(
+                            language="rust",
+                            category="path_traversal",
+                            pattern="format_path_injection",
+                            file=relpath,
+                            line=idx,
+                            evidence=_strip_line(line),
+                            description="format!构造文件路径，可能导致路径遍历攻击",
+                            suggestion="使用canonicalize()规范化路径并验证路径是否在预期目录内",
+                            confidence=0.5,
+                            severity="medium",
+                        )
+                    )
+
+    return issues
+
+
+def _rule_hardcoded_credentials(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-798: 硬编码凭证检测
+    检测点：
+    - const/static变量赋值为敏感字符串
+    - 变量名包含key/password/secret/token等关键字
+    - String::from()赋值为敏感字符串
+    """
+    issues: List[Issue] = []
+
+    # 敏感变量名关键字
+    sensitive_keywords = [
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "api_key",
+        "apikey",
+        "api_secret",
+        "token",
+        "access_key",
+        "secret_key",
+        "private_key",
+        "privatekey",
+        "priv_key",
+        "auth",
+        "credential",
+        "jwt",
+        "encryption_key",
+    ]
+
+    # 排除模式（环境变量名、配置名等）
+    exclude_patterns = [
+        "env",
+        "config",
+        "name",
+        "path",
+        "url",
+        "length",
+        "type",
+        "file",
+    ]
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # 跳过注释
+        if stripped.startswith("//") or stripped.startswith("/*"):
+            continue
+
+        # 检测const/static变量赋值
+        if (
+            stripped.startswith("const ") or stripped.startswith("static ")
+        ) and "= " in stripped:
+            # 提取变量名
+            match = re.search(r"(?:const|static)\s+(\w+)", stripped)
+            if match:
+                var_name = match.group(1).lower()
+
+                # 检查是否是敏感变量名
+                is_sensitive = any(kw in var_name for kw in sensitive_keywords)
+                is_excluded = any(ex in var_name for ex in exclude_patterns)
+
+                if is_sensitive and not is_excluded:
+                    # 检查是否赋值为字符串字面量
+                    if '"' in stripped and len(stripped) > 30:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="hardcoded_credentials",
+                                pattern="const_sensitive_value",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(line),
+                                description="const/static变量包含硬编码凭证",
+                                suggestion="使用环境变量或配置文件存储敏感信息",
+                                confidence=0.8,
+                                severity="critical",
+                            )
+                        )
+
+        # 检测let变量赋值为敏感字符串
+        if "let " in stripped and "= " in stripped:
+            # 提取变量名
+            match = re.search(r"let\s+(?:mut\s+)?(\w+)", stripped)
+            if match:
+                var_name = match.group(1).lower()
+
+                is_sensitive = any(kw in var_name for kw in sensitive_keywords)
+                is_excluded = any(ex in var_name for ex in exclude_patterns)
+
+                if is_sensitive and not is_excluded:
+                    # 检查是否赋值为字符串字面量
+                    if '"' in stripped:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="hardcoded_credentials",
+                                pattern="let_sensitive_value",
+                                file=relpath,
+                                line=idx,
+                                evidence=_strip_line(line),
+                                description="let变量包含硬编码凭证",
+                                suggestion="使用环境变量或配置文件存储敏感信息",
+                                confidence=0.7,
+                                severity="high",
+                            )
+                        )
+
+        # 检测String::from()赋值为敏感字符串
+        if "String::from(" in stripped:
+            # 向前查找变量名
+            for i in range(max(0, idx - 3), idx):
+                prev_line = lines[i - 1].strip()
+                if "let " in prev_line or ": " in prev_line:
+                    match = re.search(r"(?:let\s+(?:mut\s+)?|(\w+)\s*:)", prev_line)
+                    if match:
+                        var_name = match.group(1).lower() if match.group(1) else ""
+                        if var_name and any(
+                            kw in var_name for kw in sensitive_keywords
+                        ):
+                            issues.append(
+                                Issue(
+                                    language="rust",
+                                    category="hardcoded_credentials",
+                                    pattern="string_from_sensitive",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(line),
+                                    description="String::from()包含硬编码凭证",
+                                    suggestion="使用环境变量或配置文件存储敏感信息",
+                                    confidence=0.7,
+                                    severity="high",
+                                )
+                            )
+                            break
+
+    return issues
+
+
+def _rule_insecure_random(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-338: 非安全随机数检测
+    检测点：
+    - StdRng::seed_from_u64() 固定种子
+    - SmallRng 非加密安全
+    - thread_rng() 用于安全目的
+    """
+    issues: List[Issue] = []
+
+    # 安全敏感的函数名关键字
+    security_keywords = [
+        "key",
+        "token",
+        "secret",
+        "password",
+        "nonce",
+        "session",
+        "auth",
+        "crypt",
+        "encrypt",
+        "salt",
+    ]
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # 检测固定种子
+        if "seed_from_u64" in stripped:
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="insecure_random",
+                    pattern="fixed_seed",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description="使用固定种子初始化随机数生成器，产生的随机数可预测",
+                    suggestion="使用OsRng从操作系统获取真随机数",
+                    confidence=0.9,
+                    severity="high",
+                )
+            )
+
+        # 检测SmallRng
+        if "SmallRng" in stripped:
+            issues.append(
+                Issue(
+                    language="rust",
+                    category="insecure_random",
+                    pattern="small_rng",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(line),
+                    description="SmallRng不是加密安全的随机数生成器",
+                    suggestion="使用OsRng或rand::rngs::ThreadRng替代",
+                    confidence=0.8,
+                    severity="medium",
+                )
+            )
+
+        # 检测thread_rng用于安全目的
+        if "thread_rng" in stripped:
+            # 检查函数名是否包含安全关键字
+            for i in range(max(0, idx - 10), idx):
+                prev_line = lines[i].strip()
+                if "fn " in prev_line:
+                    # 提取函数名
+                    match = re.search(r"fn\s+(\w+)", prev_line)
+                    if match:
+                        func_name = match.group(1).lower()
+                        if any(kw in func_name for kw in security_keywords):
+                            issues.append(
+                                Issue(
+                                    language="rust",
+                                    category="insecure_random",
+                                    pattern="thread_rng_security",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(line),
+                                    description="thread_rng用于安全敏感操作，可能不够安全",
+                                    suggestion="使用OsRng进行加密安全的随机数生成",
+                                    confidence=0.6,
+                                    severity="medium",
+                                )
+                            )
+                            break
+
+    return issues
+
+
+def _rule_secret_no_zeroize(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-226: Secret未zeroize检测
+    检测点：
+    - 敏感变量存储在String/Vec中，没有使用zeroize
+    - 没有调用.zeroize()方法
+    - 没有使用Zeroizing包装器
+    """
+    issues: List[Issue] = []
+
+    # 敏感变量名关键字
+    sensitive_keywords = [
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "key",
+        "token",
+        "private",
+        "credential",
+        "session",
+    ]
+
+    # 检查是否使用了zeroize库（用于降低置信度）
+    # has_zeroize_import = False
+    # for line in lines:
+    #     if "use zeroize" in line or "zeroize::" in line:
+    #         has_zeroize_import = True
+    #         break
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # 检测敏感变量赋值
+        if "let " in stripped and "= " in stripped:
+            # 提取变量名
+            match = re.search(r"let\s+(?:mut\s+)?(\w+)", stripped)
+            if match:
+                var_name = match.group(1).lower()
+
+                # 检查是否是敏感变量名
+                is_sensitive = any(kw in var_name for kw in sensitive_keywords)
+
+                if is_sensitive:
+                    # 检查是否使用了Zeroizing包装器
+                    has_zeroizing = "Zeroizing" in stripped
+
+                    if not has_zeroizing:
+                        # 检查函数内是否有.zeroize()调用
+                        has_zeroize_call = False
+                        # 找到函数结束位置
+                        func_end = idx + 20  # 默认查看20行
+                        for i in range(idx, min(len(lines) + 1, func_end)):
+                            check_line = lines[i - 1].strip()
+                            if var_name in check_line and ".zeroize()" in check_line:
+                                has_zeroize_call = True
+                                break
+                            # 遇到函数结束标记
+                            if check_line.startswith("fn ") or check_line == "}":
+                                break
+
+                        if not has_zeroize_call:
+                            issues.append(
+                                Issue(
+                                    language="rust",
+                                    category="secret_no_zeroize",
+                                    pattern="sensitive_no_zeroize",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(line),
+                                    description="敏感数据存储在内存中未清除，可能导致内存泄露",
+                                    suggestion="使用zeroize库清除敏感数据，或使用Zeroizing包装器",
+                                    confidence=0.6,
+                                    severity="medium",
+                                )
+                            )
+
+    return issues
+
+
+def _rule_debug_leak_secret(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-532: Debug泄露secret检测
+    检测点：
+    - #[derive(Debug)] 在包含敏感字段的struct上
+    - 敏感字段名包含key/password/secret/token等
+    """
+    issues: List[Issue] = []
+
+    # 敏感字段名关键字
+    sensitive_keywords = [
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "api_key",
+        "apikey",
+        "secret_key",
+        "token",
+        "private_key",
+        "credential",
+    ]
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # 检测#[derive(Debug)]
+        if (
+            stripped == "#[derive(Debug)]"
+            or "#[derive(Debug," in stripped
+            or "derive(Debug)" in stripped
+        ):
+            # 检查下一行是否是struct定义
+            if idx < len(lines):
+                next_line = lines[idx].strip()
+                if next_line.startswith("struct ") or next_line.startswith(
+                    "pub struct "
+                ):
+                    # 提取struct名
+                    struct_match = re.search(r"struct\s+(\w+)", next_line)
+                    if struct_match:
+                        struct_name = struct_match.group(1)
+
+                        # 检查struct内是否有敏感字段
+                        has_sensitive_field = False
+                        sensitive_fields = []
+
+                        # 查找struct体范围
+                        for i in range(idx + 1, min(len(lines), idx + 20)):
+                            field_line = lines[i].strip()
+
+                            # struct结束
+                            if field_line == "}":
+                                break
+
+                            # 提取字段名
+                            field_match = re.search(r"(?:pub\s+)?(\w+)\s*:", field_line)
+                            if field_match:
+                                field_name = field_match.group(1).lower()
+                                if any(kw in field_name for kw in sensitive_keywords):
+                                    has_sensitive_field = True
+                                    sensitive_fields.append(field_match.group(1))
+
+                        if has_sensitive_field:
+                            issues.append(
+                                Issue(
+                                    language="rust",
+                                    category="debug_leak_secret",
+                                    pattern="derive_debug_sensitive",
+                                    file=relpath,
+                                    line=idx,
+                                    evidence=_strip_line(line),
+                                    description=f"struct {struct_name}包含敏感字段{sensitive_fields}，Debug trait可能泄露敏感信息",
+                                    suggestion="实现自定义Debug trait，对敏感字段进行脱敏处理",
+                                    confidence=0.7,
+                                    severity="medium",
+                                )
+                            )
+
+    return issues
+
+
+def _rule_async_safety(
+    lines: List[str],
+    relpath: str,
+    database: Optional["ProjectDatabase"] = None,
+) -> List[Issue]:
+    """
+    CWE-1031: Async安全问题检测
+    检测点：
+    - std::fs 在async函数中
+    - std::thread::sleep 在async函数中
+    - std::net::TcpStream::connect 在async函数中
+    - CPU密集循环在async函数中
+    """
+    issues: List[Issue] = []
+
+    for idx, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # 检测async函数
+        if "async fn " in stripped:
+            # 提取函数名
+            match = re.search(r"async\s+fn\s+(\w+)", stripped)
+            if match:
+                func_start = idx
+
+                # 查找函数体范围（简单方法：查找下一个async fn或文件结束）
+                func_end = len(lines)
+                for i in range(idx, len(lines)):
+                    if lines[i].strip().startswith("async fn ") and i > idx - 1:
+                        func_end = i
+                        break
+
+                # 检查函数体内的阻塞操作
+                for i in range(func_start, min(func_end + 1, len(lines) + 1)):
+                    check_line = lines[i - 1].strip()
+
+                    # 检测std::fs操作
+                    if "std::fs::" in check_line and "tokio::fs" not in check_line:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="async_safety",
+                                pattern="blocking_io",
+                                file=relpath,
+                                line=i,
+                                evidence=_strip_line(lines[i - 1]),
+                                description="async函数中使用std::fs阻塞I/O，会阻塞整个runtime",
+                                suggestion="使用tokio::fs进行异步文件操作",
+                                confidence=0.8,
+                                severity="high",
+                            )
+                        )
+
+                    # 检测std::thread::sleep
+                    if "std::thread::sleep" in check_line:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="async_safety",
+                                pattern="blocking_sleep",
+                                file=relpath,
+                                line=i,
+                                evidence=_strip_line(lines[i - 1]),
+                                description="async函数中使用std::thread::sleep，会阻塞整个runtime",
+                                suggestion="使用tokio::time::sleep进行异步睡眠",
+                                confidence=0.9,
+                                severity="high",
+                            )
+                        )
+
+                    # 检测std::net::TcpStream::connect
+                    if "std::net::TcpStream::connect" in check_line:
+                        issues.append(
+                            Issue(
+                                language="rust",
+                                category="async_safety",
+                                pattern="blocking_net",
+                                file=relpath,
+                                line=i,
+                                evidence=_strip_line(lines[i - 1]),
+                                description="async函数中使用std::net阻塞网络操作",
+                                suggestion="使用tokio::net进行异步网络操作",
+                                confidence=0.8,
+                                severity="high",
+                            )
+                        )
+
+                    # 检测CPU密集循环
+                    if "for _ in 0.." in check_line or "for _ in 0.." in check_line:
+                        # 检查循环次数是否很大
+                        loop_match = re.search(r"0\.\.([0-9]+)", check_line)
+                        if loop_match:
+                            loop_count = int(loop_match.group(1))
+                            if loop_count > 10000:
+                                issues.append(
+                                    Issue(
+                                        language="rust",
+                                        category="async_safety",
+                                        pattern="cpu_intensive_loop",
+                                        file=relpath,
+                                        line=i,
+                                        evidence=_strip_line(lines[i - 1]),
+                                        description="async函数中CPU密集循环，会阻塞runtime",
+                                        suggestion="使用spawn_blocking将CPU密集任务移到独立线程",
+                                        confidence=0.6,
+                                        severity="medium",
+                                    )
+                                )
+
+    return issues
 
 
 def analyze_rust_file(
