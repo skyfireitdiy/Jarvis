@@ -1141,6 +1141,186 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ C2Rust验证失败: {e}")
             return "", True
+        elif tag == "SecConfig":
+            # 处理SecConfig命令，管理安全扫描配置
+            from jarvis.jarvis_sec.cli import config as sec_config
+            from jarvis.jarvis_utils.input import user_confirm
+
+            PrettyOutput.auto_print("🔒 安全扫描配置管理")
+
+            # 询问操作类型
+            action = (
+                get_single_line_input("操作类型 [config/show/clear]: ").strip().lower()
+            )
+
+            if action == "show":
+                sec_config(show=True)
+                return "", True
+            elif action == "clear":
+                if user_confirm("确认清空配置？", default=False):
+                    sec_config(clear=True)
+                return "", True
+            elif action == "config" or action == "":
+                # 配置模式
+                # 询问扫描目标
+                target = get_single_line_input(
+                    "扫描目标（文件或目录路径，留空跳过）: "
+                ).strip()
+                target = target if target else None
+
+                # 询问语言过滤
+                languages = get_single_line_input(
+                    "语言过滤（逗号分隔如c,cpp,rust，留空跳过）: "
+                ).strip()
+                languages = languages if languages else None
+
+                # 询问排除目录
+                exclude_dirs = get_single_line_input(
+                    "排除目录（逗号分隔，留空跳过）: "
+                ).strip()
+                exclude_dirs = exclude_dirs if exclude_dirs else None
+
+                # 询问输出格式
+                output_format = get_single_line_input(
+                    "输出格式 [csv/markdown]: "
+                ).strip()
+                output_format = output_format if output_format else None
+
+                # 询问输出文件
+                output_file = get_single_line_input(
+                    "输出文件路径（留空跳过）: "
+                ).strip()
+                output_file = output_file if output_file else None
+
+                # 询问聚类限制
+                cluster_limit_input = get_single_line_input("聚类限制 [50]: ").strip()
+                cluster_limit = (
+                    int(cluster_limit_input) if cluster_limit_input else None
+                )
+
+                # 询问是否启用二次验证
+                enable_verification = user_confirm("启用二次验证？", default=True)
+
+                # 询问是否强制记忆
+                force_save_memory = user_confirm("强制使用记忆？", default=False)
+
+                # 询问模型组
+                llm_group = get_single_line_input(
+                    "模型组名称（留空使用默认）: "
+                ).strip()
+                llm_group = llm_group if llm_group else None
+
+                try:
+                    sec_config(
+                        target=target,
+                        languages=languages,
+                        exclude_dirs=exclude_dirs,
+                        output_format=output_format,
+                        output_file=output_file,
+                        cluster_limit=cluster_limit,
+                        enable_verification=enable_verification,
+                        force_save_memory=force_save_memory,
+                        llm_group=llm_group,
+                    )
+                except Exception as e:
+                    PrettyOutput.auto_print(f"❌ Sec配置失败: {e}")
+                return "", True
+            else:
+                PrettyOutput.auto_print(f"❌ 未知的操作类型: {action}")
+                return "", True
+        elif tag == "SecAnalyze":
+            # 处理SecAnalyze命令，从JSON分析安全问题
+            from jarvis.jarvis_sec.cli import analyze as sec_analyze
+            from jarvis.jarvis_utils.input import user_confirm
+
+            PrettyOutput.auto_print("📊 从JSON分析安全问题")
+
+            # 询问输入文件（必填）
+            input_file = get_single_line_input("JSON文件路径: ").strip()
+            if not input_file:
+                PrettyOutput.auto_print("❌ 必须提供JSON文件路径")
+                return "", True
+
+            # 询问输出格式
+            output_format = get_single_line_input("输出格式 [csv/markdown]: ").strip()
+            output_format = output_format if output_format else None
+
+            # 询问输出文件
+            output_file = get_single_line_input("输出文件路径（留空跳过）: ").strip()
+            output_file = output_file if output_file else None
+
+            # 询问聚类限制
+            cluster_limit_input = get_single_line_input("聚类限制 [50]: ").strip()
+            cluster_limit = int(cluster_limit_input) if cluster_limit_input else None
+
+            # 询问是否启用二次验证
+            enable_verification = user_confirm("启用二次验证？", default=True)
+
+            # 询问是否强制记忆
+            force_save_memory = user_confirm("强制使用记忆？", default=False)
+
+            try:
+                sec_analyze(
+                    input=input_file,
+                    output_format=output_format,
+                    output_file=output_file,
+                    cluster_limit=cluster_limit,
+                    enable_verification=enable_verification,
+                    force_save_memory=force_save_memory,
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ Sec分析失败: {e}")
+            return "", True
+        elif tag == "SecHeuristic":
+            # 处理SecHeuristic命令，启发式安全扫描
+            from jarvis.jarvis_sec.cli import heuristic as sec_heuristic
+
+            PrettyOutput.auto_print("🔍 启发式安全扫描")
+
+            # 询问扫描目标（必填）
+            target = get_single_line_input("扫描目标（文件或目录路径）: ").strip()
+            if not target:
+                PrettyOutput.auto_print("❌ 必须提供扫描目标")
+                return "", True
+
+            # 询问输出格式
+            output_format = get_single_line_input("输出格式 [json/markdown]: ").strip()
+            output_format = output_format if output_format else "json"
+
+            # 询问输出文件
+            output_file = get_single_line_input(
+                "输出文件路径（留空输出到终端）: "
+            ).strip()
+            output_file = output_file if output_file else None
+
+            # 询问规则过滤
+            rules = get_single_line_input(
+                "规则过滤（逗号分隔如unsafe_api,buffer_overflow，留空跳过）: "
+            ).strip()
+            rules = rules if rules else None
+
+            try:
+                sec_heuristic(
+                    target=target,
+                    output_format=output_format,
+                    output_file=output_file,
+                    rules=rules,
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ Sec启发式扫描失败: {e}")
+            return "", True
+        elif tag == "SecScan":
+            # 处理SecScan命令，执行安全扫描
+            from jarvis.jarvis_sec.cli import scan as sec_scan
+
+            PrettyOutput.auto_print("🔒 执行安全扫描")
+            PrettyOutput.auto_print("从配置文件读取配置，如需修改请使用 SecConfig 命令")
+
+            try:
+                sec_scan()
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ Sec扫描失败: {e}")
+            return "", True
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)

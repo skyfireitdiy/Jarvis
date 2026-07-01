@@ -207,6 +207,11 @@ BUILTIN_COMMANDS = [
     ("C2RustConfig", "C2Rust配置管理"),
     ("C2RustRun", "C2Rust运行迁移"),
     ("C2RustVerify", "C2Rust验证功能对齐"),
+    # Sec 命令
+    ("SecConfig", "安全扫描配置管理"),
+    ("SecAnalyze", "从JSON分析安全问题"),
+    ("SecHeuristic", "启发式安全扫描"),
+    ("SecScan", "执行安全扫描"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
