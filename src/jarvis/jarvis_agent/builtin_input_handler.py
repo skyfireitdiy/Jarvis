@@ -1009,6 +1009,138 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 os.environ["JARVIS_MAX_INPUT_TOKEN_COUNT"] = str(value)
                 PrettyOutput.auto_print(f"✅ 最大输入Token数已设置为 {value}")
             return "", True
+        elif tag == "C2RustConfig":
+            # 处理C2RustConfig命令，管理转译配置
+            from jarvis.jarvis_c2rust.cli import config as c2rust_config
+            from pathlib import Path
+            from jarvis.jarvis_utils.input import user_confirm, get_multiline_input
+
+            PrettyOutput.auto_print("📋 C2Rust配置管理")
+
+            # 询问操作类型
+            action = (
+                get_single_line_input("操作类型 [config/show/clear]: ").strip().lower()
+            )
+
+            if action == "show":
+                # 显示当前配置
+                c2rust_config(show=True)
+                return "", True
+            elif action == "clear":
+                # 清空配置
+                if user_confirm("确认清空配置？", default=False):
+                    c2rust_config(clear=True)
+                return "", True
+            elif action == "config" or action == "":
+                # 配置模式
+                # 询问头文件路径（可选）
+                files_input = get_single_line_input(
+                    "头文件路径（多个用逗号分隔，留空跳过）: "
+                ).strip()
+                files = None
+                if files_input:
+                    files = [Path(f.strip()) for f in files_input.split(",")]
+
+                # 询问根符号列表（可选）
+                root_syms = get_single_line_input(
+                    "根符号列表（逗号分隔，留空跳过）: "
+                ).strip()
+                root_list_syms = root_syms if root_syms else None
+
+                # 询问禁用库列表（可选）
+                disabled_libs_input = get_single_line_input(
+                    "禁用库列表（逗号分隔，留空跳过）: "
+                ).strip()
+                disabled_libs = disabled_libs_input if disabled_libs_input else None
+
+                # 询问附加说明（可选，多行）
+                additional_notes = get_multiline_input("附加说明（输入空行结束）")
+
+                # 询问是否启用FFI验证（可选，confirm）
+                enable_ffi = user_confirm("启用FFI导出验证？", default=True)
+
+                try:
+                    c2rust_config(
+                        files=files,
+                        root_list_syms=root_list_syms,
+                        disabled_libs=disabled_libs,
+                        additional_notes=additional_notes,
+                        enable_ffi_export_validation=enable_ffi,
+                    )
+                except Exception as e:
+                    PrettyOutput.auto_print(f"❌ C2Rust配置失败: {e}")
+                return "", True
+            else:
+                PrettyOutput.auto_print(f"❌ 未知的操作类型: {action}")
+                return "", True
+        elif tag == "C2RustRun":
+            # 处理C2RustRun命令，执行转译流水线
+            from jarvis.jarvis_c2rust.cli import run as c2rust_run
+            from jarvis.jarvis_utils.input import user_confirm
+
+            PrettyOutput.auto_print("🚀 C2Rust转译流水线")
+
+            # 询问模型组（可选）
+            llm_group = get_single_line_input("模型组名称（留空使用默认）: ").strip()
+            llm_group = llm_group if llm_group else None
+
+            # 询问最大重试次数（默认0）
+            max_retries_input = get_single_line_input(
+                "最大重试次数 [0=不限制]: "
+            ).strip()
+            max_retries = int(max_retries_input) if max_retries_input else 0
+
+            # 询问是否交互模式（默认false）
+            interactive = user_confirm("启用交互模式？", default=False)
+
+            # 询问是否重置状态（默认false）
+            reset = user_confirm("重置状态从头开始？", default=False)
+
+            # 询问是否快速模式（默认true）
+            quick_mode = user_confirm("启用快速模式？", default=True)
+
+            try:
+                c2rust_run(
+                    llm_group=llm_group,
+                    max_retries=max_retries,
+                    interactive=interactive,
+                    reset=reset,
+                    quick_mode=quick_mode,
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ C2Rust转译失败: {e}")
+            return "", True
+        elif tag == "C2RustVerify":
+            # 处理C2RustVerify命令，验证功能对齐
+            from jarvis.jarvis_c2rust.cli import verify as c2rust_verify
+            from jarvis.jarvis_utils.input import user_confirm
+
+            PrettyOutput.auto_print("🔍 C2Rust功能验证")
+
+            # 询问模型组（可选）
+            llm_group = get_single_line_input("模型组名称（留空使用默认）: ").strip()
+            llm_group = llm_group if llm_group else None
+
+            # 询问最大迭代次数（默认10）
+            max_iterations_input = get_single_line_input("最大迭代次数 [10]: ").strip()
+            max_iterations = int(max_iterations_input) if max_iterations_input else 10
+
+            # 询问是否交互模式（默认false）
+            interactive = user_confirm("启用交互模式？", default=False)
+
+            # 询问是否快速模式（默认true）
+            quick_mode = user_confirm("启用快速模式？", default=True)
+
+            try:
+                c2rust_verify(
+                    llm_group=llm_group,
+                    max_iterations=max_iterations,
+                    interactive=interactive,
+                    quick_mode=quick_mode,
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ C2Rust验证失败: {e}")
+            return "", True
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)
