@@ -1,0 +1,13 @@
+{
+  "id": "20260708_192940_962365",
+  "type": "project_long_term",
+  "tags": [
+    "security-audit",
+    "test-cases",
+    "c-checker",
+    "best-practice"
+  ],
+  "content": "## 安全审计测试用例编写规范\n\n### 核心原则\n测试用例必须包含规则期望匹配的**实际代码模式**，而非模拟/注释说明。\n\n### 常见错误模式\n1. **CWE-502反序列化**：只有注释说明\"模拟pickle\"，没有实际调用`pickle_loads()`等函数\n2. **CWE-400资源消耗**：使用`malloc(size)`不符合规则的`malloc(n * size)`乘法模式\n\n### 正确做法\n- 添加实际函数调用（如`pickle_loads()`, `yaml_load()`, `json_loads()`）\n- 使用规则期望匹配的代码模式（如`malloc(count * 1024)`乘法模式）\n\n### 验证方法\n运行测试用例后，检查扫描器是否检测到预期的问题类型和行号。",
+  "created_at": "2026-07-08T19:29:40.962391",
+  "updated_at": "2026-07-08T19:29:40.962395"
+}
