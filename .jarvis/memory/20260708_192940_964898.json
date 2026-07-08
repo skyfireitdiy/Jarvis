@@ -1,0 +1,13 @@
+{
+  "id": "20260708_192940_964898",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_sec",
+    "c-checker",
+    "rules",
+    "implementation"
+  ],
+  "content": "## jarvis_sec C检查器规则实现位置\n\n### 已验证的规则函数（c_checker.py）\n- `_rule_ssrf` (L6621): SSRF URL验证检测\n- `_rule_deserialization` (L6545): 反序列化漏洞检测（CWE-502）\n- `_rule_resource_consumption` (L6733): 资源消耗漏洞检测（CWE-400）\n\n### 测试数据集路径\n`tests/jarvis_sec/datasets/vulnerability_gaps/`\n\n### 规则匹配模式\n- 反序列化：匹配`pickle_loads`, `yaml_load`, `json_loads`等函数调用\n- 资源消耗：匹配`malloc(n * size)`乘法模式，检测无界内存分配",
+  "created_at": "2026-07-08T19:29:40.964921",
+  "updated_at": "2026-07-08T19:29:40.964925"
+}
