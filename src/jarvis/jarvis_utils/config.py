@@ -261,13 +261,32 @@ def get_replace_map() -> Dict[str, Any]:
     优先使用GLOBAL_CONFIG_DATA['replace_map']的配置，
     如果未配置则返回内置替换映射表。
 
+    注意：会对内置替换映射表中的模板内容进行Jinja2渲染，
+    将变量占位符替换为实际路径。
+
     返回:
         dict: 合并后的替换映射表字典(内置+配置中的映射表)
     """
-    if "replace_map" in GLOBAL_CONFIG_DATA:
-        return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA["replace_map"]}
+    from jarvis.jarvis_utils.template_utils import render_rule_template
 
-    return BUILTIN_REPLACE_MAP.copy()
+    # 渲染内置替换映射表中的模板
+    rendered_builtin_map = {}
+    for key, value in BUILTIN_REPLACE_MAP.items():
+        if isinstance(value, dict) and "template" in value:
+            # 渲染模板内容
+            template_str = value["template"]
+            if not isinstance(template_str, str):
+                rendered_builtin_map[key] = value
+                continue
+            rendered_template = render_rule_template(template_str, "")
+            rendered_builtin_map[key] = {**value, "template": rendered_template}
+        else:
+            rendered_builtin_map[key] = value
+
+    if "replace_map" in GLOBAL_CONFIG_DATA:
+        return {**rendered_builtin_map, **GLOBAL_CONFIG_DATA["replace_map"]}
+
+    return rendered_builtin_map
 
 
 def get_max_input_token_count() -> int:
