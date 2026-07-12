@@ -2884,9 +2884,11 @@ class Agent:
         参数:
             value: 是否启用非交互模式
         """
-        # 保存auto_complete的原始值（如果是首次设置）
+        # 保存auto_complete和need_summary的原始值（如果是首次设置）
         if not hasattr(self, "_auto_complete_backup"):
             self._auto_complete_backup = self.auto_complete
+        if not hasattr(self, "_need_summary_backup"):
+            self._need_summary_backup = self.need_summary
 
         # 设置非交互模式（仅作为 Agent 实例属性，不写入环境变量或全局配置）
         self.non_interactive = value
@@ -2894,14 +2896,18 @@ class Agent:
         # 同步更新 SessionManager 的非交互模式状态
         self.session.non_interactive = value
 
-        # 根据non_interactive的值调整auto_complete
+        # 根据non_interactive的值调整auto_complete和need_summary
         if value:  # 进入非交互模式
             self.auto_complete = True
+            # 进入非交互模式时，禁用总结（避免自动完成时触发总结）
+            self.need_summary = False
         else:  # 退出非交互模式
-            # 恢复auto_complete的原始值
+            # 恢复auto_complete和need_summary的原始值
             self.auto_complete = self._auto_complete_backup
+            self.need_summary = self._need_summary_backup
             # 清理备份，避免状态污染
             delattr(self, "_auto_complete_backup")
+            delattr(self, "_need_summary_backup")
 
     def _handle_run_interrupt(
         self, current_response: str
