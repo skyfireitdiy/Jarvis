@@ -173,3 +173,4 @@ src/jarvis/jarvis_vscode_extension/media/chatPanel.js
 .jarvis/symbol_table.db
 analysis.db
 
+offline_package
