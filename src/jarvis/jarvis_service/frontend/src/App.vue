@@ -6235,7 +6235,13 @@ function handleMessage(message, agentId = null) {
       })
       historyStorage.setHistoryForAgent(targetAgentId, mergedMessages)
       console.log('[ws] Merged', mergedMessages.length, 'messages (local + remote) for agent', targetAgentId)
-      // 从本地存储重新加载历史消息
+      // 清空当前消息列表，强制从本地存储重新加载完整历史
+      // 这样可以确保同步后的历史正确显示，避免与现有消息合并导致的问题
+      if (targetAgentId === currentAgentId.value) {
+        allOutputs.value.set(targetAgentId, [])
+        historyOffset.value = 0
+        hasMoreHistory.value = true
+      }
       loadHistoryMessages(false)
     }
   } else if (type === 'input_result') {
