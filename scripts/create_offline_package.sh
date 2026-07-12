@@ -47,7 +47,10 @@ esac
 log_info "检测到系统架构：$ARCH_NAME"
 
 # ===== 创建临时打包目录 =====
-TEMP_DIR=$(mktemp -d)
+# 使用磁盘目录而非/tmp（tmpfs容量有限）
+TEMP_BASE="$HOME/.cache/jarvis-offline-tmp"
+mkdir -p "$TEMP_BASE"
+TEMP_DIR=$(mktemp -d -p "$TEMP_BASE")
 PACKAGE_DIR="$TEMP_DIR/jarvis-offline"
 mkdir -p "$PACKAGE_DIR"
 
