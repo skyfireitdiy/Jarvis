@@ -168,6 +168,7 @@ class PromptManager:
     {complete_prompt if complete_prompt else "- 直接输出完成原因，不需要再有新的操作"}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
+    - 调用工具时避免一次性写入或执行大量内容，对于写文件应分段写入，避免被上下文限制截断
     - 如果信息不明确，请请求用户补充
     - 如果执行过程中连续失败5次，请请求用户操作
     - 操作列表：{action_handlers}{memory_prompts}{mode_hint}
