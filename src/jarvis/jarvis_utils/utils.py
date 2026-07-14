@@ -940,6 +940,27 @@ def init_env(
     except Exception:
         # 如果设置失败（理论上不可能），继续执行
         pass
+
+    # 0.1 修复代理环境变量：去除 socks:// 前缀
+    # 某些应用不支持 socks:// 协议前缀，需要去除
+    try:
+        proxy_vars = [
+            "http_proxy",
+            "https_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "all_proxy",
+        ]
+        for var in proxy_vars:
+            value = os.environ.get(var)
+            if value and value.startswith("socks://"):
+                # 去除 socks:// 前缀，保留地址部分
+                os.environ[var] = value[8:]
+    except Exception:
+        # 静默失败，不影响正常使用
+        pass
+
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
         if os.environ.get("terminal") == "1":
