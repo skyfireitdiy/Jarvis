@@ -1652,6 +1652,7 @@ def cli(
                     # 检测与当前commit一致的历史会话（仅在交互模式且未指定restore_session时）
                     if (
                         not non_interactive
+                        and not restore
                         and not restore_session
                         and not is_auto_resume_session()
                     ):
