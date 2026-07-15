@@ -311,6 +311,14 @@ class ProjectDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_type_info_file ON type_info(file_path)"
             )
 
+            # 数据库迁移：检查并添加缺失的列
+            # 迁移1：data_flow表添加use_type列
+            cursor.execute(
+                "SELECT name FROM pragma_table_info('data_flow') WHERE name='use_type'"
+            )
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE data_flow ADD COLUMN use_type TEXT")
+
             conn.commit()
             PrettyOutput.auto_print(
                 f"[ProjectDatabase] 数据库初始化完成: {self.db_path}"
