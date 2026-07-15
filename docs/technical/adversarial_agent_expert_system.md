@@ -377,16 +377,16 @@ jsec本质上是一个**专家系统**：每条检测规则以Python函数的形
 | 并发安全     | 12       | deadlock_patterns, data_race_suspect, thread_leak_no_join, cond_wait_no_loop |
 | 输入/注入    | 10       | format_string, command_execution, sql_injection, signal_handler_unsafe       |
 | API/编码实践 | 17       | weak_crypto, rand_insecure, atoi_family, reinterpret_cast_unsafe             |
-| **合计**     | **59**   |                                                                              |
+| **合计**     | **62**   |                                                                              |
 
-此外，Rust检查器包含18条规则，覆盖Rust特有的安全模式。
+此外，Rust检查器包含34条规则，覆盖Rust特有的安全模式。
 
 ### 6.3 测试数据集
 
 jsec的测试数据集采用**positive/negative**配对设计：
 
-- **Positive样本**（87个）：包含应被检测到的漏洞代码，用于验证规则的**漏报率**
-- **Negative样本**（66个）：包含安全代码，用于验证规则的**误报率**
+- **Positive样本**（107个）：包含应被检测到的漏洞代码，用于验证规则的**漏报率**
+- **Negative样本**（76个）：包含安全代码，用于验证规则的**误报率**
 
 这种配对设计天然契合对抗式Agent的思路：positive样本对应漏洞查找Agent发现的漏报，negative样本对应漏洞查找Agent发现的误报。
 
@@ -538,10 +538,10 @@ def _rule_malloc_no_null_check(self, db, db_file_path, ...):
 进化完成后的验证结果：
 
 - **pytest测试**：33个测试全部通过
-- **Positive检测**：87个漏洞样本全部正确检测
-- **Negative误报**：66个安全样本0误报
-- **代码规模**：c_checker.py从初始版本增长至7099行
-- **规则总数**：59个检测规则（C/C++）+ 18个检测规则（Rust）
+- **Positive检测**：107个漏洞样本全部正确检测
+- **Negative误报**：76个安全样本0误报
+- **代码规模**：c_checker.py从初始版本增长至7580行
+- **规则总数**：62个检测规则（C/C++）+ 34个检测规则（Rust）
 
 ---
 
