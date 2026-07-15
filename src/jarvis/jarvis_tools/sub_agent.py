@@ -118,6 +118,7 @@ class SubAgentTool:
             parent_use_methodology = None
             parent_use_analysis = None
             parent_non_interactive = None  # 继承父Agent的非交互模式设置
+            parent_auto_complete = None  # 继承父Agent的自动完成设置
             try:
                 if parent_agent is not None:
                     parent_execute_tool_confirm = getattr(
@@ -133,9 +134,15 @@ class SubAgentTool:
                     parent_non_interactive = getattr(
                         parent_agent, "non_interactive", None
                     )
+                    parent_auto_complete = getattr(parent_agent, "auto_complete", None)
             except Exception:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
+
+            # 如果父Agent设置了auto_complete或non_interactive，子Agent强制非交互模式
+            force_non_interactive = (
+                parent_non_interactive is True or parent_auto_complete is True
+            )
 
             agent = Agent(
                 name=agent_name,
@@ -149,8 +156,8 @@ class SubAgentTool:
                 use_analysis=parent_use_analysis,
                 force_save_memory=None,
                 files=None,
-                non_interactive=parent_non_interactive
-                if parent_non_interactive is not None
+                non_interactive=force_non_interactive
+                if force_non_interactive
                 else True,
             )
 
