@@ -489,10 +489,16 @@ def _llm_add_batch(config: Dict[str, Any], base_config_name: str) -> None:
     )
 
     # 7. 为每个选中的模型创建配置
+    # 提取hostname用于生成唯一的配置名
+    from jarvis.jarvis_utils.quick_config import _extract_hostname
+
+    hostname_part = _extract_hostname(base_url)
     added_count = 0
     for model in selected_models:
-        # 生成配置名称：{platform}_{model_normalized}
-        model_config_name = f"{platform}_{model.replace('.', '_').replace('-', '_')}"
+        # 生成配置名称：{platform}_{hostname}_{model_normalized}
+        model_config_name = (
+            f"{platform}_{hostname_part}_{model.replace('.', '_').replace('-', '_')}"
+        )
 
         # 检查是否已存在
         if model_config_name in config["llms"]:
