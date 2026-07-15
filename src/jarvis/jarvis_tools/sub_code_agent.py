@@ -166,14 +166,23 @@ class SubCodeAgentTool:
                 rule_names = None
 
             # 继承父 Agent 的非交互模式设置
+            # 当父Agent设置了auto_complete=True或non_interactive=True时，子Agent强制非交互模式
             parent_non_interactive = None
+            parent_auto_complete = None
             try:
                 if parent_agent is not None:
                     parent_non_interactive = getattr(
                         parent_agent, "non_interactive", None
                     )
+                    parent_auto_complete = getattr(parent_agent, "auto_complete", None)
             except Exception:
                 parent_non_interactive = None
+                parent_auto_complete = None
+
+            # 如果父Agent设置了auto_complete或non_interactive，子Agent强制非交互模式
+            force_non_interactive = (
+                parent_non_interactive is True or parent_auto_complete is True
+            )
 
             # 自动禁用review功能
             disable_review = True
@@ -185,8 +194,8 @@ class SubCodeAgentTool:
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,
-                    non_interactive=parent_non_interactive
-                    if parent_non_interactive is not None
+                    non_interactive=force_non_interactive
+                    if force_non_interactive
                     else True,
                     rule_names=rule_names,
                     disable_review=disable_review,
