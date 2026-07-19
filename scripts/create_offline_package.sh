@@ -9,7 +9,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$(dirname "$SCRIPT_DIR")" && pwd)"
 OUTPUT_DIR="${1:-$PROJECT_ROOT/offline_package}"
-PACKAGE_NAME="jarvis-offline-$(date +%Y%m%d-%H%M%S).7z"
+PACKAGE_NAME="jarvis-offline-$(date +%Y%m%d-%H%M%S).tar.gz"
 
 # ===== 颜色输出 =====
 RED='\033[0;31m'
@@ -472,7 +472,7 @@ mkdir -p "$OUTPUT_DIR"
 PACKAGE_FILE="$OUTPUT_DIR/$PACKAGE_NAME"
 
 cd "$TEMP_DIR"
-7z a -t7z -mx=9 "$PACKAGE_FILE" jarvis-offline
+tar -czf "$PACKAGE_FILE" jarvis-offline
 
 PACKAGE_SIZE=$(du -sh "$PACKAGE_FILE" | cut -f1)
 
@@ -496,7 +496,7 @@ log_info "架构：$ARCH_NAME"
 log_info ""
 log_info "使用方法："
 log_info "  1. 将离线包传输到目标机器"
-log_info "  2. 解压：7z x $PACKAGE_NAME"
+log_info "  2. 解压：tar -xzf $PACKAGE_NAME"
 log_info "  3. 安装：./install.sh"
 log_info ""
 log_info "========================================"
