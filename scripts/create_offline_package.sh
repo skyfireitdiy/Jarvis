@@ -18,30 +18,30 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+	echo -e "${GREEN}[INFO]${NC} $1"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+	echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+	echo -e "${RED}[ERROR]${NC} $1"
 }
 
 # ===== 检测系统架构 =====
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)
-        ARCH_NAME="x86_64"
-        ;;
-    aarch64|arm64)
-        ARCH_NAME="aarch64"
-        ;;
-    *)
-        log_error "不支持的系统架构：$ARCH"
-        exit 1
-        ;;
+x86_64)
+	ARCH_NAME="x86_64"
+	;;
+aarch64 | arm64)
+	ARCH_NAME="aarch64"
+	;;
+*)
+	log_error "不支持的系统架构：$ARCH"
+	exit 1
+	;;
 esac
 
 log_info "检测到系统架构：$ARCH_NAME"
@@ -79,35 +79,66 @@ rsync -a $EXCLUDE_PATTERNS "$PROJECT_ROOT/" "$PACKAGE_DIR/source/"
 
 log_info "源码打包完成"
 
-# ===== 2. 打包虚拟环境 =====
-log_info "步骤2: 打包虚拟环境..."
+# ===== 2. 创建并打包干净的虚拟环境 =====
+log_info "步骤2: 创建干净的虚拟环境..."
 
-if [ -d "$PROJECT_ROOT/.venv" ]; then
-    # 复制虚拟环境，但排除缓存和编译文件
-    rsync -a --exclude=__pycache__ --exclude='*.pyc' --exclude='*.pyo' --exclude=.pytest_cache --exclude='*.egg-info' "$PROJECT_ROOT/.venv/" "$PACKAGE_DIR/venv/"
+# 创建临时虚拟环境目录
+BUILD_VENV="$TEMP_DIR/build_venv"
 
-    # 记录原始虚拟环境路径，用于安装时修复路径引用
-    echo "$PROJECT_ROOT/.venv" > "$PACKAGE_DIR/venv_origin_path.txt"
-
-    log_info "虚拟环境打包完成 ($(du -sh "$PACKAGE_DIR/venv" | cut -f1))"
+# 使用uv创建新的虚拟环境（更快速且干净）
+if command -v uv &>/dev/null; then
+	UV_BIN="uv"
 else
-    log_error "未找到虚拟环境，离线安装包必须包含虚拟环境"
-    exit 1
+	UV_BIN="$PROJECT_ROOT/src/jarvis/jarvis_data/deps/${ARCH_NAME}_linux/bin/uv"
+	if [ ! -f "$UV_BIN" ]; then
+		log_error "未找到uv工具"
+		exit 1
+	fi
 fi
+
+log_info "使用uv创建虚拟环境: $UV_BIN"
+$UV_BIN venv "$BUILD_VENV" --python 3.12
+
+# 激活虚拟环境并安装依赖
+source "$BUILD_VENV/bin/activate"
+
+# 安装项目依赖（只安装必需依赖，不包含开发依赖）
+log_info "安装项目依赖..."
+cd "$PROJECT_ROOT"
+$UV_BIN pip install -e . --no-cache-dir
+
+# 清理缓存和编译文件
+find "$BUILD_VENV" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find "$BUILD_VENV" -type f -name '*.pyc' -delete 2>/dev/null || true
+find "$BUILD_VENV" -type f -name '*.pyo' -delete 2>/dev/null || true
+find "$BUILD_VENV" -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true
+find "$BUILD_VENV" -type d -name '*.egg-info' -exec rm -rf {} + 2>/dev/null || true
+
+# 复制虚拟环境到打包目录
+rsync -a --exclude=__pycache__ --exclude='*.pyc' --exclude='*.pyo' --exclude=.pytest_cache --exclude='*.egg-info' "$BUILD_VENV/" "$PACKAGE_DIR/venv/"
+
+# 记录虚拟环境路径（用于安装时修复路径引用）
+echo "$BUILD_VENV" >"$PACKAGE_DIR/venv_origin_path.txt"
+
+log_info "虚拟环境打包完成 ($(du -sh "$PACKAGE_DIR/venv" | cut -f1))"
+
+# 退出虚拟环境
+deactivate
+cd "$SCRIPT_DIR"
 
 # ===== 3. 打包Python独立环境 =====
 log_info "步骤3: 打包Python独立环境..."
 
 # 使用uv下载Python 3.12独立环境
-if command -v uv &> /dev/null; then
-    UV_BIN="uv"
+if command -v uv &>/dev/null; then
+	UV_BIN="uv"
 else
-    # 使用内置的uv
-    UV_BIN="$PROJECT_ROOT/src/jarvis/jarvis_data/deps/${ARCH_NAME}_linux/bin/uv"
-    if [ ! -f "$UV_BIN" ]; then
-        log_error "未找到uv工具"
-        exit 1
-    fi
+	# 使用内置的uv
+	UV_BIN="$PROJECT_ROOT/src/jarvis/jarvis_data/deps/${ARCH_NAME}_linux/bin/uv"
+	if [ ! -f "$UV_BIN" ]; then
+		log_error "未找到uv工具"
+		exit 1
+	fi
 fi
 
 log_info "使用uv: $UV_BIN"
@@ -119,9 +150,9 @@ mkdir -p "$PYTHON_DIR"
 $UV_BIN python install 3.12 --install-dir "$PYTHON_DIR" --no-cache
 
 if [ -d "$PYTHON_DIR" ]; then
-    log_info "Python环境打包完成 ($(du -sh "$PYTHON_DIR" | cut -f1))"
+	log_info "Python环境打包完成 ($(du -sh "$PYTHON_DIR" | cut -f1))"
 else
-    log_warn "Python环境下载失败，将在安装时从镜像下载"
+	log_warn "Python环境下载失败，将在安装时从镜像下载"
 fi
 
 # ===== 4. 打包内置依赖 =====
@@ -129,16 +160,16 @@ log_info "步骤4: 打包内置依赖..."
 
 DEPS_SRC="$PROJECT_ROOT/src/jarvis/jarvis_data/deps"
 if [ -d "$DEPS_SRC" ]; then
-    # 只复制当前架构的依赖目录，减小离线包体积
-    mkdir -p "$PACKAGE_DIR/deps"
-    if [ -d "$DEPS_SRC/${ARCH_NAME}_linux" ]; then
-        rsync -a "$DEPS_SRC/${ARCH_NAME}_linux/" "$PACKAGE_DIR/deps/${ARCH_NAME}_linux/"
-        log_info "内置依赖打包完成 ($(du -sh "$PACKAGE_DIR/deps" | cut -f1))"
-    else
-        log_warn "未找到当前架构的内置依赖目录: ${ARCH_NAME}_linux"
-    fi
+	# 只复制当前架构的依赖目录，减小离线包体积
+	mkdir -p "$PACKAGE_DIR/deps"
+	if [ -d "$DEPS_SRC/${ARCH_NAME}_linux" ]; then
+		rsync -a "$DEPS_SRC/${ARCH_NAME}_linux/" "$PACKAGE_DIR/deps/${ARCH_NAME}_linux/"
+		log_info "内置依赖打包完成 ($(du -sh "$PACKAGE_DIR/deps" | cut -f1))"
+	else
+		log_warn "未找到当前架构的内置依赖目录: ${ARCH_NAME}_linux"
+	fi
 else
-    log_warn "未找到内置依赖目录"
+	log_warn "未找到内置依赖目录"
 fi
 
 # ===== 5. 打包前端构建产物 =====
@@ -146,18 +177,18 @@ log_info "步骤5: 打包前端构建产物..."
 
 FRONTEND_DIST="$PROJECT_ROOT/src/jarvis/jarvis_service/frontend/dist"
 if [ -d "$FRONTEND_DIST" ]; then
-    mkdir -p "$PACKAGE_DIR/frontend"
-    rsync -a "$FRONTEND_DIST/" "$PACKAGE_DIR/frontend/dist/"
-    log_info "前端构建产物打包完成 ($(du -sh "$PACKAGE_DIR/frontend/dist" | cut -f1))"
+	mkdir -p "$PACKAGE_DIR/frontend"
+	rsync -a "$FRONTEND_DIST/" "$PACKAGE_DIR/frontend/dist/"
+	log_info "前端构建产物打包完成 ($(du -sh "$PACKAGE_DIR/frontend/dist" | cut -f1))"
 else
-    log_warn "未找到前端构建产物，跳过打包"
+	log_warn "未找到前端构建产物，跳过打包"
 fi
 
 # ===== 6. 创建安装脚本 =====
 log_info "步骤6: 创建安装脚本..."
 
 INSTALL_SCRIPT="$PACKAGE_DIR/install.sh"
-cat > "$INSTALL_SCRIPT" << 'INSTALL_EOF'
+cat >"$INSTALL_SCRIPT" <<'INSTALL_EOF'
 #!/bin/bash
 
 set -e
@@ -382,7 +413,7 @@ log_info "安装脚本创建完成"
 log_info "步骤7: 创建README文档..."
 
 README_FILE="$PACKAGE_DIR/README.md"
-cat > "$README_FILE" << 'README_EOF'
+cat >"$README_FILE" <<'README_EOF'
 # Jarvis 离线安装包
 
 ## 包含内容
