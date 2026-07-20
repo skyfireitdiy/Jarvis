@@ -350,7 +350,7 @@ defineExpose({
 }
 
 .editor-panel-content-main {
-  overflow: hidden;
+  overflow: auto;
 }
 
 .editor-placeholder {
