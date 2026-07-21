@@ -54,7 +54,7 @@ class FileIgnorePatterns:
     PYTHON_VENV_DIRS: Set[str] = {"venv", "env", ".venv", "virtualenv", "ENV"}
 
     # Rust 相关
-    RUST_DIRS: Set[str] = {"target", "Cargo.lock"}
+    RUST_DIRS: Set[str] = {"target"}
 
     # Go 相关
     GO_DIRS: Set[str] = {"vendor", "bin", "coverage.out"}
