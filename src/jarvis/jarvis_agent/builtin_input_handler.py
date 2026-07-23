@@ -70,6 +70,26 @@ def _get_global_config() -> Any:
     return get_global_config_data()
 
 
+def extract_tags_from_text(text: str | list | None) -> List[str]:
+    """从文本中提取所有 '<tag>' 格式的标签
+
+    参数:
+        text: 输入文本，可以是纯文本、多模态内容列表或 None
+
+    返回:
+        List[str]: 提取到的标签列表（不含尖括号和单引号）
+    """
+    if not text:
+        return []
+
+    # 处理多模态内容（列表格式）
+    if isinstance(text, list):
+        text = " ".join(b.get("text", "") for b in text if b.get("type") == "text")
+
+    # 提取 '<tag>' 格式的标签
+    return re.findall(r"'<([^>]+)>'", text)
+
+
 def _get_rule_content(rule_name: str) -> str | None:
     """获取规则内容
 

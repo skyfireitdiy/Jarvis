@@ -3072,6 +3072,7 @@ class Agent:
             bool: 如果用户已指定规则（非默认规则），返回 True
         """
         from jarvis.jarvis_utils.config import get_default_rule_names
+        from jarvis.jarvis_agent.builtin_input_handler import extract_tags_from_text
 
         # 默认规则（来自配置 default_rule_names，不视为用户指定）
         default_rules = set(get_default_rule_names())
@@ -3079,6 +3080,12 @@ class Agent:
         # 检查 loaded_rule_names 中是否有非默认规则
         for rule_name in self.loaded_rule_names:
             if rule_name not in default_rules:
+                return True
+
+        # 检查用户输入中是否包含 '<rule:xxx>' 标签
+        if self.session.prompt:
+            tags = extract_tags_from_text(self.session.prompt)
+            if any(tag.startswith("rule:") for tag in tags):
                 return True
 
         return False
