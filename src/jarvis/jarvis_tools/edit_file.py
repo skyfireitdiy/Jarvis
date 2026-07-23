@@ -572,12 +572,33 @@ class EditFileNormalTool:
         diffs: List[Dict[str, Any]],
         file_path: Optional[str] = None,
     ) -> Tuple[bool, str, List[Dict[str, Any]]]:
-        """对文件内容按顺序应用普通 search/replace 编辑。"""
+        """对文件内容应用编辑，处理顺序：
+        1. 行号模式：从后往前排序（避免行号偏移）
+        2. search/replace 模式：按原始顺序
+        """
         content = original_content
         diff_results: List[Dict[str, Any]] = []
         all_success = True
 
-        for idx, diff in enumerate(diffs, start=1):
+        # === 分离并排序 diffs ===
+        # 1. 分离行号模式和 search/replace 模式
+        line_diffs = []
+        search_diffs = []
+        for diff in diffs:
+            if diff.get("start_line") is not None and diff.get("end_line") is not None:
+                line_diffs.append(diff)
+            else:
+                search_diffs.append(diff)
+
+        # 2. 行号模式：从后往前排序（start_line 降序）
+        line_diffs_sorted = sorted(
+            line_diffs, key=lambda x: x["start_line"], reverse=True
+        )
+
+        # 3. 合并：先处理行号模式，再处理 search/replace 模式
+        sorted_diffs = line_diffs_sorted + search_diffs
+
+        for idx, diff in enumerate(sorted_diffs, start=1):
             # 检查是否使用行号模式
             start_line = diff.get("start_line")
             end_line = diff.get("end_line")
