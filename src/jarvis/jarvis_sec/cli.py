@@ -622,23 +622,29 @@ def heuristic(
 
         console = Console()
 
-        # 阶段1：建立符号数据库
+        # 阶段1：建立符号数据库（第一轮：收集符号定义）
         from jarvis.jarvis_sec.project_database import ProjectDatabase
         from jarvis.jarvis_sec.data_collector import DataCollector
 
         database = ProjectDatabase(str(target_path), in_memory=True)
         collector = DataCollector(database)
 
+        # 累计统计
+        total_symbols = 0
+
         with Progress(
-            TextColumn("[bold cyan]建立符号表"),
+            TextColumn("[bold cyan]收集符号定义"),
             BarColumn(bar_width=40),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TextColumn("{task.fields[filename]}"),
+            TextColumn("[dim]符号:{task.fields[symbols]}"),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("symbols", total=len(all_files), filename="")
+            task = progress.add_task(
+                "symbols", total=len(all_files), filename="", symbols=0
+            )
             for file_path in all_files:
                 relpath = file_path.relative_to(target_path)
                 progress.update(task, filename=str(relpath))
@@ -650,12 +656,58 @@ def heuristic(
                     else "c"
                 )
                 try:
-                    collector.analyze_file(str(file_path), lang)
+                    result = collector.analyze_file(str(file_path), lang)
+                    # 只统计符号
+                    total_symbols += len(result.get("symbols", []))
+                    progress.update(task, symbols=total_symbols)
                 except Exception:
                     pass  # 忽略单个文件的分析错误
                 progress.advance(task)
 
-        PrettyOutput.auto_print("✅ [heuristic] 符号表建立完成")
+        PrettyOutput.auto_print(
+            f"✅ [heuristic] 符号定义收集完成: {total_symbols} 个符号"
+        )
+
+        # 阶段2：分析调用关系和数据流（第二轮：此时符号表已完整）
+        total_calls = 0
+        total_nodes = 0
+
+        with Progress(
+            TextColumn("[bold cyan]分析调用关系"),
+            BarColumn(bar_width=40),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.fields[filename]}"),
+            TextColumn("[dim]调用:{task.fields[calls]} 节点:{task.fields[nodes]}"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task(
+                "calls", total=len(all_files), filename="", calls=0, nodes=0
+            )
+            for file_path in all_files:
+                relpath = file_path.relative_to(target_path)
+                progress.update(task, filename=str(relpath))
+                lang = (
+                    "cpp"
+                    if str(file_path).endswith(
+                        (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
+                    )
+                    else "c"
+                )
+                try:
+                    result = collector.analyze_file(str(file_path), lang)
+                    # 统计调用关系和数据流节点
+                    total_calls += len(result.get("call_relations", []))
+                    total_nodes += len(result.get("data_flow_nodes", []))
+                    progress.update(task, calls=total_calls, nodes=total_nodes)
+                except Exception:
+                    pass  # 忽略单个文件的分析错误
+                progress.advance(task)
+
+        PrettyOutput.auto_print(
+            f"✅ [heuristic] 调用关系分析完成: {total_calls} 个调用, {total_nodes} 个数据节点"
+        )
 
         # 阶段2：问题检测（只扫描源文件，排除头文件）
         source_files = [
