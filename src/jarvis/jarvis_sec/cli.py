@@ -600,30 +600,47 @@ def heuristic(
 
         PrettyOutput.auto_print(f"📊 [heuristic] 发现 {len(c_files)} 个C/C++文件")
 
-        # 批量分析
-        for i, file_path in enumerate(c_files, 1):
-            relpath = file_path.relative_to(target_path)
-            issues = analyze_c_cpp_file(target_path, relpath)
-            for issue in issues:
-                all_issues.append(
-                    {
-                        "language": issue.language,
-                        "category": issue.category,
-                        "pattern": issue.pattern,
-                        "file": str(file_path),
-                        "line": issue.line,
-                        "evidence": issue.evidence,
-                        "description": issue.description,
-                        "suggestion": issue.suggestion,
-                        "confidence": issue.confidence,
-                        "severity": issue.severity,
-                    }
-                )
-            # 进度提示（每10个文件）
-            if i % 10 == 0:
-                PrettyOutput.auto_print(
-                    f"⏳ [heuristic] 已扫描 {i}/{len(c_files)} 个文件"
-                )
+        # 使用 rich 进度条显示扫描进度
+        from rich.progress import (
+            Progress,
+            BarColumn,
+            TextColumn,
+            TimeElapsedColumn,
+            TimeRemainingColumn,
+        )
+        from rich.console import Console
+
+        console = Console()
+        with Progress(
+            TextColumn("[bold blue]扫描中"),
+            BarColumn(bar_width=40),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.fields[filename]}"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("scan", total=len(c_files), filename="")
+            for file_path in c_files:
+                relpath = file_path.relative_to(target_path)
+                progress.update(task, filename=str(relpath))
+                issues = analyze_c_cpp_file(target_path, relpath)
+                for issue in issues:
+                    all_issues.append(
+                        {
+                            "language": issue.language,
+                            "category": issue.category,
+                            "pattern": issue.pattern,
+                            "file": str(file_path),
+                            "line": issue.line,
+                            "evidence": issue.evidence,
+                            "description": issue.description,
+                            "suggestion": issue.suggestion,
+                            "confidence": issue.confidence,
+                            "severity": issue.severity,
+                        }
+                    )
+                progress.advance(task)
 
         PrettyOutput.auto_print(
             f"✅ [heuristic] 扫描完成，共扫描 {len(c_files)} 个文件"
