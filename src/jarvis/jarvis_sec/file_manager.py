@@ -36,6 +36,11 @@ def get_analysis_file(sec_dir: Path) -> Path:
     return sec_dir / "analysis.jsonl"
 
 
+def get_false_positives_file(sec_dir: Path) -> Path:
+    """获取误报详情文件路径"""
+    return sec_dir / "false_positives.jsonl"
+
+
 # ==================== 只扫结果文件 (candidates.jsonl) ====================
 
 
@@ -267,6 +272,40 @@ def save_analysis_result(sec_dir: Path, analysis: Dict[str, Any]) -> None:
     # 追加模式
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(analysis, ensure_ascii=False) + "\n")
+
+
+def save_false_positives(sec_dir: Path, false_positives: List[Dict[str, Any]]) -> None:
+    """
+    保存误报详情到 false_positives.jsonl（追加模式）
+
+    用于记录Agent判断为误报的详细信息，便于后续分析优化检测规则。
+
+    格式：每行一个误报记录
+    {
+        "gid": 3,
+        "has_risk": false,
+        "file": "src/main.c",
+        "line": 100,
+        "evidence": "...",
+        "description": "...",
+        "verification_notes": "...",  # Agent的判断理由
+        "analyzed_at": "2024-01-01T00:00:00"  # 分析时间
+    }
+    """
+    if not false_positives:
+        return
+
+    from datetime import datetime
+
+    path = get_false_positives_file(sec_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 追加模式，每条误报单独一行
+    with path.open("a", encoding="utf-8") as f:
+        for fp in false_positives:
+            # 添加分析时间
+            record = {**fp, "analyzed_at": datetime.now().isoformat()}
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def load_analysis_results(sec_dir: Path) -> List[Dict[str, Any]]:
