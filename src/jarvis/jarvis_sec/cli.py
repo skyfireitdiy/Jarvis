@@ -629,6 +629,9 @@ def heuristic(
         database = ProjectDatabase(str(target_path), in_memory=True)
         collector = DataCollector(database)
 
+        # 开启批量提交模式以提高性能
+        database.begin_batch()
+
         # 累计统计
         total_symbols = 0
 
@@ -708,6 +711,9 @@ def heuristic(
         PrettyOutput.auto_print(
             f"✅ [heuristic] 调用关系分析完成: {total_calls} 个调用, {total_nodes} 个数据节点"
         )
+
+        # 提交批量操作
+        database.commit_batch()
 
         # 阶段3：问题检测（扫描排除目录后的所有文件，包括头文件）
         with Progress(

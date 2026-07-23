@@ -155,6 +155,7 @@ class ProjectDatabase:
 
         # 初始化数据库连接
         self._conn: Optional[sqlite3.Connection] = None
+        self._batch_mode = False  # 批量提交模式
         self._init_database()
 
     def _init_database(self):
@@ -418,6 +419,20 @@ class ProjectDatabase:
         return file_record["hash"] != new_hash
 
     # ============================================================================
+    # 批量提交模式
+    # ============================================================================
+
+    def begin_batch(self):
+        """开始批量提交模式，延迟commit以提高性能"""
+        self._batch_mode = True
+
+    def commit_batch(self):
+        """提交批量操作并退出批量模式"""
+        if self._conn:
+            self._conn.commit()
+        self._batch_mode = False
+
+    # ============================================================================
     # 符号管理
     # ============================================================================
 
@@ -469,7 +484,8 @@ class ProjectDatabase:
                     for s in symbols
                 ],
             )
-            conn.commit()
+            if not self._batch_mode:
+                conn.commit()
             return len(symbols)
 
     def get_symbol(
@@ -571,7 +587,8 @@ class ProjectDatabase:
                     for c in calls
                 ],
             )
-            conn.commit()
+            if not self._batch_mode:
+                conn.commit()
             return len(calls)
 
     def get_callers(self, callee_name: str) -> List[Dict[str, Any]]:
@@ -671,7 +688,8 @@ class ProjectDatabase:
                     for n in nodes
                 ],
             )
-            conn.commit()
+            if not self._batch_mode:
+                conn.commit()
             return len(nodes)
 
     def get_def_sites(
@@ -788,7 +806,8 @@ class ProjectDatabase:
                     for s in states
                 ],
             )
-            conn.commit()
+            if not self._batch_mode:
+                conn.commit()
             return len(states)
 
     def get_pointer_states(
@@ -884,7 +903,8 @@ class ProjectDatabase:
             """,
                 data,
             )
-            conn.commit()
+            if not self._batch_mode:
+                conn.commit()
             return len(type_infos)
 
     def get_type_info(self, type_name: str) -> Optional[Dict[str, Any]]:
