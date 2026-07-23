@@ -572,13 +572,14 @@ def heuristic(
         # 支持的文件扩展名
         extensions = {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "c++", "h++"}
 
-        # 收集所有C/C++文件
-        c_files = []
+        # 收集所有C/C++文件（用于建立符号表，不排除任何目录）
+        all_files = []
         for ext in extensions:
-            c_files.extend(target_path.rglob(f"*.{ext}"))
+            all_files.extend(target_path.rglob(f"*.{ext}"))
 
-        # 排除常见目录（但不排除tests目录，因为可能包含测试数据集）
-        exclude_dirs = {
+        # 排除目录配置（用于问题检测阶段）
+        # 默认排除目录
+        default_exclude_dirs = {
             ".git",
             "build",
             "out",
@@ -587,6 +588,7 @@ def heuristic(
             "bin",
             "obj",
             "third_party",
+            "3rdparty",
             "vendor",
             "deps",
             "node_modules",
@@ -594,11 +596,19 @@ def heuristic(
             "spec",
             "testdata",
         }
+        # 从配置文件读取排除目录并合并
+        config = _load_config()
+        config_exclude_dirs = set(config.get("exclude_dirs", []))
+        exclude_dirs = default_exclude_dirs | config_exclude_dirs
+
+        # 问题检测阶段扫描的文件（排除指定目录）
         c_files = [
-            f for f in c_files if not any(excl in f.parts for excl in exclude_dirs)
+            f for f in all_files if not any(excl in f.parts for excl in exclude_dirs)
         ]
 
-        PrettyOutput.auto_print(f"📊 [heuristic] 发现 {len(c_files)} 个C/C++文件")
+        PrettyOutput.auto_print(
+            f"📊 [heuristic] 发现 {len(all_files)} 个C/C++文件（扫描 {len(c_files)} 个）"
+        )
 
         # 使用 rich 进度条显示扫描进度
         from rich.progress import (
@@ -611,8 +621,51 @@ def heuristic(
         from rich.console import Console
 
         console = Console()
+
+        # 阶段1：建立符号数据库
+        from jarvis.jarvis_sec.project_database import ProjectDatabase
+        from jarvis.jarvis_sec.data_collector import DataCollector
+
+        database = ProjectDatabase(str(target_path), in_memory=True)
+        collector = DataCollector(database)
+
         with Progress(
-            TextColumn("[bold blue]扫描中"),
+            TextColumn("[bold cyan]建立符号表"),
+            BarColumn(bar_width=40),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.fields[filename]}"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("symbols", total=len(all_files), filename="")
+            for file_path in all_files:
+                relpath = file_path.relative_to(target_path)
+                progress.update(task, filename=str(relpath))
+                lang = (
+                    "cpp"
+                    if str(file_path).endswith(
+                        (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
+                    )
+                    else "c"
+                )
+                try:
+                    collector.analyze_file(str(file_path), lang)
+                except Exception:
+                    pass  # 忽略单个文件的分析错误
+                progress.advance(task)
+
+        PrettyOutput.auto_print("✅ [heuristic] 符号表建立完成")
+
+        # 阶段2：问题检测（只扫描源文件，排除头文件）
+        source_files = [
+            f
+            for f in c_files
+            if f.suffix.lower() in {".c", ".cpp", ".cc", ".cxx", ".c++"}
+        ]
+
+        with Progress(
+            TextColumn("[bold blue]问题检测"),
             BarColumn(bar_width=40),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TextColumn("{task.fields[filename]}"),
@@ -621,11 +674,13 @@ def heuristic(
             TimeRemainingColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("scan", total=len(c_files), filename="", issues=0)
-            for file_path in c_files:
+            task = progress.add_task(
+                "scan", total=len(source_files), filename="", issues=0
+            )
+            for file_path in source_files:
                 relpath = file_path.relative_to(target_path)
                 progress.update(task, filename=str(relpath))
-                issues = analyze_c_cpp_file(target_path, relpath)
+                issues = analyze_c_cpp_file(target_path, relpath, database=database)
                 for issue in issues:
                     all_issues.append(
                         {
@@ -645,7 +700,7 @@ def heuristic(
                 progress.advance(task)
 
         PrettyOutput.auto_print(
-            f"✅ [heuristic] 扫描完成，共扫描 {len(c_files)} 个文件"
+            f"✅ [heuristic] 扫描完成，共扫描 {len(source_files)} 个源文件（符号表包含 {len(all_files)} 个文件）"
         )
     else:
         PrettyOutput.auto_print(f"❌ [heuristic] 目标不存在: {target_path}")
