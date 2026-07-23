@@ -797,6 +797,8 @@ def _run_with_builtin_handler(
             - (processed_input, False) = 需要调用 agent.run
     """
     processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
+    # 标记输入处理器已运行，避免在 AgentRunLoop 中重复运行
+    agent._input_handlers_already_run = True
     if should_skip_agent:
         # builtin handler 已处理完成，不需要调用 agent
         output_content_ref[0] = ""

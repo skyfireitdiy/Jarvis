@@ -739,7 +739,11 @@ class AgentRunLoop:
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
-        run_input_handlers = True
+        # 检查输入处理器是否已在外部运行过（如 CodeAgent.run 或 jarvis.py）
+        # 如果已运行，则首次调用 _call_model 时不再运行 input_handler
+        run_input_handlers = not getattr(
+            self.agent, "_input_handlers_already_run", False
+        )
 
         # 导入状态管理器
         from jarvis.jarvis_agent.jarvis import get_agent_status_manager

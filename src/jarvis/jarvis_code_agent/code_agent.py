@@ -417,6 +417,8 @@ class CodeAgent(Agent):
                     processed_input, is_handled = builtin_input_handler(
                         user_input, self
                     )
+                    # 标记输入处理器已运行，避免在 AgentRunLoop 中重复运行
+                    self._input_handlers_already_run = True
                     if is_handled:
                         # 如果有返回的提示信息，追加到 addon_prompt
                         if processed_input:
