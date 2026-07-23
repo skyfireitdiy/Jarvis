@@ -616,11 +616,12 @@ def heuristic(
             BarColumn(bar_width=40),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TextColumn("{task.fields[filename]}"),
+            TextColumn("[dim]问题:{task.fields[issues]}"),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("scan", total=len(c_files), filename="")
+            task = progress.add_task("scan", total=len(c_files), filename="", issues=0)
             for file_path in c_files:
                 relpath = file_path.relative_to(target_path)
                 progress.update(task, filename=str(relpath))
@@ -640,6 +641,7 @@ def heuristic(
                             "severity": issue.severity,
                         }
                     )
+                progress.update(task, issues=len(all_issues))
                 progress.advance(task)
 
         PrettyOutput.auto_print(
