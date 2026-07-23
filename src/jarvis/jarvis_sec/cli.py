@@ -709,13 +709,7 @@ def heuristic(
             f"✅ [heuristic] 调用关系分析完成: {total_calls} 个调用, {total_nodes} 个数据节点"
         )
 
-        # 阶段2：问题检测（只扫描源文件，排除头文件）
-        source_files = [
-            f
-            for f in c_files
-            if f.suffix.lower() in {".c", ".cpp", ".cc", ".cxx", ".c++"}
-        ]
-
+        # 阶段3：问题检测（扫描排除目录后的所有文件，包括头文件）
         with Progress(
             TextColumn("[bold blue]问题检测"),
             BarColumn(bar_width=40),
@@ -726,10 +720,8 @@ def heuristic(
             TimeRemainingColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task(
-                "scan", total=len(source_files), filename="", issues=0
-            )
-            for file_path in source_files:
+            task = progress.add_task("scan", total=len(c_files), filename="", issues=0)
+            for file_path in c_files:
                 relpath = file_path.relative_to(target_path)
                 progress.update(task, filename=str(relpath))
                 issues = analyze_c_cpp_file(target_path, relpath, database=database)
@@ -752,7 +744,7 @@ def heuristic(
                 progress.advance(task)
 
         PrettyOutput.auto_print(
-            f"✅ [heuristic] 扫描完成，共扫描 {len(source_files)} 个源文件（符号表包含 {len(all_files)} 个文件）"
+            f"✅ [heuristic] 扫描完成，共扫描 {len(c_files)} 个文件（符号表包含 {len(all_files)} 个文件）"
         )
     else:
         PrettyOutput.auto_print(f"❌ [heuristic] 目标不存在: {target_path}")
