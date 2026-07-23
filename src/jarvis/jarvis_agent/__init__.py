@@ -687,6 +687,7 @@ class Agent:
         self._last_response_content = (
             ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
+        self._last_handler_returned = False  # 记录最近一次输入处理器是否返回了消息
         self._agent_type = "normal"
 
     def add_memory_tags(self, tags: List[str]) -> None:
@@ -2710,6 +2711,25 @@ class Agent:
             3. 包含错误处理和恢复逻辑
             4. 自动加载相关方法论(如果是首次运行)
         """
+        # 设置tmux窗口平铺布局（仅在首次运行时执行一次）
+        if not hasattr(Agent, "_tmux_layout_set"):
+            Agent._tmux_layout_set = False
+        if not Agent._tmux_layout_set:
+            Agent._tmux_layout_set = True
+            try:
+                if "TMUX" in os.environ:
+                    # 在tmux环境中，设置当前窗口为平铺布局
+                    import subprocess
+
+                    subprocess.run(
+                        ["tmux", "select-layout", "tiled"],
+                        check=True,
+                        timeout=5,
+                    )
+            except Exception:
+                # 静默失败，不影响正常使用
+                pass
+
         # 如果需要延迟优化系统提示词，在第一次运行时进行优化
         if (
             self._optimize_system_prompt_on_first_run
