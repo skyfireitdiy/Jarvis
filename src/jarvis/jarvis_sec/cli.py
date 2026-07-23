@@ -493,7 +493,9 @@ def analyze(
 
 @app.command("heuristic", help="启发式扫描（快速静态分析）")
 def heuristic(
-    target: str = typer.Argument(..., help="扫描目标（文件或目录路径）"),
+    target: Optional[str] = typer.Argument(
+        None, help="扫描目标（文件或目录路径，默认从配置文件读取）"
+    ),
     output_format: str = typer.Option(
         "json", "--format", "-f", help="输出格式（json/markdown）"
     ),
@@ -531,6 +533,12 @@ def heuristic(
     from pathlib import Path
     import json
     from jarvis.jarvis_sec.checkers.c_checker import analyze_c_cpp_file
+
+    # 如果未指定 target，从配置文件读取
+    if target is None:
+        config = _load_config()
+        target = config.get("target", ".")
+        PrettyOutput.auto_print(f"📋 [heuristic] 从配置文件读取扫描目标: {target}")
 
     target_path = Path(target).resolve()
 
