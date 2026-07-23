@@ -1,0 +1,8 @@
+{
+  "id": "20260723_123557_320295",
+  "type": "project_long_term",
+  "tags": ["jsec", "heuristic", "parallel", "optimization", "performance"],
+  "content": "## jsec heuristic 并行化优化完成\n\n### 实现方案\n- 使用 `ProcessPoolExecutor` 实现真正的并行处理（不受GIL限制）\n- 阶段1+2（符号收集+调用关系分析）：每个子进程创建独立内存数据库，返回数据对象，主进程批量合并\n- 阶段3（问题检测）：将内存数据库导出到临时文件，子进程通过文件路径创建只读连接并行检测\n\n### 新增参数\n- `--workers` / `-w`：控制并行工作进程数（默认CPU核心数）\n\n### 关键代码位置\n- `cli.py` 第496-566行：`_parallel_analyze_file()` 和 `_parallel_collect_file()` worker函数\n- `cli.py` 第703-950行：`heuristic()` 函数的并行化逻辑\n\n### 性能提升\n- 38个C/C++文件：约14秒完成（原串行约30+秒）\n- 自动判断是否启用并行（文件数 > workers时启用）",
+  "created_at": "2026-07-23T12:35:57.320335",
+  "updated_at": "2026-07-23T12:35:57.320359"
+}

@@ -15,12 +15,15 @@ Jarvis 安全演进套件 —— 命令行入口（Typer 版本）
 
 from __future__ import annotations
 
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import typer
 
@@ -491,6 +494,80 @@ def analyze(
         raise typer.Exit(code=1)
 
 
+def _parallel_analyze_file(args: Tuple[str, str, str]) -> List[Dict[str, Any]]:
+    """并行分析单个文件的worker函数（用于ProcessPoolExecutor）"""
+    file_path_str, target_path_str, db_path = args
+    from pathlib import Path
+    from jarvis.jarvis_sec.checkers.c_checker import analyze_c_cpp_file
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
+
+    file_path = Path(file_path_str)
+    target_path = Path(target_path_str)
+    relpath = file_path.relative_to(target_path)
+
+    # 每个子进程创建独立的只读数据库连接
+    database = None
+    if db_path:
+        try:
+            database = ProjectDatabase(
+                str(target_path), db_path=db_path, in_memory=False
+            )
+        except Exception:
+            pass
+
+    try:
+        issues = analyze_c_cpp_file(target_path, relpath, database=database)
+        return [
+            {
+                "language": issue.language,
+                "category": issue.category,
+                "pattern": issue.pattern,
+                "file": str(file_path),
+                "line": issue.line,
+                "evidence": issue.evidence,
+                "description": issue.description,
+                "suggestion": issue.suggestion,
+                "confidence": issue.confidence,
+                "severity": issue.severity,
+            }
+            for issue in issues
+        ]
+    except Exception:
+        return []
+
+
+def _parallel_collect_file(args: Tuple[str, str]) -> Dict[str, Any]:
+    """并行收集单个文件符号数据的worker函数"""
+    file_path_str, lang = args
+    from jarvis.jarvis_sec.project_database import ProjectDatabase
+    from jarvis.jarvis_sec.data_collector import DataCollector
+
+    # 每个子进程创建独立的内存数据库
+    database = ProjectDatabase("/tmp/parallel_collect", in_memory=True)
+    database.begin_batch()
+    collector = DataCollector(database)
+
+    try:
+        result = collector.analyze_file(file_path_str, lang)
+        database.commit_batch()
+        # 导出收集的数据（不包含数据库对象本身）
+        return {
+            "symbols": result.get("symbols", []),
+            "call_relations": result.get("call_relations", []),
+            "data_flow_nodes": result.get("data_flow_nodes", []),
+            "pointer_states": result.get("pointer_states", []),
+            "type_infos": result.get("type_infos", []),
+        }
+    except Exception:
+        return {
+            "symbols": [],
+            "call_relations": [],
+            "data_flow_nodes": [],
+            "pointer_states": [],
+            "type_infos": [],
+        }
+
+
 @app.command("heuristic", help="启发式扫描（快速静态分析）")
 def heuristic(
     target: Optional[str] = typer.Argument(
@@ -507,6 +584,9 @@ def heuristic(
         "--rules",
         "-r",
         help="规则过滤（逗号分隔，如 unsafe_api,buffer_overflow）",
+    ),
+    workers: int = typer.Option(
+        os.cpu_count() or 4, "--workers", "-w", help="并行工作进程数（默认CPU核心数）"
     ),
 ) -> None:
     """
@@ -622,132 +702,272 @@ def heuristic(
 
         console = Console()
 
-        # 阶段1：建立符号数据库（第一轮：收集符号定义）
+        # 阶段1+2：并行收集符号数据和调用关系
         from jarvis.jarvis_sec.project_database import ProjectDatabase
         from jarvis.jarvis_sec.data_collector import DataCollector
+        import sqlite3
+        import tempfile
 
         database = ProjectDatabase(str(target_path), in_memory=True)
+        database.begin_batch()
         collector = DataCollector(database)
 
-        # 开启批量提交模式以提高性能
-        database.begin_batch()
+        # 准备文件参数列表
+        file_args = []
+        for file_path in all_files:
+            lang = (
+                "cpp"
+                if str(file_path).endswith(
+                    (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
+                )
+                else "c"
+            )
+            file_args.append((str(file_path), lang))
 
         # 累计统计
         total_symbols = 0
-
-        with Progress(
-            TextColumn("[bold cyan]收集符号定义"),
-            BarColumn(bar_width=40),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.fields[filename]}"),
-            TextColumn("[dim]符号:{task.fields[symbols]}"),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task(
-                "symbols", total=len(all_files), filename="", symbols=0
-            )
-            for file_path in all_files:
-                relpath = file_path.relative_to(target_path)
-                progress.update(task, filename=str(relpath))
-                lang = (
-                    "cpp"
-                    if str(file_path).endswith(
-                        (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
-                    )
-                    else "c"
-                )
-                try:
-                    result = collector.analyze_file(str(file_path), lang)
-                    # 只统计符号
-                    total_symbols += len(result.get("symbols", []))
-                    progress.update(task, symbols=total_symbols)
-                except Exception:
-                    pass  # 忽略单个文件的分析错误
-                progress.advance(task)
-
-        PrettyOutput.auto_print(
-            f"✅ [heuristic] 符号定义收集完成: {total_symbols} 个符号"
-        )
-
-        # 阶段2：分析调用关系和数据流（第二轮：此时符号表已完整）
         total_calls = 0
         total_nodes = 0
 
-        with Progress(
-            TextColumn("[bold cyan]分析调用关系"),
-            BarColumn(bar_width=40),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.fields[filename]}"),
-            TextColumn("[dim]调用:{task.fields[calls]} 节点:{task.fields[nodes]}"),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task(
-                "calls", total=len(all_files), filename="", calls=0, nodes=0
-            )
-            for file_path in all_files:
-                relpath = file_path.relative_to(target_path)
-                progress.update(task, filename=str(relpath))
-                lang = (
-                    "cpp"
-                    if str(file_path).endswith(
-                        (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
-                    )
-                    else "c"
-                )
-                try:
-                    result = collector.analyze_file(str(file_path), lang)
-                    # 统计调用关系和数据流节点
-                    total_calls += len(result.get("call_relations", []))
-                    total_nodes += len(result.get("data_flow_nodes", []))
-                    progress.update(task, calls=total_calls, nodes=total_nodes)
-                except Exception:
-                    pass  # 忽略单个文件的分析错误
-                progress.advance(task)
+        # 决定是否使用并行（文件数少于workers时串行更高效）
+        use_parallel = len(all_files) > workers and workers > 1
 
-        PrettyOutput.auto_print(
-            f"✅ [heuristic] 调用关系分析完成: {total_calls} 个调用, {total_nodes} 个数据节点"
-        )
+        if use_parallel:
+            # 并行模式：使用 ProcessPoolExecutor
+            actual_workers = min(workers, len(all_files))
+            PrettyOutput.auto_print(
+                f"⚡ [heuristic] 并行模式: {actual_workers} 个工作进程"
+            )
+
+            with Progress(
+                TextColumn("[bold cyan]并行收集数据"),
+                BarColumn(bar_width=40),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TextColumn("{task.fields[filename]}"),
+                TextColumn(
+                    "[dim]符号:{task.fields[symbols]} 调用:{task.fields[calls]}"
+                ),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(
+                    "parallel_collect",
+                    total=len(all_files),
+                    filename="",
+                    symbols=0,
+                    calls=0,
+                )
+
+                with ProcessPoolExecutor(max_workers=actual_workers) as executor:
+                    futures = {
+                        executor.submit(_parallel_collect_file, arg): arg[0]
+                        for arg in file_args
+                    }
+                    for future in as_completed(futures):
+                        file_path_str = futures[future]
+                        try:
+                            result = future.result()
+                            # 合并到主数据库
+                            if result["symbols"]:
+                                database.add_symbols_batch(result["symbols"])
+                                total_symbols += len(result["symbols"])
+                            if result["call_relations"]:
+                                database.add_call_relations_batch(
+                                    result["call_relations"]
+                                )
+                                total_calls += len(result["call_relations"])
+                            if result["data_flow_nodes"]:
+                                database.add_data_flow_nodes_batch(
+                                    result["data_flow_nodes"]
+                                )
+                                total_nodes += len(result["data_flow_nodes"])
+                            if result["pointer_states"]:
+                                database.add_pointer_states_batch(
+                                    result["pointer_states"]
+                                )
+                            if result["type_infos"]:
+                                database.add_type_infos_batch(result["type_infos"])
+                        except Exception:
+                            pass
+                        progress.update(
+                            task,
+                            filename=Path(file_path_str).name[:30],
+                            symbols=total_symbols,
+                            calls=total_calls,
+                        )
+                        progress.advance(task)
+        else:
+            # 串行模式：直接使用主进程收集
+            with Progress(
+                TextColumn("[bold cyan]收集符号定义"),
+                BarColumn(bar_width=40),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TextColumn("{task.fields[filename]}"),
+                TextColumn("[dim]符号:{task.fields[symbols]}"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(
+                    "symbols", total=len(all_files), filename="", symbols=0
+                )
+                for file_path in all_files:
+                    relpath = file_path.relative_to(target_path)
+                    progress.update(task, filename=str(relpath))
+                    lang = (
+                        "cpp"
+                        if str(file_path).endswith(
+                            (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
+                        )
+                        else "c"
+                    )
+                    try:
+                        result = collector.analyze_file(str(file_path), lang)
+                        total_symbols += len(result.get("symbols", []))
+                        progress.update(task, symbols=total_symbols)
+                    except Exception:
+                        pass
+                    progress.advance(task)
+
+            # 阶段2：分析调用关系（串行）
+            with Progress(
+                TextColumn("[bold cyan]分析调用关系"),
+                BarColumn(bar_width=40),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                TextColumn("{task.fields[filename]}"),
+                TextColumn("[dim]调用:{task.fields[calls]} 节点:{task.fields[nodes]}"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(
+                    "calls", total=len(all_files), filename="", calls=0, nodes=0
+                )
+                for file_path in all_files:
+                    relpath = file_path.relative_to(target_path)
+                    progress.update(task, filename=str(relpath))
+                    lang = (
+                        "cpp"
+                        if str(file_path).endswith(
+                            (".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".c++", ".h++")
+                        )
+                        else "c"
+                    )
+                    try:
+                        result = collector.analyze_file(str(file_path), lang)
+                        total_calls += len(result.get("call_relations", []))
+                        total_nodes += len(result.get("data_flow_nodes", []))
+                        progress.update(task, calls=total_calls, nodes=total_nodes)
+                    except Exception:
+                        pass
+                    progress.advance(task)
 
         # 提交批量操作
         database.commit_batch()
 
-        # 阶段3：问题检测（扫描排除目录后的所有文件，包括头文件）
-        with Progress(
-            TextColumn("[bold blue]问题检测"),
-            BarColumn(bar_width=40),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.fields[filename]}"),
-            TextColumn("[dim]问题:{task.fields[issues]}"),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("scan", total=len(c_files), filename="", issues=0)
-            for file_path in c_files:
-                relpath = file_path.relative_to(target_path)
-                progress.update(task, filename=str(relpath))
-                issues = analyze_c_cpp_file(target_path, relpath, database=database)
-                for issue in issues:
-                    all_issues.append(
-                        {
-                            "language": issue.language,
-                            "category": issue.category,
-                            "pattern": issue.pattern,
-                            "file": str(file_path),
-                            "line": issue.line,
-                            "evidence": issue.evidence,
-                            "description": issue.description,
-                            "suggestion": issue.suggestion,
-                            "confidence": issue.confidence,
-                            "severity": issue.severity,
-                        }
+        PrettyOutput.auto_print(
+            f"✅ [heuristic] 数据收集完成: {total_symbols} 个符号, {total_calls} 个调用, {total_nodes} 个数据节点"
+        )
+
+        # 阶段3：问题检测（并行或串行）
+        # 将内存数据库导出到临时文件，供子进程读取
+        db_temp_file = None
+        if use_parallel and database._conn:
+            # 导出内存数据库到临时文件
+            db_temp_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+            db_temp_path = db_temp_file.name
+            db_temp_file.close()
+            # 使用 SQLite backup API 导出
+            dest_conn = sqlite3.connect(db_temp_path)
+            database._conn.backup(dest_conn)
+            dest_conn.close()
+        else:
+            db_temp_path = None
+
+        try:
+            if use_parallel and len(c_files) > workers:
+                # 并行问题检测
+                analyze_args = [
+                    (str(f), str(target_path), db_temp_path or "") for f in c_files
+                ]
+
+                with Progress(
+                    TextColumn("[bold blue]并行问题检测"),
+                    BarColumn(bar_width=40),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    TextColumn("{task.fields[filename]}"),
+                    TextColumn("[dim]问题:{task.fields[issues]}"),
+                    TimeElapsedColumn(),
+                    TimeRemainingColumn(),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task(
+                        "parallel_scan", total=len(c_files), filename="", issues=0
                     )
-                progress.update(task, issues=len(all_issues))
-                progress.advance(task)
+
+                    with ProcessPoolExecutor(
+                        max_workers=min(workers, len(c_files))
+                    ) as executor:
+                        futures = {
+                            executor.submit(_parallel_analyze_file, arg): arg[0]
+                            for arg in analyze_args
+                        }
+                        for future in as_completed(futures):
+                            file_path_str = futures[future]
+                            try:
+                                issues = future.result()
+                                all_issues.extend(issues)
+                            except Exception:
+                                pass
+                            progress.update(
+                                task,
+                                filename=Path(file_path_str).name[:30],
+                                issues=len(all_issues),
+                            )
+                            progress.advance(task)
+            else:
+                # 串行问题检测
+                with Progress(
+                    TextColumn("[bold blue]问题检测"),
+                    BarColumn(bar_width=40),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    TextColumn("{task.fields[filename]}"),
+                    TextColumn("[dim]问题:{task.fields[issues]}"),
+                    TimeElapsedColumn(),
+                    TimeRemainingColumn(),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task(
+                        "scan", total=len(c_files), filename="", issues=0
+                    )
+                    for file_path in c_files:
+                        relpath = file_path.relative_to(target_path)
+                        progress.update(task, filename=str(relpath))
+                        issues = analyze_c_cpp_file(
+                            target_path, relpath, database=database
+                        )
+                        for issue in issues:
+                            all_issues.append(
+                                {
+                                    "language": issue.language,
+                                    "category": issue.category,
+                                    "pattern": issue.pattern,
+                                    "file": str(file_path),
+                                    "line": issue.line,
+                                    "evidence": issue.evidence,
+                                    "description": issue.description,
+                                    "suggestion": issue.suggestion,
+                                    "confidence": issue.confidence,
+                                    "severity": issue.severity,
+                                }
+                            )
+                        progress.update(task, issues=len(all_issues))
+                        progress.advance(task)
+        finally:
+            # 清理临时数据库文件
+            if db_temp_file and db_temp_path and Path(db_temp_path).exists():
+                Path(db_temp_path).unlink()
 
         PrettyOutput.auto_print(
             f"✅ [heuristic] 扫描完成，共扫描 {len(c_files)} 个文件（符号表包含 {len(all_files)} 个文件）"
