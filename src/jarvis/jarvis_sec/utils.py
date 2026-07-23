@@ -369,6 +369,7 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]) -> Any:
             verified_gids = []
             false_positive_gids = []
             issues = []
+            false_positives = []  # 记录误报的详细信息
 
             # 从 items 中提取已验证的问题
             for item in items:
@@ -381,6 +382,7 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]) -> Any:
                             issues.append(item)
                         else:
                             false_positive_gids.append(gid)
+                            false_positives.append(item)  # 记录误报详情
                 except Exception:
                     pass
 
@@ -395,6 +397,7 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]) -> Any:
                     ):
                         # 如果这个 gid 不在已验证的问题中，可能是误报
                         false_positive_gids.append(gid)
+                        false_positives.append(c)  # 记录候选问题作为误报详情
                 except Exception:
                     pass
 
@@ -409,6 +412,12 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]) -> Any:
                 "false_positive_gids": false_positive_gids,
                 "issues": issues,
             }
+
+            # 保存误报详情到单独文件
+            if false_positives:
+                from jarvis.jarvis_sec.file_manager import save_false_positives
+
+                save_false_positives(sec_dir, false_positives)
 
             # 保存到 analysis.jsonl
             save_analysis_result(sec_dir, analysis_result)
