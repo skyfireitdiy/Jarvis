@@ -1121,19 +1121,6 @@ def init_env(
             # 静默失败，不影响正常使用
             pass
 
-    # 6. 设置tmux窗口平铺布局（统一管理）
-    try:
-        if "TMUX" in os.environ:
-            # 在tmux环境中，设置当前窗口为平铺布局
-            subprocess.run(
-                ["tmux", "select-layout", "tiled"],
-                check=True,
-                timeout=5,
-            )
-    except Exception:
-        # 静默失败，不影响正常使用
-        pass
-
 
 def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导
