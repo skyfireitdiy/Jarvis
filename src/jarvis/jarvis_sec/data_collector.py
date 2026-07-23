@@ -1553,11 +1553,12 @@ class DataCollector:
         if result["type_infos"]:
             self.database.add_type_infos_batch(result["type_infos"])
 
-        PrettyOutput.auto_print(
-            f"[DataCollector] 保存数据: {len(result['symbols'])}个符号, "
-            f"{len(result['call_relations'])}个调用关系, "
-            f"{len(result['data_flow_nodes'])}个数据流节点"
-        )
+        # 静默日志输出，避免干扰进度条显示
+        # PrettyOutput.auto_print(
+        #     f"[DataCollector] 保存数据: {len(result['symbols'])}个符号, "
+        #     f"{len(result['call_relations'])}个调用关系, "
+        #     f"{len(result['data_flow_nodes'])}个数据流节点"
+        # )
 
     def _check_init_declarator_for_allocation(
         self, node: Node, code: str, file_path: str, result: Dict[str, Any], scope: str

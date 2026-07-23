@@ -320,9 +320,10 @@ class ProjectDatabase:
                 cursor.execute("ALTER TABLE data_flow ADD COLUMN use_type TEXT")
 
             conn.commit()
-            PrettyOutput.auto_print(
-                f"[ProjectDatabase] 数据库初始化完成: {self.db_path}"
-            )
+            # 静默日志输出，避免干扰进度条显示
+            # PrettyOutput.auto_print(
+            #     f"[ProjectDatabase] 数据库初始化完成: {self.db_path}"
+            # )
 
     @contextmanager
     def _get_connection(self):
