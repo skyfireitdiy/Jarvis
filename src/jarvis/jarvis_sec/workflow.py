@@ -215,6 +215,12 @@ def direct_scan(
             f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）"
         )
 
+    # 收集所有文件（用于建立符号表，不排除目录）
+    all_source_files = list(
+        _iter_source_files(entry_path, languages, exclude_dirs=None)
+    )
+
+    # 问题检测阶段扫描的文件（排除指定目录）
     files = list(_iter_source_files(entry_path, languages, exclude_dirs))
 
     # 按语言分组
@@ -230,13 +236,14 @@ def direct_scan(
             PrettyOutput.auto_print("[jarvis-sec] 开始构建项目级数据库...")
             database = ProjectDatabase(str(base))
 
-            # 准备文件列表（file_path, language）
+            # 准备文件列表（file_path, language）- 使用所有文件建立符号表
             all_files = []
-            for p in c_files:
-                lang = "cpp" if p.suffix.lower() in {".cpp", ".hpp"} else "c"
-                all_files.append((str(base / p), lang))
-            for p in r_files:
-                all_files.append((str(base / p), "rust"))
+            for p in all_source_files:
+                if p.suffix.lower() in c_like_exts:
+                    lang = "cpp" if p.suffix.lower() in {".cpp", ".hpp"} else "c"
+                    all_files.append((str(base / p), lang))
+                elif p.suffix.lower() in rust_exts:
+                    all_files.append((str(base / p), "rust"))
 
             # 使用增量更新机制
             sync_result = database.sync_files(all_files)
