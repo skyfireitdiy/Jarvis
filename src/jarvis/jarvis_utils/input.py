@@ -212,6 +212,8 @@ BUILTIN_COMMANDS = [
     ("SecAnalyze", "从JSON分析安全问题"),
     ("SecHeuristic", "启发式安全扫描"),
     ("SecScan", "执行安全扫描"),
+    # Agent 编排命令
+    ("OrganizeAgents", "批量编排创建Agent"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
