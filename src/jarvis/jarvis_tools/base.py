@@ -3,6 +3,7 @@ import json
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import Optional
 
 
 class Tool:
@@ -15,6 +16,7 @@ class Tool:
         parameters: Dict[str, Any],
         func: Callable[[Dict[str, Any]], Dict[str, Any]],
         protocol_version: str = "1.0",
+        allowed_agent_types: Optional[list] = None,
     ) -> None:
         """
         初始化工具对象
@@ -25,12 +27,14 @@ class Tool:
             parameters (Dict[str, Any]): 工具参数定义
             func (Callable): 工具执行函数
             protocol_version (str): 工具协议版本，默认"1.0"；支持"1.0"或"2.0"
+            allowed_agent_types (Optional[list]): 允许调用此工具的Agent类型列表，None表示所有Agent均可调用
         """
         self.name = name
         self.description = description
         self.parameters = parameters
         self.func = func
         self.protocol_version = protocol_version
+        self.allowed_agent_types = allowed_agent_types
 
     def to_dict(self) -> Dict[str, Any]:
         """将工具对象转换为字典格式，主要用于序列化"""
