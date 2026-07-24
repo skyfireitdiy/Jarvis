@@ -84,6 +84,16 @@ class SubCodeAgentTool:
 
             # 继承父 Agent 的模型组与工具使用集（用于覆盖默认值）
             parent_agent = args.get("agent")
+
+            # 权限检查：仅 CodeAgent 可调用此工具
+            if parent_agent is not None:
+                if not isinstance(parent_agent, CodeAgent):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "sub_code_agent 工具仅支持 CodeAgent 调用，当前 Agent 类型不支持此工具。",
+                    }
+
             # 获取父 Agent 的对话历史（在创建 CodeAgent 之前）
             parent_messages = None
             if parent_agent and hasattr(parent_agent, "model"):
