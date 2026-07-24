@@ -362,6 +362,112 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 PrettyOutput.auto_print(f"❌ 目录不存在或不可用: {target_dir}")
             return "", True
+        elif tag == "OrganizeAgents":
+            # 交互式获取编排文件路径
+            file_path = get_single_line_input("请输入编排文件路径: ")
+            if not file_path:
+                PrettyOutput.auto_print("❌ 未输入编排文件路径")
+                return "", True
+
+            file_path = file_path.strip().strip('"').strip("'")
+            if not os.path.isfile(file_path):
+                PrettyOutput.auto_print(f"❌ 编排文件不存在: {file_path}")
+                return "", True
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                orchestration = yaml.safe_load(content)
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 读取编排文件失败: {e}")
+                return "", True
+
+            if (
+                not orchestration
+                or not isinstance(orchestration, dict)
+                or "agents" not in orchestration
+            ):
+                PrettyOutput.auto_print("❌ 编排文件格式错误：缺少 'agents' 列表")
+                return "", True
+
+            agents_config = orchestration["agents"]
+            if not isinstance(agents_config, list) or not agents_config:
+                PrettyOutput.auto_print("❌ 编排文件格式错误：'agents' 必须是非空列表")
+                return "", True
+
+            # 批量创建 Agent
+            from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+
+            if not GatewayManagerTool.check():
+                PrettyOutput.auto_print("❌ Web Gateway 未连接，无法创建 Agent")
+                return "", True
+
+            gateway = GatewayManagerTool()
+            success_count = 0
+            fail_count = 0
+            results = []
+
+            for i, agent_cfg in enumerate(agents_config):
+                if not isinstance(agent_cfg, dict):
+                    PrettyOutput.auto_print(f"⚠️ 第 {i + 1} 个 Agent 配置格式错误，跳过")
+                    fail_count += 1
+                    continue
+
+                agent_name = agent_cfg.get("name", f"agent_{i + 1}")  # type: ignore
+                agent_type = agent_cfg.get("type", "code")  # type: ignore
+                working_dir = agent_cfg.get("working_dir", os.getcwd())  # type: ignore
+
+                # 必填字段校验
+                if not agent_type or not working_dir:
+                    PrettyOutput.auto_print(
+                        f"⚠️ Agent '{agent_name}' 缺少必填字段 type 或 working_dir，跳过"
+                    )
+                    fail_count += 1
+                    continue
+
+                try:
+                    result = gateway._create_agent(
+                        agent_type=agent_type,
+                        working_dir=working_dir,
+                        name=agent_name,
+                        llm_group=agent_cfg.get("llm_group"),  # type: ignore
+                        tool_group=agent_cfg.get("tool_group"),  # type: ignore
+                        config_file=agent_cfg.get("config_file"),  # type: ignore
+                        task=agent_cfg.get("task"),  # type: ignore
+                        additional_args=agent_cfg.get("additional_args"),  # type: ignore
+                        worktree=bool(agent_cfg.get("worktree", False)),  # type: ignore
+                        quick_mode=bool(agent_cfg.get("quick_mode", False)),  # type: ignore
+                        no_interaction_mode=bool(
+                            agent_cfg.get("no_interaction_mode", False)
+                        ),  # type: ignore
+                    )
+                    if result.get("success"):
+                        success_count += 1
+                        results.append([agent_name, agent_type, working_dir, "✅ 成功"])
+                        PrettyOutput.auto_print(f"✅ Agent '{agent_name}' 创建成功")
+                    else:
+                        fail_count += 1
+                        error_msg = result.get("stderr", "未知错误")
+                        results.append(
+                            [agent_name, agent_type, working_dir, f"❌ {error_msg}"]
+                        )
+                        PrettyOutput.auto_print(
+                            f"❌ Agent '{agent_name}' 创建失败: {error_msg}"
+                        )
+                except Exception as e:
+                    fail_count += 1
+                    results.append(
+                        [agent_name, agent_type, working_dir, f"❌ 异常: {e}"]
+                    )
+                    PrettyOutput.auto_print(f"❌ Agent '{agent_name}' 创建异常: {e}")
+
+            # 输出汇总
+            _print_markdown_table(
+                f"📋 Agent 编排结果 (成功: {success_count}, 失败: {fail_count})",
+                ["名称", "类型", "工作目录", "状态"],
+                results,
+            )
+            return "", True
         elif tag == "ListRule":
             # 列出所有规则及其状态
             # 使用 agent 的 rules_manager 实例，而不是创建新实例
