@@ -719,9 +719,6 @@ class ToolRegistry(OutputHandlerProtocol):
                             protocol_version=getattr(
                                 tool_instance, "protocol_version", "1.0"
                             ),
-                            allowed_agent_types=getattr(
-                                tool_instance, "allowed_agent_types", None
-                            ),
                         )
                         tool_found = True
                         break
@@ -1546,7 +1543,6 @@ class ToolRegistry(OutputHandlerProtocol):
         parameters: Any,
         func: Callable[..., Dict[str, Any]],
         protocol_version: str = "1.0",
-        allowed_agent_types: Optional[list] = None,
     ) -> None:
         """注册新工具
 
@@ -1555,13 +1551,11 @@ class ToolRegistry(OutputHandlerProtocol):
             description: 工具描述
             parameters: 工具参数定义
             func: 工具执行函数
-            allowed_agent_types: 允许调用此工具的Agent类型列表，None表示所有Agent均可调用
         """
         if name in self.tools:
             PrettyOutput.auto_print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
-        tool = Tool(
-            name, description, parameters, func, protocol_version, allowed_agent_types
-        )
+        tool = Tool(name, description, parameters, func, protocol_version)
+        self.tools[name] = tool
         # 同时更新 _all_tools，确保新注册的工具可以被调用
         if hasattr(self, "_all_tools"):
             self._all_tools[name] = tool
@@ -1632,19 +1626,6 @@ class ToolRegistry(OutputHandlerProtocol):
                 except Exception:
                     # hook 异常不拦截，继续执行
                     pass
-        # 检查工具的allowed_agent_types权限
-        if tool.allowed_agent_types is not None:
-            agent_type = (
-                getattr(agent, "agent_type", "normal")
-                if agent is not None
-                else "normal"
-            )
-            if agent_type not in tool.allowed_agent_types:
-                return {
-                    "success": False,
-                    "stderr": f"工具 {name} 不允许被类型为 '{agent_type}' 的Agent调用，允许的Agent类型: {', '.join(tool.allowed_agent_types)}",
-                    "stdout": "",
-                }
 
         # 根据工具实现声明的协议版本分发调用方式
         try:
