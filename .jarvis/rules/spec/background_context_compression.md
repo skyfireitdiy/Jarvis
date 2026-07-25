@@ -131,3 +131,48 @@ jarvis_agent/
 1-4. 同上
 5. 后台线程压缩失败，设置 `compression_failed = True`
 6. 下一轮主循环检测到失败，降级执行同步压缩
+
+## 4. 接口设计
+
+### 4.1 BackgroundCompressionManager 类
+
+- **类定义**：`BackgroundCompressionManager(agent)`
+- **功能**：管理后台压缩线程生命周期，确保线程安全和结果正确合并
+- **核心属性**：
+  - `_lock: threading.Lock` - 保护共享状态
+  - `_is_compressing: bool` - 是否正在压缩
+  - `_pending_replacement: CompressionResult | None` - 待应用的压缩结果
+  - `_compression_failed: bool` - 压缩是否失败
+  - `_snapshot_turn: int` - 快照时的对话轮次
+
+#### start_background_compression
+
+- **签名**：`def start_background_compression(self, model_instance, current_message_tokens: int) -> bool`
+- **功能**：启动后台压缩线程（非阻塞，静默）
+- **返回**：True成功启动，False已有压缩在运行
+- **异常**：线程启动失败返回False，不抛异常
+
+#### check_and_apply
+
+- **签名**：`def check_and_apply(self, model_instance) -> tuple[bool, bool]`
+- **功能**：检查压缩状态并应用结果（供主循环每轮调用，静默）
+- **返回**：`(applied, need_fallback)` - applied是否应用了结果，need_fallback是否需要降级同步压缩
+
+### 4.2 修改的现有接口
+
+#### check_and_compress_context（修改）
+
+- **位置**：`run_loop.py:check_and_compress_context()`
+- **修改**：
+  1. 每轮开始先调用 `compression_manager.check_and_apply()`
+  2. 触发压缩时调用 `start_background_compression()` 而非同步压缩
+  3. 后台压缩失败时降级为同步压缩
+  4. 移除所有压缩相关的 PrettyOutput 提示
+
+#### _sliding_window_compression（修改）
+
+- **位置**：`__init__.py:_sliding_window_compression()`
+- **修改**：
+  1. 新增参数 `snapshot` 和 `snapshot_turn`，支持基于快照压缩
+  2. 返回压缩结果而非直接修改历史
+  3. 移除所有压缩相关的 PrettyOutput 提示
