@@ -4251,6 +4251,817 @@ def _rule_assignment_in_condition(
     return issues
 
 
+def _ast_null_deref_check(
+    lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
+) -> Optional[List[Issue]]:
+    """基于tree-sitter AST的空指针解引用检测，替代正则扫描。"""
+    try:
+        import tree_sitter_c as tsc
+        import tree_sitter_cpp as tscpp
+        from tree_sitter import Language, Parser
+    except ImportError:
+        return None
+
+    # Ensure no double-newlines: lines may already contain trailing \n
+    code = "".join(lines)
+    if not code.endswith("\n"):
+        code += "\n"
+    code_bytes = code.encode("utf-8")
+
+    is_cpp = _is_cpp_file(relpath)
+    try:
+        if is_cpp:
+            lang = Language(tscpp.language())
+        else:
+            lang = Language(tsc.language())
+        parser = Parser(lang)
+    except Exception:
+        return None
+
+    tree = parser.parse(code_bytes)
+    root = tree.root_node
+    # Note: has_error only means partial parse errors (e.g. macros),
+    # the AST is still usable for analysis. Don't return None.
+
+    stack_arrays: set[str] = set()
+    stack_structs: set[str] = set()  # 非指针局部变量，用.访问安全
+    func_params: set[str] = set()  # 函数参数，调用者保证非NULL
+    global_vars: set[str] = set()  # 全局变量
+
+    def _extract_declarator_name(decl_node):
+        """从declarator节点提取变量名，处理pointer_declarator/array_declarator嵌套。"""
+        name = None
+        is_pointer = False
+        is_array = False
+        node = decl_node
+        while node:
+            if node.type == "identifier":
+                name = code_bytes[node.start_byte : node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                break
+            elif node.type == "pointer_declarator":
+                is_pointer = True
+                for child in node.children:
+                    if child.type in (
+                        "identifier",
+                        "array_declarator",
+                        "pointer_declarator",
+                    ):
+                        node = child
+                        break
+                else:
+                    break
+            elif node.type == "array_declarator":
+                is_array = True
+                for child in node.children:
+                    if child.type in (
+                        "identifier",
+                        "pointer_declarator",
+                        "array_declarator",
+                    ):
+                        node = child
+                        break
+                else:
+                    break
+            else:
+                break
+        return name, is_pointer, is_array
+
+    def _collect_declarations(node, is_global=False):
+        """收集声明信息：栈数组、栈结构体、函数参数、全局变量。"""
+        if node.type == "parameter_declaration":
+            decl_node = None
+            for child in node.children:
+                if child.type in (
+                    "pointer_declarator",
+                    "identifier",
+                    "array_declarator",
+                ):
+                    decl_node = child
+                    break
+            if decl_node:
+                name, is_pointer, is_array = _extract_declarator_name(decl_node)
+                if name:
+                    func_params.add(name)
+                    if is_array:
+                        stack_arrays.add(name)
+        elif node.type == "declaration":
+            parent = node.parent
+            is_local = parent is not None and parent.type == "compound_statement"
+            decl_nodes = []
+            for child in node.children:
+                if child.type in (
+                    "identifier",
+                    "pointer_declarator",
+                    "array_declarator",
+                    "init_declarator",
+                ):
+                    decl_nodes.append(child)
+            for dn in decl_nodes:
+                if dn.type == "init_declarator":
+                    for ic in dn.children:
+                        if ic.type in (
+                            "pointer_declarator",
+                            "identifier",
+                            "array_declarator",
+                        ):
+                            name, is_pointer, is_array = _extract_declarator_name(ic)
+                            if name:
+                                if is_array:
+                                    stack_arrays.add(name)
+                                elif not is_pointer and is_local:
+                                    stack_structs.add(name)
+                                if not is_local:
+                                    global_vars.add(name)
+                            break
+                else:
+                    name, is_pointer, is_array = _extract_declarator_name(dn)
+                    if name:
+                        if is_array:
+                            stack_arrays.add(name)
+                        elif not is_pointer and is_local:
+                            stack_structs.add(name)
+                        if not is_local:
+                            global_vars.add(name)
+        for child in node.children:
+            _collect_declarations(
+                child, is_global=(is_global or node.type == "translation_unit")
+            )
+
+    _collect_declarations(root)
+
+    # Track local pointer variables assigned from safe sources
+    safe_assigned_vars: set[str] = set()
+
+    def _is_safe_rhs(node):
+        """Check if RHS of assignment is a safe (non-NULL) source."""
+        if node.type == "pointer_expression":
+            op = node.child_by_field_name("operator")
+            if op and code_bytes[op.start_byte : op.end_byte].decode() == "&":
+                return True  # address-of can never be NULL
+        elif node.type == "cast_expression":
+            for cc in node.children:
+                if cc.type not in ("(", ")", "type_descriptor"):
+                    inner_text = (
+                        code_bytes[cc.start_byte : cc.end_byte]
+                        .decode("utf-8", errors="replace")
+                        .strip()
+                    )
+                    if inner_text in global_vars or inner_text in stack_arrays:
+                        return True
+                    if cc.type == "pointer_expression":
+                        op2 = cc.child_by_field_name("operator")
+                        if (
+                            op2
+                            and code_bytes[op2.start_byte : op2.end_byte].decode()
+                            == "&"
+                        ):
+                            return True
+                    if cc.type == "call_expression":
+                        func2 = cc.child_by_field_name("function")
+                        if func2:
+                            fn = code_bytes[func2.start_byte : func2.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                            if fn in ("alloca", "__builtin_alloca"):
+                                return True
+        elif node.type == "identifier":
+            rhs_text = code_bytes[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            if rhs_text in global_vars or rhs_text in stack_arrays:
+                return True
+        elif node.type == "call_expression":
+            # alloca() returns stack memory, can never be NULL
+            func = node.child_by_field_name("function")
+            if func:
+                func_name = code_bytes[func.start_byte : func.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                if func_name in ("alloca", "__builtin_alloca"):
+                    return True
+        return False
+
+    def _collect_safe_assignments(node):
+        """Track local pointer variables assigned from safe sources."""
+        if node.type == "init_declarator":
+            lhs_name = None
+            rhs_is_safe = False
+            for child in node.children:
+                if child.type in ("pointer_declarator", "identifier"):
+                    name_info = _extract_declarator_name(child)
+                    if name_info and name_info[0]:
+                        lhs_name = name_info[0]
+                elif child.type not in ("pointer_declarator", "identifier", "="):
+                    rhs_is_safe = _is_safe_rhs(child)
+            if lhs_name and rhs_is_safe:
+                safe_assigned_vars.add(lhs_name)
+        elif node.type == "assignment_expression":
+            left = node.child_by_field_name("left")
+            right = node.child_by_field_name("right")
+            if left and right and left.type == "identifier":
+                lhs_name = code_bytes[left.start_byte : left.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                if _is_safe_rhs(right):
+                    safe_assigned_vars.add(lhs_name)
+        for child in node.children:
+            _collect_safe_assignments(child)
+
+    _collect_safe_assignments(root)
+
+    protected_ranges: Dict[str, List[Tuple[int, int]]] = {}
+    early_exit_vars: Dict[
+        str, List[int]
+    ] = {}  # var_name -> list of if_statement line numbers
+
+    def _has_early_exit(block_node):
+        text = code_bytes[block_node.start_byte : block_node.end_byte].decode(
+            "utf-8", errors="replace"
+        )
+        return bool(re.search(r"\b(return|goto|exit|abort|throw)\b", text))
+
+    def _extract_null_checked_vars(condition_node):
+        checked = []
+
+        def _find_null_checks(n, result_list=None):
+            out = result_list if result_list is not None else checked
+            if n.type == "binary_expression":
+                left = n.child_by_field_name("left")
+                right = n.child_by_field_name("right")
+                op_node = n.child_by_field_name("operator")
+                if left and right and op_node:
+                    op = code_bytes[op_node.start_byte : op_node.end_byte].decode()
+                    if op in ("==", "!="):
+                        l_text = (
+                            code_bytes[left.start_byte : left.end_byte]
+                            .decode("utf-8", errors="replace")
+                            .strip()
+                        )
+                        r_text = (
+                            code_bytes[right.start_byte : right.end_byte]
+                            .decode("utf-8", errors="replace")
+                            .strip()
+                        )
+                        var_name = None
+
+                        # Helper: extract var name from identifier or (var = expr) pattern
+                        def _extract_var_from_cond(side_node):
+                            if side_node.type == "identifier":
+                                return code_bytes[
+                                    side_node.start_byte : side_node.end_byte
+                                ].decode("utf-8", errors="replace")
+                            elif side_node.type == "parenthesized_expression":
+                                # Handle (var = expr) pattern like while ((next = readdir()) != NULL)
+                                for sc in side_node.children:
+                                    if sc.type == "assignment_expression":
+                                        lhs = sc.child_by_field_name("left")
+                                        if lhs and lhs.type == "identifier":
+                                            return code_bytes[
+                                                lhs.start_byte : lhs.end_byte
+                                            ].decode("utf-8", errors="replace")
+                            return None
+
+                        if r_text in ("NULL", "0", "nullptr"):
+                            var_name = _extract_var_from_cond(left)
+                        elif l_text in ("NULL", "0", "nullptr"):
+                            var_name = _extract_var_from_cond(right)
+                        if var_name:
+                            if op == "!=":
+                                out.append((var_name, "consequence"))
+                            else:
+                                out.append((var_name, "alternative"))
+                    elif op == "&&":
+                        # Short-circuit: if left is true, right is evaluated
+                        # Left vars checked as "consequence" protect right-side derefs
+                        left_checks = []
+                        _find_null_checks(left, left_checks)
+                        for vname, branch in left_checks:
+                            if branch == "consequence":
+                                # var != NULL on left: var is safe on right
+                                out.append((vname, "consequence"))
+                        # Also: bare identifier on left means truthy check (var != NULL)
+                        if left.type == "identifier":
+                            vname = code_bytes[left.start_byte : left.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                            out.append((vname, "consequence"))
+                        # Recurse into right for additional checks
+                        _find_null_checks(right, out)
+                        return  # Already recursed; skip default child traversal
+                    elif op == "||":
+                        # Short-circuit: if left is true, right is NOT evaluated
+                        # Left vars checked as "alternative" (!var / var == NULL) protect right-side derefs
+                        left_checks = []
+                        _find_null_checks(left, left_checks)
+                        for vname, branch in left_checks:
+                            if branch == "alternative":
+                                # !var on left: var is NULL -> right only runs if var is NOT NULL
+                                out.append((vname, "consequence"))
+                        # Recurse into right for additional checks
+                        _find_null_checks(right, out)
+                        return  # Already recursed; skip default child traversal
+            elif n.type == "unary_expression":
+                op_node = n.child_by_field_name("operator")
+                # tree-sitter-c: unary_expression may not have "operand" field
+                # (same issue as pointer_expression); find identifier among named children
+                operand = n.child_by_field_name("operand")
+                if operand is None:
+                    for child in n.children:
+                        if child.is_named and child.type == "identifier":
+                            operand = child
+                            break
+                if op_node and operand:
+                    op = code_bytes[op_node.start_byte : op_node.end_byte].decode()
+                    if op == "!" and operand.type == "identifier":
+                        var_name = code_bytes[
+                            operand.start_byte : operand.end_byte
+                        ].decode("utf-8", errors="replace")
+                        out.append((var_name, "alternative"))
+            elif n.type == "identifier":
+                parent = n.parent
+                # C: bare identifier in parenthesized_expression of if/while
+                # C++: bare identifier in condition_clause of if/while
+                if parent and parent.type in (
+                    "parenthesized_expression",
+                    "condition_clause",
+                ):
+                    gp = parent.parent
+                    if gp and gp.type in ("if_statement", "while_statement"):
+                        if parent.child_count <= 3:
+                            var_name = code_bytes[n.start_byte : n.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                            out.append((var_name, "consequence"))
+            for child in n.children:
+                _find_null_checks(child, out)
+
+        _find_null_checks(condition_node)
+        return checked
+
+    def _collect_null_protections(node):
+        if node.type in ("if_statement", "while_statement"):
+            condition = None
+            for child in node.children:
+                # C uses parenthesized_expression; C++ may use condition_clause
+                if child.type in ("parenthesized_expression", "condition_clause"):
+                    condition = child
+                    break
+            if condition:
+                checked_vars = _extract_null_checked_vars(condition)
+                for var_name, safe_branch in checked_vars:
+                    if safe_branch == "consequence":
+                        consequence = None
+                        for child in node.children:
+                            if child.type == "compound_statement":
+                                consequence = child
+                                break
+                        if consequence:
+                            start = consequence.start_point[0] + 1
+                            end = consequence.end_point[0] + 1
+                            if var_name not in protected_ranges:
+                                protected_ranges[var_name] = []
+                            protected_ranges[var_name].append((start, end))
+                            # If consequence has early exit, var is also safe after the if block
+                            # e.g. if ((NULL == p) || ...) { return; } -> p safe after if
+                            if _has_early_exit(consequence):
+                                early_exit_vars.setdefault(var_name, []).append(
+                                    node.start_point[0] + 1
+                                )
+                        else:
+                            # No compound_statement: e.g. if (p) return;
+                            if _has_early_exit(node):
+                                early_exit_vars.setdefault(var_name, []).append(
+                                    node.start_point[0] + 1
+                                )
+                    elif safe_branch == "alternative":
+                        # var == NULL / !var: if consequence has early exit,
+                        # var is safe after the if block
+                        consequence = None
+                        for child in node.children:
+                            if child.type == "compound_statement":
+                                consequence = child
+                                break
+                        if consequence:
+                            if _has_early_exit(consequence):
+                                early_exit_vars.setdefault(var_name, []).append(
+                                    node.start_point[0] + 1
+                                )
+                        else:
+                            # No compound_statement: check if_statement's direct
+                            # children for early exit (e.g. if (!p) return;)
+                            if _has_early_exit(node):
+                                early_exit_vars.setdefault(var_name, []).append(
+                                    node.start_point[0] + 1
+                                )
+        for child in node.children:
+            _collect_null_protections(child)
+
+    _collect_null_protections(root)
+
+    deref_points: List[Tuple[str, int, str]] = []
+
+    def _is_short_circuit_protected(deref_node, var_name):
+        """Check if a deref of var_name inside a condition is protected by &&/|| short-circuit."""
+        n = deref_node.parent
+        while n:
+            if n.type == "binary_expression":
+                op_node = n.child_by_field_name("operator")
+                if op_node:
+                    op = code_bytes[op_node.start_byte : op_node.end_byte].decode()
+                    if op in ("&&", "||"):
+                        left = n.child_by_field_name("left")
+                        right = n.child_by_field_name("right")
+                        if left and right:
+                            # Is deref_node on the right side of this &&/||?
+                            if (
+                                deref_node.start_byte >= right.start_byte
+                                and deref_node.end_byte <= right.end_byte
+                            ):
+                                # Check if left side protects var_name
+                                # Simplified inline check (no dependency on _find_null_checks closure)
+                                left_text = (
+                                    code_bytes[left.start_byte : left.end_byte]
+                                    .decode("utf-8", errors="replace")
+                                    .strip()
+                                )
+                                if op == "&&":
+                                    # bare identifier on left means truthy (var != NULL)
+                                    if (
+                                        left.type == "identifier"
+                                        and left_text == var_name
+                                    ):
+                                        return True
+                                    # var != NULL on left
+                                    if left.type == "binary_expression":
+                                        lop = left.child_by_field_name("operator")
+                                        if lop:
+                                            lop_text = code_bytes[
+                                                lop.start_byte : lop.end_byte
+                                            ].decode()
+                                            if lop_text == "!=":
+                                                ll = left.child_by_field_name("left")
+                                                lr = left.child_by_field_name("right")
+                                                if ll and lr:
+                                                    ll_text = (
+                                                        code_bytes[
+                                                            ll.start_byte : ll.end_byte
+                                                        ]
+                                                        .decode(
+                                                            "utf-8", errors="replace"
+                                                        )
+                                                        .strip()
+                                                    )
+                                                    lr_text = (
+                                                        code_bytes[
+                                                            lr.start_byte : lr.end_byte
+                                                        ]
+                                                        .decode(
+                                                            "utf-8", errors="replace"
+                                                        )
+                                                        .strip()
+                                                    )
+                                                    if (
+                                                        lr_text
+                                                        in ("NULL", "0", "nullptr")
+                                                        and ll_text == var_name
+                                                    ):
+                                                        return True
+                                                    if (
+                                                        ll_text
+                                                        in ("NULL", "0", "nullptr")
+                                                        and lr_text == var_name
+                                                    ):
+                                                        return True
+                                elif op == "||":
+                                    # !var on left means var == NULL -> right only runs if var non-NULL
+                                    if left.type == "unary_expression":
+                                        lop = left.child_by_field_name("operator")
+                                        if (
+                                            lop
+                                            and code_bytes[
+                                                lop.start_byte : lop.end_byte
+                                            ].decode()
+                                            == "!"
+                                        ):
+                                            # Find operand (may not have field name)
+                                            loperand = left.child_by_field_name(
+                                                "operand"
+                                            )
+                                            if loperand is None:
+                                                for ch in left.children:
+                                                    if (
+                                                        ch.is_named
+                                                        and ch.type == "identifier"
+                                                    ):
+                                                        loperand = ch
+                                                        break
+                                            if (
+                                                loperand
+                                                and loperand.type == "identifier"
+                                            ):
+                                                lo_text = code_bytes[
+                                                    loperand.start_byte : loperand.end_byte
+                                                ].decode("utf-8", errors="replace")
+                                                if lo_text == var_name:
+                                                    return True
+                                    # var == NULL on left
+                                    if left.type == "binary_expression":
+                                        lop = left.child_by_field_name("operator")
+                                        if lop:
+                                            lop_text = code_bytes[
+                                                lop.start_byte : lop.end_byte
+                                            ].decode()
+                                            if lop_text == "==":
+                                                ll = left.child_by_field_name("left")
+                                                lr = left.child_by_field_name("right")
+                                                if ll and lr:
+                                                    ll_text = (
+                                                        code_bytes[
+                                                            ll.start_byte : ll.end_byte
+                                                        ]
+                                                        .decode(
+                                                            "utf-8", errors="replace"
+                                                        )
+                                                        .strip()
+                                                    )
+                                                    lr_text = (
+                                                        code_bytes[
+                                                            lr.start_byte : lr.end_byte
+                                                        ]
+                                                        .decode(
+                                                            "utf-8", errors="replace"
+                                                        )
+                                                        .strip()
+                                                    )
+                                                    if (
+                                                        lr_text
+                                                        in ("NULL", "0", "nullptr")
+                                                        and ll_text == var_name
+                                                    ):
+                                                        return True
+                                                    if (
+                                                        ll_text
+                                                        in ("NULL", "0", "nullptr")
+                                                        and lr_text == var_name
+                                                    ):
+                                                        return True
+            # Stop at condition boundary
+            if n.type in ("if_statement", "while_statement"):
+                break
+            n = n.parent
+        return False
+
+    def _collect_implicit_deref_arg(arg_node, call_node):
+        """从call_expression的参数节点中提取指针变量名，标记为隐式解引用。"""
+        if arg_node.type == "identifier":
+            var_name = code_bytes[arg_node.start_byte : arg_node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            if _is_short_circuit_protected(arg_node, var_name):
+                return
+            line = call_node.start_point[0] + 1
+            evidence = code_bytes[call_node.start_byte : call_node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            deref_points.append((var_name, line, evidence))
+        elif arg_node.type == "field_expression":
+            # p->member 传参：提取base pointer
+            op_node = arg_node.child_by_field_name("operator")
+            if (
+                op_node
+                and code_bytes[op_node.start_byte : op_node.end_byte].decode() == "->"
+            ):
+                base_arg = arg_node.child_by_field_name("argument")
+                if base_arg and base_arg.type == "identifier":
+                    var_name = code_bytes[
+                        base_arg.start_byte : base_arg.end_byte
+                    ].decode("utf-8", errors="replace")
+                    if not _is_short_circuit_protected(arg_node, var_name):
+                        line = call_node.start_point[0] + 1
+                        evidence = code_bytes[
+                            call_node.start_byte : call_node.end_byte
+                        ].decode("utf-8", errors="replace")
+                        deref_points.append((var_name, line, evidence))
+        elif arg_node.type == "pointer_expression":
+            # *p 传参：提取operand
+            op_node = arg_node.child_by_field_name("operator")
+            if (
+                op_node
+                and code_bytes[op_node.start_byte : op_node.end_byte].decode() == "*"
+            ):
+                for child in arg_node.children:
+                    if child.is_named and child.type == "identifier":
+                        var_name = code_bytes[child.start_byte : child.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        if not _is_short_circuit_protected(arg_node, var_name):
+                            line = call_node.start_point[0] + 1
+                            evidence = code_bytes[
+                                call_node.start_byte : call_node.end_byte
+                            ].decode("utf-8", errors="replace")
+                            deref_points.append((var_name, line, evidence))
+                        break
+
+    def _collect_derefs(node):
+        if node.type == "pointer_expression":
+            # tree-sitter-c: both * (deref) and & (address-of) are pointer_expression
+            # Only collect * (dereference), skip & (address-of which is safe)
+            op_node = node.child_by_field_name("operator")
+            is_deref = True
+            if op_node:
+                op_text = code_bytes[op_node.start_byte : op_node.end_byte].decode()
+                if op_text == "&":
+                    is_deref = False  # address-of, not dereference
+            if not is_deref:
+                pass  # &var is not a dereference
+            else:
+                # tree-sitter-c: pointer_expression children are [* identifier],
+                # no "operand" field; find identifier among named children
+                var_name = None
+                for child in node.children:
+                    if child.is_named and child.type == "identifier":
+                        var_name = code_bytes[child.start_byte : child.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        break
+                if var_name:
+                    if _is_short_circuit_protected(node, var_name):
+                        pass  # protected by &&/|| short-circuit in condition
+                    else:
+                        line = node.start_point[0] + 1
+                        # *p 写入也算解引用（*p = value 若p为NULL同样崩溃）
+                        evidence = code_bytes[node.start_byte : node.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        deref_points.append((var_name, line, evidence))
+        elif node.type == "field_expression":
+            # 区分 `.` (栈结构体访问，不可能为NULL) vs `->` (指针解引用)
+            operator_node = node.child_by_field_name("operator")
+            is_arrow = False
+            if operator_node:
+                op_text = code_bytes[
+                    operator_node.start_byte : operator_node.end_byte
+                ].decode()
+                is_arrow = op_text == "->"
+            if is_arrow:
+                # `->` 是指针解引用，提取argument侧的变量名
+                arg_node = node.child_by_field_name("argument")
+                if arg_node and arg_node.type == "identifier":
+                    var_name = code_bytes[
+                        arg_node.start_byte : arg_node.end_byte
+                    ].decode("utf-8", errors="replace")
+                    if _is_short_circuit_protected(node, var_name):
+                        pass
+                    else:
+                        line = node.start_point[0] + 1
+                        evidence = code_bytes[node.start_byte : node.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        deref_points.append((var_name, line, evidence))
+            # `.` 访问栈结构体，不可能为NULL，不收集
+        elif node.type == "subscript_expression":
+            # arr[i] 或 next->d_name[0]
+            base = node.child_by_field_name("argument")
+            if base:
+                if base.type == "identifier":
+                    var_name = code_bytes[base.start_byte : base.end_byte].decode(
+                        "utf-8", errors="replace"
+                    )
+                    if _is_short_circuit_protected(node, var_name):
+                        pass
+                    else:
+                        line = node.start_point[0] + 1
+                        evidence = code_bytes[node.start_byte : node.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        deref_points.append((var_name, line, evidence))
+                elif base.type == "field_expression":
+                    # next->d_name[0]: 提取field_expression的base pointer
+                    base_arg = base.child_by_field_name("argument")
+                    if base_arg and base_arg.type == "identifier":
+                        var_name = code_bytes[
+                            base_arg.start_byte : base_arg.end_byte
+                        ].decode("utf-8", errors="replace")
+                        if _is_short_circuit_protected(node, var_name):
+                            pass
+                        else:
+                            line = node.start_point[0] + 1
+                            evidence = code_bytes[
+                                node.start_byte : node.end_byte
+                            ].decode("utf-8", errors="replace")
+                            deref_points.append((var_name, line, evidence))
+        elif node.type == "call_expression":
+            # 隐式解引用：白名单函数的指针参数会被函数内部解引用
+            # e.g. strcpy(p, "hello") 会解引用 p
+            func_node = node.child_by_field_name("function")
+            if func_node and func_node.type == "identifier":
+                func_name = code_bytes[
+                    func_node.start_byte : func_node.end_byte
+                ].decode("utf-8", errors="replace")
+                # 确定哪些参数位置需要检查
+                # key=函数名, value=需要检查的参数索引列表（0-based）
+                # -1 表示"格式字符串之后的所有参数"（printf族）
+                _deref_arg_indices = {
+                    # 字符串操作：第1个参数（目标缓冲区）被解引用
+                    "strcpy": [0],
+                    "strncpy": [0],
+                    "strcat": [0],
+                    "strncat": [0],
+                    # 内存操作：第1个参数被解引用
+                    "memcpy": [0],
+                    "memmove": [0],
+                    "memset": [0],
+                    # 字符串查询：第1个参数（源字符串）被解引用
+                    "strlen": [0],
+                    "strcmp": [0, 1],
+                    "strncmp": [0, 1],
+                    "strchr": [0],
+                    "strrchr": [0],
+                    "strstr": [0],
+                    "strtok": [0],
+                    # I/O：相关参数被解引用
+                    "puts": [0],
+                    "fputs": [0],
+                    "gets": [0],
+                    "fgets": [0],
+                    # free：free(NULL)安全，不解引用指针，不标记为隐式解引用
+                    # printf族：-1表示格式字符串之后的所有参数
+                    "printf": [-1],
+                    "fprintf": [-1],
+                    "sprintf": [-1],
+                    "snprintf": [-1],
+                    "syslog": [-1],
+                }
+                arg_indices = _deref_arg_indices.get(func_name)
+                if arg_indices is not None:
+                    # 收集argument_list中的参数
+                    arg_list = None
+                    for child in node.children:
+                        if child.type == "argument_list":
+                            arg_list = child
+                            break
+                    if arg_list:
+                        args = [c for c in arg_list.children if c.is_named]
+                        for idx in arg_indices:
+                            if idx == -1:
+                                # printf族：跳过格式字符串（第0个参数），检查之后所有参数
+                                for ai in range(1, len(args)):
+                                    _collect_implicit_deref_arg(args[ai], node)
+                            elif idx < len(args):
+                                _collect_implicit_deref_arg(args[idx], node)
+        for child in node.children:
+            _collect_derefs(child)
+
+    _collect_derefs(root)
+
+    issues: List[Issue] = []
+    reported_vars: set[str] = set()
+
+    for var_name, line, evidence in deref_points:
+        if var_name == "this":
+            continue
+        if var_name in stack_arrays:
+            continue
+        if var_name in stack_structs:
+            continue
+        # func_params不跳过：函数参数恰恰是最可能为NULL的，需检测
+        if var_name in global_vars:
+            continue
+        if var_name in safe_assigned_vars:
+            continue
+        if var_name in early_exit_vars and any(
+            line > check_line for check_line in early_exit_vars[var_name]
+        ):
+            continue
+        in_protected = any(
+            start <= line <= end for start, end in protected_ranges.get(var_name, [])
+        )
+        if in_protected:
+            continue
+        if var_name in reported_vars:
+            continue
+        reported_vars.add(var_name)
+        issues.append(
+            Issue(
+                language="c/cpp",
+                category="memory_mgmt",
+                pattern="possible_null_deref",
+                file=relpath,
+                line=line,
+                evidence=_strip_line(evidence),
+                description=f"可能对指针 {var_name} 进行了解引用，但未见 NULL 检查保护，存在空指针解引用风险。",
+                suggestion="在使用指针前执行 NULL 判定；确保所有返回/赋值路径均进行了合法性检查。",
+                confidence=0.7,
+                severity="high",
+                var_name=var_name,
+            )
+        )
+
+    return issues
+
+
 def _rule_possible_null_deref(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
@@ -4265,10 +5076,17 @@ def _rule_possible_null_deref(
     """
     issues: List[Issue] = []
 
+    # 优先使用AST检测
+    ast_issues = _ast_null_deref_check(lines, relpath, database)
+    if ast_issues is not None:
+        return ast_issues
+
     # 从database获取null_checks信息（用于误报过滤）
     db_null_checks: Dict[str, List[int]] = {}
     # 收集函数参数（参数的NULL检查应在调用者处进行）
     func_params: set[str] = set()
+    # 从database查询的数组变量名（待合并到stack_arrays）
+    db_array_vars: set[str] = set()
     if database is not None:
         try:
             # 直接从database查询null_checks
@@ -4289,14 +5107,35 @@ def _rule_possible_null_deref(
                     var_name = node.get("var_name", "")
                     if var_name:
                         func_params.add(var_name)
-        except Exception as e:
-            save_exception(
-                e,
-                module="jarvis_sec.checkers.c_checker",
-                function="_rule_possible_null_deref",
-            )
-            pass
+            # 从symbols表查询当前文件的数组变量（type_name以[]结尾）
+            try:
+                file_symbols = database.get_symbols_by_file(relpath)
+                # 路径不匹配回退：database可能存绝对路径，而relpath是相对路径
+                if not file_symbols:
+                    import os
 
+                    abs_path = os.path.abspath(relpath)
+                    file_symbols = database.get_symbols_by_file(abs_path)
+                if not file_symbols:
+                    # 最后尝试LIKE后缀匹配
+                    with database._get_connection() as _conn:
+                        _cur = _conn.cursor()
+                        _cur.execute(
+                            "SELECT * FROM symbols WHERE file_path LIKE ? ORDER BY line_start",
+                            ("%" + relpath,),
+                        )
+                        file_symbols = [dict(row) for row in _cur.fetchall()]
+                for sym in file_symbols:
+                    if sym.get("kind") == "variable" and (
+                        sym.get("type_name", "").endswith("[]")
+                    ):
+                        sym_name = sym.get("name", "")
+                        if sym_name:
+                            db_array_vars.add(sym_name)
+            except Exception:
+                pass
+        except Exception:
+            pass
     # 优先尝试污点分析
     try:
         import jarvis.jarvis_sec.taint_analyzer as taint_analyzer
@@ -4380,6 +5219,8 @@ def _rule_possible_null_deref(
     safe_vars: set[str] = set()
     # 收集栈数组变量（栈数组不可能为NULL）
     stack_arrays: set[str] = set()
+    # 合并database查询的数组变量
+    stack_arrays.update(db_array_vars)
     # 收集智能指针变量（不可能为NULL）
     smart_ptr_vars: set[str] = set()
     # 收集C++容器变量（值类型，不可能为NULL）
@@ -4388,8 +5229,9 @@ def _rule_possible_null_deref(
         r"std::(?:array|vector|deque|list|set|map|unordered_set|unordered_map)[^>]*>\s*&?\s*([A-Za-z_]\w*)"
     )
     # 栈数组声明模式：类型 变量名[大小]
+    # 支持标准C类型 + 大写typedef风格（如CHAR, UCHAR, UINT等）
     re_stack_array = re.compile(
-        r"\b(char|int|long|short|void|unsigned|signed|float|double|size_t|ssize_t|uint\d*_t|int\d*_t)\s+(?:\*\s*)*([A-Za-z_]\w*)\s*\["
+        r"\b(char|int|long|short|void|unsigned|signed|float|double|size_t|ssize_t|uint\d*_t|int\d*_t|[A-Z][A-Z0-9_]*)\s+(?:\*\s*)*([A-Za-z_]\w*)\s*\["
     )
     for line in lines:
         m_static = re_static_global.search(line)
@@ -4440,6 +5282,9 @@ def _rule_possible_null_deref(
                     return True
         return False
 
+    # 去重：同一变量在同一文件内只报第一次出现
+    reported_vars: set[str] = set()
+
     for idx, s in enumerate(lines, start=1):
         vars_hit: List[str] = []
         # '->' 访问几乎必为解引用
@@ -4450,6 +5295,14 @@ def _rule_possible_null_deref(
             for m in re_star.finditer(s):
                 star_pos = m.start(0)
                 if not _is_deref_context(s, star_pos):
+                    continue
+                # 排除 *p = value 写入操作（不是解引用读取，是写入）
+                after_star = s[m.end(0) :].lstrip()
+                if (
+                    after_star
+                    and after_star[0] == "="
+                    and (len(after_star) < 2 or after_star[1] != "=")
+                ):
                     continue
                 vars_hit.append(m.group(1))
         # 数组访问 arr[...]：排除数组声明
@@ -4471,6 +5324,7 @@ def _rule_possible_null_deref(
                 if re.match(r"\s*\[[^\]]*\]\s*=", after_var):
                     continue
             vars_hit.append(var)
+        _stack_array_filtered = 0
         for v in set(vars_hit):
             if v == "this":  # C++ 成员函数中 this-> 通常不应视为空指针
                 continue
@@ -4479,7 +5333,17 @@ def _rule_possible_null_deref(
                 continue
             # 跳过栈数组（栈数组不可能为NULL）
             if v in stack_arrays:
+                _stack_array_filtered += 1
                 continue
+            # 通过database查询全局数组变量（跨文件声明的数组）
+            if database is not None and v not in stack_arrays:
+                try:
+                    global_sym = database.get_symbol(v)
+                    if global_sym and global_sym.get("type_name", "").endswith("[]"):
+                        stack_arrays.add(v)  # 缓存以避免重复查询
+                        continue
+                except Exception:
+                    pass
             # 跳过智能指针变量（不可能为NULL）
             if v in smart_ptr_vars:
                 continue
@@ -4491,6 +5355,9 @@ def _rule_possible_null_deref(
                 continue
             # 跳过 delete/delete[] 语句（不是解引用）
             if re_delete_stmt.search(s):
+                continue
+            # 去重：同一变量在同一文件内只报第一次出现
+            if v in reported_vars:
                 continue
             # 跳过刚分配成功后的立即使用（分配成功通常意味着非空）
             if _is_just_allocated(v, lines, idx):
@@ -4506,6 +5373,7 @@ def _rule_possible_null_deref(
             else:
                 has_null_check = _has_null_check_around(v, lines, idx, radius=3)
             if not has_null_check:
+                reported_vars.add(v)
                 issues.append(
                     Issue(
                         language="c/cpp",
