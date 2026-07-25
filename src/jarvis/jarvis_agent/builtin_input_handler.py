@@ -363,37 +363,65 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"❌ 目录不存在或不可用: {target_dir}")
             return "", True
         elif tag == "OrganizeAgents":
-            # 交互式获取编排文件路径
-            file_path = get_single_line_input("请输入编排文件路径: ")
-            if not file_path:
+            # 交互式获取编排文件路径（支持多行输入，每行一个路径）
+            from jarvis.jarvis_utils.input import get_multiline_input
+
+            PrettyOutput.auto_print("请输入编排文件路径（每行一个，输入空行结束）：")
+            file_paths_input = get_multiline_input("编排文件路径")
+            if not file_paths_input:
                 PrettyOutput.auto_print("❌ 未输入编排文件路径")
                 return "", True
 
-            file_path = file_path.strip().strip('"').strip("'")
-            if not os.path.isfile(file_path):
-                PrettyOutput.auto_print(f"❌ 编排文件不存在: {file_path}")
+            # 解析多行输入，去除每行前后引号和空白
+            file_paths = []
+            for line in file_paths_input.strip().split("\n"):
+                line = line.strip().strip('"').strip("'").strip()
+                if line:
+                    file_paths.append(line)
+
+            if not file_paths:
+                PrettyOutput.auto_print("❌ 未输入有效的编排文件路径")
                 return "", True
 
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                orchestration = yaml.safe_load(content)
-            except Exception as e:
-                PrettyOutput.auto_print(f"❌ 读取编排文件失败: {e}")
+            # 读取并合并所有编排文件
+            all_agents_config = []
+            for file_path in file_paths:
+                if not os.path.isfile(file_path):
+                    PrettyOutput.auto_print(f"❌ 编排文件不存在: {file_path}")
+                    continue
+
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    orchestration = yaml.safe_load(content)
+                except Exception as e:
+                    PrettyOutput.auto_print(f"❌ 读取编排文件失败: {file_path} - {e}")
+                    continue
+
+                if (
+                    not orchestration
+                    or not isinstance(orchestration, dict)
+                    or "agents" not in orchestration
+                ):
+                    PrettyOutput.auto_print(
+                        f"❌ 编排文件格式错误：{file_path} 缺少 'agents' 列表"
+                    )
+                    continue
+
+                agents_config = orchestration["agents"]
+                if not isinstance(agents_config, list) or not agents_config:
+                    PrettyOutput.auto_print(
+                        f"❌ 编排文件格式错误：{file_path} 'agents' 必须是非空列表"
+                    )
+                    continue
+
+                all_agents_config.extend(agents_config)
+
+            if not all_agents_config:
+                PrettyOutput.auto_print("❌ 没有有效的编排配置")
                 return "", True
 
-            if (
-                not orchestration
-                or not isinstance(orchestration, dict)
-                or "agents" not in orchestration
-            ):
-                PrettyOutput.auto_print("❌ 编排文件格式错误：缺少 'agents' 列表")
-                return "", True
-
-            agents_config = orchestration["agents"]
-            if not isinstance(agents_config, list) or not agents_config:
-                PrettyOutput.auto_print("❌ 编排文件格式错误：'agents' 必须是非空列表")
-                return "", True
+            agents_config = all_agents_config
 
             # 批量创建 Agent
             from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
