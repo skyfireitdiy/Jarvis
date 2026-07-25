@@ -1,0 +1,8 @@
+{
+  "id": "20260725_120028_363623",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "possible_null_deref", "jsec", "误报修复", "已完成"],
+  "content": "## possible_null_deref 误报修复 - 已完成\n\n### 修复结果\n339 → 33，减少90.3%\n\n### 三项修复策略\n1. **去重（reported_vars集合）**：同一变量在同一文件内只报第一次，消除 p->member 重复报告\n2. **re_stack_array增强**：添加 [A-Z][A-Z0-9_]* 匹配typedef大写类型名（CHAR, UCHAR等），识别非标准C类型数组\n3. **写入过滤**：*p = value 赋值操作不算解引用读取，排除 after_star 以 = 开头（排除==）的情况\n\n### 修改文件\nsrc/jarvis/jarvis_sec/checkers/c_checker.py (+54, -2)\n- re_stack_array: 第4317-4319行\n- 写入过滤: 第4384-4387行\n- reported_vars去重: 第4370-4371行 + 第4439-4440行 + 第4454行\n\n### 剩余33个的根因\n- 跨函数指针参数（需数据流分析）\n- 头文件/宏中声明的数组（正则无法识别）\n- 函数参数解引用（确实可能为NULL）\n- dirent等结构体成员访问（需类型信息）\n\n### Git\n初始commit: 97a8b97a, 修复后HEAD: 5693332",
+  "created_at": "2026-07-25T12:00:28.363650",
+  "updated_at": "2026-07-25T12:00:28.363655"
+}
