@@ -176,3 +176,61 @@ jarvis_agent/
   1. 新增参数 `snapshot` 和 `snapshot_turn`，支持基于快照压缩
   2. 返回压缩结果而非直接修改历史
   3. 移除所有压缩相关的 PrettyOutput 提示
+
+## 5. 数据结构设计
+
+### 5.1 CompressionResult
+
+| 字段名              | 类型                  | 必填 | 说明                           |
+| ------------------- | --------------------- | ---- | ------------------------------ |
+| summary_text        | str                   | 是   | 压缩生成的摘要文本             |
+| snapshot_turn       | int                   | 是   | 对应快照的对话轮次             |
+| compressed_turns    | int                   | 是   | 被压缩的对话轮数               |
+| success             | bool                  | 是   | 压缩是否成功                   |
+
+### 5.2 数据流转
+
+```text
+1. 快照阶段（主线程，持锁）
+   model.history_messages -> copy.deepcopy -> snapshot
+   model.get_conversation_turn() -> snapshot_turn
+
+2. 压缩阶段（后台线程，无锁）
+   snapshot -> temp_model.chat() -> summary_text
+   summary_text + snapshot_turn -> CompressionResult
+   CompressionResult -> pending_replacement（持锁写入）
+
+3. 合并阶段（主线程，持锁读取后无锁合并）
+   CompressionResult + 当前历史 -> 新历史
+   新历史 = [system_prompt] + [压缩摘要msg] + [snapshot_turn之后的新消息]
+```
+
+## 6. 核心算法设计
+
+### 6.1 后台压缩执行算法
+
+- **算法目标**：在后台线程中执行上下文压缩，生成摘要
+- **输入**：历史消息快照、当前消息token数
+- **输出**：CompressionResult
+- **算法流程**：
+  1. 创建临时模型实例（复用 `_create_temp_model`）
+  2. 将快照历史注入临时模型
+  3. 构建压缩提示词（复用 `SUMMARY_REQUEST_PROMPT`）
+  4. 调用临时模型生成摘要
+  5. 验证摘要完整性（复用 `_validate_summary`）
+  6. 封装为 CompressionResult
+  7. 持锁写入 `pending_replacement`
+- **异常处理**：任何步骤失败，持锁设置 `compression_failed = True`
+- **静默要求**：全程不调用 PrettyOutput，仅用 logging 记录
+
+### 6.2 安全合并算法
+
+- **算法目标**：将压缩结果安全合并到当前历史，不丢失新消息
+- **输入**：CompressionResult、当前历史消息
+- **输出**：合并后的新历史
+- **算法流程**：
+  1. 获取当前对话轮次 `current_turn`
+  2. 从当前历史中提取 `snapshot_turn` 之后的新消息
+  3. 构建新历史：`[system_prompt] + [压缩摘要] + new_messages`
+  4. 替换模型的历史消息
+- **关键保证**：新消息是快照之后产生的，压缩未触及，必须100%保留
