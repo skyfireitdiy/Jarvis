@@ -1,0 +1,8 @@
+{
+  "id": "20260725_132748_183020",
+  "type": "project_long_term",
+  "tags": ["jarvis", "c_checker", "possible_null_deref", "ast_analysis"],
+  "content": "AST数据流分析实现完成 - possible_null_deref检测\n\n关键发现：\n1. tree-sitter解析C文件常有has_error=True(宏等)，但不影响AST可用性。不能因has_error返回None回退到正则。\n2. 函数参数通过parameter_declaration收集，但很多'安全'变量实际是局部指针(从参数/全局/栈数组赋值而来)，需要赋值追踪。\n3. while((var=func())!=NULL)模式需特殊处理：_extract_null_checked_vars需从parenthesized_expression中提取assignment_expression的LHS。\n4. 2D数组声明产生嵌套array_declarator，_extract_declarator_name需递归处理。\n5. alloca()返回栈内存不可能为NULL，应标记为安全源。\n6. subscript_expression在declaration内(如全局数组声明g_tClientInfo[MAX_PROC_NUM])不应收集为deref。\n\n文件: /home/wangmaobin/Jarvis/src/jarvis/jarvis_sec/checkers/c_checker.py\n函数: _ast_null_deref_check (line ~4148), _rule_possible_null_deref (line ~4497)",
+  "created_at": "2026-07-25T13:27:48.183055",
+  "updated_at": "2026-07-25T13:27:48.183060"
+}
