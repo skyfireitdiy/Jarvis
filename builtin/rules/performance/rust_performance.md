@@ -1,6 +1,6 @@
 ---
 name: rust_performance
-description: 当需要优化Rust代码性能、进行Rust性能分析或调优时使用此规则——Rust代码性能优化策略和最佳实践。包括：分析Rust代码的性能瓶颈；使用Perf等工具进行性能分析；优化Rust的内存管理；减少不必要的内存分配；优化算法和数据结构；利用Rust的零成本抽象；使用并发和异步提升性能；优化编译期计算；减少不必要的拷贝和克隆；遵循Rust性能优化最佳实践。每当用户提及"Rust性能"、"Rust优化"、"Rust调优"、"Rust性能分析"、"Rust代码性能"、"Perf分析"或需要Rust性能优化、Rust代码调优、Rust性能分析时触发，无论代码的规模和复杂度如何。如果需要优化Rust代码的性能或进行性能分析，请使用此规则。
+description: 当需要优化Rust代码性能或进行Rust性能分析时触发。每当用户提及"Rust性能"、"Rust优化"、"Rust调优"、"Rust性能分析"、"Rust代码性能"、"Perf分析"时触发。不触发：非Rust代码的性能优化；仅编写Rust代码不涉及性能；仅阅读Rust代码不修改。
 ---
 
 # Rust 性能优化规则（基于 Perf 分析）
