@@ -786,8 +786,6 @@ def save_exception(
         # 脱敏：移除可能的API key等敏感信息
         safe_tb = tb_text
         safe_context = context or ""
-        for text in [safe_tb, safe_context]:
-            pass  # 仅用于引用，实际脱敏在下方
         sensitive_patterns = [
             r"sk-[a-zA-Z0-9]{20,}",
             r'key["\s:=]+["\']?[a-zA-Z0-9]{20,}["\']?',
