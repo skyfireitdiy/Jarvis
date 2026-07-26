@@ -3588,6 +3588,9 @@ def _rule_uninitialized_var(
         t = s.lstrip()
         if t.startswith("#"):
             continue
+        # 跳过typedef（类型别名，不是变量声明）
+        if re.search(r"\btypedef\b", s):
+            continue
         # 跳过class/struct成员变量（由uninitialized_member规则覆盖）
         if idx in class_member_lines:
             continue
