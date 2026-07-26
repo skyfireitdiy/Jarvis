@@ -1,0 +1,8 @@
+{
+  "id": "20260726_221921_181773",
+  "type": "project_long_term",
+  "tags": ["执行方案", "Bug修复", "divide_by_zero"],
+  "content": "## divide_by_zero 宏常量误报修复完成\n\n### 根因\n正则检查器只排除数字常量除数，不排除 #define 宏常量（如 MSINSECOND=1000）\n\n### 修复\n新增 `_ast_divide_by_zero_check` 函数，用tree-sitter AST替代正则：\n- 从 preproc_def 节点收集值为非零数字常量的宏名集合\n- 找 binary_expression 中 operator 为 / 或 % 的节点\n- 右操作数为数字字面量非零 → 跳过\n- 右操作数为identifier且在宏常量集合中 → 跳过\n- 右操作数为变量 → 检查附近零检查\n- tree-sitter不可用时保留原正则作为回退\n\n### 验证\nushell_client项目 divide_by_zero 1→0\n\n### 修改文件\nsrc/jarvis/jarvis_sec/checkers/c_checker.py (+143行新函数, +7行调用入口)\n\n### Git\ncommit: 9592b6a",
+  "created_at": "2026-07-26T22:19:21.181799",
+  "updated_at": "2026-07-26T22:19:21.181803"
+}
