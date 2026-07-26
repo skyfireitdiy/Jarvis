@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.config import save_exception
 """GitHub 搜索源实现"""
 
 import aiohttp
+from jarvis.jarvis_utils.config import save_exception
 from typing import List, Optional
 from .base import ISkillSource, SkillResult
 

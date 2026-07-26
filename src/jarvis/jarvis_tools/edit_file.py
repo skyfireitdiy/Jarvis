@@ -4,10 +4,11 @@ import os
 import shutil
 import sys
 
-from jarvis.jarvis_utils.config import (, save_exception
+from jarvis.jarvis_utils.config import (
     detect_file_encoding,
     get_default_encoding,
     read_text_file,
+    save_exception,
 )
 from jarvis.jarvis_utils.output import PrettyOutput
 

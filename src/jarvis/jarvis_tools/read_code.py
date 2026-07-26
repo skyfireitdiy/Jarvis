@@ -4,11 +4,12 @@ import sys
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from jarvis.jarvis_utils.config import (, save_exception
+from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     detect_file_encoding,
     get_max_input_token_count,
     read_text_file,
+    save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput

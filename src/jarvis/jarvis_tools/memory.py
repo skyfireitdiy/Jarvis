@@ -8,10 +8,11 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from jarvis.jarvis_utils.config import (, save_exception
+from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     get_data_dir,
     get_max_input_token_count,
+    save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
