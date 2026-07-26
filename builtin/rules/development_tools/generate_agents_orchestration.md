@@ -1,6 +1,6 @@
 ---
 name: generate_agents_orchestration
-description: 当需要生成Agents编排文件时使用此规则——Agents编排文件生成规则，用于指导用户创建YAML格式的Agent编排配置文件，供@OrganizeAgents命令批量创建Agent使用。包括：编排文件结构说明、字段定义、配置示例、最佳实践。每当用户提及"编排文件"、"批量创建Agent"、"Agent编排"、"OrganizeAgents配置"或需要批量创建多个Agent时触发。
+description: 当需要生成Agents编排文件以批量创建Agent时触发。每当用户提及"编排文件"、"批量创建Agent"、"Agent编排"、"OrganizeAgents配置"时触发。不触发：仅创建单个Agent；仅查看Agent列表；Agent间通信不涉及编排。
 ---
 
 # Agents 编排文件生成规则

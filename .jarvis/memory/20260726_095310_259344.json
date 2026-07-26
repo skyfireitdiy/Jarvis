@@ -1,0 +1,8 @@
+{
+  "id": "20260726_095310_259344",
+  "type": "project_long_term",
+  "tags": ["规则优化", "description规范", "已完成"],
+  "content": "规则description优化任务已完成。共修改66个文件的YAML description字段，覆盖builtin/rules所有目录（performance/tool_config/development_workflow/development_tools/security/deployment/architecture_design/agent_network/agent_personality/code_quality/ui_design/testing/superpowers/skills）和.jarvis/rules非spec类规则。新规范：description只含触发条件+触发关键词+不触发条件，禁止写功能介绍/技能说明/规则内容/操作列表。格式：当需要[触发条件]时触发。每当用户提及\"[关键词1]\"、\"[关键词2]\"时触发。不触发：[条件1]；[条件2]；[条件3]。spec类规则description保持简洁，不套用新格式。初始commit: 8891735e1f40f46bf273ffa2de67028b679b796c",
+  "created_at": "2026-07-26T09:53:10.259379",
+  "updated_at": "2026-07-26T09:53:10.259394"
+}

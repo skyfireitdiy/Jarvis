@@ -1,6 +1,6 @@
 ---
 name: plantuml_fix
-description: 当需要修复Markdown文件中的PlantUML代码块时使用此规则——PlantUML修复规则，提取、校验和修复PlantUML代码。包括：从MD文件中提取PlantUML代码块为单独的.puml文件；使用PlantUML程序校验语法并报告错误；AI根据错误信息修复.puml文件；将修复后的代码写回原文件。每当用户提及"PlantUML"、"UML图"、"图表修复"、"语法错误"或需要修复/校验PlantUML代码时触发，无论他们使用什么编辑器或环境。如果需要提取、校验或修复Markdown文件中的PlantUML代码块，请使用此规则。
+description: 当需要修复或校验PlantUML代码块时触发。每当用户提及"PlantUML"、"UML图"、"图表修复"、"语法错误"时触发。不触发：仅生成PlantUML不修复；非PlantUML图表；Mermaid图表。
 license: MIT
 ---
 
@@ -125,6 +125,7 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 **问题**：`!theme plain` 等指令在旧版本（如 1.2020.02）中不支持
 
 **修复方法**：
+
 - 移除不支持的 `!theme` 指令
 - 检查 PlantUML 版本：`plantuml -version`
 - 使用 `-checkonly` 验证语法兼容性
@@ -132,6 +133,7 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 ### 2. Activity Diagram 语法问题
 
 **问题**：单独的代码行不是有效语法
+
 ```plantuml
 # 错误示例
 :调用函数;
@@ -139,6 +141,7 @@ enqueueCommandInLane();  # 单独的代码行无效
 ```
 
 **修复方法**：将代码合并到描述行
+
 ```plantuml
 # 正确示例
 :调用函数 enqueueCommandInLane();
@@ -147,6 +150,7 @@ enqueueCommandInLane();  # 单独的代码行无效
 ### 3. 变量赋值语法问题
 
 **问题**：单独的变量赋值行无效
+
 ```plantuml
 # 错误示例
 :初始化;
@@ -154,6 +158,7 @@ count = 1;  # 单独的赋值行无效
 ```
 
 **修复方法**：将赋值合并到描述行
+
 ```plantuml
 # 正确示例
 :初始化 count = 1;
@@ -162,6 +167,7 @@ count = 1;  # 单独的赋值行无效
 ### 4. 条件语句语法问题
 
 **问题**：`if`/`elseif` 缺少 `then` 关键字
+
 ```plantuml
 # 错误示例
 if (条件?) (是)
@@ -172,6 +178,7 @@ endif
 ```
 
 **修复方法**：添加 `then` 关键字
+
 ```plantuml
 # 正确示例
 if (条件?) then (是)
@@ -184,6 +191,7 @@ endif
 ### 5. 多行对象字面量问题
 
 **问题**：对象字面量跨多行可能导致解析错误
+
 ```plantuml
 # 错误示例
 :调用函数 func({
@@ -193,6 +201,7 @@ endif
 ```
 
 **修复方法**：合并为单行或使用变量
+
 ```plantuml
 # 正确示例
 :调用函数 func({ key1: value1, key2: value2 });
@@ -201,6 +210,7 @@ endif
 ### 6. 箭头语法问题
 
 **问题**：箭头语法不正确
+
 ```plantuml
 # 错误示例
 A -> B: 消息
@@ -208,6 +218,7 @@ A --> B: 消息
 ```
 
 **修复方法**：根据图表类型使用正确的箭头
+
 - 类图：使用 `-->` 或 `--*` 等
 - 时序图：使用 `->` 或 `-->`
 - 活动图：使用 `->` 连接活动
@@ -215,16 +226,19 @@ A --> B: 消息
 ## 修复策略总结
 
 ### 最小化修改原则
+
 1. 只修复语法错误，不改变语义
 2. 保持原始代码的缩进和格式
 3. 优先合并代码行，而非删除
 
 ### 修复顺序
+
 1. 先修复版本兼容性问题（如移除 `!theme`）
 2. 再修复语法结构问题（如 `if`/`then`）
 3. 最后修复代码行合并问题
 
 ### 验证方法
+
 ```bash
 # 逐个文件验证
 for f in *.puml; do
