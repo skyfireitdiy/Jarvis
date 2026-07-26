@@ -6,6 +6,8 @@
 
 from typing import Any
 
+from jarvis.jarvis_utils.config import save_exception
+
 
 def _collect_language_support_info() -> dict[str, dict[str, Any]]:
     """收集所有语言的功能支持信息"""
