@@ -817,6 +817,172 @@ def _extract_call_args(line: str, func_name: str) -> str:
     return ""
 
 
+def _ast_realloc_assign_back_check(
+    lines: Sequence[str], relpath: str
+) -> Optional[List[Issue]]:
+    """基于tree-sitter AST的realloc返回值使用检测，替代正则扫描。"""
+    try:
+        import tree_sitter_c as tsc
+        import tree_sitter_cpp as tscpp
+        from tree_sitter import Language, Parser
+    except ImportError:
+        return None
+
+    code = "".join(lines)
+    if not code.endswith("\n"):
+        code += "\n"
+    code_bytes = code.encode("utf-8")
+
+    is_cpp = _is_cpp_file(relpath)
+    try:
+        if is_cpp:
+            lang = Language(tscpp.language())
+        else:
+            lang = Language(tsc.language())
+        parser = Parser(lang)
+    except Exception:
+        return None
+
+    tree = parser.parse(code_bytes)
+    root = tree.root_node
+
+    issues: List[Issue] = []
+
+    def _find_realloc_calls(node):
+        """递归查找所有realloc调用节点。"""
+        results = []
+        if node.type == "call_expression":
+            func = node.child_by_field_name("function")
+            if (
+                func
+                and code_bytes[func.start_byte : func.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                == "realloc"
+            ):
+                results.append(node)
+        for child in node.children:
+            results.extend(_find_realloc_calls(child))
+        return results
+
+    realloc_calls = _find_realloc_calls(root)
+
+    for call_node in realloc_calls:
+        line_num = call_node.start_point[0] + 1
+        evidence = _strip_line(lines[line_num - 1])
+
+        # 提取realloc第一个参数（原指针变量名）
+        args = call_node.child_by_field_name("arguments")
+        first_arg_name = None
+        if args:
+            for child in args.children:
+                if child.type == "identifier":
+                    first_arg_name = code_bytes[
+                        child.start_byte : child.end_byte
+                    ].decode("utf-8", errors="replace")
+                    break
+                elif child.type in (
+                    "pointer_expression",
+                    "parenthesized_expression",
+                    "cast_expression",
+                ):
+                    # 递归找最左边的identifier
+                    inner = child
+                    while inner and inner.type != "identifier":
+                        ids = [c for c in inner.children if c.type == "identifier"]
+                        if ids:
+                            inner = ids[0]
+                            break
+                        inner = inner.children[0] if inner.children else None
+                    if inner and inner.type == "identifier":
+                        first_arg_name = code_bytes[
+                            inner.start_byte : inner.end_byte
+                        ].decode("utf-8", errors="replace")
+                    break
+
+        # 检查realloc调用是否在赋值表达式右值中
+        parent = call_node.parent
+        lhs_var = None
+        is_assigned = False
+
+        # cast_expression: (int *)realloc(...) → parent是cast
+        if parent and parent.type == "cast_expression":
+            parent = parent.parent
+
+        # parenthesized_expression: (realloc(...)) → 不太常见但处理
+        while parent and parent.type == "parenthesized_expression":
+            parent = parent.parent
+
+        if parent and parent.type == "assignment_expression":
+            is_assigned = True
+            # 提取左值变量名
+            lhs_node = parent.child_by_field_name("left")
+            if lhs_node:
+                lhs_var = (
+                    code_bytes[lhs_node.start_byte : lhs_node.end_byte]
+                    .decode("utf-8", errors="replace")
+                    .strip()
+                )
+
+        # 也检查初始化声明: type *p = realloc(...)
+        if parent and parent.type == "init_declarator":
+            is_assigned = True
+            decl_node = parent.child_by_field_name("declarator")
+            if decl_node:
+                # 处理pointer_declarator等嵌套
+                inner = decl_node
+                while inner and inner.type != "identifier":
+                    ids = [c for c in inner.children if c.type == "identifier"]
+                    if ids:
+                        inner = ids[0]
+                        break
+                    inner = inner.children[0] if inner.children else None
+                if inner and inner.type == "identifier":
+                    lhs_var = code_bytes[inner.start_byte : inner.end_byte].decode(
+                        "utf-8", errors="replace"
+                    )
+
+        if not is_assigned:
+            # realloc调用但未赋值，内存泄漏风险
+            var_desc = f"指针 {first_arg_name}" if first_arg_name else "指针"
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="realloc_assign_back",
+                    file=relpath,
+                    line=line_num,
+                    evidence=evidence,
+                    description=f"realloc 调用但未将结果赋值回{var_desc}，可能导致内存泄漏或使用已释放内存。",
+                    suggestion="使用临时指针接收 realloc 返回值，判空成功后再赋值回原指针。",
+                    confidence=0.75,
+                    severity="high",
+                )
+            )
+        elif lhs_var and first_arg_name and lhs_var == first_arg_name:
+            # p = realloc(p, ...) 直接覆盖原指针，若realloc失败则原内存泄漏
+            conf = 0.8
+            if not _has_null_check_around(lhs_var, lines, line_num, radius=3):
+                conf += 0.1
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="realloc_assign_back",
+                    file=relpath,
+                    line=line_num,
+                    evidence=evidence,
+                    description=f"realloc 直接覆盖原指针 {lhs_var}，若失败将导致原内存泄漏。",
+                    suggestion="使用临时指针接收 realloc 返回值，判空成功后再赋值回原指针。",
+                    confidence=min(conf, 0.95),
+                    severity=_severity_from_confidence(conf, "memory_mgmt"),
+                )
+            )
+        # else: tmp = realloc(p, ...) 用临时变量接收，这是安全写法，不报
+
+    return issues
+
+
 def _rule_realloc_assign_back(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
@@ -853,27 +1019,27 @@ def _rule_realloc_assign_back(
             )
         return issues
 
-    # 污点分析无结果，回退到启发式检测
-    # 检测 realloc 调用但未赋值回原指针的情况
+    # 污点分析无结果，使用tree-sitter AST检测
+    ast_issues = _ast_realloc_assign_back_check(lines, relpath)
+    if ast_issues is not None:
+        issues.extend(ast_issues)
+        return issues
+
+    # tree-sitter不可用时的最终回退：正则启发式
     realloc_call_pattern = re.compile(
         r"realloc\s*\(\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE
     )
     for idx, s in enumerate(lines, start=1):
-        # 检测 realloc(p, size) 但没有赋值回的情况
         m = realloc_call_pattern.search(s)
         if m:
             var = m.group(1)
-            # 检查是否有赋值操作（p = realloc(p, ...) 或 tmp = realloc(p, ...)）
-            # 如果行中没有 = 或者 = 不在 realloc 之前，则认为未赋值回
             has_assign = False
             if "=" in s:
-                # 检查是否是 p = realloc(p, ...) 形式
                 assign_match = re.search(
                     rf"\b{re.escape(var)}\s*=\s*realloc", s, re.IGNORECASE
                 )
                 if assign_match:
                     has_assign = True
-                # 或者是 tmp = realloc(p, ...) 形式（有临时变量接收）
                 else:
                     tmp_assign_match = re.search(
                         r"\b([A-Za-z_]\w*)\s*=\s*realloc", s, re.IGNORECASE
@@ -882,7 +1048,6 @@ def _rule_realloc_assign_back(
                         has_assign = True
 
             if not has_assign:
-                # realloc 调用但未赋值回，可能导致内存泄漏或使用已释放内存
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -898,12 +1063,10 @@ def _rule_realloc_assign_back(
                     )
                 )
 
-        # 检测 realloc 直接覆盖原指针的情况（p = realloc(p, ...)）
         m2 = RE_REALLOC_ASSIGN_BACK.search(s)
         if m2:
             var = m2.group(1)
             conf = 0.8
-            # 如果附近未见错误处理/NULL检查，置信度更高
             if not _has_null_check_around(var, lines, idx, radius=3):
                 conf += 0.1
             issues.append(
