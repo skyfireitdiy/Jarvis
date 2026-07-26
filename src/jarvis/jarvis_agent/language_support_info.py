@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.config import save_exception
 """语言功能支持信息模块
 
 提供语言功能支持情况的收集和展示功能。
