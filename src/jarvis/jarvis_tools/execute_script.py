@@ -216,7 +216,7 @@ class ScriptTool:
         其他（如 PowerShell）可能用控制台编码（GBK）。优先尝试 UTF-8 以正确显示中文。"""
         if not data:
             return ""
-        from jarvis.jarvis_utils.config import get_default_encoding, save_exception
+        from jarvis.jarvis_utils.config import get_default_encoding
 
         # 优先 UTF-8：Python 脚本 stdout 在此模式下为 UTF-8
         for enc in ("utf-8", get_default_encoding(), "cp936"):
