@@ -25,7 +25,7 @@ from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
-from jarvis.jarvis_utils.config import get_agent_definition_dirs
+from jarvis.jarvis_utils.config import get_agent_definition_dirs, save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_roles_dirs
 from jarvis.jarvis_utils.config import is_auto_resume_session
@@ -507,7 +507,12 @@ def handle_builtin_config_selector(
                 builtin_dir = _get_builtin_dir()
                 if builtin_dir is not None:
                     builtin_dirs.append(builtin_dir)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.jarvis",
+                    function="handle_builtin_config_selector",
+                )
                 pass
 
             # 向后兼容：也尝试从文件位置向上查找（开发环境）
@@ -517,7 +522,12 @@ def handle_builtin_config_selector(
                     p = anc / "builtin"
                     if p.exists() and p.is_dir():
                         builtin_dirs.append(p)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.jarvis",
+                    function="handle_builtin_config_selector",
+                )
                 pass
 
             # 去重，保留顺序
@@ -1512,14 +1522,20 @@ def run_cli(
                 from jarvis.jarvis_gateway.manager import get_current_gateway
 
                 get_current_gateway()
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.jarvis", function="on_status_update"
+                )
                 pass
         except Exception as web_gateway_err:
             try:
                 from jarvis.jarvis_gateway.manager import set_current_gateway
 
                 set_current_gateway(None)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.jarvis", function="on_status_update"
+                )
                 pass
             PrettyOutput.auto_print(f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}")
 
@@ -1643,7 +1659,10 @@ def run_cli(
             if agent is not None:
                 try:
                     agent.save_session()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_agent.jarvis", function="on_status_update"
+                    )
                     pass
 
             if web_gateway_server is not None:
@@ -1654,13 +1673,19 @@ def run_cli(
                     web_gateway_server.force_exit = True
                     # 等待 uvicorn 线程结束（最多等待 2 秒）
                     thread.join(timeout=2)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_agent.jarvis", function="on_status_update"
+                    )
                     pass
                 try:
                     from jarvis.jarvis_gateway.manager import set_current_gateway
 
                     set_current_gateway(None)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_agent.jarvis", function="on_status_update"
+                    )
                     pass
 
             # 如果是tmux并行任务，写入状态文件

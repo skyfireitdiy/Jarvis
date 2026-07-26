@@ -8,6 +8,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+from jarvis.jarvis_utils.config import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.constants import MAX_LLM_RETRIES
@@ -59,7 +60,12 @@ def create_llm_model(
         # 确保模型没有控制台输出（与 code_agent.py 保持一致）
         try:
             model.set_suppress_output(False)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.library_replacer_llm",
+                function="create_llm_model",
+            )
             pass
 
         # 设置系统提示词

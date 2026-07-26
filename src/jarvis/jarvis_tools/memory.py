@@ -12,6 +12,7 @@ from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     get_data_dir,
     get_max_input_token_count,
+    save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -386,7 +387,10 @@ class MemoryTool:
                     memory_token_limit = calculate_token_limit(remaining_tokens)
                     if memory_token_limit <= 0:
                         memory_token_limit = None
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_tools.memory", function="_execute_retrieve"
+                    )
                     pass
 
             # 回退方案：使用输入窗口的2/3

@@ -3,6 +3,7 @@
 代码生成模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import re
 from pathlib import Path
@@ -232,9 +233,19 @@ class GenerationManager:
                     PrettyOutput.auto_print(
                         f"✅ [c2rust-transpiler][gen] auto-created module file: {mp}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_generation",
+                        function="codeagent_generate_impl",
+                    )
                     pass
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.transpiler_generation",
+                function="codeagent_generate_impl",
+            )
             pass
 
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
@@ -290,5 +301,10 @@ class GenerationManager:
                             PrettyOutput.auto_print(
                                 f"📋 [c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露"
                             )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_c2rust.transpiler_generation",
+                    function="codeagent_generate_impl",
+                )
                 pass

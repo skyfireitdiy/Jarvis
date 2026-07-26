@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 import json
 import threading
 from typing import Any
@@ -216,7 +217,7 @@ class StreamableMcpClient(McpClient):
             if "text/event-stream" in content_type.lower():
                 # 处理SSE格式响应
                 # 强制使用 UTF-8 解码，避免 requests 猜测错误（默认 ISO-8859-1）
-                response_text = response.content.decode('utf-8')
+                response_text = response.content.decode("utf-8")
                 for line in response_text.splitlines():
                     line = line.strip()
                     if line.startswith("data:"):
@@ -259,7 +260,12 @@ class StreamableMcpClient(McpClient):
                                             break
                                     except json.JSONDecodeError:
                                         continue
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_mcp.streamable_mcp_client",
+                                function="_send_request",
+                            )
                             pass
                 # 处理非流式响应（用于初始化请求）
                 # 即使是非流式请求，服务器也可能返回SSE格式的响应

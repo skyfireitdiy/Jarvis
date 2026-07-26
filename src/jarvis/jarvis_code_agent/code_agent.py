@@ -38,7 +38,7 @@ from jarvis.jarvis_code_agent.code_agent_prompts import (
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
-from jarvis.jarvis_utils.config import is_auto_resume_session
+from jarvis.jarvis_utils.config import is_auto_resume_session, save_exception
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_utils.config import is_enable_request_classification
@@ -638,7 +638,8 @@ git reset --hard {start_commit}
             # Ensure switching back to the original working directory after CodeAgent completes
             try:
                 os.chdir(prev_dir)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_code_agent.code_agent", function="run")
                 pass
 
     def _on_after_tool_call(
@@ -790,7 +791,12 @@ git reset --hard {start_commit}
                                     f"   Commit ID: {commit_short_hash} ({commit_hash})\n"
                                     f"   提交信息: {commit_message}\n"
                                 )
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_code_agent.code_agent",
+                                function="_on_after_tool_call",
+                            )
                             pass
 
                     if commit_info:
@@ -1487,7 +1493,8 @@ def cli(
                 from jarvis.jarvis_gateway.manager import set_current_gateway
 
                 set_current_gateway(None)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_code_agent.code_agent", function="cli")
                 pass
             PrettyOutput.auto_print(f"⚠️ 启动 Web Gateway 失败: {str(web_gateway_err)}")
 
@@ -1774,7 +1781,12 @@ def cli(
                         error_file = status_file_path.with_suffix(".error")
                         try:
                             error_file.write_text(error_message, encoding="utf-8")
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_code_agent.code_agent",
+                                function="_convert_to_string",
+                            )
                             pass
                 except Exception as status_err:
                     PrettyOutput.auto_print(f"⚠️ 写入状态文件失败: {str(status_err)}")
@@ -1788,13 +1800,23 @@ def cli(
             if web_gateway_server is not None:
                 try:
                     web_gateway_server.should_exit = True
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_code_agent.code_agent",
+                        function="_convert_to_string",
+                    )
                     pass
                 try:
                     from jarvis.jarvis_gateway.manager import set_current_gateway
 
                     set_current_gateway(None)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_code_agent.code_agent",
+                        function="_convert_to_string",
+                    )
                     pass
 
     except typer.Exit:

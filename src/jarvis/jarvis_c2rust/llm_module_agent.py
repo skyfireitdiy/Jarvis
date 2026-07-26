@@ -21,6 +21,7 @@ CLI 集成建议:
 
 from __future__ import annotations
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any, List, Optional, Union
@@ -88,7 +89,12 @@ class LLMRustCratePlannerAgent:
                     config = json.load(f)
                     if isinstance(config, dict):
                         return str(config.get("additional_notes", "") or "").strip()
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.llm_module_agent",
+                function="_load_additional_notes",
+            )
             pass
         return ""
 

@@ -3,6 +3,7 @@
 Agent 管理模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import time
 from pathlib import Path
@@ -355,7 +356,12 @@ class AgentManager:
                 f"- crate: {self.crate_dir.resolve()}",
             ]
             self._current_context_compact_header = "\n".join(compact_lines)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.transpiler_agents",
+                function="refresh_compact_context",
+            )
             pass
 
     def on_before_tool_call(

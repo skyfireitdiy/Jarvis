@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的提示词构建逻辑。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -72,7 +73,12 @@ class PromptBuilder:
                         continue
                     try:
                         obj = json_loads(line)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_c2rust.llm_module_agent_prompts",
+                            function="_extract_names_from_items",
+                        )
                         continue
 
                     roots = obj.get("roots") or []

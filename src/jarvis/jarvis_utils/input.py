@@ -50,7 +50,7 @@ from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.styles import Style as PromptStyle
 
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.config import get_submit_keys
 from jarvis.jarvis_utils.globals import get_message_history
@@ -711,7 +711,10 @@ def _clear_previous_prompt(text: str) -> None:
             sys.stdout.write("\x1b[1A")  # 光标上移一行
             sys.stdout.write("\x1b[2K\r")  # 清除整行
         sys.stdout.flush()
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_utils.input", function="_clear_previous_prompt"
+        )
         pass
 
 
@@ -1062,7 +1065,8 @@ class FileCompleter(Completer):
                     self._all_files_cache or [], additional_paths
                 )
             all_completions.extend([(path, "File") for path in paths])
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.input", function="get_completions")
             pass
 
         if token:
@@ -1243,7 +1247,10 @@ def _get_current_agent_for_input() -> Optional[Any]:
         current_name = g.get_current_agent_name()
         if current_name:
             return g.get_agent(current_name)
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_utils.input", function="_get_current_agent_for_input"
+        )
         pass
     return None
 
@@ -1271,7 +1278,12 @@ def _is_auto_complete_for_current_agent() -> bool:
         if ag is not None and hasattr(ag, "auto_complete"):
             try:
                 return bool(getattr(ag, "auto_complete", False))
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_utils.input",
+                    function="_is_auto_complete_for_current_agent",
+                )
                 pass
         return False
     except Exception:
@@ -1307,7 +1319,8 @@ def _get_agent_hint() -> str:
                 + ", ".join(ordered)
                 + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
             )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.input", function="_get_agent_hint")
         pass
     return ""
 
@@ -1339,7 +1352,8 @@ def user_confirm(tip: str, default: bool = True) -> bool:
                 name = getattr(ag, "name", None)
                 if name:
                     agent_name = f"[{name}] "
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.input", function="user_confirm")
             pass
 
         # 检查是否在 Gateway 模式下
@@ -1468,12 +1482,18 @@ def _get_multiline_input_internal(
                 )
                 try:
                     input("按回车继续...")
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_utils.input", function="_show_notice"
+                    )
                     pass
                 # Persist the hint so it won't be shown again in future runs
                 try:
                     _mark_multiline_hint_shown()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_utils.input", function="_show_notice"
+                    )
                     pass
 
             run_in_terminal(_show_notice)
@@ -1563,7 +1583,8 @@ def _get_multiline_input_internal(
                 buf.insert_text("@")
                 # 即使发生异常，也尝试触发补全
                 buf.start_completion(select_first=False)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_utils.input", function="_")
                 pass
 
     @bindings.add("#", filter=has_focus(DEFAULT_BUFFER), eager=True)
@@ -1594,7 +1615,8 @@ def _get_multiline_input_internal(
                 buf.insert_text("#")
                 # 即使发生异常，也尝试触发补全
                 buf.start_completion(select_first=False)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_utils.input", function="_")
                 pass
 
     style = PromptStyle.from_dict(
@@ -1663,7 +1685,8 @@ def _get_multiline_input_internal(
             if preset is not None and preset_cursor is not None:
                 cp = max(0, min(len(buf.text), preset_cursor))
                 buf.cursor_position = cp
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.input", function="_pre_run")
             pass
 
     try:
@@ -1830,7 +1853,10 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                     sys.stdout.write("\x1b[1A")
                     sys.stdout.write("\x1b[2K\r")
                 sys.stdout.flush()
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.input", function="_get_input_via_provider"
+                )
                 pass
             tip = f"已插入文件，继续编辑或按{submit_keys_display}确认:"
             continue

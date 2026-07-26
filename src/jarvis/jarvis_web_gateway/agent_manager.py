@@ -23,7 +23,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from jarvis.jarvis_utils.utils import _is_process_alive
 import jarvis.jarvis_utils.globals as jglobals
 
@@ -805,9 +805,17 @@ class AgentManager:
                     # 保存到内存
                     self._agents[agent_info.agent_id] = agent_info
                 except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_web_gateway.agent_manager",
+                        function="_load_agents",
+                    )
                     pass
 
         except Exception as e:
+            save_exception(
+                e, module="jarvis_web_gateway.agent_manager", function="_load_agents"
+            )
             pass
 
     def _save_agents(self) -> None:
@@ -820,6 +828,9 @@ class AgentManager:
             with open(self.PERSISTENCE_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
+            save_exception(
+                e, module="jarvis_web_gateway.agent_manager", function="_save_agents"
+            )
             pass
 
     def _is_process_running(self, pid: int) -> bool:

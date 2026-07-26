@@ -20,7 +20,7 @@ from typing import Optional
 from typing import cast
 
 import typer
-from jarvis.jarvis_utils.config import set_llm_group
+from jarvis.jarvis_utils.config import set_llm_group, save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.library_replacer import (
@@ -377,7 +377,10 @@ def config(
                         # 清理临时文件
                         try:
                             tmp_path.unlink()
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e, module="jarvis_c2rust.cli", function="config"
+                            )
                             pass
                     except Exception as e:
                         PrettyOutput.auto_print(

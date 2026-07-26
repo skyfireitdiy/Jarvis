@@ -13,6 +13,7 @@ from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.config import save_exception
 
 
 class TaskAnalyzer:
@@ -54,7 +55,10 @@ class TaskAnalyzer:
             self._analysis_done = True
             try:
                 self.agent.set_user_data("__task_analysis_done__", True)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.task_analyzer", function="analysis_task"
+                )
                 pass
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
@@ -73,7 +77,12 @@ class TaskAnalyzer:
                 # 检查 meta_agent 工具
                 generate_tool = tool_registry.get_tool("meta_agent")
                 has_generate_new_tool = generate_tool is not None
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.task_analyzer",
+                function="_prepare_analysis_prompt",
+            )
             pass
 
         # 根据配置获取相应的提示词
@@ -101,7 +110,12 @@ class TaskAnalyzer:
                     agent=self.agent,
                     current_response=response,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.task_analyzer",
+                    function="_process_analysis_loop",
+                )
                 pass
             need_return, tool_prompt = self.agent._call_tools(response)
             self.agent.session.prompt = tool_prompt
@@ -113,7 +127,12 @@ class TaskAnalyzer:
                     need_return=need_return,
                     tool_prompt=tool_prompt,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.task_analyzer",
+                    function="_process_analysis_loop",
+                )
                 pass
 
             # 如果没有工具调用或者没有新的提示，退出循环
@@ -210,7 +229,10 @@ class TaskAnalyzer:
             if bool(self.agent.get_user_data("__task_analysis_done__")):
                 self._analysis_done = True
                 return
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.task_analyzer", function="trigger_task_analysis"
+            )
             pass
 
         # 任务完成后统一默认启用任务分析（默认True），不再区分场景
@@ -254,6 +276,11 @@ class TaskAnalyzer:
                                 ):
                                     if len(line) > 10 and len(line) < 200:
                                         steps.append(line)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.task_analyzer",
+                function="_collect_execution_steps",
+            )
             pass
         return steps[:20]  # 限制步骤数量

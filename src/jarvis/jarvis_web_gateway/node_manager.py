@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 import asyncio
 import ipaddress
 import json
@@ -1465,7 +1467,10 @@ class ChildNodeClient:
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_web_gateway.node_manager", function="start"
+                )
                 pass
             self._ws = None
 
@@ -1500,7 +1505,12 @@ class ChildNodeClient:
                 if self._ws is not None:
                     try:
                         await self._ws.close()
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_web_gateway.node_manager",
+                            function="start",
+                        )
                         pass
                     self._ws = None
 

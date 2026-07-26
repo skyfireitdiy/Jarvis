@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 import os
 import shutil
 import subprocess
@@ -81,7 +83,12 @@ class TerminalSession:
             except Exception:
                 try:
                     self.proc.kill()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_web_gateway.terminal_session_manager",
+                        function="close",
+                    )
                     pass
 
     def is_closed(self) -> bool:
@@ -124,7 +131,12 @@ class TerminalSession:
                     termios.TIOCSWINSZ,
                     struct.pack("HHHH", rows, cols, 0, 0),
                 )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_web_gateway.terminal_session_manager",
+                function="resize",
+            )
             pass
 
     def _publish_output(self, data: bytes) -> None:
@@ -296,11 +308,21 @@ class TerminalSessionManager:
         except Exception as e:
             try:
                 os.close(master_fd)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_web_gateway.terminal_session_manager",
+                    function="_create_session_unix",
+                )
                 pass
             try:
                 os.close(slave_fd)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_web_gateway.terminal_session_manager",
+                    function="_create_session_unix",
+                )
                 pass
             return None, f"创建终端失败: {str(e)}"
 

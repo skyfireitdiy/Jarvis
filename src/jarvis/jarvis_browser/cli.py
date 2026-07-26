@@ -20,7 +20,7 @@ import typer
 from playwright.async_api import async_playwright
 from markdownify import markdownify as html_to_markdown
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from jarvis.jarvis_utils.utils import init_env
 
 
@@ -285,7 +285,8 @@ class BrowserDaemon:
                     await writer.drain()
                     break
 
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_browser.cli", function="__init__")
             pass
         finally:
             writer.close()
@@ -761,7 +762,10 @@ def daemon(
             if loop is not None:
                 try:
                     loop.close()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_browser.cli", function="check_daemon_running"
+                    )
                     pass
 
     if is_unix:
@@ -2132,7 +2136,10 @@ async def _get_interactables_list(
                 )
                 if len(interactables) >= 100:
                     break
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_browser.cli", function="handle_console_message"
+                )
                 continue
         if len(interactables) >= 100:
             break
@@ -2717,7 +2724,12 @@ async def fill_form(
                         element = await page.query_selector(selector)
                         if element:
                             break
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_browser.cli",
+                            function="handle_console_message",
+                        )
                         continue
 
                 if element:
@@ -2839,7 +2851,10 @@ async def clear_form(
             try:
                 await input_elem.fill("")
                 cleared_count += 1
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_browser.cli", function="handle_console_message"
+                )
                 pass
 
         # Clear textarea elements
@@ -2847,7 +2862,10 @@ async def clear_form(
             try:
                 await textarea.fill("")
                 cleared_count += 1
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_browser.cli", function="handle_console_message"
+                )
                 pass
 
         # Reset select elements to first option
@@ -2855,7 +2873,10 @@ async def clear_form(
             try:
                 await select.select_option(index=0)
                 cleared_count += 1
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_browser.cli", function="handle_console_message"
+                )
                 pass
 
         return {

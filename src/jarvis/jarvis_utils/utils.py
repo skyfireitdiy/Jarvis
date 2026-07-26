@@ -28,6 +28,7 @@ from jarvis.jarvis_utils.config import (
     read_text_file,
     set_global_config_data,
     set_llm_group,
+    save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
@@ -218,7 +219,10 @@ def is_editable_install() -> bool:
         for name in candidates:
             try:
                 dist = metadata.distribution(name)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.utils", function="_check_direct_url"
+                )
                 continue
             try:
                 files = dist.files or []
@@ -240,9 +244,15 @@ def is_editable_install() -> bool:
                                 if bool(info.get("editable")):
                                     return True
                                 return False  # 找到了 direct_url.json 但未标记 editable
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e, module="jarvis_utils.utils", function="_check_direct_url"
+                        )
                         continue
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.utils", function="_check_direct_url"
+                )
                 continue
         return None
 
@@ -266,7 +276,10 @@ def is_editable_install() -> bool:
                 pth_file = Path(entry) / f"{pkg_root.name}.pth"
                 if _os.path.exists(str(egg_link)) or _os.path.exists(str(pth_file)):
                     return True
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.utils", function="_check_direct_url"
+                )
                 continue
 
         # 2) 兼容更通用的 .egg-link 形式（读取指向源码路径）
@@ -285,11 +298,18 @@ def is_editable_install() -> bool:
                         # 当前包根目录在 egg-link 指向的源码路径下，视为可编辑安装
                         if str(pkg_root).startswith(str(src_path)):
                             return True
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e, module="jarvis_utils.utils", function="_check_direct_url"
+                        )
                         continue
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.utils", function="_check_direct_url"
+                )
                 continue
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.utils", function="_check_direct_url")
         pass
 
     # 启发式回退：源码仓库路径
@@ -301,7 +321,8 @@ def is_editable_install() -> bool:
         )
         if has_git and not in_site:
             return True
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.utils", function="_check_direct_url")
         pass
 
     return False
@@ -499,11 +520,22 @@ def _is_installed_via_uv_tool() -> bool:
                             if result.returncode == 0:
                                 if "jarvis-ai-assistant" in result.stdout.lower():
                                     return True
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_utils.utils",
+                                function="_is_installed_via_uv_tool",
+                            )
                             pass
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.utils", function="_is_installed_via_uv_tool"
+                )
                 pass
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_utils.utils", function="_is_installed_via_uv_tool"
+        )
         pass
     return False
 
@@ -528,7 +560,10 @@ def _check_pip_updates() -> bool:
             last_check_date = last_check_file.read_text().strip()
             if last_check_date == today_str:
                 return False
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_utils.utils", function="_check_pip_updates"
+            )
             pass
 
     try:
@@ -972,19 +1007,22 @@ def init_env(
             if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
                 PrettyOutput.auto_print("ℹ️ 已取消启动以避免终端嵌套。")
                 sys.exit(0)
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.utils", function="init_env")
         pass
 
     # 1. 设置信号处理
     try:
         _setup_signal_handler()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.utils", function="init_env")
         pass
 
     # 2. 注入仓库内置依赖目录，确保后续命令和子进程可直接找到 bundled tools
     try:
         ensure_bundled_deps_in_path()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.utils", function="init_env")
         pass
 
     # 3. 设置配置文件
@@ -1020,7 +1058,10 @@ def init_env(
             def show_stats_async() -> None:
                 try:
                     _show_usage_stats(welcome_str)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_utils.utils", function="show_stats_async"
+                    )
                     pass
 
             stats_thread = threading.Thread(target=show_stats_async, daemon=True)
@@ -1956,7 +1997,10 @@ def is_context_overflow(
             threshold = int(remaining_tokens * 0.8)
             if threshold > 0:
                 return content_tokens > threshold
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_utils.utils", function="is_context_overflow"
+            )
             pass
 
     # 回退方案：使用输入窗口限制

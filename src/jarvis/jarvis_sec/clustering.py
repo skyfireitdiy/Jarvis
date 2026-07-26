@@ -2,6 +2,7 @@
 # type: ignore
 """聚类相关模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -70,7 +71,12 @@ def load_existing_clusters(
                                     gid_int = int(gid_val)
                                     if gid_int >= 1:
                                         _reviewed_invalid_gids.add(gid_int)
-                                except Exception:
+                                except Exception as e:
+                                    save_exception(
+                                        e,
+                                        module="jarvis_sec.clustering",
+                                        function="load_existing_clusters",
+                                    )
                                     pass
         # 不再回退到旧的 cluster_report.jsonl，因为用户要求不考虑兼容
     except Exception:
@@ -103,7 +109,12 @@ def restore_clusters_from_checkpoint(
                 if _gid >= 1:
                     all_candidate_gids_in_clustering.add(_gid)
                     gid_to_candidate[_gid] = it
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="restore_clusters_from_checkpoint",
+                )
                 pass
 
     # 2. 从 cluster_report.jsonl 恢复所有聚类结果
@@ -128,7 +139,12 @@ def restore_clusters_from_checkpoint(
                         _gid_int = int(_gid)
                         if _gid_int >= 1:
                             all_clustered_gids_from_file.add(_gid_int)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_sec.clustering",
+                            function="restore_clusters_from_checkpoint",
+                        )
                         pass
 
     # 对于所有在 clusters.jsonl 中记录的 gid，如果它们也在当前候选集中，就计入 clustered_gids
@@ -173,7 +189,12 @@ def restore_clusters_from_checkpoint(
                                             if it_gid == _gid_int:
                                                 found_candidate = it
                                                 break
-                                        except Exception:
+                                        except Exception as e:
+                                            save_exception(
+                                                e,
+                                                module="jarvis_sec.clustering",
+                                                function="restore_clusters_from_checkpoint",
+                                            )
                                             pass
                                     if found_candidate:
                                         break
@@ -193,7 +214,12 @@ def restore_clusters_from_checkpoint(
                                 # 这些gid不应该被计入clustered_gids，因为它们不在当前运行中
                                 # 这是正常情况，不需要记录为遗漏（因为它们确实不在当前运行中）
                                 pass
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.clustering",
+                        function="restore_clusters_from_checkpoint",
+                    )
                     pass
 
             # 只有当至少有一个gid在当前候选集中时，才恢复这个聚类
@@ -212,7 +238,12 @@ def restore_clusters_from_checkpoint(
                             gid_int = int(gid_val)
                             if gid_int >= 1:
                                 cluster_gids_int.add(gid_int)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_sec.clustering",
+                                function="restore_clusters_from_checkpoint",
+                            )
                             pass
                     # 检查所有 gid 是否都已被复核过
                     all_reviewed = cluster_gids_int and cluster_gids_int.issubset(
@@ -257,14 +288,24 @@ def restore_clusters_from_checkpoint(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：发现 {len(_reviewed_invalid_gids)} 个已复核的无效聚类 gids",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="restore_clusters_from_checkpoint",
+            )
             pass
     if skipped_reviewed_count > 0:
         try:
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：跳过 {skipped_reviewed_count} 个已复核的无效聚类",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="restore_clusters_from_checkpoint",
+            )
             pass
     if missing_gids_in_restore:
         # 诊断信息：记录恢复时无法匹配的gid数量
@@ -283,7 +324,12 @@ def restore_clusters_from_checkpoint(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 断点恢复诊断：发现 {missing_count} 个gid在当前候选集中但无法匹配（可能存在数据不一致）: {display_list}",
                 )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="restore_clusters_from_checkpoint",
+            )
             pass
 
     return cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids
@@ -336,7 +382,12 @@ def create_cluster_snapshot_writer(
 
                     # 使用新的文件管理器保存
                     save_cluster(sec_dir, cluster)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="_write_cluster_batch_snapshot",
+            )
             pass
 
     def _write_cluster_report_snapshot() -> None:
@@ -372,7 +423,12 @@ def create_cluster_snapshot_writer(
                     "total_candidates": len(compact_candidates),
                 }
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="_write_cluster_report_snapshot",
+            )
             pass
 
     return _write_cluster_batch_snapshot, _write_cluster_report_snapshot
@@ -387,7 +443,10 @@ def collect_candidate_gids(file_groups: Dict[str, List[Dict[str, Any]]]) -> set[
                 _gid = int(it.get("gid", 0))
                 if _gid >= 1:
                     all_gids.add(_gid)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_sec.clustering", function="collect_candidate_gids"
+                )
                 pass
     return all_gids
 
@@ -404,7 +463,10 @@ def collect_clustered_gids(
                 _gid = int(item.get("gid", 0))
                 if _gid >= 1:
                     all_clustered_gids.add(_gid)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_sec.clustering", function="collect_clustered_gids"
+                )
                 pass
     # 也收集无效聚类中的 gid（它们已经进入复核流程）
     for invalid_cluster in invalid_clusters_for_review:
@@ -414,7 +476,10 @@ def collect_clustered_gids(
                 _gid_int = int(_gid)
                 if _gid_int >= 1:
                     all_clustered_gids.add(_gid_int)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_sec.clustering", function="collect_clustered_gids"
+                )
                 pass
     return all_clustered_gids
 
@@ -496,13 +561,23 @@ def filter_single_gid_clusters(
                                 PrettyOutput.auto_print(
                                     f"[jarvis-sec] 警告：gid={gid}是自动创建的单独聚类，但不在clusters.jsonl中，保留以避免遗漏告警",
                                 )
-                            except Exception:
+                            except Exception as e:
+                                save_exception(
+                                    e,
+                                    module="jarvis_sec.clustering",
+                                    function="filter_single_gid_clusters",
+                                )
                                 pass
                     else:
                         # 不是自动创建的单独聚类，可能是正常的单告警文件（handle_single_alert_file创建的）
                         # 保留它（避免遗漏告警）
                         pass
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="filter_single_gid_clusters",
+                )
                 pass
 
         # 保留这个批次（不是单独聚类，或者单独聚类但需要保留）
@@ -528,7 +603,10 @@ def filter_single_gid_clusters(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 移除的gid（示例）: {display_list}",
                 )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="filter_single_gid_clusters"
+            )
             pass
 
     return filtered_batches
@@ -666,7 +744,12 @@ def extract_classified_gids(cluster_items: List[Dict[str, Any]]) -> set[int]:
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：在提取gid时遇到格式错误（值={x}，类型={type(x).__name__}），这不应该发生（格式验证应该已捕获）",
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_sec.clustering",
+                            function="extract_classified_gids",
+                        )
                         pass
                     continue
     return classified_gids
@@ -740,7 +823,12 @@ def run_cluster_agent_direct_model(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.clustering",
+                function="run_cluster_agent_direct_model",
+            )
             pass
         cluster_agent.run(cluster_task)
 
@@ -834,7 +922,12 @@ def run_cluster_agent_with_retry(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 调试：摘要文本预览（前500字符）: {preview}",
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="run_cluster_agent_with_retry",
+                )
                 pass
 
         # 校验结构
@@ -863,7 +956,12 @@ def run_cluster_agent_with_retry(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 连续失败 {consecutive_failures} 次，需要重新创建agent",
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="run_cluster_agent_with_retry",
+                )
                 pass
             return None, parse_error or "连续失败5次", True
 
@@ -890,7 +988,12 @@ def process_cluster_results(
                 _gid = int(it.get("gid", 0))
                 if _gid >= 1:
                     gid_to_item[_gid] = it
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="process_cluster_results",
+                )
                 pass
     except Exception:
         gid_to_item = {}
@@ -911,7 +1014,12 @@ def process_cluster_results(
                     if xi >= 1:
                         norm_keys.append(xi)
                         classified_gids_final.add(xi)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.clustering",
+                        function="process_cluster_results",
+                    )
                     pass
 
         members: List[Dict[str, Any]] = []
@@ -930,7 +1038,12 @@ def process_cluster_results(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 聚类阶段判定为无效（gids={invalid_gids}），将提交复核Agent验证",
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="process_cluster_results",
+                )
                 pass
             invalid_clusters_for_review.append(
                 {
@@ -1038,7 +1151,10 @@ def extract_input_gids(pending_in_file_with_ids: List[Dict[str, Any]]) -> set[in
             _gid = int(it.get("gid", 0))
             if _gid >= 1:
                 input_gids.add(_gid)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="extract_input_gids"
+            )
             pass
     return input_gids
 
@@ -1054,9 +1170,17 @@ def build_gid_to_item_mapping(
                 _gid = int(it.get("gid", 0))
                 if _gid >= 1:
                     gid_to_item[_gid] = it
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="build_gid_to_item_mapping",
+                )
                 pass
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.clustering", function="build_gid_to_item_mapping"
+        )
         pass
     return gid_to_item
 
@@ -1132,7 +1256,10 @@ def process_cluster_chunk(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 重新创建聚类Agent（第 {recreate_count} 次）",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="process_cluster_chunk"
+            )
             pass
         cluster_agent = create_cluster_agent(
             file, chunk_idx, force_save_memory=force_save_memory
@@ -1208,7 +1335,10 @@ def process_cluster_chunk(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="process_cluster_chunk"
+            )
             pass
 
     # 写入当前批次的聚类结果
@@ -1231,7 +1361,10 @@ def filter_pending_items(
             _gid = int(c.get("gid", 0))
             if _gid >= 1 and _gid not in clustered_gids:
                 pending_in_file.append(c)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="filter_pending_items"
+            )
             pass
     return pending_in_file
 
@@ -1369,14 +1502,20 @@ def check_unclustered_gids(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 发现 {len(unclustered_gids)} 个未聚类的 gid，将进行聚类",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="check_unclustered_gids"
+            )
             pass
     else:
         try:
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 所有 {len(all_candidate_gids)} 个候选已聚类，跳过聚类阶段",
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="check_unclustered_gids"
+            )
             pass
     return unclustered_gids
 
@@ -1450,7 +1589,10 @@ def record_clustering_completion(
                 "note": "每个批次已增量保存，无需重写整个文件",
             }
         )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.clustering", function="record_clustering_completion"
+        )
         pass
 
 
@@ -1470,7 +1612,12 @@ def fallback_to_file_based_batches(
                 _gid = int(c.get("gid", 0))
                 if _gid >= 1:
                     gid_to_item_fallback[_gid] = c
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.clustering",
+                    function="fallback_to_file_based_batches",
+                )
                 pass
 
     # 如果还有未聚类的 gid，按文件分组创建批次
@@ -1487,7 +1634,12 @@ def fallback_to_file_based_batches(
                         _gid_int = int(_gid)
                         if _gid_int >= 1:
                             clustered_gids_fallback.add(_gid_int)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_sec.clustering",
+                            function="fallback_to_file_based_batches",
+                        )
                         pass
 
         unclustered_gids_fallback = all_gids_in_file_groups - clustered_gids_fallback
@@ -1601,7 +1753,10 @@ def process_clustering_phase(
                     f"[jarvis-sec] 警告：发现 {missing_count} 个遗漏的gid（恢复逻辑可能有问题）: {display_list}",
                 )
 
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.clustering", function="process_clustering_phase"
+            )
             pass
 
     # 清理之前创建的单独聚类（避免分析工作量激增）

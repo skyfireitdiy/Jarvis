@@ -10,7 +10,7 @@ from typing import cast
 from tree_sitter import Language
 from tree_sitter import Node
 
-from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.config import read_text_file, save_exception
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency
@@ -219,7 +219,12 @@ class GoDependencyAnalyzer(DependencyAnalyzer):
                         # For now, just track the module name
                         # In a real implementation, you'd resolve using go.mod
                         pass
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_code_agent.code_analyzer.languages.go_language",
+                        function="build_dependency_graph",
+                    )
                     continue
 
         return graph

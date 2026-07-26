@@ -4,6 +4,7 @@
 支持多种分析器后端（Joern、PhASAR、SVF），提供可扩展的规则配置机制。
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
@@ -794,7 +795,10 @@ class TaintAnalyzerFactory:
                 analyzer = analyzer_class()
                 if analyzer.is_available():
                     available.append(name)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_sec.taint_analyzer", function="list_available"
+                )
                 pass
         return available
 

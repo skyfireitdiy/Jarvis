@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 from typing import Any, Dict
 
 from jarvis.jarvis_agent import Agent
@@ -31,7 +32,8 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
 
         try:
             agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.agents", function="_on_after_summary")
             pass
     return summary_container
 

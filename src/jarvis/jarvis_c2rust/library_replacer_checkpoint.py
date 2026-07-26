@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """库替换器的检查点管理模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import time
 from pathlib import Path
@@ -74,7 +75,12 @@ def atomic_write(path: Path, content: str) -> None:
     except Exception:
         try:
             path.write_text(content, encoding="utf-8")
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.library_replacer_checkpoint",
+                function="atomic_write",
+            )
             pass
 
 

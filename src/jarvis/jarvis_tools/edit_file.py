@@ -8,6 +8,7 @@ from jarvis.jarvis_utils.config import (
     detect_file_encoding,
     get_default_encoding,
     read_text_file,
+    save_exception,
 )
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -254,7 +255,12 @@ class EditFileNormalTool:
                 try:
                     shutil.copy2(backup_path, abs_path)
                     os.remove(backup_path)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.edit_file",
+                        function="_write_file_with_rollback",
+                    )
                     pass
             error_msg = f"文件写入失败: {str(write_error)}"
             PrettyOutput.auto_print(f"❌ {error_msg}")
@@ -810,7 +816,10 @@ class EditFileNormalTool:
                     if backup_path and os.path.exists(backup_path):
                         try:
                             os.remove(backup_path)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e, module="jarvis_tools.edit_file", function="execute"
+                            )
                             pass
                     all_results.append(f"❌ {file_path}: {result_or_error}")
                     failed_files.append(file_path)
@@ -833,7 +842,10 @@ class EditFileNormalTool:
                     if backup_path and os.path.exists(backup_path):
                         try:
                             os.remove(backup_path)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e, module="jarvis_tools.edit_file", function="execute"
+                            )
                             pass
 
                     # 检查文件是否不在当前工作目录的子级目录下

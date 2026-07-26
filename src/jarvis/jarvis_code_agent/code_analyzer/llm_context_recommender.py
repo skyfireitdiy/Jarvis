@@ -14,7 +14,11 @@ from rich.console import Console
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_cheap_model_name, read_text_file
+from jarvis.jarvis_utils.config import (
+    get_cheap_model_name,
+    read_text_file,
+    save_exception,
+)
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.config import get_llm_group
@@ -270,7 +274,12 @@ class ContextRecommender:
                         self.context_manager.symbol_table._file_mtimes[file_path] = (
                             os.path.getmtime(file_path)
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_code_agent.code_analyzer.llm_context_recommender",
+                            function="format_progress_msg",
+                        )
                         pass
 
                     files_scanned += 1
