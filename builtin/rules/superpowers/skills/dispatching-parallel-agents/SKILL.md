@@ -1,6 +1,6 @@
 ---
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies. Do not trigger: single task; tasks with shared state or dependencies; quick one-off operations.
 ---
 
 # Dispatching Parallel Agents
