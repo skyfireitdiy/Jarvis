@@ -1,6 +1,6 @@
 ---
 name: plantuml_fix
-description: 当需要修复Markdown文件中的PlantUML代码块时使用此规则——PlantUML修复规则，提取、校验和修复PlantUML代码。包括：从MD文件中提取PlantUML代码块为单独的.puml文件；使用PlantUML程序校验语法并报告错误；AI根据错误信息修复.puml文件；将修复后的代码写回原文件。每当用户提及"PlantUML"、"UML图"、"图表修复"、"语法错误"或需要修复/校验PlantUML代码时触发，无论他们使用什么编辑器或环境。如果需要提取、校验或修复Markdown文件中的PlantUML代码块，请使用此规则。
+description: 当需要修复或校验PlantUML代码块时触发。每当用户提及"PlantUML"、"UML图"、"图表修复"、"语法错误"时触发。不触发：仅生成PlantUML不修复；非PlantUML图表；Mermaid图表。
 license: MIT
 ---
 
