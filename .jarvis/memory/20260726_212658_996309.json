@@ -1,0 +1,8 @@
+{
+  "id": "20260726_212658_996309",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "integer_overflow", "alloc_size_overflow", "误报修复"],
+  "content": "## integer_overflow/alloc_size_overflow 误报修复完成\n\n### 修复前\ninteger_overflow: 16, alloc_size_overflow: 4 (共20个)\n\n### 修复后\ninteger_overflow: 1, alloc_size_overflow: 1 (共2个，均为合理报告)\n\n### 三项修复策略\n1. **去重**(line,pattern)粒度：同一行同一pattern只报一次，消除call_graph重复条目导致的重复报告\n2. **排除sizeof乘法**：alloc_arg含sizeof时跳过乘法溢出检测（var * sizeof(...)是标准安全写法）\n3. **排除小常量加法**：var2.isdigit() and int(var2) <= 100 时跳过（var+1/2不可能溢出）\n\n### 修改文件\nsrc/jarvis/jarvis_sec/checkers/c_checker.py\n- _rule_integer_overflow_from_calls(L2684): reported集合+sizeof排除+小常量排除\n- _rule_alloc_size_overflow(L3913): reported集合去重\n\n### 去重设计决策\n用户指出同一行可能有多个不同问题，因此去重粒度为(line, pattern)而非(line)，允许同一行报不同pattern的issue",
+  "created_at": "2026-07-26T21:26:58.996333",
+  "updated_at": "2026-07-26T21:26:58.996338"
+}
