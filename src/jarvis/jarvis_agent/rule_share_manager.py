@@ -12,7 +12,8 @@ import typer
 
 from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.share_manager import ShareManager
-from jarvis.jarvis_utils.config import get_central_rules_repo, save_exception
+from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.output import PrettyOutput
 

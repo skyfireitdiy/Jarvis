@@ -441,7 +441,8 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
     import random
     from pathlib import Path
 
-    from jarvis.jarvis_utils.config import get_data_dir, save_exception
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.exception_utils import save_exception
 
     tags_by_type: Dict[str, List[str]] = {
         "short_term": [],

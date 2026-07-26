@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from typing import Any, Dict
 
 from jarvis.jarvis_agent import Agent

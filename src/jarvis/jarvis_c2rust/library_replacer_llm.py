@@ -8,7 +8,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.constants import MAX_LLM_RETRIES

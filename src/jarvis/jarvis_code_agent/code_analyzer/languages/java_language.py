@@ -7,7 +7,8 @@ from typing import Optional
 from typing import Set
 from typing import cast
 
-from jarvis.jarvis_utils.config import read_text_file, save_exception
+from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency

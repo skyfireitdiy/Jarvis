@@ -3,7 +3,7 @@
 模块管理模块
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import re
 from pathlib import Path
 from typing import Optional
