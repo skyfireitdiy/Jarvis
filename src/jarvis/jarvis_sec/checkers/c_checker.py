@@ -4045,13 +4045,169 @@ def _rule_signed_to_unsigned(
     return issues
 
 
+def _ast_divide_by_zero_check(
+    lines: Sequence[str], relpath: str
+) -> Optional[List[Issue]]:
+    """基于tree-sitter AST的除零错误检测，替代正则扫描。
+    优势：能识别 #define 宏常量作为除数的情况，避免误报。
+    """
+    try:
+        import tree_sitter_c as tsc
+        import tree_sitter_cpp as tscpp
+        from tree_sitter import Language, Parser
+    except ImportError:
+        return None
+
+    code = "".join(lines)
+    if not code.endswith("\n"):
+        code += "\n"
+    code_bytes = code.encode("utf-8")
+
+    is_cpp = _is_cpp_file(relpath)
+    try:
+        if is_cpp:
+            lang = Language(tscpp.language())
+        else:
+            lang = Language(tsc.language())
+        parser = Parser(lang)
+    except Exception:
+        return None
+
+    tree = parser.parse(code_bytes)
+    root = tree.root_node
+
+    # 1. 收集 #define 定义的常量宏（值为非零常量）
+    const_macros: set = set()
+
+    def _collect_const_macros(node):
+        if node.type == "preproc_def":
+            name_node = node.child_by_field_name("name")
+            value_node = node.child_by_field_name("value")
+            if name_node and value_node:
+                name = code_bytes[name_node.start_byte : name_node.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                val = (
+                    code_bytes[value_node.start_byte : value_node.end_byte]
+                    .decode("utf-8", errors="replace")
+                    .strip()
+                )
+                # 值为非零数字常量
+                if val.isdigit() and val != "0":
+                    const_macros.add(name)
+        for child in node.children:
+            _collect_const_macros(child)
+
+    _collect_const_macros(root)
+
+    # 2. 找所有除法/取模表达式
+    issues: List[Issue] = []
+
+    def _extract_identifier(node):
+        """从节点提取标识符名，处理嵌套情况。"""
+        if node.type == "identifier":
+            return code_bytes[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+        if node.type == "parenthesized_expression" and node.children:
+            inner = node.children[1] if len(node.children) > 1 else node.children[0]
+            return _extract_identifier(inner)
+        return None
+
+    def _find_div_mod(node):
+        if node.type == "binary_expression":
+            for child in node.children:
+                if child.type in ("/", "%"):
+                    right = node.child_by_field_name("right")
+                    if right:
+                        _check_divisor(right, node)
+                    break
+        for child in node.children:
+            _find_div_mod(child)
+
+    def _check_divisor(divisor_node, expr_node):
+        line_num = expr_node.start_point[0] + 1
+        divisor_name = _extract_identifier(divisor_node)
+
+        # 数字字面量
+        if divisor_node.type == "number_literal":
+            val = code_bytes[divisor_node.start_byte : divisor_node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            digits = "".join(c for c in val if c.isdigit())
+            if digits and digits != "0":
+                return  # 非零常量，安全
+
+        # 宏常量
+        if divisor_name and divisor_name in const_macros:
+            return  # 宏定义为非零常量，安全
+
+        # sizeof表达式
+        if divisor_node.type == "sizeof_expression" or (
+            divisor_name and divisor_name == "sizeof"
+        ):
+            return
+
+        # 确定除数描述
+        divisor_desc = divisor_name or code_bytes[
+            divisor_node.start_byte : divisor_node.end_byte
+        ].decode("utf-8", errors="replace")
+
+        # 检查附近零检查
+        if divisor_name:
+            has_zero_check = False
+            start = max(1, line_num - 5)
+            for j in range(start, line_num + 1):
+                sj = _safe_line(lines, j)
+                if re.search(
+                    rf"\bif\s*\([^)]*{re.escape(divisor_name)}\s*(==|!=)\s*0", sj
+                ):
+                    has_zero_check = True
+                    break
+                if re.search(rf"\bif\s*\(\s*!?\s*{re.escape(divisor_name)}\s*\)", sj):
+                    has_zero_check = True
+                    break
+                if re.search(rf"\b{re.escape(divisor_name)}\s*(==|!=)\s*0", sj):
+                    has_zero_check = True
+                    break
+            if has_zero_check:
+                return
+
+        issues.append(
+            Issue(
+                language="c/cpp",
+                category="arithmetic",
+                pattern="divide_by_zero",
+                file=relpath,
+                line=line_num,
+                evidence=_strip_line(lines[line_num - 1])
+                if line_num <= len(lines)
+                else "",
+                description=f"除数 {divisor_desc} 可能为零，存在除零错误风险。",
+                suggestion="在除法/取模前检查除数是否为零。",
+                confidence=0.7,
+                severity="high",
+            )
+        )
+
+    _find_div_mod(root)
+    return issues
+
+
 def _rule_divide_by_zero(
     lines: Sequence[str], relpath: str, database: Optional["ProjectDatabase"] = None
 ) -> List[Issue]:
     """
     检测除零错误（CWE-369）：a/b 或 a%b 中 b 为变量且附近无零检查。
-    排除：除数是常量非零值、附近有零检查（if (b == 0) / if (b) / if (!b)）。
+    排除：除数是常量非零值、宏常量非零值、附近有零检查（if (b == 0) / if (b) / if (!b)）。
+    优先使用tree-sitter AST检测，不可用时回退正则。
     """
+    # 优先使用AST检测
+    ast_issues = _ast_divide_by_zero_check(lines, relpath)
+    if ast_issues is not None:
+        return ast_issues
+
+    # 回退：正则检测
     issues: List[Issue] = []
     # 除法/取模模式：var / var 或 var % var
     div_pattern = re.compile(r"\b([A-Za-z_]\w*)\s*/\s*([A-Za-z_]\w*)")
