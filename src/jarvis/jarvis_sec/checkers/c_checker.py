@@ -4058,7 +4058,9 @@ def _ast_divide_by_zero_check(
     except ImportError:
         return None
 
-    code = "".join(lines)
+    # Ensure each line ends with \n for correct AST line numbers
+    normalized = [(l if l.endswith("\n") else l + "\n") for l in lines]
+    code = "".join(normalized)
     if not code.endswith("\n"):
         code += "\n"
     code_bytes = code.encode("utf-8")
@@ -4147,6 +4149,27 @@ def _ast_divide_by_zero_check(
             divisor_name and divisor_name == "sizeof"
         ):
             return
+
+        # 溢出检查中的除法：如 INT_MAX / obj_size, SIZE_MAX / count
+        # 检查除法表达式的父节点是否是比较表达式的一部分
+        parent = expr_node.parent
+        if parent and parent.type == "binary_expression":
+            parent_op = parent.child_by_field_name("operator")
+            if parent_op:
+                op_text = code_bytes[parent_op.start_byte : parent_op.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                if op_text in (">", ">=", "<", "<=", "==", "!="):
+                    # 检查比较的另一侧是否包含 INT_MAX/UINT_MAX/SIZE_MAX
+                    left_of_cmp = parent.child_by_field_name("left")
+                    right_of_cmp = parent.child_by_field_name("right")
+                    for cmp_side in (left_of_cmp, right_of_cmp):
+                        if cmp_side:
+                            side_text = code_bytes[
+                                cmp_side.start_byte : cmp_side.end_byte
+                            ].decode("utf-8", errors="replace")
+                            if re.search(r"\b(INT_MAX|UINT_MAX|SIZE_MAX|LONG_MAX|ULONG_MAX)\b", side_text):
+                                return  # 溢出检查中的除法，安全
 
         # 确定除数描述
         divisor_desc = divisor_name or code_bytes[
@@ -4612,8 +4635,10 @@ def _ast_null_deref_check(
     except ImportError:
         return None
 
-    # Ensure no double-newlines: lines may already contain trailing \n
-    code = "".join(lines)
+    # Ensure each line ends with \n for correct AST line numbers
+    # (callers may pass splitlines() which strips \n)
+    normalized = [(l if l.endswith("\n") else l + "\n") for l in lines]
+    code = "".join(normalized)
     if not code.endswith("\n"):
         code += "\n"
     code_bytes = code.encode("utf-8")
@@ -4944,6 +4969,20 @@ def _ast_null_deref_check(
                                 "utf-8", errors="replace"
                             )
                             out.append((var_name, "consequence"))
+                # bare identifier in assert() argument: assert(ptr) means ptr is non-NULL
+                elif parent and parent.type == "argument_list":
+                    gp = parent.parent
+                    if gp and gp.type == "call_expression":
+                        func_node = gp.child_by_field_name("function")
+                        if func_node and func_node.type == "identifier":
+                            func_name = code_bytes[
+                                func_node.start_byte : func_node.end_byte
+                            ].decode("utf-8", errors="replace")
+                            if func_name == "assert":
+                                var_name = code_bytes[n.start_byte : n.end_byte].decode(
+                                    "utf-8", errors="replace"
+                                )
+                                out.append((var_name, "consequence"))
             for child in n.children:
                 _find_null_checks(child, out)
 
@@ -4951,6 +4990,33 @@ def _ast_null_deref_check(
         return checked
 
     def _collect_null_protections(node):
+        # Handle assert() calls: assert(p != NULL) means p is safe after this line
+        # assert is equivalent to if (!(condition)) abort();
+        if node.type == "expression_statement":
+            for child in node.children:
+                if child.type == "call_expression":
+                    func_name_node = child.child_by_field_name("function")
+                    if func_name_node and func_name_node.type == "identifier":
+                        func_name = code_bytes[func_name_node.start_byte : func_name_node.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
+                        if func_name == "assert":
+                            args = child.child_by_field_name("arguments")
+                            if args:
+                                # Extract the first argument as the condition
+                                for arg in args.children:
+                                    if arg.is_named and arg.type != ",":
+                                        checked_vars = _extract_null_checked_vars(arg)
+                                        for var_name, safe_branch in checked_vars:
+                                            # assert(p != NULL): p is safe after assert (consequence)
+                                            # assert(p): p is truthy (non-NULL) after assert (consequence)
+                                            if safe_branch == "consequence":
+                                                # assert acts as early exit for the negation,
+                                                # so var is safe from assert line onwards
+                                                early_exit_vars.setdefault(var_name, []).append(
+                                                    node.start_point[0] + 1
+                                                )
+                                        break  # Only process first argument
         if node.type in ("if_statement", "while_statement"):
             condition = None
             for child in node.children:
@@ -4959,6 +5025,33 @@ def _ast_null_deref_check(
                     condition = child
                     break
             if condition:
+                # 识别bounds check: if (idx >= 0 && idx < 10) 等
+                # 将bounds-checked变量加入protected_ranges，用于subscript_expression保护
+                cond_text = code_bytes[
+                    condition.start_byte : condition.end_byte
+                ].decode("utf-8", errors="replace")
+                bounds_check_match = re.finditer(
+                    r"\b(\w+)\s*>=\s*\d+\s*&&\s*\1\s*<\s*\d+",
+                    cond_text,
+                )
+                bounds_check_match2 = re.finditer(
+                    r"\b(\w+)\s*>=\s*\d+\s*&&\s*\1\s*<=\s*\d+",
+                    cond_text,
+                )
+                consequence = None
+                for child in node.children:
+                    if child.type == "compound_statement":
+                        consequence = child
+                        break
+                if consequence:
+                    cstart = consequence.start_point[0] + 1
+                    cend = consequence.end_point[0] + 1
+                    for m in list(bounds_check_match) + list(bounds_check_match2):
+                        bvar = m.group(1)
+                        if bvar not in protected_ranges:
+                            protected_ranges[bvar] = []
+                        protected_ranges[bvar].append((cstart, cend))
+
                 checked_vars = _extract_null_checked_vars(condition)
                 for var_name, safe_branch in checked_vars:
                     if safe_branch == "consequence":
@@ -5169,6 +5262,15 @@ def _ast_null_deref_check(
             var_name = code_bytes[arg_node.start_byte : arg_node.end_byte].decode(
                 "utf-8", errors="replace"
             )
+            # 栈数组不可能为NULL，跳过
+            if var_name in stack_arrays:
+                return
+            # 如果同一调用表达式中包含sizeof(var)，说明var是数组而非指针
+            call_text = code_bytes[call_node.start_byte : call_node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            if re.search(rf"\bsizeof\s*\(\s*{re.escape(var_name)}\s*\)", call_text):
+                return
             if _is_short_circuit_protected(arg_node, var_name):
                 return
             line = call_node.start_point[0] + 1
@@ -5281,6 +5383,29 @@ def _ast_null_deref_check(
                     )
                     if _is_short_circuit_protected(node, var_name):
                         pass
+                    elif var_name in func_params:
+                        # 函数参数数组：如果下标在bounds check保护范围内，跳过null deref检测
+                        # e.g. void safe(int* arr, int idx) { if (idx >= 0 && idx < 10) { arr[idx] = 42; } }
+                        index_node = node.child_by_field_name("index")
+                        has_bounds_protection = False
+                        if index_node and index_node.type == "identifier":
+                            idx_name = code_bytes[index_node.start_byte : index_node.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                            line = node.start_point[0] + 1
+                            if any(
+                                start <= line <= end
+                                for start, end in protected_ranges.get(idx_name, [])
+                            ):
+                                has_bounds_protection = True
+                        if has_bounds_protection:
+                            pass  # 下标受bounds check保护，数组参数的null检查应在调用者处
+                        else:
+                            line = node.start_point[0] + 1
+                            evidence = code_bytes[node.start_byte : node.end_byte].decode(
+                                "utf-8", errors="replace"
+                            )
+                            deref_points.append((var_name, line, evidence))
                     else:
                         line = node.start_point[0] + 1
                         evidence = code_bytes[node.start_byte : node.end_byte].decode(
@@ -5377,6 +5502,7 @@ def _ast_null_deref_check(
         if var_name in stack_structs:
             continue
         # func_params不跳过：函数参数恰恰是最可能为NULL的，需检测
+        # 但subscript_expression中的数组参数，如果下标在bounds check保护范围内，则跳过（见_collect_derefs）
         if var_name in global_vars:
             continue
         if var_name in safe_assigned_vars:
