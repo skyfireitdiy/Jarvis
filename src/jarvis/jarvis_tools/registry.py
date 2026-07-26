@@ -1399,6 +1399,63 @@ class ToolRegistry(OutputHandlerProtocol):
         return ret
 
     @staticmethod
+    def _save_parse_error(
+        content: str, error_msg: str, agent: Optional[Any] = None
+    ) -> None:
+        """保存工具调用解析失败的内容，用于后续优化解析器。
+
+        参数:
+            content: 解析失败的原始响应内容
+            error_msg: 错误信息
+            agent: 可选的Agent实例，用于获取模型名称等上下文
+        """
+        try:
+            # 创建保存目录
+            error_dir = os.path.join(get_data_dir(), "tool_parse_errors")
+            os.makedirs(error_dir, exist_ok=True)
+
+            # 获取模型名称
+            model_name = "unknown"
+            if agent is not None:
+                try:
+                    if hasattr(agent, "model") and agent.model:
+                        model_name = (
+                            getattr(agent.model, "model_name", None)
+                            or getattr(agent.model, "name", None)
+                            or "unknown"
+                        )
+                except Exception:
+                    pass
+
+            # 脱敏：移除可能的API key等敏感信息
+            safe_content = content
+            sensitive_patterns = [
+                r"sk-[a-zA-Z0-9]{20,}",
+                r'key["\s:=]+["\']?[a-zA-Z0-9]{20,}["\']?',
+                r'token["\s:=]+["\']?[a-zA-Z0-9]{20,}["\']?',
+                r'password["\s:=]+["\']?[a-zA-Z0-9]{20,}["\']?',
+            ]
+            for pattern in sensitive_patterns:
+                safe_content = re.sub(pattern, "[REDACTED]", safe_content)
+
+            # 构建保存数据
+            error_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "model": model_name,
+                "error_msg": error_msg,
+                "content": safe_content,
+            }
+
+            # 保存文件：时间戳_模型名.json
+            filename = f"{time.strftime('%Y%m%d_%H%M%S')}_{model_name.replace('/', '_').replace('\\', '_')}.json"
+            filepath = os.path.join(error_dir, filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(error_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            # 保存失败不影响主流程，静默忽略
+            pass
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
         agent: Optional[Any] = None,
@@ -1496,6 +1553,9 @@ class ToolRegistry(OutputHandlerProtocol):
                 )
                 if llm_fixed_content is not None:
                     return ToolRegistry._extract_tool_calls(llm_fixed_content, None)
+
+            # 保存解析失败的内容，用于后续优化解析器
+            ToolRegistry._save_parse_error(content, error_msg, agent)
 
             return (
                 [],
