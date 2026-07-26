@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """库替换器的输出写入模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import time
 from pathlib import Path
@@ -85,7 +86,8 @@ def write_output_symbols(
                 # 入口函数：保持 ref 不变（不修改），但后续仍会保存 lib_replacement 元数据
                 try:
                     rec_out["updated_at"] = now_ts
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_c2rust.library_replacer_output", function="write_output_symbols")
                     pass
                 # 保存库替代元数据到符号表，供后续转译阶段作为上下文使用
                 try:

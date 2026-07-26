@@ -45,6 +45,7 @@
   - 如果 output_file 后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from __future__ import annotations
 
 import csv
@@ -340,7 +341,8 @@ def build_json_and_markdown(
             report["meta"] = (
                 meta  # 注入可选审计信息（仅用于JSON时保留，为兼容未来需要）
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.report", function="build_json_and_markdown")
             pass
 
     # 根据输出文件名后缀选择格式

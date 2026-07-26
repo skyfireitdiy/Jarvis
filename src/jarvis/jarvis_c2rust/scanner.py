@@ -43,6 +43,7 @@ JSONL 文件
   - LLVM_HOME (包含 lib/libclang.so 的前缀)
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from __future__ import annotations
 
 import json
@@ -296,7 +297,8 @@ def _try_import_libclang() -> Any:
         for d in extra_glob_dirs:
             try:
                 extra_globs.extend(d.glob("libclang.so.*"))
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_ensure_supported_and_set")
                 pass
         # Deduplicate while preserving order (Path is hashable)
         seen = set()
@@ -318,7 +320,8 @@ def _try_import_libclang() -> Any:
     try:
         _ = cindex.Index.create()
         return cindex
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.scanner", function="_ensure_supported_and_set")
         pass
 
     # If we got here, we failed to locate a supported libclang 16-21
@@ -873,7 +876,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 s = str(tp.underlying_type).strip()
                 if s:
                     refs.append(s)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_tp_record")
                 pass
         return {
             "id": id_val,
@@ -920,7 +924,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 s = str(tp.underlying_type).strip()
                 if s:
                     refs_t.append(s)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_sym_record_from_type")
                 pass
         return {
             "id": id_val,
@@ -1044,7 +1049,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     finally:
         try:
             f_sym.close()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.scanner", function="_has_symbol")
             pass
 
     # Write meta.json
@@ -1060,7 +1066,8 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         meta_json.write_text(
             json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.scanner", function="_has_symbol")
         pass
 
     PrettyOutput.auto_print(
@@ -1154,7 +1161,8 @@ def scan_types_file(cindex: Any, file_path: Path, args: List[str]) -> List[TypeI
                         language=language,
                     )
                     types.append(ti)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_c2rust.scanner", function="visit")
                     pass
 
         for ch in node.get_children():
@@ -1203,7 +1211,8 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> Path:
                 continue
             try:
                 obj = json.loads(line)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_resolve_symbols_jsonl_path")
                 continue
             idx += 1
             fid = int(obj.get("id") or idx)
@@ -1306,7 +1315,8 @@ def find_root_function_ids(db_path: Path) -> List[int]:
                 continue
             try:
                 obj = json.loads(line)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_resolve_symbols_jsonl_path")
                 continue
             idx += 1
             fid = int(obj.get("id") or idx)
@@ -1384,7 +1394,8 @@ def compute_translation_order_jsonl(
                 continue
             try:
                 obj = json.loads(line)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_resolve_symbols_jsonl_path")
                 continue
             idx += 1
             fid = int(obj.get("id") or idx)
@@ -1657,7 +1668,8 @@ def compute_translation_order_jsonl(
             name = Path(fjsonl).name.lower()
             if "symbols_raw.jsonl" in name:
                 base = "translation_order_raw.jsonl"
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.scanner", function="_is_entry")
             pass
         out_path = fjsonl.parent / base
     out_path = Path(out_path)
@@ -1668,7 +1680,8 @@ def compute_translation_order_jsonl(
         steps = [
             dict((k, v) for k, v in st.items() if k not in ("symbols",)) for st in steps
         ]
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.scanner", function="_is_entry")
         pass
     with open(out_path, "w", encoding="utf-8") as fo:
         for st in steps:
@@ -1710,7 +1723,8 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
                 continue
             try:
                 obj = json.loads(line)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.scanner", function="_resolve_symbols_jsonl_path")
                 continue
             idx += 1
             # unified handling: include all symbols

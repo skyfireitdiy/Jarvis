@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """优化器进度管理模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -48,7 +49,8 @@ class ProgressManager:
                     ),
                     encoding="utf-8",
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.optimizer_progress", function="load_or_reset_progress")
                 pass
             self.processed = set()
             if not hasattr(self, "steps_completed"):
@@ -216,7 +218,8 @@ class ProgressManager:
             self.progress_path.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.optimizer_progress", function="save_progress_for_batch")
             pass
 
     def save_fix_progress(

@@ -8,6 +8,7 @@
 3. analysis.jsonl - 分析结果文件：包括所有聚类，聚类中哪些问题是问题，哪些问题是误报
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -73,7 +74,8 @@ def save_candidates(sec_dir: Path, candidates: List[Dict[str, Any]]) -> None:
         PrettyOutput.auto_print(
             f"✅ [jarvis-sec] 已保存 {len(candidates)} 个候选到 {path}"
         )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.file_manager", function="save_candidates")
         pass
 
 
@@ -96,14 +98,16 @@ def load_candidates(sec_dir: Path) -> List[Dict[str, Any]]:
                     try:
                         candidate = json.loads(line)
                         candidates.append(candidate)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.file_manager", function="load_candidates")
                         pass
         except Exception as e:
             try:
                 PrettyOutput.auto_print(
                     f"⚠️ [jarvis-sec] 警告：加载 candidates.jsonl 失败: {e}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.file_manager", function="load_candidates")
                 pass
 
     return candidates
@@ -118,7 +122,8 @@ def get_all_candidate_gids(sec_dir: Path) -> Set[int]:
             gid = int(candidate.get("gid", 0))
             if gid >= 1:
                 gids.add(gid)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.file_manager", function="get_all_candidate_gids")
             pass
     return gids
 
@@ -192,7 +197,8 @@ def load_clusters(sec_dir: Path) -> List[Dict[str, Any]]:
                             else:
                                 # 第一次遇到这个 cluster_id，直接保存
                                 seen_clusters[cluster_id] = cluster
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.file_manager", function="load_clusters")
                         pass
 
             clusters = list(seen_clusters.values())
@@ -201,7 +207,8 @@ def load_clusters(sec_dir: Path) -> List[Dict[str, Any]]:
                 PrettyOutput.auto_print(
                     f"⚠️ [jarvis-sec] 警告：加载 clusters.jsonl 失败: {e}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.file_manager", function="load_clusters")
                 pass
 
     return clusters
@@ -219,7 +226,8 @@ def get_all_clustered_gids(sec_dir: Path) -> Set[int]:
                     gid_int = int(gid_val)
                     if gid_int >= 1:
                         gids.add(gid_int)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.file_manager", function="get_all_clustered_gids")
                     pass
     return gids
 
@@ -388,7 +396,8 @@ def load_analysis_results(sec_dir: Path) -> List[Dict[str, Any]]:
                             else:
                                 # 第一次遇到这个 cluster_id，直接保存
                                 seen_results[cluster_id] = result
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.file_manager", function="load_analysis_results")
                         pass
 
             results = list(seen_results.values())
@@ -397,7 +406,8 @@ def load_analysis_results(sec_dir: Path) -> List[Dict[str, Any]]:
                 PrettyOutput.auto_print(
                     f"⚠️ [jarvis-sec] 警告：加载 analysis.jsonl 失败: {e}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.file_manager", function="load_analysis_results")
                 pass
 
     return results
@@ -415,7 +425,8 @@ def get_all_analyzed_gids(sec_dir: Path) -> Set[int]:
                     gid_int = int(gid_val)
                     if gid_int >= 1:
                         gids.add(gid_int)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.file_manager", function="get_all_analyzed_gids")
                     pass
     return gids
 
@@ -432,7 +443,8 @@ def get_verified_issue_gids(sec_dir: Path) -> Set[int]:
                     gid_int = int(gid_val)
                     if gid_int >= 1:
                         gids.add(gid_int)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.file_manager", function="get_verified_issue_gids")
                     pass
     return gids
 
@@ -449,7 +461,8 @@ def get_false_positive_gids(sec_dir: Path) -> Set[int]:
                     gid_int = int(gid_val)
                     if gid_int >= 1:
                         gids.add(gid_int)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.file_manager", function="get_false_positive_gids")
                     pass
     return gids
 

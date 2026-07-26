@@ -3,6 +3,7 @@
 符号映射模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import re
 from pathlib import Path
 from typing import Any
@@ -102,7 +103,8 @@ class SymbolMapper:
             for p in sorted(src_root.rglob("*.rs")):
                 try:
                     text = p.read_text(encoding="utf-8", errors="replace")
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_c2rust.transpiler_symbols", function="resolve_pending_todos_for_symbol")
                     continue
                 pat_todo = re.compile(
                     r'todo\s*!\s*\(\s*["\']' + re.escape(symbol) + r'["\']\s*\)'

@@ -280,7 +280,8 @@ def _get_builtin_dir() -> Path | None:
             builtin_dir = Path(git_root) / "builtin"
             if builtin_dir.exists() and builtin_dir.is_dir():
                 return builtin_dir
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.template_utils", function="_get_builtin_dir")
         pass
 
     return None
@@ -293,7 +294,7 @@ def _get_jarvis_data_dir() -> str:
         str: jarvis数据目录路径
     """
     try:
-        from jarvis.jarvis_utils.config import get_data_dir
+        from jarvis.jarvis_utils.config import get_data_dir, save_exception
 
         return get_data_dir()
     except ImportError:

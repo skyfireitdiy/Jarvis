@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """分析相关模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 from typing import Any, Dict, List, Optional, cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -210,7 +211,8 @@ def run_analysis_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"⚠️ [jarvis-sec] 直接模型调用失败: {e}，回退到 run()"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
                     pass
                 agent.run(per_task)
         else:
@@ -237,9 +239,11 @@ def run_analysis_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"🔵 [jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- ."
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
                     pass
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
             pass
 
         # 解析摘要中的 <REPORT>（JSON）
@@ -253,7 +257,8 @@ def run_analysis_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"⚠️ [jarvis-sec] 分析结果JSON解析失败: {parse_error_analysis}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
                     pass
             elif isinstance(rep, list):
                 parsed_items = cast(List[Dict[str, Any]], rep)
@@ -283,14 +288,16 @@ def run_analysis_agent_with_retry(
                 PrettyOutput.auto_print(
                     f"⚠️ [jarvis-sec] 分析结果JSON解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
                 pass
         else:
             try:
                 PrettyOutput.auto_print(
                     f"⚠️ [jarvis-sec] 分析结果格式无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.analysis", function="run_analysis_agent_with_retry")
                 pass
 
     return summary_items, workspace_restore_info
@@ -320,7 +327,8 @@ def expand_and_filter_analysis_results(
                             items_with_risk.append(item)
                         else:
                             items_without_risk.append(item)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.analysis", function="expand_and_filter_analysis_results")
                     pass
         elif "gid" in it:
             if has_risk:

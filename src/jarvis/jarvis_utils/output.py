@@ -31,7 +31,7 @@ from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
 
-from jarvis.jarvis_utils.config import get_pretty_output
+from jarvis.jarvis_utils.config import get_pretty_output, save_exception
 from jarvis.jarvis_utils.config import is_print_error_traceback
 from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_agent_list
@@ -621,7 +621,8 @@ def emit_output(event: OutputEvent) -> None:
 
             if jglobals.agent_id:
                 gateway_context["agent_id"] = jglobals.agent_id
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.output", function="emit_output")
             pass
     gateway_context.pop("_gateway_skip", None)
     if not gateway_context:
@@ -772,7 +773,8 @@ class PrettyOutput:
             agent_name = get_current_agent_name()
             if agent_name and "agent_name" not in context:
                 context["agent_name"] = agent_name
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.output", function="_print")
             pass
 
         # 获取当前 ARCHER 工作流阶段
@@ -784,7 +786,8 @@ class PrettyOutput:
                 current_mode = agent.state_manager.get_mode()
                 if current_mode and "current_mode" not in context:
                     context["current_mode"] = current_mode
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.output", function="_print")
             pass
 
         # 获取是否无交互模式
@@ -794,7 +797,8 @@ class PrettyOutput:
             non_interactive = is_non_interactive()
             if "non_interactive" not in context:
                 context["non_interactive"] = non_interactive
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.output", function="_print")
             pass
 
         event = OutputEvent(

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 import json
 import threading
 import time
@@ -571,7 +572,8 @@ class SSEMcpClient(McpClient):
         if self.sse_response:
             try:
                 self.sse_response.close()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_mcp.sse_mcp_client", function="__del__")
                 pass
 
         # 关闭HTTP会话

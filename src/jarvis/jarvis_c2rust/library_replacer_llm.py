@@ -20,7 +20,7 @@ def check_llm_availability() -> tuple[bool, Any, Any, Any, Any]:
     """
     try:
         from jarvis.jarvis_platform.registry import PlatformRegistry
-        from jarvis.jarvis_utils.config import get_llm_config
+        from jarvis.jarvis_utils.config import get_llm_config, save_exception
         from jarvis.jarvis_utils.config import get_smart_model_name
         from jarvis.jarvis_utils.config import get_smart_platform_name
 
@@ -59,7 +59,8 @@ def create_llm_model(
         # 确保模型没有控制台输出（与 code_agent.py 保持一致）
         try:
             model.set_suppress_output(False)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.library_replacer_llm", function="create_llm_model")
             pass
 
         # 设置系统提示词

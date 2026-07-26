@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """优化器配置管理模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 
@@ -26,7 +27,8 @@ def load_additional_notes(crate_dir: Path) -> str:
                 config = json.load(f)
                 if isinstance(config, dict):
                     return str(config.get("additional_notes", "") or "").strip()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.optimizer_config", function="load_additional_notes")
         pass
     return ""
 

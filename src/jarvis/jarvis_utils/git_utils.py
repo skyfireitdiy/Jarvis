@@ -18,7 +18,7 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch, save_exception
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
@@ -147,7 +147,8 @@ def has_uncommitted_changes(cwd: Optional[str] = None) -> bool:
         # 如果 status 输出非空，说明有未提交的更改（包括未跟踪文件、修改文件、暂存文件等）
         if status_result.stdout.strip():
             return True
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_utils.git_utils", function="has_uncommitted_changes")
         pass
 
     # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）

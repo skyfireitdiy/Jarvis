@@ -121,7 +121,8 @@ class BuildSystemDetector:
                             file_list.append(item)
                             if len(file_list) >= max_files:
                                 break
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_code_agent.code_analyzer.build_validator.detector", function="_get_git_root_file_list")
                     pass
 
             # 返回格式化的字符串
@@ -339,7 +340,7 @@ Git根目录文件列表（前30项）：
         # 检查是否处于非交互模式
         def _is_non_interactive() -> bool:
             try:
-                from jarvis.jarvis_utils.config import is_non_interactive
+                from jarvis.jarvis_utils.config import is_non_interactive, save_exception
 
                 return bool(is_non_interactive())
             except Exception:

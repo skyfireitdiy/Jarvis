@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """验证相关模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 from typing import Any
 from typing import Dict
 from typing import List
@@ -42,7 +43,8 @@ def build_gid_to_verification_mapping(
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：验证结果中 gids 数组元素格式错误: {gid_val}, 错误: {e}"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="build_gid_to_verification_mapping")
                         pass
         elif "gid" in vr:
             try:
@@ -55,21 +57,24 @@ def build_gid_to_verification_mapping(
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：验证结果中 gid 值无效: {gid_val} (必须 >= 1)"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="build_gid_to_verification_mapping")
                         pass
             except Exception as e:
                 try:
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 警告：验证结果中 gid 格式错误: {vr.get('gid')}, 错误: {e}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="build_gid_to_verification_mapping")
                     pass
         else:
             try:
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 警告：验证结果项缺少 gid 或 gids 字段: {vr}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="build_gid_to_verification_mapping")
                 pass
 
         is_valid = vr.get("is_valid")
@@ -94,7 +99,8 @@ def merge_verified_items(
             c_gid = int(c.get("gid", 0))
             if c_gid >= 1:
                 gid_to_candidate[c_gid] = c
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="merge_verified_items")
             pass
 
     verified_items: List[Dict[str, Any]] = []
@@ -117,14 +123,16 @@ def merge_verified_items(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="merge_verified_items")
                 pass
         else:
             try:
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="merge_verified_items")
                 pass
     return verified_items
 
@@ -140,7 +148,8 @@ def merge_verified_items_without_verification(
             c_gid = int(c.get("gid", 0))
             if c_gid >= 1:
                 gid_to_candidate[c_gid] = c
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="merge_verified_items_without_verification")
             pass
 
     verified_items: List[Dict[str, Any]] = []
@@ -231,7 +240,8 @@ def run_verification_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
                     pass
                 verification_agent.run(verification_task)
         else:
@@ -245,9 +255,11 @@ def run_verification_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
                     pass
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
             pass
 
         # 解析验证结果
@@ -263,7 +275,8 @@ def run_verification_agent_with_retry(
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 验证结果JSON解析失败: {parse_error_verify}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
                     pass
             else:
                 prev_parse_error_verify = None
@@ -280,14 +293,16 @@ def run_verification_agent_with_retry(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 验证结果JSON解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
                 pass
         else:
             try:
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="run_verification_agent_with_retry")
                 pass
 
 
@@ -348,7 +363,8 @@ def process_verification_batch(
                 gid_int = int(gid_val) if gid_val else 0
                 if gid_int >= 1:
                     batch_gids_all.append(gid_int)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                 pass
         batch_gids_all_sorted = sorted(batch_gids_all)
     except Exception:
@@ -365,7 +381,8 @@ def process_verification_batch(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)"
             )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
         pass
 
     # 创建分析Agent
@@ -413,7 +430,8 @@ def process_verification_batch(
                             "verification_notes": "分析 Agent 返回空数组，判定为无风险",
                         }
                         no_risk_items.append(no_risk_item)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                     pass
 
             # 保存到 analysis.jsonl
@@ -434,7 +452,8 @@ def process_verification_batch(
         except Exception as e:
             try:
                 PrettyOutput.auto_print(f"[jarvis-sec] 警告：处理空数组结果失败: {e}")
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                 pass
 
     elif summary_items:
@@ -472,7 +491,8 @@ def process_verification_batch(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 判定结果: 有风险gid={risk_gids}, 无风险gid={no_risk_gids}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                 pass
 
         # 如果所有 gid 都被判定为无风险，也需要保存到 analysis.jsonl
@@ -493,14 +513,16 @@ def process_verification_batch(
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 批次 {bidx}/{total_batches} 所有候选均为无风险，已保存到 analysis.jsonl"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                         pass
             except Exception as e:
                 try:
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 警告：保存无风险 gid 失败: {e}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                     pass
 
         # 运行验证Agent（仅当分析Agent发现有风险的问题时，且启用二次验证）
@@ -624,28 +646,32 @@ def process_verification_batch(
                         PrettyOutput.auto_print(
                             "[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                         pass
                 elif not isinstance(verification_results, list):
                     try:  # type: ignore[unreachable]
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                         pass
                 elif len(verification_results) == 0:
                     try:
                         PrettyOutput.auto_print(
                             "[jarvis-sec] 警告：验证 Agent 返回空列表"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                         pass
                 else:
                     try:
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                         pass
 
                 # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
@@ -701,14 +727,16 @@ def process_verification_batch(
                                 PrettyOutput.auto_print(
                                     f"[jarvis-sec] 验证 Agent 未验证的候选（不在验证结果中，视为无风险）: 无风险gid={unverified_gids}"
                                 )
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                             pass
                     else:
                         try:
                             PrettyOutput.auto_print(
                                 f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}"
                             )
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_sec.verification", function="process_verification_batch")
                             pass
 
                     # 合并验证通过的告警
@@ -878,7 +906,8 @@ def process_verification_phase(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(completed_cluster_ids)} 个已完成的聚类"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="process_verification_phase")
             pass
 
     if analyzed_gids:
@@ -886,7 +915,8 @@ def process_verification_phase(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(analyzed_gids)} 个已分析的 gids"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="process_verification_phase")
             pass
 
     meta_records: List[Dict[str, Any]] = []
@@ -913,7 +943,8 @@ def process_verification_phase(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：已分析的 gid 示例: {sample_gids}{'...' if len(analyzed_gids_sorted) > 10 else ''} (共 {len(analyzed_gids)} 个)"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="process_verification_phase")
             pass
 
     for bidx, batch in enumerate(batches, start=1):
@@ -931,7 +962,8 @@ def process_verification_phase(
                 _gid = int(_gid_val) if _gid_val else 0
                 if _gid >= 1:
                     batch_gids.add(_gid)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="process_verification_phase")
                 pass
 
         if not batch_gids:
@@ -949,7 +981,8 @@ def process_verification_phase(
             for gid_val in cluster_gids_list:
                 try:
                     cluster_gids.add(int(gid_val))
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="process_verification_phase")
                     pass
 
             # 文件路径匹配：使用标准化路径进行比较（去除尾部斜杠等）
@@ -986,7 +1019,8 @@ def process_verification_phase(
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 批次 {bidx} 部分 gid 未分析: 缺失={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''}, 已分析={sorted(list(batch_gids & analyzed_gids))[:5]}{'...' if len(batch_gids & analyzed_gids) > 5 else ''}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="normalize_path")
                     pass
 
         if is_batch_completed:
@@ -996,7 +1030,8 @@ def process_verification_phase(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 跳过批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}): {completion_reason}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.verification", function="normalize_path")
                 pass
         else:
             # 调试日志：显示待处理的批次信息
@@ -1008,7 +1043,8 @@ def process_verification_phase(
                     PrettyOutput.auto_print(
                         f"[jarvis-sec] 待处理批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}, 未分析={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''})"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.verification", function="normalize_path")
                     pass
             pending_batches.append((bidx, batch))
 
@@ -1022,7 +1058,8 @@ def process_verification_phase(
             PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：跳过 {skipped_count} 个已完成的批次，剩余 {actual_total_batches} 个批次待处理"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.verification", function="normalize_path")
             pass
 
     # 更新验证阶段状态（使用实际需要处理的总批次数）

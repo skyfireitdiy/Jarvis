@@ -3,6 +3,7 @@
 配置和进度管理模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,8 @@ class ConfigManager:
                         continue
                     try:
                         obj = json.loads(ln)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_c2rust.transpiler_config", function="load_order_index")
                         continue
                     # 仅支持新格式：items
                     recs = obj.get("items")
@@ -122,7 +124,8 @@ class ConfigManager:
                             if rec_id is None:
                                 continue
                             fid = int(rec_id)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_c2rust.transpiler_config", function="load_order_index")
                             continue
                         if fid in fn_index_by_id:
                             # 已收录

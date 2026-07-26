@@ -3,6 +3,7 @@
 编译命令处理模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -140,7 +141,8 @@ class CompileCommandsManager:
                     elif entry.get("command"):
                         command = entry.get("command", "")
                         return command if command else None
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.transpiler_compile", function="extract_compile_flags")
                 continue
 
         return None

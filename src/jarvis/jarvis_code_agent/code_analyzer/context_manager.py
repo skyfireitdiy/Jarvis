@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.config import save_exception
 import os
 import re
 from dataclasses import dataclass
@@ -238,7 +239,8 @@ class ContextManager:
                     self.symbol_table._file_mtimes[file_path] = os.path.getmtime(
                         file_path
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_code_agent.code_analyzer.context_manager", function="update_context_for_file")
                     pass
 
         # 5. Analyze dependencies
@@ -342,7 +344,8 @@ class ContextManager:
             language = detect_language(file_path)
             if language:
                 treesitter_extractor = get_symbol_extractor(language)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_code_agent.code_analyzer.context_manager", function="_find_used_symbols")
             pass
 
         # 用于跟踪已处理的符号，避免重复
@@ -534,7 +537,8 @@ class ContextManager:
                         line_end=def_symbol.line_end,
                         signature=def_symbol.signature,
                     )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_code_agent.code_analyzer.context_manager", function="_find_definition_location")
                 pass
 
         return None

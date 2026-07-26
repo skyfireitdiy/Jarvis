@@ -1,5 +1,6 @@
 """CodeAgent 后处理模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 import os
 import subprocess
 
@@ -101,5 +102,6 @@ class PostProcessManager:
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL,
                         )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_code_agent.code_agent_postprocess", function="post_process_modified_files")
                 pass

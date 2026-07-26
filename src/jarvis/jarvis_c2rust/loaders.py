@@ -3,6 +3,7 @@
 C2Rust 转译器数据加载器
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from __future__ import annotations
 
 import json
@@ -51,7 +52,8 @@ class _DbLoader:
                             continue
                         try:
                             obj = json.loads(line)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_c2rust.loaders", function="_iter_records_from_file")
                             continue
                         idx += 1
                         yield idx, obj
@@ -162,10 +164,12 @@ class _SymbolMapJsonl:
                             continue
                         try:
                             obj = json.loads(line)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_c2rust.loaders", function="_load")
                             continue
                         self._add_record_in_memory(obj)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.loaders", function="_load")
                 pass
 
     def _add_record_in_memory(self, rec: Dict[str, Any]) -> None:
@@ -220,6 +224,7 @@ class _SymbolMapJsonl:
             self.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
             with self.jsonl_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.loaders", function="add")
             pass
         self._add_record_in_memory(obj)

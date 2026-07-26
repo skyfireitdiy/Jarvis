@@ -14,6 +14,7 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 - run_with_agent(entry_path, languages=None) -> str：使用单Agent逐条子任务分析模式（复用 jarvis.jarvis_sec.__init__ 的实现）
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, cast
@@ -595,7 +596,8 @@ def _create_conversion_agent(
         # 清理临时脚本文件
         try:
             Path(script_file).unlink()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.workflow", function="_create_conversion_agent")
             pass
 
         if result.returncode != 0:

@@ -15,6 +15,7 @@ Jarvis 安全分析套件 —— C/C++ 启发式安全检查器
 - issues = analyze_files("./repo", ["src/a.c", "include/a.h"])
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from __future__ import annotations
 
 import re
@@ -663,7 +664,8 @@ def _rule_unsafe_api(
                         ):
                             _ua_is_protected = True
                             break
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_unsafe_api")
                     pass
             if _ua_is_protected:
                 continue
@@ -802,7 +804,8 @@ def _extract_call_args(line: str, func_name: str) -> str:
         end = line.rfind(")")
         if end != -1 and end > start:
             return line[start + 1 : end]
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_extract_call_args")
         pass
     return ""
 
@@ -964,7 +967,8 @@ def _rule_malloc_no_null_check(
                                 )
                 if issues:
                     return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_malloc_no_null_check")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -1036,7 +1040,8 @@ def _rule_function_return_ptr_no_check(
                                         ):
                                             has_check = True
                                             break
-                                except Exception:
+                                except Exception as e:
+                                    save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_function_return_ptr_no_check")
                                     pass
                             if not has_check:
                                 issues.append(
@@ -1057,7 +1062,8 @@ def _rule_function_return_ptr_no_check(
                                 )
                 if issues:
                     return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_function_return_ptr_no_check")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -1198,7 +1204,8 @@ def _detect_cross_file_double_free(
                         )
 
         conn.close()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_detect_cross_file_double_free")
         pass
 
     return issues
@@ -1362,7 +1369,8 @@ def _detect_cross_file_uaf(
                     )
 
         conn.close()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_detect_cross_file_uaf")
         pass
 
     return issues
@@ -1509,7 +1517,8 @@ def _rule_unchecked_io(
                 for n in df_nodes:
                     if n.get("use_type") == "condition_protected":
                         protected_lines.add(n["line"])
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_unchecked_io")
                 pass
 
         # 从database查询value_check变量集合，用于过滤受值检查保护的IO调用
@@ -1520,7 +1529,8 @@ def _rule_unchecked_io(
                 for n in df_nodes:
                     if n.get("use_type") == "value_check":
                         value_checked_vars.add(n["var_name"])
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_unchecked_io")
                 pass
 
         for path in taint_paths:
@@ -1544,7 +1554,8 @@ def _rule_unchecked_io(
                                 if vc["line"] < path.line_number:
                                     protected_lines.add(path.line_number)
                                     break
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_unchecked_io")
                             pass
             if path.line_number in protected_lines:
                 continue
@@ -1576,7 +1587,8 @@ def _rule_unchecked_io(
             for n in _df_nodes_regex:
                 if n.get("use_type") == "condition_protected":
                     _protected_lines_regex.add(n["line"])
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_unchecked_io")
             pass
     for idx, s in enumerate(lines, start=1):
         # 排除预处理与声明
@@ -1718,7 +1730,8 @@ def _rule_strncpy_no_nullterm(
                         ):
                             is_condition_protected = True
                             break
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_strncpy_no_nullterm")
                     pass
             if is_condition_protected:
                 continue
@@ -1965,7 +1978,8 @@ def _rule_format_string(
                 else:
                     # 无法解析参数位置，保守告警
                     flagged = True
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_nth_arg_start")
                 pass
 
         # fprintf：第二个参数为格式串
@@ -1991,7 +2005,8 @@ def _rule_format_string(
                             flagged = True
                 else:
                     flagged = True
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_nth_arg_start")
                 pass
 
         if flagged:
@@ -2051,7 +2066,8 @@ def _rule_insecure_tmpfile(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_insecure_tmpfile")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -2180,7 +2196,8 @@ def _rule_command_execution(
                         flagged = False
                     else:
                         flagged = True
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_var_sanitized")
                 pass
         if not flagged:
             m_exec = RE_EXEC_LIKE.search(s)
@@ -2239,7 +2256,8 @@ def _rule_command_execution(
                             severity="high",
                         )
                     )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_var_sanitized")
                 pass
 
     # 检测exec*系列第二参数为用户输入（漏报修复）
@@ -2279,7 +2297,8 @@ def _rule_command_execution(
                                 severity="high",
                             )
                         )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_var_sanitized")
             pass
 
     return issues
@@ -2362,7 +2381,8 @@ def _rule_sql_injection(
                             )
                         )
                         break
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_sql_injection")
             pass
 
     # 检测 strcpy+strcat 拼接SQL语句（漏报修复）
@@ -2488,7 +2508,8 @@ def _rule_memory_leak(
         for sym in symbols:
             if sym.get("kind") == "parameter":
                 func_params.add(sym.get("name", ""))
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_memory_leak")
         pass
 
     # 检查每个变量的状态
@@ -2511,7 +2532,8 @@ def _rule_memory_leak(
                 )
                 if result and result.null_checks and var_name in result.null_checks:
                     continue
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_memory_leak")
                 pass
             # 找到第一个ALLOCATED状态的位置
             for state in state_list:
@@ -2925,7 +2947,8 @@ def _rule_integer_overflow(
             # 如果database中有数据，使用database结果
             if alloc_calls:
                 return _rule_integer_overflow_from_calls(lines, relpath, alloc_calls)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_integer_overflow")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -2994,7 +3017,8 @@ def _rule_hardcoded_credentials(
             # 如果database有结果，返回
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_hardcoded_credentials")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -3093,7 +3117,8 @@ def _rule_toctou_race(
             # 如果database中有数据，使用database结果
             if file_calls:
                 return _rule_toctou_race_from_calls(lines, relpath, file_calls)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_toctou_race")
             pass
 
     # 无database时跳过检测（避免误报）
@@ -3968,7 +3993,8 @@ def _rule_alloc_size_overflow(
                                 severity="medium",
                             )
                         )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_alloc_size_overflow")
                 pass
         return issues
 
@@ -4182,7 +4208,8 @@ def _rule_possible_null_deref(
                     var_name = node.get("var_name", "")
                     if var_name:
                         func_params.add(var_name)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_possible_null_deref")
             pass
 
     # 优先尝试污点分析
@@ -4214,7 +4241,8 @@ def _rule_possible_null_deref(
             if issues:
                 return issues
         # 污点分析不可用，回退到启发式检测
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_possible_null_deref")
         pass
     # 启发式检测（回退方案）
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
@@ -4695,7 +4723,8 @@ def _rule_deadlock_patterns(
             # 如果database中有数据，使用database结果
             if lock_calls:
                 return _rule_deadlock_patterns_from_calls(lines, relpath, lock_calls)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_deadlock_patterns")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -4746,7 +4775,8 @@ def _rule_double_free_and_free_non_heap(
                     )
             # 污点分析成功，继续检查free_non_heap
         # 污点分析不可用，回退到启发式检测
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_double_free_and_free_non_heap")
         pass
     last_free_line: dict[str, int] = {}
     last_assign_line: dict[str, int] = {}
@@ -4857,7 +4887,8 @@ def _rule_atoi_family(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_atoi_family")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -4924,7 +4955,8 @@ def _rule_rand_insecure(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_rand_insecure")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -4970,7 +5002,8 @@ def _rule_strtok_nonreentrant(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_strtok_nonreentrant")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5037,7 +5070,8 @@ def _rule_open_permissive_perms(
                             )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_open_permissive_perms")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5105,7 +5139,8 @@ def _rule_alloca_unbounded(
                             )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_alloca_unbounded")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5208,7 +5243,8 @@ def _rule_pthread_returns_unchecked(
                             )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_pthread_returns_unchecked")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5279,7 +5315,8 @@ def _rule_cond_wait_no_loop(
                             )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_cond_wait_no_loop")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5390,7 +5427,8 @@ def _rule_thread_leak_no_join(
                 return _rule_thread_leak_no_join_from_calls(
                     lines, relpath, thread_calls
                 )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_thread_leak_no_join")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5436,7 +5474,8 @@ def _rule_inet_legacy(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_inet_legacy")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5482,7 +5521,8 @@ def _rule_time_apis_not_threadsafe(
                     )
             if issues:
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_time_apis_not_threadsafe")
             pass
 
     # 无database时跳过正则回退（避免误报）
@@ -5576,7 +5616,8 @@ def _rule_getenv_unchecked(
                     return issues
                 # database检测无问题，直接返回空
                 return issues
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.checkers.c_checker", function="_rule_getenv_unchecked")
             pass
 
     # 无database时跳过正则回退（避免误报）

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """库替换器的工具函数。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import os
 import re
@@ -111,7 +112,8 @@ def load_additional_notes(data_dir: Path) -> str:
                 config = json.load(f)
                 if isinstance(config, dict):
                     return str(config.get("additional_notes", "") or "").strip()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.library_replacer_utils", function="load_additional_notes")
         pass
     return ""
 
@@ -124,7 +126,8 @@ def normalize_list(items: Any) -> List[str]:
     for x in items:
         try:
             s = str(x).strip()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.library_replacer_utils", function="normalize_list")
             continue
         if s:
             vals.append(s)
@@ -146,7 +149,8 @@ def normalize_list_lower(items: Optional[List[str]]) -> List[str]:
     for x in items:
         try:
             s = str(x).strip().lower()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.library_replacer_utils", function="normalize_list_lower")
             continue
         if s:
             lower_items.append(s)

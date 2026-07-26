@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.config import read_text_file, save_exception
 
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.client import LSPClient
@@ -166,7 +166,8 @@ class LSPServerInstance:
                     await asyncio.wait_for(self.client.shutdown(), timeout=5.0)
                 except Exception:
                     pass  # 忽略 shutdown 错误
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_lsp.server_manager", function="")
             pass
         finally:
             await self._cleanup()
@@ -184,7 +185,8 @@ class LSPServerInstance:
                 except asyncio.TimeoutError:
                     self.process.kill()
                     await asyncio.wait_for(self.process.wait(), timeout=2.0)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_lsp.server_manager", function="")
                 pass
             finally:
                 self.process = None
@@ -416,7 +418,8 @@ class LSPServerManager:
                                         os.kill(int(pid), signal.SIGKILL)
                                 except (ProcessLookupError, ValueError):
                                     pass
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_lsp.server_manager", function="_remove_server_state")
                     pass
 
     async def stop_all(self) -> None:
@@ -429,7 +432,8 @@ class LSPServerManager:
             try:
                 if self._state_file.exists():
                     self._state_file.unlink()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_lsp.server_manager", function="_remove_server_state")
                 pass
 
     def get_status(self) -> Dict[str, Dict[str, Any]]:

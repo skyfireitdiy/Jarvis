@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的项目结构应用模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import re
 from pathlib import Path
 from typing import Any
@@ -68,7 +69,8 @@ def apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
             if not file_path.exists():
                 try:
                     file_path.touch(exist_ok=True)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_c2rust.llm_module_agent_apply", function="apply_item")
                     pass
             return
 

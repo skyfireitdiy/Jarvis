@@ -12,6 +12,7 @@ LLM 驱动的 Rust Crate 模块规划 Agent
 - 对输出格式进行强约束：仅输出 JSON，无解释文本
 
 用法:
+from jarvis.jarvis_utils.config import save_exception
   from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_json_llm
   PrettyOutput.auto_print(plan_crate_json_llm(project_root="."))
 
@@ -88,7 +89,8 @@ class LLMRustCratePlannerAgent:
                     config = json.load(f)
                     if isinstance(config, dict):
                         return str(config.get("additional_notes", "") or "").strip()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.llm_module_agent", function="_load_additional_notes")
             pass
         return ""
 

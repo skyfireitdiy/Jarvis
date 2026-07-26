@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """库替换器的符号表加载和图构建模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from pathlib import Path
 from typing import Any
@@ -37,7 +38,8 @@ def load_symbols(
                 continue
             try:
                 obj = json.loads(line)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.library_replacer_loader", function="load_symbols")
                 continue
             idx += 1
             fid = int(obj.get("id") or idx)
@@ -170,7 +172,8 @@ def process_candidate_scope(
                 rec_id = rec.get("id")
                 if rec_id is not None:
                     cand_ids.add(int(rec_id))
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_c2rust.library_replacer_loader", function="process_candidate_scope")
                 continue
 
     if not cand_ids:

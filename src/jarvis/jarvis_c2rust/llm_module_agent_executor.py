@@ -3,7 +3,7 @@
 import os
 import subprocess
 
-from jarvis.jarvis_utils.config import get_llm_group
+from jarvis.jarvis_utils.config import get_llm_group, save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -219,7 +219,8 @@ def execute_llm_plan(
                         PrettyOutput.auto_print(
                             f"[c2rust-llm-planner] 当前解析的模型: {get_smart_platform_name()}/{get_smart_model_name()}"
                         )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_c2rust.llm_module_agent_executor", function="_format_tree")
                         pass
                 raise
 

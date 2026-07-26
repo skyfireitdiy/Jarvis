@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 import os
 import sys
 from functools import lru_cache
@@ -325,7 +326,8 @@ def calculate_content_token_limit(agent: Any = None) -> int:
                 remaining_tokens = agent.model.get_remaining_token_count()
                 # 使用剩余token的2/3作为限制，保留1/3作为安全余量
                 return calculate_token_limit(remaining_tokens)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_utils.config", function="calculate_content_token_limit")
                 pass
 
         # 回退方案：使用输入窗口的2/3

@@ -19,6 +19,7 @@ Jarvis 安全分析套件
 - 模块化重构：将功能拆分为多个模块（prompts, parsers, utils, agents, clustering, analysis, verification, review）
 """
 
+from jarvis.jarvis_utils.config import save_exception
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -136,7 +137,8 @@ def run_security_analysis(
                 "issues_count": len(compact_candidates),
             }
         )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.__init__", function="mark_error")
         pass
 
     # 记录批次选择信息（可选，用于日志）
@@ -148,7 +150,8 @@ def run_security_analysis(
                 PrettyOutput.auto_print(
                     f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(items)}"
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.__init__", function="mark_error")
                 pass
             _progress_append(
                 {
@@ -158,7 +161,8 @@ def run_security_analysis(
                     "total_in_file": len(items),
                 }
             )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.__init__", function="mark_error")
         pass
 
     # 创建报告写入函数

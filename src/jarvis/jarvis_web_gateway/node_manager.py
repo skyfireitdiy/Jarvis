@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Node 主子节点连接与基础状态管理。"""
 
+from jarvis.jarvis_utils.config import save_exception
 from __future__ import annotations
 
 import asyncio
@@ -1465,7 +1466,8 @@ class ChildNodeClient:
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_web_gateway.node_manager", function="start")
                 pass
             self._ws = None
 
@@ -1500,7 +1502,8 @@ class ChildNodeClient:
                 if self._ws is not None:
                     try:
                         await self._ws.close()
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_web_gateway.node_manager", function="start")
                         pass
                     self._ws = None
 

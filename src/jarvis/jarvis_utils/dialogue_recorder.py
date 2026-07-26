@@ -6,6 +6,7 @@
 提供对话记录和管理功能，支持多会话、JSONL格式存储、自动清理等功能。
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import atexit
 import json
 import uuid
@@ -129,7 +130,8 @@ class DialogueRecorder:
                             messages.append(message)
                         except json.JSONDecodeError:
                             continue
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.dialogue_recorder", function="read_session")
             pass
         return messages
 
@@ -145,7 +147,8 @@ class DialogueRecorder:
         if file_path.exists():
             try:
                 file_path.unlink()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_utils.dialogue_recorder", function="cleanup_session")
                 pass
 
     def cleanup_all_sessions(self) -> None:
@@ -160,7 +163,8 @@ class DialogueRecorder:
         for file_path in session_files:
             try:
                 file_path.unlink()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_utils.dialogue_recorder", function="cleanup_all_sessions")
                 pass
 
     def get_session_count(self) -> int:
@@ -175,7 +179,8 @@ class DialogueRecorder:
         """确保数据目录存在"""
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.dialogue_recorder", function="_ensure_data_dir")
             pass
 
     def _get_current_session_id(self) -> str:
@@ -206,7 +211,8 @@ class DialogueRecorder:
             with open(file_path, "a", encoding="utf-8") as f:
                 json.dump(record, f, ensure_ascii=False)
                 f.write("\n")
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.dialogue_recorder", function="_write_record")
             pass
 
     def _get_session_path(self, session_id: str) -> Path:

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 import json
 import threading
 from typing import Any
@@ -259,7 +260,8 @@ class StreamableMcpClient(McpClient):
                                             break
                                     except json.JSONDecodeError:
                                         continue
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_mcp.streamable_mcp_client", function="_send_request")
                             pass
                 # 处理非流式响应（用于初始化请求）
                 # 即使是非流式请求，服务器也可能返回SSE格式的响应
