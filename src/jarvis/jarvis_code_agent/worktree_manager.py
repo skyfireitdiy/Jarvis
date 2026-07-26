@@ -3,7 +3,7 @@
 该模块提供 WorktreeManager 类，用于管理 git worktree 的创建、合并和清理。
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import os
 import shutil
 import subprocess

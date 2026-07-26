@@ -13,7 +13,7 @@ from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 
 class TaskAnalyzer:

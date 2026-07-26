@@ -4,7 +4,7 @@
 构建和修复模块
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import re
 import subprocess
 from pathlib import Path

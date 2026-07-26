@@ -13,7 +13,8 @@ from abc import ABC, abstractmethod
 if TYPE_CHECKING:
     from jarvis.jarvis_agent.rules_manager import RulesManager
 
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from .sources.base import SkillResult
 
 

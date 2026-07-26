@@ -25,7 +25,8 @@ from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
-from jarvis.jarvis_utils.config import get_agent_definition_dirs, save_exception
+from jarvis.jarvis_utils.config import get_agent_definition_dirs
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_roles_dirs
 from jarvis.jarvis_utils.config import is_auto_resume_session

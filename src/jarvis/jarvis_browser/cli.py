@@ -20,7 +20,8 @@ import typer
 from playwright.async_api import async_playwright
 from markdownify import markdownify as html_to_markdown
 
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.utils import init_env
 
 

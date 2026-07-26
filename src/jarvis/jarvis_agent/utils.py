@@ -175,7 +175,8 @@ def install_plugin(source_path: str) -> bool:
     import yaml
     from pathlib import Path
 
-    from jarvis.jarvis_utils.config import get_data_dir, save_exception
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.exception_utils import save_exception
     from jarvis.jarvis_utils.output import PrettyOutput
 
     try:

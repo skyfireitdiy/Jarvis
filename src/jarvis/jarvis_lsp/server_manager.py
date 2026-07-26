@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from jarvis.jarvis_utils.config import read_text_file, save_exception
+from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.client import LSPClient
