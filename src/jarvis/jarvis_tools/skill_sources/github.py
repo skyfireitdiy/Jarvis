@@ -89,6 +89,7 @@ class GitHubSkillSource(ISkillSource):
                         )
 
         except Exception:
+            save_exception(e, module="jarvis_tools.skill_sources.github", function="priority")
             pass
 
         return results

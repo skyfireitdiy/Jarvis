@@ -86,6 +86,7 @@ class ReadCodeTool:
                     if limit_tokens > 0:
                         return limit_tokens
                 except Exception:
+                    save_exception(e, module="jarvis_tools.read_code", function="_get_max_token_limit")
                     pass
 
             # 回退方案：使用输入窗口的2/3
@@ -560,6 +561,7 @@ class ReadCodeTool:
                         )
                         total_tokens += content_tokens
                 except Exception:
+                    save_exception(e, module="jarvis_tools.read_code", function="execute")
                     continue
 
             # 检查累计token数是否超过限制
@@ -663,6 +665,7 @@ class ReadCodeTool:
                 if status_lines:
                     PrettyOutput.auto_print("\n".join(status_lines))
             except Exception:
+                save_exception(e, module="jarvis_tools.read_code", function="execute")
                 pass
             return {
                 "success": overall_success,

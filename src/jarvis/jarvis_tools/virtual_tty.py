@@ -586,12 +586,14 @@ class VirtualTTYTool:
                     process.kill()
                     process.wait()
                 except Exception:
+                    save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
             except Exception:
                 try:
                     process.kill()
                     process.wait()
                 except Exception:
+                    save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
             finally:
                 # 确保所有文件描述符被关闭
@@ -603,6 +605,7 @@ class VirtualTTYTool:
                     if process.stderr:
                         process.stderr.close()
                 except Exception:
+                    save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
 
             # 重置终端数据

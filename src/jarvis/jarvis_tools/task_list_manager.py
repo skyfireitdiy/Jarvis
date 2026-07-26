@@ -116,6 +116,7 @@ class task_list_manager:
                     if limit_chars > 0:
                         return limit_chars
                 except Exception:
+                    save_exception(e, module="jarvis_tools.task_list_manager", function="_get_max_output_length")
                     pass
 
             # 回退方案：使用输入窗口的2/3
@@ -192,6 +193,7 @@ class task_list_manager:
             else:
                 agent.set_user_data("__running_task_id__", task_id)
         except Exception:
+            save_exception(e, module="jarvis_tools.task_list_manager", function="_set_running_task_id")
             pass
 
     def _increment_task_conversation_round(
@@ -263,6 +265,7 @@ class task_list_manager:
         try:
             agent.set_user_data("__task_list_id__", task_list_id)
         except Exception:
+            save_exception(e, module="jarvis_tools.task_list_manager", function="_set_task_list_id")
             pass
 
     def _determine_agent_type(
@@ -387,6 +390,7 @@ class task_list_manager:
                 # 优先从父 Agent 获取 llm_group
                 llm_group = getattr(parent_agent, "llm_group", None)
         except Exception:
+            save_exception(e, module="jarvis_tools.task_list_manager", function="_create_verification_agent")
             pass
 
         # 如果父 Agent 没有 llm_group，才使用当前模型组
@@ -679,6 +683,7 @@ class task_list_manager:
                             )
                         )
                     except Exception:
+                        save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                         pass
                     return True, verification_result_str
                 else:
@@ -705,6 +710,7 @@ class task_list_manager:
                             )
                         )
                     except Exception:
+                        save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                         pass
                     return False, verification_result_str
             else:
@@ -727,6 +733,7 @@ class task_list_manager:
                         )
                     )
                 except Exception:
+                    save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                     pass
                 return False, "验证无结果"
 
@@ -750,6 +757,7 @@ class task_list_manager:
                     )
                 )
             except Exception:
+                save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                 pass
             return False, f"验证异常: {str(e)}"
 
@@ -1841,6 +1849,7 @@ class task_list_manager:
                                 )
                             )
                         except Exception:
+                            save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                             pass
 
                         if is_code_task:
@@ -2012,6 +2021,7 @@ class task_list_manager:
                                     )
                                 )
                             except Exception:
+                                save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                                 pass
 
                         # 记录验证结果
@@ -2114,6 +2124,7 @@ class task_list_manager:
                             )
                         )
                     except Exception:
+                        save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                         pass
                 else:
                     # 验证未通过，标记为 failed，并返回详细的验证结果
@@ -2143,6 +2154,7 @@ class task_list_manager:
                             )
                         )
                     except Exception:
+                        save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                         pass
 
                     # 获取最后一次验证结果
@@ -2247,6 +2259,7 @@ class task_list_manager:
                     actual_output=f"执行异常: {str(e)}",
                 )
             except Exception:
+                save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                 pass
 
             return {
@@ -2514,6 +2527,7 @@ class task_list_manager:
                         )
                     )
                 except Exception:
+                    save_exception(e, module="jarvis_tools.task_list_manager", function="_handle_update_task")
                     pass
 
                 # 任务状态更新成功后，清理事件订阅（对于 main 类型的任务）

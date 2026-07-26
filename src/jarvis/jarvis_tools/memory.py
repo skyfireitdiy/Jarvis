@@ -387,6 +387,7 @@ class MemoryTool:
                     if memory_token_limit <= 0:
                         memory_token_limit = None
                 except Exception:
+                    save_exception(e, module="jarvis_tools.memory", function="_execute_retrieve")
                     pass
 
             # 回退方案：使用输入窗口的2/3

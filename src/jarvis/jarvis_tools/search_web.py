@@ -68,6 +68,7 @@ class SearchWebTool:
             if spec is not None:
                 return [sys.executable, "-m", "ddgr"]
         except Exception:
+            save_exception(e, module="jarvis_tools.search_web", function="_get_ddgr_command")
             pass
 
         # 方法3: 回退到直接使用 ddgr（让 subprocess 处理错误）
@@ -247,6 +248,7 @@ class SearchWebTool:
                             }
                         )
                 except Exception:
+                    save_exception(e, module="jarvis_tools.search_web", function="_search_with_playwright")
                     continue
 
             if not results:

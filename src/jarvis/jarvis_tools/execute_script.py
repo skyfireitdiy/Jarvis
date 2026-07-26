@@ -355,8 +355,10 @@ class ScriptTool:
                 try:
                     set_size(rows, cols)
                 except Exception:
+                    save_exception(e, module="jarvis_tools.execute_script", function="apply_resize")
                     pass
             except Exception:
+                save_exception(e, module="jarvis_tools.execute_script", function="apply_resize")
                 pass
 
         def poll_resize() -> None:
@@ -507,10 +509,12 @@ class ScriptTool:
                             terminate_method()
                             break
                         except Exception:
+                            save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                             pass
                 try:
                     getattr(proc, "wait", lambda: None)()
                 except Exception:
+                    save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                     pass
                 read_done.wait(timeout=2)
                 self._publish_execution_event(
@@ -538,6 +542,7 @@ class ScriptTool:
                         terminate_method()
                         break
                     except Exception:
+                        save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                         pass
             self._publish_execution_event(
                 stream_publisher,
@@ -647,6 +652,7 @@ class ScriptTool:
                     struct.pack("HHHH", rows, cols, 0, 0),
                 )
             except Exception:
+                save_exception(e, module="jarvis_tools.execute_script", function="apply_resize")
                 pass
 
         def poll_resize() -> None:
@@ -789,6 +795,7 @@ class ScriptTool:
 
                         termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_attrs)
                     except Exception:
+                        save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                         pass
 
         try:
@@ -812,6 +819,7 @@ class ScriptTool:
             try:
                 os.close(slave_fd)
             except Exception:
+                save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                 pass
 
         self._publish_execution_event(
@@ -885,6 +893,7 @@ class ScriptTool:
                     proc.kill()
                     proc.wait(timeout=2)
                 except Exception:
+                    save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                     pass
         except Exception as e:
             exc_holder.append(e)
@@ -892,6 +901,7 @@ class ScriptTool:
             try:
                 proc.terminate()
             except Exception:
+                save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
                 pass
 
         stop_event.set()
@@ -900,6 +910,7 @@ class ScriptTool:
         try:
             os.close(master_fd)
         except Exception:
+            save_exception(e, module="jarvis_tools.execute_script", function="stdin_forward")
             pass
 
         # 使用 pyte 处理原始字节数据，得到正确的显示输出（处理控制字符）
@@ -1046,6 +1057,7 @@ class ScriptTool:
                             proc.kill()
                             proc.wait()
                         except Exception:
+                            save_exception(e, module="jarvis_tools.execute_script", function="_execute_on_windows")
                             pass
                     return {
                         "success": False,
@@ -1234,12 +1246,14 @@ class ScriptTool:
                                 proc.kill()
                                 proc.wait()
                             except Exception:
+                                save_exception(e, module="jarvis_tools.execute_script", function="_execute_script_with_interpreter_internal")
                                 pass
                         except Exception:
                             try:
                                 proc.kill()
                                 proc.wait()
                             except Exception:
+                                save_exception(e, module="jarvis_tools.execute_script", function="_execute_script_with_interpreter_internal")
                                 pass
                     except Exception as e:
                         if proc is not None:
@@ -1251,6 +1265,7 @@ class ScriptTool:
                                     proc.kill()
                                     proc.wait()
                                 except Exception:
+                                    save_exception(e, module="jarvis_tools.execute_script", function="_execute_script_with_interpreter_internal")
                                     pass
                         PrettyOutput.auto_print(f"❌ {str(e)}")
                         try:
@@ -1273,6 +1288,7 @@ class ScriptTool:
                                 if proc.stderr:
                                     proc.stderr.close()
                             except Exception:
+                                save_exception(e, module="jarvis_tools.execute_script", function="_execute_script_with_interpreter_internal")
                                 pass
                         clear_script_pid()
 

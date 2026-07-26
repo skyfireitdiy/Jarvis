@@ -126,6 +126,7 @@ class ReadSymbolsTool:
                     try:
                         obj = json.loads(line)
                     except Exception:
+                        save_exception(e, module="jarvis_tools.read_symbols", function="execute")
                         continue
 
                     name = obj.get("name") or ""
@@ -162,6 +163,7 @@ class ReadSymbolsTool:
                 if status_lines:
                     PrettyOutput.auto_print("".join(status_lines))
             except Exception:
+                save_exception(e, module="jarvis_tools.read_symbols", function="execute")
                 pass
 
             return {"success": True, "stdout": stdout, "stderr": ""}

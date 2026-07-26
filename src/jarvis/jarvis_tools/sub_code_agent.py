@@ -131,6 +131,7 @@ class SubCodeAgentTool:
                             if isinstance(t, dict) and t.get("name"):
                                 use_tools.append(str(t["name"]))
             except Exception:
+                save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 
             # 创建 CodeAgent：参数优先使用父Agent的配置（若可获取），否则使用默认
@@ -140,6 +141,7 @@ class SubCodeAgentTool:
                 if parent_agent is not None:
                     tool_group = getattr(parent_agent, "tool_group", tool_group)
             except Exception:
+                save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 
             # 依据父Agent已启用工具集，推导 append_tools（作为在 CodeAgent 基础工具上的增量）
@@ -229,6 +231,7 @@ class SubCodeAgentTool:
                         code_agent.set_use_tools(filtered_tools)
                 # 不再从父 Agent 获取模型名，使用系统默认配置（符合"不依赖父 Agent"的约定）
             except Exception:
+                save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 
             # 设置继承的对话历史到 CodeAgent（在 CodeAgent 创建后）
