@@ -108,15 +108,24 @@ class PromptManager:
             str: 格式化的系统工具信息字符串，供AI助手了解可用工具
         """
         import os
+        import platform
+        from datetime import datetime
 
         current_work_dir = os.getcwd()
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        os_type = platform.system()  # Linux, Darwin, Windows
+        os_release = (
+            platform.freedesktop_os_release().get("PRETTY_NAME", platform.release())
+            if os_type == "Linux"
+            else platform.version()
+        )
 
         return f"""
 <system_info>
-可用工具:
-- grep: 搜索文件内容
-- find: 查找文件
 - 当前工作目录: {current_work_dir}
+- 当前时间: {current_time}
+- 系统类型: {os_type}
+- 系统发行版: {os_release}
 </system_info>"""
 
     def build_default_addon_prompt(self, need_complete: bool) -> str:
