@@ -8,7 +8,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from jarvis.jarvis_utils.config import (
+from jarvis.jarvis_utils.config import (, save_exception
     calculate_token_limit,
     get_data_dir,
     get_max_input_token_count,
@@ -386,7 +386,7 @@ class MemoryTool:
                     memory_token_limit = calculate_token_limit(remaining_tokens)
                     if memory_token_limit <= 0:
                         memory_token_limit = None
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.memory", function="_execute_retrieve")
                     pass
 

@@ -8,6 +8,7 @@ from typing import Dict
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
+from jarvis.jarvis_utils.config import save_exception
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
@@ -585,14 +586,14 @@ class VirtualTTYTool:
                 try:
                     process.kill()
                     process.wait()
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
             except Exception:
                 try:
                     process.kill()
                     process.wait()
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
             finally:
@@ -604,7 +605,7 @@ class VirtualTTYTool:
                         process.stdout.close()
                     if process.stderr:
                         process.stderr.close()
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.virtual_tty", function="_close_tty_windows")
                     pass
 

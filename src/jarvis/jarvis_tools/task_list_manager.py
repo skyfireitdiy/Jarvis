@@ -18,7 +18,7 @@ from jarvis.jarvis_utils.output import (
 from typing import Dict, List, Optional, Any
 
 from jarvis.jarvis_agent.task_list import TaskStatus
-from jarvis.jarvis_utils.config import (
+from jarvis.jarvis_utils.config import (, save_exception
     calculate_token_limit,
     get_max_input_token_count,
     get_llm_group,
@@ -115,7 +115,7 @@ class task_list_manager:
                     # 确保至少返回一个合理的值
                     if limit_chars > 0:
                         return limit_chars
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.task_list_manager", function="_get_max_output_length")
                     pass
 
@@ -192,7 +192,7 @@ class task_list_manager:
                 agent.delete_user_data("__running_task_id__")
             else:
                 agent.set_user_data("__running_task_id__", task_id)
-        except Exception:
+        except Exception as e:
             save_exception(e, module="jarvis_tools.task_list_manager", function="_set_running_task_id")
             pass
 
@@ -264,7 +264,7 @@ class task_list_manager:
             return
         try:
             agent.set_user_data("__task_list_id__", task_list_id)
-        except Exception:
+        except Exception as e:
             save_exception(e, module="jarvis_tools.task_list_manager", function="_set_task_list_id")
             pass
 
@@ -389,7 +389,7 @@ class task_list_manager:
             if parent_agent is not None:
                 # 优先从父 Agent 获取 llm_group
                 llm_group = getattr(parent_agent, "llm_group", None)
-        except Exception:
+        except Exception as e:
             save_exception(e, module="jarvis_tools.task_list_manager", function="_create_verification_agent")
             pass
 
@@ -682,7 +682,7 @@ class task_list_manager:
                                 },
                             )
                         )
-                    except Exception:
+                    except Exception as e:
                         save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                         pass
                     return True, verification_result_str
@@ -709,7 +709,7 @@ class task_list_manager:
                                 },
                             )
                         )
-                    except Exception:
+                    except Exception as e:
                         save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                         pass
                     return False, verification_result_str
@@ -732,7 +732,7 @@ class task_list_manager:
                             },
                         )
                     )
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                     pass
                 return False, "验证无结果"
@@ -756,7 +756,7 @@ class task_list_manager:
                         },
                     )
                 )
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.task_list_manager", function="_verify_task_completion")
                 pass
             return False, f"验证异常: {str(e)}"
@@ -1848,7 +1848,7 @@ class task_list_manager:
                                     },
                                 )
                             )
-                        except Exception:
+                        except Exception as e:
                             save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                             pass
 
@@ -2020,7 +2020,7 @@ class task_list_manager:
                                         },
                                     )
                                 )
-                            except Exception:
+                            except Exception as e:
                                 save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                                 pass
 
@@ -2123,7 +2123,7 @@ class task_list_manager:
                                 },
                             )
                         )
-                    except Exception:
+                    except Exception as e:
                         save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                         pass
                 else:
@@ -2153,7 +2153,7 @@ class task_list_manager:
                                 },
                             )
                         )
-                    except Exception:
+                    except Exception as e:
                         save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                         pass
 
@@ -2258,7 +2258,7 @@ class task_list_manager:
                     is_main_agent=is_main_agent,
                     actual_output=f"执行异常: {str(e)}",
                 )
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.task_list_manager", function="model_call_callback")
                 pass
 
@@ -2526,7 +2526,7 @@ class task_list_manager:
                             },
                         )
                     )
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.task_list_manager", function="_handle_update_task")
                     pass
 

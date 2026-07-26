@@ -13,6 +13,7 @@ sub_code_agent 工具
 from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_utils.config import save_exception
 
 
 class SubCodeAgentTool:
@@ -130,7 +131,7 @@ class SubCodeAgentTool:
                         for t in parent_registry.get_all_tools():
                             if isinstance(t, dict) and t.get("name"):
                                 use_tools.append(str(t["name"]))
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 
@@ -140,7 +141,7 @@ class SubCodeAgentTool:
             try:
                 if parent_agent is not None:
                     tool_group = getattr(parent_agent, "tool_group", tool_group)
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 
@@ -230,7 +231,7 @@ class SubCodeAgentTool:
                     if filtered_tools:
                         code_agent.set_use_tools(filtered_tools)
                 # 不再从父 Agent 获取模型名，使用系统默认配置（符合"不依赖父 Agent"的约定）
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.sub_code_agent", function="execute")
                 pass
 

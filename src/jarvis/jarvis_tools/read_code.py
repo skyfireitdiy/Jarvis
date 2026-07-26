@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from jarvis.jarvis_utils.config import (
+from jarvis.jarvis_utils.config import (, save_exception
     calculate_token_limit,
     detect_file_encoding,
     get_max_input_token_count,
@@ -85,7 +85,7 @@ class ReadCodeTool:
                     # 确保至少返回一个合理的值
                     if limit_tokens > 0:
                         return limit_tokens
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.read_code", function="_get_max_token_limit")
                     pass
 
@@ -560,7 +560,7 @@ class ReadCodeTool:
                             }
                         )
                         total_tokens += content_tokens
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.read_code", function="execute")
                     continue
 
@@ -664,7 +664,7 @@ class ReadCodeTool:
             try:
                 if status_lines:
                     PrettyOutput.auto_print("\n".join(status_lines))
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.read_code", function="execute")
                 pass
             return {

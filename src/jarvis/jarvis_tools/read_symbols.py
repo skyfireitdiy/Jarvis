@@ -18,7 +18,7 @@
 import json
 import os
 
-from jarvis.jarvis_utils.config import detect_file_encoding, get_default_encoding
+from jarvis.jarvis_utils.config import detect_file_encoding, get_default_encoding, save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -125,7 +125,7 @@ class ReadSymbolsTool:
                         continue
                     try:
                         obj = json.loads(line)
-                    except Exception:
+                    except Exception as e:
                         save_exception(e, module="jarvis_tools.read_symbols", function="execute")
                         continue
 
@@ -162,7 +162,7 @@ class ReadSymbolsTool:
                     status_lines.append(f"[read_symbols] {s}: {cnt} 条匹配")
                 if status_lines:
                     PrettyOutput.auto_print("".join(status_lines))
-            except Exception:
+            except Exception as e:
                 save_exception(e, module="jarvis_tools.read_symbols", function="execute")
                 pass
 

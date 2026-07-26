@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 
-from jarvis.jarvis_utils.config import (
+from jarvis.jarvis_utils.config import (, save_exception
     detect_file_encoding,
     get_default_encoding,
     read_text_file,
@@ -254,7 +254,7 @@ class EditFileNormalTool:
                 try:
                     shutil.copy2(backup_path, abs_path)
                     os.remove(backup_path)
-                except Exception:
+                except Exception as e:
                     save_exception(e, module="jarvis_tools.edit_file", function="_write_file_with_rollback")
                     pass
             error_msg = f"文件写入失败: {str(write_error)}"
@@ -811,7 +811,7 @@ class EditFileNormalTool:
                     if backup_path and os.path.exists(backup_path):
                         try:
                             os.remove(backup_path)
-                        except Exception:
+                        except Exception as e:
                             save_exception(e, module="jarvis_tools.edit_file", function="execute")
                             pass
                     all_results.append(f"❌ {file_path}: {result_or_error}")
@@ -835,7 +835,7 @@ class EditFileNormalTool:
                     if backup_path and os.path.exists(backup_path):
                         try:
                             os.remove(backup_path)
-                        except Exception:
+                        except Exception as e:
                             save_exception(e, module="jarvis_tools.edit_file", function="execute")
                             pass
 
