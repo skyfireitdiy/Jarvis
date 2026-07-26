@@ -27,6 +27,7 @@ from typing import Union
 from jarvis.jarvis_utils.globals import clear_script_pid
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.config import save_exception
 from jarvis.jarvis_utils.globals import set_script_pid
 from jarvis.jarvis_utils.output import PrettyOutput
 
