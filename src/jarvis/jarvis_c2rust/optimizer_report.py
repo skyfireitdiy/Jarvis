@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """优化器报告管理模块。"""
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -48,5 +49,8 @@ def write_final_report(report_path: Path, stats: OptimizeStats) -> None:
             report_path,
             json.dumps(asdict(stats), ensure_ascii=False, indent=2),
         )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_c2rust.optimizer_report", function="write_final_report"
+        )
         pass

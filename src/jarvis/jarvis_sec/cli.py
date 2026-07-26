@@ -15,6 +15,7 @@ Jarvis 安全演进套件 —— 命令行入口（Typer 版本）
 
 from __future__ import annotations
 
+from jarvis.jarvis_utils.config import save_exception
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -450,7 +451,8 @@ def analyze(
     # 初始化环境
     try:
         init_env()
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_sec.cli", function="analyze")
         pass
 
     from jarvis.jarvis_sec.workflow import analyze_from_json
@@ -512,7 +514,10 @@ def _parallel_analyze_file(args: Tuple[str, str, str]) -> List[Dict[str, Any]]:
             database = ProjectDatabase(
                 str(target_path), db_path=db_path, in_memory=False
             )
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.cli", function="_parallel_analyze_file"
+            )
             pass
 
     try:
@@ -788,7 +793,10 @@ def heuristic(
                                 )
                             if result["type_infos"]:
                                 database.add_type_infos_batch(result["type_infos"])
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e, module="jarvis_sec.cli", function="heuristic"
+                            )
                             pass
                         progress.update(
                             task,
@@ -826,7 +834,8 @@ def heuristic(
                         result = collector.analyze_file(str(file_path), lang)
                         total_symbols += len(result.get("symbols", []))
                         progress.update(task, symbols=total_symbols)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.cli", function="heuristic")
                         pass
                     progress.advance(task)
 
@@ -859,7 +868,8 @@ def heuristic(
                         total_calls += len(result.get("call_relations", []))
                         total_nodes += len(result.get("data_flow_nodes", []))
                         progress.update(task, calls=total_calls, nodes=total_nodes)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_sec.cli", function="heuristic")
                         pass
                     progress.advance(task)
 
@@ -918,7 +928,10 @@ def heuristic(
                             try:
                                 issues = future.result()
                                 all_issues.extend(issues)
-                            except Exception:
+                            except Exception as e:
+                                save_exception(
+                                    e, module="jarvis_sec.cli", function="heuristic"
+                                )
                                 pass
                             progress.update(
                                 task,
@@ -1150,7 +1163,8 @@ def scan() -> None:
             PrettyOutput.auto_print(
                 f"⚠️ [jsec-scan] Agent 分析过程出错，将回退到直扫基线（fast）：{e}"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.cli", function="scan")
             pass
         text = None
 
@@ -1159,7 +1173,8 @@ def scan() -> None:
             PrettyOutput.auto_print(
                 "⚠️ [jsec-scan] Agent 无输出，回退到直扫基线（fast）。"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_sec.cli", function="scan")
             pass
         result = direct_scan(scan_dir, languages=languages, exclude_dirs=exclude_dirs)
         # 如果指定了文件过滤，过滤结果
@@ -1197,12 +1212,14 @@ def scan() -> None:
             p.write_text(md_text, encoding="utf-8")
             try:
                 PrettyOutput.auto_print(f"✅ [jsec-scan] 报告已写入: {p}")
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.cli", function="scan")
                 pass
         except Exception as e:
             try:
                 PrettyOutput.auto_print(f"❌ [jsec-scan] 写入报告失败: {e}")
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_sec.cli", function="scan")
                 pass
     PrettyOutput.auto_print(text)
 

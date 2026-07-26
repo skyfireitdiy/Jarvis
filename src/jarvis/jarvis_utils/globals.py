@@ -441,7 +441,7 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
     import random
     from pathlib import Path
 
-    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.config import get_data_dir, save_exception
 
     tags_by_type: Dict[str, List[str]] = {
         "short_term": [],
@@ -496,7 +496,10 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
                 with open(memory_file, "r", encoding="utf-8") as f:
                     memory_data = json.load(f)
                     project_memories.append(memory_data)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.globals", function="get_all_memory_tags"
+                )
                 pass
 
         # 收集所有标签
@@ -545,7 +548,10 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
                 with open(memory_file, "r", encoding="utf-8") as f:
                     memory_data = json.load(f)
                     global_memories.append(memory_data)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_utils.globals", function="get_all_memory_tags"
+                )
                 pass
 
         # 收集所有标签

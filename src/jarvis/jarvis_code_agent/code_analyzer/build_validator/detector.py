@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 
+from jarvis.jarvis_utils.config import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.input import get_single_line_input
@@ -121,7 +122,12 @@ class BuildSystemDetector:
                             file_list.append(item)
                             if len(file_list) >= max_files:
                                 break
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_code_agent.code_analyzer.build_validator.detector",
+                        function="_get_git_root_file_list",
+                    )
                     pass
 
             # 返回格式化的字符串

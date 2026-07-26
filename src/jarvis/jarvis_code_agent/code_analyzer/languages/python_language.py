@@ -7,7 +7,7 @@ from typing import Optional
 from typing import Set
 from typing import Union
 
-from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.config import read_text_file, save_exception
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency
@@ -225,7 +225,12 @@ class PythonDependencyAnalyzer(DependencyAnalyzer):
                         )
                         if dep_path and dep_path != file_path:
                             graph.add_dependency(file_path, dep_path)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_code_agent.code_analyzer.languages.python_language",
+                        function="build_dependency_graph",
+                    )
                     continue
 
         return graph

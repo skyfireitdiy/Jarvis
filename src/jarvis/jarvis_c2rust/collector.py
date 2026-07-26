@@ -23,6 +23,8 @@
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 from pathlib import Path
 from typing import Dict
 from typing import List
@@ -141,7 +143,8 @@ def _collect_decl_function_names(cindex: Any, file: Path, args: List[str]) -> Li
 
     try:
         visit(tu.cursor)
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.collector", function="visit")
         pass
     return names
 
@@ -168,7 +171,10 @@ def collect_function_names(
     for p in files or []:
         try:
             fp = Path(p).resolve()
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_c2rust.collector", function="collect_function_names"
+            )
             continue
         if fp.is_file() and fp.suffix.lower() in HEADER_EXTS:
             hdrs.append(fp)

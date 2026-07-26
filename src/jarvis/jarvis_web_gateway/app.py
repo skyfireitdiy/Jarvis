@@ -90,6 +90,7 @@ from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 from jarvis.jarvis_utils.config import (
     GLOBAL_CONFIG_DATA,
     get_gateway_auth_config,
+    save_exception,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,13 +153,15 @@ async def _handle_node_secret_client(
             error_response = json.dumps({"error": str(e)})
             writer.write(error_response.encode("utf-8") + b"\n")
             await writer.drain()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_web_gateway.app", function="")
             pass
     finally:
         writer.close()
         try:
             await writer.wait_closed()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_web_gateway.app", function="")
             pass
 
 
@@ -314,7 +317,10 @@ def _update_status(status: str) -> None:
             # 推送状态变化消息
             message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_web_gateway.app", function="_update_status"
+            )
             pass
 
 
@@ -609,11 +615,17 @@ class WebSocketConnectionManager:
                         "CONNECTION_LOCKED",
                         "Your connection has been replaced by a new one",
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_web_gateway.app", function="__init__"
+                    )
                     pass
                 try:
                     await old_websocket.close()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_web_gateway.app", function="__init__"
+                    )
                     pass
                 self._router.unregister(old_connection_id, session_id=session_id)
                 self._active_connections.pop(session_id, None)
@@ -955,7 +967,10 @@ class WebSocketConnectionManager:
                             "payload": {"terminal_id": payload.get("terminal_id")},
                         }
                         self._router.publish(result_msg, session_id=session_id)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_web_gateway.app", function="__init__"
+                    )
                     pass
                 return
 
@@ -1214,7 +1229,12 @@ def create_app(
                                     headers={"X-Internal-Sync": "true"},
                                     timeout=5.0,
                                 )
-                            except Exception:
+                            except Exception as e:
+                                save_exception(
+                                    e,
+                                    module="jarvis_web_gateway.app",
+                                    function="_build_callback_from_metadata",
+                                )
                                 pass
         if node_config.is_master:
             node_runtime.mark_ready()
@@ -1770,7 +1790,12 @@ def create_app(
             )
             try:
                 await websocket.close(code=4003, reason="Remote websocket proxy failed")
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_web_gateway.app",
+                    function="verify_agent_proxy_access",
+                )
                 pass
         finally:
             try:
@@ -3272,7 +3297,12 @@ def create_app(
                     payload = response.get("payload") or {}
                     if payload.get("success"):
                         return {"success": True, "data": payload.get("result")}
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_web_gateway.app",
+                        function="_reload_model_groups_config",
+                    )
                     pass
             return {
                 "success": False,
@@ -3409,7 +3439,12 @@ def create_app(
                     if payload.get("success"):
                         node_runtime.agent_route_registry.remove(agent_id)
                         return {"success": True, "data": payload.get("result")}
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_web_gateway.app",
+                        function="_reload_model_groups_config",
+                    )
                     pass
             return {
                 "success": False,
@@ -3823,7 +3858,12 @@ def create_app(
                                             "description": "File",
                                         }
                                     )
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_web_gateway.app",
+                            function="_reload_model_groups_config",
+                        )
                         pass
 
                 # 回退到 fuzzywuzzy
@@ -5491,12 +5531,14 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
         async def _send():
             try:
                 await websocket.send_json(message)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_web_gateway.app", function="_sender")
                 pass
 
         try:
             asyncio.run_coroutine_threadsafe(_send(), loop)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_web_gateway.app", function="_sender")
             pass
 
     return _sender

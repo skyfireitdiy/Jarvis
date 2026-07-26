@@ -1,0 +1,8 @@
+{
+  "id": "20260726_035022_605656",
+  "type": "project_long_term",
+  "tags": ["异常记录", "save_exception", "已完成"],
+  "content": "新增统一异常记录工具函数 save_exception，位于 jarvis.jarvis_utils.config。功能：将异常信息记录到 ~/.jarvis/exceptions/ 目录，JSON格式含timestamp/exception_type/exception_msg/traceback/context/module/function，自动脱敏，保存失败静默忽略。调用方式：from jarvis.jarvis_utils.config import save_exception; save_exception(e, context='描述', module='模块名', function='函数名')。Commit: 00a4989",
+  "created_at": "2026-07-26T03:50:22.605693",
+  "updated_at": "2026-07-26T03:50:22.605699"
+}

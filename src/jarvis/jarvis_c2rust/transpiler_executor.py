@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 import os
 from pathlib import Path
 from typing import Any
@@ -196,7 +198,12 @@ class TranspilerExecutor:
                     PrettyOutput.auto_print(
                         f"✅ [c2rust-transpiler][init] created Cargo.toml at {cargo}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_executor",
+                        function="_ensure_crate_structure",
+                    )
                     pass
             # 确保 src/lib.rs 存在
             src_dir.mkdir(parents=True, exist_ok=True)
@@ -208,7 +215,12 @@ class TranspilerExecutor:
                     PrettyOutput.auto_print(
                         f"✅ [c2rust-transpiler][init] created src/lib.rs at {lib_rs}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_executor",
+                        function="_ensure_crate_structure",
+                    )
                     pass
             # 确保 .gitignore 存在（不覆盖已有）
             if not gitignore.exists():
@@ -218,7 +230,12 @@ class TranspilerExecutor:
                     PrettyOutput.auto_print(
                         f"✅ [c2rust-transpiler][init] created .gitignore at {gitignore}"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_executor",
+                        function="_ensure_crate_structure",
+                    )
                     pass
         except Exception:
             # 保持稳健，失败不阻塞主流程
@@ -326,7 +343,12 @@ class TranspilerExecutor:
                         if mp.is_absolute():
                             rel = mp.relative_to(self.crate_dir.resolve())
                             module_path_clean = str(rel).replace("\\", "/")
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_c2rust.transpiler_executor",
+                            function="_process_function",
+                        )
                         pass
                 # 确保路径以 src/ 开头
                 if module_path_clean.startswith("src/"):
@@ -400,7 +422,12 @@ class TranspilerExecutor:
             # 刷新精简上下文（防止签名/模块调整后提示不同步）
             try:
                 self.refresh_compact_context(rec, module, rust_sig)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_c2rust.transpiler_executor",
+                    function="_process_function",
+                )
                 pass
 
             # 3) 构建与修复
@@ -526,5 +553,10 @@ class TranspilerExecutor:
             cur["mod_visibility_fixed"] = True
             self.progress["current"] = cur
             self.save_progress()
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.transpiler_executor",
+                function="_ensure_module_structure",
+            )
             pass

@@ -3,6 +3,7 @@
 代码审查模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import json
 import re
 from pathlib import Path
@@ -897,7 +898,12 @@ class ReviewManager:
                     # 清理 agent_before_commits 中的记录
                     if agent_key in self.agent_before_commits:
                         del self.agent_before_commits[agent_key]
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_review",
+                        function="build_review_prompts",
+                    )
                     pass
                 # 记录审查结果到进度
                 try:
@@ -919,7 +925,12 @@ class ReviewManager:
                     cur["metrics"] = metrics
                     self.progress["current"] = cur
                     self.save_progress()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_review",
+                        function="build_review_prompts",
+                    )
                     pass
                 return
 
@@ -1143,7 +1154,12 @@ class ReviewManager:
                 cur["metrics"] = metrics
                 self.progress["current"] = cur
                 self.save_progress()
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_c2rust.transpiler_review",
+                    function="build_review_prompts",
+                )
                 pass
 
             # 清理当前迭代的 agent 事件订阅和记录（为下一次迭代做准备）
@@ -1158,7 +1174,12 @@ class ReviewManager:
                 # 清理 agent_before_commits 中的记录
                 if agent_key in self.agent_before_commits:
                     del self.agent_before_commits[agent_key]
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_c2rust.transpiler_review",
+                    function="build_review_prompts",
+                )
                 pass
 
             i += 1
@@ -1174,5 +1195,10 @@ class ReviewManager:
                 cur["review_iterations"] = i
                 self.progress["current"] = cur
                 self.save_progress()
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_c2rust.transpiler_review",
+                    function="build_review_prompts",
+                )
                 pass

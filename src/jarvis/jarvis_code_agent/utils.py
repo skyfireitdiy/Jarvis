@@ -4,6 +4,7 @@
 提供项目概况等工具函数。
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import subprocess
 from typing import Any
 from typing import Dict
@@ -141,7 +142,10 @@ def get_project_overview(project_root: str) -> str:
         loc_stats = get_loc_stats()
         if loc_stats:
             project_info.append(f"代码统计:\n{loc_stats}")
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_code_agent.utils", function="get_project_overview"
+        )
         pass
 
     # 获取Git托管的文件信息
@@ -149,7 +153,10 @@ def get_project_overview(project_root: str) -> str:
         git_files_info = get_git_tracked_files_info(project_root)
         if git_files_info:
             project_info.append(git_files_info)
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_code_agent.utils", function="get_project_overview"
+        )
         pass
 
     # 获取最近提交信息
@@ -163,7 +170,10 @@ def get_project_overview(project_root: str) -> str:
                 for i, commit in enumerate(commits_info[:5])
             )
             project_info.append(f"最近提交:\n{commits_str}")
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_code_agent.utils", function="get_project_overview"
+        )
         pass
 
     if project_info:

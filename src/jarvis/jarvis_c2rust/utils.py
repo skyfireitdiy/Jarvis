@@ -21,7 +21,11 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
 from jarvis.jarvis_c2rust.constants import ORDER_JSONL
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
-from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
+from jarvis.jarvis_utils.config import (
+    calculate_token_limit,
+    get_max_input_token_count,
+    save_exception,
+)
 from jarvis.jarvis_utils.git_utils import get_diff
 from jarvis.jarvis_utils.git_utils import get_diff_file_list
 from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
@@ -97,7 +101,10 @@ def iter_order_steps(order_jsonl: Path) -> List[List[int]]:
                 continue
             try:
                 obj = json.loads(ln)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_c2rust.utils", function="iter_order_steps"
+                )
                 continue
 
             ids = obj.get("ids")
@@ -151,7 +158,8 @@ def read_json(path: Path, default: Any) -> Any:
     try:
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.utils", function="read_json")
         pass
     return default
 
@@ -173,7 +181,8 @@ def write_json(path: Path, obj: Any) -> None:
             path.write_text(
                 json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_c2rust.utils", function="write_json")
             pass
 
 
@@ -540,7 +549,12 @@ def truncate_git_diff_with_context_limit(
                 )
                 if max_diff_chars <= 0:
                     max_diff_chars = None
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_c2rust.utils",
+                function="truncate_git_diff_with_context_limit",
+            )
             pass
 
     # 回退方案：使用输入窗口的指定比例转换为字符数

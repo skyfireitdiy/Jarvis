@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 import typer
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
@@ -882,7 +882,8 @@ WantedBy=default.target
                     pid = (
                         int(pid_str) if pid_str.isdigit() and int(pid_str) > 0 else None
                     )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_service.cli", function="status")
                 pass
 
         return ServiceStatus(

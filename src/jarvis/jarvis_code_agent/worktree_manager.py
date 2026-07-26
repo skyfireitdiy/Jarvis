@@ -3,6 +3,7 @@
 该模块提供 WorktreeManager 类，用于管理 git worktree 的创建、合并和清理。
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import os
 import shutil
 import subprocess
@@ -464,7 +465,12 @@ class WorktreeManager:
                     cwd=self.worktree_path,
                 )
                 # 如果没有进行中的 rebase，返回码非0是正常的，忽略错误
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_code_agent.worktree_manager",
+                    function="merge_back",
+                )
                 pass
 
             # 检查 worktree 状态，提供恢复指导
@@ -487,7 +493,12 @@ class WorktreeManager:
                     PrettyOutput.auto_print("💡 请手动检查并处理:")
                     PrettyOutput.auto_print(f"   cd {self.worktree_path}")
                     PrettyOutput.auto_print("   git status")
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_code_agent.worktree_manager",
+                    function="merge_back",
+                )
                 pass
 
     def cleanup(self, worktree_path: Optional[str] = None) -> bool:

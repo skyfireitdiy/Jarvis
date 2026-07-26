@@ -2,6 +2,7 @@
 """GitHub 搜索源实现"""
 
 import aiohttp
+from jarvis.jarvis_utils.config import save_exception
 from typing import List, Optional
 from .base import ISkillSource, SkillResult
 
@@ -88,7 +89,10 @@ class GitHubSkillSource(ISkillSource):
                             )
                         )
 
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_tools.skill_sources.github", function="priority"
+            )
             pass
 
         return results

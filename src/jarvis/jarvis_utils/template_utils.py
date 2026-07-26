@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
+from jarvis.jarvis_utils.config import save_exception
 import jinja2
 from jinja2 import TemplateError, TemplateSyntaxError
 
@@ -280,7 +281,10 @@ def _get_builtin_dir() -> Path | None:
             builtin_dir = Path(git_root) / "builtin"
             if builtin_dir.exists() and builtin_dir.is_dir():
                 return builtin_dir
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_utils.template_utils", function="_get_builtin_dir"
+        )
         pass
 
     return None

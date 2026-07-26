@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from jarvis.jarvis_utils.config import save_exception
 import re
 from pathlib import Path
 from typing import Match
@@ -95,7 +96,8 @@ def ensure_mod_rs_decl(dir_path: Path, child_mod: str) -> None:
         PrettyOutput.auto_print(
             f"✅ [c2rust-transpiler][mod] updated {mod_rs}: ensured pub mod {child_mod}"
         )
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_c2rust.transpiler_mod_utils", function="_repl")
         pass
 
 
@@ -185,7 +187,12 @@ def ensure_mod_chain_for_module(crate_dir: Path, module: str) -> None:
                 # parent 不在 crate/src 下，跳过
                 break
             cur_dir = parent
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_c2rust.transpiler_mod_utils",
+            function="ensure_mod_chain_for_module",
+        )
         pass
 
 
@@ -209,7 +216,12 @@ def module_file_to_crate_path(crate_dir: Path, module: str) -> str:
             except Exception:
                 # 绝对路径不在 crate_dir 下，保持原样
                 pass
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_c2rust.transpiler_mod_utils",
+            function="module_file_to_crate_path",
+        )
         pass
     # 规范化 ./ 前缀
     if mod.startswith("./"):
