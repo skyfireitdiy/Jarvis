@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的项目结构应用模块。"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import re
 from pathlib import Path
 from typing import Any

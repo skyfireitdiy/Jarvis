@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.input import get_single_line_input

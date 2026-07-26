@@ -2,7 +2,7 @@
 # type: ignore
 """聚类相关模块"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import json
 from pathlib import Path
 from typing import Any

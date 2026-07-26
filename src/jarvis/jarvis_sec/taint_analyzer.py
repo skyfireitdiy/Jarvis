@@ -4,7 +4,7 @@
 支持多种分析器后端（Joern、PhASAR、SVF），提供可扩展的规则配置机制。
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional

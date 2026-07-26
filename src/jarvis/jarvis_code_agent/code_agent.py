@@ -38,7 +38,8 @@ from jarvis.jarvis_code_agent.code_agent_prompts import (
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
-from jarvis.jarvis_utils.config import is_auto_resume_session, save_exception
+from jarvis.jarvis_utils.config import is_auto_resume_session
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_utils.config import is_enable_request_classification

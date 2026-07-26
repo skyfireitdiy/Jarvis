@@ -3,7 +3,8 @@
 import os
 import subprocess
 
-from jarvis.jarvis_utils.config import get_llm_group, save_exception
+from jarvis.jarvis_utils.config import get_llm_group
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-

@@ -16,7 +16,8 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
-from jarvis.jarvis_utils.config import read_text_file, save_exception
+from jarvis.jarvis_utils.config import read_text_file
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.utils import decode_output
 
 from .context_manager import ContextManager

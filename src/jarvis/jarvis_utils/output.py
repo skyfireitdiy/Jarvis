@@ -31,7 +31,8 @@ from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
 
-from jarvis.jarvis_utils.config import get_pretty_output, save_exception
+from jarvis.jarvis_utils.config import get_pretty_output
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import is_print_error_traceback
 from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_agent_list

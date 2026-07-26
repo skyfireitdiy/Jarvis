@@ -20,7 +20,8 @@ from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.template_utils import render_rule_template
-from jarvis.jarvis_utils.config import get_central_rules_repo, save_exception
+from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.utils import daily_check_git_updates

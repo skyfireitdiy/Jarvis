@@ -13,7 +13,7 @@ sub_code_agent 工具
 from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 
 class SubCodeAgentTool:

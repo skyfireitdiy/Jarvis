@@ -11,7 +11,7 @@ from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.events import TASK_STARTED
 from jarvis.jarvis_utils.globals import get_all_memory_tags
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 
 class MemoryManager:

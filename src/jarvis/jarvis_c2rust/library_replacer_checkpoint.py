@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """库替换器的检查点管理模块。"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import json
 import time
 from pathlib import Path

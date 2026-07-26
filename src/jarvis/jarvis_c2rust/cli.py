@@ -20,7 +20,8 @@ from typing import Optional
 from typing import cast
 
 import typer
-from jarvis.jarvis_utils.config import set_llm_group, save_exception
+from jarvis.jarvis_utils.config import set_llm_group
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.library_replacer import (

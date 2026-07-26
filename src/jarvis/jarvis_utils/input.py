@@ -50,7 +50,8 @@ from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.styles import Style as PromptStyle
 
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.config import get_submit_keys
 from jarvis.jarvis_utils.globals import get_message_history

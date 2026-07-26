@@ -6,7 +6,7 @@
 
 from typing import Any
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 
 def _collect_language_support_info() -> dict[str, dict[str, Any]]:

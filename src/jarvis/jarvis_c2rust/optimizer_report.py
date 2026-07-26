@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """优化器报告管理模块。"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import json
 from dataclasses import asdict
 from pathlib import Path

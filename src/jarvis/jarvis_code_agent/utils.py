@@ -4,7 +4,7 @@
 提供项目概况等工具函数。
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import subprocess
 from typing import Any
 from typing import Dict

@@ -8,7 +8,7 @@ from typing import Dict
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:

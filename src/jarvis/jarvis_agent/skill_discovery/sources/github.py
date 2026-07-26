@@ -2,7 +2,7 @@
 """GitHub 技能发现源实现"""
 
 import aiohttp
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from typing import List, Optional
 from .base import ISkillSource, SkillResult
 
