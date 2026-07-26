@@ -22,7 +22,8 @@ from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import calculate_token_limit, save_exception
+from jarvis.jarvis_utils.config import calculate_token_limit
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_tool_load_dirs

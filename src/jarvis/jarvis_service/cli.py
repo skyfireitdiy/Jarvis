@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 
 import typer
 
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 

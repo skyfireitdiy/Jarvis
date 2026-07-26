@@ -25,7 +25,8 @@ from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
 from jarvis.jarvis_platform.content_types import ContentBlock
-from jarvis.jarvis_utils.config import get_conversation_turn_threshold, save_exception
+from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot

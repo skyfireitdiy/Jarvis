@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Union
 
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.server_manager import LSPServerInstance
 

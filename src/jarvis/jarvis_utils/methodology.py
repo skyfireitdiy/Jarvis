@@ -21,7 +21,8 @@ from typing import Optional
 from typing import Tuple
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_central_methodology_repo, save_exception
+from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_methodology_dirs

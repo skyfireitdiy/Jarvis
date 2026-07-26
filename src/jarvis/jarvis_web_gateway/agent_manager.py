@@ -23,7 +23,8 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from jarvis.jarvis_utils.config import get_data_dir, save_exception
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.utils import _is_process_alive
 import jarvis.jarvis_utils.globals as jglobals
 
