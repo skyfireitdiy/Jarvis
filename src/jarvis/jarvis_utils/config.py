@@ -10,6 +10,7 @@ from typing import cast
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict
+from jarvis.jarvis_utils.exception_utils import save_exception  # noqa: F401
 
 
 # 全局环境变量存储
@@ -754,10 +755,6 @@ def get_data_dir() -> str:
         return env_data_dir
     # 默认使用 ~/.jarvis
     return os.path.expanduser("~/.jarvis")
-
-
-# Re-export from exception_utils for backward compatibility (will be removed later)
-from jarvis.jarvis_utils.exception_utils import save_exception  # noqa: F401
 
 
 def get_continuous_learning_dir() -> str:
