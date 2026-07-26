@@ -28,6 +28,8 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 import json
 import shutil
 from pathlib import Path
@@ -178,7 +180,10 @@ def apply_library_replacement(
     if resume and loaded_ckpt:
         try:
             eval_counter = int(loaded_ckpt.get("eval_counter") or 0)
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_c2rust.library_replacer", function="new_model"
+            )
             pass
         try:
             processed_roots = set(
@@ -409,7 +414,10 @@ def apply_library_replacement(
     # 若限定候选根（candidates）已指定，则将不可达函数一并删除
     try:
         pruned_funcs.update(scope_unreachable_funcs)
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_c2rust.library_replacer", function="evaluate_node"
+        )
         pass
 
     # 写出新符号表
@@ -459,7 +467,10 @@ def apply_library_replacement(
         if resume and clear_checkpoint_on_done and ckpt_path.exists():
             ckpt_path.unlink()
             PrettyOutput.auto_print(f"[c2rust-library] 已清理断点文件: {ckpt_path}")
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_c2rust.library_replacer", function="evaluate_node"
+        )
         pass
 
     PrettyOutput.auto_print(

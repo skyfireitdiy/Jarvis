@@ -9,6 +9,7 @@ from jarvis.jarvis_utils.config import (
     detect_file_encoding,
     get_max_input_token_count,
     read_text_file,
+    save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -85,7 +86,12 @@ class ReadCodeTool:
                     # 确保至少返回一个合理的值
                     if limit_tokens > 0:
                         return limit_tokens
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.read_code",
+                        function="_get_max_token_limit",
+                    )
                     pass
 
             # 回退方案：使用输入窗口的2/3
@@ -559,7 +565,10 @@ class ReadCodeTool:
                             }
                         )
                         total_tokens += content_tokens
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_tools.read_code", function="execute"
+                    )
                     continue
 
             # 检查累计token数是否超过限制
@@ -662,7 +671,8 @@ class ReadCodeTool:
             try:
                 if status_lines:
                     PrettyOutput.auto_print("\n".join(status_lines))
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_tools.read_code", function="execute")
                 pass
             return {
                 "success": overall_success,

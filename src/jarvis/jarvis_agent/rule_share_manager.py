@@ -12,7 +12,7 @@ import typer
 
 from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.share_manager import ShareManager
-from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.config import get_central_rules_repo, save_exception
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -51,7 +51,12 @@ class RuleShareManager(ShareManager):
                     content = f.read()
                     if content:
                         existing_rules[rel_path] = content
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.rule_share_manager",
+                    function="get_existing_resources",
+                )
                 pass
         return existing_rules
 
@@ -114,7 +119,12 @@ class RuleShareManager(ShareManager):
                             }
                         )
                         seen_rule_names.add(rel_path)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_agent.rule_share_manager",
+                        function="get_local_resources",
+                    )
                     pass
 
         return rule_files

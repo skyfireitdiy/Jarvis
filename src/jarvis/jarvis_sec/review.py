@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """复核相关模块"""
 
+from jarvis.jarvis_utils.config import save_exception
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -74,7 +75,12 @@ def build_gid_to_review_mapping(
                     gid_int = int(gid_val)
                     if gid_int >= 1:
                         gids_to_process.append(gid_int)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.review",
+                        function="build_gid_to_review_mapping",
+                    )
                     pass
         elif "gid" in rr:
             # 单个格式：gid
@@ -82,7 +88,12 @@ def build_gid_to_review_mapping(
                 gid_int = int(rr.get("gid", 0))
                 if gid_int >= 1:
                     gids_to_process.append(gid_int)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.review",
+                    function="build_gid_to_review_mapping",
+                )
                 pass
 
         # 为每个 gid 创建复核结果映射
@@ -183,7 +194,12 @@ def process_review_batch(
                                 gid_int = int(gid_val)
                                 if gid_int >= 1:
                                     false_positive_gids.append(gid_int)
-                            except Exception:
+                            except Exception as e:
+                                save_exception(
+                                    e,
+                                    module="jarvis_sec.review",
+                                    function="process_review_batch",
+                                )
                                 pass
 
                         # 保存分析结果
@@ -205,7 +221,12 @@ def process_review_batch(
                             PrettyOutput.auto_print(
                                 f"⚠️ [jarvis-sec] 警告：保存复核结果到analysis.jsonl失败: {str(e)}"
                             )
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_sec.review",
+                                function="process_review_batch",
+                            )
                             pass
     else:
         # 复核结果解析失败，保守策略：重新加入验证流程
@@ -313,7 +334,12 @@ def run_review_agent_with_retry(
                         f"✨ [jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()",
                         timestamp=True,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.review",
+                        function="run_review_agent_with_retry",
+                    )
                     pass
                 review_agent.run(review_task)
         else:
@@ -328,9 +354,17 @@ def run_review_agent_with_retry(
                         f"✨ [jarvis-sec] 复核 Agent 工作区已恢复 ({_changed_review} 个文件）",
                         timestamp=True,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.review",
+                        function="run_review_agent_with_retry",
+                    )
                     pass
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_sec.review", function="run_review_agent_with_retry"
+            )
             pass
 
         # 解析复核结果
@@ -347,7 +381,12 @@ def run_review_agent_with_retry(
                         f"✨ [jarvis-sec] 复核结果JSON解析失败: {parse_error_review}",
                         timestamp=True,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_sec.review",
+                        function="run_review_agent_with_retry",
+                    )
                     pass
             else:
                 prev_parse_error_review = None
@@ -366,7 +405,12 @@ def run_review_agent_with_retry(
                     f"✨ [jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)",
                     timestamp=True,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.review",
+                    function="run_review_agent_with_retry",
+                )
                 pass
         else:
             try:
@@ -374,7 +418,12 @@ def run_review_agent_with_retry(
                     f"✨ [jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次 (使用直接模型调用)",
                     timestamp=True,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_sec.review",
+                    function="run_review_agent_with_retry",
+                )
                 pass
 
 
@@ -505,7 +554,10 @@ def process_review_phase(
                 gid_int = int(gid_val)
                 if gid_int >= 1:
                     all_reviewed_gids.add(gid_int)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_sec.review", function="process_review_phase"
+                )
                 pass
 
     if all_reviewed_gids:

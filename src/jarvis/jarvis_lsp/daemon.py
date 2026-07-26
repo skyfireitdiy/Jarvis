@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Union
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.server_manager import LSPServerInstance
 
@@ -206,7 +206,8 @@ class LSPDaemon:
                     await writer.drain()
                     break
 
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_lsp.daemon", function="__init__")
             pass
         finally:
             writer.close()

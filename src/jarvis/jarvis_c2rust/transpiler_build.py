@@ -4,6 +4,7 @@
 构建和修复模块
 """
 
+from jarvis.jarvis_utils.config import save_exception
 import re
 import subprocess
 from pathlib import Path
@@ -157,7 +158,10 @@ class BuildManager:
                 return "bin"
             if has_lib:
                 return "lib"
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_c2rust.transpiler_build", function="detect_crate_kind"
+            )
             pass
         # 默认假设为 lib
         return "lib"
@@ -982,7 +986,12 @@ class BuildManager:
                             cur["failed_stage"] = None
                             self.progress["current"] = cur
                             self.save_progress()
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_c2rust.transpiler_build",
+                                function="run_cargo_test_and_fix",
+                            )
                             pass
                         return (True, False)
         else:
@@ -1028,7 +1037,12 @@ class BuildManager:
                     cur["last_build_error"] = err_summary
                     self.progress["current"] = cur
                     self.save_progress()
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_c2rust.transpiler_build",
+                        function="run_cargo_test_and_fix",
+                    )
                     pass
                 return (False, False)
 

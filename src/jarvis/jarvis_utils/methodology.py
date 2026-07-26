@@ -21,7 +21,7 @@ from typing import Optional
 from typing import Tuple
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.config import get_central_methodology_repo, save_exception
 from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_methodology_dirs
@@ -94,7 +94,12 @@ def _load_methodologies_from_dir(directory: str) -> Dict[str, str]:
                 content = methodology.get("content", "")
                 if problem_type and content:
                     all_methodologies[problem_type] = content
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_utils.methodology",
+                function="_load_methodologies_from_dir",
+            )
             continue
 
     return all_methodologies
@@ -323,7 +328,10 @@ def load_methodology(
             methodology_token_limit = int(max_input_tokens * 0.80)
             if methodology_token_limit <= 0:
                 methodology_token_limit = None
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_utils.methodology", function="load_methodology"
+            )
             pass
 
         # 回退方案：使用cheap模型的输入窗口限制

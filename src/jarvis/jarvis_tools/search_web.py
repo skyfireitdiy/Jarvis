@@ -24,6 +24,7 @@ import sys
 # pylint: disable=import-error,missing-module-docstring
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_utils.config import save_exception
 
 # fmt: on
 
@@ -67,7 +68,10 @@ class SearchWebTool:
             spec = importlib.util.find_spec("ddgr")
             if spec is not None:
                 return [sys.executable, "-m", "ddgr"]
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_tools.search_web", function="_get_ddgr_command"
+            )
             pass
 
         # 方法3: 回退到直接使用 ddgr（让 subprocess 处理错误）
@@ -246,7 +250,12 @@ class SearchWebTool:
                                 "abstract": str(abstract),
                             }
                         )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.search_web",
+                        function="_search_with_playwright",
+                    )
                     continue
 
             if not results:

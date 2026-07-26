@@ -22,6 +22,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
 from jarvis.jarvis_utils.config import (
     set_llm_group,
+    save_exception,
 )
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
@@ -108,7 +109,10 @@ def _save_config(config: Dict[str, Any]) -> bool:
 
                 shutil.copy2(backup_file, config_file)
                 PrettyOutput.auto_print("ℹ️ 已恢复原配置文件")
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_platform_manager.main", function="_save_config"
+                )
                 pass
         return False
 
@@ -1432,7 +1436,10 @@ def chat_with_model(
         # Clean up resources
         try:
             platform.reset()
-        except Exception:
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_platform_manager.main", function="chat_with_model"
+            )
             pass
 
 

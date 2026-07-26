@@ -17,6 +17,8 @@ Jarvis 安全分析套件 —— Rust 启发式安全检查器
 
 from __future__ import annotations
 
+
+from jarvis.jarvis_utils.config import save_exception
 import re
 from pathlib import Path
 from typing import List
@@ -564,7 +566,10 @@ def _rule_unsafe(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_unsafe"
+        )
         pass
 
     return issues
@@ -617,7 +622,10 @@ def _rule_raw_pointer(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_raw_pointer"
+        )
         pass
 
     return issues
@@ -677,7 +685,10 @@ def _rule_transmute(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_transmute"
+        )
         pass
 
     return issues
@@ -782,7 +793,10 @@ def _rule_maybe_uninit(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_maybe_uninit"
+        )
         pass
 
     return issues
@@ -839,7 +853,10 @@ def _rule_unwrap_expect(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_unwrap_expect"
+        )
         pass
 
     return issues
@@ -891,7 +908,10 @@ def _rule_extern_c(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_extern_c"
+        )
         pass
 
     return issues
@@ -961,7 +981,10 @@ def _rule_unsafe_impl(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_unsafe_impl"
+        )
         pass
 
     return issues
@@ -1013,7 +1036,10 @@ def _rule_ignore_result(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_ignore_result"
+        )
         pass
 
     return issues
@@ -1072,7 +1098,10 @@ def _rule_forget(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_forget"
+        )
         pass
 
     return issues
@@ -1131,7 +1160,10 @@ def _rule_get_unchecked(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_get_unchecked"
+        )
         pass
 
     return issues
@@ -1197,7 +1229,12 @@ def _rule_pointer_arithmetic(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_pointer_arithmetic",
+        )
         pass
 
     return issues
@@ -1267,7 +1304,12 @@ def _rule_unsafe_mem_ops(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_unsafe_mem_ops",
+        )
         pass
 
     return issues
@@ -1326,7 +1368,12 @@ def _rule_from_raw_parts(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_from_raw_parts",
+        )
         pass
 
     return issues
@@ -1443,7 +1490,10 @@ def _rule_manually_drop(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_manually_drop"
+        )
         pass
 
     return issues
@@ -1502,7 +1552,12 @@ def _rule_panic_unreachable(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_panic_unreachable",
+        )
         pass
 
     return issues
@@ -1593,7 +1648,12 @@ def _rule_refcell_borrow(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_refcell_borrow",
+        )
         pass
 
     return issues
@@ -1677,7 +1737,10 @@ def _rule_ffi_cstring(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_ffi_cstring"
+        )
         pass
 
     return issues
@@ -1976,7 +2039,10 @@ def _rule_into_raw(
                         severity=_severity_from_confidence(conf),
                     )
                 )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_into_raw"
+        )
         pass
 
     return issues
@@ -2091,7 +2157,12 @@ def _rule_unchecked_math(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_sec.checkers.rust_checker",
+            function="_rule_unchecked_math",
+        )
         pass
 
     return issues
@@ -2517,7 +2588,10 @@ def _rule_uninit_zeroed(
                     severity=_severity_from_confidence(conf),
                 )
             )
-    except Exception:
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_sec.checkers.rust_checker", function="_rule_uninit_zeroed"
+        )
         pass
 
     return issues

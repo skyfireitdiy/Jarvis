@@ -22,7 +22,7 @@ from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import calculate_token_limit
+from jarvis.jarvis_utils.config import calculate_token_limit, save_exception
 from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_tool_load_dirs
@@ -127,7 +127,10 @@ class ToolRegistry(OutputHandlerProtocol):
                             and "arguments" in parsed
                         ):
                             return True
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e, module="jarvis_tools.registry", function="can_handle"
+                        )
                         continue
 
         # 第二层：严格格式检测——必须是标准的工具调用格式
@@ -205,7 +208,10 @@ class ToolRegistry(OutputHandlerProtocol):
                                 # 只有唯一匹配时才判定为工具调用，避免误判
                                 if len(matched_tools) == 1:
                                     return True
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e, module="jarvis_tools.registry", function="can_handle"
+                            )
                             continue
 
         # 条件6：特征组合检测——工具调用标记 + 已注册工具名同时出现
@@ -224,7 +230,8 @@ class ToolRegistry(OutputHandlerProtocol):
             results, _, _ = ToolRegistry._extract_tool_calls(response, None)
             if results and any(r.get("name") in self.tools for r in results):
                 return True
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_tools.registry", function="can_handle")
             pass
 
         return False
@@ -858,7 +865,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         tool_name = parsed.get("name", "")
                         if valid_tool_names is None or tool_name in valid_tool_names:
                             results.append(json_str)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.registry",
+                        function="_fuzzy_extract_tool_json",
+                    )
                     continue
         return results
 
@@ -952,7 +964,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         arguments = json_loads(json_str)
                         tool_call = {"name": tool_name, "arguments": arguments}
                         ret.append(tool_call)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_parse_tool_call_format",
+                        )
                         continue
 
         # 格式2: <tool_call name="工具名"> [JSON数组参数] </tool_call>
@@ -970,7 +987,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         arguments = json_loads(json_str)
                         tool_call = {"name": tool_name, "arguments": arguments}
                         ret.append(tool_call)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_parse_tool_call_format",
+                        )
                         continue
 
         return ret
@@ -999,7 +1021,12 @@ class ToolRegistry(OutputHandlerProtocol):
                             arguments = json_loads(json_str)
                             tool_call = {"name": tool_name, "arguments": arguments}
                             ret.append(tool_call)
-                        except Exception:
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_tools.registry",
+                                function="_parse_special_marker_format",
+                            )
                             continue
             else:
                 # 有结束标记，提取标记之间的内容
@@ -1021,7 +1048,12 @@ class ToolRegistry(OutputHandlerProtocol):
                                         "arguments": arguments,
                                     }
                                     ret.append(tool_call)
-                                except Exception:
+                                except Exception as e:
+                                    save_exception(
+                                        e,
+                                        module="jarvis_tools.registry",
+                                        function="_parse_special_marker_format",
+                                    )
                                     continue
         return ret
 
@@ -1044,7 +1076,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 arguments = json_loads(json_str)
                 tool_call = {"name": tool_name, "arguments": arguments}
                 ret.append(tool_call)
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_tools.registry",
+                    function="_parse_function_call_format",
+                )
                 continue
         return ret
 
@@ -1079,7 +1116,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 arguments = json_loads(json_str)
                 if isinstance(arguments, dict):
                     ret.append({"name": tool_name, "arguments": arguments})
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_tools.registry",
+                    function="_parse_tool_name_json_format",
+                )
                 continue
         return ret
 
@@ -1110,7 +1152,12 @@ class ToolRegistry(OutputHandlerProtocol):
                                 break
                         if not already_found:
                             ret.append(tool_call)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_parse_xml_tag_format",
+                        )
                         pass
         return ret
 
@@ -1134,7 +1181,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 # 尝试 JSON 解析，失败则保持字符串
                 try:
                     param_value = json_loads(param_value)
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.registry",
+                        function="_parse_xml_parameter_format",
+                    )
                     pass
                 arguments[param_name] = param_value
             if arguments:
@@ -1175,7 +1227,12 @@ class ToolRegistry(OutputHandlerProtocol):
                     if isinstance(arguments, dict):
                         ret.append({"name": tool_name, "arguments": arguments})
                         continue
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.registry",
+                        function="_parse_tool_calls_xml_format",
+                    )
                     pass
             # 回退到 <parameter> 子标签格式（旧格式）
             param_pattern = r'<parameter\s+name="(\w+)"(?:\s+string="(true|false)")?\s*>\s*(.*?)\s*</parameter>'
@@ -1187,7 +1244,12 @@ class ToolRegistry(OutputHandlerProtocol):
                 if is_string == "false":
                     try:
                         param_value = json_loads(param_value)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_parse_tool_calls_xml_format",
+                        )
                         pass
                 arguments[param_name] = param_value
             if arguments:
@@ -1342,7 +1404,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         ret.append(tool_call)
                     auto_completed = True
                     continue
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_tools.registry",
+                    function="_parse_code_block_format",
+                )
                 pass
 
             tool_call = {"name": tool_name, "arguments": {"content": code_content}}
@@ -1394,7 +1461,12 @@ class ToolRegistry(OutputHandlerProtocol):
                             ):
                                 ret.append(parsed)
                                 used_ranges.append((i, end_pos))
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_parse_embedded_json_format",
+                        )
                         continue
         return ret
 
@@ -1424,7 +1496,10 @@ class ToolRegistry(OutputHandlerProtocol):
                             or getattr(agent.model, "name", None)
                             or "unknown"
                         )
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_tools.registry", function="_save_parse_error"
+                    )
                     pass
 
             # 脱敏：移除可能的API key等敏感信息
@@ -1538,7 +1613,12 @@ class ToolRegistry(OutputHandlerProtocol):
                         ):
                             ret.append(fuzzy_msg)
                             auto_completed = True
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="_extract_tool_calls",
+                        )
                         pass
 
         # 如果仍然没有数据，尝试使用大模型修复
@@ -1846,7 +1926,10 @@ class ToolRegistry(OutputHandlerProtocol):
                     # 如果压缩后比原始短很多才替换
                     if len(compact) < len(stripped) * 0.7:
                         return f"<{tag}>\n{compact}\n</{tag}>"
-                except Exception:
+                except Exception as e:
+                    save_exception(
+                        e, module="jarvis_tools.registry", function="_compact_json"
+                    )
                     pass
             return match.group(0)
 
@@ -2044,7 +2127,10 @@ class ToolRegistry(OutputHandlerProtocol):
                 agent_instance_for_record.set_user_data(
                     "__executed_tools__", executed_list
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_tools.registry", function="handle_tool_calls"
+                )
                 pass
 
             # 如果执行失败，附带工具使用提示返回
@@ -2094,7 +2180,12 @@ class ToolRegistry(OutputHandlerProtocol):
                     # 清理临时文件
                     try:
                         os.unlink(output_file)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(
+                            e,
+                            module="jarvis_tools.registry",
+                            function="handle_tool_calls",
+                        )
                         pass
 
             return output
