@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """验证相关模块"""
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 from typing import Any
 from typing import Dict
 from typing import List

@@ -46,7 +46,7 @@ JSONL 文件
 from __future__ import annotations
 
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import json
 
 from jarvis.jarvis_utils.output import PrettyOutput

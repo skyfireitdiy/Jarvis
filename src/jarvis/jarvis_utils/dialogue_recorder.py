@@ -6,7 +6,7 @@
 提供对话记录和管理功能，支持多会话、JSONL格式存储、自动清理等功能。
 """
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import atexit
 import json
 import uuid

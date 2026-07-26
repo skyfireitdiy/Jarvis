@@ -29,7 +29,7 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 from __future__ import annotations
 
 
-from jarvis.jarvis_utils.config import save_exception
+from jarvis.jarvis_utils.exception_utils import save_exception
 import json
 import shutil
 from pathlib import Path
