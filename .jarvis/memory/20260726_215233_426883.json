@@ -1,0 +1,8 @@
+{
+  "id": "20260726_215233_426883",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "realloc_assign_back", "AST", "tree-sitter"],
+  "content": "## realloc_assign_back 误报修复完成\n\n### 根因\n正则回退无法识别带cast的realloc赋值，如 `pidList = (int *)realloc(pidList, ...)` 中 `(int *)` 导致正则匹配失败\n\n### 修复\n新增 `_ast_realloc_assign_back_check` 函数，用tree-sitter AST替代正则回退：\n- AST正确识别 cast_expression → assignment_expression 的赋值关系\n- p = realloc(p, ...) 直接覆盖仍报（真实风险）\n- tmp = realloc(p, ...) 临时变量接收不报（安全写法）\n- tree-sitter不可用时保留原正则作为最终回退\n\n### 验证\nushell_client项目 realloc_assign_back 1→0\n\n### 修改文件\nsrc/jarvis/jarvis_sec/checkers/c_checker.py (+146行新函数, +3行调用入口)\n\n### Git\ncommit: ede6d9c",
+  "created_at": "2026-07-26T21:52:33.426907",
+  "updated_at": "2026-07-26T21:52:33.426912"
+}
