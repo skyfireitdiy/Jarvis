@@ -1651,6 +1651,16 @@ def _rule_unchecked_io(
         if idx in _protected_lines_regex:
             continue
 
+        # 排除IO调用被错误处理宏/函数包裹（如RETRY_IF_EINTR(write(...))）
+        # 模式：MACRO_NAME(io_func(...))，宏已处理返回值
+        if re.search(
+            r"\b[A-Z][A-Z0-9_]*\s*\(\s*"
+            + re.escape(m.group(0).split("(")[0])
+            + r"\s*\(",
+            s,
+        ):
+            continue
+
         # 若本行/紧随其后 2 行出现条件判断，认为已检查（直接跳过）
         nearby = " ".join(
             _safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1)
