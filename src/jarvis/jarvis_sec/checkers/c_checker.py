@@ -2874,6 +2874,8 @@ def _rule_integer_overflow_from_calls(
 
         return False
 
+    reported = set()  # 去重：(line, pattern) 只报一次
+
     for call in alloc_calls:
         idx = call.get("caller_line", 0)
         callee_name = call.get("callee_name", "malloc")
@@ -2899,11 +2901,19 @@ def _rule_integer_overflow_from_calls(
         except (ValueError, IndexError):
             continue
 
+        # 跳过已报告的同一行同一pattern（去重）
+        if (idx, "integer_overflow") in reported:
+            continue
+
         # 检测乘法溢出
         mul_match = mul_pattern.search(alloc_arg)
         if mul_match:
             var1, var2 = mul_match.group(1), mul_match.group(2)
-            if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+            # 排除sizeof安全模式：var * sizeof(...) 是标准安全写法
+            if re.search(r"\bsizeof\s*\(", alloc_arg):
+                mul_match = None
+            elif not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                reported.add((idx, "integer_overflow"))
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -2921,9 +2931,13 @@ def _rule_integer_overflow_from_calls(
 
         # 检测加法溢出
         add_match = add_pattern.search(alloc_arg)
-        if add_match:
+        if add_match and (idx, "integer_overflow") not in reported:
             var1, var2 = add_match.group(1), add_match.group(2)
-            if not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+            # 排除小常量加法：var + 小数字 不可能溢出
+            if var2.isdigit() and int(var2) <= 100:
+                add_match = None
+            elif not _has_overflow_check(var1, var2, lines, idx, lookback=10):
+                reported.add((idx, "integer_overflow"))
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -4013,6 +4027,7 @@ def _rule_alloc_size_overflow(
     if database:
         import os
 
+        reported = set()  # 去重：(line, pattern) 只报一次
         call_graph = database.get_call_graph()
         for call in call_graph:
             callee_name = call.get("callee_name", "")
@@ -4022,6 +4037,8 @@ def _rule_alloc_size_overflow(
             if os.path.basename(caller_file) != os.path.basename(relpath):
                 continue
             idx = call.get("caller_line", 0)
+            if (idx, "alloc_size_overflow") in reported:
+                continue
             if 0 < idx <= len(lines):
                 s = lines[idx - 1]
             else:
@@ -4059,6 +4076,7 @@ def _rule_alloc_size_overflow(
                                 break
                         if has_overflow_check:
                             continue
+                        reported.add((idx, "alloc_size_overflow"))
                         issues.append(
                             Issue(
                                 language="c/cpp",
