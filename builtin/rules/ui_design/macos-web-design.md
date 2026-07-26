@@ -1,6 +1,6 @@
 ---
 name: macos-web-design
-description: 当需要设计macOS风格的Web界面时使用此规则——包括macOS原生的设计语言和交互模式。包括：采用macOS的设计风格（磨砂玻璃效果、圆角、阴影等）；设计macOS风格的窗口和控件；实现macOS的交互模式（如三指拖动、全屏模式等）；适配macOS系统的字体和排版；使用macOS的图标设计规范；设计macOS风格的菜单栏和工具栏；适配macOS的深色模式和亮色模式；确保与macOS系统的一致性和原生感。每当用户提及"macOS风格"、"苹果风格"、"桌面端UI"、"macOS界面"、"原生风格"、"macOS设计"或需要设计macOS风格的Web应用时触发，无论他们之后打算如何实现。如果需要设计、实现或评估macOS风格的Web界面，请使用此规则。
+description: 当需要设计macOS风格Web界面时触发。每当用户提及"macOS风格"、"苹果风格"、"桌面端UI"、"macOS界面"、"macOS设计"时触发。不触发：纯暗色/亮色主题（用对应主题规则）；移动端UI设计；纯后端开发。
 ---
 
 # macOS Web 设计规范

@@ -1,6 +1,6 @@
 ---
 name: writing-skills
-description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
+description: Use when creating new skills, editing existing skills, or verifying skills work before deployment. Do not trigger: using existing skills; general coding; debugging; code review.
 ---
 
 # Writing Skills

@@ -1,6 +1,6 @@
 ---
 name: hacker_news_search
-description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索、信息检索等场景
+description: 当需要搜索Hacker News内容时触发。每当用户提及"Hacker News"、"HN搜索"、"科技新闻"时触发。不触发：通用网页搜索；代码搜索；非Hacker News的新闻来源。
 ---
 
 # Hacker News 搜索规则

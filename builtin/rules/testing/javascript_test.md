@@ -1,6 +1,6 @@
 ---
 name: javascript_test
-description: 当需要为JavaScript/TypeScript项目编写测试或配置测试框架时使用此规则——JavaScript测试规则，JavaScript/TypeScript项目测试框架使用规范。包括：选择合适的测试框架（Jest、Mocha、Vitest、Jasmine）；编写单元测试用例；编写集成测试和端到端测试；配置测试环境和依赖；使用mock和spy进行测试；测试React、Vue等前端组件；编写异步测试和Promise测试；测试覆盖率分析和报告；处理DOM操作和事件测试；遵循JavaScript测试最佳实践；组织测试目录结构；编写测试文档。每当用户提及"JavaScript测试"、"TypeScript测试"、"前端测试"、"单元测试"、"Jest"、"Mocha"、"Vitest"、"测试框架"或需要JavaScript/TypeScript项目测试、前端测试、单元测试时触发，无论项目规模和测试类型如何。如果需要为JavaScript/TypeScript项目编写或配置测试，请使用此规则。
+description: 当需要为JavaScript/TypeScript项目编写测试或配置测试框架时触发。每当用户提及"JavaScript测试"、"TypeScript测试"、"前端测试"、"Jest"、"Mocha"、"Vitest"时触发。不触发：非JS/TS项目测试；代码审查；性能优化。
 ---
 
 # JavaScript/TypeScript 测试规则

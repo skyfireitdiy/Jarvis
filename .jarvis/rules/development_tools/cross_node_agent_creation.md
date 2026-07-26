@@ -1,6 +1,6 @@
 ---
 name: cross_node_agent_creation
-description: 当需要在远程节点上创建 Agent 时使用此规则——跨节点 Agent 创建指南，确保 Agent 在目标节点上正确运行。包括：确认目标节点状态和架构；验证工作目录路径；选择正确的模型组；使用正确的 agent_type 参数。每当用户提及"创建 Agent"、"在节点上运行"、"跨节点"或需要在非 master 节点上部署 Agent 时触发，无论任务类型。如果需要创建跨节点 Agent，请使用此规则。
+description: 当需要在远程节点上创建Agent时触发。每当用户提及"创建Agent"、"在节点上运行"、"跨节点"时触发。不触发：本节点创建Agent；Agent管理非创建操作；节点配置管理。
 ---
 
 # 跨节点 Agent 创建指南

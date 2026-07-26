@@ -1,6 +1,6 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+description: Use when you have a written implementation plan to execute in a separate session with review checkpoints. Do not trigger: no plan exists yet (use writing-plans); single-step tasks; ad-hoc quick fixes.
 ---
 
 # Executing Plans

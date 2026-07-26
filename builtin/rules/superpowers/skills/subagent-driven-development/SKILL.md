@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks in the current session
+description: Use when executing implementation plans with independent tasks in the current session. Do not trigger: no plan exists; single task; tasks with heavy dependencies between them.
 ---
 
 # Subagent-Driven Development

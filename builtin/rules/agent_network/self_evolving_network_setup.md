@@ -1,6 +1,6 @@
 ---
 name: self_evolving_network_setup
-description: 当需要从零开始搭建自进化Agent网络时使用此规则——自进化Agent网络搭建流程规则，指导如何完整搭建自进化Agent网络基础设施。包括：知识库目录结构创建、知识库Agent创建、协作群组创建、网络架构信息保存、规则优化等完整流程。每当用户提及"搭建自进化网络"、"创建Agent网络"、"初始化知识库"、"网络基础设施"或需要从零开始构建自进化Agent网络时触发。
+description: 当需要从零搭建自进化Agent网络时触发。每当用户提及"搭建自进化网络"、"创建Agent网络"、"初始化知识库"、"网络基础设施"时触发。不触发：已有网络的架构管理（用self_evolving_network规则）；仅创建单个Agent；仅监控网络状态。
 license: MIT
 ---
 

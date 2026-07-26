@@ -1,6 +1,6 @@
 ---
 name: markitdown
-description: 当需要将各种文件格式转换为Markdown格式时使用此规则——markitdown工具使用规则。包括：安装配置、命令行使用、Python API调用、插件扩展、Azure文档智能集成等功能。每当用户提及"文件转markdown"、"文档转换"、"markitdown使用"或需要将PDF、Word、Excel、PowerPoint等文档转换为Markdown格式时触发。
+description: 当需要将文件转换为Markdown格式时触发。每当用户提及"文件转markdown"、"文档转换"、"markitdown"时触发。不触发：仅编写Markdown内容；仅阅读Markdown文件；Markdown格式化不涉及文件转换。
 license: MIT
 ---
 
@@ -81,7 +81,7 @@ from openai import OpenAI
 
 client = OpenAI()
 md = MarkItDown(
-    llm_client=client, 
+    llm_client=client,
     llm_model="gpt-4o",
     llm_prompt="描述图像内容"
 )
@@ -138,7 +138,7 @@ markitdown支持按需安装的功能模块：
 
 - `[all]` - 安装所有可选依赖
 - `[pptx]` - PowerPoint文件支持
-- `[docx]` - Word文件支持  
+- `[docx]` - Word文件支持
 - `[xlsx]` - Excel文件支持
 - `[pdf]` - PDF文件支持
 - `[az-doc-intel]` - Azure文档智能
