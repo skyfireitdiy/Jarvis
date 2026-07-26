@@ -20,7 +20,7 @@ from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.template_utils import render_rule_template
-from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.config import get_central_rules_repo, save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.utils import daily_check_git_updates
@@ -386,7 +386,8 @@ class RulesManager:
 
                         # 格式: - [description](absolute_path)
                         index_lines.append(f"- [{description}]({abs_path})")
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_agent.rules_manager", function="_get_builtin_rules_index")
                         continue
 
             if not index_lines:
@@ -565,7 +566,8 @@ class RulesManager:
                                         rule_name, rule_content
                                     )
                                 return None
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_agent.rules_manager", function="get_named_rule")
                         pass
                     return None
 
@@ -697,7 +699,8 @@ class RulesManager:
                                     # 规则名称带来源前缀（如 project:deployment/version_release.md）
                                     prefixed_name = prefix + rel_path
                                     result["files"].append(prefixed_name)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.rules_manager", function="get_all_available_rule_names")
                     continue
 
         return result
@@ -848,7 +851,8 @@ class RulesManager:
                         if builtin_dir is not None:
                             builtin_rules_dir = builtin_dir / "rules"
                             return str(builtin_rules_dir / actual_name)
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_agent.rules_manager", function="get_rule_file_path")
                         pass
 
                 # 处理 project 前缀
@@ -882,7 +886,8 @@ class RulesManager:
                 path = get_builtin_rule_path(rule_name)
                 if path:
                     return path
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.rules_manager", function="get_rule_file_path")
                 pass
 
             return "--"
@@ -980,7 +985,8 @@ class RulesManager:
                     rules_info.append(
                         ("builtin_rules", preview, is_loaded, str(builtin_rule_path))
                     )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.rules_manager", function="get_all_rules_with_status")
             pass
 
         # 处理动态加载的规则（通过 load_rule 工具加载的规则）

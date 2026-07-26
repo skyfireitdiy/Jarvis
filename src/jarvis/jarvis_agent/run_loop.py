@@ -25,7 +25,7 @@ from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
 from jarvis.jarvis_platform.content_types import ContentBlock
-from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+from jarvis.jarvis_utils.config import get_conversation_turn_threshold, save_exception
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
@@ -150,7 +150,8 @@ class AgentRunLoop:
                             last_end = end_pos
                             i = end_pos
                             continue
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_agent.run_loop", function="_filter_tool_calls_from_response")
                         pass
                 i += 1
             elif response[i : i + 3] == "```":
@@ -199,7 +200,8 @@ class AgentRunLoop:
                                     i += 3
                                 last_end = i
                                 continue
-                        except Exception:
+                        except Exception as e:
+                            save_exception(e, module="jarvis_agent.run_loop", function="_filter_tool_calls_from_response")
                             pass
                 i += 1
             else:
@@ -418,7 +420,8 @@ class AgentRunLoop:
                 prompt=current_response,
                 auto_completed=False,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.run_loop", function="_handle_summary")
             pass
         # 直接使用全量总结
         summary_text = ag._summarize_and_clear_history(trigger_reason="手动触发")
@@ -429,7 +432,8 @@ class AgentRunLoop:
                 agent=ag,
                 summary=summary_text,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.run_loop", function="_handle_summary")
             pass
         if summary_text:
             # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
@@ -493,9 +497,11 @@ class AgentRunLoop:
                         need_return=need_return,
                         tool_prompt=tool_prompt,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.run_loop", function="_handle_tool_calls")
                     pass
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.run_loop", function="_handle_tool_calls")
             pass
 
         # 非关键流程：广播工具调用后的事件（用于日志、监控等）
@@ -507,7 +513,8 @@ class AgentRunLoop:
                 need_return=need_return,
                 tool_prompt=tool_prompt,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.run_loop", function="_handle_tool_calls")
             pass
 
         # 检查是否需要继续
@@ -563,7 +570,8 @@ class AgentRunLoop:
                                         "main_goal": summary.get("main_goal", ""),
                                     }
                                 )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.run_loop", function="_collect_auto_complete_context")
             pass
 
         if all_unfinished_tasks:
@@ -595,7 +603,8 @@ class AgentRunLoop:
         if hasattr(ag, "_review_and_fix"):
             try:
                 ag._review_and_fix()
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.run_loop", function="_execute_auto_complete")
                 pass
 
         if ag.return_control_on_auto_complete:

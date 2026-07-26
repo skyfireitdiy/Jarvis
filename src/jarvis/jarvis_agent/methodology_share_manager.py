@@ -13,7 +13,7 @@ import typer
 
 from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.share_manager import ShareManager
-from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.config import get_central_methodology_repo, save_exception
 from jarvis.jarvis_utils.config import get_methodology_dirs
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -52,7 +52,8 @@ class MethodologyShareManager(ShareManager):
                     content = methodology.get("content", "")
                     if problem_type and content:
                         existing_methodologies[problem_type] = content
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.methodology_share_manager", function="get_existing_resources")
                 pass
         return existing_methodologies
 
@@ -111,7 +112,8 @@ class MethodologyShareManager(ShareManager):
                                 }
                             )
                             seen_problem_types.add(problem_type)
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.methodology_share_manager", function="get_local_resources")
                     pass
 
         return methodology_files

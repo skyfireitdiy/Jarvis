@@ -42,7 +42,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 
 # 本地库导入
 # jarvis_agent 相关
-from jarvis.jarvis_utils.config import is_enable_quick_mode
+from jarvis.jarvis_utils.config import is_enable_quick_mode, save_exception
 from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.prompt_builder import get_tool_registry
@@ -386,13 +386,15 @@ class Agent:
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
             self.memory_manager._ensure_memory_prompt(agent=self)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="clear_history")
             pass
 
         # 非关键流程：广播清理历史前事件（用于日志、监控等）
         try:
             self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="clear_history")
             pass
 
         # 清理会话历史并重置模型状态
@@ -412,13 +414,15 @@ class Agent:
         # 重置后重新设置系统提示词，确保系统约束仍然生效
         try:
             self._setup_system_prompt()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="clear_history")
             pass
 
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="clear_history")
             pass
 
     def __del__(self) -> None:
@@ -1067,7 +1071,8 @@ class Agent:
         # 优先通过用户交互封装，便于未来替换 UI
         try:
             return self.user_interaction.multiline_input(tip, print_on_empty)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_multiline_input")
             pass
         try:
             # Try to pass the keyword for enhanced input handler
@@ -1608,7 +1613,8 @@ class Agent:
                 current_message=message,
                 has_session_addon=bool(self.session.addon_prompt),
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_add_addon_prompt")
             pass
 
         addon_text = ""
@@ -1658,7 +1664,8 @@ class Agent:
                 addon_text=addon_text,
                 final_message=message,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_add_addon_prompt")
             pass
         return message
 
@@ -1674,7 +1681,8 @@ class Agent:
                 result = modifier(agent=self, message=message)
                 if result is not None:
                     message = result
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
                 pass
 
         # 事件：模型调用前（通知型）
@@ -1684,7 +1692,8 @@ class Agent:
                 agent=self,
                 message=message,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
             pass
 
         response = self.model.chat_until_success(message)
@@ -1692,7 +1701,8 @@ class Agent:
         if not response:
             try:
                 PrettyOutput.auto_print("⚠️ 模型返回空响应，已使用空字符串回退。")
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
                 pass
             response = ""
 
@@ -1704,7 +1714,8 @@ class Agent:
                 message=message,
                 response=response,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
             pass
 
         return response
@@ -1850,7 +1861,8 @@ class Agent:
                 if not summary:
                     try:
                         PrettyOutput.auto_print("⚠️  模型返回空响应")
-                    except Exception:
+                    except Exception as e:
+                        save_exception(e, module="jarvis_agent.__init__", function="generate_summary")
                         pass
                     summary = ""
                     break  # 空响应不重试
@@ -2291,13 +2303,15 @@ class Agent:
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
             self.memory_manager._ensure_memory_prompt(agent=self)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_handle_history_with_summary")
             pass
 
             # 非关键流程：广播清理历史前事件（用于日志、监控等）
             try:
                 self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_handle_history_with_summary")
                 pass
 
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
@@ -2349,7 +2363,8 @@ class Agent:
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_handle_history_with_summary")
             pass
 
         # 将任务列表信息添加到摘要中
@@ -2535,7 +2550,8 @@ class Agent:
         if self.use_analysis:
             try:
                 self.task_analyzer.trigger_task_analysis(auto_completed=auto_completed)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
                 pass
 
         if self.need_summary:
@@ -2559,7 +2575,8 @@ class Agent:
                     )
                     if result is not None:
                         safe_summary_prompt = result
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
                     pass
 
             # 非关键流程：广播将要生成总结事件（用于日志、监控等）
@@ -2571,7 +2588,8 @@ class Agent:
                     auto_completed=auto_completed,
                     need_summary=self.need_summary,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
                 pass
 
             if not self.model:
@@ -2584,7 +2602,8 @@ class Agent:
                     PrettyOutput.auto_print(
                         "⚠️ 总结阶段模型返回空响应，已使用空字符串回退。"
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
                     pass
                 ret = ""
             result = ret
@@ -2609,7 +2628,8 @@ class Agent:
                     agent=self,
                     summary=result,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
                 pass
 
             # 关键流程：直接调用 task_analyzer 和 memory_manager
@@ -2625,7 +2645,8 @@ class Agent:
                 auto_completed=auto_completed,
                 need_summary=self.need_summary,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
             pass
 
         # 非关键流程：广播任务完成事件（用于日志、监控等）
@@ -2636,7 +2657,8 @@ class Agent:
                 auto_completed=auto_completed,
                 need_summary=self.need_summary,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
             pass
 
         # 如果有记忆标签，在返回结果中添加提示信息
@@ -2658,7 +2680,8 @@ class Agent:
         # 优先使用 PromptManager 以保持逻辑集中
         try:
             return self.prompt_manager.build_default_addon_prompt(need_complete)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="make_default_addon_prompt")
             pass
 
         # 结构化系统指令（回退方案）
@@ -2845,7 +2868,8 @@ class Agent:
                     description=self.description,
                     user_input=self.session.prompt,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="run")
                 pass
 
             # 非关键流程：广播任务开始事件（用于日志、监控等）
@@ -2857,7 +2881,8 @@ class Agent:
                     description=self.description,
                     user_input=self.session.prompt,
                 )
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.__init__", function="run")
                 pass
 
             return self._main_loop()
@@ -2959,7 +2984,8 @@ class Agent:
                 current_response=current_response,
                 user_input=user_input,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_handle_run_interrupt")
             pass
 
         self.run_input_handlers_next_turn = True
@@ -3198,7 +3224,8 @@ class Agent:
                 total_tools=len(all_tools),
                 threshold=threshold,
             )
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.__init__", function="_filter_tools_if_needed")
             pass
 
         # 使用临时模型实例调用模型，以避免污染历史记录
@@ -3238,7 +3265,8 @@ class Agent:
                         total_tools=len(all_tools),
                         threshold=threshold,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.__init__", function="_filter_tools_if_needed")
                     pass
             else:
                 PrettyOutput.auto_print("⚠️ AI 未能筛选出任何相关工具，将使用所有工具。")
@@ -3252,7 +3280,8 @@ class Agent:
                         total_tools=len(all_tools),
                         threshold=threshold,
                     )
-                except Exception:
+                except Exception as e:
+                    save_exception(e, module="jarvis_agent.__init__", function="_filter_tools_if_needed")
                     pass
 
         except Exception as e:

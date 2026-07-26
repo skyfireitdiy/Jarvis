@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 """GitHub 技能发现源实现"""
 
 import aiohttp
@@ -88,7 +89,8 @@ class GitHubSkillSource(ISkillSource):
                             )
                         )
 
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.skill_discovery.sources.github", function="priority")
             pass
 
         return results

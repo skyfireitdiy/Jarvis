@@ -11,6 +11,7 @@ from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.events import TASK_STARTED
 from jarvis.jarvis_utils.globals import get_all_memory_tags
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.config import save_exception
 
 
 class MemoryManager:
@@ -29,7 +30,8 @@ class MemoryManager:
         # 订阅 Agent 事件（旁路集成，失败不影响主流程）
         try:
             self._subscribe_events()
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.memory_manager", function="__init__")
             pass
 
     def prepare_memory_tags_prompt(self) -> str:
@@ -95,7 +97,8 @@ class MemoryManager:
             try:
                 self.agent.set_user_data("__last_executed_tool__", "")
                 self.agent.set_user_data("__executed_tools__", [])
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.memory_manager", function="prompt_memory_save")
                 pass
 
             response = self.agent.model.chat_until_success(prompt)
@@ -123,7 +126,8 @@ class MemoryManager:
             self._memory_prompted = True
             try:
                 self.agent.set_user_data("__memory_save_prompted__", True)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.memory_manager", function="prompt_memory_save")
                 pass
 
     def add_memory_prompts_to_addon(self, addon_prompt: str, tool_registry: Any) -> str:
@@ -162,7 +166,8 @@ class MemoryManager:
         self._memory_prompted = False
         try:
             self.agent.set_user_data("__memory_save_prompted__", False)
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.memory_manager", function="_on_task_started")
             pass
 
     def _ensure_memory_prompt(self, **payload: Any) -> None:
@@ -177,7 +182,8 @@ class MemoryManager:
             if already:
                 self._memory_prompted = True
                 return
-        except Exception:
+        except Exception as e:
+            save_exception(e, module="jarvis_agent.memory_manager", function="_ensure_memory_prompt")
             pass
         # 静默执行保存逻辑，失败不影响主流程
         try:

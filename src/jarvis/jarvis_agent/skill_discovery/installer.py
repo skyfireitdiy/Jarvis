@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 if TYPE_CHECKING:
     from jarvis.jarvis_agent.rules_manager import RulesManager
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, save_exception
 from .sources.base import SkillResult
 
 
@@ -162,7 +162,8 @@ class SkillInstaller:
                 load_method = getattr(self.rules_manager, "load_rule_file", None)
                 if load_method:
                     load_method(skill_md_path)
-            except Exception:
+            except Exception as e:
+                save_exception(e, module="jarvis_agent.skill_discovery.installer", function="_install_via_git_clone")
                 pass
 
         return skill_md_path

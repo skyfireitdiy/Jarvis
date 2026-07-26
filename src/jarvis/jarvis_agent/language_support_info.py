@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.config import save_exception
 """语言功能支持信息模块
 
 提供语言功能支持情况的收集和展示功能。
@@ -14,7 +15,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
     # 确保语言支持模块已加载（触发自动注册）
     try:
         pass
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
         pass
 
     # 从 code_analyzer 获取语言支持
@@ -46,7 +48,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                 except Exception:
                     info[lang_name]["依赖分析"] = False
 
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
         pass
 
     # 从 file_context_handler 获取上下文提取支持，同时也用于补充符号提取支持
@@ -97,7 +100,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
             except Exception:
                 # 静默失败，不记录错误（避免输出过多调试信息）
                 pass
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
         pass
 
     # 检查构建验证支持（自动发现所有构建验证器）
@@ -202,7 +206,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                 and LINT_COMMAND_TEMPLATES_BY_FILE.get(ext)
             ):
                 info[lang_name]["静态检查"] = True
-    except Exception:
+    except Exception as e:
+        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
         pass
 
     # 确保所有已知语言都在 info 中（即使某些功能不支持）
@@ -257,7 +262,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                                     if extractor:
                                         has_extractor = True
                                         break
-                                except Exception:
+                                except Exception as e:
+                                    save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
                                     continue
                         info[lang_name][feature] = has_extractor
                     except Exception:
@@ -294,7 +300,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                                         if extractor:
                                             has_extractor = True
                                             break
-                                    except Exception:
+                                    except Exception as e:
+                                        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
                                         continue
                             info[lang_name][feature] = has_extractor
                         except Exception:
@@ -361,7 +368,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                                     if extractor:
                                         has_extractor = True
                                         break
-                                except Exception:
+                                except Exception as e:
+                                    save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
                                     continue
                         info[lang_name][feature] = has_extractor
                     except Exception:
@@ -398,7 +406,8 @@ def _collect_language_support_info() -> dict[str, dict[str, Any]]:
                                         if extractor:
                                             has_extractor = True
                                             break
-                                    except Exception:
+                                    except Exception as e:
+                                        save_exception(e, module="jarvis_agent.language_support_info", function="_collect_language_support_info")
                                         continue
                             info[lang_name][feature] = has_extractor
                         except Exception:
