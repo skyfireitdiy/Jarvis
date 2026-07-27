@@ -19,6 +19,33 @@ class SkillHubSource(ISkillSource):
     def priority(self) -> int:
         return 10  # 高优先级
 
+    def _calc_quality_score(self, item: dict) -> float:
+        """根据API返回数据计算质量分
+
+        优先使用 simple_rating，为空时基于 github_stars 推算。
+        质量分范围 0-10。
+        """
+        # 优先使用API返回的评分
+        simple_rating = item.get("simple_rating")
+        if simple_rating is not None:
+            try:
+                return float(simple_rating)
+            except (ValueError, TypeError):
+                pass
+
+        # 基于 github_stars 推算质量分
+        stars = item.get("github_stars", 0) or 0
+        if stars >= 10000:
+            return 8.0
+        elif stars >= 1000:
+            return 7.0
+        elif stars >= 100:
+            return 6.0
+        elif stars >= 10:
+            return 5.0
+        else:
+            return 4.0  # 默认基础分
+
     def _parse_repo_url(self, repo_url: str) -> Optional[Dict]:
         """
         解析 SkillHub repo_url 格式
@@ -100,8 +127,8 @@ class SkillHubSource(ISkillSource):
                                     query,
                                     f"{item.get('name', '')} {item.get('description', '')}",
                                 ),
-                                quality_score=float(item.get("rating", 0)),
-                                popularity=int(item.get("stars", 0)),
+                                quality_score=self._calc_quality_score(item),
+                                popularity=int(item.get("github_stars", 0)),
                                 platform=self.name,
                                 author=item.get("author"),
                                 tags=item.get("tags", []),
