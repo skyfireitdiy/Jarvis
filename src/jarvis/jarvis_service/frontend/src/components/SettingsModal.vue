@@ -433,7 +433,7 @@ const maskedNodeSecret = computed(() => {
 .modal-overlay .modal {
   background: var(--color-bg-secondary);
   border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
 }
 
@@ -442,8 +442,8 @@ const maskedNodeSecret = computed(() => {
   margin-bottom: 16px;
   padding: 16px;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   box-shadow: 0 2px 8px var(--color-shadow);
 }
 
@@ -470,7 +470,7 @@ const maskedNodeSecret = computed(() => {
   padding: 11px 14px;
   background: var(--color-bg-primary);
   border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -486,7 +486,7 @@ const maskedNodeSecret = computed(() => {
   padding: 11px 14px;
   background: var(--color-bg-primary);
   border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
   cursor: pointer;
@@ -527,8 +527,7 @@ const maskedNodeSecret = computed(() => {
 }
 
 .toggle-wrapper:hover {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
+
   border-color: var(--color-accent);
   outline-color: var(--color-accent-subtle);
 }
@@ -564,14 +563,13 @@ const maskedNodeSecret = computed(() => {
   right: 0;
   bottom: 0;
   background-color: var(--color-bg-secondary);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px var(--color-shadow), inset 0 1px 0 var(--color-border);
-  border-radius: 15px;
+
+  border: none;
+  box-shadow: var(--tile-shadow);
+  border-radius: var(--tile-radius-sm);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   /* 外描边效果 */
-  outline: 1px solid var(--color-border);
+  outline: none;
   outline-offset: -1px;
 }
 
@@ -583,18 +581,17 @@ const maskedNodeSecret = computed(() => {
   left: 3px;
   bottom: 3px;
   background-color: var(--color-text-secondary);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px var(--color-shadow);
-  border: 1px solid var(--color-border);
+  border: none;
 }
 
 .toggle-input:checked + .toggle-slider {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-secondary) 100%);
   border-color: var(--color-accent);
-  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 var(--color-border);
+  box-shadow: var(--tile-shadow);
   outline-color: var(--color-accent-subtle);
 }
 
@@ -607,8 +604,7 @@ const maskedNodeSecret = computed(() => {
 
 /* Hover 状态 */
 .toggle-switch:hover .toggle-slider {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
+
 }
 
 .toggle-switch:hover .toggle-slider:before {
@@ -691,7 +687,7 @@ const maskedNodeSecret = computed(() => {
 .close-btn {
   background: var(--color-bg-tertiary);
   border: 0.5px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   font-size: 22px;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -720,7 +716,7 @@ const maskedNodeSecret = computed(() => {
   padding: 10px 20px;
   background: var(--color-error);
   border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
@@ -749,7 +745,7 @@ const maskedNodeSecret = computed(() => {
   padding: 16px;
   background: var(--color-bg-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
 }
 
 .history-stat {
@@ -775,7 +771,7 @@ const maskedNodeSecret = computed(() => {
   padding: 10px 20px;
   background: var(--color-bg-tertiary);
   border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 600;
@@ -784,7 +780,7 @@ const maskedNodeSecret = computed(() => {
 
 .ghost-btn:hover {
   background: var(--color-bg-tertiary);
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
   transform: translateY(-1px);
 }
 
@@ -792,7 +788,7 @@ const maskedNodeSecret = computed(() => {
   margin-top: 16px;
   padding: 16px;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   border: none;
 }
 
@@ -816,8 +812,8 @@ const maskedNodeSecret = computed(() => {
   width: 100%;
   padding: 8px 12px;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 13px;
   cursor: pointer;
@@ -825,13 +821,13 @@ const maskedNodeSecret = computed(() => {
 }
 
 .config-sync-section .node-select:hover {
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
 }
 
 .config-sync-section .node-select:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  box-shadow: var(--tile-shadow);
 }
 
 .checkbox-label {
@@ -840,7 +836,7 @@ const maskedNodeSecret = computed(() => {
   gap: 8px;
   padding: 8px 12px;
   background: var(--color-bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
@@ -863,7 +859,7 @@ const maskedNodeSecret = computed(() => {
   margin-top: 12px;
   padding: 16px;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   border: none;
 }
 
@@ -874,8 +870,8 @@ const maskedNodeSecret = computed(() => {
   margin-bottom: 12px;
   padding: 12px;
   background: var(--color-bg-primary);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border-radius: var(--tile-radius);
+  border: none;
 }
 
 .secret-code {
@@ -901,7 +897,7 @@ const maskedNodeSecret = computed(() => {
   padding: 6px;
   background: var(--color-bg-tertiary);
   border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;

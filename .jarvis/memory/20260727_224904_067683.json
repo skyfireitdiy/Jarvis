@@ -1,0 +1,8 @@
+{
+  "id": "20260727_224904_067683",
+  "type": "project_long_term",
+  "tags": ["ui-tile-style", "jarvis", "frontend", "completed"],
+  "content": "Jarvis前端磁贴风格改造已完成(2025-07-27):\n1. style.css: CSS变量底色微调(#080e1e/#0d1630/#121f42/#182a52), border→transparent, 新增--color-bg-tile/#111c3a, --color-border-subtle, --tile-shadow/hover/inset, --tile-radius(16px)/sm(12px)/xs(8px), --color-accent-glow降至0.3\n2. style.css全局组件: header/panel/input/button/terminal去border加磁贴, dot去glow改opacity动画, badge/output/terminal圆角变量化\n3. App.vue: 226处border→none/subtle, border-radius变量化, backdrop-filter全部删除, border-color变量化, box-shadow变量化\n4. 13个组件+diff.css: 全部同步改造\n5. 构建验证: npm run build成功(22.40s)\n6. 关键约束: 不用backdrop-filter保护无GPU机器, 用色块差异+微阴影替代边框, 保留深蓝科技色调\n7. Git安全回退点: 23b529211470c32f37810e7a6ba1011002c92d3a",
+  "created_at": "2026-07-27T22:49:04.067710",
+  "updated_at": "2026-07-27T22:49:04.067714"
+}

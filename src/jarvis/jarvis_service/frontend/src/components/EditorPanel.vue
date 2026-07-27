@@ -129,9 +129,9 @@ defineExpose({
 .editor-panel {
   position: fixed;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border: none;
+  border-radius: var(--tile-radius);
+  box-shadow: var(--tile-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -147,7 +147,7 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
   cursor: move;
   gap: 8px;
@@ -198,9 +198,9 @@ defineExpose({
   min-width: 0;
   max-width: 220px;
   padding: 6px 10px;
-  border: 1px solid var(--color-border);
+  border: none;
   border-bottom: none;
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--tile-radius-xs) var(--tile-radius-xs) 0 0;
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -241,8 +241,8 @@ defineExpose({
   gap: 8px;
   min-height: 30px;
   padding: 0 10px;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-secondary);
 }
 
@@ -265,14 +265,14 @@ defineExpose({
   gap: 6px;
   padding: 5px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease-out;
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
-  backdrop-filter: blur(20px);
+
 }
 
 .editor-edit-toggle:hover {
@@ -315,7 +315,7 @@ defineExpose({
   align-items: center;
   gap: 8px;
   padding: 8px 4px;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
 }
 
@@ -328,7 +328,7 @@ defineExpose({
   padding: 0;
   line-height: 1;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;

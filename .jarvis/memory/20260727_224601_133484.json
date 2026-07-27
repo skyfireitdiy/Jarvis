@@ -1,0 +1,8 @@
+{
+  "id": "20260727_224601_133484",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "ui-tile-style", "technical-decisions"],
+  "content": "Jarvis前端磁贴风改造完整技术决策记录：\n1. border→none而非transparent，更彻底去除边框线\n2. border-bottom/top/left/right方向性border→var(--color-border-subtle)保留分隔线\n3. border-radius变量化：8px→var(--tile-radius), 6px→var(--tile-radius-xs), 12px→var(--tile-radius-sm), 14px/15px/16px→var(--tile-radius-sm), 9px/10px→var(--tile-radius), 3px/4px/5px保留(小元素)\n4. backdrop-filter全部删除(含-webkit前缀)，backdrop-filter:none保留(显式禁用)\n5. box-shadow: 0 Xpx Ypx rgba(0,0,0,...)→var(--tile-shadow), inset阴影→var(--tile-shadow-inset), 0 0 Npx glow→var(--tile-shadow)或删除\n6. border-color: var(--color-border)→var(--color-border-subtle), rgba硬编码→var(--color-border-subtle)\n7. outline: 1px solid var(--color-border)→outline:none\n8. 保留不动：border-box, border-collapse, border:none已有, border:1px solid transparent(布局), border-radius:50%(圆形), spinner border(动画), border-color:var(--color-border-active)(focus), border-color:var(--color-accent)(active)\n9. CSS变量驱动，edit_file replace_all批量替换策略",
+  "created_at": "2026-07-27T22:46:01.133516",
+  "updated_at": "2026-07-27T22:46:01.133520"
+}

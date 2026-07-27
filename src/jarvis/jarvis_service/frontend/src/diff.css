@@ -1,7 +1,7 @@
 /* Side by side Diff 样式 */
 .diff-side-by-side {
   background: var(--color-bg-tertiary);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   overflow-x: auto;
   margin: 8px 0;
   width: 100%;
@@ -15,7 +15,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .diff-file-path {
@@ -89,7 +89,7 @@
   text-align: right;
   width: 50px;
   user-select: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid var(--color-border-subtle);
   vertical-align: top;
 }
 
@@ -134,8 +134,8 @@
 .diff-separator td {
   height: 8px;
   background: var(--color-bg-secondary);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding: 0;
 }
 

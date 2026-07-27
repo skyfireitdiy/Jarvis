@@ -185,8 +185,8 @@ const emit = defineEmits([
 /* 模态框基础样式 */
 .modal-overlay .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
 }
 
@@ -252,8 +252,8 @@ const emit = defineEmits([
   width: 100%;
   padding: 10px 12px;
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -315,7 +315,7 @@ const emit = defineEmits([
   padding: 12px 16px;
   background: rgba(220, 53, 69, 0.1);
   border: 1px solid var(--color-error);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   color: var(--color-error);
   font-size: 14px;
   line-height: 1.5;
@@ -335,14 +335,14 @@ const emit = defineEmits([
   gap: 6px;
   padding: 14px 16px;
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 10px;
+  border: none;
+  border-radius: var(--tile-radius);
   cursor: pointer;
 }
 
 .create-agent-modal .radio-label:hover {
   background: var(--color-bg-primary);
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
   transform: translateY(-1px);
 }
 
@@ -356,7 +356,7 @@ const emit = defineEmits([
   -webkit-appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid var(--color-border);
+  border: 2px solid var(--color-border-subtle);
   border-radius: 50%;
   background: var(--color-bg-primary);
   cursor: pointer;
@@ -364,7 +364,7 @@ const emit = defineEmits([
 }
 
 .create-agent-modal .radio-label input[type="radio"]:hover {
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
 }
 
 .create-agent-modal .radio-label input[type="radio"]:checked {
@@ -434,8 +434,8 @@ const emit = defineEmits([
   padding: 10px 16px;
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -453,19 +453,15 @@ const emit = defineEmits([
   gap: 16px;
   padding: 16px 20px;
   background: var(--color-bg-secondary);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid var(--color-border);
-  outline: 1px solid var(--color-border);
+  border: none;
+  outline: none;
   outline-offset: -1px;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: var(--tile-radius-sm);
+  box-shadow: var(--tile-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toggle-wrapper:hover {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
   border-color: var(--color-accent);
   outline-color: var(--color-accent);
 }
@@ -501,13 +497,11 @@ const emit = defineEmits([
   right: 0;
   bottom: 0;
   background-color: var(--color-bg-secondary);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border-radius: 15px;
+  border: none;
+  box-shadow: var(--tile-shadow);
+  border-radius: var(--tile-radius-sm);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: 1px solid var(--color-border);
+  outline: none;
   outline-offset: -1px;
 }
 
@@ -519,31 +513,29 @@ const emit = defineEmits([
   left: 3px;
   bottom: 3px;
   background-color: var(--color-text-primary);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--color-border);
+  box-shadow: var(--tile-shadow);
+  border: none;
 }
 
 .toggle-input:checked + .toggle-slider {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
   border-color: var(--color-accent);
-  box-shadow: 0 4px 16px var(--color-accent-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: var(--tile-shadow);
   outline-color: var(--color-accent);
 }
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
   background-color: var(--color-text-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--tile-shadow);
   border-color: var(--color-accent);
 }
 
 .toggle-switch:hover .toggle-slider {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
+
 }
 
 .toggle-switch:hover .toggle-slider:before {

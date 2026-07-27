@@ -63,8 +63,8 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 
 .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
   width: 100%;
 }
@@ -104,16 +104,16 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
   max-height: 300px;
   overflow-y: auto;
   background: var(--color-bg-primary);
-  border-radius: 8px;
-  border: 0.5px solid var(--color-border);
+  border-radius: var(--tile-radius);
+  border: none;
   margin-bottom: 20px;
 }
 
 .session-item {
   padding: 12px 14px;
-  border-bottom: 0.5px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin: 4px;
 }
 
@@ -157,8 +157,8 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 .ghost-btn {
   padding: 10px 20px;
   background: transparent;
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 600;
@@ -173,8 +173,8 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
 .primary-btn {
   padding: 10px 20px;
   background: var(--color-success);
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #0a1228;
   font-size: 14px;
   font-weight: 600;

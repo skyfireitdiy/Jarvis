@@ -49,8 +49,8 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
 
 .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
   width: 100%;
   max-width: 420px;
@@ -67,7 +67,7 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
 .error-message {
   background: var(--color-error-subtle);
   border: 1px solid var(--color-error);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   padding: 12px;
   margin-bottom: 16px;
   color: var(--color-error);
@@ -91,8 +91,8 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   width: 100%;
   padding: 11px 14px;
   background: var(--color-bg-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -100,7 +100,7 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
 .form-group input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  box-shadow: var(--tile-shadow);
 }
 
 .form-group input::placeholder {
@@ -111,8 +111,8 @@ defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'
   width: 100%;
   padding: 10px 20px;
   background: var(--color-success);
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #0a1228;
   font-size: 14px;
   font-weight: 600;

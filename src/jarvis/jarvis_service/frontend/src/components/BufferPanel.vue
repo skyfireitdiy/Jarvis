@@ -79,8 +79,8 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 
 .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   width: 100%;
 }
 
@@ -88,7 +88,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   max-width: min(720px, 100%);
   padding: 0;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--tile-shadow);
   animation: slideDown 0.2s ease-out;
 }
 
@@ -109,7 +109,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   align-items: center;
   padding: 12px 16px;
   background: var(--color-accent-subtle);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .buffer-panel-title {
@@ -129,8 +129,8 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 .buffer-panel-btn {
   padding: 6px 12px;
   background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 500;
@@ -178,7 +178,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
 .buffer-panel-footer {
   padding: 12px 16px;
   background: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   justify-content: flex-end;
 }
@@ -187,7 +187,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   padding: 8px 16px;
   background: var(--color-accent-subtle);
   border: 1px solid var(--color-accent);
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-accent);
   font-size: 13px;
   font-weight: 600;
