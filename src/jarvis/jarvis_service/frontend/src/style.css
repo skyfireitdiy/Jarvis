@@ -3,12 +3,12 @@
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 - 深蓝磁贴 */
-  --color-bg-primary: #080e1e;
-  --color-bg-secondary: #0d1630;
-  --color-bg-tertiary: #121f42;
-  --color-bg-hover: #182a52;
-  --color-bg-tile: #111c3a;
+  /* 主色调 - 蓝紫辉光 */
+  --color-bg-primary: #060d1f;
+  --color-bg-secondary: #0a1428;
+  --color-bg-tertiary: #101c3a;
+  --color-bg-hover: #18284e;
+  --color-bg-tile: #0e1832;
 
   /* 文字颜色 */
   --color-text-primary: #e8f0ff;
@@ -17,7 +17,7 @@
 
   /* 强调色 - 科技蓝 */
   --color-accent: #00d4ff;
-  --color-accent-glow: rgba(0, 212, 255, 0.3);
+  --color-accent-glow: rgba(0, 180, 255, 0.25);
   --color-accent-subtle: rgba(0, 212, 255, 0.12);
   --color-accent-secondary: #4d9fff;
 
@@ -30,12 +30,14 @@
   /* 边框 - 磁贴风格：几乎不可见，仅focus时显示 */
   --color-border: transparent;
   --color-border-active: rgba(0, 212, 255, 0.5);
-  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-subtle: rgba(120, 140, 255, 0.1);
 
   /* 磁贴效果 */
-  --tile-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --tile-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --tile-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --tile-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35), 0 0 1px rgba(120, 140, 255, 0.12);
+  --tile-shadow-hover:
+    0 4px 16px rgba(0, 0, 0, 0.4), 0 0 3px rgba(120, 140, 255, 0.2);
+  --tile-shadow-inset: inset 0 1px 0 rgba(120, 140, 255, 0.08);
   --tile-radius: 16px;
   --tile-radius-sm: 12px;
   --tile-radius-xs: 8px;
@@ -47,7 +49,7 @@
     #4d9fff 50%,
     #00ff88 100%
   );
-  --gradient-bg: linear-gradient(180deg, #080e1e 0%, #0d1630 50%, #121f42 100%);
+  --gradient-bg: linear-gradient(180deg, #060d1f 0%, #0a1428 50%, #101c3a 100%);
   --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
