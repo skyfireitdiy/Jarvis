@@ -5,10 +5,10 @@
 
   /* 主色调 - 蓝紫辉光（半透明，透出SVG背景） */
   --color-bg-primary: transparent;
-  --color-bg-secondary: rgba(10, 20, 40, 0.88);
-  --color-bg-tertiary: rgba(16, 28, 58, 0.78);
-  --color-bg-hover: rgba(24, 40, 78, 0.85);
-  --color-bg-tile: rgba(14, 24, 50, 0.82);
+  --color-bg-secondary: rgba(10, 20, 40, 0.72);
+  --color-bg-tertiary: rgba(16, 28, 58, 0.6);
+  --color-bg-hover: rgba(24, 40, 78, 0.7);
+  --color-bg-tile: rgba(14, 24, 50, 0.65);
 
   /* 文字颜色 */
   --color-text-primary: #e8f0ff;
