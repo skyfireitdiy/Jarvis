@@ -1,0 +1,14 @@
+{
+  "id": "20260727_233825_474556",
+  "type": "project_long_term",
+  "tags": [
+    "ui-tile-style",
+    "frontend",
+    "svg-background",
+    "jarvis",
+    "completed"
+  ],
+  "content": "Jarvis前端磁贴风格改造 - SVG背景+半透明控件方案：\n1. SVG背景图: src/jarvis/jarvis_service/frontend/src/assets/jarvis-bg.svg - 包含J字母水印、JARVIS文字、网格线、光点粒子、连接线、蓝紫辉光\n2. body设置SVG背景: background-color:#060d1f + background-image:url('./assets/jarvis-bg.svg')\n3. CSS变量半透明化: --color-bg-primary:transparent, --color-bg-secondary:rgba(10,20,40,0.88), --color-bg-tertiary:rgba(16,28,58,0.78), --color-bg-hover:rgba(24,40,78,0.85), --color-bg-tile:rgba(14,24,50,0.82)\n4. 磁贴效果: --tile-shadow带蓝紫边光rgba(120,140,255,0.12), --tile-shadow-hover带蓝紫辉光rgba(120,140,255,0.2), --tile-shadow-inset蓝紫高光rgba(120,140,255,0.08)\n5. --color-border-subtle:rgba(120,140,255,0.1) 带蓝紫调\n6. App.vue .app背景改为transparent，var(--color-bg-primary)全部替换为transparent\n7. 硬编码hex背景色改为rgba半透明版本\n8. 构建验证通过: npm run build 10.63s",
+  "created_at": "2026-07-27T23:38:25.474605",
+  "updated_at": "2026-07-27T23:38:25.474609"
+}

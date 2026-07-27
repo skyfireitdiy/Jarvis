@@ -3,12 +3,12 @@
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 - 蓝紫辉光 */
-  --color-bg-primary: #060d1f;
-  --color-bg-secondary: #0a1428;
-  --color-bg-tertiary: #101c3a;
-  --color-bg-hover: #18284e;
-  --color-bg-tile: #0e1832;
+  /* 主色调 - 蓝紫辉光（半透明，透出SVG背景） */
+  --color-bg-primary: transparent;
+  --color-bg-secondary: rgba(10, 20, 40, 0.88);
+  --color-bg-tertiary: rgba(16, 28, 58, 0.78);
+  --color-bg-hover: rgba(24, 40, 78, 0.85);
+  --color-bg-tile: rgba(14, 24, 50, 0.82);
 
   /* 文字颜色 */
   --color-text-primary: #e8f0ff;
@@ -49,11 +49,28 @@
     #4d9fff 50%,
     #00ff88 100%
   );
-  --gradient-bg: linear-gradient(180deg, #060d1f 0%, #0a1428 50%, #101c3a 100%);
+  --gradient-bg: linear-gradient(
+    180deg,
+    rgba(6, 13, 31, 0.95) 0%,
+    rgba(10, 20, 40, 0.9) 50%,
+    rgba(16, 28, 58, 0.85) 100%
+  );
   --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
+  background: transparent;
+}
+
+/* SVG背景 - Jarvis水印 */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #060d1f;
+  background-image: url("./assets/jarvis-bg.svg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 * {
@@ -62,7 +79,6 @@
 
 body {
   margin: 0;
-  background: var(--gradient-bg);
   min-height: 100vh;
 }
 
@@ -291,7 +307,7 @@ button:disabled {
 }
 
 .output-body pre {
-  background: var(--color-bg-primary);
+  background: rgba(6, 13, 31, 0.9);
   color: var(--color-text-primary);
   padding: 10px;
   border-radius: var(--tile-radius-xs);
@@ -321,7 +337,7 @@ button:disabled {
 /* 终端样式 */
 .terminal-host {
   height: 200px;
-  background: var(--color-bg-primary);
+  background: rgba(6, 13, 31, 0.9);
   border-radius: var(--tile-radius-sm);
   padding: 6px;
   border: none;
@@ -335,7 +351,7 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
