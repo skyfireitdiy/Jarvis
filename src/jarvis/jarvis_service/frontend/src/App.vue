@@ -7635,7 +7635,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.hostEl = el
   termInfo.terminal = new Terminal({
     theme: {
-      background: 'rgba(11,18,32,0.7)',
+      background: 'rgba(10,20,40,0.6)',
     },
     fontSize: 12,
     allowProposedApi: true,
@@ -7897,7 +7897,7 @@ function initIndependentTerminal(terminalId, el) {
   // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
-      background: 'rgba(11,18,32,0.7)',
+      background: 'rgba(10,20,40,0.6)',
     },
     fontSize: 12,
     cols: 80,
@@ -9590,7 +9590,7 @@ body::-webkit-scrollbar {
   padding: 0;
   min-width: 0;
   min-height: 0;
-  background: rgba(13,17,23,0.7);
+  background: var(--color-bg-secondary);
 }
 
 .editor-codemirror-container {
@@ -9859,7 +9859,7 @@ body::-webkit-scrollbar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: rgba(22, 27, 34, 0.7);
+  background: var(--color-bg-secondary);
   border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
@@ -10017,7 +10017,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background: rgba(22, 27, 34, 0.9);
+  background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border-subtle);
   gap: 12px;
 }
@@ -10457,7 +10457,7 @@ body::-webkit-scrollbar {
 .dir-search-input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -10467,7 +10467,7 @@ body::-webkit-scrollbar {
 .dir-search-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
 }
 
 .dir-search-input::placeholder {
@@ -10589,7 +10589,7 @@ body::-webkit-scrollbar {
 }
 
 .message {
-  background: rgba(22, 27, 34, 0.75);
+  background: var(--color-bg-secondary);
   border-radius: var(--tile-radius);
   padding: 6px 10px;
   border: none;
@@ -10703,7 +10703,7 @@ body::-webkit-scrollbar {
 .message-meta-left .badge {
   font-size: 10px;
   padding: 3px 8px;
-  background: rgba(33, 38, 45, 0.8);
+  background: var(--color-bg-secondary);
   color: #8b949e;
   border-radius: var(--tile-radius-xs);
   font-weight: 600;
@@ -10758,7 +10758,7 @@ body::-webkit-scrollbar {
 }
 
 .message-body.markdown-content :deep(pre) {
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
   padding: 14px;
   border-radius: var(--tile-radius);
   border: none;
@@ -10767,7 +10767,7 @@ body::-webkit-scrollbar {
 }
 
 .message-body.markdown-content :deep(code) {
-  background: rgba(13, 17, 23, 0.7);
+  background: var(--color-bg-secondary);
   padding: 3px 7px;
   border-radius: 5px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
@@ -10929,11 +10929,11 @@ body::-webkit-scrollbar {
   max-height: 600px;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 17, 23, 0.6);
+  background: var(--color-bg-tertiary);
 }
 
 .terminal-host {
-  background: rgba(10,13,18,0.7);
+  background: var(--color-bg-secondary);
   flex: 1;
   min-height: 400px;
   overflow: hidden;
@@ -10951,13 +10951,13 @@ body::-webkit-scrollbar {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 17, 23, 0.6);
+  background: var(--color-bg-tertiary);
   /* max-height 由动态样式控制 */
 }
 
 .terminal-history-header {
   padding: 10px 16px;
-  background: rgba(22, 27, 34, 0.9);
+  background: var(--color-bg-secondary);
   border-bottom: 0.5px solid var(--color-border-subtle);
   color: #8b949e;
   font-size: 13px;
@@ -10965,7 +10965,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-history-content {
-  background: rgba(10,13,18,0.7);
+  background: var(--color-bg-secondary);
   display: block;
   width: 100%;
   max-width: 100%;
@@ -10989,7 +10989,7 @@ body::-webkit-scrollbar {
 
 /* 输入区 */
 .input-area {
-  background: rgba(22, 27, 34, 0.9);
+  background: var(--color-bg-secondary);
   border-top: 0.5px solid var(--color-border-subtle);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   flex-shrink: 0;
@@ -11023,7 +11023,7 @@ body::-webkit-scrollbar {
   flex: 1;
   min-width: 0;
   padding: 11px 15px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 10px;
   color: #e6edf3;
@@ -11033,7 +11033,7 @@ body::-webkit-scrollbar {
 .input-wrapper.single-line input:focus {
   outline: none;
   border-color: var(--color-accent);
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
 }
 
 .input-wrapper.single-line .send-btn {
@@ -11104,7 +11104,7 @@ body::-webkit-scrollbar {
   width: 100%;
   min-height: 120px;
   max-height: 300px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 10px;
   padding: 14px;
@@ -11118,7 +11118,7 @@ body::-webkit-scrollbar {
 .input-wrapper textarea:focus {
   outline: none;
   border-color: var(--color-accent);
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
 }
 
 /* 缓冲区指示器 */
@@ -11242,7 +11242,7 @@ body::-webkit-scrollbar {
 
 .buffer-panel-btn {
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.6);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius-xs);
   color: #8b949e;
@@ -11274,7 +11274,7 @@ body::-webkit-scrollbar {
   width: 100%;
   min-height: 220px;
   max-height: min(60vh, 520px);
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   padding: 14px 16px;
   color: #e6edf3;
@@ -11291,7 +11291,7 @@ body::-webkit-scrollbar {
 
 .buffer-panel-footer {
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.6);
+  background: var(--color-bg-tertiary);
   border-top: 1px solid var(--color-border-subtle);
   display: flex;
   justify-content: flex-end;
@@ -11372,7 +11372,7 @@ body::-webkit-scrollbar {
 /* 操作按钮 */
 .action-btn {
   padding: 11px 20px;
-  background: rgba(48, 54, 61, 0.6);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius);
   color: #8b949e;
@@ -11449,7 +11449,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11458,7 +11458,7 @@ body::-webkit-scrollbar {
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.7);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: 14px;
   padding: 28px;
@@ -11501,7 +11501,7 @@ body::-webkit-scrollbar {
 .form-group input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11511,13 +11511,13 @@ body::-webkit-scrollbar {
 .form-group input:focus {
   outline: none;
   border-color: var(--color-accent);
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
 }
 
 .form-group select {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11533,7 +11533,7 @@ body::-webkit-scrollbar {
 .form-group select:focus {
   outline: none;
   border-color: var(--color-accent);
-  background-color: rgba(13, 17, 23, 0.9);
+  background-color: var(--color-bg-secondary);
 }
 
 .form-group select option {
@@ -11641,7 +11641,7 @@ body::-webkit-scrollbar {
 
 .ghost-btn {
   padding: 10px 20px;
-  background: rgba(33, 38, 45, 0.5);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11651,7 +11651,7 @@ body::-webkit-scrollbar {
 }
 
 .ghost-btn:hover {
-  background: rgba(48, 54, 61, 0.7);
+  background: var(--color-bg-secondary);
   border-color: var(--color-border-subtle);
   transform: translateY(-1px);
 }
@@ -11661,7 +11661,7 @@ body::-webkit-scrollbar {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .app {
-    background: rgba(13,17,23,0.7);
+    background: var(--color-bg-secondary);
   }
   
   .app-header {
@@ -11765,7 +11765,7 @@ body::-webkit-scrollbar {
 .completions-search input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11775,7 +11775,7 @@ body::-webkit-scrollbar {
 .completions-search input:focus {
   outline: none;
   border-color: var(--color-accent);
-  background: rgba(13, 17, 23, 0.9);
+  background: var(--color-bg-secondary);
 }
 
 .completions-list {
@@ -11784,7 +11784,7 @@ body::-webkit-scrollbar {
   max-height: 400px;
   border: none;
   border-radius: 10px;
-  background: rgba(13, 17, 23, 0.6);
+  background: var(--color-bg-tertiary);
 }
 
 .completion-item {
@@ -11852,7 +11852,7 @@ body::-webkit-scrollbar {
 /* 终端面板 */
 .terminal-panel {
   position: fixed;
-  background: rgba(13, 17, 23, 0.75);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--tile-radius);
   display: flex;
@@ -11869,7 +11869,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: rgba(22, 27, 34, 0.7);
+  background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border-subtle);
   border-radius: 6px 6px 0 0;
   cursor: move;
@@ -11937,7 +11937,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.6);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: 4px;
   font-size: 12px;
@@ -12022,7 +12022,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: rgba(22, 27, 34, 0.7);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--tile-radius);
   color: #e6edf3;
@@ -12295,7 +12295,7 @@ body::-webkit-scrollbar {
     width: 100%;
     height: 100%;
     z-index: 999;
-    background: rgba(22, 27, 34, 0.75);
+    background: var(--color-bg-secondary);
   }
   
   .agent-sidebar.collapsed {
@@ -12484,7 +12484,7 @@ body::-webkit-scrollbar {
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(28, 28, 30, 0.5);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -12527,7 +12527,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.5);
+  background-color: var(--color-bg-tertiary);
   border: none;
   box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
   border-radius: var(--tile-radius);
@@ -12633,7 +12633,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12642,7 +12642,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-modal {
-  background: rgba(22, 27, 34, 0.7);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: 14px;
   width: 100%;
@@ -12659,7 +12659,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 0.5px solid var(--color-border-subtle);
-  background: rgba(22, 27, 34, 0.75);
+  background: var(--color-bg-secondary);
 }
 
 .diff-modal-header h3 {
@@ -12702,7 +12702,7 @@ body::-webkit-scrollbar {
 .diff-raw {
   margin: 0;
   padding: 16px;
-  background: rgba(13, 17, 23, 0.65);
+  background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
@@ -12734,7 +12734,7 @@ body::-webkit-scrollbar {
 }
 
 .rules-table th {
-  background: rgba(22, 27, 34, 0.75);
+  background: var(--color-bg-secondary);
   color: #8b949e;
   font-weight: 600;
   font-size: 12px;
