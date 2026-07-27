@@ -1,76 +1,67 @@
-/* Jarvis 磁贴风格主题 */
+/* Jarvis 金属质感主题 */
 :root {
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 - 蓝紫辉光（半透明，透出SVG背景） */
-  --color-bg-primary: transparent;
-  --color-bg-secondary: rgba(10, 20, 40, 0.72);
-  --color-bg-tertiary: rgba(16, 28, 58, 0.6);
-  --color-bg-hover: rgba(24, 40, 78, 0.7);
-  --color-bg-tile: rgba(14, 24, 50, 0.65);
+  /* 主色调 - 深钢蓝金属 */
+  --color-bg-primary: #0f1923;
+  --color-bg-secondary: #1a2332;
+  --color-bg-tertiary: #243040;
+  --color-bg-hover: #2d3d50;
+  --color-bg-tile: #1e2a3a;
 
   /* 文字颜色 */
-  --color-text-primary: #e8f0ff;
-  --color-text-secondary: #8ba4d0;
-  --color-text-muted: #5a7099;
+  --color-text-primary: #d0dce8;
+  --color-text-secondary: #7a8fa3;
+  --color-text-muted: #4a5f73;
 
-  /* 强调色 - 科技蓝 */
-  --color-accent: #00d4ff;
-  --color-accent-glow: rgba(0, 180, 255, 0.25);
-  --color-accent-subtle: rgba(0, 212, 255, 0.12);
-  --color-accent-secondary: #4d9fff;
+  /* 强调色 - 冷钢蓝 */
+  --color-accent: #4da6ff;
+  --color-accent-glow: rgba(77, 166, 255, 0.2);
+  --color-accent-subtle: rgba(77, 166, 255, 0.1);
+  --color-accent-secondary: #3d8bfd;
 
   /* 状态色 */
-  --color-success: #00ff88;
-  --color-warning: #ffaa00;
-  --color-error: #ff4757;
-  --color-info: #00d4ff;
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --color-error: #f85149;
+  --color-info: #4da6ff;
 
-  /* 边框 - 磁贴风格：几乎不可见，仅focus时显示 */
-  --color-border: transparent;
-  --color-border-active: rgba(0, 212, 255, 0.5);
-  --color-border-subtle: rgba(120, 140, 255, 0.1);
+  /* 边框 - 金属线 */
+  --color-border: rgba(100, 140, 180, 0.15);
+  --color-border-active: rgba(77, 166, 255, 0.5);
+  --color-border-subtle: rgba(100, 140, 180, 0.1);
 
-  /* 磁贴效果 */
+  /* 金属质感效果 */
   --tile-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.35), 0 0 1px rgba(120, 140, 255, 0.12);
+    0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --tile-shadow-hover:
-    0 4px 16px rgba(0, 0, 0, 0.4), 0 0 3px rgba(120, 140, 255, 0.2);
-  --tile-shadow-inset: inset 0 1px 0 rgba(120, 140, 255, 0.08);
-  --tile-radius: 16px;
-  --tile-radius-sm: 12px;
-  --tile-radius-xs: 8px;
+    0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --tile-shadow-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --tile-radius: 10px;
+  --tile-radius-sm: 8px;
+  --tile-radius-xs: 6px;
 
   /* 渐变 */
   --gradient-accent: linear-gradient(
     135deg,
-    #00d4ff 0%,
-    #4d9fff 50%,
-    #00ff88 100%
+    #3d8bfd 0%,
+    #4da6ff 50%,
+    #3fb950 100%
   );
-  --gradient-bg: linear-gradient(
-    180deg,
-    rgba(6, 13, 31, 0.95) 0%,
-    rgba(10, 20, 40, 0.9) 50%,
-    rgba(16, 28, 58, 0.85) 100%
-  );
-  --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
+  --gradient-bg: linear-gradient(180deg, #0a1018 0%, #0f1923 50%, #162030 100%);
+  --gradient-blue: linear-gradient(135deg, #1a50b0 0%, #4da6ff 100%);
 
   color: var(--color-text-primary);
-  background: transparent;
+  background: var(--color-bg-primary);
 }
 
-/* SVG背景 - Jarvis水印 */
+/* 金属质感背景 */
 body {
   margin: 0;
   padding: 0;
-  background-color: #060d1f;
-  background-image: url("./assets/jarvis-bg.svg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background: var(--gradient-bg);
 }
 
 * {

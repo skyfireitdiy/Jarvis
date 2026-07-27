@@ -1,0 +1,8 @@
+{
+  "id": "20260728_010908_438787",
+  "type": "project_long_term",
+  "tags": ["UI改造", "金属质感", "Jarvis前端", "当前进度"],
+  "content": "## Jarvis前端金属质感改造 - 阶段2完成\n\n### 已完成\n- style.css CSS变量全部改为实色金属配色\n- body背景去掉SVG改为金属渐变\n- App.vue xterm终端theme 2处rgba→#1a2332\n- App.vue 深色遮挡性rgba(0,0,0,0.1~0.25)→var(--color-bg-*)\n- App.vue plantuml/diagram rgba(13,17,23,0.35)→var(--color-bg-tertiary)\n- App.vue 白色微透明rgba(255,255,255,0.02~0.1)→var(--color-bg-secondary/hover/tertiary)\n- App.vue rules-loaded-content rgba(22,27,34,0.4)→var(--color-bg-tertiary)\n- rgba从115处降至76处（剩余为语义状态色、scrollbar、toggle switch等，保留）\n- 14组件+diff.css检查：均为语义状态色rgba，保留\n- 构建验证通过\n\n### 保留的rgba（不改）\n- 语义状态色：绿rgba(63,185,80,0.2)、蓝rgba(56,139,253,0.15)、红rgba(248,81,73,0.2)、黄rgba(210,153,34,0.2)、紫rgba(139,92,246,0.15)\n- Scrollbar thumb: rgba(255,255,255,0.15/0.25/0.3)\n- Toggle switch滑块: rgba(255,255,255,0.4/0.5)\n- 用户消息badge: rgba(255,255,255,0.3)\n- 搜索高亮: rgba(242,204,96,0.32)\n- box-shadow等非background的rgba\n\n### 待完成\n- 浏览器实际效果验证\n- 移动端适配检查",
+  "created_at": "2026-07-28T01:09:08.438808",
+  "updated_at": "2026-07-28T01:09:08.438811"
+}

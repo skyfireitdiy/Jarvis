@@ -7635,7 +7635,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.hostEl = el
   termInfo.terminal = new Terminal({
     theme: {
-      background: 'rgba(10,20,40,0.6)',
+      background: '#1a2332',
     },
     fontSize: 12,
     allowProposedApi: true,
@@ -7897,7 +7897,7 @@ function initIndependentTerminal(terminalId, el) {
   // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
-      background: 'rgba(10,20,40,0.6)',
+      background: '#1a2332',
     },
     fontSize: 12,
     cols: 80,
@@ -8964,7 +8964,7 @@ body {
 }
 
 *::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--color-bg-primary);
   border-radius: 3px;
 }
 
@@ -9714,7 +9714,7 @@ body::-webkit-scrollbar {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
 }
 
 .current-agent-info .agent-status.running {
@@ -9751,7 +9751,7 @@ body::-webkit-scrollbar {
 }
 
 .icon-btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   border: none;
   border-radius: var(--tile-radius);
   font-size: 18px;
@@ -9767,7 +9767,7 @@ body::-webkit-scrollbar {
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   color: #e6edf3;
   transform: translateY(-1px);
 }
@@ -9817,7 +9817,7 @@ body::-webkit-scrollbar {
   font-weight: 500;
   color: #8b949e;
   padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-tertiary);
   border-radius: 20px;
   border: none;
 }
@@ -9859,7 +9859,7 @@ body::-webkit-scrollbar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: rgba(10, 20, 40, 0.88);
+  background: var(--color-bg-secondary);
   border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
@@ -9910,7 +9910,7 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-secondary);
 }
 
 .sidebar-header-actions {
@@ -9946,7 +9946,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--tile-radius-xs);
   color: #8b949e;
@@ -9955,7 +9955,7 @@ body::-webkit-scrollbar {
 }
 
 .agent-collapsed-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   color: #e6edf3;
 }
 
@@ -9977,7 +9977,7 @@ body::-webkit-scrollbar {
 
 .agent-item {
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--tile-radius);
   cursor: pointer;
@@ -9985,7 +9985,7 @@ body::-webkit-scrollbar {
 }
 
 .agent-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-bg-hover);
   border-color: var(--color-border-subtle);
 }
 
@@ -10036,7 +10036,7 @@ body::-webkit-scrollbar {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   margin-left: 8px;
 }
 
@@ -10152,7 +10152,7 @@ body::-webkit-scrollbar {
 }
 
 .icon-btn-small {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   border: none;
   border-radius: var(--tile-radius-xs);
   font-size: 14px;
@@ -10163,7 +10163,7 @@ body::-webkit-scrollbar {
 }
 
 .icon-btn-small:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   color: #e6edf3;
   transform: translateY(-1px);
 }
@@ -10205,7 +10205,7 @@ body::-webkit-scrollbar {
 }
 
 .tree-node-content:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-hover);
 }
 
 .tree-node-icon {
@@ -10334,7 +10334,7 @@ body::-webkit-scrollbar {
 .session-list {
   max-height: 300px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
   border: none;
   margin-bottom: 20px;
@@ -10370,7 +10370,7 @@ body::-webkit-scrollbar {
 }
 
 .session-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
 }
 
 .session-item.selected {
@@ -10425,7 +10425,7 @@ body::-webkit-scrollbar {
 .path-btn {
   flex: 1;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   color: #e6edf3;
   border: none;
   border-radius: var(--tile-radius-xs);
@@ -10434,13 +10434,13 @@ body::-webkit-scrollbar {
 }
 
 .path-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-hover);
   transform: translateY(-1px);
 }
 
 .current-path {
   padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 13px;
@@ -10477,7 +10477,7 @@ body::-webkit-scrollbar {
 .dir-list {
   max-height: 350px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
   border: none;
   margin-bottom: 20px;
@@ -10510,7 +10510,7 @@ body::-webkit-scrollbar {
 }
 
 .dir-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
 }
 
 .dir-item.selected {
@@ -10552,7 +10552,7 @@ body::-webkit-scrollbar {
 
 .select-dir-btn {
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   color: #e6edf3;
   border: none;
   border-radius: var(--tile-radius-xs);
@@ -10562,7 +10562,7 @@ body::-webkit-scrollbar {
 }
 
 .select-dir-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-hover);
   transform: translateY(-1px);
 }
 
@@ -10586,11 +10586,11 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: rgba(10, 20, 40, 0.45);
+  background: var(--color-bg-tile);
 }
 
 .message {
-  background: rgba(14, 24, 50, 0.55);
+  background: var(--color-bg-tile);
   border-radius: var(--tile-radius);
   padding: 6px 10px;
   border: none;
@@ -10788,7 +10788,7 @@ body::-webkit-scrollbar {
   padding: 12px;
   border: none;
   border-radius: 10px;
-  background: rgba(13, 17, 23, 0.35);
+  background: var(--color-bg-tertiary);
 }
 
 .message-body.markdown-content :deep(.plantuml-notice) {
@@ -10830,7 +10830,7 @@ body::-webkit-scrollbar {
   padding: 12px;
   border: none;
   border-radius: 10px;
-  background: rgba(13, 17, 23, 0.35);
+  background: var(--color-bg-tertiary);
 }
 
 .message-body.markdown-content :deep(.diagram-notice) {
@@ -10913,12 +10913,12 @@ body::-webkit-scrollbar {
 }
 
 .message-body.markdown-content :deep(table:not(.diff-table) th) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   font-weight: 600;
 }
 
 .message-body.markdown-content :deep(table:not(.diff-table) tr:nth-child(even)) {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-secondary);
 }
 
 /* 终端 */
@@ -11560,7 +11560,7 @@ body::-webkit-scrollbar {
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   border: none;
   border-radius: var(--tile-radius);
   font-size: 22px;
@@ -11898,7 +11898,7 @@ body::-webkit-scrollbar {
   padding: 0 32px 0 12px;
   border: none;
   border-radius: var(--tile-radius);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-hover);
   color: #e5e7eb;
   font-size: 13px;
   line-height: 32px;
@@ -11929,7 +11929,7 @@ body::-webkit-scrollbar {
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -11990,7 +11990,7 @@ body::-webkit-scrollbar {
   position: absolute;
   top: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-hover);
   border: none;
   border-radius: var(--tile-radius-xs);
   padding: 4px 8px;
@@ -12010,7 +12010,7 @@ body::-webkit-scrollbar {
 }
 
 .copy-message-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-tertiary);
   color: #e6edf3;
 }
 
@@ -12748,7 +12748,7 @@ body::-webkit-scrollbar {
 }
 
 .rules-table tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-bg-secondary);
 }
 
 .rule-loaded {
@@ -12775,7 +12775,7 @@ body::-webkit-scrollbar {
 }
 
 .rules-loaded-content {
-  background: rgba(22, 27, 34, 0.4);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius-xs);
   padding: 12px;
