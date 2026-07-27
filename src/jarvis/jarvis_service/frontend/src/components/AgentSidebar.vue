@@ -221,8 +221,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
 <style scoped>
 .icon-btn {
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   font-size: 18px;
   cursor: pointer;
   padding: 0;
@@ -261,7 +261,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
   width: 320px;
   min-width: 0;
   background: var(--color-bg-secondary);
-  border-right: 0.5px solid var(--color-border);
+  border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -307,7 +307,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 .agent-sidebar-header {
   padding: 12px;
-  border-bottom: 0.5px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -348,8 +348,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
   gap: 6px;
   padding: 6px 8px;
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-text-secondary);
   cursor: pointer;
   text-align: left;
@@ -379,8 +379,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
 .agent-item {
   padding: 6px;
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   cursor: pointer;
   position: relative;
 }
@@ -419,7 +419,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
   align-items: center;
   padding: 12px;
   background: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
   gap: 12px;
 }
 
@@ -501,27 +501,27 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 .agent-status-dot.running {
   background: #3fb950;
-  box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
+  box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.stopped {
   background: #f85149;
-  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
+  box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_multi {
   background: #d29922;
-  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+  box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_single {
   background: #d29922;
-  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+  box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_confirm {
   background: #d29922;
-  box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
+  box-shadow: var(--tile-shadow);
 }
 
 .agent-llm-group {
@@ -566,8 +566,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 .icon-btn-small {
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 4px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 12px;
   cursor: pointer;
   padding: 3px 6px;
@@ -607,20 +607,20 @@ watch(() => props.currentAgentId, (newAgentId) => {
 .agent-node-label {
   font-size: 11px;
   padding: 1px 6px;
-  border-radius: 10px;
+  border-radius: var(--tile-radius);
   background: var(--color-bg-hover);
   color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   margin-left: 4px;
 }
 
 .agent-proxy-node-label {
   font-size: 11px;
   padding: 1px 6px;
-  border-radius: 10px;
+  border-radius: var(--tile-radius);
   background: rgba(56, 132, 255, 0.1); /* 浅蓝色背景 */
   color: #3884ff; /* 蓝色文字 */
-  border: 1px solid rgba(56, 132, 255, 0.2);
+  border: none;
   margin-left: 4px;
 }
 </style>

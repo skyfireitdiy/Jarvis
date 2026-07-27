@@ -96,8 +96,8 @@ defineExpose({
 
 .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
   width: 100%;
 }
@@ -145,8 +145,8 @@ defineExpose({
   padding: 8px 12px;
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 13px;
   cursor: pointer;
 }
@@ -176,8 +176,8 @@ defineExpose({
   width: 100%;
   padding: 12px 16px;
   background: var(--color-bg-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -196,8 +196,8 @@ defineExpose({
   max-height: 350px;
   overflow-y: auto;
   background: var(--color-bg-primary);
-  border-radius: 8px;
-  border: 0.5px solid var(--color-border);
+  border-radius: var(--tile-radius);
+  border: none;
   margin-bottom: 20px;
 }
 
@@ -206,7 +206,7 @@ defineExpose({
   align-items: center;
   padding: 12px 14px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin: 4px;
 }
 
@@ -255,8 +255,8 @@ defineExpose({
 
 .btn {
   padding: 10px 20px;
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

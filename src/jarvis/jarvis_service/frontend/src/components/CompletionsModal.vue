@@ -90,8 +90,8 @@ defineExpose({
 
 .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
   width: 100%;
 }
@@ -138,8 +138,8 @@ defineExpose({
   width: 100%;
   padding: 12px 16px;
   background: var(--color-bg-primary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 9px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -154,8 +154,8 @@ defineExpose({
   flex: 1;
   overflow-y: auto;
   max-height: 400px;
-  border: 0.5px solid var(--color-border);
-  border-radius: 10px;
+  border: none;
+  border-radius: var(--tile-radius);
   background: var(--color-bg-primary);
 }
 
@@ -164,7 +164,7 @@ defineExpose({
   flex-direction: column;
   gap: 4px;
   padding: 12px 16px;
-  border-bottom: 0.5px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   cursor: pointer;
 }
 
@@ -215,7 +215,7 @@ defineExpose({
   background-color: var(--color-error);
   color: var(--color-text-primary);
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin-bottom: 16px;
   font-size: 14px;
   text-align: center;

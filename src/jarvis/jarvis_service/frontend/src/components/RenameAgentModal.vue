@@ -62,8 +62,8 @@ watch(() => props.visible, async (newVal) => {
 /* 模态框基础样式 */
 .modal-overlay .modal {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 14px;
+  border: none;
+  border-radius: var(--tile-radius-sm);
   padding: 28px;
 }
 
@@ -91,8 +91,8 @@ watch(() => props.visible, async (newVal) => {
   width: 100%;
   padding: 10px 12px;
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: var(--color-text-primary);
   font-size: 14px;
 }
@@ -112,7 +112,7 @@ watch(() => props.visible, async (newVal) => {
 .create-agent-modal .btn {
   flex: 1;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

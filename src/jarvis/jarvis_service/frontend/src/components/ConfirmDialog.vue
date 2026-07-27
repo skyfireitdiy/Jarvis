@@ -89,7 +89,7 @@ onUnmounted(() => {
 <style scoped>
 .message-confirm {
   background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-accent-subtle);
+  border: none;
 }
 
 .confirm-box {
@@ -112,29 +112,29 @@ onUnmounted(() => {
 
 .confirm-btn {
   padding: 9px 18px;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  border: 0.5px solid var(--color-border);
+  border: none;
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
 }
 
 .confirm-btn:hover {
   background: var(--color-bg-hover);
-  border-color: var(--color-border);
+  border-color: var(--color-border-subtle);
   transform: translateY(-1px);
 }
 
 .confirm-btn.default {
   background: #238636;
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-border-subtle);
   font-weight: 700;
 }
 
 .confirm-btn.default:hover {
   background: #2ea043;
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: var(--color-border-subtle);
 }
 </style>

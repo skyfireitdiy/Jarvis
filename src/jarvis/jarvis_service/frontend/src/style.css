@@ -1,13 +1,14 @@
-/* Jarvis 蓝色科技风主题 */
+/* Jarvis 磁贴风格主题 */
 :root {
   color-scheme: dark;
   font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
 
-  /* 主色调 - 深蓝科技 */
-  --color-bg-primary: #050a18;
-  --color-bg-secondary: #0a1228;
-  --color-bg-tertiary: #0f1a38;
-  --color-bg-hover: #152548;
+  /* 主色调 - 深蓝磁贴 */
+  --color-bg-primary: #080e1e;
+  --color-bg-secondary: #0d1630;
+  --color-bg-tertiary: #121f42;
+  --color-bg-hover: #182a52;
+  --color-bg-tile: #111c3a;
 
   /* 文字颜色 */
   --color-text-primary: #e8f0ff;
@@ -16,7 +17,7 @@
 
   /* 强调色 - 科技蓝 */
   --color-accent: #00d4ff;
-  --color-accent-glow: rgba(0, 212, 255, 0.5);
+  --color-accent-glow: rgba(0, 212, 255, 0.3);
   --color-accent-subtle: rgba(0, 212, 255, 0.12);
   --color-accent-secondary: #4d9fff;
 
@@ -26,9 +27,18 @@
   --color-error: #ff4757;
   --color-info: #00d4ff;
 
-  /* 边框 */
-  --color-border: rgba(0, 212, 255, 0.15);
-  --color-border-active: rgba(0, 212, 255, 0.6);
+  /* 边框 - 磁贴风格：几乎不可见，仅focus时显示 */
+  --color-border: transparent;
+  --color-border-active: rgba(0, 212, 255, 0.5);
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+
+  /* 磁贴效果 */
+  --tile-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --tile-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --tile-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --tile-radius: 16px;
+  --tile-radius-sm: 12px;
+  --tile-radius-xs: 8px;
 
   /* 渐变 */
   --gradient-accent: linear-gradient(
@@ -37,7 +47,7 @@
     #4d9fff 50%,
     #00ff88 100%
   );
-  --gradient-bg: linear-gradient(180deg, #050a18 0%, #0a1228 50%, #0f1a38 100%);
+  --gradient-bg: linear-gradient(180deg, #080e1e 0%, #0d1630 50%, #121f42 100%);
   --gradient-blue: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
 
   color: var(--color-text-primary);
@@ -71,18 +81,17 @@ p {
   gap: 10px;
 }
 
-/* 头部样式 - 科技感 */
+/* 头部样式 - 磁贴 */
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tile);
   color: var(--color-text-primary);
   padding: 8px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-radius: var(--tile-radius);
+  border: none;
+  box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
 }
 
 .subtitle {
@@ -105,52 +114,48 @@ p {
   border-radius: 50%;
   display: inline-block;
   background: var(--color-text-muted);
-  box-shadow: 0 0 6px currentColor;
 }
 
 .dot.online {
   background: var(--color-success);
-  box-shadow: 0 0 8px var(--color-success);
   animation: pulse-green 2s infinite;
 }
 
 .dot.connecting {
   background: var(--color-warning);
-  box-shadow: 0 0 8px var(--color-warning);
   animation: pulse-yellow 1s infinite;
 }
 
 @keyframes pulse-green {
   0%,
   100% {
-    box-shadow: 0 0 8px var(--color-success);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 16px var(--color-success);
+    opacity: 0.6;
   }
 }
 
 @keyframes pulse-yellow {
   0%,
   100% {
-    box-shadow: 0 0 8px var(--color-warning);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 16px var(--color-warning);
+    opacity: 0.6;
   }
 }
 
-/* 面板样式 - 玻璃态 */
+/* 面板样式 - 磁贴 */
 .panel {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tile);
   padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: var(--tile-radius);
+  border: none;
+  box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  backdrop-filter: blur(10px);
 }
 
 .field {
@@ -163,8 +168,8 @@ p {
 input,
 textarea {
   background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-xs);
   padding: 8px 12px;
   font-size: 14px;
   color: var(--color-text-primary);
@@ -179,50 +184,48 @@ textarea::placeholder {
 
 input:focus,
 textarea:focus {
-  border-color: var(--color-accent);
-  box-shadow:
-    0 0 0 3px var(--color-accent-subtle),
-    0 0 20px var(--color-accent-glow);
+  border-color: var(--color-border-active);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
-/* 按钮样式 - 科技感 */
+/* 按钮样式 - 磁贴 */
 button {
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   padding: 8px 14px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
 }
 
 button.primary {
   background: var(--color-accent);
-  color: #ffffff;
-  box-shadow: 0 4px 15px var(--color-accent-glow);
+  color: #080e1e;
+  font-weight: 600;
+  box-shadow: var(--tile-shadow);
 }
 
 button.primary:hover {
-  background: #79b8ff;
-  box-shadow: 0 6px 25px var(--color-accent-glow);
-  transform: translateY(-1px);
+  background: #33ddff;
+  box-shadow: var(--tile-shadow-hover);
 }
 
 button.primary:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 button.ghost {
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  border: none;
+  box-shadow: var(--tile-shadow-inset);
 }
 
 button.ghost:hover {
   background: var(--color-bg-hover);
-  border-color: var(--color-accent);
 }
 
 button:disabled {
@@ -256,7 +259,7 @@ button:disabled {
 }
 
 .output-item {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding-bottom: 8px;
 }
 
@@ -272,7 +275,7 @@ button:disabled {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--tile-radius-xs);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
@@ -289,9 +292,9 @@ button:disabled {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   overflow: auto;
-  border: 1px solid var(--color-border);
+  border: none;
   font-family: "JetBrains Mono", "Fira Code", monospace;
   font-size: 13px;
 }
@@ -317,10 +320,10 @@ button:disabled {
 .terminal-host {
   height: 200px;
   background: var(--color-bg-primary);
-  border-radius: 8px;
+  border-radius: var(--tile-radius-sm);
   padding: 6px;
-  border: 1px solid var(--color-border);
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
+  border: none;
+  box-shadow: var(--tile-shadow-inset);
 }
 
 /* 滚动条全局样式 */
@@ -359,7 +362,6 @@ button:disabled {
   width: 32px;
   height: 32px;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px var(--color-accent-glow));
 }
 
 .header-brand {
@@ -370,5 +372,4 @@ button:disabled {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 0 20px var(--color-accent-glow);
 }

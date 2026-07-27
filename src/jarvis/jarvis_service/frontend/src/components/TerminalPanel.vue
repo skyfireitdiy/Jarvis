@@ -103,8 +103,8 @@ const emit = defineEmits([
 <style scoped>
 .icon-btn {
   background: var(--color-bg-tertiary);
-  border: 0.5px solid var(--color-border);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   font-size: 18px;
   cursor: pointer;
   padding: 0;
@@ -135,8 +135,8 @@ const emit = defineEmits([
 .terminal-panel {
   position: fixed;
   background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -152,8 +152,8 @@ const emit = defineEmits([
   align-items: center;
   padding: 6px 10px;
   background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
-  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-xs) var(--tile-radius-xs) 0 0;
   cursor: move;
   min-height: 32px;
 }
@@ -177,8 +177,8 @@ const emit = defineEmits([
   min-width: 168px;
   max-width: 240px;
   padding: 0 32px 0 12px;
-  border: 0.5px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
   font-size: 14px;
@@ -193,7 +193,7 @@ const emit = defineEmits([
 
 .terminal-node-select:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+  box-shadow: var(--tile-shadow);
   background: var(--color-bg-tertiary);
 }
 
@@ -212,7 +212,7 @@ const emit = defineEmits([
   gap: 2px;
   padding: 4px;
   background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .terminal-tab {
@@ -221,8 +221,8 @@ const emit = defineEmits([
   gap: 6px;
   padding: 6px 12px;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 12px;
   color: var(--color-text-secondary);
   cursor: pointer;

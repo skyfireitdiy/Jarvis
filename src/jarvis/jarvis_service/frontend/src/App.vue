@@ -9034,7 +9034,7 @@ body::-webkit-scrollbar {
   padding: 10px 16px;
   padding-top: calc(10px + env(safe-area-inset-top, 0px));
   background: var(--color-bg-secondary);
-  border-bottom: 0.5px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 
@@ -9071,7 +9071,7 @@ body::-webkit-scrollbar {
 .editor-panel {
   position: fixed;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   display: flex;
@@ -9089,7 +9089,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
   cursor: move;
   gap: 8px;
@@ -9140,7 +9140,7 @@ body::-webkit-scrollbar {
   min-width: 0;
   max-width: 220px;
   padding: 6px 10px;
-  border: 1px solid var(--color-border);
+  border: none;
   border-bottom: none;
   border-radius: 6px 6px 0 0;
   background: var(--color-bg-tertiary);
@@ -9183,8 +9183,8 @@ body::-webkit-scrollbar {
   gap: 8px;
   min-height: 30px;
   padding: 0 10px;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-secondary);
 }
 
@@ -9207,14 +9207,14 @@ body::-webkit-scrollbar {
   gap: 6px;
   padding: 5px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease-out;
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
-  backdrop-filter: blur(20px);
+
 }
 
 .editor-edit-toggle:hover {
@@ -9257,7 +9257,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
   padding: 8px 4px;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
 }
 
@@ -9270,7 +9270,7 @@ body::-webkit-scrollbar {
   padding: 0;
   line-height: 1;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -9291,7 +9291,7 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
 }
 
@@ -9301,7 +9301,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .editor-sidebar-title {
@@ -9341,7 +9341,7 @@ body::-webkit-scrollbar {
 
 /* Agent 节点样式 */
 .editor-agent-node {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .editor-agent-node.selected {
@@ -9353,7 +9353,7 @@ body::-webkit-scrollbar {
 }
 
 .stopped-agents-group {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .stopped-agents-header {
@@ -9386,7 +9386,7 @@ body::-webkit-scrollbar {
 }
 
 .stopped-agents-list {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .editor-agent-node.stopped {
@@ -9427,7 +9427,7 @@ body::-webkit-scrollbar {
 }
 
 .agent-file-tree {
-  border-left: 2px solid var(--color-border);
+  border-left: 2px solid var(--color-border-subtle);
   margin-left: 12px;
 }
 
@@ -9454,14 +9454,14 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .editor-global-search-input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   font-size: 12px;
@@ -9543,8 +9543,8 @@ body::-webkit-scrollbar {
   display: flex;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   text-align: left;
@@ -9701,8 +9701,8 @@ body::-webkit-scrollbar {
   gap: 12px;
   padding: 6px 16px;
   background: rgba(35, 134, 54, 0.15);
-  border: 1px solid rgba(56, 139, 253, 0.2);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 13px;
 }
 
@@ -9752,8 +9752,8 @@ body::-webkit-scrollbar {
 
 .icon-btn {
   background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   font-size: 18px;
   cursor: pointer;
   padding: 0;
@@ -9783,8 +9783,8 @@ body::-webkit-scrollbar {
 
 .manual-interrupt-btn {
   background: #f0883e;
-  border: 0.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
@@ -9819,7 +9819,7 @@ body::-webkit-scrollbar {
   padding: 4px 10px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 20px;
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  border: none;
 }
 
 .dot {
@@ -9860,7 +9860,7 @@ body::-webkit-scrollbar {
   width: 320px;
   min-width: 0;
   background: rgba(22, 27, 34, 0.95);
-  border-right: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -9906,7 +9906,7 @@ body::-webkit-scrollbar {
 
 .agent-sidebar-header {
   padding: 12px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -9947,8 +9947,8 @@ body::-webkit-scrollbar {
   gap: 6px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.02);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: #8b949e;
   cursor: pointer;
   text-align: left;
@@ -9978,25 +9978,25 @@ body::-webkit-scrollbar {
 .agent-item {
   padding: 12px;
   background: rgba(255, 255, 255, 0.03);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   cursor: pointer;
   position: relative;
 }
 
 .agent-item:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-border-subtle);
 }
 
 .agent-item.active {
   background: rgba(56, 139, 253, 0.15);
-  border-color: rgba(56, 139, 253, 0.4);
+  border-color: var(--color-accent);
 }
 
 .agent-item.selected {
   background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+  border-color: var(--color-accent-secondary);
 }
 
 .agent-checkbox {
@@ -10018,7 +10018,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 12px;
   background: rgba(22, 27, 34, 0.9);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--color-border-subtle);
   gap: 12px;
 }
 
@@ -10153,8 +10153,8 @@ body::-webkit-scrollbar {
 
 .icon-btn-small {
   background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
@@ -10180,7 +10180,7 @@ body::-webkit-scrollbar {
 .agent-actions .icon-btn-small.stop-btn:hover {
   background: rgba(248, 81, 73, 0.2);
   color: #f85149;
-  border-color: rgba(248, 81, 73, 0.3);
+  border-color: var(--color-error);
 }
 
 .agent-empty {
@@ -10257,7 +10257,7 @@ body::-webkit-scrollbar {
 
 .tree-children {
   margin-left: 16px;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--color-border-subtle);
   padding-left: 4px;
 }
 
@@ -10273,8 +10273,8 @@ body::-webkit-scrollbar {
 .tree-loading-icon {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(139, 148, 158, 0.3);
-  border-top-color: #8b949e;
+  border: 2px solid var(--color-border-subtle);
+  border-top-color: var(--color-text-secondary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -10335,8 +10335,8 @@ body::-webkit-scrollbar {
   max-height: 300px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--tile-radius);
+  border: none;
   margin-bottom: 20px;
 }
 
@@ -10359,9 +10359,9 @@ body::-webkit-scrollbar {
 
 .session-item {
   padding: 12px 14px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin: 4px;
 }
 
@@ -10375,7 +10375,7 @@ body::-webkit-scrollbar {
 
 .session-item.selected {
   background: rgba(63, 185, 80, 0.15);
-  border-color: rgba(63, 185, 80, 0.3);
+  border-color: var(--color-success);
 }
 
 .session-item.selected:hover {
@@ -10427,8 +10427,8 @@ body::-webkit-scrollbar {
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.1);
   color: #e6edf3;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 13px;
   cursor: pointer;
 }
@@ -10441,7 +10441,7 @@ body::-webkit-scrollbar {
 .current-path {
   padding: 12px 14px;
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 13px;
   color: #e6edf3;
@@ -10458,7 +10458,7 @@ body::-webkit-scrollbar {
   width: 100%;
   padding: 12px 16px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
@@ -10466,7 +10466,7 @@ body::-webkit-scrollbar {
 
 .dir-search-input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background: rgba(13, 17, 23, 0.9);
 }
 
@@ -10478,8 +10478,8 @@ body::-webkit-scrollbar {
   max-height: 350px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--tile-radius);
+  border: none;
   margin-bottom: 20px;
 }
 
@@ -10505,7 +10505,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 12px 14px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin: 4px;
 }
 
@@ -10515,7 +10515,7 @@ body::-webkit-scrollbar {
 
 .dir-item.selected {
   background: rgba(63, 185, 80, 0.15);
-  border-color: rgba(63, 185, 80, 0.3);
+  border-color: var(--color-success);
 }
 
 .dir-item.selected:hover {
@@ -10554,8 +10554,8 @@ body::-webkit-scrollbar {
   padding: 10px 16px;
   background: rgba(255, 255, 255, 0.1);
   color: #e6edf3;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -10590,22 +10590,22 @@ body::-webkit-scrollbar {
 
 .message {
   background: rgba(22, 27, 34, 0.75);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   padding: 6px 10px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .message:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-border-subtle);
 }
 
 /* 用户输入消息 - 右对齐样式（必须放在 .message 之后以覆盖） */
 .message.message-user_input {
   background: #1f6feb !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.2) !important;
+  border: none !important;
   align-self: flex-end;
   max-width: 75%;
 }
@@ -10705,10 +10705,10 @@ body::-webkit-scrollbar {
   padding: 3px 8px;
   background: rgba(33, 38, 45, 0.8);
   color: #8b949e;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  border: none;
 }
 
 .message-meta-left .agent-name {
@@ -10741,7 +10741,7 @@ body::-webkit-scrollbar {
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 500;
-  border-radius: 12px;
+  border-radius: var(--tile-radius-sm);
   background: #21262d;
   color: #8b949e;
 }
@@ -10760,8 +10760,8 @@ body::-webkit-scrollbar {
 .message-body.markdown-content :deep(pre) {
   background: rgba(13, 17, 23, 0.9);
   padding: 14px;
-  border-radius: 8px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--tile-radius);
+  border: none;
   overflow-x: auto;
   margin: 10px 0;
 }
@@ -10772,7 +10772,7 @@ body::-webkit-scrollbar {
   border-radius: 5px;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 12px;
-  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  border: none;
 }
 
 .message-body.markdown-content :deep(p) {
@@ -10785,7 +10785,7 @@ body::-webkit-scrollbar {
   gap: 10px;
   margin: 12px 0;
   padding: 12px;
-  border: 1px solid rgba(139, 148, 158, 0.25);
+  border: none;
   border-radius: 10px;
   background: rgba(13, 17, 23, 0.35);
 }
@@ -10812,7 +10812,7 @@ body::-webkit-scrollbar {
   max-width: 100%;
   height: auto;
   background: #ffffff;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
 }
 
 .message-body.markdown-content :deep(.plantuml-source summary) {
@@ -10827,7 +10827,7 @@ body::-webkit-scrollbar {
   gap: 10px;
   margin: 12px 0;
   padding: 12px;
-  border: 1px solid rgba(139, 148, 158, 0.25);
+  border: none;
   border-radius: 10px;
   background: rgba(13, 17, 23, 0.35);
 }
@@ -10854,7 +10854,7 @@ body::-webkit-scrollbar {
   max-width: 100%;
   height: auto;
   background: #ffffff;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
 }
 
 .message-body.markdown-content :deep(.diagram-source summary) {
@@ -10901,12 +10901,12 @@ body::-webkit-scrollbar {
   border-collapse: collapse;
   width: 100%;
   margin: 12px 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: none;
 }
 
 .message-body.markdown-content :deep(table:not(.diff-table) th),
 .message-body.markdown-content :deep(table:not(.diff-table) td) {
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: none;
   padding: 8px 12px;
   text-align: left;
 }
@@ -10923,7 +10923,7 @@ body::-webkit-scrollbar {
 /* 终端 */
 .terminal-wrapper {
   margin-top: 14px;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 10px;
   overflow: hidden;
   max-height: 600px;
@@ -10946,7 +10946,7 @@ body::-webkit-scrollbar {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 10px;
   overflow: hidden;
   display: flex;
@@ -10958,7 +10958,7 @@ body::-webkit-scrollbar {
 .terminal-history-header {
   padding: 10px 16px;
   background: rgba(22, 27, 34, 0.9);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   color: #8b949e;
   font-size: 13px;
   font-weight: 500;
@@ -10990,7 +10990,7 @@ body::-webkit-scrollbar {
 /* 输入区 */
 .input-area {
   background: rgba(22, 27, 34, 0.9);
-  border-top: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-top: 0.5px solid var(--color-border-subtle);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   flex-shrink: 0;
 }
@@ -11024,7 +11024,7 @@ body::-webkit-scrollbar {
   min-width: 0;
   padding: 11px 15px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 10px;
   color: #e6edf3;
   font-size: 14px;
@@ -11032,7 +11032,7 @@ body::-webkit-scrollbar {
 
 .input-wrapper.single-line input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background: rgba(13, 17, 23, 0.9);
 }
 
@@ -11049,8 +11049,8 @@ body::-webkit-scrollbar {
 
 .send-btn {
   background: #238636;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -11075,8 +11075,8 @@ body::-webkit-scrollbar {
 
 .complete-btn {
   background: #0969da;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -11105,7 +11105,7 @@ body::-webkit-scrollbar {
   min-height: 120px;
   max-height: 300px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 10px;
   padding: 14px;
   color: #e6edf3;
@@ -11117,7 +11117,7 @@ body::-webkit-scrollbar {
 
 .input-wrapper textarea:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background: rgba(13, 17, 23, 0.9);
 }
 
@@ -11129,8 +11129,8 @@ body::-webkit-scrollbar {
   gap: 10px;
   padding: 12px 16px;
   background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   margin: 8px 0;
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -11138,8 +11138,8 @@ body::-webkit-scrollbar {
 .thinking-spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  border-top-color: #3b82f6;
+  border: 2px solid var(--color-accent-subtle);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -11175,15 +11175,15 @@ body::-webkit-scrollbar {
   gap: 8px;
   padding: 10px 14px;
   background: rgba(35, 134, 54, 0.15);
-  border: 1px solid rgba(35, 134, 54, 0.4);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   margin: 8px 0;
   cursor: pointer;
 }
 
 .buffer-indicator:hover {
   background: rgba(35, 134, 54, 0.25);
-  border-color: rgba(35, 134, 54, 0.6);
+  border-color: var(--color-success);
   transform: translateY(-1px);
 }
 
@@ -11223,7 +11223,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 12px 16px;
   background: rgba(35, 134, 54, 0.1);
-  border-bottom: 1px solid rgba(48, 54, 61, 0.6);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .buffer-panel-title {
@@ -11243,8 +11243,8 @@ body::-webkit-scrollbar {
 .buffer-panel-btn {
   padding: 6px 12px;
   background: rgba(48, 54, 61, 0.8);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: #8b949e;
   font-size: 13px;
   font-weight: 500;
@@ -11254,13 +11254,13 @@ body::-webkit-scrollbar {
 
 .buffer-panel-btn:hover {
   background: rgba(56, 139, 253, 0.15);
-  border-color: rgba(56, 139, 253, 0.5);
+  border-color: var(--color-accent);
   color: #58a6ff;
 }
 
 .buffer-panel-btn.close-btn:hover {
   background: rgba(248, 81, 73, 0.15);
-  border-color: rgba(248, 81, 73, 0.5);
+  border-color: var(--color-error);
   color: #f85149;
 }
 
@@ -11292,7 +11292,7 @@ body::-webkit-scrollbar {
 .buffer-panel-footer {
   padding: 12px 16px;
   background: rgba(13, 17, 23, 0.6);
-  border-top: 1px solid rgba(48, 54, 61, 0.6);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   justify-content: flex-end;
 }
@@ -11300,8 +11300,8 @@ body::-webkit-scrollbar {
 .buffer-save-btn {
   padding: 8px 16px;
   background: rgba(56, 139, 253, 0.15);
-  border: 1px solid rgba(56, 139, 253, 0.5);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: #58a6ff;
   font-size: 13px;
   font-weight: 600;
@@ -11311,7 +11311,7 @@ body::-webkit-scrollbar {
 
 .buffer-save-btn:hover:not(:disabled) {
   background: rgba(56, 139, 253, 0.25);
-  border-color: rgba(56, 139, 253, 0.8);
+  border-color: var(--color-accent);
   transform: translateY(-1px);
 }
 
@@ -11331,7 +11331,7 @@ body::-webkit-scrollbar {
     width: 100%;
     max-width: 100%;
     max-height: min(80vh, 100%);
-    border-radius: 12px;
+    border-radius: var(--tile-radius-sm);
   }
 
   .buffer-panel-header {
@@ -11373,8 +11373,8 @@ body::-webkit-scrollbar {
 .action-btn {
   padding: 11px 20px;
   background: rgba(48, 54, 61, 0.8);
-  border: 1px solid #30363d;
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #8b949e;
   font-size: 14px;
   font-weight: 600;
@@ -11384,7 +11384,7 @@ body::-webkit-scrollbar {
 
 .action-btn:hover {
   background: rgba(56, 139, 253, 0.15);
-  border-color: #58a6ff;
+  border-color: var(--color-accent);
   color: #58a6ff;
   transform: translateY(-1px);
 }
@@ -11395,7 +11395,7 @@ body::-webkit-scrollbar {
 
 .clear-buffer-btn:hover {
   background: rgba(248, 81, 73, 0.15);
-  border-color: #f85149;
+  border-color: var(--color-error);
   color: #f85149;
 }
 
@@ -11409,8 +11409,8 @@ body::-webkit-scrollbar {
 .cancel-btn {
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid #30363d;
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   color: #8b949e;
   font-size: 14px;
   font-weight: 500;
@@ -11431,7 +11431,7 @@ body::-webkit-scrollbar {
   padding: 8px;
   background: #f85149;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   color: #ffffff;
   font-size: 14px;
   font-weight: 500;
@@ -11459,7 +11459,7 @@ body::-webkit-scrollbar {
 
 .modal {
   background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 14px;
   padding: 28px;
   width: 100%;
@@ -11502,7 +11502,7 @@ body::-webkit-scrollbar {
   width: 100%;
   padding: 11px 14px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
@@ -11510,7 +11510,7 @@ body::-webkit-scrollbar {
 
 .form-group input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background: rgba(13, 17, 23, 0.9);
 }
 
@@ -11518,7 +11518,7 @@ body::-webkit-scrollbar {
   width: 100%;
   padding: 11px 14px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
@@ -11532,7 +11532,7 @@ body::-webkit-scrollbar {
 
 .form-group select:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background-color: rgba(13, 17, 23, 0.9);
 }
 
@@ -11560,8 +11560,8 @@ body::-webkit-scrollbar {
 
 .close-btn {
   background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   font-size: 22px;
   color: #8b949e;
   cursor: pointer;
@@ -11589,7 +11589,7 @@ body::-webkit-scrollbar {
 .primary-btn {
   padding: 10px 20px;
   background: #238636;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border: none;
   border-radius: 9px;
   color: #ffffff;
   font-size: 14px;
@@ -11614,7 +11614,7 @@ body::-webkit-scrollbar {
 .danger-btn {
   padding: 10px 20px;
   background: #f85149;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border: none;
   border-radius: 9px;
   color: #ffffff;
   font-size: 14px;
@@ -11642,7 +11642,7 @@ body::-webkit-scrollbar {
 .ghost-btn {
   padding: 10px 20px;
   background: rgba(33, 38, 45, 0.5);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
@@ -11652,7 +11652,7 @@ body::-webkit-scrollbar {
 
 .ghost-btn:hover {
   background: rgba(48, 54, 61, 0.7);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-border-subtle);
   transform: translateY(-1px);
 }
 
@@ -11730,13 +11730,13 @@ body::-webkit-scrollbar {
 .completion-btn {
   min-width: 44px;
   background: rgba(88, 166, 255, 0.1);
-  border-color: rgba(88, 166, 255, 0.3);
+  border-color: var(--color-accent-subtle);
   color: #58a6ff;
 }
 
 .completion-btn:hover:not(:disabled) {
   background: rgba(88, 166, 255, 0.2);
-  border-color: #58a6ff;
+  border-color: var(--color-accent);
 }
 
 .completion-btn:disabled {
@@ -11766,7 +11766,7 @@ body::-webkit-scrollbar {
   width: 100%;
   padding: 12px 16px;
   background: rgba(13, 17, 23, 0.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 9px;
   color: #e6edf3;
   font-size: 14px;
@@ -11774,7 +11774,7 @@ body::-webkit-scrollbar {
 
 .completions-search input:focus {
   outline: none;
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: var(--color-accent);
   background: rgba(13, 17, 23, 0.9);
 }
 
@@ -11782,7 +11782,7 @@ body::-webkit-scrollbar {
   flex: 1;
   overflow-y: auto;
   max-height: 400px;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 10px;
   background: rgba(13, 17, 23, 0.6);
 }
@@ -11792,7 +11792,7 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 4px;
   padding: 12px 16px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   cursor: pointer;
 }
 
@@ -11843,7 +11843,7 @@ body::-webkit-scrollbar {
   background-color: #f85149;
   color: white;
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--tile-radius-xs);
   margin-bottom: 16px;
   font-size: 14px;
   text-align: center;
@@ -11853,8 +11853,8 @@ body::-webkit-scrollbar {
 .terminal-panel {
   position: fixed;
   background: rgba(13, 17, 23, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -11870,7 +11870,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 6px 10px;
   background: rgba(22, 27, 34, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--color-border-subtle);
   border-radius: 6px 6px 0 0;
   cursor: move;
   min-height: 32px;
@@ -11895,8 +11895,8 @@ body::-webkit-scrollbar {
   min-width: 168px;
   max-width: 240px;
   padding: 0 32px 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   background: rgba(255, 255, 255, 0.08);
   color: #e5e7eb;
   font-size: 13px;
@@ -11907,11 +11907,11 @@ body::-webkit-scrollbar {
 
 .terminal-node-select:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-border-subtle);
 }
 
 .terminal-node-select:focus {
-  border-color: rgba(96, 165, 250, 0.9);
+  border-color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
 }
 
@@ -11929,7 +11929,7 @@ body::-webkit-scrollbar {
   gap: 2px;
   padding: 4px;
   background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .terminal-tab {
@@ -11938,7 +11938,7 @@ body::-webkit-scrollbar {
   gap: 6px;
   padding: 6px 12px;
   background: rgba(48, 54, 61, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 4px;
   font-size: 12px;
   color: #8b949e;
@@ -11953,7 +11953,7 @@ body::-webkit-scrollbar {
 .terminal-tab.active {
   background: rgba(56, 139, 253, 0.2);
   color: #58a6ff;
-  border-color: rgba(56, 139, 253, 0.3);
+  border-color: var(--color-accent-subtle);
 }
 
 .terminal-tab-title {
@@ -11990,8 +11990,8 @@ body::-webkit-scrollbar {
   top: 0;
   right: 0;
   background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   padding: 4px 8px;
   color: #8b949e;
   opacity: 0;
@@ -12023,13 +12023,13 @@ body::-webkit-scrollbar {
   gap: 8px;
   padding: 12px 16px;
   background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: none;
+  border-radius: var(--tile-radius);
   color: #e6edf3;
   font-size: 14px;
   z-index: 9999;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+
 }
 
 .toast-icon {
@@ -12445,7 +12445,7 @@ body::-webkit-scrollbar {
   .modal {
     padding: 20px;
     max-width: 95%;
-    border-radius: 12px;
+    border-radius: var(--tile-radius-sm);
   }
   
   .modal-header h2,
@@ -12485,20 +12485,15 @@ body::-webkit-scrollbar {
   gap: 16px;
   padding: 16px 20px;
   background: rgba(28, 28, 30, 0.6);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  outline: 1px solid rgba(113, 113, 122, 0.4);
-  outline-offset: -1px;
-  border-radius: 16px;
+  border: none;
+  border-radius: var(--tile-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toggle-wrapper:hover {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border-color: rgba(0, 122, 255, 0.3);
+
+  border-color: var(--color-border-subtle);
   outline-color: rgba(0, 122, 255, 0.4);
 }
 
@@ -12533,11 +12528,9 @@ body::-webkit-scrollbar {
   right: 0;
   bottom: 0;
   background-color: rgba(28, 28, 30, 0.6);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border-radius: 15px;
+  border: none;
+  box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
+  border-radius: var(--tile-radius);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   /* 外描边效果 */
@@ -12553,17 +12546,17 @@ body::-webkit-scrollbar {
   left: 3px;
   bottom: 3px;
   background-color: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+
+
   border-radius: 50%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: none;
 }
 
 .toggle-input:checked + .toggle-slider {
   background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
-  border-color: rgba(0, 122, 255, 0.6);
+  border-color: var(--color-border-active);
   box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   outline-color: rgba(0, 122, 255, 0.5);
 }
@@ -12572,13 +12565,12 @@ body::-webkit-scrollbar {
   transform: translateX(22px);
   background-color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 122, 255, 0.3);
+  border-color: var(--color-border-subtle);
 }
 
 /* Hover 状态 */
 .toggle-switch:hover .toggle-slider {
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
+
 }
 
 
@@ -12651,7 +12643,7 @@ body::-webkit-scrollbar {
 
 .diff-modal {
   background: rgba(22, 27, 34, 0.95);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: none;
   border-radius: 14px;
   width: 100%;
   max-width: 90vw;
@@ -12666,7 +12658,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0.5px solid var(--color-border-subtle);
   background: rgba(22, 27, 34, 0.98);
 }
 
@@ -12711,7 +12703,7 @@ body::-webkit-scrollbar {
   margin: 0;
   padding: 16px;
   background: rgba(13, 17, 23, 0.8);
-  border-radius: 8px;
+  border-radius: var(--tile-radius);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
   line-height: 1.5;
@@ -12738,7 +12730,7 @@ body::-webkit-scrollbar {
 .rules-table td {
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 0.5px solid var(--color-border-subtle);
 }
 
 .rules-table th {
@@ -12769,7 +12761,7 @@ body::-webkit-scrollbar {
 .rules-loaded-content-section {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .rules-section-title {
@@ -12783,8 +12775,8 @@ body::-webkit-scrollbar {
 
 .rules-loaded-content {
   background: rgba(22, 27, 34, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
   padding: 12px;
   font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
   font-size: 12px;
