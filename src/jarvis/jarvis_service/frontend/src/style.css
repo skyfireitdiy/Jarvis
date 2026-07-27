@@ -17,8 +17,8 @@
 
   /* 强调色 - 冷钢蓝 */
   --color-accent: #4da6ff;
-  --color-accent-glow: rgba(77, 166, 255, 0.2);
-  --color-accent-subtle: rgba(77, 166, 255, 0.1);
+  --color-accent-glow: #1e3045;
+  --color-accent-subtle: #162838;
   --color-accent-secondary: #3d8bfd;
 
   /* 状态色 */
@@ -28,9 +28,9 @@
   --color-info: #4da6ff;
 
   /* 边框 - 金属线 */
-  --color-border: rgba(100, 140, 180, 0.15);
-  --color-border-active: rgba(77, 166, 255, 0.5);
-  --color-border-subtle: rgba(100, 140, 180, 0.1);
+  --color-border: #1e3045;
+  --color-border-active: #4da6ff;
+  --color-border-subtle: #182838;
 
   /* 金属质感效果 */
   --tile-shadow:
@@ -298,7 +298,7 @@ button:disabled {
 }
 
 .output-body pre {
-  background: rgba(6, 13, 31, 0.9);
+  background: var(--color-bg-primary);
   color: var(--color-text-primary);
   padding: 10px;
   border-radius: var(--tile-radius-xs);
@@ -328,7 +328,7 @@ button:disabled {
 /* 终端样式 */
 .terminal-host {
   height: 200px;
-  background: rgba(6, 13, 31, 0.9);
+  background: var(--color-bg-primary);
   border-radius: var(--tile-radius-sm);
   padding: 6px;
   border: none;
