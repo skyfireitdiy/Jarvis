@@ -101,6 +101,25 @@ p {
   border-radius: var(--tile-radius);
   border: none;
   box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Header 底部光线扫描 */
+.app-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -100%;
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    transparent
+  );
+  animation: header-scan 4s ease-in-out infinite;
 }
 
 .subtitle {
@@ -139,9 +158,11 @@ p {
   0%,
   100% {
     opacity: 1;
+    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4);
   }
   50% {
-    opacity: 0.6;
+    opacity: 0.8;
+    box-shadow: 0 0 6px 2px rgba(63, 185, 80, 0.2);
   }
 }
 
@@ -149,9 +170,11 @@ p {
   0%,
   100% {
     opacity: 1;
+    box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.4);
   }
   50% {
-    opacity: 0.6;
+    opacity: 0.8;
+    box-shadow: 0 0 6px 2px rgba(210, 153, 34, 0.2);
   }
 }
 
@@ -165,6 +188,17 @@ p {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  animation:
+    fade-in 0.4s ease-out both,
+    panel-flash 0.6s ease-out 0.3s both;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--tile-shadow-hover), var(--tile-shadow-inset);
 }
 
 .field {
@@ -194,7 +228,12 @@ textarea::placeholder {
 input:focus,
 textarea:focus {
   border-color: var(--color-border-active);
-  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+  box-shadow:
+    0 0 0 2px var(--color-accent-subtle),
+    0 0 8px rgba(77, 166, 255, 0.15);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 /* 按钮样式 - 磁贴 */
@@ -217,13 +256,42 @@ button.primary {
   box-shadow: var(--tile-shadow);
 }
 
+/* 按钮hover金属光泽 - 斜向高光划过 */
+button.primary::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 60%;
+  height: 200%;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 60%
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+button.primary:hover::after {
+  left: 120%;
+}
+
 button.primary:hover {
   background: #33ddff;
   box-shadow: var(--tile-shadow-hover);
 }
 
 button.primary:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+button.primary {
+  transition:
+    all 0.15s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 button.ghost {
@@ -351,7 +419,8 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: var(--color-text-secondary);
+  box-shadow: 0 0 4px rgba(77, 166, 255, 0.2);
 }
 
 /* 选中文本样式 */
@@ -381,4 +450,70 @@ button:disabled {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ===== 动画特效 ===== */
+
+/* 面板首次渲染微光闪烁 */
+@keyframes panel-flash {
+  0% {
+    box-shadow:
+      var(--tile-shadow),
+      var(--tile-shadow-inset),
+      0 0 0 0 rgba(77, 166, 255, 0);
+  }
+  30% {
+    box-shadow:
+      var(--tile-shadow),
+      var(--tile-shadow-inset),
+      0 0 8px 1px rgba(77, 166, 255, 0.12);
+  }
+  100% {
+    box-shadow:
+      var(--tile-shadow),
+      var(--tile-shadow-inset),
+      0 0 0 0 rgba(77, 166, 255, 0);
+  }
+}
+
+/* Header 光线扫描动画 */
+@keyframes header-scan {
+  0% {
+    left: -60%;
+  }
+  100% {
+    left: 160%;
+  }
+}
+
+/* 页面加载渐入动画 - 只动opacity，translate独立属性不与hover transform冲突 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.app-header {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.panel {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.panel:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.panel:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.panel:nth-child(4) {
+  animation-delay: 0.15s;
 }
