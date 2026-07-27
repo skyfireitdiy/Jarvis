@@ -9859,7 +9859,7 @@ body::-webkit-scrollbar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: var(--color-bg-secondary);
+  background: rgba(10, 20, 40, 0.88);
   border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
@@ -10586,10 +10586,11 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  background: rgba(10, 20, 40, 0.45);
 }
 
 .message {
-  background: var(--color-bg-secondary);
+  background: rgba(14, 24, 50, 0.55);
   border-radius: var(--tile-radius);
   padding: 6px 10px;
   border: none;
