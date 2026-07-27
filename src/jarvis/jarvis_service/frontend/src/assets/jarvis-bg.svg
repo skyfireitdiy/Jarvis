@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(120,140,255,0.04)" stroke-width="0.5"/>
+    </pattern>
+    <pattern id="grid-fine" width="15" height="15" patternUnits="userSpaceOnUse">
+      <path d="M 15 0 L 0 0 0 15" fill="none" stroke="rgba(120,140,255,0.015)" stroke-width="0.3"/>
+    </pattern>
+    <radialGradient id="center-glow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="rgba(0,180,255,0.06)"/>
+      <stop offset="40%" stop-color="rgba(80,100,255,0.03)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="corner-tl" cx="0%" cy="0%" r="30%">
+      <stop offset="0%" stop-color="rgba(0,180,255,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="corner-br" cx="100%" cy="100%" r="35%">
+      <stop offset="0%" stop-color="rgba(120,80,255,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="j-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(0,180,255,0.08)"/>
+      <stop offset="60%" stop-color="rgba(0,120,255,0.03)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="#060d1f"/>
+  <rect width="100%" height="100%" fill="url(#grid-fine)"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  <rect width="100%" height="100%" fill="url(#center-glow)"/>
+  <rect width="100%" height="100%" fill="url(#corner-tl)"/>
+  <rect width="100%" height="100%" fill="url(#corner-br)"/>
+  <g opacity="0.025">
+    <text x="960" y="580" text-anchor="middle" font-family="Inter, sans-serif" font-size="720" font-weight="800" fill="url(#j-glow)">J</text>
+  </g>
+  <g opacity="0.02">
+    <text x="960" y="620" text-anchor="middle" font-family="Inter, sans-serif" font-size="120" font-weight="300" letter-spacing="40" fill="rgba(120,140,255,1)">JARVIS</text>
+  </g>
+  <g opacity="0.6">
+    <circle cx="150" cy="200" r="1" fill="rgba(0,180,255,0.3)"/>
+    <circle cx="380" cy="120" r="0.8" fill="rgba(120,140,255,0.25)"/>
+    <circle cx="620" cy="350" r="1.2" fill="rgba(0,180,255,0.2)"/>
+    <circle cx="850" cy="180" r="0.6" fill="rgba(120,80,255,0.3)"/>
+    <circle cx="1100" cy="280" r="1" fill="rgba(0,180,255,0.25)"/>
+    <circle cx="1350" cy="150" r="0.8" fill="rgba(120,140,255,0.2)"/>
+    <circle cx="1600" cy="320" r="1.1" fill="rgba(0,180,255,0.3)"/>
+    <circle cx="1780" cy="100" r="0.7" fill="rgba(120,80,255,0.25)"/>
+    <circle cx="250" cy="500" r="0.9" fill="rgba(0,180,255,0.2)"/>
+    <circle cx="500" cy="680" r="1" fill="rgba(120,140,255,0.3)"/>
+    <circle cx="780" cy="550" r="0.7" fill="rgba(0,180,255,0.25)"/>
+    <circle cx="1050" cy="720" r="1.2" fill="rgba(120,80,255,0.2)"/>
+    <circle cx="1300" cy="600" r="0.8" fill="rgba(0,180,255,0.3)"/>
+    <circle cx="1550" cy="480" r="1" fill="rgba(120,140,255,0.25)"/>
+    <circle cx="1750" cy="650" r="0.6" fill="rgba(0,180,255,0.2)"/>
+    <circle cx="100" cy="800" r="1.1" fill="rgba(120,80,255,0.3)"/>
+    <circle cx="400" cy="900" r="0.8" fill="rgba(0,180,255,0.25)"/>
+    <circle cx="700" cy="850" r="1" fill="rgba(120,140,255,0.2)"/>
+    <circle cx="950" cy="950" r="0.7" fill="rgba(0,180,255,0.3)"/>
+    <circle cx="1200" cy="880" r="1.2" fill="rgba(120,80,255,0.25)"/>
+    <circle cx="1500" cy="780" r="0.9" fill="rgba(0,180,255,0.2)"/>
+    <circle cx="1800" cy="900" r="1" fill="rgba(120,140,255,0.3)"/>
+  </g>
+  <g opacity="0.03" stroke="rgba(0,180,255,1)" stroke-width="0.5" fill="none">
+    <line x1="150" y1="200" x2="380" y2="120"/>
+    <line x1="620" y1="350" x2="850" y2="180"/>
+    <line x1="1100" y1="280" x2="1350" y2="150"/>
+    <line x1="500" y1="680" x2="780" y2="550"/>
+    <line x1="1050" y1="720" x2="1300" y2="600"/>
+    <line x1="1550" y1="480" x2="1600" y2="320"/>
+    <line x1="400" y1="900" x2="700" y2="850"/>
+    <line x1="1200" y1="880" x2="1500" y2="780"/>
+  </g>
+</svg>

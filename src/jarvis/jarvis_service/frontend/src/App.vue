@@ -7635,7 +7635,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.hostEl = el
   termInfo.terminal = new Terminal({
     theme: {
-      background: '#0b1220',
+      background: 'rgba(11,18,32,0.88)',
     },
     fontSize: 12,
     allowProposedApi: true,
@@ -7897,7 +7897,7 @@ function initIndependentTerminal(terminalId, el) {
   // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
-      background: '#0b1220',
+      background: 'rgba(11,18,32,0.88)',
     },
     fontSize: 12,
     cols: 80,
@@ -9009,7 +9009,7 @@ body::-webkit-scrollbar {
   padding: 0;
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-  background: var(--color-bg-primary);
+  background: transparent;
   color: var(--color-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -9090,7 +9090,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-primary);
+  background: transparent;
   cursor: move;
   gap: 8px;
   min-height: 32px;
@@ -9129,7 +9129,7 @@ body::-webkit-scrollbar {
   align-items: stretch;
   gap: 2px;
   padding: 4px 4px 0;
-  background: var(--color-bg-primary);
+  background: transparent;
   overflow-x: auto;
 }
 
@@ -9151,7 +9151,7 @@ body::-webkit-scrollbar {
 }
 
 .editor-tab.active {
-  background: var(--color-bg-primary);
+  background: transparent;
   color: var(--color-text-primary);
 }
 
@@ -9247,7 +9247,7 @@ body::-webkit-scrollbar {
   flex: 1;
   min-height: 0;
   display: flex;
-  background: var(--color-bg-primary);
+  background: transparent;
 }
 
 .editor-activity-bar {
@@ -9258,7 +9258,7 @@ body::-webkit-scrollbar {
   gap: 8px;
   padding: 8px 4px;
   border-right: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-primary);
+  background: transparent;
 }
 
 .editor-activity-button {
@@ -9292,7 +9292,7 @@ body::-webkit-scrollbar {
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-primary);
+  background: transparent;
 }
 
 .editor-sidebar-header {
@@ -9590,7 +9590,7 @@ body::-webkit-scrollbar {
   padding: 0;
   min-width: 0;
   min-height: 0;
-  background: #0d1117;
+  background: rgba(13,17,23,0.88);
 }
 
 .editor-codemirror-container {
@@ -10933,7 +10933,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-host {
-  background: #0a0d12;
+  background: rgba(10,13,18,0.88);
   flex: 1;
   min-height: 400px;
   overflow: hidden;
@@ -10965,7 +10965,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-history-content {
-  background: #0a0d12;
+  background: rgba(10,13,18,0.88);
   display: block;
   width: 100%;
   max-width: 100%;
@@ -11661,7 +11661,7 @@ body::-webkit-scrollbar {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .app {
-    background: #0d1117;
+    background: rgba(13,17,23,0.88);
   }
   
   .app-header {
