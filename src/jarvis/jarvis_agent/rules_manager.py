@@ -1479,12 +1479,12 @@ data parsing
                         f"   {i}. {r.name} (相关度：{r.relevance_score:.2f}, 质量：{r.quality_score:.1f})"
                     )
 
-            # 过滤：只保留高相关度 (>0.7) 且高质量 (>7.0) 的技能
+            # 过滤：只保留相关度 (>0.3) 且质量 (>4.0) 的技能
             filtered = [
-                r for r in results if r.relevance_score > 0.7 and r.quality_score > 7.0
+                r for r in results if r.relevance_score > 0.3 and r.quality_score > 4.0
             ]
             PrettyOutput.auto_print(
-                f"🔍 过滤后保留：{len(filtered)} 个技能 (阈值：相关度>0.7, 质量>7.0)"
+                f"🔍 过滤后保留：{len(filtered)} 个技能 (阈值：相关度>0.3, 质量>4.0)"
             )
 
             return filtered
