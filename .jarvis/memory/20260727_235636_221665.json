@@ -1,0 +1,8 @@
+{
+  "id": "20260727_235636_221665",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "ui-style", "css", "config"],
+  "content": "Jarvis前端UI风格：蓝紫辉光磁贴风。CSS变量驱动半透明层级：body实色底#060d1f+SVG背景(jarvis-bg.svg)，控件rgba透出。关键变量：--color-bg-secondary:rgba(10,20,40,0.72), --color-bg-tertiary:rgba(16,28,58,0.6), --color-bg-tile:rgba(14,24,50,0.65)。禁忌：不用backdrop-filter(保护无GPU机器)、不用GPU密集效果。磁贴特征：去border用色块+微阴影(--tile-shadow带蓝紫边光)、大圆角(--tile-radius:16px)、半透明控件透出SVG背景。Git回退点：23b529211470c32f37810e7a6ba1011002c92d3a",
+  "created_at": "2026-07-27T23:56:36.221698",
+  "updated_at": "2026-07-27T23:56:36.221701"
+}

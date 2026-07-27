@@ -7635,7 +7635,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.hostEl = el
   termInfo.terminal = new Terminal({
     theme: {
-      background: 'rgba(11,18,32,0.88)',
+      background: 'rgba(11,18,32,0.7)',
     },
     fontSize: 12,
     allowProposedApi: true,
@@ -7897,7 +7897,7 @@ function initIndependentTerminal(terminalId, el) {
   // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
-      background: 'rgba(11,18,32,0.88)',
+      background: 'rgba(11,18,32,0.7)',
     },
     fontSize: 12,
     cols: 80,
@@ -9590,7 +9590,7 @@ body::-webkit-scrollbar {
   padding: 0;
   min-width: 0;
   min-height: 0;
-  background: rgba(13,17,23,0.88);
+  background: rgba(13,17,23,0.7);
 }
 
 .editor-codemirror-container {
@@ -9859,7 +9859,7 @@ body::-webkit-scrollbar {
   position: relative;
   width: 320px;
   min-width: 0;
-  background: rgba(22, 27, 34, 0.95);
+  background: rgba(22, 27, 34, 0.7);
   border-right: 0.5px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
@@ -10440,7 +10440,7 @@ body::-webkit-scrollbar {
 
 .current-path {
   padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.25);
   border-radius: var(--tile-radius);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 13px;
@@ -10457,7 +10457,7 @@ body::-webkit-scrollbar {
 .dir-search-input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -10933,7 +10933,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-host {
-  background: rgba(10,13,18,0.88);
+  background: rgba(10,13,18,0.7);
   flex: 1;
   min-height: 400px;
   overflow: hidden;
@@ -10965,7 +10965,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-history-content {
-  background: rgba(10,13,18,0.88);
+  background: rgba(10,13,18,0.7);
   display: block;
   width: 100%;
   max-width: 100%;
@@ -11023,7 +11023,7 @@ body::-webkit-scrollbar {
   flex: 1;
   min-width: 0;
   padding: 11px 15px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 10px;
   color: #e6edf3;
@@ -11104,7 +11104,7 @@ body::-webkit-scrollbar {
   width: 100%;
   min-height: 120px;
   max-height: 300px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 10px;
   padding: 14px;
@@ -11242,7 +11242,7 @@ body::-webkit-scrollbar {
 
 .buffer-panel-btn {
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.8);
+  background: rgba(48, 54, 61, 0.6);
   border: none;
   border-radius: var(--tile-radius-xs);
   color: #8b949e;
@@ -11274,7 +11274,7 @@ body::-webkit-scrollbar {
   width: 100%;
   min-height: 220px;
   max-height: min(60vh, 520px);
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   padding: 14px 16px;
   color: #e6edf3;
@@ -11372,7 +11372,7 @@ body::-webkit-scrollbar {
 /* 操作按钮 */
 .action-btn {
   padding: 11px 20px;
-  background: rgba(48, 54, 61, 0.8);
+  background: rgba(48, 54, 61, 0.6);
   border: none;
   border-radius: var(--tile-radius);
   color: #8b949e;
@@ -11449,7 +11449,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11458,7 +11458,7 @@ body::-webkit-scrollbar {
 }
 
 .modal {
-  background: rgba(22, 27, 34, 0.95);
+  background: rgba(22, 27, 34, 0.7);
   border: none;
   border-radius: 14px;
   padding: 28px;
@@ -11501,7 +11501,7 @@ body::-webkit-scrollbar {
 .form-group input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11517,7 +11517,7 @@ body::-webkit-scrollbar {
 .form-group select {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11661,7 +11661,7 @@ body::-webkit-scrollbar {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .app {
-    background: rgba(13,17,23,0.88);
+    background: rgba(13,17,23,0.7);
   }
   
   .app-header {
@@ -11765,7 +11765,7 @@ body::-webkit-scrollbar {
 .completions-search input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border: none;
   border-radius: 9px;
   color: #e6edf3;
@@ -11852,7 +11852,7 @@ body::-webkit-scrollbar {
 /* 终端面板 */
 .terminal-panel {
   position: fixed;
-  background: rgba(13, 17, 23, 0.95);
+  background: rgba(13, 17, 23, 0.75);
   border: none;
   border-radius: var(--tile-radius);
   display: flex;
@@ -11869,7 +11869,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: rgba(22, 27, 34, 0.95);
+  background: rgba(22, 27, 34, 0.7);
   border-bottom: 1px solid var(--color-border-subtle);
   border-radius: 6px 6px 0 0;
   cursor: move;
@@ -11928,7 +11928,7 @@ body::-webkit-scrollbar {
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.25);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -11937,7 +11937,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(48, 54, 61, 0.8);
+  background: rgba(48, 54, 61, 0.6);
   border: none;
   border-radius: 4px;
   font-size: 12px;
@@ -12022,13 +12022,13 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: rgba(22, 27, 34, 0.95);
+  background: rgba(22, 27, 34, 0.7);
   border: none;
   border-radius: var(--tile-radius);
   color: #e6edf3;
   font-size: 14px;
   z-index: 9999;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 
 }
 
@@ -12295,7 +12295,7 @@ body::-webkit-scrollbar {
     width: 100%;
     height: 100%;
     z-index: 999;
-    background: rgba(22, 27, 34, 0.98);
+    background: rgba(22, 27, 34, 0.75);
   }
   
   .agent-sidebar.collapsed {
@@ -12484,7 +12484,7 @@ body::-webkit-scrollbar {
   justify-content: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(28, 28, 30, 0.6);
+  background: rgba(28, 28, 30, 0.5);
   border: none;
   border-radius: var(--tile-radius);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -12527,7 +12527,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 28, 30, 0.6);
+  background-color: rgba(28, 28, 30, 0.5);
   border: none;
   box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
   border-radius: var(--tile-radius);
@@ -12633,7 +12633,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12642,7 +12642,7 @@ body::-webkit-scrollbar {
 }
 
 .diff-modal {
-  background: rgba(22, 27, 34, 0.95);
+  background: rgba(22, 27, 34, 0.7);
   border: none;
   border-radius: 14px;
   width: 100%;
@@ -12659,7 +12659,7 @@ body::-webkit-scrollbar {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 0.5px solid var(--color-border-subtle);
-  background: rgba(22, 27, 34, 0.98);
+  background: rgba(22, 27, 34, 0.75);
 }
 
 .diff-modal-header h3 {
@@ -12702,7 +12702,7 @@ body::-webkit-scrollbar {
 .diff-raw {
   margin: 0;
   padding: 16px;
-  background: rgba(13, 17, 23, 0.8);
+  background: rgba(13, 17, 23, 0.65);
   border-radius: var(--tile-radius);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 13px;
@@ -12734,7 +12734,7 @@ body::-webkit-scrollbar {
 }
 
 .rules-table th {
-  background: rgba(22, 27, 34, 0.98);
+  background: rgba(22, 27, 34, 0.75);
   color: #8b949e;
   font-weight: 600;
   font-size: 12px;
@@ -12774,7 +12774,7 @@ body::-webkit-scrollbar {
 }
 
 .rules-loaded-content {
-  background: rgba(22, 27, 34, 0.5);
+  background: rgba(22, 27, 34, 0.4);
   border: none;
   border-radius: var(--tile-radius-xs);
   padding: 12px;
