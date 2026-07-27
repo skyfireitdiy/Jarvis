@@ -9901,7 +9901,7 @@ body::-webkit-scrollbar {
 
 .agent-sidebar-resize-handle:hover::after,
 .agent-sidebar-resizing .agent-sidebar-resize-handle::after {
-  background: rgba(88, 166, 255, 0.6);
+  background: #4da6ff;
 }
 
 .agent-sidebar-header {
@@ -10126,7 +10126,7 @@ body::-webkit-scrollbar {
 .agent-llm-group {
   font-size: 11px;
   color: #666;
-  background: rgba(108, 117, 125, 0.1);
+  background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -10629,12 +10629,12 @@ body::-webkit-scrollbar {
 }
 
 .message.message-user_input .agent-name {
-  color: rgba(255, 255, 255, 0.9);
+  color: #e6edf3;
   font-size: 10px;
 }
 
 .message.message-user_input .timestamp {
-  color: rgba(255, 255, 255, 0.7);
+  color: #8b949e;
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
   font-size: 10px;
 }
@@ -11129,7 +11129,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius);
   margin: 8px 0;
@@ -11223,7 +11223,7 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: rgba(35, 134, 54, 0.1);
+  background: var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -11730,13 +11730,13 @@ body::-webkit-scrollbar {
 /* 补全按钮 */
 .completion-btn {
   min-width: 44px;
-  background: rgba(88, 166, 255, 0.1);
+  background: var(--color-bg-tertiary);
   border-color: var(--color-accent-subtle);
   color: #58a6ff;
 }
 
 .completion-btn:hover:not(:disabled) {
-  background: rgba(88, 166, 255, 0.2);
+  background: var(--color-bg-hover);
   border-color: var(--color-accent);
 }
 
@@ -11802,11 +11802,11 @@ body::-webkit-scrollbar {
 }
 
 .completion-item:hover {
-  background: rgba(88, 166, 255, 0.1);
+  background: var(--color-bg-hover);
 }
 
 .completion-item.selected {
-  background: rgba(88, 166, 255, 0.25);
+  background: var(--color-bg-hover);
 }
 
 .completion-value {
@@ -11907,7 +11907,7 @@ body::-webkit-scrollbar {
 }
 
 .terminal-node-select:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-hover);
   border-color: var(--color-border-subtle);
 }
 
@@ -11947,12 +11947,12 @@ body::-webkit-scrollbar {
 }
 
 .terminal-tab:hover {
-  background: rgba(56, 139, 253, 0.1);
+  background: var(--color-bg-hover);
   color: #58a6ff;
 }
 
 .terminal-tab.active {
-  background: rgba(56, 139, 253, 0.2);
+  background: var(--color-bg-tertiary);
   color: #58a6ff;
   border-color: var(--color-accent-subtle);
 }
@@ -12621,7 +12621,7 @@ body::-webkit-scrollbar {
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: rgba(139, 148, 158, 0.85);
+  color: #8b949e;
   line-height: 1.4;
 }
 
