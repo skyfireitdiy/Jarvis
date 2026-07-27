@@ -2101,9 +2101,23 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             check=True,
             timeout=10,
         )
-        if decode_output(status_result.stdout):
-            # 后台线程不询问用户，直接跳过有未提交更改的仓库
-            return
+        has_local_changes = bool(decode_output(status_result.stdout))
+        if has_local_changes:
+            # 有未提交更改时，先stash保存，pull后再stash pop恢复
+            try:
+                subprocess.run(
+                    ["git", "stash"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    check=True,
+                    timeout=30,
+                )
+            except subprocess.CalledProcessError as e:
+                error_message = decode_output(e.stderr).strip() if e.stderr else str(e)
+                PrettyOutput.auto_print(
+                    f"⚠️ stash '{repo_path.name}' 失败，跳过更新: {error_message}"
+                )
+                return
 
         # 检查是否是空仓库
         ls_remote_result = subprocess.run(
@@ -2125,6 +2139,22 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             check=True,
             timeout=60,
         )
+
+        # 如果之前stash了本地变更，pull后恢复
+        if has_local_changes:
+            try:
+                subprocess.run(
+                    ["git", "stash", "pop"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    check=True,
+                    timeout=30,
+                )
+            except subprocess.CalledProcessError as e:
+                error_message = decode_output(e.stderr).strip() if e.stderr else str(e)
+                PrettyOutput.auto_print(
+                    f"⚠️ stash pop '{repo_path.name}' 失败（可能存在冲突），请手动解决: {error_message}"
+                )
 
     except FileNotFoundError:
         PrettyOutput.auto_print(f"⚠️ git 命令未找到，跳过更新 '{repo_path.name}'。")
