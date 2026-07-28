@@ -25,7 +25,7 @@
               v-for="agent in agentGroup.agents"
               :key="agent.agent_id"
               class="agent-item"
-              :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id) }"
+              :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent) }"
               @click="$emit('agentClick', agent, $event)"
             >
               <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
@@ -63,7 +63,7 @@
             v-for="agent in agentGroup.agents"
             :key="agent.agent_id"
             class="agent-item"
-            :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id) }"
+            :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent) }"
             @click="$emit('agentClick', agent, $event)"
           >
             <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
@@ -161,7 +161,8 @@ const props = defineProps({
   getStatusText: Function,
   getNodeLabel: Function,
   getProxyNodeLabel: Function,
-  isSelected: Function
+  isSelected: Function,
+  isWaitingInput: Function
 })
 
 // 初始化时折叠所有分组 - 只在首次初始化时设置，避免后续数据更新覆盖用户操作
@@ -391,13 +392,22 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-item.active {
-  background: var(--color-accent-subtle);
+  background: #3b82f640;
   border-color: var(--color-border-active);
 }
 
 .agent-item.selected {
   background: var(--color-accent-subtle);
   border-color: var(--color-border-active);
+}
+
+.agent-item.waiting-input {
+  animation: breathing 1.5s ease-in-out infinite;
+}
+
+/* 激活+等待输入组合状态 - 使用紫色呼吸动画 */
+.agent-item.active.waiting-input {
+  animation: breathing-active 1.5s ease-in-out infinite;
 }
 
 .agent-checkbox {
