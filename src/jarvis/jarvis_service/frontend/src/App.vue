@@ -3063,17 +3063,11 @@ const isInputDisabled = computed(() => {
 
 // 判断完成和补全按钮是否应该禁用（只在等待多行输入时使能）
 const isWaitingMultiDisabled = computed(() => {
-  console.log('[DEBUG isWaitingMultiDisabled]', {
-    currentAgentId: currentAgentId.value,
-    executionStatus: agentStatuses.value.get(currentAgentId.value)?.execution_status,
-    agentStatusesKeys: [...agentStatuses.value.keys()],
-    agentStatusesValues: [...agentStatuses.value.entries()]
-  })
+  // @ 按钮永远启用，不再根据输入模式禁用
   if (!currentAgentId.value) {
     return true // 没有激活的 agent
   }
-  const executionStatus = agentStatuses.value.get(currentAgentId.value)?.execution_status
-  return executionStatus !== 'waiting_multi' // 只有在等待多行输入时才使能
+  return false // 永远启用
 })
 const newAgentType = ref('codeagent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
