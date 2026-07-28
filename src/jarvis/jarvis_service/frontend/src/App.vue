@@ -7233,16 +7233,25 @@ function handleTextareaKeydown(event) {
   }
   
   // Ctrl+C 在等待多行输入且输入框为空时，触发完成功能
+  // Ctrl+C 在非输入模式下且输入框为空时，发送人工介入消息
   if (event.ctrlKey && event.key === 'c') {
     const userInput = inputText.value.trim()
     const agentId = currentAgentId.value
     const statusData = agentStatuses.value.get(agentId)
+
     const executionStatus = statusData?.execution_status || 'running'
-    
-    // 只有在等待多行输入且输入框为空时才触发
+
+    // 场景1：在等待多行输入且输入框为空时，触发完成功能
     if (executionStatus === 'waiting_multi' && !userInput) {
       event.preventDefault()
       submitCompletion()
+      return
+    }
+
+    // 场景2：在非输入模式下（running）且输入框为空时，发送人工介入消息
+    if (executionStatus === 'running' && !userInput) {
+      event.preventDefault()
+      sendManualInterrupt()
       return
     }
   }
