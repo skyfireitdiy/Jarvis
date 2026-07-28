@@ -55,7 +55,7 @@ class TranspilerExecutor:
         reset_to_commit_func: Callable[[str], None],
         run_cargo_fmt_func: Callable[[str], None],
         untranslated_callee_symbols_func: Callable[[Any], List[str]],
-        codeagent_generate_impl_func: Callable[[Any, str, str, str, List[str]], str],
+        code_agent_generate_impl_func: Callable[[Any, str, str, str, List[str]], str],
         refresh_compact_context_func: Callable[[Any, str, str], None],
         cargo_build_loop_func: Callable[[], bool],
         review_and_optimize_func: Callable[[Any, str, str], bool],
@@ -89,7 +89,7 @@ class TranspilerExecutor:
         self.reset_to_commit = reset_to_commit_func
         self.run_cargo_fmt = run_cargo_fmt_func
         self.untranslated_callee_symbols = untranslated_callee_symbols_func
-        self.codeagent_generate_impl = codeagent_generate_impl_func
+        self.code_agent_generate_impl = code_agent_generate_impl_func
         self.refresh_compact_context = refresh_compact_context_func
         self.cargo_build_loop = cargo_build_loop_func
         self.review_and_optimize = review_and_optimize_func
@@ -415,7 +415,7 @@ class TranspilerExecutor:
             PrettyOutput.auto_print(
                 f"📋 [c2rust-transpiler][gen] {progress_info} 正在为 {rec.qname or rec.name} 生成 Rust 实现"
             )
-            self.codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
+            self.code_agent_generate_impl(rec, c_code, module, rust_sig, unresolved)
             PrettyOutput.auto_print(
                 f"📋 [c2rust-transpiler][gen] 已在 {module} 生成或更新实现"
             )

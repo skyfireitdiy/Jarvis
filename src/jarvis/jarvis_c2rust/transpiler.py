@@ -473,7 +473,7 @@ class Transpiler:
             rec, c_code, module, rust_sig, unresolved
         )
 
-    def _codeagent_generate_impl(
+    def _code_agent_generate_impl(
         self,
         rec: FnRecord,
         c_code: str,
@@ -482,7 +482,7 @@ class Transpiler:
         unresolved: List[str],
     ) -> None:
         """使用 CodeAgent 生成/更新目标模块中的函数实现（委托给 GenerationManager）"""
-        return self.generation_manager.codeagent_generate_impl(
+        return self.generation_manager.code_agent_generate_impl(
             rec, c_code, module, rust_sig, unresolved
         )
 
@@ -615,7 +615,7 @@ class Transpiler:
         self._load_order_index(path)
         return {}
 
-    def _codeagent_generate_impl_for_executor(
+    def _code_agent_generate_impl_for_executor(
         self, rec: Any, c_code: str, module: str, rust_sig: str, callees: List[str]
     ) -> str:
         """为TranspilerExecutor适配的代码生成实现函数"""
@@ -640,7 +640,7 @@ class Transpiler:
             )
         else:
             rec_obj = rec
-        self._codeagent_generate_impl(rec_obj, c_code, module, rust_sig, callees)
+        self._code_agent_generate_impl(rec_obj, c_code, module, rust_sig, callees)
         return ""
 
     def _cargo_build_loop_for_executor(self) -> bool:
@@ -860,7 +860,7 @@ class Transpiler:
             reset_to_commit_func=self._reset_to_commit_for_build,
             run_cargo_fmt_func=self._run_cargo_fmt,
             untranslated_callee_symbols_func=self._untranslated_callee_symbols,
-            codeagent_generate_impl_func=self._codeagent_generate_impl_for_executor,
+            code_agent_generate_impl_func=self._code_agent_generate_impl_for_executor,
             refresh_compact_context_func=self._refresh_compact_context,
             cargo_build_loop_func=self._cargo_build_loop_for_executor,
             review_and_optimize_func=self._review_and_optimize_for_executor,

@@ -94,7 +94,7 @@ class AgentManager:
     # Agent 入口文件路径
     AGENT_ENTRY_POINTS = {
         "agent": "jvs",
-        "codeagent": "jca",
+        "code_agent": "jca",
     }
 
     # 随机端口范围
@@ -143,16 +143,16 @@ class AgentManager:
         """创建 Agent。
 
         Args:
-            agent_type: Agent 类型 ("agent" 或 "codeagent")
+            agent_type: Agent 类型 ("agent" 或 "code_agent")
             working_dir: 工作目录
             name: Agent 名称（可选，用于标识）
             llm_group: LLM 模型组
             tool_group: 工具组
             config_file: 配置文件路径
-            task: 任务描述（仅对 codeagent 有效）
+            task: 任务描述（仅对 code_agent 有效）
             additional_args: 额外参数
             auth_token: 认证 Token，将通过环境变量传递给 Agent
-            worktree: 是否为 codeagent 启用 git worktree 模式
+            worktree: 是否为 code_agent 启用 git worktree 模式
             quick_mode: 是否启用极速模式
             restore_session: 是否启动时恢复会话
             no_interaction_mode: 是否启用无交互模式（启用时必须提供 task）
@@ -569,7 +569,7 @@ class AgentManager:
             config_file: 配置文件路径
             task: 任务描述
             additional_args: 额外参数
-            worktree: 是否为 codeagent 启用 git worktree 模式
+            worktree: 是否为 code_agent 启用 git worktree 模式
             quick_mode: 是否启用极速模式
             restore_session: 是否启用恢复会话
             no_interaction_mode: 是否启用无交互模式
@@ -595,7 +595,7 @@ class AgentManager:
         if task:
             cmd.extend(["--task", task])
 
-        if agent_type == "codeagent" and worktree:
+        if agent_type == "code_agent" and worktree:
             cmd.append("-w")
 
         # 添加极速模式参数

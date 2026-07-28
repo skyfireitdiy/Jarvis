@@ -442,7 +442,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     continue
 
                 agent_name = agent_cfg.get("name", f"agent_{i + 1}")  # type: ignore
-                agent_type = agent_cfg.get("type", "code")  # type: ignore
+                agent_type = agent_cfg.get("type", "code_agent")  # type: ignore
                 working_dir = agent_cfg.get("working_dir", os.getcwd())  # type: ignore
 
                 # 必填字段校验

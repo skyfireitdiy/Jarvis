@@ -254,7 +254,7 @@ class Optimizer:
                         "unsafe 清理",
                         step_num,
                         targets,
-                        self.unsafe_optimizer.codeagent_opt_unsafe_cleanup,
+                        self.unsafe_optimizer.code_agent_opt_unsafe_cleanup,
                     )
                     if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats
@@ -266,7 +266,7 @@ class Optimizer:
                         "可见性优化",
                         step_num,
                         targets,
-                        self.visibility_optimizer.codeagent_opt_visibility,
+                        self.visibility_optimizer.code_agent_opt_visibility,
                     )
                     if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats
@@ -278,7 +278,7 @@ class Optimizer:
                         "文档补充",
                         step_num,
                         targets,
-                        self.docs_optimizer.codeagent_opt_docs,
+                        self.docs_optimizer.code_agent_opt_docs,
                     )
                     if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats

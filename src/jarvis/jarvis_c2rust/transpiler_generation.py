@@ -202,7 +202,7 @@ class GenerationManager:
         )
         return m.group(1) if m else ""
 
-    def codeagent_generate_impl(
+    def code_agent_generate_impl(
         self,
         rec: FnRecord,
         c_code: str,
@@ -237,14 +237,14 @@ class GenerationManager:
                     save_exception(
                         e,
                         module="jarvis_c2rust.transpiler_generation",
-                        function="codeagent_generate_impl",
+                        function="code_agent_generate_impl",
                     )
                     pass
         except Exception as e:
             save_exception(
                 e,
                 module="jarvis_c2rust.transpiler_generation",
-                function="codeagent_generate_impl",
+                function="code_agent_generate_impl",
             )
             pass
 
@@ -305,6 +305,6 @@ class GenerationManager:
                 save_exception(
                     e,
                     module="jarvis_c2rust.transpiler_generation",
-                    function="codeagent_generate_impl",
+                    function="code_agent_generate_impl",
                 )
                 pass

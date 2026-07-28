@@ -41,7 +41,7 @@ class UnsafeOptimizer:
         self.extract_warnings_by_file = extract_warnings_by_file_func
         self.format_warnings_for_prompt = format_warnings_for_prompt_func
 
-    def codeagent_opt_unsafe_cleanup(self, target_files: List[Path]) -> None:
+    def code_agent_opt_unsafe_cleanup(self, target_files: List[Path]) -> None:
         """
         使用 CodeAgent 进行 unsafe 清理优化。
         使用 clippy 的 missing_safety_doc checker 来查找 unsafe 告警，按文件处理，每次处理一个文件的所有告警。
@@ -75,7 +75,7 @@ class UnsafeOptimizer:
                 )
                 if not has_warnings:
                     PrettyOutput.auto_print(
-                        f"[c2rust-optimizer][codeagent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration - 1} 次）"
+                        f"[c2rust-optimizer][code_agent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration - 1} 次）"
                     )
                     return  # 所有告警已消除
 
@@ -83,7 +83,7 @@ class UnsafeOptimizer:
                 warnings_by_file = self.extract_warnings_by_file(current_clippy_output)
                 if not warnings_by_file:
                     PrettyOutput.auto_print(
-                        "[c2rust-optimizer][codeagent][unsafe-cleanup] 无法提取告警，停止修复"
+                        "[c2rust-optimizer][code_agent][unsafe-cleanup] 无法提取告警，停止修复"
                     )
                     return  # 仍有告警未消除
 
@@ -114,7 +114,7 @@ class UnsafeOptimizer:
                 )
 
                 PrettyOutput.auto_print(
-                    f"[c2rust-optimizer][codeagent][unsafe-cleanup] 第 {iteration} 次迭代：修复文件 {target_file_path} 的 {warning_count} 个 missing_safety_doc 告警"
+                    f"[c2rust-optimizer][code_agent][unsafe-cleanup] 第 {iteration} 次迭代：修复文件 {target_file_path} 的 {warning_count} 个 missing_safety_doc 告警"
                 )
 
                 # 格式化告警信息
@@ -214,7 +214,7 @@ class UnsafeOptimizer:
                     )
                 agent.run(
                     prompt,
-                    prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][iter{iteration}]",
+                    prefix=f"[c2rust-optimizer][code_agent][unsafe-cleanup][iter{iteration}]",
                     suffix="",
                 )
 
@@ -224,12 +224,12 @@ class UnsafeOptimizer:
                 ):
                     # 如果回退了，需要重新运行 agent
                     PrettyOutput.auto_print(
-                        f"[c2rust-optimizer][codeagent][unsafe-cleanup] 检测到测试代码删除问题，已回退，重新运行 agent (iter={iteration})"
+                        f"[c2rust-optimizer][code_agent][unsafe-cleanup] 检测到测试代码删除问题，已回退，重新运行 agent (iter={iteration})"
                     )
                     commit_before = self.progress_manager.get_crate_commit_hash()
                     agent.run(
                         prompt,
-                        prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][iter{iteration}][retry]",
+                        prefix=f"[c2rust-optimizer][code_agent][unsafe-cleanup][iter{iteration}][retry]",
                         suffix="",
                     )
                     # 再次检测
@@ -237,7 +237,7 @@ class UnsafeOptimizer:
                         commit_before, agent
                     ):
                         PrettyOutput.auto_print(
-                            f"[c2rust-optimizer][codeagent][unsafe-cleanup] 再次检测到测试代码删除问题，已回退 (iter={iteration})"
+                            f"[c2rust-optimizer][code_agent][unsafe-cleanup] 再次检测到测试代码删除问题，已回退 (iter={iteration})"
                         )
 
                 # 验证修复是否成功（通过 cargo test）
@@ -276,32 +276,32 @@ class UnsafeOptimizer:
                             None,
                         )
                     PrettyOutput.auto_print(
-                        f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 的 {warning_count} 个告警修复成功，已保存进度"
+                        f"[c2rust-optimizer][code_agent][unsafe-cleanup] 文件 {target_file_path} 的 {warning_count} 个告警修复成功，已保存进度"
                     )
                 else:
                     # 测试失败，回退到运行前的 commit
                     if commit_before:
                         PrettyOutput.auto_print(
-                            f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}"
+                            f"[c2rust-optimizer][code_agent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}"
                         )
                         if self.progress_manager.reset_to_commit(commit_before):
                             PrettyOutput.auto_print(
-                                f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已成功回退到 commit: {commit_before[:8]}"
+                                f"[c2rust-optimizer][code_agent][unsafe-cleanup] 已成功回退到 commit: {commit_before[:8]}"
                             )
                         else:
                             PrettyOutput.auto_print(
-                                "[c2rust-optimizer][codeagent][unsafe-cleanup] 回退失败，请手动检查代码状态"
+                                "[c2rust-optimizer][code_agent][unsafe-cleanup] 回退失败，请手动检查代码状态"
                             )
                     else:
                         PrettyOutput.auto_print(
-                            f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，但无法获取运行前的 commit，继续修复"
+                            f"[c2rust-optimizer][code_agent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，但无法获取运行前的 commit，继续修复"
                         )
 
                 # 修复后再次检查告警
                 has_warnings_after, _ = check_missing_safety_doc_warnings(crate)
                 if not has_warnings_after:
                     PrettyOutput.auto_print(
-                        f"[c2rust-optimizer][codeagent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration} 次）"
+                        f"[c2rust-optimizer][code_agent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration} 次）"
                     )
                     return  # 所有告警已消除
 
