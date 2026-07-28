@@ -190,7 +190,10 @@
                 v-for="agent in activeAgents"
                 :key="agent.agent_id"
                 class="editor-agent-node"
-                :class="{ 'selected': selectedAgentId === agent.agent_id }"
+                :class="{ 
+                  'selected': selectedAgentId === agent.agent_id,
+                  'waiting-input': isWaitingInput(agent)
+                }"
               >
                 <div
                   class="tree-node-content agent-node-content"
@@ -4383,6 +4386,12 @@ function getStatusClass(agent) {
 
   // 默认 running
   return 'running'
+}
+
+// 判断是否处于等待输入状态
+function isWaitingInput(agent) {
+  const statusClass = getStatusClass(agent)
+  return statusClass === 'waiting_multi' || statusClass === 'waiting_single' || statusClass === 'waiting_confirm'
 }
 
 // 查询 Agent 状态（通过网关代理）
@@ -9391,6 +9400,10 @@ body::-webkit-scrollbar {
 
 .editor-agent-node.stopped {
   opacity: 0.7;
+}
+
+.editor-agent-node.waiting-input {
+  animation: breathing 1.5s ease-in-out infinite;
 }
 
 .agent-node-content {

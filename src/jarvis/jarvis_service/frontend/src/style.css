@@ -178,6 +178,17 @@ p {
   }
 }
 
+/* 呼吸灯动画 - 用于等待输入状态的 Agent */
+@keyframes breathing {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* 面板样式 - 磁贴 */
 .panel {
   background: var(--color-bg-tile);
