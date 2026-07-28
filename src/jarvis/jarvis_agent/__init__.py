@@ -481,7 +481,7 @@ class Agent:
         return build_action_prompt(self.output_handler)
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "Agent":
-        if kwargs.get("agent_type") == "code":
+        if kwargs.get("agent_type") == "code_agent":
             try:
                 from jarvis.jarvis_code_agent.code_agent import CodeAgent
             except ImportError as e:

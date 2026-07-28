@@ -94,16 +94,17 @@ class SessionManager:
 
         files = sorted(glob.glob(pattern))
 
-        # 过滤掉辅助文件（commit文件、tasklist文件、state文件、codeagent文件）
+        # 过滤掉辅助文件（commit文件、tasklist文件、state文件、code_agent文件）
         session_files = []
         for f in files:
             basename = os.path.basename(f)
-            # 排除 _commit.json、_tasklist.json、_state.json 和 _codeagent.json 结尾的辅助文件
+            # 排除 _commit.json、_tasklist.json、_state.json 和 _code_agent.json 结尾的辅助文件
             if not (
                 basename.endswith("_commit.json")
                 or basename.endswith("_tasklist.json")
                 or basename.endswith("_state.json")
-                or basename.endswith("_codeagent.json")
+                or basename.endswith("_code_agent.json")
+                or basename.endswith("_codeagent.json")  # 兼容旧格式
             ):
                 session_files.append(f)
 
@@ -498,7 +499,8 @@ class SessionManager:
                     basename.endswith("_commit.json")
                     or basename.endswith("_tasklist.json")
                     or basename.endswith("_state.json")
-                    or basename.endswith("_codeagent.json")
+                    or basename.endswith("_code_agent.json")
+                    or basename.endswith("_codeagent.json")  # 兼容旧格式
                 ):
                     # 提取时间戳并排序
                     timestamp = self._extract_timestamp(f)
@@ -522,7 +524,8 @@ class SessionManager:
                             "_commit.json",
                             "_tasklist.json",
                             "_state.json",
-                            "_codeagent.json",
+                            "_code_agent.json",
+                            "_codeagent.json",  # 兼容旧格式
                         ]
 
                         for suffix in auxiliary_suffixes:
@@ -1235,7 +1238,7 @@ class SessionManager:
 
         # 如果是CodeAgent，额外保存CodeAgent特定状态
         if hasattr(self.agent, "start_commit"):
-            state_data["codeagent"] = {
+            state_data["code_agent"] = {
                 "disable_review": getattr(self.agent, "disable_review", False),
                 "review_max_iterations": getattr(
                     self.agent, "review_max_iterations", 3
@@ -1411,18 +1414,22 @@ class SessionManager:
 
             # 恢复CodeAgent特定状态
             if hasattr(self.agent, "start_commit"):
-                codeagent_state = state_data.get("codeagent", {})
-                if codeagent_state:
-                    self.agent.disable_review = codeagent_state.get(
+                code_agent_state = state_data.get("code_agent", {}) or state_data.get(
+                    "codeagent", {}
+                )  # 兼容旧格式
+                if code_agent_state:
+                    self.agent.disable_review = code_agent_state.get(
                         "disable_review", False
                     )
-                    self.agent.review_max_iterations = codeagent_state.get(
+                    self.agent.review_max_iterations = code_agent_state.get(
                         "review_max_iterations", 3
                     )
-                    self.agent.tool_group = codeagent_state.get("tool_group", "default")
-                    self.agent.root_dir = codeagent_state.get("root_dir", os.getcwd())
-                    self.agent.prefix = codeagent_state.get("prefix", "")
-                    self.agent.suffix = codeagent_state.get("suffix", "")
+                    self.agent.tool_group = code_agent_state.get(
+                        "tool_group", "default"
+                    )
+                    self.agent.root_dir = code_agent_state.get("root_dir", os.getcwd())
+                    self.agent.prefix = code_agent_state.get("prefix", "")
+                    self.agent.suffix = code_agent_state.get("suffix", "")
                     PrettyOutput.auto_print("✅ CodeAgent配置已恢复")
 
             # 恢复RulesManager状态（已激活的规则）

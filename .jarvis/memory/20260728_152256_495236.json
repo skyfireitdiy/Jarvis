@@ -1,0 +1,8 @@
+{
+  "id": "20260728_152256_495236",
+  "type": "project_long_term",
+  "tags": ["jsec", "orchestration", "对抗式Agent", "污点传播", "调用图分析"],
+  "content": "JSec 对抗式 Agent 编排配置已创建：src/jarvis/jarvis_sec/orchestration.yaml\n\n两个 Agent：\n1. jsec_rule_developer - 规则开发，基于污点传播+调用图分析，**禁止正则表达式**\n2. jsec_testcase_generator - 用例生成，正例(含source→sink传播链)+反例(含sanitizer阻断)\n\n对抗式协作流程：规则开发者定义source-sink-sanitizer → 用例生成者构造逃逸用例 → 规则完善 → 再次逃逸 → 闭环\n终止条件：连续两轮无新增逃逸用例\n\n关键设计决策：\n- 规则以 TaintSource + TaintSink + sanitizer 组合定义，非正则匹配\n- 用例必须体现污点传播模式，metadata.json的pattern字段描述source→sink链\n- 泛化优先：规则覆盖一类漏洞模式，用例覆盖多种变体",
+  "created_at": "2026-07-28T15:22:56.495285",
+  "updated_at": "2026-07-28T15:22:56.495292"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260728_161449_229197",
+  "type": "project_long_term",
+  "tags": ["agent_type统一", "code_agent", "已完成"],
+  "content": "agent_type 统一为 \"code_agent\" 已完成。所有 src/jarvis/ 中的 \"code\"/\"codeagent\" 引用已替换为 \"code_agent\"，包括：\n1. __init__.py 类型判断\n2. builtin_input_handler.py 默认值\n3. agent_manager.py AGENT_ENTRY_POINTS + worktree判断 + 注释\n4. gateway_manager.py 冲突校验 + 注释\n5. session_manager.py 文件名后缀 + 状态键（读取时兼容旧格式 _codeagent.json 和 \"codeagent\" 键）+ 变量名\n6. c2rust 模块全部方法名/变量名/日志前缀（optimizer_unsafe/docs/visibility/clippy, transpiler/executor/generation/codegen）\n7. orchestration.yaml type字段\n\n兼容性：session_manager.py 读取时同时检查新旧两种格式，新数据写新格式。",
+  "created_at": "2026-07-28T16:14:49.229237",
+  "updated_at": "2026-07-28T16:14:49.229243"
+}

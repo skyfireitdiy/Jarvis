@@ -177,7 +177,7 @@ def build_generate_impl_prompt(
     return self._append_additional_notes(prompt)
 
 
-def codeagent_generate_impl(
+def code_agent_generate_impl(
     self: _TranspilerProtocol,
     rec: FnRecord,
     c_code: str,
@@ -186,7 +186,7 @@ def codeagent_generate_impl(
     unresolved: List[str],
 ) -> None:
     """
-    从 Transpiler._codeagent_generate_impl 提取出的实现，保持逻辑一致。
+    从 Transpiler._code_agent_generate_impl 提取出的实现，保持逻辑一致。
     """
     # 构建提示词
     prompt = build_generate_impl_prompt(self, rec, c_code, module, rust_sig, unresolved)
@@ -211,14 +211,14 @@ def codeagent_generate_impl(
                 save_exception(
                     e,
                     module="jarvis_c2rust.transpiler_codegen",
-                    function="codeagent_generate_impl",
+                    function="code_agent_generate_impl",
                 )
                 pass
     except Exception as e:
         save_exception(
             e,
             module="jarvis_c2rust.transpiler_codegen",
-            function="codeagent_generate_impl",
+            function="code_agent_generate_impl",
         )
         pass
 
@@ -281,6 +281,6 @@ def codeagent_generate_impl(
             save_exception(
                 e,
                 module="jarvis_c2rust.transpiler_codegen",
-                function="codeagent_generate_impl",
+                function="code_agent_generate_impl",
             )
             pass

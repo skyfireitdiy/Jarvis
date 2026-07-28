@@ -1,0 +1,8 @@
+{
+  "id": "20260728_155017_318806",
+  "type": "project_long_term",
+  "tags": ["jsec", "对抗式Agent", "编排配置", "orchestration"],
+  "content": "JSec 对抗式 Agent 编排配置已完成：src/jarvis/jarvis_sec/orchestration.yaml\n\n两个 Agent：\n1. jsec_adversary - 对抗Agent（用户主要交互对象），主动搜索漏洞、扫描仓库、抽象用例，驱动规则改进\n2. jsec_rule_developer - 规则开发Agent，被动接收对抗Agent反馈进行规则完善\n\n协作流程：对抗Agent发现问题 → 规则开发者被动接收反馈并改进 → 对抗Agent再次验证\n终止条件：连续两轮无新增逃逸用例\n\n关键设计决策：\n- 对抗Agent主动驱动（搜索互联网漏洞、扫描用户仓库、抽象问题代码为用例）\n- 规则开发者被动响应（接收漏报/误报反馈后改进）\n- 规则基于污点传播+调用图分析，禁止正则表达式\n- 用例必须体现污点传播模式，泛化优先",
+  "created_at": "2026-07-28T15:50:17.318873",
+  "updated_at": "2026-07-28T15:50:17.318883"
+}

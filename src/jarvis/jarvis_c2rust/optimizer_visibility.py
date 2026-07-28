@@ -35,7 +35,7 @@ class VisibilityOptimizer:
         self.progress_manager = progress_manager
         self.append_additional_notes = append_additional_notes_func
 
-    def codeagent_opt_visibility(self, target_files: List[Path]) -> None:
+    def code_agent_opt_visibility(self, target_files: List[Path]) -> None:
         """
         使用 CodeAgent 进行可见性优化。
 
@@ -89,7 +89,7 @@ class VisibilityOptimizer:
         # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
         PrettyOutput.auto_print(
-            "[c2rust-optimizer][codeagent][visibility] 正在调用 CodeAgent 进行可见性优化..."
+            "[c2rust-optimizer][code_agent][visibility] 正在调用 CodeAgent 进行可见性优化..."
         )
         try:
             os.chdir(str(crate))
@@ -122,7 +122,7 @@ class VisibilityOptimizer:
             if initial_commit:
                 self.progress_manager._agent_before_commits[agent_key] = initial_commit
             agent.run(
-                prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix=""
+                prompt, prefix="[c2rust-optimizer][code_agent][visibility]", suffix=""
             )
 
             # 检测并处理测试代码删除
@@ -131,12 +131,12 @@ class VisibilityOptimizer:
             ):
                 # 如果回退了，需要重新运行 agent
                 PrettyOutput.auto_print(
-                    "[c2rust-optimizer][codeagent][visibility] 检测到测试代码删除问题，已回退，重新运行 agent"
+                    "[c2rust-optimizer][code_agent][visibility] 检测到测试代码删除问题，已回退，重新运行 agent"
                 )
                 commit_before = self.progress_manager.get_crate_commit_hash()
                 agent.run(
                     prompt,
-                    prefix="[c2rust-optimizer][codeagent][visibility][retry]",
+                    prefix="[c2rust-optimizer][code_agent][visibility][retry]",
                     suffix="",
                 )
                 # 再次检测
@@ -144,7 +144,7 @@ class VisibilityOptimizer:
                     commit_before, agent
                 ):
                     PrettyOutput.auto_print(
-                        "[c2rust-optimizer][codeagent][visibility] 再次检测到测试代码删除问题，已回退"
+                        "[c2rust-optimizer][code_agent][visibility] 再次检测到测试代码删除问题，已回退"
                     )
 
             # 验证修复是否成功（通过 cargo test）
@@ -161,25 +161,25 @@ class VisibilityOptimizer:
                     "visibility_opt", "batch", file_paths if file_paths else None
                 )
                 PrettyOutput.auto_print(
-                    "[c2rust-optimizer][codeagent][visibility] 可见性优化成功，已保存进度"
+                    "[c2rust-optimizer][code_agent][visibility] 可见性优化成功，已保存进度"
                 )
             else:
                 # 测试失败，回退到运行前的 commit
                 if commit_before:
                     PrettyOutput.auto_print(
-                        f"[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败，回退到运行前的 commit: {commit_before[:8]}"
+                        f"[c2rust-optimizer][code_agent][visibility] 可见性优化后测试失败，回退到运行前的 commit: {commit_before[:8]}"
                     )
                     if self.progress_manager.reset_to_commit(commit_before):
                         PrettyOutput.auto_print(
-                            f"[c2rust-optimizer][codeagent][visibility] 已成功回退到 commit: {commit_before[:8]}"
+                            f"[c2rust-optimizer][code_agent][visibility] 已成功回退到 commit: {commit_before[:8]}"
                         )
                     else:
                         PrettyOutput.auto_print(
-                            "[c2rust-optimizer][codeagent][visibility] 回退失败，请手动检查代码状态"
+                            "[c2rust-optimizer][code_agent][visibility] 回退失败，请手动检查代码状态"
                         )
                 else:
                     PrettyOutput.auto_print(
-                        "[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败，但无法获取运行前的 commit"
+                        "[c2rust-optimizer][code_agent][visibility] 可见性优化后测试失败，但无法获取运行前的 commit"
                     )
         finally:
             os.chdir(prev_cwd)

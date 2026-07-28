@@ -370,15 +370,19 @@ class GatewayManagerTool:
                 if isinstance(agent_id, list):
                     results = []
                     for single_id in agent_id:
-                        result = self._regenerate_agent(agent_id=single_id, node_id=node_id)
+                        result = self._regenerate_agent(
+                            agent_id=single_id, node_id=node_id
+                        )
                         results.append({"agent_id": single_id, **result})
-                    
+
                     # 判断整体是否成功
                     all_success = all(r.get("success", False) for r in results)
                     return {
                         "success": all_success,
                         "stdout": json.dumps(results, ensure_ascii=False, indent=2),
-                        "stderr": "" if all_success else "Some agents failed to regenerate",
+                        "stderr": ""
+                        if all_success
+                        else "Some agents failed to regenerate",
                     }
                 else:
                     return self._regenerate_agent(agent_id=agent_id, node_id=node_id)
@@ -966,7 +970,7 @@ class GatewayManagerTool:
         working_dir: Optional[str],
         node_id: Optional[str],
     ) -> Optional[Dict[str, Any]]:
-        """校验同一节点同一工作目录不允许同时有两个未启用 worktree 的 codeagent。
+        """校验同一节点同一工作目录不允许同时有两个未启用 worktree 的 code_agent。
 
         参数:
             agent_type: Agent 类型
@@ -977,7 +981,7 @@ class GatewayManagerTool:
         返回:
             冲突时返回错误字典，无冲突返回 None
         """
-        if agent_type != "codeagent" or worktree:
+        if agent_type != "code_agent" or worktree:
             return None
 
         target_node_id = (node_id or "master").strip() or "master"
@@ -1025,7 +1029,7 @@ class GatewayManagerTool:
             # 已停止的 agent 不冲突
             if agent.get("status") in ("stopped", "completed", "failed", "abandoned"):
                 continue
-            if agent.get("agent_type") != "codeagent":
+            if agent.get("agent_type") != "code_agent":
                 continue
             if agent.get("worktree"):
                 continue
@@ -1494,7 +1498,7 @@ class GatewayManagerTool:
             for single_id in agent_id:
                 result = self._delete_single_agent(single_id, node_id)
                 results.append({"agent_id": single_id, **result})
-            
+
             # 判断整体是否成功
             all_success = all(r.get("success", False) for r in results)
             return {
