@@ -182,10 +182,21 @@ p {
 @keyframes breathing {
   0%,
   100% {
-    opacity: 1;
+    background-color: var(--color-bg-tertiary);
   }
   50% {
-    opacity: 0.5;
+    background-color: #ffaa0040;
+  }
+}
+
+/* 激活+等待输入组合状态动画 - 紫色呼吸 */
+@keyframes breathing-active {
+  0%,
+  100% {
+    background-color: #3b82f640;
+  }
+  50% {
+    background-color: #a855f780;
   }
 }
 

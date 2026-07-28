@@ -18,6 +18,7 @@
       :getNodeLabel="getAgentNodeLabel"
       :getProxyNodeLabel="getAgentProxyNodeLabel"
       :isSelected="isAgentSelected"
+      :isWaitingInput="isWaitingInput"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
@@ -4391,7 +4392,9 @@ function getStatusClass(agent) {
 // 判断是否处于等待输入状态
 function isWaitingInput(agent) {
   const statusClass = getStatusClass(agent)
-  return statusClass === 'waiting_multi' || statusClass === 'waiting_single' || statusClass === 'waiting_confirm'
+  const result = statusClass === 'waiting_multi' || statusClass === 'waiting_single' || statusClass === 'waiting_confirm'
+  console.log('[BREATHING DEBUG] Agent:', agent.agent_id, 'Status:', statusClass, 'isWaiting:', result)
+  return result
 }
 
 // 查询 Agent 状态（通过网关代理）
@@ -8944,6 +8947,11 @@ function sendSystemNotification(message) {
   box-sizing: border-box;
 }
 
+/* Agent 等待输入状态的呼吸灯效果 */
+.editor-agent-node.waiting-input {
+  animation: breathing 1.5s ease-in-out infinite;
+}
+
 html,
 body {
   width: 100vw;
@@ -9400,10 +9408,6 @@ body::-webkit-scrollbar {
 
 .editor-agent-node.stopped {
   opacity: 0.7;
-}
-
-.editor-agent-node.waiting-input {
-  animation: breathing 1.5s ease-in-out infinite;
 }
 
 .agent-node-content {
