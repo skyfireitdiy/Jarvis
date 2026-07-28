@@ -11450,7 +11450,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--color-bg-tertiary);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12634,7 +12634,7 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--color-bg-tertiary);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
