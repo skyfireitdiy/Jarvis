@@ -1,0 +1,13 @@
+{
+  "id": "20260726_154656_250019",
+  "type": "project_long_term",
+  "tags": [
+    "release",
+    "publish",
+    "workflow",
+    "troubleshooting"
+  ],
+  "content": "Jarvis发布流程：1) publish.py脚本处理版本号+git tag+push；2) GitHub Actions workflow(.github/workflows/publish.yml)由tag v*触发，同时发布PyPI和VSCode Extension；3) force push tag会重新触发workflow，VSCode Marketplace拒绝重复版本号(already exists)是正常行为，不代表发布失败；4) PyPI发布用pypa/gh-action-pypi-publish@release/v1 + PYPI_API_TOKEN secret；5) 确认发布成功：检查pypi.org/project/jarvis-ai-assistant/<version>/ 是否可访问",
+  "created_at": "2026-07-26T15:46:56.250066",
+  "updated_at": "2026-07-26T15:46:56.250073"
+}
