@@ -402,12 +402,12 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-item.waiting-input {
-  background: rgba(210, 153, 34, 0.15);
+  background: rgba(210, 153, 34, 0.35);
 }
 
 /* 激活+等待输入组合状态 - 使用紫色背景 */
 .agent-item.active.waiting-input {
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.35);
 }
 
 .agent-checkbox {
