@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import os
 import re
 from datetime import datetime
 from typing import Any
@@ -364,6 +363,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "OrganizeAgents":
             # 交互式获取编排文件路径（支持多行输入，每行一个路径）
+            import os
             from jarvis.jarvis_utils.input import get_multiline_input
 
             PrettyOutput.auto_print("请输入编排文件路径（每行一个，输入空行结束）：")
@@ -1474,6 +1474,77 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 sec_scan()
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ Sec扫描失败: {e}")
+            return "", True
+        elif tag == "Cat":
+            # 处理Cat命令，查看文件内容
+            import os
+            from jarvis.jarvis_utils.input import get_multiline_input
+
+            PrettyOutput.auto_print("🐱 查看文件内容")
+            PrettyOutput.auto_print("请输入文件路径（支持相对路径和绝对路径）:")
+
+            # 使用多行输入获取文件路径
+            file_path = get_multiline_input("输入文件路径，按Enter确认").strip()
+
+            if not file_path:
+                PrettyOutput.auto_print("⚠️ 未输入文件路径，操作已取消")
+                return "", True
+
+            # 处理路径
+            if not os.path.isabs(file_path):
+                # 相对路径，基于当前工作目录
+                file_path = os.path.join(os.getcwd(), file_path)
+
+            # 检查文件是否存在
+            if not os.path.exists(file_path):
+                PrettyOutput.auto_print(f"❌ 文件不存在: {file_path}")
+                return "", True
+
+            if not os.path.isfile(file_path):
+                PrettyOutput.auto_print(f"❌ 不是文件: {file_path}")
+                return "", True
+
+            # 读取文件内容
+            try:
+                # 检测文件大小，超过1MB提示用户
+                file_size = os.path.getsize(file_path)
+                if file_size > 1024 * 1024:  # 1MB
+                    PrettyOutput.auto_print(
+                        f"⚠️ 文件较大 ({file_size / 1024 / 1024:.2f} MB)，读取可能需要一些时间..."
+                    )
+
+                # 尝试多种编码读取文件
+                encodings = ["utf-8", "gbk", "gb2312", "latin1"]
+                content = None
+                used_encoding = None
+
+                for encoding in encodings:
+                    try:
+                        with open(file_path, "r", encoding=encoding) as f:
+                            content = f.read()
+                        used_encoding = encoding
+                        break
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+
+                if content is None:
+                    # 如果所有编码都失败，尝试二进制模式读取
+                    with open(file_path, "rb") as f:
+                        content = f.read().decode("utf-8", errors="replace")
+                    used_encoding = "binary (with replacement)"
+
+                # 显示文件信息
+                PrettyOutput.auto_print(f"📄 文件: {file_path}")
+                PrettyOutput.auto_print(f"📊 大小: {file_size} 字节")
+                PrettyOutput.auto_print(f"🔤 编码: {used_encoding}")
+
+                # 显示文件内容
+                PrettyOutput.auto_print(content)
+                PrettyOutput.auto_print("✅ 文件读取完成")
+
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 读取文件失败: {e}")
+
             return "", True
         # 处理普通替换标记
         if tag in replace_map:

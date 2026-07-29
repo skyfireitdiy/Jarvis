@@ -215,6 +215,8 @@ BUILTIN_COMMANDS = [
     ("SecScan", "执行安全扫描"),
     # Agent 编排命令
     ("OrganizeAgents", "批量编排创建Agent"),
+    # 文件操作命令
+    ("Cat", "查看文件内容"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
