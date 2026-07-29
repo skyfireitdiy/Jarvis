@@ -56,19 +56,69 @@ class SessionManager:
         """Sets the addon prompt for the next model call."""
         self.addon_prompt = addon_prompt
 
-    def _generate_session_name(self, user_input: str) -> str:
-        """根据用户输入生成会话名称
-
-        Args:
-            user_input: 用户第一条输入
+    def _generate_session_name(self) -> str:
+        """根据对话记录使用TextRank算法生成会话名称
 
         Returns:
-            str: 使用用户输入前10个字符生成的会话名称
+            str: 使用TextRank算法从对话记录提取关键词生成的会话名称
         """
         import re
+        import jieba.analyse
 
-        session_name = user_input[:10].strip()
+        # 从对话记录中提取文本
+        conversation_text = ""
+        try:
+            messages = self.model.get_messages()
+            for msg in messages:
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                # 提取用户和助手的文本内容
+                if role in ["user", "assistant"] and content:
+                    if isinstance(content, str):
+                        conversation_text += content + " "
+                    elif isinstance(content, list):
+                        # 处理多模态消息列表
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                conversation_text += block.get("text", "") + " "
+        except Exception:
+            pass
+
+        # 如果对话记录为空，返回默认名称
+        if not conversation_text.strip():
+            return "未命名会话"
+
+        # 使用TextRank提取关键词
+        try:
+            keywords = jieba.analyse.textrank(
+                conversation_text,
+                topK=5,
+                withWeight=False,
+                allowPOS=(
+                    "ns",
+                    "n",
+                    "vn",
+                    "v",
+                    "nz",
+                ),  # 地名、名词、动名词、动词、其他名词
+            )
+
+            # 取前3个关键词组合成会话名称
+            if keywords:
+                session_name = "".join(keywords[:3])
+            else:
+                # 如果没有提取到关键词，返回默认名称
+                return "未命名会话"
+        except Exception:
+            # TextRank失败时返回默认名称
+            return "未命名会话"
+
+        # 清理特殊字符，只保留中文、英文、数字、下划线和连字符
         session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", session_name)
+
+        # 限制长度（最多15个字符）
+        if len(session_name) > 15:
+            session_name = session_name[:15]
 
         if not session_name:
             return "未命名会话"
@@ -360,16 +410,9 @@ class SessionManager:
             # 已有会话名称（从恢复的会话继承），直接使用
             session_name = self.current_session_name
         else:
-            # 新建会话，从agent获取原始输入生成名称
-            user_input = ""
-            if self.agent and hasattr(self.agent, "get_user_origin_input"):
-                user_input = self.agent.get_user_origin_input().strip()
-
-            if user_input:
-                session_name = self._generate_session_name(user_input)
-                PrettyOutput.auto_print(f"📝 生成会话名称: {session_name}")
-            else:
-                session_name = "未命名会话"
+            # 新建会话，使用TextRank从对话记录生成名称
+            session_name = self._generate_session_name()
+            PrettyOutput.auto_print(f"📝 生成会话名称: {session_name}")
 
             self.current_session_name = session_name
 
