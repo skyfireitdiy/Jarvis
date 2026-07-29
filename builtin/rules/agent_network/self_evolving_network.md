@@ -178,6 +178,95 @@ license: MIT
 - **必须**：分析网络性能和瓶颈
 - **禁止**：只监控不采取行动
 
+### 5. 技术学习Agent（知识采集者）
+
+**角色说明：**
+
+- **必须**：常驻运行，保持上下文连续性
+- **必须**：定期从互联网搜索Agent开发相关技术
+- **必须**：整理和归纳搜索到的技术知识
+- **必须**：将知识保存到知识库供其他Agent使用
+- **禁止**：只搜索不整理，或只整理不保存
+
+**职责要求：**
+
+- **必须**：启动后立即创建每日定时学习任务
+- **必须**：使用gateway_manager的create_timer创建定时任务（interval_seconds: 86400）
+- **必须**：定时任务触发时执行搜索、整理、保存流程
+- **必须**：使用search_web工具搜索Agent开发相关技术
+- **必须**：使用read_webpage工具深入阅读有价值的技术文章
+- **必须**：使用memory工具将整理后的知识保存到知识库
+- **必须**：为知识添加适当的标签便于检索
+- **必须**：记录学习历史，避免重复搜索相同内容
+
+**创建示例：**
+
+创建常驻Agent（no_interaction_mode必须为false）：
+
+```json
+{
+  "name": "gateway_manager",
+  "arguments": {
+    "action": "create_agent",
+    "agent_type": "agent",
+    "agent_name": "tech_learning_agent",
+    "working_dir": "/path/to/learning/work",
+    "task": "作为常驻Agent，启动后创建每日定时任务，从互联网搜索Agent开发相关技术并保存到知识库。保持上下文连续，记录学习历史。",
+    "no_interaction_mode": false
+  }
+}
+```
+
+**Agent内部定时任务创建：**
+
+Agent启动后，应使用 `timer` 工具创建定时提示词任务：
+
+```json
+{
+  "name": "timer",
+  "arguments": {
+    "operation": "add",
+    "task_type": "prompt",
+    "time_type": "interval",
+    "time_value": 86400,
+    "prompt_text": "开始每日技术学习任务：从互联网搜索Agent开发相关技术，整理并保存到知识库。请使用search_web搜索，read_webpage深入阅读，memory保存知识。"
+  }
+}
+```
+
+**参数说明：**
+
+- `operation`: "add" - 添加定时任务
+- `task_type`: "prompt" - 提示词类型任务（定时注入提示词到Agent输入缓冲区）
+- `time_type`: "interval" - 循环定时
+- `time_value`: 86400 - 间隔秒数（24小时）
+- `prompt_text`: 学习任务提示词
+
+**工作原理：**
+
+1. Agent启动后调用timer工具创建定时任务
+2. 每24小时，timer自动将prompt_text注入到Agent的输入缓冲区
+3. Agent收到提示词后执行搜索、整理、保存流程
+4. Agent保持上下文连续，记录学习历史，避免重复搜索
+
+**搜索关键词建议：**
+
+- Agent架构设计
+- 多Agent系统
+- Agent通信协议
+- Agent协作机制
+- LLM Agent开发
+- Agent工具调用
+- Agent记忆系统
+- Agent规划与推理
+
+**上下文连续性优势：**
+
+- 记录已搜索过的内容，避免重复
+- 积累学习经验，提高搜索效率
+- 建立知识关联，形成知识图谱
+- 跟踪技术发展趋势，识别新兴技术
+
 ## 协作机制
 
 ### 1. 任务发现与认领
