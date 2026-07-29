@@ -183,20 +183,44 @@ VSCode 插件提供更紧密的 IDE 集成体验：
 
 ```bash
 # Linux/macOS
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
-
-# Windows PowerShell
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh)"
 ```
 
 安装脚本会自动完成以下操作：
 
-- 下载 Jarvis 最新 tag 对应的源码（浅克隆，减少下载体积）
-- 将仓库内置依赖目录加入当前会话 `PATH`
-- 使用仓库内置 `uv` 执行 `uv tool install -e . --python 3.12`
-- 额外安装 `playwright` 与 `ddgr`
+- 自动安装 `uv` 包管理器（如果未安装）
+- 下载 Jarvis 最新版本源码（浅克隆，减少下载体积）
+- 使用 `uv tool install -e . --python 3.12` 安装 Jarvis
+- 可选安装增强工具（rg、fd、fzf、tmux、tree）
 
-> 提示：当前仓库已内置 `x86_64_linux` 平台依赖。一键安装脚本会优先使用仓库内置 `uv`；如果当前平台没有对应内置依赖，脚本会明确提示您手动安装 `uv` 或改用受支持的版本。
+> 💡 **提示**：新版本采用极简安装方式，不再内置二进制依赖，仓库体积减小约 164MB。安装过程需要网络连接以下载 `uv` 和 Python 依赖。
+
+#### 手动安装
+
+如果您希望手动安装或自定义安装位置：
+
+```bash
+# 1. 安装 uv（如果未安装）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. 克隆仓库
+git clone --depth 1 https://github.com/skyfireitdiy/Jarvis.git ~/Jarvis
+cd ~/Jarvis
+
+# 3. 安装 Jarvis
+uv tool install -e . --python 3.12
+
+# 4. 验证安装
+jarvis --version
+```
+
+#### 升级
+
+```bash
+cd ~/Jarvis
+git pull
+uv tool install -e . --python 3.12
+```
 
 #### 手动源码安装
 
