@@ -201,7 +201,7 @@ main() {
     echo "快速开始:"
     echo "  1. 如 jarvis 命令不可用，执行: source ~/.bashrc"
     echo "  2. 启动 Jarvis: jarvis"
-    echo "  3. 升级 Jarvis: cd $DEST_DIR && git pull && uv tool install -e . --python 3.12"
+    echo "  3. 升级 Jarvis: cd $DEST_DIR && git fetch --depth 1 && git reset --hard origin/main && uv tool install -e . --python 3.12"
     echo ""
     echo "========================================"
 }
