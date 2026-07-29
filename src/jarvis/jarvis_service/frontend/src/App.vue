@@ -8950,9 +8950,9 @@ function sendSystemNotification(message) {
   box-sizing: border-box;
 }
 
-/* Agent 等待输入状态的呼吸灯效果 */
+/* Agent 等待输入状态的背景高亮 */
 .editor-agent-node.waiting-input {
-  animation: breathing 1.5s ease-in-out infinite;
+  background: rgba(210, 153, 34, 0.15);
 }
 
 html,
@@ -9861,12 +9861,6 @@ body::-webkit-scrollbar {
 .dot.reconnecting {
   background: #d29922;
   color: #d29922;
-  animation: dot-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes dot-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
 }
 
 .dot.online {
