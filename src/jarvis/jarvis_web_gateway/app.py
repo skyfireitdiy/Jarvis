@@ -593,6 +593,14 @@ class WebSocketConnectionManager:
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
 
+        # 先进行认证检查，只有认证通过才允许替换旧连接
+        auth_payload = _extract_auth_from_headers(websocket)
+        authorized, reason = self._gateway._check_auth(auth_payload)
+        if not authorized:
+            await _send_error(websocket, "AUTH_FAILED", reason or "auth failed")
+            await websocket.close()
+            return
+
         async with self._connection_state_lock:
             existing_connection = self._active_connections.get(session_id)
             if existing_connection:
@@ -630,13 +638,6 @@ class WebSocketConnectionManager:
                 self._router.unregister(old_connection_id, session_id=session_id)
                 self._active_connections.pop(session_id, None)
                 self._auth_store.pop(session_id, None)
-
-        auth_payload = _extract_auth_from_headers(websocket)
-        authorized, reason = self._gateway._check_auth(auth_payload)
-        if not authorized:
-            await _send_error(websocket, "AUTH_FAILED", reason or "auth failed")
-            await websocket.close()
-            return
 
         self._auth_store[session_id] = auth_payload
         print(
