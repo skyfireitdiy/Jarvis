@@ -45,7 +45,6 @@
               <div class="agent-actions">
                 <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
                 <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
                 <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
                 <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
                 <button class="icon-btn-small" @click.stop="$emit('saveHistory', agent)" title="保存历史">💾</button>
@@ -83,6 +82,7 @@
             <div class="agent-actions">
               <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
               <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
+              <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
               <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
               <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
               <button class="icon-btn-small" @click.stop="$emit('saveHistory', agent)" title="保存历史">💾</button>
