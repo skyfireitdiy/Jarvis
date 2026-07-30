@@ -216,6 +216,31 @@ const emit = defineEmits([
   'deleteHistory'
 ])
 
+// 监听 agentList 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
+watch(() => props.agentList, (newList, oldList) => {
+  if (!newList || !oldList) return
+  
+  // 遍历新列表，检查状态变化
+  newList.forEach(newAgent => {
+    const oldAgent = oldList.find(a => a.agent_id === newAgent.agent_id)
+    if (!oldAgent) return
+    
+    // 获取新旧状态的等待输入标志
+    const wasWaitingInput = props.isWaitingInput(oldAgent)
+    const isNowWaitingInput = props.isWaitingInput(newAgent)
+    
+    // 如果从等待输入变为非等待输入（如运行态），清除点击标记
+    if (wasWaitingInput && !isNowWaitingInput) {
+      if (clickedWaitingAgents.value.has(newAgent.agent_id)) {
+        clickedWaitingAgents.value.delete(newAgent.agent_id)
+        // 触发响应式更新
+        clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
+        console.log(`[AGENT_SIDEBAR] Cleared clicked mark for agent ${newAgent.agent_id} (status changed from waiting_input)`)
+      }
+    }
+  })
+}, { deep: true })
+
 // 监听currentAgentId变化，自动展开对应节点分组
 watch(() => props.currentAgentId, (newAgentId) => {
   if (!newAgentId || !props.agentList) return
