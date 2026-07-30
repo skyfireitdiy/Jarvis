@@ -3502,6 +3502,8 @@ async function connect() {
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     console.log('[ws] Connection info saved:', gatewayUrl.value)
     startAgentListRefresh()
+    // 登录成功后自动连接所有在线的 agent
+    autoConnectToOnlineAgents()
     // 获取模型组列表
     fetchModelGroups()
     fetchNodeStatus()
@@ -5086,11 +5088,25 @@ async function fetchAgentList() {
     
     // 更新列表（后端返回格式: { success: true, data: agents }）
     if (result.success && result.data) {
+      // 记录旧的 agent ID 列表，用于检测新创建的 agent
+      const oldAgentIds = new Set(agentList.value.map(a => a.agent_id))
+      
       // 反转数组，让后创建的 agent 排在前面
       agentList.value = result.data.slice().reverse().map(agent => ({
         ...agent,
         node_id: String(agent?.node_id || '').trim() || 'master',
       }))
+      
+      // 检测新创建的在线 agent 并自动连接
+      const newOnlineAgents = agentList.value.filter(agent => 
+        agent.status === 'running' && !oldAgentIds.has(agent.agent_id)
+      )
+      
+      if (newOnlineAgents.length > 0) {
+        console.log(`[AGENT] Found ${newOnlineAgents.length} new online agents, auto-connecting...`)
+        // 异步连接，不阻塞列表刷新
+        autoConnectToOnlineAgents()
+      }
     }
     
     // 更新当前 Agent 状态
@@ -6075,6 +6091,52 @@ async function switchAgent(agent) {
     // 用户可以看到错误并手动重试
     // 即使连接失败，状态已通过 HTTP 查询
   }
+}
+
+// 自动连接所有在线的 Agent（不切换当前选中的 Agent）
+async function autoConnectToOnlineAgents() {
+  // 获取所有在线的 agent（status 为 running）
+  const onlineAgents = agentList.value.filter(agent => agent.status === 'running')
+  
+  if (onlineAgents.length === 0) {
+    console.log('[AUTO_CONNECT] No online agents to connect')
+    return
+  }
+  
+  console.log(`[AUTO_CONNECT] Found ${onlineAgents.length} online agents, connecting...`)
+  
+  // 记录当前选中的 agent，确保不切换
+  const savedCurrentAgentId = currentAgentId.value
+  
+  // 逐个连接在线 agent，添加延迟避免同时建立过多连接
+  for (const agent of onlineAgents) {
+    // 检查是否已经连接
+    if (sockets.value.has(agent.agent_id)) {
+      const existingWs = sockets.value.get(agent.agent_id)
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        console.log(`[AUTO_CONNECT] Already connected to ${agent.name || agent.agent_id}`)
+        continue
+      }
+    }
+    
+    try {
+      console.log(`[AUTO_CONNECT] Connecting to ${agent.name || agent.agent_id}`)
+      await connectToAgent(agent)
+      // 连接间隔 500ms，避免同时建立过多连接
+      await new Promise(resolve => setTimeout(resolve, 500))
+    } catch (error) {
+      console.warn(`[AUTO_CONNECT] Failed to connect to ${agent.name || agent.agent_id}:`, error.message)
+      // 单个连接失败不影响其他连接
+    }
+  }
+  
+  // 确保当前选中的 agent 没有被改变
+  if (currentAgentId.value !== savedCurrentAgentId) {
+    console.log('[AUTO_CONNECT] Restoring current agent selection')
+    currentAgentId.value = savedCurrentAgentId
+  }
+  
+  console.log(`[AUTO_CONNECT] Auto-connect completed, connected agents: ${sockets.value.size}`)
 }
 
 // 定时刷新 Agent 列表
