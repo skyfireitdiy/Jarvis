@@ -172,6 +172,7 @@ const props = defineProps({
   windowWidth: Number,
   isAllSelected: Boolean,
   socket: [Object, null],
+  agentStatuses: Map,  // Agent状态映射 (agent_id -> {execution_status})
   getStatusClass: Function,
   getStatusText: Function,
   getNodeLabel: Function,
@@ -216,27 +217,41 @@ const emit = defineEmits([
   'deleteHistory'
 ])
 
-// 监听 agentList 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
-watch(() => props.agentList, (newList, oldList) => {
-  if (!newList || !oldList) return
-  
-  // 遍历新列表，检查状态变化
-  newList.forEach(newAgent => {
-    const oldAgent = oldList.find(a => a.agent_id === newAgent.agent_id)
-    if (!oldAgent) return
-    
-    // 获取新旧状态的等待输入标志
-    const wasWaitingInput = props.isWaitingInput(oldAgent)
-    const isNowWaitingInput = props.isWaitingInput(newAgent)
-    
-    // 如果从等待输入变为非等待输入（如运行态），清除点击标记
-    if (wasWaitingInput && !isNowWaitingInput) {
-      if (clickedWaitingAgents.value.has(newAgent.agent_id)) {
-        clickedWaitingAgents.value.delete(newAgent.agent_id)
-        // 触发响应式更新
-        clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
-        console.log(`[AGENT_SIDEBAR] Cleared clicked mark for agent ${newAgent.agent_id} (status changed from waiting_input)`)
+// 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
+// 使用 ref 来跟踪上一次的状态
+const previousStatusMap = ref(new Map())
+
+watch(() => props.agentStatuses, (newStatuses) => {
+  if (!newStatuses) return
+
+  // 遍历所有 agent，检查状态变化
+  props.agentList?.forEach(agent => {
+    const agentId = agent.agent_id
+    const currentStatus = newStatuses.get(agentId)
+    const previousStatus = previousStatusMap.value.get(agentId)
+
+    // 如果当前状态存在
+    if (currentStatus) {
+      const executionStatus = currentStatus.execution_status
+      const isWaiting = executionStatus === 'waiting_multi' || executionStatus === 'waiting_single' || executionStatus === 'waiting_confirm'
+
+      // 如果之前是等待输入状态，现在不是了，清除点击标记
+      if (previousStatus) {
+        const prevExecutionStatus = previousStatus.execution_status
+        const wasWaiting = prevExecutionStatus === 'waiting_multi' || prevExecutionStatus === 'waiting_single' || prevExecutionStatus === 'waiting_confirm'
+
+        if (wasWaiting && !isWaiting) {
+          if (clickedWaitingAgents.value.has(agentId)) {
+            clickedWaitingAgents.value.delete(agentId)
+            // 触发响应式更新
+            clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
+            console.log(`[AGENT_SIDEBAR] Cleared clicked mark for agent ${agentId} (status changed from ${prevExecutionStatus} to ${executionStatus})`)
+          }
+        }
       }
+
+      // 更新上一次的状态
+      previousStatusMap.value.set(agentId, { ...currentStatus })
     }
   })
 }, { deep: true })
