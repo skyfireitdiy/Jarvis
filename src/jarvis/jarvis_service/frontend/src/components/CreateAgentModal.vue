@@ -23,7 +23,7 @@
                 <span class="radio-desc">适用于日常任务和通用操作</span>
               </label>
               <label class="radio-label">
-                <input type="radio" :checked="agentType === 'codeagent'" @change="$emit('update:agentType', 'codeagent')" />
+                <input type="radio" :checked="agentType === 'code_agent'" @change="$emit('update:agentType', 'code_agent')" />
                 <span class="radio-text">代码 Agent</span>
                 <span class="radio-desc">专注于代码分析和开发任务</span>
               </label>
@@ -62,7 +62,7 @@
             </div>
           </div>
           <div class="form-column create-agent-options-column">
-            <div v-if="agentType === 'codeagent'" class="form-group">
+            <div v-if="agentType === 'code_agent'" class="form-group">
               <div class="toggle-wrapper">
                 <label class="toggle-switch">
                   <input :checked="codeAgentWorktree" @change="$emit('update:codeAgentWorktree', $event.target.checked)" type="checkbox" class="toggle-input" />
@@ -132,7 +132,7 @@ const props = defineProps({
   visible: Boolean,
   nodeOptions: { type: Array, default: () => [] },
   nodeId: { type: String, default: '' },
-  agentType: { type: String, default: 'codeagent' },
+  agentType: { type: String, default: 'code_agent' },
   agentName: { type: String, default: '' },
   modelGroups: { type: Array, default: () => [] },
   modelGroup: { type: String, default: 'default' },

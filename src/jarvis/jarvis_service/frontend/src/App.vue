@@ -74,7 +74,7 @@
         </div>
         
         <div class="current-agent-info desktop-only" v-if="currentAgent">
-          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'codeagent' ? '👨‍💻' : '❓') }}</span>
+          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'code_agent' ? '👨‍💻' : '❓') }}</span>
           <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
           <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeLabel(currentAgent) }}</span>
           <span class="agent-dir">{{ currentAgent.working_dir }}</span>
@@ -204,7 +204,7 @@
                     class="tree-node-icon expand-arrow"
                     :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                   >▶</span>
-                  <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
+                  <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
                   <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                   <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
                   <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
@@ -275,7 +275,7 @@
                           class="tree-node-icon expand-arrow"
                           :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                         >▶</span>
-                        <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'codeagent' ? '👨‍💻' : '🤖' }}</span>
+                        <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
                         <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                         <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '🟢' }}</span>
                         <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
@@ -3069,7 +3069,7 @@ const isWaitingMultiDisabled = computed(() => {
   }
   return false // 永远启用
 })
-const newAgentType = ref('codeagent') // 新 Agent 类型
+const newAgentType = ref('code_agent') // 新 Agent 类型
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为'通用Agent'）
 const modelGroups = ref([])        // 模型组列表
@@ -3103,8 +3103,8 @@ watch(newAgentType, (newType) => {
   if (newType === 'agent') {
     newAgentName.value = generateAgentName('agent')
     newCodeAgentWorktree.value = false
-  } else if (newType === 'codeagent') {
-    newAgentName.value = generateAgentName('codeagent')
+  } else if (newType === 'code_agent') {
+    newAgentName.value = generateAgentName('code_agent')
   }
 }, { immediate: true, flush: 'sync' })
 
@@ -4786,13 +4786,13 @@ async function createAgent() {
     alert('无交互模式下必须提供任务描述')
     return
   }
-  // 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 codeagent
-  if (newAgentType.value === 'codeagent' && !newCodeAgentWorktree.value) {
+  // 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 code_agent
+  if (newAgentType.value === 'code_agent' && !newCodeAgentWorktree.value) {
     const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
     const normalizedDir = newAgentDir.value.trim()
     const conflictingAgent = agentList.value.find(agent => {
       if (isStoppedAgent(agent)) return false  // 已停止的 agent 不冲突
-      if (agent.agent_type !== 'codeagent') return false
+      if (agent.agent_type !== 'code_agent') return false
       if (agent.worktree) return false  // 启用了 worktree 的不冲突
       const agentNodeId = String(agent.node_id || '').trim() || 'master'
       if (agentNodeId !== targetNodeId) return false
@@ -4815,7 +4815,7 @@ async function createAgent() {
         working_dir: newAgentDir.value,
         name: newAgentName.value || undefined,
         llm_group: newAgentModelGroup.value,
-        worktree: newAgentType.value === 'codeagent' ? newCodeAgentWorktree.value : false,
+        worktree: newAgentType.value === 'code_agent' ? newCodeAgentWorktree.value : false,
         quick_mode: newAgentQuickMode.value,
         restore_session: newAgentRestoreSession.value,
         no_interaction_mode: newAgentNoInteractionMode.value,
@@ -5110,7 +5110,7 @@ function buildCopiedAgentPayload(agent, copiedName, targetNodeId = undefined) {
     working_dir: agent.working_dir,
     name: copiedName,
     llm_group: agent.llm_group || 'default',
-    worktree: agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false,
+    worktree: agent.agent_type === 'code_agent' ? Boolean(agent.worktree) : false,
     quick_mode: Boolean(agent.quick_mode),
     restore_session: Boolean(agent.restore_session),
     no_interaction_mode: Boolean(agent.no_interaction_mode),
@@ -5133,9 +5133,9 @@ async function copyAgent(agent) {
   ])
 
   // 填充表单变量
-  newAgentType.value = agent.agent_type || 'codeagent'
+  newAgentType.value = agent.agent_type || 'code_agent'
   newAgentModelGroup.value = agent.llm_group || 'default'
-  newCodeAgentWorktree.value = agent.agent_type === 'codeagent' ? Boolean(agent.worktree) : false
+  newCodeAgentWorktree.value = agent.agent_type === 'code_agent' ? Boolean(agent.worktree) : false
   newAgentQuickMode.value = Boolean(agent.quick_mode)
   newAgentRestoreSession.value = Boolean(agent.restore_session)
   newAgentNoInteractionMode.value = Boolean(agent.no_interaction_mode)
@@ -5145,7 +5145,7 @@ async function copyAgent(agent) {
   newAgentNodeId.value = String(agent?.node_id || '').trim()
   newAgentDir.value = agent.working_dir || '~'
   // 设置正确的名称（Agent类型-创建时间格式）
-  newAgentName.value = generateAgentName(agent.agent_type || 'codeagent')
+  newAgentName.value = generateAgentName(agent.agent_type || 'code_agent')
 
   // 重置目录选择状态
   resetDirectorySelectionState()
@@ -5178,7 +5178,7 @@ async function batchCopyAgents() {
         const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
           method: 'POST',
           body: JSON.stringify(
-            buildCopiedAgentPayload(agent, generateAgentName(agent.agent_type || 'codeagent'), targetNodeId)
+            buildCopiedAgentPayload(agent, generateAgentName(agent.agent_type || 'code_agent'), targetNodeId)
           )
         })
         if (response.ok) {
