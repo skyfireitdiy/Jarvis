@@ -517,7 +517,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                 _print_markdown_table("📋 所有可用规则", headers, rows)
                 PrettyOutput.auto_print(
-                    f"总计: {len(rules_info)} 个规则", timestamp=False
+                    f"总计: {len(rules_info)} 个规则", timestamp=None
                 )
 
             return "", True

@@ -688,7 +688,7 @@ class task_list_manager:
                             OutputEvent(
                                 text=f"✅ 任务 [{task.task_name}] 验证通过",
                                 output_type=OutputType.INFO,
-                                timestamp=True,
+                                timestamp=None,
                                 context={
                                     "_gateway_skip": True,
                                     "task_id": task.task_id,
@@ -716,7 +716,7 @@ class task_list_manager:
                             OutputEvent(
                                 text=f"❌ 任务 [{task.task_name}] 验证未通过",
                                 output_type=OutputType.WARNING,
-                                timestamp=True,
+                                timestamp=None,
                                 context={
                                     "_gateway_skip": True,
                                     "task_id": task.task_id,
@@ -746,7 +746,7 @@ class task_list_manager:
                         OutputEvent(
                             text=f"⚠️ 任务 [{task.task_name}] 验证无结果，默认认为未完成",
                             output_type=OutputType.WARNING,
-                            timestamp=True,
+                            timestamp=None,
                             context={
                                 "_gateway_skip": True,
                                 "task_id": task.task_id,
@@ -774,7 +774,7 @@ class task_list_manager:
                     OutputEvent(
                         text=f"⚠️ 验证任务 [{task.task_name}] 时发生异常: {str(e)}",
                         output_type=OutputType.WARNING,
-                        timestamp=True,
+                        timestamp=None,
                         context={
                             "_gateway_skip": True,
                             "task_id": task.task_id,
@@ -920,7 +920,7 @@ class task_list_manager:
                             OutputEvent(
                                 text=table_md,
                                 output_type=OutputType.INFO,
-                                timestamp=True,
+                                timestamp=None,
                                 lang="markdown",  # 标记为 Markdown 格式，前端将渲染表格
                                 context={
                                     "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
@@ -1422,7 +1422,7 @@ class task_list_manager:
                     OutputEvent(
                         text=f"✅ 成功批量添加 {len(task_ids)} 个任务到任务列表: {task_list_id}",
                         output_type=OutputType.INFO,
-                        timestamp=True,
+                        timestamp=None,
                         context={
                             "_gateway_skip": True,
                             "task_list_id": task_list_id,
@@ -1722,7 +1722,7 @@ class task_list_manager:
                 OutputEvent(
                     text=f"🚀 开始执行任务: [{task.task_name}] ({task_id})",
                     output_type=OutputType.INFO,
-                    timestamp=True,
+                    timestamp=None,
                     context={
                         "_gateway_skip": True,
                         "task_list_id": task_list_id,
@@ -1870,7 +1870,7 @@ class task_list_manager:
                                 OutputEvent(
                                     text=f"🔄 执行任务 [{task.task_name}] (第 {iteration} 次迭代)...",
                                     output_type=OutputType.INFO,
-                                    timestamp=True,
+                                    timestamp=None,
                                     context={
                                         "_gateway_skip": True,
                                         "task_id": task_id,
@@ -2046,7 +2046,7 @@ class task_list_manager:
                                     OutputEvent(
                                         text=f"⏭️ 用户选择跳过验证，任务 [{task.task_name}] 直接标记为完成",
                                         output_type=OutputType.INFO,
-                                        timestamp=True,
+                                        timestamp=None,
                                         context={
                                             "_gateway_skip": True,
                                             "task_id": task_id,
@@ -2152,7 +2152,7 @@ class task_list_manager:
                             OutputEvent(
                                 text=f"✅ 任务 [{task.task_name}] 执行完成",
                                 output_type=OutputType.INFO,
-                                timestamp=True,
+                                timestamp=None,
                                 context={
                                     "_gateway_skip": True,
                                     "task_id": task_id,
@@ -2186,7 +2186,7 @@ class task_list_manager:
                             OutputEvent(
                                 text=f"❌ 任务 [{task.task_name}] 执行失败",
                                 output_type=OutputType.ERROR,
-                                timestamp=True,
+                                timestamp=None,
                                 context={
                                     "_gateway_skip": True,
                                     "task_id": task_id,
@@ -2568,7 +2568,7 @@ class task_list_manager:
                         OutputEvent(
                             text=f"{status_emoji} 任务 [{task.task_name}] 状态更新为: {status}",
                             output_type=OutputType.INFO,
-                            timestamp=True,
+                            timestamp=None,
                             context={
                                 "_gateway_skip": True,
                                 "task_id": task_id,

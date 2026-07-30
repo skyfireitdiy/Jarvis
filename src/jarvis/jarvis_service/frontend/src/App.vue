@@ -110,9 +110,9 @@
               <span class="message-agent" v-if="item.agent_name">{{ item.agent_name }}</span>
               <span class="message-separator" v-if="item.agent_name && item.timestamp"> · </span>
               <span class="message-time" v-if="item.timestamp">{{ formatMessageTime(item.timestamp) }}</span>
-              <span class="message-separator" v-if="(item.agent_name || item.timestamp) && item.non_interactive"> · </span>
-              <span class="message-silent" v-if="item.non_interactive" title="静默模式">🔇</span>
-              <span class="message-silent" v-else title="交互模式">🔊</span>
+              <span class="message-separator" v-if="(item.agent_name || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
+              <span class="message-silent" v-if="item.non_interactive === true" title="静默模式">🔇</span>
+              <span class="message-silent" v-if="item.non_interactive === false" title="交互模式">🔊</span>
             </div>
           </div>
           <!-- 终端嵌入 -->
