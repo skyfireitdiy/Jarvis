@@ -25,8 +25,8 @@
               v-for="agent in agentGroup.agents"
               :key="agent.agent_id"
               class="agent-item"
-              :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent) }"
-              @click="$emit('agentClick', agent, $event)"
+              :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
+              @click="handleAgentClick(agent, $event)"
             >
               <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
                 <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
@@ -63,8 +63,8 @@
             v-for="agent in agentGroup.agents"
             :key="agent.agent_id"
             class="agent-item"
-            :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent) }"
-            @click="$emit('agentClick', agent, $event)"
+            :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
+            @click="handleAgentClick(agent, $event)"
           >
             <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
               <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
@@ -133,6 +133,9 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
 
+// 追踪已点击过的等待输入Agent
+const clickedWaitingAgents = ref(new Set())
+
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
 }
@@ -143,6 +146,18 @@ function toggleGroupCollapse(groupKey) {
   } else {
     collapsedGroupsMap.value[groupKey] = true
   }
+}
+
+// 处理Agent点击事件，记录点击状态
+function handleAgentClick(agent, event) {
+  // 如果是等待输入状态，记录点击
+  if (props.isWaitingInput(agent)) {
+    clickedWaitingAgents.value.add(agent.agent_id)
+    // 触发响应式更新
+    clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
+  }
+  // 触发父组件的点击事件
+  emit('agentClick', agent, event)
 }
 
 const props = defineProps({
@@ -408,6 +423,20 @@ watch(() => props.currentAgentId, (newAgentId) => {
 /* 激活+等待输入组合状态 - 使用紫色背景 */
 .agent-item.active.waiting-input {
   background: rgba(139, 92, 246, 0.35);
+}
+
+/* 未点击的等待输入状态 - 呼吸灯效果 */
+.agent-item.waiting-input-unread {
+  animation: breathing 2s ease-in-out infinite;
+}
+
+@keyframes breathing {
+  0%, 100% {
+    background: rgba(210, 153, 34, 0.35);
+  }
+  50% {
+    background: rgba(210, 153, 34, 0.65);
+  }
 }
 
 .agent-checkbox {
