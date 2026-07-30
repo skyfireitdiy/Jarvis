@@ -1097,7 +1097,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Review":
             # 处理Review命令，执行单次代码审查
             # 检查是否为CodeAgent
-            agent_type = getattr(agent, "_agent_type", "normal")
+            agent_type = getattr(agent, "_agent_type", "agent")
             if agent_type != "code_agent":
                 PrettyOutput.auto_print(
                     "⚠ Review 命令仅支持 CodeAgent，当前 Agent 不支持代码审查"

@@ -514,7 +514,7 @@ class Agent:
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = True,
         in_multi_agent: Optional[bool] = None,
-        agent_type: str = "normal",
+        agent_type: str = "agent",
         allow_savesession: bool = False,
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
@@ -693,7 +693,7 @@ class Agent:
             ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
         self._last_handler_returned = False  # 记录最近一次输入处理器是否返回了消息
-        self._agent_type = "normal"
+        self._agent_type = "agent"
 
     def add_memory_tags(self, tags: List[str]) -> None:
         """添加记忆标签到 memory_tags 集合
