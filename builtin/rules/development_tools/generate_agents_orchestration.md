@@ -31,7 +31,7 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 | 字段名                | 类型   | 必填   | 默认值    | 说明                                                   |
 | --------------------- | ------ | ------ | --------- | ------------------------------------------------------ |
 | `name`                | string | 否     | `agent_N` | Agent 名称，用于标识和显示                             |
-| `type`                | string | 否     | `code`    | Agent 类型，如 `code`、`chat` 等                       |
+| `type`                | string | 否     | `code_agent` | Agent 类型，如 `agent`、`code_agent` 等                       |
 | `working_dir`         | string | **是** | -         | 工作目录，Agent 的工作路径                             |
 | `llm_group`           | string | 否     | `default` | 模型组名称                                             |
 | `tool_group`          | string | 否     | `default` | 工具组名称                                             |
@@ -47,7 +47,7 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 **必须遵守：**
 
 - `working_dir` 必须是有效的目录路径
-- `type` 必须是支持的 Agent 类型（通常为 `code` 或 `chat`）
+- `type` 必须是支持的 Agent 类型（`agent` 或 `code_agent`）
 - **禁止**：默认使用 `no_interaction_mode: true`，应优先使用交互模式以便人工确认和调整
 - 当 `no_interaction_mode: true` 时，`task` 字段必填
 - `name` 应具有描述性，便于识别
@@ -74,7 +74,7 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 ```yaml
 agents:
   - name: "agent_name"
-    type: "code"
+    type: "code_agent"
     working_dir: "/path/to/project"
 ```
 
@@ -83,20 +83,20 @@ agents:
 ```yaml
 agents:
   - name: "agent_1"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/project1"
     llm_group: "default"
     tool_group: "default"
     task: "实现用户登录功能"
 
   - name: "agent_2"
-    type: "chat"
+    type: "agent"
     working_dir: "/home/user/project2"
     llm_group: "gpt4"
     task: "分析需求文档"
 
   - name: "agent_3"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/project3"
     worktree: true
     quick_mode: true
@@ -107,7 +107,7 @@ agents:
 ```yaml
 agents:
   - name: "agent_1"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/project1"
     task: "实现用户登录功能"
     no_interaction_mode: true
@@ -131,11 +131,11 @@ agents:
 ```yaml
 agents:
   - name: "frontend_dev"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/frontend"
 
   - name: "backend_dev"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/backend"
 ```
 
@@ -146,17 +146,17 @@ agents:
 ```yaml
 agents:
   - name: "feature_auth"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/myapp"
     task: "实现用户认证模块，包括登录、注册、密码重置功能"
 
   - name: "feature_api"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/myapp"
     task: "设计并实现 RESTful API 接口"
 
   - name: "docs_writer"
-    type: "chat"
+    type: "agent"
     working_dir: "/home/user/myapp"
     task: "编写 API 文档"
 ```
@@ -168,17 +168,17 @@ agents:
 ```yaml
 agents:
   - name: "project_a_dev"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/projects/project_a"
     llm_group: "claude"
 
   - name: "project_b_dev"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/projects/project_b"
     llm_group: "gpt4"
 
   - name: "shared_lib_dev"
-    type: "code"
+    type: "code_agent"
     working_dir: "/home/user/projects/shared_lib"
     worktree: true
 ```
