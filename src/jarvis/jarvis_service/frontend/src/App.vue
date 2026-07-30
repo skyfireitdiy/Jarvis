@@ -13,6 +13,7 @@
       :windowWidth="windowWidth"
       :isAllSelected="isAllSelected"
       :socket="socket"
+      :agentStatuses="agentStatuses"
       :getStatusClass="getStatusClass"
       :getStatusText="getStatusText"
       :getNodeLabel="getAgentNodeLabel"
