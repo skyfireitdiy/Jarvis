@@ -221,7 +221,7 @@ class OutputEvent:
     输出事件的通用结构，供不同输出后端（Sink）消费。
     - text: 文本内容
     - output_type: 输出类型
-    - timestamp: 是否显示时间戳
+    - timestamp: ISO格式时间字符串（如 '2026-07-30T15:08:52'），None表示不显示时间戳
     - lang: 语法高亮语言（可选，不提供则自动检测）
     - traceback: 是否显示异常堆栈
     - section: 若为章节标题输出，填入标题文本；否则为None
@@ -230,7 +230,7 @@ class OutputEvent:
 
     text: str
     output_type: OutputType
-    timestamp: bool = True
+    timestamp: Optional[str] = None  # ISO格式时间字符串
     lang: Optional[str] = None
     traceback: bool = False
     section: Optional[str] = None
@@ -710,16 +710,16 @@ class PrettyOutput:
             return default_lang
 
     @staticmethod
-    def _format(output_type: OutputType, timestamp: bool = True) -> str:
+    def _format(output_type: OutputType, timestamp: Optional[str] = None) -> str:
         """
-        返回带时间戳前缀的Agent名字格式。
+        返回Agent名字格式（时间戳由前端显示）。
 
         参数：
             output_type: 输出类型（不再使用）
-            timestamp: 是否包含时间戳
+            timestamp: ISO格式时间字符串（保留参数兼容性，但不再使用）
 
         返回：
-            str: 包含时间戳和Agent名字的字符串
+            str: Agent名字字符串
         """
         agent_info = get_agent_list()
         if not agent_info:
@@ -742,18 +742,13 @@ class PrettyOutput:
                 agent_names_with_emoji.append(f"{name}{emoji}")
             agent_info = f"[{count}]{', '.join(agent_names_with_emoji)}"
 
-        if timestamp:
-            current_time = datetime.now().strftime("%H:%M:%S")
-            # 使用更美观的时间戳格式，添加分隔符
-            return f"⏰ {current_time} │ {agent_info}"
-        else:
-            return agent_info
+        return agent_info
 
     @staticmethod
     def _print(
         text: str,
         output_type: OutputType,
-        timestamp: bool = True,
+        timestamp: Optional[str] = None,
         lang: Optional[str] = None,
         traceback: bool = False,
         context: Optional[Dict[str, Any]] = None,
@@ -762,6 +757,9 @@ class PrettyOutput:
         使用样式和语法高亮打印格式化输出（已抽象为事件 + Sink 机制）。
         内部接口，不建议直接使用，请使用 auto_print 代替。
         保持对现有调用方的向后兼容，同时为TUI/日志等前端预留扩展点。
+
+        参数:
+            timestamp: ISO格式时间字符串，None表示自动生成当前时间戳
         """
         # 自动获取上下文信息
         if context is None:
@@ -802,10 +800,19 @@ class PrettyOutput:
             save_exception(e, module="jarvis_utils.output", function="_print")
             pass
 
+        # 生成时间戳：如果未提供则自动生成当前时间的ISO格式
+        from datetime import datetime
+
+        actual_timestamp = (
+            timestamp
+            if timestamp is not None
+            else datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        )
+
         event = OutputEvent(
             text=text,
             output_type=output_type,
-            timestamp=timestamp,
+            timestamp=actual_timestamp,
             lang=lang,
             traceback=traceback,
             context=context if context else None,
@@ -894,7 +901,7 @@ class PrettyOutput:
     @staticmethod
     def auto_print(
         text: str,
-        timestamp: bool = True,
+        timestamp: Optional[str] = None,
         lang: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -1446,7 +1453,7 @@ class PrettyOutput:
                     OutputEvent(
                         text="",
                         output_type=OutputType.STREAM_START,
-                        timestamp=False,
+                        timestamp=None,
                         context={
                             "agent_name": agent_name,
                             "model_name": model_name,
@@ -1461,7 +1468,7 @@ class PrettyOutput:
                         OutputEvent(
                             text=first_chunk_content,
                             output_type=OutputType.STREAM_CHUNK,
-                            timestamp=False,
+                            timestamp=None,
                         )
                     )
 
@@ -1497,7 +1504,7 @@ class PrettyOutput:
                             OutputEvent(
                                 text=chunk_content,
                                 output_type=OutputType.STREAM_CHUNK,
-                                timestamp=False,
+                                timestamp=None,
                             )
                         )
 
@@ -1571,7 +1578,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_END,
-                timestamp=False,
+                timestamp=None,
                 context={
                     "duration": duration,
                     "first_token_time": first_token_time,
@@ -1639,7 +1646,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_START,
-                timestamp=False,
+                timestamp=None,
                 context={
                     "agent_name": agent_name,
                     "model_name": model_name,
@@ -1667,7 +1674,7 @@ class PrettyOutput:
                         OutputEvent(
                             text=chunk_content,
                             output_type=OutputType.STREAM_CHUNK,
-                            timestamp=False,
+                            timestamp=None,
                         )
                     )
 
@@ -1718,7 +1725,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_END,
-                timestamp=False,
+                timestamp=None,
                 context={
                     "duration": duration,
                     "first_token_time": first_token_time,

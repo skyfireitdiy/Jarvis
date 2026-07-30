@@ -15,7 +15,7 @@ class GatewayOutputEvent:
 
     text: str
     output_type: str
-    timestamp: bool = True
+    timestamp: Optional[str] = None  # ISO格式时间字符串，如 '2026-07-30T15:08:52'
     lang: Optional[str] = None
     traceback: bool = False
     section: Optional[str] = None

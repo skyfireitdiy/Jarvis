@@ -330,7 +330,7 @@ class DiffVisualizer:
                         text=diff_text,
                         output_type=OutputType.CODE,
                         lang="diff",
-                        timestamp=True,
+                        timestamp=None,
                         context={
                             "file_path": file_path,
                             "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
@@ -418,7 +418,7 @@ class DiffVisualizer:
                     text=diff_text,
                     output_type=OutputType.CODE,
                     lang="diff",
-                    timestamp=True,
+                    timestamp=None,
                     context={
                         "file_path": file_path,
                         "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
@@ -499,7 +499,7 @@ class DiffVisualizer:
                     text=diff_text,
                     output_type=OutputType.CODE,
                     lang="diff",
-                    timestamp=True,
+                    timestamp=None,
                     context={
                         "file_path": file_path,
                         "_gateway_skip": True,  # 不在终端打印 Gateway 专用数据
@@ -949,7 +949,7 @@ class DiffVisualizer:
                 OutputEvent(
                     text=diff_text,
                     output_type=OutputType.DIFF,  # 使用专门的 DIFF 类型
-                    timestamp=True,
+                    timestamp=None,
                     context={
                         "file_path": file_path,
                         "additions": additions,
