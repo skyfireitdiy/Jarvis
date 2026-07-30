@@ -106,6 +106,14 @@
               </svg>
             </button>
             <div class="message-body markdown-content" v-html="item.html"></div>
+            <div class="message-meta" v-if="item.agent_name || item.timestamp || item.non_interactive">
+              <span class="message-agent" v-if="item.agent_name">{{ item.agent_name }}</span>
+              <span class="message-separator" v-if="item.agent_name && item.timestamp"> · </span>
+              <span class="message-time" v-if="item.timestamp">{{ formatMessageTime(item.timestamp) }}</span>
+              <span class="message-separator" v-if="(item.agent_name || item.timestamp) && item.non_interactive"> · </span>
+              <span class="message-silent" v-if="item.non_interactive" title="静默模式">🔇</span>
+              <span class="message-silent" v-else title="交互模式">🔊</span>
+            </div>
           </div>
           <!-- 终端嵌入 -->
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
@@ -782,6 +790,44 @@ const DOT_BLOCK_LANGUAGES = ['dot', 'graphviz']
 let mermaidRenderCounter = 0
 // Dot 渲染计数器，用于生成唯一 ID
 let dotRenderCounter = 0
+
+// 格式化消息时间
+function formatMessageTime(timestamp) {
+  if (!timestamp) return ''
+  try {
+    let date
+    // 尝试多种格式解析
+    if (typeof timestamp === 'number') {
+      date = new Date(timestamp)
+    } else if (typeof timestamp === 'string') {
+      // ISO 格式 (2024-01-01T12:00:00)
+      if (timestamp.includes('T') || timestamp.includes('-')) {
+        date = new Date(timestamp)
+      } else {
+        // 时间字符串格式 (HH:mm:ss)，无法解析为日期，直接返回
+        return timestamp
+      }
+    } else {
+      date = new Date(timestamp)
+    }
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return timestamp
+    }
+    
+    const now = new Date()
+    const isToday = date.toDateString() === now.toDateString()
+    const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    if (isToday) {
+      return timeStr
+    }
+    const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    return `${dateStr} ${timeStr}`
+  } catch {
+    return timestamp
+  }
+}
 
 // 初始化 Mermaid
 mermaid.initialize({
@@ -10821,6 +10867,38 @@ body::-webkit-scrollbar {
   color: #e6edf3;
   line-height: 1.6;
   word-wrap: break-word;
+}
+
+/* 消息元信息样式（agent名称和时间戳） */
+.message-meta {
+  font-size: 11px;
+  color: #8b949e;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+.message-agent {
+  color: #58a6ff;
+}
+
+.message-separator {
+  color: #484f58;
+}
+
+.message-time {
+  color: #8b949e;
+}
+
+.message-silent {
+  color: #f0883e;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.message-silent svg {
+  width: 12px;
+  height: 12px;
 }
 
 .message-body.markdown-content :deep(pre) {
