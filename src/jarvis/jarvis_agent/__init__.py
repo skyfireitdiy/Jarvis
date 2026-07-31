@@ -3033,6 +3033,8 @@ class Agent:
 
         if not user_input:
             # 用户输入为空，完成任务
+            # 退出自动完成模式，防止 _execute_auto_complete 重复调用 _complete_task
+            self.return_control_on_auto_complete = True
             return self._complete_task(auto_completed=False)
 
         # 处理输入（包括 shell 命令等），让 input_handler 有机会处理
