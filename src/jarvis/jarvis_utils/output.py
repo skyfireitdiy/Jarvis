@@ -237,6 +237,13 @@ class OutputEvent:
     context: Optional[Dict[str, Any]] = None
 
 
+def _get_timestamp() -> str:
+    """获取当前时间的ISO格式时间戳字符串。"""
+    from datetime import datetime
+
+    return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+
 class OutputSink(ABC):
     """输出后端抽象接口，不同前端（控制台/TUI/SSE/日志）实现该接口以消费输出事件。"""
 
@@ -828,6 +835,7 @@ class PrettyOutput:
             text="",
             output_type=output_type,
             section=title,
+            timestamp=_get_timestamp(),
         )
         emit_output(event)
 
@@ -1045,6 +1053,7 @@ class PrettyOutput:
                 output_type=OutputType.RESULT,
                 lang="markdown",
                 section=title,
+                timestamp=_get_timestamp(),
             )
             emit_output(event)
 
@@ -1122,6 +1131,7 @@ class PrettyOutput:
                 output_type=OutputType.CODE,
                 lang=lang,
                 section=None,
+                timestamp=_get_timestamp(),
             )
             emit_output(event)
 
@@ -1453,7 +1463,7 @@ class PrettyOutput:
                     OutputEvent(
                         text="",
                         output_type=OutputType.STREAM_START,
-                        timestamp=None,
+                        timestamp=_get_timestamp(),
                         context={
                             "agent_name": agent_name,
                             "model_name": model_name,
@@ -1468,7 +1478,7 @@ class PrettyOutput:
                         OutputEvent(
                             text=first_chunk_content,
                             output_type=OutputType.STREAM_CHUNK,
-                            timestamp=None,
+                            timestamp=_get_timestamp(),
                         )
                     )
 
@@ -1504,7 +1514,7 @@ class PrettyOutput:
                             OutputEvent(
                                 text=chunk_content,
                                 output_type=OutputType.STREAM_CHUNK,
-                                timestamp=None,
+                                timestamp=_get_timestamp(),
                             )
                         )
 
@@ -1578,7 +1588,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_END,
-                timestamp=None,
+                timestamp=_get_timestamp(),
                 context={
                     "duration": duration,
                     "first_token_time": first_token_time,
@@ -1646,7 +1656,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_START,
-                timestamp=None,
+                timestamp=_get_timestamp(),
                 context={
                     "agent_name": agent_name,
                     "model_name": model_name,
@@ -1674,7 +1684,7 @@ class PrettyOutput:
                         OutputEvent(
                             text=chunk_content,
                             output_type=OutputType.STREAM_CHUNK,
-                            timestamp=None,
+                            timestamp=_get_timestamp(),
                         )
                     )
 
@@ -1725,7 +1735,7 @@ class PrettyOutput:
             OutputEvent(
                 text="",
                 output_type=OutputType.STREAM_END,
-                timestamp=None,
+                timestamp=_get_timestamp(),
                 context={
                     "duration": duration,
                     "first_token_time": first_token_time,
