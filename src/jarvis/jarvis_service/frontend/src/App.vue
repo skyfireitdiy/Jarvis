@@ -794,7 +794,6 @@ let dotRenderCounter = 0
 // 格式化消息时间 - 直接显示后端传递的时间戳
 function formatMessageTime(timestamp) {
   if (!timestamp) return ''
-  // 直接返回后端传递的时间戳字符串，不做任何解析
   return timestamp
 }
 
@@ -6656,9 +6655,8 @@ function appendOutput(payload, agentId = null) {
   }
   const html = renderMessageHtml(payload)
   
-  // 生成真实时间戳
-  const showTimestamp = payload?.timestamp !== false
-  const now = showTimestamp ? new Date().toLocaleTimeString('zh-CN', { hour12: false }) : ''
+  // 使用后端传的时间戳，不做本地生成
+  const now = payload?.timestamp || ''
   
   // 从 context 中提取 agent 信息，但优先使用 payload 顶层的 agent_name
   const context = payload?.context || {}
