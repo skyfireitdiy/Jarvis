@@ -791,42 +791,11 @@ let mermaidRenderCounter = 0
 // Dot 渲染计数器，用于生成唯一 ID
 let dotRenderCounter = 0
 
-// 格式化消息时间
+// 格式化消息时间 - 直接显示后端传递的时间戳
 function formatMessageTime(timestamp) {
   if (!timestamp) return ''
-  try {
-    let date
-    // 尝试多种格式解析
-    if (typeof timestamp === 'number') {
-      date = new Date(timestamp)
-    } else if (typeof timestamp === 'string') {
-      // ISO 格式 (2024-01-01T12:00:00)
-      if (timestamp.includes('T') || timestamp.includes('-')) {
-        date = new Date(timestamp)
-      } else {
-        // 时间字符串格式 (HH:mm:ss)，无法解析为日期，直接返回
-        return timestamp
-      }
-    } else {
-      date = new Date(timestamp)
-    }
-    
-    // 检查日期是否有效
-    if (isNaN(date.getTime())) {
-      return timestamp
-    }
-    
-    const now = new Date()
-    const isToday = date.toDateString() === now.toDateString()
-    const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    if (isToday) {
-      return timeStr
-    }
-    const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
-    return `${dateStr} ${timeStr}`
-  } catch {
-    return timestamp
-  }
+  // 直接返回后端传递的时间戳字符串，不做任何解析
+  return timestamp
 }
 
 // 初始化 Mermaid
@@ -6283,7 +6252,7 @@ function handleMessage(message, agentId = null) {
             lang: 'markdown',
             agent_name: msg.context?.agent_name || msg.agent_name || '',
             model_name: msg.context?.model_name || '',
-            timestamp: msg.timestamp || new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+            timestamp: msg.timestamp || null,
             context: msg.context || {},
             seq: msg.seq,
           })
@@ -6373,7 +6342,7 @@ function handleMessage(message, agentId = null) {
         lang: 'markdown',
         agent_name: payload?.context?.agent_name || payload?.agent_name || '',
         model_name: payload?.context?.model_name || '',
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+        timestamp: payload?.timestamp || null,
         context: payload?.context || {},
         isStreaming: true
       }
