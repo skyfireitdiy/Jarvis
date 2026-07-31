@@ -50,7 +50,7 @@ class TestOutputEvent:
         event = OutputEvent(text="Test message", output_type=OutputType.INFO)
         assert event.text == "Test message"
         assert event.output_type == OutputType.INFO
-        assert event.timestamp is True  # 默认值
+        assert event.timestamp is None  # 默认值
         assert event.lang is None
         assert event.traceback is False
         assert event.section is None
@@ -315,7 +315,7 @@ class TestPrettyOutput:
         args = mock_emit.call_args[0][0]
         assert args.text == "Hello World"
         assert args.output_type == OutputType.INFO
-        assert args.timestamp is True
+        assert isinstance(args.timestamp, str) and len(args.timestamp) > 0
 
     @patch("jarvis.jarvis_utils.output.emit_output")
     def test_print_with_timestamp_false(self, mock_emit):
@@ -459,17 +459,15 @@ nested:
     def test_format_with_timestamp(
         self, mock_datetime, mock_get_agent, mock_get_agent_list
     ):
-        """测试_format方法（带时间戳）"""
-        mock_datetime.now.return_value.strftime.return_value = "12:34:56"
+        """测试_format方法（timestamp参数已不再使用，只返回agent信息）"""
         mock_agent = Mock()
         mock_agent.non_interactive = False
         mock_get_agent.return_value = mock_agent
 
-        result = PrettyOutput._format(OutputType.INFO, timestamp=True)
-        assert "12:34:56" in result
-        assert "⏰" in result
+        result = PrettyOutput._format(OutputType.INFO, timestamp="2026-07-30T12:34:56")
         assert "Agent1" in result
         assert "Agent2" in result
+        assert "12:34:56" not in result  # 时间戳不再出现在_format结果中
 
     @patch("jarvis.jarvis_utils.output.get_agent_list", return_value="[1]Agent1")
     @patch("jarvis.jarvis_utils.output.get_agent")
