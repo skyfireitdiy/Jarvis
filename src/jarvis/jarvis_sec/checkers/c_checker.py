@@ -543,14 +543,14 @@ def _has_null_check_around(
     """
     for i, s in _window(lines, line_no, before=radius, after=radius):
         # 直接真假判断
-        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*\)", s):
+        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\b", s):
             return True
-        if re.search(rf"\bif\s*\(\s*!\s*{re.escape(var)}\s*\)", s):
+        if re.search(rf"\bif\s*\(\s*!\s*{re.escape(var)}\b", s):
             return True
         # 显式与 NULL/0 比较（任意顺序）
-        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*(==|!=)\s*(NULL|0)\s*\)", s):
+        if re.search(rf"\bif\s*\(\s*{re.escape(var)}\s*(==|!=)\s*(NULL|0)\b", s):
             return True
-        if re.search(rf"\bif\s*\(\s*(NULL|0)\s*(==|!=)\s*{re.escape(var)}\s*\)", s):
+        if re.search(rf"\bif\s*\(\s*(NULL|0)\s*(==|!=)\s*{re.escape(var)}\b", s):
             return True
         # 断言/检查宏（常见宏名）：assert/BUG_ON/WARN_ON/CHECK/ENSURE
         if re.search(
@@ -629,6 +629,14 @@ def _rule_unsafe_api(
         for call in call_graph:
             callee_name = call.get("callee_name", "")
             if callee_name.lower() not in UNSAFE_APIS:
+                continue
+            # 安全封装检测：caller_name 含安全关键字则跳过
+            caller_name = call.get("caller_name", "")
+            if re.search(
+                r"(safe|secure|wrapper|bounded|checked|limited|copy)",
+                caller_name,
+                re.IGNORECASE,
+            ):
                 continue
             caller_file = call.get("caller_file", "")
             if os.path.basename(caller_file) != os.path.basename(relpath):
@@ -1221,6 +1229,12 @@ def _rule_function_return_ptr_no_check(
                                         function="_rule_function_return_ptr_no_check",
                                     )
                                     pass
+                            if not has_check:
+                                # 二次确认：使用正则检查附近是否有NULL检查
+                                if _has_null_check_around(
+                                    var_name, lines, state.line, radius=5
+                                ):
+                                    has_check = True
                             if not has_check:
                                 issues.append(
                                     Issue(
@@ -2405,9 +2419,45 @@ def _rule_command_execution(
                 return True
         return False
 
+    # 构建包装函数集合：通过call_graph查找调用system/popen/exec*的包装函数
+    _wrapper_funcs: set[str] = set()
+    if database:
+        try:
+            _dangerous_callees = {
+                "system",
+                "popen",
+                "execvp",
+                "execlp",
+                "execvpe",
+                "execl",
+                "execve",
+                "execv",
+            }
+            _cg = database.get_call_graph()
+            for _call in _cg:
+                _cn = _call.get("callee_name", "").lower()
+                if _cn in _dangerous_callees:
+                    _wrapper = _call.get("caller_name", "")
+                    if _wrapper and _wrapper != "unknown":
+                        _wrapper_funcs.add(_wrapper)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_sec.checkers.c_checker",
+                function="_rule_command_execution",
+            )
+            pass
+
     for idx, s in enumerate(lines, start=1):
         flagged = False
         m_sys = RE_SYSTEM_LIKE.search(s)
+        # 检测包装函数调用（通过call_graph追踪到system/popen/exec*）
+        if not m_sys and _wrapper_funcs:
+            for _wf in _wrapper_funcs:
+                _m_wf = re.search(rf"\b{re.escape(_wf)}\s*\(", s, re.IGNORECASE)
+                if _m_wf:
+                    m_sys = _m_wf
+                    break
         if m_sys:
             try:
                 start = s.index("(", m_sys.start())
@@ -4168,7 +4218,10 @@ def _ast_divide_by_zero_check(
                             side_text = code_bytes[
                                 cmp_side.start_byte : cmp_side.end_byte
                             ].decode("utf-8", errors="replace")
-                            if re.search(r"\b(INT_MAX|UINT_MAX|SIZE_MAX|LONG_MAX|ULONG_MAX)\b", side_text):
+                            if re.search(
+                                r"\b(INT_MAX|UINT_MAX|SIZE_MAX|LONG_MAX|ULONG_MAX)\b",
+                                side_text,
+                            ):
                                 return  # 溢出检查中的除法，安全
 
         # 确定除数描述
@@ -4997,9 +5050,9 @@ def _ast_null_deref_check(
                 if child.type == "call_expression":
                     func_name_node = child.child_by_field_name("function")
                     if func_name_node and func_name_node.type == "identifier":
-                        func_name = code_bytes[func_name_node.start_byte : func_name_node.end_byte].decode(
-                            "utf-8", errors="replace"
-                        )
+                        func_name = code_bytes[
+                            func_name_node.start_byte : func_name_node.end_byte
+                        ].decode("utf-8", errors="replace")
                         if func_name == "assert":
                             args = child.child_by_field_name("arguments")
                             if args:
@@ -5013,9 +5066,9 @@ def _ast_null_deref_check(
                                             if safe_branch == "consequence":
                                                 # assert acts as early exit for the negation,
                                                 # so var is safe from assert line onwards
-                                                early_exit_vars.setdefault(var_name, []).append(
-                                                    node.start_point[0] + 1
-                                                )
+                                                early_exit_vars.setdefault(
+                                                    var_name, []
+                                                ).append(node.start_point[0] + 1)
                                         break  # Only process first argument
         if node.type in ("if_statement", "while_statement"):
             condition = None
@@ -5256,6 +5309,24 @@ def _ast_null_deref_check(
             n = n.parent
         return False
 
+    def _is_inside_sizeof(node):
+        """Check if node is inside a sizeof expression (sizeof does not dereference)."""
+        n = node.parent
+        while n:
+            if n.type == "sizeof_expression":
+                return True
+            # Stop at statement boundaries to avoid excessive traversal
+            if n.type in (
+                "expression_statement",
+                "if_statement",
+                "while_statement",
+                "for_statement",
+                "return_statement",
+            ):
+                break
+            n = n.parent
+        return False
+
     def _collect_implicit_deref_arg(arg_node, call_node):
         """从call_expression的参数节点中提取指针变量名，标记为隐式解引用。"""
         if arg_node.type == "identifier":
@@ -5374,6 +5445,11 @@ def _ast_null_deref_check(
                         deref_points.append((var_name, line, evidence))
             # `.` 访问栈结构体，不可能为NULL，不收集
         elif node.type == "subscript_expression":
+            # sizeof(arr[i]) 不实际解引用，sizeof 只计算类型大小
+            if _is_inside_sizeof(node):
+                for child in node.children:
+                    _collect_derefs(child)
+                return
             # arr[i] 或 next->d_name[0]
             base = node.child_by_field_name("argument")
             if base:
@@ -5389,9 +5465,9 @@ def _ast_null_deref_check(
                         index_node = node.child_by_field_name("index")
                         has_bounds_protection = False
                         if index_node and index_node.type == "identifier":
-                            idx_name = code_bytes[index_node.start_byte : index_node.end_byte].decode(
-                                "utf-8", errors="replace"
-                            )
+                            idx_name = code_bytes[
+                                index_node.start_byte : index_node.end_byte
+                            ].decode("utf-8", errors="replace")
                             line = node.start_point[0] + 1
                             if any(
                                 start <= line <= end
@@ -5402,9 +5478,9 @@ def _ast_null_deref_check(
                             pass  # 下标受bounds check保护，数组参数的null检查应在调用者处
                         else:
                             line = node.start_point[0] + 1
-                            evidence = code_bytes[node.start_byte : node.end_byte].decode(
-                                "utf-8", errors="replace"
-                            )
+                            evidence = code_bytes[
+                                node.start_byte : node.end_byte
+                            ].decode("utf-8", errors="replace")
                             deref_points.append((var_name, line, evidence))
                     else:
                         line = node.start_point[0] + 1
@@ -5846,8 +5922,9 @@ def _rule_possible_null_deref(
                     if check_line < idx:
                         has_null_check = True
                         break
-            else:
-                has_null_check = _has_null_check_around(v, lines, idx, radius=3)
+            # 数据库未找到前置检查或变量不在数据库中，回退到启发式检测
+            if not has_null_check:
+                has_null_check = _has_null_check_around(v, lines, idx, radius=10)
             if not has_null_check:
                 reported_vars.add(v)
                 issues.append(
@@ -6312,13 +6389,18 @@ def _rule_atoi_family(
                     continue
                 caller_file = call.get("caller_file", "")
                 if basename == os.path.basename(caller_file):
+                    line_num = call.get("caller_line", 0)
+                    if 0 < line_num <= len(lines):
+                        s = lines[line_num - 1]
+                        if s.lstrip().startswith("#"):
+                            continue
                     issues.append(
                         Issue(
                             language="c/cpp",
                             category="input_validation",
                             pattern="atoi_family",
                             file=relpath,
-                            line=call.get("caller_line", 0),
+                            line=line_num,
                             evidence=f"{callee}() 调用",
                             description=f"使用 {callee} 缺乏错误与范围检查，容易产生解析错误或未定义行为。",
                             suggestion="使用 strtol/strtoul/strtod 等并检查 errno 和 endptr；进行范围与格式校验。",
@@ -6572,9 +6654,75 @@ def _rule_alloca_unbounded(
                             # 纯数字常量或包含 sizeof 视为更安全
                             if re.fullmatch(r"\d+\s*", arg) or "sizeof" in arg:
                                 continue
-                            # 宏常量（全大写+下划线/数字）通常为编译期常量
                             if re.fullmatch(r"[A-Z_][A-Z0-9_]*", arg):
                                 continue
+                            # 常量传播检测：若 arg 为变量名，向前搜索是否被赋值为常量表达式
+                            if re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", arg):
+                                const_assigned = False
+                                for prev_line_no in range(line_num - 2, -1, -1):
+                                    prev_s = lines[prev_line_no]
+                                    if prev_s.lstrip().startswith(
+                                        ("//", "/*", "*", "#")
+                                    ):
+                                        continue
+                                    m_assign = re.search(
+                                        rf"\b{re.escape(arg)}\s*=\s*(.+?)\s*;", prev_s
+                                    )
+                                    if m_assign:
+                                        rhs = m_assign.group(1).strip()
+                                        # 递归检查 rhs 中变量来源是否来自有界函数
+                                        _rhs_bounded = False
+                                        _rhs_vars = set(
+                                            re.findall(
+                                                r"\b[a-zA-Z_][a-zA-Z0-9_]*\b", rhs
+                                            )
+                                        )
+                                        _rhs_vars.discard(arg)
+                                        if _rhs_vars and not _rhs_bounded:
+                                            for _rv in _rhs_vars:
+                                                for _pl2 in range(
+                                                    prev_line_no - 1, -1, -1
+                                                ):
+                                                    _ps2 = lines[_pl2]
+                                                    if _ps2.lstrip().startswith(
+                                                        ("//", "/*", "*", "#")
+                                                    ):
+                                                        continue
+                                                    _m2 = re.search(
+                                                        rf"\b{re.escape(_rv)}\s*=\s*(.+?)\s*;",
+                                                        _ps2,
+                                                    )
+                                                    if _m2:
+                                                        _rrhs = _m2.group(1).strip()
+                                                        if re.search(
+                                                            r"\w*(len|size|count|n|min|max|bound)\w*\s*\(",
+                                                            _rrhs,
+                                                            re.IGNORECASE,
+                                                        ):
+                                                            _rhs_bounded = True
+                                                        break
+                                                if _rhs_bounded:
+                                                    break
+                                        if _rhs_bounded:
+                                            const_assigned = True
+                                        elif (
+                                            re.fullmatch(
+                                                r"[\d\s\+\-\*\/\%\(\)\[\]\&\|\.\^\~\<\>\!\?\:\,]+",
+                                                rhs,
+                                            )
+                                            or "sizeof" in rhs
+                                        ):
+                                            const_assigned = True
+                                        # 函数调用返回值识别：len/size/count等函数返回值暗示有界
+                                        if re.search(
+                                            r"\w*(len|size|count|n|min|max|bound)\w*\s*\(",
+                                            rhs,
+                                            re.IGNORECASE,
+                                        ):
+                                            const_assigned = True
+                                        break
+                                if const_assigned:
+                                    continue
                             conf = 0.75
                             if re.search(r"(len|size|count|n)\b", arg, re.IGNORECASE):
                                 conf = 0.85
@@ -7026,7 +7174,7 @@ def _rule_getenv_unchecked(
                 code, is_cpp=False, database=database, file_path=relpath
             )
 
-            if result and result.null_checks is not None:
+            if result:
                 # 查找getenv调用点
                 for idx, s in enumerate(lines, start=1):
                     m = RE_GETENV.search(s)
@@ -7044,7 +7192,10 @@ def _rule_getenv_unchecked(
                         if re.search(r"\breturn\s+", s):
                             continue
                         # 检查是否有null_check
-                        has_check = var_name in result.null_checks
+                        has_check = (
+                            result.null_checks is not None
+                            and var_name in result.null_checks
+                        )
                         if not has_check:
                             # 使用_has_null_check_around进行二次确认
                             has_check = _has_null_check_around(
