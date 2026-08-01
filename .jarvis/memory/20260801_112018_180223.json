@@ -1,0 +1,8 @@
+{
+  "id": "20260801_112018_180223",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "os.chdir", "并发竞态", "搜索补全", "web_gateway"],
+  "content": "Bug修复：前端 @ 补全时文件列表显示为其他 agent 工作目录的问题。根因：search_completions (src/jarvis/jarvis_web_gateway/app.py) 中 os.chdir(working_dir) 是进程级全局 cwd 变更，FastAPI 异步并发下多 agent 搜索请求交错互相污染进程 cwd，git ls-files 无 cwd 参数依赖进程 cwd 在他人目录执行。修复：删除 os.chdir，subprocess.run 显式传 cwd=working_dir，并删除未使用的 import os。注意：os.chdir 在异步服务中是高危操作，任何依赖进程 cwd 的 subprocess 调用都应显式指定 cwd。",
+  "created_at": "2026-08-01T11:20:18.180272",
+  "updated_at": "2026-08-01T11:20:18.180279"
+}
