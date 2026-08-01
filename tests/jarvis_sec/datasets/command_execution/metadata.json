@@ -11,6 +11,10 @@
     {
       "pattern": "command_exec",
       "file": "positive_system_call.c"
+    },
+    {
+      "pattern": "command_exec",
+      "file": "positive_exec_static.c"
     }
   ]
 }
