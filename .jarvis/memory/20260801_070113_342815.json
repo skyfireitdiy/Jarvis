@@ -1,0 +1,8 @@
+{
+  "id": "20260801_070113_342815",
+  "type": "project_long_term",
+  "tags": ["orchestration", "workflow", "jarvis_sec"],
+  "content": "JSec orchestration.yaml 已重构：将 workflow 段删除，工作流逻辑直接嵌入两个 Agent 的 task 描述中。jsec_rule_developer 和 jsec_adversary 各自包含完整的对抗式协作循环说明，包括 on_success/on_failure 分支逻辑。系统不再依赖 workflow 引擎，改为 Agent 自感知的工作流模式。",
+  "created_at": "2026-08-01T07:01:13.342880",
+  "updated_at": "2026-08-01T07:01:13.342888"
+}
