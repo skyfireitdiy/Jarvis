@@ -3804,7 +3804,6 @@ def create_app(
             import subprocess
             from fuzzywuzzy import process
             from jarvis.jarvis_utils.utils import decode_output
-            import os
 
             # 获取 Agent 的工作目录
             agent = agent_manager.get_agent(agent_id)
@@ -3814,11 +3813,10 @@ def create_app(
                     "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
                 }
             working_dir = agent.working_dir
-            os.chdir(working_dir)
-
-            # 获取 git 文件列表
+            # 获取 git 文件列表（显式指定 cwd，避免 os.chdir 进程级竞态导致读到他 agent 目录）
             result = subprocess.run(
                 ["git", "ls-files"],
+                cwd=working_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=False,
