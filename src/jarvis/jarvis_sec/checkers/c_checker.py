@@ -2333,8 +2333,42 @@ def _rule_command_execution(
     )
 
     # 如果污点分析有结果，转换为Issue
+    # 对污点路径进行净化检查：如果 sink 变量在最近几行内被 sanitize/validate 函数调用处理过，则跳过
+    _taint_sanitize_pat = re.compile(
+        r"\b(sanitize|validate|check|clean|escape|filter|purify|verify|is_safe|is_valid)\w*\s*\("
+    )
     if taint_paths:
         for path in taint_paths:
+            # 提取 sink 行中的第一个参数变量名并检查是否已净化
+            sink_line_idx = path.line_number - 1  # 转为0-based
+            if 0 <= sink_line_idx < len(lines):
+                sink_line = _safe_line(lines, sink_line_idx)
+                # 从 sink 调用中提取第一个参数标识符
+                paren_pos = sink_line.index("(")
+                j = paren_pos + 1
+                while j < len(sink_line) and sink_line[j].isspace():
+                    j += 1
+                if j < len(sink_line) and (
+                    sink_line[j].isalpha() or sink_line[j] == "_"
+                ):
+                    k = j
+                    while k < len(sink_line) and (
+                        sink_line[k].isalnum() or sink_line[k] == "_"
+                    ):
+                        k += 1
+                    sink_var = sink_line[j:k]
+                    # 检查 sink 变量在之前行内是否被净化函数调用
+                    start = max(1, path.line_number - 10)
+                    for row in range(start, path.line_number):
+                        sr = _safe_line(lines, row)
+                        if _taint_sanitize_pat.search(sr) and re.search(
+                            rf"\b{re.escape(sink_var)}\b", sr
+                        ):
+                            break
+                    else:
+                        sink_var = None  # 未找到净化调用
+                    if sink_var is not None:
+                        continue  # 已净化，跳过此路径
             issues.append(
                 Issue(
                     language="c/cpp",
