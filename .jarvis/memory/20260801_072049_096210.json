@@ -1,0 +1,8 @@
+{
+  "id": "20260801_072049_096210",
+  "type": "project_long_term",
+  "tags": ["orchestration", "workflow", "jarvis_sec", "deep_adversarial"],
+  "content": "JSec orchestration.yaml 工作流已更新：在 jsec_adversary 的验证通过分支中新增「深度对抗」阶段（步骤5），对抗 Agent 验证通过后会阅读规则的源码实现（checkers/*.py、analysis.py 等），寻找实现缺陷或逻辑漏洞，尝试构造规避用例。找到则继续反馈给开发 Agent 改进，未找到才进入下一轮发现。",
+  "created_at": "2026-08-01T07:20:49.096267",
+  "updated_at": "2026-08-01T07:20:49.096289"
+}
