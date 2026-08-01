@@ -1,0 +1,8 @@
+{
+  "id": "20260801_151224_831227",
+  "type": "project_long_term",
+  "tags": ["jsec", "heuristic", "regression", "round2", "verification"],
+  "content": "## 回归验证 Round 2 (2026-08-01)\n\n**改进后扫描**: 98条问题 (vs 原始96条)\n\n### 通过 (2/6)\n- FP-02 LE_S_strcpy: 7→4 ✅ 消除3条误报\n- FP-05 #define atoi: safe_func.h 宏定义已过滤 ✅\n- FN-01 command_exec: 1→2 ✅ 新增包装函数检测\n\n### 未通过 (3/6)\n- FP-01 possible_null_deref: 27→27 ❌ 搜索半径5行不足，实际距离7行\n- FP-03 alloca_unbounded: 8→8 ❌ 常量传播无法穿透 USTRNLEN_S() 函数调用\n- FP-04 getenv_unchecked: 1→1 ❌ _has_null_check_around 未应用到 getenv 模式\n\n### 改进建议\n- FP-01: 半径扩到10行，或同函数作用域内搜索\n- FP-03: 过程间常量传播，追踪宏定义链\n- FP-04: 确认 _rule_function_return_ptr_no_check 调用路径",
+  "created_at": "2026-08-01T15:12:24.831270",
+  "updated_at": "2026-08-01T15:12:24.831275"
+}

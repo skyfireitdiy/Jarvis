@@ -1,0 +1,8 @@
+{
+  "id": "20260801_144226_346103",
+  "type": "project_long_term",
+  "tags": ["jsec", "heuristic", "evaluation", "adversary", "test_cases"],
+  "content": "## jsec heuristic 评估结果 (2026-08-01)\n\n**目标**: ushell_client (9 C文件, 5100行)\n**扫描**: 96条问题, 总体评分 2.5/5\n\n### 6组对抗用例已发送给 jsec_rule_developer (513db361):\n- FP-01: malloc+NULL检查 → possible_null_deref 误报 (~27条)\n- FP-02: LE_S_strcpy安全封装 → strcpy 误报 (3条)\n- FP-03: alloca(≤263)常量上界 → unbounded 误报 (8条)\n- FP-04: getenv+NULL检查 → unchecked 误报 (1条)\n- FP-05: #define R_WARP_ATOI → atoi 误报 (多条)\n- FN-01: ushell_system(cmd) → command_injection 漏报\n\n### 改进优先级\nP0: NULL检查追踪 + 去重合并\nP1: 安全封装识别 + Command Injection\nP2: 常量传播 + 宏过滤\n\n### 已验证真阳性\n- strcpy/strcat裸调用 (mml_log_handle.c)\n- atoi/atol无校验 (ushell.c)\n- sscanf %s无宽度 (mml_log_handle.c)\n- gmtime非线程安全 (mml_log_handle.c)",
+  "created_at": "2026-08-01T14:42:26.346138",
+  "updated_at": "2026-08-01T14:42:26.346143"
+}
