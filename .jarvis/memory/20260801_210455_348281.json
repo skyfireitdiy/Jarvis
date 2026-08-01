@@ -1,0 +1,13 @@
+{
+  "id": "20260801_210455_348281",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "regression",
+    "round1",
+    "bypass"
+  ],
+  "content": "## jsec 对抗样本回归验证 Round 1 (2026-08-01)\n\n### 验证结果：3/6 对抗样本已被修复后检测器捕获\n\n✅ 3个绕过错洞已修复（样本已重命名为 positive_* 并更新 metadata）：\n- format_string/negative_pointer_indirect.c → positive_pointer_indirect.c（_var_assigned_literal覆盖检测生效）\n- format_string/negative_struct_field.c → positive_struct_field.c（同上）\n- command_execution/negative_exec_static.c → positive_exec_static.c（K&R参数source识别生效）\n\n❌ 1个新误报反馈给开发者：\n- taint_command_injection/negative_getenv_sanitized.c 误报 command_exec\n  - 已发送给 jsec_rule_developer(513db361)，等待修复\n\n⏳ 3个待验证：sql_injection、unsafe_api、null_deref 对抗样本\n\n### 关键文件\n- c_checker.py 修复点：_var_assigned_literal(l.2502-2528覆盖检查)、_ast_unsafe_api_check(新增)、_ast_null_deref_check全局变量(l.5616附近)、exec*静态命令识别\n- 测试文件：tests/jarvis_sec/test_checkers.py\n  - test_dataset_positive_cases: positive_* 文件应被检测到\n  - test_dataset_negative_cases: negative_* 文件不应误报",
+  "created_at": "2026-08-01T21:04:55.348323",
+  "updated_at": "2026-08-01T21:04:55.348327"
+}

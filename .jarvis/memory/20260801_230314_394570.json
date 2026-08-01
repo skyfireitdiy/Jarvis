@@ -1,0 +1,13 @@
+{
+  "id": "20260801_230314_394570",
+  "type": "project_long_term",
+  "tags": [
+    "c_checker",
+    "数据流分析",
+    "filter_issues",
+    "调试方法"
+  ],
+  "content": "c_checker.py 问题定位调试链路：analyze_c_cpp_text 返回空 set 时，应逐步验证：1) 直接调用 _rule_unsafe_api（带 database）确认能检测到；2) 直接调用 _ast_unsafe_api_check 确认；3) 若都能检测到但最终结果为空，则问题在 _filter_issues_with_data_flow 阶段的误报过滤函数。本次确认 _is_strcpy_false_positive 从 evidence 提取变量名后与 dataflow_result.null_checks 匹配，将宏包装调用误判为安全代码。",
+  "created_at": "2026-08-01T23:03:14.394592",
+  "updated_at": "2026-08-01T23:03:14.394596"
+}

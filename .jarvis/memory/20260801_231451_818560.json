@@ -1,0 +1,15 @@
+{
+  "id": "20260801_231451_818560",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial",
+    "stage2",
+    "complete",
+    "final",
+    "regression"
+  ],
+  "content": "## 阶段2：对抗验证 — 全部完成 (2026-08-01 14:30+)\n\n### 最终回归验证\n- pytest test_checkers.py: 8/8 ✅\n- test_cross_file_analysis.py: 11/11 ✅\n- 总计 19/19 passed\n- positive_sql_indirect.c: sql_injection x2 ✅\n- positive_safe_macro.c: unsafe_api x3 + buffer_integer_overflow x2 ✅\n\n### 6个对抗样本全部闭合\n1. format_string/positive_pointer_indirect.c ✅\n2. format_string/positive_struct_field.c ✅\n3. command_execution/positive_exec_static.c ✅\n4. null_deref/positive_cross_func.c ✅\n5. sql_injection/positive_sql_indirect.c ✅\n6. unsafe_api/positive_safe_macro.c ✅\n\n### 原始评估基线\n- 初始扫描: 96条问题, 评分 2.5/5\n- 6组FP/FN用例构造并验证完成\n\n### 已反馈给 jsec_rule_developer(513db361)",
+  "created_at": "2026-08-01T23:14:51.818612",
+  "updated_at": "2026-08-01T23:14:51.818617"
+}

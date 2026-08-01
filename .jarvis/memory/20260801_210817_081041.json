@@ -1,0 +1,14 @@
+{
+  "id": "20260801_210817_081041",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial",
+    "round1",
+    "progress",
+    "2026-08-01"
+  ],
+  "content": "## jsec 对抗样本回归验证 Round 1 进度 (2026-08-01 21:07)\n\n### 当前状态：4/6 已修复，2个仍绕过，1个误报待修复\n\n✅ 4个对抗样本已修复并重命名为 positive_*：\n1. format_string/negative_pointer_indirect.c → positive_pointer_indirect.c（_var_assigned_literal覆盖检测）\n2. format_string/negative_struct_field.c → positive_struct_field.c（同上）\n3. command_execution/negative_exec_static.c → positive_exec_static.c（K&R参数source识别）\n4. null_deref/negative_cross_func.c → positive_cross_func.c（跨函数全局变量NULL解引用）\n   - 已创建 null_deref/metadata.json，expected_issues: possible_null_deref\n   - test_dataset_positive_cases 全部通过\n\n❌ 2个对抗样本仍绕过（已反馈开发者 513db361）：\n1. sql_injection/negative_sql_indirect.c\n   - K&R风格参数 void vulnerable(conn, query) void *conn; char **query;\n   - mysql_query(conn, *query) 二级指针解引用\n   - 问题：K&R参数source识别失败 + 正则无法匹配 *query\n2. unsafe_api/negative_safe_macro.c\n   - #define SAFE_COPY(dst, src) strcpy((dst), (src))\n   - SAFE_COPY(dst, user_input) 宏包装strcpy\n   - 问题：DataCollector只记录宏调用不展开到unsafe API\n\n❌ 1个误报待修复：\n- taint_command_injection/negative_getenv_sanitized.c 误报 command_exec\n  - 已定位到 c_checker.py 2427-2462 行 _taint_sanitize_pat 净化检查\n\n### 测试状态\n- ✅ test_dataset_positive_cases 通过（4个修复样本均已检测）\n- ❌ test_dataset_negative_cases 暂未运行（等待误报修复）",
+  "created_at": "2026-08-01T21:08:17.081083",
+  "updated_at": "2026-08-01T21:08:17.081088"
+}

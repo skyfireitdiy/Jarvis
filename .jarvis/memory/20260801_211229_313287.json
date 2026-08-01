@@ -1,0 +1,14 @@
+{
+  "id": "20260801_211229_313287",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial",
+    "bypass",
+    "methodology",
+    "c_checker"
+  ],
+  "content": "## JSEC 安全检测器对抗验证方法论（已实践验证）\n\n### 核心流程\n1. **白盒审计检测器源码**：定位检测逻辑（如 c_checker.py 的正则匹配、AST分析、污点分析）\n2. **构造绕过样本**：每个样本实际不安全但绕过检测器（K&R参数、宏包装、间接引用、跨函数全局变量等）\n3. **发送给开发者修复**：通过 gateway_manager send_to_agent 发送给 jsec_rule_developer(513db361)\n4. **回归验证**：用 analyze_c_cpp_text 脚本直接验证 + pytest tests/jarvis_sec/test_checkers.py\n5. **重命名样本**：修复生效的 negative_* → positive_*，更新 metadata.json\n\n### 已发现的绕过模式（6个）\n- format_string: 覆盖变量间接引用、结构体字段传递\n- command_execution: exec* 静态命令 + K&R参数\n- null_deref: 跨函数全局变量设为NULL\n- sql_injection: K&R参数 + 二级指针解引用\n- unsafe_api: 宏包装 strcpy（SAFE_COPY宏）\n- taint_command_injection: getenv→sanitize→system 净化误报\n\n### 关键结论\n- 回归验证结果：4/6已修复，2个仍绕过，1个误报\n- 测试文件：tests/jarvis_sec/test_checkers.py（正例L240，反例L299，自发现模式）\n- 数据集结构：每个目录有 metadata.json 定义 expected_issues，positive_* 和 negative_* 文件",
+  "created_at": "2026-08-01T21:12:29.313332",
+  "updated_at": "2026-08-01T21:12:29.313338"
+}

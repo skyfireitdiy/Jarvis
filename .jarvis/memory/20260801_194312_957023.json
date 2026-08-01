@@ -1,0 +1,13 @@
+{
+  "id": "20260801_194312_957023",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass",
+    "command_execution",
+    "task-3"
+  ],
+  "content": "Task-3 command_execution 绕过成功：tests/jarvis_sec/datasets/command_execution/negative_exec_static.c。策略：K&R风格函数定义(参数不写类型)使污点分析无法识别函数参数source；配合字面量赋值+覆盖绕过_var_assigned_literal。验证0 issues。",
+  "created_at": "2026-08-01T19:43:12.957054",
+  "updated_at": "2026-08-01T19:43:12.957058"
+}

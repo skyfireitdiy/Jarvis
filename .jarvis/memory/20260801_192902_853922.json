@@ -1,0 +1,13 @@
+{
+  "id": "20260801_192902_853922",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass_samples",
+    "format_string",
+    "task-1"
+  ],
+  "content": "Task-1 format_string绕过成功：tests/jarvis_sec/datasets/format_string/negative_pointer_indirect.c\n策略：变量先赋值为字面量(char *fmt=\"%d\")，检测器_var_assigned_literal回看5行发现字面量即认为安全，未检查后续覆盖赋值(fmt=(char*)user_input)。\n验证: analyze_c_cpp_text返回0 issues。\n\n关键实现：_var_assigned_literal只检查是否存在 var = \"...\" 赋值，不检查赋值之后是否被覆盖；_arg_is_literal只检查参数首字符是否为引号。",
+  "created_at": "2026-08-01T19:29:02.853958",
+  "updated_at": "2026-08-01T19:29:02.853963"
+}

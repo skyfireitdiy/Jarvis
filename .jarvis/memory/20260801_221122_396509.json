@@ -1,0 +1,14 @@
+{
+  "id": "20260801_221122_396509",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial-validation",
+    "status",
+    "root-cause",
+    "developer-agent-unavailable"
+  ],
+  "content": "JSec对抗验证项目状态更新（2026-08-01）：\n\n## 已完成\n- 6个绕过样本构造完成\n- 4个样本修复并迁移至positive数据集\n- pytest 8/8通过\n- 2个绕过样本根因分析完成：\n  1. sql_injection/negative_sql_indirect.c：K&R风格函数定义导致_extract_function_params(data_collector.py L1353)无法提取参数，query未标记为param_in，污点分析缺污染源\n  2. unsafe_api/negative_safe_macro.c：宏#define SAFE_COPY(dst,src) strcpy((dst),(src))封装，_ast_unsafe_api_check(c_checker.py L753-785)仅检查UNSAFE_APIS字面匹配，tree-sitter不展开宏\n\n## 关键新发现\n- 向jsec_rule_developer(513db361)发送修复建议失败：HTTP 404 Agent not found\n- 开发者Agent当前不可达，无法通过gateway_manager.send_to_agent推送修复建议\n\n## 待办\n- 等待jsec_rule_developer可用后推送修复建议\n- 2个绕过样本仍返回0 issues，需驱动修复\n- 1个误报待处理：taint_command_injection/negative_getenv_sanitized.c",
+  "created_at": "2026-08-01T22:11:22.396546",
+  "updated_at": "2026-08-01T22:11:22.396550"
+}

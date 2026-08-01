@@ -1,0 +1,12 @@
+{
+  "id": "20260801_220025_473830",
+  "type": "project_long_term",
+  "tags": [
+    "对抗样本",
+    "任务完成",
+    "c_checker"
+  ],
+  "content": "## 对抗样本改进任务完成 (2026-08-01)\n\n### 任务概述\n基于6组对抗样本改进 c_checker.py 检测规则，消除误报（FP）并覆盖漏报（FN），全部6个任务完成。\n\n### 完成的任务\n1. format_string/positive_pointer_indirect.c — 格式字符串指针间接传递检测 ✅\n2. format_string/positive_struct_field.c — 结构体字段格式字符串检测 ✅\n3. command_execution/positive_exec_static.c — K&R参数source识别 ✅\n4. null_deref/positive_cross_func.c — 全局变量NULL赋值追踪 ✅\n5. sql_injection/negative_sql_indirect.c — K&R+二级指针绕过修复 ✅ (本任务阶段)\n6. unsfae_api/negative_safe_macro.c — 宏包装绕过修复 ✅ (本任务阶段)\n\n### 代码变更统计\n- 修改文件数：32个\n- 代码变更：+541/-28 行\n- 初始 commit: 35607f2f133bb7a4dd9e63926da70b470710370e\n- 最终 commit: 645397526\n\n### 关键修复\n1. c_checker.py _safe_line 使用 path.line_number 代替 sink_line_idx\n2. _wrapper not in (\"unknown\", \"main\") 避免主函数误报\n3. 污点路径净化检查和AST检测增强\n\n### 测试结果\ntest_dataset_negative_cases 和 test_dataset_positive_cases 全部通过（8/8）。\n\n### 遗留的无关FP\nnegative_getenv_sanitized.c 有2条 possible_null_deref (sanitize_command函数内部*p解引用)，属于AST检测器对函数参数未做NULL检查的保守检测，非本次修复范围。",
+  "created_at": "2026-08-01T22:00:25.473870",
+  "updated_at": "2026-08-01T22:00:25.473875"
+}

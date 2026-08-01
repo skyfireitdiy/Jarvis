@@ -1,0 +1,13 @@
+{
+  "id": "20260801_194815_014904",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass",
+    "sql_injection",
+    "task-4"
+  ],
+  "content": "Task-4 sql_injection 绕过成功：tests/jarvis_sec/datasets/sql_injection/negative_sql_indirect.c。策略：K&R风格参数定义(char **query)使污点分析无法识别source；mysql_query(conn, *query) 中 *query 间接引用使启发式正则无法匹配变量名。验证0 issues。",
+  "created_at": "2026-08-01T19:48:15.014936",
+  "updated_at": "2026-08-01T19:48:15.014941"
+}

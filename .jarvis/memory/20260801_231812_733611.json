@@ -1,0 +1,16 @@
+{
+  "id": "20260801_231812_733611",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "stage2",
+    "complete",
+    "stage3",
+    "planning",
+    "developer-feedback",
+    "fp01-known-issue"
+  ],
+  "content": "## 阶段2完成，开发者反馈 (2026-08-01 23:18)\n\n### 开发者回应\n- 6/6对抗样本全部修复闭合 ✅\n- AST宏展开检测策略建议推广到 format_string/command_execution 等其他规则\n- K&R参数识别通用方案可作为阶段3改进目标\n- FP-01 NULL检查追踪27条误报属于已知权衡（安全性>精确度），AST检测器对函数参数未做NULL检查的保守策略是有意设计的，不计划短期修复\n\n### 阶段3潜在方向\n1. 宏包装绕过推广测试（format_string, command_execution等规则）\n2. K&R参数识别通用化\n3. 其他检测规则的白盒审计（绕过挖掘）\n4. FP-01因设计权衡不纳入修复范围",
+  "created_at": "2026-08-01T23:18:12.733667",
+  "updated_at": "2026-08-01T23:18:12.733672"
+}

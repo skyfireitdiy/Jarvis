@@ -1,0 +1,13 @@
+{
+  "id": "20260801_193238_079827",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass_samples",
+    "format_string",
+    "task-2"
+  ],
+  "content": "Task-2 format_string结构体字段绕过成功：tests/jarvis_sec/datasets/format_string/negative_struct_field.c\n策略：与task-1相同（字面量赋值+覆盖）。cfg->format覆盖fmt后printf(fmt)，加NULL检查消除null_deref告警。\n验证: analyze_c_cpp_text返回0 issues。",
+  "created_at": "2026-08-01T19:32:38.079869",
+  "updated_at": "2026-08-01T19:32:38.079874"
+}

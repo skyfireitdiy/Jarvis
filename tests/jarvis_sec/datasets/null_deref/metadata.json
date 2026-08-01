@@ -1,0 +1,12 @@
+{
+  "name": "null_deref",
+  "description": "null_deref test dataset",
+  "vulnerability_type": "null_deref",
+  "cross_file": false,
+  "expected_issues": [
+    {
+      "pattern": "possible_null_deref",
+      "file": "positive_cross_func.c"
+    }
+  ]
+}

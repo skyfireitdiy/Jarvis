@@ -700,10 +700,105 @@ def _rule_unsafe_api(
                     severity=severity,
                 )
             )
+        # AST补充检测：宏展开后的不安全API调用（call_graph 只记录宏名而非展开后的函数名)
+        ast_issues = _ast_unsafe_api_check(lines, relpath, issues)
+        if ast_issues:
+            issues.extend(ast_issues)
         return issues
 
-    # 无database时跳过正则回退（避免误报）
+    # 无database时跳过正则回退（避免误报），但仍做AST辅助检测
+    ast_issues = _ast_unsafe_api_check(lines, relpath, issues)
+    if ast_issues:
+        issues.extend(ast_issues)
     return issues
+
+
+def _ast_unsafe_api_check(
+    lines: Sequence[str],
+    relpath: str,
+    existing_issues: List[Issue],
+) -> Optional[List[Issue]]:
+    """
+    使用 tree-sitter AST 补充检测宏展开后的不安全 API 调用。
+    call_graph 只能看到宏名（如 SAFE_COPY），看不到展开后的 strcpy。
+    此函数直接解析源码 AST，捕获所有不安全的函数调用。
+    """
+    try:
+        import tree_sitter_c as tsc
+        import tree_sitter_cpp as tscpp
+        from tree_sitter import Language, Parser
+    except ImportError:
+        return None
+
+    code = "\n".join(lines)
+    if not code.endswith("\n"):
+        code += "\n"
+    code_bytes = code.encode("utf-8")
+
+    is_cpp = _is_cpp_file(relpath)
+    try:
+        if is_cpp:
+            lang = Language(tscpp.language())
+        else:
+            lang = Language(tsc.language())
+        parser = Parser(lang)
+    except Exception:
+        return None
+
+    tree = parser.parse(code_bytes)
+    root = tree.root_node
+
+    UNSAFE_APIS = {"strcpy", "strcat", "gets", "sprintf", "vsprintf"}
+    # 解析 #define 宏，构建宏名到不安全API的映射
+    macro_to_unsafe: dict[str, str] = {}
+    for raw_line in lines:
+        m = re.match(r'^\s*#define\s+(\w+)\s*\([^)]*\)\s*(\w+)\s*\(', raw_line)
+        if m:
+            macro_name = m.group(1)
+            real_api = m.group(2).lower()
+            if real_api in UNSAFE_APIS:
+                macro_to_unsafe[macro_name] = real_api
+    # 收集已有 issues 的行号，避免重复报告
+    existing_lines = {issue.line for issue in existing_issues}
+    issues: List[Issue] = []
+
+    def _find_unsafe_calls(node):
+        if node.type == "call_expression":
+            func_node = node.child_by_field_name("function")
+            if func_node and func_node.type == "identifier":
+                func_name = code_bytes[
+                    func_node.start_byte : func_node.end_byte
+                ].decode("utf-8", errors="replace")
+                real_api = macro_to_unsafe.get(func_name, func_name)
+                if real_api.lower() in UNSAFE_APIS:
+                    line_num = node.start_point[0] + 1
+                    if line_num not in existing_lines:
+                        existing_lines.add(line_num)
+                        evidence = code_bytes[
+                            node.start_byte : node.end_byte
+                        ].decode("utf-8", errors="replace")
+                        # 只取第一行作为 evidence
+                        evidence_line = evidence.split("\n")[0].strip()
+                        conf = 0.75  # AST检测置信度稍低
+                        issues.append(
+                            Issue(
+                                language="c/cpp",
+                                category="unsafe_api",
+                                pattern=real_api,
+                                file=relpath,
+                                line=line_num,
+                                evidence=evidence_line,
+                                description="使用不安全/高风险字符串API，可能导致缓冲区溢出或格式化风险。",
+                                suggestion="替换为带边界的安全API（如 snprintf/strlcpy 等）或加入显式长度检查。",
+                                confidence=min(conf, 0.95),
+                                severity=_severity_from_confidence(conf, "unsafe_api"),
+                            )
+                        )
+        for child in node.children:
+            _find_unsafe_calls(child)
+
+    _find_unsafe_calls(root)
+    return issues if issues else None
 
 
 def _rule_boundary_funcs(
@@ -2101,6 +2196,7 @@ def _rule_format_string(
     ) -> bool:
         start = max(1, upto_idx - lookback)
         pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
+        literal_line = None
         for j in range(start, upto_idx):
             sj = _safe_line(lines, j)
             m = pat_assign.search(sj)
@@ -2110,8 +2206,16 @@ def _rule_format_string(
             while k < len(sj) and sj[k].isspace():
                 k += 1
             if k < len(sj) and sj[k] == '"':
-                return True
-        return False
+                literal_line = j
+                break
+        if literal_line is None:
+            return False
+        # 检查字面量赋值后是否有其他赋值覆盖同一变量
+        for j in range(literal_line + 1, upto_idx):
+            sj = _safe_line(lines, j)
+            if pat_assign.search(sj):
+                return False  # 有覆盖赋值，非安全
+        return True
 
     def _nth_arg_start(s: str, open_paren_idx: int, n: int) -> Optional[int]:
         """
@@ -2340,9 +2444,9 @@ def _rule_command_execution(
     if taint_paths:
         for path in taint_paths:
             # 提取 sink 行中的第一个参数变量名并检查是否已净化
-            sink_line_idx = path.line_number - 1  # 转为0-based
+            sink_line_idx = path.line_number - 1  # 转为0-based（仅用于长度校验）
             if 0 <= sink_line_idx < len(lines):
-                sink_line = _safe_line(lines, sink_line_idx)
+                sink_line = _safe_line(lines, path.line_number)
                 # 从 sink 调用中提取第一个参数标识符
                 paren_pos = sink_line.index("(")
                 j = paren_pos + 1
@@ -2414,6 +2518,7 @@ def _rule_command_execution(
         # 在前 lookback 行内查找 var = "..."
         start = max(1, upto_idx - lookback)
         pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
+        literal_line = None
         for j in range(start, upto_idx):
             sj = _safe_line(lines, j)
             m = pat_assign.search(sj)
@@ -2424,8 +2529,16 @@ def _rule_command_execution(
             while k < len(sj) and sj[k].isspace():
                 k += 1
             if k < len(sj) and sj[k] == '"':
-                return True
-        return False
+                literal_line = j
+                break
+        if literal_line is None:
+            return False
+        # 检查字面量赋值后是否有其他赋值覆盖同一变量
+        for j in range(literal_line + 1, upto_idx):
+            sj = _safe_line(lines, j)
+            if pat_assign.search(sj):
+                return False  # 有覆盖赋值，非安全
+        return True
 
     # sanitize/validate函数名模式（调用后认为变量已净化）
     _sanitize_pattern = re.compile(
@@ -2472,7 +2585,7 @@ def _rule_command_execution(
                 _cn = _call.get("callee_name", "").lower()
                 if _cn in _dangerous_callees:
                     _wrapper = _call.get("caller_name", "")
-                    if _wrapper and _wrapper != "unknown":
+                    if _wrapper and _wrapper not in ("unknown", "main"):
                         _wrapper_funcs.add(_wrapper)
         except Exception as e:
             save_exception(
@@ -2747,8 +2860,26 @@ def _rule_sql_injection(
         for func in sql_exec_funcs:
             if not re.search(rf"\b{func}\s*\(", s):
                 continue
+            # 先检测解引用参数（如 *query），直接报告
+            deref_m = re.search(rf"\b{func}\s*\([^,]+,\s*\*(\w+)", s)
+            if deref_m:
+                deref_var = deref_m.group(1)
+                issues.append(
+                    Issue(
+                        language="c/cpp",
+                        category="injection",
+                        pattern="sql_injection",
+                        file=relpath,
+                        line=idx,
+                        evidence=_strip_line(s),
+                        description=f"检测到{func}直接使用解引用变量指针{deref_var}，可能存在SQL注入风险。",
+                        suggestion="使用参数化查询或预编译语句，避免拼接用户输入到SQL语句。",
+                        confidence=0.75,
+                        severity="high",
+                    )
+                )
+                continue
             # 检查是否使用了变量参数（非字面量）
-            # 简化检测：如果函数调用中包含变量名（非字符串字面量）
             m = re.search(rf"\b{func}\s*\([^,]+,\s*(\w+)", s)
             if m:
                 var_name = m.group(1)
@@ -2777,7 +2908,7 @@ def _rule_sql_injection(
                                     )
                                 )
                                 break
-                        break
+                    break
 
     return issues
 
@@ -4853,6 +4984,29 @@ def _ast_null_deref_check(
 
     _collect_declarations(root)
 
+    # 收集全局变量在本函数内的NULL赋值
+    null_assigned_global_vars: set[str] = set()
+
+    def _collect_null_assigned_global_vars(node):
+        """收集对全局变量进行 NULL 赋值的模式：global_var = NULL"""
+        if node.type == "assignment_expression":
+            left = node.child_by_field_name("left")
+            right = node.child_by_field_name("right")
+            if left and left.type == "identifier":
+                lhs_name = code_bytes[left.start_byte : left.end_byte].decode(
+                    "utf-8", errors="replace"
+                )
+                if lhs_name in global_vars and right:
+                    rhs_text = code_bytes[right.start_byte : right.end_byte].decode(
+                        "utf-8", errors="replace"
+                    ).strip()
+                    if rhs_text in ("NULL", "0", "nullptr"):
+                        null_assigned_global_vars.add(lhs_name)
+        for child in node.children:
+            _collect_null_assigned_global_vars(child)
+
+    _collect_null_assigned_global_vars(root)
+
     # Track local pointer variables assigned from safe sources
     safe_assigned_vars: set[str] = set()
 
@@ -5614,7 +5768,9 @@ def _ast_null_deref_check(
         # func_params不跳过：函数参数恰恰是最可能为NULL的，需检测
         # 但subscript_expression中的数组参数，如果下标在bounds check保护范围内，则跳过（见_collect_derefs）
         if var_name in global_vars:
-            continue
+            # 全局变量仅当在本函数内被显式赋值为NULL时才报告
+            if var_name not in null_assigned_global_vars:
+                continue
         if var_name in safe_assigned_vars:
             continue
         if var_name in early_exit_vars and any(
@@ -9002,9 +9158,19 @@ def _is_strcpy_false_positive(
     判断strcpy类函数是否为误报
 
     检查逻辑：
-    1. 是否有NULL检查保护
-    2. 是否在死代码中
+    1. 是否为直接API调用（宏包装调用不适用NULL检查保护）
+    2. 是否有NULL检查保护
+    3. 是否在死代码中
     """
+    # 仅对直接 API 调用应用 NULL 检查保护过滤
+    # 宏包装调用（如 SAFE_COPY(dst, src)）虽然内部调用 strcpy，
+    # 但 NULL 检查（if (dst == NULL)）并不能消除 strcpy 的缓冲区溢出风险
+    pattern = getattr(issue, 'pattern', None)
+    if not pattern:
+        return False
+    if not issue.evidence.lstrip().startswith(pattern + "("):
+        return False
+
     line_num = issue.line
     var_name = _extract_variable_name(issue)
 

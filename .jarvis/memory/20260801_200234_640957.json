@@ -1,0 +1,13 @@
+{
+  "id": "20260801_200234_640957",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass",
+    "stage2",
+    "complete"
+  ],
+  "content": "## 阶段2：主动挖掘绕过漏洞 — 完成 (2026-08-01)\n\n### 6个绕过样本全部构造并验证通过\n\n| 任务 | 样本文件 | 绕过策略 | 缺陷位置 |\n|------|---------|---------|--------|\n| Task-1 | format_string/negative_pointer_indirect.c | 指针间接引用格式串，_var_assigned_literal只检查直接赋值 | c_checker.py:2099-2114 |\n| Task-2 | format_string/negative_struct_field.c | 结构体字段存储格式串，无法追踪成员赋值 | 同上 |\n| Task-3 | command_execution/negative_exec_static.c | K&R风格函数定义使DataCollector无法识别参数source | c_checker.py _exec_patterns |\n| Task-4 | sql_injection/negative_sql_indirect.c | 多级指针间接构造SQL，绕过字面量拼接检测 | c_checker.py sql_injection规则 |\n| Task-5 | unsafe_api/negative_safe_macro.c | 宏封装(#define SAFE_COPY)使strcpy不进入call_graph | c_checker.py unsafe_api caller_name检测 |\n| Task-6 | null_deref/negative_cross_func.c | 全局变量直接跳过_ast_null_deref_check(l.5616: if var_name in global_vars: continue) | c_checker.py:5616 |\n\n### 验证方式\n每个样本通过analyze_c_cpp_text验证返回0 issues（绕过成功），代码实际包含真实漏洞。\n\n### 已发送给jsec_rule_developer(513db361)\n包含文件路径、绕过策略、缺陷位置，等待修复反馈。\n\n### 相关文件\n- 检测器: /home/wangmaobin/Jarvis/src/jarvis/jarvis_sec/checkers/c_checker.py\n- 数据集: /home/wangmaobin/Jarvis/tests/jarvis_sec/datasets/",
+  "created_at": "2026-08-01T20:02:34.640999",
+  "updated_at": "2026-08-01T20:02:34.641004"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260801_221449_221585",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial",
+    "stage2",
+    "final",
+    "bypass",
+    "root-cause"
+  ],
+  "content": "## 阶段2最终状态 (2026-08-01 14:24)\n\n### 已完成\n- 6个绕过样本全部构造并验证（analyze_c_cpp_text均返回0 issues）\n- 4个样本修复已迁移为positive\n- 2个仍绕过的样本根因分析完成：\n  1. sql_injection/negative_sql_indirect.c: K&R参数 + 二级*query → data_collector.py _extract_function_params不处理K&R裸标识符\n  2. unsafe_api/negative_safe_macro.c: 宏SAFE_COPY包装 → tree-sitter AST不展开宏\n- pytest 8/8通过\n- 根因分析与修复建议已发送给jsec_rule_developer(513db361)",
+  "created_at": "2026-08-01T22:14:49.221634",
+  "updated_at": "2026-08-01T22:14:49.221639"
+}

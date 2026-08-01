@@ -1,0 +1,12 @@
+{
+  "id": "20260801_195420_508949",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "detector-defects",
+    "fix-locations"
+  ],
+  "content": "JSec检测器6个确认缺陷位置（供jsec_rule_developer修复）：\n1. _var_assigned_literal(2099-2114行)：只检查是否存在var=\"...\"赋值，不检查赋值之后是否被覆盖\n2. _arg_is_literal：只检查参数首字符是否为引号\n3. _rule_sql_injection(2621行)：只检测mysql_query(conn, var)直接变量名，不检测间接引用如*query\n4. _rule_unsafe_api(609-706行)：基于call_graph，宏展开的strcpy不会被记录\n5. _ast_null_deref_check第5616行：if var_name in global_vars: continue 对全局变量直接跳过\n6. DataCollector：无法识别K&R风格函数定义的参数为source",
+  "created_at": "2026-08-01T19:54:20.508968",
+  "updated_at": "2026-08-01T19:54:20.508971"
+}

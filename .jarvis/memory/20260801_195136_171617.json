@@ -1,0 +1,13 @@
+{
+  "id": "20260801_195136_171617",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass",
+    "null_deref",
+    "task-6"
+  ],
+  "content": "Task-6 null_deref 绕过成功：tests/jarvis_sec/datasets/null_deref/negative_cross_func.c。策略：利用全局变量 + 跨函数赋值。_ast_null_deref_check 第5616行 `if var_name in global_vars: continue` 对全局变量直接跳过，不检查全局变量是否可能为NULL。init_global() 中 global_item = NULL，main() 中 init_global() 后 global_item->value = 42 解引用。验证0 issues。",
+  "created_at": "2026-08-01T19:51:36.171645",
+  "updated_at": "2026-08-01T19:51:36.171649"
+}

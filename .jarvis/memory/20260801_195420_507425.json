@@ -1,0 +1,12 @@
+{
+  "id": "20260801_195420_507425",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass-techniques",
+    "heuristic-analysis"
+  ],
+  "content": "JSec启发式检测器6种绕过策略总结（已验证0 issues）：\n1. 字面量赋值+覆盖绕过_var_assigned_literal：先赋字面量(char *fmt=\"%d\")再覆盖为用户输入(fmt=(char*)user_input)，检测器只查前5行存在字面量赋值即认为安全\n2. K&R风格函数定义绕过source识别：参数类型写在函数体后，DataCollector无法识别参数为source\n3. 间接引用绕过正则匹配：如 *query 使正则 \\bmysql_query\\([^,]+,\\s*(\\w+) 无法匹配变量名\n4. 宏封装绕过call_graph检测：#define SAFE_COPY(dst,src) strcpy((dst),(src))，DataCollector只记录SAFE_COPY调用，strcpy不进入call_graph\n5. 全局变量跨函数赋值绕过null_deref：_ast_null_deref_check对全局变量直接跳过(if var_name in global_vars: continue)，不检查全局变量是否可能为NULL\n6. 添加NULL检查消除附带告警：如 if(cfg==NULL)return 消除possible_null_deref告警",
+  "created_at": "2026-08-01T19:54:20.507461",
+  "updated_at": "2026-08-01T19:54:20.507465"
+}

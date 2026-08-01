@@ -1,0 +1,15 @@
+{
+  "id": "20260801_211737_548071",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "adversarial",
+    "stage2",
+    "bypass",
+    "samples",
+    "round1"
+  ],
+  "content": "## JSec对抗验证 阶段2汇总 (2026-08-01)\n\n### 6个绕过样本及状态\n\n| 样本文件 | 绕过策略 | 状态 |\n|---------|---------|------|\n| tests/jarvis_sec/datasets/format_string/positive_pointer_indirect.c | 指针间接引用格式串 | ✅ 已修复检测 |\n| tests/jarvis_sec/datasets/format_string/positive_struct_field.c | 结构体字段存储格式串 | ✅ 已修复检测 |\n| tests/jarvis_sec/datasets/command_execution/positive_exec_static.c | K&R风格函数定义 | ✅ 已修复检测 |\n| tests/jarvis_sec/datasets/null_deref/positive_cross_func.c | 全局变量跨函数NULL | ✅ 已修复检测 |\n| tests/jarvis_sec/datasets/sql_injection/negative_sql_indirect.c | K&R+二级指针(*query) | ❌ 仍绕过 |\n| tests/jarvis_sec/datasets/unsafe_api/negative_safe_macro.c | 宏SAFE_COPY包装strcpy | ❌ 仍绕过 |\n\n### 误报问题\n- taint_command_injection/negative_getenv_sanitized.c 误报 command_exec\n- 根因: _taint_sanitize_pat净化检查正则未匹配(getenv+NULL检查应视为已净化)\n\n### 开发者Agent\n- ID: 513db361-b93d-4c8c-b37b-cfa8eaca897c\n- 已发送2轮反馈，等待修复\n\n### 缺陷位置（供后续参考）\n1. _var_assigned_literal覆盖检测 (l.2099-2114)\n2. K&R参数source识别\n3. sql_injection间接引用\n4. 宏展开后call_graph不可见\n5. 全局变量null_deref跳过 (l.5616)",
+  "created_at": "2026-08-01T21:17:37.548111",
+  "updated_at": "2026-08-01T21:17:37.548116"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260801_194815_016438",
+  "type": "project_long_term",
+  "tags": [
+    "jsec",
+    "bypass",
+    "unsafe_api",
+    "task-5"
+  ],
+  "content": "Task-5 unsafe_api 绕过成功：tests/jarvis_sec/datasets/unsafe_api/negative_safe_macro.c。策略：#define SAFE_COPY(dst, src) strcpy((dst), (src)) 宏封装。DataCollector只记录SAFE_COPY调用(不属于UNSAFE_APIS)，strcpy不进入call_graph。加if(dst==NULL)return消除null_deref。验证0 issues。",
+  "created_at": "2026-08-01T19:48:15.016468",
+  "updated_at": "2026-08-01T19:48:15.016473"
+}
