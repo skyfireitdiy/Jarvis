@@ -197,7 +197,7 @@
 
 ```bash
 # 一键安装
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/.../install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/.../quick-install.sh)"
 ```
 
 - 一键安装，无需编译

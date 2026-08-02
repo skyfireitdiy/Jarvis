@@ -113,7 +113,7 @@ curl -s --connect-timeout 5 https://gitee.com --head || echo "Gitee unreachable"
 ```bash
 # 一键安装 Jarvis（使用 GitHub 官方安装脚本）
 sshpass -p "$PASSWORD" ssh $USERNAME@$IP -p $PORT \
-  'curl -sL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh | bash'
+  'curl -sL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh | bash'
 ```
 
 #### 4.2 分步执行（用于调试）
@@ -126,7 +126,7 @@ sshpass -p "$PASSWORD" ssh $USERNAME@$IP -p $PORT 'hostname && whoami'
 
 # 步骤2：执行安装
 sshpass -p "$PASSWORD" ssh $USERNAME@$IP -p $PORT \
-  'curl -sL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh | bash'
+  'curl -sL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh | bash'
 
 # 步骤3：验证安装
 sshpass -p "$PASSWORD" ssh $USERNAME@$IP -p $PORT 'source ~/.bashrc && jarvis --version'
