@@ -15,9 +15,9 @@ class AutoSelectRuleTool:
 
     name = "auto_select_rule"
     description = (
-        "根据任务描述自动选择最合适的规则（最多 5 个），并返回规则内容。"
-        "该工具会分析任务意图，从可用规则中选择最相关的规则，加载并返回规则内容。"
-        "适用于需要根据任务类型自动匹配最佳实践和规范的场景。"
+        "据任述自择最合之规（至多 5 个），而归规内。"
+        "此工具析任之意，自可用规中择最相关之规，载而归其内。"
+        "适需依任类自动匹最佳践与范之场。"
     )
     parameters = {
         "type": "object",
@@ -84,7 +84,9 @@ class AutoSelectRuleTool:
                     # 从缓存中获取已加载的规则内容
                     rule_content = rules_manager._loaded_rules.get(rule_name)
                     if rule_content:
-                        rule_contents.append({"name": rule_name, "content": rule_content})
+                        rule_contents.append(
+                            {"name": rule_name, "content": rule_content}
+                        )
 
             output_lines = [f"已为任务选择 {len(rule_contents)} 个规则：", ""]
             for rule_info in rule_contents:

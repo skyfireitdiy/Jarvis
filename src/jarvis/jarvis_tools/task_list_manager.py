@@ -955,41 +955,41 @@ class task_list_manager:
         Returns:
             str: 工具描述
         """
-        description = """任务列表管理工具，供LLM管理复杂任务拆分和执行。
+        description = """任务列管工具，供 LLM 管复任拆分与行。
 
-**核心功能：**
-- `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
-- `execute_task`: 执行任务（自动创建子Agent）
-- `get_task_list_summary`: 查看任务状态
-- `clear_tasks`: 清除当前任务列表（删除所有任务）
+**核心能：**
+- `add_tasks`: 批加任（荐 PLAN 阶用）
+- `execute_task`: 行任（自动建子 Agent）
+- `get_task_list_summary`: 览任状
+- `clear_tasks`: 清现任列（删全任）
 
-**任务类型选择：**
-- `main`: 简单任务（1-3步、单文件）由主Agent直接执行
-- `sub`: 复杂任务（多步骤、多文件）自动创建子Agent
+**任类择：**
+- `main`: 简任（1-3步、单文件）主 Agent 直行
+- `sub`: 复任（多步、多文）自动建子 Agent
 
-**⚠️ Sub任务创建规则：**
-- **谨慎使用**：除非任务非常独立（如完全隔离的模块、独立的测试套件），否则优先使用 `main` 类型
-- **上下文完整性**：如果创建 `sub` 类型任务，务必在 `task_desc` 和 `additional_info` 中提供完整的上下文信息：
-  - 明确的文件路径和目录结构
-  - 相关的依赖关系和接口定义
-  - 必要的环境配置和技术栈信息
-  - 任务执行的先决条件和约束
+**⚠ 慎用 sub：**
+- 除非任极独立（如全隔之模、独之测套），否则先 `main` 类
+- 若建 `sub` 类任，务必于 `task_desc` 与 `additional_info` 供全上下：
+  - 明确之文径与目录构
+  - 相关之赖系与口定
+  - 必要之环配与技栈讯
+  - 任行之先决与限
 
-**强制要求：**
-- execute_task必须提供non-empty additional_info参数
-- 禁止过度拆分简单任务
-- 每个Agent只能有一个任务列表
+**强制：**
+- execute_task 必供 non-empty additional_info 参
+- 禁过拆简任
+- 每 Agent 只能有一任列
 
-**使用场景：**
-- PLAN阶段：一次性添加所有子任务
-- 数据切分：按目录/文件/模块分批处理
-- 依赖管理：自动验证任务依赖关系
+**用景：**
+- PLAN 阶：一次性加全子任
+- 数据切分：按目录/文/模分处理
+- 赖管：自动验任赖系
 
-**关键原则：**
-简单任务用main，复杂任务用sub，避免过度拆分。
+**要则：**
+简任用 main，复任用 sub，免过拆。
 
-**使用示例**
-创建任务列表：
+**用例**
+建任列：
 ```json
 {
     "name": "task_list_manager",
@@ -1017,7 +1017,7 @@ class task_list_manager:
 }
 ```
 
-执行任务：
+行任：
 ```json
 {
     "name": "task_list_manager",
@@ -1029,7 +1029,7 @@ class task_list_manager:
 }
 ```
 
-更新任务状态：
+更任状：
 ```json
 {
     "name": "task_list_manager",
@@ -1044,7 +1044,7 @@ class task_list_manager:
 }
 ```
 
-清除所有任务：
+清全任：
 ```json
 {
     "name": "task_list_manager",
@@ -1053,8 +1053,6 @@ class task_list_manager:
     }
 }
 ```
-
-
 """
 
         return description

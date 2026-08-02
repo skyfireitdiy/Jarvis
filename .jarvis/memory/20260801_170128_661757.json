@@ -1,0 +1,8 @@
+{
+  "id": "20260801_170128_661757",
+  "type": "project_long_term",
+  "tags": ["提示词文言文", "task-3", "完成状态"],
+  "content": "task-3 已全部完成：code_agent_system 下12个md文件已全部改写为文言文。research.md commit=a32d47e，troubleshooting.md commit=2f7ec37。下步：task-4，处理 src/jarvis 下7个python提示词文件，须 py_compile 验证。写文件须用 python3 一次性完整写入（edit_file 易截断失败）。",
+  "created_at": "2026-08-01T17:01:28.661796",
+  "updated_at": "2026-08-01T17:01:28.661814"
+}

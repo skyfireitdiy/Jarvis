@@ -1,0 +1,8 @@
+{
+  "id": "20260802_004930_733963",
+  "type": "project_long_term",
+  "tags": ["文言文", "jarvis_tools", "完成", "prompts"],
+  "content": "Jarvis文言文改写任务全部完成。jarvis_tools 19个工具description已成文言文：批1(2d6d532)、批2(6d2cf16)、edit_file(d1e8c78)、execute_script(d3b5a35)、gateway_manager(63e3548)、task_list_manager(02dd9ef)、memory.py(5a2b6be+1af7c15)。配套测试 test_prompt_builder.py 断言同步更新(63f4857)。回归验证：tests/jarvis_tools/ 全绿、tests/jarvis_memory_organizer/ 全绿、test_agent_task_lists/test_sliding_window_compression/test_code_agent_prompts/test_prompt_builder 全绿，综合195+测试点全部通过。工作区干净无未提交变更。回退点：eb8897575dad874780cfa6c5420f74df70e8ee79。",
+  "created_at": "2026-08-02T00:49:30.734010",
+  "updated_at": "2026-08-02T00:49:30.734017"
+}

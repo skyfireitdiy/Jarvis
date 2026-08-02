@@ -41,17 +41,17 @@ class MemoryTool:
     """统一的记忆管理工具，支持保存、检索和清除记忆"""
 
     name = "memory"
-    description = """统一的记忆管理工具，支持三种操作：
+    description = """统一忆管工具，支三种操：
 
-1. **save**: 保存信息到长短期记忆系统。支持批量保存，记忆类型：project_long_term（项目长期）、global_long_term（全局长期）、short_term（短期）。
+1. **save**: 存讯入长短期忆统，支批存。忆类：project_long_term（目久）、global_long_term（全久）、short_term（短）
 
-2. **retrieve**: 从长短期记忆系统中检索信息。支持按类型和标签过滤，支持智能语义检索。
+2. **retrieve**: 检长短期忆统之讯，支按类与签滤，支智义检
 
-3. **clear**: 清除指定的记忆。支持按类型、标签或ID清除。注意：清除操作不可恢复。
+3. **clear**: 清指忆。按类/签/ID 清。注意：清不可复
 
-**重要提示**：
-- 每次调用只能执行一种操作（save/retrieve/clear）
-- 参数根据操作类型而有所不同"""
+**要示**：
+- 每调只能执一操（save/retrieve/clear）
+- 参据操类而异"""
 
     parameters = {
         "type": "object",
@@ -59,7 +59,7 @@ class MemoryTool:
             "action": {
                 "type": "string",
                 "enum": ["save", "retrieve", "clear"],
-                "description": "操作类型：save（保存记忆）、retrieve（检索记忆）、clear（清除记忆）",
+                "description": "操类：save（存忆）、retrieve（检忆）、clear（清忆）",
             },
             # save 操作的参数
             "memories": {
@@ -74,21 +74,21 @@ class MemoryTool:
                                 "global_long_term",
                                 "short_term",
                             ],
-                            "description": "记忆类型",
+                            "description": "忆类",
                         },
                         "tags": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "用于索引记忆的标签列表",
+                            "description": "忆之标签",
                         },
                         "content": {
                             "type": "string",
-                            "description": "要保存的记忆内容",
+                            "description": "欲存之忆容",
                         },
                     },
                     "required": ["memory_type", "tags", "content"],
                 },
-                "description": "要保存的记忆列表（仅 save 操作使用）",
+                "description": "欲存之忆列（仅 save 操用）",
             },
             # retrieve 操作的参数
             "memory_types": {
@@ -102,36 +102,36 @@ class MemoryTool:
                         "all",
                     ],
                 },
-                "description": "要检索的记忆类型列表（仅 retrieve 操作使用）",
+                "description": "欲检之忆类列（仅 retrieve 操用）",
             },
             "tags": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "用于过滤的标签列表（可选，retrieve 和 clear 操作使用）",
+                "description": "滤用之签（可选，retrieve 与 clear 操用）",
             },
             "limit": {
                 "type": "integer",
-                "description": "返回结果的最大数量（可选，仅 retrieve 操作使用）",
+                "description": "返果之限数（可选，仅 retrieve 操用）",
                 "minimum": 1,
             },
             "smart_search": {
                 "type": "boolean",
-                "description": "是否启用智能语义检索模式（可选，仅 retrieve 操作使用）",
+                "description": "启智义检模否（可选，仅 retrieve 操用）",
                 "default": False,
             },
             "query": {
                 "type": "string",
-                "description": "语义检索的查询文本（仅 retrieve 操作在 smart_search=True 时使用）",
+                "description": "智义检之问文（仅 retrieve 操于 smart_search=True 时用）",
             },
             # clear 操作的参数
             "memory_ids": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "要清除的具体记忆ID列表（可选，仅 clear 操作使用）",
+                "description": "欲清之忆ID列（可选，仅 clear 操用）",
             },
             "confirm": {
                 "type": "boolean",
-                "description": "确认清除操作（仅 clear 操作使用，必须为true才会执行清除）",
+                "description": "确认清操（仅 clear 操用，必为 true 方行清）",
                 "default": False,
             },
         },

@@ -356,7 +356,7 @@ class TimerTool:
     """
 
     name = "timer"
-    description = "定时器工具：支持定时注入提示词，管理定时任务（取消/列出/清除）"
+    description = "定时器工具：支定时注入提示词，管定时任（取消/列出/清除）"
     parameters = {
         "type": "object",
         "properties": {

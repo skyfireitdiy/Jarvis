@@ -35,7 +35,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 class WebpageTool:
     name = "read_webpage"
-    description = "使用无头浏览器读取网页内容，支持JavaScript动态渲染，将HTML转换为Markdown格式返回"
+    description = "以无头浏览器读网页内，支JavaScript动渲，将HTML转Markdown式归"
     parameters = {
         "type": "object",
         "properties": {

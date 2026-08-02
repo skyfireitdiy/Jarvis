@@ -22,7 +22,7 @@ class AddImagesTool:
     """添加图片到对话上下文的工具"""
 
     name = "add_images"
-    description = "添加图片到当前对话上下文，支持大模型主动识别图片内容"
+    description = "添图至当前对话之上下文中，支大模型主动识图内"
 
     parameters = {
         "type": "object",

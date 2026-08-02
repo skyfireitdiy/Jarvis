@@ -38,7 +38,7 @@ Parameters:
         assert "# 📝 Action Details" in result
         assert "</details>" in result
         assert "<rules>" in result
-        assert "# ❗ 重要操作使用规则" in result
+        assert "# ❗ 重要之操作规（必严遵，违则致误）" in result
         assert "</rules>" in result
         assert "</actions>" in result
 

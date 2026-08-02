@@ -35,7 +35,7 @@ from typing import List
 class ReadSymbolsTool:
     # 文件名必须与工具名一致，便于注册表自动加载
     name = "read_symbols"
-    description = "从symbols.jsonl按需读取指定符号记录"
+    description = "自symbols.jsonl按需读指名符之录"
     parameters = {
         "type": "object",
         "properties": {

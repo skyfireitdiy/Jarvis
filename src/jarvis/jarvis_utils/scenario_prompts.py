@@ -202,9 +202,9 @@ def classify_user_request(
     """
     if difficulty_descriptions is None:
         difficulty_descriptions = {
-            "easy": "简单问答、单步操作、明确的小任务（注意：如果涉及代码修改，任务难度至少为medium，不能评为easy）",
-            "medium": "需要多步操作、需要理解上下文、涉及一定复杂度",
-            "hard": "需要深度分析、多维度综合、需要专业知识和深入思考",
+            "easy": "简易问答、单步操作、明晰小务（涉代码修改者，难度至少为medium，不得评easy）",
+            "medium": "需多步操作、须理解上下文、具一定复杂度",
+            "hard": "需深度分析、多维综合、赖专门知识与深思",
         }
 
     # 如果 user_input 是多模态内容，提取其中的文本
@@ -238,23 +238,23 @@ def classify_user_request(
             for k, v in difficulty_descriptions.items()
         )
 
-        classification_prompt = f"""请分析以下用户需求，判断其属于哪个{classification_context}，并评估任务难度。
+        classification_prompt = f"""析用户所请，判其属何{classification_context}，并量任之难易。
 
-用户需求：
+用户所请：
 {user_input}
 
-可选场景类型：
+可选场景：
 {scenarios_text}
 
-任务难度等级：
+难度等级：
 {difficulty_text}
 
-请按以下格式返回（只返回这两行，不要包含其他内容）：
-scenario: <场景类型>
-difficulty: <难度等级>
+依下述格式应答（仅此两行，勿杂他辞）：
+scenario: <场景>
+difficulty: <难度>
 
-如果无法明确判断场景类型，scenario 返回 default。
-如果无法明确判断难度，difficulty 返回 medium。
+若难定场景，scenario 返 default。
+若难定难度，difficulty 返 medium。
 """
 
         response = platform.chat_until_success(classification_prompt)
