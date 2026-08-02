@@ -2961,7 +2961,29 @@ const agentDisplayGroups = computed(() => {
   // 已分组的 agent_id 集合（去重，保持定义顺序）
   const groupedAgentIds = new Set()
 
-  // 第一轮：自定义分组（可折叠）
+  // 先收集自定义分组中的 agent_id，用于排除
+  agentGroups.value.forEach(group => {
+    if (!group.agentIds) group.agentIds = []
+    group.agentIds.forEach(id => groupedAgentIds.add(id))
+  })
+
+  const sortedNodeIds = Object.keys(agentsByNode.value).sort()
+
+  // 第一轮：所有节点的活跃 Agent（排除已分组的）
+  sortedNodeIds.forEach(nodeId => {
+    const nodeAgents = agentsByNode.value[nodeId]
+    const active = nodeAgents.active.filter(agent => !groupedAgentIds.has(agent.agent_id))
+    if (active.length > 0) {
+      groups.push({
+        key: `node-${nodeId}`,
+        title: nodeId,
+        agents: active,
+        isCollapsible: false,
+      })
+    }
+  })
+
+  // 第二轮：自定义分组（可折叠）
   agentGroups.value.forEach(group => {
     if (!group.agentIds) group.agentIds = []
     const agents = agentList.value.filter(agent =>
@@ -2974,22 +2996,6 @@ const agentDisplayGroups = computed(() => {
         title: group.name,
         agents,
         isCollapsible: true,
-      })
-    }
-  })
-
-  const sortedNodeIds = Object.keys(agentsByNode.value).sort()
-
-  // 第二轮：所有节点的活跃 Agent（排除已分组的）
-  sortedNodeIds.forEach(nodeId => {
-    const nodeAgents = agentsByNode.value[nodeId]
-    const active = nodeAgents.active.filter(agent => !groupedAgentIds.has(agent.agent_id))
-    if (active.length > 0) {
-      groups.push({
-        key: `node-${nodeId}`,
-        title: nodeId,
-        agents: active,
-        isCollapsible: false,
       })
     }
   })
