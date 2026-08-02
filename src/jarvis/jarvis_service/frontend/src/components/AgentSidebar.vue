@@ -15,7 +15,14 @@
     <div class="agent-list">
       <template v-for="agentGroup in displayGroups" :key="agentGroup.key">
         <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
-          <button class="agent-collapsed-toggle" @click="toggleGroupCollapse(agentGroup.key)">
+          <button
+            class="agent-collapsed-toggle"
+            :class="{
+              'group-waiting-unread': hasUnreadWaitingAgent(agentGroup.agents),
+              'group-waiting-clicked': hasClickedWaitingAgent(agentGroup.agents)
+            }"
+            @click="toggleGroupCollapse(agentGroup.key)"
+          >
             <span class="agent-collapsed-arrow">{{ isGroupCollapsed(agentGroup.key) ? '▶' : '▼' }}</span>
             <span class="agent-collapsed-title">{{ agentGroup.title }}</span>
             <span class="agent-collapsed-count">({{ agentGroup.agents.filter(a => getStatusClass(a) !== 'stopped').length }}/{{ agentGroup.agents.length }})</span>
@@ -192,6 +199,20 @@ function handleAgentClick(agent, event) {
   }
   // 触发父组件的点击事件
   emit('agentClick', agent, event)
+}
+
+// 判断组内是否有未点击的等待输入Agent（闪烁）
+function hasUnreadWaitingAgent(agents) {
+  return agents.some(agent =>
+    props.isWaitingInput(agent) && !clickedWaitingAgents.value.has(agent.agent_id)
+  )
+}
+
+// 判断组内是否有已点击的等待输入Agent（背景色）
+function hasClickedWaitingAgent(agents) {
+  return agents.some(agent =>
+    props.isWaitingInput(agent) && clickedWaitingAgents.value.has(agent.agent_id)
+  )
 }
 
 const props = defineProps({
@@ -477,6 +498,25 @@ watch(() => props.currentAgentId, (newAgentId) => {
 .agent-collapsed-toggle:hover {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
+}
+
+/* 组内有已点击的等待输入Agent - 背景色 */
+.agent-collapsed-toggle.group-waiting-clicked {
+  background: rgba(210, 153, 34, 0.35);
+}
+
+/* 组内有未点击的等待输入Agent - 呼吸灯闪烁 */
+.agent-collapsed-toggle.group-waiting-unread {
+  animation: group-breathing 2s ease-in-out infinite;
+}
+
+@keyframes group-breathing {
+  0%, 100% {
+    background: rgba(210, 153, 34, 0.35);
+  }
+  50% {
+    background: rgba(210, 153, 34, 0.65);
+  }
 }
 
 .agent-collapsed-arrow {
