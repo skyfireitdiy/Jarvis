@@ -20,6 +20,7 @@
       :getProxyNodeLabel="getAgentProxyNodeLabel"
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
+      :agentGroups="agentGroups"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
@@ -32,6 +33,8 @@
       @toggleSelectAll="toggleSelectAll"
       @batchCopy="batchCopyAgents"
       @batchDelete="batchDeleteAgents"
+      @addToGroup="addSelectedToGroup"
+      @createGroupWithAgents="createGroupWithAgents"
       @startResize="startAgentSidebarResize"
       @viewDiff="viewDiff"
       @viewRules="viewRules"
@@ -2955,29 +2958,51 @@ const agentsByNode = computed(() => {
 const agentDisplayGroups = computed(() => {
   const groups = []
 
+  // 已分组的 agent_id 集合（去重，保持定义顺序）
+  const groupedAgentIds = new Set()
+
+  // 第一轮：自定义分组（可折叠）
+  agentGroups.value.forEach(group => {
+    if (!group.agentIds) group.agentIds = []
+    const agents = agentList.value.filter(agent =>
+      group.agentIds.includes(agent.agent_id) && !isStoppedAgent(agent)
+    )
+    if (agents.length > 0) {
+      agents.forEach(agent => groupedAgentIds.add(agent.agent_id))
+      groups.push({
+        key: `group-${group.id}`,
+        title: group.name,
+        agents,
+        isCollapsible: true,
+      })
+    }
+  })
+
   const sortedNodeIds = Object.keys(agentsByNode.value).sort()
 
-  // 第一轮：所有节点的活跃 Agent
+  // 第二轮：所有节点的活跃 Agent（排除已分组的）
   sortedNodeIds.forEach(nodeId => {
     const nodeAgents = agentsByNode.value[nodeId]
-    if (nodeAgents.active.length > 0) {
+    const active = nodeAgents.active.filter(agent => !groupedAgentIds.has(agent.agent_id))
+    if (active.length > 0) {
       groups.push({
         key: `node-${nodeId}`,
         title: nodeId,
-        agents: nodeAgents.active,
+        agents: active,
         isCollapsible: false,
       })
     }
   })
 
-  // 第二轮：所有节点的已停止 Agent
+  // 第三轮：所有节点的已停止 Agent（排除已分组的）
   sortedNodeIds.forEach(nodeId => {
     const nodeAgents = agentsByNode.value[nodeId]
-    if (nodeAgents.stopped.length > 0) {
+    const stopped = nodeAgents.stopped.filter(agent => !groupedAgentIds.has(agent.agent_id))
+    if (stopped.length > 0) {
       groups.push({
         key: `stopped-${nodeId}`,
         title: `${nodeId}已停止的 Agent`,
-        agents: nodeAgents.stopped,
+        agents: stopped,
         isCollapsible: true,
       })
     }
@@ -3000,6 +3025,60 @@ watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisib
     ensureEditorSidebarFileTree()
   })
 })
+
+// Agent 分组管理
+const AGENT_GROUPS_STORAGE_KEY = 'jarvis_agent_groups'
+const agentGroups = ref([]) // 自定义分组 [{ id, name, agentIds: [] }]
+
+function loadAgentGroups() {
+  try {
+    const saved = localStorage.getItem(AGENT_GROUPS_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed)) {
+        agentGroups.value = parsed
+        return
+      }
+    }
+  } catch (e) {
+    console.warn('[AGENT_GROUPS] Failed to load groups:', e)
+  }
+  agentGroups.value = []
+}
+
+function saveAgentGroups() {
+  try {
+    localStorage.setItem(AGENT_GROUPS_STORAGE_KEY, JSON.stringify(agentGroups.value))
+  } catch (e) {
+    console.warn('[AGENT_GROUPS] Failed to save groups:', e)
+  }
+}
+
+function removeStoppedAgentsFromGroups() {
+  let changed = false
+  agentGroups.value.forEach(group => {
+    if (!group.agentIds) group.agentIds = []
+    const before = group.agentIds.length
+    group.agentIds = group.agentIds.filter(agentId => {
+      const agent = agentList.value.find(a => a.agent_id === agentId)
+      return !agent || !isStoppedAgent(agent)
+    })
+    if (group.agentIds.length !== before) changed = true
+  })
+  if (changed) saveAgentGroups()
+}
+
+// 监听 agent 状态/列表变化，自动移除已停止或已删除的 agent
+watch(
+  [agentStatuses, agentList],
+  () => {
+    removeStoppedAgentsFromGroups()
+  },
+  { deep: true }
+)
+
+// 初始化加载
+loadAgentGroups()
 
 // Agent 批量选择管理
 const selectedAgents = ref(new Set()) // 选中的 Agent ID 集合
@@ -5237,7 +5316,61 @@ async function batchCopyAgents() {
   }
 }
 
+// Agent 分组操作
+function addSelectedToGroup(groupId) {
+  const group = agentGroups.value.find(g => g.id === groupId)
+  if (!group) return
+  if (!group.agentIds) group.agentIds = []
+  // 只添加活跃的 agent，过滤已停止的
+  const selectedIds = Array.from(selectedAgents.value).filter(agentId => {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    return agent && !isStoppedAgent(agent)
+  })
+  if (selectedIds.length === 0) {
+    showToast('没有可加入分组的活跃 Agent', 'warning')
+    return
+  }
+  let added = 0
+  selectedIds.forEach(agentId => {
+    if (!group.agentIds.includes(agentId)) {
+      group.agentIds.push(agentId)
+      added++
+    }
+  })
+  saveAgentGroups()
+  selectedAgents.value.clear()
+  selectedAgents.value = new Set()
+  isBatchMode.value = false
+  showToast(`已加入 ${added} 个 Agent 到「${group.name}」`, 'success')
+}
 
+function createGroupWithAgents(name) {
+  const trimmedName = String(name || '').trim()
+  if (!trimmedName) {
+    showToast('请输入分组名称', 'warning')
+    return
+  }
+  const group = {
+    id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: trimmedName,
+    agentIds: [],
+  }
+  const selectedIds = Array.from(selectedAgents.value).filter(agentId => {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    return agent && !isStoppedAgent(agent)
+  })
+  selectedIds.forEach(agentId => {
+    if (!group.agentIds.includes(agentId)) {
+      group.agentIds.push(agentId)
+    }
+  })
+  agentGroups.value.push(group)
+  saveAgentGroups()
+  selectedAgents.value.clear()
+  selectedAgents.value = new Set()
+  isBatchMode.value = false
+  showToast(`已创建分组「${group.name}」并加入 ${group.agentIds.length} 个 Agent`, 'success')
+}
 
 // 查看 Agent 的 Diff
 async function viewDiff(agent) {
