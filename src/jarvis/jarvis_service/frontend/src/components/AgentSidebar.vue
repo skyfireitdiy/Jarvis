@@ -107,12 +107,37 @@
           <button class="icon-btn-small" @click="$emit('batchCopy')" title="批量复制">
             📋
           </button>
+          <button class="icon-btn-small" @click="showGroupPanel = !showGroupPanel" title="加入分组">
+            📁
+          </button>
           <button class="icon-btn-small stop-btn" @click="$emit('batchDelete')" title="批量删除">
             🗑
           </button>
           <button class="icon-btn-small" @click="$emit('toggleBatchMode')" title="退出批量模式">
             ✕
           </button>
+        </div>
+        <div v-if="showGroupPanel" class="agent-group-panel">
+          <div class="agent-group-panel-title">加入分组</div>
+          <div v-if="agentGroups.length === 0" class="agent-group-empty">暂无分组，请先创建</div>
+          <div
+            v-for="group in agentGroups"
+            :key="group.id"
+            class="agent-group-item"
+            @click="$emit('addToGroup', group.id)"
+          >
+            <span class="agent-group-item-name">📁 {{ group.name }}</span>
+            <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
+          </div>
+          <div class="agent-group-create">
+            <input
+              v-model="newGroupName"
+              class="agent-group-create-input"
+              placeholder="新建分组名称"
+              @keyup.enter="handleCreateGroup"
+            />
+            <button class="icon-btn-small" @click="handleCreateGroup" title="创建分组">➕</button>
+          </div>
         </div>
       </div>
       <div v-if="agentList.length === 0" class="agent-empty">
@@ -178,8 +203,21 @@ const props = defineProps({
   getNodeLabel: Function,
   getProxyNodeLabel: Function,
   isSelected: Function,
-  isWaitingInput: Function
+  isWaitingInput: Function,
+  agentGroups: { type: Array, default: () => [] }
 })
+
+// 分组面板状态
+const showGroupPanel = ref(false)
+const newGroupName = ref('')
+
+function handleCreateGroup() {
+  const name = newGroupName.value.trim()
+  if (!name) return
+  emit('createGroupWithAgents', name)
+  newGroupName.value = ''
+  showGroupPanel.value = false
+}
 
 // 初始化时折叠所有分组 - 只在首次初始化时设置，避免后续数据更新覆盖用户操作
 watch(() => props.displayGroups, (newGroups) => {
@@ -207,6 +245,8 @@ const emit = defineEmits([
   'toggleSelectAll',
   'batchCopy',
   'batchDelete',
+  'addToGroup',
+  'createGroupWithAgents',
   'startResize',
   'viewDiff',
   'viewRules',
@@ -510,6 +550,76 @@ watch(() => props.currentAgentId, (newAgentId) => {
 .batch-actions-buttons {
   display: flex;
   gap: 8px;
+}
+
+.agent-group-panel {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--tile-radius-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.agent-group-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.agent-group-empty {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 4px 0;
+}
+
+.agent-group-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-radius: var(--tile-radius-xs);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.agent-group-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.agent-group-item-name {
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.agent-group-item-count {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.agent-group-create {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.agent-group-create-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-xs);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.agent-group-create-input:focus {
+  border-color: var(--color-border-active);
 }
 
 .agent-item .agent-status {
