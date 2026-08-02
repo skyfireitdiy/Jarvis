@@ -623,7 +623,7 @@ Jarvis 专注于代码开发，提供规则系统和方法论系统；OpenClaw/Z
 
 ```bash
 # Linux/macOS
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh)"
 
 # Windows PowerShell
 iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
