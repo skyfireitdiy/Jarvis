@@ -107,7 +107,7 @@
           <button class="icon-btn-small" @click="$emit('batchCopy')" title="批量复制">
             📋
           </button>
-          <button class="icon-btn-small" @click="showGroupPanel = !showGroupPanel" title="加入分组">
+          <button class="icon-btn-small" @click="openGroupModal" title="加入分组">
             📁
           </button>
           <button class="icon-btn-small stop-btn" @click="$emit('batchDelete')" title="批量删除">
@@ -116,28 +116,6 @@
           <button class="icon-btn-small" @click="$emit('toggleBatchMode')" title="退出批量模式">
             ✕
           </button>
-        </div>
-        <div v-if="showGroupPanel" class="agent-group-panel">
-          <div class="agent-group-panel-title">加入分组</div>
-          <div v-if="agentGroups.length === 0" class="agent-group-empty">暂无分组，请先创建</div>
-          <div
-            v-for="group in agentGroups"
-            :key="group.id"
-            class="agent-group-item"
-            @click="$emit('addToGroup', group.id)"
-          >
-            <span class="agent-group-item-name">📁 {{ group.name }}</span>
-            <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
-          </div>
-          <div class="agent-group-create">
-            <input
-              v-model="newGroupName"
-              class="agent-group-create-input"
-              placeholder="新建分组名称"
-              @keyup.enter="handleCreateGroup"
-            />
-            <button class="icon-btn-small" @click="handleCreateGroup" title="创建分组">➕</button>
-          </div>
         </div>
       </div>
       <div v-if="agentList.length === 0" class="agent-empty">
@@ -150,6 +128,37 @@
       @mousedown="$emit('startResize', $event)"
     ></div>
   </aside>
+
+  <!-- 加入分组弹窗 -->
+  <Teleport to="body">
+    <div v-if="showGroupModal" class="group-modal-overlay" @click.self="closeGroupModal">
+      <div class="group-modal">
+        <div class="group-modal-header">
+          <span>加入分组</span>
+          <button class="icon-btn-small" @click="closeGroupModal" title="关闭">✕</button>
+        </div>
+        <div v-if="agentGroups.length === 0" class="agent-group-empty">暂无分组，请先创建</div>
+        <div
+          v-for="group in agentGroups"
+          :key="group.id"
+          class="agent-group-item"
+          @click="selectGroup(group.id)"
+        >
+          <span class="agent-group-item-name">📁 {{ group.name }}</span>
+          <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
+        </div>
+        <div class="agent-group-create">
+          <input
+            v-model="newGroupName"
+            class="agent-group-create-input"
+            placeholder="新建分组名称"
+            @keyup.enter="handleCreateGroup"
+          />
+          <button class="icon-btn-small" @click="handleCreateGroup" title="创建分组">➕</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -207,16 +216,30 @@ const props = defineProps({
   agentGroups: { type: Array, default: () => [] }
 })
 
-// 分组面板状态
-const showGroupPanel = ref(false)
+// 分组弹窗状态
+const showGroupModal = ref(false)
 const newGroupName = ref('')
+
+function openGroupModal() {
+  newGroupName.value = ''
+  showGroupModal.value = true
+}
+
+function closeGroupModal() {
+  showGroupModal.value = false
+}
+
+function selectGroup(groupId) {
+  emit('addToGroup', groupId)
+  closeGroupModal()
+}
 
 function handleCreateGroup() {
   const name = newGroupName.value.trim()
   if (!name) return
   emit('createGroupWithAgents', name)
   newGroupName.value = ''
-  showGroupPanel.value = false
+  closeGroupModal()
 }
 
 // 初始化时折叠所有分组 - 只在首次初始化时设置，避免后续数据更新覆盖用户操作
@@ -552,22 +575,39 @@ watch(() => props.currentAgentId, (newAgentId) => {
   gap: 8px;
 }
 
-.agent-group-panel {
-  margin-top: 8px;
-  padding: 8px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--tile-radius-xs);
+.group-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 200px;
-  overflow-y: auto;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.agent-group-panel-title {
-  font-size: 12px;
+.group-modal {
+  width: 320px;
+  max-width: 90vw;
+  max-height: 70vh;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.group-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
+  margin-bottom: 4px;
 }
 
 .agent-group-empty {
