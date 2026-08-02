@@ -16,12 +16,12 @@ class meta_agent:
 
     name = "meta_agent"
     description = (
-        "元代理（Meta-Agent）工具：用于**根据自然语言需求自动创建或改进 Jarvis 工具**，并完成注册集成。"
-        "核心能力：1）调用 CodeAgent 生成完整可用的新工具代码（包含参数定义、错误处理、最佳实践模板）；"
-        "2）在生成后自动写入到 data/tools 目录并注册到 ToolRegistry；"
-        "3）支持在新工具内部编排现有 Agent（通用任务编排、ARCHER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）；"
-        "4）支持通过再次调用 meta_agent 对已有工具进行自举式改进（自我分析和演化）。"
-        "调用方式：传入 tool_name（工具名/文件名）与 function_description（目标功能的清晰描述），返回值中包含生成状态和新工具文件的绝对路径。"
+        "元代理（Meta-Agent）工具：**据自然语求自建或改 Jarvis 工具**，并成注册之合。"
+        "核能：1）调 CodeAgent 生全可用之新工具码（含参定、错处、最佳践模）；"
+        "2）生后自写入 data/tools 目并注于 ToolRegistry；"
+        "3）支在新工具内编现有 Agent（通用任编、ARCHER 作流、task_list_manager）与 CodeAgent（码改、构验、lint、review 等）；"
+        "4）支复调 meta_agent 对已有工具行自举式之改（自析与演）。"
+        "调法：传 tool_name（工具名/文件名）与 function_description（目标功之晰述），归值中含生状与新工具文之绝对径。"
     )
 
     parameters = {

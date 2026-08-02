@@ -93,31 +93,27 @@ def build_subtree_prompt(
     )
 
     return (
-        "请评估以下 C/C++ 函数子树是否可以由一个或多个成熟的 Rust 库整体替代（语义等价或更强）。"
-        "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。"
-        "如果当前调用的函数无法使用 crate 直接提供的功能而需要封装或者改造，则认为不可替代。\n"
+        "请估以下 C/C++ 函数子树，可否由一或数成熟 Rust 库整代（语义等价或更强）。"
+        "许库内多 API 协作，许多库合用；若必赖未熟/冷门库或非 Rust 库，则判不可代。"
+        "若所调函数不能径用 crate 所供之功，而须封装改造，则视为不可代。\n"
         f"{disabled_hint}"
-        "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
-        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。\n\n"
-        f"根函数(被评估子树的根): {root_name}\n"
+        "输出格式：唯出 <SUMMARY> 一区，区内径含 JSON 对象（无需别加标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
+        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述诸库何以协作实现之意)。\n\n"
+        f"根函数(被估子树之根): {root_name}\n"
         f"签名: {root_sig}\n"
         f"语言: {root_lang}\n"
-        "根函数源码片段（可能截断）:\n"
+        "根函数源码片段（或已截断）:\n"
         f"{root_src}\n\n"
         f"子树规模: {len(desc)} 个函数\n"
         "子树函数列表（名称|签名）:\n" + "\n".join(nodes_meta) + "\n\n"
         "依赖图（调用边，caller -> callee）:\n"
         f"{edges_text}\n\n"
-        + (
-            f"DOT 表示（边数较少时提供）:\n```dot\n{dot_text}\n```\n\n"
-            if dot_text
-            else ""
-        )
-        + "代表性源码样本（部分节点，可能截断，仅供辅助判断）:\n"
+        + (f"DOT 表示（边少时供）:\n```dot\n{dot_text}\n```\n\n" if dot_text else "")
+        + "代表性源码样本（部分节点，或已截断，仅供佐断）:\n"
         + "\n".join(samples)
         + "\n"
         + (
-            f"\n【附加说明（用户自定义）】\n{additional_notes}\n"
+            f"\n【附加说明（用户自定）】\n{additional_notes}\n"
             if additional_notes
             else ""
         )

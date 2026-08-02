@@ -21,7 +21,7 @@ class MethodologyTool:
     """
 
     name = "methodology"
-    description = "管理问题解决方法论，支持项目级和全局级，支持添加、更新和删除操作"
+    description = "管问题解之法论，支项目级与全局级，支增、更、删之操"
     parameters = {
         "type": "object",
         "properties": {

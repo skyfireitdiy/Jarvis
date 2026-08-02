@@ -26,7 +26,7 @@ class SubCodeAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_code_agent"
-    description = "将子任务交给 CodeAgent 执行并返回结果（自动完成并生成总结）。"
+    description = "将子任交 CodeAgent 执而归果（自竟并成总）。"
     parameters = {
         "type": "object",
         "properties": {

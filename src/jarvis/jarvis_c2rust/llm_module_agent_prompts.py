@@ -146,12 +146,12 @@ class PromptBuilder:
             indent=2,
         )
         prompt = f"""
-下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或JSON内容：
+下供项目调用图之上下（JSON），先通读之，勿出规划或JSON之文：
 <context>
 {context_json}
 </context>
 
-如果已准备好进入总结阶段以生成完整输出，请仅输出：{ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
+若已备毕欲入总结之阶以成全出，唯出：{ot("!!!COMPLETE!!!")}，勿杂他辞。事之总结，待后询。
 """.strip()
         return self.append_additional_notes(prompt)
 
@@ -161,24 +161,24 @@ class PromptBuilder:
         """
         crate_name = self.crate_name_func()
         prompt = (
-            "你是资深 Rust 架构师。任务：根据给定的函数级调用关系（仅包含 root_function 及其可达的函数名列表），为目标项目规划合理的 Rust crate 结构。\n"
+            "汝为资深 Rust 架构师。任务：据所予函数级调用关系（唯含 root_function 及其可达函数名之表），为彼项目规合宜之 Rust crate 结构。\n"
             "\n"
-            "规划原则：\n"
-            "- 根导向：以每个 root_function 为边界组织顶层模块，形成清晰的入口与责任范围。\n"
-            "- 内聚优先：按调用内聚性拆分子模块，使强相关函数位于同一子模块，减少跨模块耦合。\n"
-            "- 去环与分层：尽量消除循环依赖；遵循由上到下的调用方向，保持稳定依赖方向与层次清晰。\n"
-            "- 共享抽取：被多个 root 使用的通用能力抽取到 common/ 或 shared/ 模块，避免重复与交叉依赖。\n"
-            "- 边界隔离：将平台/IO/外设等边界能力独立到 adapter/ 或 ffi/ 等模块（如存在）。\n"
-            "- 命名规范：目录/文件采用小写下划线；模块名简洁可读，避免特殊字符与过长名称。\n"
-            "- 可演进性：模块粒度适中，保留扩展点，便于后续重构与逐步替换遗留代码。\n"
-            "- 模块组织：每个目录的 mod.rs 声明其子目录与 .rs 子模块；顶层 lib.rs 汇聚导出主要模块与公共能力。\n"
-            "- 入口策略（务必遵循，bin 仅做入口，功能尽量在 lib 中实现）：\n"
-            "  * 若原始项目包含 main 函数：不要生成 src/main.rs；使用 src/bin/"
+            "规划之则：\n"
+            "- 根导：以各 root_function 为界组顶层模块，成清晰之入口与责任之域。\n"
+            "- 内聚先：按调用内聚性分子模块，使强相关函数同处一子模块，减跨模块耦。\n"
+            "- 去环分层：力消循环依赖；循自上而下之调用向，保依赖向稳而层次明。\n"
+            "- 共享抽取：为多 root 所用之共性，抽入 common/ 或 shared/ 模块，免重复与交叉依赖。\n"
+            "- 界隔：平台/IO/外设等界能，独立入 adapter/ 或 ffi/ 等模块（若有）。\n"
+            "- 命名规：目录/文件用小写下划线；模块名简而可读，避特殊字符与过繁之名。\n"
+            "- 可演进：模块粒度适中，留扩展点，便后重构与渐代遗留之码。\n"
+            "- 模块组织：每目录之 mod.rs 宣其子目录与 .rs 子模块；顶层 lib.rs 汇出主模块与公共之能。\n"
+            "- 入口策（务遵，bin 唯作入口，功能尽于 lib 中成）：\n"
+            "  * 若原项目含 main 函数：勿生 src/main.rs；用 src/bin/"
             + crate_name
-            + ".rs 作为唯一可执行入口，并在其中仅保留最小入口逻辑（调用库层）；共享代码放在 src/lib.rs；\n"
-            "  * 若原始项目不包含 main 函数：不要生成任何二进制入口（不创建 src/main.rs 或 src/bin/），仅生成 src/lib.rs；\n"
-            "  * 多可执行仅在确有多个清晰入口时才使用 src/bin/<name>.rs；每个 bin 文件仅做入口，尽量调用库；\n"
-            "  * 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
+            + ".rs 为唯一可执入口，其中唯留至简入口逻辑（调库层）；共享码置 src/lib.rs；\n"
+            "  * 若原项目不含 main 函数：勿生任何二进制入口（不建 src/main.rs 或 src/bin/），唯生 src/lib.rs；\n"
+            "  * 多可执，唯果有数清晰入口方用 src/bin/<name>.rs；每 bin 文件唯作入口，尽量调库；\n"
+            "  * 二进制命名：<name> 用小写下划线，彰入口之意，避与模块/文件同名。\n"
         )
         return self.append_additional_notes(prompt)
 
@@ -195,22 +195,22 @@ class PromptBuilder:
         has_main = self.has_original_main_func()
         crate_name = self.crate_name_func()
         guidance_common = """
-输出规范：
-- 只输出一个 <PROJECT> 块
-- 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 JSON 数组：
-  - 目录项使用对象表示，键为 '<name>/'，值为子项数组
+输出之规：
+- 唯出 <PROJECT> 一区
+- 区外不得有任何字符（含空行、注释、Markdown 等）
+- 区内必为 JSON 数组：
+  - 目录项用对象表之，键为 '<name>/'，值为子项数组
   - 文件为字符串项（例如 "lib.rs"）
-- 不要创建与入口无关的占位文件
+- 勿建与入口无关之占位文件
 """.strip()
         if has_main:
             entry_rule = f"""
-入口约定（基于原始项目存在 main）：
-- 必须包含 src/lib.rs；
-- 不要包含 src/main.rs；
-- 必须包含 src/bin/{crate_name}.rs，作为唯一可执行入口（仅做入口，调用库逻辑）；
-- 如无明确多个入口，不要创建额外 bin 文件。
-正确示例（JSON格式）：
+入口之约（因原项目有 main）：
+- 必含 src/lib.rs；
+- 勿含 src/main.rs；
+- 必含 src/bin/{crate_name}.rs，为唯一可执入口（唯作入口，调库逻辑）；
+- 如无明分之多入口，勿建额外 bin 文件。
+正例（JSON格式）：
 <PROJECT>
 [
   "Cargo.toml",
@@ -229,11 +229,11 @@ class PromptBuilder:
 """.strip()
         else:
             entry_rule = """
-入口约定（基于原始项目不存在 main）：
-- 必须包含 src/lib.rs；
-- 不要包含 src/main.rs；
-- 不要包含 src/bin/ 目录。
-正确示例（JSON格式）：
+入口之约（因原项目无 main）：
+- 必含 src/lib.rs；
+- 勿含 src/main.rs；
+- 勿含 src/bin/ 目录。
+正例（JSON格式）：
 <PROJECT>
 [
   "Cargo.toml",
@@ -247,11 +247,11 @@ class PromptBuilder:
 """.strip()
         guidance = f"{guidance_common}\n{entry_rule}"
         prompt = f"""
-请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 JSON）。严格遵循以下要求：
+据前对话已供之<context>，成总结之出（项目目录结构之 JSON）。严遵下求：
 
 {guidance}
 
-你的输出必须仅包含以下单个块（用项目的真实目录结构替换块内内容）：
+汝之出，唯含以下单区（以项目实目录结构代区内）：
 <PROJECT>
 [...]
 </PROJECT>
@@ -265,9 +265,9 @@ class PromptBuilder:
         在原始 summary_prompt 基础上，附加错误反馈，要求严格重试。
         """
         feedback = (
-            "\n\n[格式校验失败，必须重试]\n"
-            f"- 失败原因：{error_reason}\n"
-            '- 请严格遵循上述"输出规范"与"入口约定"，重新输出；\n'
-            "- 仅输出一个 <PROJECT> 块，块内为可解析的 JSON 数组；块外不得有任何字符。\n"
+            "\n\n[格式校验败，必重试]\n"
+            f"- 败因：{error_reason}\n"
+            '- 严遵上述"输出之规"与"入口之约"，重出；\n'
+            "- 唯出 <PROJECT> 一区，区内为可解析之 JSON 数组；区外不得有任何字符。\n"
         )
         return base_summary_prompt + feedback

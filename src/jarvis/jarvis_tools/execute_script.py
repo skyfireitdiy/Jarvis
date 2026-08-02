@@ -136,17 +136,17 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "执行脚本并返回结果，支持任意解释器。Windows 默认使用 powershell，Unix 默认使用 bash。为了避免输出过多内容，建议使用 grep、Select-String 等命令过滤和限制输出长度。\n\n示例用法（Unix/Linux）：\n• 查找日志中的错误：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 查看文件开头20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜索代码中的函数定义：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查找文件中的错误：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 查看目录列表：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执行 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
+    description = "执脚本而归果，支任意解释器。Windows 默用 powershell，Unix 默用 bash。免出过多，议用 grep、Select-String 等令滤限出长。\n\n示例用法（Unix/Linux）：\n• 查错：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 览首20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜函定：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 览目：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
     parameters = {
         "type": "object",
         "properties": {
             "interpreter": {
                 "type": "string",
-                "description": "脚本解释器。Windows 推荐 powershell 或 python；Unix 推荐 bash 或 python3。",
+                "description": "脚本解释器。Windows 荐 powershell 或 python；Unix 荐 bash 或 python3。",
             },
             "script_content": {
                 "type": "string",
-                "description": "要执行的脚本内容。为了避免输出过多，建议使用过滤命令：\n例如：\n• grep -i 'error' filename  # 查找包含'error'的行\n• grep -rn 'pattern' filename     # 搜索文件内容\n• tail -n 50 filename       # 显示文件最后50行\n• head -n 20 filename       # 显示文件前20行\n• command | head -n 100     # 限制命令输出前100行",
+                "description": "欲执之脚本内容。免出过多，议用滤令：\n例：\n• grep -i 'error' filename  # 查含'error'之行\n• grep -rn 'pattern' filename     # 搜文内\n• tail -n 50 filename       # 示文末50行\n• head -n 20 filename       # 示文首20行\n• command | head -n 100     # 限出首100行",
             },
         },
         "required": ["script_content"],

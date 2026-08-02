@@ -33,7 +33,7 @@ class SearchWebTool:
     """处理网络搜索的类。"""
 
     name = "search_web"
-    description = "搜索互联网上的信息"
+    description = "搜互联网上之讯"
     parameters = {
         "type": "object",
         "properties": {

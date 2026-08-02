@@ -25,10 +25,10 @@ SCENARIO_TYPES: Dict[str, str] = _get_scenario_types(_SCENARIO_SUBDIR)
 def classify_user_request(
     user_input: Union[str, List[ContentBlock]],
 ) -> Tuple[str, str]:
-    """使用 normal_llm 对用户需求进行分类
+    """以 normal_llm 分类用户需求
 
     参数:
-        user_input: 用户输入的需求描述（支持纯文本或多模态内容）
+        user_input: 用户所请之述（纯文本或多模态皆可）
 
     返回:
         Tuple[str, str]: (场景类型, 难度等级)
@@ -37,22 +37,22 @@ def classify_user_request(
         user_input,
         scenario_subdir=_SCENARIO_SUBDIR,
         default_scenario_name="通用开发",
-        classification_context="开发场景类型",
+        classification_context="开发场类",
         difficulty_descriptions={
-            "easy": "单文件修改、简单配置调整、明确的小改动",
-            "medium": "多文件修改、需要理解业务逻辑、涉及一定复杂度",
-            "hard": "架构级改动、复杂重构、需要深入分析和设计",
+            "easy": "单文件之改、简配置之调、明小之动",
+            "medium": "多文件之改、须明业务之逻、涉一定之繁",
+            "hard": "架构级之改、复重构、须深析细设",
         },
     )
 
 
 def get_system_prompt(scenario: str = "default") -> str:
-    """根据场景类型获取对应的系统提示词
+    """据场景取对应系统提示词
 
     参数:
         scenario: 场景类型
 
     返回:
-        str: 对应场景的完整系统提示词
+        str: 对应场景之完整系统提示词
     """
     return _get_system_prompt_impl(scenario, scenario_subdir=_SCENARIO_SUBDIR)

@@ -49,34 +49,34 @@ class GatewayManagerTool:
         """检查工具是否可用，仅当 Gateway 存在时启用（通过 agent_id 是否设置判断）。"""
         return jglobals.agent_id is not None
 
-    description = """Agent 管理工具，用于管理 Agent 之间的通信和协作。
+    description = """管 Agent 间通协之工具。
 
-支持的操作：
-1. **send_to_agent**: 向指定 Agent 发送消息，消息会通过 Web Gateway 代理到目标 Agent 的 /message 接口，添加到目标 Agent 的输入缓冲区
-2. **list_agents**: 获取所有 Agent 列表
-3. **list_nodes**: 获取节点列表信息，包括本节点配置、运行状态、已注册的子节点等
-4. **list_model_groups**: 获取指定节点的模型组列表，包括模型组名称、各档位模型配置等
-5. **create_agent**: 创建新的 Agent，支持指定类型、工作目录、模型组、任务等参数
-6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询（通过 node_id 指定目标节点）
-7. **delete_agent**: 删除指定的 Agent，支持跨节点删除（通过 node_id 指定目标节点）
-8. **get_node_secret**: 获取网关的节点连接私钥，用于子节点连接主网关时的身份认证
-9. **update_nodes_code**: 更新所有节点代码到 main 分支，将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码
-10. **restart_nodes**: 一键重启所有节点服务，跳过当前节点（因为当前节点有 Agent 在运行），依次重启子节点后最后重启 master 节点
-11. **create_timer**: 创建定时任务，支持指定节点，可定时创建 Agent 或执行 Shell 命令
-12. **list_timers**: 查询所有节点的定时任务并汇总
-13. **get_timer**: 查询单个定时任务详情
-14. **delete_timer**: 删除指定定时任务
-15. **create_group**: 创建群组
-16. **list_groups**: 查询所有群组
-17. **get_group**: 查询群组详情
-18. **join_group**: 加入群组
-19. **leave_group**: 退出群组
-20. **send_group_message**: 发送群组消息
-21. **regenerate_agent**: 无损重生指定 Agent
+支之操：
+1. **send_to_agent**: 发讯于 Agent，经 Web Gateway 代至目之 /message 口，入其入缓
+2. **list_agents**: 得全 Agent 列
+3. **list_nodes**: 得节讯，含节配、行状、已注子节等
+4. **list_model_groups**: 得指节之模组列，含模组名、各档模配等
+5. **create_agent**: 建新 Agent，支指类、工目、模组、任等参
+6. **list_directory**: 览指径文/目录，支跨节询
+7. **delete_agent**: 删指 Agent，支跨节删
+8. **get_node_secret**: 得网关节连私钥，用于子节连主网关时之身验
+9. **update_nodes_code**: 更全节码至 main 分并拉最新
+10. **restart_nodes**: 一键重启全节服，跳过现节，次启子节后终启 master 节
+11. **create_timer**: 建定任，支指节，可定建 Agent 或执 Shell 令
+12. **list_timers**: 询全节之定任并汇
+13. **get_timer**: 询单定任详
+14. **delete_timer**: 删指定任
+15. **create_group**: 建群组
+16. **list_groups**: 询全群组
+17. **get_group**: 询群组详
+18. **join_group**: 入群组
+19. **leave_group**: 出群组
+20. **send_group_message**: 发群组讯
+21. **regenerate_agent**: 无损重生指 Agent
 
-**重要提示**：
-- 每次调用只能执行一种操作（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent）
-- 参数根据操作类型而有所不同"""
+**要示**：
+- 每调只能执一操（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent）
+- 参据操类而异"""
 
     parameters = {
         "type": "object",
