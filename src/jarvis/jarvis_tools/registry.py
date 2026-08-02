@@ -2,7 +2,6 @@ import json
 import os
 import re
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -1980,6 +1979,85 @@ class ToolRegistry(OutputHandlerProtocol):
 
         return output
 
+    def _truncate_for_summary(self, output: str, max_chars: int = 120000) -> str:
+        """为cheap模型总结而截断超长内容，保留首尾。
+
+        参数:
+            output: 原始输出
+            max_chars: 允许送入cheap模型的最大字符数
+
+        返回:
+            str: 截断后的内容（保留首尾），未超限则返回原文
+        """
+        if len(output) <= max_chars:
+            return output
+        head_chars = max_chars // 2
+        tail_chars = max_chars - head_chars
+        truncated = (
+            output[:head_chars]
+            + f"\n\n...（中间 {len(output) - head_chars - tail_chars} 字符已省略，原始总长度 {len(output)} 字符）\n\n"
+            + output[-tail_chars:]
+        )
+        return truncated
+
+    def _summarize_with_cheap_model(self, output: str) -> str:
+        """使用cheap模型提取超长工具输出的关键信息。
+
+        当工具输出超过上下文限制时，用cheap模型总结关键信息，
+        避免超长内容持续占用后续对话上下文。
+        内容过长时先截断（保留首尾）再总结，防止超过cheap模型上下文。
+        失败时回退到截断处理。
+
+        参数:
+            output: 要总结的输出内容
+
+        返回:
+            str: 总结后的内容
+        """
+        try:
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+
+            # 获取cheap平台实例
+            platform = (
+                PlatformRegistry.get_global_platform_registry().get_cheap_platform()
+            )
+
+            # 内容过长时先截断保留首尾，避免超过cheap模型上下文
+            summary_input = self._truncate_for_summary(output)
+
+            summary_prompt = (
+                "请提取以下工具输出中的关键信息，用于替代原始输出返回给Agent。要求：\n"
+                "1. 保留对后续决策有用的关键数据、错误信息、文件路径、函数名、返回值等\n"
+                "2. 压缩冗余内容（如重复日志、无关细节）\n"
+                "3. 用简洁的结构化文本输出（如列表）\n"
+                "4. 如果输出包含错误，必须明确指出错误原因\n"
+                "5. 控制在较短篇幅内，突出最有价值的信息\n\n"
+                f"原始输出内容（{len(output)}字符）：\n\n{summary_input}"
+            )
+
+            # 使用无状态补全，不影响主对话历史
+            result = platform.complete(summary_prompt)
+
+            if result and result != "<输出被用户中断>":
+                return (
+                    f"<tool_output_summary>\n"
+                    f"（原始输出过长{len(output)}字符，已由cheap模型总结关键信息）\n\n"
+                    f"{result}\n"
+                    f"</tool_output_summary>"
+                )
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.registry",
+                function="_summarize_with_cheap_model",
+            )
+            PrettyOutput.auto_print(
+                f"⚠ 使用cheap模型总结输出失败，回退到截断: {str(e)}"
+            )
+
+        # 失败回退到截断
+        return self._truncate_output(output)
+
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
             name = tool_call["name"]  # 确保name是str类型
@@ -2166,28 +2244,8 @@ class ToolRegistry(OutputHandlerProtocol):
             is_large_content = is_context_overflow(output, platform)
 
             if is_large_content:
-                # 创建临时文件
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".txt", delete=False
-                ) as tmp_file:
-                    output_file = tmp_file.name
-                    tmp_file.write(output)
-                    tmp_file.flush()
-
-                try:
-                    # 使用上传的文件生成摘要
-                    return self._truncate_output(output)
-                finally:
-                    # 清理临时文件
-                    try:
-                        os.unlink(output_file)
-                    except Exception as e:
-                        save_exception(
-                            e,
-                            module="jarvis_tools.registry",
-                            function="handle_tool_calls",
-                        )
-                        pass
+                # 使用cheap模型提取关键信息，避免超长上下文持续占用后续对话
+                return self._summarize_with_cheap_model(output)
 
             return output
 
