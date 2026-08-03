@@ -1322,7 +1322,11 @@ class PrettyOutput:
                             f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                         )
                     else:
-                        pnl.subtitle = f"[bold green]✓ {current_time_str} | ({get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | 首token: {first_tok_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s[/bold green]"
+                        pnl.subtitle = (
+                            f"[bold green]✓ {current_time_str} | ({get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
+                            f"首token: {first_tok_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
+                            f"Token: {total_tokens}/{max_tokens}[/bold green]"
+                        )
                 else:
                     if max_tokens > 0 and progress_bar:
                         pnl.subtitle = (
@@ -1612,6 +1616,8 @@ class PrettyOutput:
         check_interrupt: Callable[[], bool] = lambda: False,
         append_session_history: Callable[[str, str], None] = lambda a, b: None,
         get_context_token_count: Optional[Callable[[str], int]] = None,
+        get_used_token_count: Optional[Callable[[], int]] = None,
+        get_platform_max_input_token_count: Optional[Callable[[], int]] = None,
     ) -> Tuple[str, str, float]:
         """
         使用简单模式进行流式聊天输出（逐字符打印）。
@@ -1726,9 +1732,26 @@ class PrettyOutput:
         tokens_per_second = (
             response_tokens / generation_time if generation_time > 0 else 0
         )
-        PrettyOutput.auto_print(
-            f"✅ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
-        )
+        # 计算当前使用的token数和总token数
+        used_tokens = 0
+        max_tokens = 0
+        try:
+            if get_used_token_count is not None:
+                used_tokens = get_used_token_count() + response_tokens
+            if get_platform_max_input_token_count is not None:
+                max_tokens = get_platform_max_input_token_count()
+        except Exception:
+            pass
+
+        if max_tokens > 0:
+            PrettyOutput.auto_print(
+                f"✅ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
+                f"Token: {used_tokens}/{max_tokens}"
+            )
+        else:
+            PrettyOutput.auto_print(
+                f"✅ 对话完成耗时: {duration:.2f}秒 | 首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+            )
 
         # 发送流式结束事件
         emit_output(
