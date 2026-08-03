@@ -262,6 +262,8 @@ class BasePlatform(ABC):
             check_interrupt=lambda: bool(is_immediate_abort() and get_interrupt()),
             append_session_history=self._append_session_history,
             get_context_token_count=get_context_token_count,
+            get_used_token_count=self.get_used_token_count,
+            get_platform_max_input_token_count=self._get_platform_max_input_token_count,
         )
         return response, reasoning_content, first_token_time
 
@@ -370,9 +372,17 @@ class BasePlatform(ABC):
                     response
                 )
                 threshold = get_conversation_turn_threshold()
+                # 计算当前使用的token数和总token数
+                used_tokens = (
+                    self.get_used_token_count()
+                    + get_context_token_count(response)
+                    + get_context_token_count(reasoning_content)
+                )
+                max_tokens = self._get_platform_max_input_token_count()
                 PrettyOutput.auto_print(
                     f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
-                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | Token: {usage_percent:.1f}%"
+                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
+                    f"Token: {used_tokens}/{max_tokens} ({usage_percent:.1f}%)"
                 )
             except Exception:
                 threshold = get_conversation_turn_threshold()
