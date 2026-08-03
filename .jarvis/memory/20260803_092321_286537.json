@@ -1,0 +1,8 @@
+{
+  "id": "20260803_092321_286537",
+  "type": "project_long_term",
+  "tags": ["文言化", "提示词", "任务完成"],
+  "content": "Jarvis 项目 7 个提示词文件文言化任务全部完成（2026-08-03）。改动文件：1) builtin/prompts/code_agent_system/performance.md（commit 21f331d）；2) builtin/prompts/code_agent_system/refactor.md（commit 43cb057）；3) builtin/prompts/code_agent_system/research.md（commit 6a46f76）；4) builtin/prompts/code_agent_system/troubleshooting.md（commit 5855a84）；5) src/jarvis/jarvis_agent/prompts.py（commit 6b13219）；6) src/jarvis/jarvis_agent/prompt_optimizer.py（commit 2154c68）；7) src/jarvis/jarvis_agent/prompt_manager.py（commit 265731a）。所有文件仅改文字风格（白话→文言），功能逻辑不变，Python 文件均验证可正常导入。",
+  "created_at": "2026-08-03T09:23:21.286580",
+  "updated_at": "2026-08-03T09:23:21.286593"
+}
