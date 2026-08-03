@@ -1166,7 +1166,7 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           updateCodeToMainButton.disabled = true;
           updateCodeToMainButton.textContent = '更新中...';
           const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
-          const url = 'http://' + gatewayAddress.host + ':' + gatewayAddress.port + '/api/node/master/code/update-to-main';
+          const url = 'http://' + gatewayAddress.host + ':' + gatewayAddress.port + '/api/nodes/master/code-update';
           const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -1179,23 +1179,13 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
           if (!response.ok || !result.success) {
             throw new Error(result.error?.message || '代码更新失败');
           }
-          const successCount = result.data?.success_count || 0;
-          const totalCount = result.data?.total_nodes || 0;
-          const failedCount = result.data?.failed_count || 0;
-          let message = '';
-          if (successCount === totalCount) {
-            message = '✓ 代码更新成功，已更新 ' + successCount + '/' + totalCount + ' 个节点';
-          } else if (successCount > 0) {
-            message = '⚠ 代码更新部分成功，成功 ' + successCount + '/' + totalCount + ' 个节点，失败 ' + failedCount + ' 个节点';
-          } else {
-            message = '✗ 代码更新失败，没有节点更新成功';
-          }
-          vscode.postMessage({ type: 'showNotification', message, level: successCount > 0 ? 'info' : 'error' });
+          const message = result.data?.message || '代码更新成功';
+          vscode.postMessage({ type: 'showNotification', message, level: 'info' });
         } catch (error: any) {
           vscode.postMessage({ type: 'showNotification', message: error.message || '代码更新失败', level: 'error' });
         } finally {
           updateCodeToMainButton.disabled = false;
-          updateCodeToMainButton.textContent = '更新代码到 main 分支';
+          updateCodeToMainButton.textContent = '更新代码';
         }
       });
     }
@@ -4004,6 +3994,33 @@ class JarvisAgentListViewProvider implements vscode.WebviewViewProvider {
       });
     }
     this.renderAgentListView();
+  }
+
+  public async getNodeSecret(): Promise<void> {
+    if (!this.panelState.token) {
+      vscode.window.showErrorMessage("请先连接并登录 Jarvis 网关");
+      return;
+    }
+    try {
+      const gatewayAddress = parseGatewayAddress(this.panelState.gatewayUrl);
+      const response = await this.fetchWithAuth(
+        buildHttpUrl(gatewayAddress, "/api/node/secret"),
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { node_secret?: string };
+        error?: { message?: string };
+      };
+      if (!response.ok || !result.success || !result.data?.node_secret) {
+        throw new Error(result.error?.message || "获取节点私钥失败");
+      }
+      vscode.window.showInformationMessage(
+        `节点私钥：${result.data.node_secret}`,
+        { modal: true },
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(getErrorMessage(error));
+    }
   }
 
   public postPanelStateImmediate(): void {
