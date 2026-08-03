@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-PromptManager: 统一管理 Agent 的系统提示词与附加提示词的构建逻辑。
+PromptManager: 统一管理 Agent 之系统提示词与附加提示词之构建逻辑。
 
 设计目标（阶段一，最小变更）：
-- 提供独立的提示构建类，不改变现有行为
+- 提供独立之提示构建类，不改现有行为
 - 先行落地构建逻辑，后续在 Agent 中逐步委派使用
 - 保持与现有工具/记忆系统兼容
 """
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class PromptManager:
     """
     提示管理器：负责构建系统提示与默认附加提示。
-    注意：该类不直接访问模型，只负责拼装字符串。
+    注意：此类不直接访问模型，只负责拼装字符串。
     """
 
     def __init__(self, agent: "Agent"):
@@ -33,7 +33,7 @@ class PromptManager:
     # ----------------------------
     def build_system_prompt(self, agent_: Any) -> str:
         """
-        构建系统提示词，复用现有的工具使用提示生成逻辑，保持行为一致。
+        构建系统提示词，复用现有之工具使用提示生成逻辑，保持行为一致。
         """
         action_prompt = self.agent.get_tool_usage_prompt()
 
@@ -105,7 +105,7 @@ class PromptManager:
         返回系统工具信息。
 
         返回:
-            str: 格式化的系统工具信息字符串，供AI助手了解可用工具
+            str: 格式化之系统工具信息字符串，供AI助手了解可用工具
         """
         import os
         import platform
