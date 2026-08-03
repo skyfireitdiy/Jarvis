@@ -222,6 +222,14 @@ BUILTIN_COMMANDS = [
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
 _ADDITIONAL_COMPLETION_DIRS_LOCK = threading.RLock()
 
+# 默认将 Jarvis 的 builtin 目录加入补全路径（以 __file__ 为锚点定位项目根）
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+_BUILTIN_DIR = os.path.join(_PROJECT_ROOT, "builtin")
+if os.path.isdir(_BUILTIN_DIR):
+    _ADDITIONAL_COMPLETION_DIRS.append(_BUILTIN_DIR)
+
 
 def add_additional_completion_dir(dir_path: str) -> bool:
     """添加会话级附加补全目录。"""
