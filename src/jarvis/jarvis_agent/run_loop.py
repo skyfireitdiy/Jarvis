@@ -795,6 +795,7 @@ class AgentRunLoop:
                             [
                                 self.agent.session.addon_prompt,
                                 self.agent.get_tool_usage_prompt(),
+                                "请用工具以竟其事。",
                             ]
                         )
                     )
