@@ -1,0 +1,8 @@
+{
+  "id": "20260803_192304_610759",
+  "type": "project_long_term",
+  "tags": ["agent_network", "orchestration", "self_evolving"],
+  "content": "自进化Agent网络编排文件已更新：builtin/agent_orchestration/self_evolving_network.yaml（134行，四常驻Agent）。执行Agent已删，改为由调度Agent按需创建（code_agent），事毕即弃不常驻。常驻四Agent：知识库（code_agent，含知识条目之式与行事之则七条）、监控（含状态监控/故障检测/预防性维护）、技术学习、调度（含架构感知/任务分析/Agent匹配/资源优化，Agent匹配节含按需创建执行Agent之责）。yamllint通过。",
+  "created_at": "2026-08-03T19:23:04.610808",
+  "updated_at": "2026-08-03T19:23:04.610814"
+}
