@@ -885,6 +885,13 @@ class Agent:
         # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）
         self.model.agent = self
 
+        # 打印新模型的 max_input_token_count
+        try:
+            max_tokens = self.model._get_platform_max_input_token_count()
+            PrettyOutput.auto_print(f"📊 新模型 max_input_token_count: {max_tokens}")
+        except Exception:
+            pass
+
     def _init_session(self) -> None:
         """初始化会话管理器"""
         self.session = SessionManager(
@@ -957,6 +964,15 @@ class Agent:
             PrettyOutput.auto_print(
                 f"🔄 根据任务难度（{difficulty}）切换模型类型: {model_type_display} ({model_type})"
             )
+
+            # 打印新模型的 max_input_token_count
+            try:
+                max_tokens = self.model._get_platform_max_input_token_count()
+                PrettyOutput.auto_print(
+                    f"📊 新模型 max_input_token_count: {max_tokens}"
+                )
+            except Exception:
+                pass
         else:
             PrettyOutput.auto_print("⚠️ 模型切换失败，保持当前模型")
 
