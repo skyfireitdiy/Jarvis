@@ -1,0 +1,8 @@
+{
+  "id": "20260803_072247_937988",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "execute_script", "流式输出", "非交互模式"],
+  "content": "修复 execute_script 非交互模式无实时流式输出问题（2026-08-03）。根因：非交互模式走 script -q -c 分支，输出重定向至文件，无实时发布。修策：非交互模式改用 PTY 路径（_execute_on_unix_interactive_pty / _execute_on_windows_interactive_pty），仅 timeout 不同（传 get_script_execution_timeout 而非 None）。改动文件：src/jarvis/jarvis_tools/execute_script.py。删除了 script -q -c 分支（Unix）与 subprocess.PIPE 捕获分支（Windows），统一走 PTY。验收：非交互模式实时发布 tool_stream 事件、超时仍生效（180秒默认）、返回结构不变、交互模式行为不变。测试 51 项全过。",
+  "created_at": "2026-08-03T07:22:47.938045",
+  "updated_at": "2026-08-03T07:22:47.938055"
+}

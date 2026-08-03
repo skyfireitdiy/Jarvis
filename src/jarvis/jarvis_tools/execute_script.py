@@ -1034,88 +1034,23 @@ class ScriptTool:
         非交互模式：接管 stdin/stdout/stderr，捕获输出返回（用户无法交互）
         交互模式：继承父进程 stdio，用户可与程序交互（如 input/Read-Host），但不捕获输出
         """
-        import subprocess
-
         cmd = self._get_windows_command(interpreter, script_path, extension)
         env = os.environ.copy()
         if interpreter in ("python", "python2", "python3"):
             env["PYTHONIOENCODING"] = "utf-8"
         try:
             if is_non_interactive:
-                # Agent/自动化模式：接管 I/O，捕获输出，用户无法交互
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    stdin=subprocess.DEVNULL,
-                    cwd=os.getcwd(),
+                # Agent/自动化模式：使用 ConPTY，既可实时流式输出又可捕获输出
+                return self._execute_on_windows_interactive_pty(
+                    argv=cmd,
                     env=env,
+                    get_timeout=get_timeout,
+                    stream_publisher=stream_publisher,
+                    session_id=session_id,
+                    execution_id=execution_id,
+                    input_callback=input_callback,
+                    resize_callback=resize_callback,
                 )
-                set_script_pid(proc.pid)
-                try:
-                    # 使用轮询方式检查中断，而不是直接调用 communicate
-                    import time
-
-                    start_time = time.time()
-                    timeout_val = get_timeout()
-                    while proc.poll() is None:
-                        # 检查是否收到中断信号
-                        if get_interrupt() > 0:
-                            proc.terminate()
-                            try:
-                                proc.wait(timeout=2)
-                            except subprocess.TimeoutExpired:
-                                proc.kill()
-                                proc.wait()
-                            clear_script_pid()
-                            return {
-                                "success": False,
-                                "stdout": "",
-                                "stderr": "执行被用户中断。",
-                            }
-                        # 短暂等待后继续检查
-                        elapsed = time.time() - start_time
-                        if timeout_val and elapsed >= timeout_val:
-                            raise subprocess.TimeoutExpired(cmd, timeout_val)
-                        time.sleep(0.1)
-                    # 进程已结束，获取输出
-                    stdout_bytes, stderr_bytes = proc.communicate()
-                except subprocess.TimeoutExpired:
-                    clear_script_pid()
-                    try:
-                        proc.terminate()
-                        proc.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        try:
-                            proc.kill()
-                            proc.wait()
-                        except Exception as e:
-                            save_exception(
-                                e,
-                                module="jarvis_tools.execute_script",
-                                function="_execute_on_windows",
-                            )
-                            pass
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"执行超时（超过{get_timeout()}秒），进程已被终止（非交互模式）。",
-                    }
-                stdout_str = self._strip_ansi(
-                    self._decode_windows_output(stdout_bytes or b"")
-                )
-                stderr_str = self._strip_ansi(
-                    self._decode_windows_output(stderr_bytes or b"")
-                )
-                output = (
-                    stdout_str + ("\n" + stderr_str if stderr_str else "")
-                ).strip()
-                clear_script_pid()
-                return {
-                    "success": proc.returncode == 0,
-                    "stdout": output,
-                    "stderr": stderr_str if proc.returncode != 0 else "",
-                }
             else:
                 # 交互模式：尝试使用 pywinpty (ConPTY)，既可用户交互又可捕获输出（类似 script）
                 return self._execute_on_windows_interactive_pty(
@@ -1233,134 +1168,24 @@ class ScriptTool:
                     )
 
                 if force_non_interactive:
-                    if self._is_macos():
-                        tee_command = (
-                            f"script -q {output_file} {interpreter} {script_path}"
-                        )
-                    else:
-                        tee_command = (
-                            f"script -q -c '{interpreter} {script_path}' {output_file}"
-                        )
-                    timed_out = False
-                    proc = None
-                    import time
-
-                    start_time = time.time()
-                    timeout_val = get_script_execution_timeout()
-
-                    try:
-                        proc = subprocess.Popen(tee_command, shell=True)  # nosec B602
-                        set_script_pid(proc.pid)
-                        # 使用轮询方式检查中断，而不是直接调用 wait
-                        while proc.poll() is None:
-                            # 检查是否收到中断信号
-                            if get_interrupt() > 0:
-                                proc.terminate()
-                                try:
-                                    proc.wait(timeout=2)
-                                except subprocess.TimeoutExpired:
-                                    proc.kill()
-                                    proc.wait()
-                                clear_script_pid()
-                                return {
-                                    "success": False,
-                                    "stdout": "",
-                                    "stderr": "执行被用户中断。",
-                                }
-                            # 短暂等待后继续检查
-                            elapsed = time.time() - start_time
-                            if timeout_val and elapsed >= timeout_val:
-                                timed_out = True
-                                break
-                            time.sleep(0.1)
-                    except Exception:
-                        timed_out = True
-                        try:
-                            proc.terminate()
-                            proc.wait(timeout=2)
-                        except subprocess.TimeoutExpired:
-                            try:
-                                proc.kill()
-                                proc.wait()
-                            except Exception as e:
-                                save_exception(
-                                    e,
-                                    module="jarvis_tools.execute_script",
-                                    function="_execute_script_with_interpreter_internal",
-                                )
-                                pass
-                        except Exception:
-                            try:
-                                proc.kill()
-                                proc.wait()
-                            except Exception as e:
-                                save_exception(
-                                    e,
-                                    module="jarvis_tools.execute_script",
-                                    function="_execute_script_with_interpreter_internal",
-                                )
-                                pass
-                    except Exception as e:
-                        if proc is not None:
-                            try:
-                                proc.terminate()
-                                proc.wait(timeout=1)
-                            except Exception:
-                                try:
-                                    proc.kill()
-                                    proc.wait()
-                                except Exception as e:
-                                    save_exception(
-                                        e,
-                                        module="jarvis_tools.execute_script",
-                                        function="_execute_script_with_interpreter_internal",
-                                    )
-                                    pass
-                        PrettyOutput.auto_print(f"❌ {str(e)}")
-                        try:
-                            output = self.get_display_output(output_file)
-                        except Exception as ee:
-                            output = f"读取输出文件失败: {str(ee)}"
-                        clear_script_pid()
-                        return {
-                            "success": False,
-                            "stdout": output,
-                            "stderr": f"执行脚本失败: {str(e)}",
-                        }
-                    finally:
-                        if proc is not None:
-                            try:
-                                if proc.stdin:
-                                    proc.stdin.close()
-                                if proc.stdout:
-                                    proc.stdout.close()
-                                if proc.stderr:
-                                    proc.stderr.close()
-                            except Exception as e:
-                                save_exception(
-                                    e,
-                                    module="jarvis_tools.execute_script",
-                                    function="_execute_script_with_interpreter_internal",
-                                )
-                                pass
-                        clear_script_pid()
-
-                    try:
-                        output = self.get_display_output(output_file)
-                    except Exception as e:
-                        output = f"读取输出文件失败: {str(e)}"
-
-                    if timed_out:
-                        return {
-                            "success": False,
-                            "stdout": output,
-                            "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
-                        }
-                    return {
-                        "success": True,
-                        "stdout": output,
-                        "stderr": "",
-                    }
+                    env = os.environ.copy()
+                    # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
+                    env["TERM"] = "xterm-256color"
+                    if interpreter in ("python", "python2", "python3"):
+                        env["PYTHONIOENCODING"] = "utf-8"
+                    argv = [interpreter, script_path]
+                    if interpreter in ("python", "python2", "python3"):
+                        argv = [interpreter, "-u", script_path]
+                    return self._execute_on_unix_interactive_pty(
+                        argv=argv,
+                        env=env,
+                        get_timeout=get_script_execution_timeout,
+                        stream_publisher=request.stream_publisher,
+                        session_id=request.session_id,
+                        execution_id=request.execution_id,
+                        input_callback=request.input_callback,
+                        resize_callback=request.resize_callback,
+                    )
 
                 env = os.environ.copy()
                 # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
