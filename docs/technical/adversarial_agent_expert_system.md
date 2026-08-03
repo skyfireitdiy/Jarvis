@@ -1,6 +1,6 @@
 # 对抗式Agent技术在专家系统优化上的应用
 
-**摘要**：本文提出对抗式Agent方法论，通过两个角色对立的Agent进行对抗迭代，将大语言模型的泛化能力逐步沉淀到专家系统的确定性规则中，实现两种范式的优势融合。以Jarvis平台上的安全扫描模块jsec为案例，展示了2天内59条C/C++检测规则从正则驱动到数据库驱动架构的对抗式进化过程，最终实现87个漏洞样本全检测、66个安全样本0误报。该方法的核心特点是逐步将模型的不确定能力沉淀为专家系统的确定规则，可推广至故障定位、专家运维等专家系统与Agent混合场景。
+**摘要**：本文提出对抗式Agent方法论，通过两个角色对立的Agent进行对抗迭代，将大语言模型的泛化能力逐步沉淀到专家系统的确定性规则中，实现两种范式的优势融合。以Jarvis平台上的安全扫描模块jsec为案例，展示了2天内62条C/C++检测规则从正则驱动到数据库驱动架构的对抗式进化过程，最终实现154个漏洞样本全检测、110个安全样本0误报。该方法的核心特点是逐步将模型的不确定能力沉淀为专家系统的确定规则，可推广至故障定位、专家运维等专家系统与Agent混合场景。
 
 ## 1. 引言
 
@@ -208,9 +208,9 @@ Jarvis是一个本地运行、开箱即用的AI开发助手平台，其核心能
 - **分布式节点支持**：Master/Child节点架构，Agent可运行在不同物理节点上
 - **会话与状态管理**：维护Agent的执行上下文，支持断线重连和状态恢复
 
-### 5.2 主网关与节点架构
+### 5.2 主网关与多节点架构
 
-Jarvis采用**Master/Child节点模式**实现分布式部署。以下PlantUML图展示了对抗式Agent场景中，主网关、子网关与各Agent之间的关系：
+Jarvis采用**Master/Child节点模式**实现分布式部署，支持将Agent运行在不同物理节点上。以下PlantUML图展示了Jarvis的多节点架构能力：
 
 ```plantuml
 @startuml
@@ -219,42 +219,84 @@ skinparam componentStyle rectangle
 skinparam defaultFontSize 13
 skinparam arrowThickness 1.5
 
-title Jarvis对抗式Agent架构：主网关、子网关与Agent关系
+title Jarvis多节点架构：Master/Child分布式部署
 
 node "Master 节点" as master {
     component [Web 网关\n(jarvis_web_gateway)] as gateway
-    component [节点管理器\nNodeConnectionManager] as node_mgr
-    component [Agent路由表\nAgentRouteRegistry] as route
     component [Agent代理\nAgentProxyManager] as proxy
-    component [开发Agent\n(Code Agent)\n编写/修复规则] as dev_agent
+    component [Agent路由表\nAgentRouteRegistry] as route
+    component [节点管理器\nNodeConnectionManager] as node_mgr
 }
 
-node "Child 节点" as child {
-    component [子网关\n(jarvis_web_gateway)] as child_gw
-    component [子节点客户端\nChildNodeClient] as child_client
+node "Child 节点 1" as child1 {
+    component [子网关\n(jarvis_web_gateway)] as child1_gw
+    component [子节点客户端\nChildNodeClient] as child1_client
+    component [Agent A] as agent_a
+}
+
+node "Child 节点 2" as child2 {
+    component [子网关\n(jarvis_web_gateway)] as child2_gw
+    component [子节点客户端\nChildNodeClient] as child2_client
+    component [Agent B] as agent_b
+}
+
+actor "用户/开发者" as user
+
+gateway <--> user : HTTP/WebSocket
+gateway --> proxy : 本地HTTP/WS代理
+proxy --> route : agent_id -> node_id
+gateway --> node_mgr : 节点管理
+node_mgr <--> child1_client : WebSocket\n(节点间协议)
+node_mgr <--> child2_client : WebSocket\n(节点间协议)
+child1_client <--> child1_gw : 本地HTTP/WS
+child2_client <--> child2_gw : 本地HTTP/WS
+child1_gw --> agent_a : ws://127.0.0.1:{port}/ws
+child2_gw --> agent_b : ws://127.0.0.1:{port}/ws
+proxy ... agent_a : 经代理通信
+proxy ... agent_b : 经代理通信
+
+note right of gateway
+  多节点支持
+  Agent可运行在不同物理节点
+  节点间通过WebSocket长连接通信
+  路由表维护 agent_id -> node_id 映射
+end note
+
+@enduml
+```
+
+### 5.3 单节点对抗式Agent架构
+
+对抗式Agent技术通常运行在**单节点**上的多个Agent之间。以下PlantUML图聚焦于开发Agent与漏洞查找Agent之间的对抗协作：
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam defaultFontSize 13
+skinparam arrowThickness 1.5
+
+title 单节点对抗式Agent架构：开发Agent vs 漏洞查找Agent
+
+node "单节点" as node {
+    component [Web 网关\n(jarvis_web_gateway)] as gateway
+    component [Agent代理\nAgentProxyManager] as proxy
+    component [开发Agent\n(Code Agent)\n编写/修复规则] as dev_agent
     component [漏洞查找Agent\n(Code Agent)\n发现漏报/误报] as vuln_agent
 }
 
 actor "用户/开发者" as user
 
 gateway <--> user : HTTP/WebSocket
-node_mgr <--> child_client : WebSocket\n(节点间协议)
 gateway --> proxy : 本地HTTP/WS代理
 proxy --> dev_agent : ws://127.0.0.1:{port}/ws
-gateway --> route : agent_id -> node_id
-child_gw --> vuln_agent : ws://127.0.0.1:{port}/ws
+proxy --> vuln_agent : ws://127.0.0.1:{port}/ws
 
-dev_agent -right-> gateway : ① send_to_agent\n(漏洞分析结果)
-gateway -down-> node_mgr : ② 节点间转发
-node_mgr -down-> child_client : ③ WebSocket传输
-child_client -down-> child_gw : ④ 代理到Agent
-child_gw -down-> vuln_agent : ⑤ /message注入
+dev_agent -right..> gateway : ① send_to_agent\n(漏洞分析结果)
+gateway -down..> vuln_agent : ② /message注入
 
-vuln_agent -up-> child_gw : ⑥ 漏洞查找结果
-child_gw -up-> child_client : ⑦ Agent输出
-child_client -up-> node_mgr : ⑧ AGENT_WS_RECV
-node_mgr -up-> gateway : ⑨ 转发到Master
-gateway -up-> dev_agent : ⑩ 旁路注入开发Agent
+vuln_agent -up..> gateway : ③ 漏洞查找结果
+gateway -up..> dev_agent : ④ 旁路注入开发Agent
 
 note right of gateway
   旁路注入机制
@@ -266,11 +308,11 @@ end note
 @enduml
 ```
 
-### 5.3 旁路注入机制
+### 5.4 旁路注入机制
 
 Jarvis的Agent间通信采用**旁路注入（Bypass Injection）**机制，这是实现对抗式Agent的关键技术。
 
-#### 5.3.1 消息注入流程
+#### 5.4.1 消息注入流程
 
 当一个Agent需要向另一个Agent发送消息时：
 
@@ -282,7 +324,7 @@ Jarvis的Agent间通信采用**旁路注入（Bypass Injection）**机制，这�
    - 否则，消息存入**输入缓冲区**（`input_buffer`），等待下一轮循环消费
 5. 消息以`Agent {sender_id} 发来消息：{content}`的格式出现在目标Agent的提示词上下文中
 
-#### 5.3.2 关键代码实现
+#### 5.4.2 关键代码实现
 
 Agent端的`/message`端点实现（`jarvis.py:1436`）：
 
@@ -308,7 +350,7 @@ async def receive_message(request: dict):
         delivered = "buffered"
 ```
 
-#### 5.3.3 旁路注入的优势
+#### 5.4.3 旁路注入的优势
 
 旁路注入机制具有以下优势：
 
@@ -317,7 +359,7 @@ async def receive_message(request: dict):
 - **可靠性**：缓冲机制确保消息不会丢失，即使Agent正在执行长时间推理
 - **透明性**：对Agent而言，来自其他Agent的消息与用户输入在形式上无差别，无需特殊处理
 
-### 5.4 对抗式Agent在Jarvis中的工作模式
+### 5.5 对抗式Agent在Jarvis中的工作模式
 
 在Jarvis平台上，对抗式Agent的具体工作模式为：
 
@@ -330,7 +372,86 @@ async def receive_message(request: dict):
    - 开发Agent将修复结果发送给漏洞查找Agent，进入下一轮
 5. **收敛判定**：当漏洞查找Agent连续多轮无法发现新的漏报/误报时，迭代终止
 
-### 5.5 跨节点对抗
+### 5.6 Agent编排：快速部署对抗式Agent网络
+
+Jarvis内置了**Agent编排（Orchestration）**机制，通过`<OrganizeAgents>`标签和YAML编排文件，可以一键批量创建多个Agent并配置其对抗协作关系，快速部署出一个对抗式Agent优化网络。
+
+#### 5.6.1 编排机制
+
+`builtin_input_handler.py`中的`<OrganizeAgents>`标签处理器（`builtin_input_handler.py:364`）实现了Agent编排功能：
+
+1. **读取编排文件**：用户输入一个或多个YAML编排文件路径
+2. **解析Agent配置**：从YAML的`agents`列表中解析每个Agent的名称、类型、工作目录、任务描述等配置
+3. **批量创建Agent**：通过`GatewayManagerTool`调用Web网关的`create_agent`接口，批量创建所有配置的Agent
+4. **输出汇总结果**：以表格形式展示每个Agent的创建状态
+
+编排文件格式如下：
+
+```yaml
+agents:
+  - name: "agent_name"
+    type: "code_agent" # Agent类型
+    working_dir: "." # 工作目录
+    task: | # Agent的任务描述（提示词）
+      你的角色定义和工作目标...
+```
+
+#### 5.6.2 对抗式Agent编排示例
+
+`jarvis_sec/orchestration.yaml`定义了一个完整的对抗式Agent编排配置，包含两个Agent：
+
+| Agent名称             | 类型       | 角色          | 工作模式                   |
+| --------------------- | ---------- | ------------- | -------------------------- |
+| `jsec_rule_developer` | code_agent | 规则开发Agent | 被动接收反馈，改进检测规则 |
+| `jsec_adversary`      | agent      | 对抗Agent     | 主动发现漏洞，驱动规则改进 |
+
+两个Agent形成**对抗式协作循环**：
+
+1. **对抗Agent主动发现**：`jsec_adversary`通过互联网搜索CVE、扫描用户仓库、分析现有用例等方式主动发现漏洞
+2. **抽象普适用例**：对抗Agent将真实漏洞抽象为脱敏、自包含、普适的正反用例
+3. **反馈规则开发者**：对抗Agent将漏报/误报反馈发送给`jsec_rule_developer`
+4. **规则改进**：规则开发Agent分析反馈，基于污点传播分析和调用图分析改进检测规则
+5. **验证与深度对抗**：对抗Agent验证改进效果，通过后进入深度对抗阶段——阅读规则源码尝试规避
+6. **持续迭代**：重复上述循环，直到对抗Agent无法找到规避方法
+
+#### 5.6.3 编排优势
+
+- **快速部署**：一条命令即可创建完整的对抗式Agent网络，无需手动逐个创建Agent
+- **配置即代码**：Agent的角色、任务、协作关系全部定义在YAML文件中，便于版本管理和复用
+- **灵活扩展**：可以编排任意数量的Agent，构建更复杂的多Agent协作拓扑
+- **开箱即用**：`jarvis_sec/orchestration.yaml`提供了现成的对抗式Agent编排配置，可直接用于安全检测规则的持续优化
+
+#### 5.6.4 核心特性
+
+对抗式Agent系统具备以下核心特性：
+
+**特性一：任意工程作为输入**
+
+对抗Agent可以利用**任何现有的工程**作为输入，结合扫描结果和AI分析结果生成正反例，作为开发Agent优化的依据。具体流程为：
+
+1. 用户提供任意代码仓库或工程目录
+2. 对抗Agent对工程进行扫描，结合AI分析识别潜在漏洞模式
+3. 从扫描结果中抽象出正例（漏洞代码）和反例（安全代码）
+4. 将生成的正反例作为反馈发送给开发Agent，驱动规则优化
+
+**特性二：可进化能力**
+
+利用编排特性，系统支持**随时重启或启动优化**，使整个系统具备可进化能力：
+
+- **随时启动**：通过`<OrganizeAgents>`标签和编排文件，可随时启动一轮新的对抗优化
+- **随时重启**：优化过程中可随时中断并重启，编排配置保证了Agent状态的快速恢复
+- **持续进化**：每一轮优化都会沉淀新的规则和用例，系统能力随迭代次数持续增强
+
+**特性三：黑盒+白盒结合的对抗策略**
+
+对抗Agent结合**黑盒测试**和**白盒扫描**来生成正反例，通过阅读开发Agent生成的checker代码，有针对性地进行绕过，从而强制开发Agent开发出泛化的高质量checker：
+
+- **黑盒测试**：对抗Agent将正反例输入检测系统，观察检测结果，发现漏报/误报
+- **白盒扫描**：对抗Agent阅读开发Agent生成的checker源码（如`c_checker.py`、`rust_checker.py`），分析规则实现逻辑
+- **针对性绕过**：基于白盒分析结果，构造可规避当前检测逻辑的用例，验证规则的健壮性
+- **强制泛化**：通过持续构造绕过用例，迫使开发Agent不断泛化规则，避免针对特定测试用例的投机实现
+
+### 5.7 跨节点对抗
 
 Jarvis的Master/Child架构使得对抗式Agent可以跨物理节点运行：
 
@@ -341,7 +462,7 @@ Jarvis的Master/Child架构使得对抗式Agent可以跨物理节点运行：
 
 这种跨节点部署不仅提供了计算资源的隔离，更重要的是模拟了真实的安全评估场景——攻击者与防御者处于不同的环境，拥有不同的信息视角。
 
-### 5.6 节点间协议消息类型
+### 5.8 节点间协议消息类型
 
 Jarvis定义了完整的节点间协议，支撑对抗式Agent的跨节点通信：
 
@@ -385,8 +506,8 @@ jsec本质上是一个**专家系统**：每条检测规则以Python函数的形
 
 jsec的测试数据集采用**positive/negative**配对设计：
 
-- **Positive样本**（107个）：包含应被检测到的漏洞代码，用于验证规则的**漏报率**
-- **Negative样本**（76个）：包含安全代码，用于验证规则的**误报率**
+- **Positive样本**（154个）：包含应被检测到的漏洞代码，用于验证规则的**漏报率**
+- **Negative样本**（110个）：包含安全代码，用于验证规则的**误报率**
 
 这种配对设计天然契合对抗式Agent的思路：positive样本对应漏洞查找Agent发现的漏报，negative样本对应漏洞查找Agent发现的误报。
 
@@ -437,7 +558,7 @@ jsec的规则覆盖了以下CWE（Common Weakness Enumeration）类别：
 - **Negative测试用例**：漏洞查找Agent发现的每个误报，都会生成一个对应的negative测试文件，包含不应被报告的安全代码。修复规则后，必须确保这些negative用例不再被误报。
 - **pytest集成**：所有测试用例通过pytest框架自动执行，每次规则修改后自动运行全量测试，确保修复不引入回归问题。
 
-这种"发现即测试"的模式，使得jsec的规则库在快速迭代中始终保持质量：87个positive样本和66个negative样本构成了完整的回归测试套件，任何规则修改都必须通过全部测试才能合入。
+这种"发现即测试"的模式，使得jsec的规则库在快速迭代中始终保持质量：154个positive样本和110个negative样本构成了完整的回归测试套件，任何规则修改都必须通过全部测试才能合入。
 
 ---
 
@@ -537,10 +658,10 @@ def _rule_malloc_no_null_check(self, db, db_file_path, ...):
 
 进化完成后的验证结果：
 
-- **pytest测试**：33个测试全部通过
-- **Positive检测**：107个漏洞样本全部正确检测
-- **Negative误报**：76个安全样本0误报
-- **代码规模**：c_checker.py从初始版本增长至7580行
+- **pytest测试**：34个测试全部通过
+- **Positive检测**：154个漏洞样本全部正确检测
+- **Negative误报**：110个安全样本0误报
+- **代码规模**：c_checker.py从初始版本增长至9453行
 - **规则总数**：62个检测规则（C/C++）+ 34个检测规则（Rust）
 
 ---
@@ -560,6 +681,8 @@ def _rule_malloc_no_null_check(self, db, db_file_path, ...):
 4. **对抗式进化推动了架构演进**。jsec从正则驱动到数据库驱动的架构重构，并非预先设计，而是在对抗过程中自然演化的结果——当正则匹配无法满足跨函数、跨文件检测需求时，架构重构成为必然选择。
 
 5. **联网知识获取使Agent具备持续进化能力**。通过搜索CWE数据库、开源工具规则和安全研究文献，Agent能够获取最新的安全知识，持续丰富规则库，突破了传统专家系统知识获取的瓶颈。
+
+6. **Agent编排使对抗式优化网络可快速部署**。通过`<OrganizeAgents>`标签和YAML编排文件，可以一键创建对抗式Agent网络，支持随时启动或重启优化流程。对抗Agent结合黑盒测试与白盒扫描，利用任意工程作为输入生成正反例，通过阅读checker源码进行针对性绕过，强制开发Agent产出泛化的高质量规则。
 
 ### 8.2 方法论总结
 
@@ -581,6 +704,8 @@ def _rule_malloc_no_null_check(self, db, db_file_path, ...):
 2. **多Agent对抗**：引入多个漏洞查找Agent，从不同攻击视角（如内存安全、逻辑漏洞、密码学弱点）同时进行对抗
 3. **规则质量评估**：建立规则质量评分体系，自动评估LLM生成规则的准确性、完整性和可维护性
 4. **人机协同**：在对抗循环中引入人类专家的审查节点，结合LLM的效率和人类专家的判断力
+5. **可进化能力增强**：基于编排机制实现优化流程的随时启动与重启，支持任意工程作为输入，使对抗式Agent网络能够持续适应新的代码库和漏洞模式
+6. **黑盒+白盒融合对抗**：进一步深化对抗Agent的黑盒测试与白盒扫描融合策略，通过阅读checker源码实现更精准的绕过攻击，推动规则泛化能力的持续提升
 
 #### 应用领域
 
