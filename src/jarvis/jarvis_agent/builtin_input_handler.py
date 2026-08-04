@@ -1864,6 +1864,8 @@ def switch_model_group(agent: Any) -> bool:
         PrettyOutput.auto_print(f"🔄 正在切换到模型组 '{new_group}'...")
         if perform_switch(agent, new_group, platform_type):
             PrettyOutput.auto_print(f"✅ 已成功切换到模型组 '{new_group}'")
+            # 设置手动切换标记，禁用后续自动切换
+            agent._manual_model_switch = True
             # 打印新模型的 max_input_token_count
             try:
                 max_tokens = agent.model._get_platform_max_input_token_count()
@@ -2091,6 +2093,8 @@ def switch_model(agent: Any) -> bool:
     if switch_platform_type(agent, selected_type):
         agent._model_type = selected_type
         PrettyOutput.auto_print(f"✅ 已成功切换到 {type_name} 模型 '{model_name}'")
+        # 设置手动切换标记，禁用后续自动切换
+        agent._manual_model_switch = True
         # 打印新模型的 max_input_token_count
         try:
             max_tokens = agent.model._get_platform_max_input_token_count()
