@@ -7,14 +7,14 @@ description: 当需要在Windows平台进行桌面程序自动化或GUI测试时
 
 ## 概述
 
-`jw` (或 `jarvis-windows`) 是一个基于 pywinauto 的 Windows 桌面程序自动化命令行工具，支持启动应用、连接到已有窗口、执行点击、输入、截图、获取控件树、列举窗口、以及修改常用系统配置（主题、电源、代理等）。**仅支持 Windows 平台**。
+`jw`（或`jarvis-windows`）乃基于pywinauto之Windows桌面程序自动化命令行工具，支持启动应用、连接至已有窗口、执行点击、输入、截图、获取控件树、列举窗口，以及修改常用系统配置（主题、电源、代理等）。**仅支持Windows平台**。
 
 > **⚠️ 重要提醒**
 >
-> 1. **截图功能限制**：除非用户明确要求，否则不要使用 `screenshot` 命令。截图主要用于调试和验证目的，不是默认行为。
-> 2. **输出完整性**：`jw` 的所有命令都返回 JSON 格式的完整结果（包含 `success`、`stdout`、`stderr` 字段）。**绝对不允许对 jw 执行命令的结果进行任何形式的过滤、截断或修改**，必须完整返回原始 JSON 输出，以确保用户能够准确判断操作是否成功。
+> 1. **截图功能限制**：除非用户明确要求，否则勿用`screenshot`命令。截图主要用于调试与验证目的，非默认行为。
+> 2. **输出完整性**：`jw`之所有命令皆返回JSON格式之完整结果（含`success`、`stdout`、`stderr`字段）。**绝对不允许对jw执行命令之结果进行任何形式之过滤、截断或修改**，必完整返回原始JSON输出，以确保用户能准确判断操作是否成功。
 
-通过 `~/.jarvis/jw_sessions.json` 持久化连接信息，后续命令可复用已保存的会话。
+通过`~/.jarvis/jw_sessions.json`持久化连接信息，后续命令可复用已保存之会话。
 
 ## 快速开始
 
@@ -22,7 +22,7 @@ description: 当需要在Windows平台进行桌面程序自动化或GUI测试时
 # 1. 启动记事本
 jw start --path notepad.exe
 
-# 2. 连接到已运行的记事本（若未使用 start）
+# 2. 连接至已运行之记事本（若未用start）
 jw connect --title "无标题 - 记事本"
 
 # 3. 输入文本
@@ -39,11 +39,11 @@ jw close
 
 多数命令支持以下可选参数：
 
-- `--app-id TEXT`: 应用会话 ID（默认：`default`）
+- `--app-id TEXT`: 应用会话ID（默认：`default`）
 - `--process TEXT`: 进程名或路径（覆盖会话）
 - `--title TEXT`: 窗口标题（覆盖会话，支持正则）
-- `--pid INT`: 进程 ID（覆盖会话）
-- `--backend TEXT`: pywinauto 后端，`uia`（默认）或 `win32`
+- `--pid INT`: 进程ID（覆盖会话）
+- `--backend TEXT`: pywinauto后端，`uia`（默认）或`win32`
 
 ## 命令列表
 
@@ -57,7 +57,7 @@ jw close
 
 - `-p, --path TEXT`: 可执行文件路径（必需）
 - `-a, --args TEXT`: 启动参数
-- `--app-id TEXT`: 会话 ID（默认：`default`）
+- `--app-id TEXT`: 会话ID（默认：`default`）
 - `--backend TEXT`: 后端（默认：`uia`）
 - `-t, --timeout INT`: 启动超时秒数（默认：30）
 
@@ -68,18 +68,18 @@ jw start --path notepad.exe
 jw start --path "C:\Program Files\app\app.exe" --args "C:\file.txt"
 ```
 
-#### connect - 连接到已运行窗口
+#### connect - 连接至已运行窗口
 
-连接到已运行的窗口并保存会话。
+连接至已运行之窗口并保存会话。
 
 **参数：**
 
-- `--process TEXT`: 进程名或路径，如 `notepad.exe`
+- `--process TEXT`: 进程名或路径，如`notepad.exe`
 - `-t, --title TEXT`: 窗口标题（支持正则匹配）
-- `--pid INT`: 进程 ID
-- `--app-id TEXT`: 会话 ID（默认：`default`）
+- `--pid INT`: 进程ID
+- `--app-id TEXT`: 会话ID（默认：`default`）
 
-至少需要 `--process`、`--title` 或 `--pid` 之一。
+至少需`--process`、`--title`或`--pid`之一。
 
 **示例：**
 
@@ -91,11 +91,11 @@ jw connect --pid 12345
 
 #### list - 列出会话
 
-列出所有已注册的应用会话。
+列出所有已注册之应用会话。
 
 **参数：**
 
-- `--app-id TEXT`: 按会话 ID 过滤
+- `--app-id TEXT`: 按会话ID过滤
 
 **示例：**
 
@@ -105,13 +105,13 @@ jw list
 
 #### list-windows - 列举窗口
 
-列举当前可见的顶层窗口，便于选择要 connect 的目标。
+列举当前可见之顶层窗口，便于选择要connect之目标。
 
 **参数：**
 
-- `--backend TEXT`: uia（默认）或 win32
+- `--backend TEXT`: uia（默认）或win32
 - `-t, --title TEXT`: 按窗口标题过滤（子串匹配）
-- `-n, --limit INT`: 最多列出数量（默认 50）
+- `-n, --limit INT`: 最多列出数量（默认50）
 
 **示例：**
 
@@ -120,7 +120,7 @@ jw list-windows              # 列举所有可见窗口
 jw list-windows --title Cursor   # 过滤标题含 Cursor 的窗口
 ```
 
-返回每项含 `title`、`pid`、`handle`，可用于 `jw connect --pid <pid>` 或 `jw connect --title "<title>"`。
+返回每项含`title`、`pid`、`handle`，可用于`jw connect --pid <pid>`或`jw connect --title "<title>"`。
 
 #### close - 关闭/断开会话
 
@@ -128,8 +128,8 @@ jw list-windows --title Cursor   # 过滤标题含 Cursor 的窗口
 
 **参数：**
 
-- `--app-id TEXT`: 会话 ID（默认：`default`）
-- `-k, --kill / --no-kill`: 是否结束进程（默认：kill）。`--no-kill` 仅断开会话、不结束进程
+- `--app-id TEXT`: 会话ID（默认：`default`）
+- `-k, --kill / --no-kill`: 是否结束进程（默认：kill）。`--no-kill`仅断开会话、不结束进程
 
 **示例：**
 
@@ -146,9 +146,9 @@ jw close --no-kill  # 仅断开会话，进程继续运行
 
 **参数：**
 
-- `-c, --control TEXT`: 控件标题、AutomationId 或 `title_regex=模式`
-- `-m, --menu TEXT`: 菜单路径，如 `文件(&F)->打开(&O)`
-- `-i, --index INT`: 同类型控件中的索引（从 0 开始）
+- `-c, --control TEXT`: 控件标题、AutomationId或`title_regex=模式`
+- `-m, --menu TEXT`: 菜单路径，如`文件(&F)->打开(&O)`
+- `-i, --index INT`: 同类型控件中之索引（从0开始）
 
 **示例：**
 
@@ -190,13 +190,13 @@ jw right-click --control "编辑区域"
 
 #### hover - 移动鼠标
 
-将鼠标移动到控件中心或指定屏幕坐标。
+将鼠标移至控件中心或指定屏幕坐标。
 
 **参数：**
 
 - `-c, --control TEXT`: 移至控件中心
-- `--x INT`: 屏幕 X 坐标（与 --control 二选一）
-- `--y INT`: 屏幕 Y 坐标（与 --control 二选一）
+- `--x INT`: 屏幕X坐标（与--control二选一）
+- `--y INT`: 屏幕Y坐标（与--control二选一）
 
 **示例：**
 
@@ -207,7 +207,7 @@ jw hover --x 100 --y 200
 
 #### drag - 拖拽
 
-拖拽鼠标从起点到终点。
+拖拽鼠标从起点至终点。
 
 **参数：**
 
@@ -215,7 +215,7 @@ jw hover --x 100 --y 200
 - `--from-x INT`, `--from-y INT`: 起始屏幕坐标
 - `--to-control TEXT`: 目标控件
 - `--to-x INT`, `--to-y INT`: 目标屏幕坐标
-- `-b, --button TEXT`: 鼠标按键（默认：`left`，可选 `right`、`middle`）
+- `-b, --button TEXT`: 鼠标按键（默认：`left`，可选`right`、`middle`）
 
 **示例：**
 
@@ -232,7 +232,7 @@ jw drag --to-x 200 --to-y 200
 
 **参数：**
 
-- `-t, --text TEXT`: 要输入的文本（必需）
+- `-t, --text TEXT`: 要输入之文本（必需）
 - `-c, --control TEXT`: 目标控件（可选，不指定则为当前焦点）
 
 **示例：**
@@ -244,11 +244,11 @@ jw type --control "Edit" --text "内容"
 
 #### type-keys - 发送按键序列
 
-发送键盘按键序列，支持 pywinauto 的 `type_keys` 语法。
+发送键盘按键序列，支持pywinauto之`type_keys`语法。
 
 **参数：**
 
-- `-k, --keys TEXT`: 按键序列（必需），如 `^a`（Ctrl+A）、`{ENTER}`
+- `-k, --keys TEXT`: 按键序列（必需），如`^a`（Ctrl+A）、`{ENTER}`
 
 **示例：**
 
@@ -265,7 +265,7 @@ jw type-keys --keys "{ENTER}"
 
 **参数：**
 
-- `-p, --path TEXT`: 保存路径（可选，默认保存到 `~/.jarvis/`）
+- `-p, --path TEXT`: 保存路径（可选，默认保存至`~/.jarvis/`）
 
 **示例：**
 
@@ -276,12 +276,12 @@ jw screenshot --path C:\temp\capture.png
 
 #### get-tree - 获取控件树
 
-获取窗口控件树结构，用于生成选择器，序号 #N 可用于 click/type 的 `--control #N` 或 `--index N`。
+获取窗口控件树结构，用于生成选择器，序号#N可用于click/type之`--control #N`或`--index N`。
 
 **参数：**
 
 - `-d, --depth INT`: 遍历深度（默认：99，全树）
-- `-c, --control TEXT`: 从指定控件开始（可选），可为 #N
+- `-c, --control TEXT`: 从指定控件开始（可选），可为#N
 
 **示例：**
 
@@ -296,7 +296,7 @@ jw get-tree --depth 5 --control "Panel"
 
 **参数：**
 
-- `-p, --path TEXT`: 菜单路径（必需），如 `文件(&F)->打开(&O)`
+- `-p, --path TEXT`: 菜单路径（必需），如`文件(&F)->打开(&O)`
 
 **示例：**
 
@@ -306,7 +306,7 @@ jw menu --path "编辑(&E)->粘贴(&P)"
 
 ### 5. 系统配置 (config)
 
-修改 Windows 常用系统配置（通过 PowerShell/注册表，无需 pywinauto 会话）。
+修改Windows常用系统配置（通过PowerShell/注册表，无需pywinauto会话）。
 
 #### config theme - 主题切换
 
@@ -353,7 +353,7 @@ jw config remote-desktop disable
 
 #### config startup - 启动项
 
-管理当前用户「启动」文件夹中的启动项（通过重命名添加/移除 .disabled 后缀）。
+管理当前用户「启动」文件夹中之启动项（通过重命名添加/移除.disabled后缀）。
 
 ```bash
 jw config startup list
@@ -390,13 +390,13 @@ jw close --kill
 # 1. 列举窗口，找到目标
 jw list-windows --title 记事本
 
-# 2. 连接到已打开的记事本
+# 2. 连接至已打开之记事本
 jw connect --title "无标题 - 记事本"
 
 # 3. 查看控件树
 jw get-tree
 
-# 4. 双击编辑区（或使用 --control "#N" 从 get-tree 获取的序号）
+# 4. 双击编辑区（或用--control "#N"从get-tree获取之序号）
 jw double-click --control "Edit"
 
 # 5. 全选并复制
@@ -410,7 +410,7 @@ jw type-keys --keys "^c"
 # 切换深色模式
 jw config theme dark
 
-# 设置熄屏 10 分钟
+# 设置熄屏10分钟
 jw config screen-timeout set --minutes 10
 
 # 启用代理
@@ -422,7 +422,7 @@ jw config startup list
 
 ## 最佳实践
 
-### 1. 使用 list-windows 查找窗口
+### 1. 用list-windows查找窗口
 
 不确定要连接哪个窗口时，先列举可见窗口：
 
@@ -431,11 +431,11 @@ jw list-windows              # 列举所有
 jw list-windows --title Cursor   # 过滤标题
 ```
 
-根据返回的 `title` 或 `pid` 使用 `jw connect --title "..."` 或 `jw connect --pid <pid>`。
+根据返回之`title`或`pid`用`jw connect --title "..."`或`jw connect --pid <pid>`。
 
-### 2. 使用 get-tree 定位控件
+### 2. 用get-tree定位控件
 
-在不清楚控件标识时，先用 `get-tree` 查看结构，序号 #N 可用于 click/type：
+在不清楚控件标识时，先用`get-tree`查看结构，序号#N可用于click/type：
 
 ```bash
 jw connect --title "应用标题"
@@ -444,18 +444,18 @@ jw get-tree
 
 ### 3. 会话持久化
 
-`connect` 或 `start` 成功后，会话会保存到 `~/.jarvis/jw_sessions.json`，后续命令可直接使用 `--app-id` 而不必重复指定 `--process`/`--title`。
+`connect`或`start`成功后，会话会保存至`~/.jarvis/jw_sessions.json`，后续命令可直接用`--app-id`而不必重复指定`--process`/`--title`。
 
 ### 4. 控件标识方式
 
 - **标题文本**：`--control "确定"`
 - **AutomationId**：`--control "submitButton"`
 - **正则匹配**：`--control "title_regex=.*记事本.*"`
-- **get-tree 序号**：`--control "#5"` 或 `--index 5`
+- **get-tree序号**：`--control "#5"`或`--index 5`
 
 ### 5. 错误处理
 
-所有命令返回 JSON 格式：
+所有命令返回JSON格式：
 
 ```json
 {
@@ -465,17 +465,17 @@ jw get-tree
 }
 ```
 
-失败时 `success` 为 `false`，`stderr` 包含错误描述。
+失败时`success`为`false`，`stderr`含错误描述。
 
 ## 故障排除
 
-### 非 Windows 平台
+### 非Windows平台
 
 **错误：** `jarvis-windows (jw) requires Windows`
 
-**说明：** 此工具仅支持 Windows，请在 Windows 上使用。
+**说明：** 此工具仅支持Windows，请在Windows上使用。
 
-### pywinauto 未安装
+### pywinauto未安装
 
 **错误：** `pywinauto not installed. Run: pip install pywinauto`
 
@@ -483,26 +483,26 @@ jw get-tree
 
 ```bash
 pip install pywinauto
-# 或安装 Jarvis（已包含 pywinauto）
+# 或安装Jarvis（已含pywinauto）
 pip install jarvis-ai-assistant
 ```
 
 ### 找不到窗口
 
-**错误：** `Connect failed` 或 `Control not found`
+**错误：** `Connect failed`或`Control not found`
 
 **解决：**
 
 ```bash
-# 1. 使用 list-windows 确认目标窗口存在
+# 1. 用list-windows确认目标窗口存在
 jw list-windows
 jw list-windows --title "部分标题"
 
-# 2. 用返回的 title 或 pid 连接
+# 2. 用返回之title或pid连接
 jw connect --title "完整或部分标题"
 jw connect --pid 12345
 
-# 3. 使用 get-tree 检查控件结构
+# 3. 用get-tree检查控件结构
 jw get-tree
 
 # 4. 尝试不同后端
@@ -514,15 +514,15 @@ jw connect --title "标题" --backend win32
 | 命令                  | 描述         | 关键参数                             |
 | --------------------- | ------------ | ------------------------------------ |
 | start                 | 启动应用     | --path (必需), --args                |
-| connect               | 连接窗口     | --process / --title / --pid 至少其一 |
+| connect               | 连接窗口     | --process / --title / --pid至少其一 |
 | list                  | 列出会话     | --app-id                             |
-| list-windows          | 列举可见窗口 | --title 过滤, --limit                |
+| list-windows          | 列举可见窗口 | --title过滤, --limit                |
 | close                 | 关闭会话     | --app-id, --kill/--no-kill           |
 | click                 | 点击         | --control, --menu, --index           |
 | double-click          | 双击         | --control (必需), --index            |
 | right-click           | 右键点击     | --control                            |
-| hover                 | 移动鼠标     | --control 或 --x --y                 |
-| drag                  | 拖拽         | --from-control, --to-control 或坐标  |
+| hover                 | 移动鼠标     | --control或--x --y                 |
+| drag                  | 拖拽         | --from-control, --to-control或坐标  |
 | type                  | 输入文本     | --text (必需), --control             |
 | type-keys             | 发送按键     | --keys (必需)                        |
 | screenshot            | 截图         | --path                               |
@@ -537,5 +537,5 @@ jw connect --title "标题" --backend win32
 
 ## 相关文档
 
-- [pywinauto 文档](https://pywinauto.readthedocs.io/)
-- [Windows App 工具规范]({{ git_root_dir }}/.jarvis/spec/windows_app_tool_spec.md)
+- [pywinauto文档](https://pywinauto.readthedocs.io/)
+- [Windows App工具规范]({{ git_root_dir }}/.jarvis/spec/windows_app_tool_spec.md)

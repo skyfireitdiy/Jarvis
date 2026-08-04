@@ -3,30 +3,30 @@ name: javascript_test
 description: 当需要为JavaScript/TypeScript项目编写测试或配置测试框架时触发。每当用户提及"JavaScript测试"、"TypeScript测试"、"前端测试"、"Jest"、"Mocha"、"Vitest"时触发。不触发：非JS/TS项目测试；代码审查；性能优化。
 ---
 
-# JavaScript/TypeScript 测试规则
+# JavaScript/TypeScript 测试之规
 
-## ⚠️ 你必须遵守的核心要求
+## ⚠ 要
 
-**编写完成务必执行测试，直到修复完成为止！**
+**写毕必行测试，至修毕乃止！**
 
-### 执行要求
+### 行要
 
-- **必须**：每次代码修改后，立即运行测试
-- **必须**：如果测试失败，修复代码直到所有测试通过
-- **禁止**：提交未通过测试的代码
-- **禁止**：在测试未通过的情况下继续开发
+- **必**：每改码后，即行测试
+- **必**：若测试败，修码至全过
+- **禁**：提交未过之码
+- **禁**：于测试未过之际续行开发
 
-### 工作流程
+### 流程
 
-1. 编写或修改代码
-2. **立即**运行测试
-3. 如果测试失败，修复代码
-4. 重复步骤 2-3，直到所有测试通过
-5. 确认所有测试通过后，才能提交代码
+1. 写或改码
+2. **即**行测试
+3. 若败，修之
+4. 复步 2-3，至全过
+5. 全过之后，方得提交
 
-## 你必须使用的测试框架
+## 汝必用之测架
 
-### Jest（推荐使用）
+### Jest（荐）
 
 **安装命令：**
 
@@ -37,10 +37,10 @@ npm install --save-dev jest
 **运行命令：**
 
 ```bash
-npm test                  # 运行所有测试
-npm test -- --watch       # 监视模式
-npm test -- file.test.js  # 运行特定文件
-npm test -- --coverage    # 显示覆盖率
+npm test                  # 行全测
+npm test -- --watch       # 监视模
+npm test -- file.test.js  # 行特文件
+npm test -- --coverage    # 示覆盖率
 ```
 
 ### Mocha + Chai
@@ -54,11 +54,11 @@ npm install --save-dev mocha chai
 **运行命令：**
 
 ```bash
-npm test                  # 运行所有测试
-npx mocha test/**/*.js    # 运行特定目录
+npm test                  # 行全测
+npx mocha test/**/*.js    # 行特目录
 ```
 
-### Vitest（Vite 项目推荐）
+### Vitest（Vite 项目荐）
 
 **安装命令：**
 
@@ -69,13 +69,13 @@ npm install --save-dev vitest
 **运行命令：**
 
 ```bash
-npm test                  # 运行所有测试
-npm test -- --watch       # 监视模式
+npm test                  # 行全测
+npm test -- --watch       # 监视模
 ```
 
-## 你必须编写的测试示例
+## 汝必写之测例
 
-### Jest 测试格式
+### Jest 测例
 
 ```javascript
 // test/calculator.test.js
@@ -92,7 +92,7 @@ describe("Calculator", () => {
 });
 ```
 
-### TypeScript + Jest 测试格式
+### TypeScript + Jest 测例
 
 ```typescript
 // test/calculator.test.ts
@@ -105,14 +105,14 @@ describe("Calculator", () => {
 });
 ```
 
-## 测试执行检查清单
+## 测试行检单
 
-在提交代码前，你必须确认：
+提交码前，汝必确：
 
-- [ ] **编写完成后立即运行了测试**
-- [ ] **所有测试都通过了**
-- [ ] **如果测试失败，已修复代码直到通过**
-- [ ] 测试覆盖了正常情况
-- [ ] 测试覆盖了边界情况
-- [ ] 测试覆盖了异常情况
-- [ ] 使用了描述性的测试名称
+- [ ] **写毕即行测试矣**
+- [ ] **全测皆过矣**
+- [ ] **若败，已修至过矣**
+- [ ] 测覆正常之情
+- [ ] 测覆边界之情
+- [ ] 测覆异常之情
+- [ ] 用描述性之测试名

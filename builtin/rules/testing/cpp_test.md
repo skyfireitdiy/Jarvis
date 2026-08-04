@@ -3,44 +3,44 @@ name: cpp_test
 description: 当需要为C/C++项目编写测试或配置测试框架时触发。每当用户提及"C++测试"、"C测试"、"Google Test"、"GTest"、"Catch2"时触发。不触发：非C/C++项目测试；代码审查；性能优化。
 ---
 
-# C/C++ 测试规则
+# C/C++ 测试之规
 
-## ⚠️ 你必须遵守的核心要求
+## ⚠ 要
 
-**编写完成务必执行测试，直到修复完成为止！**
+**写毕必行测试，至修毕乃止！**
 
-### 执行要求
+### 行要
 
-- **必须**：每次代码修改后，立即运行测试
-- **必须**：如果测试失败，修复代码直到所有测试通过
-- **禁止**：提交未通过测试的代码
-- **禁止**：在测试未通过的情况下继续开发
+- **必**：每改码后，即行测试
+- **必**：若测试败，修码至全过
+- **禁**：提交未过之码
+- **禁**：于测试未过之际续行开发
 
-### 工作流程
+### 流程
 
-1. 编写或修改代码
-2. **立即**运行测试
-3. 如果测试失败，修复代码
-4. 重复步骤 2-3，直到所有测试通过
-5. 确认所有测试通过后，才能提交代码
+1. 写或改码
+2. **即**行测试
+3. 若败，修之
+4. 复步 2-3，至全过
+5. 全过之后，方得提交
 
-## 你必须使用的测试框架
+## 汝必用之测架
 
-### Google Test (gtest)（推荐使用）
+### Google Test (gtest)（荐）
 
-**安装方式：**
+**安装之法：**
 
-- 使用包管理器安装（如 `apt-get install libgtest-dev`）
-- 或从源码编译安装
+- 以包管理器安（如 `apt-get install libgtest-dev`）
+- 或自源码编译安之
 
-**CMake 构建和运行：**
+**CMake 构建运行：**
 
 ```bash
 mkdir build && cd build
 cmake ..
 make
-./test_runner              # 运行所有测试
-./test_runner --gtest_filter=TestClass.* # 运行特定测试
+./test_runner              # 行全测
+./test_runner --gtest_filter=TestClass.* # 行特测
 ```
 
 **直接编译运行：**
@@ -52,10 +52,10 @@ g++ -std=c++17 test.cpp -lgtest -lgtest_main -pthread
 
 ### Catch2
 
-**安装方式：**
+**安装之法：**
 
-- 下载单头文件版本
-- 或使用包管理器安装
+- 下载单头文件版
+- 或以包管理器安
 
 **编译运行：**
 
@@ -64,9 +64,9 @@ g++ -std=c++17 test.cpp -o test
 ./test
 ```
 
-## 你必须编写的测试示例
+## 汝必写之测例
 
-### Google Test 测试格式
+### Google Test 测例
 
 ```cpp
 // test/calculator_test.cpp
@@ -78,13 +78,14 @@ TEST(CalculatorTest, Add) {
     EXPECT_EQ(5, calc.add(2, 3));
 }
 
+
 TEST(CalculatorTest, DivideByZero) {
     Calculator calc;
     EXPECT_THROW(calc.divide(10, 0), std::invalid_argument);
 }
 ```
 
-### Catch2 测试格式
+### Catch2 测例
 
 ```cpp
 // test/calculator_test.cpp
@@ -97,27 +98,27 @@ TEST_CASE("Calculator add", "[calculator]") {
 }
 ```
 
-## 断言宏使用规范
+## 断言宏用规
 
 ### Google Test 断言
 
-- **必须**：使用 `EXPECT_*` 进行非致命断言（测试继续执行）
-- **必须**：使用 `ASSERT_*` 进行致命断言（测试立即终止）
-- **常用断言**：`EXPECT_EQ`, `ASSERT_EQ`, `EXPECT_THROW`, `ASSERT_THROW`
+- **必**：用 `EXPECT_*` 行非致命断言（测续行）
+- **必**：用 `ASSERT_*` 行致命断言（测即止）
+- **常用**：`EXPECT_EQ`, `ASSERT_EQ`, `EXPECT_THROW`, `ASSERT_THROW`
 
 ### Catch2 断言
 
-- **必须**：使用 `REQUIRE` 进行致命断言
-- **必须**：使用 `CHECK` 进行非致命断言
+- **必**：用 `REQUIRE` 行致命断言
+- **必**：用 `CHECK` 行非致命断言
 
-## 测试执行检查清单
+## 测试行检单
 
-在提交代码前，你必须确认：
+提交码前，汝必确：
 
-- [ ] **编写完成后立即运行了测试**
-- [ ] **所有测试都通过了**
-- [ ] **如果测试失败，已修复代码直到通过**
-- [ ] 测试覆盖了正常情况
-- [ ] 测试覆盖了边界情况
-- [ ] 测试覆盖了异常情况
-- [ ] 使用了适当的断言宏（EXPECT_EQ, ASSERT_EQ 等）
+- [ ] **写毕即行测试矣**
+- [ ] **全测皆过矣**
+- [ ] **若败，已修至过矣**
+- [ ] 测覆正常之情
+- [ ] 测覆边界之情
+- [ ] 测覆异常之情
+- [ ] 用适当之断言宏（EXPECT_EQ, ASSERT_EQ 等）

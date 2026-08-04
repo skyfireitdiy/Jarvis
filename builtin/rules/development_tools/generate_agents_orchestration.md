@@ -3,71 +3,69 @@ name: generate_agents_orchestration
 description: 当需要生成Agents编排文件以批量创建Agent时触发。每当用户提及"编排文件"、"批量创建Agent"、"Agent编排"、"OrganizeAgents配置"时触发。不触发：仅创建单个Agent；仅查看Agent列表；Agent间通信不涉及编排。
 ---
 
-# Agents 编排文件生成规则
+# Agents编排文件生成规则
 
 ## 规则简介
 
-本规则用于指导用户创建 YAML 格式的 Agents 编排文件，配合 `@OrganizeAgents` 命令实现批量创建 Agent 的功能。
+此规则用以指导用户创建YAML格式之Agents编排文件，配合`@OrganizeAgents`命令，实现批量创建Agent之功能。
 
-## 你必须遵守的原则
+## 汝必守之原则
 
 ### 1. 文件格式要求
 
 **要求说明：**
 
-- **必须**：使用 YAML 格式
-- **必须**：使用 UTF-8 编码
-- **必须**：文件根节点包含 `agents` 列表
-- **禁止**：在编排文件中使用 Tab 缩进（YAML 不支持 Tab）
+- **必**：用YAML格式
+- **必**：用UTF-8编码
+- **必**：文件根节点含`agents`列表
+- **禁**：编排文件中用Tab缩进（YAML不支持Tab）
 
 ### 2. 字段定义
 
-#### agents 列表（必填）
+#### agents列表（必填）
 
-`agents` 是一个列表，每个元素定义一个 Agent 的配置。
+`agents`乃一列表，每元素定义一Agent之配置。
 
-#### Agent 配置字段
+#### Agent配置字段
 
-| 字段名                | 类型   | 必填   | 默认值    | 说明                                                   |
+| 字段名                | 类型   | 必填   | 默认值    | 说明               |
 | --------------------- | ------ | ------ | --------- | ------------------------------------------------------ |
-| `name`                | string | 否     | `agent_N` | Agent 名称，用于标识和显示                             |
-| `type`                | string | 否     | `code_agent` | Agent 类型，如 `agent`、`code_agent` 等                       |
-| `working_dir`         | string | **是** | -         | 工作目录，Agent 的工作路径                             |
-| `llm_group`           | string | 否     | `default` | 模型组名称                                             |
+| `name`                | string | 否     | `agent_N` | Agent名称，用以标识与显示                             |
+| `type`                | string | 否     | `code_agent` | Agent类型，如`agent`、`code_agent`等                       |
+| `working_dir`         | string | **是** | -         | 工作目录，Agent之工作路径                             |
+| `llm_group`           | string | 否     | `default` | 模型组名称          |
 | `tool_group`          | string | 否     | `default` | 工具组名称                                             |
 | `config_file`         | string | 否     | -         | 配置文件路径                                           |
 | `task`                | string | 否     | -         | 初始任务描述                                           |
 | `additional_args`     | string | 否     | -         | 附加参数                                               |
-| `worktree`            | bool   | 否     | `false`   | 是否使用 git worktree                                  |
+| `worktree`            | bool   | 否     | `false`   | 是否用git worktree                                  |
 | `quick_mode`          | bool   | 否     | `false`   | 是否启用快速模式                                       |
-| `no_interaction_mode` | bool   | 否     | `false`   | 是否启用无交互模式（启用时 task 必填，**不推荐使用**） |
+| `no_interaction_mode` | bool   | 否     | `false`   | 是否启用无交互模式（启用时task必填，**不推荐用**） |
 
 ### 3. 字段约束
 
-**必须遵守：**
+**必守：**
 
-- `working_dir` 必须是有效的目录路径
-- `type` 必须是支持的 Agent 类型（`agent` 或 `code_agent`）
-- **禁止**：默认使用 `no_interaction_mode: true`，应优先使用交互模式以便人工确认和调整
-- 当 `no_interaction_mode: true` 时，`task` 字段必填
-- `name` 应具有描述性，便于识别
-
-## 你必须执行的操作
+- `working_dir`必为有效之目录路径
+- `type`必为支持之Agent类型（`agent`或`code_agent`）
+- **禁**：默认用`no_interaction_mode: true`，当优先用交互模式以便人工确认与调整
+- 当`no_interaction_mode: true`时，`task`字段必填
+- `name`当具描述性，便于识别
 
 ### 操作 1：确定编排需求
 
-在创建编排文件前，明确以下信息：
+创建编排文件前，当明以下信息：
 
-1. 需要创建多少个 Agent？
-2. 每个 Agent 的类型是什么？
-3. 每个 Agent 的工作目录是什么？
-4. 是否需要指定模型组？
-5. 是否需要设置初始任务？
-6. 是否需要无交互模式？（仅当明确需要无人值守运行时才启用，默认不启用）
+1. 需创建多少Agent？
+2. 每Agent之类型为何？
+3. 每Agent之工作目录为何？
+4. 需指定模型组否？
+5. 需设置初始任务否？
+6. 需无交互模式否？（仅当明确需无人值守运行时方启用，默认不启用）
 
 ### 操作 2：编写编排文件
 
-根据需求编写 YAML 格式的编排文件。
+依需求编写YAML格式之编排文件。
 
 **基本模板（推荐，交互模式）：**
 
@@ -102,7 +100,7 @@ agents:
     quick_mode: true
 ```
 
-**无人值守模板（仅当明确需要无人值守时使用）：**
+**无人值守模板（仅当明确需无人值守时用之）：**
 
 ```yaml
 agents:
@@ -117,16 +115,16 @@ agents:
 
 创建编排文件后，验证以下内容：
 
-1. YAML 语法正确
-2. `agents` 列表存在且非空
-3. 每个 Agent 配置包含必填字段 `working_dir`
-4. 无交互模式的 Agent 包含 `task` 字段
+1. YAML语法正确
+2. `agents`列表存在且非空
+3. 每Agent配置含必填字段`working_dir`
+4. 无交互模式之Agent含`task`字段
 
 ## 编排文件示例
 
 ### 示例 1：简单编排
 
-创建两个代码 Agent，使用默认配置：
+创建两个代码Agent，用默认配置：
 
 ```yaml
 agents:
@@ -139,9 +137,9 @@ agents:
     working_dir: "/home/user/backend"
 ```
 
-### 示例 2：带任务的编排（交互模式，推荐）
+### 示例 2：带任务之编排（交互模式，推荐）
 
-创建多个 Agent 并分配初始任务，使用交互模式便于人工确认：
+创建多个Agent并分配初始任务，用交互模式便于人工确认：
 
 ```yaml
 agents:
@@ -163,7 +161,7 @@ agents:
 
 ### 示例 3：多项目编排
 
-跨多个项目创建 Agent：
+跨多个项目创建Agent：
 
 ```yaml
 agents:
@@ -187,52 +185,52 @@ agents:
 
 ### 1. 命名规范
 
-- 使用描述性名称，如 `frontend_dev`、`api_designer`
-- 避免使用无意义名称，如 `agent_1`、`test`
+- 用描述性名称，如`frontend_dev`、`api_designer`
+- 避用无意义名称，如`agent_1`、`test`
 
 ### 2. 工作目录
 
-- 使用绝对路径，避免路径歧义
+- 用绝对路径，避路径歧义
 - 确保目录存在且有访问权限
 
 ### 3. 任务描述
 
-- 任务描述应具体、可执行
-- 包含明确的目标和范围
-- 避免过于笼统的描述
+- 任务描述当具体、可执行
+- 含明确之目标与范围
+- 避过于笼统之描述
 
 ### 4. 交互模式优先
 
-- **必须**：默认使用交互模式（不设置 `no_interaction_mode` 或设为 `false`）
-- 交互模式允许人工确认和调整 Agent 行为，提高可控性
-- 仅当明确需要无人值守运行时才启用 `no_interaction_mode: true`
+- **必**：默认用交互模式（不设`no_interaction_mode`或设为`false`）
+- 交互模式允许人工确认与调整Agent行为，提高可控性
+- 仅当明确需无人值守运行时方启用`no_interaction_mode: true`
 
 ### 5. 模型组选择
 
-- 根据任务复杂度选择合适的模型组
-- 简单任务可使用默认模型组
-- 复杂任务建议使用高级模型组
+- 依任务复杂度选合适之模型组
+- 简单任务可用默认模型组
+- 复杂任务建议用高级模型组
 
 ## 检查清单
 
-在创建编排文件后，你必须确认：
+创建编排文件后，汝必确认：
 
-- [ ] 文件使用 YAML 格式
-- [ ] 文件包含 `agents` 列表
-- [ ] 每个 Agent 配置包含 `working_dir` 字段
-- [ ] 默认使用交互模式（未设置 `no_interaction_mode` 或设为 `false`）
-- [ ] 如有使用 `no_interaction_mode: true` 的 Agent，确认包含 `task` 字段
-- [ ] 所有路径使用正确的格式
-- [ ] YAML 语法正确（无缩进错误）
+- [ ] 文件用YAML格式
+- [ ] 文件含`agents`列表
+- [ ] 每Agent配置含`working_dir`字段
+- [ ] 默认用交互模式（未设`no_interaction_mode`或设为`false`）
+- [ ] 如有用`no_interaction_mode: true`之Agent，确认含`task`字段
+- [ ] 所有路径用正确格式
+- [ ] YAML语法正确（无缩进错误）
 
 ## 使用方式
 
-1. 创建编排文件（如 `orchestration.yaml`）
-2. 在 Jarvis 中输入 `@OrganizeAgents`
-3. 根据提示输入编排文件路径
+1. 创建编排文件（如`orchestration.yaml`）
+2. 在Jarvis中输入`@OrganizeAgents`
+3. 依提示输入编排文件路径
 4. 等待批量创建完成
 
 ## 相关资源
 
-- OrganizeAgents 命令：内置命令，用于批量创建 Agent
-- gateway_manager 工具：底层实现，支持 create_agent 操作
+- OrganizeAgents命令：内置命令，用于批量创建Agent
+- gateway_manager工具：底层实现，支持create_agent操作
