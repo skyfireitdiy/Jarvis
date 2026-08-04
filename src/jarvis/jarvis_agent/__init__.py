@@ -568,6 +568,8 @@ class Agent:
 
         # 模型类型配置
         self._model_type = model_type
+        # 手动切换模型标记（禁用自动切换）
+        self._manual_model_switch = False
         # 极速模式配置（合并命令行参数和配置项）
         self.quick_mode = quick_mode or is_enable_quick_mode()
 
@@ -925,6 +927,10 @@ class Agent:
         参数:
             difficulty: 任务难度等级（easy/medium/hard）
         """
+        # 如果用户手动切换过模型，则禁用自动切换
+        if getattr(self, "_manual_model_switch", False):
+            return
+
         # 难度到模型类型的映射
         difficulty_to_model_type = {
             "easy": "cheap",
