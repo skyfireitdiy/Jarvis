@@ -86,48 +86,47 @@ class meta_agent:
 
         files_info = "\n".join([f"- {f}" for f in key_files_absolute])
 
-        return f"""请根据我的需求生成一个新的Jarvis工具。
+        return f"""宜据吾之需求生成一新Jarvis工具。
 
 工具要求：
 - 工具名称：{tool_name}
 - 功能描述：{function_description}
-- 生成的文件名：{tool_name}.py
+- 生成之文件名：{tool_name}.py
 - 文件保存路径：{tools_dir.resolve() / f"{tool_name}.py"}
-- 必须继承自Tool基类（参考：{base_tool_file}）
-- 必须实现name、description、parameters、execute方法
+- 必继承自Tool基类（参考：{base_tool_file}）
+- 必实现name、description、parameters、execute方法
 
 关键参考文件：
 {files_info}
 
-其他文件也可酌情参考。
+他文件亦可酌情参考。
 
-### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅读源码的绝对路径）
+### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅源码之绝对路径）
 - Agent（通用 Agent）：
   - 职责：通用任务编排与对话式工作流，严格遵循 ARCHER（ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW）。
   - **ARCHER 工作流说明**：
-    - **ANALYZE**（分析意图）：理解我的需求，明确任务目标，识别约束条件和边界，**主动识别可能需要的规则支撑**。
-    - **RULE**（加载规则）：加载相关的专业规则和最佳实践，为后续阶段提供指导。
-    - **COLLECT**（收集信息）：只读收集必要信息，定位相关文件和上下文，为方案设计做准备。
-    - **HYPOTHESIZE**（提出方案）：基于收集的信息，设计最优的技术方案，制定可执行的计划。**重要：此阶段完成后，必须经过我确认，才能进入到EXECUTE阶段**。
-    - **EXECUTE**（执行操作）：按照计划精准实施，确保修改正确且可回退。
-    - **REVIEW**（反思）：全面反思工作成果：审查代码质量（语法/功能/风格），核对功能是否完成，检查波及的代码是否都考虑到，确认是否有配套的修改（如文档、测试、配置等），评估影响面和潜在风险，确保质量。
+    - **ANALYZE**（析义）：悟吾之需求，明定任务目标，识别约束条件与边界，**主动识别可能需要之规则支撑**。
+    - **RULE**（载则）：加载相关之专业规则与最佳实践，为后续阶段提供指导。
+    - **COLLECT**（集讯）：只读收集必要信息，定位相关文件与上下文，为方案设计做准备。
+    - **HYPOTHESIZE**（设策）：基于收集之信息，设计最优之技术方案，制定可执行之计划。**重要：此阶段完成后，必须经吾确认，方能进入EXECUTE阶段**。
+    - **EXECUTE**（行）：按计精施，确保修改正确且可回退。
+    - **REVIEW**（省）：全面反思工作成果：审查代码质量（语法/功能/风格），核对功能是否完成，检查波及之代码是否皆考虑到，确认是否有配套之修改（如文档、测试、配置等），评估影响面与潜在风险，确保质量。
   - **关键特性**：
-    - 各阶段可以穿插和回退，形成迭代式闭环
+    - 各阶段可穿插与回退，形成迭代式闭环
     - 在 ANALYZE 阶段主动考虑规则，避免跑偏
-    - 严格按照流程顺序推进，禁止跳步或乱序（除非我明确要求并说明风险）
+    - 严格按流程顺序推进，禁止跳步或乱序（除非吾明确要求并说明风险）
   - 初始化要点：`Agent(system_prompt=..., name=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
-  - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
-  - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{agent_init_file}`。
+  - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度与总结；总结与返回值行为由 `summary_prompt` 与 `need_summary` 控制。
+  - 更多细节（参数含义、总结与返回值策略、事件回调等）请径阅：`{agent_init_file}`。
 - CodeAgent（代码 Agent）：
-  - 职责：代码分析与修改、git 操作、构建验证、lint、diff 展示和自动 review。
-  - 初始化要点：`CodeAgent(need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{code_agent_file}` 与 `{code_agent_prompts_file}` 中定义。
-  - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 的返回值通常是"结果摘要字符串或 None"。
-  - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{code_agent_file}` 与 `{code_agent_prompts_file}`。
+  - 职责：代码分析与修改、git 操作、构建验证、lint、diff 展示与自动 review。
+  - 初始化要点：`CodeAgent(need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流与提示词在 `{code_agent_file}` 与 `{code_agent_prompts_file}` 中定义。
+  - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 之返回值通常是"结果摘要字符串或 None"。
+  - 更多细节（review 流程、任务总结、返回值语义等）请径阅：`{code_agent_file}` 与 `{code_agent_prompts_file}`。
 
-在本工具生成的新工具中，推荐：
-- 使用 Agent 负责上层的需求分析、ARCHER 工作流以及多步骤任务编排；
-- 使用 CodeAgent 负责具体代码层面的修改、重构和验证。
-
+在本工具生成之新工具中，推荐：
+- 使用 Agent 负责上层之需求分析、ARCHER 工作流以及多步骤任务编排；
+- 使用 CodeAgent 负责具体代码层面之修改、重构与验证。
 生成的工具必须具备以下特性：
 1. 自举能力：能够调用现有package中的Agent和CodeAgent
 2. 自我进化：能够利用现有的CodeAgent功能

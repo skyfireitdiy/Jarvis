@@ -691,7 +691,7 @@ class CodeReviewer:
             for i, issue in enumerate(issues)
         )
 
-        prompt = f"""代码审查发现以下问题，请修复：
+        prompt = f"""代码审查发现以下问题，宜修正：
 
 【审查结果】
 {review_result.get("summary", "")}
@@ -699,7 +699,7 @@ class CodeReviewer:
 【问题列表】
 {issues_text}
 
-请根据上述问题进行修复，确保代码正确实现用户需求。"""
+宜据上述问题修正，确保代码正确实现用户需求。"""
         return prompt
 
     def run_review_with_fix(
