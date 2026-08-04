@@ -738,9 +738,19 @@ class AgentRunLoop:
             # 构建确认提示
             confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
             confirm_prompt_parts.append(context)
-            confirm_prompt_parts.append("\n请确认是否要完成任务（自动完成）。")
-            confirm_prompt_parts.append("如果确认完成，请回复 <!!!YES!!!>")
-            confirm_prompt_parts.append("如果要继续执行任务，请回复 <!!!NO!!!>")
+            confirm_prompt_parts.append(
+                "\n⚠️ 重要：在确认完成之前，必须验证所有验收准则都已通过："
+            )
+            confirm_prompt_parts.append("1. 检查任务目标是否完全达成")
+            confirm_prompt_parts.append("2. 验证所有交付物是否符合要求")
+            confirm_prompt_parts.append("3. 确认没有遗漏或未完成的工作项")
+            confirm_prompt_parts.append("4. 确保结果质量符合预期标准")
+            confirm_prompt_parts.append(
+                "\n如果所有验收准则都已通过，请回复 <!!!YES!!!>"
+            )
+            confirm_prompt_parts.append(
+                "如果还有任何未完成或未验证的项目，请回复 <!!!NO!!!> 并继续执行任务"
+            )
 
             confirm_prompt = "\n".join(confirm_prompt_parts)
 
