@@ -174,8 +174,33 @@ import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
 
-// 追踪已点击过的等待输入Agent
-const clickedWaitingAgents = ref(new Set())
+// 追踪已点击过的等待输入Agent - 从localStorage恢复状态
+const CLICKED_WAITING_STORAGE_KEY = 'jarvis_clicked_waiting_agents'
+
+// 从localStorage加载已点击状态
+function loadClickedWaitingAgents() {
+  try {
+    const stored = localStorage.getItem(CLICKED_WAITING_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return new Set(Array.isArray(parsed) ? parsed : [])
+    }
+  } catch (e) {
+    console.warn('[AGENT_SIDEBAR] Failed to load clicked waiting agents:', e)
+  }
+  return new Set()
+}
+
+// 保存已点击状态到localStorage
+function saveClickedWaitingAgents(set) {
+  try {
+    localStorage.setItem(CLICKED_WAITING_STORAGE_KEY, JSON.stringify([...set]))
+  } catch (e) {
+    console.warn('[AGENT_SIDEBAR] Failed to save clicked waiting agents:', e)
+  }
+}
+
+const clickedWaitingAgents = ref(loadClickedWaitingAgents())
 
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
@@ -194,6 +219,8 @@ function handleAgentClick(agent, event) {
   // 如果是等待输入状态，记录点击
   if (props.isWaitingInput(agent)) {
     clickedWaitingAgents.value.add(agent.agent_id)
+    // 持久化到localStorage
+    saveClickedWaitingAgents(clickedWaitingAgents.value)
     // 触发响应式更新
     clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
   }
@@ -327,6 +354,8 @@ watch(() => props.agentStatuses, (newStatuses) => {
         if (wasWaiting && !isWaiting) {
           if (clickedWaitingAgents.value.has(agentId)) {
             clickedWaitingAgents.value.delete(agentId)
+            // 持久化到localStorage
+            saveClickedWaitingAgents(clickedWaitingAgents.value)
             // 触发响应式更新
             clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
             console.log(`[AGENT_SIDEBAR] Cleared clicked mark for agent ${agentId} (status changed from ${prevExecutionStatus} to ${executionStatus})`)
