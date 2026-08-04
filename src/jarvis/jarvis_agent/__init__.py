@@ -694,6 +694,9 @@ class Agent:
         )
         self._last_handler_returned = False  # 记录最近一次输入处理器是否返回了消息
         self._agent_type = "agent"
+        self._last_responses: List[str] = []  # 记录最近LLM响应（用于重复检测）
+        self._repeat_detected = False  # 是否已检测到重复响应
+        self._repeat_count = 0  # 连续相同响应计数
 
     def add_memory_tags(self, tags: List[str]) -> None:
         """添加记忆标签到 memory_tags 集合
@@ -3102,6 +3105,15 @@ class Agent:
                 return LoopAction.CONTINUE
 
             self.session.prompt = processed_input
+            # 检测到重复响应时，在提示词末尾补充不要重复的提示
+            if self._repeat_detected:
+                self.session.prompt = join_prompts(
+                    [
+                        self.session.prompt,
+                        "请不要再重复之前的回答内容，请给出不同的回答。",
+                    ]
+                )
+                self._repeat_detected = False
             # 使用显式动作信号，保留返回类型注释以保持兼容
             return LoopAction.CONTINUE
         else:
