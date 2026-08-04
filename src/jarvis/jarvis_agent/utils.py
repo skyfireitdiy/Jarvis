@@ -98,7 +98,7 @@ def build_fix_prompt(content: str, error_msg: str, tool_usage: str) -> str:
     返回:
         str: 构建好的提示字符串
     """
-    return f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
+    return f"""汝前次工具调用格式有误，宜据工具使用说明修正以下内容。
 
 **错误信息：**
 {error_msg}
@@ -106,15 +106,15 @@ def build_fix_prompt(content: str, error_msg: str, tool_usage: str) -> str:
 **工具使用说明：**
 {tool_usage}
 
-**错误的工具调用内容：**
+**错误之工具调用内容：**
 {content}
 
-请修复上述工具调用内容，确保：
-1. 输出纯 JSON 对象，包含 name 和 arguments 字段
-2. JSON格式正确，包含 name、arguments、want 三个字段
-3. 如果使用多行字符串，直接换行即可
+宜修正上述工具调用内容，确保：
+一、输出纯 JSON 对象，含 name 与 arguments 字段
+二、JSON格式正确，含 name、arguments、want 三字段
+三、若用多行字符串，径换行即可
 
-请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
+径返修正后之完整工具调用内容，勿添他辞。"""
 
 
 def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional[str]:

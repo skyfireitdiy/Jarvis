@@ -1905,7 +1905,7 @@ class task_list_manager:
 **之前的验证反馈（需要修复的问题）：**
 {last_verification}
 
-请根据以上验证反馈修复问题，确保任务真正完成。
+宜据以上验证反馈修正问题，确保任务真正完成。
 """
 
                             # 调用 sub_code_agent 执行任务
@@ -1938,7 +1938,7 @@ class task_list_manager:
 **之前的验证反馈（需要修复的问题）：**
 {last_verification}
 
-请根据以上验证反馈修复问题，确保任务真正完成。
+宜据以上验证反馈修正问题，确保任务真正完成。
 """
 
                             # 调用 sub_agent 执行任务
@@ -2524,7 +2524,7 @@ class task_list_manager:
    • 任务状态将保持为 {task.status.value}，不会更新为 completed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-任务 [{task.task_name}] 验证未通过，请根据上述反馈进行修复。
+任务 [{task.task_name}] 验证未通过，宜据上述反馈修正之。
 """
                         return {
                             "success": False,

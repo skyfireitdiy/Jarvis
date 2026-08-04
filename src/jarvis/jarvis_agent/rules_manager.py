@@ -1091,7 +1091,7 @@ class RulesManager:
                 numbered_rules += f"{i}. {rule_name}\n   描述: {description}\n"
 
             # 构造 prompt，要求模型返回编号
-            prompt = f"""请根据以下任务描述，从可用规则中选择最合适的规则。
+            prompt = f"""宜据以下任务描述，从可用规则中选择最合适之规则。
 
 <task_description>
 {task_description}
@@ -1231,7 +1231,7 @@ class RulesManager:
                 [f"规则{i + 1}:\n{content}" for i, content in enumerate(rules_content)]
             )
 
-            prompt = f"""请根据任务描述，从以下规则中选择真正相关的规则。
+            prompt = f"""宜据任务描述，从以下规则中选择真正相关之规则。
 
 <task_description>
 {task_description}
@@ -1387,7 +1387,7 @@ class RulesManager:
         """
         try:
             # 构造生成关键词的prompt
-            prompt = f"""请根据以下任务描述，生成3-5个精准的英文搜索关键词，用于在技能库中搜索相关技能。
+            prompt = f"""宜据以下任务描述，生成三至五个精准之英文搜索关键词，用于在技能库中搜索相关技能。
 
 <task_description>
 {query}

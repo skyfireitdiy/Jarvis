@@ -2766,16 +2766,16 @@ class Agent:
 
         addon_prompt = f"""
 <system_prompt>
-    请判断是否已经完成任务，如果已经完成：
-    {complete_prompt if complete_prompt else "- 直接输出完成原因，不需要再有新的操作"}
-    如果没有完成，请进行下一步操作：
+    请判断是否已经完成任务，若已完成：
+    {complete_prompt if complete_prompt else "- 直接输出完成原因，无需再有新操作"}
+    若未完成，请进行下一步操作：
     - 仅包含一个操作
-    - 如果信息不明确，请请求用户补充
-    - 如果执行过程中连续失败5次，请请求用户操作
+    - 若信息不明确，请请求用户补充
+    - 若执行过程中连续失败五次，请请求用户操作
     - 工具调用直接输出纯 JSON 对象，无需任何标签包裹
     - 操作列表：{action_handlers}{memory_prompts}
     
-    注意：如果当前部分任务已完成，之前的上下文价值不大，可以输出{ot("!!!SUMMARY!!!")}标记来触发总结并清空历史，以便开始新的任务阶段。
+    注意：若当前部分任务已完成，之前之上下文价值不大，可输出{ot("!!!SUMMARY!!!")}标记以触发总结并清空历史，以便开始新任务阶段。
 </system_prompt>
 
 请继续。
@@ -3083,7 +3083,7 @@ class Agent:
                 self.session.prompt = join_prompts(
                     [
                         f"被用户中断，用户补充信息为：{processed_input}",
-                        "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。",
+                        "检测到有工具调用，但被用户拒绝执行。宜据用户之补充信息重新考虑下一步操作。",
                     ]
                 )
                 return LoopAction.SKIP_TURN  # 请求主循环 continue
@@ -3286,7 +3286,7 @@ class Agent:
 {tools_prompt_part}
 </tools>
 
-请根据用户任务，从列表中选择最相关的工具。
+请根据用户任务，从列表中选择最相关之工具。
 请仅返回所选工具的编号，以逗号分隔。例如：1, 5, 12
 """
         PrettyOutput.auto_print(
