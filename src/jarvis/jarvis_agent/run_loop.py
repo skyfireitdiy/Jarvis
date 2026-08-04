@@ -863,6 +863,55 @@ class AgentRunLoop:
                 ag.session.prompt = ""
                 run_input_handlers = False
 
+                # 重复响应检测：连续5次相同响应时判定为重复
+                if current_response and current_response.strip():
+                    filtered_for_detect = self._filter_tool_calls_from_response(
+                        current_response
+                    ).strip()
+                    if filtered_for_detect:
+                        if (
+                            ag._last_responses
+                            and ag._last_responses[-1] == filtered_for_detect
+                        ):
+                            ag._repeat_count += 1
+                        else:
+                            ag._repeat_count = 1
+                        ag._last_responses.append(filtered_for_detect)
+                        # 只保留最近10条响应，避免无限增长
+                        if len(ag._last_responses) > 10:
+                            ag._last_responses = ag._last_responses[-10:]
+
+                        # 连续5次相同响应，判定为重复
+                        if ag._repeat_count >= 5 and not ag._repeat_detected:
+                            ag._repeat_detected = True
+                            ag._repeat_count = 0
+                            # 清除messages中第一次之后的重复assistant消息
+                            try:
+                                messages = ag.model.get_messages()
+                                if messages:
+                                    # 找到所有重复的assistant消息并移除第一次之后的
+                                    assistant_indices = [
+                                        i
+                                        for i, m in enumerate(messages)
+                                        if m.get("role") == "assistant"
+                                        and m.get("content") == filtered_for_detect
+                                    ]
+                                    # 保留第一个，移除后续的重复消息
+                                    for idx in reversed(assistant_indices[1:]):
+                                        messages.pop(idx)
+                                    ag.model.set_messages(messages)
+                            except Exception as e:
+                                from jarvis.jarvis_utils.utils import save_exception
+
+                                save_exception(
+                                    e,
+                                    module="jarvis_agent.run_loop",
+                                    function="repeat_detection",
+                                )
+                            PrettyOutput.auto_print(
+                                f"⚠ 检测到LLM连续{5}次重复响应，已清除重复内容"
+                            )
+
                 # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
                 if current_response and current_response.strip():
                     # 先移除阶段标识 [MODE: xxx]
