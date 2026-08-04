@@ -7,7 +7,7 @@ description: 当需要使用浏览器进行自动化操作时触发。每当用�
 
 ## 概述
 
-`jb` (或 `jarvis-browser`) 是一个基于 Playwright 的浏览器自动化命令行工具，支持守护进程模式，可以跨多个 CLI 调用维护浏览器会话。
+`jb`（或`jarvis-browser`）乃基于Playwright之浏览器自动化命令行工具，支持守护进程模式，可跨多个CLI调用维护浏览器会话。
 
 ## 快速开始
 
@@ -30,9 +30,9 @@ jb screenshot --browser-id demo --path /tmp/screenshot.png
 
 ## 通用参数
 
-所有命令都支持以下可选参数：
+所有命令皆支持以下可选参数：
 
-- `--browser-id TEXT`: 浏览器会话 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器会话ID（默认：`default`）
 
 ## 命令列表
 
@@ -40,11 +40,11 @@ jb screenshot --browser-id demo --path /tmp/screenshot.png
 
 #### daemon - 启动守护进程
 
-启动后台守护进程，用于持久化浏览器会话。守护进程会脱离终端持续运行，即使终端关闭也不会退出。
+启动后台守护进程，用于持久化浏览器会话。守护进程会脱离终端持续运行，纵使终端关闭亦不退出。
 
 **参数：**
 
-无（socket 固定为 `~/.jarvis/playwright_daemon.sock`）
+无（socket固定为`~/.jarvis/playwright_daemon.sock`）
 
 **示例：**
 
@@ -55,10 +55,10 @@ jb daemon-stop   # 关闭守护进程
 
 **说明：**
 
-- 守护进程会检查是否已运行，如果已运行则不会重复启动
-- 使用 double-fork 方法实现真正的后台守护进程
-- 若 30 分钟内无任何请求，守护进程将自动退出以节省资源
-- 运行日志写入 `~/.jarvis/logs/browser_daemon/daemon.log`，包含各类浏览器操作记录（如 launch、navigate、click 等）
+- 守护进程会检查是否已运行，若已运行则不会重复启动
+- 用double-fork方法实现真正之后台守护进程
+- 若30分钟内无任何请求，守护进程将自动退出以节省资源
+- 运行日志写入`~/.jarvis/logs/browser_daemon/daemon.log`，含各类浏览器操作记录（如launch、navigate、click等）
 
 #### daemon-stop - 关闭守护进程
 
@@ -76,11 +76,11 @@ jb daemon-stop
 
 #### launch - 启动浏览器
 
-启动一个新的浏览器实例。
+启动一新浏览器实例。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **说明：**
 
@@ -94,11 +94,11 @@ jb launch --browser-id demo
 
 #### close - 关闭浏览器
 
-关闭指定的浏览器实例。
+关闭指定之浏览器实例。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -108,7 +108,7 @@ jb close --browser-id demo
 
 #### list - 列出浏览器
 
-列出所有活动的浏览器会话。
+列出所有活动之浏览器会话。
 
 **参数：**
 
@@ -122,14 +122,14 @@ jb list
 
 ### 3. 页面导航
 
-#### navigate - 导航到 URL
+#### navigate - 导航到URL
 
-将浏览器导航到指定的 URL。
+将浏览器导航至指定之URL。
 
 **参数：**
 
-- `-u, --url TEXT`: 要导航的 URL（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-u, --url TEXT`: 要导航之URL（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -139,11 +139,11 @@ jb navigate --url https://example.com --browser-id demo
 
 #### goback - 后退
 
-导航到上一页。
+导航至上一页。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -153,11 +153,11 @@ jb goback --browser-id demo
 
 #### goforward - 前进
 
-导航到下一页。
+导航至下一页。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -169,31 +169,31 @@ jb goforward --browser-id demo
 
 #### click - 点击元素
 
-点击元素。支持 CSS 选择器或 list-interactables 的编号。
+点击元素。支持CSS选择器或list-interactables之编号。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（与 --index 二选一）
-- `-i, --index INT`: 可交互元素编号（与 --selector 二选一）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（与--index二选一）
+- `-i, --index INT`: 可交互元素编号（与--selector二选一）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
 ```bash
 jb click --selector '#submit-button' --browser-id demo
-jb click --index 3 --browser-id demo   # 点击 list-interactables 中的第 3 个元素
+jb click --index 3 --browser-id demo   # 点击list-interactables中之第3个元素
 ```
 
 #### type - 输入文本
 
-在元素中输入文本。支持 CSS 选择器或 list-interactables 的编号。
+于元素中输入文本。支持CSS选择器或list-interactables之编号。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（与 --index 二选一）
-- `-i, --index INT`: 可交互元素编号（与 --selector 二选一）
-- `-t, --text TEXT`: 要输入的文本（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（与--index二选一）
+- `-i, --index INT`: 可交互元素编号（与--selector二选一）
+- `-t, --text TEXT`: 要输入之文本（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -204,12 +204,12 @@ jb type --index 5 --text 'user@example.com' --browser-id demo
 
 #### hover - 悬停
 
-将鼠标移动到匹配的元素上。
+将鼠标移至匹配之元素上。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -219,13 +219,13 @@ jb hover --selector '.menu-item' --browser-id demo
 
 #### drag - 拖拽
 
-将源元素拖拽到目标元素。
+将源元素拖拽至目标元素。
 
 **参数：**
 
-- `-s, --selector TEXT`: 源元素的 CSS 选择器（必需）
-- `-t, --target-selector TEXT`: 目标元素的 CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: 源元素之CSS选择器（必需）
+- `-t, --target-selector TEXT`: 目标元素之CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -235,12 +235,12 @@ jb drag --selector '#draggable' --target-selector '#dropzone' --browser-id demo
 
 #### doubleclick - 双击
 
-双击匹配的元素。
+双击匹配之元素。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -250,12 +250,12 @@ jb doubleclick --selector '.file' --browser-id demo
 
 #### presskey - 按键
 
-按指定的键盘键。
+按指定之键盘键。
 
 **参数：**
 
-- `-k, --key TEXT`: 要按的键（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-k, --key TEXT`: 要按之键（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -268,11 +268,11 @@ jb presskey --key 'Escape' --browser-id demo
 
 #### screenshot - 页面截图
 
-截取当前页面的屏幕截图。
+截取当前页面之屏幕截图。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `-p, --path TEXT`: 截图路径（默认：`/tmp/screenshot.png`）
 
 **示例：**
@@ -283,12 +283,12 @@ jb screenshot --browser-id demo --path /tmp/my_screenshot.png
 
 #### gettext - 获取文本
 
-从匹配的元素获取文本内容。
+从匹配之元素获取文本内容。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -303,9 +303,9 @@ jb gettext --selector '.title' --browser-id demo
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
+- `-s, --selector TEXT`: CSS选择器（必需）
 - `-a, --attribute TEXT`: 属性名（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -316,12 +316,12 @@ jb getattribute --selector 'img' --attribute 'src' --browser-id demo
 
 #### getelementinfo - 获取元素信息
 
-获取选定元素的详细信息。
+获取选定元素之详细信息。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -329,13 +329,13 @@ jb getattribute --selector 'img' --attribute 'src' --browser-id demo
 jb getelementinfo --selector '#main-content' --browser-id demo
 ```
 
-#### get-markdown - 获取页面 Markdown
+#### get-markdown - 获取页面Markdown
 
-将当前页面的 HTML 内容转换为 Markdown 格式。
+将当前页面之HTML内容转换为Markdown格式。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -345,17 +345,17 @@ jb get-markdown --browser-id demo
 
 **说明：**
 
-- 使用 markdownify 库将页面 HTML 转换为 Markdown
+- 用markdownify库将页面HTML转换为Markdown
 - 适用于提取页面结构化内容
-- 返回的 Markdown 格式可直接用于文档生成或内容分析
+- 返回之Markdown格式可直接用于文档生成或内容分析
 
 #### list-interactables - 列出交互控件
 
-列出页面上所有可交互的元素（按钮、输入框、链接等）。返回的 `selector` 与 click、type 等命令一致，可直接用于后续操作。
+列出页面上所有可交互之元素（按钮、输入框、链接等）。返回之`selector`与click、type等命令一致，可直接用于后续操作。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `-f, --filter TEXT`: 按元素类型过滤（可选：`button`, `input`, `link`, `checkbox`, `radio`, `select`, `file`）
 
 **示例：**
@@ -376,28 +376,28 @@ jb list-interactables --browser-id demo --filter link
 
 **说明：**
 
-- 支持的元素类型包括：
+- 支持之元素类型包括：
   - `button`: 按钮、提交按钮、重置按钮等
   - `input`: 文本输入框、密码框、邮箱框、数字输入框、文本区域
-  - `link`: 带有 href 属性的链接
+  - `link`: 带有href属性之链接
   - `checkbox`: 复选框
   - `radio`: 单选按钮
   - `select`: 下拉选择框
   - `file`: 文件上传输入框
-- 每个元素返回的信息包括：编号（index）、类型、选择器、文本内容
-- click、type、gettext、hover、doubleclick、getelementinfo、getattribute、elementscreenshot 支持 `--index` 参数，可直接用编号操作
-- **selector 生成优先级**：`#id` > `[name]` > `[placeholder]` > `[aria-label]` > `[data-testid]` > `a[href]` > `.class:nth-of-type(n)` > `tag:nth-of-type(n)`，尽量保证唯一性
-- 最多返回 100 个元素，避免数据量过大
-- 元素文本内容限制为 100 个字符
+- 每元素返回之信息包括：编号（index）、类型、选择器、文本内容
+- click、type、gettext、hover、doubleclick、getelementinfo、getattribute、elementscreenshot支持`--index`参数，可直接用编号操作
+- **selector生成优先级**：`#id` > `[name]` > `[placeholder]` > `[aria-label]` > `[data-testid]` > `a[href]` > `.class:nth-of-type(n)` > `tag:nth-of-type(n)`，尽量保证唯一性
+- 最多返回100个元素，避免数据量过大
+- 元素文本内容限制为100个字符
 
 #### elementscreenshot - 元素截图
 
-截取指定元素的屏幕截图。
+截取指定元素之屏幕截图。
 
 **参数：**
 
-- `-s, --selector TEXT`: 元素的 CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: 元素之CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -411,7 +411,7 @@ jb elementscreenshot --selector '.header' --browser-id demo --path /tmp/element.
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `--clear-logs`: 读取后清除日志
 
 **示例：**
@@ -421,15 +421,15 @@ jb console --browser-id demo
 jb console --browser-id demo --clear-logs
 ```
 
-#### eval - 执行 JavaScript
+#### eval - 执行JavaScript
 
-在浏览器上下文中执行 JavaScript 代码。
+在浏览器上下文中执行JavaScript代码。
 
 **参数：**
 
-- `-c, --code TEXT`: 要执行的 JavaScript 代码（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
-- `--save-result`: 将结果保存到文件
+- `-c, --code TEXT`: 要执行之JavaScript代码（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
+- `--save-result`: 将结果保存至文件
 
 **示例：**
 
@@ -441,11 +441,11 @@ jb eval --code 'document.querySelectorAll("a").length' --browser-id demo
 
 #### getperformancemetrics - 获取性能指标
 
-获取当前页面的性能指标。
+获取当前页面之性能指标。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -457,12 +457,12 @@ jb getperformancemetrics --browser-id demo
 
 #### waitforselector - 等待选择器
 
-等待元素达到指定状态。
+等待元素达指定状态。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `--wait-state TEXT`: 等待状态（visible, hidden, attached, detached）（默认：`visible`）
 - `-t, --timeout FLOAT`: 超时时间（秒）（默认：30.0）
 
@@ -476,13 +476,13 @@ jb waitforselector --selector '#button' --timeout 10 --browser-id demo
 
 #### waitfortext - 等待文本
 
-等待文本出现在页面上。
+等待文本出现于页面上。
 
 **参数：**
 
-- `-t, --text TEXT`: 要等待的文本（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
-- `-s, --selector TEXT`: CSS 选择器（默认：`*`）
+- `-t, --text TEXT`: 要等待之文本（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（默认：`*`）
 - `--timeout FLOAT`: 超时时间（秒）（默认：30.0）
 
 **示例：**
@@ -500,8 +500,8 @@ jb waitfortext --text 'Success' --selector '#status' --browser-id demo
 
 **参数：**
 
-- `-f, --fields TEXT`: 表单字段（JSON 字符串格式）（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-f, --fields TEXT`: 表单字段（JSON字符串格式）（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -511,11 +511,11 @@ jb fillform --fields '{"#username":"john","#password":"secret","#email":"john@ex
 
 #### submitform - 提交表单
 
-提交指定的表单。
+提交指定之表单。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `--form-selector TEXT`: 表单选择器（默认：`form`）
 
 **示例：**
@@ -527,11 +527,11 @@ jb submitform --form-selector '#login-form' --browser-id demo
 
 #### clearform - 清除表单
 
-清除指定表单中的所有字段。
+清除指定表单中之所有字段。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 - `--form-selector TEXT`: 表单选择器（默认：`form`）
 
 **示例：**
@@ -545,13 +545,13 @@ jb clearform --form-selector '#contact-form' --browser-id demo
 
 #### uploadfile - 上传文件
 
-上传文件到指定的输入元素。
+上传文件至指定之输入元素。
 
 **参数：**
 
-- `-s, --selector TEXT`: CSS 选择器（必需）
-- `-f, --file-path TEXT`: 要上传的文件路径（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-s, --selector TEXT`: CSS选择器（必需）
+- `-f, --file-path TEXT`: 要上传之文件路径（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -565,8 +565,8 @@ jb uploadfile --selector '#file-input' --file-path /tmp/document.pdf --browser-i
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
-- `-s, --selector TEXT`: 下载按钮/链接的 CSS 选择器
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
+- `-s, --selector TEXT`: 下载按钮/链接之CSS选择器
 
 **示例：**
 
@@ -583,7 +583,7 @@ jb downloadfile --selector '#download-btn' --browser-id demo
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -593,12 +593,12 @@ jb newtab --browser-id demo
 
 #### switchtab - 切换标签页
 
-切换到指定的标签页。
+切换至指定之标签页。
 
 **参数：**
 
-- `-p, --page-id TEXT`: 要切换到的页面 ID（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-p, --page-id TEXT`: 要切换至之页面ID（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -608,12 +608,12 @@ jb switchtab --page-id 2 --browser-id demo
 
 #### closetab - 关闭标签页
 
-关闭指定的标签页。
+关闭指定之标签页。
 
 **参数：**
 
-- `-p, --page-id TEXT`: 要关闭的页面 ID（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-p, --page-id TEXT`: 要关闭之页面ID（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -625,13 +625,13 @@ jb closetab --page-id 1 --browser-id demo
 
 #### scrollto - 滚动到位置
 
-滚动到页面上的指定位置。
+滚动至页面上之指定位置。
 
 **参数：**
 
-- `-x, --scroll-x INTEGER`: 滚动到的 X 坐标（默认：0）
-- `-y, --scroll-y INTEGER`: 滚动到的 Y 坐标（默认：0）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-x, --scroll-x INTEGER`: 滚动至之X坐标（默认：0）
+- `-y, --scroll-y INTEGER`: 滚动至之Y坐标（默认：0）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -645,14 +645,14 @@ jb scrollto --scroll-x 0 --scroll-y 500 --browser-id demo
 
 **参数：**
 
-- `-a, --scroll-amount INTEGER`: 向下滚动的像素数（默认：300）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-a, --scroll-amount INTEGER`: 向下滚动之像素数（默认：300）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
 ```bash
 jb scrolldown --scroll-amount 500 --browser-id demo
-jb scrolldown --browser-id demo  # 使用默认值
+jb scrolldown --browser-id demo  # 用默认值
 ```
 
 #### scrollup - 向上滚动
@@ -661,8 +661,8 @@ jb scrolldown --browser-id demo  # 使用默认值
 
 **参数：**
 
-- `-a, --scroll-amount INTEGER`: 向上滚动的像素数（默认：300）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-a, --scroll-amount INTEGER`: 向上滚动之像素数（默认：300）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -670,15 +670,15 @@ jb scrolldown --browser-id demo  # 使用默认值
 jb scrollup --scroll-amount 500 --browser-id demo
 ```
 
-### 11. Cookie 管理
+### 11. Cookie管理
 
-#### getcookies - 获取 Cookie
+#### getcookies - 获取Cookie
 
-获取浏览器的所有 Cookie。
+获取浏览器之所有Cookie。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -686,14 +686,14 @@ jb scrollup --scroll-amount 500 --browser-id demo
 jb getcookies --browser-id demo
 ```
 
-#### setcookies - 设置 Cookie
+#### setcookies - 设置Cookie
 
-从 JSON 字符串设置 Cookie。
+从JSON字符串设置Cookie。
 
 **参数：**
 
-- `-c, --cookies TEXT`: Cookie（JSON 列表格式）（必需）
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-c, --cookies TEXT`: Cookie（JSON列表格式）（必需）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -701,13 +701,13 @@ jb getcookies --browser-id demo
 jb setcookies --cookies '[{"name":"session","value":"abc123","domain":"example.com"}]' --browser-id demo
 ```
 
-#### clearcookies - 清除 Cookie
+#### clearcookies - 清除Cookie
 
-清除浏览器的所有 Cookie。
+清除浏览器之所有Cookie。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -715,15 +715,15 @@ jb setcookies --cookies '[{"name":"session","value":"abc123","domain":"example.c
 jb clearcookies --browser-id demo
 ```
 
-### 12. LocalStorage 管理
+### 12. LocalStorage管理
 
-#### getlocalstorage - 获取 LocalStorage
+#### getlocalstorage - 获取LocalStorage
 
-获取页面的所有 LocalStorage 数据。
+获取页面之所有LocalStorage数据。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -731,15 +731,15 @@ jb clearcookies --browser-id demo
 jb getlocalstorage --browser-id demo
 ```
 
-#### setlocalstorage - 设置 LocalStorage
+#### setlocalstorage - 设置LocalStorage
 
-从 JSON 字符串设置 LocalStorage。
+从JSON字符串设置LocalStorage。
 
 **参数：**
 
-- `-d, --data TEXT`: 存储数据（JSON 字典格式）（必需）
-- `--clear`: 设置前清除所有 LocalStorage
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-d, --data TEXT`: 存储数据（JSON字典格式）（必需）
+- `--clear`: 设置前清除所有LocalStorage
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -756,7 +756,7 @@ jb setlocalstorage --data '{"key":"value"}' --clear --browser-id demo
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -766,11 +766,11 @@ jb startnetworkmonitor --browser-id demo
 
 #### getnetworkrequests - 获取网络请求
 
-获取所有记录的网络请求。
+获取所有记录之网络请求。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -778,15 +778,15 @@ jb startnetworkmonitor --browser-id demo
 jb getnetworkrequests --browser-id demo
 ```
 
-### 14. PDF 导出
+### 14. PDF导出
 
-#### exportpdf - 导出 PDF
+#### exportpdf - 导出PDF
 
-将当前页面导出为 PDF。
+将当前页面导出为PDF。
 
 **参数：**
 
-- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `--browser-id TEXT`: 浏览器ID（默认：`default`）
 
 **示例：**
 
@@ -876,18 +876,18 @@ jb gettext --selector '.success-message' --browser-id form_test
 
 ## 最佳实践
 
-### 1. 始终使用浏览器 ID
+### 1. 始终用浏览器ID
 
-为不同的任务使用不同的浏览器 ID，避免冲突：
+为不同任务用不同之浏览器ID，避冲突：
 
 ```bash
 jb launch --browser-id task1
 jb launch --browser-id task2
 ```
 
-### 2. 使用等待而不是睡眠
+### 2. 用等待而非睡眠
 
-不要使用固定的等待时间，而是使用 `waitforselector` 或 `waitfortext`：
+勿用固定之等待时间，当用`waitforselector`或`waitfortext`：
 
 ```bash
 # 不推荐
@@ -899,9 +899,9 @@ jb waitforselector --selector '#button' --browser-id demo
 jb click --selector '#button' --browser-id demo
 ```
 
-### 3. 使用 CSS 选择器
+### 3. 用CSS选择器
 
-优先使用稳定的 CSS 选择器，避免脆弱的选择器：
+优先用稳定之CSS选择器，避脆弱之选择器：
 
 ```bash
 # 脆弱（依赖于位置）
@@ -911,38 +911,38 @@ jb click --selector 'div:nth-child(3)' --browser-id demo
 jb click --selector '#submit-button' --browser-id demo
 ```
 
-### 4. 优先使用 Index 而非选择器
+### 4. 优先用Index而非选择器
 
-对于元素操作，**推荐优先使用 `--index` 参数而不是 `--selector`**。通过 `list-interactables` 命令获取元素编号，然后使用编号进行操作：
+对于元素操作，**推荐优先用`--index`参数而非`--selector`**。通过`list-interactables`命令获取元素编号，然后用编号操作：
 
 ```bash
 # 首先列出可交互元素
 jb list-interactables --browser-id demo
 
-# 使用 index 操作（推荐）
+# 用index操作（推荐）
 jb click --index 3 --browser-id demo
 jb type --index 5 --text 'user@example.com' --browser-id demo
 
-# 而不是使用选择器（不推荐，除非必要）
+# 而非用选择器（不推荐，除非必要）
 jb click --selector 'div.form:nth-child(2) > button.submit' --browser-id demo
 ```
 
 **优势：**
 
-- **更稳定可靠**：`list-interactables` 会智能选择最合适的选择器（优先级：`#id` > `[name]` > `[placeholder]` > `[aria-label]` > `[data-testid]` 等），比手工构造选择器更准确
-- **避免脆弱选择器**：无需编写可能随页面结构变化的复杂 CSS/XPath 选择器
-- **便于调试**：index 清晰直观，便于看到操作的是哪个元素
-- **减少错误**：避免因选择器编写错误导致的元素未找到问题
+- **更稳定可靠**：`list-interactables`会智能选最合适之选择器（优先级：`#id` > `[name]` > `[placeholder]` > `[aria-label]` > `[data-testid]`等），比手工构造选择器更准确
+- **避脆弱选择器**：无需编写可能随页面结构变化之复杂CSS/XPath选择器
+- **便于调试**：index清晰直观，便于见操作之元素
+- **减少错误**：避因选择器编写错误导致之元素未找到问题
 
-**何时使用选择器：**
+**何时用选择器：**
 
-- 当知道明确的 `id` 或稳定的属性时（如 `#submit-button`）
+- 当知明确之`id`或稳定之属性时（如`#submit-button`）
 - 当元素不在可交互列表中时
-- 当需要等待元素出现然后操作时（结合 `waitforselector`）
+- 当需等待元素出现然后操作时（结合`waitforselector`）
 
 ### 5. 错误处理
 
-所有命令返回 JSON 格式的响应：
+所有命令返回JSON格式之响应：
 
 ```json
 {
@@ -954,7 +954,7 @@ jb click --selector 'div.form:nth-child(2) > button.submit' --browser-id demo
 
 ### 6. 调试技巧
 
-使用 `getelementinfo` 和 `console` 来调试：
+用`getelementinfo`与`console`来调试：
 
 ```bash
 # 检查元素状态
@@ -963,13 +963,13 @@ jb getelementinfo --selector '#element' --browser-id demo
 # 检查控制台日志
 jb console --browser-id demo
 
-# 执行调试 JavaScript
+# 执行调试JavaScript
 jb eval --code 'console.log("debug"); document.title' --browser-id demo
 ```
 
 ### 7. 性能优化
 
-对于大型页面，考虑使用无头模式：
+对于大型页面，考虑用无头模式：
 
 ```bash
 jb launch --browser-id demo
@@ -1005,14 +1005,14 @@ ps aux | grep 'jb daemon'
 jb daemon
 ```
 
-### Socket 文件冲突
+### Socket文件冲突
 
 **错误：** `Address already in use`
 
 **解决：**
 
 ```bash
-# 清理旧的 socket 文件
+# 清理旧之socket文件
 rm -f ~/.jarvis/playwright_daemon.sock
 
 # 重新启动守护进程
@@ -1045,7 +1045,7 @@ jb eval --code 'document.body.innerHTML' --browser-id demo
 # 增加超时时间
 jb waitforselector --selector '#element' --timeout 60 --browser-id demo
 
-# 或者等待不同的状态
+# 或等待不同之状态
 jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 ```
 
@@ -1053,15 +1053,15 @@ jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 
 | 命令                  | 描述              | 关键参数                                                  |
 | --------------------- | ----------------- | --------------------------------------------------------- |
-| daemon                | 启动守护进程      | 无                                                        |
+| daemon                | 启动守护进程      | 无                           |
 | daemon-stop           | 关闭守护进程      | 无                                                        |
 | launch                | 启动浏览器        | --browser-id                                              |
 | close                 | 关闭浏览器        | --browser-id                                              |
 | list                  | 列出浏览器        | 无                                                        |
-| navigate              | 导航到 URL        | --url (必需), --browser-id                                |
+| navigate              | 导航到URL        | --url (必需), --browser-id                                |
 | click                 | 点击元素          | --selector (必需), --browser-id                           |
 | type                  | 输入文本          | --selector (必需), --text (必需), --browser-id            |
-| screenshot            | 页面截图          | --path, --browser-id                                      |
+| screenshot            | 页面截图          | --path, --browser-id       |
 | gettext               | 获取文本          | --selector (必需), --browser-id                           |
 | getelementinfo        | 元素信息          | --selector (必需), --browser-id                           |
 | getattribute          | 获取属性          | --selector (必需), --attribute (必需), --browser-id       |
@@ -1072,7 +1072,7 @@ jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 | doubleclick           | 双击              | --selector (必需), --browser-id                           |
 | presskey              | 按键              | --key (必需), --browser-id                                |
 | fillform              | 填写表单          | --fields (必需), --browser-id                             |
-| submitform            | 提交表单          | --form-selector, --browser-id                             |
+| submitform            | 提交表单          | --form-selector, --browser-id                 |
 | clearform             | 清除表单          | --form-selector, --browser-id                             |
 | uploadfile            | 上传文件          | --selector (必需), --file-path (必需), --browser-id       |
 | downloadfile          | 下载文件          | --selector, --browser-id                                  |
@@ -1083,25 +1083,25 @@ jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 | goforward             | 前进              | --browser-id                                              |
 | scrollto              | 滚动到位置        | --scroll-x, --scroll-y, --browser-id                      |
 | scrolldown            | 向下滚动          | --scroll-amount, --browser-id                             |
-| scrollup              | 向上滚动          | --scroll-amount, --browser-id                             |
-| getcookies            | 获取 Cookie       | --browser-id                                              |
-| setcookies            | 设置 Cookie       | --cookies (必需), --browser-id                            |
-| clearcookies          | 清除 Cookie       | --browser-id                                              |
-| getlocalstorage       | 获取 LocalStorage | --browser-id                                              |
-| setlocalstorage       | 设置 LocalStorage | --data (必需), --clear, --browser-id                      |
+| scrollup              | 向上滚动          | --scroll-amount, --browser-id                          |
+| getcookies            | 获取Cookie       | --browser-id                                              |
+| setcookies            | 设置Cookie       | --cookies (必需), --browser-id                            |
+| clearcookies          | 清除Cookie       | --browser-id                                              |
+| getlocalstorage       | 获取LocalStorage | --browser-id                                              |
+| setlocalstorage       | 设置LocalStorage | --data (必需), --clear, --browser-id                      |
 | startnetworkmonitor   | 启动网络监控      | --browser-id                                              |
 | getnetworkrequests    | 获取网络请求      | --browser-id                                              |
-| elementscreenshot     | 元素截图          | --selector (必需), --browser-id                           |
-| exportpdf             | 导出 PDF          | --browser-id                                              |
+| elementscreenshot     | 元素截图          | --selector (必需), --browser-id      |
+| exportpdf             | 导出PDF          | --browser-id                                              |
 | console               | 获取控制台日志    | --browser-id, --clear-logs                                |
-| eval                  | 执行 JavaScript   | --code (必需), --save-result, --browser-id                |
+| eval                  | 执行JavaScript   | --code (必需), --save-result, --browser-id                |
 | getperformancemetrics | 性能指标          | --browser-id                                              |
 
 ## 相关文档
 
-- [Playwright 文档](https://playwright.dev/python/)
-- [CSS 选择器参考](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors)
-- [Typer 文档](https://typer.tiangolo.com/)
+- [Playwright文档](https://playwright.dev/python/)
+- [CSS选择器参考](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors)
+- [Typer文档](https://typer.tiangolo.com/)
 
 ## 版本信息
 

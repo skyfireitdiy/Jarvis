@@ -10,7 +10,7 @@ license: MIT
 
 ### 规则目的
 
-本规则提供完整的自进化Agent网络搭建流程指导，确保搭建过程规范、可验证、可回溯。
+本规则提供完整之自进化Agent网络搭建流程指导，确保搭建过程规范、可验证、可回溯。
 
 ### 适用场景
 
@@ -30,22 +30,22 @@ license: MIT
 
 **Agent（智能体）**：
 
-- 独立的智能实体，有自己的工作目录、模型、任务
-- 使用 `gateway_manager` 工具的 `create_agent` 操作创建
-- agent_type 必须是 `'agent'` 或 `'codeagent'`
+- 独立之智能实体，有其工作目录、模型、任务
+- 用 `gateway_manager` 工具之 `create_agent` 操作创建
+- agent_type 必为 `'agent'` 或 `'codeagent'`
 - 示例：知识库Agent、监控Agent、调度Agent
 
 **Tool（工具）**：
 
-- 供Agent调用的功能模块
-- 使用 `meta_agent` 工具创建（不在此规则范围内）
+- 供Agent调用之功能模块
+- 用 `meta_agent` 工具创建（不在此规则范围内）
 - 示例：memory工具、execute_script工具、read_code工具
 
 **常见错误警示**：
 
-- ❌ 混淆Agent和工具的概念
-- ❌ 使用错误的agent_type（如'knowledge'、'monitor'等）
-- ❌ 尝试用工具创建方式创建Agent
+- ❌ 混淆Agent与工具之概念
+- ❌ 用错误之agent_type（如'knowledge'、'monitor'等）
+- ❌ 尝试以工具创建方式创建Agent
 
 ## 3. 搭建流程
 
@@ -53,7 +53,7 @@ license: MIT
 
 #### 目标
 
-创建知识库的目录结构和配置文件。
+创建知识库之目录结构与配置文件。
 
 #### 操作步骤
 
@@ -138,15 +138,15 @@ mkdir -p /path/to/project/.jarvis/knowledge_base/{experiences,best_practices,sol
 ls -la /path/to/project/.jarvis/knowledge_base/
 ```
 
-预期输出应包含所有子目录和配置文件。
-
+预期输出应包含所有子目录与配置文件。
 ---
 
+### 阶段2：知识库Agent创建
 ### 阶段2：知识库Agent创建
 
 #### 目标
 
-创建负责管理知识库的Agent。
+创建负责管理知识库之Agent。
 
 #### 操作步骤
 
@@ -167,12 +167,12 @@ ls -la /path/to/project/.jarvis/knowledge_base/
 
 **重要参数说明**：
 
-- `agent_type`：必须是 `'agent'`（不能是 'knowledge' 或其他值）
+- `agent_type`：必为 `'agent'`（不能为 'knowledge' 或其他值）
 - `working_dir`：建议设置为项目根目录
-- `task`：详细描述Agent职责和知识库路径
+- `task`：详细描述Agent职责与知识库路径
 
 **步骤2.2：记录Agent ID**
-创建成功后，记录返回的 `agent_id`，后续操作需要使用。
+创建成功后，记录返回之 `agent_id`，后续操作需用。
 
 #### 验证方法
 
@@ -187,16 +187,11 @@ ls -la /path/to/project/.jarvis/knowledge_base/
 }
 ```
 
-**方法2：检查Agent端口**
-Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
-
----
-
 ### 阶段3：网络协作群组创建
 
 #### 目标
 
-创建Agent协作群组，便于Agent间通信和协作。
+创建Agent协作群组，便于Agent间通信与协作。
 
 #### 操作步骤
 
@@ -242,14 +237,14 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
 
 - 群组创建成功返回 `group_id`
 - 群组详情中应包含知识库Agent
+### 阶段4：网络架构信息保存
 
----
-
+#### 目标
 ### 阶段4：网络架构信息保存
 
 #### 目标
 
-将网络架构信息保存到项目长期记忆，便于后续查询和恢复。
+将网络架构信息保存至项目长期记忆，便于后续查询与恢复。
 
 #### 操作步骤
 
@@ -287,16 +282,16 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
 
 #### 验证方法
 
-- 检索结果应包含刚保存的架构信息
+- 检索结果应包含刚保存之架构信息
 - 内容完整且格式正确
 
----
+#### 目标
 
 ### 阶段5：规则优化（可选）
 
 #### 目标
 
-优化相关规则文件，补充概念澄清和最佳实践。
+优化相关规则文件，补充概念澄清与最佳实践。
 
 #### 操作步骤
 
@@ -333,6 +328,7 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
 - 检查规则文件是否包含"核心概念澄清"章节
 - 检查是否包含Agent创建示例
 
+- [ ] **知识库目录结构完整**
 ## 4. 验证清单
 
 搭建完成后，确认以下项目：
@@ -352,7 +348,7 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
   - 群组成员列表正确
 
 - [ ] **网络架构信息已保存**
-  - 架构信息已保存到项目长期记忆
+  - 架构信息已保存至项目长期记忆
   - 可通过检索获取架构信息
   - 信息内容完整准确
 
@@ -360,6 +356,8 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
   - 规则文件包含核心概念澄清
   - 规则文件包含Agent创建示例
 
+```
+Error: Invalid agent_type 'knowledge'
 ## 5. 常见问题与解决方案
 
 ### 问题1：agent_type 参数错误
@@ -370,7 +368,7 @@ Agent启动后会在随机端口运行微型Web服务，可通过日志查看。
 Error: Invalid agent_type 'knowledge'
 ```
 
-**原因**：agent_type 只能是 `'agent'` 或 `'codeagent'`。
+**原因**：agent_type 只能为 `'agent'` 或 `'codeagent'`。
 
 **解决方案**：
 
@@ -382,16 +380,16 @@ Error: Invalid agent_type 'knowledge'
 
 ---
 
-### 问题2：混淆Agent和工具概念
+### 问题2：混淆Agent与工具概念
 
-**错误现象**：尝试使用工具创建方式创建Agent。
+**错误现象**：尝试用工具创建方式创建Agent。
 
-**原因**：不理解Agent和工具的区别。
+**原因**：不理解Agent与工具之区别。
 
 **解决方案**：
 
-- Agent：独立智能实体，使用 `gateway_manager create_agent` 创建
-- Tool：功能模块，使用 `meta_agent` 创建
+- Agent：独立智能实体，用 `gateway_manager create_agent` 创建
+- Tool：功能模块，用 `meta_agent` 创建
 
 ---
 
@@ -422,21 +420,29 @@ Error: Invalid agent_type 'knowledge'
 1. memory_types 参数错误
 2. tags 格式不正确
 
-**解决方案**：
-
 ```json
 {
   "memory_type": "project_long_term", // 正确
-  "tags": ["tag1", "tag2"], // 必须是数组
+  "tags": ["tag1", "tag2"], // 必为数组
   "content": "内容"
 }
 ```
 
 ## 6. 最佳实践
 
-### 6.1 使用任务列表管理搭建流程
+**解决方案**：
 
-对于复杂的搭建任务，建议使用 `task_list_manager` 工具进行任务拆分：
+```json
+{
+  "memory_type": "project_long_term", // 正确
+  "tags": ["tag1", "tag2"], // 必为数组
+  "content": "内容"
+}
+```
+
+### 6.1 用任务列表管理搭建流程
+
+对于复杂之搭建任务，建议用 `task_list_manager` 工具进行任务拆分：
 
 ```json
 {
@@ -475,27 +481,27 @@ Error: Invalid agent_type 'knowledge'
 }
 ```
 
-### 6.2 每个阶段完成后立即验证
+### 6.2 每阶段完成后立即验证
 
-不要等到所有阶段完成才验证，每个阶段完成后立即验证：
+勿待所有阶段完成才验证，每阶段完成后立即验证：
 
 - 阶段1：`ls -la` 检查目录结构
 - 阶段2：`list_agents` 检查Agent状态
 - 阶段3：`get_group` 检查群组状态
 - 阶段4：`memory retrieve` 检查记忆保存
 
-### 6.3 保存关键信息到长期记忆
+### 6.3 保存关键信息至长期记忆
 
-所有关键信息都应保存到项目长期记忆：
+所有关键信息皆应保存至项目长期记忆：
 
 - Agent ID
 - 群组 ID
 - 知识库路径
 - 配置参数
 
-### 6.4 记录错误经验到知识库
+### 6.4 记录错误经验至知识库
 
-遇到错误时，将错误信息和解决方案记录到知识库：
+遇错误时，将错误信息与解决方案记录至知识库：
 
 ```json
 {
