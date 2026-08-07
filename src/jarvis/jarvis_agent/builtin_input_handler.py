@@ -773,7 +773,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 sub_agent_tool = SubAgentTool()
                 result = sub_agent_tool.execute(
                     {
-                        "task": "你是一个项目分析专家。请严格按照以下内置规则中的原则和操作步骤执行：\n'<rule:builtin:development_workflow/init_project.md>'\n\n你的任务是深入分析当前项目，生成一份结构化的项目综述文件，并使用 edit_file 工具将其写入 .jarvis/rule.md 文件。\n\n具体要求：分析当前项目的目录结构、技术栈、架构设计、核心模块、构建方式、测试方式等，生成一份项目综述文件，写入到 .jarvis/rule.md 文件中。综述应包含：项目概述、技术栈、目录结构说明、核心模块说明、构建与运行方式、测试方式、关键配置等。请使用 edit_file 工具将内容写入 .jarvis/rule.md 文件。",
+                        "task": "你是一个项目分析专家。请严格按照以下全局分析中的原则和操作步骤执行：\n'<rule:builtin:development_workflow/init_project.md>'\n\n你的任务是深入分析当前项目，生成一份结构化的项目综述文件，并使用 edit_file 工具将其写入 .jarvis/rules/rule.md 文件。\n\n具体要求：分析当前项目的目录结构、技术栈、架构设计、核心模块、构建方式、测试方式等，生成一份项目综述文件，写入到 .jarvis/rules/rule.md 文件中。综述应包含：项目概述、技术栈、目录结构说明、核心模块说明、构建与运行方式、测试方式、关键配置等。请使用 edit_file 工具将内容写入 .jarvis/rules/rule.md 文件。",
                         "name": "InitProjectAgent",
                         "background": f"用户通过 @Init 命令启动项目综述生成。当前工作目录: {os.getcwd()}",
                         "agent": agent,
