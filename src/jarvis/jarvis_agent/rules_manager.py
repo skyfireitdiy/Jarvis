@@ -47,33 +47,13 @@ class RulesManager:
         self._load_project_rule_file()
 
     def _load_project_rule_file(self) -> None:
-        """自动加载项目 .jarvis/rule.md 文件（项目综述）
+        """自动加载项目 .jarvis/rules/rule.md 文件（项目综述）
 
-        如果项目根目录下存在 .jarvis/rule.md 文件，将其内容作为
+        如果项目根目录下存在 .jarvis/rules/rule.md 文件，将其内容作为
         特殊规则自动加载到规则系统中。
         """
-        rule_file_path = os.path.join(self.root_dir, ".jarvis", "rule.md")
-        if not os.path.exists(rule_file_path) or not os.path.isfile(rule_file_path):
-            return
-
-        try:
-            with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read().strip()
-
-            if not content:
-                return
-
-            # 使用jinja2渲染规则模板
-            content = render_rule_template(content, os.path.dirname(rule_file_path))
-
-            if content:
-                rule_name = "project:rule"
-                self._loaded_rules[rule_name] = content
-                self.loaded_rules.add(rule_name)
-                self._merge_loaded_rules()
-        except Exception:
-            # 加载失败时忽略，不影响主流程
-            pass
+        # 使用 load_rule 方法加载，与其他规则一致
+        self.load_rule("project:rule")
 
     def _add_path_comment(self, rule_name: str, rule_content: str) -> str:
         """在规则内容前添加路径注释
@@ -829,9 +809,14 @@ class RulesManager:
             if rule_name in self._loaded_rules:
                 # 获取规则文件路径
                 rule_path = self.get_rule_file_path(rule_name)
-                # 格式化规则内容和路径
+                # 提取规则描述
+                description = ""
                 if rule_path and rule_path != "--":
-                    rule_content = f"## 规则文件路径: {rule_path}\n\n{self._loaded_rules[rule_name]}"
+                    description = self._extract_rule_description(rule_path)
+                # 格式化规则内容（路径已在 _add_path_comment 中添加）
+                if description:
+                    # 在规则内容前添加描述（路径注释已由 _add_path_comment 添加）
+                    rule_content = f"**规则描述**: {description}\n\n{self._loaded_rules[rule_name]}"
                 else:
                     rule_content = self._loaded_rules[rule_name]
                 combined_parts.append(rule_content)
