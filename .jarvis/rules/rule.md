@@ -63,33 +63,33 @@
 
 ## 代码统计
 
-| 模块 | 文件数 | 代码行数 |
-| --- | --- | --- |
-| jarvis_agent | 53 | 17,662 |
-| jarvis_code_agent | 60 | 16,968 |
-| jarvis_c2rust | 52 | 18,329 |
-| jarvis_tools | 25 | 14,550 |
-| jarvis_utils | 22 | 14,773 |
-| jarvis_web_gateway | 17 | 11,016 |
-| jarvis_sec | 18 | 11,513 |
-| jarvis_lsp | 8 | 6,287 |
-| jarvis_service | 7 | 2,473 |
-| jarvis_platform | 7 | 2,417 |
-| jarvis_config | 4 | 2,444 |
-| jarvis_platform_manager | 3 | 2,019 |
-| jarvis_browser | 2 | 3,833 |
-| jarvis_gateway | 7 | 907 |
-| jarvis_jck | 4 | 754 |
-| jarvis_memory_organizer | 3 | 1,457 |
-| jarvis_mcp | 4 | 1,467 |
-| jarvis_windows | 2 | 1,683 |
-| jarvis_methodology | 1 | 481 |
-| jarvis_smart_shell | 2 | 458 |
-| jarvis_git_utils | 1 | 574 |
-| jarvis_git_squash | 2 | 76 |
-| jarvis_rules_index | 3 | 255 |
-| jarvis_vscode_extension | 1 | 144 |
-| **合计** | **311** | **132,594** |
+| 模块                    | 文件数  | 代码行数    |
+| ----------------------- | ------- | ----------- |
+| jarvis_agent            | 53      | 17,662      |
+| jarvis_code_agent       | 60      | 16,968      |
+| jarvis_c2rust           | 52      | 18,329      |
+| jarvis_tools            | 25      | 14,550      |
+| jarvis_utils            | 22      | 14,773      |
+| jarvis_web_gateway      | 17      | 11,016      |
+| jarvis_sec              | 18      | 11,513      |
+| jarvis_lsp              | 8       | 6,287       |
+| jarvis_service          | 7       | 2,473       |
+| jarvis_platform         | 7       | 2,417       |
+| jarvis_config           | 4       | 2,444       |
+| jarvis_platform_manager | 3       | 2,019       |
+| jarvis_browser          | 2       | 3,833       |
+| jarvis_gateway          | 7       | 907         |
+| jarvis_jck              | 4       | 754         |
+| jarvis_memory_organizer | 3       | 1,457       |
+| jarvis_mcp              | 4       | 1,467       |
+| jarvis_windows          | 2       | 1,683       |
+| jarvis_methodology      | 1       | 481         |
+| jarvis_smart_shell      | 2       | 458         |
+| jarvis_git_utils        | 1       | 574         |
+| jarvis_git_squash       | 2       | 76          |
+| jarvis_rules_index      | 3       | 255         |
+| jarvis_vscode_extension | 1       | 144         |
+| **合计**                | **311** | **132,594** |
 
 > 注：统计范围 src/ 目录下的Python文件；测试文件87个
 
@@ -356,21 +356,21 @@ Jarvis/
 
 ### 其他模块
 
-| 模块 | 职责 | CLI命令 |
-| --- | --- | --- |
-| jarvis_config | 配置管理 | `jcfg` |
-| jarvis_platform_manager | AI平台管理器 | `jpm` |
-| jarvis_browser | 浏览器自动化 | `jb` |
-| jarvis_gateway | CLI网关桥接 | - |
-| jarvis_mcp | MCP协议集成 | - |
-| jarvis_memory_organizer | 记忆组织与整理 | `jmo` |
-| jarvis_smart_shell | 智能Shell交互 | `jss` |
-| jarvis_git_utils | Git提交工具 | `jgc` |
-| jarvis_git_squash | Git压缩合并 | `jgs` |
-| jarvis_methodology | 方法论管理 | `jm` |
-| jarvis_rules_index | 规则索引查询 | `jri` |
-| jarvis_windows | Windows平台支持 | `jw` |
-| jarvis_jck | JCK工具 | - |
+| 模块                    | 职责            | CLI命令 |
+| ----------------------- | --------------- | ------- |
+| jarvis_config           | 配置管理        | `jcfg`  |
+| jarvis_platform_manager | AI平台管理器    | `jpm`   |
+| jarvis_browser          | 浏览器自动化    | `jb`    |
+| jarvis_gateway          | CLI网关桥接     | -       |
+| jarvis_mcp              | MCP协议集成     | -       |
+| jarvis_memory_organizer | 记忆组织与整理  | `jmo`   |
+| jarvis_smart_shell      | 智能Shell交互   | `jss`   |
+| jarvis_git_utils        | Git提交工具     | `jgc`   |
+| jarvis_git_squash       | Git压缩合并     | `jgs`   |
+| jarvis_methodology      | 方法论管理      | `jm`    |
+| jarvis_rules_index      | 规则索引查询    | `jri`   |
+| jarvis_windows          | Windows平台支持 | `jw`    |
+| jarvis_jck              | JCK工具         | -       |
 
 ## 代理与节点架构
 
@@ -601,31 +601,31 @@ Jarvis 支持分布式部署，采用 **Master/Child** 节点模式：
 
 ## CLI命令一览
 
-| 命令 | 别名 | 入口模块 | 用途 |
-| --- | --- | --- | --- |
-| `jarvis` | `jvs` | jarvis_agent.jarvis | 主Agent CLI |
-| `jarvis-agent` | `ja` | jarvis_agent.main | Agent入口 |
-| `jarvis-agent-dispatcher` | `jvsd` | jarvis_agent.jvsd_cli | Agent调度器 |
-| `jarvis-code-agent` | `jca` | jarvis_code_agent.code_agent | 代码Agent |
-| `jarvis-code-agent-dispatcher` | `jcad` | jarvis_code_agent.jcad_cli | 代码Agent调度器 |
-| `jarvis-smart-shell` | `jss` | jarvis_smart_shell.main | 智能Shell |
-| `jarvis-platform-manager` | `jpm` | jarvis_platform_manager.main | 平台管理器 |
-| `jarvis-git-commit` | `jgc` | jarvis_git_utils.git_commiter | Git提交 |
-| `jarvis-git-squash` | `jgs` | jarvis_git_squash.main | Git压缩 |
-| `jarvis-memory-organizer` | `jmo` | jarvis_memory_organizer.memory_organizer | 记忆组织器 |
-| `jarvis-tool` | `jt` | jarvis_tools.cli.main | 工具CLI |
-| `jarvis-methodology` | `jm` | jarvis_methodology.main | 方法论管理 |
-| `jarvis-sec` | `jsec` | jarvis_sec.cli | 安全扫描 |
-| `jarvis-c2rust` | `jc2r` | jarvis_c2rust.cli | C→Rust迁移 |
-| `jarvis-config` | `jcfg` | jarvis_config.cli | 配置管理 |
-| `jarvis-lsp` | `jlsp` | jarvis_lsp.cli | LSP服务 |
-| `jarvis-browser` | `jb` | jarvis_browser.cli | 浏览器自动化 |
-| `jarvis-windows` | `jw` | jarvis_windows.cli | Windows支持 |
-| `jarvis-web-gateway` | `jwg` | jarvis_web_gateway.cli | Web网关 |
-| `jarvis-service` | `jservice` | jarvis_service.cli | Web服务 |
-| `jarvis-quick-config` | `jqc` | jarvis_utils.quick_config | 快速配置 |
-| `jarvis-rules-index` | `jri` | jarvis_rules_index.cli | 规则索引 |
-| `install-playwright` | - | jarvis.scripts.install_playwright | Playwright安装 |
+| 命令                           | 别名       | 入口模块                                 | 用途            |
+| ------------------------------ | ---------- | ---------------------------------------- | --------------- |
+| `jarvis`                       | `jvs`      | jarvis_agent.jarvis                      | 主Agent CLI     |
+| `jarvis-agent`                 | `ja`       | jarvis_agent.main                        | Agent入口       |
+| `jarvis-agent-dispatcher`      | `jvsd`     | jarvis_agent.jvsd_cli                    | Agent调度器     |
+| `jarvis-code-agent`            | `jca`      | jarvis_code_agent.code_agent             | 代码Agent       |
+| `jarvis-code-agent-dispatcher` | `jcad`     | jarvis_code_agent.jcad_cli               | 代码Agent调度器 |
+| `jarvis-smart-shell`           | `jss`      | jarvis_smart_shell.main                  | 智能Shell       |
+| `jarvis-platform-manager`      | `jpm`      | jarvis_platform_manager.main             | 平台管理器      |
+| `jarvis-git-commit`            | `jgc`      | jarvis_git_utils.git_commiter            | Git提交         |
+| `jarvis-git-squash`            | `jgs`      | jarvis_git_squash.main                   | Git压缩         |
+| `jarvis-memory-organizer`      | `jmo`      | jarvis_memory_organizer.memory_organizer | 记忆组织器      |
+| `jarvis-tool`                  | `jt`       | jarvis_tools.cli.main                    | 工具CLI         |
+| `jarvis-methodology`           | `jm`       | jarvis_methodology.main                  | 方法论管理      |
+| `jarvis-sec`                   | `jsec`     | jarvis_sec.cli                           | 安全扫描        |
+| `jarvis-c2rust`                | `jc2r`     | jarvis_c2rust.cli                        | C→Rust迁移      |
+| `jarvis-config`                | `jcfg`     | jarvis_config.cli                        | 配置管理        |
+| `jarvis-lsp`                   | `jlsp`     | jarvis_lsp.cli                           | LSP服务         |
+| `jarvis-browser`               | `jb`       | jarvis_browser.cli                       | 浏览器自动化    |
+| `jarvis-windows`               | `jw`       | jarvis_windows.cli                       | Windows支持     |
+| `jarvis-web-gateway`           | `jwg`      | jarvis_web_gateway.cli                   | Web网关         |
+| `jarvis-service`               | `jservice` | jarvis_service.cli                       | Web服务         |
+| `jarvis-quick-config`          | `jqc`      | jarvis_utils.quick_config                | 快速配置        |
+| `jarvis-rules-index`           | `jri`      | jarvis_rules_index.cli                   | 规则索引        |
+| `install-playwright`           | -          | jarvis.scripts.install_playwright        | Playwright安装  |
 
 ## 构建与运行
 
@@ -726,13 +726,13 @@ tests/
 
 ## CI/CD
 
-| 工作流 | 文件 | 触发条件 | 用途 |
-| --- | --- | --- | --- |
-| 测试 | `.github/workflows/test.yml` | push/PR到main | 运行pytest |
-| PyPI发布 | `.github/workflows/publish.yml` | 推送v*标签 | 构建并发布到PyPI |
-| Docker发布 | `.github/workflows/docker-publish.yml` | - | 构建并推送Docker镜像到GHCR |
-| 文档部署 | `.github/workflows/deploy-docs.yml` | - | 部署MkDocs文档到GitHub Pages |
-| VSCode插件发布 | `.github/workflows/publish-vscode.yml` | - | 发布VSCode扩展 |
+| 工作流         | 文件                                   | 触发条件      | 用途                         |
+| -------------- | -------------------------------------- | ------------- | ---------------------------- |
+| 测试           | `.github/workflows/test.yml`           | push/PR到main | 运行pytest                   |
+| PyPI发布       | `.github/workflows/publish.yml`        | 推送v\*标签   | 构建并发布到PyPI             |
+| Docker发布     | `.github/workflows/docker-publish.yml` | -             | 构建并推送Docker镜像到GHCR   |
+| 文档部署       | `.github/workflows/deploy-docs.yml`    | -             | 部署MkDocs文档到GitHub Pages |
+| VSCode插件发布 | `.github/workflows/publish-vscode.yml` | -             | 发布VSCode扩展               |
 
 ## 关键配置
 
