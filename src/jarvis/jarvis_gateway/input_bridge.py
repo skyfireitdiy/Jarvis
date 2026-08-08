@@ -198,6 +198,7 @@ class InputSessionRegistry:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._sessions: Dict[str, RemoteInputSession] = {}
+        self._provider_counts: Dict[str, int] = {}  # 连接引用计数
         self._confirm_sessions: Dict[str, RemoteConfirmSession] = {}  # 确认会话
         self._pending_input_requests: Dict[
             str, List[dict]
@@ -220,12 +221,19 @@ class InputSessionRegistry:
         session = self.get_or_create(session_id)
         provider = WebSocketInputProvider(session=session, timeout=timeout)
         register_input_provider(session_id, provider)
+        with self._lock:
+            self._provider_counts[session_id] = self._provider_counts.get(session_id, 0) + 1
         return provider
 
     def unregister_provider(
         self, session_id: str, disconnect_reason: str = "remote session disconnected"
     ) -> None:
         with self._lock:
+            count = self._provider_counts.get(session_id, 0)
+            if count > 1:
+                self._provider_counts[session_id] = count - 1
+                return
+            self._provider_counts.pop(session_id, None)
             session = self._sessions.pop(session_id, None)
         unregister_input_provider(session_id)
         if session is not None:

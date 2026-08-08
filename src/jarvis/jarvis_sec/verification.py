@@ -253,7 +253,7 @@ def run_verification_agent_with_retry(
             verification_summary_prompt_text = build_verification_summary_prompt()
             error_guidance = ""
             if prev_parse_error_verify:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_verify}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释等）。"
+                error_guidance = f"\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_verify}\n\n请确保输出之JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释等）。"
 
             full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
             try:
@@ -659,7 +659,7 @@ def process_verification_batch(
   - 在验证过程中，充分利用 memory 工具（action=retrieve）检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
   - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等，可以帮助你更准确地验证分析结论。
   - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
-- 完成验证后，主输出仅打印结束符 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
+- 完成验证后，主输出仅打印结束符 {ot("!!!COMPLETE!!!")}，勿输出其他任何内容。任务总结将于后交互中见询。
 """.strip()
 
                 verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
@@ -696,7 +696,7 @@ def process_verification_batch(
 3. 后果（consequences）评估是否准确
 4. 建议（suggestions）是否合适
 
-对于每个 gid，请判断分析结论是否正确（is_valid: true/false），并给出验证说明。
+对于每个 gid，请判分析结论是否正确（is_valid: true/false），并予验证说明。
 """.strip()
 
                 # 订阅验证 Agent 的摘要

@@ -552,8 +552,8 @@ def _create_conversion_agent(
 
     # 创建 Agent
     agent = Agent(
-        system_prompt="""你是一个安全扫描格式转换专家。
-你的任务是分析外部扫描工具的JSON格式，并生成Python转换脚本，将其转换为标准的安全问题格式。
+        system_prompt="""汝乃安全扫描格式转换专家。
+汝之任务乃分析外部扫描工具之JSON格式，并生成Python转换脚本，将其转换为标准之安全问题格式。
 """,
         name="format_converter",
         description="安全扫描格式转换专家",

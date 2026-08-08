@@ -101,7 +101,7 @@ def _install_missing_tools(results: list) -> None:
         f"```json\n"
         f"{tools_json}\n"
         f"```\n\n"
-        f"请根据每个工具的 install_hint 信息执行安装命令。"
+        f"请据每个工具之 install_hint 信息执行安装命令。"
     )
 
     try:

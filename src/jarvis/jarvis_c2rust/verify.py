@@ -333,7 +333,7 @@ def _run_alignment_analysis(
 - summary: 简洁描述总体结论，例如："完全一致"、"存在 High 级别问题"、"部分一致，主要是 Low 级别问题"
 - report_path: 生成的报告文件路径（必须是：{report_file}）
 
-请先读取报告文件 {report_file}，根据报告内容判断 is_aligned 的值，然后输出 JSON。
+请先读报告文件 {report_file}，据报告内容判 is_aligned 之值，然后输出 JSON。
 """
 
     agent = create_agent(

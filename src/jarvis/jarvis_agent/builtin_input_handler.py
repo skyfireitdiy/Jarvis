@@ -773,7 +773,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 sub_agent_tool = SubAgentTool()
                 result = sub_agent_tool.execute(
                     {
-                        "task": "你是一个项目分析专家。请严格按照以下全局分析中的原则和操作步骤执行：\n'<rule:builtin:development_workflow/init_project.md>'\n\n你的任务是深入分析当前项目，生成一份结构化的项目综述文件，并使用 edit_file 工具将其写入 .jarvis/rules/rule.md 文件。\n\n具体要求：分析当前项目的目录结构、技术栈、架构设计、核心模块、构建方式、测试方式等，生成一份项目综述文件，写入到 .jarvis/rules/rule.md 文件中。综述应包含：项目概述、技术栈、目录结构说明、核心模块说明、构建与运行方式、测试方式、关键配置等。请使用 edit_file 工具将内容写入 .jarvis/rules/rule.md 文件。",
+                        "task": "汝乃项目分析专家。请严依以下全局分析中之原则与操作步骤执行：\n'<rule:builtin:development_workflow/init_project.md>'\n\n汝之任务乃深入分析当前项目，生成一份结构化之项目综述文件，并用 edit_file 工具将其写入 .jarvis/rules/rule.md 文件。\n\n具体要求：分析当前项目之目录结构、技术栈、架构设计、核心模块、构建方式、测试方式等，生成一份项目综述文件，写入到 .jarvis/rules/rule.md 文件中。综述应含：项目概述、技术栈、目录结构说明、核心模块说明、构建与运行方式、测试方式、关键配置等。请用 edit_file 工具将内容写入 .jarvis/rules/rule.md 文件。",
                         "name": "InitProjectAgent",
                         "background": f"用户通过 @Init 命令启动项目综述生成。当前工作目录: {os.getcwd()}",
                         "agent": agent,
@@ -806,7 +806,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 sub_agent_tool = SubAgentTool()
                 result = sub_agent_tool.execute(
                     {
-                        "task": "你是一个测试用例设计专家。请严格按照以下内置规则中的原则和操作步骤执行：\n'<rule:builtin:development_workflow/generate_testcase.md>'\n\n你的任务是深入分析当前项目的需求文档和代码接口，生成结构化的文本化测试用例，用于指导后续集成测试开发。\n\n具体要求：分析当前项目的需求文档、Spec文件（.jarvis/rules/spec/目录下）、代码接口定义，生成一份文本化测试用例文件，用于指导后续集成测试开发。测试用例应覆盖：功能测试、边界条件测试、异常处理测试、接口兼容性测试。每个测试用例需包含：用例编号、用例名称、前置条件、测试步骤、预期结果、优先级。请使用 edit_file 工具将测试用例写入 .jarvis/rules/spec/test_cases.md 文件。",
+                        "task": "汝乃测试用例设计专家。请严依以下内置规则中之原则与操作步骤执行：\n'<rule:builtin:development_workflow/generate_testcase.md>'\n\n汝之任务乃深入分析当前项目之需求文档与代码接口，生成结构化之文本化测试用例，用于指导后续集成测试开发。\n\n具体要求：分析当前项目之需求文档、Spec文件（.jarvis/rules/spec/目录下）、代码接口定义，生成一份文本化测试用例文件，用于指导后续集成测试开发。测试用例应覆盖：功能测试、边界条件测试、异常处理测试、接口兼容性测试。每个测试用例需含：用例编号、用例名称、前置条件、测试步骤、预期结果、优先级。请用 edit_file 工具将测试用例写入 .jarvis/rules/spec/test_cases.md 文件。",
                         "name": "TestCaseAgent",
                         "background": f"用户通过 @TestCase 命令启动测试用例生成。当前工作目录: {os.getcwd()}",
                         "agent": agent,

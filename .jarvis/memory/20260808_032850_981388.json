@@ -1,0 +1,12 @@
+{
+  "id": "20260808_032850_981388",
+  "type": "project_long_term",
+  "tags": [
+    "文言文",
+    "提示词",
+    "任务完成"
+  ],
+  "content": "统一项目中与LLM交互内容之语言风格为文言文任务已完成。修改文件：1) git_commiter.py 默认提示词改文言文（提交51082c9）；2) __init__.py 中 origin_agent_system_prompt 第227-342行改文言文（提交3e8ea91、1fd7466）。确认无需修改：rules_manager.py、prompts.py、methodology.py、task_analyzer.py（提示词已是文言文风格）。",
+  "created_at": "2026-08-08T03:28:50.981443",
+  "updated_at": "2026-08-08T03:28:50.981449"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260808_042709_895051",
+  "type": "project_long_term",
+  "tags": [
+    "文言文",
+    "提示词",
+    "审查",
+    "修复"
+  ],
+  "content": "统一项目中与LLM交互内容之语言风格为文言文任务审查与修复完成。审查发现原总结不实：rules_manager.py 与 methodology.py 之 LLM 提示词实为白话文，非总结所称'已是文言文无需修改'。修复涉及30+文件：rules_manager.py、methodology.py、git_commiter.py、__init__.py、task_list_manager.py、skill_evaluator.py、builtin_input_handler.py、jarvis_smart_shell/main.py、jarvis_sec/（workflow/agents/analysis/review/verification/clustering）、jarvis_methodology/main.py、jarvis_jck/cli.py、add_images.py、meta_agent.py、registry.py、memory_manager.py、run_loop.py、main.py、gateway_manager.py、read_code.py、memory_organizer.py、input.py、jarvis_c2rust/（optimizer_unsafe/optimizer_docs/utils/llm_module_agent/llm_module_agent_executor/verify/transpiler_planning）。所有修改文件语法检查通过。无关修改：input_bridge.py 与 app.py 之多连接支持与任务无关。",
+  "created_at": "2026-08-08T04:27:09.895133",
+  "updated_at": "2026-08-08T04:27:09.895142"
+}

@@ -127,7 +127,7 @@ def cli(
             if not user_input:
                 return
             agent.set_addon_prompt(
-                "如果有必要，请先指定出行动计划，然后根据计划一步步执行，如果任务过于复杂，可以拆分子Agent进行执行，拆的子Agent需要掌握所有必要的任务信息，否则无法执行"
+                "若有需要，请先定行动计划，然后据计划一步步执行，若任务过繁，可拆分子Agent执行，拆之子Agent需掌所有必要之任务信息，否则无法执行"
             )
             agent.run(user_input)
         except KeyboardInterrupt:

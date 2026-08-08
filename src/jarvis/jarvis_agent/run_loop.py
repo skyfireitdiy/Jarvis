@@ -679,7 +679,7 @@ class AgentRunLoop:
                 if ag._no_tool_call_count >= 2:
                     from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
 
-                    error_msg = "连续2次对话没有工具调用，请使用工具来完成你的任务"
+                    error_msg = "连续2次对话无工具调用，请用工具以竟其事"
                     PrettyOutput.auto_print(f"⚠ {error_msg}")
 
                     # 尝试使用大模型修复
@@ -736,7 +736,7 @@ class AgentRunLoop:
             context = self._collect_auto_complete_context(ag)
 
             # 构建确认提示
-            confirm_prompt_parts = ["检测到自动完成标记，请确认是否要完成当前任务。\n"]
+            confirm_prompt_parts = ["检测到自动完成标记，请确认是否完成当前任务。\n"]
             confirm_prompt_parts.append(context)
             confirm_prompt_parts.append(
                 "\n⚠️ 重要：在确认完成之前，必须验证所有验收准则都已通过："
@@ -774,7 +774,7 @@ class AgentRunLoop:
             elif "<!!!YES!!!>" in llm_response:
                 PrettyOutput.auto_print("✅ LLM确认完成当前任务。")
             else:
-                ag.set_addon_prompt("请继续执行任务。")
+                ag.set_addon_prompt("请续行任务。")
                 PrettyOutput.auto_print("⚠ LLM响应不明确，默认继续执行任务。")
                 return True, None
 

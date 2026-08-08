@@ -584,7 +584,7 @@ class WebSocketConnectionManager:
         self._connection_lock_enabled = (
             False  # 连接锁定模式：True=拒绝新连接，False=允许新连接替换旧连接
         )
-        self._active_connections: Dict[str, tuple[str, WebSocket]] = {}
+        self._active_connections: Dict[str, Dict[str, tuple[str, WebSocket]]] = {}
         self._connection_state_lock = asyncio.Lock()
 
     async def handle(self, websocket: WebSocket) -> None:
@@ -602,42 +602,19 @@ class WebSocketConnectionManager:
             return
 
         async with self._connection_state_lock:
-            existing_connection = self._active_connections.get(session_id)
-            if existing_connection:
-                if self._connection_lock_enabled:
-                    await _send_error(
-                        websocket,
-                        "CONNECTION_REJECTED",
-                        "Already have an active connection (connection lock enabled)",
-                    )
-                    await websocket.close()
-                    return
-                old_connection_id, old_websocket = existing_connection
-                print(
-                    "[WS CONNECTION] New connection replacing old one (connection lock disabled)"
+            existing_connections = self._active_connections.get(session_id)
+            if existing_connections and self._connection_lock_enabled:
+                await _send_error(
+                    websocket,
+                    "CONNECTION_REJECTED",
+                    "Already have an active connection (connection lock enabled)",
                 )
-                # 先向旧连接发送 CONNECTION_LOCKED 错误，让前端清除 token 停止重连
-                try:
-                    await _send_error(
-                        old_websocket,
-                        "CONNECTION_LOCKED",
-                        "Your connection has been replaced by a new one",
-                    )
-                except Exception as e:
-                    save_exception(
-                        e, module="jarvis_web_gateway.app", function="__init__"
-                    )
-                    pass
-                try:
-                    await old_websocket.close()
-                except Exception as e:
-                    save_exception(
-                        e, module="jarvis_web_gateway.app", function="__init__"
-                    )
-                    pass
-                self._router.unregister(old_connection_id, session_id=session_id)
-                self._active_connections.pop(session_id, None)
-                self._auth_store.pop(session_id, None)
+                await websocket.close()
+                return
+            if existing_connections:
+                print(
+                    f"[WS CONNECTION] New connection added (existing={len(existing_connections)})"
+                )
 
         self._auth_store[session_id] = auth_payload
         print(
@@ -652,7 +629,8 @@ class WebSocketConnectionManager:
             session_id=session_id,
         )
         async with self._connection_state_lock:
-            self._active_connections[session_id] = (connection_id, websocket)
+            connections = self._active_connections.setdefault(session_id, {})
+            connections[connection_id] = (connection_id, websocket)
         self._input_registry.register_provider(session_id)
         await websocket.send_json(
             {"type": "ready", "payload": {"session_id": session_id}}
@@ -692,10 +670,12 @@ class WebSocketConnectionManager:
             self._input_registry.unregister_provider(session_id)
             self._input_registry.disconnect_confirm_session(session_id)
             async with self._connection_state_lock:
-                active_connection = self._active_connections.get(session_id)
-                if active_connection and active_connection[0] == connection_id:
-                    self._active_connections.pop(session_id, None)
-                    self._auth_store.pop(session_id, None)
+                connections = self._active_connections.get(session_id)
+                if connections:
+                    connections.pop(connection_id, None)
+                    if not connections:
+                        self._active_connections.pop(session_id, None)
+                        self._auth_store.pop(session_id, None)
             print(
                 "[WS CLEANUP] end "
                 f"session_id={session_id} connection_id={connection_id} "
@@ -703,7 +683,7 @@ class WebSocketConnectionManager:
             )
 
     async def _handle_sync_request(
-        self, session_id: str, agent_seqs: Dict[str, int]
+        self, session_id: str, agent_seqs: Dict[str, int], websocket: WebSocket
     ) -> None:
         """处理同步请求，一次性返回消息缓存中该 agent 的所有历史消息"""
         print(
@@ -711,14 +691,6 @@ class WebSocketConnectionManager:
             f"agent_seqs={agent_seqs} "
             f"cache_size={len(self._gateway._message_cache)}"
         )
-        connection = self._active_connections.get(session_id)
-        if not connection:
-            print(
-                f"[SYNC_REQUEST] NO_ACTIVE_CONNECTION for session_id={session_id}, "
-                f"active_connections={list(self._active_connections.keys())}"
-            )
-            return
-        _, websocket = connection
 
         # 获取前端请求的 agent_id 列表
         requested_agent_ids = set(agent_seqs.keys())
@@ -805,7 +777,7 @@ class WebSocketConnectionManager:
                     f"[SYNC_REQUEST] dispatching to _handle_sync_request "
                     f"session_id={session_id} agent_seqs={agent_seqs}"
                 )
-                await self._handle_sync_request(session_id, agent_seqs)
+                await self._handle_sync_request(session_id, agent_seqs, websocket)
             else:
                 print(
                     f"[SYNC_REQUEST] IGNORED (not agent process) "
@@ -825,20 +797,19 @@ class WebSocketConnectionManager:
             message_with_seq = dict(message)
             message_with_seq["seq"] = seq
 
-            # ➕ 新增：将用户输入作为 output 消息发送回前端，确保前端收到带 seq 的用户输入
-            await websocket.send_json(
-                {
-                    "type": "output",
-                    "payload": {
-                        "output_type": "user_input",
-                        "agent_name": "user",
-                        "text": text,
-                        "lang": "text",
-                        "agent_id": agent_id,
-                    },
-                    "seq": seq,
-                }
-            )
+            # ➕ 新增：将用户输入作为 output 消息广播至所有前端，确保所有前端收到带 seq 的用户输入
+            user_input_msg = {
+                "type": "output",
+                "payload": {
+                    "output_type": "user_input",
+                    "agent_name": "user",
+                    "text": text,
+                    "lang": "text",
+                    "agent_id": agent_id,
+                },
+                "seq": seq,
+            }
+            self._router.publish(user_input_msg, session_id=session_id)
 
             # 缓存用户输入消息，用于重连后恢复对话完整性
             self._gateway._message_cache.append(message_with_seq)

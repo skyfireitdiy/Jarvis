@@ -1328,7 +1328,7 @@ def _get_agent_hint() -> str:
             return (
                 "\n当前可用智能体: "
                 + ", ".join(ordered)
-                + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
+                + f"\n如需将任务交予他智能体，请用 {ot('SEND_MESSAGE')} 块。"
             )
     except Exception as e:
         save_exception(e, module="jarvis_utils.input", function="_get_agent_hint")
