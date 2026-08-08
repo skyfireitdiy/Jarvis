@@ -299,22 +299,22 @@ class GitCommitTool:
                 base_prompt = (
                     custom_prompt
                     if custom_prompt
-                    else """根据代码差异生成提交信息：
-                提交信息应使用中文书写
+                    else """据代码差异生成提交信息：
+提交信息当用中文书写
 # 格式模板
-必须使用以下格式：
+必用以下格式：
 
 [Jarvis Code Agent提交] <类型>(<范围>): <主题>
 
-[可选] 详细描述变更内容和原因
+[可选] 详述变更内容与缘由
 
 # 格式规则
-1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
-2. 范围表示变更的模块或组件 (例如: auth, database, ui)
-3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
-4. 如有详细描述，使用空行分隔主题和详细描述
-5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
-6. 仅输出提交信息，不要输出其他内容
+1. 类型: fix(修bug), feat(新功), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
+2. 范围示变更之模块或组件 (如: auth, database, ui)
+3. 主题行不逾72字符，不以句号终，用祈使语气
+4. 若有详述，用空行隔主题与详述
+5. 详述当释"何物"与"何故"，非"如何"
+6. 唯出提交信息，勿出他文
 """
                 )
                 base_prompt += f"""
@@ -456,7 +456,7 @@ commit信息
                         if suffix:
                             commit_message = f"{commit_message}\n{suffix}"
                         break
-                    prompt = f"""格式错误，请按照以下格式重新生成提交信息：
+                    prompt = f"""格式有误，请依下式重新生成提交信息：
                     {ot("COMMIT_MESSAGE")}
                     commit信息
                     {ct("COMMIT_MESSAGE")}

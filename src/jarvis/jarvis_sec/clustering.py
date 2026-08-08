@@ -789,7 +789,7 @@ def build_cluster_error_guidance(
     error_guidance = ""
     if error_details:
         error_guidance = (
-            "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
+            "\n\n**格式错误详情（请据以下错误修复输出格式）：**\n"
             + "\n".join(f"- {detail}" for detail in error_details)
         )
     if missing_gids:

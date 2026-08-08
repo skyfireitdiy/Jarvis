@@ -55,7 +55,7 @@ class AddImagesTool:
             "prompt": {
                 "type": "string",
                 "description": "添加图片后的提示文本（可选）",
-                "default": "请分析以下图片内容：",
+                "default": "请析以下图片内容：",
             },
         },
         "required": ["images"],
@@ -168,7 +168,7 @@ class AddImagesTool:
                     }
 
             images = args.get("images", [])
-            prompt = args.get("prompt", "请分析以下图片内容：")
+            prompt = args.get("prompt", "请析以下图片内容：")
 
             if not images:
                 return {

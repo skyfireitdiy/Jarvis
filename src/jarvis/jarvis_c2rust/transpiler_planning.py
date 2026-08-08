@@ -106,7 +106,7 @@ class PlanningManager:
                 if (is_root_not_main and self.enable_ffi_export_validation)
                 else ""
             )
-            + "- **评估是否需要实现**：在规划阶段，请评估此函数是否真的需要实现。以下情况可以跳过实现（设置 skip_implementation 为 true），但**必须确保功能一致性**：\n"
+            + "- **评估是否需要实现**：规划阶段，请评估此函数是否真需实现。以下情况可跳过实现（设 skip_implementation 为 true），但**必确保功能一致性**：\n"
             + "  * **已实现的函数**：如果函数已经在目标模块（module）中实现，可以使用 read_code 工具检查目标文件，确认函数已存在且**功能与 C 实现一致**，则无需重复实现。**重要**：如果已实现的函数功能不一致（如参数处理不同、返回值不同、行为不同等），则不能跳过，需要重新实现或修正\n"
             + "  * **资源释放类函数**：如文件关闭 fclose、内存释放 free、句柄释放、锁释放等，在 Rust 中通常通过 RAII（Drop trait）自动管理，无需显式实现\n"
             + "  * **已被库替代**：如果函数已被标准库或第三方 crate 替代（lib_replacement 字段已设置），且**库的功能与 C 实现完全一致**，不需要兼容层，可以跳过实现。**重要**：如果库的功能与 C 实现不一致（如 API 行为不同、参数要求不同、返回值不同等），则需要实现兼容层或重新实现，不能跳过\n"
@@ -131,7 +131,7 @@ class PlanningManager:
 
         user_prompt = "\n".join(
             [
-                "请阅读以下上下文并准备总结：",
+                "请读以下上下文并备总结：",
                 f"- 函数标识: id={rec.id}, name={rec.name}, qualified={rec.qname}",
                 f"- 源文件位置: {rec.file}:{rec.start_line}-{rec.end_line}",
                 f"- crate 根目录路径: {self.crate_dir.resolve()}",

@@ -193,7 +193,7 @@ class {tool_name}:
         pass
 ```
 
-请生成完整的、可直接使用的Python代码，生成完成后不用进行测试与验证。"""
+请生成完整、可直接用之Python代码，生成完成后无需进行测试与验证。"""
 
     def _register_new_tool(
         self, agent: Any, tool_name: str, tool_file_path: str

@@ -235,7 +235,7 @@ def extract_methodology(
         
 {text_content}
 
-请按以下格式返回结果：
+请按下式返结果：
 <methodologies>
 - problem_type: [问题类型1]
   content: |2
@@ -388,7 +388,7 @@ def extract_methodology_from_url(
         
 {url}
 
-请按以下格式返回结果：
+请按下式返结果：
 <methodologies>
 - problem_type: [问题类型1]
   content: |2

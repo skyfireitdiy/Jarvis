@@ -261,7 +261,7 @@ def execute_llm_plan(
                     [
                         requirement_text,
                         "",
-                        "请根据以下构建错误进行最小化修复，然后再次执行 `cargo build` 验证：",
+                        "请据以下构建错误行最小化修复，然后再次执行 `cargo build` 验证：",
                         "<BUILD_ERROR>",
                         output,
                         "</BUILD_ERROR>",

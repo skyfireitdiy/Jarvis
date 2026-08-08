@@ -17,13 +17,13 @@ def _build_detailed_error_guidance(
 ) -> str:
     """构建详细的格式错误指导信息"""
     if prev_parsed_items is None:
-        return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法解析出有效的 JSON 数组"
+        return "\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- 无法解析出有效之 JSON 数组"
 
     errors = []
     if not isinstance(prev_parsed_items, list):
         errors.append("结果不是数组")  # type: ignore[unreachable]
         error_text = "\n".join(f"- {err}" for err in errors)
-        return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n{error_text}"
+        return f"\n\n**格式错误详情（请据以下错误修复输出格式）：**\n{error_text}"
 
     for idx, item in enumerate(prev_parsed_items):
         if not isinstance(item, dict):
@@ -84,9 +84,9 @@ def _build_detailed_error_guidance(
 
     if errors:
         error_text = "\n".join(f"- {err}" for err in errors)
-        return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n{error_text}"
+        return f"\n\n**格式错误详情（请据以下错误修复输出格式）：**\n{error_text}"
 
-    return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 数据格式不符合要求，请检查必填字段和数据类型"
+    return "\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- 数据格式不符合要求，请查必填字段与数据类型"
 
 
 def valid_items(items: Optional[List[Dict[str, Any]]]) -> bool:
@@ -161,12 +161,12 @@ def build_validation_error_guidance(
     if parse_error_analysis:
         return f"""
 
-**格式错误详情（请根据以下错误修复输出格式）：**
+**格式错误详情（请据以下错误修复输出格式）：**
 - JSON解析失败: {parse_error_analysis}
 
-请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释等）。"""
+请确保输出之JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释等）。"""
     elif prev_parsed_items is None:
-        return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 数组"
+        return "\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 数组"
 
     # 如果通过验证函数，返回空字符串
     if valid_items(prev_parsed_items):

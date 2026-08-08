@@ -207,9 +207,9 @@ class LLMRustCratePlannerAgent:
                 error_guidance = ""
                 if last_error and last_error != "未知错误":
                     if "JSON解析失败" in last_error:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释等）。"
+                        error_guidance = f"\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出之JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释等）。"
                     else:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释等）。"
+                        error_guidance = f"\n\n**格式错误详情（请据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅含 JSON 格式之项目结构定义。支持jsonnet语法（如尾随逗号、注释等）。"
 
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:

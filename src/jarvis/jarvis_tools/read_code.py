@@ -224,7 +224,7 @@ class ReadCodeTool:
                         f"📊 实际读取范围: {start_line}-{safe_end_line} (原请求范围: {start_line}-{end_line})\n\n"
                         f"{partial_content}\n\n"
                         f"💡 建议:\n"
-                        f"   1. 如需继续读取，请使用:\n"
+                        f"   1. 如需续读，请用:\n"
                         f"      start_line={safe_end_line + 1}&end_line={end_line}\n"
                         f"   2. 需要读取全部内容? 请缩小行范围或分批读取"
                     ),

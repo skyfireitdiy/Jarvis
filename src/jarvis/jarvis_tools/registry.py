@@ -2026,7 +2026,7 @@ class ToolRegistry(OutputHandlerProtocol):
             summary_input = self._truncate_for_summary(output)
 
             summary_prompt = (
-                "请提取以下工具输出中的关键信息，用于替代原始输出返回给Agent。要求：\n"
+                "请提取以下工具输出中之关键信息，用于替代原始输出返回给Agent。要求：\n"
                 "1. 保留对后续决策有用的关键数据、错误信息、文件路径、函数名、返回值等\n"
                 "2. 压缩冗余内容（如重复日志、无关细节）\n"
                 "3. 用简洁的结构化文本输出（如列表）\n"
@@ -2079,7 +2079,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     except Exception:
                         usage_prompt = tool_call_help
                     PrettyOutput.auto_print("❌ 工具参数格式无效")
-                    return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
+                    return f"工具参数格式无效: {name}。arguments 应为可解析之 Jsonnet 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
 
             # 检查是否包含定时参数（after/at/loop）
             if isinstance(args, dict):
