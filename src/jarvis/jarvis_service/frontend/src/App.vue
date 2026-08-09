@@ -85,6 +85,9 @@
         </div>
         
         <div class="header-actions desktop-only">
+          <button class="icon-btn" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
+            💬
+          </button>
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
@@ -162,6 +165,31 @@
       @closeTerminal="closeTerminal"
       @setHostRef="setTerminalHostRef"
       @startResize="startTerminalPanelResize"
+    />
+
+    <!-- 聊天室面板 -->
+    <ChatPanel
+      :visible="showChatPanel"
+      :interaction="chatPanelInteraction"
+      :panelStyle="chatPanelStyle"
+      :socket="socket"
+      :isMaximized="isChatMaximized"
+      :rooms="chatRooms"
+      :messages="chatMessages"
+      :clients="chatClients"
+      :myClientId="myClientId"
+      :activeRoomId="activeChatRoomId"
+      :activePrivateId="activePrivateClientId"
+      :resizeDirections="chatResizeDirections"
+      @focus="focusWindow"
+      @startMove="startChatPanelMove"
+      @toggleMaximize="toggleChatMaximize"
+      @close="showChatPanel = false"
+      @createRoom="createChatRoom"
+      @joinRoom="joinChatRoom"
+      @sendMessage="sendChatMessage"
+      @selectPrivate="selectPrivateClient"
+      @startResize="startChatPanelResize"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -774,6 +802,7 @@ import SessionDialog from './components/SessionDialog.vue'
 import AgentSidebar from './components/AgentSidebar.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
+import ChatPanel from './components/ChatPanel.vue'
 import EditorPanel from './components/EditorPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -1390,6 +1419,7 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
+const showChatPanel = ref(false)     // 聊天室面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
 const showMobileMenu = ref(false)     // 移动端菜单
 const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
@@ -1451,8 +1481,10 @@ const PANEL_DRAG_ACTIVATION_DISTANCE = 4
 // 窗口最大化状态
 const isEditorMaximized = ref(false)
 const isTerminalMaximized = ref(false)
+const isChatMaximized = ref(false)
 const editorPanelRectBeforeMaximize = ref(null)
 const terminalPanelRectBeforeMaximize = ref(null)
+const chatPanelRectBeforeMaximize = ref(null)
 
 function getDefaultEditorPanelRect() {
   return {
@@ -1759,6 +1791,27 @@ function toggleTerminalMaximize() {
       height: window.innerHeight,
     }
     isTerminalMaximized.value = true
+  }
+}
+
+// 聊天室窗口最大化/还原
+function toggleChatMaximize() {
+  if (isChatMaximized.value) {
+    // 还原
+    if (chatPanelRectBeforeMaximize.value) {
+      chatPanelRect.value = { ...chatPanelRectBeforeMaximize.value }
+    }
+    isChatMaximized.value = false
+  } else {
+    // 最大化
+    chatPanelRectBeforeMaximize.value = { ...chatPanelRect.value }
+    chatPanelRect.value = {
+      top: 0,
+      left: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
+    isChatMaximized.value = true
   }
 }
 
@@ -6732,6 +6785,75 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
+  } else if (type && type.startsWith('chat_')) {
+    handleChatMessage(type, payload)
+  }
+}
+
+// 聊天室消息处理
+function handleChatMessage(type, payload) {
+  switch (type) {
+    case 'chat_register_response':
+      if (payload?.success) {
+        myClientId.value = payload.client_id || myClientId.value
+      }
+      break
+    case 'chat_get_rooms_response':
+      chatRooms.value = payload?.rooms || []
+      break
+    case 'chat_create_room_response':
+      if (payload?.success && payload.room) {
+        chatRooms.value.push(payload.room)
+        showToast('聊天室创建成功', 'success')
+      } else {
+        showToast(payload?.error || '创建聊天室失败', 'error')
+      }
+      break
+    case 'chat_join_room_response':
+      if (payload?.success) {
+        showToast('已加入聊天室', 'success')
+      } else {
+        showToast(payload?.error || '加入聊天室失败', 'error')
+      }
+      break
+    case 'chat_get_clients_response':
+      chatClients.value = payload?.clients || []
+      break
+    case 'chat_message':
+      // 聊天室广播消息
+      chatMessages.value.push({
+        client_id: payload?.client_id,
+        client_name: payload?.sender_name || payload?.client_id,
+        sender_name: payload?.sender_name || payload?.client_id,
+        content: payload?.content,
+        room_id: payload?.room_id,
+        timestamp: payload?.timestamp || Date.now(),
+      })
+      break
+    case 'chat_private_message':
+      // 私聊消息
+      chatMessages.value.push({
+        client_id: payload?.from_client_id,
+        client_name: payload?.from_client_name || payload?.from_client_id,
+        content: payload?.content,
+        private: true,
+        timestamp: payload?.timestamp || Date.now(),
+      })
+      break
+    case 'chat_get_private_history_response':
+      if (payload?.messages) {
+        chatMessages.value = payload.messages.map(msg => ({
+          client_id: msg.from_client_id,
+          client_name: msg.from_client_name || msg.from_client_id,
+          content: msg.content,
+          private: true,
+          timestamp: msg.timestamp || Date.now(),
+        }))
+      }
+      break
+    case 'chat_error':
+      showToast(payload?.error || '聊天室操作失败', 'error')
+      break
   }
 }
 
@@ -8354,6 +8476,87 @@ const terminalPanelStyle = computed(() => ({
   zIndex: activeWindow.value === 'terminal' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
 }))
 
+// 聊天室面板
+const CHAT_PANEL_MIN_WIDTH = 400
+const CHAT_PANEL_MIN_HEIGHT = 300
+const CHAT_PANEL_STORAGE_KEY = 'jarvis_chat_panel_rect'
+const chatResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+
+function getDefaultChatPanelRect() {
+  return {
+    top: 88,
+    left: Math.max(window.innerWidth - 824, 16),
+    width: 800,
+    height: 500,
+  }
+}
+
+function loadChatPanelRect() {
+  const defaultChatPanelRect = getDefaultChatPanelRect()
+  const savedValue = localStorage.getItem(CHAT_PANEL_STORAGE_KEY)
+  if (!savedValue) {
+    return defaultChatPanelRect
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (
+      typeof parsedValue.top !== 'number' ||
+      typeof parsedValue.left !== 'number' ||
+      typeof parsedValue.width !== 'number' ||
+      typeof parsedValue.height !== 'number'
+    ) {
+      return defaultChatPanelRect
+    }
+
+    return parsedValue
+  } catch {
+    return defaultChatPanelRect
+  }
+}
+
+function saveChatPanelRect() {
+  localStorage.setItem(CHAT_PANEL_STORAGE_KEY, JSON.stringify(chatPanelRect.value))
+}
+
+const chatPanelRect = ref(loadChatPanelRect())
+const chatPanelInteraction = ref({
+  active: false,
+  mode: null,
+  direction: null,
+  startX: 0,
+  startY: 0,
+  startTop: 0,
+  startLeft: 0,
+  startWidth: 0,
+  startHeight: 0,
+})
+
+const chatPanelStyle = computed(() => ({
+  top: `${chatPanelRect.value.top}px`,
+  left: `${chatPanelRect.value.left}px`,
+  width: `${chatPanelRect.value.width}px`,
+  height: `${chatPanelRect.value.height}px`,
+  zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+}))
+
+// 聊天室数据状态
+const chatRooms = ref([])
+const chatMessages = ref([])
+const chatClients = ref([])
+const myClientId = ref('')
+const activeChatRoomId = ref('')
+const activePrivateClientId = ref('')
+
+function getOrCreateClientId() {
+  let clientId = localStorage.getItem('jarvis_chat_client_id')
+  if (!clientId) {
+    clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    localStorage.setItem('jarvis_chat_client_id', clientId)
+  }
+  return clientId
+}
+
 function getTerminalPanelBounds() {
   const HEADER_HEIGHT = 32 // 标题栏高度
   const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
@@ -8517,6 +8720,242 @@ function stopTerminalPanelInteraction() {
   document.removeEventListener('mousemove', onTerminalPanelPointerMove)
   document.removeEventListener('mouseup', stopTerminalPanelInteraction)
   saveTerminalPanelRect()
+}
+
+// 聊天室面板交互
+function getChatPanelBounds() {
+  const HEADER_HEIGHT = 32 // 标题栏高度
+  const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
+  return {
+    minTop: 0,
+    minLeft: 0,
+    maxLeft: window.innerWidth - MIN_VISIBLE_WIDTH,
+    maxTop: window.innerHeight - HEADER_HEIGHT,
+    maxWidth: window.innerWidth,
+    maxHeight: window.innerHeight,
+  }
+}
+
+function ensureChatPanelInViewport() {
+  const HEADER_HEIGHT = 32
+  const MIN_VISIBLE_WIDTH = 100
+  const maxWidth = Math.max(window.innerWidth, CHAT_PANEL_MIN_WIDTH)
+  const maxHeight = Math.max(window.innerHeight, CHAT_PANEL_MIN_HEIGHT)
+
+  chatPanelRect.value.width = clamp(chatPanelRect.value.width, CHAT_PANEL_MIN_WIDTH, maxWidth)
+  chatPanelRect.value.height = clamp(chatPanelRect.value.height, CHAT_PANEL_MIN_HEIGHT, maxHeight)
+
+  chatPanelRect.value.left = clamp(
+    chatPanelRect.value.left,
+    0,
+    window.innerWidth - MIN_VISIBLE_WIDTH
+  )
+  chatPanelRect.value.top = clamp(
+    chatPanelRect.value.top,
+    0,
+    window.innerHeight - HEADER_HEIGHT
+  )
+}
+
+function startChatPanelMove(event) {
+  if (windowWidth.value <= 768) return
+  if (event.target.closest('.chat-panel-actions')) return
+
+  focusWindow('chat')
+
+  chatPanelInteraction.value = {
+    active: false,
+    mode: 'move',
+    direction: null,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: chatPanelRect.value.top,
+    startLeft: chatPanelRect.value.left,
+    startWidth: chatPanelRect.value.width,
+    startHeight: chatPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onChatPanelPointerMove)
+  document.addEventListener('mouseup', stopChatPanelInteraction)
+}
+
+function startChatPanelResize(event, direction) {
+  if (windowWidth.value <= 768) return
+
+  chatPanelInteraction.value = {
+    active: true,
+    mode: 'resize',
+    direction,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: chatPanelRect.value.top,
+    startLeft: chatPanelRect.value.left,
+    startWidth: chatPanelRect.value.width,
+    startHeight: chatPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onChatPanelPointerMove)
+  document.addEventListener('mouseup', stopChatPanelInteraction)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onChatPanelPointerMove(event) {
+  const deltaX = event.clientX - chatPanelInteraction.value.startX
+  const deltaY = event.clientY - chatPanelInteraction.value.startY
+
+  if (chatPanelInteraction.value.mode === 'move' && !chatPanelInteraction.value.active) {
+    const dragDistance = Math.hypot(deltaX, deltaY)
+    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
+      return
+    }
+
+    chatPanelInteraction.value = {
+      ...chatPanelInteraction.value,
+      active: true,
+    }
+    event.preventDefault()
+  }
+
+  if (!chatPanelInteraction.value.active) return
+
+  if (chatPanelInteraction.value.mode === 'move') {
+    const bounds = getChatPanelBounds()
+    chatPanelRect.value.left = clamp(chatPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    chatPanelRect.value.top = clamp(chatPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+    return
+  }
+
+  const direction = chatPanelInteraction.value.direction || ''
+  const startLeft = chatPanelInteraction.value.startLeft
+  const startTop = chatPanelInteraction.value.startTop
+  const startWidth = chatPanelInteraction.value.startWidth
+  const startHeight = chatPanelInteraction.value.startHeight
+
+  let nextLeft = startLeft
+  let nextTop = startTop
+  let nextWidth = startWidth
+  let nextHeight = startHeight
+
+  if (direction.includes('e')) {
+    nextWidth = clamp(startWidth + deltaX, CHAT_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, CHAT_PANEL_MIN_WIDTH))
+  }
+
+  if (direction.includes('s')) {
+    nextHeight = clamp(startHeight + deltaY, CHAT_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, CHAT_PANEL_MIN_HEIGHT))
+  }
+
+  if (direction.includes('w')) {
+    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - CHAT_PANEL_MIN_WIDTH)
+    nextLeft = desiredLeft
+    nextWidth = startWidth - (desiredLeft - startLeft)
+  }
+
+  if (direction.includes('n')) {
+    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - CHAT_PANEL_MIN_HEIGHT)
+    nextTop = desiredTop
+    nextHeight = startHeight - (desiredTop - startTop)
+  }
+
+  if (nextLeft + nextWidth > window.innerWidth) {
+    nextWidth = Math.max(CHAT_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
+  }
+
+  if (nextTop + nextHeight > window.innerHeight) {
+    nextHeight = Math.max(CHAT_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
+  }
+
+  chatPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  chatPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  chatPanelRect.value.width = clamp(nextWidth, CHAT_PANEL_MIN_WIDTH, Math.max(window.innerWidth - chatPanelRect.value.left, CHAT_PANEL_MIN_WIDTH))
+  chatPanelRect.value.height = clamp(nextHeight, CHAT_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - chatPanelRect.value.top, CHAT_PANEL_MIN_HEIGHT))
+}
+
+function stopChatPanelInteraction() {
+  chatPanelInteraction.value = {
+    active: false,
+    mode: null,
+    direction: null,
+    startX: 0,
+    startY: 0,
+    startTop: 0,
+    startLeft: 0,
+    startWidth: 0,
+    startHeight: 0,
+  }
+
+  document.removeEventListener('mousemove', onChatPanelPointerMove)
+  document.removeEventListener('mouseup', stopChatPanelInteraction)
+  saveChatPanelRect()
+}
+
+// 聊天室功能方法
+function toggleChatPanel() {
+  showChatPanel.value = !showChatPanel.value
+  if (showChatPanel.value) {
+    focusWindow('chat')
+    // 首次打开时注册客户端并获取聊天室列表
+    if (!myClientId.value) {
+      myClientId.value = getOrCreateClientId()
+      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: '用户' + myClientId.value.slice(-6) })
+    }
+    sendChatMessageToServer('chat_get_rooms', {})
+    sendChatMessageToServer('chat_get_clients', {})
+  }
+}
+
+function sendChatMessageToServer(type, payload) {
+  if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+    console.warn('[CHAT] No socket connection')
+    return
+  }
+  socket.value.send(JSON.stringify({ type, payload }))
+}
+
+function createChatRoom() {
+  const roomName = prompt('请输入聊天室名称：')
+  if (!roomName || !roomName.trim()) return
+  sendChatMessageToServer('chat_create_room', { name: roomName.trim(), client_id: myClientId.value })
+}
+
+function joinChatRoom(roomId) {
+  activeChatRoomId.value = roomId
+  sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
+}
+
+function sendChatMessage(content) {
+  if (!content || !content.trim()) return
+  if (activePrivateClientId.value) {
+    // 私聊模式
+    sendChatMessageToServer('chat_send_private', {
+      sender_id: myClientId.value,
+      receiver_id: activePrivateClientId.value,
+      content: content.trim(),
+    })
+  } else if (activeChatRoomId.value) {
+    // 聊天室模式
+    sendChatMessageToServer('chat_send_message', {
+      room_id: activeChatRoomId.value,
+      client_id: myClientId.value,
+      content: content.trim(),
+    })
+  } else {
+    showToast('请先加入聊天室或选择私聊对象', 'warning')
+  }
+}
+
+function selectPrivateClient(clientId) {
+  if (activePrivateClientId.value === clientId) {
+    activePrivateClientId.value = ''
+  } else {
+    activePrivateClientId.value = clientId
+    activeChatRoomId.value = ''
+    // 获取私聊历史
+    sendChatMessageToServer('chat_get_private_history', {
+      client_id: myClientId.value,
+      other_id: clientId,
+    })
+  }
 }
 
 // 监听面板显示状态

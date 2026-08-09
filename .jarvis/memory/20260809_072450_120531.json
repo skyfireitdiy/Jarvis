@@ -1,0 +1,8 @@
+{
+  "id": "20260809_072450_120531",
+  "type": "project_long_term",
+  "tags": ["聊天室", "Bug修复", "字段名", "前后端"],
+  "content": "聊天室前后端字段名统一（2026-08-08修复）：\n1. chat_send_private 使用 sender_id/receiver_id（前端 App.vue:8931-8932，后端 app.py:1215-1216）\n2. chat_get_private_history 使用 client_id/other_id（前端 App.vue:8956，后端 app.py:1226）\n3. chat_message 广播含 sender_name（前端 App.vue:6827，后端 app.py:1194）\n4. chat_create_room 需传 client_id（前端 App.vue:8918，后端 app.py:1149）\n5. chat_register 需传 name（前端 App.vue:8900，后端 app.py:1125）",
+  "created_at": "2026-08-09T07:24:50.120576",
+  "updated_at": "2026-08-09T07:24:50.120582"
+}
