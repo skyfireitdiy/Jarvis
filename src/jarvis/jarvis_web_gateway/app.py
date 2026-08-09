@@ -17,6 +17,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 import uuid
 
 import yaml  # type: ignore[import-untyped]
@@ -44,6 +45,7 @@ from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_web_gateway.agent_manager import AgentManager
+from jarvis.jarvis_web_gateway.chat_manager import ChatManager
 from jarvis.jarvis_web_gateway.agent_proxy_manager import (
     AgentProxyManager,
     AgentNotFoundError,
@@ -585,6 +587,9 @@ class WebSocketConnectionManager:
         self._active_connections: Dict[str, Dict[str, tuple[str, WebSocket]]] = {}
         self._connection_state_lock = asyncio.Lock()
 
+        # 聊天室管理
+        self._chat_manager = ChatManager()
+
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept(subprotocol="jarvis-ws")
         session_id = "default"  # 固定使用 default session，简化重连逻辑
@@ -659,6 +664,10 @@ class WebSocketConnectionManager:
             self._router.unregister(connection_id, session_id=session_id)
             self._input_registry.unregister_provider(session_id)
             self._input_registry.disconnect_confirm_session(session_id)
+            # 注销聊天客户端
+            for cid, client in list(self._chat_manager._chat_clients.items()):
+                if client.get("connection_id") == connection_id:
+                    await self._chat_manager.unregister_client(cid)
             async with self._connection_state_lock:
                 connections = self._active_connections.get(session_id)
                 if connections:
@@ -1064,6 +1073,189 @@ class WebSocketConnectionManager:
                 }
                 self._router.publish(error_msg, session_id=session_id)
             return
+
+        # ============================================================
+        # 聊天室消息处理
+        # ============================================================
+        if message_type.startswith("chat_"):
+            await self._handle_chat_message(message_type, payload, websocket)
+            return
+
+    async def _handle_chat_message(
+        self, message_type: str, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """处理聊天室相关消息。"""
+        try:
+            if message_type == "chat_register":
+                await self._handle_chat_register(payload, websocket)
+            elif message_type == "chat_get_rooms":
+                await self._handle_chat_get_rooms(websocket)
+            elif message_type == "chat_create_room":
+                await self._handle_chat_create_room(payload, websocket)
+            elif message_type == "chat_join_room":
+                await self._handle_chat_join_room(payload, websocket)
+            elif message_type == "chat_leave_room":
+                await self._handle_chat_leave_room(payload, websocket)
+            elif message_type == "chat_send_message":
+                await self._handle_chat_send_message(payload, websocket)
+            elif message_type == "chat_get_clients":
+                await self._handle_chat_get_clients(websocket)
+            elif message_type == "chat_send_private":
+                await self._handle_chat_send_private(payload, websocket)
+            elif message_type == "chat_get_private_history":
+                await self._handle_chat_get_private_history(payload, websocket)
+            else:
+                await websocket.send_json(
+                    {
+                        "type": "chat_error",
+                        "payload": {"error": f"未知消息类型: {message_type}"},
+                    }
+                )
+        except Exception as e:
+            logger.error(f"[CHAT] Error handling {message_type}: {e}", exc_info=True)
+            try:
+                await websocket.send_json(
+                    {"type": "chat_error", "payload": {"error": str(e)}}
+                )
+            except Exception:
+                pass
+
+    async def _handle_chat_register(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """注册聊天客户端。"""
+        client_id = payload.get("client_id", "")
+        name = payload.get("name", "匿名用户")
+        if not client_id:
+            await websocket.send_json(
+                {
+                    "type": "chat_register_response",
+                    "payload": {"success": False, "error": "client_id 不能为空"},
+                }
+            )
+            return
+        connection_id = str(uuid.uuid4())
+        result = await self._chat_manager.register_client(
+            client_id, name, connection_id, websocket
+        )
+        await websocket.send_json({"type": "chat_register_response", "payload": result})
+
+    async def _handle_chat_get_rooms(self, websocket: WebSocket) -> None:
+        """获取聊天室列表。"""
+        rooms = self._chat_manager.get_rooms()
+        await websocket.send_json(
+            {
+                "type": "chat_get_rooms_response",
+                "payload": {"success": True, "rooms": rooms},
+            }
+        )
+
+    async def _handle_chat_create_room(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """创建聊天室。"""
+        name = payload.get("name", "")
+        creator_id = payload.get("client_id", "")
+        if not name:
+            await websocket.send_json(
+                {
+                    "type": "chat_create_room_response",
+                    "payload": {"success": False, "error": "聊天室名称不能为空"},
+                }
+            )
+            return
+        result = await self._chat_manager.create_room(name, creator_id)
+        await websocket.send_json(
+            {"type": "chat_create_room_response", "payload": result}
+        )
+
+    async def _handle_chat_join_room(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """加入聊天室。"""
+        room_id = payload.get("room_id", "")
+        client_id = payload.get("client_id", "")
+        result = await self._chat_manager.join_room(room_id, client_id)
+        await websocket.send_json(
+            {"type": "chat_join_room_response", "payload": result}
+        )
+
+    async def _handle_chat_leave_room(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """离开聊天室。"""
+        room_id = payload.get("room_id", "")
+        client_id = payload.get("client_id", "")
+        result = await self._chat_manager.leave_room(room_id, client_id)
+        await websocket.send_json(
+            {"type": "chat_leave_room_response", "payload": result}
+        )
+
+    async def _handle_chat_send_message(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """发送聊天室消息。"""
+        room_id = payload.get("room_id", "")
+        client_id = payload.get("client_id", "")
+        content = payload.get("content", "")
+        client = self._chat_manager.get_client(client_id)
+        if not client:
+            await websocket.send_json(
+                {
+                    "type": "chat_send_message_response",
+                    "payload": {"success": False, "error": "客户端未注册"},
+                }
+            )
+            return
+        msg = {
+            "type": "chat_message",
+            "payload": {
+                "room_id": room_id,
+                "client_id": client_id,
+                "sender_name": client["name"],
+                "content": content,
+                "timestamp": time.time(),
+            },
+        }
+        await self._chat_manager.broadcast_to_room(
+            room_id, msg, exclude_client_id=client_id
+        )
+        await websocket.send_json(
+            {"type": "chat_send_message_response", "payload": {"success": True}}
+        )
+
+    async def _handle_chat_get_clients(self, websocket: WebSocket) -> None:
+        """获取在线客户端列表。"""
+        clients = self._chat_manager.get_clients()
+        await websocket.send_json(
+            {
+                "type": "chat_get_clients_response",
+                "payload": {"success": True, "clients": clients},
+            }
+        )
+
+    async def _handle_chat_send_private(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """发送私聊消息。"""
+        sender_id = payload.get("sender_id", "")
+        receiver_id = payload.get("receiver_id", "")
+        content = payload.get("content", "")
+        result = await self._chat_manager.send_private(sender_id, receiver_id, content)
+        await websocket.send_json(
+            {"type": "chat_send_private_response", "payload": result}
+        )
+
+    async def _handle_chat_get_private_history(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """获取私聊历史消息。"""
+        client_id = payload.get("client_id", "")
+        other_id = payload.get("other_id", "")
+        result = self._chat_manager.get_private_history(client_id, other_id)
+        await websocket.send_json(
+            {"type": "chat_get_private_history_response", "payload": result}
+        )
 
 
 def create_app(
