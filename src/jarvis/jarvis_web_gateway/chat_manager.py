@@ -72,6 +72,21 @@ class ChatManager:
             for cid, info in self._chat_clients.items()
         ]
 
+    async def broadcast_to_all(
+        self,
+        message: Dict[str, Any],
+        exclude_client_id: Optional[str] = None,
+    ) -> None:
+        """向所有在线客户端广播消息。"""
+        for client_id, client in self._chat_clients.items():
+            if client_id == exclude_client_id:
+                continue
+            if client and client["websocket"]:
+                try:
+                    await client["websocket"].send_json(message)
+                except Exception:
+                    pass
+
     # ------------------------------------------------------------------
     # 聊天室
     # ------------------------------------------------------------------

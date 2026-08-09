@@ -1,0 +1,8 @@
+{
+  "id": "20260809_155953_450848",
+  "type": "project_long_term",
+  "tags": ["chat", "room-broadcast", "create-room"],
+  "content": "新创建聊天室广播修复：\n1. chat_manager.py新增broadcast_to_all方法，向所有在线客户端广播（排除指定client_id）\n2. app.py的_handle_chat_create_room在创建成功后广播chat_room_created事件给其他在线用户\n3. App.vue新增chat_room_created case，将新房间添加到chatRooms列表\n\n注意：join_room/leave_room的成员数变化尚未广播，可作为后续优化",
+  "created_at": "2026-08-09T15:59:53.450889",
+  "updated_at": "2026-08-09T15:59:53.450895"
+}
