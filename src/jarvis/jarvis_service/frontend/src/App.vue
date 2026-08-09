@@ -3817,19 +3817,8 @@ function confirmRestartGateway() {
   )
 }
 
-// 确认重启所有节点（先检查 agent 状态，再依次重启子节点，最后 master）
+// 确认重启所有节点（依次重启子节点，最后 master）
 async function confirmRestartAllNodes() {
-  // 第一步：检查所有节点是否有运行中的 agent
-  const runningAgents = agentList.value.filter(agent => agent.status === 'running')
-  if (runningAgents.length > 0) {
-    const agentDetails = runningAgents.map(agent => {
-      const nodeId = agent.node_id || 'master'
-      return `- ${agent.name || agent.agent_id} (节点：${nodeId})`
-    }).join('\n')
-    showToast(`检测到 ${runningAgents.length} 个运行中的 Agent：\n${agentDetails}\n\n请先手动停止或完成这些 Agent 后再重启节点服务`, 'warning')
-    return
-  }
-
   showSettingsModal.value = false
   showConfirm(
     '确认要一键重启所有节点吗？\n\n操作顺序：\n1. 依次重启所有子节点\n2. 最后重启 master 节点\n\n这将短暂中断所有节点的连接。',
