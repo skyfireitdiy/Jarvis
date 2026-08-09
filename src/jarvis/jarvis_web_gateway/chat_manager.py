@@ -119,6 +119,23 @@ class ChatManager:
             room["members"].discard(client_id)
         return {"success": True, "room_id": room_id}
 
+    async def delete_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
+        """删除聊天室（仅创建者可删除）。返回被删除房间的成员列表用于通知。"""
+        async with self._lock:
+            room = self._chat_rooms.get(room_id)
+            if not room:
+                return {"success": False, "error": "聊天室不存在"}
+            if room["created_by"] != client_id:
+                return {"success": False, "error": "仅创建者可删除聊天室"}
+            members = list(room["members"])
+            del self._chat_rooms[room_id]
+        return {
+            "success": True,
+            "room_id": room_id,
+            "name": room["name"],
+            "members": members,
+        }
+
     def get_room_members(self, room_id: str) -> list[Dict[str, Any]]:
         """获取聊天室成员列表（含详细信息）。"""
         room = self._chat_rooms.get(room_id)

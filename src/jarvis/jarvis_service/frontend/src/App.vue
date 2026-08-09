@@ -178,7 +178,6 @@
       :socket="socket"
       :isMaximized="isChatMaximized"
       :rooms="chatRooms"
-      :messages="chatMessages"
       :clients="chatClients"
       :roomMembers="chatRoomMembers"
       :myClientId="myClientId"
@@ -188,6 +187,8 @@
       :unreadCount="chatUnreadCount"
       :myName="chatName"
       :collapsed="chatPanelCollapsed"
+      :sidebarWidth="chatSidebarWidth"
+      :messages="chatMessages[activeChatRoomId] || chatMessages['private'] || []"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -199,6 +200,9 @@
       @startResize="startChatPanelResize"
       @updateName="updateChatName"
       @toggleCollapse="toggleChatPanelCollapse"
+      @leaveRoom="leaveChatRoom"
+      @deleteRoom="deleteChatRoom"
+      @startSidebarResize="startChatSidebarResize"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -6835,12 +6839,14 @@ function handleChatMessage(type, payload) {
       break
     case 'chat_message':
       // 聊天室广播消息
-      chatMessages.value.push({
+      const roomId = payload?.room_id || 'general'
+      if (!chatMessages.value[roomId]) chatMessages.value[roomId] = []
+      chatMessages.value[roomId].push({
         client_id: payload?.client_id,
         client_name: payload?.sender_name || payload?.client_id,
         sender_name: payload?.sender_name || payload?.client_id,
         content: payload?.content,
-        room_id: payload?.room_id,
+        room_id: roomId,
         timestamp: payload?.timestamp || Date.now(),
       })
       saveChatMessages()
@@ -6854,7 +6860,9 @@ function handleChatMessage(type, payload) {
       break
     case 'chat_private_message':
       // 私聊消息
-      chatMessages.value.push({
+      const privKey = 'private'
+      if (!chatMessages.value[privKey]) chatMessages.value[privKey] = []
+      chatMessages.value[privKey].push({
         client_id: payload?.message?.sender_id,
         client_name: payload?.message?.sender_name || payload?.message?.sender_id,
         sender_name: payload?.message?.sender_name || payload?.message?.sender_id,
@@ -6873,7 +6881,7 @@ function handleChatMessage(type, payload) {
       break
     case 'chat_get_private_history_response':
       if (payload?.messages) {
-        chatMessages.value = payload.messages.map(msg => ({
+        chatMessages.value['private'] = payload.messages.map(msg => ({
           client_id: msg.sender_id,
           client_name: msg.sender_name || msg.sender_id,
           sender_name: msg.sender_name || msg.sender_id,
@@ -6882,6 +6890,42 @@ function handleChatMessage(type, payload) {
           timestamp: msg.timestamp || Date.now(),
         }))
         saveChatMessages()
+      }
+      break
+    case 'chat_leave_room_response':
+      if (payload?.success) {
+        showToast('已退出聊天室', 'success')
+        delete chatMessages.value[activeChatRoomId.value]
+        activeChatRoomId.value = ''
+        saveChatMessages()
+      } else {
+        showToast(payload?.error || '退出聊天室失败', 'error')
+      }
+      break
+    case 'chat_delete_room_response':
+      if (payload?.success) {
+        showToast('聊天室已删除', 'success')
+        const deletedRoomId = payload?.room_id || activeChatRoomId.value
+        delete chatMessages.value[deletedRoomId]
+        chatRooms.value = chatRooms.value.filter(r => r.room_id !== deletedRoomId)
+        if (activeChatRoomId.value === deletedRoomId) {
+          activeChatRoomId.value = ''
+        }
+        saveChatMessages()
+      } else {
+        showToast(payload?.error || '删除聊天室失败', 'error')
+      }
+      break
+    case 'chat_room_deleted':
+      const removedRoomId = payload?.room_id
+      if (removedRoomId) {
+        delete chatMessages.value[removedRoomId]
+        chatRooms.value = chatRooms.value.filter(r => r.room_id !== removedRoomId)
+        if (activeChatRoomId.value === removedRoomId) {
+          activeChatRoomId.value = ''
+        }
+        saveChatMessages()
+        showToast('聊天室已被创建者删除', 'warning')
       }
       break
     case 'chat_error':
@@ -8608,17 +8652,33 @@ const CHAT_MESSAGES_STORAGE_KEY = 'jarvis_chat_messages'
 function loadChatMessages() {
   try {
     const saved = localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY)
-    return saved ? JSON.parse(saved) : []
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // 兼容旧格式（数组）和新格式（对象）
+      if (Array.isArray(parsed)) {
+        const map = {}
+        parsed.forEach(msg => {
+          const key = msg.room_id || 'private'
+          if (!map[key]) map[key] = []
+          map[key].push(msg)
+        })
+        return map
+      }
+      return parsed
+    }
+    return {}
   } catch {
-    return []
+    return {}
   }
 }
 
 function saveChatMessages() {
   try {
-    // 只保留最近 500 条消息
-    const messages = chatMessages.value.slice(-500)
-    localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages))
+    const toSave = {}
+    for (const [roomId, msgs] of Object.entries(chatMessages.value)) {
+      toSave[roomId] = msgs.slice(-200)
+    }
+    localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(toSave))
   } catch (e) {
     console.warn('[CHAT] Failed to save messages:', e)
   }
@@ -8633,6 +8693,23 @@ const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
 const chatName = ref('')
+const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
+
+function startChatSidebarResize(event) {
+  const startX = event.clientX
+  const startWidth = chatSidebarWidth.value
+  const onMove = (e) => {
+    const delta = e.clientX - startX
+    chatSidebarWidth.value = Math.max(120, Math.min(400, startWidth + delta))
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    localStorage.setItem('jarvis_chat_sidebar_width', String(chatSidebarWidth.value))
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 function getOrCreateClientId() {
   let clientId = localStorage.getItem('jarvis_chat_client_id')
@@ -9020,6 +9097,16 @@ function joinChatRoom(roomId) {
   sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
 }
 
+function leaveChatRoom(roomId) {
+  sendChatMessageToServer('chat_leave_room', { room_id: roomId, client_id: myClientId.value })
+}
+
+function deleteChatRoom(roomId) {
+  showConfirm('确定要删除此聊天室吗？此操作不可撤销。', () => {
+    sendChatMessageToServer('chat_delete_room', { room_id: roomId, client_id: myClientId.value })
+  })
+}
+
 function sendChatMessage(content) {
   if (!content || !content.trim()) return
   const trimmed = content.trim()
@@ -9031,7 +9118,8 @@ function sendChatMessage(content) {
       content: trimmed,
     })
     // 本地追加自己的消息
-    chatMessages.value.push({
+    if (!chatMessages.value['private']) chatMessages.value['private'] = []
+    chatMessages.value['private'].push({
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
       sender_name: chatName.value || myClientId.value,
@@ -9048,7 +9136,8 @@ function sendChatMessage(content) {
       content: trimmed,
     })
     // 本地追加自己的消息
-    chatMessages.value.push({
+    if (!chatMessages.value[activeChatRoomId.value]) chatMessages.value[activeChatRoomId.value] = []
+    chatMessages.value[activeChatRoomId.value].push({
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
       sender_name: chatName.value || myClientId.value,

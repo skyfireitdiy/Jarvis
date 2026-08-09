@@ -20,8 +20,8 @@
           class="chat-name-input"
           placeholder="输入昵称..."
           @keyup.enter="saveName"
-          @blur="saveName"
         />
+        <button class="icon-btn small chat-name-confirm" @click="saveName" title="确认昵称">✓</button>
       </div>
       <div class="chat-panel-actions">
         <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
@@ -36,79 +36,87 @@
       <span>💬</span>
     </div>
 
-    <!-- 左侧侧边栏：聊天室列表 + 在线用户列表 -->
-    <div v-show="!collapsed" class="chat-sidebar">
-      <div class="chat-sidebar-header">
-        <span>聊天室</span>
-        <button class="icon-btn small" @click="$emit('createRoom')" title="创建聊天室">➕</button>
-      </div>
-      <div class="chat-room-list">
-        <div
-          v-for="room in rooms"
-          :key="room.room_id"
-          class="chat-room-item"
-          :class="{ active: activeRoomId === room.room_id }"
-          @click="$emit('joinRoom', room.room_id)"
-        >
-          <span class="chat-room-name">{{ room.name }}</span>
-          <span class="chat-room-count">{{ room.member_count }}</span>
-        </div>
-        <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
-      </div>
-
-      <!-- 在线用户列表（有活跃聊天室时显示成员，否则显示所有在线用户） -->
-      <div class="chat-users-panel">
+    <!-- 主体区域：侧边栏 + 消息区 横向排列 -->
+    <div v-show="!collapsed" class="chat-body">
+      <!-- 左侧侧边栏：聊天室列表 + 在线用户列表 -->
+      <div class="chat-sidebar" :style="{ width: sidebarWidth + 'px' }">
         <div class="chat-sidebar-header">
-          <span>{{ activeRoomId ? '聊天室成员' : '在线用户' }}</span>
+          <span>聊天室</span>
+          <button class="icon-btn small" @click="$emit('createRoom')" title="创建聊天室">➕</button>
         </div>
-        <div class="chat-client-list">
+        <div class="chat-room-list">
           <div
-            v-for="client in activeRoomId ? roomMembers : clients"
-            :key="client.client_id"
-            class="chat-client-item"
-            :class="{ active: activePrivateId === client.client_id }"
-            @click="$emit('selectPrivate', client.client_id)"
+            v-for="room in rooms"
+            :key="room.room_id"
+            class="chat-room-item"
+            :class="{ active: activeRoomId === room.room_id }"
+            @click="$emit('joinRoom', room.room_id)"
           >
-            <span class="chat-client-name">{{ client.name }}</span>
+            <span class="chat-room-name">{{ room.name }}</span>
+            <div class="chat-room-actions">
+              <span class="chat-room-count">{{ room.member_count }}</span>
+              <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
+              <button class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室">🗑</button>
+            </div>
           </div>
-          <div v-if="(activeRoomId ? roomMembers : clients).length === 0" class="chat-empty">暂无{{ activeRoomId ? '成员' : '在线用户' }}</div>
+          <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
+        </div>
+
+        <!-- 在线用户列表（有活跃聊天室时显示成员，否则显示所有在线用户） -->
+        <div class="chat-users-panel">
+          <div class="chat-sidebar-header">
+            <span>{{ activeRoomId ? '聊天室成员' : '在线用户' }}</span>
+          </div>
+          <div class="chat-client-list">
+            <div
+              v-for="client in activeRoomId ? roomMembers : clients"
+              :key="client.client_id"
+              class="chat-client-item"
+              :class="{ active: activePrivateId === client.client_id }"
+              @click="$emit('selectPrivate', client.client_id)"
+            >
+              <span class="chat-client-name">{{ client.name }}</span>
+            </div>
+            <div v-if="(activeRoomId ? roomMembers : clients).length === 0" class="chat-empty">暂无{{ activeRoomId ? '成员' : '在线用户' }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 侧边栏拖拽调整宽度 -->
+      <div class="chat-sidebar-resize" @mousedown="$emit('startSidebarResize', $event)"></div>
+
+      <!-- 消息区域 -->
+      <div class="chat-main">
+        <div class="chat-messages" ref="messagesRef">
+          <div
+            v-for="(msg, idx) in messages"
+            :key="idx"
+            class="chat-message"
+            :class="{ mine: msg.client_id === myClientId, 'chat-message-new': idx === messages.length - 1 && msg.client_id !== myClientId }"
+          >
+            <span class="chat-message-sender">{{ msg.sender_name }}</span>
+            <div class="chat-message-bubble">
+              <span class="chat-message-content">{{ msg.content }}</span>
+            </div>
+            <span class="chat-message-time">{{ formatTime(msg.timestamp) }}</span>
+          </div>
+          <div v-if="messages.length === 0" class="chat-empty">暂无消息</div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="chat-input-area">
+          <textarea
+            v-model="draftMessage"
+            class="chat-input"
+            placeholder="输入消息... (Enter发送, Shift+Enter换行)"
+            rows="2"
+            @keydown.enter.exact.prevent="sendMessage"
+            @keydown.enter.shift.prevent="insertNewline"
+          ></textarea>
+          <button class="icon-btn" @click="sendMessage" :disabled="!socket" title="发送">➤</button>
         </div>
       </div>
     </div>
-
-    <!-- 消息区域 -->
-    <div v-show="!collapsed" class="chat-main">
-      <div class="chat-messages" ref="messagesRef">
-        <div
-          v-for="(msg, idx) in messages"
-          :key="idx"
-          class="chat-message"
-          :class="{ mine: msg.client_id === myClientId, 'chat-message-new': idx === messages.length - 1 && msg.client_id !== myClientId }"
-        >
-          <span class="chat-message-sender">{{ msg.sender_name }}</span>
-          <div class="chat-message-bubble">
-            <span class="chat-message-content">{{ msg.content }}</span>
-          </div>
-          <span class="chat-message-time">{{ formatTime(msg.timestamp) }}</span>
-        </div>
-        <div v-if="messages.length === 0" class="chat-empty">暂无消息</div>
-      </div>
-
-      <!-- 输入区域 -->
-      <div class="chat-input-area">
-        <textarea
-          v-model="draftMessage"
-          class="chat-input"
-          placeholder="输入消息... (Enter发送, Shift+Enter换行)"
-          rows="2"
-          @keydown.enter.exact.prevent="sendMessage"
-          @keydown.enter.shift.prevent="insertNewline"
-        ></textarea>
-        <button class="icon-btn" @click="sendMessage" :disabled="!socket" title="发送">➤</button>
-      </div>
-    </div>
-
-
 
     <div
       v-for="direction in resizeDirections"
@@ -139,7 +147,8 @@ const props = defineProps({
   resizeDirections: Array,
   unreadCount: Number,
   myName: String,
-  collapsed: Boolean
+  collapsed: Boolean,
+  sidebarWidth: { type: Number, default: 160 },
 })
 
 const emit = defineEmits([
@@ -153,7 +162,10 @@ const emit = defineEmits([
   'selectPrivate',
   'startResize',
   'updateName',
-  'toggleCollapse'
+  'toggleCollapse',
+  'leaveRoom',
+  'deleteRoom',
+  'startSidebarResize',
 ])
 
 const draftMessage = ref('')
@@ -367,6 +379,14 @@ watch(
   flex: 1;
   margin: 0 8px;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-name-confirm {
+  flex-shrink: 0;
+  color: var(--color-accent);
 }
 
 .chat-name-input {
@@ -384,12 +404,32 @@ watch(
   border: 1px solid var(--color-accent);
 }
 
+.chat-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
 .chat-sidebar {
-  width: 160px;
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-sidebar-resize {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.chat-sidebar-resize:hover {
+  background: var(--color-accent);
 }
 
 .chat-users-panel {
@@ -397,6 +437,7 @@ watch(
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   border-top: 1px solid var(--color-border);
 }
 
@@ -413,6 +454,7 @@ watch(
 .chat-room-list,
 .chat-client-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -442,6 +484,23 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-room-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.chat-room-action-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.chat-room-item:hover .chat-room-action-btn,
+.chat-room-item.active .chat-room-action-btn {
+  opacity: 1;
 }
 
 .chat-room-count {
