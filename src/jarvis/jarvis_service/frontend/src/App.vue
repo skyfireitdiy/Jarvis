@@ -6817,7 +6817,7 @@ function handleChatMessage(type, payload) {
           name: payload.name || '未命名聊天室',
           member_count: 1,
         })
-        chatJoinedRooms.value.add(payload.room_id)
+        if (!chatJoinedRooms.value.includes(payload.room_id)) chatJoinedRooms.value = [...chatJoinedRooms.value, payload.room_id]
         showToast('聊天室创建成功', 'success')
       } else {
         showToast(payload?.error || '创建聊天室失败', 'error')
@@ -6826,7 +6826,7 @@ function handleChatMessage(type, payload) {
     case 'chat_join_room_response':
       if (payload?.success) {
         showToast('已加入聊天室', 'success')
-        chatJoinedRooms.value.add(activeChatRoomId.value)
+        if (!chatJoinedRooms.value.includes(activeChatRoomId.value)) chatJoinedRooms.value = [...chatJoinedRooms.value, activeChatRoomId.value]
         // 获取聊天室成员列表
         sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
       } else {
@@ -6862,7 +6862,7 @@ function handleChatMessage(type, payload) {
         // 按房间维度记录未读数
         const roomKey = payload?.room_id || 'general'
         if (activeChatRoomId.value !== roomKey) {
-          chatUnreadMap.value[roomKey] = (chatUnreadMap.value[roomKey] || 0) + 1
+          chatUnreadMap.value = { ...chatUnreadMap.value, [roomKey]: (chatUnreadMap.value[roomKey] || 0) + 1 }
         }
       }
       break
@@ -6889,7 +6889,7 @@ function handleChatMessage(type, payload) {
         // 按私聊维度记录未读数
         const privKey = `private_${payload?.message?.sender_id}`
         if (activePrivateClientId.value !== payload?.message?.sender_id) {
-          chatUnreadMap.value[privKey] = (chatUnreadMap.value[privKey] || 0) + 1
+          chatUnreadMap.value = { ...chatUnreadMap.value, [privKey]: (chatUnreadMap.value[privKey] || 0) + 1 }
         }
       }
       break
@@ -6910,7 +6910,7 @@ function handleChatMessage(type, payload) {
       if (payload?.success) {
         showToast('已退出聊天室', 'success')
         const leftRoomId = payload?.room_id || activeChatRoomId.value
-        chatJoinedRooms.value.delete(leftRoomId)
+        chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== leftRoomId)
         delete chatMessages.value[leftRoomId]
         if (activeChatRoomId.value === leftRoomId) {
           activeChatRoomId.value = ''
@@ -6924,7 +6924,7 @@ function handleChatMessage(type, payload) {
       if (payload?.success) {
         showToast('聊天室已删除', 'success')
         const deletedRoomId = payload?.room_id || activeChatRoomId.value
-        chatJoinedRooms.value.delete(deletedRoomId)
+        chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== deletedRoomId)
         delete chatMessages.value[deletedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== deletedRoomId)
         if (activeChatRoomId.value === deletedRoomId) {
@@ -6938,7 +6938,7 @@ function handleChatMessage(type, payload) {
     case 'chat_room_deleted':
       const removedRoomId = payload?.room_id
       if (removedRoomId) {
-        chatJoinedRooms.value.delete(removedRoomId)
+        chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== removedRoomId)
         delete chatMessages.value[removedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== removedRoomId)
         if (activeChatRoomId.value === removedRoomId) {
@@ -8715,7 +8715,7 @@ const chatUnreadCount = ref(0)
 const chatName = ref('')
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
-const chatJoinedRooms = ref(new Set())
+const chatJoinedRooms = ref([])
 
 function startChatSidebarResize(event) {
   const startX = event.clientX
@@ -9125,9 +9125,9 @@ function joinChatRoom(roomId) {
   // 切换到群聊时清空私聊选中
   activePrivateClientId.value = ''
   // 清除房间未读计数
-  chatUnreadMap.value[roomId] = 0
+  chatUnreadMap.value = { ...chatUnreadMap.value, [roomId]: 0 }
   // 已加入的房间仅切换查看，未加入的才发送join请求
-  if (!chatJoinedRooms.value.has(roomId)) {
+  if (!chatJoinedRooms.value.includes(roomId)) {
     sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
   } else {
     sendChatMessageToServer('chat_get_room_members', { room_id: roomId })
@@ -9197,7 +9197,7 @@ function selectPrivateClient(clientId) {
     chatRoomMembers.value = []
     // 清除私聊未读计数
     const privKey = `private_${clientId}`
-    chatUnreadMap.value[privKey] = 0
+    chatUnreadMap.value = { ...chatUnreadMap.value, [privKey]: 0 }
     // 获取私聊历史
     sendChatMessageToServer('chat_get_private_history', {
       client_id: myClientId.value,
