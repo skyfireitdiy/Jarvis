@@ -1172,6 +1172,20 @@ class WebSocketConnectionManager:
         await websocket.send_json(
             {"type": "chat_create_room_response", "payload": result}
         )
+        # 广播新房间通知给所有其他在线用户
+        if result.get("success"):
+            await self._chat_manager.broadcast_to_all(
+                {
+                    "type": "chat_room_created",
+                    "payload": {
+                        "room_id": result["room_id"],
+                        "name": result["name"],
+                        "member_count": 1,
+                        "created_by": creator_id,
+                    },
+                },
+                exclude_client_id=creator_id,
+            )
 
     async def _handle_chat_join_room(
         self, payload: Dict[str, Any], websocket: WebSocket

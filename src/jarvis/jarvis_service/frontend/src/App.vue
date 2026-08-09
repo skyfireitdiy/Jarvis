@@ -6936,6 +6936,16 @@ function handleChatMessage(type, payload) {
         showToast(payload?.error || '删除聊天室失败', 'error')
       }
       break
+    case 'chat_room_created':
+      // 其他用户创建的新房间通知
+      if (payload?.room_id) {
+        chatRooms.value = [...chatRooms.value, {
+          room_id: payload.room_id,
+          name: payload.name || '未命名聊天室',
+          member_count: payload.member_count || 1,
+        }]
+      }
+      break
     case 'chat_room_deleted':
       const removedRoomId = payload?.room_id
       if (removedRoomId) {
