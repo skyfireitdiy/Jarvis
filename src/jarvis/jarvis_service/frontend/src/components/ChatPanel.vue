@@ -63,14 +63,33 @@
           <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
         </div>
 
-        <!-- 在线用户列表（有活跃聊天室时显示成员，否则显示所有在线用户） -->
-        <div class="chat-users-panel">
+        <!-- 聊天室成员（仅加入房间时显示） -->
+        <div v-if="activeRoomId && roomMembers.length > 0" class="chat-members-panel">
           <div class="chat-sidebar-header">
-            <span>{{ activeRoomId ? '聊天室成员' : '在线用户' }}</span>
+            <span>聊天室成员</span>
           </div>
           <div class="chat-client-list">
             <div
-              v-for="client in activeRoomId ? roomMembers : clients"
+              v-for="member in roomMembers"
+              :key="member.client_id"
+              class="chat-client-item"
+              :class="{ active: activePrivateId === member.client_id }"
+              @click="$emit('selectPrivate', member.client_id)"
+            >
+              <span class="chat-client-name">{{ member.name }}</span>
+              <span v-if="unreadMap['private_' + member.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + member.client_id] }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 在线用户列表（始终显示） -->
+        <div class="chat-users-panel">
+          <div class="chat-sidebar-header">
+            <span>在线用户</span>
+          </div>
+          <div class="chat-client-list">
+            <div
+              v-for="client in clients"
               :key="client.client_id"
               class="chat-client-item"
               :class="{ active: activePrivateId === client.client_id }"
@@ -79,7 +98,7 @@
               <span class="chat-client-name">{{ client.name }}</span>
               <span v-if="unreadMap['private_' + client.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + client.client_id] }}</span>
             </div>
-            <div v-if="(activeRoomId ? roomMembers : clients).length === 0" class="chat-empty">暂无{{ activeRoomId ? '成员' : '在线用户' }}</div>
+            <div v-if="clients.length === 0" class="chat-empty">暂无在线用户</div>
           </div>
         </div>
       </div>

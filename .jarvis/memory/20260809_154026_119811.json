@@ -1,0 +1,8 @@
+{
+  "id": "20260809_154026_119811",
+  "type": "project_long_term",
+  "tags": ["chat", "interaction-fix", "private-message-storage", "unread-fix"],
+  "content": "聊天室交互修复（第二轮）：\n1. ChatPanel侧边栏改为三段式：聊天室列表 + 聊天室成员(仅activeRoomId时显示) + 在线用户(始终显示)，解决在线用户消失问题\n2. selectPrivateClient移除chatRoomMembers.value=[]，解决点击用户后成员列表变空\n3. 修复privKey变量名冲突：chat_private_message case中privKey重复声明导致运行时错误，改为privMsgKey和privUnreadKey\n4. 私聊消息存储改为按发送者分开：chatMessages['private'] → chatMessages['private_'+senderId]，解决私聊消息混合问题\n5. 群聊未读计数修复：私聊模式下收到群聊消息也应累加未读（条件加|| activePrivateClientId.value）\n6. 未读清零改为删除key而非设0：const { [key]: _, ...rest } = chatUnreadMap.value\n7. messages prop改为按私聊对象读取：chatMessages['private_'+activePrivateClientId]\n\n修改文件：App.vue, ChatPanel.vue",
+  "created_at": "2026-08-09T15:40:26.119862",
+  "updated_at": "2026-08-09T15:40:26.119867"
+}
