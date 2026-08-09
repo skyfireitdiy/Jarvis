@@ -11,15 +11,7 @@
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
-      <div class="chat-name-edit">
-        <input
-          v-model="myName"
-          class="chat-name-input"
-          placeholder="输入昵称..."
-          @keyup.enter="saveName"
-        />
-        <button class="icon-btn small chat-name-confirm" @click="saveName" title="确认昵称">✓</button>
-      </div>
+      <span class="chat-username">{{ myName }}</span>
       <div class="chat-panel-actions">
         <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
@@ -172,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -206,7 +198,6 @@ const emit = defineEmits([
   'sendMessage',
   'selectPrivate',
   'startResize',
-  'updateName',
   'toggleCollapse',
   'leaveRoom',
   'deleteRoom',
@@ -218,25 +209,10 @@ const draftMessage = ref('')
 const messagesRef = ref(null)
 const chatInputRef = ref(null)
 const createRoomInputRef = ref(null)
-const myName = ref(props.myName || '')
+const myName = computed(() => props.myName || '')
 const sidebarCollapsed = ref(false)
 const creatingRoom = ref(false)
 const newRoomName = ref('')
-
-// 同步父组件传入的myName变化
-watch(() => props.myName, (val) => {
-  if (val !== undefined && val !== myName.value) {
-    myName.value = val
-  }
-})
-
-// 保存自定义名字
-function saveName() {
-  const name = myName.value.trim()
-  if (name) {
-    emit('updateName', name)
-  }
-}
 
 function sendMessage() {
   if (!draftMessage.value.trim()) return
@@ -311,14 +287,6 @@ function formatTime(timestamp) {
   const DD = String(date.getDate()).padStart(2, '0')
   return `${MM}-${DD} ${hh}:${mm}`
 }
-
-// 监听外部名字变化
-watch(
-  () => props.myName,
-  (val) => {
-    if (val) myName.value = val
-  }
-)
 
 // 自动滚动到底部
 watch(
@@ -473,33 +441,14 @@ watch(
   gap: 4px;
 }
 
-.chat-name-edit {
+.chat-username {
   flex: 1;
   margin: 0 8px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.chat-name-confirm {
-  flex-shrink: 0;
-  color: var(--color-accent);
-}
-
-.chat-name-input {
-  width: 100%;
-  background: var(--color-bg-tertiary);
-  border: none;
-  border-radius: var(--tile-radius);
-  padding: 3px 8px;
   font-size: 12px;
-  color: var(--color-text-primary);
-  outline: none;
-}
-
-.chat-name-input:focus {
-  border: 1px solid var(--color-accent);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-body {

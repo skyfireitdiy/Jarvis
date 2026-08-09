@@ -1,0 +1,8 @@
+{
+  "id": "20260809_233926_874394",
+  "type": "project_long_term",
+  "tags": ["chat", "username", "stage8-complete"],
+  "content": "阶段8完成：登录加username+Agent名前缀+聊天室统一username+去掉改名\n- App.vue行6810 chatName.value=payload.name已删除（computed不可赋值）\n- chatName改为computed(()=>username.value)，删updateChatName，改watch(username)同步注册\n- username存localStorage(jarvis_username)，首次随机User-XXXXXX\n- ConnectModal.vue加username输入框\n- generateAgentName改为${username}-${typeName}-${date}-${time}\n- ChatPanel.vue删昵称编辑区，myName改computed\n- vite build通过\n- commit: 4f885e9",
+  "created_at": "2026-08-09T23:39:26.874431",
+  "updated_at": "2026-08-09T23:39:26.874438"
+}
