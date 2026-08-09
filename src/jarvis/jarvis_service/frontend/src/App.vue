@@ -188,7 +188,7 @@
       :myName="chatName"
       :collapsed="chatPanelCollapsed"
       :sidebarWidth="chatSidebarWidth"
-      :messages="activePrivateClientId ? (chatMessages['private'] || []) : (chatMessages[activeChatRoomId] || [])"
+      :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -6861,7 +6861,7 @@ function handleChatMessage(type, payload) {
         }
         // 按房间维度记录未读数
         const roomKey = payload?.room_id || 'general'
-        if (activeChatRoomId.value !== roomKey) {
+        if (activeChatRoomId.value !== roomKey || activePrivateClientId.value) {
           chatUnreadMap.value = { ...chatUnreadMap.value, [roomKey]: (chatUnreadMap.value[roomKey] || 0) + 1 }
         }
       }
@@ -6869,9 +6869,9 @@ function handleChatMessage(type, payload) {
     case 'chat_private_message':
       // 私聊消息（过滤自己发送的，本地已追加）
       if (payload?.message?.sender_id === myClientId.value) break
-      const privKey = 'private'
-      if (!chatMessages.value[privKey]) chatMessages.value[privKey] = []
-      chatMessages.value[privKey].push({
+      const privMsgKey = `private_${payload?.message?.sender_id}`
+      if (!chatMessages.value[privMsgKey]) chatMessages.value[privMsgKey] = []
+      chatMessages.value[privMsgKey].push({
         client_id: payload?.message?.sender_id,
         client_name: payload?.message?.sender_name || payload?.message?.sender_id,
         sender_name: payload?.message?.sender_name || payload?.message?.sender_id,
@@ -6887,15 +6887,16 @@ function handleChatMessage(type, payload) {
           chatUnreadCount.value++
         }
         // 按私聊维度记录未读数
-        const privKey = `private_${payload?.message?.sender_id}`
+        const privUnreadKey = `private_${payload?.message?.sender_id}`
         if (activePrivateClientId.value !== payload?.message?.sender_id) {
-          chatUnreadMap.value = { ...chatUnreadMap.value, [privKey]: (chatUnreadMap.value[privKey] || 0) + 1 }
+          chatUnreadMap.value = { ...chatUnreadMap.value, [privUnreadKey]: (chatUnreadMap.value[privUnreadKey] || 0) + 1 }
         }
       }
       break
     case 'chat_get_private_history_response':
       if (payload?.messages) {
-        chatMessages.value['private'] = payload.messages.map(msg => ({
+        const histKey = `private_${payload?.other_id || activePrivateClientId.value}`
+        chatMessages.value[histKey] = payload.messages.map(msg => ({
           client_id: msg.sender_id,
           client_name: msg.sender_name || msg.sender_id,
           sender_name: msg.sender_name || msg.sender_id,
@@ -9125,7 +9126,8 @@ function joinChatRoom(roomId) {
   // 切换到群聊时清空私聊选中
   activePrivateClientId.value = ''
   // 清除房间未读计数
-  chatUnreadMap.value = { ...chatUnreadMap.value, [roomId]: 0 }
+  const { [roomId]: _, ...rest } = chatUnreadMap.value
+  chatUnreadMap.value = rest
   // 已加入的房间仅切换查看，未加入的才发送join请求
   if (!chatJoinedRooms.value.includes(roomId)) {
     sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
@@ -9155,8 +9157,9 @@ function sendChatMessage(content) {
       content: trimmed,
     })
     // 本地追加自己的消息
-    if (!chatMessages.value['private']) chatMessages.value['private'] = []
-    chatMessages.value['private'].push({
+    const selfMsgKey = `private_${activePrivateClientId.value}`
+    if (!chatMessages.value[selfMsgKey]) chatMessages.value[selfMsgKey] = []
+    chatMessages.value[selfMsgKey].push({
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
       sender_name: chatName.value || myClientId.value,
@@ -9194,10 +9197,10 @@ function selectPrivateClient(clientId) {
   } else {
     activePrivateClientId.value = clientId
     // 不清空activeChatRoomId，保持群聊加入状态
-    chatRoomMembers.value = []
     // 清除私聊未读计数
     const privKey = `private_${clientId}`
-    chatUnreadMap.value = { ...chatUnreadMap.value, [privKey]: 0 }
+    const { [privKey]: _, ...rest } = chatUnreadMap.value
+    chatUnreadMap.value = rest
     // 获取私聊历史
     sendChatMessageToServer('chat_get_private_history', {
       client_id: myClientId.value,
