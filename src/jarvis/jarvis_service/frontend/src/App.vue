@@ -182,6 +182,7 @@
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
       :unreadCount="chatUnreadCount"
+      :myName="chatName"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -191,6 +192,7 @@
       @sendMessage="sendChatMessage"
       @selectPrivate="selectPrivateClient"
       @startResize="startChatPanelResize"
+      @updateName="updateChatName"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -6797,14 +6799,21 @@ function handleChatMessage(type, payload) {
     case 'chat_register_response':
       if (payload?.success) {
         myClientId.value = payload.client_id || myClientId.value
+        if (payload.name) {
+          chatName.value = payload.name
+        }
       }
       break
     case 'chat_get_rooms_response':
       chatRooms.value = payload?.rooms || []
       break
     case 'chat_create_room_response':
-      if (payload?.success && payload.room) {
-        chatRooms.value.push(payload.room)
+      if (payload?.success && payload.room_id) {
+        chatRooms.value.push({
+          room_id: payload.room_id,
+          name: payload.name || '未命名聊天室',
+          member_count: 1,
+        })
         showToast('聊天室创建成功', 'success')
       } else {
         showToast(payload?.error || '创建聊天室失败', 'error')
@@ -6841,14 +6850,15 @@ function handleChatMessage(type, payload) {
     case 'chat_private_message':
       // 私聊消息
       chatMessages.value.push({
-        client_id: payload?.from_client_id,
-        client_name: payload?.from_client_name || payload?.from_client_id,
-        content: payload?.content,
+        client_id: payload?.message?.sender_id,
+        client_name: payload?.message?.sender_name || payload?.message?.sender_id,
+        sender_name: payload?.message?.sender_name || payload?.message?.sender_id,
+        content: payload?.message?.content,
         private: true,
-        timestamp: payload?.timestamp || Date.now(),
+        timestamp: payload?.message?.timestamp || Date.now(),
       })
       // 新消息提醒：非自己发送的消息触发提醒
-      if (payload?.from_client_id !== myClientId.value) {
+      if (payload?.message?.sender_id !== myClientId.value) {
         playChatNotificationSound()
         if (!showChatPanel.value || activeWindow.value !== 'chat') {
           chatUnreadCount.value++
@@ -6858,8 +6868,9 @@ function handleChatMessage(type, payload) {
     case 'chat_get_private_history_response':
       if (payload?.messages) {
         chatMessages.value = payload.messages.map(msg => ({
-          client_id: msg.from_client_id,
-          client_name: msg.from_client_name || msg.from_client_id,
+          client_id: msg.sender_id,
+          client_name: msg.sender_name || msg.sender_id,
+          sender_name: msg.sender_name || msg.sender_id,
           content: msg.content,
           private: true,
           timestamp: msg.timestamp || Date.now(),
@@ -8563,6 +8574,7 @@ const myClientId = ref('')
 const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
+const chatName = ref('')
 
 function getOrCreateClientId() {
   let clientId = localStorage.getItem('jarvis_chat_client_id')
@@ -8914,10 +8926,20 @@ function toggleChatPanel() {
     // 首次打开时注册客户端并获取聊天室列表
     if (!myClientId.value) {
       myClientId.value = getOrCreateClientId()
-      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: '用户' + myClientId.value.slice(-6) })
+      chatName.value = localStorage.getItem('jarvis_chat_name') || '用户' + myClientId.value.slice(-6)
+      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: chatName.value })
     }
     sendChatMessageToServer('chat_get_rooms', {})
     sendChatMessageToServer('chat_get_clients', {})
+  }
+}
+
+// 更新自定义名字
+function updateChatName(name) {
+  chatName.value = name
+  localStorage.setItem('jarvis_chat_name', name)
+  if (myClientId.value) {
+    sendChatMessageToServer('chat_register', { client_id: myClientId.value, name })
   }
 }
 
