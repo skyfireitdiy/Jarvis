@@ -172,6 +172,13 @@ const draftMessage = ref('')
 const messagesRef = ref(null)
 const myName = ref(props.myName || '')
 
+// 同步父组件传入的myName变化
+watch(() => props.myName, (val) => {
+  if (val !== undefined && val !== myName.value) {
+    myName.value = val
+  }
+})
+
 // 保存自定义名字
 function saveName() {
   const name = myName.value.trim()
