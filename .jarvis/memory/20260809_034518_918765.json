@@ -1,0 +1,8 @@
+{
+  "id": "20260809_034518_918765",
+  "type": "project_long_term",
+  "tags": ["Code Agent", "auto_complete", "commit", "流程修改"],
+  "content": "Code Agent auto_complete流程修改：在run_loop.py:_execute_auto_complete中，REVIEW无误后自动执行commit流程。参考builtin_input_handler.py中commit命令实现，调用ag.git_manager.handle_commit_confirmation(skip_confirm=True)。仅当agent有git_manager和start_commit属性时执行。commit失败不影响后续_complete_task流程。",
+  "created_at": "2026-08-09T03:45:18.918804",
+  "updated_at": "2026-08-09T03:45:18.918811"
+}

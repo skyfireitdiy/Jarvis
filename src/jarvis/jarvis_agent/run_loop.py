@@ -632,6 +632,39 @@ class AgentRunLoop:
                 )
                 pass
 
+        # 自动完成时，执行commit流程（参考builtin_input_handler中commit命令实现）
+        if (
+            hasattr(ag, "git_manager")
+            and hasattr(ag, "start_commit")
+            and ag.start_commit
+        ):
+            try:
+                from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+                PrettyOutput.auto_print("📝 AutoComplete: 正在提交代码...")
+                end_commit = get_latest_commit_hash()
+                commits = ag.git_manager.show_commit_between(
+                    ag.start_commit, end_commit
+                )
+                ag.git_manager.handle_commit_confirmation(
+                    commits,
+                    ag.start_commit,
+                    prefix=getattr(ag, "prefix", ""),
+                    suffix=getattr(ag, "suffix", ""),
+                    agent=ag,
+                    post_process_func=getattr(
+                        getattr(ag, "post_process_manager", None),
+                        "post_process_modified_files",
+                        None,
+                    ),
+                    skip_confirm=True,
+                )
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.run_loop", function="_execute_auto_complete"
+                )
+                PrettyOutput.auto_print(f"⚠ AutoComplete: 提交代码失败: {str(e)}")
+
         if ag.return_control_on_auto_complete:
             ag.return_control_on_auto_complete = False
             if ag.non_interactive:
