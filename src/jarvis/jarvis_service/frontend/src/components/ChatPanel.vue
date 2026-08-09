@@ -49,7 +49,7 @@
             v-for="room in rooms"
             :key="room.room_id"
             class="chat-room-item"
-            :class="{ active: activeRoomId === room.room_id, joined: joinedRooms?.has?.(room.room_id) }"
+            :class="{ active: activeRoomId === room.room_id, joined: joinedRooms?.includes?.(room.room_id) }"
             @click="$emit('joinRoom', room.room_id)"
           >
             <span class="chat-room-name">{{ room.name }}</span>

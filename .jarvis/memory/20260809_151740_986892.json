@@ -1,0 +1,8 @@
+{
+  "id": "20260809_151740_986892",
+  "type": "project_long_term",
+  "tags": ["chat", "reactive-fix", "completed"],
+  "content": "Vue3响应式修复完成：\n1. chatUnreadMap: ref({})属性赋值改为整体替换 `{ ...chatUnreadMap.value, [key]: value }` (4处)\n2. chatJoinedRooms: ref(new Set())改为ref([])，add/delete/has改为push+filter+includes (6处)\n3. ChatPanel.vue: joinedRooms?.has?.()改为joinedRooms?.includes?.()\n\n关键：Vue3的ref包裹对象/数组时，直接修改内部属性/调用Set方法不触发响应式，必须整体替换引用。",
+  "created_at": "2026-08-09T15:17:40.986941",
+  "updated_at": "2026-08-09T15:17:40.986948"
+}
