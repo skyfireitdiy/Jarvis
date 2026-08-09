@@ -11,6 +11,15 @@
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
+      <div class="chat-name-edit">
+        <input
+          v-model="myName"
+          class="chat-name-input"
+          placeholder="输入昵称..."
+          @keyup.enter="saveName"
+          @blur="saveName"
+        />
+      </div>
       <div class="chat-panel-actions">
         <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
@@ -57,12 +66,14 @@
 
       <!-- 输入区域 -->
       <div class="chat-input-area">
-        <input
+        <textarea
           v-model="draftMessage"
           class="chat-input"
-          placeholder="输入消息..."
-          @keyup.enter="sendMessage"
-        />
+          placeholder="输入消息... (Enter发送, Shift+Enter换行)"
+          rows="2"
+          @keydown.enter.exact.prevent="sendMessage"
+          @keydown.enter.shift.prevent="insertNewline"
+        ></textarea>
         <button class="icon-btn" @click="sendMessage" :disabled="!socket" title="发送">➤</button>
       </div>
     </div>
@@ -111,7 +122,8 @@ const props = defineProps({
   activeRoomId: String,
   activePrivateId: String,
   resizeDirections: Array,
-  unreadCount: Number
+  unreadCount: Number,
+  myName: String
 })
 
 const emit = defineEmits([
@@ -123,17 +135,40 @@ const emit = defineEmits([
   'joinRoom',
   'sendMessage',
   'selectPrivate',
-  'startResize'
+  'startResize',
+  'updateName'
 ])
 
 const draftMessage = ref('')
 const messagesRef = ref(null)
+const myName = ref(props.myName || '')
+
+// 保存自定义名字
+function saveName() {
+  const name = myName.value.trim()
+  if (name) {
+    emit('updateName', name)
+  }
+}
 
 function sendMessage() {
   if (!draftMessage.value.trim()) return
   emit('sendMessage', draftMessage.value)
   draftMessage.value = ''
 }
+
+// Shift+Enter 插入换行
+function insertNewline() {
+  draftMessage.value += '\n'
+}
+
+// 监听外部名字变化
+watch(
+  () => props.myName,
+  (val) => {
+    if (val) myName.value = val
+  }
+)
 
 // 自动滚动到底部
 watch(
@@ -267,6 +302,27 @@ watch(
   gap: 4px;
 }
 
+.chat-name-edit {
+  flex: 1;
+  margin: 0 8px;
+  min-width: 0;
+}
+
+.chat-name-input {
+  width: 100%;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: var(--tile-radius);
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.chat-name-input:focus {
+  border: 1px solid var(--color-accent);
+}
+
 .chat-sidebar {
   width: 160px;
   border-right: 1px solid var(--color-border);
@@ -383,6 +439,11 @@ watch(
   font-size: 13px;
   color: var(--color-text-primary);
   outline: none;
+  resize: none;
+  min-height: 32px;
+  max-height: 80px;
+  line-height: 1.4;
+  font-family: inherit;
 }
 
 .chat-input:focus {

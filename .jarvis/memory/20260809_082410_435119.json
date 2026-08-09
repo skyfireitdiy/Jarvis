@@ -1,0 +1,8 @@
+{
+  "id": "20260809_082410_435119",
+  "type": "project_long_term",
+  "tags": ["聊天室", "阶段4", "多行输入", "字段名修复", "自定义名字"],
+  "content": "聊天室阶段4完成（2026-08-09）：1) ChatPanel.vue 输入框改为 textarea，Enter发送、Shift+Enter换行（insertNewline函数）；2) 修复 chat_private_message 分支字段名（payload.message.sender_id/sender_name）和 chat_get_private_history_response 分支（msg.sender_id/sender_name）；3) 修复 chat_create_room_response 分支（payload.room_id/name，无room字段）；4) 自定义名字：ChatPanel.vue 标题栏添加昵称输入框（myName prop + updateName emit），App.vue 添加 chatName 状态和 updateChatName 函数，名字存 localStorage('jarvis_chat_name')，通过 chat_register 重新注册。vite build 通过（32.73s）。",
+  "created_at": "2026-08-09T08:24:10.435177",
+  "updated_at": "2026-08-09T08:24:10.435184"
+}
