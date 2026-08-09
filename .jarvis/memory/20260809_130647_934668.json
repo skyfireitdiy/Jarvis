@@ -1,0 +1,8 @@
+{
+  "id": "20260809_130647_934668",
+  "type": "project_long_term",
+  "tags": ["chat", "7-fixes", "completed", "code-review"],
+  "content": "聊天室7个严重问题修复已完成（代码层面）：\n1. 侧边栏布局：ChatPanel从column改为header+body(row: sidebar+main)，sidebar高度100%\n2. 退出机制：ChatPanel emit leaveRoom → App.vue leaveChatRoom → 后端chat_leave_room\n3. 切换房间历史：chatMessages从ref([])改为ref({})按room_id分组，兼容旧数组格式自动转换\n4. 昵称确认按钮：ChatPanel input旁加✓按钮\n5. 侧边栏高度：CSS height:100% + overflow:hidden\n6. 侧边栏拖拽：ChatPanel emit startSidebarResize → App.vue startChatSidebarResize处理mousemove/mouseup，宽度120-400px\n7. 删除聊天室：后端delete_room(仅创建者可删) + 前端deleteChatRoom + chat_room_deleted广播通知\n\n修改文件：\n- chat_manager.py: 新增delete_room方法(行122-132)\n- app.py: 新增_handle_chat_delete_room(行1198-1225) + chat_delete_room路由(行1099)\n- ChatPanel.vue: 布局重构+新增emit(leaveRoom/deleteRoom/startSidebarResize)+prop(sidebarWidth)\n- App.vue: chatMessages分组+3个新case+leaveChatRoom/deleteChatRoom+chatSidebarWidth+resize逻辑\n\n初始commit: f12deb0993c1cd7261b2a7ede59c709f66dc2116\n变更统计: 6 files, +293 -76",
+  "created_at": "2026-08-09T13:06:47.934709",
+  "updated_at": "2026-08-09T13:06:47.934715"
+}

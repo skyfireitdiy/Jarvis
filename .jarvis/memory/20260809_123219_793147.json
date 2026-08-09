@@ -1,0 +1,8 @@
+{
+  "id": "20260809_123219_793147",
+  "type": "project_long_term",
+  "tags": ["chat", "architecture", "frontend", "vue"],
+  "content": "Jarvis聊天室前端架构决策：1)消息分组方案：chatMessages从单一数组改为Map<roomId, messages[]>，切换房间显示对应消息，避免丢失历史 2)事件通信：ChatPanel.vue emit事件由App.vue统一处理，包括leaveRoom/deleteRoom/startSidebarResize 3)sidebar resize模式：ChatPanel emit startSidebarResize事件，App.vue处理resize逻辑（与现有面板resize模式一致）4)删除权限：后端校验created_by，前端不判断权限 5)ChatPanel.vue关键props: sidebarWidth(Number,默认160), myClientId 6)关键emits: leaveRoom, deleteRoom, startSidebarResize",
+  "created_at": "2026-08-09T12:32:19.793194",
+  "updated_at": "2026-08-09T12:32:19.793205"
+}

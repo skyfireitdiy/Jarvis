@@ -1,0 +1,8 @@
+{
+  "id": "20260809_125632_898986",
+  "type": "project_long_term",
+  "tags": ["chat", "feature-complete", "7-fixes", "code-review"],
+  "content": "聊天室7个严重问题修复已全部完成代码变更，待集成验证：\n1. 侧边栏布局错误 → ChatPanel.vue横向flex布局(chat-body)\n2. 无退出机制 → 退出🚪按钮 + leaveChatRoom函数 + chat_leave_room后端路由\n3. 切换房间无历史 → chatMessages从ref([])改为ref({})按room_id分组，兼容旧数组格式自动转换\n4. 昵称无确认按钮 → ✓按钮 + saveName函数\n5. 侧边栏高度不全 → sidebar样式修复\n6. 侧边栏不可拖拽调宽 → chat-sidebar-resize拖拽 + startChatSidebarResize + localStorage持久化\n7. 无法删除聊天室 → 删除🗑按钮 + deleteChatRoom函数 + chat_delete_room后端路由(仅创建者可删除) + chat_room_deleted广播通知\n\n关键文件：\n- chat_manager.py: delete_room方法(行122-132)\n- app.py: _handle_chat_delete_room(行1198-1225), _handle_chat_leave_room(行1187-1196)\n- ChatPanel.vue: 678行，props含sidebarWidth/messages，emits含leaveRoom/deleteRoom/startSidebarResize\n- App.vue: chatMessages分组(行8652-8685), 3个新case(行6895-6930), leaveChatRoom(行9100-9102), deleteChatRoom(行9104-9108), chatSidebarWidth(行8696), startChatSidebarResize(行8698-8712)\n\nmessages传递: :messages=\"chatMessages[activeChatRoomId] || chatMessages['private'] || []\"",
+  "created_at": "2026-08-09T12:56:32.899036",
+  "updated_at": "2026-08-09T12:56:32.899044"
+}

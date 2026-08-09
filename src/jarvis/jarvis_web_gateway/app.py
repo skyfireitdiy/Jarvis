@@ -1096,6 +1096,8 @@ class WebSocketConnectionManager:
                 await self._handle_chat_join_room(payload, websocket)
             elif message_type == "chat_leave_room":
                 await self._handle_chat_leave_room(payload, websocket)
+            elif message_type == "chat_delete_room":
+                await self._handle_chat_delete_room(payload, websocket)
             elif message_type == "chat_send_message":
                 await self._handle_chat_send_message(payload, websocket)
             elif message_type == "chat_get_clients":
@@ -1191,6 +1193,35 @@ class WebSocketConnectionManager:
         result = await self._chat_manager.leave_room(room_id, client_id)
         await websocket.send_json(
             {"type": "chat_leave_room_response", "payload": result}
+        )
+
+    async def _handle_chat_delete_room(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """删除聊天室（仅创建者可删除）。"""
+        room_id = payload.get("room_id", "")
+        client_id = payload.get("client_id", "")
+        result = await self._chat_manager.delete_room(room_id, client_id)
+        if result.get("success"):
+            # 通知被删除房间的所有成员
+            room_name = result.get("name", "")
+            members = result.get("members", [])
+            for mid in members:
+                if mid == client_id:
+                    continue
+                client = self._chat_manager.get_client(mid)
+                if client and client.get("websocket"):
+                    try:
+                        await client["websocket"].send_json(
+                            {
+                                "type": "chat_room_deleted",
+                                "payload": {"room_id": room_id, "name": room_name},
+                            }
+                        )
+                    except Exception:
+                        pass
+        await websocket.send_json(
+            {"type": "chat_delete_room_response", "payload": result}
         )
 
     async def _handle_chat_send_message(
