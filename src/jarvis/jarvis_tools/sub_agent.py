@@ -113,6 +113,31 @@ class SubAgentTool:
                     pass
             # 使用当前模型组（不再从 parent_agent 继承）
             get_llm_group()
+
+            # 从父Agent获取工具列表（用于继承）
+            use_tools: list = []
+            try:
+                if parent_agent is not None:
+                    parent_registry = parent_agent.get_tool_registry()
+                    if parent_registry:
+                        for t in parent_registry.get_all_tools():
+                            if isinstance(t, dict) and t.get("name"):
+                                use_tools.append(str(t["name"]))
+            except Exception:
+                pass
+
+            # 获取父代理的规则名称列表用于继承
+            rule_names = None
+            try:
+                if parent_agent is not None and hasattr(
+                    parent_agent, "loaded_rule_names"
+                ):
+                    parent_rules = getattr(parent_agent, "loaded_rule_names", [])
+                    if parent_rules:
+                        rule_names = ",".join(parent_rules)
+            except Exception:
+                rule_names = None
+
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
             parent_use_methodology = None
@@ -144,11 +169,21 @@ class SubAgentTool:
                 parent_non_interactive is True or parent_auto_complete is True
             )
 
+            # 过滤掉禁止的工具，避免无限递归
+            forbidden_tools = {"sub_agent", "sub_code_agent"}
+            filtered_use_tools = (
+                [t for t in use_tools if t not in forbidden_tools]
+                if use_tools
+                else None
+            )
+
             agent = Agent(
                 name=agent_name,
                 description="Temporary sub agent for executing a subtask",
-                auto_complete=True,
-                use_tools=None,
+                auto_complete=parent_auto_complete
+                if parent_auto_complete is not None
+                else True,
+                use_tools=filtered_use_tools,
                 execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,
                 multiline_inputer=parent_multiline_inputer,
@@ -159,6 +194,7 @@ class SubAgentTool:
                 non_interactive=force_non_interactive
                 if force_non_interactive
                 else True,
+                rule_names=rule_names,
             )
 
             # 设置继承的对话历史到子 Agent（在 Agent 创建后）
