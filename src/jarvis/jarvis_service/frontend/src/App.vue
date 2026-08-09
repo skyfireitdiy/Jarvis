@@ -180,12 +180,14 @@
       :rooms="chatRooms"
       :messages="chatMessages"
       :clients="chatClients"
+      :roomMembers="chatRoomMembers"
       :myClientId="myClientId"
       :activeRoomId="activeChatRoomId"
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
       :unreadCount="chatUnreadCount"
       :myName="chatName"
+      :collapsed="chatPanelCollapsed"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -196,6 +198,7 @@
       @selectPrivate="selectPrivateClient"
       @startResize="startChatPanelResize"
       @updateName="updateChatName"
+      @toggleCollapse="toggleChatPanelCollapse"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -1819,6 +1822,10 @@ function toggleChatMaximize() {
     }
     isChatMaximized.value = true
   }
+}
+
+function toggleChatPanelCollapse() {
+  chatPanelCollapsed.value = !chatPanelCollapsed.value
 }
 
 function getEditorPanelBounds() {
@@ -6825,12 +6832,17 @@ function handleChatMessage(type, payload) {
     case 'chat_join_room_response':
       if (payload?.success) {
         showToast('已加入聊天室', 'success')
+        // 获取聊天室成员列表
+        sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
       } else {
         showToast(payload?.error || '加入聊天室失败', 'error')
       }
       break
     case 'chat_get_clients_response':
       chatClients.value = payload?.clients || []
+      break
+    case 'chat_get_room_members_response':
+      chatRoomMembers.value = payload?.members || []
       break
     case 'chat_message':
       // 聊天室广播消息
@@ -6842,6 +6854,7 @@ function handleChatMessage(type, payload) {
         room_id: payload?.room_id,
         timestamp: payload?.timestamp || Date.now(),
       })
+      saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
       if (payload?.client_id !== myClientId.value) {
         playChatNotificationSound()
@@ -6860,6 +6873,7 @@ function handleChatMessage(type, payload) {
         private: true,
         timestamp: payload?.message?.timestamp || Date.now(),
       })
+      saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
       if (payload?.message?.sender_id !== myClientId.value) {
         playChatNotificationSound()
@@ -6878,6 +6892,7 @@ function handleChatMessage(type, payload) {
           private: true,
           timestamp: msg.timestamp || Date.now(),
         }))
+        saveChatMessages()
       }
       break
     case 'chat_error':
@@ -8549,6 +8564,7 @@ function saveChatPanelRect() {
 }
 
 const chatPanelRect = ref(loadChatPanelRect())
+const chatPanelCollapsed = ref(false)
 const chatPanelInteraction = ref({
   active: false,
   mode: null,
@@ -8572,6 +8588,16 @@ const chatPanelStyle = computed(() => {
       zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
     }
   }
+  // 折叠状态：只显示窄条
+  if (chatPanelCollapsed.value) {
+    return {
+      top: `${chatPanelRect.value.top}px`,
+      left: `${chatPanelRect.value.left}px`,
+      width: '40px',
+      height: `${chatPanelRect.value.height}px`,
+      zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+    }
+  }
   return {
     top: `${chatPanelRect.value.top}px`,
     left: `${chatPanelRect.value.left}px`,
@@ -8582,9 +8608,31 @@ const chatPanelStyle = computed(() => {
 })
 
 // 聊天室数据状态
+const CHAT_MESSAGES_STORAGE_KEY = 'jarvis_chat_messages'
+
+function loadChatMessages() {
+  try {
+    const saved = localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY)
+    return saved ? JSON.parse(saved) : []
+  } catch {
+    return []
+  }
+}
+
+function saveChatMessages() {
+  try {
+    // 只保留最近 500 条消息
+    const messages = chatMessages.value.slice(-500)
+    localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(messages))
+  } catch (e) {
+    console.warn('[CHAT] Failed to save messages:', e)
+  }
+}
+
 const chatRooms = ref([])
-const chatMessages = ref([])
+const chatMessages = ref(loadChatMessages())
 const chatClients = ref([])
+const chatRoomMembers = ref([])
 const myClientId = ref('')
 const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
@@ -8979,20 +9027,41 @@ function joinChatRoom(roomId) {
 
 function sendChatMessage(content) {
   if (!content || !content.trim()) return
+  const trimmed = content.trim()
   if (activePrivateClientId.value) {
     // 私聊模式
     sendChatMessageToServer('chat_send_private', {
       sender_id: myClientId.value,
       receiver_id: activePrivateClientId.value,
-      content: content.trim(),
+      content: trimmed,
     })
+    // 本地追加自己的消息
+    chatMessages.value.push({
+      client_id: myClientId.value,
+      client_name: chatName.value || myClientId.value,
+      sender_name: chatName.value || myClientId.value,
+      content: trimmed,
+      private: true,
+      timestamp: Date.now(),
+    })
+    saveChatMessages()
   } else if (activeChatRoomId.value) {
     // 聊天室模式
     sendChatMessageToServer('chat_send_message', {
       room_id: activeChatRoomId.value,
       client_id: myClientId.value,
-      content: content.trim(),
+      content: trimmed,
     })
+    // 本地追加自己的消息
+    chatMessages.value.push({
+      client_id: myClientId.value,
+      client_name: chatName.value || myClientId.value,
+      sender_name: chatName.value || myClientId.value,
+      content: trimmed,
+      room_id: activeChatRoomId.value,
+      timestamp: Date.now(),
+    })
+    saveChatMessages()
   } else {
     showToast('请先加入聊天室或选择私聊对象', 'warning')
   }
@@ -9004,6 +9073,7 @@ function selectPrivateClient(clientId) {
   } else {
     activePrivateClientId.value = clientId
     activeChatRoomId.value = ''
+    chatRoomMembers.value = []
     // 获取私聊历史
     sendChatMessageToServer('chat_get_private_history', {
       client_id: myClientId.value,

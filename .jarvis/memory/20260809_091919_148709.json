@@ -1,0 +1,8 @@
+{
+  "id": "20260809_091919_148709",
+  "type": "project_long_term",
+  "tags": ["聊天室", "成员列表", "chat_get_room_members"],
+  "content": "聊天室成员列表功能已完成（2026-08-09）：1) 后端 chat_manager.py get_room_members 改为返回成员详细信息（含 client_id 和 name）；2) app.py 添加 chat_get_room_members 消息分发和 _handle_chat_get_room_members 处理方法；3) 前端 App.vue 添加 chatRoomMembers 状态、chat_get_room_members_response 分支、joinChatRoom 和 chat_join_room_response 成功时获取成员列表、selectPrivateClient 切换私聊时清空成员列表；4) ChatPanel.vue 添加 roomMembers prop，有活跃聊天室时显示聊天室成员，否则显示所有在线用户。vite build 通过（34.58s），后端导入通过。",
+  "created_at": "2026-08-09T09:19:19.148740",
+  "updated_at": "2026-08-09T09:19:19.148745"
+}

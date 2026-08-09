@@ -6,11 +6,14 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <div class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
+    <div v-show="!collapsed" class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
       <div class="chat-panel-title-group">
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
+      <button class="icon-btn small chat-collapse-btn" @click.stop="$emit('toggleCollapse')" :title="collapsed ? '展开侧边栏' : '收起侧边栏'">
+        {{ collapsed ? '▶' : '◀' }}
+      </button>
       <div class="chat-name-edit">
         <input
           v-model="myName"
@@ -28,8 +31,13 @@
       </div>
     </div>
 
-    <!-- 聊天室列表 -->
-    <div class="chat-sidebar">
+    <!-- 折叠状态：只显示窄条 -->
+    <div v-if="collapsed" class="chat-collapsed-bar" @click="$emit('toggleCollapse')" title="展开侧边栏">
+      <span>💬</span>
+    </div>
+
+    <!-- 左侧侧边栏：聊天室列表 + 在线用户列表 -->
+    <div v-show="!collapsed" class="chat-sidebar">
       <div class="chat-sidebar-header">
         <span>聊天室</span>
         <button class="icon-btn small" @click="$emit('createRoom')" title="创建聊天室">➕</button>
@@ -47,10 +55,29 @@
         </div>
         <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
       </div>
+
+      <!-- 在线用户列表（有活跃聊天室时显示成员，否则显示所有在线用户） -->
+      <div class="chat-users-panel">
+        <div class="chat-sidebar-header">
+          <span>{{ activeRoomId ? '聊天室成员' : '在线用户' }}</span>
+        </div>
+        <div class="chat-client-list">
+          <div
+            v-for="client in activeRoomId ? roomMembers : clients"
+            :key="client.client_id"
+            class="chat-client-item"
+            :class="{ active: activePrivateId === client.client_id }"
+            @click="$emit('selectPrivate', client.client_id)"
+          >
+            <span class="chat-client-name">{{ client.name }}</span>
+          </div>
+          <div v-if="(activeRoomId ? roomMembers : clients).length === 0" class="chat-empty">暂无{{ activeRoomId ? '成员' : '在线用户' }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 消息区域 -->
-    <div class="chat-main">
+    <div v-show="!collapsed" class="chat-main">
       <div class="chat-messages" ref="messagesRef">
         <div
           v-for="(msg, idx) in messages"
@@ -59,7 +86,10 @@
           :class="{ mine: msg.client_id === myClientId, 'chat-message-new': idx === messages.length - 1 && msg.client_id !== myClientId }"
         >
           <span class="chat-message-sender">{{ msg.sender_name }}</span>
-          <span class="chat-message-content">{{ msg.content }}</span>
+          <div class="chat-message-bubble">
+            <span class="chat-message-content">{{ msg.content }}</span>
+          </div>
+          <span class="chat-message-time">{{ formatTime(msg.timestamp) }}</span>
         </div>
         <div v-if="messages.length === 0" class="chat-empty">暂无消息</div>
       </div>
@@ -78,27 +108,11 @@
       </div>
     </div>
 
-    <!-- 在线终端列表 -->
-    <div class="chat-clients-panel">
-      <div class="chat-sidebar-header">
-        <span>在线终端</span>
-      </div>
-      <div class="chat-client-list">
-        <div
-          v-for="client in clients"
-          :key="client.client_id"
-          class="chat-client-item"
-          :class="{ active: activePrivateId === client.client_id }"
-          @click="$emit('selectPrivate', client.client_id)"
-        >
-          <span class="chat-client-name">{{ client.name }}</span>
-        </div>
-        <div v-if="clients.length === 0" class="chat-empty">暂无在线终端</div>
-      </div>
-    </div>
+
 
     <div
       v-for="direction in resizeDirections"
+      v-show="!collapsed"
       :key="direction"
       :class="['chat-resize-handle', `chat-resize-${direction}`]"
       @mousedown="$emit('startResize', $event, direction)"
@@ -118,12 +132,14 @@ const props = defineProps({
   rooms: Array,
   messages: Array,
   clients: Array,
+  roomMembers: Array,
   myClientId: String,
   activeRoomId: String,
   activePrivateId: String,
   resizeDirections: Array,
   unreadCount: Number,
-  myName: String
+  myName: String,
+  collapsed: Boolean
 })
 
 const emit = defineEmits([
@@ -136,7 +152,8 @@ const emit = defineEmits([
   'sendMessage',
   'selectPrivate',
   'startResize',
-  'updateName'
+  'updateName',
+  'toggleCollapse'
 ])
 
 const draftMessage = ref('')
@@ -160,6 +177,24 @@ function sendMessage() {
 // Shift+Enter 插入换行
 function insertNewline() {
   draftMessage.value += '\n'
+}
+
+// 格式化消息时间
+function formatTime(timestamp) {
+  if (!timestamp) return ''
+  // 兼容秒和毫秒两种时间戳单位
+  const ts = timestamp > 1e12 ? timestamp : timestamp * 1000
+  const date = new Date(ts)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  if (isToday) {
+    return `${hh}:${mm}`
+  }
+  const MM = String(date.getMonth() + 1).padStart(2, '0')
+  const DD = String(date.getDate()).padStart(2, '0')
+  return `${MM}-${DD} ${hh}:${mm}`
 }
 
 // 监听外部名字变化
@@ -232,6 +267,32 @@ watch(
 
 .chat-panel-dragging {
   user-select: none;
+}
+
+.chat-collapsed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 100%;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  transition: background 0.2s;
+}
+
+.chat-collapsed-bar:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.chat-collapse-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
 }
 
 .chat-panel-header {
@@ -331,6 +392,14 @@ watch(
   flex-shrink: 0;
 }
 
+.chat-users-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--color-border);
+}
+
 .chat-sidebar-header {
   display: flex;
   align-items: center;
@@ -397,9 +466,10 @@ watch(
 }
 
 .chat-message {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 .chat-message.mine {
@@ -410,16 +480,35 @@ watch(
   font-size: 11px;
   color: var(--color-text-secondary);
   margin-bottom: 2px;
+  padding: 0 4px;
+}
+
+.chat-message-bubble {
+  max-width: 80%;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.chat-message.mine .chat-message-bubble {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 .chat-message-content {
   font-size: 13px;
-  color: var(--color-text-primary);
-  background: var(--color-bg-secondary);
-  border-radius: 8px;
-  padding: 4px 8px;
-  max-width: 80%;
+  color: inherit;
   word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-message-time {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  padding: 0 4px;
 }
 
 .chat-input-area {
@@ -450,13 +539,7 @@ watch(
   border: 1px solid var(--color-accent);
 }
 
-.chat-clients-panel {
-  width: 140px;
-  border-left: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
+
 
 .chat-empty {
   padding: 12px;
