@@ -54,6 +54,9 @@
           <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent列表">
             📋
           </button>
+          <button class="icon-btn" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
+            💬
+          </button>
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
@@ -8558,13 +8561,25 @@ const chatPanelInteraction = ref({
   startHeight: 0,
 })
 
-const chatPanelStyle = computed(() => ({
-  top: `${chatPanelRect.value.top}px`,
-  left: `${chatPanelRect.value.left}px`,
-  width: `${chatPanelRect.value.width}px`,
-  height: `${chatPanelRect.value.height}px`,
-  zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
-}))
+const chatPanelStyle = computed(() => {
+  // 移动端全屏显示
+  if (windowWidth.value <= 768) {
+    return {
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: 'var(--app-height, 100vh)',
+      zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+    }
+  }
+  return {
+    top: `${chatPanelRect.value.top}px`,
+    left: `${chatPanelRect.value.left}px`,
+    width: `${chatPanelRect.value.width}px`,
+    height: `${chatPanelRect.value.height}px`,
+    zIndex: activeWindow.value === 'chat' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+  }
+})
 
 // 聊天室数据状态
 const chatRooms = ref([])

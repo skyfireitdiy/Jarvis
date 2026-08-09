@@ -1,0 +1,8 @@
+{
+  "id": "20260809_083602_828430",
+  "type": "project_long_term",
+  "tags": ["聊天室", "移动端", "图标", "面板适配"],
+  "content": "移动端聊天图标修复（2026-08-09）：1) App.vue mobile-header-actions 中添加 💬 聊天按钮（toggleChatPanel）；2) chatPanelStyle computed 添加移动端适配（windowWidth<=768 时全屏 100vw×100vh）；3) startChatPanelMove/startChatPanelResize 已有移动端禁用判断。vite build 通过（33.06s）。",
+  "created_at": "2026-08-09T08:36:02.828458",
+  "updated_at": "2026-08-09T08:36:02.828464"
+}
