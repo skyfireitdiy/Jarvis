@@ -6838,7 +6838,8 @@ function handleChatMessage(type, payload) {
       chatRoomMembers.value = payload?.members || []
       break
     case 'chat_message':
-      // 聊天室广播消息
+      // 聊天室广播消息（过滤自己发送的，本地已追加）
+      if (payload?.client_id === myClientId.value) break
       const roomId = payload?.room_id || 'general'
       if (!chatMessages.value[roomId]) chatMessages.value[roomId] = []
       chatMessages.value[roomId].push({
@@ -6859,7 +6860,8 @@ function handleChatMessage(type, payload) {
       }
       break
     case 'chat_private_message':
-      // 私聊消息
+      // 私聊消息（过滤自己发送的，本地已追加）
+      if (payload?.message?.sender_id === myClientId.value) break
       const privKey = 'private'
       if (!chatMessages.value[privKey]) chatMessages.value[privKey] = []
       chatMessages.value[privKey].push({
