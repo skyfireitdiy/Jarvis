@@ -6859,7 +6859,7 @@ function handleChatMessage(type, payload) {
         }
         // 按房间维度记录未读数
         const roomKey = payload?.room_id || 'general'
-        if (activeChatRoomId.value !== roomKey && !activePrivateClientId.value) {
+        if (activeChatRoomId.value !== roomKey) {
           chatUnreadMap.value[roomKey] = (chatUnreadMap.value[roomKey] || 0) + 1
         }
       }
@@ -9113,6 +9113,8 @@ function createChatRoom() {
 
 function joinChatRoom(roomId) {
   activeChatRoomId.value = roomId
+  // 切换到群聊时清空私聊选中
+  activePrivateClientId.value = ''
   // 清除房间未读计数
   chatUnreadMap.value[roomId] = 0
   sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
