@@ -9077,6 +9077,12 @@ function updateChatName(name) {
   localStorage.setItem('jarvis_chat_name', name)
   if (myClientId.value) {
     sendChatMessageToServer('chat_register', { client_id: myClientId.value, name })
+    // 刷新在线用户列表，使昵称变更即时反映
+    sendChatMessageToServer('chat_get_clients', {})
+    // 若在聊天室中，同步刷新成员列表
+    if (activeChatRoomId.value) {
+      sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
+    }
   }
 }
 
