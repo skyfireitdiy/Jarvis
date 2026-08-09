@@ -385,7 +385,11 @@ defineExpose({
 .editor-codemirror-container {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+}
+
+.editor-codemirror-container :deep(.cm-editor) {
+  height: 100%;
 }
 
 .editor-resize-handle {
