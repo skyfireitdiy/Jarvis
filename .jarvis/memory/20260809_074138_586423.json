@@ -1,0 +1,8 @@
+{
+  "id": "20260809_074138_586423",
+  "type": "project_long_term",
+  "tags": ["聊天室", "消息提醒", "提示音", "未读徽标"],
+  "content": "聊天室新消息提醒功能（2026-08-08）：\n1. 新提示音：playChatNotificationSound() 使用 880Hz+1320Hz 三角波双音阶\"叮咚\"效果（App.vue:9507-9537）\n2. 提醒触发：handleChatMessage 中 chat_message 和 chat_private_message 分支，非自己发送的消息触发（App.vue:6832-6858）\n3. 未读计数：chatUnreadCount 状态（App.vue:8564），面板关闭或非激活时累加，打开面板清零\n4. 未读徽标：ChatPanel.vue 标题栏显示红色脉冲徽标（chat-unread-badge）\n5. 新消息动画：chat-message-new 类实现滑入+高亮效果（ChatPanel.vue:243-260）",
+  "created_at": "2026-08-09T07:41:38.586477",
+  "updated_at": "2026-08-09T07:41:38.586485"
+}

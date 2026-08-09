@@ -9,6 +9,7 @@
     <div class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
       <div class="chat-panel-title-group">
         <h3>聊天室</h3>
+        <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
       <div class="chat-panel-actions">
         <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
@@ -46,7 +47,7 @@
           v-for="(msg, idx) in messages"
           :key="idx"
           class="chat-message"
-          :class="{ mine: msg.client_id === myClientId }"
+          :class="{ mine: msg.client_id === myClientId, 'chat-message-new': idx === messages.length - 1 && msg.client_id !== myClientId }"
         >
           <span class="chat-message-sender">{{ msg.sender_name }}</span>
           <span class="chat-message-content">{{ msg.content }}</span>
@@ -109,7 +110,8 @@ const props = defineProps({
   myClientId: String,
   activeRoomId: String,
   activePrivateId: String,
-  resizeDirections: Array
+  resizeDirections: Array,
+  unreadCount: Number
 })
 
 const emit = defineEmits([
@@ -217,6 +219,46 @@ watch(
   margin: 0;
   font-size: 14px;
   color: var(--color-text-primary);
+}
+
+.chat-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  animation: chat-badge-pulse 1s ease-in-out infinite;
+}
+
+@keyframes chat-badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.chat-message-new {
+  animation: chat-message-slide-in 0.4s ease-out;
+  background: rgba(64, 158, 255, 0.08);
+  border-radius: 6px;
+}
+
+@keyframes chat-message-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    background: rgba(64, 158, 255, 0.25);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    background: rgba(64, 158, 255, 0.08);
+  }
 }
 
 .chat-panel-actions {

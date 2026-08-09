@@ -181,6 +181,7 @@
       :activeRoomId="activeChatRoomId"
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
+      :unreadCount="chatUnreadCount"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -6829,6 +6830,13 @@ function handleChatMessage(type, payload) {
         room_id: payload?.room_id,
         timestamp: payload?.timestamp || Date.now(),
       })
+      // 新消息提醒：非自己发送的消息触发提醒
+      if (payload?.client_id !== myClientId.value) {
+        playChatNotificationSound()
+        if (!showChatPanel.value || activeWindow.value !== 'chat') {
+          chatUnreadCount.value++
+        }
+      }
       break
     case 'chat_private_message':
       // 私聊消息
@@ -6839,6 +6847,13 @@ function handleChatMessage(type, payload) {
         private: true,
         timestamp: payload?.timestamp || Date.now(),
       })
+      // 新消息提醒：非自己发送的消息触发提醒
+      if (payload?.from_client_id !== myClientId.value) {
+        playChatNotificationSound()
+        if (!showChatPanel.value || activeWindow.value !== 'chat') {
+          chatUnreadCount.value++
+        }
+      }
       break
     case 'chat_get_private_history_response':
       if (payload?.messages) {
@@ -8547,6 +8562,7 @@ const chatClients = ref([])
 const myClientId = ref('')
 const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
+const chatUnreadCount = ref(0)
 
 function getOrCreateClientId() {
   let clientId = localStorage.getItem('jarvis_chat_client_id')
@@ -8894,6 +8910,7 @@ function toggleChatPanel() {
   showChatPanel.value = !showChatPanel.value
   if (showChatPanel.value) {
     focusWindow('chat')
+    chatUnreadCount.value = 0
     // 首次打开时注册客户端并获取聊天室列表
     if (!myClientId.value) {
       myClientId.value = getOrCreateClientId()
@@ -9502,6 +9519,38 @@ function playSingleBeep(audioContext, startTime) {
 
   oscillator.start(startTime)
   oscillator.stop(startTime + 0.2)
+}
+
+// 播放聊天室新消息提示音（双音阶，区别于普通提示音）
+function playChatNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const now = audioContext.currentTime
+
+    // 播放两个不同频率的音符，形成"叮咚"效果
+    playChatSingleTone(audioContext, now, 880, 'triangle', 0.25)
+    playChatSingleTone(audioContext, now + 0.18, 1320, 'triangle', 0.3)
+  } catch (e) {
+    console.log('[ChatNotification] 无法播放提示音:', e)
+  }
+}
+
+// 播放单次聊天提示音
+function playChatSingleTone(audioContext, startTime, frequency, type, duration) {
+  const oscillator = audioContext.createOscillator()
+  const gainNode = audioContext.createGain()
+
+  oscillator.connect(gainNode)
+  gainNode.connect(audioContext.destination)
+
+  oscillator.frequency.value = frequency
+  oscillator.type = type
+
+  gainNode.gain.setValueAtTime(0.25, startTime)
+  gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
+
+  oscillator.start(startTime)
+  oscillator.stop(startTime + duration)
 }
 
 // 播放提示音（连续三次）
