@@ -6974,6 +6974,12 @@ function appendOutput(payload, agentId = null) {
 
   currentOutputs.push(outputItem)
 
+  // 消息数量限制：超过100条时截断前50条，只保留后50条，避免DOM过多致页面卡顿
+  if (currentOutputs.length > 100) {
+    currentOutputs.splice(0, currentOutputs.length - 50)
+    allOutputs.value.set(targetAgentId, currentOutputs)
+  }
+
   // 保存消息到本地存储
   try {
     // execution 消息也保存到历史（含 execution_chunks），用于切换 Agent 后重建 xterm
