@@ -49,7 +49,7 @@
             v-for="room in rooms"
             :key="room.room_id"
             class="chat-room-item"
-            :class="{ active: activeRoomId === room.room_id }"
+            :class="{ active: activeRoomId === room.room_id, joined: joinedRooms?.has?.(room.room_id) }"
             @click="$emit('joinRoom', room.room_id)"
           >
             <span class="chat-room-name">{{ room.name }}</span>
@@ -149,6 +149,7 @@ const props = defineProps({
   resizeDirections: Array,
   unreadCount: Number,
   unreadMap: Object,
+  joinedRooms: Object,
   myName: String,
   collapsed: Boolean,
   sidebarWidth: { type: Number, default: 160 },
@@ -487,6 +488,15 @@ watch(
 .chat-room-item.active,
 .chat-client-item.active {
   background: var(--color-bg-active);
+}
+
+.chat-room-item.joined:not(.active) {
+  background: var(--color-bg-secondary);
+  border-left: 3px solid var(--color-primary, #4a9eff);
+}
+
+.chat-room-item:not(.joined) {
+  opacity: 0.6;
 }
 
 .chat-room-name,
