@@ -53,6 +53,7 @@
             @click="$emit('joinRoom', room.room_id)"
           >
             <span class="chat-room-name">{{ room.name }}</span>
+            <span v-if="unreadMap[room.room_id]" class="chat-unread-badge chat-room-unread">{{ unreadMap[room.room_id] }}</span>
             <div class="chat-room-actions">
               <span class="chat-room-count">{{ room.member_count }}</span>
               <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
@@ -76,6 +77,7 @@
               @click="$emit('selectPrivate', client.client_id)"
             >
               <span class="chat-client-name">{{ client.name }}</span>
+              <span v-if="unreadMap['private_' + client.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + client.client_id] }}</span>
             </div>
             <div v-if="(activeRoomId ? roomMembers : clients).length === 0" class="chat-empty">暂无{{ activeRoomId ? '成员' : '在线用户' }}</div>
           </div>
@@ -146,6 +148,7 @@ const props = defineProps({
   activePrivateId: String,
   resizeDirections: Array,
   unreadCount: Number,
+  unreadMap: Object,
   myName: String,
   collapsed: Boolean,
   sidebarWidth: { type: Number, default: 160 },
@@ -491,6 +494,18 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-room-unread,
+.chat-client-unread {
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
 }
 
 .chat-room-actions {

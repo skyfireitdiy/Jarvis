@@ -184,7 +184,7 @@
       :activeRoomId="activeChatRoomId"
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
-      :unreadCount="chatUnreadCount"
+      :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap"
       :myName="chatName"
       :collapsed="chatPanelCollapsed"
       :sidebarWidth="chatSidebarWidth"
@@ -6857,6 +6857,11 @@ function handleChatMessage(type, payload) {
         if (!showChatPanel.value || activeWindow.value !== 'chat') {
           chatUnreadCount.value++
         }
+        // 按房间维度记录未读数
+        const roomKey = payload?.room_id || 'general'
+        if (activeChatRoomId.value !== roomKey && !activePrivateClientId.value) {
+          chatUnreadMap.value[roomKey] = (chatUnreadMap.value[roomKey] || 0) + 1
+        }
       }
       break
     case 'chat_private_message':
@@ -6878,6 +6883,11 @@ function handleChatMessage(type, payload) {
         playChatNotificationSound()
         if (!showChatPanel.value || activeWindow.value !== 'chat') {
           chatUnreadCount.value++
+        }
+        // 按私聊维度记录未读数
+        const privKey = `private_${payload?.message?.sender_id}`
+        if (activePrivateClientId.value !== payload?.message?.sender_id) {
+          chatUnreadMap.value[privKey] = (chatUnreadMap.value[privKey] || 0) + 1
         }
       }
       break
@@ -8696,6 +8706,7 @@ const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
 const chatName = ref('')
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
+const chatUnreadMap = ref({})
 
 function startChatSidebarResize(event) {
   const startX = event.clientX
@@ -9102,6 +9113,8 @@ function createChatRoom() {
 
 function joinChatRoom(roomId) {
   activeChatRoomId.value = roomId
+  // 清除房间未读计数
+  chatUnreadMap.value[roomId] = 0
   sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
 }
 
@@ -9166,6 +9179,9 @@ function selectPrivateClient(clientId) {
     activePrivateClientId.value = clientId
     activeChatRoomId.value = ''
     chatRoomMembers.value = []
+    // 清除私聊未读计数
+    const privKey = `private_${clientId}`
+    chatUnreadMap.value[privKey] = 0
     // 获取私聊历史
     sendChatMessageToServer('chat_get_private_history', {
       client_id: myClientId.value,
