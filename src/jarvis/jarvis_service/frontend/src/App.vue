@@ -6723,7 +6723,22 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'status_update') {
     // 更新 Agent 执行状态
     if (payload?.execution_status) {
+      const prevStatus = agentStatuses.value.get(targetAgentId)?.execution_status
       agentStatuses.value.set(targetAgentId, {execution_status: payload.execution_status})
+
+      // 多端同步：当状态从等待输入/确认切换到运行时，清除该Agent的输入请求和确认对话框
+      // 防止一端已响应后，其他端仍显示可重复提交的UI
+      if (payload.execution_status === 'running' && ['waiting_single', 'waiting_multi', 'waiting_confirm'].includes(prevStatus)) {
+        if (inputRequests.value.has(targetAgentId)) {
+          inputRequests.value.delete(targetAgentId)
+          console.log('[STATUS_SYNC] Cleared input request for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
+        }
+        if (confirmDialog.value && pendingConfirmAgentId.value === targetAgentId) {
+          confirmDialog.value = null
+          pendingConfirmAgentId.value = null
+          console.log('[STATUS_SYNC] Cleared confirm dialog for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
+        }
+      }
 
       // 同步更新 agentList 中对应 agent 的状态，确保界面能及时响应
       const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
