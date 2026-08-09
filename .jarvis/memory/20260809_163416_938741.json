@@ -1,0 +1,8 @@
+{
+  "id": "20260809_163416_938741",
+  "type": "project_long_term",
+  "tags": ["chat-panel", "ui-optimization", "phase6", "milestone"],
+  "content": "ChatPanel.vue阶段6 UI优化4项代码修改已全部完成：\n1. 收起侧边栏：sidebarCollapsed ref控制sidebar v-show，展开按钮chat-sidebar-expand\n2. 输入框auto-resize：chatInputRef + autoResizeInput + Ctrl+Enter发送(handleInputKeydown)\n3. 选中样式美化：border-left accent色 + font-weight:600 + transition\n4. 创建聊天室内联输入框：creatingRoom/newRoomName ref + showCreateRoomInput/confirmCreateRoom/cancelCreateRoom\nApp.vue createChatRoom已适配接收name参数(不再用prompt)\n样式修改：删除collapsed-bar→sidebar-expand样式；新增create-room-inline/input/actions样式；chat-input增强(border/border-radius/overflow-y/max-height/placeholder)\n编译/构建和功能验证尚未执行",
+  "created_at": "2026-08-09T16:34:16.938774",
+  "updated_at": "2026-08-09T16:34:16.938784"
+}
