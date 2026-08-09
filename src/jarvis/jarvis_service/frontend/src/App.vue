@@ -203,6 +203,7 @@
       @leaveRoom="leaveChatRoom"
       @deleteRoom="deleteChatRoom"
       @startSidebarResize="startChatSidebarResize"
+      @clearMessages="clearChatMessages"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -9153,6 +9154,26 @@ function deleteChatRoom(roomId) {
   showConfirm('确定要删除此聊天室吗？此操作不可撤销。', () => {
     sendChatMessageToServer('chat_delete_room', { room_id: roomId, client_id: myClientId.value })
   })
+}
+
+function clearChatMessages(scope) {
+  if (scope === 'all') {
+    showConfirm('确定要清空全部聊天记录吗？此操作不可撤销。', () => {
+      chatMessages.value = {}
+      saveChatMessages()
+    })
+  } else if (scope === 'current') {
+    const key = activePrivateClientId.value
+      ? `private_${activePrivateClientId.value}`
+      : activeChatRoomId.value
+    if (key) {
+      showConfirm('确定要清空当前聊天记录吗？此操作不可撤销。', () => {
+        const { [key]: _, ...rest } = chatMessages.value
+        chatMessages.value = rest
+        saveChatMessages()
+      })
+    }
+  }
 }
 
 function sendChatMessage(content) {

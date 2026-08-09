@@ -36,6 +36,7 @@
           <span>聊天室</span>
           <div class="chat-sidebar-actions">
             <button class="icon-btn small" @click="showCreateRoomInput" title="创建聊天室">➕</button>
+            <button class="icon-btn small" @click="$emit('clearMessages', 'all')" title="清空全部记录">🗑</button>
             <button class="icon-btn small" @click="sidebarCollapsed = true" title="收起侧边栏">◀</button>
           </div>
         </div>
@@ -124,6 +125,10 @@
 
       <!-- 消息区域 -->
       <div class="chat-main">
+        <div class="chat-main-header">
+          <span class="chat-main-title">{{ activeRoomId ? '聊天室消息' : (activePrivateId ? '私聊消息' : '消息') }}</span>
+          <button v-if="activeRoomId || activePrivateId" class="icon-btn small" @click="$emit('clearMessages', 'current')" title="清空当前记录">🗑</button>
+        </div>
         <div class="chat-messages" ref="messagesRef">
           <div
             v-for="(msg, idx) in messages"
@@ -206,6 +211,7 @@ const emit = defineEmits([
   'leaveRoom',
   'deleteRoom',
   'startSidebarResize',
+  'clearMessages',
 ])
 
 const draftMessage = ref('')
@@ -688,6 +694,20 @@ watch(
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.chat-main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color, #333);
+  flex-shrink: 0;
+}
+
+.chat-main-title {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
 }
 
 .chat-messages {
