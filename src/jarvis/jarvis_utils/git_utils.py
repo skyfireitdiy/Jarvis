@@ -1400,47 +1400,38 @@ def confirm_add_new_files() -> None:
                 repo_root = "."
             gitignore_path = os.path.join(repo_root, ".gitignore")
 
-            # 检查是否需要添加默认的各语言 ignore 模板
-            needs_default_templates = False
+            # 检查是否需要添加 .gitignore 内容
             if os.path.exists(gitignore_path):
+                # .gitignore 已存在：仅追加 .jarvis（如果尚未包含）
                 with open(gitignore_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                # 只检查是否已包含 .jarvis
                 if ".jarvis" not in content:
-                    needs_default_templates = True
+                    try:
+                        needs_newline = content and not content.endswith("\n")
+                        with open(
+                            gitignore_path, "a", encoding="utf-8", newline="\n"
+                        ) as f:
+                            if needs_newline:
+                                f.write("\n")
+                            f.write("\n.jarvis/\n")
+                        PrettyOutput.auto_print("✅ 已添加 .jarvis/ 到 .gitignore")
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠ 添加 .jarvis/ 到 .gitignore 失败: {e}"
+                        )
             else:
-                needs_default_templates = True
-
-            # 询问是否添加默认模板
-            if needs_default_templates:
-                PrettyOutput.auto_print(
-                    "ℹ️ 检测到 .gitignore 缺少常见语言默认规则，建议添加以避免跟踪不必要的文件"
-                )
+                # .gitignore 不存在：生成完整的各语言默认模板
+                PrettyOutput.auto_print("ℹ 检测到未找到 .gitignore 文件")
                 if user_confirm("是否添加各语言的默认 .gitignore 规则？", True):
                     default_templates = get_default_gitignore_templates()
                     try:
-                        if os.path.exists(gitignore_path):
-                            # 追加模式：检查并补齐换行
-                            with open(gitignore_path, "r", encoding="utf-8") as f:
-                                content = f.read()
-                            needs_newline = content and not content.endswith("\n")
-                            with open(
-                                gitignore_path, "a", encoding="utf-8", newline="\n"
-                            ) as f:
-                                if needs_newline:
-                                    f.write("\n")
-                                f.write("\n" + default_templates + "\n")
-                        else:
-                            # 新建模式
-                            with open(
-                                gitignore_path, "w", encoding="utf-8", newline="\n"
-                            ) as f:
-                                f.write(default_templates + "\n")
+                        with open(
+                            gitignore_path, "w", encoding="utf-8", newline="\n"
+                        ) as f:
+                            f.write(default_templates + "\n")
                         PrettyOutput.auto_print("✅ 已添加各语言默认 .gitignore 规则")
                     except Exception as e:
-                        PrettyOutput.auto_print(
-                            f"⚠️ 添加默认 .gitignore 规则失败: {str(e)}"
-                        )
+                        PrettyOutput.auto_print(f"⚠ 添加 .gitignore 失败: {e}")
 
             # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 .gitignore 忽略）
             files_to_ignore = sorted(set(new_files))
