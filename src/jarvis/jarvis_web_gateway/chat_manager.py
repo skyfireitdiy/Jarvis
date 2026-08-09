@@ -119,12 +119,17 @@ class ChatManager:
             room["members"].discard(client_id)
         return {"success": True, "room_id": room_id}
 
-    def get_room_members(self, room_id: str) -> list[str]:
-        """获取聊天室成员列表。"""
+    def get_room_members(self, room_id: str) -> list[Dict[str, Any]]:
+        """获取聊天室成员列表（含详细信息）。"""
         room = self._chat_rooms.get(room_id)
         if not room:
             return []
-        return list(room["members"])
+        members = []
+        for cid in room["members"]:
+            client = self._chat_clients.get(cid)
+            if client:
+                members.append({"client_id": cid, "name": client["name"]})
+        return members
 
     # ------------------------------------------------------------------
     # 消息广播

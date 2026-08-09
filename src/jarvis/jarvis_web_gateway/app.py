@@ -1100,6 +1100,8 @@ class WebSocketConnectionManager:
                 await self._handle_chat_send_message(payload, websocket)
             elif message_type == "chat_get_clients":
                 await self._handle_chat_get_clients(websocket)
+            elif message_type == "chat_get_room_members":
+                await self._handle_chat_get_room_members(payload, websocket)
             elif message_type == "chat_send_private":
                 await self._handle_chat_send_private(payload, websocket)
             elif message_type == "chat_get_private_history":
@@ -1231,6 +1233,19 @@ class WebSocketConnectionManager:
             {
                 "type": "chat_get_clients_response",
                 "payload": {"success": True, "clients": clients},
+            }
+        )
+
+    async def _handle_chat_get_room_members(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """获取聊天室成员列表。"""
+        room_id = payload.get("room_id", "")
+        members = self._chat_manager.get_room_members(room_id)
+        await websocket.send_json(
+            {
+                "type": "chat_get_room_members_response",
+                "payload": {"success": True, "room_id": room_id, "members": members},
             }
         )
 
