@@ -184,11 +184,11 @@
       :activeRoomId="activeChatRoomId"
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
-      :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap"
+      :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
       :myName="chatName"
       :collapsed="chatPanelCollapsed"
       :sidebarWidth="chatSidebarWidth"
-      :messages="chatMessages[activeChatRoomId] || chatMessages['private'] || []"
+      :messages="activePrivateClientId ? (chatMessages['private'] || []) : (chatMessages[activeChatRoomId] || [])"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @toggleMaximize="toggleChatMaximize"
@@ -6817,6 +6817,7 @@ function handleChatMessage(type, payload) {
           name: payload.name || '未命名聊天室',
           member_count: 1,
         })
+        chatJoinedRooms.value.add(payload.room_id)
         showToast('聊天室创建成功', 'success')
       } else {
         showToast(payload?.error || '创建聊天室失败', 'error')
@@ -6825,6 +6826,7 @@ function handleChatMessage(type, payload) {
     case 'chat_join_room_response':
       if (payload?.success) {
         showToast('已加入聊天室', 'success')
+        chatJoinedRooms.value.add(activeChatRoomId.value)
         // 获取聊天室成员列表
         sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
       } else {
@@ -6907,8 +6909,12 @@ function handleChatMessage(type, payload) {
     case 'chat_leave_room_response':
       if (payload?.success) {
         showToast('已退出聊天室', 'success')
-        delete chatMessages.value[activeChatRoomId.value]
-        activeChatRoomId.value = ''
+        const leftRoomId = payload?.room_id || activeChatRoomId.value
+        chatJoinedRooms.value.delete(leftRoomId)
+        delete chatMessages.value[leftRoomId]
+        if (activeChatRoomId.value === leftRoomId) {
+          activeChatRoomId.value = ''
+        }
         saveChatMessages()
       } else {
         showToast(payload?.error || '退出聊天室失败', 'error')
@@ -6918,6 +6924,7 @@ function handleChatMessage(type, payload) {
       if (payload?.success) {
         showToast('聊天室已删除', 'success')
         const deletedRoomId = payload?.room_id || activeChatRoomId.value
+        chatJoinedRooms.value.delete(deletedRoomId)
         delete chatMessages.value[deletedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== deletedRoomId)
         if (activeChatRoomId.value === deletedRoomId) {
@@ -6931,6 +6938,7 @@ function handleChatMessage(type, payload) {
     case 'chat_room_deleted':
       const removedRoomId = payload?.room_id
       if (removedRoomId) {
+        chatJoinedRooms.value.delete(removedRoomId)
         delete chatMessages.value[removedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== removedRoomId)
         if (activeChatRoomId.value === removedRoomId) {
@@ -8707,6 +8715,7 @@ const chatUnreadCount = ref(0)
 const chatName = ref('')
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
+const chatJoinedRooms = ref(new Set())
 
 function startChatSidebarResize(event) {
   const startX = event.clientX
@@ -9117,7 +9126,12 @@ function joinChatRoom(roomId) {
   activePrivateClientId.value = ''
   // 清除房间未读计数
   chatUnreadMap.value[roomId] = 0
-  sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
+  // 已加入的房间仅切换查看，未加入的才发送join请求
+  if (!chatJoinedRooms.value.has(roomId)) {
+    sendChatMessageToServer('chat_join_room', { room_id: roomId, client_id: myClientId.value })
+  } else {
+    sendChatMessageToServer('chat_get_room_members', { room_id: roomId })
+  }
 }
 
 function leaveChatRoom(roomId) {
@@ -9179,7 +9193,7 @@ function selectPrivateClient(clientId) {
     activePrivateClientId.value = ''
   } else {
     activePrivateClientId.value = clientId
-    activeChatRoomId.value = ''
+    // 不清空activeChatRoomId，保持群聊加入状态
     chatRoomMembers.value = []
     // 清除私聊未读计数
     const privKey = `private_${clientId}`
