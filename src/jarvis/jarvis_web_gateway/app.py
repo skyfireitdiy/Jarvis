@@ -581,9 +581,7 @@ class WebSocketConnectionManager:
         self._terminal_input_registry = terminal_input_registry
         self._gateway = gateway
         self._auth_store = auth_store
-        self._connection_lock_enabled = (
-            False  # 连接锁定模式：True=拒绝新连接，False=允许新连接替换旧连接
-        )
+
         self._active_connections: Dict[str, Dict[str, tuple[str, WebSocket]]] = {}
         self._connection_state_lock = asyncio.Lock()
 
@@ -603,14 +601,6 @@ class WebSocketConnectionManager:
 
         async with self._connection_state_lock:
             existing_connections = self._active_connections.get(session_id)
-            if existing_connections and self._connection_lock_enabled:
-                await _send_error(
-                    websocket,
-                    "CONNECTION_REJECTED",
-                    "Already have an active connection (connection lock enabled)",
-                )
-                await websocket.close()
-                return
             if existing_connections:
                 print(
                     f"[WS CONNECTION] New connection added (existing={len(existing_connections)})"
@@ -762,13 +752,7 @@ class WebSocketConnectionManager:
             return
         message_type = message.get("type")
         payload = message.get("payload") or {}
-        if message_type == "connection_lock":
-            enabled = payload.get("enabled", False)
-            self._connection_lock_enabled = enabled
-            print(
-                f"[WS CONNECTION LOCK] Connection lock {'enabled' if enabled else 'disabled'}"
-            )
-            return
+
         if message_type == "sync_request":
             # 处理增量同步请求（仅 Agent 进程处理）
             if os.environ.get("IS_AGENT_PROCESS") == "1":
@@ -1372,19 +1356,6 @@ def create_app(
                             "message": "Invalid password",
                         },
                     }
-
-            has_authorized_connection = manager._auth_store.get("default") is not None
-            if manager._connection_lock_enabled and has_authorized_connection:
-                logger.warning(
-                    "[AUTH] Login rejected: connection lock enabled and an authorized connection already exists"
-                )
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "CONNECTION_LOCKED",
-                        "message": "An authenticated connection already exists",
-                    },
-                }
 
             logger.info("[AUTH] Password verification passed")
             # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）

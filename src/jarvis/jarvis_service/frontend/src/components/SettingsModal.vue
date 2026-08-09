@@ -9,18 +9,6 @@
       <div class="form-group">
         <div class="toggle-wrapper">
           <label class="toggle-switch">
-            <input type="checkbox" v-model="localConnectionLockEnabled" @change="handleConnectionLockChange" class="toggle-input" />
-            <span class="toggle-slider"></span>
-          </label>
-          <div class="toggle-info">
-            <span class="toggle-label-text">锁定连接（拒绝新连接）</span>
-            <span class="form-help">启用后，当已有活跃连接时，新连接将被拒绝。禁用后，新连接会替换旧连接。</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <div class="toggle-wrapper">
-          <label class="toggle-switch">
             <input type="checkbox" v-model="localAutoLoginEnabled" @change="handleAutoLoginChange" class="toggle-input" />
             <span class="toggle-slider"></span>
           </label>
@@ -163,10 +151,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  connectionLockEnabled: {
-    type: Boolean,
-    default: false
-  },
   historyStorage: {
     type: Object,
     required: true
@@ -211,8 +195,6 @@ const props = defineProps({
 
 const emit = defineEmits([
   'update:visible',
-  'update:connectionLockEnabled',
-  'saveConnectionLockSetting',
   'confirmClearHistory',
   'confirmRestartGateway',
   'confirmRestartAllNodes',
@@ -225,7 +207,6 @@ const emit = defineEmits([
 ])
 
 // 本地状态
-const localConnectionLockEnabled = ref(props.connectionLockEnabled)
 const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
@@ -237,10 +218,6 @@ const isLoadingSecret = ref(false)
 const showSecret = ref(false)
 
 // 监听props变化
-watch(() => props.connectionLockEnabled, (newVal) => {
-  localConnectionLockEnabled.value = newVal
-})
-
 watch(() => props.autoLoginEnabled, (newVal) => {
   localAutoLoginEnabled.value = newVal
 })
@@ -248,12 +225,6 @@ watch(() => props.autoLoginEnabled, (newVal) => {
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
-}
-
-// 处理连接锁定设置变更
-function handleConnectionLockChange() {
-  emit('update:connectionLockEnabled', localConnectionLockEnabled.value)
-  emit('saveConnectionLockSetting')
 }
 
 // 处理免登录设置变更
