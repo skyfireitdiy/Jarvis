@@ -6,6 +6,10 @@
         {{ errorMessage }}
       </div>
       <div class="form-group">
+        <label>用户名</label>
+        <input :value="username" @input="$emit('update:username', $event.target.value)" type="text" placeholder="输入用户名" />
+      </div>
+      <div class="form-group">
         <label>密码</label>
         <input :value="password" @input="$emit('update:password', $event.target.value)" type="password" placeholder="可选" @keydown.enter="$emit('connect')" />
       </div>
@@ -26,10 +30,11 @@ defineProps({
   connecting: Boolean,
   errorMessage: String,
   gatewayUrl: String,
-  password: String
+  password: String,
+  username: String
 })
 
-defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'connect'])
+defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'update:username', 'connect'])
 </script>
 
 <style scoped>

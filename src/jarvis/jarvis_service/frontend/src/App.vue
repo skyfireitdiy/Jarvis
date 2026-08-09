@@ -198,7 +198,6 @@
       @sendMessage="sendChatMessage"
       @selectPrivate="selectPrivateClient"
       @startResize="startChatPanelResize"
-      @updateName="updateChatName"
       @toggleCollapse="toggleChatPanelCollapse"
       @leaveRoom="leaveChatRoom"
       @deleteRoom="deleteChatRoom"
@@ -623,8 +622,10 @@
       :errorMessage="connectErrorMessage"
       :gatewayUrl="gatewayUrl"
       :password="auth.password"
+      :username="username"
       @update:gatewayUrl="gatewayUrl = $event"
       @update:password="auth.password = $event"
+      @update:username="username = $event"
       @connect="connect"
     />
 
@@ -1187,6 +1188,8 @@ const auth = ref({
   password: '',
   token: ''
 })
+const username = ref(localStorage.getItem('jarvis_username') || 'User-' + Math.random().toString(36).slice(2, 8))
+watch(username, (val) => { localStorage.setItem('jarvis_username', val) })
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
@@ -3258,7 +3261,7 @@ function generateAgentName(agentType) {
   const now = new Date()
   const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
   const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
-  return `${typeName}-${date}-${time}`
+  return `${username.value}-${typeName}-${date}-${time}`
 }
 
 // 复制 Agent 时跳过 watch 中的名称设置
@@ -6803,9 +6806,6 @@ function handleChatMessage(type, payload) {
     case 'chat_register_response':
       if (payload?.success) {
         myClientId.value = payload.client_id || myClientId.value
-        if (payload.name) {
-          chatName.value = payload.name
-        }
       }
       break
     case 'chat_get_rooms_response':
@@ -8724,7 +8724,7 @@ const myClientId = ref('')
 const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
-const chatName = ref('')
+const chatName = computed(() => username.value)
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
 const chatJoinedRooms = ref([])
@@ -9095,28 +9095,23 @@ function toggleChatPanel() {
     // 首次打开时注册客户端并获取聊天室列表
     if (!myClientId.value) {
       myClientId.value = getOrCreateClientId()
-      chatName.value = localStorage.getItem('jarvis_chat_name') || '用户' + myClientId.value.slice(-6)
-      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: chatName.value })
+      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: username.value })
     }
     sendChatMessageToServer('chat_get_rooms', {})
     sendChatMessageToServer('chat_get_clients', {})
   }
 }
 
-// 更新自定义名字
-function updateChatName(name) {
-  chatName.value = name
-  localStorage.setItem('jarvis_chat_name', name)
-  if (myClientId.value) {
-    sendChatMessageToServer('chat_register', { client_id: myClientId.value, name })
-    // 刷新在线用户列表，使昵称变更即时反映
+// username变更时同步更新聊天室注册名
+watch(username, (val) => {
+  if (myClientId.value && val) {
+    sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: val })
     sendChatMessageToServer('chat_get_clients', {})
-    // 若在聊天室中，同步刷新成员列表
     if (activeChatRoomId.value) {
       sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
     }
   }
-}
+})
 
 function sendChatMessageToServer(type, payload) {
   if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
