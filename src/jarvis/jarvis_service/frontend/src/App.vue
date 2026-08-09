@@ -589,7 +589,6 @@
     <!-- 设置弹窗 -->
     <SettingsModal
       :visible="showSettingsModal"
-      :connectionLockEnabled="connectionLockEnabled"
       :autoLoginEnabled="autoLoginEnabled"
       :historyStorage="historyStorage"
       :availableNodeOptions="availableNodeOptions"
@@ -601,9 +600,7 @@
       :gatewayUrl="gatewayUrl"
       :showToast="showToast"
       @update:visible="showSettingsModal = $event"
-      @update:connectionLockEnabled="connectionLockEnabled = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
-      @saveConnectionLockSetting="saveConnectionLockSetting"
       @saveAutoLoginSetting="saveAutoLoginSetting"
       @confirmClearHistory="confirmClearHistory"
       @confirmRestartGateway="handleRestartGateway"
@@ -1158,7 +1155,6 @@ const HEARTBEAT_TIMEOUT = 15000 // 心跳超时时间：15 秒（3 次）未收�
 const connecting = ref(false)
 const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
 const connectErrorMessage = ref('')  // 连接错误信息
-const connectionLockEnabled = ref(localStorage.getItem('connection_lock_enabled') === 'true')  // 连接锁定开关
 const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
@@ -3508,24 +3504,6 @@ async function loadHistoryMessages(prepend = false) {
   }
 }
 
-// 保存连接锁定设置
-function saveConnectionLockSetting() {
-  localStorage.setItem('connection_lock_enabled', connectionLockEnabled.value)
-  console.log('[SETTINGS] Connection lock setting saved:', connectionLockEnabled.value)
-  // 如果已连接，发送设置更新消息
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-    try {
-      socket.value.send(JSON.stringify({
-        type: 'connection_lock',
-        payload: { enabled: connectionLockEnabled.value }
-      }))
-      console.log('[SETTINGS] Connection lock setting sent to server')
-    } catch (error) {
-      console.error('[SETTINGS] Failed to send connection lock setting:', error)
-    }
-  }
-}
-
 // 保存免登录设置
 function saveAutoLoginSetting() {
   localStorage.setItem('jarvis_auto_login', autoLoginEnabled.value)
@@ -3614,13 +3592,6 @@ async function connect() {
     } else {
       console.log('[HISTORY] Skip loading history, messages already exist')
     }
-    // 发送连接锁定设置
-    ws.send(JSON.stringify({
-      type: 'connection_lock',
-      payload: { enabled: connectionLockEnabled.value }
-    }))
-    console.log('[ws] connection_lock sent', connectionLockEnabled.value)
-
     // 心跳机制已移除
   }
   ws.onmessage = (event) => {
@@ -6694,29 +6665,14 @@ function handleMessage(message, agentId = null) {
     const errorMessage = payload?.message || '未知错误'
     const errorCode = payload?.code || ''
     
-    // 如果是认证失败、连接被拒绝，重新显示连接对话框
-    if (errorCode === 'AUTH_FAILED' || errorCode === 'CONNECTION_REJECTED') {
+    // 如果是认证失败，重新显示连接对话框
+    if (errorCode === 'AUTH_FAILED') {
       // 显示错误信息
       connectErrorMessage.value = errorMessage
       // 清空密码输入框
       auth.value.password = ''
       // 重新显示连接对话框
       showConnectModal.value = true
-    }
-    // CONNECTION_LOCKED 需要区分 Gateway 和 Agent 连接
-    if (errorCode === 'CONNECTION_LOCKED') {
-      if (!agentId) {
-        // Gateway 连接被抢占：清除token，防止自动登录循环
-        console.log('[ws] Gateway connection locked, clearing token')
-        localStorage.removeItem('jarvis_auth_token')
-        auth.value.token = ''
-        connectErrorMessage.value = errorMessage
-        auth.value.password = ''
-        showConnectModal.value = true
-      } else {
-        // Agent 连接被抢占：这是正常的切换行为，只记录日志
-        console.log(`[ws] Agent ${agentId} connection locked (normal switch behavior)`)
-      }
     }
     // 不再通过 appendOutput 显示系统错误消息，避免污染会话窗口
     // 错误信息仍通过 console.warn 输出，便于调试
