@@ -9125,8 +9125,7 @@ function sendChatMessageToServer(type, payload) {
   socket.value.send(JSON.stringify({ type, payload }))
 }
 
-function createChatRoom() {
-  const roomName = prompt('请输入聊天室名称：')
+function createChatRoom(roomName) {
   if (!roomName || !roomName.trim()) return
   sendChatMessageToServer('chat_create_room', { name: roomName.trim(), client_id: myClientId.value })
 }

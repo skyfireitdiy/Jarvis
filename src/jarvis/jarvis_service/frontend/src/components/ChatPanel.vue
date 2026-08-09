@@ -6,14 +6,11 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <div v-show="!collapsed" class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
+    <div class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
       <div class="chat-panel-title-group">
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
-      <button class="icon-btn small chat-collapse-btn" @click.stop="$emit('toggleCollapse')" :title="collapsed ? '展开侧边栏' : '收起侧边栏'">
-        {{ collapsed ? '▶' : '◀' }}
-      </button>
       <div class="chat-name-edit">
         <input
           v-model="myName"
@@ -31,18 +28,32 @@
       </div>
     </div>
 
-    <!-- 折叠状态：只显示窄条 -->
-    <div v-if="collapsed" class="chat-collapsed-bar" @click="$emit('toggleCollapse')" title="展开侧边栏">
-      <span>💬</span>
-    </div>
-
     <!-- 主体区域：侧边栏 + 消息区 横向排列 -->
-    <div v-show="!collapsed" class="chat-body">
+    <div class="chat-body">
       <!-- 左侧侧边栏：聊天室列表 + 在线用户列表 -->
-      <div class="chat-sidebar" :style="{ width: sidebarWidth + 'px' }">
+      <div v-show="!sidebarCollapsed" class="chat-sidebar" :style="{ width: sidebarWidth + 'px' }">
         <div class="chat-sidebar-header">
           <span>聊天室</span>
-          <button class="icon-btn small" @click="$emit('createRoom')" title="创建聊天室">➕</button>
+          <div class="chat-sidebar-actions">
+            <button class="icon-btn small" @click="showCreateRoomInput" title="创建聊天室">➕</button>
+            <button class="icon-btn small" @click="sidebarCollapsed = true" title="收起侧边栏">◀</button>
+          </div>
+        </div>
+
+        <!-- 创建聊天室内联输入框 -->
+        <div v-if="creatingRoom" class="chat-create-room-inline">
+          <input
+            v-model="newRoomName"
+            class="chat-create-room-input"
+            placeholder="输入聊天室名称..."
+            @keydown.enter.exact="confirmCreateRoom"
+            @keydown.escape="cancelCreateRoom"
+            ref="createRoomInputRef"
+          />
+          <div class="chat-create-room-actions">
+            <button class="icon-btn small chat-create-confirm" @click="confirmCreateRoom" title="确认">✓</button>
+            <button class="icon-btn small chat-create-cancel" @click="cancelCreateRoom" title="取消">✕</button>
+          </div>
         </div>
         <div class="chat-room-list">
           <div
@@ -104,7 +115,12 @@
       </div>
 
       <!-- 侧边栏拖拽调整宽度 -->
-      <div class="chat-sidebar-resize" @mousedown="$emit('startSidebarResize', $event)"></div>
+      <div v-show="!sidebarCollapsed" class="chat-sidebar-resize" @mousedown="$emit('startSidebarResize', $event)"></div>
+
+      <!-- 侧边栏收起时的展开按钮 -->
+      <div v-if="sidebarCollapsed" class="chat-sidebar-expand" @click="sidebarCollapsed = false" title="展开侧边栏">
+        <span>▶</span>
+      </div>
 
       <!-- 消息区域 -->
       <div class="chat-main">
@@ -129,19 +145,20 @@
           <textarea
             v-model="draftMessage"
             class="chat-input"
-            placeholder="输入消息... (Enter发送, Shift+Enter换行)"
-            rows="2"
-            @keydown.enter.exact.prevent="sendMessage"
-            @keydown.enter.shift.prevent="insertNewline"
+            placeholder="输入消息... (Ctrl+Enter / Ctrl+D 发送)"
+            rows="1"
+            @input="autoResizeInput"
+            @keydown="handleInputKeydown"
+            ref="chatInputRef"
           ></textarea>
-          <button class="icon-btn" @click="sendMessage" :disabled="!socket" title="发送">➤</button>
+          <button class="icon-btn chat-send-btn" @click="sendMessage" :disabled="!socket || !draftMessage.trim()" title="发送">➤</button>
         </div>
       </div>
     </div>
 
     <div
       v-for="direction in resizeDirections"
-      v-show="!collapsed"
+      v-show="true"
       :key="direction"
       :class="['chat-resize-handle', `chat-resize-${direction}`]"
       @mousedown="$emit('startResize', $event, direction)"
@@ -193,7 +210,12 @@ const emit = defineEmits([
 
 const draftMessage = ref('')
 const messagesRef = ref(null)
+const chatInputRef = ref(null)
+const createRoomInputRef = ref(null)
 const myName = ref(props.myName || '')
+const sidebarCollapsed = ref(false)
+const creatingRoom = ref(false)
+const newRoomName = ref('')
 
 // 同步父组件传入的myName变化
 watch(() => props.myName, (val) => {
@@ -214,11 +236,56 @@ function sendMessage() {
   if (!draftMessage.value.trim()) return
   emit('sendMessage', draftMessage.value)
   draftMessage.value = ''
+  // 重置输入框高度
+  nextTick(() => {
+    if (chatInputRef.value) {
+      chatInputRef.value.style.height = 'auto'
+    }
+  })
 }
 
-// Shift+Enter 插入换行
-function insertNewline() {
-  draftMessage.value += '\n'
+// 自动调整输入框高度
+function autoResizeInput() {
+  const el = chatInputRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+}
+
+// 处理输入框键盘事件
+function handleInputKeydown(event) {
+  // Ctrl+Enter / Ctrl+D 发送
+  if (event.ctrlKey && (event.key === 'Enter' || event.key.toLowerCase() === 'd')) {
+    event.preventDefault()
+    sendMessage()
+    return
+  }
+}
+
+// 显示创建聊天室输入框
+function showCreateRoomInput() {
+  creatingRoom.value = true
+  newRoomName.value = ''
+  nextTick(() => {
+    if (createRoomInputRef.value) {
+      createRoomInputRef.value.focus()
+    }
+  })
+}
+
+// 确认创建聊天室
+function confirmCreateRoom() {
+  const name = newRoomName.value.trim()
+  if (!name) return
+  emit('createRoom', name)
+  creatingRoom.value = false
+  newRoomName.value = ''
+}
+
+// 取消创建聊天室
+function cancelCreateRoom() {
+  creatingRoom.value = false
+  newRoomName.value = ''
 }
 
 // 格式化消息时间
@@ -311,30 +378,25 @@ watch(
   user-select: none;
 }
 
-.chat-collapsed-bar {
+/* 侧边栏展开按钮 */
+.chat-sidebar-expand {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
+  width: 24px;
   height: 100%;
   cursor: pointer;
   background: var(--color-bg-secondary);
   border-right: 1px solid var(--color-border);
   flex-shrink: 0;
-  font-size: 18px;
+  font-size: 12px;
   color: var(--color-text-secondary);
   transition: background 0.2s;
 }
 
-.chat-collapsed-bar:hover {
+.chat-sidebar-expand:hover {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
-}
-
-.chat-collapse-btn {
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
 }
 
 .chat-panel-header {
@@ -481,6 +543,57 @@ watch(
   border-bottom: 1px solid var(--color-border);
 }
 
+.chat-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 创建聊天室内联输入框 */
+.chat-create-room-inline {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-create-room-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.chat-create-room-input:focus {
+  border-color: var(--color-accent, #4a9eff);
+}
+
+.chat-create-room-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.chat-create-room-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.chat-create-confirm {
+  color: var(--color-accent, #4a9eff) !important;
+}
+
+.chat-create-cancel {
+  color: var(--color-text-secondary) !important;
+}
+
 .chat-room-list,
 .chat-client-list {
   flex: 1;
@@ -497,6 +610,8 @@ watch(
   justify-content: space-between;
   font-size: 13px;
   color: var(--color-text-primary);
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
 }
 
 .chat-room-item:hover,
@@ -504,9 +619,15 @@ watch(
   background: var(--color-bg-hover);
 }
 
-.chat-room-item.active,
+.chat-room-item.active {
+  background: var(--color-bg-active);
+  border-left: 3px solid var(--color-accent, #4a9eff);
+  font-weight: 600;
+}
+
 .chat-client-item.active {
   background: var(--color-bg-active);
+  border-left: 3px solid var(--color-accent, #4a9eff);
 }
 
 .chat-room-item.joined:not(.active) {
@@ -632,21 +753,28 @@ watch(
 .chat-input {
   flex: 1;
   background: var(--color-bg-tertiary);
-  border: none;
-  border-radius: var(--tile-radius);
-  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 12px;
   font-size: 13px;
   color: var(--color-text-primary);
   outline: none;
   resize: none;
-  min-height: 32px;
-  max-height: 80px;
-  line-height: 1.4;
+  overflow-y: auto;
+  min-height: 36px;
+  max-height: 120px;
+  line-height: 1.5;
   font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
 }
 
 .chat-input:focus {
-  border: 1px solid var(--color-accent);
+  border-color: var(--color-accent, #4a9eff);
+}
+
+.chat-input::placeholder {
+  color: var(--color-text-secondary);
 }
 
 
