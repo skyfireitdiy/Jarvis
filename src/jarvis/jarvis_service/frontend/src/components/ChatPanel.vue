@@ -80,7 +80,7 @@
               :class="{ active: activePrivateId === member.client_id }"
               @click="$emit('selectPrivate', member.client_id)"
             >
-              <span class="chat-client-name">{{ member.name }}</span>
+              <span class="chat-client-name">{{ member.display_name || member.name }}</span>
               <span v-if="unreadMap['private_' + member.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + member.client_id] }}</span>
             </div>
           </div>
@@ -99,7 +99,7 @@
               :class="{ active: activePrivateId === client.client_id }"
               @click="$emit('selectPrivate', client.client_id)"
             >
-              <span class="chat-client-name">{{ client.name }}</span>
+              <span class="chat-client-name">{{ client.display_name || client.name }}</span>
               <span v-if="unreadMap['private_' + client.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + client.client_id] }}</span>
             </div>
             <div v-if="clients.length === 0" class="chat-empty">暂无在线用户</div>
@@ -128,7 +128,7 @@
             class="chat-message"
             :class="{ mine: msg.client_id === myClientId, 'chat-message-new': idx === messages.length - 1 && msg.client_id !== myClientId }"
           >
-            <span class="chat-message-sender">{{ msg.sender_name }}</span>
+            <span class="chat-message-sender">{{ msg.sender_display_name || msg.sender_name }}</span>
             <div class="chat-message-bubble">
               <span class="chat-message-content">{{ msg.content }}</span>
             </div>

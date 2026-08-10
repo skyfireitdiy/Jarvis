@@ -59,11 +59,20 @@ class ChatManager:
         await self.broadcast_to_all(
             {
                 "type": "chat_client_joined",
-                "payload": {"client_id": client_id, "name": name, "display_name": display_name or name},
+                "payload": {
+                    "client_id": client_id,
+                    "name": name,
+                    "display_name": display_name or name,
+                },
             },
             exclude_client_id=client_id,
         )
-        return {"success": True, "client_id": client_id, "name": name, "display_name": display_name or name}
+        return {
+            "success": True,
+            "client_id": client_id,
+            "name": name,
+            "display_name": display_name or name,
+        }
 
     async def unregister_client(self, client_id: str) -> None:
         """注销客户端，并清理其所在聊天室，广播下线通知。"""
@@ -92,7 +101,11 @@ class ChatManager:
     def get_clients(self) -> list[Dict[str, Any]]:
         """获取所有在线客户端列表。"""
         return [
-            {"client_id": cid, "name": info["name"], "display_name": info.get("display_name", info["name"])}
+            {
+                "client_id": cid,
+                "name": info["name"],
+                "display_name": info.get("display_name", info["name"]),
+            }
             for cid, info in self._chat_clients.items()
         ]
 
@@ -240,6 +253,9 @@ class ChatManager:
         msg = {
             "sender_id": sender_id,
             "sender_name": self._chat_clients[sender_id]["name"],
+            "sender_display_name": self._chat_clients[sender_id].get(
+                "display_name", self._chat_clients[sender_id]["name"]
+            ),
             "content": content,
             "timestamp": time.time(),
         }
