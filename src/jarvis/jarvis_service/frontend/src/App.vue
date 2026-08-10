@@ -93,7 +93,7 @@
         
         <div class="header-actions desktop-only">
           <span v-if="auth.userInfo" class="user-info-display" :title="'当前用户: ' + auth.userInfo.username">
-            👤 {{ auth.userInfo.username }}
+            👤 {{ auth.userInfo.display_name || auth.userInfo.username }}
           </span>
           <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
@@ -1346,6 +1346,24 @@ function getAuthToken() {
     return savedToken
   }
   return null
+}
+
+// 刷新用户信息（确保display_name等字段最新）
+async function refreshUserInfo() {
+  if (!hasAuthToken()) return
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/auth/me`)
+    if (response.ok) {
+      const result = await response.json()
+      if (result.success && result.data) {
+        auth.value.userInfo = result.data
+        localStorage.setItem('jarvis_user_info', JSON.stringify(result.data))
+      }
+    }
+  } catch (e) {
+    console.warn('[AUTH] Failed to refresh user info:', e)
+  }
 }
 
 // 尝试从 localStorage 加载已保存的 token 和用户信息
@@ -3749,6 +3767,8 @@ async function connect() {
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     console.log('[ws] Connection info saved:', gatewayUrl.value)
     startAgentListRefresh()
+    // 刷新用户信息（确保display_name等字段最新）
+    refreshUserInfo()
     // 登录成功后自动连接所有在线的 agent
     autoConnectToOnlineAgents()
     // 获取模型组列表
@@ -6901,6 +6921,13 @@ function handleChatMessage(type, payload) {
     case 'chat_register_response':
       if (payload?.success) {
         myClientId.value = payload.client_id || myClientId.value
+        // 将自身加入在线用户列表（使用display_name）
+        if (payload.client_id) {
+          const exists = chatClients.value.some(c => c.client_id === payload.client_id)
+          if (!exists) {
+            chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name, display_name: payload.display_name || payload.name }]
+          }
+        }
         // 自动重新加入缓存的房间
         const savedRooms = chatJoinedRooms.value.filter(rid => rid)
         if (savedRooms.length > 0) {
@@ -6961,7 +6988,7 @@ function handleChatMessage(type, payload) {
       if (payload?.client_id && payload?.client_id !== myClientId.value) {
         const exists = chatClients.value.some(c => c.client_id === payload.client_id)
         if (!exists) {
-          chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name }]
+          chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name, display_name: payload.display_name || payload.name }]
         }
       }
       break
@@ -6980,8 +7007,9 @@ function handleChatMessage(type, payload) {
       if (!chatMessages.value[roomId]) chatMessages.value[roomId] = []
       chatMessages.value[roomId].push({
         client_id: payload?.client_id,
-        client_name: payload?.sender_name || payload?.client_id,
+        client_name: payload?.sender_display_name || payload?.sender_name || payload?.client_id,
         sender_name: payload?.sender_name || payload?.client_id,
+        sender_display_name: payload?.sender_display_name || payload?.sender_name,
         content: payload?.content,
         room_id: roomId,
         timestamp: payload?.timestamp || Date.now(),
@@ -7007,8 +7035,9 @@ function handleChatMessage(type, payload) {
       if (!chatMessages.value[privMsgKey]) chatMessages.value[privMsgKey] = []
       chatMessages.value[privMsgKey].push({
         client_id: payload?.message?.sender_id,
-        client_name: payload?.message?.sender_name || payload?.message?.sender_id,
+        client_name: payload?.message?.sender_display_name || payload?.message?.sender_name || payload?.message?.sender_id,
         sender_name: payload?.message?.sender_name || payload?.message?.sender_id,
+        sender_display_name: payload?.message?.sender_display_name || payload?.message?.sender_name,
         content: payload?.message?.content,
         private: true,
         timestamp: payload?.message?.timestamp || Date.now(),
@@ -8860,7 +8889,7 @@ const myClientId = ref('')
 const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
-const chatName = computed(() => username.value)
+const chatName = computed(() => auth.value.userInfo?.display_name || username.value)
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
 const CHAT_JOINED_ROOMS_KEY = 'jarvis_chat_joined_rooms'
@@ -9331,7 +9360,8 @@ function sendChatMessage(content) {
     chatMessages.value[selfMsgKey].push({
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
-      sender_name: chatName.value || myClientId.value,
+      sender_name: username.value || myClientId.value,
+      sender_display_name: chatName.value || username.value,
       content: trimmed,
       private: true,
       timestamp: Date.now(),
@@ -9349,7 +9379,8 @@ function sendChatMessage(content) {
     chatMessages.value[activeChatRoomId.value].push({
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
-      sender_name: chatName.value || myClientId.value,
+      sender_name: username.value || myClientId.value,
+      sender_display_name: chatName.value || username.value,
       content: trimmed,
       room_id: activeChatRoomId.value,
       timestamp: Date.now(),
