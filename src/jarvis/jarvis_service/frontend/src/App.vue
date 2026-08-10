@@ -65,7 +65,10 @@
             👤
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
-            ⚙️
+            ⚙
+          </button>
+          <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理">
+            🛡️
           </button>
         </div>
         
@@ -104,6 +107,9 @@
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙
+          </button>
+          <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理">
+            🛡️
           </button>
           <button v-if="auth.token" class="icon-btn logout-btn" @click="logout()" title="登出">
             🚪
@@ -662,6 +668,17 @@
       @confirmUpdateCodeToMain="confirmUpdateCodeToMain"
     />
 
+    <!-- 管理面板 -->
+    <AdminPanel
+      :visible="showAdminPanel"
+      :auth="auth"
+      :fetchWithAuth="fetchWithAuth"
+      :gatewayUrl="gatewayUrl"
+      :showToast="showToast"
+      :getHttpProtocol="getHttpProtocol"
+      @update:visible="showAdminPanel = $event"
+    />
+
     <!-- Session 选择对话框 -->
     <SessionDialog
       :visible="showSessionDialog"
@@ -832,6 +849,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
+import AdminPanel from './components/AdminPanel.vue'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -1257,7 +1275,6 @@ async function loginWithPassword(password) {
     // 如果免登录开启，将 Token 保存到 localStorage
     if (autoLoginEnabled.value) {
       localStorage.setItem('jarvis_auth_token', result.data.token)
-      console.log('[AUTH] Token saved to localStorage (auto login enabled)')
     }
 
     // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
@@ -1288,9 +1305,26 @@ async function logout() {
     auth.value.password = ''
     localStorage.removeItem('jarvis_auth_token')
     localStorage.removeItem('jarvis_user_info')
+
+    // 断开所有WebSocket连接
+    stopAgentListRefresh()
+    sockets.value.forEach((ws, agentId) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+    })
+    sockets.value.clear()
+    if (socket.value) {
+      socket.value.close()
+      socket.value = null
+    }
+    currentAgentId.value = null
+    agentList.value = []
+    agentStatuses.value.clear()
+
     showConnectModal.value = true
     connectErrorMessage.value = ''
-    console.log('[AUTH] Logged out successfully')
+    console.log('[AUTH] Logged out successfully, all connections closed')
   }
 }
 
@@ -1494,6 +1528,7 @@ function getGatewayAddress() {
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
+const showAdminPanel = ref(false) // 管理面板
 const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板

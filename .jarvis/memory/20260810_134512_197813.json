@@ -1,0 +1,8 @@
+{
+  "id": "20260810_134512_197813",
+  "type": "project_long_term",
+  "tags": ["admin-panel", "implementation-complete", "auth-permission-design"],
+  "content": "前端用户/权限管理界面(AdminPanel)实施完成：\n\n新增文件：\n- AdminPanel.vue(434行)：系统管理面板，含三Tab\n  - 用户管理：列表+创建+删除+重置密码+组分配\n  - 权限组管理：列表+创建+编辑+删除\n  - 我的账户：修改密码\n\nApp.vue集成：\n- L849: import AdminPanel\n- L1512: showAdminPanel ref\n- L70: 管理按钮(v-if=auth.userInfo?.is_admin)\n- L669-677: AdminPanel组件挂载\n\n后端API对接：\n- GET/POST /api/users, GET/PUT/DELETE /api/users/{id}\n- POST /api/users/{id}/reset-password, /api/users/{id}/change-password\n- GET/PUT /api/permissions/user/{id}/groups\n- GET/POST/PUT/DELETE /api/permissions/groups\n\n权限控制：管理按钮仅is_admin用户可见\n构建状态：npm run build通过",
+  "created_at": "2026-08-10T13:45:12.197872",
+  "updated_at": "2026-08-10T13:45:12.197888"
+}
