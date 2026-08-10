@@ -87,6 +87,26 @@
           <div style="margin-bottom:8px;font-weight:600;font-size:13px">编辑组 - {{ selectedGroup.name }}</div>
           <div class="form-row"><label>显示名</label><input v-model="editGroupForm.display_name" placeholder="输入显示名" /></div>
           <div class="form-row"><label>描述</label><input v-model="editGroupForm.description" placeholder="输入描述" /></div>
+          <!-- 权限矩阵 -->
+          <div class="permission-matrix">
+            <div style="margin-bottom:8px;font-weight:600;font-size:13px">权限设置</div>
+            <div v-if="loadingGroupPerms" style="color:var(--text-secondary,#888);font-size:13px">加载权限中...</div>
+            <div v-else>
+              <div class="perm-resource" v-for="(actions, resource) in permissionSchema" :key="resource">
+                <div class="perm-resource-header">{{ resourceLabels[resource] || resource }}</div>
+                <div class="perm-actions">
+                  <div class="perm-action" v-for="action in actions" :key="action">
+                    <span class="perm-action-name">{{ action }}</span>
+                    <select class="perm-select" v-model="editPermissions[resource + ':' + action]">
+                      <option value="">未设置</option>
+                      <option value="allow">允许</option>
+                      <option value="deny">拒绝</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="btn-group"><button class="ghost-btn" @click="updateGroup" :disabled="loading">保存</button><button class="ghost-btn" @click="showEditGroup = false">取消</button></div>
         </div>
       </div>
@@ -145,6 +165,26 @@ const editGroupForm = ref({ group_id: '', display_name: '', description: '' })
 const userGroupIds = ref([])
 const allGroups = ref([])
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
+const editPermissions = ref({})
+const loadingGroupPerms = ref(false)
+
+// 权限Schema：资源→动作列表
+const permissionSchema = {
+  '*': ['*'],
+  'agent': ['*', 'create', 'read', 'execute', 'delete'],
+  'terminal': ['*', 'read', 'execute'],
+  'timer': ['*', 'read', 'create', 'delete'],
+  'chat': ['*', 'read', 'send'],
+  'admin': ['*', 'users', 'permissions'],
+}
+const resourceLabels = {
+  '*': '全部',
+  'agent': 'Agent',
+  'terminal': '终端',
+  'timer': '定时任务',
+  'chat': '聊天',
+  'admin': '管理',
+}
 
 // 计算属性
 const currentUserId = computed(() => props.auth?.userInfo?.user_id || '')
@@ -312,22 +352,50 @@ async function createGroup() {
   finally { loading.value = false }
 }
 
-function openEditGroup(group) {
+async function openEditGroup(group) {
   selectedGroup.value = group
   editGroupForm.value = { group_id: group.group_id, display_name: group.display_name || '', description: group.description || '' }
   showEditGroup.value = true
+  // 加载组权限
+  loadingGroupPerms.value = true
+  editPermissions.value = {}
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/permissions/groups/${group.group_id}/permissions`))
+    const result = await resp.json()
+    if (result.success) {
+      // 将permissions对象转为扁平的key→value映射
+      const perms = result.data.permissions || {}
+      const flat = {}
+      for (const [key, val] of Object.entries(perms)) {
+        flat[key] = val
+      }
+      editPermissions.value = flat
+    }
+  } catch (e) { props.showToast('加载权限失败', 'error') }
+  finally { loadingGroupPerms.value = false }
 }
 
 async function updateGroup() {
   loading.value = true
   try {
     const { group_id, ...updateData } = editGroupForm.value
+    // 更新组基本信息
     const resp = await props.fetchWithAuth(buildApiUrl(`/api/permissions/groups/${group_id}`), {
       method: 'PUT', body: JSON.stringify(updateData)
     })
     const result = await resp.json()
-    if (result.success) { props.showToast('权限组已更新', 'success'); showEditGroup.value = false; loadGroups() }
-    else props.showToast(result.error?.message || '更新失败', 'error')
+    if (!result.success) { props.showToast(result.error?.message || '更新失败', 'error'); return }
+    // 保存权限（过滤掉空值）
+    const perms = {}
+    for (const [key, val] of Object.entries(editPermissions.value)) {
+      if (val) perms[key] = val
+    }
+    const permResp = await props.fetchWithAuth(buildApiUrl(`/api/permissions/groups/${group_id}/permissions`), {
+      method: 'PUT', body: JSON.stringify({ permissions: perms })
+    })
+    const permResult = await permResp.json()
+    if (permResult.success) { props.showToast('权限组已更新', 'success'); showEditGroup.value = false; loadGroups() }
+    else props.showToast(permResult.error?.message || '权限更新失败', 'error')
   } catch (e) { props.showToast('更新失败: ' + e.message, 'error') }
   finally { loading.value = false }
 }
@@ -370,7 +438,7 @@ async function changePassword() {
 }
 .admin-modal {
   background: var(--bg-secondary, #1e1e2e); color: var(--text-primary, #cdd6f4);
-  border-radius: 12px; width: 90%; max-width: 800px; max-height: 85vh;
+  border-radius: 12px; width: 80%; max-width: 1200px; max-height: 90vh;
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
@@ -484,4 +552,36 @@ async function changePassword() {
 }
 .toggle-input:checked + .toggle-slider { background: var(--accent, #89b4fa); }
 .toggle-input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+/* 权限矩阵 */
+.permission-matrix {
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--border-color, #45475a);
+}
+.perm-resource {
+  margin-bottom: 12px;
+}
+.perm-resource-header {
+  font-size: 13px; font-weight: 600; color: var(--accent, #89b4fa);
+  margin-bottom: 6px; padding: 4px 0;
+}
+.perm-actions {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  padding-left: 12px;
+}
+.perm-action {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+}
+.perm-action-name {
+  color: var(--text-secondary, #a6adc8); min-width: 70px;
+}
+.perm-select {
+  padding: 2px 6px; border-radius: 4px; font-size: 12px;
+  border: 1px solid var(--border-color, #45475a);
+  background: var(--bg-primary, #11111b); color: var(--text-primary, #cdd6f4);
+  cursor: pointer; outline: none;
+}
+.perm-select:focus { border-color: var(--accent, #89b4fa); }
+.perm-select option[value="allow"] { color: #a6e3a1; }
+.perm-select option[value="deny"] { color: #f38ba8; }
 </style>
