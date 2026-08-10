@@ -1358,8 +1358,9 @@ async function refreshUserInfo() {
     if (response.ok) {
       const result = await response.json()
       if (result.success && result.data) {
-        auth.value.userInfo = result.data
-        localStorage.setItem('jarvis_user_info', JSON.stringify(result.data))
+        const userData = result.data.user || result.data
+        auth.value.userInfo = userData
+        localStorage.setItem('jarvis_user_info', JSON.stringify(userData))
       }
     }
   } catch (e) {

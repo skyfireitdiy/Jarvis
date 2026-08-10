@@ -584,12 +584,14 @@ class WebSocketConnectionManager:
         terminal_input_registry: TerminalInputRegistry,
         gateway: WebGateway,
         auth_store: Dict[str, Optional[Dict[str, Any]]],
+        user_manager: Optional[Any] = None,
     ) -> None:
         self._router = router
         self._input_registry = input_registry
         self._terminal_input_registry = terminal_input_registry
         self._gateway = gateway
         self._auth_store = auth_store
+        self._user_manager = user_manager
 
         self._active_connections: Dict[str, Dict[str, tuple[str, WebSocket]]] = {}
         self._connection_state_lock = asyncio.Lock()
@@ -1155,7 +1157,7 @@ class WebSocketConnectionManager:
                 user_id = user_info.get("user_id")
         # 从user_manager获取display_name
         display_name = None
-        if user_id and hasattr(self, "_user_manager") and self._user_manager:
+        if user_id and self._user_manager:
             user_data = self._user_manager.get_user(user_id)
             if user_data:
                 display_name = user_data.get("display_name")
@@ -1456,7 +1458,12 @@ def create_app(
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     manager = WebSocketConnectionManager(
-        router, input_registry, terminal_input_registry, gateway, auth_store
+        router,
+        input_registry,
+        terminal_input_registry,
+        gateway,
+        auth_store,
+        user_manager,
     )
 
     set_current_gateway(gateway)
