@@ -91,21 +91,24 @@
           <div class="permission-matrix">
             <div style="margin-bottom:8px;font-weight:600;font-size:13px">权限设置</div>
             <div v-if="loadingGroupPerms" style="color:var(--text-secondary,#888);font-size:13px">加载权限中...</div>
-            <div v-else>
-              <div class="perm-resource" v-for="(actions, resource) in permissionSchema" :key="resource">
-                <div class="perm-resource-header">{{ resourceLabels[resource] || resource }}</div>
-                <div class="perm-actions">
-                  <div class="perm-action" v-for="action in actions" :key="action">
-                    <span class="perm-action-name">{{ action }}</span>
-                    <select class="perm-select" v-model="editPermissions[resource + ':' + action]">
-                      <option value="">未设置</option>
-                      <option value="allow">允许</option>
-                      <option value="deny">拒绝</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <table v-else class="perm-table">
+              <thead><tr><th>资源</th><th>动作</th><th>权限</th></tr></thead>
+              <tbody>
+                <template v-for="(actions, resource) in permissionSchema" :key="resource">
+                  <tr v-for="(action, idx) in actions" :key="resource + ':' + action">
+                    <td v-if="idx === 0" :rowspan="actions.length" class="perm-resource-cell">{{ resourceLabels[resource] || resource }}</td>
+                    <td class="perm-action-cell">{{ action }}</td>
+                    <td class="perm-value-cell">
+                      <select class="perm-select" v-model="editPermissions[resource + ':' + action]">
+                        <option value="">无</option>
+                        <option value="allow">✓ 允许</option>
+                        <option value="deny">✗ 拒绝</option>
+                      </select>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
           <div class="btn-group"><button class="ghost-btn" @click="updateGroup" :disabled="loading">保存</button><button class="ghost-btn" @click="showEditGroup = false">取消</button></div>
         </div>
@@ -558,22 +561,25 @@ async function changePassword() {
   margin-top: 16px; padding-top: 12px;
   border-top: 1px solid var(--border-color, #45475a);
 }
-.perm-resource {
-  margin-bottom: 12px;
+.perm-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
 }
-.perm-resource-header {
-  font-size: 13px; font-weight: 600; color: var(--accent, #89b4fa);
-  margin-bottom: 6px; padding: 4px 0;
+.perm-table th {
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-color, #45475a);
+  color: var(--text-secondary, #a6adc8); font-weight: 500; font-size: 12px;
 }
-.perm-actions {
-  display: flex; flex-wrap: wrap; gap: 8px 16px;
-  padding-left: 12px;
+.perm-table td {
+  padding: 4px 10px; border-bottom: 1px solid rgba(69,71,90,0.2);
 }
-.perm-action {
-  display: flex; align-items: center; gap: 6px; font-size: 12px;
+.perm-resource-cell {
+  font-weight: 600; color: var(--accent, #89b4fa); vertical-align: middle;
+  border-right: 1px solid var(--border-color, #45475a);
 }
-.perm-action-name {
-  color: var(--text-secondary, #a6adc8); min-width: 70px;
+.perm-action-cell {
+  color: var(--text-secondary, #a6adc8);
+}
+.perm-value-cell {
+  text-align: center;
 }
 .perm-select {
   padding: 2px 6px; border-radius: 4px; font-size: 12px;
