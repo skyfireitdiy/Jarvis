@@ -43,7 +43,7 @@ class ChatManager:
         connection_id: str,
         websocket: WebSocket,
     ) -> Dict[str, Any]:
-        """注册客户端。"""
+        """注册客户端，并广播上线通知。"""
         async with self._lock:
             self._chat_clients[client_id] = {
                 "name": name,
@@ -51,15 +51,30 @@ class ChatManager:
                 "websocket": websocket,
                 "registered_at": time.time(),
             }
+        # 广播上线通知（锁外执行，避免死锁）
+        await self.broadcast_to_all(
+            {"type": "chat_client_joined", "client_id": client_id, "name": name},
+            exclude_client_id=client_id,
+        )
         return {"success": True, "client_id": client_id, "name": name}
 
     async def unregister_client(self, client_id: str) -> None:
-        """注销客户端，并清理其所在聊天室。"""
+        """注销客户端，并清理其所在聊天室，广播下线通知。"""
+        client_info = None
         async with self._lock:
-            self._chat_clients.pop(client_id, None)
+            client_info = self._chat_clients.pop(client_id, None)
             # 从所有聊天室中移除
             for room in self._chat_rooms.values():
                 room["members"].discard(client_id)
+        # 广播下线通知（锁外执行，避免死锁）
+        if client_info:
+            await self.broadcast_to_all(
+                {
+                    "type": "chat_client_left",
+                    "client_id": client_id,
+                    "name": client_info.get("name", ""),
+                },
+            )
 
     def get_client(self, client_id: str) -> Optional[Dict[str, Any]]:
         """获取客户端信息。"""

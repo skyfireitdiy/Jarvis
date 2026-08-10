@@ -6837,6 +6837,19 @@ function handleChatMessage(type, payload) {
     case 'chat_get_clients_response':
       chatClients.value = payload?.clients || []
       break
+    case 'chat_client_joined':
+      if (payload?.client_id && payload?.client_id !== myClientId.value) {
+        const exists = chatClients.value.some(c => c.client_id === payload.client_id)
+        if (!exists) {
+          chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name }]
+        }
+      }
+      break
+    case 'chat_client_left':
+      if (payload?.client_id) {
+        chatClients.value = chatClients.value.filter(c => c.client_id !== payload.client_id)
+      }
+      break
     case 'chat_get_room_members_response':
       chatRoomMembers.value = payload?.members || []
       break
