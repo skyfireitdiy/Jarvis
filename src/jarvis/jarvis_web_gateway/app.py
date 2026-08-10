@@ -1153,8 +1153,14 @@ class WebSocketConnectionManager:
             user_info = auth_payload.get("user_info")
             if user_info and isinstance(user_info, dict):
                 user_id = user_info.get("user_id")
+        # 从user_manager获取display_name
+        display_name = None
+        if user_id and hasattr(self, '_user_manager') and self._user_manager:
+            user_data = self._user_manager.get_user(user_id)
+            if user_data:
+                display_name = user_data.get("display_name")
         result = await self._chat_manager.register_client(
-            client_id, name, connection_id, websocket, user_id=user_id
+            client_id, name, connection_id, websocket, user_id=user_id, display_name=display_name
         )
         await websocket.send_json({"type": "chat_register_response", "payload": result})
 
