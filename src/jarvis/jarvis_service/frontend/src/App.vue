@@ -54,8 +54,9 @@
           <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent列表">
             📋
           </button>
-          <button class="icon-btn" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
+          <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
+            <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
           </button>
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
@@ -88,8 +89,9 @@
         </div>
         
         <div class="header-actions desktop-only">
-          <button class="icon-btn" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
+          <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
+            <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
           </button>
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
@@ -10733,6 +10735,29 @@ body::-webkit-scrollbar {
 .icon-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.chat-btn-wrapper {
+  position: relative;
+}
+
+.chat-unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #f85149;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .manual-interrupt-btn {
