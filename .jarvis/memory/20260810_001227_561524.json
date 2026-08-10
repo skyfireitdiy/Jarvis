@@ -1,0 +1,8 @@
+{
+  "id": "20260810_001227_561524",
+  "type": "project_long_term",
+  "tags": ["chat", "online-clients", "broadcast"],
+  "content": "在线用户列表实时同步：后端register_client广播chat_client_joined(排除自身)，unregister_client广播chat_client_left；前端App.vue新增两个case处理chatClients增删。广播在锁外执行避免死锁。commit: 22827b7",
+  "created_at": "2026-08-10T00:12:27.561556",
+  "updated_at": "2026-08-10T00:12:27.561562"
+}
