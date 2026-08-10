@@ -1339,7 +1339,14 @@ function loadSavedToken() {
 
 async function fetchWithAuth(url, options = {}) {
   if (!hasAuthToken()) {
-    throw new Error('尚未登录，已阻止向后端发送请求')
+    // 返回模拟401响应，触发统一401处理流程
+    return new Response(
+      JSON.stringify({success: false, error: {message: '未登录', code: 'UNAUTHORIZED'}}),
+      {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    )
   }
 
   // 复制 options 避免修改原始对象
@@ -1367,6 +1374,7 @@ async function fetchWithAuth(url, options = {}) {
     localStorage.removeItem('jarvis_user_info')
     showConnectModal.value = true
     connectErrorMessage.value = '登录已过期，请重新登录'
+    stopAgentListRefresh()
   }
   
   return response

@@ -55,7 +55,6 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
 from jarvis.jarvis_web_gateway.token_manager import (
     generate_gateway_token,
     validate_gateway_token,
-    validate_token_with_user,
     extract_token_from_authorization_header,
 )
 from jarvis.jarvis_web_gateway.user_manager import UserManager
@@ -63,7 +62,6 @@ from jarvis.jarvis_web_gateway.permission_manager import PermissionManager
 from jarvis.jarvis_web_gateway.jwt_utils import (
     generate_jwt_token,
     revoke_token,
-    cleanup_revoked_tokens,
 )
 from jarvis.jarvis_web_gateway.node_config import (
     NodeRuntimeConfig,
@@ -101,7 +99,6 @@ import jarvis.jarvis_utils.globals as jglobals
 from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 from jarvis.jarvis_utils.config import (
     GLOBAL_CONFIG_DATA,
-    get_gateway_auth_config,
     save_exception,
 )
 
@@ -1638,46 +1635,6 @@ def create_app(
                         },
                     },
                 }
-
-            # 回退：旧密码模式（兼容JARVIS_GATEWAY_PASSWORD）
-            config = get_gateway_auth_config()
-            expected_password = config.get("password") if config else None
-            if expected_password and password == expected_password:
-                # 旧密码验证通过，返回环境变量Token
-                token = os.environ.get("JARVIS_AUTH_TOKEN")
-                if token:
-                    logger.info(f"[AUTH] Legacy password login successful")
-                    return {
-                        "success": True,
-                        "data": {
-                            "token": token,
-                            "user": {
-                                "user_id": "system",
-                                "username": "gateway",
-                                "display_name": "Gateway Admin",
-                                "is_admin": True,
-                            },
-                            "note": "Token is valid until Web Gateway restarts",
-                        },
-                    }
-
-            # 未配置密码时，允许直接登录
-            if not expected_password:
-                token = os.environ.get("JARVIS_AUTH_TOKEN")
-                if token:
-                    logger.info("[AUTH] No password configured, login allowed")
-                    return {
-                        "success": True,
-                        "data": {
-                            "token": token,
-                            "user": {
-                                "user_id": "system",
-                                "username": "gateway",
-                                "display_name": "Gateway Admin",
-                                "is_admin": True,
-                            },
-                        },
-                    }
 
             logger.warning(f"[AUTH] Login failed for user '{username}'")
             return {
