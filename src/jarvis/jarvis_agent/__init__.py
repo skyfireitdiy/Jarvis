@@ -1940,7 +1940,13 @@ class Agent:
                             f"📋 总结内容（前 500 字符）: {summary[:500]}..."
                         )
             return summary
+        except KeyboardInterrupt:
+            raise  # 中断信号直接向上传播
         except Exception:
+            # 检查是否为中断导致的异常
+            from jarvis.jarvis_utils.utils import get_interrupt
+            if get_interrupt() > 0:
+                raise KeyboardInterrupt("用户中断")
             PrettyOutput.auto_print("❌ 总结对话历史失败")
             return ""
 

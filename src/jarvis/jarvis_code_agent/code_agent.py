@@ -398,6 +398,8 @@ class CodeAgent(Agent):
         """
         # 标记是否应该保存会话（内置命令处理完成时不保存）
         _should_save_session = True
+        # 重置 review 标志，确保每次 run 调用时 review 状态干净
+        self._review_already_done = False
         try:
             set_current_agent(self.name, self)
 
@@ -586,12 +588,15 @@ git reset --hard {start_commit}
             self.git_manager.handle_uncommitted_changes()
 
             # 如果启用了 review，执行 review 和修复循环
-            if not self.disable_review:
+            # AutoComplete 完成后跳过 review（_execute_auto_complete 已执行过）
+            # 检查后立即重置标志，确保仅跳过一次
+            if not self.disable_review and not getattr(self, '_review_already_done', False):
                 self._review_and_fix(
                     prefix=prefix,
                     suffix=suffix,
                     code_generation_summary=result_str,
                 )
+            self._review_already_done = False  # 重置标志，确保后续 run 调用不受影响
 
             # 根据配置在任务结束时手动调用分析功能（在最终提交之前）
             if self._use_analysis_config:
@@ -978,8 +983,14 @@ git reset --hard {start_commit}
             # 使用父类的 generate_summary 方法
             summary = self.generate_summary(for_token_limit=False)
             return summary or ""
+        except KeyboardInterrupt:
+            raise  # 中断信号直接向上传播
         except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 生成修复总结失败: {e}")
+            # 检查是否为中断导致的异常
+            from jarvis.jarvis_utils.utils import get_interrupt
+            if get_interrupt() > 0:
+                raise KeyboardInterrupt("用户中断")
+            PrettyOutput.auto_print(f"⚠ 生成修复总结失败: {str(e)}")
             return ""
 
     def _generate_review_target(self, max_retries: int = 3) -> str:

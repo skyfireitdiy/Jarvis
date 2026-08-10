@@ -882,7 +882,11 @@ class CodeReviewer:
 
             # 生成修复总结并追加到修改历史
             if on_generate_fix_summary:
-                fix_summary = on_generate_fix_summary()
+                try:
+                    fix_summary = on_generate_fix_summary()
+                except KeyboardInterrupt:
+                    PrettyOutput.auto_print("ℹ 用户中断，退出代码审查循环")
+                    return
                 PrettyOutput.auto_print(f"🔍 修复总结: {fix_summary}")
                 if fix_summary:
                     modification_history += (
