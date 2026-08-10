@@ -28,7 +28,7 @@
             <tbody>
               <tr v-for="user in users" :key="user.user_id">
                 <td>{{ user.username }}</td><td>{{ user.display_name || '-' }}</td><td>{{ user.is_admin ? '是' : '否' }}</td>
-                <td><div class="btn-group"><button class="btn-sm" @click="openGroupAssign(user)">分配组</button><button class="btn-sm" @click="openResetPassword(user)">重置密码</button><button class="btn-sm danger" @click="deleteUser(user)" :disabled="user.user_id === currentUserId">删除</button></div></td>
+                <td><div class="btn-group"><button class="btn-sm" @click="openEditUser(user)">编辑</button><button class="btn-sm" @click="openGroupAssign(user)">分配组</button><button class="btn-sm" @click="openResetPassword(user)">重置密码</button><button class="btn-sm danger" @click="deleteUser(user)" :disabled="user.user_id === currentUserId">删除</button></div></td>
               </tr>
               <tr v-if="users.length === 0"><td colspan="4" style="text-align:center;color:var(--text-secondary,#888)">暂无用户</td></tr>
             </tbody>
@@ -57,6 +57,17 @@
           <div class="btn-group">
             <button class="ghost-btn" @click="resetPassword" :disabled="loading">确认重置</button>
             <button class="ghost-btn" @click="showResetPassword = false">取消</button>
+          </div>
+        </div>
+        <!-- 编辑用户 -->
+        <div class="expand-section" v-if="showEditUser && selectedEditUser">
+          <div style="margin-bottom:8px;font-weight:600;font-size:13px">编辑用户 - {{ selectedEditUser.username }}</div>
+          <div class="form-row"><label>显示名</label><input v-model="editUserForm.display_name" placeholder="输入显示名（可选）" /></div>
+          <div class="form-row"><label>管理员</label><label class="toggle-switch"><input type="checkbox" v-model="editUserForm.is_admin" class="toggle-input" /><span class="toggle-slider"></span></label></div>
+          <div class="form-row"><label>状态</label><select v-model="editUserForm.status"><option value="active">活跃</option><option value="disabled">禁用</option><option value="locked">锁定</option></select></div>
+          <div class="btn-group">
+            <button class="ghost-btn" @click="updateUser" :disabled="loading">保存</button>
+            <button class="ghost-btn" @click="showEditUser = false">取消</button>
           </div>
         </div>
       </div>
@@ -164,6 +175,9 @@ const selectedGroup = ref(null)
 const newUserForm = ref({ username: '', password: '', display_name: '', is_admin: false })
 const newGroupForm = ref({ name: '', description: '' })
 const resetPasswordForm = ref({ new_password: '' })
+const showEditUser = ref(false)
+const selectedEditUser = ref(null)
+const editUserForm = ref({ display_name: '', is_admin: false, status: 'active' })
 const editGroupForm = ref({ group_id: '', display_name: '', description: '' })
 const userGroupIds = ref([])
 const allGroups = ref([])
@@ -286,11 +300,33 @@ async function deleteUser(user) {
   finally { loading.value = false }
 }
 
+function openEditUser(user) {
+  selectedEditUser.value = user
+  editUserForm.value = { display_name: user.display_name || '', is_admin: !!user.is_admin, status: user.status || 'active' }
+  showEditUser.value = true
+  showResetPassword.value = false
+  showGroupAssign.value = false
+}
+
+async function updateUser() {
+  loading.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/users/${selectedEditUser.value.user_id}`), {
+      method: 'PUT', body: JSON.stringify(editUserForm.value)
+    })
+    const result = await resp.json()
+    if (result.success) { props.showToast('用户已更新', 'success'); showEditUser.value = false; await loadUsers() }
+    else props.showToast(result.error?.message || '更新失败', 'error')
+  } catch (e) { props.showToast('更新失败: ' + e.message, 'error') }
+  finally { loading.value = false }
+}
+
 function openResetPassword(user) {
   selectedUser.value = user
   resetPasswordForm.value = { new_password: '' }
   showResetPassword.value = true
   showGroupAssign.value = false
+  showEditUser.value = false
 }
 
 async function resetPassword() {
@@ -311,6 +347,7 @@ async function openGroupAssign(user) {
   selectedUser.value = user
   showGroupAssign.value = true
   showResetPassword.value = false
+  showEditUser.value = false
   loadingGroups.value = true
   try {
     const [groupsResp, userGroupsResp] = await Promise.all([
