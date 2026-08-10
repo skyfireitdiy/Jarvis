@@ -54,6 +54,16 @@ from jarvis.jarvis_web_gateway.agent_proxy_manager import (
 )
 from jarvis.jarvis_web_gateway.token_manager import (
     generate_gateway_token,
+    validate_gateway_token,
+    validate_token_with_user,
+    extract_token_from_authorization_header,
+)
+from jarvis.jarvis_web_gateway.user_manager import UserManager
+from jarvis.jarvis_web_gateway.permission_manager import PermissionManager
+from jarvis.jarvis_web_gateway.jwt_utils import (
+    generate_jwt_token,
+    revoke_token,
+    cleanup_revoked_tokens,
 )
 from jarvis.jarvis_web_gateway.node_config import (
     NodeRuntimeConfig,
@@ -1139,8 +1149,15 @@ class WebSocketConnectionManager:
             )
             return
         connection_id = str(uuid.uuid4())
+        # 从认证信息获取user_id
+        auth_payload = self._auth_store.get("default")
+        user_id = None
+        if auth_payload and isinstance(auth_payload, dict):
+            user_info = auth_payload.get("user_info")
+            if user_info and isinstance(user_info, dict):
+                user_id = user_info.get("user_id")
         result = await self._chat_manager.register_client(
-            client_id, name, connection_id, websocket
+            client_id, name, connection_id, websocket, user_id=user_id
         )
         await websocket.send_json({"type": "chat_register_response", "payload": result})
 
@@ -1340,6 +1357,25 @@ def create_app(
     # 统一设置到环境变量，供子进程（Agent）使用
     os.environ["JARVIS_AUTH_TOKEN"] = gateway_token
 
+    # 初始化用户管理和权限管理
+    from jarvis.jarvis_utils.utils import get_data_dir
+
+    _data_dir = get_data_dir()
+    user_manager = UserManager(_data_dir)
+    permission_manager = PermissionManager(_data_dir)
+
+    # 确保admin用户在sys-admin组中
+    admin_user = user_manager.get_user_by_username("admin")
+    if admin_user:
+        admin_groups = permission_manager.get_user_groups(admin_user["user_id"])
+        admin_group_names = (
+            [g["name"] for g in admin_groups]
+            if admin_groups and isinstance(admin_groups[0], dict)
+            else (admin_groups or [])
+        )
+        if "sys-admin" not in admin_group_names:
+            permission_manager.set_user_groups(admin_user["user_id"], ["sys-admin"])
+
     # 设置 node_secret 到环境变量（供 Unix Domain Socket 服务使用）
     if node_config.node_secret:
         os.environ["JARVIS_NODE_SECRET"] = node_config.node_secret
@@ -1487,8 +1523,8 @@ def create_app(
     )
 
     # HTTP 认证依赖
-    def verify_token(request: Request) -> None:
-        """验证 HTTP 请求的 Token。
+    def verify_token(request: Request) -> Dict[str, Any]:
+        """验证 HTTP 请求的 Token，返回用户信息。
 
         支持两种认证方式（任一通过即可）：
         1. Authorization: Bearer <token> - 兼容现有服务
@@ -1497,16 +1533,19 @@ def create_app(
         Args:
             request: FastAPI Request 对象
 
+        Returns:
+            用户信息字典
+
         Raises:
             HTTPException: Token 无效时抛出 401 错误
         """
-        from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
         from fastapi import HTTPException
 
         # 尝试从 X-Jarvis-Token 头提取 Token（优先）
         jarvis_token = request.headers.get("X-Jarvis-Token")
         if jarvis_token:
-            if not validate_gateway_token(jarvis_token):
+            user_info = validate_gateway_token(jarvis_token)
+            if user_info is None:
                 raise HTTPException(
                     status_code=401,
                     detail={
@@ -1514,7 +1553,8 @@ def create_app(
                         "message": "Invalid or expired X-Jarvis-Token",
                     },
                 )
-            return  # X-Jarvis-Token 验证通过
+            request.state.user_info = user_info
+            return user_info
 
         # 尝试从 Authorization Header 提取 Token（兼容模式）
         authorization = request.headers.get("Authorization")
@@ -1540,11 +1580,14 @@ def create_app(
         token = parts[1]
 
         # 验证 Token
-        if not validate_gateway_token(token):
+        user_info = validate_gateway_token(token)
+        if user_info is None:
             raise HTTPException(
                 status_code=401,
                 detail={"code": "INVALID_TOKEN", "message": "Invalid or expired token"},
             )
+        request.state.user_info = user_info
+        return user_info
 
     def verify_agent_proxy_access(request: Request) -> None:
         """验证 Agent HTTP 代理访问权限。
@@ -1557,77 +1600,91 @@ def create_app(
 
     # HTTP API：登录接口
     @app.post("/api/auth/login")
-    async def login(request: Dict[str, Any]) -> Dict[str, Any]:
-        """登录接口，验证密码并返回 Token。"""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
+    async def login(request: Request) -> Dict[str, Any]:
+        """登录接口，验证用户名密码并返回 JWT Token。"""
         try:
-            raw_password = request.get("password")
-            password = str(raw_password).strip() if raw_password is not None else ""
-            logger.info(f"[AUTH] Login attempt with password length: {len(password)}")
+            body = await request.json()
+            username = str(body.get("username", "")).strip()
+            password = str(body.get("password", "")).strip()
 
-            # 验证密码（get_gateway_auth_config 已集成环境变量优先逻辑）
-            config = get_gateway_auth_config()
-            expected_password = config.get("password") if config else None
-
-            # 判断密码来源：检查环境变量和配置文件
-            password_source = (
-                "环境变量"
-                if os.environ.get("JARVIS_GATEWAY_PASSWORD")
-                else "配置文件"
-                if expected_password
-                else "未设置"
-            )
-            logger.info(
-                f"[AUTH] Password source: {password_source}, set: {'yes (length: ' + str(len(expected_password)) + ')' if expected_password else 'no'}"
-            )
-
-            # 未配置密码时，允许直接登录获取令牌
-            if not expected_password:
-                logger.info("[AUTH] Gateway password is not configured, login allowed")
-            else:
-                if not password:
-                    logger.warning("[AUTH] Login failed: password is empty")
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "MISSING_PASSWORD",
-                            "message": "password is required",
-                        },
-                    }
-
-                # 如果设置了密码，进行验证
-                if password != expected_password:
-                    logger.warning("[AUTH] Login failed: password mismatch")
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "AUTH_FAILED",
-                            "message": "Invalid password",
-                        },
-                    }
-
-            logger.info("[AUTH] Password verification passed")
-            # 如果没有配置密码或密码验证通过，返回预生成的 Token（从环境变量读取）
-            token = os.environ.get("JARVIS_AUTH_TOKEN")
-
-            if not token:
-                logger.error("[AUTH] Login failed: Token not generated")
+            if not username or not password:
                 return {
                     "success": False,
                     "error": {
-                        "code": "INTERNAL_ERROR",
-                        "message": "Token not generated",
+                        "code": "MISSING_CREDENTIALS",
+                        "message": "username and password are required",
                     },
                 }
-            logger.info("[AUTH] Login successful")
+
+            # 尝试用户认证
+            user = user_manager.authenticate(username, password)
+            if user:
+                # JWT认证成功
+                token = generate_jwt_token(
+                    user_id=user["user_id"],
+                    username=user["username"],
+                    is_admin=user.get("is_admin", False),
+                )
+                logger.info(f"[AUTH] User '{username}' login successful (JWT)")
+                return {
+                    "success": True,
+                    "data": {
+                        "token": token,
+                        "user": {
+                            "user_id": user["user_id"],
+                            "username": user["username"],
+                            "display_name": user.get("display_name", ""),
+                            "is_admin": user.get("is_admin", False),
+                        },
+                    },
+                }
+
+            # 回退：旧密码模式（兼容JARVIS_GATEWAY_PASSWORD）
+            config = get_gateway_auth_config()
+            expected_password = config.get("password") if config else None
+            if expected_password and password == expected_password:
+                # 旧密码验证通过，返回环境变量Token
+                token = os.environ.get("JARVIS_AUTH_TOKEN")
+                if token:
+                    logger.info(f"[AUTH] Legacy password login successful")
+                    return {
+                        "success": True,
+                        "data": {
+                            "token": token,
+                            "user": {
+                                "user_id": "system",
+                                "username": "gateway",
+                                "display_name": "Gateway Admin",
+                                "is_admin": True,
+                            },
+                            "note": "Token is valid until Web Gateway restarts",
+                        },
+                    }
+
+            # 未配置密码时，允许直接登录
+            if not expected_password:
+                token = os.environ.get("JARVIS_AUTH_TOKEN")
+                if token:
+                    logger.info("[AUTH] No password configured, login allowed")
+                    return {
+                        "success": True,
+                        "data": {
+                            "token": token,
+                            "user": {
+                                "user_id": "system",
+                                "username": "gateway",
+                                "display_name": "Gateway Admin",
+                                "is_admin": True,
+                            },
+                        },
+                    }
+
+            logger.warning(f"[AUTH] Login failed for user '{username}'")
             return {
-                "success": True,
-                "data": {
-                    "token": token,
-                    "note": "Token is valid until Web Gateway restarts",
+                "success": False,
+                "error": {
+                    "code": "AUTH_FAILED",
+                    "message": "Invalid username or password",
                 },
             }
         except Exception as e:
@@ -1636,6 +1693,684 @@ def create_app(
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
+
+    # HTTP API：登出接口
+    @app.post("/api/auth/logout")
+    async def logout(request: Request) -> Dict[str, Any]:
+        """登出接口，将当前JWT加入黑名单。"""
+        authorization = request.headers.get("Authorization")
+        if authorization:
+            token = extract_token_from_authorization_header(authorization)
+            if token:
+                revoke_token(token)
+        jarvis_token = request.headers.get("X-Jarvis-Token")
+        if jarvis_token:
+            revoke_token(jarvis_token)
+        return {"success": True, "data": {"message": "Logged out successfully"}}
+
+    # HTTP API：获取当前用户信息
+    @app.get("/api/auth/me")
+    async def get_current_user(request: Request) -> Dict[str, Any]:
+        """获取当前登录用户信息。"""
+        user_info = verify_token(request)
+        if user_info.get("user_id") != "system":
+            full_user = user_manager.get_user(user_info["user_id"])
+            if full_user:
+                return {"success": True, "data": {"user": full_user}}
+        return {"success": True, "data": {"user": user_info}}
+
+    # 权限检查依赖
+    def require_permission(resource: str, action: str):
+        """创建需要特定权限的FastAPI依赖。"""
+        from fastapi import HTTPException
+
+        def check_perm(request: Request) -> Dict[str, Any]:
+            user_info = verify_token(request)
+            user_id = user_info.get("user_id", "")
+            if user_id == "system":
+                return user_info
+            has_perm = permission_manager.check_permission(
+                user_id, f"{resource}:{action}"
+            )
+            if not has_perm:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "PERMISSION_DENIED",
+                        "message": f"Permission denied: {resource}:{action}",
+                    },
+                )
+            return user_info
+
+        return Depends(check_perm)
+
+    # ==================== 用户管理 API ====================
+
+    @app.get("/api/users", dependencies=[Depends(verify_token)])
+    async def api_list_users(
+        request: Request, search: str = "", offset: int = 0, limit: int = 50
+    ) -> Dict[str, Any]:
+        """列出用户（需要admin:users权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:users"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        users = user_manager.list_users(
+            search=search or None, offset=offset, limit=limit
+        )
+        return {"success": True, "data": {"users": users}}
+
+    @app.post("/api/users", dependencies=[Depends(verify_token)])
+    async def api_create_user(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+        """创建用户（需要admin:users权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:users"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        username = str(body.get("username", "")).strip()
+        password = str(body.get("password", "")).strip()
+        display_name = str(body.get("display_name", "")).strip() or None
+        is_admin = bool(body.get("is_admin", False))
+        if not username or not password:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_INPUT",
+                    "message": "username and password are required",
+                },
+            }
+        try:
+            user = user_manager.create_user(
+                username, password, display_name=display_name, is_admin=is_admin
+            )
+            permission_manager.invalidate_cache(user["user_id"])
+            return {"success": True, "data": {"user": user}}
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": {"code": "VALIDATION_ERROR", "message": str(e)},
+            }
+
+    @app.get("/api/users/{user_id}", dependencies=[Depends(verify_token)])
+    async def api_get_user(request: Request, user_id: str) -> Dict[str, Any]:
+        """获取用户详情（只能查看自己，或admin:users权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        is_self = user_info.get("user_id") == user_id
+        if (
+            not is_self
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:users"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        user = user_manager.get_user(user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "User not found"},
+            }
+        return {"success": True, "data": {"user": user}}
+
+    @app.put("/api/users/{user_id}", dependencies=[Depends(verify_token)])
+    async def api_update_user(
+        request: Request, user_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """更新用户信息（需要admin:users权限，或更新自己）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        is_self = user_info.get("user_id") == user_id
+        if (
+            not is_self
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:users"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        try:
+            user = user_manager.update_user(user_id, **body)
+            if user:
+                permission_manager.invalidate_cache(user_id)
+                return {"success": True, "data": {"user": user}}
+            return {
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "User not found"},
+            }
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": {"code": "VALIDATION_ERROR", "message": str(e)},
+            }
+
+    @app.delete("/api/users/{user_id}", dependencies=[Depends(verify_token)])
+    async def api_delete_user(request: Request, user_id: str) -> Dict[str, Any]:
+        """删除用户（需要admin:users权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:users"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        success = user_manager.delete_user(user_id)
+        if success:
+            permission_manager.invalidate_cache(user_id)
+            return {"success": True, "data": {"message": "User deleted"}}
+        return {
+            "success": False,
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "User not found or cannot be deleted",
+            },
+        }
+
+    @app.post(
+        "/api/users/{user_id}/reset-password", dependencies=[Depends(verify_token)]
+    )
+    async def api_reset_password(
+        request: Request, user_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """重置用户密码（需要admin:users权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:users"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:users",
+                },
+            )
+        new_password = str(body.get("new_password", "")).strip()
+        if not new_password:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_INPUT",
+                    "message": "new_password is required",
+                },
+            }
+        success = user_manager.reset_password(user_id, new_password)
+        if success:
+            return {"success": True, "data": {"message": "Password reset successfully"}}
+        return {
+            "success": False,
+            "error": {"code": "NOT_FOUND", "message": "User not found"},
+        }
+
+    @app.post(
+        "/api/users/{user_id}/change-password", dependencies=[Depends(verify_token)]
+    )
+    async def api_change_password(
+        request: Request, user_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """修改密码（只能修改自己）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Can only change own password",
+                },
+            )
+        old_password = str(body.get("old_password", "")).strip()
+        new_password = str(body.get("new_password", "")).strip()
+        if not old_password or not new_password:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_INPUT",
+                    "message": "old_password and new_password are required",
+                },
+            }
+        success = user_manager.change_password(user_id, old_password, new_password)
+        if success:
+            return {
+                "success": True,
+                "data": {"message": "Password changed successfully"},
+            }
+        return {
+            "success": False,
+            "error": {"code": "AUTH_FAILED", "message": "Old password is incorrect"},
+        }
+
+    # ==================== 权限管理 API ====================
+
+    @app.get("/api/permissions/user/{user_id}", dependencies=[Depends(verify_token)])
+    async def api_get_user_permissions(
+        request: Request, user_id: str
+    ) -> Dict[str, Any]:
+        """获取用户权限。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if (
+            user_info.get("user_id") != "system"
+            and user_info.get("user_id") != user_id
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:permissions"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            )
+        perms = permission_manager.get_user_permissions(user_id)
+        return {"success": True, "data": {"permissions": perms}}
+
+    @app.get(
+        "/api/permissions/user/{user_id}/groups", dependencies=[Depends(verify_token)]
+    )
+    async def api_get_user_groups(request: Request, user_id: str) -> Dict[str, Any]:
+        """获取用户所属组。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if (
+            user_info.get("user_id") != "system"
+            and user_info.get("user_id") != user_id
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:permissions"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            )
+        groups = permission_manager.get_user_groups(user_id)
+        return {"success": True, "data": {"groups": groups}}
+
+    @app.put(
+        "/api/permissions/user/{user_id}/groups", dependencies=[Depends(verify_token)]
+    )
+    async def api_set_user_groups(
+        request: Request, user_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置用户所属组（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        group_ids = body.get("group_ids", [])
+        permission_manager.set_user_groups(user_id, group_ids)
+        permission_manager.invalidate_cache(user_id)
+        return {"success": True, "data": {"message": "User groups updated"}}
+
+    @app.get(
+        "/api/permissions/user/{user_id}/overrides",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_get_user_overrides(request: Request, user_id: str) -> Dict[str, Any]:
+        """获取用户权限覆盖。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if (
+            user_info.get("user_id") != "system"
+            and user_info.get("user_id") != user_id
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:permissions"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            )
+        overrides = permission_manager.get_user_overrides(user_id)
+        return {"success": True, "data": {"overrides": overrides}}
+
+    @app.put(
+        "/api/permissions/user/{user_id}/overrides",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_set_user_overrides(
+        request: Request, user_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置用户权限覆盖（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        overrides = body.get("overrides", {})
+        permission_manager.set_user_overrides(user_id, overrides)
+        permission_manager.invalidate_cache(user_id)
+        return {"success": True, "data": {"message": "User overrides updated"}}
+
+    # ==================== 组管理 API ====================
+
+    @app.get("/api/permissions/groups", dependencies=[Depends(verify_token)])
+    async def api_list_groups(request: Request) -> Dict[str, Any]:
+        """列出所有权限组。"""
+        groups = permission_manager.list_groups()
+        return {"success": True, "data": {"groups": groups}}
+
+    @app.get("/api/permissions/groups/{group_id}", dependencies=[Depends(verify_token)])
+    async def api_get_group(request: Request, group_id: str) -> Dict[str, Any]:
+        """获取权限组详情。"""
+        group = permission_manager.get_group(group_id)
+        if not group:
+            return {
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "Group not found"},
+            }
+        return {"success": True, "data": {"group": group}}
+
+    @app.post("/api/permissions/groups", dependencies=[Depends(verify_token)])
+    async def api_create_group(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """创建权限组（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        name = str(body.get("name", "")).strip()
+        description = str(body.get("description", "")).strip() or None
+        if not name:
+            return {
+                "success": False,
+                "error": {"code": "INVALID_INPUT", "message": "name is required"},
+            }
+        try:
+            group = permission_manager.create_group(
+                name, display_name=name, description=description or ""
+            )
+            return {"success": True, "data": {"group": group}}
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": {"code": "VALIDATION_ERROR", "message": str(e)},
+            }
+
+    @app.put("/api/permissions/groups/{group_id}", dependencies=[Depends(verify_token)])
+    async def api_update_group(
+        request: Request, group_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """更新权限组（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        try:
+            group = permission_manager.update_group(group_id, **body)
+            if group:
+                return {"success": True, "data": {"group": group}}
+            return {
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "Group not found"},
+            }
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": {"code": "VALIDATION_ERROR", "message": str(e)},
+            }
+
+    @app.delete(
+        "/api/permissions/groups/{group_id}", dependencies=[Depends(verify_token)]
+    )
+    async def api_delete_group(request: Request, group_id: str) -> Dict[str, Any]:
+        """删除权限组（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        success = permission_manager.delete_group(group_id)
+        if success:
+            return {"success": True, "data": {"message": "Group deleted"}}
+        return {
+            "success": False,
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "Group not found or cannot be deleted",
+            },
+        }
+
+    @app.get(
+        "/api/permissions/groups/{group_id}/permissions",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_get_group_permissions(
+        request: Request, group_id: str
+    ) -> Dict[str, Any]:
+        """获取组权限（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        perms = permission_manager.get_group_permissions(group_id)
+        return {"success": True, "data": {"permissions": perms}}
+
+    @app.put(
+        "/api/permissions/groups/{group_id}/permissions",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_set_group_permissions(
+        request: Request, group_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置组权限（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        permissions = body.get("permissions", {})
+        permission_manager.set_group_permissions(group_id, permissions)
+        permission_manager.invalidate_cache()
+        return {"success": True, "data": {"message": "Group permissions updated"}}
+
+    # ==================== 资源ACL API ====================
+
+    @app.put(
+        "/api/permissions/resources/{resource_type}/{resource_id}/acl",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_set_resource_acl(
+        request: Request, resource_type: str, resource_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置资源ACL（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+
+        acl = body.get("acl", {})
+        permission_manager.set_resource_acl(resource_type, resource_id, acl)
+        permission_manager.invalidate_cache()
+        return {"success": True, "data": {"message": "Resource ACL updated"}}
+
+    @app.get(
+        "/api/permissions/resources/{resource_type}/{resource_id}/acl",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_get_resource_acl(
+        request: Request, resource_type: str, resource_id: str
+    ) -> Dict[str, Any]:
+        """获取资源ACL（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        acl = permission_manager.get_resource_acl(resource_type, resource_id)
+        return {"success": True, "data": {"acl": acl}}
+
+    @app.delete(
+        "/api/permissions/resources/{resource_type}/{resource_id}/acl",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_delete_resource_acl(
+        request: Request, resource_type: str, resource_id: str
+    ) -> Dict[str, Any]:
+        """删除资源ACL（需要admin:permissions权限）。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if user_info.get(
+            "user_id"
+        ) != "system" and not permission_manager.check_permission(
+            user_info["user_id"], "admin:permissions"
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:permissions",
+                },
+            )
+        permission_manager.delete_resource_acl(resource_type, resource_id)
+        permission_manager.invalidate_cache()
+        return {"success": True, "data": {"message": "Resource ACL deleted"}}
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
@@ -3123,20 +3858,28 @@ def create_app(
 
     # HTTP API：创建 Agent（需要认证）
     @app.post("/api/agents", dependencies=[Depends(verify_token)])
-    async def create_agent(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_agent(
+        request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
         """创建 Agent。"""
         try:
-            agent_type = request.get("agent_type")
-            working_dir = request.get("working_dir")
-            name = request.get("name")
-            llm_group = request.get("llm_group", "default")
-            tool_group = request.get("tool_group", "default")
-            config_file = request.get("config_file")
-            task = request.get("task")
-            additional_args = request.get("additional_args")
-            worktree = bool(request.get("worktree", False))
-            quick_mode = bool(request.get("quick_mode", False))
-            restore_session = request.get("restore_session")
+            # 从认证信息获取owner_id
+            user_info = getattr(request.state, "user_info", None)
+            if user_info and user_info.get("user_id"):
+                owner_id = user_info["user_id"]
+            else:
+                owner_id = request_body.get("owner_id")
+            agent_type = request_body.get("agent_type")
+            working_dir = request_body.get("working_dir")
+            name = request_body.get("name")
+            llm_group = request_body.get("llm_group", "default")
+            tool_group = request_body.get("tool_group", "default")
+            config_file = request_body.get("config_file")
+            task = request_body.get("task")
+            additional_args = request_body.get("additional_args")
+            worktree = bool(request_body.get("worktree", False))
+            quick_mode = bool(request_body.get("quick_mode", False))
+            restore_session = request_body.get("restore_session")
             # 确保 restore_session 是布尔值或字符串
             if isinstance(restore_session, str):
                 # 如果是字符串，保持原样（指定文件路径）
@@ -3147,9 +3890,9 @@ def create_app(
             else:
                 # 如果是假值（如 False, None），转换为 False
                 restore_session = False
-            no_interaction_mode = bool(request.get("no_interaction_mode", False))
-            proxy_node = request.get("proxy_node")
-            target_node_id = str(request.get("node_id") or "").strip()
+            no_interaction_mode = bool(request_body.get("no_interaction_mode", False))
+            proxy_node = request_body.get("proxy_node")
+            target_node_id = str(request_body.get("node_id") or "").strip()
 
             if not agent_type:
                 return {
@@ -3260,6 +4003,7 @@ def create_app(
                 restore_session=restore_session,
                 no_interaction_mode=no_interaction_mode,
                 proxy_node=proxy_node,
+                owner_id=owner_id,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
@@ -3446,8 +4190,27 @@ def create_app(
 
     # HTTP API：停止 Agent
     @app.delete("/api/agents/{agent_id}/stop", dependencies=[Depends(verify_token)])
-    async def stop_agent(agent_id: str) -> Dict[str, Any]:
+    async def stop_agent(agent_id: str, request: Request) -> Dict[str, Any]:
         """停止 Agent。"""
+        # 权限检查：只有owner或admin可以停止Agent
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                if not permission_manager.check_permission(
+                    user_info["user_id"], "admin:agents"
+                ):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "You can only stop your own agents",
+                        },
+                    }
         try:
             route = node_runtime.agent_route_registry.get(agent_id)
             if route is not None and route.node_id not in (
@@ -3514,11 +4277,32 @@ def create_app(
 
     # HTTP API：更新 Agent（重命名）
     @app.patch("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
-    async def patch_agent(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def patch_agent(
+        agent_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
         """更新 Agent 信息（目前只支持重命名）。"""
+        # 权限检查：只有owner或admin可以更新Agent
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                if not permission_manager.check_permission(
+                    user_info["user_id"], "admin:agents"
+                ):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "You can only update your own agents",
+                        },
+                    }
         try:
-            name = request.get("name")
-            target_node_id = str(request.get("node_id") or "").strip()
+            name = request_body.get("name")
+            target_node_id = str(request_body.get("node_id") or "").strip()
 
             if name is not None and not isinstance(name, str):
                 return {
@@ -3580,8 +4364,29 @@ def create_app(
 
     # HTTP API：删除 Agent
     @app.delete("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
-    async def delete_agent(agent_id: str, node_id: str = "") -> Dict[str, Any]:
+    async def delete_agent(
+        agent_id: str, request: Request, node_id: str = ""
+    ) -> Dict[str, Any]:
         """删除 Agent。"""
+        # 权限检查：只有owner或admin可以删除Agent
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                if not permission_manager.check_permission(
+                    user_info["user_id"], "admin:agents"
+                ):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "You can only delete your own agents",
+                        },
+                    }
         try:
             resolved_target_node = str(node_id or "").strip()
             route = node_runtime.agent_route_registry.get(agent_id)
@@ -4417,6 +5222,7 @@ def create_app(
         task = action_params.get("task")
         additional_args = action_params.get("additional_args")
         worktree = bool(action_params.get("worktree", False))
+        owner_id = action_params.get("owner_id")
 
         if not agent_type:
             raise ValueError("action.params.agent_type is required")
@@ -4435,6 +5241,7 @@ def create_app(
                 "task": task,
                 "additional_args": additional_args,
                 "worktree": worktree,
+                "owner_id": owner_id,
             },
         }
 
@@ -4453,6 +5260,7 @@ def create_app(
                 additional_args=additional_args,
                 worktree=worktree,
                 proxy_node=proxy_node,
+                owner_id=owner_id,
             )
 
         return _create_agent_callback, metadata

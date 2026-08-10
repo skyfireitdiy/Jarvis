@@ -42,6 +42,7 @@ class ChatManager:
         name: str,
         connection_id: str,
         websocket: WebSocket,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """注册客户端，并广播上线通知。"""
         async with self._lock:
@@ -50,6 +51,7 @@ class ChatManager:
                 "connection_id": connection_id,
                 "websocket": websocket,
                 "registered_at": time.time(),
+                "user_id": user_id,
             }
         # 广播上线通知（锁外执行，避免死锁）
         await self.broadcast_to_all(

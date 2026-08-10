@@ -1,0 +1,8 @@
+{
+  "id": "20260810_094942_466602",
+  "type": "project_long_term",
+  "tags": ["P5-completed", "auth-permission-design", "implementation-guide"],
+  "content": "P5 app.py认证+路由API全部完成并通过功能验证\n\n## 完成内容\n- import+初始化: UserManager/PermissionManager/generate_jwt_token/revoke_token等\n- verify_token: 返回Dict[str,Any]，存request.state.user_info\n- login: username+password→JWT token，兼容旧密码模式\n- 新增路由: logout/auth/me/require_permission/用户管理API/权限管理API/组管理API/资源ACL API\n- admin用户自动加入sys-admin组（app.py初始化时）\n\n## 修复的bug（共5个）\n1. PermissionManager初始化: PermissionManager(_data_dir) 只接受1个参数\n2. check_permission参数: 2参数(user_id, 'resource:action') 非3参数\n3. generate_jwt_token参数: 需要3个参数(user_id, username, is_admin)\n4. admin用户未自动加入sys-admin组: 在app.py初始化后添加自动加入逻辑\n5. 资源ACL API路由: set/get/delete_resource_acl需要(resource_type, resource_id)两个参数，URL路径改为/api/permissions/resources/{resource_type}/{resource_id}/acl\n\n## 关键API签名\n- check_permission(user_id: str, permission: str) -> bool, permission格式'resource:action'\n- set_resource_acl(resource_type: str, resource_id: str, acl: dict) -> dict\n- get_resource_acl(resource_type: str, resource_id: str) -> dict\n- delete_resource_acl(resource_type: str, resource_id: str) -> bool\n- get_user_groups(user_id) -> list[dict] 返回组对象列表，非字符串列表\n- PermissionManager.__init__(data_dir: str) 只接受1个参数\n- generate_jwt_token(user_id, username, is_admin) 3个参数\n\n## Commits\n- b0ca48a: admin自动加入sys-admin组\n- 712b48b: 资源ACL API路由修复（添加resource_type参数）\n\n## 验证结果\n- PYTHONPATH=src .venv/bin/python 15项测试全部通过\n- ty静态扫描通过（F401为预留import，ty错误为已有问题）\n\n## 待完成\n- P5 WebSocket验证修改\n- P6 agent_manager.py+chat_manager.py\n- P7 前端App.vue+ConnectModal.vue",
+  "created_at": "2026-08-10T09:49:42.466640",
+  "updated_at": "2026-08-10T09:49:42.466646"
+}

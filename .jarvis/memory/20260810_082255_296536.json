@@ -1,0 +1,13 @@
+{
+  "id": "20260810_082255_296536",
+  "type": "project_long_term",
+  "tags": [
+    "auth-permission-design",
+    "implementation-guide",
+    "multi-user",
+    "P3-completed"
+  ],
+  "content": "P3 permission_manager.py 已完成并验证通过（commit: ef38238）\n- 文件：src/jarvis/jarvis_web_gateway/permission_manager.py（311行）\n- PermissionManager类：5个内置组（sys-admin/sys-operator/sys-developer/sys-viewer/sys-chat）\n- 核心方法：check_permission/check_resource_permission/get_user_permissions\n- 组管理：create_group/update_group/delete_group/list_groups/get_group\n- 组权限：get_group_permissions/set_group_permissions\n- 用户组：get_user_groups/set_user_groups\n- 用户覆盖：get_user_overrides/set_user_overrides\n- 资源ACL：set_resource_acl/get_resource_acl/delete_resource_acl\n- 缓存：invalidate_cache（支持按user_id或全清）\n- 数据存储：jarvis_data_dir/auth/ 下5个JSON文件\n- 验证：PYTHONPATH=src/jarvis .venv/bin/python 测试通过\n- ty静态扫描通过，ruff F401（uuid/Optional未使用）为后续方法所需，非实际错误",
+  "created_at": "2026-08-10T08:22:55.296577",
+  "updated_at": "2026-08-10T08:22:55.296584"
+}

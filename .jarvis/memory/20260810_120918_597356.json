@@ -1,0 +1,14 @@
+{
+  "id": "20260810_120918_597356",
+  "type": "project_long_term",
+  "tags": [
+    "code-review",
+    "jwt-auth",
+    "bug",
+    "permission-system",
+    "architecture"
+  ],
+  "content": "【架构升级代码审查结论】JWT认证+分组权限体系\n\n✅ 符合验收：\n1. WebSocket Token传递：前端用Sec-WebSocket-Protocol子协议传jarvis-token.{token}，后端_extract_auth_from_headers解析，gateway._check_auth验证，比URL参数更安全\n2. JWT工具链：jwt_utils/user_manager/permission_manager/token_manager实现完整\n3. 旧Token兼容：login回退JARVIS_GATEWAY_PASSWORD+无密码模式，token_manager回退环境变量比对\n4. 权限三层检查：用户覆盖→组继承→默认拒绝\n\n🔴 确认Bug：\n1. admin组检查Bug（app.py L1366）：get_user_groups返回组对象列表(dict)，但用\"sys-admin\" not in admin_groups比对字符串，永远为True，每次启动重设admin组。修复：应用[\"name\"]或get_user_group_ids\n2. create_group签名不一致（app.py L1933）：create_group(name, display_name, description=\"\")需3参数，调用缺display_name，必致TypeError。修复：补display_name参数或改签名\n\n⚠️ 风格问题：\n1. login路由参数用Dict非Request，与logout/me等不一致\n2. token_manager用相对导入.jwt_utils避免模块实例问题",
+  "created_at": "2026-08-10T12:09:18.597390",
+  "updated_at": "2026-08-10T12:09:18.597396"
+}

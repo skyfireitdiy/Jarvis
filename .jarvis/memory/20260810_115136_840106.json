@@ -1,0 +1,8 @@
+{
+  "id": "20260810_115136_840106",
+  "type": "project_long_term",
+  "tags": ["jarvis", "auth", "jwt", "multi-user", "implementation-complete"],
+  "content": "多用户JWT认证+权限体系实施完成(P1-P7)：\n\n新增文件：\n- jwt_utils.py(103行): JWT签发/验证/黑名单，环境变量JARVIS_JWT_SECRET/JARVIS_JWT_EXPIRE_HOURS\n- user_manager.py(208行): UserManager类，bcrypt密码，首次启动创建admin，JARVIS_ADMIN_PASSWORD\n- permission_manager.py(312行): PermissionManager类，5内置组(sys-admin/operator/developer/viewer/chat)，权限格式resource:action，三层检查(组+用户覆盖+资源ACL)\n\n修改文件：\n- token_manager.py: 新增validate_token_with_user，优先JWT验证回退旧Token\n- gateway.py: _check_auth改用JWT\n- app.py: login改JWT，require_permission装饰器，20+API路由，WebSocket Token验证\n- agent_manager.py: create_agent新增owner_id\n- chat_manager.py: register_client新增user_id\n- App.vue: loginWithPassword改JWT，loadSavedToken，401处理，登出按钮\n- ConnectModal.vue: 新增username输入框\n\n关键：token_manager.py用相对导入.jwt_utils；PYTHONPATH必须为src；npm run build通过",
+  "created_at": "2026-08-10T11:51:36.840141",
+  "updated_at": "2026-08-10T11:51:36.840147"
+}

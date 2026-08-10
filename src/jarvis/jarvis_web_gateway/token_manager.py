@@ -3,13 +3,14 @@
 
 负责生成和验证 Gateway Token。
 Token 在 Web Gateway 启动时生成一次，永久使用。
+支持JWT Token验证，回退旧UUID Token。
 """
 
 from __future__ import annotations
 
 import os
 import uuid
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 def generate_gateway_token() -> str:
@@ -23,25 +24,61 @@ def generate_gateway_token() -> str:
     return str(uuid.uuid4())
 
 
-def validate_gateway_token(token: Optional[str]) -> bool:
-    """验证 Gateway Token。
+def validate_gateway_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
+    """验证 Gateway Token，优先JWT验证，回退环境变量比对。
 
     Args:
         token: 要验证的 Token
 
     Returns:
-        Token 是否有效
+        验证成功返回用户信息dict，失败返回None
     """
     if not token:
-        return False
+        return None
 
-    # 统一从环境变量读取 Token（Web Gateway 和 Agent Gateway 共用）
+    # 优先JWT验证
+    try:
+        from .jwt_utils import validate_jwt_token
+
+        payload = validate_jwt_token(token)
+        if payload:
+            return payload
+    except ImportError:
+        pass
+
+    # 回退：环境变量比对（CLI Gateway用）
     expected_token = os.environ.get("JARVIS_AUTH_TOKEN")
+    if expected_token and token == expected_token:
+        return {"user_id": "system", "username": "gateway", "is_admin": True}
 
-    if not expected_token:
-        return False
+    return None
 
-    return token == expected_token
+
+def validate_token_with_user(token: str) -> Optional[Dict[str, Any]]:
+    """验证Token并返回用户信息，用于HTTP API认证。
+
+    Args:
+        token: 要验证的 Token
+
+    Returns:
+        验证成功返回用户信息dict，失败返回None
+    """
+    # 优先JWT验证
+    try:
+        from .jwt_utils import validate_jwt_token
+
+        payload = validate_jwt_token(token)
+        if payload:
+            return payload
+    except ImportError:
+        pass
+
+    # 回退旧Token
+    env_token = os.environ.get("JARVIS_AUTH_TOKEN")
+    if env_token and token == env_token:
+        return {"user_id": "system", "username": "gateway", "is_admin": True}
+
+    return None
 
 
 def extract_token_from_authorization_header(

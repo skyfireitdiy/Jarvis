@@ -1,0 +1,8 @@
+{
+  "id": "20260810_090021_137255",
+  "type": "project_long_term",
+  "tags": ["P4-completed", "multi-user", "implementation-guide"],
+  "content": "P4 token_manager.py+gateway.py修改已完成并验证通过\n\n## 修改内容\n- token_manager.py：validate_gateway_token返回值从bool→Optional[Dict[str,Any]]，优先JWT验证（相对导入.jwt_utils），回退环境变量比对返回system用户；新增validate_token_with_user函数\n- gateway.py：_check_auth中`if validate_gateway_token(token)`→`user_info = validate_gateway_token(token); if user_info is not None; auth[\"user_info\"] = user_info`\n\n## 关键发现：Python模块实例问题\n- `jarvis_web_gateway`和`jarvis.jarvis_web_gateway`是两个不同的模块实例（各自独立的_jwt_secret）\n- token_manager.py必须用相对导入`.jwt_utils`而非绝对导入，确保与调用方使用同一模块实例\n- 测试必须用PYTHONPATH=src（非src/jarvis），模拟项目实际运行环境\n- app.py中L1509/L1543的`if not validate_gateway_token(token)`无需修改（None为falsy，dict为truthy）\n\n## 验证结果\n- PYTHONPATH=src .venv/bin/python 11项测试全部通过\n- ty静态扫描通过\n- Commits: 3724aa1(token_manager) + 12db711(gateway) + a2260c8+a57805d(import修复)",
+  "created_at": "2026-08-10T09:00:21.137300",
+  "updated_at": "2026-08-10T09:00:21.137305"
+}

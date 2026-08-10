@@ -1,0 +1,13 @@
+{
+  "id": "20260810_083456_932178",
+  "type": "project_long_term",
+  "tags": [
+    "auth-permission-design",
+    "multi-user",
+    "P2-completed",
+    "implementation-guide"
+  ],
+  "content": "P2 user_manager.py 已完成并验证通过（commit: b61440a）\n- 文件：src/jarvis/jarvis_web_gateway/user_manager.py（208行）\n- UserManager类：自动创建admin用户（JARVIS_ADMIN_PASSWORD或随机生成）\n- 核心方法：create_user/authenticate/get_user/get_user_by_username/update_user/reset_password/change_password/delete_user/list_users\n- 密码：bcrypt cost=12，_hash_password/_verify_password\n- 安全：用户名3-32字符正则验证，重复用户名检查，5次失败锁定，不可删自己/最后管理员\n- _sanitize_user：返回不含password_hash的用户信息\n- 数据存储：jarvis_data_dir/auth/users.json\n- 验证：PYTHONPATH=src/jarvis .venv/bin/python 全部14项测试通过\n- ty静态扫描通过（Optional[str]=None修复后）\n\n当前进度：P1✅ P2✅ P3✅ → 下一步P4（修改token_manager.py+gateway.py适配JWT）",
+  "created_at": "2026-08-10T08:34:56.932218",
+  "updated_at": "2026-08-10T08:34:56.932224"
+}

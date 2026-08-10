@@ -1,0 +1,8 @@
+{
+  "id": "20260810_112545_854478",
+  "type": "project_long_term",
+  "tags": ["jarvis", "auth", "permission", "bug-fix", "progress"],
+  "content": "P1-P6代码扫描修复完成，发现并修复3个权限遗漏+1个关键bug：\n1. api_get_user缺少权限检查（commit: c851da7）- 添加self/admin:users检查\n2. api_get_group_permissions缺少权限检查（commit: 13d9f88）- 添加admin:permissions检查\n3. api_get_resource_acl缺少权限检查（commit: 13d9f88）- 添加admin:permissions检查\n4. _compute_permission布尔值bug（commit: 412a10b）- 用户覆盖支持True/False和\"allow\"/\"deny\"两种格式\n\n设计决策：\n- api_list_groups和api_get_group保持无权限检查（普通用户可查看组列表，合理）\n- api_get_group_permissions和api_get_resource_acl需要admin:permissions（管理敏感信息）\n\n下一步：P7前端App.vue+ConnectModal.vue适配JWT登录",
+  "created_at": "2026-08-10T11:25:45.854514",
+  "updated_at": "2026-08-10T11:25:45.854519"
+}

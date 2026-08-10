@@ -1,0 +1,8 @@
+{
+  "id": "20260810_062323_775732",
+  "type": "project_long_term",
+  "tags": ["auth-permission-design", "implementation-guide", "multi-user"],
+  "content": "多用户认证系统实施指导文档已完成：docs/design/multi-user-implementation-guide.md (563行7章)\n\n章节结构：\n1. 当前系统认证架构（流程+关键文件行号+核心问题）\n2. 实施顺序与依赖关系（P1-P7）\n3. 新增文件详细设计（jwt_utils.py/user_manager.py/permission_manager.py）\n4. 现有文件修改指导（token_manager.py/gateway.py/app.py/agent_manager.py/chat_manager.py）\n5. 前端修改指导（App.vue/ConnectModal.vue）\n6. 依赖与部署（PyJWT+bcrypt/环境变量/数据目录/首次启动流程）\n7. 验证清单（后端/前端/权限）\n\n关键修改点：\n- app.py: login改为username+password→JWT, verify_token改为JWT验证+权限注入, 新增require_permission依赖, 新增20+API路由, WebSocket添加Token验证\n- token_manager.py: validate_gateway_token优先JWT验证, 新增validate_token_with_user\n- gateway.py: _check_auth改用JWT, 新增_client_users映射\n- agent_manager.py: create_agent新增owner_id参数\n- chat_manager.py: register_client新增user_id/username, 房间新增owner_id\n- App.vue: auth新增username, loginWithPassword改JWT, WebSocket URL加token参数\n- ConnectModal.vue: 新增username输入框\n\ncommit: 4d83698",
+  "created_at": "2026-08-10T06:23:23.775776",
+  "updated_at": "2026-08-10T06:23:23.775782"
+}

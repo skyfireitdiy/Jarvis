@@ -1,0 +1,12 @@
+{
+  "id": "20260810_095451_755168",
+  "type": "project_long_term",
+  "tags": [
+    "P5-fully-completed",
+    "auth-permission-design",
+    "implementation-guide"
+  ],
+  "content": "P5 app.py认证+路由API+WebSocket验证 全部完成\n\n## WebSocket验证结论\n- WebSocket认证链: _extract_auth_from_headers → gateway._check_auth → validate_gateway_token\n- _extract_auth_from_headers从sec-websocket-protocol头提取token，返回{\"token\": token}\n- gateway._check_auth在P4已适配JWT（validate_gateway_token返回Optional[dict]）\n- WebSocket认证无需额外修改，已自动适配JWT\n\n## P5完整完成项\n1. import+初始化（UserManager/PermissionManager）\n2. verify_token返回Dict[str,Any]，存request.state.user_info\n3. login路由JWT认证，兼容旧密码模式\n4. 所有API路由添加（logout/auth/me/用户管理/权限管理/组管理/资源ACL）\n5. admin自动加入sys-admin组\n6. 资源ACL API修复（添加resource_type参数）\n7. WebSocket认证已自动适配\n\n## 下一步: P6 agent_manager.py+chat_manager.py\n- 需要添加owner_id/user_id参数\n- Agent创建时关联创建者\n- Chat会话关联用户",
+  "created_at": "2026-08-10T09:54:51.755215",
+  "updated_at": "2026-08-10T09:54:51.755223"
+}

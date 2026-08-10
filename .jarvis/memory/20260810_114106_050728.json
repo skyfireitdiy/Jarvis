@@ -1,0 +1,8 @@
+{
+  "id": "20260810_114106_050728",
+  "type": "project_long_term",
+  "tags": ["jarvis", "auth", "jwt", "frontend", "P7", "completed"],
+  "content": "P7 前端App.vue+ConnectModal.vue适配JWT登录已完成\n\n完成内容：\n1. App.vue loginWithPassword: 发送{username,password}而非{password}，保存userInfo到auth.value和localStorage\n2. App.vue auth ref: 添加userInfo字段，username默认值改为空字符串\n3. App.vue loadSavedToken: 加载token同时加载jarvis_user_info，恢复username\n4. ConnectModal.vue: 密码placeholder从'可选'改为'必填'\n5. App.vue fetchWithAuth 401处理: 清除userInfo+localStorage\n6. App.vue logout函数: 调用/api/auth/logout+清除本地状态+显示登录弹窗\n7. App.vue header: 添加用户名显示(👤 username)+登出按钮(🚪)\n8. CSS: .user-info-display样式+.logout-btn:hover样式\n\nCommits: 8a3ed0a, 9358d46, 3509c05, b7a241a(修复重复代码), f0e487e, fa3119d, 8a5b89c, e2b8798, 5d94f33\n前端构建验证通过(npm run build成功)\n\nP1-P7全部完成！",
+  "created_at": "2026-08-10T11:41:06.050767",
+  "updated_at": "2026-08-10T11:41:06.050773"
+}
