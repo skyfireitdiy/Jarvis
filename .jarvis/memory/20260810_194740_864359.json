@@ -1,0 +1,14 @@
+{
+  "id": "20260810_194740_864359",
+  "type": "project_long_term",
+  "tags": [
+    "prompt-classical-style",
+    "jarvis_agent",
+    "__init__.py",
+    "文言文",
+    "已完成"
+  ],
+  "content": "jarvis_agent/__init__.py提示词文言文化已完成。9处LLM提示词区域：origin_agent_system_prompt(L227-342)、start_commit_hint(L1880-1887)、retry_prompt(L2050-2054)、_format_summary_message(L2494-2516)、make_default_addon_prompt(L2755-2779)、non_interactive_note(L2878-2884)、selection_prompt(L3276-3289)、temp_model system_prompt(L3310)、memory_check prompt(L3428-3432)。注意：L2777重复行已删除；L2235/L2489 initial_commit_info已改；L2480 session_file_info已改；L2756/2776 总结→撮要、已完成→已竟。",
+  "created_at": "2026-08-10T19:47:40.864381",
+  "updated_at": "2026-08-10T19:47:40.864386"
+}

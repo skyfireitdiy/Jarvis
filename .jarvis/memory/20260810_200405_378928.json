@@ -1,0 +1,8 @@
+{
+  "id": "20260810_200405_378928",
+  "type": "project_long_term",
+  "tags": ["prompt-classical-style", "文言文", "提示词文言文化", "已完成文件"],
+  "content": "提示词文言文化已完成文件清单：1)git_commiter.py(5处,L302/L395/L423/L436/L461) 2)rules_manager.py(5处,L1079/L1094/L1219/L1234/L1375) 3)__init__.py(6处,L1880/L2232/L2477/L2753/L2773) 4)methodology.py(6处)。待完成：task_analyzer.py。约束：仅改提示词字符串，不改代码逻辑/变量名/格式化占位符",
+  "created_at": "2026-08-10T20:04:05.378952",
+  "updated_at": "2026-08-10T20:04:05.378957"
+}

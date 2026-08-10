@@ -1,0 +1,8 @@
+{
+  "id": "20260810_182256_400596",
+  "type": "project_long_term",
+  "tags": ["websocket", "connection-lock", "bug-fix"],
+  "content": "Agent WebSocket多连接消息重复修复：根因为connectToAgent无连接锁，心跳超时与onclose可同时触发重连。解决方案用connectingAgents Set作连接锁，所有退出路径均释放锁（检查L4337/添加L4390/删除L4412+4448+4495+4556+4569/心跳L9731+9737）。",
+  "created_at": "2026-08-10T18:22:56.400614",
+  "updated_at": "2026-08-10T18:22:56.400619"
+}

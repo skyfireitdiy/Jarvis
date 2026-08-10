@@ -1,0 +1,14 @@
+{
+  "id": "20260810_200405_377358",
+  "type": "project_long_term",
+  "tags": [
+    "prompt-classical-style",
+    "methodology.py",
+    "文言文",
+    "提示词文言文化",
+    "代码变更"
+  ],
+  "content": "methodology.py提示词文言化已完成（6处修改）：1)\"规划或总结\"→\"规划或撮要\" 2)\"规划/总结\"→\"规划/撮要\" 3)\"从方法论总结的\"→\"从方法论撮要之\" 4)\"没有历史方法论可参考\"→\"无历史方法论可参\" 5)\"用户需求\"→\"用户之需\"(提示词中) 6)\"注意：\"→\"切记：\"。文件路径：src/jarvis/jarvis_utils/methodology.py，关键行L242-266(selection_prompt), L345-366(base_prompt+suffix_prompt), L414(PrettyOutput标题)",
+  "created_at": "2026-08-10T20:04:05.377395",
+  "updated_at": "2026-08-10T20:04:05.377402"
+}

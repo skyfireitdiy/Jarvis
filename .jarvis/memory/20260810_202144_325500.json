@@ -1,0 +1,8 @@
+{
+  "id": "20260810_202144_325500",
+  "type": "project_long_term",
+  "tags": ["提示词文言文化", "LLM交互", "编码规范", "已完成文件"],
+  "content": "提示词文言文化已完成文件清单：git_commiter.py(5处L302,L395,L423,L436,L461)、rules_manager.py(5处L1079,L1094,L1219,L1234,L1375)、__init__.py(6处L1880,L2232,L2477,L2753,L2773)、methodology.py(6处L242-266,L345-366)、task_analyzer.py(5处L52,L150,L175,L197,L201)、prompts.py(已为文言文无需改)。约束：仅改提示词字符串不改代码逻辑/变量名/格式化占位符。UI交互输出(PrettyOutput等)亦改。",
+  "created_at": "2026-08-10T20:21:44.325517",
+  "updated_at": "2026-08-10T20:21:44.325521"
+}

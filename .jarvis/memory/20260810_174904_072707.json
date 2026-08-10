@@ -1,0 +1,8 @@
+{
+  "id": "20260810_174904_072707",
+  "type": "project_long_term",
+  "tags": ["Agent WebSocket", "连接锁", "消息重复修复", "connectingAgents"],
+  "content": "Agent WebSocket多连接导致消息重复修复：\n1. 新增connectingAgents Set作为连接锁，防止同一agent_id并发重连建多连接\n2. connectToAgent入口检查connectingAgents，若已在连接中则跳过\n3. 连接开始时add(agentId)，连接成功/失败/超时/onclose/onerror时delete(agentId)\n4. 心跳超时重连前检查connectingAgents，避免与onclose重连冲突\n5. 流式消息(STREAM_START/CHUNK/END)已有seq去重机制，无需额外处理\n\n关键文件：src/jarvis/jarvis_service/frontend/src/App.vue\n- connectingAgents定义：L1229\n- connectToAgent连接锁检查：L4337-4342\n- 连接锁add：L4390\n- onopen释放锁：L4448\n- onclose释放锁：L4495\n- onerror释放锁：L4556\n- catch释放锁：L4569\n- timeout释放锁：L4412\n- 心跳超时释放锁+检查：L9731, L9737",
+  "created_at": "2026-08-10T17:49:04.072750",
+  "updated_at": "2026-08-10T17:49:04.072756"
+}

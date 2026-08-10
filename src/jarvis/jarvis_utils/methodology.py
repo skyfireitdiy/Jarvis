@@ -239,7 +239,7 @@ def load_methodology(
             [f"{i}. {title}" for i, title in enumerate(methodology_titles, 1)]
         )
 
-        selection_prompt = f"""以下是所有可用的方法论标题：
+        selection_prompt = f"""兹列所有可用之方法论标题：
 
 <methodology_titles>
 {methodology_titles_text}
@@ -253,16 +253,16 @@ def load_methodology(
 {user_input}
 </user_requirement>
 
-请析用户需求，从上述方法论中择与需求相关性较高之方法论（可选多个）。
+祈析用户之需，从上述方法论中择与需求相关性较高之方法论（可选多个）。
 
-请严依下式返序号：
+祈严依下式返序号：
 <NUM>序号1,序号2,序号3</NUM>
 
 例如：<NUM>1,3,5</NUM>
 
-若无相关方法论，请返：<NUM>none</NUM>
+若无相关方法论，祈返：<NUM>none</NUM>
 
-注意：只返<NUM>标签内之内容，勿有其他任何输出。
+切记：只返<NUM>标签内之内容，勿有其他任何输出。
 """
 
         response = platform.chat_until_success(selection_prompt).strip()
@@ -298,8 +298,8 @@ def load_methodology(
                     selected_indices_str = ",".join(valid_numbers)
 
         if selected_indices_str.lower() == "none":
-            PrettyOutput.auto_print("没有历史方法论可参考")
-            return "⚠️ 没有历史方法论可参考"
+            PrettyOutput.auto_print("无历史方法论可参")
+            return "⚠️ 无历史方法论可参"
 
         # 解析选择的序号
         selected_methodologies = []
@@ -315,10 +315,10 @@ def load_methodology(
                         selected_methodologies.append(methodologies[idx - 1])
         except Exception:
             # 如果解析失败，返回空结果
-            return "没有历史方法论可参考"
+            return "无历史方法论可参"
 
         if not selected_methodologies:
-            return "没有历史方法论可参考"
+            return "无历史方法论可参"
 
         # 获取模型上下文窗口大小，用于限制方法论内容
         methodology_token_limit = None
@@ -342,25 +342,25 @@ def load_methodology(
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分
-        base_prompt = """以下是与用户需求相关的方法论内容：
+        base_prompt = """以下乃与用户之需相关之方法论内容：
 
 """
-        suffix_prompt = f"""以下是所有可用的工具内容：
+        suffix_prompt = f"""以下乃所有可用之工具内容：
 
 {prompt}
 
-用户需求：{user_input}
+用户之需：{user_input}
 
-请据以上方法论与可调用之工具内容，规划或总结出执行步骤。
+祈据以上方法论与可调用之工具内容，规划或撮要出执行步骤。
 
-请按下式回复：
+祈依下式回复：
 ### 与该任务/需求相关之方法论
-1. [方法论名字]
-2. [方法论名字]
-### 据以上方法论，规划/总结出执行步骤
-1. [步骤1]
-2. [步骤2]
-3. [步骤3]
+一. [方法论名字]
+二. [方法论名字]
+### 据以上方法论，规划/撮要出执行步骤
+一. [步骤1]
+二. [步骤2]
+三. [步骤3]
 
 除以上要求外，勿输出任何内容
 """
@@ -399,7 +399,7 @@ def load_methodology(
         # 如果一个方法论都没有加载成功
         if selected_count == 0:
             PrettyOutput.auto_print("⚠️ 警告：由于token限制，无法加载任何方法论内容")
-            return "没有历史方法论可参考"
+            return "无历史方法论可参"
 
         final_prompt += suffix_prompt
 
@@ -411,7 +411,7 @@ def load_methodology(
         result = platform.chat_until_success(final_prompt)
 
         # 打印大模型返回的方法论执行步骤
-        PrettyOutput.print_markdown(result, title="📋 从方法论总结的执行步骤")
+        PrettyOutput.print_markdown(result, title="📋 从方法论撮要之执行步骤")
 
         return result
 

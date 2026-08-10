@@ -1,0 +1,8 @@
+{
+  "id": "20260810_182256_399076",
+  "type": "project_long_term",
+  "tags": ["display_name", "architecture", "frontend-backend"],
+  "content": "display_name架构决策：display_name可重复仅展示用，username不可重复为唯一标识。后端sender_name保留为username，新增sender_display_name字段。前端统一用display_name || name回退模式。JWT payload含user_id/username/is_admin不含display_name，需通过/api/auth/me获取。localStorage缓存旧userInfo无display_name字段是显示丢失之根因，需refreshUserInfo()于ws.onopen时刷新。",
+  "created_at": "2026-08-10T18:22:56.399114",
+  "updated_at": "2026-08-10T18:22:56.399120"
+}

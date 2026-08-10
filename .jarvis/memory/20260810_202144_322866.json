@@ -1,0 +1,15 @@
+{
+  "id": "20260810_202144_322866",
+  "type": "project_long_term",
+  "tags": [
+    "WebSocket",
+    "连接锁",
+    "消息重复",
+    "Agent",
+    "connectingAgents",
+    "bug-fix"
+  ],
+  "content": "Agent WebSocket多连接消息重复修复：connectToAgent无连接锁，心跳超时与onclose可同时触发重连致双连接。解决方案：用connectingAgents Set作连接锁，所有退出路径（正常连接成功、连接失败、心跳超时、onclose）均释放锁。流式消息(STREAM_START/CHUNK/END)已有seq去重机制。关键代码位置：App.vue L1229(定义), L4337(检查), L4390(add), L4412/4448/4495/4556/4569(delete), L9731-9737(心跳)",
+  "created_at": "2026-08-10T20:21:44.322886",
+  "updated_at": "2026-08-10T20:21:44.322891"
+}

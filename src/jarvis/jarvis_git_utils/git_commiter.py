@@ -300,7 +300,7 @@ class GitCommitTool:
                     custom_prompt
                     if custom_prompt
                     else """据代码差异生成提交信息：
-提交信息当用中文书写
+提交信息当以中文书写
 # 格式模板
 必用以下格式：
 
@@ -309,12 +309,12 @@ class GitCommitTool:
 [可选] 详述变更内容与缘由
 
 # 格式规则
-1. 类型: fix(修bug), feat(新功), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
-2. 范围示变更之模块或组件 (如: auth, database, ui)
-3. 主题行不逾72字符，不以句号终，用祈使语气
-4. 若有详述，用空行隔主题与详述
-5. 详述当释"何物"与"何故"，非"如何"
-6. 唯出提交信息，勿出他文
+一、类型: fix(修bug), feat(新功), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
+二、范围示变更之模块或组件 (如: auth, database, ui)
+三、主题行不逾七十二字符，不以句号终，用祈使语气
+四、若有详述，以空行隔主题与详述
+五、详述当释"何物"与"何故"，非"如何"
+六、唯出提交信息，勿出他文
 """
                 )
                 base_prompt += f"""
@@ -387,12 +387,12 @@ commit信息
                         + f"""
 # 变更概述
 - 变更文件数量: {file_count} 个文件
-- 已上传包含完整代码差异的文件
+- 已上传含完整代码差异之文件
 
 # 变更文件列表
 {files_list}
 
-请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
+祈详析已上传之代码差异文件，生成符合上述格式之提交信息。
 """
                     )
 
@@ -421,7 +421,7 @@ commit信息
 # 变更文件列表
 {files_list}
 
-宜据上述文件列表生成符合格式之提交信息。
+宜据上述文件列表，生成符合格式之提交信息。
 """
                     )
 
@@ -433,6 +433,8 @@ commit信息
                         + f"""
 # 分析材料
 {diff}
+
+祈据上述差异，生成符合格式之提交信息。
 """
                     )
 
@@ -456,7 +458,7 @@ commit信息
                         if suffix:
                             commit_message = f"{commit_message}\n{suffix}"
                         break
-                    prompt = f"""格式有误，请依下式重新生成提交信息：
+                    prompt = f"""格式有误，祈依下式重新生成提交信息：
                     {ot("COMMIT_MESSAGE")}
                     commit信息
                     {ct("COMMIT_MESSAGE")}

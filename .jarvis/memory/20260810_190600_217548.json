@@ -1,0 +1,8 @@
+{
+  "id": "20260810_190600_217548",
+  "type": "project_long_term",
+  "tags": ["架构决策", "display_name", "用户标识", "WebSocket"],
+  "content": "Jarvis项目用户标识架构决策：sender_name保留为username（唯一标识，不可重复），新增sender_display_name（展示用，可重复）。前端展示统一用display_name || name回退模式。Agent WebSocket连接管理用connectingAgents Set作连接锁，保证同一agent_id只有一个活跃WebSocket连接，所有退出路径释放锁。",
+  "created_at": "2026-08-10T19:06:00.217595",
+  "updated_at": "2026-08-10T19:06:00.217602"
+}

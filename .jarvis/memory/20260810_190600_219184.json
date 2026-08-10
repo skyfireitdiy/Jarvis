@@ -1,0 +1,8 @@
+{
+  "id": "20260810_190600_219184",
+  "type": "project_long_term",
+  "tags": ["代码变更", "提示词文言文化", "LLM交互"],
+  "content": "Jarvis项目提示词文言文化规范：LLM交互prompt中'请'统一替换为'祈'，阿拉伯数字改中文数字（如72→七十二）。约束：1)仅改prompt字符串，不改代码逻辑/变量名/格式化占位符；2)PrettyOutput等UI输出消息不改；3)_multiline_input/confirm_callback等用户交互提示不改。已修改文件：rules_manager.py(5处)、methodology.py(2处)、git_commiter.py(5处)、__init__.py(12处)、prompts.py(先前完成)。",
+  "created_at": "2026-08-10T19:06:00.219226",
+  "updated_at": "2026-08-10T19:06:00.219232"
+}

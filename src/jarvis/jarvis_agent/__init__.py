@@ -309,7 +309,7 @@ origin_agent_system_prompt = f"""
 - [准2]
 ...
 
-请确认此计无误，确认后吾将始行（输入"确认"、"继续"或"ENTER EXECUTE"）。
+祈确认此计无误，确认后吾将始行（输入"确认"、"继续"或"ENTER EXECUTE"）。
 ```
 
 #### EXECUTE（行）
@@ -1879,9 +1879,9 @@ class Agent:
             if hasattr(self, "start_commit") and self.start_commit:
                 start_commit_hint = (
                     f"\n\n<start_commit_context>\n"
-                    f"本次任务的初始 Git Commit 是：`{self.start_commit}`\n"
-                    f"请只总结该 commit 之后的任务目标、变更和进展，"
-                    f"不需要总结该 commit 之前的历史内容。\n"
+                    f"本次任务之初始 Git Commit 为：`{self.start_commit}`\n"
+                    f"祈仅撮要该 commit 之后之任务目标、变更与进展，"
+                    f"无需撮要该 commit 之前之历史之载。\n"
                     f"</start_commit_context>"
                 )
                 prompt_to_use += start_commit_hint
@@ -2054,8 +2054,8 @@ class Agent:
                     else:
                         # 重试时将缺失信息反馈给模型，要求补充
                         retry_prompt = (
-                            f"你之前生成的摘要缺少以下关键章节：{', '.join(missing_sections)}。"
-                            f"请重新生成完整的摘要，确保包含所有缺失的章节。"
+                            f"汝先前所撰之摘要缺以下要章：{', '.join(missing_sections)}。"
+                            f"祈重撰完整之摘要，务必含所有缺失之章。"
                         )
                         compressed_summary = temp_model.chat_until_success(retry_prompt)
 
@@ -2238,7 +2238,7 @@ class Agent:
         initial_commit_info = ""
         try:
             if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务始时之初始 commit 乃：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -2472,7 +2472,7 @@ class Agent:
 
         if loaded_rule_infos:
             rules_info = "\n".join(loaded_rule_infos)
-            rules_section = f"\n\n\n**📋 当前已加载的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详细内容，请使用 `load_rule` 工具加载对应的规则文件。\n\n"
+            rules_section = f"\n\n\n**📋 当前已加载之规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详尽内容，祈用 `load_rule` 工具载对应之规则文件。\n\n"
 
         # 获取会话文件路径信息
         session_file_info = ""
@@ -2483,7 +2483,7 @@ class Agent:
             recorder = get_global_recorder()
             session_file_path = recorder.get_session_file_path()
             if Path(session_file_path).exists():
-                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整的对话历史已自动保存到以下文件，如果需要查看详细的历史信息，可以读取此文件：\n`{session_file_path}`\n\n此文件包含之前所有对话的完整记录（JSONL格式），每行一个消息记录，包括时间戳、角色和内容。"
+                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整对话历史已自存于下文，若需察详尽之历史讯，可读此文件：\n`{session_file_path}`\n\n此文件含先前所有对话之全录（JSONL格式），每行一消息录，含时戳、角色与内容。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -2492,33 +2492,33 @@ class Agent:
         initial_commit_info = ""
         try:
             if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务始时之初始 commit 乃：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
 
         formatted_message = f"""
-以下是之前对话的关键信息总结：
+以下乃先前对话之要讯摘要：
 
 <content>
 {summary}
 </content>{rules_section}
 
-**⚠️ 重要系统约束提醒（总结后必须严格遵守）：**
-1. **每次只能执行一个工具调用**：每个响应必须包含且仅包含一个工具调用（任务完成时除外）。同时调用多个工具会导致错误。
-2. **禁止虚构结果**：所有操作必须基于实际执行结果，禁止推测、假设或虚构任何执行结果。必须等待工具执行完成并获得实际结果后再进行下一步。
-3. **等待工具结果**：在继续下一步之前，必须等待当前工具的执行结果，不能假设工具执行的结果。
-4. **基于实际验证**：所有结论必须基于实际执行结果和验证证据，禁止基于推测或假设。
-5. **代码任务完成标准（严格执行）**：
-   - **编译/构建必须通过**：代码必须能够成功编译/构建，无编译错误、无语法错误、无链接错误
-   - **功能必须验证**：功能必须经过实际运行验证，不能仅凭代码存在就认为完成
-   - **错误必须修复**：如果存在编译错误、运行时错误、测试失败，任务必须标记为"部分完成"或"进行中"，不能标记为"已完成"
-   - **不能因为"代码已编写"就认为任务完成**：必须验证编译通过、功能正常运行、测试通过
+**⚠ 严规**：
+一. **每响应唯含一工具调用**：每个响应必含且仅含一工具调用（任务已竟时除外）。同时调用多工具必致误。
+二. **禁虚构结果**：一切操作必据实果，禁推测、假设或虚构。必待工具执行既毕而获实果后方行下步。
+三. **待工具结果**：续行之前，必待现工具之果，不得臆其果。
+四. **据实验证**：一切结论必据实果与验证之据，禁据推测或假设。
+五. **代码任务竟之标准（严行）**：
+   - **编译/构建必通**：代码必能成编/构建，无编误、无语误、无链误
+   - **功能必验**：功能必经实运验证，不得仅凭代码之存即谓已竟
+   - **误必修**：若有编误、运时之误、测败，任务必标为"部分竟"或"进行中"，不得标为"已竟"
+   - **不得因"代码已撰"即谓任务竟**：必验编通、功能常行、测通
 
 **🎯 核心任务目标提醒**：
-请始终牢记用户的最新任务目标（已在"用户的原始需求和要求"部分明确列出）。所有操作都应该围绕完成最新任务目标进行。如果当前进度偏离了最新目标，请及时调整方向。注意：用户的任务目标可能在对话过程中发生变化，请以最新的目标为准。
+祈始终牢记用户之最新任务目标（已于"用户之原始需求与要求"部分明列）。一切操作皆宜围绕竟最新任务目标而行。若当前进度偏离最新目标，祈及时调向。注意：用户之任务目标或于对话过程中生变，祈以最新之目标为准。
 
-请据以上信息续行任务。注意，此乃先前对话之摘要，上下文长度已逾限而重置。请径续行任务，无需重复已竟之步骤。若有需要，可询用户以获更多信息。{session_file_info}{initial_commit_info}
+祈据以上信息续行任务。注意，此乃先前对话之摘要，上下文长度已逾限而重置。祈径续行任务，无需重复已竟之步骤。若有需要，可询用户以获更多信息。{session_file_info}{initial_commit_info}
         """
 
         # 如果有任务列表信息，添加到消息后面
@@ -2759,7 +2759,7 @@ class Agent:
 
         # 任务完成提示
         complete_prompt = (
-            f"- 若任务已竟，只输出 {ot('!!!COMPLETE!!!')}，勿输出其他任何内容。任务总结将于后交互中见询。"
+            f"- 若任务已竟，只输出 {ot('!!!COMPLETE!!!')}，勿输出其他任何内容。任务撮要将于后交互中见询。"
             if need_complete and self.auto_complete
             else ""
         )
@@ -2771,20 +2771,17 @@ class Agent:
         )
 
         addon_prompt = f"""
-    请判任已竟否，若竟：
+    祈判任已竟否，若竟：
     {complete_prompt if complete_prompt else "- 径出完成原因，无需再有新操作"}
-    若未竟，请行下步：
+    若未竟，祈行下步：
     - 唯含一操
-    - 若讯不明，请询用补
-    - 若执中连败五次，请询用操
+    - 若讯不明，祈询用补
+    - 若执中连败五次，祈询用操
     - 工具调用径出纯 JSON 对象，无需任何标签包裹
     - 操列：{action_handlers}{memory_prompts}
-
-    注意：若当前部分任务已竟，之前之上下文价值不大，可输出{ot("!!!SUMMARY!!!")}标记以触发总结并清空历史，以便开始新任务阶段。
-    注意：若当前部分任务已完成，之前之上下文价值不大，可输出{ot("!!!SUMMARY!!!")}标记以触发总结并清空历史，以便开始新任务阶段。
+    注意：若当前部分任务已竟，之前之上下文价值不大，可输出{ot("!!!SUMMARY!!!")}标记以触发撮要并清空历史，以便开始新任务阶段。
 </system_prompt>
-
-请续。
+祈续。
 """
 
         return addon_prompt
@@ -2886,9 +2883,9 @@ class Agent:
                 non_interactive_note = (
                     "\n\n[系统说明]\n"
                     "本次会话处于**非交互模式**：\n"
-                    "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问'是否继续'；\n"
-                    "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+                    "- 于 PLAN 模式中给出清晰、可执行之详计后，应**自动入 EXECUTE 模式以行其计**，勿待用户额外确认；\n"
+                    "- 于 EXECUTE 模式中，保持逐步之小步提交与可退策略，然无需向用户反复询'是否续行'；\n"
+                    "- 若遇讯严重不足，可于 RESEARCH 模式中自补必要之析，而非困于待用户输入。\n"
                 )
 
                 # 非交互模式下不再自动设置pin_content
@@ -3044,7 +3041,7 @@ class Agent:
             self.set_non_interactive(False)
 
         user_input = self._multiline_input(
-            "模型交互期间被中断，请输入用户干预信息", False
+            "模型交互期间为之中断，请输入用户干预之讯", False
         )
         # 广播中断事件（包含用户输入，可能为空字符串）
         try:
@@ -3077,24 +3074,24 @@ class Agent:
             return LoopAction.SKIP_TURN
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
-            if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", False):
+            if self.confirm_callback("察有工具调用，是否续行工具调用？", False):
                 self.session.prompt = join_prompts(
                     [
-                        f"被用户中断，用户补充信息为：{processed_input}",
-                        "用户同意继续工具调用。",
+                        f"为用户所中断，用户补讯为：{processed_input}",
+                        "用户允续行工具调用。",
                     ]
                 )
                 return None  # 继续执行工具调用
             else:
                 self.session.prompt = join_prompts(
                     [
-                        f"被用户中断，用户补充信息为：{processed_input}",
-                        "检测到有工具调用，但被用户拒绝执行。宜据用户之补充信息重新考虑下一步操作。",
+                        f"为用户所中断，用户补讯为：{processed_input}",
+                        "察有工具调用，然为用户所拒。宜据用户之补讯重思下步之操。",
                     ]
                 )
                 return LoopAction.SKIP_TURN  # 请求主循环 continue
         else:
-            self.session.prompt = f"被用户中断，用户补充信息为：{processed_input}"
+            self.session.prompt = f"为用户所中断，用户补讯为：{processed_input}"
             return LoopAction.SKIP_TURN  # 请求主循环 continue
 
     def _get_next_user_action(self) -> Union[str, "LoopAction"]:
@@ -3104,7 +3101,7 @@ class Agent:
             LoopAction.CONTINUE 或 LoopAction.COMPLETE（兼容旧字符串值 "continue"/"complete"）
         """
         user_input = self._multiline_input(
-            f"{self.name}: 请输入（Ctrl+C 结束当前任务）", False
+            f"{self.name}: 请输入（Ctrl+C 以竟当前之务）", False
         )
 
         if user_input:
@@ -3122,7 +3119,7 @@ class Agent:
                 self.session.prompt = join_prompts(
                     [
                         self.session.prompt,
-                        "请勿再复前答，请予异答。",
+                        "祈勿再复前答，祈予异答。",
                     ]
                 )
                 self._repeat_detected = False
@@ -3282,18 +3279,18 @@ class Agent:
             tools_prompt_part += f"{i}. {tool['name']}: {tool['description']}\n"
 
         selection_prompt = f"""
-用户任务是：
+用户之务：
 <task>
 {task}
 </task>
 
-这是一个可用工具的列表：
+此乃可用工具之列：
 <tools>
 {tools_prompt_part}
 </tools>
 
-请据用户任务，从列表中选择最相关之工具。
-请仅返所选工具之编号，以逗号分隔。例如：1, 5, 12
+祈据用户之务，从列中择最相关之工具。
+祈仅返所选工具之编号，以逗号分隔。例如：1, 5, 12
 """
         PrettyOutput.auto_print(
             f"ℹ️ 工具数量超过{threshold}个，正在使用AI筛选相关工具..."
@@ -3434,9 +3431,9 @@ class Agent:
             return
 
         prompt = (
-            f"检测到您的 '{scope_name}' 记忆库中包含 {len(memories)} 条记忆，"
-            f"并且存在3个以上标签重叠的记忆。\n"
-            f"是否立即整理记忆库以优化性能和相关性？"
+            f"察汝之'{scope_name}'忆库含 {len(memories)} 条记忆，"
+            f"且有叁以上签重叠之记忆。\n"
+            f"是否立整忆库以优性能与相关性？"
         )
         if self.confirm_callback(prompt, False):
             PrettyOutput.auto_print(

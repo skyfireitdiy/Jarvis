@@ -1,0 +1,14 @@
+{
+  "id": "20260810_202144_324188",
+  "type": "project_long_term",
+  "tags": [
+    "localStorage",
+    "缓存",
+    "display_name丢失",
+    "refreshUserInfo",
+    "bug-fix"
+  ],
+  "content": "display_name丢失根因与修复：localStorage缓存旧userInfo无display_name字段，页面刷新后回退至username。解决方案：App.vue定义refreshUserInfo()函数，在ws.onopen时调用，从/api/auth/me获取最新用户信息更新localStorage。关键代码位置：App.vue L1351-1367(定义), L3752(ws.onopen调用)",
+  "created_at": "2026-08-10T20:21:44.324205",
+  "updated_at": "2026-08-10T20:21:44.324209"
+}

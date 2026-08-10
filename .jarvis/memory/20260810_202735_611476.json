@@ -1,0 +1,8 @@
+{
+  "id": "20260810_202735_611476",
+  "type": "project_long_term",
+  "tags": ["prompt-classical-style", "completed-task", "文言文化"],
+  "content": "提示词文言文化任务已竟。修改文件及处数：git_commiter.py(5处)、rules_manager.py(5处)、__init__.py(12处)、methodology.py(6处)、task_analyzer.py(5处)、prompts.py(章节名)。约束：仅改提示词字符串，不改代码逻辑/变量名/格式化占位符。UI交互输出(PrettyOutput等)亦改。序号用中文数字。",
+  "created_at": "2026-08-10T20:27:35.611509",
+  "updated_at": "2026-08-10T20:27:35.611515"
+}

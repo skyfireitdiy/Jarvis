@@ -1226,6 +1226,7 @@ const HEARTBEAT_INTERVAL = 5000 // 心跳间隔：5 秒发送一次 ping
 const HEARTBEAT_TIMEOUT = 15000 // 心跳超时时间：15 秒（3 次）未收到 pong 就重连
 const connecting = ref(false)
 const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连接状态）
+const connectingAgents = ref(new Set()) // Agent 连接锁：防止同一 agent 并发重连建多连接
 const connectErrorMessage = ref('')  // 连接错误信息
 const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
 const isRestartingGateway = ref(false)
@@ -4334,6 +4335,12 @@ async function connectToAgent(agent, retryCount = 0) {
   const retryDelay = 2000 // 2秒重试间隔
   const connectionTimeout = 10000 // 10秒连接超时（适应Agent启动时间）
   
+  // 连接锁检查：防止同一 agent 并发重连建多连接
+  if (connectingAgents.value.has(agentId)) {
+    console.log(`[AGENT] Connection to ${agent.name || agentId} already in progress, skipping`)
+    return Promise.resolve(null)
+  }
+
   // 检查是否已有连接
   if (sockets.value.has(agentId)) {
     const existingWs = sockets.value.get(agentId)
@@ -4378,10 +4385,13 @@ async function connectToAgent(agent, retryCount = 0) {
   }
   
   console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
-  
+
+  // 加连接锁
+  connectingAgents.value.add(agentId)
+
   const { host, port } = getGatewayAddress()
   const url = buildAgentWebSocketUrl(host, agentId, null, port, String(agent?.node_id || 'master').trim())
-  
+
   agentConnecting.value = true
   
   // 返回 Promise，等待连接真正建立
@@ -4398,6 +4408,7 @@ async function connectToAgent(agent, retryCount = 0) {
         console.error(`[AGENT ${agentId}] Connection timeout after ${connectionTimeout}ms`)
         ws.close()
         sockets.value.delete(agentId)
+        connectingAgents.value.delete(agentId) // 释放连接锁
         if (agentConnecting.value) agentConnecting.value = false
 
         // 只通知超时，不重连
@@ -4434,6 +4445,7 @@ async function connectToAgent(agent, retryCount = 0) {
 
         clearTimeout(timeoutId)
         console.log(`[AGENT ${agentId}] Connected to ${url}`)
+        connectingAgents.value.delete(agentId) // 释放连接锁
         agentConnecting.value = false
 
         // 保存连接
@@ -4480,6 +4492,7 @@ async function connectToAgent(agent, retryCount = 0) {
 
         console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason || 'unknown'}`)
         sockets.value.delete(agentId)
+        connectingAgents.value.delete(agentId) // 释放连接锁
         if (agentConnecting.value) agentConnecting.value = false
 
         // 如果断开的Agent不是当前活跃的Agent，静默重连（后台Agent需要保持消息接收）
@@ -4541,6 +4554,7 @@ async function connectToAgent(agent, retryCount = 0) {
 
         clearTimeout(timeoutId)
         console.error(`[AGENT ${agentId}] Connection error:`, error)
+        connectingAgents.value.delete(agentId) // 释放连接锁
         if (agentConnecting.value) agentConnecting.value = false
 
         // 只清理和通知，不重连
@@ -4552,6 +4566,7 @@ async function connectToAgent(agent, retryCount = 0) {
       
     } catch (error) {
       console.error(`[AGENT ${agentId}] Failed to connect:`, error)
+      connectingAgents.value.delete(agentId) // 释放连接锁
       agentConnecting.value = false
       
       if (retryCount < maxRetries) {
@@ -9713,11 +9728,12 @@ function checkHeartbeatTimeout() {
         ws.close()
       }
       sockets.value.delete(agentId)
+      connectingAgents.value.delete(agentId) // 释放连接锁
       lastPongTime.value.delete(agentId)
       // 如果是当前活跃 Agent，触发重连
       if (agentId === currentAgentId.value) {
         const agent = agentMap.value.get(agentId)
-        if (agent) {
+        if (agent && !connectingAgents.value.has(agentId)) {
           connectToAgent(agent).catch(e => console.warn(`[HEARTBEAT] Reconnect failed for ${agentId}:`, e.message))
         }
       }

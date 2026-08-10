@@ -1,0 +1,8 @@
+{
+  "id": "20260810_182049_559844",
+  "type": "project_long_term",
+  "tags": ["prompt-classical-style", "jarvis_agent", "completed-task"],
+  "content": "提示词文言文化任务已完成。已修改文件：\n1. jarvis_agent/__init__.py - 多处提示词改为文言文风格（中断处理、工具筛选、记忆整理、摘要格式化、非交互模式说明、commit上下文提示、重试提示等）\n2. jarvis_agent/prompts.py - 章节名称改为文言文（汝必守之则、汝必行之操）\n3. jarvis_git_utils/git_commiter.py - 格式规则改中文数字等\n4. jarvis_utils/methodology.py - 序号改中文数字等\n5. jarvis_agent/task_analyzer.py - 多处提示词改文言文\n6. rules_manager.py - 已确认3处prompt已为文言文风格，无需修改\n注意：PrettyOutput/auto_print等UI输出消息不改（面向用户非LLM）；字符串比较值（如'没有检测到代码变更'）不改（非提示词）",
+  "created_at": "2026-08-10T18:20:49.559886",
+  "updated_at": "2026-08-10T18:20:49.559893"
+}
