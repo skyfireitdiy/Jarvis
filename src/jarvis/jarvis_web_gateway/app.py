@@ -3047,6 +3047,7 @@ def create_app(
                     query=str(request.query_params),
                     headers=dict(request.headers),
                     body=body,
+                    user_info=getattr(request.state, "user_info", None),
                 )
                 return Response(
                     content=result.get("body", "{}"),
@@ -5689,11 +5690,32 @@ def create_app(
         query: str,
         headers: Dict[str, Any],
         body: str,
+        user_info: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         normalized_method = str(method or "GET").upper()
         normalized_path = "/" + str(path or "").lstrip("/")
         if normalized_path.startswith("/api/"):
             normalized_path = "/" + normalized_path[len("/api/") :].lstrip("/")
+
+        # 构造模拟Request，传递user_info给需要request参数的API函数
+        class _MockRequest:
+            pass
+
+        _mock_req = _MockRequest()
+        _mock_req.state = type("state", (), {"user_info": user_info})()
+        # 若无user_info，尝试从headers解析JWT
+        if user_info is None:
+            auth_header = headers.get("authorization", headers.get("Authorization", ""))
+            if auth_header and auth_header.startswith("Bearer "):
+                try:
+                    from jarvis.jarvis_web_gateway.jwt_utils import verify_jwt_token
+
+                    token = auth_header[7:]
+                    token_payload = verify_jwt_token(token)
+                    if token_payload:
+                        _mock_req.state.user_info = token_payload
+                except Exception:
+                    pass
 
         payload: Dict[str, Any] = {}
         if normalized_method == "GET":
@@ -5768,7 +5790,7 @@ def create_app(
         elif normalized_method == "GET" and normalized_path == "/agents":
             result = await get_agents()
         elif normalized_method == "POST" and normalized_path == "/agents":
-            result = await create_agent(payload)
+            result = await create_agent(payload, _mock_req)
         elif normalized_path.startswith("/agents/") and normalized_path.endswith(
             "/sessions"
         ):
@@ -5814,9 +5836,11 @@ def create_app(
         ].strip("/"):
             agent_id = normalized_path[len("/agents/") :].strip("/")
             if normalized_method == "DELETE":
-                result = await delete_agent(agent_id, str(payload.get("node_id") or ""))
+                result = await delete_agent(
+                    agent_id, _mock_req, str(payload.get("node_id") or "")
+                )
             elif normalized_method == "PATCH":
-                result = await patch_agent(agent_id, payload)
+                result = await patch_agent(agent_id, payload, _mock_req)
             else:
                 result = {
                     "success": False,
@@ -5901,7 +5925,7 @@ def create_app(
             and normalized_method == "DELETE"
         ):
             agent_id = normalized_path[len("/agents/") : -len("/stop")].strip("/")
-            result = await stop_agent(agent_id)
+            result = await stop_agent(agent_id, _mock_req)
         else:
             return {
                 "success": False,
