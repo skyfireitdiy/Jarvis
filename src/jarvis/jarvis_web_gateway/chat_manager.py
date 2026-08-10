@@ -43,11 +43,13 @@ class ChatManager:
         connection_id: str,
         websocket: WebSocket,
         user_id: Optional[str] = None,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """注册客户端，并广播上线通知。"""
         async with self._lock:
             self._chat_clients[client_id] = {
                 "name": name,
+                "display_name": display_name or name,
                 "connection_id": connection_id,
                 "websocket": websocket,
                 "registered_at": time.time(),
@@ -57,11 +59,11 @@ class ChatManager:
         await self.broadcast_to_all(
             {
                 "type": "chat_client_joined",
-                "payload": {"client_id": client_id, "name": name},
+                "payload": {"client_id": client_id, "name": name, "display_name": display_name or name},
             },
             exclude_client_id=client_id,
         )
-        return {"success": True, "client_id": client_id, "name": name}
+        return {"success": True, "client_id": client_id, "name": name, "display_name": display_name or name}
 
     async def unregister_client(self, client_id: str) -> None:
         """注销客户端，并清理其所在聊天室，广播下线通知。"""
@@ -90,7 +92,7 @@ class ChatManager:
     def get_clients(self) -> list[Dict[str, Any]]:
         """获取所有在线客户端列表。"""
         return [
-            {"client_id": cid, "name": info["name"]}
+            {"client_id": cid, "name": info["name"], "display_name": info.get("display_name", info["name"])}
             for cid, info in self._chat_clients.items()
         ]
 
