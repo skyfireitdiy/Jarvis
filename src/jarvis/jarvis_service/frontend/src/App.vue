@@ -6808,6 +6808,19 @@ function handleChatMessage(type, payload) {
     case 'chat_register_response':
       if (payload?.success) {
         myClientId.value = payload.client_id || myClientId.value
+        // 自动重新加入缓存的房间
+        const savedRooms = chatJoinedRooms.value.filter(rid => rid)
+        if (savedRooms.length > 0) {
+          chatAutoRejoining = true
+          chatAutoRejoinCount = savedRooms.length
+          savedRooms.forEach(rid => {
+            sendChatMessageToServer('chat_join_room', { room_id: rid, client_id: myClientId.value })
+          })
+        }
+      } else {
+        // 注册失败，清空缓存
+        chatJoinedRooms.value = []
+        saveChatJoinedRooms()
       }
       break
     case 'chat_get_rooms_response':
@@ -6820,7 +6833,7 @@ function handleChatMessage(type, payload) {
           name: payload.name || '未命名聊天室',
           member_count: 1,
         })
-        if (!chatJoinedRooms.value.includes(payload.room_id)) chatJoinedRooms.value = [...chatJoinedRooms.value, payload.room_id]
+        if (!chatJoinedRooms.value.includes(payload.room_id)) { chatJoinedRooms.value = [...chatJoinedRooms.value, payload.room_id]; saveChatJoinedRooms() }
         showToast('聊天室创建成功', 'success')
       } else {
         showToast(payload?.error || '创建聊天室失败', 'error')
@@ -6828,12 +6841,24 @@ function handleChatMessage(type, payload) {
       break
     case 'chat_join_room_response':
       if (payload?.success) {
-        showToast('已加入聊天室', 'success')
-        if (!chatJoinedRooms.value.includes(activeChatRoomId.value)) chatJoinedRooms.value = [...chatJoinedRooms.value, activeChatRoomId.value]
+        if (!chatAutoRejoining) showToast('已加入聊天室', 'success')
+        const joinedRoomId = payload?.room_id || activeChatRoomId.value
+        if (joinedRoomId && !chatJoinedRooms.value.includes(joinedRoomId)) { chatJoinedRooms.value = [...chatJoinedRooms.value, joinedRoomId]; saveChatJoinedRooms() }
         // 获取聊天室成员列表
-        sendChatMessageToServer('chat_get_room_members', { room_id: activeChatRoomId.value })
+        if (joinedRoomId) sendChatMessageToServer('chat_get_room_members', { room_id: joinedRoomId })
       } else {
-        showToast(payload?.error || '加入聊天室失败', 'error')
+        if (!chatAutoRejoining) showToast(payload?.error || '加入聊天室失败', 'error')
+        // 加入失败（房间可能已删除），从缓存中移除
+        const failedRoomId = payload?.room_id || activeChatRoomId.value
+        if (failedRoomId && chatJoinedRooms.value.includes(failedRoomId)) {
+          chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== failedRoomId)
+          saveChatJoinedRooms()
+        }
+      }
+      // 自动重连加入完成计数
+      if (chatAutoRejoining) {
+        chatAutoRejoinCount--
+        if (chatAutoRejoinCount <= 0) chatAutoRejoining = false
       }
       break
     case 'chat_get_clients_response':
@@ -6928,6 +6953,7 @@ function handleChatMessage(type, payload) {
         showToast('已退出聊天室', 'success')
         const leftRoomId = payload?.room_id || activeChatRoomId.value
         chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== leftRoomId)
+        saveChatJoinedRooms()
         delete chatMessages.value[leftRoomId]
         if (activeChatRoomId.value === leftRoomId) {
           activeChatRoomId.value = ''
@@ -6942,6 +6968,7 @@ function handleChatMessage(type, payload) {
         showToast('聊天室已删除', 'success')
         const deletedRoomId = payload?.room_id || activeChatRoomId.value
         chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== deletedRoomId)
+        saveChatJoinedRooms()
         delete chatMessages.value[deletedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== deletedRoomId)
         if (activeChatRoomId.value === deletedRoomId) {
@@ -6966,6 +6993,7 @@ function handleChatMessage(type, payload) {
       const removedRoomId = payload?.room_id
       if (removedRoomId) {
         chatJoinedRooms.value = chatJoinedRooms.value.filter(r => r !== removedRoomId)
+        saveChatJoinedRooms()
         delete chatMessages.value[removedRoomId]
         chatRooms.value = chatRooms.value.filter(r => r.room_id !== removedRoomId)
         if (activeChatRoomId.value === removedRoomId) {
@@ -8742,7 +8770,15 @@ const chatUnreadCount = ref(0)
 const chatName = computed(() => username.value)
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
-const chatJoinedRooms = ref([])
+const CHAT_JOINED_ROOMS_KEY = 'jarvis_chat_joined_rooms'
+const chatJoinedRooms = ref(JSON.parse(localStorage.getItem(CHAT_JOINED_ROOMS_KEY) || '[]'))
+
+function saveChatJoinedRooms() {
+  localStorage.setItem(CHAT_JOINED_ROOMS_KEY, JSON.stringify(chatJoinedRooms.value))
+}
+
+let chatAutoRejoining = false
+let chatAutoRejoinCount = 0
 
 function startChatSidebarResize(event) {
   const startX = event.clientX
