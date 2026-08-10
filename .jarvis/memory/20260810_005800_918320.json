@@ -1,0 +1,8 @@
+{
+  "id": "20260810_005800_918320",
+  "type": "project_long_term",
+  "tags": ["chat", "online-clients", "broadcast", "bugfix"],
+  "content": "在线用户列表广播格式修复：chat_client_joined和chat_client_left的client_id/name从顶层移入payload内，与前端handleMessage的{type,payload}解析一致。chat_room_created和chat_message广播已正确使用payload。commit: db70611",
+  "created_at": "2026-08-10T00:58:00.918366",
+  "updated_at": "2026-08-10T00:58:00.918372"
+}

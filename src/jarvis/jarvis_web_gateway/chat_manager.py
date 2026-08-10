@@ -53,7 +53,10 @@ class ChatManager:
             }
         # 广播上线通知（锁外执行，避免死锁）
         await self.broadcast_to_all(
-            {"type": "chat_client_joined", "client_id": client_id, "name": name},
+            {
+                "type": "chat_client_joined",
+                "payload": {"client_id": client_id, "name": name},
+            },
             exclude_client_id=client_id,
         )
         return {"success": True, "client_id": client_id, "name": name}
@@ -71,8 +74,10 @@ class ChatManager:
             await self.broadcast_to_all(
                 {
                     "type": "chat_client_left",
-                    "client_id": client_id,
-                    "name": client_info.get("name", ""),
+                    "payload": {
+                        "client_id": client_id,
+                        "name": client_info.get("name", ""),
+                    },
                 },
             )
 
