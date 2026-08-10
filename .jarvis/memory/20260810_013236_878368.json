@@ -1,0 +1,8 @@
+{
+  "id": "20260810_013236_878368",
+  "type": "project_long_term",
+  "tags": ["chat", "persistence", "joined-rooms"],
+  "content": "聊天室加入状态持久化：chatJoinedRooms从ref([])改为从localStorage(jarvis_chat_joined_rooms)初始化，变更时同步写入saveChatJoinedRooms()。注册成功后自动重新加入缓存房间（chatAutoRejoining标记抑制toast），加入失败时从缓存移除。5处变更点均添加saveChatJoinedRooms()调用。commit: eb83f8a",
+  "created_at": "2026-08-10T01:32:36.878421",
+  "updated_at": "2026-08-10T01:32:36.878427"
+}
