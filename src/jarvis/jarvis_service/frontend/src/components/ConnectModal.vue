@@ -11,7 +11,7 @@
       </div>
       <div class="form-group">
         <label>密码</label>
-        <input :value="password" @input="$emit('update:password', $event.target.value)" type="password" placeholder="可选" @keydown.enter="$emit('connect')" />
+        <input :value="password" @input="$emit('update:password', $event.target.value)" type="password" placeholder="必填" @keydown.enter="$emit('connect')" />
       </div>
       <div class="form-group">
         <label>网关地址</label>

@@ -61,7 +61,7 @@ class BaseGateway(IGateway):
     """基础网关实现，便于扩展自定义交互方式。"""
 
     def _check_auth(self, auth: Optional[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
-        """检查认证信息。
+        """检查认证信息，支持JWT Token和旧UUID Token。
 
         Args:
             auth: 认证信息字典，应包含 token 字段
@@ -84,7 +84,11 @@ class BaseGateway(IGateway):
         if not token:
             return False, "token missing"
 
-        if validate_gateway_token(token):
+        # validate_gateway_token 现在返回 Optional[dict]，None表示验证失败
+        user_info = validate_gateway_token(token)
+        if user_info is not None:
+            # 存储用户信息到auth字典中，供后续使用
+            auth["user_info"] = user_info
             return True, None
 
         return False, "invalid token"

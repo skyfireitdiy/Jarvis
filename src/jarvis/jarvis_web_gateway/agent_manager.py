@@ -48,6 +48,7 @@ class AgentInfo:
         restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -64,6 +65,7 @@ class AgentInfo:
         self.proxy_node = proxy_node
         self.status = "running"
         self.node_id = node_id
+        self.owner_id = owner_id
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
 
@@ -84,6 +86,7 @@ class AgentInfo:
             "no_interaction_mode": self.no_interaction_mode,
             "proxy_node": self.proxy_node,
             "node_id": self.node_id,
+            "owner_id": self.owner_id,
             "created_at": self.created_at,
         }
 
@@ -139,6 +142,7 @@ class AgentManager:
         restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -156,6 +160,7 @@ class AgentManager:
             quick_mode: 是否启用极速模式
             restore_session: 是否启动时恢复会话
             no_interaction_mode: 是否启用无交互模式（启用时必须提供 task）
+            owner_id: 创建者用户ID
 
         Returns:
             Agent 信息字典
@@ -250,6 +255,7 @@ class AgentManager:
             restore_session=restore_session,
             no_interaction_mode=no_interaction_mode,
             proxy_node=proxy_node,
+            owner_id=owner_id,
         )
 
         # 保存到内存
@@ -304,6 +310,7 @@ class AgentManager:
         auth_token: Optional[str] = None,
         worktree: bool = False,
         proxy_node: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """在线程环境中安全地创建 Agent。"""
         if self._event_loop is None:
@@ -322,6 +329,7 @@ class AgentManager:
                 auth_token=auth_token,
                 worktree=worktree,
                 proxy_node=proxy_node,
+                owner_id=owner_id,
             ),
             self._event_loop,
         )
@@ -340,6 +348,7 @@ class AgentManager:
         auth_token: Optional[str] = None,
         worktree: bool = False,
         proxy_node: Optional[str] = None,
+        owner_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """在事件循环上下文中创建 Agent。"""
         return self.create_agent(
@@ -354,6 +363,7 @@ class AgentManager:
             auth_token=auth_token,
             worktree=worktree,
             proxy_node=proxy_node,
+            owner_id=owner_id,
         )
 
     def stop_agent(self, agent_id: str) -> Dict[str, Any]:
@@ -783,6 +793,7 @@ class AgentManager:
                             "no_interaction_mode", False
                         ),
                         proxy_node=agent_data.get("proxy_node"),
+                        owner_id=agent_data.get("owner_id"),
                     )
 
                     # 检查进程是否还在运行

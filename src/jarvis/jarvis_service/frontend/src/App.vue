@@ -89,6 +89,9 @@
         </div>
         
         <div class="header-actions desktop-only">
+          <span v-if="auth.userInfo" class="user-info-display" :title="'当前用户: ' + auth.userInfo.username">
+            👤 {{ auth.userInfo.username }}
+          </span>
           <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
             <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
@@ -100,7 +103,10 @@
             👤
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
-            ⚙️
+            ⚙
+          </button>
+          <button v-if="auth.token" class="icon-btn logout-btn" @click="logout()" title="登出">
+            🚪
           </button>
         </div>
       </header>
@@ -1186,12 +1192,12 @@ function getLanguageExtension(language) {
 }
 
 // 认证和连接配置
-const auth = ref({ 
+const auth = ref({
   password: '',
-  token: ''
+  token: '',
+  userInfo: null
 })
-const username = ref(localStorage.getItem('jarvis_username') || 'User-' + Math.random().toString(36).slice(2, 8))
-watch(username, (val) => { localStorage.setItem('jarvis_username', val) })
+const username = ref(localStorage.getItem('jarvis_username') || '')
 const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
@@ -1224,38 +1230,67 @@ const syncConfigSections = ref(['llms', 'llm_groups']) // 要同步的配置类�
 const isSyncingConfig = ref(false) // 是否正在同步配置
 const isUpdatingCode = ref(false) // 是否正在更新代码
 
-// 登录函数：使用密码获取 Token
+// 登录函数：使用用户名+密码获取 JWT Token
 async function loginWithPassword(password) {
   try {
     const { host, port } = getGatewayAddress()
     const response = await fetch(`${getHttpProtocol()}://${host}:${port}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ username: username.value, password })
     })
-    
+
     const result = await response.json()
     if (!response.ok || !result.success || !result.data?.token) {
       throw new Error(result.error?.message || '登录失败')
     }
-    
+
     // 保存 Token（仅在内存中保存，页面刷新后会失效，需要重新登录）
     auth.value.token = result.data.token
+
+    // 保存用户信息
+    if (result.data.user) {
+      auth.value.userInfo = result.data.user
+      localStorage.setItem('jarvis_user_info', JSON.stringify(result.data.user))
+    }
 
     // 如果免登录开启，将 Token 保存到 localStorage
     if (autoLoginEnabled.value) {
       localStorage.setItem('jarvis_auth_token', result.data.token)
       console.log('[AUTH] Token saved to localStorage (auto login enabled)')
     }
-    
+
     // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
     auth.value.password = ''
-    
+
     console.log('[AUTH] Login successful, token saved, password cleared')
     return true
   } catch (error) {
     console.error('[AUTH] Login failed:', error)
     throw error
+  }
+}
+
+// 登出函数
+async function logout() {
+  try {
+    // 尝试调用后端登出API（撤销token）
+    if (hasAuthToken()) {
+      const { host, port } = getGatewayAddress()
+      await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/auth/logout`, {
+        method: 'POST'
+      }).catch(() => {}) // 忽略网络错误
+    }
+  } finally {
+    // 无论后端是否成功，都清除本地状态
+    auth.value.token = ''
+    auth.value.userInfo = null
+    auth.value.password = ''
+    localStorage.removeItem('jarvis_auth_token')
+    localStorage.removeItem('jarvis_user_info')
+    showConnectModal.value = true
+    connectErrorMessage.value = ''
+    console.log('[AUTH] Logged out successfully')
   }
 }
 
@@ -1279,12 +1314,24 @@ function getAuthToken() {
   return null
 }
 
-// 尝试从 localStorage 加载已保存的 token
+// 尝试从 localStorage 加载已保存的 token 和用户信息
 function loadSavedToken() {
   const savedToken = localStorage.getItem('jarvis_auth_token')
   if (savedToken) {
     auth.value.token = savedToken
     console.log('[AUTH] Loaded saved token from localStorage')
+    // 加载用户信息
+    const savedUserInfo = localStorage.getItem('jarvis_user_info')
+    if (savedUserInfo) {
+      try {
+        auth.value.userInfo = JSON.parse(savedUserInfo)
+        if (auth.value.userInfo?.username) {
+          username.value = auth.value.userInfo.username
+        }
+      } catch (e) {
+        console.warn('[AUTH] Failed to parse saved user info')
+      }
+    }
     return true
   }
   return false
@@ -1315,6 +1362,9 @@ async function fetchWithAuth(url, options = {}) {
   if (response.status === 401) {
     console.log('[AUTH] Received 401 Unauthorized, showing login modal')
     auth.value.token = ''
+    auth.value.userInfo = null
+    localStorage.removeItem('jarvis_auth_token')
+    localStorage.removeItem('jarvis_user_info')
     showConnectModal.value = true
     connectErrorMessage.value = '登录已过期，请重新登录'
   }
@@ -10058,6 +10108,19 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.user-info-display {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  padding: 0 8px;
+  border-right: 1px solid var(--color-border);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.logout-btn:hover {
+  color: var(--color-error) !important;
 }
 
 .editor-panel {
