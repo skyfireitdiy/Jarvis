@@ -21,6 +21,7 @@
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
       :agentGroups="agentGroups"
+      :currentUserId="username"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
@@ -40,6 +41,7 @@
       @viewRules="viewRules"
       @viewTools="viewTools"
       @openEditor="createEditorForAgent"
+      @editAccess="editAgentAccess"
     />
 
     <!-- 主内容区 -->
@@ -595,6 +597,10 @@
       @update:proxyNode="newAgentProxyNode = $event"
       :formatNodeLabel="formatNodeOptionLabel"
       :createError="newAgentCreateError"
+      :accessAclRead="newAgentAccessAclRead"
+      @update:accessAclRead="newAgentAccessAclRead = $event"
+      :accessAclInteract="newAgentAccessAclInteract"
+      @update:accessAclInteract="newAgentAccessAclInteract = $event"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -608,6 +614,27 @@
       @cancel="showRenameAgentModal = false"
       @confirm="confirmRename"
     />
+
+    <!-- Agent ACL编辑弹窗 -->
+    <div v-if="showEditAccessModal" class="modal-overlay" @click.self="showEditAccessModal = false">
+      <div class="modal-content" style="max-width: 480px;">
+        <h3>权限管理 - {{ editingAccessAgent?.name || editingAccessAgent?.agent_id }}</h3>
+        <div class="form-group">
+          <label>可查看用户 (read)</label>
+          <input v-model="editAccessRead" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
+          <div class="form-help">允许查看此Agent的用户ID列表，逗号分隔</div>
+        </div>
+        <div class="form-group">
+          <label>可交互用户 (interact)</label>
+          <input v-model="editAccessInteract" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
+          <div class="form-help">允许向此Agent发送输入的用户ID列表，逗号分隔</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" @click="showEditAccessModal = false">取消</button>
+          <button class="btn primary" @click="saveAgentAccess">保存</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 目录选择对话框 -->
     <DirectoryDialog
@@ -3362,6 +3389,8 @@ const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互�
 const newAgentTaskDescription = ref('') // 新 Agent 任务描述
 const newAgentCreateError = ref('') // 创建 Agent 时的错误信息
 const newAgentProxyNode = ref('') // 新 Agent 代理节点
+const newAgentAccessAclRead = ref('') // 新 Agent ACL read用户列表
+const newAgentAccessAclInteract = ref('') // 新 Agent ACL interact用户列表
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
@@ -5085,6 +5114,10 @@ async function createAgent() {
         task: newAgentNoInteractionMode.value && newAgentTaskDescription.value.trim() ? newAgentTaskDescription.value.trim() : undefined,
         node_id: targetNodeId,
         proxy_node: newAgentProxyNode.value || undefined,
+        access_acl: (newAgentAccessAclRead.value.trim() || newAgentAccessAclInteract.value.trim()) ? {
+          read: newAgentAccessAclRead.value.trim() ? newAgentAccessAclRead.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+          interact: newAgentAccessAclInteract.value.trim() ? newAgentAccessAclInteract.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+        } : undefined,
       })
     })
     if (!response.ok) {
@@ -5112,6 +5145,8 @@ async function createAgent() {
       newAgentNoInteractionMode.value = false
       newAgentTaskDescription.value = ''
       newAgentNodeId.value = ''
+      newAgentAccessAclRead.value = ''
+      newAgentAccessAclInteract.value = ''
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = generateAgentName(newAgentType.value)
       // 立即切换到新创建的 agent
@@ -5741,6 +5776,49 @@ async function confirmRename() {
     console.error('[AGENT] Rename failed:', error)
     alert(`重命名失败: ${error.message}`)
     showRenameAgentModal.value = false
+  }
+}
+
+// Agent ACL编辑
+const showEditAccessModal = ref(false)
+const editingAccessAgent = ref(null)
+const editAccessRead = ref('')
+const editAccessInteract = ref('')
+
+function editAgentAccess(agent) {
+  editingAccessAgent.value = agent
+  const acl = agent.access_acl || {}
+  editAccessRead.value = Array.isArray(acl.read) ? acl.read.join(', ') : ''
+  editAccessInteract.value = Array.isArray(acl.interact) ? acl.interact.join(', ') : ''
+  showEditAccessModal.value = true
+}
+
+async function saveAgentAccess() {
+  const agent = editingAccessAgent.value
+  if (!agent) return
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${agent.agent_id}/access`), {
+      method: 'PUT',
+      body: JSON.stringify({
+        access_acl: {
+          read: editAccessRead.value.trim() ? editAccessRead.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+          interact: editAccessInteract.value.trim() ? editAccessInteract.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+        }
+      })
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`权限更新失败: ${error.error?.message || error.detail || '未知错误'}`)
+      return
+    }
+    await fetchAgentList()
+    showToast('权限更新成功', 'success')
+    showEditAccessModal.value = false
+  } catch (error) {
+    console.error('[AGENT] Access update failed:', error)
+    alert(`权限更新失败: ${error.message}`)
   }
 }
 

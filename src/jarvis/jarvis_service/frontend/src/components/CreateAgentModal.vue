@@ -60,8 +60,21 @@
               <input :value="workDir" @input="$emit('update:workDir', $event.target.value)" type="text" class="form-control" placeholder="/path/to/workspace" />
               <button class="btn select-dir-btn" @click="$emit('selectDir')">选择目录</button>
             </div>
+          <div class="form-group">
+            <label>访问控制（可选）</label>
+            <div class="acl-section">
+              <div class="acl-field">
+                <label class="acl-label">可查看用户 (read)</label>
+                <input :value="accessAclRead" @input="$emit('update:accessAclRead', $event.target.value)" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
+                <div class="form-help">允许查看此Agent的用户ID列表，逗号分隔</div>
+              </div>
+              <div class="acl-field">
+                <label class="acl-label">可交互用户 (interact)</label>
+                <input :value="accessAclInteract" @input="$emit('update:accessAclInteract', $event.target.value)" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
+                <div class="form-help">允许向此Agent发送输入的用户ID列表，逗号分隔</div>
+              </div>
+            </div>
           </div>
-          <div class="form-column create-agent-options-column">
             <div v-if="agentType === 'code_agent'" class="form-group">
               <div class="toggle-wrapper">
                 <label class="toggle-switch">
@@ -144,7 +157,9 @@ const props = defineProps({
   noInteractionMode: { type: Boolean, default: false },
   taskDescription: { type: String, default: '' },
   formatNodeLabel: { type: Function, default: (node) => node.node_id },
-  createError: { type: String, default: '' }
+  createError: { type: String, default: '' },
+  accessAclRead: { type: String, default: '' },
+  accessAclInteract: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -159,6 +174,8 @@ const emit = defineEmits([
   'update:restoreSession',
   'update:noInteractionMode',
   'update:taskDescription',
+  'update:accessAclRead',
+  'update:accessAclInteract',
   'cancel',
   'create',
   'selectDir'
@@ -166,6 +183,22 @@ const emit = defineEmits([
 </script>
 
 <style scoped>
+/* ACL配置区样式 */
+.acl-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.acl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.acl-label {
+  font-size: 0.85em;
+  color: var(--color-text-secondary, #888);
+  font-weight: 500;
+}
 
 /* 模态框遮罩层 */
 .modal-overlay {
