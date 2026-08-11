@@ -1,0 +1,8 @@
+{
+  "id": "20260811_112011_447453",
+  "type": "project_long_term",
+  "tags": ["agent_permission", "bug_fix", "node_http_proxy"],
+  "content": "修复/api/node/master/agents 404错误：\n1. 根因：_dispatch_node_http_request中get_agents()缺少_mock_req参数导致TypeError，被外层except捕获返回502\n2. 修复：L6106 get_agents()→get_agents(_mock_req)\n3. 新增/agents/{id}/access(PUT)和/agents/{id}/stop(DELETE)子路由到_dispatch_node_http_request\n4. 删除_dispatch末尾重复的/agents/{id}/stop路由\n5. 文件：app.py L6106, L6124-6138(新增), L6251(删除重复)\n6. commit: 0e479d7→3ba1ba1→a74a30f→71a4ce7",
+  "created_at": "2026-08-11T11:20:11.447489",
+  "updated_at": "2026-08-11T11:20:11.447495"
+}
