@@ -49,6 +49,7 @@ class AgentInfo:
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
         owner_id: Optional[str] = None,
+        access_acl: Optional[Dict[str, List[str]]] = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -66,6 +67,7 @@ class AgentInfo:
         self.status = "running"
         self.node_id = node_id
         self.owner_id = owner_id
+        self.access_acl = access_acl or {}
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
 
@@ -87,6 +89,7 @@ class AgentInfo:
             "proxy_node": self.proxy_node,
             "node_id": self.node_id,
             "owner_id": self.owner_id,
+            "access_acl": self.access_acl,
             "created_at": self.created_at,
         }
 
@@ -143,6 +146,7 @@ class AgentManager:
         no_interaction_mode: bool = False,
         proxy_node: Optional[str] = None,
         owner_id: Optional[str] = None,
+        access_acl: Optional[Dict[str, List[str]]] = None,
     ) -> Dict[str, Any]:
         """创建 Agent。
 
@@ -256,6 +260,7 @@ class AgentManager:
             no_interaction_mode=no_interaction_mode,
             proxy_node=proxy_node,
             owner_id=owner_id,
+            access_acl=access_acl,
         )
 
         # 保存到内存
@@ -511,6 +516,31 @@ class AgentManager:
 
         agent = self._agents[agent_id]
         agent.name = name
+
+        # 保存到文件
+        self._save_agents()
+        return agent.to_dict()
+
+    def update_agent_access(
+        self, agent_id: str, access_acl: Dict[str, List[str]]
+    ) -> Dict[str, Any]:
+        """更新 Agent 的访问控制列表。
+
+        Args:
+            agent_id: Agent ID
+            access_acl: 访问控制列表，格式为 {"read": [user_id, ...], "interact": [user_id, ...]}
+
+        Returns:
+            更新后的 Agent 信息字典
+
+        Raises:
+            KeyError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise KeyError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        agent.access_acl = access_acl
 
         # 保存到文件
         self._save_agents()

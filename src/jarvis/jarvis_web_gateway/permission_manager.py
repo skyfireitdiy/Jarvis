@@ -24,7 +24,8 @@ BUILTIN_GROUPS = {
         "description": "Agent, Terminal, Timer, Chat management",
         "is_builtin": True,
         "permissions": {
-            "agent:*": "allow",
+            "agent:create": "allow",
+            "agent:delete": "allow",
             "terminal:*": "allow",
             "file:upload": "allow",
             "timer:*": "allow",
@@ -34,12 +35,11 @@ BUILTIN_GROUPS = {
     },
     "sys-developer": {
         "display_name": "Developer",
-        "description": "Agent create/read/execute, Terminal, Chat",
+        "description": "Agent create/delete, Terminal, Chat",
         "is_builtin": True,
         "permissions": {
             "agent:create": "allow",
-            "agent:read": "allow",
-            "agent:execute": "allow",
+            "agent:delete": "allow",
             "terminal:*": "allow",
             "file:upload": "allow",
             "chat:*": "allow",
@@ -50,8 +50,6 @@ BUILTIN_GROUPS = {
         "description": "Read-only access",
         "is_builtin": True,
         "permissions": {
-            "agent:read": "allow",
-            "terminal:read": "allow",
             "chat:*": "allow",
         },
     },

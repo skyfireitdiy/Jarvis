@@ -286,7 +286,7 @@ const showSecret = ref(false)
 // 权限Schema：资源→动作列表
 const permissionSchema = {
   '*': ['*'],
-  'agent': ['*', 'create', 'read', 'execute', 'delete'],
+  'agent': ['*', 'create', 'delete'],
   'terminal': ['*', 'read', 'execute'],
   'timer': ['*', 'read', 'create', 'delete'],
   'chat': ['*', 'read', 'send'],
@@ -808,4 +808,186 @@ const maskedNodeSecret = computed(() => {
 .perm-select:focus { border-color: var(--accent, #89b4fa); }
 .perm-select option[value="allow"] { color: #a6e3a1; }
 .perm-select option[value="deny"] { color: #f38ba8; }
+
+/* 模态操作区 */
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* 帮助文本 */
+.form-help {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #a6adc8);
+  line-height: 1.4;
+}
+
+/* 配置同步区域 */
+.config-sync-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: transparent;
+  border-radius: 6px;
+  border: none;
+}
+.config-sync-row {
+  margin-bottom: 16px;
+}
+.config-sync-row:last-child {
+  margin-bottom: 0;
+}
+.config-sync-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #cdd6f4);
+}
+.config-sync-section .node-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.config-sync-section .node-select:hover {
+  border-color: var(--border-color, #45475a);
+}
+.config-sync-section .node-select:focus {
+  outline: none;
+  border-color: var(--accent, #89b4fa);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.config-sync-button {
+  margin-top: 16px;
+}
+
+/* 复选框标签 */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #1e1e2e);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  color: var(--text-primary, #cdd6f4);
+}
+.checkbox-label:hover {
+  background: var(--bg-secondary, #1e1e2e);
+}
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent, #89b4fa);
+}
+
+/* 私钥显示区域 */
+.node-secret-section {
+  margin-top: 12px;
+  padding: 16px;
+  background: transparent;
+  border-radius: 6px;
+  border: none;
+}
+.secret-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--bg-primary, #11111b);
+  border-radius: 6px;
+  border: none;
+}
+.secret-code {
+  flex: 1;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--text-primary, #cdd6f4);
+  word-break: break-all;
+  min-width: 0;
+}
+.secret-placeholder {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary, #a6adc8);
+  font-style: italic;
+}
+.copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: var(--bg-tertiary, #313244);
+  border: 0.5px solid var(--border-color, #45475a);
+  border-radius: 4px;
+  color: var(--text-secondary, #a6adc8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.copy-btn:hover:not(:disabled) {
+  background: var(--bg-secondary, #1e1e2e);
+  color: var(--accent, #89b4fa);
+  border-color: var(--accent, #89b4fa);
+}
+.copy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.secret-actions {
+  display: flex;
+  gap: 8px;
+}
+.secret-actions .ghost-btn {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+/* 重启节点服务区域 */
+.restart-service-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.restart-service-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 节点选择器（重启区域） */
+.restart-service-section .node-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.restart-service-section .node-select:hover {
+  border-color: var(--border-color, #45475a);
+}
+.restart-service-section .node-select:focus {
+  outline: none;
+  border-color: var(--accent, #89b4fa);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
 </style>

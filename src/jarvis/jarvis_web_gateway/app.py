@@ -2466,6 +2466,26 @@ def create_app(
             await websocket.close(code=4401, reason="Unauthorized")
             return
 
+        # 检查read权限：非owner需在access_acl.read中或有agent:delete权限
+        user_id = None
+        if auth_payload is not None:
+            user_id = auth_payload.get("user_id")
+        if user_id and user_id != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if agent_info and agent_info.owner_id and agent_info.owner_id != user_id:
+                access_acl = agent_info.access_acl or {}
+                has_read = user_id in (access_acl.get("read") or [])
+                has_delete = permission_manager.check_permission(
+                    user_id, "agent:delete"
+                )
+                if not has_read and not has_delete:
+                    await websocket.accept(subprotocol="jarvis-ws")
+                    await _send_error(
+                        websocket, "FORBIDDEN", "No read access to this agent"
+                    )
+                    await websocket.close(code=4403, reason="Forbidden")
+                    return
+
         await websocket.accept(subprotocol="jarvis-ws")
 
         requested_node_id = str(websocket.query_params.get("node_id") or "").strip()
@@ -2531,6 +2551,44 @@ def create_app(
                 async def forward_client_to_remote() -> None:
                     while True:
                         data = await websocket.receive_text()
+                        # 检查interact权限：拦截input_result/confirm_result/manual_interrupt
+                        if user_id and user_id != "system":
+                            try:
+                                msg = json.loads(data)
+                                msg_type = msg.get("type", "")
+                                if msg_type in (
+                                    "input_result",
+                                    "confirm_result",
+                                    "manual_interrupt",
+                                ):
+                                    agent_info = agent_manager.get_agent(agent_id)
+                                    if (
+                                        agent_info
+                                        and agent_info.owner_id
+                                        and agent_info.owner_id != user_id
+                                    ):
+                                        access_acl = agent_info.access_acl or {}
+                                        has_interact = user_id in (
+                                            access_acl.get("interact") or []
+                                        )
+                                        has_delete = (
+                                            permission_manager.check_permission(
+                                                user_id, "agent:delete"
+                                            )
+                                        )
+                                        if not has_interact and not has_delete:
+                                            await websocket.send_json(
+                                                {
+                                                    "type": "error",
+                                                    "payload": {
+                                                        "code": "FORBIDDEN",
+                                                        "message": "No interact access to this agent",
+                                                    },
+                                                }
+                                            )
+                                            continue
+                            except (json.JSONDecodeError, AttributeError):
+                                pass
                         send_response = (
                             await node_connection_manager.send_request_to_node(
                                 target_node_id,
@@ -2615,6 +2673,44 @@ def create_app(
                         close_exc,
                     )
             return
+
+        # 本地代理路径：包装websocket拦截interact消息
+        if user_id and user_id != "system":
+            _original_receive_text = websocket.receive_text
+            _interact_types = {"input_result", "confirm_result", "manual_interrupt"}
+
+            async def _checked_receive_text() -> str:
+                data = await _original_receive_text()
+                try:
+                    msg = json.loads(data)
+                    if msg.get("type", "") in _interact_types:
+                        agent_info = agent_manager.get_agent(agent_id)
+                        if (
+                            agent_info
+                            and agent_info.owner_id
+                            and agent_info.owner_id != user_id
+                        ):
+                            access_acl = agent_info.access_acl or {}
+                            has_interact = user_id in (access_acl.get("interact") or [])
+                            has_delete = permission_manager.check_permission(
+                                user_id, "agent:delete"
+                            )
+                            if not has_interact and not has_delete:
+                                await websocket.send_json(
+                                    {
+                                        "type": "error",
+                                        "payload": {
+                                            "code": "FORBIDDEN",
+                                            "message": "No interact access to this agent",
+                                        },
+                                    }
+                                )
+                                return await _checked_receive_text()
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                return data
+
+            websocket.receive_text = _checked_receive_text  # type: ignore[assignment]
 
         try:
             await agent_proxy_manager.proxy_websocket(websocket, agent_id)
@@ -3999,6 +4095,7 @@ def create_app(
                 restore_session = False
             no_interaction_mode = bool(request_body.get("no_interaction_mode", False))
             proxy_node = request_body.get("proxy_node")
+            access_acl = request_body.get("access_acl")
             target_node_id = str(request_body.get("node_id") or "").strip()
 
             if not agent_type:
@@ -4111,6 +4208,7 @@ def create_app(
                 no_interaction_mode=no_interaction_mode,
                 proxy_node=proxy_node,
                 owner_id=owner_id,
+                access_acl=access_acl,
             )
             node_runtime.agent_route_registry.register(
                 AgentRouteInfo(
@@ -4141,10 +4239,12 @@ def create_app(
 
     # HTTP API：获取 Agent 列表
     @app.get("/api/agents", dependencies=[Depends(verify_token)])
-    async def get_agents() -> Dict[str, Any]:
-        """获取 Agent 列表。"""
+    async def get_agents(request: Request) -> Dict[str, Any]:
+        """获取 Agent 列表（按用户权限过滤）。"""
         try:
             agents = agent_manager.get_agent_list()
+            user_info = getattr(request.state, "user_info", None)
+            user_id = user_info.get("user_id") if user_info else None
             known_agent_ids: set[str] = set()
             for agent in agents:
                 agent_id = str(agent.get("agent_id") or "")
@@ -4188,6 +4288,27 @@ def create_app(
                         node_id,
                         exc,
                     )
+            # 按用户权限过滤：非system用户只能看到自己owner的、ACL中有read权限的、或有agent:delete权限的
+            if user_id and user_id != "system":
+                filtered = []
+                for agent in agents:
+                    agent_id = agent.get("agent_id", "")
+                    owner_id = agent.get("owner_id")
+                    # owner可见
+                    if owner_id == user_id:
+                        filtered.append(agent)
+                        continue
+                    # ACL中有read权限可见
+                    access_acl = agent.get("access_acl") or {}
+                    if user_id in (access_acl.get("read") or []):
+                        filtered.append(agent)
+                        continue
+                    # 有agent:delete权限可见
+                    if permission_manager.check_permission(user_id, "agent:delete"):
+                        filtered.append(agent)
+                        continue
+                agents = filtered
+
             return {"success": True, "data": agents}
         except Exception as e:
             return {
@@ -4309,7 +4430,7 @@ def create_app(
                 and agent_info.owner_id != user_info.get("user_id")
             ):
                 if not permission_manager.check_permission(
-                    user_info["user_id"], "admin:agents"
+                    user_info["user_id"], "agent:delete"
                 ):
                     return {
                         "success": False,
@@ -4398,7 +4519,7 @@ def create_app(
                 and agent_info.owner_id != user_info.get("user_id")
             ):
                 if not permission_manager.check_permission(
-                    user_info["user_id"], "admin:agents"
+                    user_info["user_id"], "agent:delete"
                 ):
                     return {
                         "success": False,
@@ -4469,7 +4590,52 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    # HTTP API：删除 Agent
+    # HTTP API：更新 Agent 访问控制
+    @app.put("/api/agents/{agent_id}/access", dependencies=[Depends(verify_token)])
+    async def update_agent_access(
+        agent_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """更新 Agent 的访问控制列表（仅 owner 可操作）。"""
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FORBIDDEN",
+                        "message": "Only the agent owner can update access control",
+                    },
+                }
+
+        access_acl = request_body.get("access_acl")
+        if access_acl is not None and not isinstance(access_acl, dict):
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_ARGUMENT",
+                    "message": "access_acl must be a dict",
+                },
+            }
+
+        try:
+            result = agent_manager.update_agent_access(agent_id, access_acl or {})
+            return {"success": True, "data": result}
+        except KeyError as e:
+            return {
+                "success": False,
+                "error": {"code": "AGENT_NOT_FOUND", "message": str(e)},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     @app.delete("/api/agents/{agent_id}", dependencies=[Depends(verify_token)])
     async def delete_agent(
         agent_id: str, request: Request, node_id: str = ""
@@ -4485,7 +4651,7 @@ def create_app(
                 and agent_info.owner_id != user_info.get("user_id")
             ):
                 if not permission_manager.check_permission(
-                    user_info["user_id"], "admin:agents"
+                    user_info["user_id"], "agent:delete"
                 ):
                     return {
                         "success": False,

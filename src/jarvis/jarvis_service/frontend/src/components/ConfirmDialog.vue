@@ -1,19 +1,19 @@
 <template>
-  <article v-if="visible" class="message message-confirm">
-    <div class="confirm-box">
+  <div v-if="visible" class="modal-overlay">
+    <div class="confirm-modal">
       <p class="confirm-message">{{ message }}</p>
       <div class="confirm-actions">
         <template v-if="defaultConfirm">
-          <button ref="cancelBtnRef" class="confirm-btn" @click="handleCancel">取消</button>
-          <button ref="confirmBtnRef" class="confirm-btn default" @click="handleConfirm">确认</button>
+          <button ref="cancelBtnRef" class="ghost-btn" @click="handleCancel">取消</button>
+          <button ref="confirmBtnRef" class="ghost-btn default" @click="handleConfirm">确认</button>
         </template>
         <template v-else>
-          <button ref="confirmBtnRef" class="confirm-btn" @click="handleConfirm">确认</button>
-          <button ref="cancelBtnRef" class="confirm-btn default" @click="handleCancel">取消</button>
+          <button ref="confirmBtnRef" class="ghost-btn" @click="handleConfirm">确认</button>
+          <button ref="cancelBtnRef" class="ghost-btn default" @click="handleCancel">取消</button>
         </template>
       </div>
     </div>
-  </article>
+  </div>
 </template>
 
 <script setup>
@@ -87,21 +87,34 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.message-confirm {
-  background: var(--color-bg-secondary);
-  border: none;
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.confirm-box {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.confirm-modal {
+  background: var(--bg-secondary, #1e1e2e);
+  color: var(--text-primary, #cdd6f4);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .confirm-message {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: 13px;
+  margin: 0 0 16px 0;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .confirm-actions {
@@ -110,31 +123,31 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
-.confirm-btn {
-  padding: 9px 18px;
-  border-radius: var(--tile-radius);
+.ghost-btn {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #45475a);
+  background: none;
+  color: var(--text-primary, #cdd6f4);
   font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
-  border: none;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
+  transition: all 0.2s;
 }
 
-.confirm-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-subtle);
-  transform: translateY(-1px);
+.ghost-btn:hover {
+  background: rgba(137, 180, 250, 0.1);
+  border-color: var(--accent, #89b4fa);
 }
 
-.confirm-btn.default {
+.ghost-btn.default {
   background: #238636;
-  border-color: var(--color-border-subtle);
-  font-weight: 700;
+  border-color: #238636;
+  color: white;
+  font-weight: 600;
 }
 
-.confirm-btn.default:hover {
+.ghost-btn.default:hover {
   background: #2ea043;
-  border-color: var(--color-border-subtle);
+  border-color: #2ea043;
 }
 </style>
