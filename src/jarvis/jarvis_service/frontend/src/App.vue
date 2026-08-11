@@ -5049,7 +5049,7 @@ async function fetchNodeStatus() {
 async function fetchUserList() {
   try {
     const { host, port } = getGatewayAddress()
-    const response = await fetchWithAuth(`http://${host}:${port}/api/users/brief`)
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/users/brief`)
     if (!response.ok) {
       console.warn('[USER] 获取用户列表失败:', response.status)
       availableUserOptions.value = []
@@ -5472,6 +5472,7 @@ async function copyAgent(agent) {
   await Promise.all([
     fetchModelGroups(agent?.node_id || 'master', false),
     fetchNodeStatus(),
+    fetchUserList(),
   ])
 
   // 填充表单变量
