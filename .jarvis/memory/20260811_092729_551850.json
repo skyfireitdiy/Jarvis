@@ -1,0 +1,8 @@
+{
+  "id": "20260811_092729_551850",
+  "type": "project_long_term",
+  "tags": ["文言化", "取消", "决策"],
+  "content": "用户已取消所有文言化任务(methodology/task_analyzer/prompts/__init__.py提示词文言化)，不再执行。",
+  "created_at": "2026-08-11T09:27:29.551884",
+  "updated_at": "2026-08-11T09:27:29.551890"
+}

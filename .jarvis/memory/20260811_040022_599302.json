@@ -1,0 +1,8 @@
+{
+  "id": "20260811_040022_599302",
+  "type": "project_long_term",
+  "tags": ["admin_config", "AdminPanel", "样式迁移"],
+  "content": "AdminPanel系统配置tab样式补全完成(commit e08c928)。从SettingsModal迁移CSS类：modal-actions, form-help, config-sync-section/row/label/button, node-select(两处上下文选择器), checkbox-label, node-secret-section, secret-display/code/placeholder, copy-btn, secret-actions, restart-service-section/row。CSS变量已从--color-*适配为--bg-*/--text-*/--border-color体系，保留fallback值。",
+  "created_at": "2026-08-11T04:00:22.599335",
+  "updated_at": "2026-08-11T04:00:22.599341"
+}

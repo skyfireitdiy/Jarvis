@@ -148,16 +148,17 @@
             <pre class="terminal-history-content">{{ item.terminal_content || '' }}</pre>
           </div>
         </article>
-        <!-- 确认对话框 -->
-        <ConfirmDialog
-          :visible="!!confirmDialog"
-          :message="confirmDialog?.message || ''"
-          :defaultConfirm="confirmDialog?.defaultConfirm ?? true"
-          @confirm="handleConfirmDialogConfirm"
-          @cancel="handleConfirmDialogCancel"
-        />
       </div>
     </main>
+
+    <!-- 确认对话框（弹出式） -->
+    <ConfirmDialog
+      :visible="!!confirmDialog"
+      :message="confirmDialog?.message || ''"
+      :defaultConfirm="confirmDialog?.defaultConfirm ?? true"
+      @confirm="handleConfirmDialogConfirm"
+      @cancel="handleConfirmDialogCancel"
+    />
 
 <!-- 终端面板 -->
     <TerminalPanel

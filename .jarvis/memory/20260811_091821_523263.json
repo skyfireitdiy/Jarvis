@@ -1,0 +1,8 @@
+{
+  "id": "20260811_091821_523263",
+  "type": "project_long_term",
+  "tags": ["agent_permission", "T9", "T10", "websocket"],
+  "content": "T9 WebSocket消息interact权限检查已完成(commit 6c03804+2ff2792):\n1. 远程代理路径：forward_client_to_remote中解析JSON，拦截input_result/confirm_result/manual_interrupt，无interact权限则返回FORBIDDEN错误并continue跳过转发\n2. 本地代理路径：包装websocket.receive_text为_checked_receive_text，拦截同三种消息类型，无权限则返回FORBIDDEN并递归等待下一条\n3. 权限检查逻辑：非system用户+非owner+无access_acl.interact+无agent:delete权限=拦截\n4. owner和system用户不受限\n\nT10 前端permissionSchema更新已完成(commit 5d3733d):\n- AdminPanel.vue L289: agent权限从['*','create','read','execute','delete']简化为['*','create','delete']\n- 与后端BUILTIN_GROUPS简化一致",
+  "created_at": "2026-08-11T09:18:21.523307",
+  "updated_at": "2026-08-11T09:18:21.523313"
+}
