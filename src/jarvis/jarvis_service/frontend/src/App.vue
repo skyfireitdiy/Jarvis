@@ -164,7 +164,7 @@
       :visible="showTerminalPanel"
       :interaction="terminalPanelInteraction"
       :panelStyle="terminalPanelStyle"
-      :nodeOptions="availableNodeOptions"
+      :nodeOptions="filteredNodeOptionsForCreateAgent"
       :selectedNodeId="selectedTerminalNodeId"
       :socket="socket"
       :isMaximized="isTerminalMaximized"
@@ -571,7 +571,7 @@
     <!-- 创建 Agent 弹窗 -->
     <CreateAgentModal
       :visible="showCreateAgentModal"
-      :nodeOptions="availableNodeOptions"
+      :nodeOptions="filteredNodeOptionsForCreateAgent"
       :nodeId="newAgentNodeId"
       @update:nodeId="newAgentNodeId = $event"
       :agentType="newAgentType"
@@ -596,6 +596,7 @@
       :proxyNode="newAgentProxyNode"
       @update:proxyNode="newAgentProxyNode = $event"
       :formatNodeLabel="formatNodeOptionLabel"
+      :noNodeAccess="userAccessibleNodes !== null && userAccessibleNodes.length === 0"
       :createError="newAgentCreateError"
       :accessAclRead="newAgentAccessAclRead"
       @update:accessAclRead="newAgentAccessAclRead = $event"
@@ -1338,6 +1339,7 @@ async function logout() {
     auth.value.token = ''
     auth.value.userInfo = null
     auth.value.password = ''
+    userAccessibleNodes.value = null
     localStorage.removeItem('jarvis_auth_token')
     localStorage.removeItem('jarvis_user_info')
 
@@ -1458,6 +1460,7 @@ async function fetchWithAuth(url, options = {}) {
     console.log('[AUTH] Received 401 Unauthorized, showing login modal')
     auth.value.token = ''
     auth.value.userInfo = null
+    userAccessibleNodes.value = null
     localStorage.removeItem('jarvis_auth_token')
     localStorage.removeItem('jarvis_user_info')
     showConnectModal.value = true
@@ -3404,8 +3407,20 @@ const newAgentAccessAclRead = ref([]) // 新 Agent ACL read用户ID数组
 const newAgentAccessAclInteract = ref([]) // 新 Agent ACL interact用户ID数组
 const availableUserOptions = ref([]) // 用户列表（用于ACL选择）
 const availableNodeOptions = ref([])
+const userAccessibleNodes = ref(null) // null=未加载, []=无权限, ["*"]=所有, ["id1","id2"]=限定节点
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
+
+// 创建Agent弹窗：按用户可访问节点过滤节点选项
+const filteredNodeOptionsForCreateAgent = computed(() => {
+  const accessible = userAccessibleNodes.value
+  // null=未加载（权限系统未启用或未获取），显示全部节点
+  if (accessible === null) return availableNodeOptions.value
+  // ["*"]=所有节点权限
+  if (accessible.includes('*')) return availableNodeOptions.value
+  // 限定节点列表：只显示有权限的节点
+  return availableNodeOptions.value.filter(node => accessible.includes(node.node_id))
+})
 
 // 生成 Agent 名称：Agent类型-创建时间（如：代码Agent-20261213-140013）
 function generateAgentName(agentType) {
@@ -3813,6 +3828,7 @@ async function connect() {
     // 获取模型组列表
     fetchModelGroups()
     fetchNodeStatus()
+    fetchUserAccessibleNodes()
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
@@ -4332,6 +4348,7 @@ function disconnectAll() {
   localStorage.removeItem('jarvis_auth_token')
   localStorage.removeItem('jarvis_auto_login')
   auth.value.token = ''
+  userAccessibleNodes.value = null
   autoLoginEnabled.value = false
   console.log('[WS] Cleared saved token and auto login setting')
   // 强制刷新页面确保状态重置
@@ -4978,6 +4995,7 @@ async function openCreateAgentModal() {
     fetchModelGroups(),
     fetchNodeStatus(),
     fetchUserList(),
+    fetchUserAccessibleNodes(),
   ])
   newAgentNodeId.value = ''
   newAgentDir.value = '~'
@@ -5015,6 +5033,29 @@ async function fetchModelGroups(nodeId = 'master', autoSelect = true) {
     }
   } catch (error) {
     console.error('[MODEL GROUP] 获取模型组列表出错:', error)
+  }
+}
+
+async function fetchUserAccessibleNodes() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const userId = username.value
+    if (!userId) { userAccessibleNodes.value = []; return }
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/permissions/user/${encodeURIComponent(userId)}/accessible-nodes`)
+    if (!response.ok) {
+      console.warn('[PERM] 获取可访问节点失败:', response.status)
+      userAccessibleNodes.value = []
+      return
+    }
+    const result = await response.json()
+    if (result.success && result.data) {
+      userAccessibleNodes.value = result.data.accessible_nodes || []
+    } else {
+      userAccessibleNodes.value = []
+    }
+  } catch (error) {
+    console.error('[PERM] 获取可访问节点出错:', error)
+    userAccessibleNodes.value = []
   }
 }
 
@@ -5473,6 +5514,7 @@ async function copyAgent(agent) {
     fetchModelGroups(agent?.node_id || 'master', false),
     fetchNodeStatus(),
     fetchUserList(),
+    fetchUserAccessibleNodes(),
   ])
 
   // 填充表单变量

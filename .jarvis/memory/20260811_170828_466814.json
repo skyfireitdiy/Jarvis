@@ -1,0 +1,8 @@
+{
+  "id": "20260811_170828_466814",
+  "type": "project_long_term",
+  "tags": ["task_verification", "code_review", "T4", "validation_methodology"],
+  "content": "T4任务验证方法论：1) 将预期输出解析为多条具体条目 2) 对每条预期输出条目检查是否有对应代码或产物支撑 3) 若某条目无法找到对应产物或不符，标记为FAILED并说明原因 4) 仅在所有预期输出条目皆验证通过时，整体判定为PASSED 5) 使用read_code和execute_script工具交叉验证，重点检查compute属性定义、prop传递链、disabled条件逻辑",
+  "created_at": "2026-08-11T17:08:28.466846",
+  "updated_at": "2026-08-11T17:08:28.466851"
+}

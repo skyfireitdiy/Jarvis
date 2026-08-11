@@ -1,0 +1,13 @@
+{
+  "id": "20260811_170828_465324",
+  "type": "project_long_term",
+  "tags": [
+    "T4_completed",
+    "frontend_permission",
+    "CreateAgentModal",
+    "accessible_nodes"
+  ],
+  "content": "T4前端CreateAgentModal节点过滤已完成并验证通过：1) filteredNodeOptionsForCreateAgent compute属性(App.vue L3415-3423)实现完整过滤逻辑：null返回全部节点，['*']返回全部节点，指定列表只返回有权限的节点 2) noNodeAccess prop控制创建按钮禁用(CreateAgentModal.vue L150: :disabled=\"!workDir.trim() || noNodeAccess\") 3) 权限语义：null=未加载, []=无权限, ['*']=所有权限, [id1,id2]=限定权限 4) 前端构建通过(35.30s)，后端语法检查通过",
+  "created_at": "2026-08-11T17:08:28.465358",
+  "updated_at": "2026-08-11T17:08:28.465364"
+}

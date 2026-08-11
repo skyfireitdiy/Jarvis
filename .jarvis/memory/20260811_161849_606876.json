@@ -1,0 +1,15 @@
+{
+  "id": "20260811_161849_606876",
+  "type": "project_long_term",
+  "tags": [
+    "accessible_nodes",
+    "node_permission",
+    "AdminPanel",
+    "CreateAgentModal",
+    "frontend",
+    "phase5"
+  ],
+  "content": "节点级权限控制前端实现已完成：\n1. AdminPanel编辑组弹窗新增可访问节点多选区（checkbox列表，含\"*\"全选、master、子节点选项）\n2. AdminPanel新增toggleAllNodesAccess/toggleNodeAccess函数\n3. AdminPanel openEditGroup加载accessible_nodes并排除出权限矩阵\n4. AdminPanel updateGroup保存时提交accessible_nodes\n5. App.vue新增userAccessibleNodes状态(null=未加载,[]=无权限,[\"*\"]=所有)\n6. App.vue新增fetchUserAccessibleNodes函数调用/api/permissions/user/{user_id}/accessible-nodes\n7. App.vue新增filteredNodeOptionsForCreateAgent计算属性按可访问节点过滤\n8. CreateAgentModal和TerminalPanel的nodeOptions改用filteredNodeOptionsForCreateAgent\n9. 登录/连接成功时获取accessible_nodes，登出/401/disconnectAll时重置为null\n10. 前端构建验证通过",
+  "created_at": "2026-08-11T16:18:49.606919",
+  "updated_at": "2026-08-11T16:18:49.606927"
+}

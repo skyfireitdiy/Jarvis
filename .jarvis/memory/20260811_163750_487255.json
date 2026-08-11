@@ -1,0 +1,14 @@
+{
+  "id": "20260811_163750_487255",
+  "type": "project_long_term",
+  "tags": [
+    "AdminPanel",
+    "permission_schema",
+    "accessible_nodes",
+    "frontend",
+    "verification"
+  ],
+  "content": "T3_前端AdminPanel节点多选验证完成：1) permissionSchema新增node资源含['*','access']权限(L320)，resourceLabels新增'node': '节点'(L329)；2) 编辑组弹窗新增可访问节点多选区(L125-149)：checkbox列表含\"所有节点(*)\"、availableNodeOptions遍历、master选项；3) editAccessibleNodes状态变量(L303)；4) toggleAllNodesAccess/toggleNodeAccess函数(L612-626)；5) openEditGroup加载时回显accessible_nodes(L535, L538, L541)；6) updateGroup保存时提交accessible_nodes(L562)；7) 前端构建验证通过(✓ built in 38.85s)。关键代码位置：permissionSchema在L313-321，编辑组弹窗在L125-149，openEditGroup在L521-545，updateGroup在L547-571。",
+  "created_at": "2026-08-11T16:37:50.487294",
+  "updated_at": "2026-08-11T16:37:50.487301"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260811_171107_792847",
+  "type": "project_long_term",
+  "tags": [
+    "accessible_nodes",
+    "check_node_access",
+    "node_permission",
+    "permission_manager",
+    "app.py"
+  ],
+  "content": "节点级权限控制已完成：\n1. PermissionManager新增accessible_nodes字段（空=无权限，[\"*\"]=所有节点，列表=限定节点）\n2. BUILTIN_GROUPS: sys-admin/sys-operator为[\"*\"]，其他组为[]\n3. check_node_access(user_id, node_id)方法：system用户返回True，查用户所属组accessible_nodes\n4. get_user_accessible_nodes(user_id)方法：返回用户可访问节点列表\n5. get_group_permissions返回accessible_nodes，set_group_permissions支持accessible_nodes\n6. create_agent API(L4168-4179)添加check_node_access校验\n7. terminal_create WS消息(L968-979)添加check_node_access校验\n8. 新增GET /api/permissions/user/{user_id}/accessible-nodes API\n9. AdminPanel编辑组弹窗新增可访问节点多选\n10. CreateAgentModal节点下拉框按可访问节点过滤，noNodeAccess prop控制禁用\n11. App.vue新增userAccessibleNodes状态和fetchUserAccessibleNodes方法\n关键文件：permission_manager.py(L345-392), app.py(L968-979,L2130-2153,L4168-4179), AdminPanel.vue, CreateAgentModal.vue, App.vue",
+  "created_at": "2026-08-11T17:11:07.792881",
+  "updated_at": "2026-08-11T17:11:07.792887"
+}

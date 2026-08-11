@@ -1,0 +1,17 @@
+{
+  "id": "20260811_163025_887025",
+  "type": "project_long_term",
+  "tags": [
+    "accessible_nodes",
+    "check_node_access",
+    "node_permission",
+    "AdminPanel",
+    "App.vue",
+    "permission_manager",
+    "app.py",
+    "code_review_complete"
+  ],
+  "content": "## 节点级权限控制 - 代码审查验证完成\n\n### 验证结果：所有代码已就位，逻辑完整\n\n#### 后端验证\n1. permission_manager.py (L340-392): check_node_access/get_user_accessible_nodes逻辑正确, BUILTIN_GROUPS含accessible_nodes, _ensure_builtin_groups/update_group/get_group_permissions/set_group_permissions均处理accessible_nodes\n2. app.py: terminal_create(L971-979)与create_agent(L4170-4179)加入check_node_access校验; accessible-nodes API(L2130-2153)权限校验正确\n\n#### 前端验证\n3. App.vue: userAccessibleNodes ref(null)(L3409); filteredNodeOptionsForCreateAgent computed(L3414-3422); fetchUserAccessibleNodes(L5038-5058); ws.onopen(L3830)/openCreateAgentModal(L4997)/copyAgent(L5516)调用fetchUserAccessibleNodes; CreateAgentModal(L574)/TerminalPanel(L167)使用filteredNodeOptionsForCreateAgent; logout(L1341)/401(L1462)/disconnectAll(L4350)重置为null\n4. AdminPanel.vue: editAccessibleNodes ref(L303); 可访问节点多选区模板(L125-142); toggleAllNodesAccess(L612-616)/toggleNodeAccess(L620-625); openEditGroup加载accessible_nodes排除出权限矩阵(L528-541); updateGroup保存accessible_nodes(L562); permissionSchema新增node资源(L287-295)\n\n### 待验证: 实际运行联调测试",
+  "created_at": "2026-08-11T16:30:25.887066",
+  "updated_at": "2026-08-11T16:30:25.887073"
+}

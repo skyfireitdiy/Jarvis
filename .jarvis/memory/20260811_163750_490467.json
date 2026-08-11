@@ -1,0 +1,8 @@
+{
+  "id": "20260811_163750_490467",
+  "type": "project_long_term",
+  "tags": ["tech_stack", "architecture", "file_structure", "api_convention"],
+  "content": "Jarvis前端项目技术栈：Vue 3 + Vite + TypeScript，组件位于src/jarvis/jarvis_service/frontend/src/components/，主应用为App.vue，权限管理界面为AdminPanel.vue。后端API路径格式：/api/permissions/groups/{group_id}/permissions，支持GET/PUT方法。",
+  "created_at": "2026-08-11T16:37:50.490488",
+  "updated_at": "2026-08-11T16:37:50.490492"
+}

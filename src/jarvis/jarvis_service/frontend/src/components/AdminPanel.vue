@@ -122,6 +122,31 @@
               </tbody>
             </table>
           </div>
+          <!-- 可访问节点 -->
+          <div class="permission-matrix" style="margin-top:12px">
+            <div style="margin-bottom:8px;font-weight:600;font-size:13px">可访问节点</div>
+            <div style="font-size:12px;color:var(--text-secondary,#888);margin-bottom:8px">空列表=无节点权限，["*"]=所有节点，指定节点ID=限定节点</div>
+            <div class="form-row" style="align-items:flex-start">
+              <label style="min-width:60px">节点列表</label>
+              <div style="flex:1">
+                <label class="checkbox-label" style="margin-bottom:6px">
+                  <input type="checkbox" :checked="editAccessibleNodes.includes('*')" @change="toggleAllNodesAccess" />
+                  <span>所有节点 ("*")</span>
+                </label>
+                <template v-if="!editAccessibleNodes.includes('*')">
+                  <label v-for="node in availableNodeOptions" :key="node.node_id" class="checkbox-label" style="margin-bottom:4px;display:block">
+                    <input type="checkbox" :checked="editAccessibleNodes.includes(node.node_id)" @change="toggleNodeAccess(node.node_id)" />
+                    <span>{{ formatNodeOptionLabel(node) }}</span>
+                  </label>
+                  <label class="checkbox-label" style="margin-bottom:4px;display:block">
+                    <input type="checkbox" :checked="editAccessibleNodes.includes('master')" @change="toggleNodeAccess('master')" />
+                    <span>本节点 (master)</span>
+                  </label>
+                  <div v-if="availableNodeOptions.length === 0" style="font-size:12px;color:var(--text-secondary,#888)">暂无子节点</div>
+                </template>
+              </div>
+            </div>
+          </div>
           <div class="btn-group"><button class="ghost-btn" @click="updateGroup" :disabled="loading">保存</button><button class="ghost-btn" @click="showEditGroup = false">取消</button></div>
         </div>
       </div>
@@ -275,6 +300,7 @@ const userGroupIds = ref([])
 const allGroups = ref([])
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const editPermissions = ref({})
+const editAccessibleNodes = ref([])
 const loadingGroupPerms = ref(false)
 const localRestartNodeId = ref('')
 const localRestartFrontendService = ref(false)
@@ -291,6 +317,7 @@ const permissionSchema = {
   'timer': ['*', 'read', 'create', 'delete'],
   'chat': ['*', 'read', 'send'],
   'admin': ['*', 'users', 'permissions', 'config'],
+  'node': ['*', 'access'],
 }
 const resourceLabels = {
   '*': '全部',
@@ -299,6 +326,7 @@ const resourceLabels = {
   'timer': '定时任务',
   'chat': '聊天',
   'admin': '管理',
+  'node': '节点',
 }
 
 // 计算属性
@@ -497,17 +525,20 @@ async function openEditGroup(group) {
   // 加载组权限
   loadingGroupPerms.value = true
   editPermissions.value = {}
+  editAccessibleNodes.value = []
   try {
     const resp = await props.fetchWithAuth(buildApiUrl(`/api/permissions/groups/${group.group_id}/permissions`))
     const result = await resp.json()
     if (result.success) {
       // 将permissions对象转为扁平的key→value映射
       const perms = result.data.permissions || {}
+      const accessibleNodes = perms.accessible_nodes || []
       const flat = {}
       for (const [key, val] of Object.entries(perms)) {
-        flat[key] = val
+        if (key !== 'accessible_nodes') flat[key] = val
       }
       editPermissions.value = flat
+      editAccessibleNodes.value = Array.isArray(accessibleNodes) ? [...accessibleNodes] : []
     }
   } catch (e) { props.showToast('加载权限失败', 'error') }
   finally { loadingGroupPerms.value = false }
@@ -528,6 +559,7 @@ async function updateGroup() {
     for (const [key, val] of Object.entries(editPermissions.value)) {
       if (val) perms[key] = val
     }
+    perms.accessible_nodes = editAccessibleNodes.value
     const permResp = await props.fetchWithAuth(buildApiUrl(`/api/permissions/groups/${group_id}/permissions`), {
       method: 'PUT', body: JSON.stringify({ permissions: perms })
     })
@@ -575,6 +607,23 @@ function formatNodeOptionLabel(node) {
   const isStopped = !status || status === 'stopped' || status === 'stop' || status === 'terminated'
   if (!isStopped && label) return `${nodeId} (${status}) - ${label}`
   return status ? `${nodeId} (${status})` : nodeId
+}
+
+function toggleAllNodesAccess() {
+  if (editAccessibleNodes.value.includes('*')) {
+    editAccessibleNodes.value = []
+  } else {
+    editAccessibleNodes.value = ['*']
+  }
+}
+
+function toggleNodeAccess(nodeId) {
+  const idx = editAccessibleNodes.value.indexOf(nodeId)
+  if (idx >= 0) {
+    editAccessibleNodes.value.splice(idx, 1)
+  } else {
+    editAccessibleNodes.value.push(nodeId)
+  }
 }
 
 function confirmRestartGateway() {

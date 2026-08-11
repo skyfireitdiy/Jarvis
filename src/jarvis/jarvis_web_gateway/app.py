@@ -968,6 +968,19 @@ class WebSocketConnectionManager:
                     }
                     self._router.publish(error_msg, session_id=session_id)
                     return
+                # 节点访问校验
+                check_node_id = terminal_node_id if terminal_node_id else "master"
+                if not self._permission_manager.check_node_access(
+                    user_id, check_node_id
+                ):
+                    error_msg = {
+                        "type": "terminal_error",
+                        "payload": {
+                            "error": f"Permission denied: no access to node {check_node_id}"
+                        },
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                    return
             interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
             raw_working_dir = payload.get("working_dir")
             working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
@@ -1801,7 +1814,13 @@ def create_app(
     ) -> Dict[str, Any]:
         """列出用户简要信息（仅需登录，用于ACL选择等场景）。"""
         users = user_manager.list_users(search=search or None, limit=100)
-        brief = [{"user_id": u.get("user_id"), "display_name": u.get("display_name", u.get("username"))} for u in users]
+        brief = [
+            {
+                "user_id": u.get("user_id"),
+                "display_name": u.get("display_name", u.get("username")),
+            }
+            for u in users
+        ]
         return {"success": True, "data": {"users": brief}}
 
     async def api_list_users(
@@ -2117,6 +2136,31 @@ def create_app(
         permission_manager.set_user_groups(user_id, group_ids)
         permission_manager.invalidate_cache(user_id)
         return {"success": True, "data": {"message": "User groups updated"}}
+
+    @app.get(
+        "/api/permissions/user/{user_id}/accessible-nodes",
+        dependencies=[Depends(verify_token)],
+    )
+    async def api_get_user_accessible_nodes(
+        request: Request, user_id: str
+    ) -> Dict[str, Any]:
+        """获取用户可访问的节点列表。"""
+        from fastapi import HTTPException
+
+        user_info = request.state.user_info
+        if (
+            user_info.get("user_id") != "system"
+            and user_info.get("user_id") != user_id
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:permissions"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            )
+        nodes = permission_manager.get_user_accessible_nodes(user_id)
+        return {"success": True, "data": {"accessible_nodes": nodes}}
 
     @app.get(
         "/api/permissions/user/{user_id}/overrides",
@@ -4132,6 +4176,19 @@ def create_app(
                 }
 
             resolved_target_node = target_node_id or node_runtime.local_node_id
+
+            # 节点访问校验
+            if owner_id and owner_id != "system" and permission_manager:
+                if not permission_manager.check_node_access(
+                    owner_id, resolved_target_node
+                ):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "PERMISSION_DENIED",
+                            "message": f"Permission denied: no access to node {resolved_target_node}",
+                        },
+                    }
 
             if resolved_target_node not in (node_runtime.local_node_id, "master"):
                 node_info = node_runtime.node_registry.get(resolved_target_node)

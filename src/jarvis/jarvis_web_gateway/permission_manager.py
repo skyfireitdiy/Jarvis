@@ -18,6 +18,7 @@ BUILTIN_GROUPS = {
         "description": "Full system access",
         "is_builtin": True,
         "permissions": {"*:*": "allow"},
+        "accessible_nodes": ["*"],
     },
     "sys-operator": {
         "display_name": "Operator",
@@ -32,6 +33,7 @@ BUILTIN_GROUPS = {
             "admin:config": "allow",
             "chat:*": "allow",
         },
+        "accessible_nodes": ["*"],
     },
     "sys-developer": {
         "display_name": "Developer",
@@ -44,6 +46,7 @@ BUILTIN_GROUPS = {
             "file:upload": "allow",
             "chat:*": "allow",
         },
+        "accessible_nodes": [],
     },
     "sys-viewer": {
         "display_name": "Viewer",
@@ -52,12 +55,14 @@ BUILTIN_GROUPS = {
         "permissions": {
             "chat:*": "allow",
         },
+        "accessible_nodes": [],
     },
     "sys-chat": {
         "display_name": "Chat User",
         "description": "Chat only access",
         "is_builtin": True,
         "permissions": {"chat:*": "allow"},
+        "accessible_nodes": [],
     },
 }
 
@@ -133,6 +138,7 @@ class PermissionManager:
                     "display_name": group_def["display_name"],
                     "description": group_def["description"],
                     "is_builtin": True,
+                    "accessible_nodes": group_def.get("accessible_nodes", []),
                 }
                 perms = group_def["permissions"]
                 self._group_permissions[group_id] = (
@@ -235,7 +241,7 @@ class PermissionManager:
         group = self._groups.get(group_id)
         if group is None:
             return None
-        allowed = {"display_name", "description"}
+        allowed = {"display_name", "description", "accessible_nodes"}
         for key, value in kwargs.items():
             if key in allowed:
                 group[key] = value
@@ -269,15 +275,26 @@ class PermissionManager:
     # --- 组权限方法 ---
 
     def get_group_permissions(self, group_id: str) -> Optional[dict]:
-        return self._group_permissions.get(group_id)
+        perms = self._group_permissions.get(group_id)
+        if perms is None:
+            return None
+        group = self._groups.get(group_id, {})
+        result = dict(perms)
+        result["accessible_nodes"] = group.get("accessible_nodes", [])
+        return result
 
     def set_group_permissions(self, group_id: str, permissions: dict) -> Optional[dict]:
         if group_id not in self._groups:
             return None
+        # 提取accessible_nodes，不存入group_permissions
+        accessible_nodes = permissions.pop("accessible_nodes", None)
+        if accessible_nodes is not None:
+            self._groups[group_id]["accessible_nodes"] = accessible_nodes
+            self._save_groups()
         self._group_permissions[group_id] = permissions
         self._save_group_permissions()
         self.invalidate_cache()
-        return self._group_permissions[group_id]
+        return self.get_group_permissions(group_id)
 
     # --- 用户组方法 ---
 
@@ -322,6 +339,57 @@ class PermissionManager:
         del self._resource_acl[resource_type][resource_id]
         self._save_resource_acl()
         return True
+
+    # --- 节点访问检查 ---
+
+    def check_node_access(self, user_id: str, node_id: str) -> bool:
+        """检查用户是否有权访问指定节点。
+
+        Args:
+            user_id: 用户ID
+            node_id: 目标节点ID
+
+        Returns:
+            True=有权限，False=无权限
+        """
+        if user_id == "system":
+            return True
+        user_group_ids = self._user_groups.get(user_id, [])
+        for group_id in user_group_ids:
+            group = self._groups.get(group_id, {})
+            accessible_nodes = group.get("accessible_nodes", [])
+            if "*" in accessible_nodes:
+                return True
+            if node_id in accessible_nodes:
+                return True
+        return False
+
+    def get_user_accessible_nodes(self, user_id: str) -> list:
+        """获取用户可访问的所有节点ID列表。
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            节点ID列表，["*"]表示所有节点
+        """
+        if user_id == "system":
+            return ["*"]
+        result = []
+        has_all = False
+        user_group_ids = self._user_groups.get(user_id, [])
+        for group_id in user_group_ids:
+            group = self._groups.get(group_id, {})
+            accessible_nodes = group.get("accessible_nodes", [])
+            if "*" in accessible_nodes:
+                has_all = True
+                break
+            for nid in accessible_nodes:
+                if nid not in result:
+                    result.append(nid)
+        if has_all:
+            return ["*"]
+        return result
 
     # --- 缓存失效 ---
 
