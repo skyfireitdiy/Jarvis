@@ -26,6 +26,7 @@ BUILTIN_GROUPS = {
         "permissions": {
             "agent:*": "allow",
             "terminal:*": "allow",
+            "file:upload": "allow",
             "timer:*": "allow",
             "chat:*": "allow",
         },
@@ -39,6 +40,7 @@ BUILTIN_GROUPS = {
             "agent:read": "allow",
             "agent:execute": "allow",
             "terminal:*": "allow",
+            "file:upload": "allow",
             "chat:*": "allow",
         },
     },
