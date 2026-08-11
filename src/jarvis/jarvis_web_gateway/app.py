@@ -6103,7 +6103,7 @@ def create_app(
         elif normalized_method == "POST" and normalized_path == "/service/restart":
             result = await restart_service(payload)
         elif normalized_method == "GET" and normalized_path == "/agents":
-            result = await get_agents()
+            result = await get_agents(_mock_req)
         elif normalized_method == "POST" and normalized_path == "/agents":
             result = await create_agent(payload, _mock_req)
         elif normalized_path.startswith("/agents/") and normalized_path.endswith(
@@ -6124,6 +6124,20 @@ def create_app(
                         "message": "Unsupported method",
                     },
                 }
+        elif (
+            normalized_path.startswith("/agents/")
+            and normalized_path.endswith("/access")
+            and normalized_method == "PUT"
+        ):
+            agent_id = normalized_path[len("/agents/") : -len("/access")].strip("/")
+            result = await update_agent_access(agent_id, payload, _mock_req)
+        elif (
+            normalized_path.startswith("/agents/")
+            and normalized_path.endswith("/stop")
+            and normalized_method == "DELETE"
+        ):
+            agent_id = normalized_path[len("/agents/") : -len("/stop")].strip("/")
+            result = await stop_agent(agent_id, _mock_req)
         elif normalized_path.startswith("/completions/") and normalized_path.endswith(
             "/search"
         ):
@@ -6234,13 +6248,6 @@ def create_app(
                     "headers": {"content-type": "application/json"},
                     "body": json.dumps({"error": f"Request failed: {str(e)}"}),
                 }
-        elif (
-            normalized_path.startswith("/agents/")
-            and normalized_path.endswith("/stop")
-            and normalized_method == "DELETE"
-        ):
-            agent_id = normalized_path[len("/agents/") : -len("/stop")].strip("/")
-            result = await stop_agent(agent_id, _mock_req)
         else:
             return {
                 "success": False,
