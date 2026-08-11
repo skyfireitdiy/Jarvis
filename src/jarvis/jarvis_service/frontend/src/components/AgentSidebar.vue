@@ -54,9 +54,6 @@
                 <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
                 <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
                 <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-                <button class="icon-btn-small" @click.stop="$emit('saveHistory', agent)" title="保存历史">💾</button>
-                <button class="icon-btn-small" @click.stop="$emit('restoreHistory', agent)" title="恢复历史">🔄</button>
-                <button class="icon-btn-small" @click.stop="$emit('deleteHistory', agent)" title="删除历史">❌</button>
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
                 <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
@@ -92,9 +89,6 @@
               <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
               <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
               <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-              <button class="icon-btn-small" @click.stop="$emit('saveHistory', agent)" title="保存历史">💾</button>
-              <button class="icon-btn-small" @click.stop="$emit('restoreHistory', agent)" title="恢复历史">🔄</button>
-              <button class="icon-btn-small" @click.stop="$emit('deleteHistory', agent)" title="删除历史">❌</button>
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
               <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
@@ -323,9 +317,7 @@ const emit = defineEmits([
   'viewRules',
   'viewTools',
   'openEditor',
-  'saveHistory',
-  'restoreHistory',
-  'deleteHistory'
+
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
