@@ -1,0 +1,8 @@
+{
+  "id": "20260811_135442_161849",
+  "type": "project_long_term",
+  "tags": ["agent_permission", "frontend_acl", "access_control"],
+  "content": "前端Agent ACL适配已完成：\n1. CreateAgentModal.vue：新增accessAclRead/accessAclInteract props+emits，模板添加ACL配置区(read/interact用户列表输入)，CSS样式\n2. AgentSidebar.vue：新增currentUserId prop+editAccess emit，owner可见🔒权限管理按钮(两处：折叠/展开模式)\n3. App.vue：\n   - 新增newAgentAccessAclRead/newAgentAccessAclInteract状态变量\n   - createAgent请求body添加access_acl参数(逗号分隔→数组)\n   - 创建成功后重置ACL状态\n   - CreateAgentModal绑定ACL props/events\n   - AgentSidebar绑定currentUserId(username)+editAccess事件\n   - 新增showEditAccessModal/editingAccessAgent/editAccessRead/editAccessInteract状态\n   - editAgentAccess函数：打开ACL编辑弹窗，填充现有ACL\n   - saveAgentAccess函数：PUT /agents/{id}/access，更新ACL\n   - ACL编辑弹窗模板(modal-overlay+form-group+modal-actions)\n4. 后端API已实现：POST /api/agents支持access_acl，GET /api/agents按权限过滤，PUT /api/agents/{id}/access仅owner可更新\n5. 构建验证通过(npm run build成功)",
+  "created_at": "2026-08-11T13:54:42.161896",
+  "updated_at": "2026-08-11T13:54:42.161903"
+}
