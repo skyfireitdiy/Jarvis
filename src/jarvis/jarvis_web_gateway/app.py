@@ -3357,12 +3357,25 @@ def create_app(
         }
 
     @app.get("/api/node/secret", dependencies=[Depends(verify_token)])
-    async def get_node_secret() -> Dict[str, Any]:
-        """获取节点连接私钥（仅 master 模式）。
+    async def get_node_secret(request: Request) -> Dict[str, Any]:
+        """获取节点连接私钥（仅 master 模式，需要admin:config权限）。"""
+        from fastapi import HTTPException
 
-        Returns:
-            包含 node_secret 的响应，如果不是 master 模式或未配置则返回错误
-        """
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
         if not node_config.is_master:
             return {
                 "success": False,
@@ -3390,15 +3403,25 @@ def create_app(
         }
 
     @app.get("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
-    async def get_node_config(node_id: str) -> Dict[str, Any]:
-        """获取指定节点的配置。
+    async def get_node_config(node_id: str, request: Request) -> Dict[str, Any]:
+        """获取指定节点的配置（需要admin:config权限）。"""
+        from fastapi import HTTPException
 
-        Args:
-            node_id: 节点ID
-
-        Returns:
-            包含节点配置的响应
-        """
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
         try:
             # 检查是否是本地节点
             if node_id in (node_runtime.local_node_id, "master"):
@@ -3489,21 +3512,30 @@ def create_app(
             }
 
     @app.post("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
-    async def set_node_config(node_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
-        """设置指定节点的配置。
+    async def set_node_config(
+        node_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """设置指定节点的配置（需要admin:config权限）。"""
+        from fastapi import HTTPException
 
-        Args:
-            node_id: 节点ID
-            request: 请求体，包含以下字段：
-                - config_sections: 要设置的配置类型列表（llms, llm_groups）
-                - config_data: 配置数据
-
-        Returns:
-            设置结果的响应
-        """
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
         try:
-            config_sections = request.get("config_sections", [])
-            config_data = request.get("config_data", {})
+            config_sections = request_body.get("config_sections", [])
+            config_data = request_body.get("config_data", {})
 
             if not config_sections:
                 return {
@@ -3642,17 +3674,30 @@ def create_app(
             }
 
     @app.post("/api/service/restart", dependencies=[Depends(verify_token)])
-    async def restart_service(request: Dict[str, Any]) -> Dict[str, Any]:
-        """请求 jarvis-service 通过 SIGUSR1/SIGUSR2 重启服务。
+    async def restart_service(
+        request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """请求 jarvis-service 重启服务（需要admin:config权限）。"""
+        from fastapi import HTTPException
 
-        Args:
-            request: 请求体，可包含以下字段：
-                - node_id: 要重启的节点ID
-                - restart_frontend: 是否同时重启前端服务（默认 true）
-        """
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
         try:
-            target_node_id = str(request.get("node_id") or "").strip()
-            restart_frontend = bool(request.get("restart_frontend", True))
+            target_node_id = str(request_body.get("node_id") or "").strip()
+            restart_frontend = bool(request_body.get("restart_frontend", True))
 
             # 如果指定了远端节点，转发重启请求
             if target_node_id and target_node_id not in (
@@ -3783,15 +3828,25 @@ def create_app(
             }
 
     @app.post("/api/nodes/{node_id}/code-update", dependencies=[Depends(verify_token)])
-    async def node_code_update(node_id: str) -> Dict[str, Any]:
-        """更新指定节点的代码到 main 分支。
+    async def node_code_update(node_id: str, request: Request) -> Dict[str, Any]:
+        """更新指定节点的代码到 main 分支（需要admin:config权限）。"""
+        from fastapi import HTTPException
 
-        Args:
-            node_id: 节点ID
-
-        Returns:
-            更新结果的响应
-        """
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
         try:
             # 检查是否是本地节点
             if node_id in (node_runtime.local_node_id, "master"):

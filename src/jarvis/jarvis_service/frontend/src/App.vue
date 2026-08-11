@@ -648,24 +648,12 @@
       :visible="showSettingsModal"
       :autoLoginEnabled="autoLoginEnabled"
       :historyStorage="historyStorage"
-      :availableNodeOptions="availableNodeOptions"
       :socket="socket"
-      :isRestartingGateway="isRestartingGateway"
-      :isSyncingConfig="isSyncingConfig"
-      :isUpdatingCode="isUpdatingCode"
-      :getToken="getAuthToken"
-      :gatewayUrl="gatewayUrl"
-      :showToast="showToast"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
       @confirmClearHistory="confirmClearHistory"
-      @confirmRestartGateway="handleRestartGateway"
-      @confirmRestartAllNodes="confirmRestartAllNodes"
       @disconnectAll="disconnectAll"
-      @syncConfig="handleSyncConfig"
-      @updateCodeToMain="handleUpdateCodeToMain"
-      @confirmUpdateCodeToMain="confirmUpdateCodeToMain"
     />
 
     <!-- 管理面板 -->
@@ -676,7 +664,17 @@
       :gatewayUrl="gatewayUrl"
       :showToast="showToast"
       :getHttpProtocol="getHttpProtocol"
+      :availableNodeOptions="availableNodeOptions"
+      :isRestartingGateway="isRestartingGateway"
+      :isSyncingConfig="isSyncingConfig"
+      :isUpdatingCode="isUpdatingCode"
+      :getToken="getAuthToken"
       @update:visible="showAdminPanel = $event"
+      @confirmRestartGateway="handleRestartGateway"
+      @confirmRestartAllNodes="confirmRestartAllNodes"
+      @syncConfig="handleSyncConfig"
+      @updateCodeToMain="handleUpdateCodeToMain"
+      @confirmUpdateCodeToMain="confirmUpdateCodeToMain"
     />
 
     <!-- Session 选择对话框 -->
