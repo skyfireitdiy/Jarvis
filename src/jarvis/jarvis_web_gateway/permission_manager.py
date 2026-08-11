@@ -28,6 +28,7 @@ BUILTIN_GROUPS = {
             "terminal:*": "allow",
             "file:upload": "allow",
             "timer:*": "allow",
+            "admin:config": "allow",
             "chat:*": "allow",
         },
     },

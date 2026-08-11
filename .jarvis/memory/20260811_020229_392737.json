@@ -1,0 +1,8 @@
+{
+  "id": "20260811_020229_392737",
+  "type": "project_long_term",
+  "tags": ["admin_config", "系统功能迁移", "SettingsModal", "AdminPanel"],
+  "content": "系统级功能迁移至AdminPanel已完成：\n1. 后端4个API(/api/node/secret, /api/service/restart, /api/nodes/{node_id}/config GET/POST, /api/nodes/{node_id}/code-update)已加admin:config权限校验\n2. AdminPanel新增系统配置tab含4项功能(重启/代码更新/私钥/配置同步)，需props: availableNodeOptions/isRestartingGateway/isSyncingConfig/isUpdatingCode/getToken\n3. SettingsModal已清理所有系统级功能(模板/props/emits/状态/函数)，仅保留用户级功能(免登录/历史管理/连接管理)\n4. App.vue已调整props/事件传递：系统级功能从SettingsModal移至AdminPanel\n5. permissionSchema新增admin:config，BUILTIN_GROUPS中sys-admin/sys-operator含admin:config\n6. 所有改动待实际运行验证",
+  "created_at": "2026-08-11T02:02:29.392769",
+  "updated_at": "2026-08-11T02:02:29.392774"
+}

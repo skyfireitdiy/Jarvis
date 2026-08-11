@@ -9,6 +9,7 @@
         <button class="admin-tab" :class="{ active: activeTab === 'users' }" @click="switchTab('users')">用户管理</button>
         <button class="admin-tab" :class="{ active: activeTab === 'groups' }" @click="switchTab('groups')">权限组</button>
         <button class="admin-tab" :class="{ active: activeTab === 'account' }" @click="switchTab('account')">我的账户</button>
+        <button class="admin-tab" :class="{ active: activeTab === 'system' }" @click="switchTab('system')">系统配置</button>
       </div>
       <!-- 用户管理 -->
       <div v-if="activeTab === 'users'" class="tab-content">
@@ -138,6 +139,92 @@
           <button class="ghost-btn" @click="changePassword" :disabled="loading">修改密码</button>
         </div>
       </div>
+      <!-- 系统配置 -->
+      <div v-if="activeTab === 'system'" class="tab-content">
+        <!-- 重启节点服务 -->
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>重启节点服务</label>
+          <div class="restart-service-section">
+            <div class="restart-service-row">
+              <select v-model="localRestartNodeId" class="node-select">
+                <option value="">本节点 (master)</option>
+                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                  {{ formatNodeOptionLabel(node) }}
+                </option>
+              </select>
+              <span class="form-help">选择要重启服务的节点，默认为本节点</span>
+            </div>
+            <div class="restart-service-row" v-if="!localRestartNodeId || localRestartNodeId === 'master'">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="localRestartFrontendService" />
+                <span>同时重启前端服务</span>
+              </label>
+              <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
+            </div>
+            <div class="restart-service-row">
+              <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
+                {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
+              </button>
+              <button class="ghost-btn" @click="confirmRestartAllNodes" :disabled="isRestartingGateway">
+                一键重启所有节点
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- 代码更新 -->
+        <div class="form-group">
+          <label>代码更新</label>
+          <span class="form-help">将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码</span>
+          <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
+            {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
+          </button>
+        </div>
+        <!-- 节点连接私钥 -->
+        <div class="form-group">
+          <label>节点连接私钥</label>
+          <div class="node-secret-section">
+            <div class="secret-display">
+              <code class="secret-code" v-if="nodeSecret" :title="nodeSecret">{{ maskedNodeSecret }}</code>
+              <span class="secret-placeholder" v-else>点击"获取私钥"加载</span>
+              <button class="copy-btn" @click="copyNodeSecret" :disabled="!nodeSecret" title="复制私钥">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="secret-actions">
+              <button class="ghost-btn" @click="fetchNodeSecret" :disabled="isLoadingSecret">
+                {{ isLoadingSecret ? '加载中...' : '获取私钥' }}
+              </button>
+              <button class="ghost-btn" @click="toggleSecretMask" :disabled="!nodeSecret" title="显示/隐藏">
+                {{ showSecret ? '隐藏' : '显示' }}
+              </button>
+            </div>
+            <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
+          </div>
+        </div>
+        <!-- 配置同步 -->
+        <div class="form-group" v-if="availableNodeOptions.length > 0">
+          <label>配置同步</label>
+          <div class="config-sync-section">
+            <div class="config-sync-row">
+              <span class="config-sync-label">源节点:</span>
+              <select v-model="localSyncConfigSourceNode" class="node-select">
+                <option value="">本节点 (master)</option>
+                <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
+                  {{ formatNodeOptionLabel(node) }}
+                </option>
+              </select>
+            </div>
+            <div class="config-sync-button">
+              <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
+                {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
       </div>
@@ -154,10 +241,15 @@ const props = defineProps({
   fetchWithAuth: { type: Function, required: true },
   gatewayUrl: { type: String, default: '127.0.0.1:8000' },
   showToast: { type: Function, default: () => {} },
-  getHttpProtocol: { type: Function, default: () => 'http' }
+  getHttpProtocol: { type: Function, default: () => 'http' },
+  availableNodeOptions: { type: Array, default: () => [] },
+  isRestartingGateway: { type: Boolean, default: false },
+  isSyncingConfig: { type: Boolean, default: false },
+  isUpdatingCode: { type: Boolean, default: false },
+  getToken: { type: Function, default: null },
 })
 
-const emit = defineEmits(['update:visible'])
+const emit = defineEmits(['update:visible', 'confirmRestartGateway', 'confirmRestartAllNodes', 'syncConfig', 'updateCodeToMain', 'confirmUpdateCodeToMain'])
 
 // 状态
 const activeTab = ref('users')
@@ -184,6 +276,12 @@ const allGroups = ref([])
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const editPermissions = ref({})
 const loadingGroupPerms = ref(false)
+const localRestartNodeId = ref('')
+const localRestartFrontendService = ref(false)
+const localSyncConfigSourceNode = ref('')
+const nodeSecret = ref('')
+const isLoadingSecret = ref(false)
+const showSecret = ref(false)
 
 // 权限Schema：资源→动作列表
 const permissionSchema = {
@@ -192,7 +290,7 @@ const permissionSchema = {
   'terminal': ['*', 'read', 'execute'],
   'timer': ['*', 'read', 'create', 'delete'],
   'chat': ['*', 'read', 'send'],
-  'admin': ['*', 'users', 'permissions'],
+  'admin': ['*', 'users', 'permissions', 'config'],
 }
 const resourceLabels = {
   '*': '全部',
@@ -467,6 +565,89 @@ async function changePassword() {
   } catch (e) { props.showToast('修改失败: ' + e.message, 'error') }
   finally { loading.value = false }
 }
+
+// ===== 系统配置功能 =====
+
+function formatNodeOptionLabel(node) {
+  const nodeId = String(node?.node_id || '').trim()
+  const status = String(node?.status || node?.runtime_status || '').trim()
+  const label = String(node?.label || node?.agent_label || '').trim()
+  const isStopped = !status || status === 'stopped' || status === 'stop' || status === 'terminated'
+  if (!isStopped && label) return `${nodeId} (${status}) - ${label}`
+  return status ? `${nodeId} (${status})` : nodeId
+}
+
+function confirmRestartGateway() {
+  emit('confirmRestartGateway', { nodeId: localRestartNodeId.value, restartFrontend: localRestartFrontendService.value })
+}
+
+function confirmRestartAllNodes() {
+  emit('confirmRestartAllNodes')
+}
+
+function syncConfig() {
+  emit('syncConfig', { sourceNodeId: localSyncConfigSourceNode.value })
+}
+
+function updateCodeToMain() {
+  emit('confirmUpdateCodeToMain')
+}
+
+async function fetchNodeSecret() {
+  if (isLoadingSecret.value) return
+  isLoadingSecret.value = true
+  try {
+    const token = props.getToken ? props.getToken() : null
+    if (!token) { props.showToast('请先登录', 'error'); return }
+    const apiProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const apiUrl = `${apiProtocol}://${props.gatewayUrl}/api/node/secret`
+    const response = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } })
+    const result = await response.json()
+    if (result.success && result.data?.node_secret) {
+      nodeSecret.value = result.data.node_secret
+    } else {
+      props.showToast(result.error?.message || '获取私钥失败', 'error')
+    }
+  } catch (error) {
+    props.showToast('获取私钥异常: ' + error.message, 'error')
+  } finally {
+    isLoadingSecret.value = false
+  }
+}
+
+function toggleSecretMask() {
+  showSecret.value = !showSecret.value
+}
+
+async function copyNodeSecret() {
+  if (!nodeSecret.value) { props.showToast('私钥内容为空', 'error'); return }
+  try {
+    await navigator.clipboard.writeText(nodeSecret.value)
+    props.showToast('已复制到剪贴板', 'success')
+  } catch (error) {
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = nodeSecret.value
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      props.showToast('已复制到剪贴板', 'success')
+    } catch (fallbackErr) {
+      props.showToast('复制失败，请手动复制', 'error')
+    }
+  }
+}
+
+const maskedNodeSecret = computed(() => {
+  if (!nodeSecret.value) return ''
+  if (showSecret.value) return nodeSecret.value
+  const secret = nodeSecret.value
+  if (secret.length <= 16) return '*'.repeat(secret.length)
+  return `${secret.slice(0, 8)}${'*'.repeat(secret.length - 16)}${secret.slice(-8)}`
+})
 </script>
 
 <style scoped>

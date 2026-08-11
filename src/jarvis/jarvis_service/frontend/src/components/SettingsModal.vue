@@ -37,73 +37,7 @@
           清除历史记录
         </button>
       </div>
-      <!-- 重启节点服务 -->
-      <div class="form-group" v-if="availableNodeOptions.length > 0">
-        <label>重启节点服务</label>
-        <div class="restart-service-section">
-          <div class="restart-service-row">
-            <select v-model="localRestartNodeId" class="node-select">
-              <option value="">本节点 (master)</option>
-              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                {{ formatNodeOptionLabel(node) }}
-              </option>
-            </select>
-            <span class="form-help">选择要重启服务的节点，默认为本节点</span>
-          </div>
 
-          <div class="restart-service-row" v-if="!localRestartNodeId || localRestartNodeId === 'master'">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="localRestartFrontendService" />
-              <span>同时重启前端服务</span>
-            </label>
-            <span class="form-help">前端服务重启时间较长，通常只需重启后端</span>
-          </div>
-
-          <div class="restart-service-row">
-            <button class="ghost-btn" @click="confirmRestartGateway" :disabled="isRestartingGateway">
-              {{ isRestartingGateway ? '请稍候...' : (localRestartNodeId ? `重启节点 ${localRestartNodeId} 服务` : '重启本节点服务') }}
-            </button>
-            <button class="ghost-btn" @click="confirmRestartAllNodes" :disabled="isRestartingGateway">
-              一键重启所有节点
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 代码更新 -->
-      <div class="form-group">
-        <label>代码更新</label>
-        <span class="form-help">将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码</span>
-        <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
-          {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
-        </button>
-      </div>
-
-      <!-- 节点认证 -->
-      <div class="form-group">
-        <label>节点连接私钥</label>
-        <div class="node-secret-section">
-          <div class="secret-display">
-            <code class="secret-code" v-if="nodeSecret" :title="nodeSecret">{{ maskedNodeSecret }}</code>
-            <span class="secret-placeholder" v-else>点击"获取私钥"加载</span>
-            <button class="copy-btn" @click="copyNodeSecret" :disabled="!nodeSecret" title="复制私钥">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="secret-actions">
-            <button class="ghost-btn" @click="fetchNodeSecret" :disabled="isLoadingSecret">
-              {{ isLoadingSecret ? '加载中...' : '获取私钥' }}
-            </button>
-            <button class="ghost-btn" @click="toggleSecretMask" :disabled="!nodeSecret" title="显示/隐藏">
-              {{ showSecret ? '隐藏' : '显示' }}
-            </button>
-          </div>
-          <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
-        </div>
-      </div>
 
       <!-- 连接管理 -->
       <div class="form-group">
@@ -116,26 +50,7 @@
         </div>
       </div>
 
-      <!-- 配置同步 -->
-      <div class="form-group" v-if="availableNodeOptions.length > 0">
-        <label>配置同步</label>
-        <div class="config-sync-section">
-          <div class="config-sync-row">
-            <span class="config-sync-label">源节点:</span>
-            <select v-model="localSyncConfigSourceNode" class="node-select">
-              <option value="">本节点 (master)</option>
-              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                {{ formatNodeOptionLabel(node) }}
-              </option>
-            </select>
-          </div>
-          <div class="config-sync-button">
-            <button class="ghost-btn" @click="syncConfig" :disabled="isSyncingConfig">
-              {{ isSyncingConfig ? '同步中...' : '同步配置到其他节点' }}
-            </button>
-          </div>
-        </div>
-      </div>
+
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
       </div>
@@ -144,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   visible: {
@@ -155,67 +70,26 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  availableNodeOptions: {
-    type: Array,
-    default: () => []
-  },
   socket: {
     type: Object,
     default: null
   },
-  isRestartingGateway: {
-    type: Boolean,
-    default: false
-  },
-  isSyncingConfig: {
-    type: Boolean,
-    default: false
-  },
-  isUpdatingCode: {
-    type: Boolean,
-    default: false
-  },
   autoLoginEnabled: {
     type: Boolean,
     default: false
-  },
-  getToken: {
-    type: Function,
-    required: true
-  },
-  gatewayUrl: {
-    type: String,
-    default: '127.0.0.1:8000'
-  },
-  showToast: {
-    type: Function,
-    default: () => {}
   }
 })
 
 const emit = defineEmits([
   'update:visible',
   'confirmClearHistory',
-  'confirmRestartGateway',
-  'confirmRestartAllNodes',
   'disconnectAll',
-  'syncConfig',
   'update:autoLoginEnabled',
-  'saveAutoLoginSetting',
-  'updateCodeToMain',
-  'confirmUpdateCodeToMain'
+  'saveAutoLoginSetting'
 ])
 
 // 本地状态
 const localAutoLoginEnabled = ref(props.autoLoginEnabled)
-const localRestartNodeId = ref('')
-const localRestartFrontendService = ref(false)
-const localSyncConfigSourceNode = ref('')
-
-// 私钥相关状态
-const nodeSecret = ref('')
-const isLoadingSecret = ref(false)
-const showSecret = ref(false)
 
 // 监听props变化
 watch(() => props.autoLoginEnabled, (newVal) => {
@@ -233,154 +107,23 @@ function handleAutoLoginChange() {
   emit('saveAutoLoginSetting')
 }
 
-// 格式化节点选项标签
-function formatNodeOptionLabel(node) {
-  const nodeId = String(node?.node_id || '').trim()
-  const status = String(node?.status || node?.runtime_status || '').trim()
-  const label = String(node?.label || node?.agent_label || '').trim()
-  
-  // 非停止状态且有标签时，显示标签
-  const isStopped = !status || status === 'stopped' || status === 'stop' || status === 'terminated'
-  if (!isStopped && label) {
-    return `${nodeId} (${status}) - ${label}`
-  }
-  
-  return status ? `${nodeId} (${status})` : nodeId
-}
+
 
 // 确认清除历史
 function confirmClearHistory() {
   emit('confirmClearHistory')
 }
 
-// 确认重启网关
-function confirmRestartGateway() {
-  emit('confirmRestartGateway', {
-    nodeId: localRestartNodeId.value,
-    restartFrontend: localRestartFrontendService.value
-  })
-}
 
-// 确认重启所有节点
-function confirmRestartAllNodes() {
-  emit('confirmRestartAllNodes')
-}
 
 // 断开所有连接
 function disconnectAll() {
   emit('disconnectAll')
 }
 
-// 同步配置
-function syncConfig() {
-  // 先关闭设置弹窗
-  close()
-  
-  // emit事件给父组件，让父组件显示确认框
-  emit('syncConfig', {
-    sourceNodeId: localSyncConfigSourceNode.value
-  })
-}
 
-// 更新代码到 main 分支
-function updateCodeToMain() {
-  emit('confirmUpdateCodeToMain')
-}
 
-// ========== 私钥管理函数 ==========
 
-/**
- * 获取节点私钥
- */
-async function fetchNodeSecret() {
-  if (isLoadingSecret.value) return
-  
-  try {
-    // 通过父组件传递的 getToken 函数获取 Token（优先内存，其次 localStorage）
-    const token = props.getToken()
-    if (!token) {
-      throw new Error('请先登录')
-    }
-    // 构建完整的后端 API URL
-    const apiProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
-    const apiUrl = `${apiProtocol}://${props.gatewayUrl}/api/node/secret`
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    const result = await response.json()
-    
-    if (result.success && result.data?.node_secret) {
-      nodeSecret.value = result.data.node_secret
-    } else {
-      console.error('获取私钥失败:', result.error?.message || '未知错误')
-      alert(`获取私钥失败：${result.error?.message || '未知错误'}`)
-    }
-  } catch (error) {
-    console.error('获取私钥异常:', error)
-    alert(`获取私钥异常：${error.message}`)
-  } finally {
-    isLoadingSecret.value = false
-  }
-}
-
-/**
- * 切换私钥显示/隐藏状态
- */
-function toggleSecretMask() {
-  showSecret.value = !showSecret.value
-}
-
-/**
- * 复制私钥到剪贴板
- */
-async function copyNodeSecret() {
-  if (!nodeSecret.value) {
-    console.warn('复制失败：私钥内容为空')
-    alert('私钥内容为空，请先获取私钥')
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(nodeSecret.value)
-    console.log('复制成功')
-    props.showToast('已复制到剪贴板', 'success')
-  } catch (error) {
-    console.error('复制失败，尝试降级方案:', error)
-    // 降级方案：使用 execCommand
-    try {
-      const textArea = document.createElement('textarea')
-      textArea.value = nodeSecret.value
-      textArea.style.position = 'fixed'
-      textArea.style.opacity = '0'
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      console.log('降级方案复制成功')
-      props.showToast('已复制到剪贴板', 'success')
-    } catch (fallbackErr) {
-      console.error('降级方案也失败:', fallbackErr)
-      alert('复制失败，请手动复制')
-    }
-  }
-}
-
-/**
- * 掩码显示的私钥（仅显示首尾部分）
- */
-const maskedNodeSecret = computed(() => {
-  if (!nodeSecret.value) return ''
-  if (showSecret.value) return nodeSecret.value
-  
-  const secret = nodeSecret.value
-  if (secret.length <= 16) {
-    return '*'.repeat(secret.length)
-  }
-  return `${secret.slice(0, 8)}${'*'.repeat(secret.length - 16)}${secret.slice(-8)}`
-})
 </script>
 
 <style scoped>
