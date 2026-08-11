@@ -1,0 +1,12 @@
+{
+  "id": "20260811_150026_795650",
+  "type": "project_long_term",
+  "tags": [
+    "agent_permission",
+    "dispatch_fix",
+    "parameter_check"
+  ],
+  "content": "## _dispatch_node_http_request API参数排查结论\n\n所有API调用参数已验证正确，无遗漏：\n- get_node_status() ✅ 无需Request\n- restart_service(payload, _mock_req) ✅ 已修(commit b1ac0d7)\n- get_agents(_mock_req) ✅ 已修\n- create_agent(payload, _mock_req) ✅\n- stop_agent(agent_id, _mock_req) ✅\n- update_agent_access(agent_id, payload, _mock_req) ✅\n- patch_agent(agent_id, payload, _mock_req) ✅\n- search_completions(agent_id, query, node_id) ✅ 无需Request\n- delete_agent(agent_id, _mock_req, node_id) ✅\n- get_node_secret: _dispatch中无路由，直接路由/api/node/secret(L3462)已存在，无需重复\n- get_model_groups() ✅\n- list_agent_sessions(agent_id, node_id) ✅\n- restore_agent_session(agent_id, payload) ✅\n- get_completions(agent_id, node_id) ✅\n- global_search(agent_id, payload) ✅\n\n排查完成，无待修项。",
+  "created_at": "2026-08-11T15:00:26.795698",
+  "updated_at": "2026-08-11T15:00:26.795706"
+}

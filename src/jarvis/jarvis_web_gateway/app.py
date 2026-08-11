@@ -1795,9 +1795,15 @@ def create_app(
 
         return Depends(check_perm)
 
-    # ==================== 用户管理 API ====================
+    @app.get("/api/users/brief", dependencies=[Depends(verify_token)])
+    async def api_list_users_brief(
+        request: Request, search: str = ""
+    ) -> Dict[str, Any]:
+        """列出用户简要信息（仅需登录，用于ACL选择等场景）。"""
+        users = user_manager.list_users(search=search or None, limit=100)
+        brief = [{"user_id": u.get("user_id"), "display_name": u.get("display_name", u.get("username"))} for u in users]
+        return {"success": True, "data": {"users": brief}}
 
-    @app.get("/api/users", dependencies=[Depends(verify_token)])
     async def api_list_users(
         request: Request, search: str = "", offset: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
@@ -6101,7 +6107,7 @@ def create_app(
         elif normalized_method == "GET" and normalized_path == "/node/status":
             result = await get_node_status()
         elif normalized_method == "POST" and normalized_path == "/service/restart":
-            result = await restart_service(payload)
+            result = await restart_service(payload, _mock_req)
         elif normalized_method == "GET" and normalized_path == "/agents":
             result = await get_agents(_mock_req)
         elif normalized_method == "POST" and normalized_path == "/agents":

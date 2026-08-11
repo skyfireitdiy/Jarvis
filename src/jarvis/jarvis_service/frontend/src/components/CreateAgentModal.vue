@@ -29,6 +29,31 @@
               </label>
             </div>
           </div>
+          <div class="form-group">
+            <label>访问控制（可选）</label>
+            <div class="acl-section">
+              <div class="acl-field">
+                <label class="acl-label">可查看用户 (read)</label>
+                <div class="acl-user-list">
+                  <label v-for="user in userOptions" :key="user.user_id" class="checkbox-label">
+                    <input type="checkbox" :value="user.user_id" :checked="accessAclRead.includes(user.user_id)" @change="toggleAclRead(user.user_id, $event)" />
+                    {{ user.display_name || user.user_id }}
+                  </label>
+                  <div v-if="userOptions.length === 0" class="form-help">暂无可选用户</div>
+                </div>
+              </div>
+              <div class="acl-field">
+                <label class="acl-label">可交互用户 (interact)</label>
+                <div class="acl-user-list">
+                  <label v-for="user in userOptions" :key="user.user_id" class="checkbox-label">
+                    <input type="checkbox" :value="user.user_id" :checked="accessAclInteract.includes(user.user_id)" @change="toggleAclInteract(user.user_id, $event)" />
+                    {{ user.display_name || user.user_id }}
+                  </label>
+                  <div v-if="userOptions.length === 0" class="form-help">暂无可选用户</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-column create-agent-column create-agent-column-right">
           <div class="form-group">
@@ -60,74 +85,59 @@
               <input :value="workDir" @input="$emit('update:workDir', $event.target.value)" type="text" class="form-control" placeholder="/path/to/workspace" />
               <button class="btn select-dir-btn" @click="$emit('selectDir')">选择目录</button>
             </div>
-          <div class="form-group">
-            <label>访问控制（可选）</label>
-            <div class="acl-section">
-              <div class="acl-field">
-                <label class="acl-label">可查看用户 (read)</label>
-                <input :value="accessAclRead" @input="$emit('update:accessAclRead', $event.target.value)" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
-                <div class="form-help">允许查看此Agent的用户ID列表，逗号分隔</div>
-              </div>
-              <div class="acl-field">
-                <label class="acl-label">可交互用户 (interact)</label>
-                <input :value="accessAclInteract" @input="$emit('update:accessAclInteract', $event.target.value)" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
-                <div class="form-help">允许向此Agent发送输入的用户ID列表，逗号分隔</div>
+          </div>
+          <div v-if="agentType === 'code_agent'" class="form-group">
+            <div class="toggle-wrapper">
+              <label class="toggle-switch">
+                <input :checked="codeAgentWorktree" @change="$emit('update:codeAgentWorktree', $event.target.checked)" type="checkbox" class="toggle-input" />
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-info">
+                <span class="toggle-label-text">启用 worktree</span>
+                <span class="form-help">为代码 Agent 使用独立 git worktree 进行隔离开发。</span>
               </div>
             </div>
           </div>
-            <div v-if="agentType === 'code_agent'" class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input :checked="codeAgentWorktree" @change="$emit('update:codeAgentWorktree', $event.target.checked)" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">启用 worktree</span>
-                  <span class="form-help">为代码 Agent 使用独立 git worktree 进行隔离开发。</span>
-                </div>
+          <div class="form-group">
+            <div class="toggle-wrapper">
+              <label class="toggle-switch">
+                <input :checked="quickMode" @change="$emit('update:quickMode', $event.target.checked)" type="checkbox" class="toggle-input" />
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-info">
+                <span class="toggle-label-text">极速模式</span>
+                <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
               </div>
             </div>
-            <div class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input :checked="quickMode" @change="$emit('update:quickMode', $event.target.checked)" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">极速模式</span>
-                  <span class="form-help">跳过任务分类、规则加载、上下文推荐等，直接执行任务。</span>
-                </div>
+          </div>
+          <div class="form-group">
+            <div class="toggle-wrapper">
+              <label class="toggle-switch">
+                <input :checked="restoreSession" @change="$emit('update:restoreSession', $event.target.checked)" type="checkbox" class="toggle-input" />
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-info">
+                <span class="toggle-label-text">启动时恢复会话</span>
+                <span class="form-help">启动时自动恢复上次会话。</span>
               </div>
             </div>
-            <div class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input :checked="restoreSession" @change="$emit('update:restoreSession', $event.target.checked)" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">启动时恢复会话</span>
-                  <span class="form-help">启动时自动恢复上次会话。</span>
-                </div>
+          </div>
+          <div class="form-group">
+            <div class="toggle-wrapper">
+              <label class="toggle-switch">
+                <input :checked="noInteractionMode" @change="$emit('update:noInteractionMode', $event.target.checked)" type="checkbox" class="toggle-input" />
+                <span class="toggle-slider"></span>
+              </label>
+              <div class="toggle-info">
+                <span class="toggle-label-text">无交互模式</span>
+                <span class="form-help">启用后必须提供任务描述，Agent 将自动执行任务而不等待用户确认。</span>
               </div>
             </div>
-            <div class="form-group">
-              <div class="toggle-wrapper">
-                <label class="toggle-switch">
-                  <input :checked="noInteractionMode" @change="$emit('update:noInteractionMode', $event.target.checked)" type="checkbox" class="toggle-input" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <div class="toggle-info">
-                  <span class="toggle-label-text">无交互模式</span>
-                  <span class="form-help">启用后必须提供任务描述，Agent 将自动执行任务而不等待用户确认。</span>
-                </div>
-              </div>
-            </div>
-            <div class="form-group" v-if="noInteractionMode">
-              <label>任务描述 <span class="required">*</span></label>
-              <textarea :value="taskDescription" @input="$emit('update:taskDescription', $event.target.value)" class="form-control" rows="4" placeholder="请输入任务描述..." :class="{ 'error-border': noInteractionMode && !taskDescription.trim() }"></textarea>
-              <div class="form-help" v-if="noInteractionMode && !taskDescription.trim()" style="color: var(--color-error);">无交互模式下必须提供任务描述</div>
-            </div>
+          </div>
+          <div class="form-group" v-if="noInteractionMode">
+            <label>任务描述 <span class="required">*</span></label>
+            <textarea :value="taskDescription" @input="$emit('update:taskDescription', $event.target.value)" class="form-control" rows="4" placeholder="请输入任务描述..." :class="{ 'error-border': noInteractionMode && !taskDescription.trim() }"></textarea>
+            <div class="form-help" v-if="noInteractionMode && !taskDescription.trim()" style="color: var(--color-error);">无交互模式下必须提供任务描述</div>
           </div>
         </div>
       </div>
@@ -158,8 +168,9 @@ const props = defineProps({
   taskDescription: { type: String, default: '' },
   formatNodeLabel: { type: Function, default: (node) => node.node_id },
   createError: { type: String, default: '' },
-  accessAclRead: { type: String, default: '' },
-  accessAclInteract: { type: String, default: '' }
+  accessAclRead: { type: Array, default: () => [] },
+  accessAclInteract: { type: Array, default: () => [] },
+  userOptions: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits([
@@ -180,6 +191,28 @@ const emit = defineEmits([
   'create',
   'selectDir'
 ])
+
+function toggleAclRead(userId, event) {
+  const current = [...props.accessAclRead]
+  if (event.target.checked) {
+    if (!current.includes(userId)) current.push(userId)
+  } else {
+    const idx = current.indexOf(userId)
+    if (idx > -1) current.splice(idx, 1)
+  }
+  emit('update:accessAclRead', current)
+}
+
+function toggleAclInteract(userId, event) {
+  const current = [...props.accessAclInteract]
+  if (event.target.checked) {
+    if (!current.includes(userId)) current.push(userId)
+  } else {
+    const idx = current.indexOf(userId)
+    if (idx > -1) current.splice(idx, 1)
+  }
+  emit('update:accessAclInteract', current)
+}
 </script>
 
 <style scoped>
@@ -198,6 +231,25 @@ const emit = defineEmits([
   font-size: 0.85em;
   color: var(--color-text-secondary, #888);
   font-weight: 500;
+}
+.acl-user-list {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.acl-user-list .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+.acl-user-list .checkbox-label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
 }
 
 /* 模态框遮罩层 */
