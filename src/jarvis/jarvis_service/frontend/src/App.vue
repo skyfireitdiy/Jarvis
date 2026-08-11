@@ -601,6 +601,7 @@
       @update:accessAclRead="newAgentAccessAclRead = $event"
       :accessAclInteract="newAgentAccessAclInteract"
       @update:accessAclInteract="newAgentAccessAclInteract = $event"
+      :userOptions="availableUserOptions"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -621,13 +622,23 @@
         <h3>权限管理 - {{ editingAccessAgent?.name || editingAccessAgent?.agent_id }}</h3>
         <div class="form-group">
           <label>可查看用户 (read)</label>
-          <input v-model="editAccessRead" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
-          <div class="form-help">允许查看此Agent的用户ID列表，逗号分隔</div>
+          <div class="acl-user-list">
+            <label v-for="user in availableUserOptions" :key="user.user_id" class="checkbox-label">
+              <input type="checkbox" :value="user.user_id" v-model="editAccessRead" />
+              {{ user.display_name || user.user_id }}
+            </label>
+            <div v-if="availableUserOptions.length === 0" class="form-help">暂无可选用户</div>
+          </div>
         </div>
         <div class="form-group">
           <label>可交互用户 (interact)</label>
-          <input v-model="editAccessInteract" type="text" class="form-control" placeholder="用户ID，逗号分隔" />
-          <div class="form-help">允许向此Agent发送输入的用户ID列表，逗号分隔</div>
+          <div class="acl-user-list">
+            <label v-for="user in availableUserOptions" :key="user.user_id" class="checkbox-label">
+              <input type="checkbox" :value="user.user_id" v-model="editAccessInteract" />
+              {{ user.display_name || user.user_id }}
+            </label>
+            <div v-if="availableUserOptions.length === 0" class="form-help">暂无可选用户</div>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="btn secondary" @click="showEditAccessModal = false">取消</button>
@@ -3389,8 +3400,9 @@ const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互�
 const newAgentTaskDescription = ref('') // 新 Agent 任务描述
 const newAgentCreateError = ref('') // 创建 Agent 时的错误信息
 const newAgentProxyNode = ref('') // 新 Agent 代理节点
-const newAgentAccessAclRead = ref('') // 新 Agent ACL read用户列表
-const newAgentAccessAclInteract = ref('') // 新 Agent ACL interact用户列表
+const newAgentAccessAclRead = ref([]) // 新 Agent ACL read用户ID数组
+const newAgentAccessAclInteract = ref([]) // 新 Agent ACL interact用户ID数组
+const availableUserOptions = ref([]) // 用户列表（用于ACL选择）
 const availableNodeOptions = ref([])
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
@@ -4965,6 +4977,7 @@ async function openCreateAgentModal() {
   await Promise.all([
     fetchModelGroups(),
     fetchNodeStatus(),
+    fetchUserList(),
   ])
   newAgentNodeId.value = ''
   newAgentDir.value = '~'
@@ -5030,6 +5043,23 @@ async function fetchNodeStatus() {
   } catch (error) {
     console.error('[NODE] 获取节点状态出错:', error)
     availableNodeOptions.value = []
+  }
+}
+
+async function fetchUserList() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(`http://${host}:${port}/api/users/brief`)
+    if (!response.ok) {
+      console.warn('[USER] 获取用户列表失败:', response.status)
+      availableUserOptions.value = []
+      return
+    }
+    const result = await response.json()
+    availableUserOptions.value = result?.data?.users || []
+  } catch (err) {
+    console.warn('[USER] 获取用户列表异常:', err)
+    availableUserOptions.value = []
   }
 }
 
@@ -5114,9 +5144,9 @@ async function createAgent() {
         task: newAgentNoInteractionMode.value && newAgentTaskDescription.value.trim() ? newAgentTaskDescription.value.trim() : undefined,
         node_id: targetNodeId,
         proxy_node: newAgentProxyNode.value || undefined,
-        access_acl: (newAgentAccessAclRead.value.trim() || newAgentAccessAclInteract.value.trim()) ? {
-          read: newAgentAccessAclRead.value.trim() ? newAgentAccessAclRead.value.split(',').map(s => s.trim()).filter(Boolean) : [],
-          interact: newAgentAccessAclInteract.value.trim() ? newAgentAccessAclInteract.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+        access_acl: (newAgentAccessAclRead.value.length || newAgentAccessAclInteract.value.length) ? {
+          read: newAgentAccessAclRead.value,
+          interact: newAgentAccessAclInteract.value,
         } : undefined,
       })
     })
@@ -5145,8 +5175,8 @@ async function createAgent() {
       newAgentNoInteractionMode.value = false
       newAgentTaskDescription.value = ''
       newAgentNodeId.value = ''
-      newAgentAccessAclRead.value = ''
-      newAgentAccessAclInteract.value = ''
+      newAgentAccessAclRead.value = []
+      newAgentAccessAclInteract.value = []
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = generateAgentName(newAgentType.value)
       // 立即切换到新创建的 agent
@@ -5782,14 +5812,14 @@ async function confirmRename() {
 // Agent ACL编辑
 const showEditAccessModal = ref(false)
 const editingAccessAgent = ref(null)
-const editAccessRead = ref('')
-const editAccessInteract = ref('')
+const editAccessRead = ref([])
+const editAccessInteract = ref([])
 
 function editAgentAccess(agent) {
   editingAccessAgent.value = agent
   const acl = agent.access_acl || {}
-  editAccessRead.value = Array.isArray(acl.read) ? acl.read.join(', ') : ''
-  editAccessInteract.value = Array.isArray(acl.interact) ? acl.interact.join(', ') : ''
+  editAccessRead.value = Array.isArray(acl.read) ? [...acl.read] : []
+  editAccessInteract.value = Array.isArray(acl.interact) ? [...acl.interact] : []
   showEditAccessModal.value = true
 }
 
@@ -5803,8 +5833,8 @@ async function saveAgentAccess() {
       method: 'PUT',
       body: JSON.stringify({
         access_acl: {
-          read: editAccessRead.value.trim() ? editAccessRead.value.split(',').map(s => s.trim()).filter(Boolean) : [],
-          interact: editAccessInteract.value.trim() ? editAccessInteract.value.split(',').map(s => s.trim()).filter(Boolean) : [],
+          read: editAccessRead.value,
+          interact: editAccessInteract.value,
         }
       })
     })
@@ -12742,6 +12772,25 @@ body::-webkit-scrollbar {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 24px;
+}
+.acl-user-list {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.acl-user-list .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+.acl-user-list .checkbox-label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
 }
 
 .primary-btn {
