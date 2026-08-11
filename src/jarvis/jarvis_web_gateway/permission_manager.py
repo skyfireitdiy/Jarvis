@@ -144,6 +144,11 @@ class PermissionManager:
                 self._group_permissions[group_id] = (
                     {k: v for k, v in perms.items()} if isinstance(perms, dict) else {}
                 )
+            else:
+                # 已有内置组：补全 accessible_nodes 字段
+                existing = self._groups[group_id]
+                if existing.get("is_builtin") and "accessible_nodes" not in existing:
+                    existing["accessible_nodes"] = group_def.get("accessible_nodes", [])
         self._save_groups()
         self._save_group_permissions()
 

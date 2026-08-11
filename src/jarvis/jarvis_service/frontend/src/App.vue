@@ -5039,7 +5039,7 @@ async function fetchModelGroups(nodeId = 'master', autoSelect = true) {
 async function fetchUserAccessibleNodes() {
   try {
     const { host, port } = getGatewayAddress()
-    const userId = username.value
+    const userId = auth.value.userInfo?.user_id
     if (!userId) { userAccessibleNodes.value = []; return }
     const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/permissions/user/${encodeURIComponent(userId)}/accessible-nodes`)
     if (!response.ok) {
