@@ -1,0 +1,8 @@
+{
+  "id": "20260811_003621_006711",
+  "type": "project_long_term",
+  "tags": ["terminal_permission", "permission_fix", "websocket"],
+  "content": "终端创建权限未生效修复：\n1. WebSocketConnectionManager.__init__新增permission_manager参数(默认None)\n2. create_app中创建manager时传入permission_manager\n3. terminal_create消息处理(L953-968)添加权限校验：从auth_store获取user_id，非system用户调用permission_manager.check_permission(user_id, 'terminal:create')，无权限返回terminal_error\n关键文件：src/jarvis/jarvis_web_gateway/app.py L585-596(init), L1466-1468(create), L953-968(校验)\ncommit: 3e2d384",
+  "created_at": "2026-08-11T00:36:21.006756",
+  "updated_at": "2026-08-11T00:36:21.006762"
+}

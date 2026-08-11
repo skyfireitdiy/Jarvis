@@ -1,0 +1,13 @@
+{
+  "id": "20260811_010244_916275",
+  "type": "project_long_term",
+  "tags": [
+    "ws_permission",
+    "terminal_permission",
+    "file_upload_permission",
+    "security"
+  ],
+  "content": "WebSocket消息权限补全：\n1. terminal_close → terminal:create权限校验 (app.py L997-1012)\n2. terminal_session_input → terminal:create权限校验 (app.py L1022-1037)\n3. file_upload → file:upload权限校验 (app.py L1057-1073)\n4. BUILTIN_GROUPS新增file:upload权限至sys-operator、sys-developer组\n5. 终端操作统一用terminal:create权限（创建/关闭/输入）\n6. 文件上传独立用file:upload权限\n7. system用户跳过权限检查\n8. 无权限时：terminal类返回terminal_error，file_upload返回file_upload_response(success=False)\n9. terminal_create已有权限校验(L953-968)\n10. 其他消息类型(sync_request/input_result/confirm_result/terminal_input/terminal_resize/manual_interrupt/get_status/chat_*)无需权限校验",
+  "created_at": "2026-08-11T01:02:44.916327",
+  "updated_at": "2026-08-11T01:02:44.916333"
+}

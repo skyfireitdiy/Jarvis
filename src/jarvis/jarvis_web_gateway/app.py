@@ -585,6 +585,7 @@ class WebSocketConnectionManager:
         gateway: WebGateway,
         auth_store: Dict[str, Optional[Dict[str, Any]]],
         user_manager: Optional[Any] = None,
+        permission_manager: Optional[Any] = None,
     ) -> None:
         self._router = router
         self._input_registry = input_registry
@@ -592,6 +593,7 @@ class WebSocketConnectionManager:
         self._gateway = gateway
         self._auth_store = auth_store
         self._user_manager = user_manager
+        self._permission_manager = permission_manager
 
         self._active_connections: Dict[str, Dict[str, tuple[str, WebSocket]]] = {}
         self._connection_state_lock = asyncio.Lock()
@@ -949,6 +951,23 @@ class WebSocketConnectionManager:
                 return
 
         if message_type == "terminal_create":
+            # 权限校验：terminal:create
+            auth_payload = self._auth_store.get("default")
+            user_id = None
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    user_id = user_info.get("user_id")
+            if user_id and user_id != "system" and self._permission_manager:
+                if not self._permission_manager.check_permission(
+                    user_id, "terminal:create"
+                ):
+                    error_msg = {
+                        "type": "terminal_error",
+                        "payload": {"error": "Permission denied: terminal:create"},
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                    return
             interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
             raw_working_dir = payload.get("working_dir")
             working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
@@ -978,6 +997,23 @@ class WebSocketConnectionManager:
                     self._router.publish(message, session_id=session_id)
             return
         if message_type == "terminal_close":
+            # 权限校验：terminal:create（终端操作统一权限）
+            auth_payload = self._auth_store.get("default")
+            user_id = None
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    user_id = user_info.get("user_id")
+            if user_id and user_id != "system" and self._permission_manager:
+                if not self._permission_manager.check_permission(
+                    user_id, "terminal:create"
+                ):
+                    error_msg = {
+                        "type": "terminal_error",
+                        "payload": {"error": "Permission denied: terminal:create"},
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                    return
             terminal_id = payload.get("terminal_id")
             if terminal_id and _terminal_session_manager:
                 _terminal_session_manager.close_session(terminal_id)
@@ -988,6 +1024,23 @@ class WebSocketConnectionManager:
                 self._router.publish(message, session_id=session_id)
             return
         if message_type == "terminal_session_input":
+            # 权限校验：terminal:create（终端操作统一权限）
+            auth_payload = self._auth_store.get("default")
+            user_id = None
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    user_id = user_info.get("user_id")
+            if user_id and user_id != "system" and self._permission_manager:
+                if not self._permission_manager.check_permission(
+                    user_id, "terminal:create"
+                ):
+                    error_msg = {
+                        "type": "terminal_error",
+                        "payload": {"error": "Permission denied: terminal:create"},
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                    return
             terminal_id = payload.get("terminal_id")
             data = payload.get("data", "")
             if terminal_id and _terminal_session_manager:
@@ -1008,6 +1061,27 @@ class WebSocketConnectionManager:
                 _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
             return
         if message_type == "file_upload":
+            # 权限校验：file:upload
+            auth_payload = self._auth_store.get("default")
+            user_id = None
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    user_id = user_info.get("user_id")
+            if user_id and user_id != "system" and self._permission_manager:
+                if not self._permission_manager.check_permission(
+                    user_id, "file:upload"
+                ):
+                    error_msg = {
+                        "type": "file_upload_response",
+                        "message_id": message.get("message_id"),
+                        "payload": {
+                            "success": False,
+                            "error": "Permission denied: file:upload",
+                        },
+                    }
+                    self._router.publish(error_msg, session_id=session_id)
+                    return
             # 处理文件上传请求
             message_id = message.get("message_id")
             file_name = payload.get("file_name")
@@ -1464,6 +1538,7 @@ def create_app(
         gateway,
         auth_store,
         user_manager,
+        permission_manager,
     )
 
     set_current_gateway(gateway)
