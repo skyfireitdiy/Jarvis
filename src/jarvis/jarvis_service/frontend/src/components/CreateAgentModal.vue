@@ -14,6 +14,9 @@
             </select>
             <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
           </div>
+          <div class="form-group" v-if="noNodeAccess">
+            <div class="error-message">当前用户无任何节点访问权限，无法创建 Agent。请联系管理员分配节点权限。</div>
+          </div>
           <div class="form-group">
             <label>Agent 类型</label>
             <div class="radio-group">
@@ -144,7 +147,7 @@
       <div v-if="createError" class="error-message">{{ createError }}</div>
       <div class="modal-actions">
         <button class="btn secondary" @click="$emit('cancel')">取消</button>
-        <button class="btn primary" @click="$emit('create')" :disabled="!workDir.trim()">创建</button>
+        <button class="btn primary" @click="$emit('create')" :disabled="!workDir.trim() || noNodeAccess">创建</button>
       </div>
     </div>
   </div>
@@ -155,6 +158,7 @@ const props = defineProps({
   visible: Boolean,
   nodeOptions: { type: Array, default: () => [] },
   nodeId: { type: String, default: '' },
+  noNodeAccess: { type: Boolean, default: false },
   agentType: { type: String, default: 'code_agent' },
   agentName: { type: String, default: '' },
   modelGroups: { type: Array, default: () => [] },
