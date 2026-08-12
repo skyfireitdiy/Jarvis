@@ -1,0 +1,8 @@
+{
+  "id": "20260812_154431_943015",
+  "type": "project_long_term",
+  "tags": ["bug修复", "ACL", "持久化", "agent_manager"],
+  "content": "ACL持久化Bug：_load_agents重建AgentInfo时遗漏access_acl参数，导致重启后ACL丢失。修复：在AgentInfo构造中添加access_acl=agent_data.get('access_acl', {})。持久化文件路径：~/.jarvis/gateway/.jarvis_agents.json，to_dict()已正确序列化access_acl，但_load_agents反序列化时遗漏。",
+  "created_at": "2026-08-12T15:44:31.943068",
+  "updated_at": "2026-08-12T15:44:31.943077"
+}

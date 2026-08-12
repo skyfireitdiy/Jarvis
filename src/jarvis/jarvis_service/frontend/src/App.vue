@@ -6909,8 +6909,11 @@ function handleMessage(message, agentId = null) {
       auth.value.password = ''
       // 重新显示连接对话框
       showConnectModal.value = true
+    } else if (errorCode === 'FORBIDDEN') {
+      // 权限拒绝：显示toast提示
+      showToast(errorMessage, 'error')
     }
-    // 不再通过 appendOutput 显示系统错误消息，避免污染会话窗口
+    // 其他错误不再通过 appendOutput 显示系统错误消息，避免污染会话窗口
     // 错误信息仍通过 console.warn 输出，便于调试
   } else if (type === 'status_update') {
     // 更新 Agent 执行状态

@@ -1420,7 +1420,9 @@ class WebSocketConnectionManager:
         receiver_id = payload.get("receiver_id", "")
         content = payload.get("content", "")
         image_url = payload.get("image_url", "")
-        result = await self._chat_manager.send_private(sender_id, receiver_id, content, image_url=image_url)
+        result = await self._chat_manager.send_private(
+            sender_id, receiver_id, content, image_url=image_url
+        )
         await websocket.send_json(
             {"type": "chat_send_private_response", "payload": result}
         )
@@ -1622,6 +1624,7 @@ def create_app(
 
     # 挂载 uploads 目录为静态文件服务，使上传的图片可通过 HTTP 访问
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
+
     _uploads_dir = os.path.join(_get_data_dir(), "uploads")
     os.makedirs(_uploads_dir, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
@@ -2527,19 +2530,17 @@ def create_app(
             await websocket.close(code=4401, reason="Unauthorized")
             return
 
-        # 检查read权限：非owner需在access_acl.read中或有agent:delete权限
+        # 检查read权限：非owner需在access_acl.read中
         user_id = None
         if auth_payload is not None:
-            user_id = auth_payload.get("user_id")
+            user_info = auth_payload.get("user_info") or {}
+            user_id = user_info.get("user_id")
         if user_id and user_id != "system":
             agent_info = agent_manager.get_agent(agent_id)
             if agent_info and agent_info.owner_id and agent_info.owner_id != user_id:
                 access_acl = agent_info.access_acl or {}
                 has_read = user_id in (access_acl.get("read") or [])
-                has_delete = permission_manager.check_permission(
-                    user_id, "agent:delete"
-                )
-                if not has_read and not has_delete:
+                if not has_read:
                     await websocket.accept(subprotocol="jarvis-ws")
                     await _send_error(
                         websocket, "FORBIDDEN", "No read access to this agent"
@@ -2632,12 +2633,7 @@ def create_app(
                                         has_interact = user_id in (
                                             access_acl.get("interact") or []
                                         )
-                                        has_delete = (
-                                            permission_manager.check_permission(
-                                                user_id, "agent:delete"
-                                            )
-                                        )
-                                        if not has_interact and not has_delete:
+                                        if not has_interact:
                                             await websocket.send_json(
                                                 {
                                                     "type": "error",
@@ -2753,10 +2749,7 @@ def create_app(
                         ):
                             access_acl = agent_info.access_acl or {}
                             has_interact = user_id in (access_acl.get("interact") or [])
-                            has_delete = permission_manager.check_permission(
-                                user_id, "agent:delete"
-                            )
-                            if not has_interact and not has_delete:
+                            if not has_interact:
                                 await websocket.send_json(
                                     {
                                         "type": "error",
@@ -4363,14 +4356,25 @@ def create_app(
                         exc,
                     )
             # 按用户权限过滤：非system用户只能看到自己owner的或ACL中有read权限的
-            logger.debug("[AGENTS] Filtering: user_id=%s, user_info=%s, total_agents=%d", user_id, user_info, len(agents))
+            logger.debug(
+                "[AGENTS] Filtering: user_id=%s, user_info=%s, total_agents=%d",
+                user_id,
+                user_info,
+                len(agents),
+            )
             if user_id and user_id != "system":
                 # is_admin用户可见所有agent
                 is_admin = (user_info or {}).get("is_admin", False)
-                logger.debug("[AGENTS] is_admin=%s, has_agent_read=%s", is_admin, permission_manager.check_permission(user_id, "agent:read"))
+                logger.debug(
+                    "[AGENTS] is_admin=%s, has_agent_read=%s",
+                    is_admin,
+                    permission_manager.check_permission(user_id, "agent:read"),
+                )
                 if not is_admin:
                     # 检查用户是否有agent:read组权限（可看所有agent）
-                    has_agent_read = permission_manager.check_permission(user_id, "agent:read")
+                    has_agent_read = permission_manager.check_permission(
+                        user_id, "agent:read"
+                    )
                     if not has_agent_read:
                         filtered = []
                         for agent in agents:
@@ -4386,7 +4390,11 @@ def create_app(
                                 filtered.append(agent)
                                 continue
                         agents = filtered
-                logger.debug("[AGENTS] After filtering: %d agents for user_id=%s", len(agents), user_id)
+                logger.debug(
+                    "[AGENTS] After filtering: %d agents for user_id=%s",
+                    len(agents),
+                    user_id,
+                )
             return {"success": True, "data": agents}
         except Exception as e:
             return {
@@ -4812,8 +4820,29 @@ def create_app(
 
     # HTTP API：获取可恢复的 session 列表
     @app.get("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
-    async def list_agent_sessions(agent_id: str, node_id: str = "") -> Dict[str, Any]:
+    async def list_agent_sessions(
+        agent_id: str, request: Request, node_id: str = ""
+    ) -> Dict[str, Any]:
         """获取可恢复的 session 列表。"""
+        # 权限检查：非owner需有read ACL权限
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                access_acl = agent_info.access_acl or {}
+                has_read = user_info.get("user_id") in (access_acl.get("read") or [])
+                if not has_read:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "No read access to this agent",
+                        },
+                    }
         try:
             resolved_target_node = str(node_id or "").strip()
             if not resolved_target_node:
@@ -4880,11 +4909,32 @@ def create_app(
     # HTTP API：恢复指定的 session
     @app.post("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
     async def restore_agent_session(
-        agent_id: str, request: Dict[str, Any]
+        agent_id: str, request_body: Dict[str, Any], request: Request
     ) -> Dict[str, Any]:
         """恢复指定的 session。"""
+        # 权限检查：非owner需有interact ACL权限
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            agent_info = agent_manager.get_agent(agent_id)
+            if (
+                agent_info
+                and agent_info.owner_id
+                and agent_info.owner_id != user_info.get("user_id")
+            ):
+                access_acl = agent_info.access_acl or {}
+                has_interact = user_info.get("user_id") in (
+                    access_acl.get("interact") or []
+                )
+                if not has_interact:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "No interact access to this agent",
+                        },
+                    }
         try:
-            resolved_target_node = str(request.get("node_id") or "").strip()
+            resolved_target_node = str(request_body.get("node_id") or "").strip()
             if not resolved_target_node:
                 route = node_runtime.agent_route_registry.get(agent_id)
                 if route is not None:
@@ -4894,7 +4944,7 @@ def create_app(
                 node_runtime.local_node_id,
                 "master",
             ):
-                forward_body = dict(request)
+                forward_body = dict(request_body)
                 forward_body.pop("node_id", None)
                 response = await node_connection_manager.send_request_to_node(
                     resolved_target_node,
@@ -6147,9 +6197,13 @@ def create_app(
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
             _upload_user_info = getattr(_mock_req.state, "user_info", None)
-            _upload_user_id = _upload_user_info.get("user_id", "") if _upload_user_info else ""
+            _upload_user_id = (
+                _upload_user_info.get("user_id", "") if _upload_user_info else ""
+            )
             if _upload_user_id and _upload_user_id != "system":
-                if not permission_manager.check_permission(_upload_user_id, "file:upload"):
+                if not permission_manager.check_permission(
+                    _upload_user_id, "file:upload"
+                ):
                     return {
                         "success": False,
                         "status_code": 403,
@@ -6201,10 +6255,10 @@ def create_app(
             agent_id = normalized_path[len("/agents/") : -len("/sessions")].strip("/")
             if normalized_method == "GET":
                 result = await list_agent_sessions(
-                    agent_id, str(payload.get("node_id") or "")
+                    agent_id, _mock_req, str(payload.get("node_id") or "")
                 )
             elif normalized_method == "POST":
-                result = await restore_agent_session(agent_id, payload)
+                result = await restore_agent_session(agent_id, payload, _mock_req)
             else:
                 result = {
                     "success": False,
@@ -6999,7 +7053,11 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
         file_url = f"/uploads/{unique_name}"
         return {
             "success": True,
-            "data": {"file_path": file_path, "file_url": file_url, "file_size": len(file_bytes)},
+            "data": {
+                "file_path": file_path,
+                "file_url": file_url,
+                "file_size": len(file_bytes),
+            },
         }
 
     except Exception as e:
