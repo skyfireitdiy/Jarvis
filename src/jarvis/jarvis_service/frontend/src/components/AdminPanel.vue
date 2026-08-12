@@ -127,17 +127,17 @@
             <div style="font-size:12px;color:var(--text-secondary,#888);margin-bottom:8px">空列表=无节点权限，["*"]=所有节点，指定节点ID=限定节点</div>
             <div class="form-row" style="align-items:flex-start">
               <label style="min-width:60px">节点列表</label>
-              <div style="flex:1">
-                <label class="checkbox-label" style="margin-bottom:6px">
+              <div style="flex:1;display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
+                <label class="checkbox-label" style="margin-bottom:0">
                   <input type="checkbox" :checked="editAccessibleNodes.includes('*')" @change="toggleAllNodesAccess" />
                   <span>所有节点 ("*")</span>
                 </label>
                 <template v-if="!editAccessibleNodes.includes('*')">
-                  <label v-for="node in availableNodeOptions" :key="node.node_id" class="checkbox-label" style="margin-bottom:4px;display:block">
+                  <label v-for="node in availableNodeOptions" :key="node.node_id" class="checkbox-label" style="margin-bottom:0">
                     <input type="checkbox" :checked="editAccessibleNodes.includes(node.node_id)" @change="toggleNodeAccess(node.node_id)" />
                     <span>{{ formatNodeOptionLabel(node) }}</span>
                   </label>
-                  <label class="checkbox-label" style="margin-bottom:4px;display:block">
+                  <label class="checkbox-label" style="margin-bottom:0">
                     <input type="checkbox" :checked="editAccessibleNodes.includes('master')" @change="toggleNodeAccess('master')" />
                     <span>本节点 (master)</span>
                   </label>
@@ -968,7 +968,6 @@ const maskedNodeSecret = computed(() => {
   gap: 8px;
 }
 .secret-actions .ghost-btn {
-  flex: 1;
   padding: 8px 16px;
   font-size: 13px;
 }
@@ -981,7 +980,8 @@ const maskedNodeSecret = computed(() => {
 }
 .restart-service-row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
