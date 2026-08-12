@@ -1,0 +1,13 @@
+{
+  "id": "20260812_151051_886816",
+  "type": "project_long_term",
+  "tags": [
+    "权限隔离",
+    "agent过滤",
+    "bug修复",
+    "架构"
+  ],
+  "content": "Jarvis权限隔离修复经验：\n1. 前端调用/api/node/master/agents → 路由匹配/api/node/{node_id}/{path:path} → node_http_proxy → _dispatch_node_http_request → get_agents\n2. _dispatch_node_http_request构造_MockRequest传递user_info，正确传递了权限信息\n3. get_agents从request.state.user_info获取user_id，进行三层过滤：is_admin→agent:read组权限→owner+ACL\n4. PermissionManager数据目录：get_data_dir()返回/home/skyfire/.jarvis，权限文件在auth/子目录\n5. 内置组权限需强制同步（_ensure_builtin_groups覆盖旧配置），否则旧group_permissions.json中权限不更新\n6. 前端AgentSidebar.vue中owner比较需用owner_id（UUID）而非owner（username）\n7. App.vue中currentUserId需绑定auth.userInfo?.user_id而非username\n8. 网关端口8000（非8999），登录API为/api/auth/login",
+  "created_at": "2026-08-12T15:10:51.886872",
+  "updated_at": "2026-08-12T15:10:51.886878"
+}
