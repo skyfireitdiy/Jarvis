@@ -28,6 +28,7 @@ from urllib.parse import unquote
 from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket
+from starlette.staticfiles import StaticFiles
 from fastapi import WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -1358,6 +1359,7 @@ class WebSocketConnectionManager:
         room_id = payload.get("room_id", "")
         client_id = payload.get("client_id", "")
         content = payload.get("content", "")
+        image_url = payload.get("image_url", "")
         client = self._chat_manager.get_client(client_id)
         if not client:
             await websocket.send_json(
@@ -1378,6 +1380,8 @@ class WebSocketConnectionManager:
                 "timestamp": time.time(),
             },
         }
+        if image_url:
+            msg["payload"]["image_url"] = image_url
         await self._chat_manager.broadcast_to_room(
             room_id, msg, exclude_client_id=client_id
         )
@@ -1415,7 +1419,8 @@ class WebSocketConnectionManager:
         sender_id = payload.get("sender_id", "")
         receiver_id = payload.get("receiver_id", "")
         content = payload.get("content", "")
-        result = await self._chat_manager.send_private(sender_id, receiver_id, content)
+        image_url = payload.get("image_url", "")
+        result = await self._chat_manager.send_private(sender_id, receiver_id, content, image_url=image_url)
         await websocket.send_json(
             {"type": "chat_send_private_response", "payload": result}
         )
@@ -1614,6 +1619,12 @@ def create_app(
     app.state.agent_manager = agent_manager
     app.state.agent_proxy_manager = agent_proxy_manager
     app.state.node_connection_manager = node_connection_manager
+
+    # 挂载 uploads 目录为静态文件服务，使上传的图片可通过 HTTP 访问
+    from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
+    _uploads_dir = os.path.join(_get_data_dir(), "uploads")
+    os.makedirs(_uploads_dir, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
     app.state.child_node_client = child_node_client
 
     # 添加 CORS 中间件，允许前端跨域访问
@@ -6130,6 +6141,17 @@ def create_app(
         elif normalized_method == "POST" and normalized_path == "/file-write":
             result = await _handle_file_write_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
+            # 权限校验：file:upload
+            _upload_user_info = getattr(_mock_req.state, "user_info", None)
+            _upload_user_id = _upload_user_info.get("user_id", "") if _upload_user_info else ""
+            if _upload_user_id and _upload_user_id != "system":
+                if not permission_manager.check_permission(_upload_user_id, "file:upload"):
+                    return {
+                        "success": False,
+                        "status_code": 403,
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps({"error": "Permission denied: file:upload"}),
+                    }
             result = await _handle_file_upload(payload)
         elif normalized_path.startswith("/data/"):
             from jarvis.jarvis_web_gateway.data_storage import (
@@ -6969,9 +6991,11 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
+        # 构建可访问的 HTTP URL（相对于 uploads 静态挂载点）
+        file_url = f"/uploads/{unique_name}"
         return {
             "success": True,
-            "data": {"file_path": file_path, "file_size": len(file_bytes)},
+            "data": {"file_path": file_path, "file_url": file_url, "file_size": len(file_bytes)},
         }
 
     except Exception as e:

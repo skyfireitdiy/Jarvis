@@ -229,7 +229,7 @@ class ChatManager:
     # ------------------------------------------------------------------
 
     async def send_private(
-        self, sender_id: str, receiver_id: str, content: str
+        self, sender_id: str, receiver_id: str, content: str, image_url: str = ""
     ) -> Dict[str, Any]:
         """发送私聊消息。"""
         if sender_id not in self._chat_clients:
@@ -259,6 +259,8 @@ class ChatManager:
             "content": content,
             "timestamp": time.time(),
         }
+        if image_url:
+            msg["image_url"] = image_url
         self._chat_private_sessions[session_id]["messages"].append(msg)
 
         # 发送给接收者

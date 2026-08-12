@@ -7061,7 +7061,7 @@ function handleChatMessage(type, payload) {
       if (payload?.client_id === myClientId.value) break
       const roomId = payload?.room_id || 'general'
       if (!chatMessages.value[roomId]) chatMessages.value[roomId] = []
-      chatMessages.value[roomId].push({
+      const roomMsg = {
         client_id: payload?.client_id,
         client_name: payload?.sender_display_name || payload?.sender_name || payload?.client_id,
         sender_name: payload?.sender_name || payload?.client_id,
@@ -7069,7 +7069,9 @@ function handleChatMessage(type, payload) {
         content: payload?.content,
         room_id: roomId,
         timestamp: payload?.timestamp || Date.now(),
-      })
+      }
+      if (payload?.image_url) roomMsg.image_url = payload.image_url
+      chatMessages.value[roomId].push(roomMsg)
       saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
       if (payload?.client_id !== myClientId.value) {
@@ -7089,7 +7091,7 @@ function handleChatMessage(type, payload) {
       if (payload?.message?.sender_id === myClientId.value) break
       const privMsgKey = `private_${payload?.message?.sender_id}`
       if (!chatMessages.value[privMsgKey]) chatMessages.value[privMsgKey] = []
-      chatMessages.value[privMsgKey].push({
+      const privMsg = {
         client_id: payload?.message?.sender_id,
         client_name: payload?.message?.sender_display_name || payload?.message?.sender_name || payload?.message?.sender_id,
         sender_name: payload?.message?.sender_name || payload?.message?.sender_id,
@@ -7097,7 +7099,9 @@ function handleChatMessage(type, payload) {
         content: payload?.message?.content,
         private: true,
         timestamp: payload?.message?.timestamp || Date.now(),
-      })
+      }
+      if (payload?.message?.image_url) privMsg.image_url = payload.message.image_url
+      chatMessages.value[privMsgKey].push(privMsg)
       saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
       if (payload?.message?.sender_id !== myClientId.value) {
@@ -7115,14 +7119,18 @@ function handleChatMessage(type, payload) {
     case 'chat_get_private_history_response':
       if (payload?.messages) {
         const histKey = `private_${payload?.other_id || activePrivateClientId.value}`
-        chatMessages.value[histKey] = payload.messages.map(msg => ({
-          client_id: msg.sender_id,
-          client_name: msg.sender_name || msg.sender_id,
-          sender_name: msg.sender_name || msg.sender_id,
-          content: msg.content,
-          private: true,
-          timestamp: msg.timestamp || Date.now(),
-        }))
+        chatMessages.value[histKey] = payload.messages.map(msg => {
+          const m = {
+            client_id: msg.sender_id,
+            client_name: msg.sender_name || msg.sender_id,
+            sender_name: msg.sender_name || msg.sender_id,
+            content: msg.content,
+            private: true,
+            timestamp: msg.timestamp || Date.now(),
+          }
+          if (msg.image_url) m.image_url = msg.image_url
+          return m
+        })
         saveChatMessages()
       }
       break
@@ -9400,20 +9408,22 @@ function clearChatMessages(scope) {
   }
 }
 
-function sendChatMessage(content) {
-  if (!content || !content.trim()) return
-  const trimmed = content.trim()
+function sendChatMessage(content, imageUrl) {
+  if ((!content || !content.trim()) && !imageUrl) return
+  const trimmed = (content || '').trim()
   if (activePrivateClientId.value) {
     // 私聊模式
-    sendChatMessageToServer('chat_send_private', {
+    const payload = {
       sender_id: myClientId.value,
       receiver_id: activePrivateClientId.value,
       content: trimmed,
-    })
+    }
+    if (imageUrl) payload.image_url = imageUrl
+    sendChatMessageToServer('chat_send_private', payload)
     // 本地追加自己的消息
     const selfMsgKey = `private_${activePrivateClientId.value}`
     if (!chatMessages.value[selfMsgKey]) chatMessages.value[selfMsgKey] = []
-    chatMessages.value[selfMsgKey].push({
+    const selfMsg = {
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
       sender_name: username.value || myClientId.value,
@@ -9421,18 +9431,22 @@ function sendChatMessage(content) {
       content: trimmed,
       private: true,
       timestamp: Date.now(),
-    })
+    }
+    if (imageUrl) selfMsg.image_url = imageUrl
+    chatMessages.value[selfMsgKey].push(selfMsg)
     saveChatMessages()
   } else if (activeChatRoomId.value) {
     // 聊天室模式
-    sendChatMessageToServer('chat_send_message', {
+    const payload = {
       room_id: activeChatRoomId.value,
       client_id: myClientId.value,
       content: trimmed,
-    })
+    }
+    if (imageUrl) payload.image_url = imageUrl
+    sendChatMessageToServer('chat_send_message', payload)
     // 本地追加自己的消息
     if (!chatMessages.value[activeChatRoomId.value]) chatMessages.value[activeChatRoomId.value] = []
-    chatMessages.value[activeChatRoomId.value].push({
+    const selfMsg = {
       client_id: myClientId.value,
       client_name: chatName.value || myClientId.value,
       sender_name: username.value || myClientId.value,
@@ -9440,7 +9454,9 @@ function sendChatMessage(content) {
       content: trimmed,
       room_id: activeChatRoomId.value,
       timestamp: Date.now(),
-    })
+    }
+    if (imageUrl) selfMsg.image_url = imageUrl
+    chatMessages.value[activeChatRoomId.value].push(selfMsg)
     saveChatMessages()
   } else {
     showToast('请先加入聊天室或选择私聊对象', 'warning')
