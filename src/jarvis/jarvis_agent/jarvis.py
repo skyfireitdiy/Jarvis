@@ -970,11 +970,6 @@ def run_cli(
         "--web-gateway-port",
         help="Web Gateway 监听端口",
     ),
-    gateway_password: Optional[str] = typer.Option(
-        None,
-        "--gateway-password",
-        help="Web Gateway 密码（如未设置将禁用密码认证）",
-    ),
     proxy_node: Optional[str] = typer.Option(
         None,
         "--proxy-node",
@@ -1218,8 +1213,6 @@ def run_cli(
 
     # 在 init_env 之后检测是否自动恢复会话（配置已加载）
     try:
-        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
         auto_resume_result = is_auto_resume_session()
         if restore_session is not None or auto_resume_result:
             set_config("restore_session", True)
@@ -1242,21 +1235,10 @@ def run_cli(
             from jarvis.jarvis_web_gateway.app import create_app
             from jarvis.jarvis_web_gateway.app import set_status_update_callback
 
-            # 检测认证方式：Token 认证（新）或密码认证（旧）
+            # Token 认证
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
             if auth_token:
-                # Token 认证：validate_gateway_token() 会直接从环境变量读取
                 print("[AGENT] Using JARVIS_AUTH_TOKEN for authentication")
-            elif gateway_password:
-                # 旧密码认证（兼容模式）
-                from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
-                if "gateway_auth" not in GLOBAL_CONFIG_DATA:
-                    GLOBAL_CONFIG_DATA["gateway_auth"] = {}
-                GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = gateway_password
-                GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
-                GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
-                print("[AGENT] Using gateway_password for authentication (legacy mode)")
 
             # 获取状态管理器并注册状态更新回调
             status_manager = get_agent_status_manager()

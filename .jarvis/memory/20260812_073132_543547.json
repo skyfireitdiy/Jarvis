@@ -1,0 +1,8 @@
+{
+  "id": "20260812_073132_543547",
+  "type": "project_long_term",
+  "tags": ["gateway_password_deprecation", "completed", "auth"],
+  "content": "gateway_password废弃已完成。移除项：1)cli.py移除--gateway-password参数 2)app.py移除run()password参数及gateway_auth写入 3)gateway.py移除_check_auth_fallback方法 4)config.py移除JARVIS_GATEWAY_PASSWORD环境变量逻辑 5)service/cli.py全面移除gateway_password 6)jarvis.py移除--gateway-password参数及legacy mode 7)code_agent.py移除--gateway-password参数及legacy mode。验证：grep gateway_password=0匹配，JARVIS_GATEWAY_PASSWORD=0匹配，_check_auth_fallback=0匹配，allow_unset=0匹配，py_compile全通过。commits: 489f800→01b6620→3f0c03b→aaf04cb→3c45aa7→e965eb7→03e948a→6c9f5df→6dfb405",
+  "created_at": "2026-08-12T07:31:32.543581",
+  "updated_at": "2026-08-12T07:31:32.543587"
+}

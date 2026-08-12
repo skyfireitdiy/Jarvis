@@ -98,7 +98,6 @@ from jarvis.jarvis_utils.globals import set_interrupt, get_script_pid
 import jarvis.jarvis_utils.globals as jglobals
 from jarvis.jarvis_utils.utils import _find_all_config_files, _merge_configs
 from jarvis.jarvis_utils.config import (
-    GLOBAL_CONFIG_DATA,
     save_exception,
 )
 
@@ -6842,7 +6841,6 @@ def create_app(
 def run(
     host: str = "127.0.0.1",
     port: int = 8000,
-    password: Optional[str] = None,
     node_config: Optional[NodeRuntimeConfig] = None,
 ) -> None:
     """本地启动入口。"""
@@ -6853,14 +6851,6 @@ def run(
 
     # 初始化环境并加载配置文件
     init_env(welcome_str="", config_file=None)
-
-    # 如果提供了密码参数，更新 gateway_auth 配置
-    if password:
-        if "gateway_auth" not in GLOBAL_CONFIG_DATA:
-            GLOBAL_CONFIG_DATA["gateway_auth"] = {}
-        GLOBAL_CONFIG_DATA["gateway_auth"]["password"] = password
-        GLOBAL_CONFIG_DATA["gateway_auth"]["enable"] = True
-        GLOBAL_CONFIG_DATA["gateway_auth"]["allow_unset"] = False
 
     uvicorn.run(create_app(node_config=node_config, port=port), host=host, port=port)
 

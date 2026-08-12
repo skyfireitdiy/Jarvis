@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
-    from typing import TextIO
+    pass
 
 import typer
 
@@ -87,7 +87,6 @@ class ServiceConfig:
     gateway_port: int
     frontend_host: str
     frontend_port: int
-    gateway_password: Optional[str]
     node_mode: str
     node_id: Optional[str]
     master_url: Optional[str]
@@ -343,8 +342,6 @@ class WindowsTaskBackend(ServiceBackend):
                 "--frontend-port",
                 str(config.frontend_port),
             ]
-            if config.gateway_password:
-                command.extend(["--gateway-password", config.gateway_password])
             if config.node_mode:
                 command.extend(["--node-mode", config.node_mode])
             if config.node_id:
@@ -453,8 +450,6 @@ class WindowsTaskBackend(ServiceBackend):
                 "--frontend-port",
                 str(config.frontend_port),
             ]
-            if config.gateway_password:
-                command.extend(["--gateway-password", config.gateway_password])
             if config.node_mode:
                 command.extend(["--node-mode", config.node_mode])
             if config.node_id:
@@ -704,10 +699,6 @@ ExecStart={service_executable} run --gateway-host {gateway_host} --gateway-port 
             )
 
             # 添加可选参数
-            if config.gateway_password:
-                service_content += " --gateway-password {}".format(
-                    config.gateway_password
-                )
             if config.node_mode:
                 service_content += " --node-mode {}".format(config.node_mode)
             if config.node_id:
@@ -1056,8 +1047,6 @@ class ServiceController:
             "--port",
             str(self._config.gateway_port),
         ]
-        if self._config.gateway_password:
-            command.extend(["--gateway-password", self._config.gateway_password])
         if self._config.node_mode:
             command.extend(["--node-mode", self._config.node_mode])
         if self._config.node_id:
@@ -1221,7 +1210,6 @@ def build_service_config(
     gateway_port: Optional[int] = None,
     frontend_host: Optional[str] = None,
     frontend_port: Optional[int] = None,
-    gateway_password: Optional[str] = None,
     node_mode: Optional[str] = None,
     node_id: Optional[str] = None,
     master_url: Optional[str] = None,
@@ -1242,9 +1230,6 @@ def build_service_config(
     )
     resolved_frontend_port = frontend_port or int(
         os.getenv("JARVIS_FRONTEND_PORT", str(DEFAULT_FRONTEND_PORT))
-    )
-    resolved_gateway_password = (
-        gateway_password or os.getenv("JARVIS_GATEWAY_PASSWORD") or None
     )
     resolved_node_mode = node_mode or os.getenv("JARVIS_NODE_MODE", "master")
     resolved_node_id = node_id or os.getenv("JARVIS_NODE_ID") or None
@@ -1285,7 +1270,6 @@ def build_service_config(
         gateway_port=resolved_gateway_port,
         frontend_host=resolved_frontend_host,
         frontend_port=resolved_frontend_port,
-        gateway_password=resolved_gateway_password,
         node_mode=resolved_node_mode,
         node_id=resolved_node_id,
         master_url=resolved_master_url,
@@ -1422,11 +1406,6 @@ def install_command(
         "--frontend-port",
         help="前端预览服务监听端口（默认可被 JARVIS_FRONTEND_PORT 覆盖）",
     ),
-    gateway_password: Optional[str] = typer.Option(
-        None,
-        "--gateway-password",
-        help="Gateway 密码（默认可被 JARVIS_GATEWAY_PASSWORD 覆盖）",
-    ),
     node_mode: Optional[str] = typer.Option(
         None,
         "--node-mode",
@@ -1454,7 +1433,6 @@ def install_command(
         gateway_port=gateway_port,
         frontend_host=frontend_host,
         frontend_port=frontend_port,
-        gateway_password=gateway_password,
         node_mode=node_mode,
         node_id=node_id,
         master_url=master_url,
@@ -1484,11 +1462,6 @@ def run_command(
         None,
         "--frontend-port",
         help="前端预览服务监听端口（默认可被 JARVIS_FRONTEND_PORT 覆盖）",
-    ),
-    gateway_password: Optional[str] = typer.Option(
-        None,
-        "--gateway-password",
-        help="Gateway 密码（默认可被 JARVIS_GATEWAY_PASSWORD 覆盖）",
     ),
     node_mode: Optional[str] = typer.Option(
         None,
@@ -1522,7 +1495,6 @@ def run_command(
         gateway_port=gateway_port,
         frontend_host=frontend_host,
         frontend_port=frontend_port,
-        gateway_password=gateway_password,
         node_mode=node_mode,
         node_id=node_id,
         master_url=master_url,
@@ -1840,8 +1812,6 @@ ExecStart={service_executable} run --gateway-host {gateway_host} --gateway-port 
     )
 
     # 添加可选参数
-    if config.gateway_password:
-        service_content += " --gateway-password {}".format(config.gateway_password)
     if config.node_mode:
         service_content += " --node-mode {}".format(config.node_mode)
     if config.node_id:
