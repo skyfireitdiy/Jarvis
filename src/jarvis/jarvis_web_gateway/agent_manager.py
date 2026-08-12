@@ -824,6 +824,7 @@ class AgentManager:
                         ),
                         proxy_node=agent_data.get("proxy_node"),
                         owner_id=agent_data.get("owner_id"),
+                        access_acl=agent_data.get("access_acl", {}),
                     )
 
                     # 检查进程是否还在运行
