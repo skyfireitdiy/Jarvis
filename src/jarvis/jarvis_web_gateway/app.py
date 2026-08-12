@@ -1823,6 +1823,7 @@ def create_app(
         ]
         return {"success": True, "data": {"users": brief}}
 
+    @app.get("/api/users", dependencies=[Depends(verify_token)])
     async def api_list_users(
         request: Request, search: str = "", offset: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
