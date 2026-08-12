@@ -19,6 +19,19 @@
         </div>
       </div>
 
+      <!-- 我的账户 -->
+      <div class="form-group">
+        <label>当前用户</label>
+        <div style="font-size:14px">{{ currentUserInfo?.username || '-' }}<span v-if="currentUserInfo?.display_name" style="color:var(--text-secondary,#888);margin-left:8px">({{ currentUserInfo.display_name }})</span></div>
+      </div>
+      <div class="form-group">
+        <label>修改密码</label>
+        <div class="form-row"><label>旧密码</label><input v-model="changePasswordForm.old_password" type="password" placeholder="输入旧密码" /></div>
+        <div class="form-row"><label>新密码</label><input v-model="changePasswordForm.new_password" type="password" placeholder="输入新密码" /></div>
+        <div class="form-row"><label>确认密码</label><input v-model="changePasswordForm.confirm_password" type="password" placeholder="再次输入新密码" /></div>
+        <button class="ghost-btn" @click="changePassword" :disabled="loading">修改密码</button>
+      </div>
+
       <!-- 历史消息管理 -->
       <div class="form-group">
         <div class="history-info">
@@ -59,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   visible: {
@@ -77,7 +90,12 @@ const props = defineProps({
   autoLoginEnabled: {
     type: Boolean,
     default: false
-  }
+  },
+  auth: { type: Object, default: () => ({}) },
+  fetchWithAuth: { type: Function, default: null },
+  gatewayUrl: { type: String, default: '127.0.0.1:8000' },
+  getHttpProtocol: { type: Function, default: () => 'http' },
+  showToast: { type: Function, default: () => {} }
 })
 
 const emit = defineEmits([
@@ -90,6 +108,24 @@ const emit = defineEmits([
 
 // 本地状态
 const localAutoLoginEnabled = ref(props.autoLoginEnabled)
+const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
+const loading = ref(false)
+
+// 计算属性
+const currentUserInfo = computed(() => props.auth?.userInfo || null)
+const currentUserId = computed(() => props.auth?.userInfo?.user_id || '')
+
+// 辅助函数
+function getGatewayAddress() {
+  const parts = (props.gatewayUrl || '127.0.0.1:8000').split(':')
+  return { host: parts[0] || '127.0.0.1', port: parts[1] || '8000' }
+}
+
+function buildApiUrl(path) {
+  const { host, port } = getGatewayAddress()
+  const proto = props.getHttpProtocol ? props.getHttpProtocol() : 'http'
+  return `${proto}://${host}:${port}${path}`
+}
 
 // 监听props变化
 watch(() => props.autoLoginEnabled, (newVal) => {
@@ -119,6 +155,23 @@ function confirmClearHistory() {
 // 断开所有连接
 function disconnectAll() {
   emit('disconnectAll')
+}
+
+// 修改密码
+async function changePassword() {
+  const form = changePasswordForm.value
+  if (!form.old_password || !form.new_password) { props.showToast('旧密码和新密码不能为空', 'error'); return }
+  if (form.new_password !== form.confirm_password) { props.showToast('两次输入的新密码不一致', 'error'); return }
+  loading.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/users/${currentUserId.value}/change-password`), {
+      method: 'POST', body: JSON.stringify({ old_password: form.old_password, new_password: form.new_password })
+    })
+    const result = await resp.json()
+    if (result.success) { props.showToast('密码修改成功', 'success'); changePasswordForm.value = { old_password: '', new_password: '', confirm_password: '' } }
+    else props.showToast(result.error?.message || '修改失败', 'error')
+  } catch (e) { props.showToast('修改失败: ' + e.message, 'error') }
+  finally { loading.value = false }
 }
 
 

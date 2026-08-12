@@ -8,7 +8,6 @@
       <div class="admin-tabs">
         <button class="admin-tab" :class="{ active: activeTab === 'users' }" @click="switchTab('users')">用户管理</button>
         <button class="admin-tab" :class="{ active: activeTab === 'groups' }" @click="switchTab('groups')">权限组</button>
-        <button class="admin-tab" :class="{ active: activeTab === 'account' }" @click="switchTab('account')">我的账户</button>
         <button class="admin-tab" :class="{ active: activeTab === 'system' }" @click="switchTab('system')">系统配置</button>
       </div>
       <!-- 用户管理 -->
@@ -150,20 +149,6 @@
           <div class="btn-group"><button class="ghost-btn" @click="updateGroup" :disabled="loading">保存</button><button class="ghost-btn" @click="showEditGroup = false">取消</button></div>
         </div>
       </div>
-      <!-- 我的账户 -->
-      <div v-if="activeTab === 'account'" class="tab-content">
-        <div class="form-group">
-          <label>当前用户</label>
-          <div style="font-size:14px">{{ currentUserInfo?.username || '-' }}<span v-if="currentUserInfo?.display_name" style="color:var(--text-secondary,#888);margin-left:8px">({{ currentUserInfo.display_name }})</span></div>
-        </div>
-        <div class="form-group">
-          <label>修改密码</label>
-          <div class="form-row"><label>旧密码</label><input v-model="changePasswordForm.old_password" type="password" placeholder="输入旧密码" /></div>
-          <div class="form-row"><label>新密码</label><input v-model="changePasswordForm.new_password" type="password" placeholder="输入新密码" /></div>
-          <div class="form-row"><label>确认密码</label><input v-model="changePasswordForm.confirm_password" type="password" placeholder="再次输入新密码" /></div>
-          <button class="ghost-btn" @click="changePassword" :disabled="loading">修改密码</button>
-        </div>
-      </div>
       <!-- 系统配置 -->
       <div v-if="activeTab === 'system'" class="tab-content">
         <!-- 重启节点服务 -->
@@ -298,7 +283,6 @@ const editUserForm = ref({ display_name: '', is_admin: false, status: 'active' }
 const editGroupForm = ref({ group_id: '', display_name: '', description: '' })
 const userGroupIds = ref([])
 const allGroups = ref([])
-const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const editPermissions = ref({})
 const editAccessibleNodes = ref([])
 const loadingGroupPerms = ref(false)
@@ -331,8 +315,6 @@ const resourceLabels = {
 
 // 计算属性
 const currentUserId = computed(() => props.auth?.userInfo?.user_id || '')
-const currentUserInfo = computed(() => props.auth?.userInfo || null)
-
 // 辅助函数
 function getGatewayAddress() {
   const parts = (props.gatewayUrl || '127.0.0.1:8000').split(':')
@@ -579,22 +561,6 @@ async function deleteGroup(group) {
     if (result.success) { props.showToast('权限组已删除', 'success'); loadGroups() }
     else props.showToast(result.error?.message || '删除失败', 'error')
   } catch (e) { props.showToast('删除失败: ' + e.message, 'error') }
-  finally { loading.value = false }
-}
-
-async function changePassword() {
-  const form = changePasswordForm.value
-  if (!form.old_password || !form.new_password) { props.showToast('旧密码和新密码不能为空', 'error'); return }
-  if (form.new_password !== form.confirm_password) { props.showToast('两次输入的新密码不一致', 'error'); return }
-  loading.value = true
-  try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/users/${currentUserId.value}/change-password`), {
-      method: 'POST', body: JSON.stringify({ old_password: form.old_password, new_password: form.new_password })
-    })
-    const result = await resp.json()
-    if (result.success) { props.showToast('密码修改成功', 'success'); changePasswordForm.value = { old_password: '', new_password: '', confirm_password: '' } }
-    else props.showToast(result.error?.message || '修改失败', 'error')
-  } catch (e) { props.showToast('修改失败: ' + e.message, 'error') }
   finally { loading.value = false }
 }
 
