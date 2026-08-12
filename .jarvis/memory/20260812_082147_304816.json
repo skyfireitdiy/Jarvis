@@ -1,0 +1,12 @@
+{
+  "id": "20260812_082147_304816",
+  "type": "project_long_term",
+  "tags": [
+    "permission",
+    "file-upload",
+    "security"
+  ],
+  "content": "HTTP /upload路径添加file:upload权限校验：_dispatch_node_http_request中/upload路由(app.py L6132-6143)，非system用户需check_permission(user_id, 'file:upload')，无权限返回403。与WebSocket file_upload权限校验一致。commit: 4c79e95",
+  "created_at": "2026-08-12T08:21:47.304884",
+  "updated_at": "2026-08-12T08:21:47.304892"
+}

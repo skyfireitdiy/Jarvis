@@ -1,0 +1,13 @@
+{
+  "id": "20260812_084957_246737",
+  "type": "project_long_term",
+  "tags": [
+    "chat-image",
+    "websocket",
+    "chat_manager",
+    "feature-complete"
+  ],
+  "content": "聊天室图片消息支持已实现（阶段1完成）。变更文件：\n1. app.py: _handle_chat_send_message和_handle_chat_send_private新增image_url字段提取和传递\n2. chat_manager.py: send_private签名新增image_url参数，msg构建后条件添加image_url\n3. ChatPanel.vue: 消息气泡渲染image_url为<img>标签，输入区添加图片选择按钮(🖼)和粘贴上传，pendingImageUrl状态管理，uploadChatImage函数调用/api/node/master/upload\n4. App.vue: sendChatMessage支持imageUrl参数，chat_message/chat_private_message接收处理添加image_url字段，私聊历史映射添加image_url\n5. ChatPanel.vue CSS: chat-image-btn和chat-message-image样式\n设计决策：image_url可选字段，仅非空时添加，向后兼容纯文本消息；复用/upload API上传图片获取URL",
+  "created_at": "2026-08-12T08:49:57.246775",
+  "updated_at": "2026-08-12T08:49:57.246781"
+}

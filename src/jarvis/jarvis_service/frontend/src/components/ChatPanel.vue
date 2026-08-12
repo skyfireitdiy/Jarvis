@@ -130,7 +130,8 @@
           >
             <span class="chat-message-sender">{{ msg.sender_display_name || msg.sender_name }}</span>
             <div class="chat-message-bubble">
-              <span class="chat-message-content">{{ msg.content }}</span>
+              <img v-if="msg.image_url" :src="msg.image_url" class="chat-message-image" @click="openImage(msg.image_url)" />
+              <span v-if="msg.content" class="chat-message-content">{{ msg.content }}</span>
             </div>
             <span class="chat-message-time">{{ formatTime(msg.timestamp) }}</span>
           </div>
@@ -146,9 +147,12 @@
             rows="1"
             @input="autoResizeInput"
             @keydown="handleInputKeydown"
+            @paste="handleChatPaste"
             ref="chatInputRef"
           ></textarea>
-          <button class="icon-btn chat-send-btn" @click="sendMessage" :disabled="!socket || !draftMessage.trim()" title="发送">➤</button>
+          <button class="icon-btn chat-image-btn" @click="triggerImageUpload" title="发送图片">🖼</button>
+          <input type="file" ref="imageInputRef" accept="image/*" style="display:none" @change="handleImageSelect" />
+          <button class="icon-btn chat-send-btn" @click="sendMessage" :disabled="!socket || (!draftMessage.trim() && !pendingImageUrl)" title="发送">➤</button>
         </div>
       </div>
     </div>
@@ -208,22 +212,109 @@ const emit = defineEmits([
 const draftMessage = ref('')
 const messagesRef = ref(null)
 const chatInputRef = ref(null)
+const imageInputRef = ref(null)
 const createRoomInputRef = ref(null)
 const myName = computed(() => props.myName || '')
 const sidebarCollapsed = ref(false)
 const creatingRoom = ref(false)
 const newRoomName = ref('')
+const pendingImageUrl = ref('')
 
 function sendMessage() {
-  if (!draftMessage.value.trim()) return
-  emit('sendMessage', draftMessage.value)
+  if (!draftMessage.value.trim() && !pendingImageUrl.value) return
+  emit('sendMessage', draftMessage.value, pendingImageUrl.value)
   draftMessage.value = ''
+  pendingImageUrl.value = ''
   // 重置输入框高度
   nextTick(() => {
     if (chatInputRef.value) {
       chatInputRef.value.style.height = 'auto'
     }
   })
+}
+
+function triggerImageUpload() {
+  imageInputRef.value?.click()
+}
+
+async function handleImageSelect(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  await uploadChatImage(file)
+  event.target.value = ''
+}
+
+async function handleChatPaste(event) {
+  const items = event.clipboardData?.items
+  if (!items) return
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        await uploadChatImage(file)
+      }
+      return
+    }
+  }
+}
+
+async function uploadChatImage(file) {
+  if (file.size > 20 * 1024 * 1024) {
+    alert('图片大小不能超过 20MB')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64Data = e.target.result
+    try {
+      const { host, port } = getGatewayAddress()
+      const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+      const url = `${protocol}://${host}:${port}/api/node/master/upload`
+      const token = localStorage.getItem('jarvis_auth_token') || ''
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          file_name: file.name,
+          file_data: base64Data,
+        }),
+      })
+      const result = await response.json()
+      if (result.success && result.data?.file_url) {
+        pendingImageUrl.value = result.data.file_url
+      } else {
+        alert('上传失败: ' + (result.error || '未知错误'))
+      }
+    } catch (error) {
+      console.error('上传图片失败:', error)
+      alert('上传图片失败: ' + error.message)
+    }
+  }
+  reader.readAsDataURL(file)
+}
+
+function getGatewayAddress() {
+  const saved = localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000'
+  const address = saved.trim()
+  if (address.includes('://')) {
+    try {
+      const u = new URL(address)
+      return { host: u.hostname, port: u.port || (u.protocol === 'https:' ? '443' : '80') }
+    } catch { return { host: '127.0.0.1', port: '8000' } }
+  }
+  if (address.includes(':')) {
+    const parts = address.split(':')
+    return { host: parts[0], port: parts[1] }
+  }
+  return { host: address, port: '8000' }
+}
+
+function openImage(url) {
+  window.open(url, '_blank')
 }
 
 // 自动调整输入框高度
@@ -822,5 +913,26 @@ watch(
   width: 6px;
   height: 6px;
   cursor: sw-resize;
+}
+.chat-image-btn {
+  color: var(--text-secondary, #888);
+  font-size: 1.1em;
+  padding: 4px 6px;
+}
+.chat-image-btn:hover {
+  color: var(--accent-color, #4a9eff);
+}
+
+.chat-message-image {
+  max-width: 280px;
+  max-height: 280px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: block;
+  margin-bottom: 4px;
+  object-fit: contain;
+}
+.chat-message-image:hover {
+  opacity: 0.85;
 }
 </style>

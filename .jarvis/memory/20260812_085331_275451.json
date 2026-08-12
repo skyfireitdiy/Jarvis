@@ -1,0 +1,12 @@
+{
+  "id": "20260812_085331_275451",
+  "type": "project_long_term",
+  "tags": [
+    "gateway-api",
+    "upload-endpoint",
+    "config"
+  ],
+  "content": "Jarvis Web Gateway图片上传接口：路径为/api/node/master/upload，请求体含file_name和file_data(base64)，返回success+data.file_path即为可访问的图片URL。前端ChatPanel通过localStorage中的jarvis_gateway_url确定网关地址构建上传URL。",
+  "created_at": "2026-08-12T08:53:31.275486",
+  "updated_at": "2026-08-12T08:53:31.275490"
+}

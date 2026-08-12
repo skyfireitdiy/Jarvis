@@ -1,0 +1,12 @@
+{
+  "id": "20260812_091442_364856",
+  "type": "project_long_term",
+  "tags": [
+    "chat-image",
+    "code-review",
+    "completed"
+  ],
+  "content": "聊天室图片消息功能代码审查完成（静态检查）：\n1. 后端app.py：chat_send_message(L1361)提取image_url，chat_send_private(L1382-1383,L1421-1422)提取image_url，StaticFiles挂载/uploads(L1623-1626)，_handle_file_upload返回file_url(L6993-6996)\n2. chat_manager.py：send_private签名含image_url参数(L232)，msg条件添加image_url(L262-263)\n3. ChatPanel.vue：img渲染(L133)，图片按钮(L153-154)，粘贴处理(L247-260)，上传函数用file_url(L262-298)，CSS(L926-937)\n4. App.vue：接收chat_message(L7073)/chat_private_message(L7103)/chat_get_private_history_response(L7131)均含image_url，sendChatMessage(L9411-9464)支持imageUrl参数\n5. image_url为可选字段，向后兼容纯文本消息\n6. 待实际运行验证完整链路",
+  "created_at": "2026-08-12T09:14:42.364890",
+  "updated_at": "2026-08-12T09:14:42.364896"
+}
