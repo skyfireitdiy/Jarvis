@@ -73,8 +73,8 @@ class BaseGateway(IGateway):
         try:
             from jarvis.jarvis_web_gateway.token_manager import validate_gateway_token
         except ImportError:
-            # 如果不可用（如 CLI Gateway），则回退到旧的密码认证
-            return self._check_auth_fallback(auth)
+            # 如果不可用（如 CLI Gateway），则拒绝认证
+            return False, "token validation unavailable"
 
         # 检查 Token
         if not auth:
@@ -92,45 +92,6 @@ class BaseGateway(IGateway):
             return True, None
 
         return False, "invalid token"
-
-    def _check_auth_fallback(
-        self, auth: Optional[Dict[str, Any]]
-    ) -> Tuple[bool, Optional[str]]:
-        """回退的密码认证方法（用于 CLI Gateway）。
-
-        只要在配置中设置了 password，就启用认证。
-
-        Args:
-            auth: 认证信息字典，应包含 password 字段
-
-        Returns:
-            (是否认证成功, 错误信息) 元组
-        """
-        from jarvis.jarvis_utils.config import get_gateway_auth_config
-
-        config = get_gateway_auth_config()
-
-        # 获取配置的密码（可以从配置文件或命令行参数传入）
-        expected_password = config.get("password") if config else None
-
-        # 情况1：配置中有密码 -> 启用认证
-        if expected_password:
-            if not auth:
-                return False, "gateway auth missing"
-
-            password = auth.get("password")
-            if password == expected_password:
-                return True, None
-
-            return False, "gateway auth failed"
-
-        # 情况2：配置中没有密码 -> 不启用认证
-        # - 用户没传密码 -> 允许访问
-        # - 用户传了密码 -> 拒绝（因为配置中没有可校验的密码）
-        if not auth or not auth.get("password"):
-            return True, None  # 没传密码，允许访问
-
-        return False, "gateway auth not configured"
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         del event
