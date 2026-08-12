@@ -952,7 +952,7 @@ class WebSocketConnectionManager:
 
         if message_type == "terminal_create":
             # 权限校验：terminal:create
-            auth_payload = self._auth_store.get("default")
+            auth_payload = self._auth_store.get(session_id)
             user_id = None
             if auth_payload and isinstance(auth_payload, dict):
                 user_info = auth_payload.get("user_info")
@@ -1011,7 +1011,7 @@ class WebSocketConnectionManager:
             return
         if message_type == "terminal_close":
             # 权限校验：terminal:create（终端操作统一权限）
-            auth_payload = self._auth_store.get("default")
+            auth_payload = self._auth_store.get(session_id)
             user_id = None
             if auth_payload and isinstance(auth_payload, dict):
                 user_info = auth_payload.get("user_info")
@@ -1038,7 +1038,7 @@ class WebSocketConnectionManager:
             return
         if message_type == "terminal_session_input":
             # 权限校验：terminal:create（终端操作统一权限）
-            auth_payload = self._auth_store.get("default")
+            auth_payload = self._auth_store.get(session_id)
             user_id = None
             if auth_payload and isinstance(auth_payload, dict):
                 user_info = auth_payload.get("user_info")
@@ -1075,7 +1075,7 @@ class WebSocketConnectionManager:
             return
         if message_type == "file_upload":
             # 权限校验：file:upload
-            auth_payload = self._auth_store.get("default")
+            auth_payload = self._auth_store.get(session_id)
             user_id = None
             if auth_payload and isinstance(auth_payload, dict):
                 user_info = auth_payload.get("user_info")
@@ -1174,16 +1174,22 @@ class WebSocketConnectionManager:
         # 聊天室消息处理
         # ============================================================
         if message_type.startswith("chat_"):
-            await self._handle_chat_message(message_type, payload, websocket)
+            await self._handle_chat_message(
+                message_type, payload, websocket, session_id
+            )
             return
 
     async def _handle_chat_message(
-        self, message_type: str, payload: Dict[str, Any], websocket: WebSocket
+        self,
+        message_type: str,
+        payload: Dict[str, Any],
+        websocket: WebSocket,
+        session_id: str,
     ) -> None:
         """处理聊天室相关消息。"""
         try:
             if message_type == "chat_register":
-                await self._handle_chat_register(payload, websocket)
+                await self._handle_chat_register(payload, websocket, session_id)
             elif message_type == "chat_get_rooms":
                 await self._handle_chat_get_rooms(websocket)
             elif message_type == "chat_create_room":
@@ -1221,7 +1227,7 @@ class WebSocketConnectionManager:
                 pass
 
     async def _handle_chat_register(
-        self, payload: Dict[str, Any], websocket: WebSocket
+        self, payload: Dict[str, Any], websocket: WebSocket, session_id: str
     ) -> None:
         """注册聊天客户端。"""
         client_id = payload.get("client_id", "")
@@ -1236,7 +1242,7 @@ class WebSocketConnectionManager:
             return
         connection_id = str(uuid.uuid4())
         # 从认证信息获取user_id
-        auth_payload = self._auth_store.get("default")
+        auth_payload = self._auth_store.get(session_id)
         user_id = None
         if auth_payload and isinstance(auth_payload, dict):
             user_info = auth_payload.get("user_info")
