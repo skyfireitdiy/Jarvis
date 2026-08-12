@@ -127,7 +127,7 @@
             <div style="font-size:12px;color:var(--text-secondary,#888);margin-bottom:8px">空列表=无节点权限，["*"]=所有节点，指定节点ID=限定节点</div>
             <div class="form-row" style="align-items:flex-start">
               <label style="min-width:60px">节点列表</label>
-              <div style="flex:1;display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:flex-start">
                 <label class="checkbox-label" style="margin-bottom:0">
                   <input type="checkbox" :checked="editAccessibleNodes.includes('*')" @change="toggleAllNodesAccess" />
                   <span>所有节点 ("*")</span>
