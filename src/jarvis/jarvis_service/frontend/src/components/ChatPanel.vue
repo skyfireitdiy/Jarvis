@@ -150,6 +150,10 @@
             @paste="handleChatPaste"
             ref="chatInputRef"
           ></textarea>
+          <div v-if="pendingImageUrl" class="chat-pending-image-wrapper">
+            <img :src="pendingImageUrl" class="chat-pending-image" />
+            <button class="chat-pending-image-remove" @click="pendingImageUrl = ''" title="取消图片">✕</button>
+          </div>
           <button class="icon-btn chat-image-btn" @click="triggerImageUpload" title="发送图片">🖼</button>
           <input type="file" ref="imageInputRef" accept="image/*" style="display:none" @change="handleImageSelect" />
           <button class="icon-btn chat-send-btn" @click="sendMessage" :disabled="!socket || (!draftMessage.trim() && !pendingImageUrl)" title="发送">➤</button>
@@ -934,5 +938,38 @@ watch(
 }
 .chat-message-image:hover {
   opacity: 0.85;
+}
+.chat-pending-image-wrapper {
+  position: relative;
+  display: inline-block;
+  margin: 4px 0;
+}
+.chat-pending-image {
+  max-width: 120px;
+  max-height: 80px;
+  border-radius: 6px;
+  object-fit: contain;
+  border: 2px solid var(--accent-color, #4a9eff);
+}
+.chat-pending-image-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.chat-pending-image-remove:hover {
+  background: #c0392b;
 }
 </style>
