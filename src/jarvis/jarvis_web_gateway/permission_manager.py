@@ -131,6 +131,7 @@ class PermissionManager:
 
     def _ensure_builtin_groups(self) -> None:
         for group_id, group_def in BUILTIN_GROUPS.items():
+            # 确保组定义存在并更新
             if group_id not in self._groups:
                 self._groups[group_id] = {
                     "group_id": group_id,
@@ -140,15 +141,19 @@ class PermissionManager:
                     "is_builtin": True,
                     "accessible_nodes": group_def.get("accessible_nodes", []),
                 }
-                perms = group_def["permissions"]
-                self._group_permissions[group_id] = (
-                    {k: v for k, v in perms.items()} if isinstance(perms, dict) else {}
-                )
             else:
-                # 已有内置组：补全 accessible_nodes 字段
+                # 已存在的内置组：更新元数据（不覆盖用户自定义字段）
                 existing = self._groups[group_id]
-                if existing.get("is_builtin") and "accessible_nodes" not in existing:
+                existing["display_name"] = group_def["display_name"]
+                existing["description"] = group_def["description"]
+                existing["is_builtin"] = True
+                if "accessible_nodes" not in existing:
                     existing["accessible_nodes"] = group_def.get("accessible_nodes", [])
+            # 强制同步内置组权限（覆盖旧配置）
+            perms = group_def["permissions"]
+            self._group_permissions[group_id] = (
+                {k: v for k, v in perms.items()} if isinstance(perms, dict) else {}
+            )
         self._save_groups()
         self._save_group_permissions()
 

@@ -21,7 +21,7 @@
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
       :agentGroups="agentGroups"
-      :currentUserId="username"
+      :currentUserId="auth.userInfo?.user_id || ''"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
@@ -5863,12 +5863,14 @@ const editingAccessAgent = ref(null)
 const editAccessRead = ref([])
 const editAccessInteract = ref([])
 
-function editAgentAccess(agent) {
+async function editAgentAccess(agent) {
   editingAccessAgent.value = agent
   const acl = agent.access_acl || {}
   editAccessRead.value = Array.isArray(acl.read) ? [...acl.read] : []
   editAccessInteract.value = Array.isArray(acl.interact) ? [...acl.interact] : []
   showEditAccessModal.value = true
+  // 获取用户列表供选择
+  await fetchUserList()
 }
 
 async function saveAgentAccess() {
@@ -12701,12 +12703,29 @@ body::-webkit-scrollbar {
   left: 0;
   right: 0;
   bottom: 0;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+}
+
+.modal-content {
+  background: var(--color-bg-secondary);
+  border: none;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6edf3;
 }
 
 .modal {
@@ -12842,19 +12861,26 @@ body::-webkit-scrollbar {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px 0;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
 }
 .acl-user-list .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.9em;
+  gap: 8px;
+  font-size: 13px;
+  color: #e6edf3;
   cursor: pointer;
+  padding: 4px 0;
 }
 .acl-user-list .checkbox-label input[type="checkbox"] {
   margin: 0;
   cursor: pointer;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .primary-btn {

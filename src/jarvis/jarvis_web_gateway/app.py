@@ -4362,27 +4362,31 @@ def create_app(
                         node_id,
                         exc,
                     )
-            # 按用户权限过滤：非system用户只能看到自己owner的、ACL中有read权限的、或有agent:delete权限的
+            # 按用户权限过滤：非system用户只能看到自己owner的或ACL中有read权限的
+            logger.debug("[AGENTS] Filtering: user_id=%s, user_info=%s, total_agents=%d", user_id, user_info, len(agents))
             if user_id and user_id != "system":
-                filtered = []
-                for agent in agents:
-                    agent_id = agent.get("agent_id", "")
-                    owner_id = agent.get("owner_id")
-                    # owner可见
-                    if owner_id == user_id:
-                        filtered.append(agent)
-                        continue
-                    # ACL中有read权限可见
-                    access_acl = agent.get("access_acl") or {}
-                    if user_id in (access_acl.get("read") or []):
-                        filtered.append(agent)
-                        continue
-                    # 有agent:delete权限可见
-                    if permission_manager.check_permission(user_id, "agent:delete"):
-                        filtered.append(agent)
-                        continue
-                agents = filtered
-
+                # is_admin用户可见所有agent
+                is_admin = (user_info or {}).get("is_admin", False)
+                logger.debug("[AGENTS] is_admin=%s, has_agent_read=%s", is_admin, permission_manager.check_permission(user_id, "agent:read"))
+                if not is_admin:
+                    # 检查用户是否有agent:read组权限（可看所有agent）
+                    has_agent_read = permission_manager.check_permission(user_id, "agent:read")
+                    if not has_agent_read:
+                        filtered = []
+                        for agent in agents:
+                            agent_id = agent.get("agent_id", "")
+                            owner_id = agent.get("owner_id")
+                            # owner可见
+                            if owner_id == user_id:
+                                filtered.append(agent)
+                                continue
+                            # ACL中有read权限可见
+                            access_acl = agent.get("access_acl") or {}
+                            if user_id in (access_acl.get("read") or []):
+                                filtered.append(agent)
+                                continue
+                        agents = filtered
+                logger.debug("[AGENTS] After filtering: %d agents for user_id=%s", len(agents), user_id)
             return {"success": True, "data": agents}
         except Exception as e:
             return {
