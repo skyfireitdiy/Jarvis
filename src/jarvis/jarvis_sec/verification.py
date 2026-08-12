@@ -675,6 +675,7 @@ def process_verification_batch(
                     use_analysis=False,
                     output_handler=[ToolRegistry()],
                     use_tools=["read_code", "execute_script", "memory"],
+                    quick_mode=True,
                 )
                 verification_agent = Agent(**verification_agent_kwargs)
 

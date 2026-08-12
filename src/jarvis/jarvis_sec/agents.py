@@ -84,6 +84,7 @@ def create_analysis_agent(task_id: str, force_save_memory: bool = False) -> Agen
         output_handler=[ToolRegistry()],
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "memory"],
+        quick_mode=True,
     )
     return Agent(**agent_kwargs)
 
@@ -108,6 +109,7 @@ def create_review_agent(
         use_analysis=False,
         output_handler=[ToolRegistry()],
         use_tools=["read_code", "execute_script", "memory"],
+        quick_mode=True,
     )
     return Agent(**review_agent_kwargs)
 
@@ -134,5 +136,6 @@ def create_cluster_agent(
         output_handler=[ToolRegistry()],
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "memory"],
+        quick_mode=True,
     )
     return Agent(**agent_kwargs_cluster)

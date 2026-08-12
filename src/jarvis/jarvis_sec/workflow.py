@@ -558,6 +558,7 @@ def _create_conversion_agent(
         name="format_converter",
         description="安全扫描格式转换专家",
         use_tools=["read_code", "execute_script"],
+        quick_mode=True,
     )
 
     # 执行转换
