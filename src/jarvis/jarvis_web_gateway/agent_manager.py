@@ -526,6 +526,8 @@ class AgentManager:
     ) -> Dict[str, Any]:
         """更新 Agent 的访问控制列表。
 
+        自动移除 owner 用户和 admin 用户（这两个用户对 agent 有完全控制权限）。
+
         Args:
             agent_id: Agent ID
             access_acl: 访问控制列表，格式为 {"read": [user_id, ...], "interact": [user_id, ...]}
@@ -540,7 +542,31 @@ class AgentManager:
             raise KeyError(f"Agent {agent_id} not found")
 
         agent = self._agents[agent_id]
-        agent.access_acl = access_acl
+
+        # 自动移除 owner 用户和 admin 用户
+        from jarvis.jarvis_utils.config import get_data_dir
+        from jarvis.jarvis_web_gateway.user_manager import UserManager
+
+        cleaned_acl = {}
+        data_dir = get_data_dir()
+        for acl_type, user_ids in access_acl.items():
+            if not isinstance(user_ids, list):
+                continue
+            # 过滤掉 owner 用户
+            filtered_users = [uid for uid in user_ids if uid != agent.owner_id]
+            # 过滤掉 admin 用户
+            try:
+                user_mgr = UserManager(data_dir)
+                admin_user = user_mgr.get_user_by_username("admin")
+                admin_user_id = admin_user["user_id"] if admin_user else None
+                if admin_user_id:
+                    filtered_users = [
+                        uid for uid in filtered_users if uid != admin_user_id
+                    ]
+            except Exception:
+                pass  # 忽略异常，保留原逻辑
+            if filtered_users:
+                cleaned_acl[acl_type] = filtered_users
 
         # 保存到文件
         self._save_agents()
