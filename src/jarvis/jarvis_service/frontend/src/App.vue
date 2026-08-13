@@ -602,7 +602,7 @@
       @update:accessAclRead="newAgentAccessAclRead = $event"
       :accessAclInteract="newAgentAccessAclInteract"
       @update:accessAclInteract="newAgentAccessAclInteract = $event"
-      :userOptions="availableUserOptions"
+      :userOptions="availableUserOptions.filter(u => u.username !== 'admin' && u.user_id !== auth.userInfo?.user_id)"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -624,21 +624,21 @@
         <div class="form-group">
           <label>可查看用户 (read)</label>
           <div class="acl-user-list">
-            <label v-for="user in availableUserOptions" :key="user.user_id" class="checkbox-label">
+            <label v-for="user in filteredUserOptionsForAcl" :key="user.user_id" class="checkbox-label">
               <input type="checkbox" :value="user.user_id" v-model="editAccessRead" />
               {{ user.display_name || user.user_id }}
             </label>
-            <div v-if="availableUserOptions.length === 0" class="form-help">暂无可选用户</div>
+            <div v-if="filteredUserOptionsForAcl.length === 0" class="form-help">暂无可选用户</div>
           </div>
         </div>
         <div class="form-group">
           <label>可交互用户 (interact)</label>
           <div class="acl-user-list">
-            <label v-for="user in availableUserOptions" :key="user.user_id" class="checkbox-label">
+            <label v-for="user in filteredUserOptionsForAcl" :key="user.user_id" class="checkbox-label">
               <input type="checkbox" :value="user.user_id" v-model="editAccessInteract" />
               {{ user.display_name || user.user_id }}
             </label>
-            <div v-if="availableUserOptions.length === 0" class="form-help">暂无可选用户</div>
+            <div v-if="filteredUserOptionsForAcl.length === 0" class="form-help">暂无可选用户</div>
           </div>
         </div>
         <div class="modal-actions">
@@ -3411,6 +3411,17 @@ const newAgentProxyNode = ref('') // 新 Agent 代理节点
 const newAgentAccessAclRead = ref([]) // 新 Agent ACL read用户ID数组
 const newAgentAccessAclInteract = ref([]) // 新 Agent ACL interact用户ID数组
 const availableUserOptions = ref([]) // 用户列表（用于ACL选择）
+// ACL用户列表：排除owner和admin用户（他们有完全控制权限，无需ACL授权）
+const filteredUserOptionsForAcl = computed(() => {
+  const agent = editingAccessAgent.value
+  const ownerId = agent?.owner_id || ''
+  // 从用户列表中过滤掉owner和admin
+  return availableUserOptions.value.filter(user => {
+    if (user.user_id === ownerId) return false
+    if (user.username === 'admin') return false
+    return true
+  })
+})
 const availableNodeOptions = ref([])
 const userAccessibleNodes = ref(null) // null=未加载, []=无权限, ["*"]=所有, ["id1","id2"]=限定节点
 const newAgentNodeId = ref('')
