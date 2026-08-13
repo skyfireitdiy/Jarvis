@@ -1,0 +1,8 @@
+{
+  "id": "20260813_153632_150849",
+  "type": "project_long_term",
+  "tags": ["ChatManager", "持久化", "聊天室", "架构决策"],
+  "content": "ChatManager持久化改造完成：\n1. chat_manager.py：加data_dir参数，_load_rooms/_save_rooms持久化到chat_rooms.json，members改user_id集合，新增get_user_rooms/get_client_by_user_id方法，create/join/leave/delete后调_save_rooms\n2. app.py：WebSocketConnectionManager加data_dir参数传给ChatManager，新增/api/chat/user-rooms HTTP GET路由，_handle_chat_create_room传user_id\n3. App.vue：新增restoreChatRoomsFromServer函数，chat_register_response后调API恢复房间\n4. 持久化文件路径：~/.jarvis/chat/chat_rooms.json\n5. unregister_client不删members保持久化，broadcast_to_room按user_id查在线client",
+  "created_at": "2026-08-13T15:36:32.150890",
+  "updated_at": "2026-08-13T15:36:32.150897"
+}

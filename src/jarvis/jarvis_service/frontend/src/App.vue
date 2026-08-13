@@ -7018,15 +7018,8 @@ function handleChatMessage(type, payload) {
             chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name, display_name: payload.display_name || payload.name }]
           }
         }
-        // 自动重新加入缓存的房间
-        const savedRooms = chatJoinedRooms.value.filter(rid => rid)
-        if (savedRooms.length > 0) {
-          chatAutoRejoining = true
-          chatAutoRejoinCount = savedRooms.length
-          savedRooms.forEach(rid => {
-            sendChatMessageToServer('chat_join_room', { room_id: rid, client_id: myClientId.value })
-          })
-        }
+        // 从API恢复用户已加入的房间（优先于localStorage缓存）
+        restoreChatRoomsFromServer()
       } else {
         // 注册失败，清空缓存
         chatJoinedRooms.value = []
@@ -8995,6 +8988,39 @@ const chatJoinedRooms = ref(JSON.parse(localStorage.getItem(CHAT_JOINED_ROOMS_KE
 
 function saveChatJoinedRooms() {
   localStorage.setItem(CHAT_JOINED_ROOMS_KEY, JSON.stringify(chatJoinedRooms.value))
+}
+
+async function restoreChatRoomsFromServer() {
+  // 从API获取用户已加入的房间，用于登录后恢复
+  try {
+    const resp = await fetch('/api/chat/user-rooms', { headers: { 'Authorization': `Bearer ${auth.value.token}` } })
+    const data = await resp.json()
+    if (data.success && data.rooms) {
+      const serverRoomIds = data.rooms.map(r => r.room_id)
+      // 合并服务端房间与本地缓存
+      const merged = [...new Set([...serverRoomIds, ...chatJoinedRooms.value.filter(rid => rid)])]
+      chatJoinedRooms.value = merged
+      saveChatJoinedRooms()
+      // 自动重新加入所有房间
+      if (merged.length > 0) {
+        chatAutoRejoining = true
+        chatAutoRejoinCount = merged.length
+        merged.forEach(rid => {
+          sendChatMessageToServer('chat_join_room', { room_id: rid, client_id: myClientId.value })
+        })
+      }
+    }
+  } catch (e) {
+    // API失败时回退到localStorage缓存
+    const savedRooms = chatJoinedRooms.value.filter(rid => rid)
+    if (savedRooms.length > 0) {
+      chatAutoRejoining = true
+      chatAutoRejoinCount = savedRooms.length
+      savedRooms.forEach(rid => {
+        sendChatMessageToServer('chat_join_room', { room_id: rid, client_id: myClientId.value })
+      })
+    }
+  }
 }
 
 let chatAutoRejoining = false
