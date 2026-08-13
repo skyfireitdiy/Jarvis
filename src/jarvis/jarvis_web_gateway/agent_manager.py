@@ -568,6 +568,9 @@ class AgentManager:
             if filtered_users:
                 cleaned_acl[acl_type] = filtered_users
 
+        # 更新 agent 的 access_acl
+        agent.access_acl = cleaned_acl
+
         # 保存到文件
         self._save_agents()
 
