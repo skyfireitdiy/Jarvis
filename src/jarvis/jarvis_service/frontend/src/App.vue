@@ -1364,6 +1364,19 @@ async function logout() {
     agentList.value = []
     agentStatuses.value.clear()
 
+    // 清理聊天室状态
+    chatClients.value = []
+    chatRooms.value = []
+    chatRoomMembers.value = []
+    chatMessages.value = []
+    myClientId.value = ''
+    activeChatRoomId.value = ''
+    activePrivateClientId.value = ''
+    chatUnreadCount.value = 0
+    chatUnreadMap.value = {}
+    chatJoinedRooms.value = []
+    saveChatJoinedRooms()
+
     showConnectModal.value = true
     connectErrorMessage.value = ''
     console.log('[AUTH] Logged out successfully, all connections closed')
@@ -3845,6 +3858,11 @@ async function connect() {
     fetchModelGroups()
     fetchNodeStatus()
     fetchUserAccessibleNodes()
+    // 自动注册聊天室（避免丢消息，不依赖用户手动打开聊天面板）
+    if (!myClientId.value) {
+      myClientId.value = getOrCreateClientId()
+    }
+    sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: username.value })
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
       console.log('[HISTORY] Loading history on first connect')
