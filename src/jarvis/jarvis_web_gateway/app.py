@@ -1473,6 +1473,9 @@ def create_app(
     _data_dir = get_data_dir()
     user_manager = UserManager(_data_dir)
     permission_manager = PermissionManager(_data_dir)
+    permission_manager.set_user_manager(
+        user_manager
+    )  # 注入user_manager，使check_permission支持is_admin跳过
 
     # 确保admin用户在sys-admin组中
     admin_user = user_manager.get_user_by_username("admin")
@@ -1836,7 +1839,9 @@ def create_app(
         brief = [
             {
                 "user_id": u.get("user_id"),
+                "username": u.get("username"),
                 "display_name": u.get("display_name", u.get("username")),
+                "is_admin": u.get("is_admin", False),
             }
             for u in users
         ]

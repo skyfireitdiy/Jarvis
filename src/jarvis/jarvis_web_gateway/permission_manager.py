@@ -88,6 +88,7 @@ class PermissionManager:
         self._user_permissions: dict = {}
         self._resource_acl: dict = {}
         self._permission_cache: dict = {}
+        self._user_manager = None  # 注入UserManager引用，用于is_admin检查
         self._load_data()
         self._ensure_builtin_groups()
 
@@ -167,7 +168,17 @@ class PermissionManager:
             return permission.startswith(parts[0] + ":")
         return False
 
+    def set_user_manager(self, user_manager) -> None:
+        """注入UserManager引用，用于is_admin检查。"""
+        self._user_manager = user_manager
+        self._permission_cache.clear()  # 清缓存，确保重新计算
+
     def check_permission(self, user_id: str, permission: str) -> bool:
+        # admin用户跳过所有权限检查
+        if self._user_manager and user_id:
+            user = self._user_manager.get_user(user_id)
+            if user and user.get("is_admin", False):
+                return True
         cache_key = f"{user_id}:{permission}"
         if cache_key in self._permission_cache:
             return self._permission_cache[cache_key]
