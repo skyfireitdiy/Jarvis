@@ -2542,17 +2542,23 @@ def create_app(
             user_info = auth_payload.get("user_info") or {}
             user_id = user_info.get("user_id")
         if user_id and user_id != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if agent_info and agent_info.owner_id and agent_info.owner_id != user_id:
-                access_acl = agent_info.access_acl or {}
-                has_read = user_id in (access_acl.get("read") or [])
-                if not has_read:
-                    await websocket.accept(subprotocol="jarvis-ws")
-                    await _send_error(
-                        websocket, "FORBIDDEN", "No read access to this agent"
-                    )
-                    await websocket.close(code=4403, reason="Forbidden")
-                    return
+            is_admin = (user_info or {}).get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_id
+                ):
+                    access_acl = agent_info.access_acl or {}
+                    has_read = user_id in (access_acl.get("read") or [])
+                    if not has_read:
+                        await websocket.accept(subprotocol="jarvis-ws")
+                        await _send_error(
+                            websocket, "FORBIDDEN", "No read access to this agent"
+                        )
+                        await websocket.close(code=4403, reason="Forbidden")
+                        return
 
         await websocket.accept(subprotocol="jarvis-ws")
 
@@ -2634,6 +2640,7 @@ def create_app(
                                         agent_info
                                         and agent_info.owner_id
                                         and agent_info.owner_id != user_id
+                                        and not (user_info or {}).get("is_admin", False)
                                     ):
                                         access_acl = agent_info.access_acl or {}
                                         has_interact = user_id in (
@@ -2752,6 +2759,7 @@ def create_app(
                             agent_info
                             and agent_info.owner_id
                             and agent_info.owner_id != user_id
+                            and not (user_info or {}).get("is_admin", False)
                         ):
                             access_acl = agent_info.access_acl or {}
                             has_interact = user_id in (access_acl.get("interact") or [])
@@ -4515,22 +4523,24 @@ def create_app(
         # 权限检查：只有owner或admin可以停止Agent
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                if not permission_manager.check_permission(
-                    user_info["user_id"], "agent:delete"
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
                 ):
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "FORBIDDEN",
-                            "message": "You can only stop your own agents",
-                        },
-                    }
+                    if not permission_manager.check_permission(
+                        user_info["user_id"], "agent:delete"
+                    ):
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "You can only stop your own agents",
+                            },
+                        }
         try:
             route = node_runtime.agent_route_registry.get(agent_id)
             if route is not None and route.node_id not in (
@@ -4833,22 +4843,26 @@ def create_app(
         # 权限检查：非owner需有read ACL权限
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                access_acl = agent_info.access_acl or {}
-                has_read = user_info.get("user_id") in (access_acl.get("read") or [])
-                if not has_read:
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "FORBIDDEN",
-                            "message": "No read access to this agent",
-                        },
-                    }
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
+                ):
+                    access_acl = agent_info.access_acl or {}
+                    has_read = user_info.get("user_id") in (
+                        access_acl.get("read") or []
+                    )
+                    if not has_read:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "No read access to this agent",
+                            },
+                        }
         try:
             resolved_target_node = str(node_id or "").strip()
             if not resolved_target_node:
@@ -4921,24 +4935,26 @@ def create_app(
         # 权限检查：非owner需有interact ACL权限
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                access_acl = agent_info.access_acl or {}
-                has_interact = user_info.get("user_id") in (
-                    access_acl.get("interact") or []
-                )
-                if not has_interact:
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "FORBIDDEN",
-                            "message": "No interact access to this agent",
-                        },
-                    }
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
+                ):
+                    access_acl = agent_info.access_acl or {}
+                    has_interact = user_info.get("user_id") in (
+                        access_acl.get("interact") or []
+                    )
+                    if not has_interact:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "No interact access to this agent",
+                            },
+                        }
         try:
             resolved_target_node = str(request_body.get("node_id") or "").strip()
             if not resolved_target_node:
