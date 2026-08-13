@@ -603,7 +603,6 @@ class WebSocketConnectionManager:
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept(subprotocol="jarvis-ws")
-        session_id = "default"  # 固定使用 default session，简化重连逻辑
         connection_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
 
@@ -614,6 +613,14 @@ class WebSocketConnectionManager:
             await _send_error(websocket, "AUTH_FAILED", reason or "auth failed")
             await websocket.close()
             return
+
+        # 从认证信息提取user_id，生成per-user session_id，避免多用户共享"default"导致权限互踩
+        user_id = "unknown"
+        if auth_payload and isinstance(auth_payload, dict):
+            user_info = auth_payload.get("user_info")
+            if user_info and isinstance(user_info, dict):
+                user_id = user_info.get("user_id", "unknown")
+        session_id = f"session_{user_id}"
 
         async with self._connection_state_lock:
             existing_connections = self._active_connections.get(session_id)
