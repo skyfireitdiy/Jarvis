@@ -88,11 +88,8 @@ class OpenAIModel(BasePlatform):
             # 将 base_url 拼接为代理格式
             # 注意：需要添加 /api/node/{node_id}/ 前缀以匹配 FastAPI 路由
             self.base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{self.base_url}"
-            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
-            # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
-            jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
-            if jarvis_token:
-                self.extra_headers["X-Jarvis-Token"] = jarvis_token
+            # 注意：X-Jarvis-Token 不在此处静态缓存，改为每次 API 调用时
+            # 通过 _get_proxy_extra_headers() 动态注入，避免主网关重启后 Token 失效
 
         # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
@@ -278,7 +275,12 @@ class OpenAIModel(BasePlatform):
             当API调用失败时会打印错误信息并返回空列表
         """
         try:
-            models = self.client.models.list()
+            proxy_headers = self._get_proxy_extra_headers()
+            models = (
+                self.client.models.list(extra_headers=proxy_headers)
+                if proxy_headers
+                else self.client.models.list()
+            )
             model_list = []
             for model in models:
                 model_list.append((model.id, model.id))
@@ -396,6 +398,10 @@ class OpenAIModel(BasePlatform):
 
             # 如果没有指定 max_tokens，不设置默认值，让模型使用自身的默认值
 
+            # 动态注入代理认证头，确保主网关重启后 Token 更新生效
+            proxy_headers = self._get_proxy_extra_headers()
+            if proxy_headers:
+                api_params["extra_headers"] = proxy_headers
             response = self.client.chat.completions.create(**api_params)
 
             full_response = ""
@@ -439,6 +445,9 @@ class OpenAIModel(BasePlatform):
                         self._streaming_disabled = True
                     fallback_params = api_params.copy()
                     fallback_params["stream"] = False
+                    fallback_headers = self._get_proxy_extra_headers()
+                    if fallback_headers:
+                        fallback_params["extra_headers"] = fallback_headers
                     fallback_response = self.client.chat.completions.create(
                         **fallback_params
                     )

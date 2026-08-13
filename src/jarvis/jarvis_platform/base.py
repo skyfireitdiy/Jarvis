@@ -80,6 +80,24 @@ class BasePlatform(ABC):
         # 检查是否支持多模态
         self._supports_multimodal = self._llm_config.get("supports_multimodal", False)
 
+    def _get_proxy_extra_headers(self) -> Dict[str, str]:
+        """获取代理模式下的动态请求头。
+
+        每次调用时从环境变量实时读取 JARVIS_AUTH_TOKEN，
+        避免主网关重启后 Token 更新但客户端仍用旧 Token 导致 401。
+
+        Returns:
+            包含 X-Jarvis-Token 的字典，若非代理模式或无 Token 则返回空字典。
+        """
+        import jarvis.jarvis_utils.globals as jglobals
+
+        if not (jglobals.proxy_node and jglobals.master_url):
+            return {}
+        jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
+        if jarvis_token:
+            return {"X-Jarvis-Token": jarvis_token}
+        return {}
+
     def supports_multimodal(self) -> bool:
         """检查是否支持多模态输入"""
         return self._supports_multimodal

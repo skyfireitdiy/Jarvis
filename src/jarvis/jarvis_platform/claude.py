@@ -79,13 +79,8 @@ class ClaudeModel(BasePlatform):
             # 注意：需要添加 /api/node/{node_id}/ 前缀以匹配 FastAPI 路由
             self.base_url = f"{jglobals.master_url}/api/node/{jglobals.proxy_node}/http_proxy/{self.base_url}"
 
-            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
-            # 从环境变量获取 Jarvis Token（由 Agent 启动时设置）
-            jarvis_token = os.getenv("JARVIS_AUTH_TOKEN")
-            if jarvis_token:
-                # Anthropic SDK 支持通过 http_client 或额外参数传递自定义头
-                # 这里保存到实例变量，在请求时使用
-                self._jarvis_token = jarvis_token
+            # 注意：X-Jarvis-Token 不在此处静态缓存，改为每次 API 调用时
+            # 通过 _get_proxy_extra_headers() 动态注入，避免主网关重启后 Token 失效
 
         # 只有当 llm_config 不为空但其中没有 anthropic_api_key，且环境变量也没有设置时，才打印警告
         # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
@@ -98,31 +93,15 @@ class ClaudeModel(BasePlatform):
         # 初始化 Anthropic 客户端
         self.client = None
         try:
-            # 准备默认请求头
-            default_headers = {}
-
-            # 在代理模式下，添加 X-Jarvis-Token 头用于 Gateway 认证
-            if hasattr(self, "_jarvis_token") and self._jarvis_token:
-                default_headers["X-Jarvis-Token"] = self._jarvis_token
-
+            # 注意：X-Jarvis-Token 不再通过 default_headers 静态注入，
+            # 改为每次 API 调用时通过 extra_headers 动态注入
             if self.base_url:
-                if default_headers:
-                    self.client = Anthropic(
-                        api_key=self.api_key,
-                        base_url=self.base_url,
-                        default_headers=default_headers,
-                    )
-                else:
-                    self.client = Anthropic(
-                        api_key=self.api_key, base_url=self.base_url
-                    )
+                self.client = Anthropic(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                )
             else:
-                if default_headers:
-                    self.client = Anthropic(
-                        api_key=self.api_key, default_headers=default_headers
-                    )
-                else:
-                    self.client = Anthropic(api_key=self.api_key)
+                self.client = Anthropic(api_key=self.api_key)
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
         # 消息历史
@@ -203,7 +182,12 @@ class ClaudeModel(BasePlatform):
 
         try:
             # 尝试使用models API获取实际的模型列表
-            model_response = self.client.models.list()
+            proxy_headers = self._get_proxy_extra_headers()
+            model_response = (
+                self.client.models.list(extra_headers=proxy_headers)
+                if proxy_headers
+                else self.client.models.list()
+            )
             models = []
             for model in model_response.data:
                 model_id = model.id if hasattr(model, "id") else str(model)
@@ -378,6 +362,7 @@ class ClaudeModel(BasePlatform):
                     int,
                     List[List[Dict[str, str]]],
                     List[Dict[str, str]],
+                    Dict[str, str],
                 ],
             ] = {
                 "model": self.model_name,
@@ -387,6 +372,10 @@ class ClaudeModel(BasePlatform):
             if system_param:
                 stream_kwargs["system"] = system_param
 
+            # 动态注入代理认证头，确保主网关重启后 Token 更新生效
+            proxy_headers = self._get_proxy_extra_headers()
+            if proxy_headers:
+                stream_kwargs["extra_headers"] = proxy_headers
             with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
                 full_response = ""
                 for text in stream.text_stream:
