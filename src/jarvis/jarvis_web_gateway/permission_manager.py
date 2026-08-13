@@ -396,6 +396,11 @@ class PermissionManager:
         """
         if user_id == "system":
             return ["*"]
+        # is_admin用户拥有所有节点访问权限
+        if self._user_manager and user_id:
+            user = self._user_manager.get_user(user_id)
+            if user and user.get("is_admin", False):
+                return ["*"]
         result = []
         has_all = False
         user_group_ids = self._user_groups.get(user_id, [])
