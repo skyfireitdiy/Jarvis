@@ -11019,12 +11019,13 @@ body::-webkit-scrollbar {
 
 .chat-btn-wrapper {
   position: relative;
+  overflow: visible;
 }
 
 .chat-unread-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -6px;
+  right: -8px;
   background: #f85149;
   color: #fff;
   font-size: 10px;
@@ -11038,6 +11039,8 @@ body::-webkit-scrollbar {
   padding: 0 4px;
   line-height: 1;
   pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
 }
 
 .manual-interrupt-btn {
