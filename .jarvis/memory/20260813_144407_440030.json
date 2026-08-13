@@ -1,0 +1,8 @@
+{
+  "id": "20260813_144407_440030",
+  "type": "project_long_term",
+  "tags": ["权限隔离", "WS", "session_id", "bug修复"],
+  "content": "WS session_id多用户冲突修复：app.py:606将session_id=\"default\"改为f\"session_{user_id}\"，从auth_payload[\"user_info\"][\"user_id\"]提取。根因：所有WS连接共享_auth_store[\"default\"]，后登录用户覆盖先登录用户auth，导致权限互踩。修复后per-user session_id隔离auth_store。commit: b4acc73",
+  "created_at": "2026-08-13T14:44:07.440089",
+  "updated_at": "2026-08-13T14:44:07.440096"
+}
