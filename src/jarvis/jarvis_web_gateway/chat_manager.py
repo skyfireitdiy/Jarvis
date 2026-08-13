@@ -119,6 +119,7 @@ class ChatManager:
         display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """注册客户端，并广播上线通知。"""
+        print(f"[CHAT REGISTER] client_id={client_id} name={name} user_id={user_id}")
         async with self._lock:
             self._chat_clients[client_id] = {
                 "name": name,
@@ -172,11 +173,13 @@ class ChatManager:
         return self._chat_clients.get(client_id)
 
     def get_client_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """通过user_id获取在线客户端信息。"""
+        """通过user_id获取在线客户端信息。优先返回最新注册的client。"""
+        latest = None
         for cid, info in self._chat_clients.items():
             if info.get("user_id") == user_id:
-                return {"client_id": cid, **info}
-        return None
+                if latest is None or info.get("registered_at", 0) > latest.get("registered_at", 0):
+                    latest = {"client_id": cid, **info}
+        return latest
 
     def get_clients(self) -> list[Dict[str, Any]]:
         """获取所有在线客户端列表。"""
@@ -247,6 +250,7 @@ class ChatManager:
             client = self._chat_clients.get(client_id)
             user_id = client.get("user_id") if client else None
             member_id = user_id or client_id
+            print(f"[CHAT JOIN] room={room_id} client_id={client_id} user_id={user_id} member_id={member_id} existing_members={room['members']}")
             room["members"].add(member_id)
             self._save_rooms()
         return {"success": True, "room_id": room_id, "name": room["name"]}
@@ -322,22 +326,27 @@ class ChatManager:
         """向聊天室所有成员广播消息。members存user_id，需查在线client。"""
         room = self._chat_rooms.get(room_id)
         if not room:
+            print(f"[CHAT BROADCAST] room {room_id} not found")
             return
         # 获取排除者的user_id
         exclude_user_id = None
         if exclude_client_id:
             ex_client = self._chat_clients.get(exclude_client_id)
             exclude_user_id = ex_client.get("user_id") if ex_client else None
+        print(f"[CHAT BROADCAST] room={room_id} members={room['members']} exclude_uid={exclude_user_id}")
         for uid in room["members"]:
             if uid == exclude_user_id:
+                print(f"[CHAT BROADCAST] skip excluded uid={uid}")
                 continue
             # 查在线客户端
             client = self.get_client_by_user_id(uid)
+            print(f"[CHAT BROADCAST] uid={uid} client_found={client is not None} has_ws={client.get('websocket') is not None if client else 'N/A'}")
             if client and client.get("websocket"):
                 try:
                     await client["websocket"].send_json(message)
-                except Exception:
-                    pass
+                    print(f"[CHAT BROADCAST] sent to uid={uid} client_id={client.get('client_id')}")
+                except Exception as e:
+                    print(f"[CHAT BROADCAST] FAILED to send to uid={uid}: {e}")
 
     # ------------------------------------------------------------------
     # 私聊
