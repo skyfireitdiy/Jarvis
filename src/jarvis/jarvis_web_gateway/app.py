@@ -586,6 +586,7 @@ class WebSocketConnectionManager:
         auth_store: Dict[str, Optional[Dict[str, Any]]],
         user_manager: Optional[Any] = None,
         permission_manager: Optional[Any] = None,
+        data_dir: Optional[str] = None,
     ) -> None:
         self._router = router
         self._input_registry = input_registry
@@ -599,7 +600,7 @@ class WebSocketConnectionManager:
         self._connection_state_lock = asyncio.Lock()
 
         # 聊天室管理
-        self._chat_manager = ChatManager()
+        self._chat_manager = ChatManager(data_dir)
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept(subprotocol="jarvis-ws")
@@ -1295,7 +1296,10 @@ class WebSocketConnectionManager:
                 }
             )
             return
-        result = await self._chat_manager.create_room(name, creator_id)
+        # 从client_id查user_id
+        client_info = self._chat_manager.get_client(creator_id)
+        user_id = client_info.get("user_id") if client_info else None
+        result = await self._chat_manager.create_room(name, creator_id, user_id=user_id)
         await websocket.send_json(
             {"type": "chat_create_room_response", "payload": result}
         )
@@ -1574,6 +1578,7 @@ def create_app(
         auth_store,
         user_manager,
         permission_manager,
+        _data_dir,
     )
 
     set_current_gateway(gateway)
@@ -1811,6 +1816,26 @@ def create_app(
             if full_user:
                 return {"success": True, "data": {"user": full_user}}
         return {"success": True, "data": {"user": user_info}}
+
+    @app.get("/api/chat/user-rooms", dependencies=[Depends(verify_token)])
+    async def get_user_chat_rooms(request: Request) -> Dict[str, Any]:
+        """获取当前用户已加入的聊天室ID列表（用于登录后恢复）。"""
+        user_info = verify_token(request)
+        user_id = user_info.get("user_id", "")
+        room_id_list = manager._chat_manager.get_user_rooms(user_id)
+        # 返回房间详情
+        rooms = []
+        for room_id in room_id_list:
+            room = manager._chat_manager._chat_rooms.get(room_id)
+            if room:
+                rooms.append(
+                    {
+                        "room_id": room_id,
+                        "name": room["name"],
+                        "member_count": len(room["members"]),
+                    }
+                )
+        return {"success": True, "rooms": rooms}
 
     # 权限检查依赖
     def require_permission(resource: str, action: str):

@@ -1,13 +1,16 @@
 """聊天室管理模块。
 
 管理聊天室、客户端注册、私聊会话等状态与逻辑。
+支持聊天室持久化，网关重启后自动恢复。
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import WebSocket
 
@@ -18,19 +21,89 @@ class ChatManager:
     维护聊天室、客户端、私聊会话等状态，处理所有 chat_* 消息类型。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, data_dir: Optional[str] = None) -> None:
+        self._data_dir = data_dir
         self._chat_rooms: Dict[
             str, Dict[str, Any]
-        ] = {}  # room_id -> {name, members: set[client_id], created_by, created_at}
+        ] = {}  # room_id -> {name, members: set[user_id], created_by, created_at}
         self._chat_clients: Dict[
             str, Dict[str, Any]
-        ] = {}  # client_id -> {name, connection_id, websocket}
+        ] = {}  # client_id -> {name, connection_id, websocket, user_id}
         self._chat_private_sessions: Dict[
             str, Dict[str, Any]
         ] = {}  # session_id -> {client_a, client_b, messages: list}
         self._chat_room_seq = 0  # 聊天室ID自增
         self._chat_private_seq = 0  # 私聊会话ID自增
         self._lock = asyncio.Lock()
+        # 启动时加载持久化数据
+        self._load_rooms()
+
+    # ------------------------------------------------------------------
+    # 持久化
+    # ------------------------------------------------------------------
+
+    def _get_rooms_file(self) -> str:
+        """获取聊天室持久化文件路径。"""
+        if not self._data_dir:
+            return ""
+        return os.path.join(self._data_dir, "chat_rooms.json")
+
+    def _load_rooms(self) -> None:
+        """从JSON文件加载聊天室数据。"""
+        filepath = self._get_rooms_file()
+        if not filepath or not os.path.exists(filepath):
+            return
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            max_seq = 0
+            for room_id, room_data in data.items():
+                members = set(room_data.get("members", []))
+                self._chat_rooms[room_id] = {
+                    "name": room_data.get("name", "未命名"),
+                    "members": members,  # user_id集合
+                    "created_by": room_data.get("created_by", ""),
+                    "created_at": room_data.get("created_at", 0),
+                }
+                # 恢复自增序列号
+                try:
+                    seq = int(room_id.split("_")[1]) if "_" in room_id else 0
+                    if seq > max_seq:
+                        max_seq = seq
+                except (ValueError, IndexError):
+                    pass
+            self._chat_room_seq = max_seq
+            print(f"[CHAT] Loaded {len(self._chat_rooms)} rooms from {filepath}")
+        except Exception as e:
+            print(f"[CHAT] Failed to load rooms: {e}")
+
+    def _save_rooms(self) -> None:
+        """将聊天室数据保存到JSON文件。"""
+        filepath = self._get_rooms_file()
+        if not filepath:
+            return
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            data = {}
+            for room_id, room in self._chat_rooms.items():
+                data[room_id] = {
+                    "name": room["name"],
+                    "members": list(room["members"]),  # set转list序列化
+                    "created_by": room["created_by"],
+                    "created_at": room["created_at"],
+                }
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[CHAT] Failed to save rooms: {e}")
+
+    def get_user_rooms(self, user_id: str) -> List[str]:
+        """获取用户已加入的聊天室ID列表。"""
+        joined = []
+        for room_id, room in self._chat_rooms.items():
+            if user_id in room["members"]:
+                joined.append(room_id)
+        return joined
 
     # ------------------------------------------------------------------
     # 客户端注册
@@ -75,13 +148,13 @@ class ChatManager:
         }
 
     async def unregister_client(self, client_id: str) -> None:
-        """注销客户端，并清理其所在聊天室，广播下线通知。"""
+        """注销客户端，并广播下线通知。
+        注意：不将user_id从room members中移除，保持持久化成员关系。
+        """
         client_info = None
         async with self._lock:
             client_info = self._chat_clients.pop(client_id, None)
-            # 从所有聊天室中移除
-            for room in self._chat_rooms.values():
-                room["members"].discard(client_id)
+            # 不从聊天室members中移除user_id，保持持久化
         # 广播下线通知（锁外执行，避免死锁）
         if client_info:
             await self.broadcast_to_all(
@@ -97,6 +170,13 @@ class ChatManager:
     def get_client(self, client_id: str) -> Optional[Dict[str, Any]]:
         """获取客户端信息。"""
         return self._chat_clients.get(client_id)
+
+    def get_client_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """通过user_id获取在线客户端信息。"""
+        for cid, info in self._chat_clients.items():
+            if info.get("user_id") == user_id:
+                return {"client_id": cid, **info}
+        return None
 
     def get_clients(self) -> list[Dict[str, Any]]:
         """获取所有在线客户端列表。"""
@@ -128,17 +208,21 @@ class ChatManager:
     # 聊天室
     # ------------------------------------------------------------------
 
-    async def create_room(self, name: str, creator_id: str) -> Dict[str, Any]:
-        """创建聊天室。"""
+    async def create_room(
+        self, name: str, creator_id: str, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """创建聊天室。members使用user_id。"""
+        member_id = user_id or creator_id
         async with self._lock:
             self._chat_room_seq += 1
             room_id = f"room_{self._chat_room_seq}"
             self._chat_rooms[room_id] = {
                 "name": name,
-                "members": {creator_id},
-                "created_by": creator_id,
+                "members": {member_id},
+                "created_by": member_id,
                 "created_at": time.time(),
             }
+            self._save_rooms()
         return {"success": True, "room_id": room_id, "name": name}
 
     def get_rooms(self) -> list[Dict[str, Any]]:
@@ -154,21 +238,31 @@ class ChatManager:
         ]
 
     async def join_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
-        """加入聊天室。"""
+        """加入聊天室。将user_id加入members。"""
         async with self._lock:
             room = self._chat_rooms.get(room_id)
             if not room:
                 return {"success": False, "error": "聊天室不存在"}
-            room["members"].add(client_id)
+            # 从client_id查user_id
+            client = self._chat_clients.get(client_id)
+            user_id = client.get("user_id") if client else None
+            member_id = user_id or client_id
+            room["members"].add(member_id)
+            self._save_rooms()
         return {"success": True, "room_id": room_id, "name": room["name"]}
 
     async def leave_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
-        """离开聊天室。"""
+        """离开聊天室。将user_id从members移除。"""
         async with self._lock:
             room = self._chat_rooms.get(room_id)
             if not room:
                 return {"success": False, "error": "聊天室不存在"}
-            room["members"].discard(client_id)
+            # 从client_id查user_id
+            client = self._chat_clients.get(client_id)
+            user_id = client.get("user_id") if client else None
+            member_id = user_id or client_id
+            room["members"].discard(member_id)
+            self._save_rooms()
         return {"success": True, "room_id": room_id}
 
     async def delete_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
@@ -177,10 +271,15 @@ class ChatManager:
             room = self._chat_rooms.get(room_id)
             if not room:
                 return {"success": False, "error": "聊天室不存在"}
-            if room["created_by"] != client_id:
+            # 从client_id查user_id比较created_by
+            client = self._chat_clients.get(client_id)
+            user_id = client.get("user_id") if client else None
+            member_id = user_id or client_id
+            if room["created_by"] != member_id:
                 return {"success": False, "error": "仅创建者可删除聊天室"}
             members = list(room["members"])
             del self._chat_rooms[room_id]
+            self._save_rooms()
         return {
             "success": True,
             "room_id": room_id,
@@ -189,15 +288,25 @@ class ChatManager:
         }
 
     def get_room_members(self, room_id: str) -> list[Dict[str, Any]]:
-        """获取聊天室成员列表（含详细信息）。"""
+        """获取聊天室成员列表（含详细信息）。members存user_id，需查在线client。"""
         room = self._chat_rooms.get(room_id)
         if not room:
             return []
         members = []
-        for cid in room["members"]:
-            client = self._chat_clients.get(cid)
+        for uid in room["members"]:
+            # 查在线客户端
+            client = self.get_client_by_user_id(uid)
             if client:
-                members.append({"client_id": cid, "name": client["name"]})
+                members.append(
+                    {
+                        "client_id": client["client_id"],
+                        "name": client["name"],
+                        "user_id": uid,
+                    }
+                )
+            else:
+                # 离线用户也显示
+                members.append({"user_id": uid, "name": uid, "online": False})
         return members
 
     # ------------------------------------------------------------------
@@ -210,15 +319,21 @@ class ChatManager:
         message: Dict[str, Any],
         exclude_client_id: Optional[str] = None,
     ) -> None:
-        """向聊天室所有成员广播消息。"""
+        """向聊天室所有成员广播消息。members存user_id，需查在线client。"""
         room = self._chat_rooms.get(room_id)
         if not room:
             return
-        for client_id in room["members"]:
-            if client_id == exclude_client_id:
+        # 获取排除者的user_id
+        exclude_user_id = None
+        if exclude_client_id:
+            ex_client = self._chat_clients.get(exclude_client_id)
+            exclude_user_id = ex_client.get("user_id") if ex_client else None
+        for uid in room["members"]:
+            if uid == exclude_user_id:
                 continue
-            client = self._chat_clients.get(client_id)
-            if client and client["websocket"]:
+            # 查在线客户端
+            client = self.get_client_by_user_id(uid)
+            if client and client.get("websocket"):
                 try:
                     await client["websocket"].send_json(message)
                 except Exception:
