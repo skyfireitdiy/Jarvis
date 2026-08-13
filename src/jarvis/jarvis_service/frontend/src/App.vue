@@ -602,7 +602,7 @@
       @update:accessAclRead="newAgentAccessAclRead = $event"
       :accessAclInteract="newAgentAccessAclInteract"
       @update:accessAclInteract="newAgentAccessAclInteract = $event"
-      :userOptions="availableUserOptions.filter(u => u.username !== 'admin' && u.user_id !== auth.userInfo?.user_id)"
+      :userOptions="availableUserOptions.filter(u => !u.is_admin && u.user_id !== auth.userInfo?.user_id)"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -3415,10 +3415,10 @@ const availableUserOptions = ref([]) // 用户列表（用于ACL选择）
 const filteredUserOptionsForAcl = computed(() => {
   const agent = editingAccessAgent.value
   const ownerId = agent?.owner_id || ''
-  // 从用户列表中过滤掉owner和admin
+  // 从用户列表中过滤掉owner和所有管理员（管理员有完全控制权限，无需ACL授权）
   return availableUserOptions.value.filter(user => {
     if (user.user_id === ownerId) return false
-    if (user.username === 'admin') return false
+    if (user.is_admin) return false
     return true
   })
 })
