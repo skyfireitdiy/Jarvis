@@ -100,8 +100,14 @@ class SessionOutputRouter(OutputMessagePublisher):
             except Exception:
                 pass
 
-    @staticmethod
-    def _resolve_route_keys(session_id: Optional[str]) -> list[str]:
+    def _resolve_route_keys(self, session_id: Optional[str]) -> list[str]:
+        if session_id is None:
+            # 广播模式：发送到所有session订阅者+通配符订阅者
+            with self._lock:
+                keys = list(self._subscribers.keys())
+                if "*" not in keys:
+                    keys.append("*")
+                return keys
         if session_id:
             return [session_id, "*"]
         return ["*"]

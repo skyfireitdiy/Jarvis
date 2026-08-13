@@ -321,8 +321,8 @@ def _update_status(status: str) -> None:
     # 2. 通过 WebSocket 推送状态变化给前端
     if _router:
         try:
-            # 单连接模式，固定使用 default session_id
-            session_id = "default"
+            # 多用户模式：广播到所有活跃session
+            session_id = None  # None触发路由器广播到所有session
             # 推送状态变化消息
             message = {"type": "status_update", "payload": {"execution_status": status}}
             _router.publish(message, session_id=session_id)
@@ -375,10 +375,11 @@ class WebGateway(BaseGateway):
         ] = {}  # 已发送但未收到回复：{session_id: message}
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
-        # 单连接模式，固定使用 default session_id
-        session_id = "default"
-        auth_payload = self._auth_store.get(session_id)
-        authorized, _ = self._check_auth(auth_payload)
+        # 多用户模式：广播到所有活跃session，检查任意session是否已授权
+        session_id = None  # None触发路由器广播到所有session
+        authorized = any(
+            self._check_auth(auth)[0] for auth in self._auth_store.values() if auth
+        )
 
         context = dict(event.context) if event.context else {}
 
@@ -421,25 +422,44 @@ class WebGateway(BaseGateway):
             self._router.publish(message, session_id=session_id)
 
     def request_input(self, request: GatewayInputRequest) -> GatewayInputResult:
-        # 单连接模式，固定使用 default session_id
-        session_id = "default"
+        # 多用户模式：使用第一个已授权session_id等待输入
         metadata = dict(request.metadata) if request.metadata else {}
-        metadata["session_id"] = session_id
 
-        # 等待WebSocket连接建立（通过检查_auth_store中是否有认证信息）
+        # 等待WebSocket连接建立（检查auth_store中是否有任意session已授权）
         import time
 
         wait_interval = 0.5  # 秒
         waited = 0
+        session_id: Optional[str] = None
 
         while True:
-            auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
+            # 动态获取第一个已授权session_id
+            session_id = next(
+                (
+                    sid
+                    for sid, auth in self._auth_store.items()
+                    if auth and self._check_auth(auth)[0]
+                ),
+                None,
+            )
+            auth_payload = metadata.get("auth") or (
+                next(
+                    (
+                        a
+                        for a in self._auth_store.values()
+                        if a and self._check_auth(a)[0]
+                    ),
+                    None,
+                )
+            )
             authorized, reason = self._check_auth(auth_payload)
-            if authorized:
+            if authorized and session_id:
                 break
 
             time.sleep(wait_interval)
             waited += wait_interval
+
+        metadata["session_id"] = session_id
 
         payload = {
             "tip": request.tip,
@@ -482,17 +502,38 @@ class WebGateway(BaseGateway):
         return GatewayInputResult(text=text, metadata=metadata)
 
     def request_confirm(self, request: GatewayConfirmRequest) -> GatewayConfirmResult:
-        # 单连接模式，固定使用 default session_id
-        session_id = "default"
+        # 多用户模式：使用第一个已授权session_id
         metadata = dict(request.metadata) if request.metadata else {}
-        metadata["session_id"] = session_id
-        auth_payload = metadata.get("auth") or self._auth_store.get(session_id)
-        authorized, reason = self._check_auth(auth_payload)
-        if not authorized:
-            return GatewayConfirmResult(
-                confirmed=request.default if request.default is not None else False,
-                metadata={"error": reason},
+        session_id: Optional[str] = None
+        # 等待至少一个已授权session
+        import time
+
+        wait_interval = 0.5
+        while True:
+            session_id = next(
+                (
+                    sid
+                    for sid, auth in self._auth_store.items()
+                    if auth and self._check_auth(auth)[0]
+                ),
+                None,
             )
+            auth_payload = metadata.get("auth") or (
+                next(
+                    (
+                        a
+                        for a in self._auth_store.values()
+                        if a and self._check_auth(a)[0]
+                    ),
+                    None,
+                )
+            )
+            authorized, reason = self._check_auth(auth_payload)
+            if authorized and session_id:
+                break
+            time.sleep(wait_interval)
+
+        metadata["session_id"] = session_id
         payload = {
             "message": request.message,
             "default": request.default,
@@ -525,11 +566,14 @@ class WebGateway(BaseGateway):
         event: GatewayExecutionEvent,
         session_id: Optional[str] = None,
     ) -> None:
-        # 单连接模式，固定使用 default session_id
-        session_id = "default"
+        # 多用户模式：广播到所有活跃session
+        session_id = None  # None触发路由器广播到所有session
         payload = dict(event.payload) if event.payload else {}
         auth_payload = payload.get("auth") or (
-            self._auth_store.get(session_id) if session_id else None
+            next(
+                (a for a in self._auth_store.values() if a and self._check_auth(a)[0]),
+                None,
+            )
         )
         authorized, _ = self._check_auth(auth_payload)
         if not authorized:
@@ -615,7 +659,7 @@ class WebSocketConnectionManager:
             await websocket.close()
             return
 
-        # 从认证信息提取user_id，生成per-user session_id，避免多用户共享"default"导致权限互踩
+        # 从认证信息提取user_id，生成per-user session_id，实现用户级auth隔离
         user_id = "unknown"
         if auth_payload and isinstance(auth_payload, dict):
             user_info = auth_payload.get("user_info")
@@ -1732,7 +1776,7 @@ def create_app(
 
         已登录会话或 Bearer Token 任一通过即可。
         """
-        if manager._auth_store.get("default") is not None:
+        if any(auth is not None for auth in manager._auth_store.values()):
             return
         verify_token(request)
 
@@ -2565,7 +2609,7 @@ def create_app(
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = manager._auth_store.get("default") is not None
+            authorized = any(auth is not None for auth in manager._auth_store.values())
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ws")
@@ -2861,7 +2905,7 @@ def create_app(
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = manager._auth_store.get("default") is not None
+            authorized = any(auth is not None for auth in manager._auth_store.values())
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ws")
@@ -3494,8 +3538,20 @@ def create_app(
                     body_bytes = bytes(response.body)
                     body = json_module.loads(body_bytes.decode("utf-8"))
                     if body.get("execution_status") == "waiting_confirm":
-                        session_id = "default"
-                        pending_confirm = input_registry.get_confirm_request(session_id)
+                        # 多用户模式：获取任意活跃session的pending_confirm
+                        session_id = next(
+                            (
+                                sid
+                                for sid, auth in gateway._auth_store.items()
+                                if auth and gateway._check_auth(auth)[0]
+                            ),
+                            None,
+                        )
+                        pending_confirm = (
+                            input_registry.get_confirm_request(session_id)
+                            if session_id
+                            else None
+                        )
                         if pending_confirm:
                             body["pending_confirm"] = pending_confirm
                             from starlette.responses import JSONResponse
@@ -6598,11 +6654,13 @@ def create_app(
 
     # HTTP API：创建终端会话
     @app.post("/api/terminals", dependencies=[Depends(verify_token)])
-    async def create_terminal(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_terminal(
+        request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
         """创建新的终端会话。
 
         Args:
-            request: {
+            request_body: {
                 "interpreter": "bash",  # 可选，默认bash
                 "working_dir": "."     # 可选，默认当前目录
             }
@@ -6611,8 +6669,17 @@ def create_app(
             {"success": True, "data": {"terminal_id": "xxx"}}
         """
         try:
-            interpreter = request.get("interpreter") or os.environ.get("SHELL", "bash")
-            raw_working_dir = request.get("working_dir")
+            # 多用户模式：per-user session隔离
+            user_info = getattr(request.state, "user_info", None)
+            user_id = (
+                user_info.get("user_id", "anonymous") if user_info else "anonymous"
+            )
+            session_id = f"session_{user_id}"
+
+            interpreter = request_body.get("interpreter") or os.environ.get(
+                "SHELL", "bash"
+            )
+            raw_working_dir = request_body.get("working_dir")
             working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
             if not working_dir:
                 working_dir = str(pathlib.Path.home())
@@ -6621,7 +6688,7 @@ def create_app(
                 interpreter=interpreter,
                 working_dir=working_dir,
                 stream_publisher=router,
-                session_id="default",
+                session_id=session_id,
             )
 
             if terminal_id is None:
