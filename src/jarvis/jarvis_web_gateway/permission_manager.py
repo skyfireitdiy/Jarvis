@@ -31,7 +31,6 @@ BUILTIN_GROUPS = {
             "file:upload": "allow",
             "timer:*": "allow",
             "admin:config": "allow",
-            "chat:*": "allow",
         },
         "accessible_nodes": ["*"],
     },
@@ -44,7 +43,6 @@ BUILTIN_GROUPS = {
             "agent:delete": "allow",
             "terminal:*": "allow",
             "file:upload": "allow",
-            "chat:*": "allow",
         },
         "accessible_nodes": [],
     },
@@ -52,16 +50,7 @@ BUILTIN_GROUPS = {
         "display_name": "Viewer",
         "description": "Read-only access",
         "is_builtin": True,
-        "permissions": {
-            "chat:*": "allow",
-        },
-        "accessible_nodes": [],
-    },
-    "sys-chat": {
-        "display_name": "Chat User",
-        "description": "Chat only access",
-        "is_builtin": True,
-        "permissions": {"chat:*": "allow"},
+        "permissions": {},
         "accessible_nodes": [],
     },
 }
@@ -174,6 +163,9 @@ class PermissionManager:
         self._permission_cache.clear()  # 清缓存，确保重新计算
 
     def check_permission(self, user_id: str, permission: str) -> bool:
+        # chat权限全局放行，所有用户均可使用聊天功能
+        if permission.startswith("chat:"):
+            return True
         # admin用户跳过所有权限检查
         if self._user_manager and user_id:
             user = self._user_manager.get_user(user_id)
