@@ -6731,12 +6731,6 @@ function handleMessage(message, agentId = null) {
         streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
         streamingMessage.html = renderMessageHtml(streamingMessage)
-        // 仅当前 Agent 的流式消息触发滚动
-        nextTick(() => {
-          if (isCurrentAgent(targetAgentId) && outputList.value) {
-            outputList.value.scrollTop = outputList.value.scrollHeight
-          }
-        })
       } else {
         console.warn('[STREAM] Received chunk but no streaming message found for agent:', targetAgentId)
       }
@@ -6974,15 +6968,6 @@ function handleMessage(message, agentId = null) {
         } else if (payload.execution_status === 'running') {
           agentInList.status = 'running'
         }
-      }
-
-      // 当当前 Agent 开始思考时，自动滚动到底部
-      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId)) {
-        nextTick(() => {
-          if (outputList.value) {
-            outputList.value.scrollTop = outputList.value.scrollHeight
-          }
-        })
       }
 
       // Agent结束时发送系统通知
@@ -7294,8 +7279,6 @@ function appendOutput(payload, agentId = null) {
 
   // 确定目标 Agent ID：优先使用传入参数，其次使用消息自带 agent_id，最后回退到当前 Agent
   const targetAgentId = resolvedAgentId
-  // 仅当前 Agent 的消息自动滚动到底部
-  const shouldAutoScroll = isCurrentAgent(targetAgentId)
 
   // 添加到目标 Agent 的消息列表
   const currentOutputs = allOutputs.value.get(targetAgentId) || []
@@ -7369,15 +7352,6 @@ function appendOutput(payload, agentId = null) {
     console.warn('[HISTORY] Failed to save message:', error)
   }
   
-  // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发）
-  nextTick(() => {
-    requestAnimationFrame(() => {
-      if (shouldAutoScroll && outputList.value) {
-        const scrollHeight = outputList.value.scrollHeight
-        outputList.value.scrollTop = scrollHeight
-      }
-    })
-  })
 }
 
 // 复制消息内容到剪贴板
