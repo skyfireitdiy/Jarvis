@@ -61,6 +61,7 @@
             <div class="chat-room-actions">
               <span class="chat-room-count">{{ room.member_count }}</span>
               <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
+              <button class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室">✏️</button>
               <button class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室">🗑</button>
             </div>
           </div>
@@ -209,6 +210,7 @@ const emit = defineEmits([
   'toggleCollapse',
   'leaveRoom',
   'deleteRoom',
+  'renameRoom',
   'startSidebarResize',
   'clearMessages',
 ])
@@ -223,6 +225,13 @@ const sidebarCollapsed = ref(false)
 const creatingRoom = ref(false)
 const newRoomName = ref('')
 const pendingImageUrl = ref('')
+
+function handleRenameRoom(room) {
+  const newName = prompt('请输入新的聊天室名称：', room.name)
+  if (newName && newName.trim() && newName.trim() !== room.name) {
+    emit('renameRoom', room.room_id, newName.trim())
+  }
+}
 
 function sendMessage() {
   if (!draftMessage.value.trim() && !pendingImageUrl.value) return

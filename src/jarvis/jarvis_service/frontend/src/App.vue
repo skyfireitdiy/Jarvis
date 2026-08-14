@@ -215,6 +215,7 @@
       @toggleCollapse="toggleChatPanelCollapse"
       @leaveRoom="leaveChatRoom"
       @deleteRoom="deleteChatRoom"
+      @renameRoom="renameChatRoom"
       @startSidebarResize="startChatSidebarResize"
       @clearMessages="clearChatMessages"
     />
@@ -7202,6 +7203,21 @@ function handleChatMessage(type, payload) {
         }]
       }
       break
+    case 'chat_rename_room_response':
+      if (payload?.success) {
+        showToast('聊天室已重命名', 'success')
+      } else {
+        showToast(payload?.error || '重命名聊天室失败', 'error')
+      }
+      break
+    case 'chat_room_renamed':
+      // 广播通知：更新本地房间名
+      if (payload?.room_id && payload?.new_name) {
+        chatRooms.value = chatRooms.value.map(r =>
+          r.room_id === payload.room_id ? { ...r, name: payload.new_name } : r
+        )
+      }
+      break
     case 'chat_room_deleted':
       const removedRoomId = payload?.room_id
       if (removedRoomId) {
@@ -9446,6 +9462,10 @@ function deleteChatRoom(roomId) {
   showConfirm('确定要删除此聊天室吗？此操作不可撤销。', () => {
     sendChatMessageToServer('chat_delete_room', { room_id: roomId, client_id: myClientId.value })
   })
+}
+
+function renameChatRoom(roomId, newName) {
+  sendChatMessageToServer('chat_rename_room', { room_id: roomId, client_id: myClientId.value, new_name: newName })
 }
 
 function clearChatMessages(scope) {

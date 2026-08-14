@@ -303,6 +303,32 @@ class ChatManager:
             self._save_rooms()
         return {"success": True, "room_id": room_id}
 
+    async def rename_room(
+        self, room_id: str, client_id: str, new_name: str
+    ) -> Dict[str, Any]:
+        """重命名聊天室（仅创建者可重命名）。"""
+        if not new_name or not new_name.strip():
+            return {"success": False, "error": "聊天室名称不能为空"}
+        async with self._lock:
+            room = self._chat_rooms.get(room_id)
+            if not room:
+                return {"success": False, "error": "聊天室不存在"}
+            # 从client_id查user_id，仅创建者可重命名
+            client = self._chat_clients.get(client_id)
+            user_id = client.get("user_id") if client else None
+            member_id = user_id or client_id
+            if room["created_by"] != member_id:
+                return {"success": False, "error": "仅创建者可重命名聊天室"}
+            old_name = room["name"]
+            room["name"] = new_name.strip()
+            self._save_rooms()
+        return {
+            "success": True,
+            "room_id": room_id,
+            "old_name": old_name,
+            "new_name": room["name"],
+        }
+
     async def delete_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
         """删除聊天室（仅创建者可删除）。返回被删除房间的成员列表用于通知。"""
         async with self._lock:
