@@ -8,7 +8,7 @@
 **版本**: 3.1.14  
 **定位**: 本地运行、开箱即用、可深度定制的 AI 开发助手平台  
 **目标用户**: 个人开发者、工程团队、专项场景用户  
-**仓库**: https://github.com/skyfireitdiy/Jarvis.git
+**仓库**: <https://github.com/skyfireitdiy/Jarvis.git>
 
 ### 核心能力
 
@@ -88,7 +88,6 @@
 | jarvis_git_utils        | 1       | 574         |
 | jarvis_git_squash       | 2       | 76          |
 | jarvis_rules_index      | 3       | 255         |
-| jarvis_vscode_extension | 1       | 144         |
 | **合计**                | **311** | **132,594** |
 
 > 注：统计范围 src/ 目录下的Python文件；测试文件87个
@@ -220,7 +219,6 @@ Jarvis/
 │   ├── jarvis_git_squash/        # Git压缩（76行）
 │   ├── jarvis_rules_index/       # 规则索引（255行）
 │   ├── jarvis_tui/               # 终端UI模块
-│   ├── jarvis_vscode_extension/  # VSCode插件
 │   ├── prompts/                  # 提示词模板
 │   ├── scripts/                  # 安装脚本
 │   └── jarvis_data/              # 数据文件
@@ -264,7 +262,6 @@ Jarvis/
 │   ├── publish.yml               # PyPI发布
 │   ├── docker-publish.yml        # Docker发布
 │   ├── deploy-docs.yml           # 文档部署
-│   └── publish-vscode.yml        # VSCode插件发布
 ├── .jarvis/                      # Jarvis配置目录
 │   ├── rule.md                   # 项目综述
 │   ├── config.yaml               # 运行配置
@@ -726,13 +723,12 @@ tests/
 
 ## CI/CD
 
-| 工作流         | 文件                                   | 触发条件      | 用途                         |
-| -------------- | -------------------------------------- | ------------- | ---------------------------- |
-| 测试           | `.github/workflows/test.yml`           | push/PR到main | 运行pytest                   |
-| PyPI发布       | `.github/workflows/publish.yml`        | 推送v\*标签   | 构建并发布到PyPI             |
-| Docker发布     | `.github/workflows/docker-publish.yml` | -             | 构建并推送Docker镜像到GHCR   |
-| 文档部署       | `.github/workflows/deploy-docs.yml`    | -             | 部署MkDocs文档到GitHub Pages |
-| VSCode插件发布 | `.github/workflows/publish-vscode.yml` | -             | 发布VSCode扩展               |
+| 工作流     | 文件                                   | 触发条件      | 用途                         |
+| ---------- | -------------------------------------- | ------------- | ---------------------------- |
+| 测试       | `.github/workflows/test.yml`           | push/PR到main | 运行pytest                   |
+| PyPI发布   | `.github/workflows/publish.yml`        | 推送v\*标签   | 构建并发布到PyPI             |
+| Docker发布 | `.github/workflows/docker-publish.yml` | -             | 构建并推送Docker镜像到GHCR   |
+| 文档部署   | `.github/workflows/deploy-docs.yml`    | -             | 部署MkDocs文档到GitHub Pages |
 
 ## 关键配置
 

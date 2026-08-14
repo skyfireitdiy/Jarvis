@@ -52,10 +52,6 @@ def update_version(version_type: str) -> str:
             r'version\s*=\s*["\']([^"\']+)["\']',
             f'version = "{new_version}"',
         ),
-        "src/jarvis/jarvis_vscode_extension/package.json": (
-            r'"version"\s*:\s*"([^"]+)"',
-            f'"version": "{new_version}"',
-        ),
     }
     for file_path, (pattern, replacement) in files_to_update.items():
         path = Path(file_path)
@@ -63,17 +59,6 @@ def update_version(version_type: str) -> str:
             content = path.read_text()
             new_content = re.sub(pattern, replacement, content)
             path.write_text(new_content)
-
-    # Sync package-lock.json with npm
-    vscode_ext_dir = Path("src/jarvis/jarvis_vscode_extension")
-    if (vscode_ext_dir / "package.json").exists():
-        print("📦 Syncing package-lock.json...")
-        subprocess.run(
-            ["npm", "install", "--package-lock-only"],
-            cwd=vscode_ext_dir,
-            check=True,
-            capture_output=True,
-        )
 
     return new_version
 

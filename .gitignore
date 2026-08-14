@@ -22,14 +22,7 @@ plantuml-images
 package-lock.json
 package.json
 node_modules
-package-lock.json
-package.json
-node_modules
-!src/jarvis/jarvis_vscode_extension/package.json
-!src/jarvis/jarvis_vscode_extension/package-lock.json
-src/jarvis/jarvis_vscode_extension/node_modules/
-src/jarvis/jarvis_vscode_extension/dist/
-src/jarvis/jarvis_vscode_extension/*.vsix
+
 *.pyc
 # General
 .DS_Store
@@ -169,7 +162,7 @@ goals
 site
 .jarvis/sessions
 
-src/jarvis/jarvis_vscode_extension/media/chatPanel.js
+
 .jarvis/symbol_table.db
 analysis.db
 

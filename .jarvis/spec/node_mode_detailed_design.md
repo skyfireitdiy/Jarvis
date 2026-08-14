@@ -29,7 +29,6 @@
 - `src/jarvis/jarvis_web_gateway/agent_manager.py`
 - `src/jarvis/jarvis_web_gateway/agent_proxy_manager.py`
 - `src/jarvis/jarvis_service/cli.py`
-- `src/jarvis/jarvis_vscode_extension/src/extension.ts`
 
 同时允许在 `src/jarvis/jarvis_web_gateway/` 下新增 node 模式相关管理模块，但必须优先复用现有组件能力。
 
@@ -213,18 +212,18 @@ created
 
 ### 7.1 错误码表
 
-| 错误码 | 使用场景 | 责任侧 |
-| --- | --- | --- |
-| `INVALID_NODE_MODE` | 启动参数非法 | CLI / 启动层 |
-| `MISSING_NODE_CONFIG` | child 缺少必需参数 | CLI / 启动层 |
-| `NODE_AUTH_FAILED` | 子节点鉴权失败 | 主节点 |
-| `NODE_CONFLICT` | 相同 node_id 冲突接入 | 主节点 |
-| `NODE_OFFLINE` | 目标节点不可用 | 主节点 |
-| `TOKEN_SYNC_FAILED` | 子节点 token 更新失败 | 子节点 |
-| `AGENT_NOT_FOUND` | 路由未找到 Agent | 主节点 |
-| `FORWARD_TIMEOUT` | 节点转发超时 | 主节点 |
-| `FORWARD_FAILED` | 子节点执行代理失败 | 主/子节点 |
-| `UNSUPPORTED_NODE_OPERATION` | 当前模式不支持某操作 | 主/子节点 |
+| 错误码                       | 使用场景              | 责任侧       |
+| ---------------------------- | --------------------- | ------------ |
+| `INVALID_NODE_MODE`          | 启动参数非法          | CLI / 启动层 |
+| `MISSING_NODE_CONFIG`        | child 缺少必需参数    | CLI / 启动层 |
+| `NODE_AUTH_FAILED`           | 子节点鉴权失败        | 主节点       |
+| `NODE_CONFLICT`              | 相同 node_id 冲突接入 | 主节点       |
+| `NODE_OFFLINE`               | 目标节点不可用        | 主节点       |
+| `TOKEN_SYNC_FAILED`          | 子节点 token 更新失败 | 子节点       |
+| `AGENT_NOT_FOUND`            | 路由未找到 Agent      | 主节点       |
+| `FORWARD_TIMEOUT`            | 节点转发超时          | 主节点       |
+| `FORWARD_FAILED`             | 子节点执行代理失败    | 主/子节点    |
+| `UNSUPPORTED_NODE_OPERATION` | 当前模式不支持某操作  | 主/子节点    |
 
 ### 7.2 错误处理约定
 

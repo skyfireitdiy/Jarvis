@@ -225,36 +225,36 @@
 
 ### 3.1 节点模式输入
 
-| 输入项 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| node_mode | string | 否 | `master/child` |
-| node_id | string | child 时是 | 当前节点 ID |
-| master_url | string | child 时是 | 主节点地址 |
+| 输入项      | 类型   | 必填       | 说明           |
+| ----------- | ------ | ---------- | -------------- |
+| node_mode   | string | 否         | `master/child` |
+| node_id     | string | child 时是 | 当前节点 ID    |
+| master_url  | string | child 时是 | 主节点地址     |
 | node_secret | string | child 时是 | 子节点接入凭据 |
 
 ### 3.2 Agent 创建输入
 
-| 输入项 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| agent_type | string | 是 | Agent 类型 |
-| working_dir | string | 是 | 工作目录 |
-| node_id | string | 否 | 目标节点 |
+| 输入项      | 类型   | 必填 | 说明       |
+| ----------- | ------ | ---- | ---------- |
+| agent_type  | string | 是   | Agent 类型 |
+| working_dir | string | 是   | 工作目录   |
+| node_id     | string | 否   | 目标节点   |
 
 ### 3.3 Agent 创建输出
 
-| 输出项 | 类型 | 说明 |
-| --- | --- | --- |
+| 输出项   | 类型   | 说明           |
+| -------- | ------ | -------------- |
 | agent_id | string | Agent 唯一标识 |
-| node_id | string | Agent 所属节点 |
-| status | string | Agent 当前状态 |
+| node_id  | string | Agent 所属节点 |
+| status   | string | Agent 当前状态 |
 
 ### 3.4 节点状态输出
 
-| 输出项 | 类型 | 说明 |
-| --- | --- | --- |
-| node_id | string | 节点标识 |
-| status | string | `online/offline/degraded` |
-| last_heartbeat_at | string | 最近心跳时间 |
+| 输出项            | 类型   | 说明                      |
+| ----------------- | ------ | ------------------------- |
+| node_id           | string | 节点标识                  |
+| status            | string | `online/offline/degraded` |
+| last_heartbeat_at | string | 最近心跳时间              |
 
 ## 4. 数据结构要求
 
@@ -465,4 +465,3 @@
 - `src/jarvis/jarvis_web_gateway/agent_manager.py`
 - `src/jarvis/jarvis_web_gateway/agent_proxy_manager.py`
 - `src/jarvis/jarvis_service/cli.py`
-- `src/jarvis/jarvis_vscode_extension/src/extension.ts`

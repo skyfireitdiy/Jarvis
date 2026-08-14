@@ -263,7 +263,6 @@
 
 **主要代码落点**：
 
-- `src/jarvis/jarvis_vscode_extension/src/extension.ts`
 - 可能的前端调用层
 
 **输出结果**：
@@ -355,20 +354,20 @@
 
 ### 5.2 子文档职责
 
-| 文件名 | 功能点 | 主要目标 |
-| --- | --- | --- |
-| `01_cli_and_config.md` | F1 | 明确 CLI 参数、配置源、参数校验与代码入口 |
-| `02_runtime_mode_and_bootstrap.md` | F2 | 明确 master/child 模式初始化流程与组件装配 |
-| `03_node_connection_and_auth.md` | F3 | 明确节点 WS 接入、认证时序、冲突处理 |
-| `04_token_sync.md` | F4 | 明确 token 下发、更新与失败处理 |
-| `05_node_registry_and_heartbeat.md` | F5 | 明确节点状态模型、心跳、断连、重连 |
-| `06_agent_metadata_and_routing.md` | F6 | 明确 AgentInfo 扩展与路由表维护 |
-| `07_agent_creation_routing.md` | F7 | 明确创建 Agent 的本地/远端分流 |
-| `08_remote_http_proxy.md` | F8 | 明确远端 HTTP 请求封装、回传与异常处理 |
-| `09_remote_ws_proxy.md` | F9 | 明确远端 WS 通道生命周期与转发协议 |
-| `10_client_compatibility.md` | F10 | 明确 API 兼容与客户端字段扩展 |
-| `11_error_codes_and_state_machine.md` | F11 | 明确错误码、状态图、日志要求 |
-| `12_test_and_validation.md` | F12 | 明确测试矩阵、验收步骤与未验证项定义 |
+| 文件名                                | 功能点 | 主要目标                                   |
+| ------------------------------------- | ------ | ------------------------------------------ |
+| `01_cli_and_config.md`                | F1     | 明确 CLI 参数、配置源、参数校验与代码入口  |
+| `02_runtime_mode_and_bootstrap.md`    | F2     | 明确 master/child 模式初始化流程与组件装配 |
+| `03_node_connection_and_auth.md`      | F3     | 明确节点 WS 接入、认证时序、冲突处理       |
+| `04_token_sync.md`                    | F4     | 明确 token 下发、更新与失败处理            |
+| `05_node_registry_and_heartbeat.md`   | F5     | 明确节点状态模型、心跳、断连、重连         |
+| `06_agent_metadata_and_routing.md`    | F6     | 明确 AgentInfo 扩展与路由表维护            |
+| `07_agent_creation_routing.md`        | F7     | 明确创建 Agent 的本地/远端分流             |
+| `08_remote_http_proxy.md`             | F8     | 明确远端 HTTP 请求封装、回传与异常处理     |
+| `09_remote_ws_proxy.md`               | F9     | 明确远端 WS 通道生命周期与转发协议         |
+| `10_client_compatibility.md`          | F10    | 明确 API 兼容与客户端字段扩展              |
+| `11_error_codes_and_state_machine.md` | F11    | 明确错误码、状态图、日志要求               |
+| `12_test_and_validation.md`           | F12    | 明确测试矩阵、验收步骤与未验证项定义       |
 
 ## 6. 后续编写要求
 
@@ -392,7 +391,6 @@
    - `src/jarvis/jarvis_web_gateway/agent_manager.py`
    - `src/jarvis/jarvis_web_gateway/agent_proxy_manager.py`
    - `src/jarvis/jarvis_service/cli.py`
-   - `src/jarvis/jarvis_vscode_extension/src/extension.ts`
 
 3. 设计必须达到以下程度：
    - 开发者可直接据此确定修改文件
