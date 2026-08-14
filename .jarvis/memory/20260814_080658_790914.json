@@ -1,0 +1,8 @@
+{
+  "id": "20260814_080658_790914",
+  "type": "project_long_term",
+  "tags": ["架构决策", "首轮检测", "工具调用修复"],
+  "content": "首轮无工具调用检测机制：在_track_no_tool_call方法(run_loop.py:686)中，当ag.first=True且无工具调用时，创建临时cheap LLM(PlatformRegistry.get_cheap_platform())判断是否应调用工具。询问提示词含用户原始输入+LLM响应+工具列表摘要，返回<!!!YES!!!>或<!!!NO!!!>。YES时注入build_fix_prompt构建的FixToolCall提示词。异常静默跳过。commit: c18b9a4",
+  "created_at": "2026-08-14T08:06:58.790954",
+  "updated_at": "2026-08-14T08:06:58.790960"
+}

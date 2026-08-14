@@ -626,7 +626,9 @@ class AgentRunLoop:
         if hasattr(ag, "_review_and_fix"):
             try:
                 ag._review_and_fix()
-                ag._review_already_done = True  # 标记已执行 review，避免 CodeAgent.run 重复执行
+                ag._review_already_done = (
+                    True  # 标记已执行 review，避免 CodeAgent.run 重复执行
+                )
             except Exception as e:
                 save_exception(
                     e, module="jarvis_agent.run_loop", function="_execute_auto_complete"
@@ -688,6 +690,10 @@ class AgentRunLoop:
     ) -> Any:
         """跟踪无工具调用情况并在必要时尝试修复
 
+        核心逻辑：
+        - 首轮检测：若 ag.first=True（首轮）且无工具调用，触发 cheap LLM 判断是否应调用工具
+        - 后续轮次：若 ag.first=False（非首轮），沿用原有逻辑（连续2次无工具调用时修复）
+
         参数:
             ag: agent实例
             safe_tool_prompt: 安全的工具提示内容
@@ -701,6 +707,61 @@ class AgentRunLoop:
         # 保存当前响应内容供用户手动修复工具调用
         ag._last_response_content = current_response
 
+        # 【新增】首轮检测：若为首轮且无工具调用，触发cheap LLM判断
+        if ag.first and not has_tool_call:
+            try:
+                from jarvis.jarvis_platform.registry import PlatformRegistry
+                from jarvis.jarvis_agent.utils import build_fix_prompt
+
+                # 创建临时cheap LLM，避免额外成本
+                platform_registry = PlatformRegistry()
+                cheap_model = platform_registry.get_cheap_platform()
+
+                # 构建询问提示词：含用户原始输入、LLM响应、工具列表摘要
+                tool_list_summary = ag.get_tool_usage_prompt()
+                # 截取工具列表摘要，避免过长
+                if len(tool_list_summary) > 2000:
+                    tool_list_summary = (
+                        tool_list_summary[:2000] + "\n...(工具列表过长，已截断)"
+                    )
+
+                ask_prompt = (
+                    "以下是Agent首轮的输出，请判断是否需要调用工具。\n\n"
+                    f"用户输入：{ag.original_user_input}\n\n"
+                    f"Agent响应：{current_response[:1000]}\n\n"
+                    f"可用工具摘要：{tool_list_summary}\n\n"
+                    "请判断：Agent是否应该调用工具来完成此任务？\n"
+                    "如果应该调用工具，请回复 <!!!YES!!!>\n"
+                    "如果不需要调用工具（如纯对话、问候等），请回复 <!!!NO!!!>"
+                )
+
+                # 调用cheap LLM获取判断结果
+                judgment = cheap_model.chat_until_success(ask_prompt)
+
+                if "<!!!YES!!!>" in judgment:
+                    # 应调用工具，注入FixToolCall提示词
+                    PrettyOutput.auto_print(
+                        "🔍 首轮无工具调用，cheap LLM判断应调用工具，注入修复提示词"
+                    )
+                    fix_prompt = build_fix_prompt(
+                        content=current_response,
+                        error_msg="首轮未调用工具，请据工具说明修正输出",
+                        tool_usage=ag.get_tool_usage_prompt(),
+                    )
+                    ag.set_addon_prompt(fix_prompt)
+                    ag._no_tool_call_count = 0
+                    return None
+                else:
+                    # 不应调用工具或判断不明确，静默跳过
+                    ag._no_tool_call_count = 0
+                    return None
+
+            except Exception:
+                # 异常时静默跳过，不影响主流程
+                ag._no_tool_call_count = 0
+                return None
+
+        # 【原有逻辑】非首轮或已有工具调用时，沿用原有逻辑
         # 在非交互模式下，跟踪连续没有工具调用的次数
         if ag.non_interactive:
             if has_tool_call:
@@ -1036,7 +1097,7 @@ class AgentRunLoop:
                 action = normalize_next_action(next_action)
                 if action == "continue":
                     # 用户输入新需求，重置 review 标志
-                    if hasattr(ag, '_review_already_done'):
+                    if hasattr(ag, "_review_already_done"):
                         ag._review_already_done = False
                     run_input_handlers = True
                     continue
