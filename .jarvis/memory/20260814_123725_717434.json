@@ -1,0 +1,8 @@
+{
+  "id": "20260814_123725_717434",
+  "type": "project_long_term",
+  "tags": ["聊天室", "重命名接口", "chat_manager"],
+  "content": "聊天室修改群组名称接口已完成。chat_manager.py新增rename_room方法(仅创建者可重命名)，app.py新增chat_rename_room消息分发+_handle_chat_rename_room处理函数。成功后广播chat_room_renamed通知房间所有成员。请求payload含room_id/client_id/new_name，响应含success/room_id/old_name/new_name。",
+  "created_at": "2026-08-14T12:37:25.717497",
+  "updated_at": "2026-08-14T12:37:25.717504"
+}

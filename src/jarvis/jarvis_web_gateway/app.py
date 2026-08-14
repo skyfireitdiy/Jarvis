@@ -1276,6 +1276,8 @@ class WebSocketConnectionManager:
                 await self._handle_chat_join_room(payload, websocket)
             elif message_type == "chat_leave_room":
                 await self._handle_chat_leave_room(payload, websocket)
+            elif message_type == "chat_rename_room":
+                await self._handle_chat_rename_room(payload, websocket)
             elif message_type == "chat_delete_room":
                 await self._handle_chat_delete_room(payload, websocket)
             elif message_type == "chat_send_message":
@@ -1437,6 +1439,38 @@ class WebSocketConnectionManager:
                         pass
         await websocket.send_json(
             {"type": "chat_delete_room_response", "payload": result}
+        )
+
+    async def _handle_chat_rename_room(
+        self, payload: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """重命名聊天室（仅创建者可重命名）。"""
+        room_id = payload.get("room_id", "")
+        client_id = payload.get("client_id", "")
+        new_name = payload.get("new_name", "")
+        result = await self._chat_manager.rename_room(room_id, client_id, new_name)
+        if result.get("success"):
+            # 广播重命名通知给房间所有成员
+            room = self._chat_manager._chat_rooms.get(room_id)
+            if room:
+                for mid in room["members"]:
+                    client = self._chat_manager.get_client(mid)
+                    if client and client.get("websocket"):
+                        try:
+                            await client["websocket"].send_json(
+                                {
+                                    "type": "chat_room_renamed",
+                                    "payload": {
+                                        "room_id": room_id,
+                                        "old_name": result.get("old_name", ""),
+                                        "new_name": result.get("new_name", ""),
+                                    },
+                                }
+                            )
+                        except Exception:
+                            pass
+        await websocket.send_json(
+            {"type": "chat_rename_room_response", "payload": result}
         )
 
     async def _handle_chat_send_message(
