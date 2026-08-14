@@ -177,20 +177,29 @@ class ChatManager:
         latest = None
         for cid, info in self._chat_clients.items():
             if info.get("user_id") == user_id:
-                if latest is None or info.get("registered_at", 0) > latest.get("registered_at", 0):
+                if latest is None or info.get("registered_at", 0) > latest.get(
+                    "registered_at", 0
+                ):
                     latest = {"client_id": cid, **info}
         return latest
 
     def get_clients(self) -> list[Dict[str, Any]]:
-        """获取所有在线客户端列表。"""
-        return [
-            {
-                "client_id": cid,
-                "name": info["name"],
-                "display_name": info.get("display_name", info["name"]),
-            }
-            for cid, info in self._chat_clients.items()
-        ]
+        """获取所有在线客户端列表（按user_id去重，同用户多设备仅显示一次）。"""
+        user_map: Dict[str, Dict[str, Any]] = {}  # user_id -> 聚合信息
+        for cid, info in self._chat_clients.items():
+            uid = info.get("user_id") or cid
+            if uid in user_map:
+                # 同用户多设备，累加设备计数
+                user_map[uid]["client_count"] += 1
+            else:
+                user_map[uid] = {
+                    "client_id": cid,
+                    "name": info["name"],
+                    "display_name": info.get("display_name", info["name"]),
+                    "user_id": uid,
+                    "client_count": 1,
+                }
+        return list(user_map.values())
 
     async def broadcast_to_all(
         self,
@@ -250,7 +259,9 @@ class ChatManager:
             client = self._chat_clients.get(client_id)
             user_id = client.get("user_id") if client else None
             member_id = user_id or client_id
-            print(f"[CHAT JOIN] room={room_id} client_id={client_id} user_id={user_id} member_id={member_id} existing_members={room['members']}")
+            print(
+                f"[CHAT JOIN] room={room_id} client_id={client_id} user_id={user_id} member_id={member_id} existing_members={room['members']}"
+            )
             room["members"].add(member_id)
             self._save_rooms()
         return {"success": True, "room_id": room_id, "name": room["name"]}
@@ -333,18 +344,24 @@ class ChatManager:
         if exclude_client_id:
             ex_client = self._chat_clients.get(exclude_client_id)
             exclude_user_id = ex_client.get("user_id") if ex_client else None
-        print(f"[CHAT BROADCAST] room={room_id} members={room['members']} exclude_uid={exclude_user_id}")
+        print(
+            f"[CHAT BROADCAST] room={room_id} members={room['members']} exclude_uid={exclude_user_id}"
+        )
         for uid in room["members"]:
             if uid == exclude_user_id:
                 print(f"[CHAT BROADCAST] skip excluded uid={uid}")
                 continue
             # 查在线客户端
             client = self.get_client_by_user_id(uid)
-            print(f"[CHAT BROADCAST] uid={uid} client_found={client is not None} has_ws={client.get('websocket') is not None if client else 'N/A'}")
+            print(
+                f"[CHAT BROADCAST] uid={uid} client_found={client is not None} has_ws={client.get('websocket') is not None if client else 'N/A'}"
+            )
             if client and client.get("websocket"):
                 try:
                     await client["websocket"].send_json(message)
-                    print(f"[CHAT BROADCAST] sent to uid={uid} client_id={client.get('client_id')}")
+                    print(
+                        f"[CHAT BROADCAST] sent to uid={uid} client_id={client.get('client_id')}"
+                    )
                 except Exception as e:
                     print(f"[CHAT BROADCAST] FAILED to send to uid={uid}: {e}")
 
@@ -355,10 +372,15 @@ class ChatManager:
     async def send_private(
         self, sender_id: str, receiver_id: str, content: str, image_url: str = ""
     ) -> Dict[str, Any]:
-        """发送私聊消息。"""
+        """发送私聊消息（支持多设备接收）。"""
         if sender_id not in self._chat_clients:
             return {"success": False, "error": "发送者未注册"}
-        if receiver_id not in self._chat_clients:
+        # 【修改】在线检查兼容user_id：按client_id或user_id查找任一在线设备
+        receiver_online = any(
+            info.get("user_id") == receiver_id or cid == receiver_id
+            for cid, info in self._chat_clients.items()
+        )
+        if not receiver_online:
             return {"success": False, "error": "接收者不在线"}
 
         # 查找或创建私聊会话
@@ -387,23 +409,35 @@ class ChatManager:
             msg["image_url"] = image_url
         self._chat_private_sessions[session_id]["messages"].append(msg)
 
-        # 发送给接收者
-        receiver = self._chat_clients[receiver_id]
-        if receiver["websocket"]:
-            try:
-                await receiver["websocket"].send_json(
-                    {
-                        "type": "chat_private_message",
-                        "payload": {
-                            "session_id": session_id,
-                            "message": msg,
-                        },
-                    }
-                )
-            except Exception:
-                pass
+        # 【新增】按user_id查找所有在线设备并广播
+        receiver_user_id = None
+        for cid, info in self._chat_clients.items():
+            if info.get("user_id") == receiver_id or cid == receiver_id:
+                receiver_user_id = info.get("user_id") or cid
+                break
 
-        return {"success": True, "session_id": session_id, "message": msg}
+        # 向所有匹配user_id的设备发送消息
+        sent_count = 0
+        for cid, info in self._chat_clients.items():
+            if info.get("user_id") == receiver_user_id:
+                if info["websocket"]:
+                    try:
+                        await info["websocket"].send_json(
+                            {
+                                "type": "chat_private_message",
+                                "payload": {"session_id": session_id, "message": msg},
+                            }
+                        )
+                        sent_count += 1
+                    except Exception:
+                        pass
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": msg,
+            "sent_count": sent_count,
+        }
 
     def get_private_history(self, client_id: str, other_id: str) -> Dict[str, Any]:
         """获取私聊历史消息。"""
