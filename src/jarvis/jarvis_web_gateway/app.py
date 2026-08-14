@@ -5370,6 +5370,23 @@ def create_app(
                     if line.strip()
                 ]
 
+            # 【新增】合并附加补全目录（含builtin）的文件
+            from jarvis.jarvis_utils.input import (
+                get_additional_completion_dirs,
+                _scan_files_under_dir,
+            )
+
+            for extra_dir in get_additional_completion_dirs():
+                extra_files = _scan_files_under_dir(
+                    extra_dir, exclude_git=True, max_files=5000, use_absolute_path=True
+                )
+                # 去重合并
+                existing = set(files)
+                for f in extra_files:
+                    if f not in existing:
+                        files.append(f)
+                        existing.add(f)
+
             # 使用 fzf 进行模糊搜索
             search_results = []
             if query and files:
