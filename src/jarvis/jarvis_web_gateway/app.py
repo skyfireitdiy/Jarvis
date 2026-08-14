@@ -1941,6 +1941,88 @@ def create_app(
                 )
         return {"success": True, "rooms": rooms}
 
+    # ------------------------------------------------------------------
+    # 聊天室 HTTP API（供 Agent 通过 gateway_manager 调用）
+    # ------------------------------------------------------------------
+
+    @app.get("/api/chat/rooms", dependencies=[Depends(verify_token)])
+    async def api_chat_list_rooms(request: Request) -> Dict[str, Any]:
+        """获取所有聊天室列表。"""
+        rooms = manager._chat_manager.get_rooms()
+        return {"success": True, "rooms": rooms}
+
+    @app.get("/api/chat/online-clients", dependencies=[Depends(verify_token)])
+    async def api_chat_get_online_clients(request: Request) -> Dict[str, Any]:
+        """获取在线用户列表。"""
+        clients = manager._chat_manager.get_clients()
+        return {"success": True, "clients": clients}
+
+    @app.get("/api/chat/room-members", dependencies=[Depends(verify_token)])
+    async def api_chat_get_room_members(request: Request) -> Dict[str, Any]:
+        """获取聊天室成员列表。"""
+        room_id = request.query_params.get("room_id", "")
+        if not room_id:
+            return {"success": False, "error": "room_id is required"}
+        members = manager._chat_manager.get_room_members(room_id)
+        return {"success": True, "room_id": room_id, "members": members}
+
+    @app.post("/api/chat/send-room-message", dependencies=[Depends(verify_token)])
+    async def api_chat_send_room_message(request: Request) -> Dict[str, Any]:
+        """发送聊天室消息（Agent调用，以owner身份）。"""
+        body = await request.json()
+        room_id = body.get("room_id", "")
+        content = body.get("content", "")
+        sender_name = body.get("sender_name", "Agent")
+        if not room_id or not content:
+            return {"success": False, "error": "room_id and content are required"}
+        # 构造消息并广播
+        msg = {
+            "type": "chat_message",
+            "payload": {
+                "room_id": room_id,
+                "client_id": "agent",
+                "sender_name": sender_name,
+                "sender_display_name": sender_name,
+                "content": content,
+                "timestamp": time.time(),
+            },
+        }
+        await manager._chat_manager.broadcast_to_room(room_id, msg)
+        return {"success": True}
+
+    @app.post("/api/chat/send-private-message", dependencies=[Depends(verify_token)])
+    async def api_chat_send_private_message(request: Request) -> Dict[str, Any]:
+        """发送私聊消息（Agent调用，以owner身份）。"""
+        body = await request.json()
+        receiver_id = body.get("receiver_id", "")
+        content = body.get("content", "")
+        sender_name = body.get("sender_name", "Agent")
+        if not receiver_id or not content:
+            return {"success": False, "error": "receiver_id and content are required"}
+        # 查找owner的在线client作为sender
+        owner_client = None
+        for cid, info in manager._chat_manager._chat_clients.items():
+            if info.get("user_id") == "owner":
+                owner_client = cid
+                break
+        sender_id = owner_client or "agent"
+        # 若sender未注册，先注册临时client
+        if sender_id not in manager._chat_manager._chat_clients:
+            # 临时注册以支持send_private
+            temp_ws = None  # 无实际WebSocket连接
+            manager._chat_manager._chat_clients[sender_id] = {
+                "name": sender_name,
+                "display_name": sender_name,
+                "connection_id": "agent_temp",
+                "websocket": temp_ws,
+                "registered_at": time.time(),
+                "user_id": "owner",
+            }
+        result = await manager._chat_manager.send_private(
+            sender_id, receiver_id, content
+        )
+        return result
+
     # 权限检查依赖
     def require_permission(resource: str, action: str):
         """创建需要特定权限的FastAPI依赖。"""

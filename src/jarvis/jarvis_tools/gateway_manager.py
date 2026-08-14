@@ -73,10 +73,16 @@ class GatewayManagerTool:
 19. **leave_group**: 出群组
 20. **send_group_message**: 发群组讯
 21. **regenerate_agent**: 无损重生指 Agent
+22. **chat_list_rooms**: 获取聊天室列表
+23. **chat_get_online_clients**: 获取在线用户列表
+24. **chat_get_room_members**: 获取聊天室成员列表
+25. **chat_send_room_message**: 发送聊天室消息（自动添加[Agent名字]前缀）
+26. **chat_send_private_message**: 发送私聊消息（自动添加[Agent名字]前缀）
 
 **要示**：
-- 每调只能执一操（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent）
-- 参据操类而异"""
+- 每调只能执一操（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent、chat_list_rooms、chat_get_online_clients、chat_get_room_members、chat_send_room_message、chat_send_private_message）
+- 参据操类而异
+- 聊天室消息自动添加[Agent名字]前缀，以owner用户身份发送"""
 
     parameters = {
         "type": "object",
@@ -105,8 +111,13 @@ class GatewayManagerTool:
                     "leave_group",
                     "send_group_message",
                     "regenerate_agent",
+                    "chat_list_rooms",
+                    "chat_get_online_clients",
+                    "chat_get_room_members",
+                    "chat_send_room_message",
+                    "chat_send_private_message",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）、regenerate_agent（无损重生指定 Agent）",
+                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）、regenerate_agent（无损重生指定 Agent）、chat_list_rooms（获取聊天室列表）、chat_get_online_clients（获取在线用户列表）、chat_get_room_members（获取聊天室成员列表）、chat_send_room_message（发送聊天室消息）、chat_send_private_message（发送私聊消息）",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -210,6 +221,15 @@ class GatewayManagerTool:
                 "type": "string",
                 "description": "群组描述（create_group 操作可选）",
             },
+            # 聊天室操作的参数
+            "room_id": {
+                "type": "string",
+                "description": "聊天室 ID（chat_get_room_members、chat_send_room_message 操作必填）",
+            },
+            "receiver_id": {
+                "type": "string",
+                "description": "接收者 ID（chat_send_private_message 操作必填，可以是 client_id 或 user_id）",
+            },
         },
         "required": ["action"],
     }
@@ -241,6 +261,8 @@ class GatewayManagerTool:
         group_id: Optional[str] = None,
         group_name: Optional[str] = None,
         group_description: Optional[str] = None,
+        room_id: Optional[str] = None,
+        receiver_id: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """执行 Gateway 管理操作
@@ -270,6 +292,8 @@ class GatewayManagerTool:
             group_id: 群组 ID（get_group、join_group、leave_group、send_group_message）
             group_name: 群组名称（create_group）
             group_description: 群组描述（create_group）
+            room_id: 聊天室 ID（chat_get_room_members、chat_send_room_message）
+            receiver_id: 接收者 ID（chat_send_private_message）
             **kwargs: 其他参数
 
         返回:
@@ -302,6 +326,8 @@ class GatewayManagerTool:
             group_id = args.get("group_id")
             group_name = args.get("group_name")
             group_description = args.get("group_description")
+            room_id = args.get("room_id")
+            receiver_id = args.get("receiver_id")
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message, node_id=node_id)
@@ -365,6 +391,18 @@ class GatewayManagerTool:
                 return self._leave_group(group_id=group_id)
             elif action == "send_group_message":
                 return self._send_group_message(group_id=group_id, message=message)
+            elif action == "chat_list_rooms":
+                return self._chat_list_rooms()
+            elif action == "chat_get_online_clients":
+                return self._chat_get_online_clients()
+            elif action == "chat_get_room_members":
+                return self._chat_get_room_members(room_id=room_id)
+            elif action == "chat_send_room_message":
+                return self._chat_send_room_message(room_id=room_id, message=message)
+            elif action == "chat_send_private_message":
+                return self._chat_send_private_message(
+                    receiver_id=receiver_id, message=message
+                )
             elif action == "regenerate_agent":
                 # 支持批量重生
                 if isinstance(agent_id, list):
@@ -2120,3 +2158,143 @@ class GatewayManagerTool:
                 "stdout": create_result["stdout"],
                 "stderr": "",
             }
+
+    # ------------------------------------------------------------------
+    # 聊天室操作
+    # ------------------------------------------------------------------
+
+    def _get_agent_name(self) -> str:
+        """获取当前Agent名字，用于消息前缀。"""
+        try:
+            from jarvis.jarvis_utils.globals import get_current_agent_name
+
+            name = get_current_agent_name()
+            if name:
+                return name
+        except Exception:
+            pass
+        # fallback: 用agent_id
+        return jglobals.agent_id or "Agent"
+
+    def _chat_list_rooms(self) -> Dict[str, Any]:
+        """获取聊天室列表。"""
+        err = self._get_master_url("list chat rooms")
+        if err:
+            return err
+        result = self._request_gateway(
+            method="GET",
+            path="/api/chat/rooms",
+            error_prefix="Failed to list chat rooms",
+        )
+        return self._handle_gateway_response(result, success_data_key="rooms")
+
+    def _chat_get_online_clients(self) -> Dict[str, Any]:
+        """获取在线用户列表。"""
+        err = self._get_master_url("get online clients")
+        if err:
+            return err
+        result = self._request_gateway(
+            method="GET",
+            path="/api/chat/online-clients",
+            error_prefix="Failed to get online clients",
+        )
+        return self._handle_gateway_response(result, success_data_key="clients")
+
+    def _chat_get_room_members(self, room_id: Optional[str] = None) -> Dict[str, Any]:
+        """获取聊天室成员列表。
+
+        参数:
+            room_id: 聊天室 ID
+        """
+        if not room_id:
+            return {"success": False, "stdout": "", "stderr": "room_id is required"}
+        err = self._get_master_url("get room members")
+        if err:
+            return err
+        result = self._request_gateway(
+            method="GET",
+            path="/api/chat/room-members",
+            params={"room_id": room_id},
+            error_prefix=f"Failed to get members of room {room_id}",
+        )
+        return self._handle_gateway_response(result, success_data_key="members")
+
+    def _chat_send_room_message(
+        self, room_id: Optional[str] = None, message: str = ""
+    ) -> Dict[str, Any]:
+        """发送聊天室消息（自动添加[Agent名字]前缀）。
+
+        参数:
+            room_id: 聊天室 ID
+            message: 消息内容
+        """
+        if not room_id:
+            return {"success": False, "stdout": "", "stderr": "room_id is required"}
+        if not message:
+            return {"success": False, "stdout": "", "stderr": "message is required"}
+        err = self._get_master_url("send room message")
+        if err:
+            return err
+        # 自动添加[Agent名字]前缀
+        agent_name = self._get_agent_name()
+        prefixed_message = f"[{agent_name}] {message}"
+        result = self._request_gateway(
+            method="POST",
+            path="/api/chat/send-room-message",
+            json_data={
+                "room_id": room_id,
+                "content": prefixed_message,
+                "sender_name": agent_name,
+            },
+            error_prefix=f"Failed to send message to room {room_id}",
+        )
+        if result["success"]:
+            return {
+                "success": True,
+                "stdout": json.dumps(
+                    {"room_id": room_id, "message": prefixed_message},
+                    ensure_ascii=False,
+                ),
+                "stderr": "",
+            }
+        return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _chat_send_private_message(
+        self, receiver_id: Optional[str] = None, message: str = ""
+    ) -> Dict[str, Any]:
+        """发送私聊消息（自动添加[Agent名字]前缀）。
+
+        参数:
+            receiver_id: 接收者 ID
+            message: 消息内容
+        """
+        if not receiver_id:
+            return {"success": False, "stdout": "", "stderr": "receiver_id is required"}
+        if not message:
+            return {"success": False, "stdout": "", "stderr": "message is required"}
+        err = self._get_master_url("send private message")
+        if err:
+            return err
+        # 自动添加[Agent名字]前缀
+        agent_name = self._get_agent_name()
+        prefixed_message = f"[{agent_name}] {message}"
+        result = self._request_gateway(
+            method="POST",
+            path="/api/chat/send-private-message",
+            json_data={
+                "receiver_id": receiver_id,
+                "content": prefixed_message,
+                "sender_name": agent_name,
+            },
+            error_prefix=f"Failed to send private message to {receiver_id}",
+        )
+        if result["success"]:
+            return {
+                "success": True,
+                "stdout": json.dumps(
+                    {"receiver_id": receiver_id, "message": prefixed_message},
+                    ensure_ascii=False,
+                ),
+                "stderr": "",
+            }
+        return {"success": False, "stdout": "", "stderr": result["error"]}
