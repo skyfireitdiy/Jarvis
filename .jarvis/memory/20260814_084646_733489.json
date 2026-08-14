@@ -1,0 +1,8 @@
+{
+  "id": "20260814_084646_733489",
+  "type": "project_long_term",
+  "tags": ["发送人前缀", "builtin_input_handler", "已完成"],
+  "content": "发送人前缀恢复机制已完成(commit 015aac7)。builtin_input_handler中：1)入口处(128-132行)剥离发送人前缀存_sender_prefix；2)无特殊标记提前返回(141行)恢复前缀；3)末尾主返回(1609行)恢复前缀。其余return路径返回空串或特定提示词，无需恢复。",
+  "created_at": "2026-08-14T08:46:46.733533",
+  "updated_at": "2026-08-14T08:46:46.733540"
+}

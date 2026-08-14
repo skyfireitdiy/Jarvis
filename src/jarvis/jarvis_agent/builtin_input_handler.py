@@ -122,10 +122,22 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     from jarvis.jarvis_agent import Agent
 
     agent: Agent = agent_
+
+    # 【新增】剥离发送人前缀（格式：xxx：或xxx:），避免干扰特殊标记匹配和编排等逻辑
+    # 前缀仅出现在多行消息首行，格式为"发送人："或"发送人:"
+    _sender_prefix = None
+    _sender_match = re.match(r"^(.+?)[：:]\s*", user_input)
+    if _sender_match and "\n" in user_input:
+        _sender_prefix = _sender_match.group(0)
+        user_input = user_input[len(_sender_prefix) :]
+
     # 查找特殊标记
     special_tags = re.findall(r"'<([^>]+)>'", user_input)
 
     if not special_tags:
+        # 无特殊标记时亦需恢复发送人前缀
+        if _sender_prefix:
+            user_input = _sender_prefix + user_input
         return user_input, False
 
     # 获取替换映射表
@@ -1589,6 +1601,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
     # 设置附加提示词并返回处理后的内容
     agent.set_addon_prompt(add_on_prompt)
+
+    # 【新增】恢复发送人前缀，确保agent对话中保留发送人信息
+    if _sender_prefix and not modified_input.startswith(_sender_prefix):
+        modified_input = _sender_prefix + modified_input
+
     return modified_input, False
 
 
