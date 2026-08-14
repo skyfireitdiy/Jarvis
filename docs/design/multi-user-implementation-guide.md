@@ -521,84 +521,22 @@ P7: 修改前端 App.vue + ConnectModal.vue (依赖P5)
 
 ---
 
-### 5.4 VSCode插件认证适配
-
-**文件**：`src/jarvis/jarvis_vscode_extension/src/extension.ts`（6369行）
-
-**修改目标**：登录改为username+password，Token改为JWT
-
-**修改点**：
-
-1. **L122-125 `ChatPanelState` 接口**：新增username字段
-
-   ```typescript
-   // 原：password: string; token: string;
-   // 新：username: string; password: string; token: string;
-   ```
-
-2. **L322-325 初始状态**：新增username默认值
-
-   ```typescript
-   // 原：password: "", token: "",
-   // 新：username: "", password: "", token: "",
-   ```
-
-3. **L204-226 `AgentListViewMessage` 接口**：新增username字段
-
-   ```typescript
-   // 原：password?: string;
-   // 新：username?: string; password?: string;
-   ```
-
-4. **L1442-1452 `getLeftLoginHtml` 登录表单**：新增username输入框
-
-   ```html
-   <!-- 在gatewayUrl和password之间新增 -->
-   <div class="form-group">
-     <label for="username">用户名</label>
-     <input
-       id="username"
-       type="text"
-       value="${escapeHtml(this.panelState.username)}"
-       placeholder="admin"
-     />
-   </div>
-   ```
-
-5. **L1457-1484 登录脚本**：发送username+password
-
-   ```javascript
-   // 原：vscode.postMessage({ type: 'connect', gatewayUrl, password })
-   // 新：vscode.postMessage({ type: 'connect', gatewayUrl, username, password })
-   // 获取username：const username = document.getElementById('username');
-   ```
-
-6. **`connectFromLeftView` 方法**：改为username+password登录
-
-   ```typescript
-   // 原：POST /api/auth/login { password }
-   // 新：POST /api/auth/login { username, password }
-   // 存储返回的JWT token和用户信息
-   ```
-
-7. **L1174 API请求Authorization头**：保持不变（Bearer + JWT token格式兼容）
-
-8. **WebSocket连接**：URL添加token参数
+1. **WebSocket连接**：URL添加token参数
 
    ```typescript
    // 原：ws://host:port/ws
    // 新：ws://host:port/ws?token=jwt_token
    ```
 
-9. **新增用户信息存储**：
+2. **新增用户信息存储**：
    - `panelState` 新增 `userInfo: { user_id, username, display_name, is_admin } | null`
    - 登录成功后存储userInfo
    - 401响应时清除token和userInfo
 
-10. **设置面板新增**（L913-974 settingsPanelMarkup）：
-    - 显示当前登录用户名
-    - 修改密码按钮
-    - 注销按钮
+3. **设置面板新增**（L913-974 settingsPanelMarkup）：
+   - 显示当前登录用户名
+   - 修改密码按钮
+   - 注销按钮
 
 ---
 
