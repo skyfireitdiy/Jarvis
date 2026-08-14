@@ -153,8 +153,11 @@ class ChatManager:
         注意：不将user_id从room members中移除，保持持久化成员关系。
         """
         client_info = None
+        user_id = None
         async with self._lock:
             client_info = self._chat_clients.pop(client_id, None)
+            if client_info:
+                user_id = client_info.get("user_id")
             # 不从聊天室members中移除user_id，保持持久化
         # 广播下线通知（锁外执行，避免死锁）
         if client_info:
@@ -164,9 +167,29 @@ class ChatManager:
                     "payload": {
                         "client_id": client_id,
                         "name": client_info.get("name", ""),
+                        "user_id": user_id or client_id,
                     },
                 },
             )
+            # 【新增】向该用户所在房间广播成员更新通知
+            if user_id:
+                still_online = any(
+                    info.get("user_id") == user_id
+                    for info in self._chat_clients.values()
+                )
+                for room_id, room in self._chat_rooms.items():
+                    if user_id in room["members"]:
+                        await self.broadcast_to_room(
+                            room_id,
+                            {
+                                "type": "chat_room_members_update",
+                                "payload": {
+                                    "room_id": room_id,
+                                    "user_id": user_id,
+                                    "online": still_online,
+                                },
+                            },
+                        )
 
     def get_client(self, client_id: str) -> Optional[Dict[str, Any]]:
         """获取客户端信息。"""
@@ -312,11 +335,20 @@ class ChatManager:
             # 查在线客户端
             client = self.get_client_by_user_id(uid)
             if client:
+                # 【修改】在线成员增加online标记和设备计数
+                device_count = sum(
+                    1
+                    for info in self._chat_clients.values()
+                    if info.get("user_id") == uid
+                )
                 members.append(
                     {
                         "client_id": client["client_id"],
                         "name": client["name"],
+                        "display_name": client.get("display_name", client["name"]),
                         "user_id": uid,
+                        "online": True,
+                        "device_count": device_count,
                     }
                 )
             else:
