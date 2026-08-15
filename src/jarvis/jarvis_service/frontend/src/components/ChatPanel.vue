@@ -98,6 +98,7 @@
               :class="{ active: activePrivateId === member.client_id }"
               @click="$emit('selectPrivate', member.client_id)"
             >
+              <span class="chat-status-dot" :class="member.online ? 'online' : 'offline'"></span>
               <span class="chat-client-name">{{ member.display_name && member.display_name !== member.name ? member.display_name + ' (' + member.name + ')' : member.name }}</span>
               <span v-if="unreadMap['private_' + member.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + member.client_id] }}</span>
             </div>
@@ -117,6 +118,7 @@
               :class="{ active: activePrivateId === client.client_id }"
               @click="$emit('selectPrivate', client.client_id)"
             >
+              <span class="chat-status-dot online"></span>
               <span class="chat-client-name">{{ client.display_name && client.display_name !== client.name ? client.display_name + ' (' + client.name + ')' : client.name }}</span>
               <span v-if="unreadMap['private_' + client.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + client.client_id] }}</span>
             </div>
@@ -750,11 +752,35 @@ watch(
   background: var(--color-bg-active);
   border-left: 3px solid var(--color-accent, #4a9eff);
   font-weight: 600;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(74, 158, 255, 0.2);
 }
 
 .chat-client-item.active {
   background: var(--color-bg-active);
   border-left: 3px solid var(--color-accent, #4a9eff);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(74, 158, 255, 0.2);
+}
+
+/* 在线/离线状态圆点 */
+.chat-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+  display: inline-block;
+}
+
+.chat-status-dot.online {
+  background: #2ecc71;
+  box-shadow: 0 0 3px rgba(46, 204, 113, 0.5);
+}
+
+.chat-status-dot.offline {
+  background: #e74c3c;
+  box-shadow: 0 0 3px rgba(231, 76, 60, 0.5);
 }
 
 .chat-room-item.joined:not(.active) {
