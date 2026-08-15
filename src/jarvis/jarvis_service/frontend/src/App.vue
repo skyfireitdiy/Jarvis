@@ -8067,6 +8067,7 @@ function sendInputDirectly(text) {
     payload: {
       text: text,
       agent_id: currentAgentId.value,
+      display_name: chatName.value || username.value || '',
     },
   }
 
@@ -8091,6 +8092,7 @@ function sendInputResult(text, requestId, agentId = null) {
       text: text,
       request_id: requestId,
       agent_id: targetAgentId,
+      display_name: chatName.value || username.value || '',
     },
   }
   console.log('[ws] send input_result (from buffer)', message, 'agent:', targetAgentId)
