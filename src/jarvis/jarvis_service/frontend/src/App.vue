@@ -61,7 +61,7 @@
             💻
           </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
-            👤
+            🛑
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
             ⚙
@@ -102,7 +102,7 @@
             💻
           </button>
           <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
-            👤
+            🛑
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙
