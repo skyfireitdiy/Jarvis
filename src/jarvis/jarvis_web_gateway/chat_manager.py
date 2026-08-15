@@ -316,12 +316,16 @@ class ChatManager:
             room = self._chat_rooms.get(room_id)
             if not room:
                 return {"success": False, "error": "聊天室不存在"}
-            # 从client_id查user_id，仅创建者可重命名
+            # 从client_id查user_id，仅创建者和管理员可重命名
             client = self._chat_clients.get(client_id)
             user_id = client.get("user_id") if client else None
             member_id = user_id or client_id
-            if room["created_by"] != member_id:
-                return {"success": False, "error": "仅创建者可重命名聊天室"}
+            is_admin = False
+            if user_id and self._user_manager:
+                user_data = self._user_manager.get_user(user_id)
+                is_admin = bool(user_data and user_data.get("is_admin", False))
+            if room["created_by"] != member_id and not is_admin:
+                return {"success": False, "error": "仅创建者和管理员可重命名聊天室"}
             old_name = room["name"]
             room["name"] = new_name.strip()
             self._save_rooms()
