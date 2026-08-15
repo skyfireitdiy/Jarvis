@@ -844,25 +844,28 @@ class WebSocketConnectionManager:
             text = payload.get("text", "")
 
             # 【新增】在多行消息顶部添加发送人信息
-            # 从认证信息获取发送人display_name
-            auth_payload = self._auth_store.get(session_id)
-            sender_name = None
-            if auth_payload and isinstance(auth_payload, dict):
-                user_info = auth_payload.get("user_info")
-                if user_info and isinstance(user_info, dict):
-                    user_id = user_info.get("user_id")
-                    if user_id and self._user_manager:
-                        user_data = self._user_manager.get_user(user_id)
-                        if user_data:
-                            sender_name = user_data.get(
-                                "display_name"
-                            ) or user_data.get("username")
-                    if not sender_name:
-                        sender_name = (
-                            user_info.get("display_name")
-                            or user_info.get("username")
-                            or user_info.get("user_id")
-                        )
+            # 优先使用前端传入的display_name，回退到认证信息
+            sender_name = payload.get("display_name") or None
+
+            if not sender_name:
+                # 从认证信息获取发送人display_name
+                auth_payload = self._auth_store.get(session_id)
+                if auth_payload and isinstance(auth_payload, dict):
+                    user_info = auth_payload.get("user_info")
+                    if user_info and isinstance(user_info, dict):
+                        user_id = user_info.get("user_id")
+                        if user_id and self._user_manager:
+                            user_data = self._user_manager.get_user(user_id)
+                            if user_data:
+                                sender_name = user_data.get(
+                                    "display_name"
+                                ) or user_data.get("username")
+                        if not sender_name:
+                            sender_name = (
+                                user_info.get("display_name")
+                                or user_info.get("username")
+                                or user_info.get("user_id")
+                            )
 
             # 仅在多行消息时添加发送人前缀（单行消息无需添加）
             if sender_name and "\n" in text:

@@ -1,0 +1,8 @@
+{
+  "id": "20260815_032335_650848",
+  "type": "project_long_term",
+  "tags": ["bug修复", "消息前缀", "display_name", "gateway"],
+  "content": "修复前端消息前缀显示为'gateway'的Bug。根因：后端app.py行846-869在多行消息时添加sender_name前缀，sender_name从WebSocket认证信息获取。当连接使用JARVIS_AUTH_TOKEN（系统token）时，user_info.username为'gateway'，无display_name。修复：前端sendInputDirectly和sendInputResult发送input_result时携带display_name（chatName.value），后端优先使用payload.display_name，回退到认证信息。涉及文件：App.vue（行8070、8095）、app.py（行848）。",
+  "created_at": "2026-08-15T03:23:35.650890",
+  "updated_at": "2026-08-15T03:23:35.650897"
+}
