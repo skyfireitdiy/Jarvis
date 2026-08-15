@@ -867,8 +867,8 @@ class WebSocketConnectionManager:
                                 or user_info.get("user_id")
                             )
 
-            # 仅在多行消息时添加发送人前缀（单行消息无需添加）
-            if sender_name and "\n" in text:
+            # 仅在多行输入模式时添加发送人前缀（单行输入无需添加）
+            if sender_name and payload.get("input_mode") == "multi":
                 text = f"{sender_name}：{text}"
 
             # 为用户输入消息分配序号
