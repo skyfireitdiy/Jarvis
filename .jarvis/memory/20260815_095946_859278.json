@@ -1,0 +1,8 @@
+{
+  "id": "20260815_095946_859278",
+  "type": "project_long_term",
+  "tags": ["聊天室", "权限控制", "删除", "重命名"],
+  "content": "聊天室删除/重命名按钮权限控制已完成：ChatPanel.vue 新增 isAdmin、currentUserId props，删除/重命名按钮 v-if=\"room.created_by === currentUserId || isAdmin\"；App.vue 传入 auth.userInfo?.is_admin 和 auth.userInfo?.user_id；chat_create_room_response 和 chat_room_created 手动 push 时补 created_by 字段。后端 delete_room/rename_room 已有权限校验。",
+  "created_at": "2026-08-15T09:59:46.859312",
+  "updated_at": "2026-08-15T09:59:46.859318"
+}

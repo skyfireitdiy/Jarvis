@@ -78,8 +78,8 @@
             <div v-if="renamingRoomId !== room.room_id" class="chat-room-actions">
               <span class="chat-room-count">{{ room.member_count }}</span>
               <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
-              <button class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室">✏️</button>
-              <button class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室">🗑</button>
+              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室">✏️</button>
+              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室">🗑</button>
             </div>
           </div>
           <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
@@ -213,6 +213,8 @@ const props = defineProps({
   clients: Array,
   roomMembers: Array,
   myClientId: String,
+  isAdmin: Boolean,
+  currentUserId: String,
   activeRoomId: String,
   activePrivateId: String,
   resizeDirections: Array,

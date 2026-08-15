@@ -195,6 +195,8 @@
       :clients="chatClients"
       :roomMembers="chatRoomMembers"
       :myClientId="myClientId"
+      :isAdmin="auth.userInfo?.is_admin"
+      :currentUserId="auth.userInfo?.user_id"
       :activeRoomId="activeChatRoomId"
       :activePrivateId="activePrivateClientId"
       :resizeDirections="chatResizeDirections"
@@ -7036,6 +7038,7 @@ function handleChatMessage(type, payload) {
           room_id: payload.room_id,
           name: payload.name || '未命名聊天室',
           member_count: 1,
+          created_by: auth.value.userInfo?.user_id || '',
         })
         if (!chatJoinedRooms.value.includes(payload.room_id)) { chatJoinedRooms.value = [...chatJoinedRooms.value, payload.room_id]; saveChatJoinedRooms() }
         showToast('聊天室创建成功', 'success')
@@ -7200,6 +7203,7 @@ function handleChatMessage(type, payload) {
           room_id: payload.room_id,
           name: payload.name || '未命名聊天室',
           member_count: payload.member_count || 1,
+          created_by: payload.created_by || '',
         }]
       }
       break
