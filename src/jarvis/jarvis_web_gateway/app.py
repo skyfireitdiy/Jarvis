@@ -644,7 +644,7 @@ class WebSocketConnectionManager:
         self._connection_state_lock = asyncio.Lock()
 
         # 聊天室管理
-        self._chat_manager = ChatManager(data_dir)
+        self._chat_manager = ChatManager(data_dir, user_manager=self._user_manager)
 
     async def handle(self, websocket: WebSocket) -> None:
         await websocket.accept(subprotocol="jarvis-ws")
@@ -1415,7 +1415,7 @@ class WebSocketConnectionManager:
     async def _handle_chat_delete_room(
         self, payload: Dict[str, Any], websocket: WebSocket
     ) -> None:
-        """删除聊天室（仅创建者可删除）。"""
+        """删除聊天室（仅创建者和管理员可删除）。"""
         room_id = payload.get("room_id", "")
         client_id = payload.get("client_id", "")
         result = await self._chat_manager.delete_room(room_id, client_id)

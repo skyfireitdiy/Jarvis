@@ -21,8 +21,11 @@ class ChatManager:
     维护聊天室、客户端、私聊会话等状态，处理所有 chat_* 消息类型。
     """
 
-    def __init__(self, data_dir: Optional[str] = None) -> None:
+    def __init__(
+        self, data_dir: Optional[str] = None, user_manager: Optional[Any] = None
+    ) -> None:
         self._data_dir = data_dir
+        self._user_manager = user_manager
         self._chat_rooms: Dict[
             str, Dict[str, Any]
         ] = {}  # room_id -> {name, members: set[user_id], created_by, created_at}
@@ -330,7 +333,7 @@ class ChatManager:
         }
 
     async def delete_room(self, room_id: str, client_id: str) -> Dict[str, Any]:
-        """删除聊天室（仅创建者可删除）。返回被删除房间的成员列表用于通知。"""
+        """删除聊天室（仅创建者和管理员可删除）。返回被删除房间的成员列表用于通知。"""
         async with self._lock:
             room = self._chat_rooms.get(room_id)
             if not room:
@@ -339,8 +342,12 @@ class ChatManager:
             client = self._chat_clients.get(client_id)
             user_id = client.get("user_id") if client else None
             member_id = user_id or client_id
-            if room["created_by"] != member_id:
-                return {"success": False, "error": "仅创建者可删除聊天室"}
+            is_admin = False
+            if user_id and self._user_manager:
+                user_data = self._user_manager.get_user(user_id)
+                is_admin = bool(user_data and user_data.get("is_admin", False))
+            if room["created_by"] != member_id and not is_admin:
+                return {"success": False, "error": "仅创建者和管理员可删除聊天室"}
             members = list(room["members"])
             del self._chat_rooms[room_id]
             self._save_rooms()
