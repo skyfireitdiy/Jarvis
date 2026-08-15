@@ -7098,7 +7098,7 @@ function handleChatMessage(type, payload) {
         room_id: roomId,
         timestamp: payload?.timestamp || Date.now(),
       }
-      if (payload?.image_url) roomMsg.image_url = payload.image_url
+      if (payload?.image_url) roomMsg.image_url = resolveImageUrl(payload.image_url)
       chatMessages.value[roomId].push(roomMsg)
       saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
@@ -7128,7 +7128,7 @@ function handleChatMessage(type, payload) {
         private: true,
         timestamp: payload?.message?.timestamp || Date.now(),
       }
-      if (payload?.message?.image_url) privMsg.image_url = payload.message.image_url
+      if (payload?.message?.image_url) privMsg.image_url = resolveImageUrl(payload.message.image_url)
       chatMessages.value[privMsgKey].push(privMsg)
       saveChatMessages()
       // 新消息提醒：非自己发送的消息触发提醒
@@ -7156,7 +7156,7 @@ function handleChatMessage(type, payload) {
             private: true,
             timestamp: msg.timestamp || Date.now(),
           }
-          if (msg.image_url) m.image_url = msg.image_url
+          if (msg.image_url) m.image_url = resolveImageUrl(msg.image_url)
           return m
         })
         saveChatMessages()
@@ -9492,6 +9492,18 @@ function clearChatMessages(scope) {
   }
 }
 
+// 将相对路径的图片 URL 转换为完整 URL（uploads 挂载在后端网关）
+function resolveImageUrl(url) {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/uploads/')) {
+    const { host, port } = getGatewayAddress()
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    return `${protocol}://${host}:${port}${url}`
+  }
+  return url
+}
+
 function sendChatMessage(content, imageUrl) {
   if ((!content || !content.trim()) && !imageUrl) return
   const trimmed = (content || '').trim()
@@ -9502,7 +9514,7 @@ function sendChatMessage(content, imageUrl) {
       receiver_id: activePrivateClientId.value,
       content: trimmed,
     }
-    if (imageUrl) payload.image_url = imageUrl
+    if (imageUrl) payload.image_url = resolveImageUrl(imageUrl)
     sendChatMessageToServer('chat_send_private', payload)
     // 本地追加自己的消息
     const selfMsgKey = `private_${activePrivateClientId.value}`
@@ -9516,7 +9528,7 @@ function sendChatMessage(content, imageUrl) {
       private: true,
       timestamp: Date.now(),
     }
-    if (imageUrl) selfMsg.image_url = imageUrl
+    if (imageUrl) selfMsg.image_url = resolveImageUrl(imageUrl)
     chatMessages.value[selfMsgKey].push(selfMsg)
     saveChatMessages()
   } else if (activeChatRoomId.value) {
@@ -9526,7 +9538,7 @@ function sendChatMessage(content, imageUrl) {
       client_id: myClientId.value,
       content: trimmed,
     }
-    if (imageUrl) payload.image_url = imageUrl
+    if (imageUrl) payload.image_url = resolveImageUrl(imageUrl)
     sendChatMessageToServer('chat_send_message', payload)
     // 本地追加自己的消息
     if (!chatMessages.value[activeChatRoomId.value]) chatMessages.value[activeChatRoomId.value] = []
@@ -9539,7 +9551,7 @@ function sendChatMessage(content, imageUrl) {
       room_id: activeChatRoomId.value,
       timestamp: Date.now(),
     }
-    if (imageUrl) selfMsg.image_url = imageUrl
+    if (imageUrl) selfMsg.image_url = resolveImageUrl(imageUrl)
     chatMessages.value[activeChatRoomId.value].push(selfMsg)
     saveChatMessages()
   } else {
