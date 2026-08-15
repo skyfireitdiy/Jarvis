@@ -56,9 +56,26 @@
             :class="{ active: activeRoomId === room.room_id, joined: joinedRooms?.includes?.(room.room_id) }"
             @click="$emit('joinRoom', room.room_id)"
           >
-            <span class="chat-room-name">{{ room.name }}</span>
-            <span v-if="unreadMap[room.room_id]" class="chat-unread-badge chat-room-unread">{{ unreadMap[room.room_id] }}</span>
-            <div class="chat-room-actions">
+            <template v-if="renamingRoomId === room.room_id">
+              <input
+                v-model="renameRoomName"
+                class="chat-create-room-input chat-rename-room-input"
+                placeholder="输入新的聊天室名称..."
+                @keydown.enter.exact="confirmRenameRoom"
+                @keydown.escape="cancelRenameRoom"
+                @click.stop
+                ref="renameRoomInputRef"
+              />
+              <div class="chat-create-room-actions">
+                <button class="icon-btn small chat-create-confirm" @click.stop="confirmRenameRoom" title="确认">✓</button>
+                <button class="icon-btn small chat-create-cancel" @click.stop="cancelRenameRoom" title="取消">✕</button>
+              </div>
+            </template>
+            <template v-else>
+              <span class="chat-room-name">{{ room.name }}</span>
+              <span v-if="unreadMap[room.room_id]" class="chat-unread-badge chat-room-unread">{{ unreadMap[room.room_id] }}</span>
+            </template>
+            <div v-if="renamingRoomId !== room.room_id" class="chat-room-actions">
               <span class="chat-room-count">{{ room.member_count }}</span>
               <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
               <button class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室">✏️</button>
@@ -225,12 +242,37 @@ const sidebarCollapsed = ref(false)
 const creatingRoom = ref(false)
 const newRoomName = ref('')
 const pendingImageUrl = ref('')
+const renamingRoomId = ref('')
+const renameRoomName = ref('')
+const renameRoomInputRef = ref(null)
 
 function handleRenameRoom(room) {
-  const newName = prompt('请输入新的聊天室名称：', room.name)
-  if (newName && newName.trim() && newName.trim() !== room.name) {
-    emit('renameRoom', room.room_id, newName.trim())
+  renamingRoomId.value = room.room_id
+  renameRoomName.value = room.name
+  nextTick(() => {
+    if (renameRoomInputRef.value) {
+      renameRoomInputRef.value.focus()
+      renameRoomInputRef.value.select()
+    }
+  })
+}
+
+function confirmRenameRoom() {
+  const newName = renameRoomName.value.trim()
+  if (!newName) return
+  // 需要找到当前重命名的房间名做比较
+  const room = props.rooms.find(r => r.room_id === renamingRoomId.value)
+  if (room && newName === room.name) {
+    cancelRenameRoom()
+    return
   }
+  emit('renameRoom', renamingRoomId.value, newName)
+  cancelRenameRoom()
+}
+
+function cancelRenameRoom() {
+  renamingRoomId.value = ''
+  renameRoomName.value = ''
 }
 
 function sendMessage() {
@@ -655,6 +697,14 @@ watch(
 
 .chat-create-cancel {
   color: var(--color-text-secondary) !important;
+}
+
+/* 重命名聊天室内联输入框 */
+.chat-rename-room-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .chat-room-list,

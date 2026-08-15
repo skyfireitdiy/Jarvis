@@ -1,0 +1,8 @@
+{
+  "id": "20260815_081157_444457",
+  "type": "project_long_term",
+  "tags": ["聊天室", "Bug修复", "ChatPanel", "重命名"],
+  "content": "聊天室三个Bug修复完成：1) chat_manager.py get_room_members 离线成员通过 _user_manager.get_user(uid) 查询用户名和 display_name，回退到 uid；2) 前端 resolveImageUrl 函数将 /uploads/xxx.png 相对路径转换为 http://host:port/uploads/xxx.png 完整 URL；3) ChatPanel.vue 重命名改为内联编辑输入框（renamingRoomId 状态控制），复用 chat-create-room-input 样式，支持 Enter 确认/Escape 取消，重命名时隐藏 chat-room-actions。涉及文件：chat_manager.py、App.vue、ChatPanel.vue。",
+  "created_at": "2026-08-15T08:11:57.444513",
+  "updated_at": "2026-08-15T08:11:57.444519"
+}
