@@ -186,6 +186,14 @@
       :class="['chat-resize-handle', `chat-resize-${direction}`]"
       @mousedown="$emit('startResize', $event, direction)"
     ></div>
+
+    <!-- 图片大图预览 -->
+    <div v-if="previewImageUrl" class="chat-image-preview-overlay" @click.self="closeImagePreview">
+      <div class="chat-image-preview-content">
+        <button class="chat-image-preview-close" @click="closeImagePreview" title="关闭">✕</button>
+        <img :src="previewImageUrl" class="chat-image-preview-img" alt="图片预览" />
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -372,8 +380,14 @@ function getGatewayAddress() {
   return { host: address, port: '8000' }
 }
 
+const previewImageUrl = ref('')
+
 function openImage(url) {
-  window.open(url, '_blank')
+  previewImageUrl.value = url
+}
+
+function closeImagePreview() {
+  previewImageUrl.value = ''
 }
 
 // 自动调整输入框高度
@@ -1034,5 +1048,56 @@ watch(
 }
 .chat-pending-image-remove:hover {
   background: #c0392b;
+}
+
+/* 图片大图预览 */
+.chat-image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.chat-image-preview-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.chat-image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.chat-image-preview-close {
+  position: absolute;
+  top: -36px;
+  right: -36px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.chat-image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 </style>
