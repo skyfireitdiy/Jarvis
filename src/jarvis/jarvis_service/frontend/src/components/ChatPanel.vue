@@ -298,7 +298,11 @@ async function uploadChatImage(file) {
       })
       const result = await response.json()
       if (result.success && result.data?.file_url) {
-        pendingImageUrl.value = result.data.file_url
+        // 将相对路径转换为完整 URL（uploads 挂载在后端网关）
+        const fileUrl = result.data.file_url
+        pendingImageUrl.value = fileUrl.startsWith('/uploads/')
+          ? `${protocol}://${host}:${port}${fileUrl}`
+          : fileUrl
       } else {
         alert('上传失败: ' + (result.error || '未知错误'))
       }

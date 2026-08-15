@@ -385,8 +385,22 @@ class ChatManager:
                     }
                 )
             else:
-                # 离线用户也显示
-                members.append({"user_id": uid, "name": uid, "online": False})
+                # 离线用户也显示（通过 user_manager 查询用户名）
+                user_name = uid
+                user_display_name = ""
+                if self._user_manager:
+                    user_data = self._user_manager.get_user(uid)
+                    if user_data:
+                        user_name = user_data.get("username", uid)
+                        user_display_name = user_data.get("display_name", "")
+                members.append(
+                    {
+                        "user_id": uid,
+                        "name": user_name,
+                        "display_name": user_display_name or user_name,
+                        "online": False,
+                    }
+                )
         return members
 
     # ------------------------------------------------------------------

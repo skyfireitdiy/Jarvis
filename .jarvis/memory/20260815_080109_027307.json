@@ -1,0 +1,8 @@
+{
+  "id": "20260815_080109_027307",
+  "type": "project_long_term",
+  "tags": ["聊天室", "Bug修复", "图片显示", "成员显示"],
+  "content": "聊天室两个Bug修复完成：\n1. 成员显示uuid：chat_manager.py get_room_members 离线成员通过 self._user_manager.get_user(uid) 查询用户名和 display_name，回退到 uid\n2. 图片破裂：前端新增 resolveImageUrl 函数（App.vue），将 /uploads/xxx.png 相对路径转换为 http://host:port/uploads/xxx.png 完整 URL。应用于发送消息、接收消息、私聊历史、ChatPanel 上传预览。\n\n涉及文件：chat_manager.py、App.vue、ChatPanel.vue",
+  "created_at": "2026-08-15T08:01:09.027356",
+  "updated_at": "2026-08-15T08:01:09.027364"
+}
