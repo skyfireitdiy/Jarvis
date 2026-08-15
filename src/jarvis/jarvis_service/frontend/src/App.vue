@@ -6787,7 +6787,7 @@ function handleMessage(message, agentId = null) {
         // 普通输入或匹配的多行输入，发送缓冲区内容
         console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
         inputBuffers.value.delete(requestAgentId)
-        sendInputResult(bufferedText, payload.request_id, requestAgentId)
+        sendInputResult(bufferedText, payload.request_id, requestAgentId, payload.mode)
       }
       return
     }
@@ -8002,7 +8002,7 @@ function submitInput() {
   if (inputMode.value === 'single' || executionStatus === 'waiting_multi') {
     // 后端正在等待输入，直接发送
     console.log('[SUBMIT] Sending input directly to backend (inputMode:', inputMode.value, ', execution_status:', executionStatus, ')')
-    sendInputDirectly(userInput)
+    sendInputDirectly(userInput, inputMode.value)
   } else {
     // 后端没有等待输入，保存到缓冲区
     console.log('[SUBMIT] Saving input to buffer (execution_status:', executionStatus, ')')
@@ -8041,7 +8041,7 @@ function submitCompletion() {
       if (executionStatus === 'waiting_multi') {
         // 后端正在等待多行输入，直接发送 Ctrl+C 信号
         console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend (execution_status: waiting_multi)')
-        sendInputDirectly('__CTRL_C_PRESSED__')
+        sendInputDirectly('__CTRL_C_PRESSED__', 'single')
       } else {
         // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
         console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
@@ -8059,15 +8059,16 @@ function submitCompletion() {
   )
 }
 
-function sendInputDirectly(text) {
+function sendInputDirectly(text, inputMode = 'multi') {
   const agentId = currentAgentId.value
-  
+
   const message = {
     type: 'input_result',
     payload: {
       text: text,
       agent_id: currentAgentId.value,
       display_name: chatName.value || username.value || '',
+      input_mode: inputMode,
     },
   }
 
@@ -8081,11 +8082,11 @@ function sendInputDirectly(text) {
   }
 }
 
-function sendInputResult(text, requestId, agentId = null) {
+function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
   const targetAgentId = agentId || pendingInputAgentId.value || currentAgentId.value
-  
 
-  
+
+
   const message = {
     type: 'input_result',
     payload: {
@@ -8093,6 +8094,7 @@ function sendInputResult(text, requestId, agentId = null) {
       request_id: requestId,
       agent_id: targetAgentId,
       display_name: chatName.value || username.value || '',
+      input_mode: inputMode,
     },
   }
   console.log('[ws] send input_result (from buffer)', message, 'agent:', targetAgentId)
@@ -8122,7 +8124,7 @@ function sendBufferedInput() {
   // 清空缓冲区
   inputBuffers.value.delete(agentId)
   // 发送缓冲区内容
-  sendInputDirectly(bufferedText)
+  sendInputDirectly(bufferedText, 'multi')
 }
 
 function clearBuffer() {
