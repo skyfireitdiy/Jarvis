@@ -1322,33 +1322,16 @@ class RulesManager:
             PrettyOutput.auto_print("⚠️  未找到匹配的远程技能")
             return []
 
-        # === 步骤 3: 使用 LLM 评估远程技能 ===
-        PrettyOutput.auto_print(
-            f"🤖 正在使用 AI 评估 {len(remote_skills)} 个远程技能..."
-        )
-        evaluated_skills = self._evaluate_remote_skills_with_llm(
-            task_description, remote_skills
-        )
+        # === 步骤 3: 直接安装搜索到的技能 ===
+        skills_to_install = remote_skills[:3]
+        PrettyOutput.auto_print(f"📦 正在安装 {len(skills_to_install)} 个远程技能...")
 
-        if not evaluated_skills:
-            PrettyOutput.auto_print("⚠️ LLM 评估完成，但没有推荐安装的 skill")
-            return []
+        PrettyOutput.auto_print(f"✅ 搜索到 {len(skills_to_install)} 个技能:")
+        for i, skill in enumerate(skills_to_install, 1):
+            PrettyOutput.auto_print(f"   {i}. {skill.name}")
 
-        PrettyOutput.auto_print(f"✅ LLM 推荐安装 {len(evaluated_skills)} 个技能:")
-        for i, (skill, eval_result) in enumerate(evaluated_skills[:5], 1):
-            PrettyOutput.auto_print(
-                f"   {i}. {skill.name} - 评分：{eval_result.score:.1f}/10"
-            )
-            PrettyOutput.auto_print(f"      理由：{eval_result.recommendation}")
-            if eval_result.concerns:
-                PrettyOutput.auto_print(
-                    f"      注意：{', '.join(eval_result.concerns)}"
-                )
-
-        # === 步骤 4: 安装 LLM 推荐的技能 ===
-        installed = self._auto_install_skills(
-            [skill for skill, _ in evaluated_skills[:3]]
-        )
+        # === 步骤 4: 安装搜索到的技能 ===
+        installed = self._auto_install_skills(skills_to_install)
         if installed:
             PrettyOutput.auto_print(
                 f"✅ 已自动安装 {len(installed)} 个技能：{', '.join(installed)}"
@@ -1475,61 +1458,6 @@ data parsing
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 搜索远程技能失败：{str(e)}")
             return []
-
-    def _evaluate_remote_skills_with_llm(
-        self, task_description: str, skills: List[Any]
-    ) -> List[tuple]:
-        """
-        使用 LLM 评估远程技能
-
-        参数:
-            task_description: 任务描述
-            skills: 远程技能列表
-
-        返回:
-            [(skill, evaluation), ...] 按评分降序排列，只返回 should_install=True 的技能
-        """
-        try:
-            from jarvis.jarvis_agent.skill_discovery.skill_evaluator import (
-                SkillEvaluator,
-            )
-
-            # 获取 LLM 客户端（复用现有的 llm 实例）
-            llm_client = getattr(self, "llm", None)
-            if not llm_client:
-                PrettyOutput.auto_print(
-                    "⚠ LLM 客户端不可用，跳过技能评估，直接使用搜索结果"
-                )
-                # 降级：返回原始搜索结果的前 3 个
-                return [(s, None) for s in skills[:3]]
-
-            # 创建评估器
-            PrettyOutput.auto_print(f"🤖 正在使用 AI 评估 {len(skills)} 个远程技能...")
-            evaluator = SkillEvaluator(llm_client=llm_client, model="default")
-
-            # 批量评估
-            evaluations = evaluator.evaluate_batch(
-                task_description, skills, max_concurrent=3
-            )
-            PrettyOutput.auto_print(f"🤖 评估完成，共评估 {len(evaluations)} 个技能")
-
-            # 只保留推荐安装的技能
-            recommended = [
-                (eval.skill, eval)
-                for eval in evaluations
-                if eval.should_install and eval.score >= 5.0
-            ]
-            if not recommended:
-                PrettyOutput.auto_print("🤖 AI 评估后无推荐安装的技能")
-            else:
-                PrettyOutput.auto_print(f"🤖 AI 推荐安装 {len(recommended)} 个技能")
-
-            return recommended
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ LLM 评估失败：{e}，降级为直接安装 Top 3")
-            # 降级：返回原始搜索结果的前 3 个
-            return [(s, None) for s in skills[:3]]
 
     def _auto_install_skills(self, skills: List[Any]) -> List[str]:
         """自动安装技能"""
