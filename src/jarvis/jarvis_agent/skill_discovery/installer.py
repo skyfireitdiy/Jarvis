@@ -96,25 +96,56 @@ class SkillInstaller:
             else None
         )
 
-        if (
-            not repo_info
-            or not repo_info.get("clone_url")
-            or not repo_info.get("subdir")
-        ):
+        if not repo_info or not repo_info.get("clone_url"):
             raise ValueError(
                 f"技能 '{skill.name}' 缺少必要的仓库信息。\n"
-                f"必须提供 repo_info.clone_url 和 repo_info.subdir\n"
+                f"必须提供 repo_info.clone_url\n"
                 f"当前 _raw_data: {skill._raw_data}"
             )
 
+        # 若 subdir 为空，尝试从 repo_url 解析子目录路径
+        if not repo_info.get("subdir"):
+            repo_url = (
+                skill._raw_data.get("repo_url", "")
+                if isinstance(skill._raw_data, dict)
+                else ""
+            )
+            parsed_subdir = self._parse_subdir_from_repo_url(repo_url)
+            if parsed_subdir:
+                repo_info["subdir"] = parsed_subdir
+
         return self._install_via_git_clone(skill, repo_info)
+
+    def _parse_subdir_from_repo_url(self, repo_url: str) -> str:
+        """从 repo_url 中解析子目录路径。
+
+        支持格式:
+        - https://github.com/owner/repo/tree/main/skills/de-slopify
+        - https://github.com/owner/repo/tree/master/skills/de-slopify
+
+        返回:
+            子目录路径（如 "skills/de-slopify"），解析失败返回空字符串
+        """
+        if not repo_url:
+            return ""
+        # 匹配 /tree/<branch>/<subdir> 格式
+        marker = "/tree/"
+        idx = repo_url.find(marker)
+        if idx == -1:
+            return ""
+        # 跳过 /tree/<branch>/ 部分
+        rest = repo_url[idx + len(marker) :]
+        parts = rest.split("/", 1)
+        if len(parts) < 2:
+            return ""
+        return parts[1]
 
     def _install_via_git_clone(self, skill: SkillResult, repo_info: dict) -> str:
         """通过 git clone 安装技能包（直接克隆到规则目录，不修改原始内容）"""
         clone_url = repo_info.get("clone_url", "")
         subdir = repo_info.get("subdir", "")
 
-        if not clone_url or not subdir:
+        if not clone_url:
             raise ValueError(f"无效的仓库信息：{repo_info}")
 
         rule_name = self._sanitize_name(skill.name)
@@ -139,7 +170,11 @@ class SkillInstaller:
             raise ValueError(f"Git clone 失败：{result.stderr}")
 
         # 定位技能子目录中的 SKILL.md
-        skill_md_path = os.path.join(target_skill_dir, subdir, "SKILL.md")
+        skill_md_path = (
+            os.path.join(target_skill_dir, subdir, "SKILL.md")
+            if subdir
+            else os.path.join(target_skill_dir, "SKILL.md")
+        )
 
         if not os.path.exists(skill_md_path):
             # 尝试不带 skills 前缀的路径
