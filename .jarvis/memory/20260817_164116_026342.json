@@ -1,0 +1,8 @@
+{
+  "id": "20260817_164116_026342",
+  "type": "project_long_term",
+  "tags": ["配置管理", "jinja2", "模板渲染", "主配置文件"],
+  "content": "主配置文件jinja2模板渲染已实现（commit 8e2ada3）：\n1. template_utils.py新增render_main_config_template(config_content, config_file_dir)函数，支持变量：current_dir、script_dir、jarvis_data_dir、jarvis_src_dir、git_root_dir、config_file_dir\n2. utils.py的_load_config_file()在yaml.safe_load前调用渲染函数\n3. 渲染失败时返回原始内容（向后兼容）\n4. 所有配置文件（~/.jarvis/config.yaml和项目.jarvis/config.yaml）均经_load_config_file加载，故都支持模板渲染",
+  "created_at": "2026-08-17T16:41:16.026386",
+  "updated_at": "2026-08-17T16:41:16.026393"
+}
