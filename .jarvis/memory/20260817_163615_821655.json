@@ -1,0 +1,8 @@
+{
+  "id": "20260817_163615_821655",
+  "type": "project_long_term",
+  "tags": ["架构设计", "builtin_input_handler", "动态注册"],
+  "content": "builtin_input_handler动态脚本注册机制已实现（commit 41b98b7）：\n1. _custom_tag_handlers注册表（Dict[str, Callable]）和_load_custom_input_handlers()函数位于builtin_input_handler.py第116-275行\n2. 从get_builtin_input_handler_dirs()配置的目录扫描.py文件（跳过__init__.py），支持# requirements:依赖安装\n3. 三种注册方式：模块级input_handler_cb、工厂get_input_handler_cb()、register_input_handler_cb()\n4. handler签名：handler(user_input, agent, tag) -> Tuple[str, bool]，需有tag属性\n5. 在builtin_input_handler()开头（第290行）调用加载函数，在for循环replace_map检查之前（第1728行）插入自定义handler检查\n6. 内置命令优先级高于自定义handler（自定义检查在replace_map之前，但内置if/elif链更早）",
+  "created_at": "2026-08-17T16:36:15.821706",
+  "updated_at": "2026-08-17T16:36:15.821718"
+}

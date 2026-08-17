@@ -870,6 +870,20 @@ def get_after_tool_call_cb_dirs() -> List[str]:
     ]
 
 
+def get_builtin_input_handler_dirs() -> List[str]:
+    """
+    获取内置输入处理器扩展脚本目录。
+
+    返回:
+        List[str]: 内置输入处理器扩展脚本目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("builtin_input_handler_dirs", [])
+        if p
+    ]
+
+
 def get_before_tool_call_cb_dirs() -> List[str]:
     """
     获取工具调用前回调函数实现目录。
