@@ -1358,7 +1358,12 @@ def _load_config_file(config_file: str) -> Tuple[str, Dict[str, Any]]:
         Tuple[str, dict]: (文件原始内容, 解析后的配置字典)
     """
     content = read_text_file(config_file)
-    config_data = yaml.safe_load(content) or {}
+    # 渲染jinja2模板变量（如 {{current_dir}}、{{config_file_dir}} 等）
+    from jarvis.jarvis_utils.template_utils import render_main_config_template
+
+    config_file_dir = str(Path(config_file).parent)
+    rendered_content = render_main_config_template(content, config_file_dir)
+    config_data = yaml.safe_load(rendered_content) or {}
     return content, config_data
 
 

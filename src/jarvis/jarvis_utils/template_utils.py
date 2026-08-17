@@ -72,6 +72,42 @@ def render_rule_template(
         return rule_content.strip()
 
 
+def render_main_config_template(config_content: str, config_file_dir: str) -> str:
+    """使用jinja2渲染主配置文件模板
+
+    参数:
+        config_content: 配置文件原始内容
+        config_file_dir: 配置文件所在目录
+
+    返回:
+        str: 渲染后的内容，如果渲染失败则返回原始内容
+    """
+    if not config_content:
+        return config_content
+
+    # 构建jinja2上下文变量
+    context: dict[str, Any] = {
+        "current_dir": Path.cwd().as_posix(),
+        "script_dir": Path(__file__).parent.as_posix(),
+        "jarvis_data_dir": _get_jarvis_data_dir(),
+        "jarvis_src_dir": get_jarvis_src_dir(),
+        "git_root_dir": get_git_root(),
+        "config_file_dir": config_file_dir,
+    }
+
+    # 使用jinja2渲染模板
+    try:
+        template = jinja2.Template(config_content)
+        result = template.render(**context).strip()
+        return result
+    except (TemplateError, TemplateSyntaxError):
+        # 渲染失败时返回原始内容（向后兼容）
+        return config_content.strip()
+    except Exception:
+        # 其他异常也返回原始内容
+        return config_content.strip()
+
+
 def render_plugin_config_template(config_content: str, plugin_dir: str) -> str:
     """使用jinja2渲染插件配置模板
 
