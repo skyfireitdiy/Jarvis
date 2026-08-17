@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 import re
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any
+from typing import Callable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -15,6 +20,7 @@ from jarvis.jarvis_utils.config import (
     get_llm_group,
     set_llm_group,
     get_global_config_data,
+    get_builtin_input_handler_dirs,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import (
@@ -108,6 +114,158 @@ def _get_rule_content(rule_name: str) -> str | None:
         return None
 
 
+# 自定义输入处理器注册表: tag -> handler
+_custom_tag_handlers: Dict[str, Callable] = {}
+_handlers_loaded: bool = False
+
+
+def _load_custom_input_handlers() -> None:
+    """
+    扫描 builtin_input_handler_dirs 中的 Python 文件并动态注册自定义输入处理器。
+
+    约定优先级（任一命中即注册）：
+    - 模块级可调用对象: input_handler_cb（需有 tag 属性）
+    - 工厂方法返回单个或多个可调用对象: get_input_handler_cb(), register_input_handler_cb()
+
+    handler 签名: handler(user_input, agent, tag) -> Tuple[str, bool]
+    handler 需有 tag 属性标识处理的标记名。
+    """
+    global _handlers_loaded
+    if _handlers_loaded:
+        return
+    _handlers_loaded = True
+
+    try:
+        dirs = get_builtin_input_handler_dirs()
+        if not dirs:
+            return
+        for d in dirs:
+            p_dir = Path(d)
+            if not p_dir.exists() or not p_dir.is_dir():
+                continue
+            for file_path in p_dir.glob("*.py"):
+                if file_path.name == "__init__.py":
+                    continue
+                parent_dir = str(file_path.parent)
+                added_path = False
+                try:
+                    if parent_dir not in sys.path:
+                        sys.path.insert(0, parent_dir)
+                        added_path = True
+                    module_name = file_path.stem
+
+                    # 解析文件头部的 requirements 注释
+                    requirements: List[str] = []
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                line = line.strip()
+                                if line.startswith("# requirements:"):
+                                    deps_str = line[len("# requirements:") :].strip()
+                                    if deps_str:
+                                        requirements = deps_str.split()
+                                    break
+                    except Exception:
+                        pass
+
+                    # 安装依赖
+                    if requirements:
+                        PrettyOutput.auto_print(
+                            f"🔧 正在安装输入处理器依赖 [{file_path.name}]: {', '.join(requirements)}"
+                        )
+                        try:
+                            result = subprocess.run(
+                                ["uv", "pip", "install"] + requirements,
+                                capture_output=True,
+                                text=True,
+                                timeout=120,
+                            )
+                            if result.returncode == 0:
+                                PrettyOutput.auto_print(
+                                    f"✅ 依赖安装成功 [{file_path.name}]"
+                                )
+                            else:
+                                PrettyOutput.auto_print(
+                                    f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
+                                )
+                        except subprocess.TimeoutExpired:
+                            PrettyOutput.auto_print(
+                                f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
+                            )
+                        except Exception as e:
+                            PrettyOutput.auto_print(
+                                f"❌ 依赖安装异常 [{file_path.name}]: {e}"
+                            )
+
+                    module = __import__(module_name)
+                    PrettyOutput.auto_print(f"📦 从配置文件加载输入处理器：{file_path}")
+
+                    candidates: List[Callable] = []
+
+                    # 1) 直接导出的回调
+                    if hasattr(module, "input_handler_cb"):
+                        obj = getattr(module, "input_handler_cb")
+                        if callable(obj):
+                            candidates.append(obj)
+
+                    # 2) 工厂方法：get_input_handler_cb()
+                    if hasattr(module, "get_input_handler_cb"):
+                        factory = getattr(module, "get_input_handler_cb")
+                        if callable(factory):
+                            try:
+                                ret = factory()
+                                if callable(ret):
+                                    candidates.append(ret)
+                                elif isinstance(ret, (list, tuple)):
+                                    for c in ret:
+                                        if callable(c):
+                                            candidates.append(c)
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"⚠ 调用 get_input_handler_cb() 失败: {e}"
+                                )
+
+                    # 3) 工厂方法：register_input_handler_cb()
+                    if hasattr(module, "register_input_handler_cb"):
+                        factory2 = getattr(module, "register_input_handler_cb")
+                        if callable(factory2):
+                            try:
+                                ret2 = factory2()
+                                if callable(ret2):
+                                    candidates.append(ret2)
+                                elif isinstance(ret2, (list, tuple)):
+                                    for c in ret2:
+                                        if callable(c):
+                                            candidates.append(c)
+                            except Exception as e:
+                                PrettyOutput.auto_print(
+                                    f"⚠ 调用 register_input_handler_cb() 失败: {e}"
+                                )
+
+                    for handler in candidates:
+                        tag = getattr(handler, "tag", None)
+                        if not tag:
+                            PrettyOutput.auto_print(
+                                f"⚠ 输入处理器 {file_path.name} 缺少 tag 属性，已跳过"
+                            )
+                            continue
+                        _custom_tag_handlers[tag] = handler
+                        PrettyOutput.auto_print(f"✅ 已注册自定义输入处理器: '<{tag}>'")
+
+                except Exception as e:
+                    PrettyOutput.auto_print(
+                        f"⚠ 加载输入处理器 {file_path.name} 失败: {e}"
+                    )
+                finally:
+                    if added_path:
+                        try:
+                            sys.path.remove(parent_dir)
+                        except ValueError:
+                            pass
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠ 加载自定义输入处理器失败: {e}")
+
+
 def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
@@ -122,6 +280,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     from jarvis.jarvis_agent import Agent
 
     agent: Agent = agent_
+
+    # 加载自定义输入处理器
+    _load_custom_input_handlers()
 
     # 【新增】剥离发送人前缀（格式：xxx：或xxx:），避免干扰特殊标记匹配和编排等逻辑
     # 前缀仅出现在多行消息首行，格式为"发送人："或"发送人:"
@@ -1558,6 +1719,20 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"❌ 读取文件失败: {e}")
 
             return "", True
+        # 检查自定义输入处理器
+        if tag in _custom_tag_handlers:
+            try:
+                handler = _custom_tag_handlers[tag]
+                result = handler(user_input, agent, tag)
+                if isinstance(result, tuple) and len(result) == 2:
+                    return result
+                PrettyOutput.auto_print(
+                    f"⚠ 自定义输入处理器 '<{tag}>' 返回值格式错误，应为 (str, bool)"
+                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 自定义输入处理器 '<{tag}>' 执行失败: {e}")
+            return "", True
+
         # 处理普通替换标记
         if tag in replace_map:
             processed_tag.add(tag)
