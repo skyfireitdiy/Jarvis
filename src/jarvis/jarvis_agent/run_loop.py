@@ -990,31 +990,15 @@ class AgentRunLoop:
                         if ag._repeat_count >= 5 and not ag._repeat_detected:
                             ag._repeat_detected = True
                             ag._repeat_count = 0
-                            # 清除messages中第一次之后的重复assistant消息
-                            try:
-                                messages = ag.model.get_messages()
-                                if messages:
-                                    # 找到所有重复的assistant消息并移除第一次之后的
-                                    assistant_indices = [
-                                        i
-                                        for i, m in enumerate(messages)
-                                        if m.get("role") == "assistant"
-                                        and m.get("content") == filtered_for_detect
-                                    ]
-                                    # 保留第一个，移除后续的重复消息
-                                    for idx in reversed(assistant_indices[1:]):
-                                        messages.pop(idx)
-                                    ag.model.set_messages(messages)
-                            except Exception as e:
-                                from jarvis.jarvis_utils.utils import save_exception
-
-                                save_exception(
-                                    e,
-                                    module="jarvis_agent.run_loop",
-                                    function="repeat_detection",
-                                )
+                            # 不删除重复消息，而是在提示词末尾追加勿重复提示
+                            ag.session.prompt = join_prompts(
+                                [
+                                    ag.session.prompt,
+                                    "汝今重复矣，勿复前答，祈予新答。",
+                                ]
+                            )
                             PrettyOutput.auto_print(
-                                f"⚠ 检测到LLM连续{5}次重复响应，已清除重复内容"
+                                f"⚠ 检测到LLM连续{5}次重复响应，已添加勿重复提示"
                             )
 
                 # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
