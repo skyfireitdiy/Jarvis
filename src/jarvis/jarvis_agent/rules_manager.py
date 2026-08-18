@@ -284,6 +284,36 @@ class RulesManager:
 
         return "\n".join(output_lines)
 
+    def _read_rule_head(self, rule_path: str, max_bytes: int = 4096) -> str:
+        """只读取规则文件头部（前 max_bytes 字节），提取描述
+
+        用于 BM25 粗筛，避免读取完整文件内容。
+
+        Args:
+            rule_path: 规则文件的绝对路径
+            max_bytes: 最大读取字节数，默认 4096
+
+        Returns:
+            描述字符串，如果未找到则返回空字符串
+        """
+        try:
+            if not os.path.exists(rule_path):
+                return ""
+            with open(rule_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read(max_bytes)
+            # 提取 YAML Front Matter 中的 description
+            if content.startswith("---"):
+                lines = content.split("\n")
+                for i, line in enumerate(lines[1:], 1):
+                    if line.strip() == "---":
+                        break
+                    if line.startswith("description:"):
+                        description = line.split(":", 1)[1].strip()
+                        return description
+            return ""
+        except Exception:
+            return ""
+
     def _extract_rule_description(self, rule_path: str) -> str:
         """从规则文件中提取描述
 
@@ -678,7 +708,14 @@ class RulesManager:
                     prefix = "config0:"
 
                 try:
-                    for root, dirs, files in os.walk(rules_dir):
+                    for root, dirs, files in os.walk(rules_dir, topdown=True):
+                        # 若当前目录含 skill.md（不区分大小写），则不再遍历子层
+                        if any(
+                            f.lower() == "skill.md"
+                            for f in os.listdir(root)
+                            if os.path.isfile(os.path.join(root, f))
+                        ):
+                            dirs.clear()
                         for filename in files:
                             if filename.endswith(".md"):
                                 file_path = os.path.join(root, filename)
@@ -1058,9 +1095,36 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
                 return None
 
+            # 使用 BM25 筛选最相关的 Top-100 规则，避免 prompt 过长
+            try:
+                from jarvis.jarvis_memory_organizer.smart_retrieval import (
+                    SmartRetriever,
+                )
+
+                retriever = SmartRetriever()
+
+                scored_rules = []
+                for rule_name in all_rules_list:
+                    # 只读取文件头部提取 description，避免读取完整文件内容
+                    rule_path = self.get_rule_file_path(rule_name)
+                    if not rule_path or rule_path == "--":
+                        continue
+                    description = self._read_rule_head(rule_path)
+                    if not description:
+                        continue
+                    score = retriever._calculate_bm25_score(
+                        task_description, description
+                    )
+                    scored_rules.append((score, rule_name))
+                scored_rules.sort(key=lambda x: x[0], reverse=True)
+                top_rules = [rule_name for _, rule_name in scored_rules[:100]]
+            except Exception:
+                # BM25 失败时回退到全部规则
+                top_rules = all_rules_list
+
             # 构造编号列表（包含规则名称和描述，供模型选择）
             numbered_rules = ""
-            for i, rule_name in enumerate(all_rules_list, 1):
+            for i, rule_name in enumerate(top_rules, 1):
                 # 获取规则描述：优先从 YAML Front Matter 提取，否则用内容预览
                 rule_path = self.get_rule_file_path(rule_name)
                 description = ""
