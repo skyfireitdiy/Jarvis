@@ -59,15 +59,15 @@
                   <div class="agent-tooltip-row"><span class="agent-tooltip-label">目录</span><span class="agent-tooltip-dir">{{ agent.working_dir || '未提供工作目录' }}</span></div>
                 </div>
                 <div class="agent-tooltip-actions">
-                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-                  <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-                  <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-                  <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
-                  <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
-                  <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
-                  <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
+                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewDiff', agent)" title="查看变更">🔀</button>
+                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewRules', agent)" title="查看规则">📜</button>
+                  <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewTools', agent)" title="查看工具">🔧</button>
+                  <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+                  <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
+                  <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('renameAgent', agent)" title="重命名">✏</button>
+                  <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('copyAgent', agent)" title="复制 Agent">📋</button>
+                  <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="hideTooltip(); $emit('editAccess', agent)" title="权限管理">🔒</button>
+                  <button class="icon-btn-small stop-btn" @click.stop="hideTooltip(); $emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
                 </div>
               </div>
             </div>
@@ -105,15 +105,15 @@
                 <div class="agent-tooltip-row"><span class="agent-tooltip-label">目录</span><span class="agent-tooltip-dir">{{ agent.working_dir || '未提供工作目录' }}</span></div>
               </div>
               <div class="agent-tooltip-actions">
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-                <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-                <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-                <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
-                <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
-                <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
-                <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
+                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewDiff', agent)" title="查看变更">🔀</button>
+                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewRules', agent)" title="查看规则">📜</button>
+                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="hideTooltip(); $emit('viewTools', agent)" title="查看工具">🔧</button>
+                <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+                <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
+                <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('renameAgent', agent)" title="重命名">✏</button>
+                <button class="icon-btn-small" @click.stop="hideTooltip(); $emit('copyAgent', agent)" title="复制 Agent">📋</button>
+                <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="hideTooltip(); $emit('editAccess', agent)" title="权限管理">🔒</button>
+                <button class="icon-btn-small stop-btn" @click.stop="hideTooltip(); $emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
               </div>
             </div>
           </div>
