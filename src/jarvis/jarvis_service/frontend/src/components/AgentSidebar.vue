@@ -43,6 +43,7 @@
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               </div>
+              <div class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</div>
               <button class="agent-tooltip-toggle" @click.stop="toggleTooltip(agent.agent_id)" title="详细信息">▸</button>
               <div class="agent-tooltip" :class="{ 'tooltip-active': activeTooltipAgentId === agent.agent_id }" :style="{ top: tooltipTop + 'px', left: tooltipLeft + 'px' }">
                 <div class="agent-tooltip-header">
@@ -89,6 +90,7 @@
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             </div>
+            <div class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</div>
             <button class="agent-tooltip-toggle" @click.stop="toggleTooltip(agent.agent_id)" title="详细信息">▸</button>
             <div class="agent-tooltip" :class="{ 'tooltip-active': activeTooltipAgentId === agent.agent_id }" :style="{ top: tooltipTop + 'px', left: tooltipLeft + 'px' }">
               <div class="agent-tooltip-header">
