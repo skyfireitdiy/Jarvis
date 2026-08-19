@@ -34,8 +34,6 @@
               class="agent-item"
               :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
               @click="handleAgentClick(agent, $event)"
-              @mouseenter="showTooltip(agent, $event)"
-              @mouseleave="hideTooltip()"
             >
               <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
                 <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
@@ -82,8 +80,6 @@
             class="agent-item"
             :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
             @click="handleAgentClick(agent, $event)"
-            @mouseenter="showTooltip(agent, $event)"
-            @mouseleave="hideTooltip()"
           >
             <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
               <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
