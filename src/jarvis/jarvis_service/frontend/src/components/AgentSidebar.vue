@@ -815,7 +815,6 @@ watch(() => props.currentAgentId, (newAgentId) => {
   align-items: center;
   gap: 4px;
   margin-bottom: 2px;
-  padding-right: 120px;
 }
 
 .agent-type {
@@ -905,20 +904,14 @@ watch(() => props.currentAgentId, (newAgentId) => {
   color: var(--color-text-secondary);
   word-break: break-all;
   line-height: 1.3;
-  padding-right: 120px;
 }
 
 .agent-item-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 2px;
-  max-width: 70%;
+  margin-top: 4px;
 }
 
 .agent-actions {
