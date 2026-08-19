@@ -1,0 +1,8 @@
+{
+  "id": "20260819_172514_088957",
+  "type": "project_long_term",
+  "tags": ["skill.md", "格式", "索引方案"],
+  "content": "skill.md 格式规范：frontmatter 只含 name + description 两字段，skill_path 放正文中（如 `skill_path: {{ rule_file_dir }}/<repo_name>`）。rules_manager.py 的 _resolve_skill_path 从全文（frontmatter 或正文）解析 skill_path，不限于 frontmatter。installer.py 的 _generate_skill_md_index 按此格式生成。",
+  "created_at": "2026-08-19T17:25:14.088997",
+  "updated_at": "2026-08-19T17:25:14.089003"
+}

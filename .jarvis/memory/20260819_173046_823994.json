@@ -1,0 +1,8 @@
+{
+  "id": "20260819_173046_823994",
+  "type": "project_long_term",
+  "tags": ["skill.md", "索引方案", "简化"],
+  "content": "skill.md 索引方案最终设计：skill.md 即纯索引文件（frontmatter 含 name+description，正文含 skill_path 指向实际目录），agent 读到 skill.md 后自行去 skill_path 指向的目录找实际文件。rules_manager.py 的 _resolve_skill_path 已删除，_read_rule_from_dir 遇 skill.md 直接返回其内容（render_rule_template 自动渲染 {{ rule_file_dir }} 模板变量）。",
+  "created_at": "2026-08-19T17:30:46.824030",
+  "updated_at": "2026-08-19T17:30:46.824036"
+}

@@ -1095,32 +1095,8 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
                 return None
 
-            # 使用 BM25 筛选最相关的 Top-100 规则，避免 prompt 过长
-            try:
-                from jarvis.jarvis_memory_organizer.smart_retrieval import (
-                    SmartRetriever,
-                )
-
-                retriever = SmartRetriever()
-
-                scored_rules = []
-                for rule_name in all_rules_list:
-                    # 只读取文件头部提取 description，避免读取完整文件内容
-                    rule_path = self.get_rule_file_path(rule_name)
-                    if not rule_path or rule_path == "--":
-                        continue
-                    description = self._read_rule_head(rule_path)
-                    if not description:
-                        continue
-                    score = retriever._calculate_bm25_score(
-                        task_description, description
-                    )
-                    scored_rules.append((score, rule_name))
-                scored_rules.sort(key=lambda x: x[0], reverse=True)
-                top_rules = [rule_name for _, rule_name in scored_rules[:100]]
-            except Exception:
-                # BM25 失败时回退到全部规则
-                top_rules = all_rules_list
+            # 直接使用全部规则（skill.md 索引已大幅减少规则数量，无需 BM25 粗筛）
+            top_rules = all_rules_list
 
             # 构造编号列表（包含规则名称和描述，供模型选择）
             numbered_rules = ""

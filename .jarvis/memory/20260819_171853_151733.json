@@ -1,0 +1,8 @@
+{
+  "id": "20260819_171853_151733",
+  "type": "project_long_term",
+  "tags": ["skill.md", "索引方案", "rules_manager", "installer"],
+  "content": "skill.md 索引方案已完成并验证通过：1) installer.py 的 _install_via_git_clone 克隆到 <skill_name>/<repo_name>/，生成 skill.md 含 description + skill_path（用 {{ rule_file_dir }} 模板变量指向子目录）；2) rules_manager.py 的 _read_rule_from_dir 识别 skill.md 并解析 skill_path，_resolve_skill_path 指向目录时按 SKILL.md > README.md > AGENTS.md 顺序找主文件；3) BM25 过滤已移除；4) 验证结果：规则数从 7248 降至 19，_resolve_skill_path 正确解析。目录结构：auto_installed_skills/<skill_name>/skill.md + <repo_name>/",
+  "created_at": "2026-08-19T17:18:53.151794",
+  "updated_at": "2026-08-19T17:18:53.151805"
+}

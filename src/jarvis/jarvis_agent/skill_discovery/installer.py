@@ -155,9 +155,13 @@ class SkillInstaller:
         if os.path.exists(target_skill_dir):
             shutil.rmtree(target_skill_dir)
 
-        # git clone --depth 1 直接到规则目录
+        # 解析仓库名（从 clone_url 提取）
+        repo_name = clone_url.rstrip("/").split("/")[-1].replace(".git", "")
+        repo_dir = os.path.join(target_skill_dir, repo_name)
+
+        # git clone --depth 1 到 <skill_name>/<repo_name>/
         result = subprocess.run(
-            ["git", "clone", "--depth", "1", clone_url, target_skill_dir],
+            ["git", "clone", "--depth", "1", clone_url, repo_dir],
             capture_output=True,
             text=True,
             timeout=60,
@@ -171,9 +175,9 @@ class SkillInstaller:
 
         # 定位技能子目录中的 SKILL.md
         skill_md_path = (
-            os.path.join(target_skill_dir, subdir, "SKILL.md")
+            os.path.join(repo_dir, subdir, "SKILL.md")
             if subdir
-            else os.path.join(target_skill_dir, "SKILL.md")
+            else os.path.join(repo_dir, "SKILL.md")
         )
 
         if not os.path.exists(skill_md_path):
@@ -183,7 +187,7 @@ class SkillInstaller:
                 if subdir.startswith("skills/")
                 else f"skills/{subdir}"
             )
-            alt_skill_md_path = os.path.join(target_skill_dir, alt_subdir, "SKILL.md")
+            alt_skill_md_path = os.path.join(repo_dir, alt_subdir, "SKILL.md")
 
             if os.path.exists(alt_skill_md_path):
                 skill_md_path = alt_skill_md_path
@@ -191,6 +195,9 @@ class SkillInstaller:
                 # clone 成功但找不到 SKILL.md，清理并报错
                 shutil.rmtree(target_skill_dir)
                 raise ValueError(f"在子目录 {subdir} 中未找到 SKILL.md")
+
+        # 生成 skill.md 索引文件（含 description + skill_path）
+        self._generate_skill_md_index(target_skill_dir, skill, repo_name)
 
         # 热加载（不修改 SKILL.md，保持原始内容）
         if self.rules_manager:
@@ -207,6 +214,46 @@ class SkillInstaller:
                 pass
 
         return skill_md_path
+
+    def _generate_skill_md_index(
+        self, target_skill_dir: str, skill: SkillResult, repo_name: str
+    ) -> None:
+        """生成 skill.md 索引文件
+
+        在 skill 目录根目录生成 skill.md，含 description 和 skill_path。
+        skill_path 使用 {{ rule_file_dir }} 模板变量指向仓库子目录，
+        使 rules_manager 扫描时遇 skill.md 即停止遍历子层。
+
+        参数:
+            target_skill_dir: skill 安装目录
+            skill: 技能结果对象
+            repo_name: 仓库子目录名
+        """
+        try:
+            # 使用模板变量 {{ rule_file_dir }} 指向仓库子目录
+            skill_path_ref = "{{ rule_file_dir }}/" + repo_name
+
+            index_content = f"""---
+name: {skill.name}
+description: {skill.description or skill.name}
+---
+
+# {skill.name}
+
+{skill.description or ""}
+
+skill_path: {skill_path_ref}
+"""
+
+            index_path = os.path.join(target_skill_dir, "skill.md")
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(index_content)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.skill_discovery.installer",
+                function="_generate_skill_md_index",
+            )
 
     def _add_source_header(self, content: str, skill: SkillResult) -> str:
         """在原始内容前添加来源注释"""
