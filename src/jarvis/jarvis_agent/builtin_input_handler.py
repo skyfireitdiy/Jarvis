@@ -267,6 +267,8 @@ def _load_custom_input_handlers() -> None:
 
 
 def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
+    import os
+
     """
     处理内置的特殊输入标记，并追加相应的提示词
 
