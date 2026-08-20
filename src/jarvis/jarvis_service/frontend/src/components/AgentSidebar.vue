@@ -912,6 +912,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
   flex-wrap: wrap;
   gap: 2px;
   margin-top: 4px;
+  justify-content: flex-end;
 }
 
 .agent-actions {
