@@ -43,7 +43,14 @@
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               </div>
-              <div class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</div>
+              <div class="agent-dir-line">
+                <span class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</span>
+                <span class="agent-meta-tag">📍 {{ getNodeLabel(agent) }}</span>
+                <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
+                <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
+                <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
+                <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
+              </div>
               <div class="agent-item-actions">
                 <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
                 <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
@@ -54,23 +61,6 @@
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
                 <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
                 <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
-                <button class="agent-tooltip-toggle" @click.stop="toggleTooltip(agent.agent_id)" title="详细信息">▸</button>
-              </div>
-              <div class="agent-tooltip" :class="{ 'tooltip-active': activeTooltipAgentId === agent.agent_id }" :style="{ top: tooltipTop + 'px', left: tooltipLeft + 'px' }">
-                <div class="agent-tooltip-header">
-                  <span class="agent-tooltip-name">{{ agent.name }}</span>
-                  <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-                </div>
-                <div class="agent-tooltip-info">
-                  <div class="agent-tooltip-row"><span class="agent-tooltip-label">类型</span><span>{{ agent.agent_type }}</span></div>
-                  <div class="agent-tooltip-row"><span class="agent-tooltip-label">节点</span><span>{{ getNodeLabel(agent) }}</span></div>
-                  <div class="agent-tooltip-row" v-if="agent.proxy_node"><span class="agent-tooltip-label">代理</span><span>{{ getProxyNodeLabel(agent) }}</span></div>
-                  <div class="agent-tooltip-row" v-if="agent.llm_group"><span class="agent-tooltip-label">模型组</span><span>{{ agent.llm_group }}</span></div>
-                  <div class="agent-tooltip-row" v-if="agent.worktree"><span class="agent-tooltip-label">Worktree</span><span>🌿 已启用</span></div>
-                  <div class="agent-tooltip-row" v-if="agent.quick_mode"><span class="agent-tooltip-label">极速模式</span><span>⚡ 已启用</span></div>
-                  <div class="agent-tooltip-row"><span class="agent-tooltip-label">目录</span><span class="agent-tooltip-dir">{{ agent.working_dir || '未提供工作目录' }}</span></div>
-                </div>
-
               </div>
             </div>
           </div>
@@ -91,7 +81,14 @@
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             </div>
-            <div class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</div>
+            <div class="agent-dir-line">
+              <span class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</span>
+              <span class="agent-meta-tag">📍 {{ getNodeLabel(agent) }}</span>
+              <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
+              <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
+              <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
+              <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
+            </div>
             <div class="agent-item-actions">
               <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
               <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
@@ -102,23 +99,6 @@
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
               <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
               <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
-              <button class="agent-tooltip-toggle" @click.stop="toggleTooltip(agent.agent_id)" title="详细信息">▸</button>
-            </div>
-            <div class="agent-tooltip" :class="{ 'tooltip-active': activeTooltipAgentId === agent.agent_id }" :style="{ top: tooltipTop + 'px', left: tooltipLeft + 'px' }">
-              <div class="agent-tooltip-header">
-                <span class="agent-tooltip-name">{{ agent.name }}</span>
-                <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
-              </div>
-              <div class="agent-tooltip-info">
-                <div class="agent-tooltip-row"><span class="agent-tooltip-label">类型</span><span>{{ agent.agent_type }}</span></div>
-                <div class="agent-tooltip-row"><span class="agent-tooltip-label">节点</span><span>{{ getNodeLabel(agent) }}</span></div>
-                <div class="agent-tooltip-row" v-if="agent.proxy_node"><span class="agent-tooltip-label">代理</span><span>{{ getProxyNodeLabel(agent) }}</span></div>
-                <div class="agent-tooltip-row" v-if="agent.llm_group"><span class="agent-tooltip-label">模型组</span><span>{{ agent.llm_group }}</span></div>
-                <div class="agent-tooltip-row" v-if="agent.worktree"><span class="agent-tooltip-label">Worktree</span><span>🌿 已启用</span></div>
-                <div class="agent-tooltip-row" v-if="agent.quick_mode"><span class="agent-tooltip-label">极速模式</span><span>⚡ 已启用</span></div>
-                <div class="agent-tooltip-row"><span class="agent-tooltip-label">目录</span><span class="agent-tooltip-dir">{{ agent.working_dir || '未提供工作目录' }}</span></div>
-              </div>
-
             </div>
           </div>
         </template>
@@ -222,35 +202,6 @@ function saveClickedWaitingAgents(set) {
 }
 
 const clickedWaitingAgents = ref(loadClickedWaitingAgents())
-const activeTooltipAgentId = ref(null)
-const tooltipTop = ref(0)
-const tooltipLeft = ref(0)
-
-function isHoverDevice() {
-  return window.matchMedia('(hover: hover)').matches
-}
-
-function toggleTooltip(agentId, event) {
-  if (activeTooltipAgentId.value === agentId) {
-    activeTooltipAgentId.value = null
-  } else {
-    activeTooltipAgentId.value = agentId
-    if (event && event.currentTarget) {
-      const rect = event.currentTarget.getBoundingClientRect()
-      if (props.windowWidth > 768) {
-        tooltipTop.value = rect.top
-        tooltipLeft.value = rect.right + 8 + 320 > window.innerWidth ? rect.left - 328 : rect.right + 8
-      } else {
-        tooltipTop.value = rect.bottom + 4
-        tooltipLeft.value = rect.left
-      }
-    }
-  }
-}
-
-function hideTooltip() {
-  activeTooltipAgentId.value = null
-}
 
 function isGroupCollapsed(groupKey) {
   return !!collapsedGroupsMap.value[groupKey]
@@ -266,8 +217,6 @@ function toggleGroupCollapse(groupKey) {
 
 // 处理Agent点击事件，记录点击状态
 function handleAgentClick(agent, event) {
-  // 关闭悬浮框
-  activeTooltipAgentId.value = null
   // 如果是等待输入状态，记录点击
   if (props.isWaitingInput(agent)) {
     clickedWaitingAgents.value.add(agent.agent_id)
@@ -899,11 +848,21 @@ watch(() => props.currentAgentId, (newAgentId) => {
   flex-shrink: 0;
 }
 
+.agent-dir-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
 .agent-dir {
   font-size: 10px;
   color: var(--color-text-secondary);
   word-break: break-all;
   line-height: 1.3;
+  flex: 1;
+  min-width: 0;
 }
 
 .agent-item-actions {
@@ -972,92 +931,14 @@ watch(() => props.currentAgentId, (newAgentId) => {
   margin-left: 4px;
 }
 
-/* Agent 悬浮框样式 */
-.agent-tooltip {
-  display: none;
-  position: fixed;
-  z-index: 100;
-  min-width: 240px;
-  max-width: 320px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--tile-radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  padding: 10px 12px;
-}
-
-.agent-tooltip.tooltip-active {
-  display: block;
-}
-
-.agent-tooltip-toggle {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 2px 4px;
+.agent-meta-tag {
+  font-size: 10px;
+  padding: 1px 6px;
   border-radius: 3px;
-  line-height: 1;
-}
-
-.agent-tooltip-toggle:hover {
-  color: var(--color-text-primary);
   background: var(--color-bg-hover);
-}
-
-@media (max-width: 768px) and (hover: none) {
-  .agent-tooltip {
-    min-width: 200px;
-    max-width: 260px;
-  }
-}
-
-.agent-tooltip-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.agent-tooltip-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
-
-.agent-tooltip-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.agent-tooltip-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-
-.agent-tooltip-label {
-  flex-shrink: 0;
-  min-width: 48px;
-  color: var(--color-text-muted);
-}
-
-.agent-tooltip-dir {
-  word-break: break-all;
-  line-height: 1.3;
-}
-
 
 .agent-node-label {
   font-size: 11px;
