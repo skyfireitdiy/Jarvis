@@ -1,0 +1,13 @@
+{
+  "id": "20260823_124038_819863",
+  "type": "project_long_term",
+  "tags": [
+    "演示视频",
+    "Web入口",
+    "jarvis-service",
+    "CLI入口"
+  ],
+  "content": "Jarvis 三个核心入口：jvs（通用Agent命令行）、jca（Code Agent命令行）、jarvis-service（Web网关，启动后访问 http://localhost:8000）。演示视频脚本已更新：第2段补 Web 入口安装与启动；第4段（单人多Agent）改为 Web 界面演示（YAML编排、Agent通信、无人值守均在Web界面）；第5、6段（多人单Agent、多人多Agent）本就是Web演示。用户强调：除单人单Agent用jca命令行外，后续协作场景基本都在Web界面演示。",
+  "created_at": "2026-08-23T12:40:38.819931",
+  "updated_at": "2026-08-23T12:40:38.819939"
+}

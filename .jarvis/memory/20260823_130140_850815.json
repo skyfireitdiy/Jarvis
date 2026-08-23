@@ -1,0 +1,13 @@
+{
+  "id": "20260823_130140_850815",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-service",
+    "Web启动",
+    "systemd",
+    "演示视频"
+  ],
+  "content": "jarvis-service 不是一条命令直接启动，它有子命令：install（安装为systemd用户服务）、run（直接运行非systemd）、start/stop（systemd管理）、switch（切换运行模式）。正确启动流程：jarvis-service install 然后 jarvis-service start，或直接 jarvis-service run。README中简写的 jarvis-service 实际对应 run 子命令。演示视频脚本第2段已改为 install + start 两步。",
+  "created_at": "2026-08-23T13:01:40.850874",
+  "updated_at": "2026-08-23T13:01:40.850879"
+}

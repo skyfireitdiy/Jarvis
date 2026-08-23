@@ -1,0 +1,15 @@
+{
+  "id": "20260823_130654_914454",
+  "type": "project_long_term",
+  "tags": [
+    "node-mode",
+    "多节点部署",
+    "4容器",
+    "master",
+    "child",
+    "演示视频"
+  ],
+  "content": "jarvis-service install 不指定 --node-mode 时默认 master（代码：resolved_node_mode = node_mode or os.getenv('JARVIS_NODE_MODE', 'master')）。用户计划演示多节点部署，准备 4 个容器：1 master + 3 child。child 节点需指定 --node-mode child --node-id worker-XX --master-url ws://master-host:8000 --node-secret <密钥>。演示视频脚本第2段单节点不指定node-mode（默认master），第6段多节点展示4容器部署命令。",
+  "created_at": "2026-08-23T13:06:54.914496",
+  "updated_at": "2026-08-23T13:06:54.914502"
+}

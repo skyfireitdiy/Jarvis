@@ -1,0 +1,14 @@
+{
+  "id": "20260823_130432_546471",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-service",
+    "install参数",
+    "初始密码",
+    "journalctl",
+    "演示视频"
+  ],
+  "content": "jarvis-service install 参数：--gateway-host、--gateway-port、--frontend-host、--frontend-port、--node-mode（master/child）、--node-id、--master-url、--node-secret。演示视频脚本第2段已更新为：jarvis-service install --gateway-host 0.0.0.0 --gateway-port 8000 → jarvis-service start → journalctl --user -u jarvis-master -f 查看初始密码 → 浏览器访问 http://localhost:8000。",
+  "created_at": "2026-08-23T13:04:32.546519",
+  "updated_at": "2026-08-23T13:04:32.546526"
+}
