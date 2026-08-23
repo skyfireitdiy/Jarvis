@@ -1,0 +1,12 @@
+{
+  "id": "20260822_070523_774937",
+  "type": "project_long_term",
+  "tags": [
+    "Jarvis",
+    "架构",
+    "核心特色"
+  ],
+  "content": "Jarvis 是面向开发者的 AI 助手平台/智能体框架。核心特色：1) 多人协作（JWT多用户认证、权限组、聊天室群聊私聊、ACL）；2) 多Agent协同（Web网关、节点管理、Agent代理、自演化网络编排）；3) 人与人/人与Agent/Agent与Agent交互（聊天室、send_to_agent、群组）；4) Agent编排（自演化网络：知识库/监控/技术学习/调度Agent）；5) CodeAgent优化（SQLite符号数据库、图遍历BFS、LLM上下文推荐、影响分析、依赖分析、Tree-sitter多语言提取、LSP、Worktree并行、构建验证、Lint、代码审查）；6) 元代理自举（meta_agent自然语言生成工具）；7) 分层记忆（短期/项目/全局，无向量计算）；8) 方法论沉淀与共享；9) 规则按需加载；10) MCP集成（stdio/sse/streamable）；11) 多模型分层（normal/cheap/smart）；12) C2Rust迁移流水线；13) 安全分析（污点分析、数据流分析）；14) Windows GUI自动化；15) 智能Shell、虚拟终端、浏览器自动化。",
+  "created_at": "2026-08-22T07:05:23.774978",
+  "updated_at": "2026-08-22T07:05:23.774985"
+}

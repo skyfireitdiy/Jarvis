@@ -1,0 +1,12 @@
+{
+  "id": "20260822_145731_695243",
+  "type": "project_long_term",
+  "tags": [
+    "性能实测",
+    "符号数据库",
+    "参赛文档"
+  ],
+  "content": "Jarvis 符号数据库性能实测（Django 52万行代码库，2929文件，64763符号）：建库22.11秒（平均7.5ms/文件、0.34ms/符号）；查询find_definition 6.4ms/次、find_references 1.4ms/次；影响分析4.6-4.7秒/次；图遍历0.1-0.3ms/次；DB大小40.5MB。测试环境：Ubuntu 24.04，Python 3.12，SQLite WAL模式。注意：发现bug——ContextManager.update_context_for_file 调用 add_symbol(symbol) 传Symbol对象但add_symbol签名是关键字参数，导致TypeError被吞、符号未入库；且insert_node后未commit。测试时手动转换Symbol为关键字参数并手动commit绕过。",
+  "created_at": "2026-08-22T14:57:31.695292",
+  "updated_at": "2026-08-22T14:57:31.695298"
+}
