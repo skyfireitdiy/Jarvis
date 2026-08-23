@@ -1,0 +1,13 @@
+{
+  "id": "20260823_115502_713750",
+  "type": "project_long_term",
+  "tags": [
+    "演示视频",
+    "脚本",
+    "CLI入口",
+    "安装"
+  ],
+  "content": "演示视频逐字稿脚本已创建于 docs/competition/demo_video_script.md，共7段：1开场问题、2安装与两个核心入口（jvs通用Agent/jca Code Agent）、3单人单Agent（jca影响分析）、4单人多Agent（编排）、5多人单Agent（Web/ACL/聊天室）、6多人多Agent（多节点流水线）、7真实落地收尾。安装命令：bash -c \"$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh)\"。CLI入口：jvs（jarvis通用）、jca（jarvis-code-agent）。用户强调重点演示 jarvis 和 jarvis-code-agent，并演示安装。",
+  "created_at": "2026-08-23T11:55:02.713799",
+  "updated_at": "2026-08-23T11:55:02.713805"
+}
