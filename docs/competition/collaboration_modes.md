@@ -565,7 +565,7 @@ Jarvis 的 `create_agent` 支持 `worktree` 参数，这是多人多 Agent 协�
 
 **技术深度**：Worktree 是 git 的原生能力，但 Jarvis 将其与 Agent 创建深度集成。创建 Agent 时指定 `worktree=True`，Agent 自动在独立的 worktree 中工作，避免与主工作目录的代码冲突。
 
-**差异化**：主流工具不支持 worktree 集成。Jarvis 让「多人多 Agent 并行开发不同需求」成为可能，这是团队级 AI 开发的关键能力。
+**定位**：Worktree 是 git 的原生能力，主流 AI 开发工具（如 Claude Code、CodeX）也已支持。Jarvis 在此对齐主流，不落后。Jarvis 的独特价值在于将 worktree 与**多 Agent 编排深度集成**——创建 Agent 时指定 `worktree=True`，Agent 自动在独立 worktree 中工作，且多个 worktree 中的 Agent 可通过网关互相通信、协同推进不同需求，这是「多人多 Agent 并行开发」的完整闭环。
 
 #### 3.4.4 节点级运维：一键更新与重启
 
@@ -710,7 +710,7 @@ Jarvis 支持规则文件的按需加载：
 | **MCP 集成** | stdio/sse/streamable | 有限 | 有限 | 有限 |
 | **多模型分层** | normal/cheap/smart | 单一模型 | 单一模型 | 单一模型 |
 | **定时任务** | 全工具延迟调用 + 跨节点定时 | 无 | 无 | 无 |
-| **Worktree 并行** | 原生集成 | 无 | 无 | 无 |
+| **Worktree 并行** | 深度集成（与多 Agent 编排联动） | 支持 | 支持 | 支持 |
 | **节点级运维** | 一键更新/重启/拓扑感知 | 无 | 无 | 无 |
 
 ### 4.2 核心差异化：从「工具」到「平台」
