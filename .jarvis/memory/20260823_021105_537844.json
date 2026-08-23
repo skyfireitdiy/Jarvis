@@ -1,0 +1,13 @@
+{
+  "id": "20260823_021105_537844",
+  "type": "project_long_term",
+  "tags": [
+    "参赛文档",
+    "Claude Code",
+    "差异化",
+    "索引机制"
+  ],
+  "content": "Claude Code 索引机制调研结论（2026-08-22）：Claude Code 无索引机制、无 Embedding、无向量数据库，仅用 ripgrep 做实时文本搜索（grep over RAG 设计哲学）。Anthropic 官方《Effective Context Engineering for AI Agents》明确：glob 和 grep 允许 just-in-time 检索文件，绕过 stale indexing 和复杂语法树。其放弃 RAG 五因：1)索引追不上代码变化；2)语法树解析成本高；3)Embedding 压缩丢信息；4)语义相似≠代码相关；5)流水线复杂度高。Claude Code 混合架构：静态上下文（CLAUDE.md/Auto Memory/Skills）+ 动态检索（Glob/Grep/Read/Bash）+ 隔离层（Subagents/Compaction）。此与 Jarvis 符号数据库（SQLite 精确符号索引、影响分析、图遍历）形成差异化：Jarvis 提供结构化符号级理解，Claude Code 仅文本级搜索。",
+  "created_at": "2026-08-23T02:11:05.537880",
+  "updated_at": "2026-08-23T02:11:05.537886"
+}
