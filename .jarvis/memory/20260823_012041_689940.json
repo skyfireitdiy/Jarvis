@@ -1,0 +1,13 @@
+{
+  "id": "20260823_012041_689940",
+  "type": "project_long_term",
+  "tags": [
+    "参赛文档",
+    "collaboration_modes",
+    "v1.4",
+    "PlantUML"
+  ],
+  "content": "参赛文档 collaboration_modes.md 已更新至 v1.4。本轮将 7.2 节治理结构图从 ASCII 图改为 PlantUML 图（component 图，含 skinparam 样式配置，三层结构：Jarvis 项目包（内核+插件包）→ 贡献与审查流程 → 决策机制）。文档当前约1040行。",
+  "created_at": "2026-08-23T01:20:41.690011",
+  "updated_at": "2026-08-23T01:20:41.690018"
+}
