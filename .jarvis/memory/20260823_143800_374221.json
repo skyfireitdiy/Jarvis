@@ -1,0 +1,12 @@
+{
+  "id": "20260823_143800_374221",
+  "type": "project_long_term",
+  "tags": [
+    "参赛文档",
+    "对比准确性",
+    "collaboration_modes"
+  ],
+  "content": "参赛文档 collaboration_modes.md 对比部分准确性核实完成（2026-08-22）。本轮修正 14 处：1) 第661行规则按需加载（Claude Code Skills 也是渐进式披露，差异化改为 auto_select_rule 自动匹配 vs Agent 自行判断）；2) 第635行分层记忆（Claude Code 用 Markdown 文件非向量数据库，CodeBuddy 用 RAG）；3) 第623行插件系统（主流工具通过 MCP 扩展，差异化改为 MCP 外部接入 vs 插件包内核扩展）；4) 第657行删除「传统工具将所有规则一次性加载」；5) 第700行专项能力（主流工具覆盖常规链路但缺领域专项）；6) 第621行删除「传统工具集是静态的」；7) 第645/647行方法论（Claude Code Auto Memory 是 Markdown 笔记，缺乏结构化索引）；8) 对比表第720行分层记忆（Claude Code 改为 Markdown 笔记）；9) 对比表第722行规则按需加载（Claude Code 改为 Skills 渐进式披露）；10) 第749行 Agent 自举（改为 MCP 外部接入）；11) 第748行多语言（改为文本级无 AST）；12) 对比表第718行多语言（改为文本级无 AST）；13) 第755行多用户（补 Claude Code Team 计划是 SaaS 账号体系）；14) 第1138行固定工具集改为 MCP 外部接入。另修正：第246行多语言、第440行多用户、第205行 LSP 表述、第224行 LSP 表述、第257行无人值守（Claude Code 有 --dangerously-skip-permissions）、第269行定时任务（Claude Code Hooks 是事件触发）、第282行代码审查（Claude Code subagent 需手动配置）、第297行子任务（Claude Code subagent 需任务描述传递）、第376行自演化网络（Claude Code Auto Memory 是被动笔记）。文档当前约1164行，版本 v2.8。",
+  "created_at": "2026-08-23T14:38:00.374255",
+  "updated_at": "2026-08-23T14:38:00.374261"
+}
