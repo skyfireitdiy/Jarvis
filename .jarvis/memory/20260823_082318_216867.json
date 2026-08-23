@@ -1,0 +1,14 @@
+{
+  "id": "20260823_082318_216867",
+  "type": "project_long_term",
+  "tags": [
+    "Jarvis",
+    "jsec",
+    "jc2r",
+    "开放原子大赛",
+    "多Agent协作"
+  ],
+  "content": "jsec（安全分析套件）和 jc2r（C2Rust 迁移）是以 Jarvis 为基座的多 Agent 协作框架，而非 Jarvis 系统中的普通模块。它们利用 Jarvis 的多 Agent 协作能力构建，在开放原子大赛中获一等奖。",
+  "created_at": "2026-08-23T08:23:18.216922",
+  "updated_at": "2026-08-23T08:23:18.216928"
+}
