@@ -8,7 +8,7 @@
 > **技术栈**：Python 3.12 / SQLite / tree-sitter / FastAPI / WebSocket / Playwright
 > **当前版本**：4.0.0
 > **项目规模**：319 个 Python 源文件 / 15.5 万行代码 / 70 个测试文件 / 960 个测试用例
-> **代码仓库**：https://gitee.com/skyfireitdiy/Jarvis
+> **代码仓库**：Gitee（https://gitee.com/skyfireitdiy/Jarvis）/ GitHub（https://github.com/skyfireitdiy/Jarvis）
 
 ---
 
@@ -1159,6 +1159,6 @@ Jarvis 的独特之处在于：**它用自己开发自己**——超 1 万次 Ag
 
 ---
 
-*文档版本：2.7（本轮：一句话定位改为聚焦四种协作模式，去掉符号级代码理解）*
+*文档版本：2.8（本轮：头部代码仓库补 GitHub 地址）*
 
 *最后更新：2026-08-22*
