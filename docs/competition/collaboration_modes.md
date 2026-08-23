@@ -55,27 +55,57 @@ AI 开发工具的协作能力，可以从两个维度交叉分析：
 
 Jarvis 采用「多节点 + 多网关 + 多 Agent + 多用户」的分布式协作架构：
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        用户层                               │
-│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐        │
-│  │用户 A │  │用户 B │  │用户 C │  │用户 D │  │用户 E │  ...  │
-│  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘        │
-└─────┼─────────┼─────────┼─────────┼─────────┼─────────────┘
-      │         │         │         │         │
-┌─────▼─────────────────────────────────────────────────────┐
-│                    主网关（Master Gateway）                 │
-│             用户交互 · 消息转发 · Agent 管理               │
-└─────┬─────────────────────┬───────────────────────────────┘
-      │                     │
-┌─────▼─────────────┐ ┌─────▼─────────────┐ ┌─────▼─────────────┐
-│   子网关 1        │ │   子网关 2        │ │   子网关 3        │ ...
-│  （节点 1）       │ │  （节点 2）       │ │  （节点 3）       │
-│  ┌──────────────┐ │ │  ┌──────────────┐ │ │  ┌──────────────┐ │
-│  │ Agent A      │ │ │  │ Agent B      │ │ │  │ Agent C      │ │
-│  │ Agent D      │ │ │  │ Agent E      │ │ │  │ Agent F      │ │
-│  └──────────────┘ │ │  └──────────────┘ │ │  └──────────────┘ │
-└───────────────────┘ └───────────────────┘ └───────────────────┘
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam component {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+  FontSize 12
+}
+
+package "用户层" {
+  component "用户 A" as ua
+  component "用户 B" as ub
+  component "用户 C" as uc
+  component "用户 D" as ud
+  component "用户 E" as ue
+  component "..." as ux
+}
+
+component "主网关（Master Gateway）\n用户交互 · 消息转发 · Agent 管理" as master
+
+package "子网关 1（节点 1）" as gw1 {
+  component "Agent A" as a1
+  component "Agent D" as a4
+}
+
+package "子网关 2（节点 2）" as gw2 {
+  component "Agent B" as a2
+  component "Agent E" as a5
+}
+
+package "子网关 3（节点 3）" as gw3 {
+  component "Agent C" as a3
+  component "Agent F" as a6
+}
+
+component "..." as gwx
+
+ua --> master
+ub --> master
+uc --> master
+ud --> master
+ue --> master
+ux --> master
+
+master --> gw1
+master --> gw2
+master --> gw3
+master --> gwx
+
+@enduml
 ```
 
 该架构包含三个核心层次：
@@ -906,42 +936,51 @@ Jarvis 采用**内核 + 插件包**的治理路径：
 
 **治理结构图**：
 
-```
-┌─────────────────────────────────────────────────┐
-│                  Jarvis 项目                      │
-├─────────────────────────────────────────────────┤
-│                                                   │
-│  ┌───────────────┐      ┌───────────────────┐   │
-│  │     内核       │      │     插件包         │   │
-│  │  （核心团队）   │      │   （社区贡献）      │   │
-│  ├───────────────┤      ├───────────────────┤   │
-│  │ Agent 基类     │      │ jarvis_code_agent │   │
-│  │ 网关           │      │ jarvis_mcp        │   │
-│  │ 记忆           │      │ jarvis_sec        │   │
-│  │ 规则           │      │ jarvis_c2rust     │   │
-│  │ 任务列表       │      │ ...（第三方扩展）   │   │
-│  └───────┬───────┘      └─────────┬─────────┘   │
-│          │                        │              │
-│          └──────────┬─────────────┘              │
-│                     │                            │
-│          ┌──────────▼──────────┐                 │
-│          │    贡献与审查流程     │                 │
-│          ├─────────────────────┤                 │
-│          │ Fork → PR → CI → 审查 │                │
-│          │ → 合并（核心维护者）   │                │
-│          └──────────┬──────────┘                 │
-│                     │                            │
-│          ┌──────────▼──────────┐                 │
-│          │    决策机制          │                 │
-│          ├─────────────────────┤                 │
-│          │ 日常：核心维护者      │                 │
-│          │ 重大：RFC 社区讨论    │                 │
-│          │ 冲突：投票决定        │                 │
-│          │ 发布：SemVer 版本     │                 │
-│          │ 安全：48h 响应        │                 │
-│          └─────────────────────┘                 │
-│                                                   │
-└─────────────────────────────────────────────────┘
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam component {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+  FontSize 12
+}
+
+package "Jarvis 项目" {
+  component "内核\n（核心团队维护）" as kernel {
+    component "Agent 基类" as k1
+    component "网关" as k2
+    component "记忆" as k3
+    component "规则" as k4
+    component "任务列表" as k5
+  }
+  component "插件包\n（社区贡献）" as plugins {
+    component "jarvis_code_agent" as p1
+    component "jarvis_mcp" as p2
+    component "jarvis_sec" as p3
+    component "jarvis_c2rust" as p4
+    component "...（第三方扩展）" as p5
+  }
+}
+
+component "贡献与审查流程" as review {
+  component "Fork → PR → CI → 审查 → 合并" as r1
+  component "（核心维护者把关）" as r2
+}
+
+component "决策机制" as decision {
+  component "日常：核心维护者" as d1
+  component "重大：RFC 社区讨论" as d2
+  component "冲突：投票决定" as d3
+  component "发布：SemVer 版本" as d4
+  component "安全：48h 响应" as d5
+}
+
+kernel --> review
+plugins --> review
+review --> decision
+
+@enduml
 ```
 
 **治理路径说明**：内核由核心团队维护，保证稳定性；插件包由社区贡献，保证灵活性。所有贡献（无论内核还是插件包）都经过统一的「Fork → PR → CI → 审查 → 合并」流程，由核心维护者把关。重大特性走 RFC 流程，安全漏洞 48 小时内响应。
@@ -1025,6 +1064,6 @@ Jarvis 的独特之处在于：**它用自己开发自己**——超 1 万次 Ag
 
 ---
 
-*文档版本：1.3（理论论证 + CLI 调用 + 量化里程碑 + 治理结构图）*
+*文档版本：1.4（治理结构图改为 PlantUML）*
 
 *最后更新：2026-08-22*
