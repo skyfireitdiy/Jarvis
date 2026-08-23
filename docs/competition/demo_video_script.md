@@ -32,7 +32,7 @@ Jarvis 的回答是：完整覆盖四种协作模式——单人单 Agent、单�
 
 ---
 
-## 第 2 段：安装与两个核心入口（约 60 秒）
+## 第 2 段：安装与三个核心入口（约 60 秒）
 
 **【画面】**：打开终端，展示 README 的安装命令。
 
@@ -48,20 +48,44 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main
 
 **【台词】**：
 
-安装完成后，得到两个核心命令：`jvs` 和 `jca`。
+安装完成后，Jarvis 提供了丰富的命令集。不过今天演示，我们只关注三个核心入口：`jvs`、`jca`，以及 Web 服务 `jarvis-service`。
 
-`jvs` 是通用 Agent 入口，`jca` 是 Code Agent 入口——这是 Jarvis 的两个核心，也是今天演示的重点。
+`jvs` 是通用 Agent 命令行入口，`jca` 是 Code Agent 命令行入口，`jarvis-service` 是 Web 网关入口。
 
 **【操作】**：
 
 ```bash
 jvs --help
 jca --help
+jarvis-service --help
 ```
 
 **【台词】**：
 
-零配置，开箱即用。接下来，我先用 `jca` 演示单人单 Agent 的深度。
+启动 Web 服务，先安装为系统服务，再启动。安装时指定监听地址和端口。不指定节点模式时，默认就是 master 主节点。
+
+**【操作】**：
+
+```bash
+jarvis-service install --gateway-host 0.0.0.0 --gateway-port 8000
+jarvis-service start
+```
+
+**【台词】**：
+
+启动后，用 journalctl 查看服务日志，获取初始密码。
+
+**【操作】**：
+
+```bash
+journalctl --user -u jarvis-master -f
+```
+
+**【台词】**：
+
+拿到初始密码后，浏览器访问 `http://localhost:8000`，就能进入 Web 界面。
+
+零配置，开箱即用。接下来，我先用 `jca` 演示单人单 Agent 的深度，后面的协作场景都在 Web 界面演示。
 
 ---
 
@@ -105,27 +129,27 @@ jca
 
 ## 第 4 段：单人多 Agent——一人成军（约 80 秒）
 
-**【画面】**：展示 `builtin/agent_orchestration/` 目录下的编排文件。
+**【画面】**：切换到 Web 界面。
 
 **【台词】**：
 
 接下来是单人多 Agent。一个人，能不能扛起整个开发流程？
 
-Jarvis 内置了 Agent 编排机制。用一个 YAML 文件，就能一键部署多个 Agent 的协作网络。
+Jarvis 内置了 Agent 编排机制。在 Web 界面里，用一个 YAML 编排文件，就能一键部署多个 Agent 的协作网络。
 
-**【操作】**：展示 YAML 编排文件内容，然后执行编排。
+**【操作】**：在 Web 界面中上传或选择 YAML 编排文件，执行编排。
 
 **【台词】**：
 
 这里我部署一个「开发 Agent + 测试 Agent」的协作网络。开发 Agent 写完代码，通过网关通知测试 Agent；测试失败，错误自动回传给开发 Agent。
 
-**【画面】**：展示 Agent 间通信的过程。
+**【画面】**：在 Web 界面展示 Agent 间通信的过程。
 
 **【台词】**：
 
-更关键的是无人值守。我下班前布置任务，Agent 团队夜间自动完成开发、测试，第二天早上我直接看结果。
+更关键的是无人值守。我下班前在 Web 界面布置任务，Agent 团队夜间自动完成开发、测试，第二天早上我直接看结果。
 
-**【画面】**：展示无人值守模式或定时任务。
+**【画面】**：在 Web 界面展示无人值守模式或定时任务。
 
 **【台词】**：
 
@@ -176,6 +200,20 @@ Jarvis 内置 JWT 多用户认证和 ACL 权限组。管理员管系统级权限
 **【台词】**：
 
 Jarvis 可以部署在多个节点上，每个节点运行独立的 Agent 服务和网关。节点通过私钥注册，形成节点网络。
+
+我准备了 4 个容器：1 个 master 主节点，3 个 child 子节点。
+
+**【操作】**：展示 4 个容器的部署命令。
+
+```bash
+# 容器 1：master 主节点
+jarvis-service install --node-mode master --gateway-host 0.0.0.0 --gateway-port 8000
+
+# 容器 2/3/4：child 子节点
+jarvis-service install --node-mode child --node-id worker-01 --master-url ws://master-host:8000 --node-secret <密钥>
+jarvis-service install --node-mode child --node-id worker-02 --master-url ws://master-host:8000 --node-secret <密钥>
+jarvis-service install --node-mode child --node-id worker-03 --master-url ws://master-host:8000 --node-secret <密钥>
+```
 
 **【画面】**：展示跨节点「编译→测试」流水线。
 
@@ -247,7 +285,11 @@ Jarvis，让 AI 从单兵作战，进化到军团协同。
 **第 2 段**：
 - [ ] 展示 README 安装命令
 - [ ] 执行一键安装脚本
-- [ ] 展示 `jvs --help` 与 `jca --help`
+- [ ] 展示 `jvs --help`、`jca --help`、`jarvis-service --help`
+- [ ] `jarvis-service install --gateway-host 0.0.0.0 --gateway-port 8000` 安装为系统服务
+- [ ] `jarvis-service start` 启动服务
+- [ ] `journalctl --user -u jarvis-master -f` 查看初始密码
+- [ ] 浏览器访问 `http://localhost:8000`
 
 **第 3 段**：
 - [ ] `jca` 启动 Code Agent CLI
@@ -256,10 +298,10 @@ Jarvis，让 AI 从单兵作战，进化到军团协同。
 - [ ] 完整小任务闭环
 
 **第 4 段**：
-- [ ] 展示 `builtin/agent_orchestration/` 目录
-- [ ] 展示 YAML 编排文件
+- [ ] Web 界面展示 YAML 编排文件
 - [ ] 执行编排，展示 Agent 创建
-- [ ] 展示 Agent 间通信
+- [ ] Web 界面展示 Agent 间通信
+- [ ] Web 界面展示无人值守/定时任务
 
 **第 5 段**：
 - [ ] 打开 Web 界面
@@ -268,6 +310,7 @@ Jarvis，让 AI 从单兵作战，进化到军团协同。
 - [ ] 聊天室 @ Agent 提问
 
 **第 6 段**：
+- [ ] 展示 4 容器部署（1 master + 3 child）
 - [ ] 展示节点列表
 - [ ] 跨节点编译→测试流水线
 - [ ] 节点级运维（一键更新/重启）
