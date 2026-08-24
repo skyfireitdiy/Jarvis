@@ -98,7 +98,7 @@
                   class="recent-dir-tag"
                   @click="$emit('update:workDir', dir)"
                   :title="dir">
-                  {{ dir.length > 40 ? dir.substring(0, 37) + '...' : dir }}
+                  {{ dir.length > 40 ? dir.substring(0, 20) + '...' + dir.substring(dir.length - 17) : dir }}
                 </span>
               </div>
             </div>
@@ -190,7 +190,6 @@ const props = defineProps({
   accessAclInteract: { type: Array, default: () => [] },
   userOptions: { type: Array, default: () => [] },
   recentWorkDirs: { type: Array, default: () => [] }
-})
 })
 
 const emit = defineEmits([
