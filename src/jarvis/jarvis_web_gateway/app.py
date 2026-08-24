@@ -4481,6 +4481,7 @@ def create_app(
                         "restore_session": restore_session,
                         "no_interaction_mode": no_interaction_mode,
                         "proxy_node": proxy_node,
+                        "access_acl": access_acl,
                     },
                 )
                 payload = response.get("payload") or {}
