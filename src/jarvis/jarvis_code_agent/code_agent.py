@@ -590,7 +590,9 @@ git reset --hard {start_commit}
             # 如果启用了 review，执行 review 和修复循环
             # AutoComplete 完成后跳过 review（_execute_auto_complete 已执行过）
             # 检查后立即重置标志，确保仅跳过一次
-            if not self.disable_review and not getattr(self, '_review_already_done', False):
+            if not self.disable_review and not getattr(
+                self, "_review_already_done", False
+            ):
                 self._review_and_fix(
                     prefix=prefix,
                     suffix=suffix,
@@ -988,6 +990,7 @@ git reset --hard {start_commit}
         except Exception as e:
             # 检查是否为中断导致的异常
             from jarvis.jarvis_utils.utils import get_interrupt
+
             if get_interrupt() > 0:
                 raise KeyboardInterrupt("用户中断")
             PrettyOutput.auto_print(f"⚠ 生成修复总结失败: {str(e)}")
@@ -1326,6 +1329,38 @@ def cli(
                         # 解析为结构化数据
                         structured_data = parse_diff_to_structured_data(diff_content)
                         return {"diff": diff_content, "files": structured_data}
+                    # 无 start_commit 时，若工作目录为 git 仓库，返回工作区未提交变更的 diff
+                    if root_agent and hasattr(root_agent, "root_dir"):
+                        work_dir = root_agent.root_dir
+                    else:
+                        work_dir = os.getcwd()
+                    try:
+                        is_git_repo = subprocess.run(
+                            ["git", "rev-parse", "--is-inside-work-tree"],
+                            cwd=work_dir,
+                            capture_output=True,
+                            text=False,
+                        )
+                        if (
+                            is_git_repo.returncode == 0
+                            and is_git_repo.stdout.strip() == b"true"
+                        ):
+                            diff_result = subprocess.run(
+                                ["git", "diff"],
+                                cwd=work_dir,
+                                capture_output=True,
+                                text=False,
+                            )
+                            if diff_result.returncode == 0:
+                                diff_content = diff_result.stdout.decode(
+                                    "utf-8", errors="replace"
+                                )
+                                structured_data = parse_diff_to_structured_data(
+                                    diff_content
+                                )
+                                return {"diff": diff_content, "files": structured_data}
+                    except Exception:
+                        pass
                 return {"diff": "", "files": []}
 
             @custom_app.get("/rules")
