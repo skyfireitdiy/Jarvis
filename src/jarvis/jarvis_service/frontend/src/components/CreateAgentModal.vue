@@ -88,6 +88,20 @@
               <input :value="workDir" @input="$emit('update:workDir', $event.target.value)" type="text" class="form-control" placeholder="/path/to/workspace" />
               <button class="btn select-dir-btn" @click="$emit('selectDir')">选择目录</button>
             </div>
+            <!-- 历史工作目录 -->
+            <div v-if="recentWorkDirs && recentWorkDirs.length > 0" class="recent-dirs-section">
+              <div class="recent-dirs-title">最近使用的工作目录</div>
+              <div class="recent-dirs-list">
+                <span 
+                  v-for="(dir, index) in recentWorkDirs" 
+                  :key="index"
+                  class="recent-dir-tag"
+                  @click="$emit('update:workDir', dir)"
+                  :title="dir">
+                  {{ dir.length > 40 ? dir.substring(0, 37) + '...' : dir }}
+                </span>
+              </div>
+            </div>
           </div>
           <div v-if="agentType === 'code_agent'" class="form-group">
             <div class="toggle-wrapper">
@@ -174,7 +188,9 @@ const props = defineProps({
   createError: { type: String, default: '' },
   accessAclRead: { type: Array, default: () => [] },
   accessAclInteract: { type: Array, default: () => [] },
-  userOptions: { type: Array, default: () => [] }
+  userOptions: { type: Array, default: () => [] },
+  recentWorkDirs: { type: Array, default: () => [] }
+})
 })
 
 const emit = defineEmits([
@@ -220,6 +236,40 @@ function toggleAclInteract(userId, event) {
 </script>
 
 <style scoped>
+/* 历史工作目录样式 */
+.recent-dirs-section {
+  margin-top: 8px;
+}
+.recent-dirs-title {
+  font-size: 0.85em;
+  color: var(--color-text-secondary, #888);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.recent-dirs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.recent-dir-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: var(--color-bg-tertiary, #f0f0f0);
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--color-text-primary, #333);
+  cursor: pointer;
+  transition: all 0.2s;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-dir-tag:hover {
+  background-color: var(--color-primary, #409eff);
+  color: white;
+}
+
 /* ACL配置区样式 */
 .acl-section {
   display: flex;

@@ -604,8 +604,8 @@
       :accessAclRead="newAgentAccessAclRead"
       @update:accessAclRead="newAgentAccessAclRead = $event"
       :accessAclInteract="newAgentAccessAclInteract"
-      @update:accessAclInteract="newAgentAccessAclInteract = $event"
       :userOptions="availableUserOptions.filter(u => !u.is_admin && u.user_id !== auth.userInfo?.user_id)"
+      :recentWorkDirs="recentWorkDirs"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -1789,8 +1789,39 @@ const selectedDir = ref(null)              // 选中的目录
 const dirSearchText = ref('')              // 目录搜索文本
 const dirSearchInput = ref(null)           // 目录搜索输入框引用
 const selectedDirIndex = ref(-1)           // 当前选中的目录索引，-1 表示未选中
+
+const recentWorkDirs = ref([])             // 最近使用的工作目录列表（最多20个，去重）
 const renameInput = ref(null)               // 重命名输入框引用
 
+// 最近使用的工作目录管理（localStorage持久化存储）
+function loadRecentWorkDirs() {
+  try {
+    const stored = localStorage.getItem('jarvis_recent_work_dirs')
+    if (stored) {
+      recentWorkDirs.value = JSON.parse(stored)
+    } else {
+      recentWorkDirs.value = []
+    }
+  } catch (error) {
+    console.error('[HISTORY DIR] 加载历史记录失败:', error)
+    recentWorkDirs.value = []
+  }
+}
+
+function saveRecentWorkDir(path) {
+  try {
+    // 去重：过滤掉已存在的路径
+    const filtered = recentWorkDirs.value.filter(p => p !== path)
+    // 新路径加到最前面
+    const updated = [path, ...filtered]
+    // 只保留最近20个
+    recentWorkDirs.value = updated.slice(0, 20)
+    // 保存到localStorage
+    localStorage.setItem('jarvis_recent_work_dirs', JSON.stringify(recentWorkDirs.value))
+  } catch (error) {
+    console.error('[HISTORY DIR] 保存历史记录失败:', error)
+  }
+}
 // 文件树状态管理
 const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
 const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：agent_id -> Set(expandedPaths)
@@ -5014,6 +5045,8 @@ async function goToParentDir() {
 async function confirmDirectory() {
   if (selectedDir.value) {
     newAgentDir.value = selectedDir.value
+    // 保存工作目录到历史记录
+    saveRecentWorkDir(selectedDir.value)
     showDirDialog.value = false
   }
 }
@@ -5034,6 +5067,8 @@ async function openCreateAgentModal() {
     fetchUserList(),
     fetchUserAccessibleNodes(),
   ])
+  // 加载最近使用的工作目录
+  loadRecentWorkDirs()
   newAgentNodeId.value = ''
   newAgentDir.value = '~'
   newAgentCreateError.value = ''
