@@ -1273,7 +1273,36 @@ def run_cli(
 
             @custom_app.get("/diff")
             async def get_diff_api() -> dict:
-                """获取 diff（通用 Agent 返回空内容）。"""
+                """获取 diff（若工作目录为 git 仓库，返回工作区未提交变更的 diff）。"""
+                try:
+                    is_git_repo = subprocess.run(
+                        ["git", "rev-parse", "--is-inside-work-tree"],
+                        capture_output=True,
+                        text=False,
+                    )
+                    if (
+                        is_git_repo.returncode == 0
+                        and is_git_repo.stdout.strip() == b"true"
+                    ):
+                        diff_result = subprocess.run(
+                            ["git", "diff"],
+                            capture_output=True,
+                            text=False,
+                        )
+                        if diff_result.returncode == 0:
+                            diff_content = diff_result.stdout.decode(
+                                "utf-8", errors="replace"
+                            )
+                            from jarvis.jarvis_code_agent.diff_visualizer import (
+                                parse_diff_to_structured_data,
+                            )
+
+                            structured_data = parse_diff_to_structured_data(
+                                diff_content
+                            )
+                            return {"diff": diff_content, "files": structured_data}
+                except Exception:
+                    pass
                 return {"diff": "", "files": []}
 
             @custom_app.get("/rules")
