@@ -1101,27 +1101,41 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
             # 获取提交历史
             start_commit = getattr(agent, "start_commit", None)
-            commits = git_manager.show_commit_between(start_commit, end_commit)
+            if start_commit is None:
+                # 非 code agent：直接提交当前工作区变更
+                from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 
-            # 调用 handle_commit_confirmation 处理提交确认
-            # 使用 agent 中存储的 prefix/suffix，不需要额外的后处理函数
-            post_process_func = getattr(
-                getattr(agent, "post_process_manager", None),
-                "post_process_modified_files",
-                None,
-            )
-            if post_process_func is None:
-                post_process_func = lambda *args, **kwargs: None  # noqa: E731
+                git_commiter = GitCommitTool()
+                git_commiter.execute(
+                    {
+                        "prefix": getattr(agent, "prefix", ""),
+                        "suffix": getattr(agent, "suffix", ""),
+                        "agent": agent,
+                        "llm_group": get_llm_group(),
+                    }
+                )
+            else:
+                commits = git_manager.show_commit_between(start_commit, end_commit)
 
-            git_manager.handle_commit_confirmation(
-                commits,
-                start_commit,
-                prefix=getattr(agent, "prefix", ""),
-                suffix=getattr(agent, "suffix", ""),
-                agent=agent,
-                post_process_func=post_process_func,
-                skip_confirm=True,
-            )
+                # 调用 handle_commit_confirmation 处理提交确认
+                # 使用 agent 中存储的 prefix/suffix，不需要额外的后处理函数
+                post_process_func = getattr(
+                    getattr(agent, "post_process_manager", None),
+                    "post_process_modified_files",
+                    None,
+                )
+                if post_process_func is None:
+                    post_process_func = lambda *args, **kwargs: None  # noqa: E731
+
+                git_manager.handle_commit_confirmation(
+                    commits,
+                    start_commit,
+                    prefix=getattr(agent, "prefix", ""),
+                    suffix=getattr(agent, "suffix", ""),
+                    agent=agent,
+                    post_process_func=post_process_func,
+                    skip_confirm=True,
+                )
 
             # 提交完成后自动保存会话
             if getattr(agent, "allow_savesession", False):
