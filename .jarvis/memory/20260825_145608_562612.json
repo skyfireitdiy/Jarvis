@@ -1,0 +1,13 @@
+{
+  "id": "20260825_145608_562612",
+  "type": "project_long_term",
+  "tags": [
+    "参赛文档",
+    "collaboration_modes",
+    "多Agent能力修正",
+    "v3.4"
+  ],
+  "content": "参赛文档 collaboration_modes.md 已更新至 v3.4。本轮修正对其他工具多 Agent 能力的失真描述（用户指出 Claude Code 也有 Agent Teams）。核实结果：1) Claude Code 2026 年 2 月推出 Agent Teams 实验性功能（多实例点对点通信、并行协作）；2) CodeBuddy 有 Agent Teams（多实例协作、共享任务列表、成员间消息通信）；3) CodeX 有 Subagents（manager-worker 架构，2026 年 Multi-Agent V2 已稳定）。修正约 10 处：第 26 行「AI 助手是个人工具」改为「单人场景成熟、团队协同有提升空间」；第 28 行「这个假设」改为「这些局限」；第 30 行「Agent 间协作受限」补「近期才以实验性功能推出」；第 32 行「缺少通信机制」改为「近期才以实验性功能推出」；第 35 行补「多用户共享、多 Agent 协作、跨节点协同」；第 61 行「单人单 Agent（有子代理）」改为「单人单 Agent 为主（近期推出多 Agent 实验性功能）」；第 64 行补「多 Agent 协作是核心设计而非实验性附加」；对比表第 771 行协作模式、第 773 行多 Agent 补 Agent Teams/Subagents 细节；第 791 行「一个用户一个 Agent」改为「以单人单 Agent 为核心设计」；第 813-814 行「主流工具是子代理模式」改为「以子代理模式为主，Agent Teams 是实验性功能」；第 1196 行「聚焦单人单 Agent」改为「以单人单 Agent 为核心设计」；第 1209 行补「多 Agent 协作是核心设计而非实验性附加」。核心原则：承认主流工具已有实验性多 Agent 功能，但强调 Jarvis 的多 Agent 协作是核心设计、非实验性附加，且覆盖多用户、多节点等更完整维度。文档当前约 1224 行。",
+  "created_at": "2026-08-25T14:56:08.562637",
+  "updated_at": "2026-08-25T14:56:08.562643"
+}
