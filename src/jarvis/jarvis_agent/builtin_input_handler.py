@@ -34,9 +34,11 @@ from jarvis.jarvis_utils.utils import load_config
 from jarvis.jarvis_agent.rules_manager import RulesManager
 from jarvis.jarvis_agent.utils import build_fix_prompt
 from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
+from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_utils.git_utils import (
     get_latest_commit_hash,
     get_diff_between_commits,
+    find_git_root,
 )
 
 
@@ -1080,9 +1082,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"❌ 聊天失败: {str(exc)}")
             return "", True
         elif tag == "Commit":
-            # 处理代码提交命令（仅在 code agent 中可用）
-            if not hasattr(agent, "git_manager"):
-                PrettyOutput.auto_print("⚠️ Commit 命令仅在 code agent 中可用。")
+            # 处理代码提交命令（需在 git 仓库中执行）
+            try:
+                find_git_root()
+            except Exception:
+                PrettyOutput.auto_print("⚠️ Commit 命令需在 git 仓库中执行。")
                 return "", True
 
             PrettyOutput.auto_print("📝 正在提交代码...")
@@ -1090,20 +1094,32 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             # 获取当前的 end commit
             end_commit = get_latest_commit_hash()
 
+            # 获取或创建 GitManager
+            git_manager = getattr(agent, "git_manager", None)
+            if git_manager is None:
+                git_manager = GitManager(os.getcwd())
+
             # 获取提交历史
-            commits = agent.git_manager.show_commit_between(
-                agent.start_commit, end_commit
-            )
+            start_commit = getattr(agent, "start_commit", None)
+            commits = git_manager.show_commit_between(start_commit, end_commit)
 
             # 调用 handle_commit_confirmation 处理提交确认
             # 使用 agent 中存储的 prefix/suffix，不需要额外的后处理函数
-            agent.git_manager.handle_commit_confirmation(
+            post_process_func = getattr(
+                getattr(agent, "post_process_manager", None),
+                "post_process_modified_files",
+                None,
+            )
+            if post_process_func is None:
+                post_process_func = lambda *args, **kwargs: None  # noqa: E731
+
+            git_manager.handle_commit_confirmation(
                 commits,
-                agent.start_commit,
-                prefix=agent.prefix,
-                suffix=agent.suffix,
+                start_commit,
+                prefix=getattr(agent, "prefix", ""),
+                suffix=getattr(agent, "suffix", ""),
                 agent=agent,
-                post_process_func=agent.post_process_manager.post_process_modified_files,  # type: ignore[attr-defined]
+                post_process_func=post_process_func,
                 skip_confirm=True,
             )
 
