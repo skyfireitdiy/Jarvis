@@ -2286,7 +2286,8 @@ function layoutCodeMirrorEditor() {
 }
 
 function activateEditorTab(path) {
-  activeEditorTabPath.value = path
+  const session = activeEditorSession.value
+  if (session) session.activeTabPath = path
   const modelData = editorModels.get(path)
   if (cmEditorView && modelData) {
     // 切换编辑器内容：通过 dispatch 替换整个 state
@@ -2666,8 +2667,10 @@ async function openEditorFile(path, agentId = null) {
     mtimeNs: null,
     fileSize: null,
   }
-  editorTabs.value.push(tab)
-  activeEditorTabPath.value = path
+  const session = activeEditorSession.value
+  if (!session) return
+  session.tabs.push(tab)
+  session.activeTabPath = path
 
   try {
     const [content, fileStat] = await Promise.all([
@@ -2897,11 +2900,13 @@ async function closeEditorTab(path) {
     if (!confirmed) return
   }
 
-  const index = editorTabs.value.findIndex(item => item.path === path)
+  const session = activeEditorSession.value
+  if (!session) return
+  const index = session.tabs.findIndex(item => item.path === path)
   if (index === -1) return
 
-  const wasActive = activeEditorTabPath.value === path
-  editorTabs.value.splice(index, 1)
+  const wasActive = session.activeTabPath === path
+  session.tabs.splice(index, 1)
 
   const modelData = editorModels.get(path)
   if (modelData) {
@@ -2909,11 +2914,11 @@ async function closeEditorTab(path) {
   }
 
   if (wasActive) {
-    const nextTab = editorTabs.value[index] || editorTabs.value[index - 1] || null
+    const nextTab = session.tabs[index] || session.tabs[index - 1] || null
     if (nextTab) {
       activateEditorTab(nextTab.path)
     } else {
-      activeEditorTabPath.value = null
+      session.activeTabPath = null
       // 不销毁 cmEditorView，保留编辑器实例和容器 DOM，
       // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
       // 后续打开文件时无法重新创建编辑器。

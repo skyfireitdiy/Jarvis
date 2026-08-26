@@ -13,7 +13,7 @@ param(
 )
 
 if ($Help) {
-    Write-Host "用法：powershell -File install.ps1 [选项]" -ForegroundColor Cyan
+    Write-Host "用法：powershell -File quick-install.ps1 [选项]" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "选项:" -ForegroundColor Yellow
     Write-Host "  -Force, -f       强制重新安装，忽略之前的安装状态"
@@ -21,9 +21,9 @@ if ($Help) {
     Write-Host "  -Help, -h        显示此帮助信息"
     Write-Host ""
     Write-Host "示例:" -ForegroundColor Yellow
-    Write-Host "  powershell -File install.ps1              # 正常安装（自动检测断点）"
-    Write-Host "  powershell -File install.ps1 -Force       # 强制重新安装"
-    Write-Host "  powershell -File install.ps1 -NoResume    # 不恢复，从头开始"
+    Write-Host "  powershell -File quick-install.ps1              # 正常安装（自动检测断点）"
+    Write-Host "  powershell -File quick-install.ps1 -Force       # 强制重新安装"
+    Write-Host "  powershell -File quick-install.ps1 -NoResume    # 不恢复，从头开始"
     exit 0
 }
 

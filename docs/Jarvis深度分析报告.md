@@ -626,7 +626,7 @@ Jarvis 专注于代码开发，提供规则系统和方法论系统；OpenClaw/Z
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh)"
 
 # Windows PowerShell
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
+iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.ps1'))
 ```
 
 **手动安装**：
