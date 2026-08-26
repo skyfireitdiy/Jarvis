@@ -25,6 +25,21 @@ echo_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 echo_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# ===== 断点续装状态标记 =====
+STATE_FILE="$DEST_DIR/.install_state"
+
+set_state() {
+    echo "$1" >> "$STATE_FILE"
+}
+
+check_state() {
+    [ -f "$STATE_FILE" ] && grep -q "^$1$" "$STATE_FILE"
+}
+
+clear_state() {
+    rm -f "$STATE_FILE"
+}
+
 # ===== 检测系统 =====
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -80,6 +95,11 @@ install_uv() {
 
 # ===== 安装可选工具 =====
 install_optional_tools() {
+    if check_state "optional_tools"; then
+        echo_info "可选工具已安装，跳过"
+        return 0
+    fi
+
     local tools=("rg:ripgrep" "fd:fd-find" "fzf:fzf" "tmux:tmux" "tree:tree")
     
     echo ""
@@ -106,6 +126,7 @@ install_optional_tools() {
             echo_warn "未检测到包管理器，跳过可选工具安装"
         fi
         
+        set_state "optional_tools"
         echo_info "可选工具安装完成"
     fi
 }
@@ -129,6 +150,11 @@ prepare_source() {
         git fetch --depth 1 origin "$ref" 2>/dev/null || git fetch origin 2>/dev/null
         git checkout -f "$ref" 2>/dev/null || git checkout -f "origin/$ref" 2>/dev/null
         echo_info "源码更新完成"
+        # 源码更新后需重新安装 Jarvis
+        if check_state "jarvis"; then
+            echo_warn "源码已更新，将重新安装 Jarvis"
+            sed -i '/^jarvis$/d' "$STATE_FILE"
+        fi
     else
         echo_info "正在克隆源码到 $DEST_DIR..."
         rm -rf "$DEST_DIR"
@@ -148,20 +174,25 @@ prepare_source() {
 
 # ===== 安装 Jarvis =====
 install_jarvis() {
+    if check_state "jarvis"; then
+        echo_info "Jarvis 已安装，跳过"
+        return 0
+    fi
+
     cd "$DEST_DIR"
-    
+
     echo_info "正在安装 Jarvis (Python 3.12)..."
     uv tool install -e . --python 3.12 || {
         echo_error "Jarvis 安装失败"
         exit 1
     }
-    
+
     # 更新 shell 环境
     uv tool update-shell 2>/dev/null || true
-    
+
+    set_state "jarvis"
     echo_info "Jarvis 安装完成"
 }
-
 # ===== 验证安装 =====
 verify_installation() {
     export PATH="$HOME/.local/bin:$PATH"
@@ -187,7 +218,9 @@ main() {
     
     # 执行安装
     install_uv || exit 1
+    set_state "uv"
     prepare_source
+    set_state "source"
     install_jarvis
     install_optional_tools
     verify_installation
