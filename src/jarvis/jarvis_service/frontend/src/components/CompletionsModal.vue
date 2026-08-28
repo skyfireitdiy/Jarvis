@@ -184,7 +184,7 @@ defineExpose({
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
 .completion-desc {

@@ -160,7 +160,7 @@ defineExpose({
   padding: 12px 14px;
   background: var(--color-bg-primary);
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 13px;
   color: var(--color-text-primary);
   margin-bottom: 16px;
@@ -274,7 +274,7 @@ defineExpose({
 
 .btn.primary {
   background: var(--color-success);
-  color: #0a1228;
+  color: #060911;
 }
 
 .btn.primary:hover {

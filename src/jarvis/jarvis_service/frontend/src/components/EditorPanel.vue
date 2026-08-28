@@ -220,7 +220,7 @@ defineExpose({
 }
 
 .editor-tab-dirty {
-  color: #f2cc60;
+  color: #ff8520;
   font-size: 10px;
 }
 
@@ -284,12 +284,12 @@ defineExpose({
 }
 
 .editor-edit-toggle.editable {
-  background: rgba(0, 255, 136, 0.15);
+  background: rgba(54, 255, 124, 0.15);
   color: var(--color-success);
 }
 
 .editor-edit-toggle.editable:hover {
-  background: rgba(0, 255, 136, 0.25);
+  background: rgba(54, 255, 124, 0.25);
 }
 
 .editor-edit-toggle-icon {

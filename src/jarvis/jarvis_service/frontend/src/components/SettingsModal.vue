@@ -22,7 +22,7 @@
       <!-- 我的账户 -->
       <div class="form-group">
         <label>当前用户</label>
-        <div style="font-size:14px">{{ currentUserInfo?.username || '-' }}<span v-if="currentUserInfo?.display_name" style="color:var(--text-secondary,#888);margin-left:8px">({{ currentUserInfo.display_name }})</span></div>
+        <div style="font-size:14px">{{ currentUserInfo?.username || '-' }}<span v-if="currentUserInfo?.display_name" style="color:var(--text-secondary,#8ba3b8);margin-left:8px">({{ currentUserInfo.display_name }})</span></div>
       </div>
       <div class="form-group">
         <label>修改密码</label>
@@ -531,7 +531,7 @@ async function changePassword() {
   font-size: 14px;
   color: var(--color-text-primary);
   font-weight: 600;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
 .ghost-btn {
@@ -643,7 +643,7 @@ async function changePassword() {
 
 .secret-code {
   flex: 1;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 13px;
   color: var(--color-text-primary);
   word-break: break-all;
