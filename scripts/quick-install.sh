@@ -68,10 +68,9 @@ install_uv() {
 
     echo_info "正在安装 uv..."
 
-    # 尝试多个安装源：清华镜像 → 阿里云镜像 → 官方
+    # 尝试多个安装源：国内公益镜像 → 官方
     local UV_INSTALL_URLS=(
-        "https://mirrors.tuna.tsinghua.edu.cn/github-release/astral-sh/uv/LatestRelease/install.sh"
-        "https://mirrors.aliyun.com/github-release/astral-sh/uv/LatestRelease/install.sh"
+        "https://uv.agentsmirror.com/install-cn.sh"
         "https://astral.sh/uv/install.sh"
     )
 
@@ -91,8 +90,7 @@ install_uv() {
     echo_warn "安装脚本方式失败，尝试手动下载..."
     local TEMP_DIR=$(mktemp -d)
     local UV_DOWNLOAD_URLS=(
-        "https://mirrors.tuna.tsinghua.edu.cn/github-release/astral-sh/uv/LatestRelease/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
-        "https://mirrors.aliyun.com/github-release/astral-sh/uv/LatestRelease/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
+        "https://uv.agentsmirror.com/github/astral-sh/uv/releases/download/latest/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
         "https://github.com/astral-sh/uv/releases/latest/download/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
     )
 
