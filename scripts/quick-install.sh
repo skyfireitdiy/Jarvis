@@ -15,7 +15,7 @@ DEST_DIR="$HOME/Jarvis"
 DEFAULT_BRANCH="main"
 
 # 镜像配置（国内用户加速）
-export UV_PYTHON_INSTALL_MIRROR="https://mirror.nju.edu.cn/github-release/indygreg/python-build-standalone/"
+export UV_PYTHON_INSTALL_MIRROR="https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone/"
 export UV_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple/"
 
 # ===== 颜色输出 =====
