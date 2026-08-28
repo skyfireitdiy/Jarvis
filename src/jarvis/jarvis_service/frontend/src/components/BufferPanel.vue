@@ -165,7 +165,7 @@ defineEmits(['update:visible', 'update:editText', 'close', 'load', 'clear', 'sav
   padding: 14px 16px;
   color: var(--color-text-primary);
   font-size: 14px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   resize: vertical;
   box-sizing: border-box;
   outline: none;

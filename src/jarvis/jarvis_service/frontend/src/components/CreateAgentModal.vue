@@ -241,7 +241,7 @@ function toggleAclInteract(userId, event) {
 }
 .recent-dirs-title {
   font-size: 0.85em;
-  color: var(--color-text-secondary, #888);
+  color: var(--color-text-secondary, #8ba3b8);
   margin-bottom: 6px;
   font-weight: 500;
 }
@@ -253,10 +253,10 @@ function toggleAclInteract(userId, event) {
 .recent-dir-tag {
   display: inline-block;
   padding: 4px 8px;
-  background-color: var(--color-bg-tertiary, #f0f0f0);
+  background-color: var(--color-bg-tertiary, #16263a);
   border-radius: 4px;
   font-size: 0.85em;
-  color: var(--color-text-primary, #333);
+  color: var(--color-text-primary, #d6e4f0);
   cursor: pointer;
   transition: all 0.2s;
   max-width: 200px;
@@ -265,7 +265,7 @@ function toggleAclInteract(userId, event) {
   white-space: nowrap;
 }
 .recent-dir-tag:hover {
-  background-color: var(--color-primary, #409eff);
+  background-color: var(--color-primary, #20c8ff);
   color: white;
 }
 
@@ -282,7 +282,7 @@ function toggleAclInteract(userId, event) {
 }
 .acl-label {
   font-size: 0.85em;
-  color: var(--color-text-secondary, #888);
+  color: var(--color-text-secondary, #8ba3b8);
   font-weight: 500;
 }
 .acl-user-list {
@@ -434,7 +434,7 @@ function toggleAclInteract(userId, event) {
 
 .create-agent-modal .btn.primary {
   background: var(--color-success);
-  color: #0a1228;
+  color: #060911;
 }
 
 .create-agent-modal .btn.primary:hover {
@@ -451,7 +451,7 @@ function toggleAclInteract(userId, event) {
 .error-message {
   margin-top: 16px;
   padding: 12px 16px;
-  background: rgba(220, 53, 69, 0.1);
+  background: rgba(255, 60, 72, 0.1);
   border: 1px solid var(--color-error);
   border-radius: var(--tile-radius);
   color: var(--color-error);

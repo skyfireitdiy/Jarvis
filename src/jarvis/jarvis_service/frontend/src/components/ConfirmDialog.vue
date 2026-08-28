@@ -101,8 +101,8 @@ onUnmounted(() => {
 }
 
 .confirm-modal {
-  background: var(--bg-secondary, #1e1e2e);
-  color: var(--text-primary, #cdd6f4);
+  background: var(--bg-secondary, #0b1424);
+  color: var(--text-primary, #d6e4f0);
   border-radius: 12px;
   padding: 24px;
   min-width: 320px;
@@ -112,7 +112,7 @@ onUnmounted(() => {
 
 .confirm-message {
   margin: 0 0 16px 0;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -126,28 +126,28 @@ onUnmounted(() => {
 .ghost-btn {
   padding: 8px 18px;
   border-radius: 6px;
-  border: 1px solid var(--border-color, #45475a);
+  border: 1px solid var(--border-color, #1a2a3a);
   background: none;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .ghost-btn:hover {
-  background: rgba(137, 180, 250, 0.1);
-  border-color: var(--accent, #89b4fa);
+  background: rgba(32, 200, 255, 0.1);
+  border-color: var(--accent, #20c8ff);
 }
 
 .ghost-btn.default {
-  background: #238636;
-  border-color: #238636;
+  background: #36ff7c;
+  border-color: #36ff7c;
   color: white;
   font-weight: 600;
 }
 
 .ghost-btn.default:hover {
-  background: #2ea043;
-  border-color: #2ea043;
+  background: #36ff7c;
+  border-color: #36ff7c;
 }
 </style>

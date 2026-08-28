@@ -571,8 +571,8 @@ watch(
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: #ff4d4f;
-  color: #fff;
+  background: #ff3c48;
+  color: #d6e4f0;
   font-size: 11px;
   font-weight: bold;
   line-height: 1;
@@ -586,7 +586,7 @@ watch(
 
 .chat-message-new {
   animation: chat-message-slide-in 0.4s ease-out;
-  background: rgba(64, 158, 255, 0.08);
+  background: rgba(32, 200, 255, 0.08);
   border-radius: 6px;
 }
 
@@ -594,12 +594,12 @@ watch(
   from {
     opacity: 0;
     transform: translateY(-8px);
-    background: rgba(64, 158, 255, 0.25);
+    background: rgba(32, 200, 255, 0.25);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    background: rgba(64, 158, 255, 0.08);
+    background: rgba(32, 200, 255, 0.08);
   }
 }
 
@@ -696,7 +696,7 @@ watch(
 }
 
 .chat-create-room-input:focus {
-  border-color: var(--color-accent, #4a9eff);
+  border-color: var(--color-accent, #20c8ff);
 }
 
 .chat-create-room-input::placeholder {
@@ -710,7 +710,7 @@ watch(
 }
 
 .chat-create-confirm {
-  color: var(--color-accent, #4a9eff) !important;
+  color: var(--color-accent, #20c8ff) !important;
 }
 
 .chat-create-cancel {
@@ -752,17 +752,17 @@ watch(
 
 .chat-room-item.active {
   background: var(--color-bg-active);
-  border-left: 3px solid var(--color-accent, #4a9eff);
+  border-left: 3px solid var(--color-accent, #20c8ff);
   font-weight: 600;
   border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(74, 158, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(32, 200, 255, 0.2);
 }
 
 .chat-client-item.active {
   background: var(--color-bg-active);
-  border-left: 3px solid var(--color-accent, #4a9eff);
+  border-left: 3px solid var(--color-accent, #20c8ff);
   border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(74, 158, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(32, 200, 255, 0.2);
 }
 
 /* 在线/离线状态圆点 */
@@ -776,18 +776,18 @@ watch(
 }
 
 .chat-status-dot.online {
-  background: #2ecc71;
-  box-shadow: 0 0 3px rgba(46, 204, 113, 0.5);
+  background: #36ff7c;
+  box-shadow: 0 0 3px rgba(54, 255, 124, 0.5);
 }
 
 .chat-status-dot.offline {
-  background: #e74c3c;
-  box-shadow: 0 0 3px rgba(231, 76, 60, 0.5);
+  background: #ff3c48;
+  box-shadow: 0 0 3px rgba(255, 60, 72, 0.5);
 }
 
 .chat-room-item.joined:not(.active) {
   background: var(--color-bg-secondary);
-  border-left: 3px solid var(--color-primary, #4a9eff);
+  border-left: 3px solid var(--color-primary, #20c8ff);
 }
 
 .chat-room-item:not(.joined) {
@@ -850,13 +850,13 @@ watch(
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border-color, #1a2a3a);
   flex-shrink: 0;
 }
 
 .chat-main-title {
   font-size: 12px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary, #8ba3b8);
 }
 
 .chat-messages {
@@ -876,6 +876,10 @@ watch(
   align-items: flex-end;
 }
 
+.chat-message.mine .chat-message-sender {
+  color: var(--color-accent);
+}
+
 .chat-message-sender {
   font-size: 11px;
   color: var(--color-text-secondary);
@@ -892,9 +896,10 @@ watch(
 }
 
 .chat-message.mine .chat-message-bubble {
-  background: var(--color-accent);
-  color: #fff;
+  background: var(--color-bg-tertiary);
+  color: #d6e4f0;
   border-color: var(--color-accent);
+  border-width: 1px;
 }
 
 .chat-message-content {
@@ -939,7 +944,7 @@ watch(
 }
 
 .chat-input:focus {
-  border-color: var(--color-accent, #4a9eff);
+  border-color: var(--color-accent, #20c8ff);
 }
 
 .chat-input::placeholder {
@@ -1024,12 +1029,12 @@ watch(
   cursor: sw-resize;
 }
 .chat-image-btn {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary, #8ba3b8);
   font-size: 1.1em;
   padding: 4px 6px;
 }
 .chat-image-btn:hover {
-  color: var(--accent-color, #4a9eff);
+  color: var(--accent-color, #20c8ff);
 }
 
 .chat-message-image {
@@ -1054,7 +1059,7 @@ watch(
   max-height: 80px;
   border-radius: 6px;
   object-fit: contain;
-  border: 2px solid var(--accent-color, #4a9eff);
+  border: 2px solid var(--accent-color, #20c8ff);
 }
 .chat-pending-image-remove {
   position: absolute;
@@ -1063,8 +1068,8 @@ watch(
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #e74c3c;
-  color: #fff;
+  background: #ff3c48;
+  color: #d6e4f0;
   border: none;
   font-size: 11px;
   cursor: pointer;
@@ -1075,7 +1080,7 @@ watch(
   line-height: 1;
 }
 .chat-pending-image-remove:hover {
-  background: #c0392b;
+  background: #ff3c48;
 }
 
 /* 图片大图预览 */
@@ -1085,7 +1090,7 @@ watch(
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(8, 12, 22, 0.8);
   z-index: 99999;
   display: flex;
   align-items: center;
@@ -1116,7 +1121,7 @@ watch(
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: #d6e4f0;
   font-size: 14px;
   cursor: pointer;
   display: flex;

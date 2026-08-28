@@ -1138,7 +1138,7 @@ function getTerminalStyle(terminalContent) {
   const contentPadding = 32 // content的padding
   
   const baseStyle = {
-    fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
     fontSize: `${fontSize}px`,
     lineHeight: lineHeight
   }
@@ -8381,9 +8381,10 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.hostEl = el
   termInfo.terminal = new Terminal({
     theme: {
-      background: '#1a2332',
+      background: '#0b1424',
     },
     fontSize: 12,
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
     allowProposedApi: true,
     focusOnClick: false,
   })
@@ -8643,9 +8644,10 @@ function initIndependentTerminal(terminalId, el) {
   // 会在 ResizeObserver 回调中自动调整尺寸
   session.terminal = new Terminal({
     theme: {
-      background: '#1a2332',
+      background: '#0b1424',
     },
     fontSize: 12,
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
     cols: 80,
     rows: 24,
     allowProposedApi: true,
@@ -10340,7 +10342,7 @@ body::-webkit-scrollbar {
   padding-right: env(safe-area-inset-right, 0px);
   background: transparent;
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -10504,7 +10506,7 @@ body::-webkit-scrollbar {
 }
 
 .editor-tab-dirty {
-  color: #f2cc60;
+  color: #ff8520;
   font-size: 10px;
 }
 
@@ -10568,12 +10570,12 @@ body::-webkit-scrollbar {
 }
 
 .editor-edit-toggle.editable {
-  background: rgba(0, 255, 136, 0.15);
+  background: rgba(54, 255, 124, 0.15);
   color: var(--color-success);
 }
 
 .editor-edit-toggle.editable:hover {
-  background: rgba(0, 255, 136, 0.25);
+  background: rgba(54, 255, 124, 0.25);
 }
 
 .editor-edit-toggle-icon {
@@ -10914,8 +10916,8 @@ body::-webkit-scrollbar {
 }
 
 .editor-global-search-text mark {
-  background: rgba(242, 204, 96, 0.32);
-  color: #f2cc60;
+  background: rgba(255, 133, 32, 0.32);
+  color: #ff8520;
 }
 
 .editor-panel-content {
@@ -10943,7 +10945,7 @@ body::-webkit-scrollbar {
 .editor-placeholder {
   margin: auto;
   text-align: center;
-  color: #8b949e;
+  color: #8ba3b8;
   max-width: 280px;
   padding: 24px;
 }
@@ -11042,7 +11044,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 12px;
   padding: 6px 16px;
-  background: rgba(35, 134, 54, 0.15);
+  background: rgba(54, 255, 124, 0.15);
   border: none;
   border-radius: var(--tile-radius-xs);
   font-size: 13px;
@@ -11060,31 +11062,31 @@ body::-webkit-scrollbar {
 }
 
 .current-agent-info .agent-status.running {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
+  background: rgba(32, 200, 255, 0.2);
+  color: #20c8ff;
 }
 
 .current-agent-info .agent-status.stopped {
   background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .current-agent-info .agent-status.waiting_multi {
   background: rgba(210, 153, 34, 0.2);
-  color: #d29922;
+  color: #ff8520;
 }
 
 .current-agent-info .agent-status.waiting_single {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
 }
 
 .current-agent-info .agent-port {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .current-agent-info .agent-dir {
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 12px;
   max-width: 200px;
   overflow: hidden;
@@ -11099,7 +11101,7 @@ body::-webkit-scrollbar {
   font-size: 18px;
   cursor: pointer;
   padding: 0;
-  color: #8b949e;
+  color: #8ba3b8;
   width: 36px;
   height: 36px;
   display: flex;
@@ -11132,8 +11134,8 @@ body::-webkit-scrollbar {
   position: absolute;
   top: -6px;
   right: -8px;
-  background: #f85149;
-  color: #fff;
+  background: #ff3c48;
+  color: #d6e4f0;
   font-size: 10px;
   font-weight: 600;
   min-width: 16px;
@@ -11153,7 +11155,7 @@ body::-webkit-scrollbar {
   background: #f0883e;
   border: none;
   border-radius: var(--tile-radius);
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
@@ -11183,7 +11185,7 @@ body::-webkit-scrollbar {
   gap: 8px;
   font-size: 12px;
   font-weight: 500;
-  color: #8b949e;
+  color: #8ba3b8;
   padding: 4px 10px;
   background: var(--color-bg-tertiary);
   border-radius: 20px;
@@ -11197,23 +11199,23 @@ body::-webkit-scrollbar {
 }
 
 .dot.offline {
-  background: #f85149;
-  color: #f85149;
+  background: #ff3c48;
+  color: #ff3c48;
 }
 
 .dot.connecting {
-  background: #d29922;
-  color: #d29922;
+  background: #ff8520;
+  color: #ff8520;
 }
 
 .dot.reconnecting {
-  background: #d29922;
-  color: #d29922;
+  background: #ff8520;
+  color: #ff8520;
 }
 
 .dot.online {
-  background: #3fb950;
-  color: #3fb950;
+  background: #36ff7c;
+  color: #36ff7c;
 }
 
 /* Agent 浮动窗口 */
@@ -11263,7 +11265,7 @@ body::-webkit-scrollbar {
 
 .agent-sidebar-resize-handle:hover::after,
 .agent-sidebar-resizing .agent-sidebar-resize-handle::after {
-  background: #4da6ff;
+  background: #20c8ff;
 }
 
 .agent-sidebar-header {
@@ -11311,7 +11313,7 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary);
   border: none;
   border-radius: var(--tile-radius-xs);
-  color: #8b949e;
+  color: #8ba3b8;
   cursor: pointer;
   text-align: left;
 }
@@ -11323,7 +11325,7 @@ body::-webkit-scrollbar {
 
 .agent-collapsed-arrow {
   width: 16px;
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .agent-collapsed-title {
@@ -11334,7 +11336,7 @@ body::-webkit-scrollbar {
 
 .agent-collapsed-count {
   font-size: 12px;
-  color: #6e7681;
+  color: #8ba3b8;
 }
 
 .agent-item {
@@ -11352,12 +11354,12 @@ body::-webkit-scrollbar {
 }
 
 .agent-item.active {
-  background: rgba(56, 139, 253, 0.15);
+  background: rgba(32, 200, 255, 0.15);
   border-color: var(--color-accent);
 }
 
 .agent-item.selected {
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(32, 200, 255, 0.15);
   border-color: var(--color-accent-secondary);
 }
 
@@ -11371,7 +11373,7 @@ body::-webkit-scrollbar {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #58a6ff;
+  accent-color: #20c8ff;
 }
 
 .batch-actions-bar {
@@ -11386,7 +11388,7 @@ body::-webkit-scrollbar {
 
 .batch-actions-info {
   font-size: 13px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .batch-actions-buttons {
@@ -11403,23 +11405,23 @@ body::-webkit-scrollbar {
 }
 
 .agent-item .agent-status.running {
-  background: rgba(56, 139, 253, 0.2);
-  color: #58a6ff;
+  background: rgba(32, 200, 255, 0.2);
+  color: #20c8ff;
 }
 
 .agent-item .agent-status.stopped {
   background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .agent-item .agent-status.waiting_multi {
   background: rgba(210, 153, 34, 0.2);
-  color: #d29922;
+  color: #ff8520;
 }
 
 .agent-item .agent-status.waiting_single {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
 }
 
 .agent-info {
@@ -11443,12 +11445,12 @@ body::-webkit-scrollbar {
 
 .agent-status.running {
   background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .agent-status.stopped {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
 }
 
 .agent-status-dot {
@@ -11461,27 +11463,27 @@ body::-webkit-scrollbar {
 }
 
 .agent-status-dot.running {
-  background: #3fb950;
+  background: #36ff7c;
   box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
 }
 
 .agent-status-dot.stopped {
-  background: #f85149;
-  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.2);
+  background: #ff3c48;
+  box-shadow: 0 0 0 2px rgba(255, 60, 72, 0.2);
 }
 
 .agent-status-dot.waiting_multi {
-  background: #d29922;
+  background: #ff8520;
   box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
 .agent-status-dot.waiting_single {
-  background: #d29922;
+  background: #ff8520;
   box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
 .agent-status-dot.waiting_confirm {
-  background: #d29922;
+  background: #ff8520;
   box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2);
 }
 
@@ -11495,13 +11497,13 @@ body::-webkit-scrollbar {
 
 .agent-port {
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
   margin-left: auto;
 }
 
 .agent-dir {
   font-size: 11px;
-  color: #8b949e;
+  color: #8ba3b8;
   word-break: break-all;
   line-height: 1.4;
 }
@@ -11520,7 +11522,7 @@ body::-webkit-scrollbar {
   font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
-  color: #8b949e;
+  color: #8ba3b8;
   transition: all 0.2s ease;
 }
 
@@ -11540,14 +11542,14 @@ body::-webkit-scrollbar {
 }
 
 .agent-actions .icon-btn-small.stop-btn:hover {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
   border-color: var(--color-error);
 }
 
 .agent-empty {
   text-align: center;
-  color: #8b949e;
+  color: #8ba3b8;
   padding: 40px 20px;
   font-size: 13px;
 }
@@ -11577,14 +11579,14 @@ body::-webkit-scrollbar {
   align-items: center;
   justify-content: center;
   margin-right: 6px;
-  color: #6e7681;
+  color: #8ba3b8;
   transition: transform 0.2s ease;
   font-size: 12px;
 }
 
 .tree-node-icon.expand-arrow {
   margin-right: 4px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .tree-node-icon.expand-arrow.expanded {
@@ -11592,11 +11594,11 @@ body::-webkit-scrollbar {
 }
 
 .tree-node-icon.folder-icon {
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .tree-node-icon.file-icon {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .tree-node-text {
@@ -11609,12 +11611,12 @@ body::-webkit-scrollbar {
 }
 
 .tree-node-text.directory {
-  color: #58a6ff;
+  color: #20c8ff;
   font-weight: 500;
 }
 
 .tree-node-text.file {
-  color: #c9d1d9;
+  color: #d6e4f0;
 }
 
 .tree-children {
@@ -11628,7 +11630,7 @@ body::-webkit-scrollbar {
   align-items: center;
   justify-content: center;
   padding: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 12px;
 }
 
@@ -11650,7 +11652,7 @@ body::-webkit-scrollbar {
 .tree-empty {
   padding: 12px;
   text-align: center;
-  color: #6e7681;
+  color: #8ba3b8;
   font-size: 12px;
   font-style: italic;
 }
@@ -11689,7 +11691,7 @@ body::-webkit-scrollbar {
 .session-modal .modal-description {
   margin-bottom: 16px;
   font-size: 13px;
-  color: #8b949e;
+  color: #8ba3b8;
   line-height: 1.5;
 }
 
@@ -11753,21 +11755,21 @@ body::-webkit-scrollbar {
 
 .session-path {
   font-size: 11px;
-  color: #8b949e;
+  color: #8ba3b8;
   word-break: break-all;
   line-height: 1.4;
 }
 
 .session-date {
   font-size: 11px;
-  color: #6e7681;
+  color: #8ba3b8;
   margin-top: 6px;
 }
 
 .session-empty {
   padding: 40px 20px;
   text-align: center;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 13px;
 }
 
@@ -11804,7 +11806,7 @@ body::-webkit-scrollbar {
   padding: 12px 14px;
   background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 13px;
   color: #e6edf3;
   margin-bottom: 16px;
@@ -11833,7 +11835,7 @@ body::-webkit-scrollbar {
 }
 
 .dir-search-input::placeholder {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .dir-list {
@@ -11897,7 +11899,7 @@ body::-webkit-scrollbar {
 
 .dir-path {
   font-size: 11px;
-  color: #8b949e;
+  color: #8ba3b8;
   word-break: break-all;
   line-height: 1.4;
 }
@@ -11967,8 +11969,8 @@ body::-webkit-scrollbar {
 
 /* 用户输入消息 - 右对齐样式（必须放在 .message 之后以覆盖） */
 .message.message-user_input {
-  background: #1f6feb !important;
-  border: none !important;
+  background: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-accent) !important;
   align-self: flex-end;
   max-width: 75%;
 }
@@ -11984,25 +11986,25 @@ body::-webkit-scrollbar {
 }
 
 .message.message-user_input .badge {
-  background: rgba(255, 255, 255, 0.3);
-  color: #fff;
+  background: rgba(32, 200, 255, 0.15);
+  color: var(--color-accent);
   font-size: 10px;
   padding: 2px 6px;
 }
 
 .message.message-user_input .agent-name {
-  color: #e6edf3;
+  color: var(--color-accent);
   font-size: 10px;
 }
 
 .message.message-user_input .timestamp {
-  color: #8b949e;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  color: #8ba3b8;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 10px;
 }
 
 .message.message-user_input .message-body {
-  color: #fff !important;
+  color: #d6e4f0 !important;
   font-style: italic !important;
 }
 
@@ -12052,7 +12054,7 @@ body::-webkit-scrollbar {
 .message-meta-left .timestamp {
   min-width: 80px;
   justify-self: start;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 10px;
 }
 
@@ -12067,7 +12069,7 @@ body::-webkit-scrollbar {
   font-size: 10px;
   padding: 3px 8px;
   background: var(--color-bg-secondary);
-  color: #8b949e;
+  color: #8ba3b8;
   border-radius: var(--tile-radius-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -12076,7 +12078,7 @@ body::-webkit-scrollbar {
 
 .message-meta-left .agent-name {
   font-size: 10px;
-  color: #58a6ff;
+  color: #20c8ff;
   font-weight: 500;
 }
 
@@ -12091,12 +12093,12 @@ body::-webkit-scrollbar {
 }
 
 .message-meta-left .interactive {
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .message-meta-left .timestamp {
   font-size: 10px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .badge {
@@ -12105,13 +12107,13 @@ body::-webkit-scrollbar {
   font-size: 11px;
   font-weight: 500;
   border-radius: var(--tile-radius-sm);
-  background: #21262d;
-  color: #8b949e;
+  background: #0b1424;
+  color: #8ba3b8;
 }
 
 .timestamp {
   font-size: 11px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .message-body {
@@ -12123,21 +12125,21 @@ body::-webkit-scrollbar {
 /* 消息元信息样式（agent名称和时间戳） */
 .message-meta {
   font-size: 11px;
-  color: #8b949e;
+  color: #8ba3b8;
   margin-top: 4px;
   opacity: 0.8;
 }
 
 .message-agent {
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .message-separator {
-  color: #484f58;
+  color: #8ba3b8;
 }
 
 .message-time {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .message-silent {
@@ -12165,13 +12167,24 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary);
   padding: 3px 7px;
   border-radius: 5px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 12px;
   border: none;
 }
 
 .message-body.markdown-content :deep(p) {
   margin: 8px 0;
+}
+
+.message-body.markdown-content :deep(ol),
+.message-body.markdown-content :deep(ul) {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.message-body.markdown-content :deep(li) {
+  margin: 4px 0;
+  list-style-position: inside;
 }
 
 .message-body.markdown-content :deep(.plantuml-block) {
@@ -12187,14 +12200,14 @@ body::-webkit-scrollbar {
 
 .message-body.markdown-content :deep(.plantuml-notice) {
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .message-body.markdown-content :deep(.plantuml-link) {
   display: inline-flex;
   align-self: flex-start;
   max-width: 100%;
-  color: #58a6ff;
+  color: #20c8ff;
   text-decoration: none;
 }
 
@@ -12206,13 +12219,13 @@ body::-webkit-scrollbar {
   display: block;
   max-width: 100%;
   height: auto;
-  background: #ffffff;
+  background: #16263a;
   border-radius: var(--tile-radius-xs);
 }
 
 .message-body.markdown-content :deep(.plantuml-source summary) {
   cursor: pointer;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 /* 通用图表样式（dot/graphviz） */
@@ -12229,14 +12242,14 @@ body::-webkit-scrollbar {
 
 .message-body.markdown-content :deep(.diagram-notice) {
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .message-body.markdown-content :deep(.diagram-link) {
   display: inline-flex;
   align-self: flex-start;
   max-width: 100%;
-  color: #58a6ff;
+  color: #20c8ff;
   text-decoration: none;
 }
 
@@ -12248,13 +12261,13 @@ body::-webkit-scrollbar {
   display: block;
   max-width: 100%;
   height: auto;
-  background: #ffffff;
+  background: #16263a;
   border-radius: var(--tile-radius-xs);
 }
 
 .message-body.markdown-content :deep(.diagram-source summary) {
   cursor: pointer;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 /* Dot/Graphviz 图表样式 */
@@ -12269,7 +12282,7 @@ body::-webkit-scrollbar {
 }
 
 .message-body.markdown-content :deep(.dot-loading) {
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 13px;
   padding: 8px 0;
 }
@@ -12286,7 +12299,7 @@ body::-webkit-scrollbar {
 }
 
 .message-body.markdown-content :deep(.mermaid-loading) {
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 13px;
   padding: 8px 0;
 }
@@ -12354,7 +12367,7 @@ body::-webkit-scrollbar {
   padding: 10px 16px;
   background: var(--color-bg-secondary);
   border-bottom: 0.5px solid var(--color-border-subtle);
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 13px;
   font-weight: 500;
 }
@@ -12370,7 +12383,7 @@ body::-webkit-scrollbar {
   margin: 0;
   overflow-x: auto;
   overflow-y: auto;
-  color: #c9d1d9;
+  color: #d6e4f0;
   /* 字体由父容器的动态样式控制 */
   white-space: pre;
   /* 移除 word-break: break-all，让长行可以横向滚动 */
@@ -12439,14 +12452,14 @@ body::-webkit-scrollbar {
 .input-hint {
   margin: 0;
   font-size: 13px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .send-btn {
-  background: #238636;
+  background: #36ff7c;
   border: none;
   border-radius: var(--tile-radius);
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 14px;
   font-weight: 600;
   padding: 11px 22px;
@@ -12455,7 +12468,7 @@ body::-webkit-scrollbar {
 }
 
 .send-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: #36ff7c;
   transform: translateY(-1px);
 }
 
@@ -12469,10 +12482,10 @@ body::-webkit-scrollbar {
 }
 
 .complete-btn {
-  background: #0969da;
+  background: #20c8ff;
   border: none;
   border-radius: var(--tile-radius);
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 14px;
   font-weight: 600;
   padding: 11px 22px;
@@ -12481,7 +12494,7 @@ body::-webkit-scrollbar {
 }
 
 .complete-btn:hover:not(:disabled) {
-  background: #1f6feb;
+  background: #20c8ff;
   transform: translateY(-1px);
 }
 
@@ -12505,7 +12518,7 @@ body::-webkit-scrollbar {
   padding: 14px;
   color: #e6edf3;
   font-size: 14px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   resize: vertical;
   box-sizing: border-box;
 }
@@ -12541,7 +12554,7 @@ body::-webkit-scrollbar {
 
 .thinking-text {
   font-size: 14px;
-  color: #3b82f6;
+  color: #20c8ff;
   font-weight: 500;
 }
 
@@ -12569,7 +12582,7 @@ body::-webkit-scrollbar {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(35, 134, 54, 0.15);
+  background: rgba(54, 255, 124, 0.15);
   border: none;
   border-radius: var(--tile-radius);
   margin: 8px 0;
@@ -12577,7 +12590,7 @@ body::-webkit-scrollbar {
 }
 
 .buffer-indicator:hover {
-  background: rgba(35, 134, 54, 0.25);
+  background: rgba(54, 255, 124, 0.25);
   border-color: var(--color-success);
   transform: translateY(-1px);
 }
@@ -12588,7 +12601,7 @@ body::-webkit-scrollbar {
 
 .buffer-text {
   font-size: 13px;
-  color: #3fb950;
+  color: #36ff7c;
   font-weight: 500;
 }
 
@@ -12624,7 +12637,7 @@ body::-webkit-scrollbar {
 .buffer-panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #3fb950;
+  color: #36ff7c;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -12640,7 +12653,7 @@ body::-webkit-scrollbar {
   background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius-xs);
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -12648,15 +12661,15 @@ body::-webkit-scrollbar {
 }
 
 .buffer-panel-btn:hover {
-  background: rgba(56, 139, 253, 0.15);
+  background: rgba(32, 200, 255, 0.15);
   border-color: var(--color-accent);
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .buffer-panel-btn.close-btn:hover {
-  background: rgba(248, 81, 73, 0.15);
+  background: rgba(255, 60, 72, 0.15);
   border-color: var(--color-error);
-  color: #f85149;
+  color: #ff3c48;
 }
 
 .buffer-panel-content {
@@ -12674,14 +12687,14 @@ body::-webkit-scrollbar {
   padding: 14px 16px;
   color: #e6edf3;
   font-size: 14px;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   resize: vertical;
   box-sizing: border-box;
   outline: none;
 }
 
 .buffer-edit-textarea::placeholder {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .buffer-panel-footer {
@@ -12694,10 +12707,10 @@ body::-webkit-scrollbar {
 
 .buffer-save-btn {
   padding: 8px 16px;
-  background: rgba(56, 139, 253, 0.15);
+  background: rgba(32, 200, 255, 0.15);
   border: none;
   border-radius: var(--tile-radius-xs);
-  color: #58a6ff;
+  color: #20c8ff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -12705,7 +12718,7 @@ body::-webkit-scrollbar {
 }
 
 .buffer-save-btn:hover:not(:disabled) {
-  background: rgba(56, 139, 253, 0.25);
+  background: rgba(32, 200, 255, 0.25);
   border-color: var(--color-accent);
   transform: translateY(-1px);
 }
@@ -12770,7 +12783,7 @@ body::-webkit-scrollbar {
   background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--tile-radius);
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -12778,9 +12791,9 @@ body::-webkit-scrollbar {
 }
 
 .action-btn:hover {
-  background: rgba(56, 139, 253, 0.15);
+  background: rgba(32, 200, 255, 0.15);
   border-color: var(--color-accent);
-  color: #58a6ff;
+  color: #20c8ff;
   transform: translateY(-1px);
 }
 
@@ -12789,9 +12802,9 @@ body::-webkit-scrollbar {
 }
 
 .clear-buffer-btn:hover {
-  background: rgba(248, 81, 73, 0.15);
+  background: rgba(255, 60, 72, 0.15);
   border-color: var(--color-error);
-  color: #f85149;
+  color: #ff3c48;
 }
 
 /* 输入操作按钮组 */
@@ -12806,14 +12819,14 @@ body::-webkit-scrollbar {
   background: transparent;
   border: none;
   border-radius: var(--tile-radius-xs);
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .cancel-btn:hover {
-  background: #21262d;
+  background: #0b1424;
   color: #e6edf3;
 }
 
@@ -12824,17 +12837,17 @@ body::-webkit-scrollbar {
 .interrupt-btn {
   width: 100%;
   padding: 8px;
-  background: #f85149;
+  background: #ff3c48;
   border: none;
   border-radius: var(--tile-radius-xs);
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .interrupt-btn:hover {
-  background: #da3633;
+  background: #ff3c48;
 }
 
 /* 模态框 */
@@ -12906,7 +12919,7 @@ body::-webkit-scrollbar {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: #8ba3b8;
   letter-spacing: 0.01em;
 }
 
@@ -12949,7 +12962,7 @@ body::-webkit-scrollbar {
 }
 
 .form-group select option {
-  background: #161b22;
+  background: #080c16;
   color: #e6edf3;
   padding: 8px;
 }
@@ -12975,7 +12988,7 @@ body::-webkit-scrollbar {
   border: none;
   border-radius: var(--tile-radius);
   font-size: 22px;
-  color: #8b949e;
+  color: #8ba3b8;
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -12986,8 +12999,8 @@ body::-webkit-scrollbar {
 }
 
 .close-btn:hover {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
+  background: rgba(255, 60, 72, 0.15);
+  color: #ff3c48;
   transform: rotate(90deg);
 }
 
@@ -13026,17 +13039,17 @@ body::-webkit-scrollbar {
 
 .primary-btn {
   padding: 10px 20px;
-  background: #238636;
+  background: #36ff7c;
   border: none;
   border-radius: 9px;
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: #2ea043;
+  background: #36ff7c;
   transform: translateY(-1px);
 }
 
@@ -13051,10 +13064,10 @@ body::-webkit-scrollbar {
 
 .danger-btn {
   padding: 10px 20px;
-  background: #f85149;
+  background: #ff3c48;
   border: none;
   border-radius: 9px;
-  color: #ffffff;
+  color: #d6e4f0;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -13062,7 +13075,7 @@ body::-webkit-scrollbar {
 }
 
 .danger-btn:hover:not(:disabled) {
-  background: #ff6b6b;
+  background: #ff3c48;
   transform: translateY(-1px);
 }
 
@@ -13169,7 +13182,7 @@ body::-webkit-scrollbar {
   min-width: 44px;
   background: var(--color-bg-tertiary);
   border-color: var(--color-accent-subtle);
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .completion-btn:hover:not(:disabled) {
@@ -13250,35 +13263,35 @@ body::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   color: #e6edf3;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
 .completion-desc {
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .completion-item.completion-replace .completion-desc {
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .completion-item.completion-command .completion-desc {
-  color: #d29922;
+  color: #ff8520;
 }
 
 .completion-item.completion-rule .completion-desc {
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .completion-empty {
   padding: 24px;
   text-align: center;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 14px;
 }
 
 .error-message {
-  background-color: #f85149;
+  background-color: #ff3c48;
   color: white;
   padding: 12px 16px;
   border-radius: var(--tile-radius-xs);
@@ -13336,7 +13349,7 @@ body::-webkit-scrollbar {
   border: none;
   border-radius: var(--tile-radius);
   background: var(--color-bg-hover);
-  color: #e5e7eb;
+  color: #d6e4f0;
   font-size: 13px;
   line-height: 32px;
   outline: none;
@@ -13350,11 +13363,11 @@ body::-webkit-scrollbar {
 
 .terminal-node-select:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  box-shadow: 0 0 0 2px rgba(32, 200, 255, 0.2);
 }
 
 .terminal-node-select option {
-  color: #111827;
+  color: #d6e4f0;
 }
 
 .terminal-panel-actions {
@@ -13379,18 +13392,18 @@ body::-webkit-scrollbar {
   border: none;
   border-radius: 4px;
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
   cursor: pointer;
 }
 
 .terminal-tab:hover {
   background: var(--color-bg-hover);
-  color: #58a6ff;
+  color: #20c8ff;
 }
 
 .terminal-tab.active {
   background: var(--color-bg-tertiary);
-  color: #58a6ff;
+  color: #20c8ff;
   border-color: var(--color-accent-subtle);
 }
 
@@ -13405,14 +13418,14 @@ body::-webkit-scrollbar {
   width: 16px;
   height: 16px;
   border: none;
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
   border-radius: 3px;
   cursor: pointer;
 }
 
 .terminal-tab-close:hover {
-  background: rgba(248, 81, 73, 0.4);
+  background: rgba(255, 60, 72, 0.4);
 }
 
 .terminal-content {
@@ -13431,7 +13444,7 @@ body::-webkit-scrollbar {
   border: none;
   border-radius: var(--tile-radius-xs);
   padding: 4px 8px;
-  color: #8b949e;
+  color: #8ba3b8;
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: 10;
@@ -13482,17 +13495,17 @@ body::-webkit-scrollbar {
 
 .toast-success .toast-icon {
   background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .toast-error .toast-icon {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.2);
+  color: #ff3c48;
 }
 
 .toast-info .toast-icon {
-  background: rgba(88, 166, 255, 0.2);
-  color: #58a6ff;
+  background: rgba(32, 200, 255, 0.2);
+  color: #20c8ff;
 }
 
 .toast-message {
@@ -13519,7 +13532,7 @@ body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 14px;
 }
 
@@ -13932,7 +13945,7 @@ body::-webkit-scrollbar {
 .toggle-wrapper:hover {
 
   border-color: var(--color-border-subtle);
-  outline-color: rgba(0, 122, 255, 0.4);
+  outline-color: rgba(32, 200, 255, 0.4);
 }
 
 .toggle-wrapper:active {
@@ -13972,7 +13985,7 @@ body::-webkit-scrollbar {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   /* 外描边效果 */
-  outline: 1px solid rgba(113, 113, 122, 0.4);
+  outline: 1px solid rgba(26, 42, 58, 0.4);
   outline-offset: -1px;
 }
 
@@ -13993,15 +14006,15 @@ body::-webkit-scrollbar {
 }
 
 .toggle-input:checked + .toggle-slider {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  background: linear-gradient(135deg, #20c8ff 0%, #0b6ea8 100%);
   border-color: var(--color-border-active);
   box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  outline-color: rgba(0, 122, 255, 0.5);
+  outline-color: rgba(32, 200, 255, 0.5);
 }
 
 .toggle-input:checked + .toggle-slider:before {
   transform: translateX(22px);
-  background-color: #ffffff;
+  background-color: #d6e4f0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-color: var(--color-border-subtle);
 }
@@ -14058,7 +14071,7 @@ body::-webkit-scrollbar {
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: #8b949e;
+  color: #8ba3b8;
   line-height: 1.4;
 }
 
@@ -14119,19 +14132,19 @@ body::-webkit-scrollbar {
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 14px;
 }
 
 .diff-error {
-  color: #f85149;
+  color: #ff3c48;
   padding: 16px;
   text-align: center;
   font-size: 14px;
 }
 
 .diff-empty {
-  color: #8b949e;
+  color: #8ba3b8;
   padding: 16px;
   text-align: center;
   font-size: 14px;
@@ -14142,7 +14155,7 @@ body::-webkit-scrollbar {
   padding: 16px;
   background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 13px;
   line-height: 1.5;
   color: #e6edf3;
@@ -14173,7 +14186,7 @@ body::-webkit-scrollbar {
 
 .rules-table th {
   background: var(--color-bg-secondary);
-  color: #8b949e;
+  color: #8ba3b8;
   font-weight: 600;
   font-size: 12px;
   text-transform: uppercase;
@@ -14189,11 +14202,11 @@ body::-webkit-scrollbar {
 }
 
 .rule-loaded {
-  color: #3fb950;
+  color: #36ff7c;
 }
 
 .rule-not-loaded {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .rules-loaded-content-section {
@@ -14205,7 +14218,7 @@ body::-webkit-scrollbar {
 .rules-section-title {
   font-size: 13px;
   font-weight: 600;
-  color: #8b949e;
+  color: #8ba3b8;
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -14216,7 +14229,7 @@ body::-webkit-scrollbar {
   border: none;
   border-radius: var(--tile-radius-xs);
   padding: 12px;
-  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 12px;
   line-height: 1.5;
   color: #e6edf3;
@@ -14227,7 +14240,7 @@ body::-webkit-scrollbar {
 }
 
 .rule-not-loaded {
-  color: #8b949e;
+  color: #8ba3b8;
 }
 
 .rule-preview {
@@ -14235,7 +14248,7 @@ body::-webkit-scrollbar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #8b949e;
+  color: #8ba3b8;
   font-size: 12px;
 }
 

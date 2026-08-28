@@ -579,7 +579,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-item.active {
-  background: #3b82f640;
+  background: rgba(32, 200, 255, 0.25);
   border-color: var(--color-border-active);
 }
 
@@ -594,7 +594,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 
 /* 激活+等待输入组合状态 - 使用紫色背景 */
 .agent-item.active.waiting-input {
-  background: rgba(139, 92, 246, 0.35);
+  background: rgba(32, 200, 255, 0.35);
 }
 
 /* 未点击的等待输入状态 - 呼吸灯效果 */
@@ -745,17 +745,17 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-item .agent-status.stopped {
-  background: rgba(0, 255, 136, 0.15);
+  background: rgba(54, 255, 124, 0.15);
   color: var(--color-success);
 }
 
 .agent-item .agent-status.waiting_multi {
-  background: rgba(255, 170, 0, 0.15);
+  background: rgba(255, 133, 32, 0.15);
   color: var(--color-warning);
 }
 
 .agent-item .agent-status.waiting_single {
-  background: rgba(255, 71, 87, 0.15);
+  background: rgba(255, 60, 72, 0.15);
   color: var(--color-error);
 }
 
@@ -779,13 +779,13 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-status.running {
-  background: rgba(63, 185, 80, 0.2);
-  color: #3fb950;
+  background: rgba(54, 255, 124, 0.15);
+  color: var(--color-success);
 }
 
 .agent-status.stopped {
-  background: rgba(248, 81, 73, 0.2);
-  color: #f85149;
+  background: rgba(255, 60, 72, 0.15);
+  color: var(--color-error);
 }
 
 .agent-status-dot {
@@ -798,34 +798,34 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-status-dot.running {
-  background: #3fb950;
+  background: var(--color-success);
   box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.stopped {
-  background: #f85149;
+  background: var(--color-error);
   box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_multi {
-  background: #d29922;
+  background: var(--color-warning);
   box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_single {
-  background: #d29922;
+  background: var(--color-warning);
   box-shadow: var(--tile-shadow);
 }
 
 .agent-status-dot.waiting_confirm {
-  background: #d29922;
+  background: var(--color-warning);
   box-shadow: var(--tile-shadow);
 }
 
 .agent-llm-group {
   font-size: 10px;
   color: #666;
-  background: rgba(108, 117, 125, 0.1);
+  background: rgba(138, 163, 184, 0.1);
   padding: 1px 4px;
   border-radius: 3px;
 }
@@ -908,7 +908,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .agent-actions .icon-btn-small.stop-btn:hover {
-  background: rgba(255, 71, 87, 0.15);
+  background: rgba(255, 60, 72, 0.15);
   color: var(--color-error);
 }
 
@@ -925,8 +925,8 @@ watch(() => props.currentAgentId, (newAgentId) => {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: var(--tile-radius);
-  background: rgba(56, 132, 255, 0.1); /* 浅蓝色背景 */
-  color: #3884ff; /* 蓝色文字 */
+  background: rgba(32, 200, 255, 0.1); /* 浅蓝色背景 */
+  color: #20c8ff; /* 蓝色文字 */
   border: none;
   margin-left: 4px;
 }

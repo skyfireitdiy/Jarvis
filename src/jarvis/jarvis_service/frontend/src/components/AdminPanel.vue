@@ -673,35 +673,35 @@ const maskedNodeSecret = computed(() => {
   z-index: 1000;
 }
 .admin-modal {
-  background: var(--bg-secondary, #1e1e2e); color: var(--text-primary, #cdd6f4);
+  background: var(--bg-secondary, #0b1424); color: var(--text-primary, #d6e4f0);
   border-radius: 12px; width: 80%; max-width: 1200px; max-height: 90vh;
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 24px; border-bottom: 1px solid var(--border-color, #45475a);
+  padding: 16px 24px; border-bottom: 1px solid var(--border-color, #1a2a3a);
 }
 .modal-header h2 { margin: 0; font-size: 18px; }
 .close-btn {
-  background: none; border: none; color: var(--text-secondary, #a6adc8);
+  background: none; border: none; color: var(--text-secondary, #8ba3b8);
   font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px;
   transition: all 0.2s;
 }
-.close-btn:hover { color: var(--text-primary, #cdd6f4); background: rgba(255,255,255,0.1); }
+.close-btn:hover { color: var(--text-primary, #d6e4f0); background: rgba(32,200,255,0.1); }
 
 /* Tab导航 */
 .admin-tabs {
-  display: flex; border-bottom: 1px solid var(--border-color, #45475a);
+  display: flex; border-bottom: 1px solid var(--border-color, #1a2a3a);
   padding: 0 24px;
 }
 .admin-tab {
   padding: 10px 20px; cursor: pointer; border: none; background: none;
-  color: var(--text-secondary, #a6adc8); font-size: 14px;
+  color: var(--text-secondary, #8ba3b8); font-size: 14px;
   border-bottom: 2px solid transparent; transition: all 0.2s;
 }
-.admin-tab:hover { color: var(--text-primary, #cdd6f4); }
-.admin-tab.active { color: var(--accent, #89b4fa); border-bottom-color: var(--accent, #89b4fa); }
+.admin-tab:hover { color: var(--text-primary, #d6e4f0); }
+.admin-tab.active { color: var(--accent, #20c8ff); border-bottom-color: var(--accent, #20c8ff); }
 
 /* Tab内容区 */
 .tab-content {
@@ -714,57 +714,57 @@ const maskedNodeSecret = computed(() => {
 }
 .form-group > label:first-child {
   display: block; font-size: 13px; font-weight: 600;
-  color: var(--text-secondary, #a6adc8); margin-bottom: 8px;
+  color: var(--text-secondary, #8ba3b8); margin-bottom: 8px;
 }
 .form-row {
   display: flex; gap: 12px; margin-bottom: 10px; align-items: center;
 }
 .form-row > label {
-  font-size: 13px; color: var(--text-secondary, #a6adc8); min-width: 60px; flex-shrink: 0;
+  font-size: 13px; color: var(--text-secondary, #8ba3b8); min-width: 60px; flex-shrink: 0;
 }
 .form-row input {
   flex: 1; padding: 6px 10px; border-radius: 6px;
-  border: 1px solid var(--border-color, #45475a);
-  background: var(--bg-primary, #11111b); color: var(--text-primary, #cdd6f4);
+  border: 1px solid var(--border-color, #1a2a3a);
+  background: var(--bg-primary, #080c16); color: var(--text-primary, #d6e4f0);
   font-size: 13px; outline: none; transition: border-color 0.2s;
 }
-.form-row input:focus { border-color: var(--accent, #89b4fa); }
+.form-row input:focus { border-color: var(--accent, #20c8ff); }
 
 /* 按钮组 */
 .btn-group { display: flex; gap: 8px; margin-top: 8px; }
 .ghost-btn {
-  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-color, #45475a);
-  background: none; color: var(--text-primary, #cdd6f4); font-size: 13px;
+  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-color, #1a2a3a);
+  background: none; color: var(--text-primary, #d6e4f0); font-size: 13px;
   cursor: pointer; transition: all 0.2s;
 }
-.ghost-btn:hover { background: rgba(137,180,250,0.1); border-color: var(--accent, #89b4fa); }
+.ghost-btn:hover { background: rgba(32,200,255,0.1); border-color: var(--accent, #20c8ff); }
 .ghost-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm {
-  padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border-color, #45475a);
-  background: none; color: var(--text-primary, #cdd6f4); font-size: 12px;
+  padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border-color, #1a2a3a);
+  background: none; color: var(--text-primary, #d6e4f0); font-size: 12px;
   cursor: pointer; transition: all 0.2s;
 }
-.btn-sm:hover { background: rgba(137,180,250,0.1); }
-.btn-sm.danger { color: #f38ba8; border-color: rgba(243,139,168,0.3); }
-.btn-sm.danger:hover { background: rgba(243,139,168,0.1); }
+.btn-sm:hover { background: rgba(32,200,255,0.1); }
+.btn-sm.danger { color: var(--color-error, #ff3c48); border-color: rgba(255,60,72,0.3); }
+.btn-sm.danger:hover { background: rgba(255,60,72,0.1); }
 
 /* 表格 */
 .admin-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 .admin-table th {
-  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border-color, #45475a);
-  color: var(--text-secondary, #a6adc8); font-weight: 500;
+  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border-color, #1a2a3a);
+  color: var(--text-secondary, #8ba3b8); font-weight: 500;
 }
 .admin-table td {
-  padding: 8px 12px; border-bottom: 1px solid rgba(69,71,90,0.3);
+  padding: 8px 12px; border-bottom: 1px solid rgba(26,42,58,0.3);
 }
-.admin-table tr:hover { background: rgba(137,180,250,0.05); }
+.admin-table tr:hover { background: rgba(32,200,255,0.05); }
 
 /* 展开区域 */
 .expand-section {
-  background: var(--bg-primary, #11111b); border-radius: 8px; padding: 16px; margin-top: 16px;
-  border: 1px solid var(--border-color, #45475a);
+  background: var(--bg-primary, #080c16); border-radius: 8px; padding: 16px; margin-top: 16px;
+  border: 1px solid var(--border-color, #1a2a3a);
 }
 
 /* 组勾选 */
@@ -775,54 +775,122 @@ const maskedNodeSecret = computed(() => {
 
 /* 开关 */
 .toggle-switch {
-  position: relative; display: inline-block; width: 36px; height: 20px; cursor: pointer;
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
 }
-.toggle-input { opacity: 0; width: 0; height: 0; }
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .toggle-slider {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--border-color, #45475a); border-radius: 20px; transition: 0.3s;
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-bg-secondary);
+  border: none;
+  box-shadow: var(--tile-shadow);
+  border-radius: var(--tile-radius-sm);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  outline-offset: -1px;
 }
+
 .toggle-slider:before {
-  content: ''; position: absolute; height: 14px; width: 14px;
-  left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--color-text-secondary);
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border: none;
 }
-.toggle-input:checked + .toggle-slider { background: var(--accent, #89b4fa); }
-.toggle-input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+.toggle-input:checked + .toggle-slider {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-secondary) 100%);
+  border-color: var(--color-accent);
+  box-shadow: var(--tile-shadow);
+  outline-color: var(--color-accent-subtle);
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  background-color: var(--color-text-primary);
+  box-shadow: 0 2px 8px var(--color-shadow);
+  border-color: var(--color-accent-subtle);
+}
+
+/* Hover 状态 */
+.toggle-switch:hover .toggle-slider:before {
+  background-color: var(--color-text-primary);
+}
+
+/* Active 状态 - 物理回弹反馈 */
+.toggle-switch:active .toggle-slider {
+  transform: scale(0.95);
+}
+
+.toggle-switch:active .toggle-slider:before {
+  transform: translateX(22px) scale(0.95);
+}
+
+/* 禁用状态 */
+.toggle-input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* 权限矩阵 */
 .permission-matrix {
   margin-top: 16px; padding-top: 12px;
-  border-top: 1px solid var(--border-color, #45475a);
+  border-top: 1px solid var(--border-color, #1a2a3a);
 }
 .perm-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 .perm-table th {
-  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-color, #45475a);
-  color: var(--text-secondary, #a6adc8); font-weight: 500; font-size: 12px;
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-color, #1a2a3a);
+  color: var(--text-secondary, #8ba3b8); font-weight: 500; font-size: 12px;
 }
 .perm-table td {
-  padding: 4px 10px; border-bottom: 1px solid rgba(69,71,90,0.2);
+  padding: 4px 10px; border-bottom: 1px solid rgba(26,42,58,0.2);
 }
 .perm-resource-cell {
-  font-weight: 600; color: var(--accent, #89b4fa); vertical-align: middle;
-  border-right: 1px solid var(--border-color, #45475a);
+  font-weight: 600; color: var(--accent, #20c8ff); vertical-align: middle;
+  border-right: 1px solid var(--border-color, #1a2a3a);
 }
 .perm-action-cell {
-  color: var(--text-secondary, #a6adc8);
+  color: var(--text-secondary, #8ba3b8);
 }
 .perm-value-cell {
   text-align: center;
 }
 .perm-select {
   padding: 2px 6px; border-radius: 4px; font-size: 12px;
-  border: 1px solid var(--border-color, #45475a);
-  background: var(--bg-primary, #11111b); color: var(--text-primary, #cdd6f4);
+  border: 1px solid var(--border-color, #1a2a3a);
+  background: var(--bg-primary, #080c16); color: var(--text-primary, #d6e4f0);
   cursor: pointer; outline: none;
 }
-.perm-select:focus { border-color: var(--accent, #89b4fa); }
-.perm-select option[value="allow"] { color: #a6e3a1; }
-.perm-select option[value="deny"] { color: #f38ba8; }
+.perm-select:focus { border-color: var(--accent, #20c8ff); }
+.perm-select option[value="allow"] { color: var(--color-success, #36ff7c); }
+.perm-select option[value="deny"] { color: var(--color-error, #ff3c48); }
 
 /* 模态操作区 */
 .modal-actions {
@@ -838,7 +906,7 @@ const maskedNodeSecret = computed(() => {
   margin: 0;
   padding: 0;
   font-size: 12px;
-  color: var(--text-secondary, #a6adc8);
+  color: var(--text-secondary, #8ba3b8);
   line-height: 1.4;
 }
 
@@ -861,25 +929,25 @@ const maskedNodeSecret = computed(() => {
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
 }
 .config-sync-section .node-select {
   width: 100%;
   padding: 8px 12px;
-  background: var(--bg-secondary, #1e1e2e);
+  background: var(--bg-secondary, #0b1424);
   border: none;
   border-radius: 6px;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .config-sync-section .node-select:hover {
-  border-color: var(--border-color, #45475a);
+  border-color: var(--border-color, #1a2a3a);
 }
 .config-sync-section .node-select:focus {
   outline: none;
-  border-color: var(--accent, #89b4fa);
+  border-color: var(--accent, #20c8ff);
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .config-sync-button {
@@ -892,21 +960,21 @@ const maskedNodeSecret = computed(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--bg-secondary, #1e1e2e);
+  background: var(--bg-secondary, #0b1424);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
 }
 .checkbox-label:hover {
-  background: var(--bg-secondary, #1e1e2e);
+  background: var(--bg-secondary, #0b1424);
 }
 .checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--accent, #89b4fa);
+  accent-color: var(--accent, #20c8ff);
 }
 
 /* 私钥显示区域 */
@@ -923,22 +991,22 @@ const maskedNodeSecret = computed(() => {
   gap: 12px;
   margin-bottom: 12px;
   padding: 12px;
-  background: var(--bg-primary, #11111b);
+  background: var(--bg-primary, #080c16);
   border-radius: 6px;
   border: none;
 }
 .secret-code {
   flex: 1;
-  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   font-size: 13px;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
   word-break: break-all;
   min-width: 0;
 }
 .secret-placeholder {
   flex: 1;
   font-size: 13px;
-  color: var(--text-secondary, #a6adc8);
+  color: var(--text-secondary, #8ba3b8);
   font-style: italic;
 }
 .copy-btn {
@@ -946,18 +1014,18 @@ const maskedNodeSecret = computed(() => {
   align-items: center;
   justify-content: center;
   padding: 6px;
-  background: var(--bg-tertiary, #313244);
-  border: 0.5px solid var(--border-color, #45475a);
+  background: var(--bg-tertiary, #16263a);
+  border: 0.5px solid var(--border-color, #1a2a3a);
   border-radius: 4px;
-  color: var(--text-secondary, #a6adc8);
+  color: var(--text-secondary, #8ba3b8);
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 .copy-btn:hover:not(:disabled) {
-  background: var(--bg-secondary, #1e1e2e);
-  color: var(--accent, #89b4fa);
-  border-color: var(--accent, #89b4fa);
+  background: var(--bg-secondary, #0b1424);
+  color: var(--accent, #20c8ff);
+  border-color: var(--accent, #20c8ff);
 }
 .copy-btn:disabled {
   opacity: 0.4;
@@ -989,20 +1057,20 @@ const maskedNodeSecret = computed(() => {
 .restart-service-section .node-select {
   width: 100%;
   padding: 8px 12px;
-  background: var(--bg-secondary, #1e1e2e);
+  background: var(--bg-secondary, #0b1424);
   border: none;
   border-radius: 6px;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text-primary, #d6e4f0);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .restart-service-section .node-select:hover {
-  border-color: var(--border-color, #45475a);
+  border-color: var(--border-color, #1a2a3a);
 }
 .restart-service-section .node-select:focus {
   outline: none;
-  border-color: var(--accent, #89b4fa);
+  border-color: var(--accent, #20c8ff);
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 </style>
