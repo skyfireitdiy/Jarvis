@@ -2,6 +2,9 @@
 
 # Jarvis 极简安装脚本
 # 支持自动安装依赖工具和自动升级
+#
+# 国内用户拉取脚本（GitHub raw 可能超时）：
+#   bash -c "$(curl -fsSL https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/quick-install.sh)"
 
 set -e
 
