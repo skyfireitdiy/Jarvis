@@ -29,6 +29,7 @@ echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 STATE_FILE="$DEST_DIR/.install_state"
 
 set_state() {
+    mkdir -p "$(dirname "$STATE_FILE")"
     echo "$1" >> "$STATE_FILE"
 }
 
@@ -68,11 +69,13 @@ install_uv() {
     echo_info "正在安装 uv..."
     
     # 尝试官方安装脚本
-    if curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null; then
+    if curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh 2>/dev/null && sh /tmp/uv-install.sh 2>/dev/null; then
         export PATH="$HOME/.local/bin:$PATH"
         echo_info "uv 安装成功"
+        rm -f /tmp/uv-install.sh
         return 0
     fi
+    rm -f /tmp/uv-install.sh
 
     # 备用：手动下载
     echo_warn "官方安装失败，尝试备用方式..."
