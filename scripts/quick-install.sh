@@ -12,7 +12,7 @@ DEST_DIR="$HOME/Jarvis"
 DEFAULT_BRANCH="main"
 
 # 镜像配置（国内用户加速）
-export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
+export UV_PYTHON_INSTALL_MIRROR="https://mirror.nju.edu.cn/github-release/indygreg/python-build-standalone/"
 export UV_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple/"
 
 # ===== 颜色输出 =====
@@ -67,31 +67,50 @@ install_uv() {
     fi
 
     echo_info "正在安装 uv..."
-    
-    # 尝试官方安装脚本
-    if curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh 2>/dev/null && sh /tmp/uv-install.sh 2>/dev/null; then
-        export PATH="$HOME/.local/bin:$PATH"
-        echo_info "uv 安装成功"
+
+    # 尝试多个安装源：清华镜像 → 阿里云镜像 → 官方
+    local UV_INSTALL_URLS=(
+        "https://mirrors.tuna.tsinghua.edu.cn/github-release/astral-sh/uv/LatestRelease/install.sh"
+        "https://mirrors.aliyun.com/github-release/astral-sh/uv/LatestRelease/install.sh"
+        "https://astral.sh/uv/install.sh"
+    )
+
+    for url in "${UV_INSTALL_URLS[@]}"; do
+        echo_info "尝试安装源: $url"
+        if curl -LsSf "$url" -o /tmp/uv-install.sh 2>/dev/null && sh /tmp/uv-install.sh 2>/dev/null; then
+            export PATH="$HOME/.local/bin:$PATH"
+            echo_info "uv 安装成功"
+            rm -f /tmp/uv-install.sh
+            return 0
+        fi
         rm -f /tmp/uv-install.sh
-        return 0
-    fi
-    rm -f /tmp/uv-install.sh
+        echo_warn "安装源失败，尝试下一个..."
+    done
 
-    # 备用：手动下载
-    echo_warn "官方安装失败，尝试备用方式..."
-    local UV_URL="https://github.com/astral-sh/uv/releases/latest/download/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
+    # 备用：手动下载二进制（多源重试）
+    echo_warn "安装脚本方式失败，尝试手动下载..."
     local TEMP_DIR=$(mktemp -d)
-    
-    if curl -L "$UV_URL" | tar -xzf - -C "$TEMP_DIR" 2>/dev/null; then
-        mkdir -p "$HOME/.local/bin"
-        mv "$TEMP_DIR"/uv-* "$HOME/.local/bin/uv" 2>/dev/null || true
-        chmod +x "$HOME/.local/bin/uv"
-        export PATH="$HOME/.local/bin:$PATH"
-        echo_info "uv 安装成功（备用方式）"
-        rm -rf "$TEMP_DIR"
-        return 0
-    fi
+    local UV_DOWNLOAD_URLS=(
+        "https://mirrors.tuna.tsinghua.edu.cn/github-release/astral-sh/uv/LatestRelease/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
+        "https://mirrors.aliyun.com/github-release/astral-sh/uv/LatestRelease/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
+        "https://github.com/astral-sh/uv/releases/latest/download/uv-${ARCH_TYPE}-${PLATFORM}.tar.gz"
+    )
 
+    for url in "${UV_DOWNLOAD_URLS[@]}"; do
+        echo_info "尝试下载: $url"
+        if curl -L "$url" | tar -xzf - -C "$TEMP_DIR" 2>/dev/null; then
+            mkdir -p "$HOME/.local/bin"
+            mv "$TEMP_DIR"/uv-* "$HOME/.local/bin/uv" 2>/dev/null || true
+            chmod +x "$HOME/.local/bin/uv"
+            export PATH="$HOME/.local/bin:$PATH"
+            echo_info "uv 安装成功（手动下载方式）"
+            rm -rf "$TEMP_DIR"
+            return 0
+        fi
+        echo_warn "下载源失败，尝试下一个..."
+    done
+
+    rm -rf "$TEMP_DIR"
     echo_error "uv 安装失败，请手动安装: https://docs.astral.sh/uv/"
     return 1
 }
