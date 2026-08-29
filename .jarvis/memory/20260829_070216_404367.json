@@ -1,0 +1,8 @@
+{
+  "id": "20260829_070216_404367",
+  "type": "project_long_term",
+  "tags": ["前端样式", "markdown列表", "列表样式", "style.css"],
+  "content": "markdown 列表序号跑到边框外问题修复完成（Commit b1c2abc）。根因：App.vue 中 .message-body.markdown-content :deep(li) 设置了 list-style-position: inside，且 ol/ul padding-left: 20px 不够。修复：在 style.css（全局非 scoped）中添加列表样式覆盖：ol/ul padding-left: 24px !important，li list-style-position: outside !important。编译通过（34.40s）。",
+  "created_at": "2026-08-29T07:02:16.404406",
+  "updated_at": "2026-08-29T07:02:16.404411"
+}

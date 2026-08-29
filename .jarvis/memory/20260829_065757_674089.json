@@ -1,0 +1,8 @@
+{
+  "id": "20260829_065757_674089",
+  "type": "project_long_term",
+  "tags": ["前端样式", "markdown表格", "边框", "style.css"],
+  "content": "markdown 表格边框修复完成（Commit 17f3592）。根因：App.vue 中 .message-body.markdown-content :deep(table:not(.diff-table)) 样式设置了 border: none，导致表格无边框。修复：在 style.css（全局非 scoped）中添加表格边框样式，使用 !important 覆盖：table 整体 border: 1px solid #1a2a3a，th/td border: 1px solid #1a2a3a，th 背景 rgba(32,200,255,0.15)，偶数行背景 rgba(11,20,36,0.4)。编译通过（34.17s）。",
+  "created_at": "2026-08-29T06:57:57.674129",
+  "updated_at": "2026-08-29T06:57:57.674135"
+}

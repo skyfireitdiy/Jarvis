@@ -876,6 +876,40 @@ button:disabled {
   font-size: 13px !important;
 }
 
+/* Markdown 表格边框 */
+.message-body.markdown-content table:not(.diff-table) {
+  border-collapse: collapse !important;
+  border: 1px solid #1a2a3a !important;
+}
+
+.message-body.markdown-content table:not(.diff-table) th,
+.message-body.markdown-content table:not(.diff-table) td {
+  border: 1px solid #1a2a3a !important;
+  padding: 8px 12px !important;
+  text-align: left !important;
+}
+
+.message-body.markdown-content table:not(.diff-table) th {
+  background: rgba(32, 200, 255, 0.15) !important;
+  font-weight: 600 !important;
+}
+
+.message-body.markdown-content table:not(.diff-table) tr:nth-child(even) {
+  background: rgba(11, 20, 36, 0.4) !important;
+}
+
+/* Markdown 列表样式 */
+.message-body.markdown-content ol,
+.message-body.markdown-content ul {
+  padding-left: 24px !important;
+  margin: 8px 0 !important;
+}
+
+.message-body.markdown-content li {
+  list-style-position: outside !important;
+  margin: 4px 0 !important;
+}
+
 /* 输入区 - 独立悬浮层 */
 .input-area {
   background: rgba(11, 20, 36, 0.78) !important;

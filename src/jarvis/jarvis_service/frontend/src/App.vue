@@ -147,6 +147,7 @@
         @clear-buffer="clearBufferFromPanel(panel)"
         @set-output-list="setPanelOutputList(panel, $event)"
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
+        @show-toast="showToast"
       />
     </main>
 
