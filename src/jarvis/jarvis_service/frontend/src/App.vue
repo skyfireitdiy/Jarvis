@@ -94,9 +94,6 @@
           <span v-if="auth.userInfo" class="user-info-display" :title="'当前用户: ' + auth.userInfo.username">
             👤 {{ auth.userInfo.display_name || auth.userInfo.username }}
           </span>
-          <button class="icon-btn" @click="createPanel()" title="新建 Panel">
-            ➕
-          </button>
           <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
             <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>

@@ -550,9 +550,20 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 return "", True
 
             # 解析多行输入，去除每行前后引号和空白
+            # 同时去除发送人前缀（格式："发送人：内容"），避免影响路径解析
             file_paths = []
             for line in file_paths_input.strip().split("\n"):
                 line = line.strip().strip('"').strip("'").strip()
+                # 去除发送人前缀（如 "Administrator：/path/to/file"）
+                if (
+                    ":" in line
+                    and not line.startswith("/")
+                    and not line.startswith("~")
+                ):
+                    prefix, _, rest = line.partition(":")
+                    # 仅当冒号前是常见用户名/角色名时去除前缀
+                    if prefix and len(prefix) < 50 and not rest.startswith("//"):
+                        line = rest.strip().strip('"').strip("'").strip()
                 if line:
                     file_paths.append(line)
 
