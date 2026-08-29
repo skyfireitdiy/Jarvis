@@ -2874,6 +2874,7 @@ async function handleFileTreeNodeClick(agentId, node) {
 const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> outputs array
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
+const panelOutputLists = new Map() // panelId -> outputList element
 
 // 从历史记录中获取指定 agent 的最后一条消息的 seq
 function getAgentLastSeq(agentId) {
@@ -3137,6 +3138,7 @@ function closePanel(panelId) {
     closeAgentInPanel(panelId)
   }
   panels.value.splice(index, 1)
+  panelOutputLists.delete(panelId)
   // 如果关闭的是当前激活的 Panel，激活相邻 Panel
   if (activePanelId.value === panelId) {
     if (panels.value.length > 0) {
@@ -3155,6 +3157,7 @@ function closeAgentInPanel(panelId) {
   if (!panel || !panel.agentId) return
   const agentId = panel.agentId
   panel.agentId = null
+  panelOutputLists.delete(panelId)
   // 如果关闭的是当前 Agent，清空当前 Agent ID
   if (currentAgentId.value === agentId) {
     currentAgentId.value = null
@@ -3629,6 +3632,7 @@ function clearBufferFromPanel(panel) {
 // 设置 Panel 的输出列表引用
 function setPanelOutputList(panel, el) {
   if (!panel || !panel.agentId) return
+  panelOutputLists.set(panel.id, el)
   if (panel.agentId === currentAgentId.value) {
     outputList.value = el
   }
@@ -7846,8 +7850,9 @@ function appendOutput(payload, agentId = null) {
 
   // 确定目标 Agent ID：优先使用传入参数，其次使用消息自带 agent_id，最后回退到当前 Agent
   const targetAgentId = resolvedAgentId
-  // 仅当前 Agent 的消息自动滚动到底部
-  const shouldAutoScroll = isCurrentAgent(targetAgentId)
+  // 该 Agent 是否在某个 Panel 中（在 Panel 中则自动滚动）
+  const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
+  const shouldAutoScroll = !!targetPanel || isCurrentAgent(targetAgentId)
 
   // 添加到目标 Agent 的消息列表
   const currentOutputs = allOutputs.value.get(targetAgentId) || []
@@ -7924,9 +7929,13 @@ function appendOutput(payload, agentId = null) {
   // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发）
   nextTick(() => {
     requestAnimationFrame(() => {
-      if (shouldAutoScroll && outputList.value) {
-        const scrollHeight = outputList.value.scrollHeight
-        outputList.value.scrollTop = scrollHeight
+      if (!shouldAutoScroll) return
+      // 优先使用 Panel 对应的 outputList，其次使用全局 outputList
+      const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
+      const scrollEl = targetOutputList || outputList.value
+      if (scrollEl) {
+        const scrollHeight = scrollEl.scrollHeight
+        scrollEl.scrollTop = scrollHeight
       }
     })
   })
