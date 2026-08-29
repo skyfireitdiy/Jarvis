@@ -140,14 +140,14 @@ onUnmounted(() => {
 }
 
 .ghost-btn.default {
-  background: #36ff7c;
-  border-color: #36ff7c;
-  color: white;
+  background: rgba(32, 200, 255, 0.15);
+  border-color: var(--accent, #20c8ff);
+  color: var(--accent, #20c8ff);
   font-weight: 600;
 }
 
 .ghost-btn.default:hover {
-  background: #36ff7c;
-  border-color: #36ff7c;
+  background: rgba(32, 200, 255, 0.25);
+  border-color: var(--accent, #20c8ff);
 }
 </style>
