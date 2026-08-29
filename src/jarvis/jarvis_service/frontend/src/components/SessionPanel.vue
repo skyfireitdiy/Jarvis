@@ -54,14 +54,14 @@
       <!-- 输入区 -->
       <div class="input-area" :class="{ 'collapsed': inputCollapsed }">
         <div class="input-toggle-bar">
+          <!-- Agent 运行中进度指示器（不随输入框折叠） -->
+          <div class="agent-thinking-indicator" v-if="agent?.status === 'running' && (agentStatus?.execution_status ?? 'running') === 'running'">
+            <div class="thinking-spinner"></div>
+            <span class="thinking-text">Agent 正在执行...</span>
+          </div>
           <button class="input-toggle-btn" @click="inputCollapsed = !inputCollapsed" :title="inputCollapsed ? '展开输入框' : '折叠输入框'">
             {{ inputCollapsed ? '▲' : '▼' }}
           </button>
-        </div>
-        <!-- Agent 运行中进度指示器（不随输入框折叠） -->
-        <div class="agent-thinking-indicator" v-if="agent?.status === 'running' && (agentStatus?.execution_status ?? 'running') === 'running'">
-          <div class="thinking-spinner"></div>
-          <span class="thinking-text">Agent 正在执行...</span>
         </div>
         <div class="input-wrapper" v-show="!inputCollapsed">
           <!-- 多行输入框 -->
@@ -488,7 +488,8 @@ function getTerminalStyle(terminalContent) {
 
 .input-toggle-bar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding: 2px 8px;
 }
 
@@ -515,14 +516,12 @@ function getTerminalStyle(terminalContent) {
   padding: 0 8px 8px 8px;
   box-sizing: border-box;
 }
-
 .agent-thinking-indicator {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
   color: var(--color-text-secondary);
-  padding: 0 8px;
 }
 
 .thinking-spinner {
