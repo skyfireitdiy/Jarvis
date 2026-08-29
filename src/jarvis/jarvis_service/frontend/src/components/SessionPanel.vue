@@ -14,8 +14,7 @@
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <div class="session-header-actions">
-          <button class="session-close-agent-btn" @click.stop="$emit('close-agent')" title="关闭 Agent">✕</button>
-          <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">🗕</button>
+          <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
         </div>
       </div>
 
