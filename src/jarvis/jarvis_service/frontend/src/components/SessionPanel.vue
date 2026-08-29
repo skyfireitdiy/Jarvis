@@ -52,14 +52,18 @@
       </div>
 
       <!-- 输入区 -->
-      <div class="input-area">
-        <div class="input-wrapper">
-          <!-- Agent 运行中进度指示器 -->
-          <div class="agent-thinking-indicator" v-if="agent?.status === 'running' && (agentStatus?.execution_status ?? 'running') === 'running'">
-            <div class="thinking-spinner"></div>
-            <span class="thinking-text">Agent 正在执行...</span>
-          </div>
-
+      <div class="input-area" :class="{ 'collapsed': inputCollapsed }">
+        <div class="input-toggle-bar">
+          <button class="input-toggle-btn" @click="inputCollapsed = !inputCollapsed" :title="inputCollapsed ? '展开输入框' : '折叠输入框'">
+            {{ inputCollapsed ? '▲' : '▼' }}
+          </button>
+        </div>
+        <!-- Agent 运行中进度指示器（不随输入框折叠） -->
+        <div class="agent-thinking-indicator" v-if="agent?.status === 'running' && (agentStatus?.execution_status ?? 'running') === 'running'">
+          <div class="thinking-spinner"></div>
+          <span class="thinking-text">Agent 正在执行...</span>
+        </div>
+        <div class="input-wrapper" v-show="!inputCollapsed">
           <!-- 多行输入框 -->
           <textarea
             v-if="inputMode === 'multi'"
@@ -78,6 +82,7 @@
             type="text"
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
             :disabled="isInputDisabled"
+            @input="$emit('input-change', $event)"
             @keydown="$emit('keydown', $event)"
           />
 
@@ -153,6 +158,7 @@ const emit = defineEmits([
 ])
 
 const outputListRef = ref(null)
+const inputCollapsed = ref(false)
 
 function setOutputListRef(el) {
   outputListRef.value = el
@@ -365,6 +371,16 @@ function getTerminalStyle(terminalContent) {
   border: none;
 }
 
+.message-user_input {
+  background: rgba(32, 200, 255, 0.08);
+  border-left: 3px solid var(--color-accent);
+}
+
+.message-STREAM {
+  background: var(--color-bg-tile);
+  border-left: 3px solid var(--color-border-subtle);
+}
+
 .message-content {
   position: relative;
 }
@@ -373,6 +389,7 @@ function getTerminalStyle(terminalContent) {
   font-size: 13px;
   line-height: 1.6;
   word-break: break-word;
+  font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
 }
 
 .message-meta {
@@ -461,15 +478,40 @@ function getTerminalStyle(terminalContent) {
 
 .input-area {
   flex-shrink: 0;
-  padding: 8px;
+  padding: 0;
   background: var(--color-bg-secondary);
   border-top: 1px solid var(--color-border-subtle);
+  width: 100%;
+}
+
+.input-toggle-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 8px;
+}
+
+.input-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.input-toggle-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .input-wrapper {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  padding: 0 8px 8px 8px;
+  box-sizing: border-box;
 }
 
 .agent-thinking-indicator {
@@ -478,6 +520,7 @@ function getTerminalStyle(terminalContent) {
   gap: 6px;
   font-size: 11px;
   color: var(--color-text-secondary);
+  padding: 0 8px;
 }
 
 .thinking-spinner {
@@ -509,7 +552,7 @@ function getTerminalStyle(terminalContent) {
   font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
   box-sizing: border-box;
   resize: vertical;
-  min-height: 32px;
+  min-height: 96px;
 }
 
 .input-wrapper textarea:focus,

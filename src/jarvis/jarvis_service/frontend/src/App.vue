@@ -162,6 +162,7 @@
 <!-- 终端面板 -->
     <TerminalPanel
       :visible="showTerminalPanel"
+      :active="activeWindow === 'terminal'"
       :interaction="terminalPanelInteraction"
       :panelStyle="terminalPanelStyle"
       :nodeOptions="filteredNodeOptionsForCreateAgent"
@@ -226,6 +227,7 @@
     <EditorPanel
       ref="editorPanelRef"
       :visible="showEditorPanel"
+      :active="activeWindow === 'editor'"
       :interaction="editorPanelInteraction"
       :panelStyle="editorPanelStyle"
       :agentName="activeEditorSession?.agent_name"
@@ -3179,6 +3181,14 @@ function openAgentInPanel(agent, panelId = null) {
     switchAgent(agent)
     return
   }
+  // 如果该 Agent 已在某个 Panel 中打开，直接激活该 Panel
+  const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
+  if (existingPanel) {
+    activePanelId.value = existingPanel.id
+    switchAgent(agent)
+    console.log('[PANEL] Agent already open in panel, activating:', existingPanel.id, 'agent:', agent.agent_id)
+    return
+  }
   // 如果没有指定 Panel，使用当前激活的 Panel
   let targetPanel = null
   if (panelId) {
@@ -3499,6 +3509,13 @@ function handlePanelKeydown(panel, event) {
     event.preventDefault()
     completionCursorPos.value = event.target.selectionStart
     openCompletionsFromPanel(panel)
+    return
+  }
+
+  // 单行输入模式：Enter 键直接提交
+  if (event.key === 'Enter' && !event.ctrlKey && getPanelInputMode(panel) === 'single') {
+    event.preventDefault()
+    sendFromPanel(panel)
     return
   }
 
@@ -10887,13 +10904,19 @@ body::-webkit-scrollbar {
 .editor-panel {
   position: fixed;
   background: var(--color-bg-secondary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.editor-panel-active {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 20px rgba(32, 200, 255, 0.15) !important;
 }
 
 .editor-panel-dragging {
@@ -12869,14 +12892,10 @@ body::-webkit-scrollbar {
   overflow-x: auto;
   overflow-y: auto;
   color: #d6e4f0;
-  /* 字体由父容器的动态样式控制 */
   white-space: pre;
-  /* 移除 word-break: break-all，让长行可以横向滚动 */
-  /* 移除 flex: 1，高度由父容器控制 */
-  /* 继承父容器的字体设置 */
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 
@@ -13789,11 +13808,17 @@ body::-webkit-scrollbar {
 .terminal-panel {
   position: fixed;
   background: var(--color-bg-secondary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.terminal-panel-active {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 20px rgba(32, 200, 255, 0.15) !important;
 }
 
 .terminal-panel-dragging {
@@ -14180,7 +14205,7 @@ body::-webkit-scrollbar {
     width: 100vw !important;
     height: var(--app-height, 100vh) !important;
     border-radius: 0 !important;
-    border: none !important;
+    border: 1px solid var(--color-border-subtle) !important;
     z-index: 2000 !important;
   }
 

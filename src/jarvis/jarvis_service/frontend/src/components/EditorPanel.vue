@@ -2,7 +2,7 @@
   <aside
     v-show="visible"
     class="editor-panel"
-    :class="{ 'editor-panel-dragging': interaction.active }"
+    :class="{ 'editor-panel-dragging': interaction.active, 'editor-panel-active': active }"
     :style="panelStyle"
     @mousedown="$emit('focus', 'editor')"
   >
@@ -92,6 +92,7 @@ import { ref, defineProps, defineEmits } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
+  active: Boolean,
   interaction: Object,
   panelStyle: Object,
   agentName: String,
@@ -129,13 +130,19 @@ defineExpose({
 .editor-panel {
   position: fixed;
   background: var(--color-bg-secondary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius);
   box-shadow: var(--tile-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.editor-panel-active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(32, 200, 255, 0.15);
 }
 
 .editor-panel-dragging {
