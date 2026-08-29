@@ -754,6 +754,13 @@ button:disabled {
   }
 }
 
+/* 用户输入消息 - 荧光蓝发光竖线 */
+.message.message-user_input {
+  background: rgba(32, 200, 255, 0.35) !important;
+  border-left: 3px solid #20c8ff !important;
+  box-shadow: 0 2px 12px rgba(32, 200, 255, 0.15) !important;
+}
+
 /* 成功日志 - 荧光绿发光竖线 */
 .message.message-success {
   border-left: 3px solid #36ff7c !important;
