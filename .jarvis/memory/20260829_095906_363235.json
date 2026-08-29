@@ -1,0 +1,8 @@
+{
+  "id": "20260829_095906_363235",
+  "type": "project_long_term",
+  "tags": ["frontend", "SessionPanel", "send-btn", "mobile"],
+  "content": "SessionPanel.vue 发送按钮已加宽：新增 .send-btn 样式 min-width:64px、min-height:36px（桌面端），移动端 @media (max-width: 768px) 下 min-width:72px、min-height:44px、padding:10px 20px、font-size:15px。已重新构建前端（npm run build），dist 产物更新为 index-D0QZCR5c.js + index-DGGAjcko.css。注意：主聊天界面的发送按钮在 SessionPanel.vue 中（.send-btn），ChatPanel.vue 中的 .chat-send-btn 是聊天室面板的发送按钮。",
+  "created_at": "2026-08-29T09:59:06.363284",
+  "updated_at": "2026-08-29T09:59:06.363290"
+}

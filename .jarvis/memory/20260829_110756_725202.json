@@ -1,0 +1,8 @@
+{
+  "id": "20260829_110756_725202",
+  "type": "project_long_term",
+  "tags": ["frontend", "SessionPanel", "send-btn", "mobile"],
+  "content": "SessionPanel.vue 发送按钮移动端宽度已扩大两倍：@media (max-width: 768px) 下 .send-btn min-width 从 72px 改为 144px，min-height:44px、padding:10px 20px、font-size:15px。已重新构建前端（npm run build），dist 产物更新为 index-1qQJyxI9.js + index-DDrtp37n.css。",
+  "created_at": "2026-08-29T11:07:56.725252",
+  "updated_at": "2026-08-29T11:07:56.725259"
+}

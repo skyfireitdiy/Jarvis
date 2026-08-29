@@ -631,10 +631,10 @@ function getTerminalStyle(terminalContent) {
 .action-btn,
 .complete-btn,
 .send-btn {
-  padding: 5px 10px;
+  padding: 8px 16px;
   border: none;
   border-radius: var(--tile-radius-xs);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -663,6 +663,8 @@ function getTerminalStyle(terminalContent) {
   background: rgba(32, 200, 255, 0.15);
   color: var(--color-accent);
   border: 1px solid var(--color-accent);
+  min-width: 64px;
+  min-height: 36px;
 }
 
 .send-btn:hover:not(:disabled) {
@@ -674,6 +676,16 @@ function getTerminalStyle(terminalContent) {
 .send-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 移动端适配：发送按钮加大 */
+@media (max-width: 768px) {
+  .send-btn {
+    min-width: 144px;
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 15px;
+  }
 }
 
 /* 内嵌确认区域 */

@@ -1,0 +1,8 @@
+{
+  "id": "20260829_093434_939779",
+  "type": "project_long_term",
+  "tags": ["前端", "ChatPanel", "发送按钮", "移动端"],
+  "content": "ChatPanel.vue 发送按钮已加宽：新增 .chat-send-btn 样式（44×36px，桌面端），移动端 @media (max-width: 768px) 下 52×42px。按钮使用主题色背景（--color-accent）白色箭头图标，disabled 状态恢复灰色。已重新构建前端（npm run build），dist 产物更新为 index-CntfzmS8.js + index-Bm131cYu.css。",
+  "created_at": "2026-08-29T09:34:34.939835",
+  "updated_at": "2026-08-29T09:34:34.939841"
+}
