@@ -549,23 +549,49 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("❌ 未输入编排文件路径")
                 return "", True
 
-            # 解析多行输入，去除每行前后引号和空白
-            # 同时去除发送人前缀（格式："发送人：内容"），避免影响路径解析
+            # 解析多行输入，从内容中自动提取文件路径
+            # 支持格式：
+            #   - 纯路径：/path/to/file.yaml
+            #   - 带前缀：Administrator：/path/to/file.yaml
+            #   - 带引号："/path/to/file.yaml" 或 '/path/to/file.yaml'
+            #   - 带说明：请使用 /path/to/file.yaml 这个文件
             file_paths = []
             for line in file_paths_input.strip().split("\n"):
-                line = line.strip().strip('"').strip("'").strip()
-                # 去除发送人前缀（如 "Administrator：/path/to/file"）
-                if (
-                    ":" in line
-                    and not line.startswith("/")
-                    and not line.startswith("~")
-                ):
-                    prefix, _, rest = line.partition(":")
-                    # 仅当冒号前是常见用户名/角色名时去除前缀
-                    if prefix and len(prefix) < 50 and not rest.startswith("//"):
-                        line = rest.strip().strip('"').strip("'").strip()
-                if line:
-                    file_paths.append(line)
+                line = line.strip()
+                if not line:
+                    continue
+                # 尝试从行中提取文件路径
+                # 1. 先尝试匹配带引号的路径
+                quoted_match = re.search(r'["\']([^"\']+\.ya?ml)["\']', line)
+                if quoted_match:
+                    file_paths.append(quoted_match.group(1))
+                    continue
+                # 2. 尝试匹配绝对路径或 home 路径（/path/to/file.yaml 或 ~/path/to/file.yaml）
+                abs_match = re.search(
+                    r'(?:^|[\s：:])((/[^\s：:"\']+\.ya?ml)|(~/[^\s：:"\']+\.ya?ml))',
+                    line,
+                )
+                if abs_match:
+                    file_paths.append(abs_match.group(1))
+                    continue
+                # 3. 尝试匹配相对路径（如 ./path/file.yaml 或 ../path/file.yaml）
+                rel_match = re.search(
+                    r'(?:^|[\s：:])((\.{1,2}/[^\s：:"\']+\.ya?ml))', line
+                )
+                if rel_match:
+                    file_paths.append(rel_match.group(1))
+                    continue
+                # 4. 尝试匹配 Windows 路径（如 C:\\path\\file.yaml）
+                win_match = re.search(
+                    r'(?:^|[\s：:])(([A-Za-z]:[\\/][^\s：:"\']+\.ya?ml))', line
+                )
+                if win_match:
+                    file_paths.append(win_match.group(1))
+                    continue
+                # 5. 最后尝试：整行就是路径（去除引号和空白后）
+                cleaned = line.strip().strip('"').strip("'").strip()
+                if cleaned and (cleaned.endswith(".yaml") or cleaned.endswith(".yml")):
+                    file_paths.append(cleaned)
 
             if not file_paths:
                 PrettyOutput.auto_print("❌ 未输入有效的编排文件路径")
