@@ -493,8 +493,8 @@
       :filteredCompletions="filteredCompletions"
       :selectedIndex="selectedIndex"
       @update:searchText="completionSearch = $event"
-      @close="insertAtPosition('@', completionCursorPos.value); showCompletions = false; completionCursorPos.value = -1"
-      @select="insertCompletion"
+      @close="insertAtPosition('@', completionCursorPos.value, completionAgentId.value); showCompletions = false; completionCursorPos.value = -1; completionAgentId.value = null"
+      @select="(item) => insertCompletion(item, completionAgentId.value)"
       @keydown="handleCompletionKeydown"
     />
 
@@ -2928,6 +2928,7 @@ const COMPLETION_USAGE_STORAGE_KEY = 'jarvis_completion_usage_stats'
 const inputHistory = ref([]) // 历史输入记录数组
 const historyIndex = ref(-1) // 当前浏览的历史记录索引（-1 表示未浏览历史）
 const currentTempInput = ref('') // 用户正在编辑的临时内容
+const panelTempInputs = ref(new Map()) // 每个 Panel 的临时编辑内容 (key: agentId, value: 内容)
 
 function loadCompletionUsageStats() {
   const savedValue = localStorage.getItem(COMPLETION_USAGE_STORAGE_KEY)
@@ -3347,8 +3348,9 @@ function sendFromPanel(panel) {
   // 单行输入模式：允许发送空字符串
   // 多行输入模式：不允许发送空字符串
   const panelInput = panelInputTexts.value.get(agentId) || ''
+  const panelInputMode = getPanelInputMode(panel)
   let userInput
-  if (inputMode.value === 'single') {
+  if (panelInputMode === 'single') {
     userInput = panelInput
   } else {
     userInput = panelInput.trim()
@@ -3360,7 +3362,7 @@ function sendFromPanel(panel) {
   const executionStatus = statusData?.execution_status || 'running'
 
   // 判断是发送到缓冲区还是直接发送
-  if (inputMode.value === 'single' || executionStatus === 'waiting_multi') {
+  if (panelInputMode === 'single' || executionStatus === 'waiting_multi') {
     // 后端正在等待输入，直接发送
     const message = {
       type: 'input_result',
@@ -3368,7 +3370,7 @@ function sendFromPanel(panel) {
         text: userInput,
         agent_id: agentId,
         display_name: chatName.value || username.value || '',
-        input_mode: inputMode.value,
+        input_mode: panelInputMode,
       },
     }
     sendMessageToAgent(message, agentId)
@@ -3432,6 +3434,7 @@ function completeFromPanel(panel) {
 }
 
 // 从 Panel 打开补全
+// 从 Panel 打开补全
 async function openCompletionsFromPanel(panel) {
   if (!panel || !panel.agentId) return
   const agent = getPanelAgent(panel)
@@ -3440,10 +3443,10 @@ async function openCompletionsFromPanel(panel) {
     return
   }
 
+  completionAgentId.value = panel.agentId
   completionSearch.value = ''
   selectedIndex.value = -1
   showCompletions.value = true
-
   // 获取补全列表
   try {
     const { host, port } = getGatewayAddress()
@@ -3566,7 +3569,7 @@ function handlePanelKeydown(panel, event) {
     const textarea = event.target
     if (isCursorAtFirstLine(textarea)) {
       event.preventDefault()
-      navigateHistory('up')
+      navigateHistory('up', agentId)
     }
     return
   }
@@ -3576,7 +3579,7 @@ function handlePanelKeydown(panel, event) {
     const textarea = event.target
     if (isCursorAtLastLine(textarea)) {
       event.preventDefault()
-      navigateHistory('down')
+      navigateHistory('down', agentId)
     }
     return
   }
@@ -4227,6 +4230,7 @@ function handleConfirmDialogCancel() {
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
 const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位置
+const completionAgentId = ref(null) // 记录打开补全列表时的 Panel agentId
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 const fileCompletions = ref([]) // 文件补全搜索结果
@@ -5770,18 +5774,18 @@ async function createAgent() {
     alert(`创建失败: ${error.message}`)
   }
 }
-
 // 打开补全列表
 async function openCompletions() {
   if (!currentAgent.value) {
     alert('请先选择一个 Agent')
     return
   }
-  
+
+  completionAgentId.value = currentAgentId.value
   completionSearch.value = ''
   selectedIndex.value = -1
   showCompletions.value = true
-  
+
   // 获取补全列表
   try {
     const { host, port } = getGatewayAddress()
@@ -5842,17 +5846,18 @@ const filteredCompletions = computed(() => {
 // 处理补全对话框的键盘事件
 function handleCompletionKeydown(event) {
   const maxIndex = filteredCompletions.value.length - 1
-  
+
   if (event.key === 'Escape') {
     // ESC 键关闭对话框，插入 @ 符号
-    insertAtPosition('@', completionCursorPos.value)
+    insertAtPosition('@', completionCursorPos.value, completionAgentId.value)
     showCompletions.value = false
     selectedIndex.value = -1
     completionCursorPos.value = -1
+    completionAgentId.value = null
     event.preventDefault()
     return
   }
-  
+
   if (event.key === 'ArrowDown') {
     // 向下键：选择下一个条目
     if (selectedIndex.value < maxIndex) {
@@ -5864,7 +5869,7 @@ function handleCompletionKeydown(event) {
     event.preventDefault()
     return
   }
-  
+
   if (event.key === 'ArrowUp') {
     // 向上键：选择上一个条目
     if (selectedIndex.value > 0) {
@@ -5878,11 +5883,11 @@ function handleCompletionKeydown(event) {
     event.preventDefault()
     return
   }
-  
+
   if (event.key === 'Enter') {
     // 回车键：如果选中了条目，则插入
     if (selectedIndex.value >= 0 && selectedIndex.value <= maxIndex) {
-      insertCompletion(filteredCompletions.value[selectedIndex.value])
+      insertCompletion(filteredCompletions.value[selectedIndex.value], completionAgentId.value)
       event.preventDefault()
     }
     return
@@ -5926,30 +5931,42 @@ function scrollToDirSelected() {
 }
 
 // 在指定位置插入文本
-function insertAtPosition(text, position) {
-  const textarea = document.querySelector('.input-wrapper textarea')
+function insertAtPosition(text, position, agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  const textarea = targetAgentId
+    ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
+    : document.querySelector('.input-wrapper textarea')
   if (!textarea || position === -1) return
-  
-  const currentText = textarea.value
+
+  const currentText = targetAgentId
+    ? (panelInputTexts.value.get(targetAgentId) || '')
+    : inputText.value
   // 在指定位置插入文本
   const newText = currentText.substring(0, position) + text + currentText.substring(position)
+  if (targetAgentId) {
+    panelInputTexts.value.set(targetAgentId, newText)
+  }
   inputText.value = newText
-  
+
   // 更新 textarea 并设置光标位置
   textarea.value = newText
   const newCursorPos = position + text.length
   textarea.setSelectionRange(newCursorPos, newCursorPos)
   textarea.focus()
 }
-
 // 插入选中的补全
-function insertCompletion(item) {
-  const textarea = document.querySelector('.input-wrapper textarea')
+function insertCompletion(item, agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  const textarea = targetAgentId
+    ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
+    : document.querySelector('.input-wrapper textarea')
   if (!textarea) return
 
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
-  const text = textarea.value
+  const text = targetAgentId
+    ? (panelInputTexts.value.get(targetAgentId) || '')
+    : textarea.value
 
   recordCompletionSelection(item)
 
@@ -5958,10 +5975,13 @@ function insertCompletion(item) {
   if (deleteStart === -1) {
     deleteStart = start
   }
-  
+
   // 在删除@符号的位置插入补全（添加单引号包裹）
   const valueToInsert = `'${item.value}'`
   const newText = text.substring(0, deleteStart) + valueToInsert + text.substring(end)
+  if (targetAgentId) {
+    panelInputTexts.value.set(targetAgentId, newText)
+  }
   inputText.value = newText
 
   // 设置新的光标位置
@@ -5974,6 +5994,7 @@ function insertCompletion(item) {
   showCompletions.value = false
   selectedIndex.value = -1
   completionCursorPos.value = -1
+  completionAgentId.value = null
 }
 
 // 获取 Agent 列表
@@ -8240,18 +8261,37 @@ function saveToHistory(text) {
 }
 
 // 翻阅历史记录
-function navigateHistory(direction) {
+function navigateHistory(direction, agentId = null) {
   // direction: 'up' 或 'down'
-  
+  // agentId: 指定 Panel 的 agentId，传入时操作 Panel 隔离的输入
+
+  const isPanel = agentId !== null
+  const getInput = () => isPanel ? (panelInputTexts.value.get(agentId) || '') : inputText.value
+  const setInput = (val) => {
+    if (isPanel) {
+      panelInputTexts.value.set(agentId, val)
+    } else {
+      inputText.value = val
+    }
+  }
+  const getTemp = () => isPanel ? (panelTempInputs.value.get(agentId) || '') : currentTempInput.value
+  const setTemp = (val) => {
+    if (isPanel) {
+      panelTempInputs.value.set(agentId, val)
+    } else {
+      currentTempInput.value = val
+    }
+  }
+
   if (direction === 'up') {
     // 向上翻阅：加载更早的历史记录
     if (historyIndex.value < inputHistory.value.length - 1) {
       // 第一次翻阅时，保存当前正在编辑的内容
       if (historyIndex.value === -1) {
-        currentTempInput.value = inputText.value
+        setTemp(getInput())
       }
       historyIndex.value++
-      inputText.value = inputHistory.value[historyIndex.value]
+      setInput(inputHistory.value[historyIndex.value])
     }
   } else if (direction === 'down') {
     // 向下翻阅：加载更新的历史记录
@@ -8259,9 +8299,9 @@ function navigateHistory(direction) {
       historyIndex.value--
       if (historyIndex.value === -1) {
         // 回到最新状态，恢复临时编辑的内容
-        inputText.value = currentTempInput.value
+        setInput(getTemp())
       } else {
-        inputText.value = inputHistory.value[historyIndex.value]
+        setInput(inputHistory.value[historyIndex.value])
       }
     }
   }
