@@ -1,0 +1,8 @@
+{
+  "id": "20260829_114519_194240",
+  "type": "project_long_term",
+  "tags": ["Panel", "输入隔离", "switchAgent", "closeAgentInPanel"],
+  "content": "切换Agent输入内容丢失问题修复（Commit 50400f4）：1) switchAgent 中删除清空 panelInputTexts/panelInputTips/panelInputModes 的逻辑（原在 App.vue:6923-6928），切换Agent时旧Agent的Panel输入状态保留；2) closeAgentInPanel 中添加清理 panelInputTexts/panelInputTips/panelInputModes 的逻辑（App.vue:3164-3166），关闭Panel时清理输入状态。",
+  "created_at": "2026-08-29T11:45:19.194287",
+  "updated_at": "2026-08-29T11:45:19.194293"
+}

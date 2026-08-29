@@ -3161,6 +3161,10 @@ function closeAgentInPanel(panelId) {
   panelOutputLists.delete(panelId)
   // 清除该 Agent 的 Panel 内嵌确认数据
   panelConfirmData.value.delete(agentId)
+  // 清除该 Agent 的 Panel 输入状态
+  panelInputTexts.value.delete(agentId)
+  panelInputTips.value.delete(agentId)
+  panelInputModes.value.delete(agentId)
   // 如果关闭的是当前 Agent，清空当前 Agent ID
   if (currentAgentId.value === agentId) {
     currentAgentId.value = null
@@ -6920,12 +6924,6 @@ async function switchAgent(agent) {
   inputText.value = ''
   inputTip.value = ''
   inputMode.value = 'multi'
-  // 同步清空 Panel 隔离状态
-  if (oldAgentId) {
-    panelInputTexts.value.delete(oldAgentId)
-    panelInputTips.value.delete(oldAgentId)
-    panelInputModes.value.delete(oldAgentId)
-  }
   
   // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
