@@ -779,7 +779,6 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
-import { oneDark } from '@codemirror/theme-one-dark'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { EditorView as CMEditorView } from '@codemirror/view'
 import { HighlightStyle as CMHighlightStyle, syntaxHighlighting as CMSyntaxHighlighting } from '@codemirror/language'
@@ -2328,7 +2327,7 @@ function activateEditorTab(path) {
           ...searchKeymap,
           indentWithTab,
         ]),
-        oneDark,
+        blueDark,
         langExt,
         editableCompartment.of(EditorView.editable.of(isEditorEditable.value)),
         readOnlyCompartment.of(EditorState.readOnly.of(!isEditorEditable.value)),
