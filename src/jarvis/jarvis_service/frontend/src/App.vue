@@ -3180,6 +3180,15 @@ function activatePanel(panelId) {
 function openAgentInPanel(agent, panelId = null) {
   // 移动端不支持多 Panel，直接切换
   if (windowWidth.value <= 768) {
+    // 确保至少有一个 Panel 存在
+    if (panels.value.length === 0) {
+      createPanel()
+    }
+    // 将 Agent 放入当前激活的 Panel
+    const targetPanel = panels.value.find(p => p.id === activePanelId.value) || panels.value[0]
+    if (targetPanel) {
+      targetPanel.agentId = agent.agent_id
+    }
     switchAgent(agent)
     return
   }
@@ -14484,6 +14493,8 @@ body::-webkit-scrollbar {
     grid-template-rows: 1fr !important;
     padding: 0 !important;
     gap: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
   }
 
   .session-panel {
