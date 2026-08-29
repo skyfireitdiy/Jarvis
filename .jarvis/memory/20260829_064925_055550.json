@@ -1,0 +1,8 @@
+{
+  "id": "20260829_064925_055550",
+  "type": "project_long_term",
+  "tags": ["前端样式", "消息左边框", "output_type", "style.css"],
+  "content": "前端消息左边框颜色映射已完成（Commit f0ffa57）。在 style.css 中为不同类型消息添加了不同颜色的左边框样式，参考 output.py 中 _SECTION_STYLES 的颜色映射：system=#20c8ff(青)、code=#36ff7c(绿)、result=#4d9fff(蓝)、planning=#c792ea(紫)、progress=#8ba3b8(灰)、debug=#8ba3b8(灰)、tool=#36ff7c(绿)、start=#20c8ff(青)、target=#c792ea(紫)、stop=#ff3c48(红)、directory=#20c8ff(青)、statistics=#8ba3b8(灰)、diff=#20c8ff(青)、info=#8ba3b8(灰)。message-stream 保持无边框。匹配不上的类型默认无左边框（.message 基础样式 border: 1px solid transparent）。",
+  "created_at": "2026-08-29T06:49:25.055590",
+  "updated_at": "2026-08-29T06:49:25.055596"
+}

@@ -774,10 +774,93 @@ button:disabled {
   box-shadow: 0 2px 12px rgba(255, 133, 32, 0.1) !important;
 }
 
+/* 系统消息 - 青色发光竖线 */
+.message.message-system {
+  border-left: 3px solid #20c8ff !important;
+  box-shadow: 0 2px 12px rgba(32, 200, 255, 0.08) !important;
+}
+
+/* 代码输出 - 绿色发光竖线 */
+.message.message-code {
+  border-left: 3px solid #36ff7c !important;
+  box-shadow: 0 2px 12px rgba(54, 255, 124, 0.08) !important;
+}
+
+/* 工具执行结果 - 蓝色发光竖线 */
+.message.message-result {
+  border-left: 3px solid #4d9fff !important;
+  box-shadow: 0 2px 12px rgba(77, 159, 255, 0.08) !important;
+}
+
+/* 任务规划 - 紫色发光竖线 */
+.message.message-planning {
+  border-left: 3px solid #c792ea !important;
+  box-shadow: 0 2px 12px rgba(199, 146, 234, 0.08) !important;
+}
+
+/* 执行进度 - 灰色发光竖线 */
+.message.message-progress {
+  border-left: 3px solid #8ba3b8 !important;
+  box-shadow: 0 2px 12px rgba(139, 163, 184, 0.08) !important;
+}
+
+/* 调试信息 - 灰色发光竖线 */
+.message.message-debug {
+  border-left: 3px solid #8ba3b8 !important;
+  box-shadow: 0 2px 12px rgba(139, 163, 184, 0.08) !important;
+}
+
+/* 工具调用 - 绿色发光竖线 */
+.message.message-tool {
+  border-left: 3px solid #36ff7c !important;
+  box-shadow: 0 2px 12px rgba(54, 255, 124, 0.08) !important;
+}
+
+/* 任务开始 - 青色发光竖线 */
+.message.message-start {
+  border-left: 3px solid #20c8ff !important;
+  box-shadow: 0 2px 12px rgba(32, 200, 255, 0.08) !important;
+}
+
+/* 目标任务 - 紫色发光竖线 */
+.message.message-target {
+  border-left: 3px solid #c792ea !important;
+  box-shadow: 0 2px 12px rgba(199, 146, 234, 0.08) !important;
+}
+
+/* 任务停止 - 红色发光竖线 */
+.message.message-stop {
+  border-left: 3px solid #ff3c48 !important;
+  box-shadow: 0 2px 12px rgba(255, 60, 72, 0.08) !important;
+}
+
+/* 目录相关 - 青色发光竖线 */
+.message.message-directory {
+  border-left: 3px solid #20c8ff !important;
+  box-shadow: 0 2px 12px rgba(32, 200, 255, 0.08) !important;
+}
+
+/* 统计信息 - 灰色发光竖线 */
+.message.message-statistics {
+  border-left: 3px solid #8ba3b8 !important;
+  box-shadow: 0 2px 12px rgba(139, 163, 184, 0.08) !important;
+}
+
+/* Diff 可视化 - 青色发光竖线 */
+.message.message-diff {
+  border-left: 3px solid #20c8ff !important;
+  box-shadow: 0 2px 12px rgba(32, 200, 255, 0.08) !important;
+}
+
 /* 普通日志 - 无发光 */
-.message.message-stream,
-.message.message-info {
+.message.message-stream {
   border-left: none !important;
+}
+
+/* 信息日志 - 灰色发光竖线 */
+.message.message-info {
+  border-left: 3px solid #8ba3b8 !important;
+  box-shadow: 0 2px 12px rgba(139, 163, 184, 0.08) !important;
 }
 
 /* 时间戳弱化 */
