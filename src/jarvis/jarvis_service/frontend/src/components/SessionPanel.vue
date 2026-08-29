@@ -587,7 +587,7 @@ function getTerminalStyle(terminalContent) {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius-xs);
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: 14px;
   font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
   box-sizing: border-box;
   resize: vertical;
