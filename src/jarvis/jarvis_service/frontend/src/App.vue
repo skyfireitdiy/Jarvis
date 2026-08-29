@@ -134,6 +134,9 @@
         :has-buffered-input="getPanelHasBufferedInput(panel)"
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
+        :confirm-data="getPanelConfirmData(panel)"
+        @confirm="handlePanelConfirm(panel)"
+        @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
         @close-agent="closeAgentInPanel(panel.id)"
         @close-panel="closePanel(panel.id)"
@@ -2920,6 +2923,7 @@ const multilineInput = ref(null)
 const singlelineInput = ref(null)
 const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
 const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
+const panelConfirmData = ref(new Map()) // 每个 Panel 的确认数据（key: agentId, value: {message, defaultConfirm}）
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
 // 历史输入记录
@@ -3158,6 +3162,8 @@ function closeAgentInPanel(panelId) {
   const agentId = panel.agentId
   panel.agentId = null
   panelOutputLists.delete(panelId)
+  // 清除该 Agent 的 Panel 内嵌确认数据
+  panelConfirmData.value.delete(agentId)
   // 如果关闭的是当前 Agent，清空当前 Agent ID
   if (currentAgentId.value === agentId) {
     currentAgentId.value = null
@@ -3269,6 +3275,12 @@ function getPanelInputRequest(panel) {
 function getPanelAgentStatus(panel) {
   if (!panel || !panel.agentId) return null
   return agentStatuses.value.get(panel.agentId) || null
+}
+
+// 获取 Panel 的确认数据
+function getPanelConfirmData(panel) {
+  if (!panel || !panel.agentId) return null
+  return panelConfirmData.value.get(panel.agentId) || null
 }
 
 // 获取 Panel 的终端列表
@@ -5288,6 +5300,11 @@ async function fetchAgentStatus(agent) {
         if (pendingConfirm && pendingConfirm.payload) {
           const payload = pendingConfirm.payload
           pendingConfirmAgentId.value = agent.agent_id
+          // 更新 Panel 内嵌确认数据（按 agentId 隔离）
+          panelConfirmData.value.set(agent.agent_id, {
+            message: payload.message || '请确认',
+            defaultConfirm: payload.default !== undefined ? payload.default : true
+          })
           console.log('[AGENT STATUS] Showing confirm dialog with message:', payload.message)
           showConfirm(
             payload.message || '请确认',
@@ -7403,7 +7420,13 @@ function handleMessage(message, agentId = null) {
     // 更新 Agent 状态为 waiting_confirm
     agentStatuses.value.set(targetAgentId, {execution_status: 'waiting_confirm'})
 
-    // 只有当前 Agent 才立即弹出确认对话框
+    // 更新 Panel 内嵌确认数据（按 agentId 隔离）
+    panelConfirmData.value.set(targetAgentId, {
+      message: payload.message || '请确认',
+      defaultConfirm: payload.default !== undefined ? payload.default : true
+    })
+
+    // 只有当前 Agent 才立即弹出全局确认对话框（兼容非 Panel 场景）
     // 非当前 Agent 的确认请求会在切换时通过 fetchAgentStatus 恢复
     if (isCurrentAgent(targetAgentId)) {
       showConfirm(
@@ -7516,6 +7539,11 @@ function handleMessage(message, agentId = null) {
           confirmDialog.value = null
           pendingConfirmAgentId.value = null
           console.log('[STATUS_SYNC] Cleared confirm dialog for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
+        }
+        // 清除 Panel 内嵌确认数据
+        if (panelConfirmData.value.has(targetAgentId)) {
+          panelConfirmData.value.delete(targetAgentId)
+          console.log('[STATUS_SYNC] Cleared panel confirm data for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
         }
       }
 
@@ -8778,8 +8806,44 @@ function sendConfirmResult(confirmed, agentId = null) {
     } else {
       console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
     }
+    // 清除 Panel 内嵌确认数据
+    panelConfirmData.value.delete(targetAgentId)
   }
   pendingConfirmAgentId.value = null
+}
+
+// 处理 Panel 内嵌确认
+function handlePanelConfirm(panel) {
+  if (!panel || !panel.agentId) return
+  sendConfirmResult(true, panel.agentId)
+}
+
+// 处理 Panel 内嵌取消确认
+function handlePanelCancelConfirm(panel) {
+  if (!panel || !panel.agentId) return
+  sendConfirmResult(false, panel.agentId)
+}
+
+// 恢复 waiting_confirm UI（从 panelConfirmData 恢复）
+function restoreWaitingConfirmUI(agentId) {
+  if (!agentId) return
+  const confirmData = panelConfirmData.value.get(agentId)
+  if (confirmData) {
+    console.log('[AGENT] Restoring waiting_confirm UI for agent', agentId, ':', confirmData.message)
+    pendingConfirmAgentId.value = agentId
+    showConfirm(
+      confirmData.message || '请确认',
+      () => {
+        sendConfirmResult(true, agentId)
+      },
+      () => {
+        sendConfirmResult(false, agentId)
+      },
+      confirmData.defaultConfirm !== undefined ? confirmData.defaultConfirm : true
+    )
+  } else {
+    console.warn('[AGENT] No panel confirm data found for agent', agentId)
+  }
 }
 
 function sendMessageToAgentById(agentId, message) {

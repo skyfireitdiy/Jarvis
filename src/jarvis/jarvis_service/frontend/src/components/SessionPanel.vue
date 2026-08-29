@@ -50,6 +50,15 @@
         </article>
       </div>
 
+      <!-- 内嵌确认区域 -->
+      <div v-if="confirmData" class="panel-confirm-bar">
+        <div class="panel-confirm-message">{{ confirmData.message }}</div>
+        <div class="panel-confirm-actions">
+          <button class="panel-confirm-btn panel-confirm-yes" @click="$emit('confirm')">确认</button>
+          <button class="panel-confirm-btn panel-confirm-no" @click="$emit('cancel-confirm')">取消</button>
+        </div>
+      </div>
+
       <!-- 输入区 -->
       <div class="input-area" :class="{ 'collapsed': inputCollapsed }">
         <div class="input-toggle-bar">
@@ -148,6 +157,7 @@ const props = defineProps({
   hasBufferedInput: { type: Boolean, default: false },
   agentStatus: { type: Object, default: null },
   active: { type: Boolean, default: false },
+  confirmData: { type: Object, default: null },
 })
 
 const emit = defineEmits([
@@ -157,6 +167,7 @@ const emit = defineEmits([
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
   'show-toast',
+  'confirm', 'cancel-confirm',
 ])
 
 const outputListRef = ref(null)
@@ -663,5 +674,62 @@ function getTerminalStyle(terminalContent) {
 .send-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 内嵌确认区域 */
+.panel-confirm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(32, 200, 255, 0.08);
+  border: 1px solid rgba(32, 200, 255, 0.3);
+  border-radius: var(--tile-radius-xs);
+  margin: 0 8px 8px;
+}
+
+.panel-confirm-message {
+  flex: 1;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.panel-confirm-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.panel-confirm-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.panel-confirm-yes {
+  background: rgba(32, 200, 255, 0.15);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+}
+
+.panel-confirm-yes:hover {
+  background: rgba(32, 200, 255, 0.25);
+}
+
+.panel-confirm-no {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.panel-confirm-no:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 </style>
