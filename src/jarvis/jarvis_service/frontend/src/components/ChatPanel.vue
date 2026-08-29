@@ -506,6 +506,33 @@ watch(
   font-size: 14px;
 }
 
+.chat-send-btn {
+  width: 44px;
+  height: 36px;
+  font-size: 18px;
+  background: var(--color-accent, #20c8ff);
+  color: #fff;
+  border-radius: 8px;
+}
+
+.chat-send-btn:hover:not(:disabled) {
+  background: var(--color-accent-hover, #1ab0e0);
+  color: #fff;
+}
+
+.chat-send-btn:disabled {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .chat-send-btn {
+    width: 52px;
+    height: 42px;
+    font-size: 20px;
+  }
+}
+
 .chat-panel {
   position: fixed;
   background: var(--color-bg-primary);
