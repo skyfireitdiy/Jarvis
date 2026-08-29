@@ -68,6 +68,7 @@
           <textarea
             v-if="inputMode === 'multi'"
             :value="inputText"
+            :data-agent-id="agent?.agent_id || ''"
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
             :disabled="isInputDisabled"
             @input="$emit('input-change', $event)"
@@ -79,13 +80,14 @@
           <input
             v-else
             :value="inputText"
+            :data-agent-id="agent?.agent_id || ''"
             type="text"
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
             :disabled="isInputDisabled"
             @input="$emit('input-change', $event)"
             @keydown="$emit('keydown', $event)"
+            @paste="$emit('paste', $event)"
           />
-
           <!-- 缓冲区指示器 -->
           <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatus?.execution_status ?? 'running') !== 'waiting_multi'" @click="$emit('show-buffer')">
             <span class="buffer-icon">📝</span>
