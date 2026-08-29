@@ -3384,12 +3384,24 @@ function sendFromPanel(panel) {
   const executionStatus = statusData?.execution_status || 'running'
 
   // 判断是发送到缓冲区还是直接发送
+  const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
   if (panelInputMode === 'single' || executionStatus === 'waiting_multi') {
     // 后端正在等待输入，直接发送
+    // 如果有缓冲区内容，先发送缓冲区内容
+    let sendText = userInput
+    if (hasBuffered) {
+      const bufferedText = inputBuffers.value.get(agentId)
+      inputBuffers.value.delete(agentId)
+      sendText = bufferedText
+      // 如果输入框也有内容，追加到缓冲区内容后面
+      if (userInput) {
+        sendText = `${bufferedText}\n${userInput}`
+      }
+    }
     const message = {
       type: 'input_result',
       payload: {
-        text: userInput,
+        text: sendText,
         agent_id: agentId,
         display_name: chatName.value || username.value || '',
         input_mode: panelInputMode,
@@ -3398,6 +3410,21 @@ function sendFromPanel(panel) {
     sendMessageToAgent(message, agentId)
     // 从Map中删除该Agent的输入请求
     inputRequests.value.delete(agentId)
+  } else if (hasBuffered) {
+    // 有缓冲区内容且后端没有等待输入，发送缓冲区内容
+    sendBufferedInput(agentId)
+    // 如果输入框也有内容，追加到缓冲区
+    if (userInput) {
+      const existingText = inputBuffers.value.get(agentId) || ''
+      const nextValue = existingText ? `${existingText}\n${userInput}` : userInput
+      inputBuffers.value.set(agentId, nextValue)
+      appendOutput({
+        output_type: 'system',
+        agent_name: 'system',
+        text: '✓ 输入已追加到缓冲区，等待后端请求',
+        lang: 'text',
+      }, agentId)
+    }
   } else {
     // 后端没有等待输入，保存到缓冲区
     const existingText = inputBuffers.value.get(agentId) || ''
@@ -8676,23 +8703,22 @@ function submitCompletion() {
   )
 }
 
-function sendInputDirectly(text, inputMode = 'multi') {
-  const agentId = currentAgentId.value
+function sendInputDirectly(text, inputMode = 'multi', agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
 
   const message = {
     type: 'input_result',
     payload: {
       text: text,
-      agent_id: currentAgentId.value,
+      agent_id: targetAgentId,
       display_name: chatName.value || username.value || '',
       input_mode: inputMode,
     },
   }
 
-  sendMessageToAgent(message)
+  sendMessageToAgent(message, targetAgentId)
 
-  // 从Map中删除该函数没有agentId参数，使用当前Agent的ID
-  const targetAgentId = currentAgentId.value
+  // 从Map中删除该Agent的输入请求
   if (targetAgentId) {
     inputRequests.value.delete(targetAgentId)
     console.log('[INPUT] Cleared input request for agent', targetAgentId, 'from Map')
@@ -8732,16 +8758,16 @@ function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
   pendingInputAgentId.value = null
 }
 
-function sendBufferedInput() {
-  const agentId = currentAgentId.value
-  if (!agentId || !inputBuffers.value.has(agentId)) {
+function sendBufferedInput(agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  if (!targetAgentId || !inputBuffers.value.has(targetAgentId)) {
     return
   }
-  const bufferedText = inputBuffers.value.get(agentId)
+  const bufferedText = inputBuffers.value.get(targetAgentId)
   // 清空缓冲区
-  inputBuffers.value.delete(agentId)
+  inputBuffers.value.delete(targetAgentId)
   // 发送缓冲区内容
-  sendInputDirectly(bufferedText, 'multi')
+  sendInputDirectly(bufferedText, 'multi', targetAgentId)
 }
 
 function clearBuffer() {
