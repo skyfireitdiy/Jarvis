@@ -779,8 +779,11 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { EditorView as CMEditorView } from '@codemirror/view'
+import { HighlightStyle as CMHighlightStyle, syntaxHighlighting as CMSyntaxHighlighting } from '@codemirror/language'
+import { tags as cmTags } from '@lezer/highlight'
 import { javascript } from '@codemirror/lang-javascript'
 import { python } from '@codemirror/lang-python'
 import { json } from '@codemirror/lang-json'
@@ -2160,6 +2163,86 @@ function markEditorTabExternalModified(path, value) {
   }
 }
 
+// ===== 蓝色系 CodeMirror 主题 =====
+const blueDarkTheme = CMEditorView.theme({
+  '&': {
+    color: '#a8c8e8',
+    backgroundColor: '#0d1b2a',
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
+  },
+  '.cm-content': {
+    caretColor: '#528bff',
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
+  },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#528bff' },
+  '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': { backgroundColor: '#264f78' },
+  '.cm-panels': { backgroundColor: '#0a1522', color: '#a8c8e8' },
+  '.cm-panels.cm-panels-top': { borderBottom: '2px solid #1a2a3a' },
+  '.cm-panels.cm-panels-bottom': { borderTop: '2px solid #1a2a3a' },
+  '.cm-searchMatch': {
+    backgroundColor: '#72a1ff59',
+    outline: '1px solid #457dff',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: '#6199ff2f' },
+  '.cm-activeLine': { backgroundColor: '#1a2a3a55' },
+  '.cm-selectionMatch': { backgroundColor: '#264f7855' },
+  '&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket': {
+    backgroundColor: '#264f78aa',
+  },
+  '.cm-gutters': {
+    backgroundColor: '#0d1b2a',
+    color: '#5a7a9a',
+    border: 'none',
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
+  },
+  '.cm-activeLineGutter': { backgroundColor: '#1a2a3a' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#5a7a9a',
+  },
+  '.cm-tooltip': {
+    border: 'none',
+    backgroundColor: '#16263a',
+    fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
+  },
+  '.cm-tooltip .cm-tooltip-arrow:before': {
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  '.cm-tooltip .cm-tooltip-arrow:after': {
+    borderTopColor: '#16263a',
+    borderBottomColor: '#16263a',
+  },
+  '.cm-tooltip-autocomplete': {
+    '& > ul > li[aria-selected]': {
+      backgroundColor: '#1a2a3a',
+      color: '#a8c8e8',
+    },
+  },
+}, { dark: true })
+
+const blueDarkHighlightStyle = CMHighlightStyle.define([
+  { tag: cmTags.keyword, color: '#7aa2f7' },
+  { tag: [cmTags.name, cmTags.deleted, cmTags.character, cmTags.propertyName, cmTags.macroName], color: '#f7768e' },
+  { tag: [cmTags.function(cmTags.variableName), cmTags.labelName], color: '#82aaff' },
+  { tag: [cmTags.color, cmTags.constant(cmTags.name), cmTags.standard(cmTags.name)], color: '#ff9e64' },
+  { tag: [cmTags.definition(cmTags.name), cmTags.separator], color: '#a8c8e8' },
+  { tag: [cmTags.typeName, cmTags.className, cmTags.number, cmTags.changed, cmTags.annotation, cmTags.modifier, cmTags.self, cmTags.namespace], color: '#e0af68' },
+  { tag: [cmTags.operator, cmTags.operatorKeyword, cmTags.url, cmTags.escape, cmTags.regexp, cmTags.link, cmTags.special(cmTags.string)], color: '#56b6c2' },
+  { tag: [cmTags.meta, cmTags.comment], color: '#5a7a9a' },
+  { tag: cmTags.strong, fontWeight: 'bold' },
+  { tag: cmTags.emphasis, fontStyle: 'italic' },
+  { tag: cmTags.strikethrough, textDecoration: 'line-through' },
+  { tag: cmTags.link, color: '#5a7a9a', textDecoration: 'underline' },
+  { tag: cmTags.heading, fontWeight: 'bold', color: '#f7768e' },
+  { tag: [cmTags.atom, cmTags.bool, cmTags.special(cmTags.variableName)], color: '#ff9e64' },
+  { tag: [cmTags.processingInstruction, cmTags.string, cmTags.inserted], color: '#9ece6a' },
+  { tag: cmTags.invalid, color: '#ffffff' },
+])
+
+const blueDark = [blueDarkTheme, CMSyntaxHighlighting(blueDarkHighlightStyle)]
+
 function ensureCodeMirrorEditor() {
   if (cmEditorView || !editorContainerRef.value) return
 
@@ -2198,7 +2281,7 @@ function ensureCodeMirrorEditor() {
           ...searchKeymap,
           indentWithTab,
         ]),
-        oneDark,
+        blueDark,
         editableCompartment.of(EditorView.editable.of(isEditorEditable.value)),
         readOnlyCompartment.of(EditorState.readOnly.of(!isEditorEditable.value)),
         updateListener,
@@ -11579,6 +11662,7 @@ body::-webkit-scrollbar {
 .editor-codemirror-container {
   width: 100%;
   height: 100%;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
 .editor-placeholder {
@@ -12714,6 +12798,7 @@ body::-webkit-scrollbar {
   font-size: 13px;
   line-height: 1.5;
   color: #e6edf3;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
   width: 100%;
 }
 
@@ -12772,6 +12857,7 @@ body::-webkit-scrollbar {
   color: #e6edf3;
   line-height: 1.6;
   word-wrap: break-word;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
 /* 消息元信息样式（agent名称和时间戳） */
