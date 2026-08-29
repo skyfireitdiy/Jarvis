@@ -157,6 +157,7 @@ const emit = defineEmits([
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
+  'show-toast',
 ])
 
 const outputListRef = ref(null)
@@ -171,8 +172,35 @@ function setTerminalRef(executionId, el, agentId) {
   emit('set-terminal-ref', executionId, el, agentId)
 }
 
-function copyToClipboard(text, index) {
-  navigator.clipboard?.writeText(text || '').catch(() => {})
+async function copyToClipboard(text, index) {
+  if (!text) {
+    console.warn('[COPY] No text to copy')
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    console.log('[COPY] Successfully copied text to clipboard')
+    emit('show-toast', '已复制到剪贴板', 'success')
+  } catch (err) {
+    console.error('[COPY] Failed to copy text:', err)
+    // 降级方案
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      console.log('[COPY] Fallback: Successfully copied using execCommand')
+      emit('show-toast', '已复制到剪贴板', 'success')
+    } catch (fallbackErr) {
+      console.error('[COPY] Fallback also failed:', fallbackErr)
+      emit('show-toast', '复制失败，请手动复制', 'error')
+    }
+  }
 }
 
 function formatMessageTime(timestamp) {
