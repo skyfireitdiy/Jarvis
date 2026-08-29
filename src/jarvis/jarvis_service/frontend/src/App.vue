@@ -94,6 +94,9 @@
           <span v-if="auth.userInfo" class="user-info-display" :title="'当前用户: ' + auth.userInfo.username">
             👤 {{ auth.userInfo.display_name || auth.userInfo.username }}
           </span>
+          <button class="icon-btn" @click="createPanel()" title="新建 Panel">
+            ➕
+          </button>
           <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
             💬
             <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
@@ -116,38 +119,35 @@
         </div>
       </header>
 
-    <!-- 消息列表 -->
-    <main class="chat-container">
-      <div class="messages" ref="outputList">
-        <article v-for="(item, index) in outputs" :key="item._stableId || index" class="message" :class="`message-${item.output_type?.toLowerCase()}`">
-          <div class="message-content">
-            <button class="icon-btn copy-message-btn" @click="copyToClipboard(item.text, index)" title="复制到剪贴板" v-if="item.text">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
-            <div class="message-body markdown-content" v-html="item.html"></div>
-            <div class="message-meta" v-if="item.agent_name || item.timestamp || item.non_interactive">
-              <span class="message-agent" v-if="item.agent_name">{{ item.agent_name }}</span>
-              <span class="message-separator" v-if="item.agent_name && item.timestamp"> · </span>
-              <span class="message-time" v-if="item.timestamp">{{ formatMessageTime(item.timestamp) }}</span>
-              <span class="message-separator" v-if="(item.agent_name || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
-              <span class="message-silent" v-if="item.non_interactive === true" title="静默模式">🔇</span>
-              <span class="message-silent" v-if="item.non_interactive === false" title="交互模式">🔊</span>
-            </div>
-          </div>
-          <!-- 终端嵌入 -->
-          <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
-            <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
-          </div>
-          <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
-            <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content">{{ item.terminal_content || '' }}</pre>
-          </div>
-        </article>
-      </div>
+    <!-- Panel 网格布局 -->
+    <main class="panel-grid" :style="panelGridStyle">
+      <SessionPanel
+        v-for="panel in panels"
+        :key="panel.id"
+        :agent="getPanelAgent(panel)"
+        :messages="getPanelMessages(panel)"
+        :input-text="getPanelInputText(panel)"
+        :input-mode="getPanelInputMode(panel)"
+        :input-tip="getPanelInputTip(panel)"
+        :is-input-disabled="getPanelInputDisabled(panel)"
+        :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(panel)"
+        :has-buffered-input="getPanelHasBufferedInput(panel)"
+        :agent-status="getPanelAgentStatus(panel)"
+        :active="panel.id === activePanelId"
+        @activate="activatePanel(panel.id)"
+        @close-agent="closeAgentInPanel(panel.id)"
+        @close-panel="closePanel(panel.id)"
+        @send="sendFromPanel(panel)"
+        @complete="completeFromPanel(panel)"
+        @open-completions="openCompletionsFromPanel(panel)"
+        @input-change="handlePanelInputChange(panel, $event)"
+        @keydown="handlePanelKeydown(panel, $event)"
+        @paste="handlePanelPaste(panel, $event)"
+        @show-buffer="showBufferPanel = true"
+        @clear-buffer="clearBufferFromPanel(panel)"
+        @set-output-list="setPanelOutputList(panel, $event)"
+        @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
+      />
     </main>
 
     <!-- 确认对话框（弹出式） -->
@@ -468,82 +468,7 @@
     </EditorPanel>
 
     <!-- 底部输入区 -->
-    <footer class="input-area">
-      <!-- 输入框 -->
-      <div class="input-wrapper">
-        <!-- Agent 运行中进度指示器 -->
-        <div class="agent-thinking-indicator" v-if="currentAgent?.status === 'running' && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'running'">
-          <div class="thinking-spinner"></div>
-          <span class="thinking-text">Agent 正在执行...</span>
-        </div>
-        
-        <!-- 多行输入框 -->
-        <textarea
-          v-if="inputMode === 'multi'"
-          v-model="inputText"
-          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
-          :disabled="isInputDisabled"
-          @input="handleTextareaInput"
-          @keydown="handleTextareaKeydown"
-          @paste="handlePaste"
-          ref="multilineInput"
-        ></textarea>
-        
-        <!-- 单行输入框 -->
-        <input 
-          v-else
-          v-model="inputText" 
-          type="text"
-          :placeholder="isInputDisabled ? '没有激活的 Agent 或 Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
-          :disabled="isInputDisabled"
-          @keydown="handleSinglelineKeydown"
-          ref="singlelineInput"
-        />
-        
-        <!-- 缓冲区指示器 -->
-        <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" @click="showBufferPanel = true">
-          <span class="buffer-icon">📝</span>
-          <span class="buffer-text">缓冲区有内容，点击管理</span>
-        </div>
-        
-        <!-- 操作按钮 -->
-        <div class="input-actions">
-          <button 
-            v-if="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi'" 
-            class="action-btn clear-buffer-btn" 
-            @click="clearBuffer"
-            :disabled="isInputDisabled"
-            title="清空缓冲区"
-          >
-            清空
-          </button>
-          <button 
-            class="complete-btn" 
-            @click="submitCompletion" 
-            :disabled="isWaitingMultiDisabled"
-            title="完成（发送空消息）"
-          >
-            完成
-          </button>
-          <button 
-            class="action-btn completion-btn" 
-            @click="openCompletions" 
-            :disabled="isWaitingMultiDisabled"
-            title="插入补全 (@)"
-          >
-            @
-          </button>
-          <button 
-            class="send-btn" 
-            @click="hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? sendBufferedInput() : submitInput()" 
-            :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') === 'waiting_multi'))"
-          >
-            {{ hasBufferedInput && (agentStatuses.get(currentAgentId)?.execution_status ?? 'running') !== 'waiting_multi' ? '发送缓冲区' : '发送 (Ctrl+Enter / Ctrl+D)' }}
-          </button>
-        </div>
-      </div>
-      
-    </footer>
+
     </div> <!-- 结束 main-content-wrapper -->
 
     <!-- 缓存管理弹窗 -->
@@ -890,6 +815,7 @@ import EditorPanel from './components/EditorPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
+import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
@@ -2983,6 +2909,9 @@ const inputText = ref('')
 const inputMode = ref('multi') // 当前显示Agent的输入模式
 const inputRequests = ref(new Map()) // 每个 Agent 的输入请求（key: agentId, value: {tip, mode, preset, request_id}）
 const inputTip = ref('') // 当前显示Agent的输入提示
+const panelInputTexts = ref(new Map()) // 每个 Panel 的输入文本（key: agentId, value: string）
+const panelInputModes = ref(new Map()) // 每个 Panel 的输入模式（key: agentId, value: 'multi'|'single'）
+const panelInputTips = ref(new Map()) // 每个 Panel 的输入提示（key: agentId, value: string）
 const multilineInput = ref(null)
 const singlelineInput = ref(null)
 const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
@@ -3173,6 +3102,734 @@ watch(showSettingsModal, (newVal) => {
     fetchNodeStatus()
   }
 })
+
+// Panel 布局管理
+const panels = ref([]) // [{ id, agentId: null }]
+const activePanelId = ref(null)
+const MAX_PANELS = 6
+
+// 创建新 Panel
+function createPanel() {
+  if (panels.value.length >= MAX_PANELS) {
+    showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+    return
+  }
+  const panel = {
+    id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    agentId: null
+  }
+  panels.value.push(panel)
+  activePanelId.value = panel.id
+  console.log('[PANEL] Created panel:', panel.id, 'total:', panels.value.length)
+}
+
+// 关闭 Panel
+function closePanel(panelId) {
+  const index = panels.value.findIndex(p => p.id === panelId)
+  if (index === -1) return
+  const panel = panels.value[index]
+  // 如果 Panel 中有 Agent，关闭 Agent 会话
+  if (panel.agentId) {
+    closeAgentInPanel(panelId)
+  }
+  panels.value.splice(index, 1)
+  // 如果关闭的是当前激活的 Panel，激活相邻 Panel
+  if (activePanelId.value === panelId) {
+    if (panels.value.length > 0) {
+      const newIndex = Math.min(index, panels.value.length - 1)
+      activePanelId.value = panels.value[newIndex].id
+    } else {
+      activePanelId.value = null
+    }
+  }
+  console.log('[PANEL] Closed panel:', panelId, 'remaining:', panels.value.length)
+}
+
+// 关闭 Panel 中的 Agent（保留 Panel）
+function closeAgentInPanel(panelId) {
+  const panel = panels.value.find(p => p.id === panelId)
+  if (!panel || !panel.agentId) return
+  const agentId = panel.agentId
+  panel.agentId = null
+  // 如果关闭的是当前 Agent，清空当前 Agent ID
+  if (currentAgentId.value === agentId) {
+    currentAgentId.value = null
+  }
+  console.log('[PANEL] Closed agent in panel:', panelId, 'agent:', agentId)
+}
+
+// 激活 Panel
+function activatePanel(panelId) {
+  activePanelId.value = panelId
+  const panel = panels.value.find(p => p.id === panelId)
+  if (panel && panel.agentId) {
+    // 如果 Panel 中有 Agent，切换当前 Agent
+    const agent = agentList.value.find(a => a.agent_id === panel.agentId)
+    if (agent) {
+      switchAgent(agent)
+    }
+  }
+  console.log('[PANEL] Activated panel:', panelId)
+}
+
+// 在 Panel 中打开 Agent（替代 switchAgent）
+function openAgentInPanel(agent, panelId = null) {
+  // 移动端不支持多 Panel，直接切换
+  if (windowWidth.value <= 768) {
+    switchAgent(agent)
+    return
+  }
+  // 如果没有指定 Panel，使用当前激活的 Panel
+  let targetPanel = null
+  if (panelId) {
+    targetPanel = panels.value.find(p => p.id === panelId)
+  } else {
+    targetPanel = panels.value.find(p => p.id === activePanelId.value)
+  }
+  // 如果当前激活的 Panel 已有 Agent，创建新 Panel
+  if (!targetPanel || targetPanel.agentId) {
+    if (panels.value.length >= MAX_PANELS) {
+      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+      return
+    }
+    targetPanel = {
+      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      agentId: null
+    }
+    panels.value.push(targetPanel)
+  }
+  targetPanel.agentId = agent.agent_id
+  activePanelId.value = targetPanel.id
+  // 切换当前 Agent
+  switchAgent(agent)
+  console.log('[PANEL] Opened agent in panel:', targetPanel.id, 'agent:', agent.agent_id)
+}
+
+// 获取 Panel 中的 Agent
+function getPanelAgent(panel) {
+  if (!panel || !panel.agentId) return null
+  return agentList.value.find(a => a.agent_id === panel.agentId) || null
+}
+
+// 获取 Panel 的消息列表
+function getPanelMessages(panel) {
+  if (!panel || !panel.agentId) return []
+  return allOutputs.value.get(panel.agentId) || []
+}
+
+// 获取 Panel 的输入文本
+function getPanelInputText(panel) {
+  if (!panel || !panel.agentId) return ''
+  return panelInputTexts.value.get(panel.agentId) || ''
+}
+
+// 获取 Panel 的输入模式
+function getPanelInputMode(panel) {
+  if (!panel || !panel.agentId) return 'multi'
+  return panelInputModes.value.get(panel.agentId) || 'multi'
+}
+
+// 获取 Panel 的输入提示
+function getPanelInputTip(panel) {
+  if (!panel || !panel.agentId) return ''
+  return panelInputTips.value.get(panel.agentId) || ''
+}
+
+// 获取 Panel 的输入请求
+function getPanelInputRequest(panel) {
+  if (!panel || !panel.agentId) return null
+  return inputRequests.value.get(panel.agentId) || null
+}
+
+// 获取 Panel 的 Agent 状态
+function getPanelAgentStatus(panel) {
+  if (!panel || !panel.agentId) return null
+  return agentStatuses.value.get(panel.agentId) || null
+}
+
+// 获取 Panel 的终端列表
+function getPanelTerminals(panel) {
+  if (!panel || !panel.agentId) return []
+  return terminals.value.filter(t => t.agentId === panel.agentId)
+}
+
+// 获取 Panel 的终端宿主
+function getPanelTerminalHosts(panel) {
+  if (!panel || !panel.agentId) return new Map()
+  const hosts = new Map()
+  for (const [sessionKey, hostEl] of terminalHosts.value.entries()) {
+    const [agentId] = sessionKey.split(':')
+    if (agentId === panel.agentId) {
+      hosts.set(sessionKey, hostEl)
+    }
+  }
+  return hosts
+}
+
+// 获取 Panel 的输入禁用状态
+function getPanelInputDisabled(panel) {
+  if (!panel || !panel.agentId) return true
+  const agent = getPanelAgent(panel)
+  if (!agent || agent.status !== 'running') return true
+  return false
+}
+
+// 获取 Panel 的等待多行禁用状态
+function getPanelWaitingMultiDisabled(panel) {
+  if (!panel || !panel.agentId) return true
+  const statusData = agentStatuses.value.get(panel.agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  // 等待多行输入时不禁用（允许输入），其他状态禁用
+  return executionStatus !== 'waiting_multi'
+}
+
+// 获取 Panel 的流式消息
+function getPanelStreamingMessages(panel) {
+  if (!panel || !panel.agentId) return new Map()
+  const msgs = new Map()
+  for (const [agentId, msg] of streamingMessages.value.entries()) {
+    if (agentId === panel.agentId) {
+      msgs.set(agentId, msg)
+    }
+  }
+  return msgs
+}
+
+// 获取 Panel 的历史加载状态
+function getPanelHistoryState(panel) {
+  if (!panel || !panel.agentId) return { isLoading: false, hasMore: false }
+  return {
+    isLoading: isLoadingHistory.value,
+    hasMore: hasMoreHistory.value
+  }
+}
+
+// 获取 Panel 的布局样式
+function getPanelLayout() {
+  const count = panels.value.length
+  if (count === 0) return {}
+  if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }
+  if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' }
+  if (count === 3) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }
+  if (count === 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }
+  if (count === 5) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' }
+  return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' }
+}
+
+// Panel 网格布局样式（计算属性）
+const panelGridStyle = computed(() => {
+  return getPanelLayout()
+})
+
+// 获取 Panel 的缓冲输入状态
+function getPanelHasBufferedInput(panel) {
+  if (!panel || !panel.agentId) return false
+  return inputBuffers.value.has(panel.agentId)
+}
+
+// 从 Panel 发送消息
+function sendFromPanel(panel) {
+  if (!panel || !panel.agentId) return
+  const agentId = panel.agentId
+  const agent = getPanelAgent(panel)
+  if (!agent || agent.status !== 'running') return
+
+  // 单行输入模式：允许发送空字符串
+  // 多行输入模式：不允许发送空字符串
+  const panelInput = panelInputTexts.value.get(agentId) || ''
+  let userInput
+  if (inputMode.value === 'single') {
+    userInput = panelInput
+  } else {
+    userInput = panelInput.trim()
+    if (!userInput) return
+  }
+
+  // 获取当前运行状态
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+
+  // 判断是发送到缓冲区还是直接发送
+  if (inputMode.value === 'single' || executionStatus === 'waiting_multi') {
+    // 后端正在等待输入，直接发送
+    const message = {
+      type: 'input_result',
+      payload: {
+        text: userInput,
+        agent_id: agentId,
+        display_name: chatName.value || username.value || '',
+        input_mode: inputMode.value,
+      },
+    }
+    sendMessageToAgent(message, agentId)
+    // 从Map中删除该Agent的输入请求
+    inputRequests.value.delete(agentId)
+  } else {
+    // 后端没有等待输入，保存到缓冲区
+    const existingText = inputBuffers.value.get(agentId) || ''
+    const nextValue = existingText ? `${existingText}\n${userInput}` : userInput
+    inputBuffers.value.set(agentId, nextValue)
+    appendOutput({
+      output_type: 'system',
+      agent_name: 'system',
+      text: '✓ 输入已追加到缓冲区，等待后端请求',
+      lang: 'text',
+    }, agentId)
+  }
+
+  // 保存到历史记录
+  saveToHistory(userInput)
+  panelInputTexts.value.set(agentId, '')
+  inputText.value = ''
+}
+
+// 从 Panel 完成输入
+function completeFromPanel(panel) {
+  if (!panel || !panel.agentId) return
+  const agentId = panel.agentId
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+
+  showConfirm(
+    '确定要发送完成信号吗？',
+    () => {
+      if (executionStatus === 'waiting_multi') {
+        // 后端正在等待多行输入，直接发送 Ctrl+C 信号
+        const message = {
+          type: 'input_result',
+          payload: {
+            text: '__CTRL_C_PRESSED__',
+            agent_id: agentId,
+            display_name: chatName.value || username.value || '',
+            input_mode: 'single',
+          },
+        }
+        sendMessageToAgent(message, agentId)
+      } else {
+        // 后端没有等待输入，将完成信号保存到缓冲区
+        inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
+        appendOutput({
+          output_type: 'system',
+          agent_name: 'system',
+          text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
+          lang: 'text',
+        }, agentId)
+      }
+    },
+    null,
+    true
+  )
+}
+
+// 从 Panel 打开补全
+async function openCompletionsFromPanel(panel) {
+  if (!panel || !panel.agentId) return
+  const agent = getPanelAgent(panel)
+  if (!agent) {
+    alert('请先选择一个 Agent')
+    return
+  }
+
+  completionSearch.value = ''
+  selectedIndex.value = -1
+  showCompletions.value = true
+
+  // 获取补全列表
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `completions/${agent.agent_id}`))
+
+    const result = await response.json()
+    console.log('[COMPLETIONS] API response:', result)
+
+    if (!response.ok) {
+      alert(`获取补全列表失败: ${result.error?.message || result.detail || '未知错误'}`)
+      return
+    }
+
+    if (result.success && result.data) {
+      completions.value = sortCompletionItems(result.data)
+      console.log('[COMPLETIONS] Loaded', result.data.length, 'completions')
+    } else {
+      console.error('[COMPLETIONS] Invalid format:', result)
+      alert('获取补全列表失败：返回数据格式错误')
+    }
+  } catch (error) {
+    console.error('[COMPLETIONS] Fetch failed:', error)
+    alert(`获取补全列表失败: ${error.message}`)
+  }
+
+  // PC端聚焦搜索框，移动端不聚焦
+  if (windowWidth.value > 768) {
+    nextTick(() => {
+      completionSearchInput.value?.focus()
+    })
+  }
+}
+
+// 处理 Panel 输入变化
+function handlePanelInputChange(panel, event) {
+  if (!panel || !panel.agentId) return
+  const target = event.target
+  // 更新该 Panel 的输入文本
+  panelInputTexts.value.set(panel.agentId, target.value)
+  // 同步全局输入文本（保持兼容）
+  inputText.value = target.value
+  const cursorPosition = target.selectionStart
+  const textBeforeCursor = target.value.substring(0, cursorPosition)
+
+  // 检测是否刚刚输入了@符号（包括中文输入法）
+  if (textBeforeCursor.endsWith('@')) {
+    const lastChar = textBeforeCursor.slice(-1)
+    if (lastChar === '@') {
+      completionCursorPos.value = cursorPosition - 1
+      openCompletionsFromPanel(panel)
+    }
+  }
+}
+
+// 处理 Panel 键盘事件
+function handlePanelKeydown(panel, event) {
+  if (!panel || !panel.agentId) return
+  const agentId = panel.agentId
+
+  // @ 键：打开补全列表
+  if (event.key === '@') {
+    event.preventDefault()
+    completionCursorPos.value = event.target.selectionStart
+    openCompletionsFromPanel(panel)
+    return
+  }
+
+  // Ctrl+Enter / Ctrl+D 提交输入
+  if (event.ctrlKey && (event.key === 'Enter' || event.key.toLowerCase() === 'd')) {
+    event.preventDefault()
+    sendFromPanel(panel)
+    return
+  }
+
+  // Alt+T 触发终端命令执行
+  if (event.altKey && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
+    event.preventDefault()
+    event.stopPropagation()
+    panelInputTexts.value.set(agentId, '__ALT_T_PRESSED__')
+    sendFromPanel(panel)
+    return
+  }
+
+  // Ctrl+C 在等待多行输入且输入框为空时，触发完成功能
+  // Ctrl+C 在非输入模式下且输入框为空时，发送人工介入消息
+  if (event.ctrlKey && event.key === 'c') {
+    const userInput = (panelInputTexts.value.get(agentId) || '').trim()
+    const statusData = agentStatuses.value.get(agentId)
+    const executionStatus = statusData?.execution_status || 'running'
+
+    // 场景1：在等待多行输入且输入框为空时，触发完成功能
+    if (executionStatus === 'waiting_multi' && !userInput) {
+      event.preventDefault()
+      completeFromPanel(panel)
+      return
+    }
+
+    // 场景2：在非输入模式下（running）且输入框为空时，发送人工介入消息
+    if (executionStatus === 'running' && !userInput) {
+      event.preventDefault()
+      const message = {
+        type: 'manual_interrupt',
+        payload: {},
+      }
+      sendMessageToAgent(message, agentId)
+      return
+    }
+  }
+
+  // 向上箭头：检查是否在第一行，是才触发历史
+  if (event.key === 'ArrowUp') {
+    const textarea = event.target
+    if (isCursorAtFirstLine(textarea)) {
+      event.preventDefault()
+      navigateHistory('up')
+    }
+    return
+  }
+
+  // 向下箭头：检查是否在最后一行，是才触发历史
+  if (event.key === 'ArrowDown') {
+    const textarea = event.target
+    if (isCursorAtLastLine(textarea)) {
+      event.preventDefault()
+      navigateHistory('down')
+    }
+    return
+  }
+}
+
+// 处理 Panel 粘贴事件
+function handlePanelPaste(panel, event) {
+  if (!panel || !panel.agentId) return
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        uploadImageToNode(file, panel.agentId)
+      }
+      break
+    }
+  }
+}
+
+// 从 Panel 清空缓冲
+function clearBufferFromPanel(panel) {
+  if (!panel || !panel.agentId) return
+  const agentId = panel.agentId
+  inputBuffers.value.delete(agentId)
+  appendOutput({
+    output_type: 'system',
+    agent_name: 'system',
+    text: '🗑 缓冲区已清空',
+    lang: 'text',
+  }, agentId)
+}
+
+// 设置 Panel 的输出列表引用
+function setPanelOutputList(panel, el) {
+  if (!panel || !panel.agentId) return
+  if (panel.agentId === currentAgentId.value) {
+    outputList.value = el
+  }
+}
+
+// 设置 Panel 的终端引用
+function setPanelTerminalRef(panel, executionId, el, agentId) {
+  if (!panel || !panel.agentId) return
+  const targetAgentId = agentId || panel.agentId
+  if (!executionId || !el) return
+  const sessionKey = getExecutionSessionKey(targetAgentId, executionId)
+  terminalHosts.value.set(sessionKey, el)
+}
+
+// 发送消息到指定 Agent
+function sendMessageToAgent(message, agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  if (!targetAgentId) {
+    console.warn('[SEND] No agent ID, cannot send message')
+    return
+  }
+
+  const ws = sockets.value.get(targetAgentId)
+  if (!ws) {
+    console.warn(`[SEND] No WebSocket connection for agent ${targetAgentId}`)
+    return
+  }
+
+  if (ws.readyState !== WebSocket.OPEN) {
+    console.warn(`[SEND] WebSocket for agent ${targetAgentId} is not open, state: ${ws.readyState}`)
+    return
+  }
+
+  console.log(`[SEND] Sending message to agent ${targetAgentId}:`, message)
+  ws.send(JSON.stringify(message))
+}
+
+// 加载指定 Agent 的历史消息
+async function loadHistoryMessages(prepend = false, agentId = null) {
+  const targetAgentId = agentId || currentAgentId.value
+  // 没有激活的 agent 时，不加载历史记录
+  if (!targetAgentId) {
+    console.log('[HISTORY] No active agent, skip loading history')
+    return
+  }
+
+  if (isLoadingHistory.value) {
+    console.log('[HISTORY] Already loading, skip')
+    return
+  }
+
+  if (!hasMoreHistory.value) {
+    console.log('[HISTORY] No more history to load')
+    return
+  }
+
+  isLoadingHistory.value = true
+  console.log('[HISTORY] Loading history (prepend:', prepend, ', offset:', historyOffset.value, ', agent:', targetAgentId, ')')
+
+  try {
+    const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value, targetAgentId)
+
+    if (historyMessages.length === 0) {
+      console.log('[HISTORY] No more history messages')
+      hasMoreHistory.value = false
+      isLoadingHistory.value = false
+      return
+    }
+
+    // 保存当前的滚动位置（用于 prepend 时）
+    let scrollPosition = 0
+    if (prepend && outputList.value) {
+      scrollPosition = outputList.value.scrollHeight - outputList.value.scrollTop
+    }
+
+    // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
+    const streamAccumulator = new Map() // agent_id -> accumulated message
+    const mergedHistoryMessages = []
+    for (const msg of historyMessages) {
+          // 过滤内部控制信号，防止在 UI 中显示
+          if (msg.text === '__CTRL_C_PRESSED__') {
+            continue;
+          }
+      const outputType = msg.output_type
+      if (outputType === 'STREAM_START') {
+        const msgAgentId = msg.agent_id || targetAgentId
+        streamAccumulator.set(msgAgentId, {
+          ...msg,
+          output_type: 'STREAM',
+          text: '',
+          isStreaming: false,
+        })
+        continue
+      } else if (outputType === 'STREAM_CHUNK') {
+        const msgAgentId = msg.agent_id || targetAgentId
+        const acc = streamAccumulator.get(msgAgentId)
+        if (acc) {
+          acc.text += msg.text || ''
+          if (typeof msg.seq === 'number') acc.seq = msg.seq
+        } else {
+          // 孤立的 CHUNK（没有 STREAM_START），保留为独立消息
+          mergedHistoryMessages.push(msg)
+        }
+        continue
+      } else if (outputType === 'STREAM_END') {
+        const msgAgentId = msg.agent_id || targetAgentId
+        const acc = streamAccumulator.get(msgAgentId)
+        if (acc) {
+          if (typeof msg.seq === 'number') acc.seq = msg.seq
+          mergedHistoryMessages.push(acc)
+          streamAccumulator.delete(msgAgentId)
+        }
+        continue
+      }
+      mergedHistoryMessages.push(msg)
+    }
+
+    // 处理未收到 STREAM_END 的残留流式消息（异常情况）
+    for (const acc of streamAccumulator.values()) {
+      mergedHistoryMessages.push(acc)
+    }
+    historyMessages.length = 0
+    historyMessages.push(...mergedHistoryMessages)
+
+    // 处理每条历史消息
+    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages (after stream merge)`)
+    const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
+    if (executionMessages.length > 0) {
+      console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))
+    }
+    // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
+    // 修复execution消息的is_finished标记：终端执行是串行的，同一agent同一时间只有一个execution在运行
+    // 从后往前扫描：最后一条execution信任历史中的is_finished值；前面所有execution强制is_finished=true
+    const executionIndices = []
+    historyMessages.forEach((msg, idx) => {
+      if (msg.output_type === 'execution') executionIndices.push(idx)
+    })
+    const processedMessages = historyMessages.map((msg, idx) => {
+        if (msg.output_type === 'execution') {
+          const isLast = executionIndices.length > 0 && idx === executionIndices[executionIndices.length - 1]
+          if (!isLast && !msg.is_finished) {
+            // 非最后一条execution：强制标记为已完成
+            console.log(`[HISTORY] Fixing non-last execution message: ${msg.execution_id}, setting is_finished=true`)
+            msg.is_finished = true
+            // 如果没有terminal_content，添加占位文本，避免显示空白区域
+            if (!msg.terminal_content) {
+              console.log(`[HISTORY] Non-last execution ${msg.execution_id} has no terminal_content, adding placeholder`)
+              msg.terminal_content = '(终端输出未保存或执行被中断)'
+            }
+          }
+          // 对于最后一条execution：不强制标记为已完成，保留原始状态
+          // 只有在收到后端的tool_stream_end事件时才会标记为已完成
+          // 这样切换回Agent时，如果执行还在进行中，xterm可以正常渲染
+          if (isLast && !msg.is_finished) {
+            console.log(`[HISTORY] Last execution ${msg.execution_id} is still running, keeping is_finished=false for xterm restoration`)
+          }
+        }
+        const html = renderMessageHtml(msg)
+        // 生成稳定ID，避免v-for使用index作为key导致DOM重建
+        const stableId = msg.execution_id
+          ? `exec_${msg.execution_id}`
+          : msg._stableId || `msg_${msg.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        return {
+          ...msg,
+          html,
+          timestamp: msg.timestamp || '',
+          agent_name: msg.agent_name || '',
+          non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false,
+          _stableId: stableId,
+        }
+      })
+    console.log(`🚨 [loadHistoryMessages] After filtering: ${processedMessages.length} messages`)
+
+    // 获取目标 Agent 的消息列表
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    if (prepend) {
+      // 插入到消息列表开头
+      allOutputs.value.set(targetAgentId, [...processedMessages, ...currentOutputs])
+    } else {
+      // 合并历史消息与现有消息，去重（避免重复）
+      // 现有消息（可能来自 WebSocket 推送）优先级更高，历史消息补充缺失的
+      const merged = [...currentOutputs]
+      const existingIds = new Set()
+      for (const msg of currentOutputs) {
+        if (msg.execution_id) existingIds.add('exec_' + msg.execution_id)
+        if (typeof msg.seq === 'number') existingIds.add('seq_' + msg.seq)
+      }
+      for (const msg of processedMessages) {
+        const execKey = msg.execution_id ? 'exec_' + msg.execution_id : null
+        const seqKey = typeof msg.seq === 'number' ? 'seq_' + msg.seq : null
+        if ((execKey && existingIds.has(execKey)) || (seqKey && existingIds.has(seqKey))) continue
+        merged.push(msg)
+        if (execKey) existingIds.add(execKey)
+        if (seqKey) existingIds.add(seqKey)
+      }
+      allOutputs.value.set(targetAgentId, merged)
+    }
+
+    // 更新偏移量
+    historyOffset.value += historyMessages.length
+
+    // 检查是否还有更多历史
+    const totalCount = historyStorage.getTotalCount(targetAgentId)
+    hasMoreHistory.value = historyOffset.value < totalCount
+
+    console.log('[HISTORY] Loaded', historyMessages.length, 'messages, total loaded:', historyOffset.value, '/', totalCount, 'hasMore:', hasMoreHistory.value)
+
+    // 恢复滚动位置
+    if (prepend && outputList.value) {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          const newScrollHeight = outputList.value.scrollHeight
+          outputList.value.scrollTop = newScrollHeight - scrollPosition
+          console.log('[HISTORY] Scroll position restored')
+        })
+      })
+    } else {
+      // 首次加载历史，滚动到底部
+      nextTick(() => {
+        if (outputList.value) {
+          outputList.value.scrollTop = outputList.value.scrollHeight
+          console.log('[HISTORY] Scrolled to bottom on initial load')
+        }
+      })
+    }
+  } catch (error) {
+    console.error('[HISTORY] Failed to load history:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
 
 // Agent 管理
 const agentList = ref([])        // Agent 列表
@@ -3384,8 +4041,8 @@ function handleAgentItemClick(agent, event) {
     // 多选模式下，点击整个 item 只切换选择状态，不切换 agent
     toggleSelectAgent(agent.agent_id)
   } else {
-    // 正常模式下，切换 agent
-    switchAgent(agent)
+    // 正常模式下，在 Panel 中打开 agent
+    openAgentInPanel(agent)
   }
 }
 
@@ -3616,202 +4273,6 @@ const inputModeLabel = computed(() => (inputMode.value === 'multi' ? '多行' : 
 const isLoadingHistory = ref(false)
 const historyOffset = ref(0)
 const hasMoreHistory = ref(true)
-
-/**
- * 加载历史消息
- * @param {boolean} prepend - 是否插入到消息列表开头
- */
-async function loadHistoryMessages(prepend = false) {
-  // 没有激活的 agent 时，不加载历史记录
-  if (!currentAgentId.value) {
-    console.log('[HISTORY] No active agent, skip loading history')
-    return
-  }
-  
-  if (isLoadingHistory.value) {
-    console.log('[HISTORY] Already loading, skip')
-    return
-  }
-  
-  if (!hasMoreHistory.value) {
-    console.log('[HISTORY] No more history to load')
-    return
-  }
-  
-  isLoadingHistory.value = true
-  console.log('[HISTORY] Loading history (prepend:', prepend, ', offset:', historyOffset.value, ')')
-  
-  try {
-    const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value, currentAgentId.value)
-    
-    if (historyMessages.length === 0) {
-      console.log('[HISTORY] No more history messages')
-      hasMoreHistory.value = false
-      isLoadingHistory.value = false
-      return
-    }
-    
-    // 保存当前的滚动位置（用于 prepend 时）
-    let scrollPosition = 0
-    if (prepend && outputList.value) {
-      scrollPosition = outputList.value.scrollHeight - outputList.value.scrollTop
-    }
-    
-    // stream 消息合并：将 STREAM_START/STREAM_CHUNK/STREAM_END 合并为一条消息
-    const streamAccumulator = new Map() // agent_id -> accumulated message
-    const mergedHistoryMessages = []
-    for (const msg of historyMessages) {
-          // 过滤内部控制信号，防止在 UI 中显示
-          if (msg.text === '__CTRL_C_PRESSED__') {
-            continue;
-          }
-      const outputType = msg.output_type
-      if (outputType === 'STREAM_START') {
-        const msgAgentId = msg.agent_id || currentAgentId.value
-        streamAccumulator.set(msgAgentId, {
-          ...msg,
-          output_type: 'STREAM',
-          text: '',
-          isStreaming: false,
-        })
-        continue
-      } else if (outputType === 'STREAM_CHUNK') {
-        const msgAgentId = msg.agent_id || currentAgentId.value
-        const acc = streamAccumulator.get(msgAgentId)
-        if (acc) {
-          acc.text += msg.text || ''
-          if (typeof msg.seq === 'number') acc.seq = msg.seq
-        } else {
-          // 孤立的 CHUNK（没有 STREAM_START），保留为独立消息
-          mergedHistoryMessages.push(msg)
-        }
-        continue
-      } else if (outputType === 'STREAM_END') {
-        const msgAgentId = msg.agent_id || currentAgentId.value
-        const acc = streamAccumulator.get(msgAgentId)
-        if (acc) {
-          if (typeof msg.seq === 'number') acc.seq = msg.seq
-          mergedHistoryMessages.push(acc)
-          streamAccumulator.delete(msgAgentId)
-        }
-        continue
-      }
-      mergedHistoryMessages.push(msg)
-    }
-    // 处理未收到 STREAM_END 的残留流式消息（异常情况）
-    for (const acc of streamAccumulator.values()) {
-      mergedHistoryMessages.push(acc)
-    }
-    historyMessages.length = 0
-    historyMessages.push(...mergedHistoryMessages)
-
-    // 处理每条历史消息
-    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages (after stream merge)`)
-    const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
-    if (executionMessages.length > 0) {
-      console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))
-    }
-    // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
-    // 修复execution消息的is_finished标记：终端执行是串行的，同一agent同一时间只有一个execution在运行
-    // 从后往前扫描：最后一条execution信任历史中的is_finished值；前面所有execution强制is_finished=true
-    const executionIndices = []
-    historyMessages.forEach((msg, idx) => {
-      if (msg.output_type === 'execution') executionIndices.push(idx)
-    })
-    const processedMessages = historyMessages.map((msg, idx) => {
-        if (msg.output_type === 'execution') {
-          const isLast = executionIndices.length > 0 && idx === executionIndices[executionIndices.length - 1]
-          if (!isLast && !msg.is_finished) {
-            // 非最后一条execution：强制标记为已完成
-            console.log(`[HISTORY] Fixing non-last execution message: ${msg.execution_id}, setting is_finished=true`)
-            msg.is_finished = true
-            // 如果没有terminal_content，添加占位文本，避免显示空白区域
-            if (!msg.terminal_content) {
-              console.log(`[HISTORY] Non-last execution ${msg.execution_id} has no terminal_content, adding placeholder`)
-              msg.terminal_content = '(终端输出未保存或执行被中断)'
-            }
-          }
-          // 对于最后一条execution：不强制标记为已完成，保留原始状态
-          // 只有在收到后端的tool_stream_end事件时才会标记为已完成
-          // 这样切换回Agent时，如果执行还在进行中，xterm可以正常渲染
-          if (isLast && !msg.is_finished) {
-            console.log(`[HISTORY] Last execution ${msg.execution_id} is still running, keeping is_finished=false for xterm restoration`)
-          }
-        }
-        const html = renderMessageHtml(msg)
-        // 生成稳定ID，避免v-for使用index作为key导致DOM重建
-        const stableId = msg.execution_id
-          ? `exec_${msg.execution_id}`
-          : msg._stableId || `msg_${msg.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        return {
-          ...msg,
-          html,
-          timestamp: msg.timestamp || '',
-          agent_name: msg.agent_name || '',
-          non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false,
-          _stableId: stableId,
-        }
-      })
-    console.log(`🚨 [loadHistoryMessages] After filtering: ${processedMessages.length} messages`)
-    
-    // 获取当前 Agent 的消息列表
-    const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
-    if (prepend) {
-      // 插入到消息列表开头
-      allOutputs.value.set(currentAgentId.value, [...processedMessages, ...currentOutputs])
-    } else {
-      // 合并历史消息与现有消息，去重（避免重复）
-      // 现有消息（可能来自 WebSocket 推送）优先级更高，历史消息补充缺失的
-      const merged = [...currentOutputs]
-      const existingIds = new Set()
-      for (const msg of currentOutputs) {
-        if (msg.execution_id) existingIds.add('exec_' + msg.execution_id)
-        if (typeof msg.seq === 'number') existingIds.add('seq_' + msg.seq)
-      }
-      for (const msg of processedMessages) {
-        const execKey = msg.execution_id ? 'exec_' + msg.execution_id : null
-        const seqKey = typeof msg.seq === 'number' ? 'seq_' + msg.seq : null
-        if ((execKey && existingIds.has(execKey)) || (seqKey && existingIds.has(seqKey))) continue
-        merged.push(msg)
-        if (execKey) existingIds.add(execKey)
-        if (seqKey) existingIds.add(seqKey)
-      }
-      allOutputs.value.set(currentAgentId.value, merged)
-    }
-    
-    // 更新偏移量
-    historyOffset.value += historyMessages.length
-    
-    // 检查是否还有更多历史
-    const totalCount = historyStorage.getTotalCount(currentAgentId.value)
-    hasMoreHistory.value = historyOffset.value < totalCount
-    
-    console.log('[HISTORY] Loaded', historyMessages.length, 'messages, total loaded:', historyOffset.value, '/', totalCount, 'hasMore:', hasMoreHistory.value)
-    
-    // 恢复滚动位置
-    if (prepend && outputList.value) {
-      nextTick(() => {
-        requestAnimationFrame(() => {
-          const newScrollHeight = outputList.value.scrollHeight
-          outputList.value.scrollTop = newScrollHeight - scrollPosition
-          console.log('[HISTORY] Scroll position restored')
-        })
-      })
-    } else {
-      // 首次加载历史，滚动到底部
-      nextTick(() => {
-        if (outputList.value) {
-          outputList.value.scrollTop = outputList.value.scrollHeight
-          console.log('[HISTORY] Scrolled to bottom on initial load')
-        }
-      })
-    }
-  } catch (error) {
-    console.error('[HISTORY] Failed to load history:', error)
-  } finally {
-    isLoadingHistory.value = false
-  }
-}
 
 // 保存免登录设置
 function saveAutoLoginSetting() {
@@ -4433,29 +4894,6 @@ function disconnectAll() {
 
 // ========== Agent 管理方法 ==========
 
-// 发送消息到当前 Agent 的 WebSocket 连接
-function sendMessageToAgent(message) {
-  const agentId = currentAgentId.value
-  if (!agentId) {
-    console.warn('[SEND] No current agent ID, cannot send message')
-    return
-  }
-  
-  const ws = sockets.value.get(agentId)
-  if (!ws) {
-    console.warn(`[SEND] No WebSocket connection for agent ${agentId}`)
-    return
-  }
-  
-  if (ws.readyState !== WebSocket.OPEN) {
-    console.warn(`[SEND] WebSocket for agent ${agentId} is not open, state: ${ws.readyState}`)
-    return
-  }
-  
-  console.log(`[SEND] Sending message to agent ${agentId}:`, message)
-  ws.send(JSON.stringify(message))
-}
-
 // 连接到指定的 Agent（建立独立的 WebSocket 连接）
 async function connectToAgent(agent, retryCount = 0) {
   const agentId = agent.agent_id
@@ -4802,9 +5240,11 @@ async function fetchAgentStatus(agent) {
       console.log(`[AGENT STATUS] Restoring UI for agent ${agent.agent_id}, execution_status:`, executionStatus)
       if (executionStatus === 'waiting_single') {
         inputMode.value = 'single'
+        panelInputModes.value.set(agent.agent_id, 'single')
         console.log('[AGENT STATUS] Set inputMode to single')
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
+        panelInputModes.value.set(agent.agent_id, 'multi')
         console.log('[AGENT STATUS] Set inputMode to multi')
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
@@ -4828,8 +5268,10 @@ async function fetchAgentStatus(agent) {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
         }
         inputMode.value = 'multi'
+        panelInputModes.value.set(agent.agent_id, 'multi')
       } else {
         inputMode.value = 'multi'
+        panelInputModes.value.set(agent.agent_id, 'multi')
       }
     } else {
       console.log(`[AGENT STATUS] Agent ${agent.agent_id} is not current agent (${currentAgentId.value}), skipping UI restoration`)
@@ -5297,8 +5739,8 @@ async function createAgent() {
       newAgentAccessAclInteract.value = []
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = generateAgentName(newAgentType.value)
-      // 立即切换到新创建的 agent
-      await switchAgent(agent)
+      // 立即在 Panel 中打开新创建的 agent
+      await openAgentInPanel(agent)
       // 刷新列表
       await fetchAgentList()
       // 开始定时刷新列表
@@ -6385,6 +6827,12 @@ async function switchAgent(agent) {
   inputText.value = ''
   inputTip.value = ''
   inputMode.value = 'multi'
+  // 同步清空 Panel 隔离状态
+  if (oldAgentId) {
+    panelInputTexts.value.delete(oldAgentId)
+    panelInputTips.value.delete(oldAgentId)
+    panelInputModes.value.delete(oldAgentId)
+  }
   
   // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
@@ -6621,6 +7069,12 @@ function handleMessage(message, agentId = null) {
       inputTip.value = inputRequest.tip || ''
       inputMode.value = inputRequest.mode || 'multi'
       inputText.value = inputText.value || inputRequest.preset || ''
+      // 同步到 Panel 隔离状态
+      panelInputTips.value.set(currentAgentIdLocal, inputRequest.tip || '')
+      panelInputModes.value.set(currentAgentIdLocal, inputRequest.mode || 'multi')
+      if (inputRequest.preset) {
+        panelInputTexts.value.set(currentAgentIdLocal, inputRequest.preset)
+      }
       pendingInputAgentId.value = currentAgentIdLocal
       nextTick(() => {
         const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
@@ -6848,6 +7302,12 @@ function handleMessage(message, agentId = null) {
       inputTip.value = payload.tip || ''
       inputMode.value = payload.mode || 'multi'
       inputText.value = payload.preset || inputText.value
+      // 同步到 Panel 隔离状态
+      panelInputTips.value.set(targetAgentId, payload.tip || '')
+      panelInputModes.value.set(targetAgentId, payload.mode || 'multi')
+      if (payload.preset) {
+        panelInputTexts.value.set(targetAgentId, payload.preset)
+      }
       pendingInputAgentId.value = targetAgentId
 
       // 如果编辑器面板和终端面板都没有打开，输入框主动抢占焦点
@@ -7853,25 +8313,28 @@ function handlePaste(event) {
 }
 
 // 上传图片到节点
-async function uploadImageToNode(file) {
+async function uploadImageToNode(file, agentId = null) {
   // 限制文件大小 20MB
   if (file.size > 20 * 1024 * 1024) {
     alert('图片大小不能超过 20MB')
     return
   }
 
+  const targetAgentId = agentId || currentAgentId.value
+  const targetAgent = agentList.value.find(a => a.agent_id === targetAgentId)
+  const targetNodeId = String(targetAgent?.node_id || '').trim() || 'master'
+
   const reader = new FileReader()
   reader.onload = async (e) => {
     const base64Data = e.target.result
     const { host, port } = getGatewayAddress()
-    const nodeId = getCurrentAgentNodeId() || 'master'
-    const url = buildNodeHttpUrl(host, port, nodeId, 'upload')
+    const url = buildNodeHttpUrl(host, port, targetNodeId, 'upload')
 
     try {
       const response = await fetchWithAuth(url, {
         method: 'POST',
         body: JSON.stringify({
-          agent_id: currentAgentId.value,
+          agent_id: targetAgentId,
           file_name: file.name,
           file_data: base64Data
         })
@@ -7879,7 +8342,7 @@ async function uploadImageToNode(file) {
 
       const result = await response.json()
       if (result.success && result.data?.file_path) {
-        insertTextAtCursor(`${result.data.file_path} `)
+        insertTextAtCursor(`${result.data.file_path} `, targetAgentId)
       } else {
         alert('上传失败: ' + (result.error || '未知错误'))
       }
@@ -7892,17 +8355,26 @@ async function uploadImageToNode(file) {
 }
 
 // 在光标位置插入文本
-function insertTextAtCursor(text) {
+// 在光标位置插入文本
+function insertTextAtCursor(text, agentId = null) {
   const textarea = document.querySelector('textarea')
   if (!textarea) return
 
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
-  const before = inputText.value.substring(0, start)
-  const after = inputText.value.substring(end)
-  
-  inputText.value = before + text + after
-  
+  const targetAgentId = agentId || currentAgentId.value
+  const currentText = targetAgentId
+    ? (panelInputTexts.value.get(targetAgentId) || '')
+    : inputText.value
+  const before = currentText.substring(0, start)
+  const after = currentText.substring(end)
+  const newText = before + text + after
+
+  if (targetAgentId) {
+    panelInputTexts.value.set(targetAgentId, newText)
+  }
+  inputText.value = newText
+
   // 更新光标位置
   textarea.selectionStart = textarea.selectionEnd = start + text.length
   textarea.focus()
@@ -11930,6 +12402,19 @@ body::-webkit-scrollbar {
   transform: translateY(-1px);
 }
 
+/* Panel 网格布局 */
+.panel-grid {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* 聊天容器 */
 .chat-container {
   flex: 1;
@@ -13926,6 +14411,19 @@ body::-webkit-scrollbar {
   
   /* ========== Diff 优化 ========== */
   /* 已移到全局样式中，因v-html插入的内容无法使用scoped样式 */
+
+  /* ========== Panel 移动端强制单 Panel ========== */
+  .panel-grid {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .session-panel {
+    border-radius: 0 !important;
+    border: none !important;
+  }
 }
 
 /* ========== Toggle Switch 样式 ========== */
