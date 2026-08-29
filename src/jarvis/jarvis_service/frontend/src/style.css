@@ -852,9 +852,75 @@ button:disabled {
   box-shadow: 0 2px 12px rgba(32, 200, 255, 0.08) !important;
 }
 
-/* 普通日志 - 无发光 */
+/* 流式输出 - 炫酷特效 */
 .message.message-stream {
   border-left: none !important;
+  position: relative !important;
+  animation: stream-breathe 2s ease-in-out infinite !important;
+}
+
+/* 打字机光标 */
+.message.message-stream::after {
+  content: "▍";
+  color: #20c8ff;
+  margin-left: 2px;
+  animation: stream-cursor-blink 0.8s step-end infinite;
+  text-shadow: 0 0 8px rgba(32, 200, 255, 0.8);
+}
+
+/* 呼吸发光动画 */
+@keyframes stream-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 4px rgba(32, 200, 255, 0.1),
+      inset 0 0 4px rgba(32, 200, 255, 0.03);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(32, 200, 255, 0.25),
+      inset 0 0 8px rgba(32, 200, 255, 0.08);
+  }
+}
+
+/* 光标闪烁动画 */
+@keyframes stream-cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 扫描线背景效果 */
+.message.message-stream::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(32, 200, 255, 0.02) 2px,
+    rgba(32, 200, 255, 0.02) 4px
+  );
+  animation: stream-scan 3s linear infinite;
+}
+
+/* 扫描线移动动画 */
+@keyframes stream-scan {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 20px;
+  }
 }
 
 /* 信息日志 - 灰色发光竖线 */
