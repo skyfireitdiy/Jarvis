@@ -61,13 +61,13 @@
 
       <!-- 输入区 -->
       <div class="input-area" :class="{ 'collapsed': inputCollapsed }">
-        <div class="input-toggle-bar">
+        <div class="input-toggle-bar" @click="inputCollapsed = !inputCollapsed" :title="inputCollapsed ? '展开输入框' : '折叠输入框'">
           <!-- Agent 运行中进度指示器（不随输入框折叠） -->
           <div class="agent-thinking-indicator" v-if="agent?.status === 'running' && (agentStatus?.execution_status ?? 'running') === 'running'">
             <div class="thinking-spinner"></div>
             <span class="thinking-text">Agent 正在执行...</span>
           </div>
-          <button class="input-toggle-btn" @click="inputCollapsed = !inputCollapsed" :title="inputCollapsed ? '展开输入框' : '折叠输入框'">
+          <button class="input-toggle-btn">
             {{ inputCollapsed ? '▲' : '▼' }}
           </button>
         </div>
@@ -590,8 +590,15 @@ function getTerminalStyle(terminalContent) {
   font-size: 14px;
   font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
   box-sizing: border-box;
+}
+
+.input-wrapper textarea {
   resize: vertical;
   min-height: 96px;
+}
+
+.input-wrapper input[type="text"] {
+  min-height: 36px;
 }
 
 .input-wrapper textarea:focus,
