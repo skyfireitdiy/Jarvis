@@ -2,7 +2,7 @@
   <aside
     v-show="visible"
     class="terminal-panel"
-    :class="{ 'terminal-panel-dragging': interaction.active }"
+    :class="{ 'terminal-panel-dragging': interaction.active, 'terminal-panel-active': active }"
     :style="panelStyle"
     @mousedown="$emit('focus', 'terminal')"
   >
@@ -74,6 +74,7 @@ import { defineProps, defineEmits } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
+  active: Boolean,
   interaction: Object,
   panelStyle: Object,
   nodeOptions: Array,
@@ -135,11 +136,17 @@ const emit = defineEmits([
 .terminal-panel {
   position: fixed;
   background: var(--color-bg-primary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.terminal-panel-active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(32, 200, 255, 0.15);
 }
 
 .terminal-panel-dragging {
