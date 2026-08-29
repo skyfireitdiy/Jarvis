@@ -367,19 +367,19 @@ function getTerminalStyle(terminalContent) {
 }
 
 .message {
-  background: var(--color-bg-tile);
+  background: var(--color-bg-tertiary);
   border-radius: var(--tile-radius);
   padding: 6px 10px;
   border: none;
 }
 
 .message-user_input {
-  background: rgba(32, 200, 255, 0.25);
+  background: rgba(32, 200, 255, 0.35);
   border-left: 3px solid var(--color-accent);
 }
 
 .message-STREAM {
-  background: var(--color-bg-tile);
+  background: var(--color-bg-tertiary);
   border-left: 3px solid var(--color-border-subtle);
 }
 
