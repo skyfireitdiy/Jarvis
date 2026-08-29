@@ -374,13 +374,15 @@ function getTerminalStyle(terminalContent) {
 }
 
 .message-user_input {
-  background: rgba(32, 200, 255, 0.08);
+  background: rgba(32, 200, 255, 0.15);
   border-left: 3px solid var(--color-accent);
+  margin-left: 20%;
 }
 
 .message-STREAM {
   background: var(--color-bg-tile);
   border-left: 3px solid var(--color-border-subtle);
+  margin-right: 20%;
 }
 
 .message-content {
