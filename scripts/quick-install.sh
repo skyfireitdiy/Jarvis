@@ -16,6 +16,7 @@ DEFAULT_BRANCH="main"
 
 # 镜像配置（国内用户加速）
 export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
+export UV_DEFAULT_INDEX="https://pypi.org/simple/"
 export UV_INDEX_URL="https://pypi.org/simple/"
 # 限制并行下载数，避免触发远端源限流（403）
 export UV_CONCURRENT_DOWNLOADS=10
@@ -226,7 +227,7 @@ install_jarvis() {
 	cd "$DEST_DIR"
 
 	echo_info "正在安装 Jarvis (Python 3.12)..."
-	uv tool install -e . --python 3.12 || {
+	uv tool install -e . --python 3.12 --default-index https://pypi.org/simple/ || {
 		echo_error "Jarvis 安装失败"
 		exit 1
 	}
