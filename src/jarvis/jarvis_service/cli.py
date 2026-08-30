@@ -656,6 +656,14 @@ class SystemdBackend(ServiceBackend):
 
             # 构建服务文件内容
             current_path = os.environ.get("PATH", "")
+            # 确保 PATH 包含 uv tool 安装目录（~/.local/bin）和 jarvis-service 所在目录
+            extra_paths = [
+                os.path.expanduser("~/.local/bin"),
+                os.path.dirname(service_executable),
+            ]
+            for p in extra_paths:
+                if p and p not in current_path.split(":"):
+                    current_path = f"{p}:{current_path}" if current_path else p
             proxy_env_vars = []
             for var_name in [
                 "http_proxy",
