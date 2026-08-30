@@ -148,6 +148,7 @@ install_optional_tools() {
 		if command -v apt-get &>/dev/null; then
 			sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep fd-find fzf tmux tree 2>/dev/null || true
 		elif command -v pacman &>/dev/null; then
+			sudo pacman -Sy --noconfirm 2>/dev/null || true
 			sudo pacman -S --noconfirm --needed ripgrep fd fzf tmux tree 2>/dev/null || true
 		elif command -v brew &>/dev/null; then
 			brew install ripgrep fd fzf tmux tree 2>/dev/null || true
