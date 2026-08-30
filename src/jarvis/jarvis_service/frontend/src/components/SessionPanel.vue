@@ -54,8 +54,8 @@
       <div v-if="confirmData" class="panel-confirm-bar">
         <div class="panel-confirm-message">{{ confirmData.message }}</div>
         <div class="panel-confirm-actions">
-          <button class="panel-confirm-btn panel-confirm-yes" @click="$emit('confirm')">确认</button>
-          <button class="panel-confirm-btn panel-confirm-no" @click="$emit('cancel-confirm')">取消</button>
+          <button class="panel-confirm-btn panel-confirm-yes" :class="{ 'default': confirmData.defaultConfirm !== false }" @click="$emit('confirm')">确认</button>
+          <button class="panel-confirm-btn panel-confirm-no" :class="{ 'default': confirmData.defaultConfirm === false }" @click="$emit('cancel-confirm')">取消</button>
         </div>
       </div>
 

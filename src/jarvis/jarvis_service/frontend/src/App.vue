@@ -3672,7 +3672,7 @@ function handlePanelKeydown(panel, event) {
     return
   }
 
-  // waiting_confirm 状态：y/n 键直接发送确认结果
+  // waiting_confirm 状态：y/n 键直接发送确认结果，Enter 键触发默认操作
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
   if (executionStatus === 'waiting_confirm') {
@@ -3684,6 +3684,17 @@ function handlePanelKeydown(panel, event) {
     if (event.key === 'n' || event.key === 'N') {
       event.preventDefault()
       sendConfirmResult(false, agentId)
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const confirmData = panelConfirmData.value.get(agentId)
+      const defaultConfirm = confirmData?.defaultConfirm !== false
+      if (defaultConfirm) {
+        handlePanelConfirm(panel)
+      } else {
+        handlePanelCancelConfirm(panel)
+      }
       return
     }
   }
