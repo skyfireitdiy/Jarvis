@@ -748,9 +748,16 @@ def _mark_multiline_hint_shown() -> None:
         pass
 
 
-def get_single_line_input(tip: str, default: str = "") -> str:
+def get_single_line_input(
+    tip: str, default: str = "", is_password: bool = False
+) -> str:
     """
     获取支持历史记录的单行输入。
+
+    Args:
+        tip: 提示文本
+        default: 默认值
+        is_password: 是否为密码输入（回显为 *）
     """
     is_non_interactive = _is_non_interactive_for_current_agent()
     if is_non_interactive:
@@ -780,6 +787,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
                     tip=tip,
                     mode="single",
                     preset=default,
+                    is_password=is_password,
                 )
                 result = gateway.request_input(request)
                 return result.text.strip() if result is not None else default.strip()
@@ -799,7 +807,9 @@ def get_single_line_input(tip: str, default: str = "") -> str:
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
-    return str(session.prompt(prompt, default=default, style=style)).strip()
+    return str(
+        session.prompt(prompt, default=default, style=style, is_password=is_password)
+    ).strip()
 
 
 def get_choice(tip: str, choices: List[str]) -> str:

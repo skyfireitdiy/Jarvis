@@ -643,7 +643,7 @@ def llm_add() -> None:
         PrettyOutput.auto_print("❌ API基础URL不能为空")
         raise typer.Exit(code=1)
 
-    api_key = get_single_line_input("API密钥: ").strip()
+    api_key = get_single_line_input("API密钥: ", is_password=True).strip()
     if not api_key:
         PrettyOutput.auto_print("❌ API密钥不能为空")
         raise typer.Exit(code=1)
@@ -788,7 +788,8 @@ def llm_update(
     ).strip()
 
     api_key = get_single_line_input(
-        f"API密钥 (当前: {'已设置' if current_api_key else '未设置'}, 留空不变): "
+        f"API密钥 (当前: {'已设置' if current_api_key else '未设置'}, 留空不变): ",
+        is_password=True,
     ).strip()
 
     # 如果有更新，应用到配置

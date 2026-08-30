@@ -194,8 +194,11 @@ Jarvis 支持完整的多用户认证、权限管理与团队协作能力，适�
 #### 一键安装（推荐）
 
 ```bash
-# Linux/macOS
+# Linux/macOS（GitHub 源）
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/quick-install.sh)"
+
+# Linux/macOS（Gitee 源，国内用户加速）
+bash -c "$(curl -fsSL https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/quick-install.sh)"
 ```
 
 安装脚本会自动完成以下操作：

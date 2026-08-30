@@ -30,6 +30,7 @@ class GatewayInputRequest:
     mode: Optional[str] = None  # 'single' or 'multi'
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
+    is_password: bool = False
     metadata: Optional[Dict[str, Any]] = None
 
 

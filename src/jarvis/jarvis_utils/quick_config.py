@@ -156,7 +156,7 @@ def run_quick_config():
     # 提示用户输入参数
     platform = get_single_line_input("请输入LLM平台类型 (claude/openai):")
     base_url = get_single_line_input("请输入API基础URL:")
-    api_key = get_single_line_input("请输入API密钥:")
+    api_key = get_single_line_input("请输入API密钥:", is_password=True)
 
     # 验证平台类型
     platform = platform.lower().strip()
