@@ -10,9 +10,11 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import signal
 import socket
 import subprocess
+import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -646,8 +648,34 @@ class AgentManager:
         Returns:
             命令列表
         """
-        # 基础命令
-        base_cmd = self.AGENT_ENTRY_POINTS[agent_type].split()
+        # 基础命令（解析完整路径，避免 PATH 问题）
+        entry_point = self.AGENT_ENTRY_POINTS[agent_type]
+        resolved = shutil.which(entry_point)
+        if resolved is None:
+            # 用 bash 加载用户环境查找（覆盖用户 shell PATH）
+            try:
+                result = subprocess.run(
+                    ["bash", "-lc", f"which {entry_point}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    resolved = result.stdout.strip()
+            except Exception:
+                pass
+        if resolved is None:
+            # 回退到常见用户 bin 目录
+            for candidate in [
+                Path.home() / ".local" / "bin" / entry_point,
+                Path(sys.executable).parent / entry_point,
+            ]:
+                if candidate.exists():
+                    resolved = str(candidate)
+                    break
+        if resolved is None:
+            resolved = entry_point
+        base_cmd = [resolved]
 
         # 添加参数
         cmd = base_cmd.copy()
