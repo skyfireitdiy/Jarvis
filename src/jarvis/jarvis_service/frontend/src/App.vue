@@ -3556,9 +3556,11 @@ function completeFromPanel(panel) {
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
 
-  showConfirm(
-    '确定要发送完成信号吗？',
-    () => {
+  // 使用 Panel 内嵌确认，而非全局弹出对话框
+  panelConfirmData.value.set(agentId, {
+    message: '确定要发送完成信号吗？',
+    defaultConfirm: true,
+    onConfirm: () => {
       if (executionStatus === 'waiting_multi') {
         // 后端正在等待多行输入，直接发送 Ctrl+C 信号
         const message = {
@@ -3582,9 +3584,10 @@ function completeFromPanel(panel) {
         }, agentId)
       }
     },
-    null,
-    true
-  )
+    onCancel: () => {
+      // 取消时无需额外操作，panelConfirmData 已在 handlePanelCancelConfirm 中清除
+    },
+  })
 }
 
 // 从 Panel 打开补全
@@ -8780,12 +8783,24 @@ function sendConfirmResult(confirmed, agentId = null) {
 // 处理 Panel 内嵌确认
 function handlePanelConfirm(panel) {
   if (!panel || !panel.agentId) return
+  const confirmData = panelConfirmData.value.get(panel.agentId)
+  if (confirmData?.onConfirm) {
+    confirmData.onConfirm()
+    panelConfirmData.value.delete(panel.agentId)
+    return
+  }
   sendConfirmResult(true, panel.agentId)
 }
 
 // 处理 Panel 内嵌取消确认
 function handlePanelCancelConfirm(panel) {
   if (!panel || !panel.agentId) return
+  const confirmData = panelConfirmData.value.get(panel.agentId)
+  if (confirmData?.onCancel) {
+    confirmData.onCancel()
+    panelConfirmData.value.delete(panel.agentId)
+    return
+  }
   sendConfirmResult(false, panel.agentId)
 }
 
