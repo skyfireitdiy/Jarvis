@@ -1056,7 +1056,7 @@ class ServiceController:
             Path(sys.executable).parent / command_name,
         ]
         for candidate in candidates:
-            if candidate.exists() and os.access(candidate, os.X_OK):
+            if candidate.exists():
                 return str(candidate)
         return None
 
