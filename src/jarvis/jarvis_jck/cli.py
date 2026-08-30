@@ -106,7 +106,35 @@ def _install_missing_tools(results: list) -> None:
 
     try:
         # 使用 jvs -T 命令批量安装工具，传递完整的工具配置信息
-        cmd = ["jvs", "-T", combined_description]
+        import shutil
+        import sys
+        from pathlib import Path
+
+        jvs_path = shutil.which("jvs")
+        if jvs_path is None:
+            # 用 bash 加载用户环境查找（覆盖用户 shell PATH）
+            try:
+                result = subprocess.run(
+                    ["bash", "-lc", "which jvs"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    jvs_path = result.stdout.strip()
+            except Exception:
+                pass
+        if jvs_path is None:
+            for candidate in [
+                Path.home() / ".local" / "bin" / "jvs",
+                Path(sys.executable).parent / "jvs",
+            ]:
+                if candidate.exists():
+                    jvs_path = str(candidate)
+                    break
+        if jvs_path is None:
+            jvs_path = "jvs"
+        cmd = [jvs_path, "-T", combined_description]
         subprocess.run(cmd)
 
     except FileNotFoundError:

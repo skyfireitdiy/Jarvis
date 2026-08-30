@@ -1050,6 +1050,18 @@ class ServiceController:
         found = shutil.which(command_name)
         if found:
             return found
+        # 用 bash 加载用户环境查找（覆盖用户 shell PATH）
+        try:
+            result = subprocess.run(
+                ["bash", "-lc", f"which {command_name}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
         # 额外检查常见用户 bin 目录
         candidates = [
             Path.home() / ".local" / "bin" / command_name,
