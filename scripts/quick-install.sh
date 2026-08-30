@@ -32,7 +32,7 @@ echo_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 echo_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # ===== 断点续装状态标记 =====
-STATE_FILE="$DEST_DIR/.install_state"
+STATE_FILE="$HOME/.jarvis/.install_state"
 
 set_state() {
 	mkdir -p "$(dirname "$STATE_FILE")"
