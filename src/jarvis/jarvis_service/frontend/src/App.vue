@@ -3461,15 +3461,16 @@ function sendFromPanel(panel) {
   if (!agent || agent.status !== 'running') return
 
   // 单行输入模式：允许发送空字符串
-  // 多行输入模式：不允许发送空字符串
+  // 多行输入模式：不允许发送空字符串（但缓冲区有内容时除外）
   const panelInput = panelInputTexts.value.get(agentId) || ''
   const panelInputMode = getPanelInputMode(panel)
+  const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
   let userInput
   if (panelInputMode === 'single') {
     userInput = panelInput
   } else {
     userInput = panelInput.trim()
-    if (!userInput) return
+    if (!userInput && !hasBuffered) return
   }
 
   // 获取当前运行状态
@@ -3489,7 +3490,6 @@ function sendFromPanel(panel) {
   }
 
   // 判断是发送到缓冲区还是直接发送
-  const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
   if (panelInputMode === 'single' || executionStatus === 'waiting_multi') {
     // 后端正在等待输入，直接发送
     // 如果有缓冲区内容，先发送缓冲区内容
