@@ -3000,8 +3000,7 @@ const panelInputTexts = ref(new Map()) // 每个 Panel 的输入文本（key: ag
 const panelInputModes = ref(new Map()) // 每个 Panel 的输入模式（key: agentId, value: 'multi'|'single'）
 const panelInputTips = ref(new Map()) // 每个 Panel 的输入提示（key: agentId, value: string）
 const panelInputPasswords = ref(new Map()) // 每个 Panel 的密码输入标志（key: agentId, value: boolean）
-const multilineInput = ref(null)
-const singlelineInput = ref(null)
+
 const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
 const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
 const panelConfirmData = ref(new Map()) // 每个 Panel 的确认数据（key: agentId, value: {message, defaultConfirm}）
@@ -3477,6 +3476,18 @@ function sendFromPanel(panel) {
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
 
+  // 等待确认状态：Enter 发送确认结果
+  if (executionStatus === 'waiting_confirm') {
+    const trimmedInput = userInput.trim().toLowerCase()
+    // 空输入或 y/yes/确认 视为确认，n/no/取消 视为取消
+    const confirmed = trimmedInput === '' || trimmedInput === 'y' || trimmedInput === 'yes' || trimmedInput === '确认' || trimmedInput === '是'
+    sendConfirmResult(confirmed, agentId)
+    // 清空输入框
+    panelInputTexts.value.set(agentId, '')
+    inputText.value = ''
+    return
+  }
+
   // 判断是发送到缓冲区还是直接发送
   const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
   if (panelInputMode === 'single' || executionStatus === 'waiting_multi') {
@@ -3656,6 +3667,22 @@ function handlePanelKeydown(panel, event) {
     completionCursorPos.value = event.target.selectionStart
     openCompletionsFromPanel(panel)
     return
+  }
+
+  // waiting_confirm 状态：y/n 键直接发送确认结果
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  if (executionStatus === 'waiting_confirm') {
+    if (event.key === 'y' || event.key === 'Y') {
+      event.preventDefault()
+      sendConfirmResult(true, agentId)
+      return
+    }
+    if (event.key === 'n' || event.key === 'N') {
+      event.preventDefault()
+      sendConfirmResult(false, agentId)
+      return
+    }
   }
 
   // 单行输入模式：Enter 键直接提交
@@ -5423,22 +5450,15 @@ async function fetchAgentStatus(agent) {
             message: payload.message || '请确认',
             defaultConfirm: payload.default !== undefined ? payload.default : true
           })
-          console.log('[AGENT STATUS] Showing confirm dialog with message:', payload.message)
-          showConfirm(
-            payload.message || '请确认',
-            () => {
-              sendConfirmResult(true, agent.agent_id)
-            },
-            () => {
-              sendConfirmResult(false, agent.agent_id)
-            },
-            payload.default !== undefined ? payload.default : true
-          )
+          // 确认请求使用单行输入模式
+          inputMode.value = 'single'
+          panelInputModes.value.set(agent.agent_id, 'single')
+          inputTip.value = payload.message || '请确认 (y/n/Enter)'
+          panelInputTips.value.set(agent.agent_id, payload.message || '请确认 (y/n/Enter)')
+          // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
         } else {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
         }
-        inputMode.value = 'multi'
-        panelInputModes.value.set(agent.agent_id, 'multi')
       } else {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
@@ -7494,13 +7514,7 @@ function handleMessage(message, agentId = null) {
       }
       pendingInputAgentId.value = targetAgentId
 
-      // 如果编辑器面板和终端面板都没有打开，输入框主动抢占焦点
-      if (!showEditorPanel.value && !showTerminalPanel.value) {
-        nextTick(() => {
-          const inputEl = inputMode.value === 'multi' ? multilineInput.value : singlelineInput.value
-          inputEl?.focus()
-        })
-      }
+
     }
     
     // 检查是否在底部（用于判断是否需要在显示输入框后滚动）
@@ -7541,20 +7555,12 @@ function handleMessage(message, agentId = null) {
       defaultConfirm: payload.default !== undefined ? payload.default : true
     })
 
-    // 只有当前 Agent 才立即弹出全局确认对话框（兼容非 Panel 场景）
-    // 非当前 Agent 的确认请求会在切换时通过 fetchAgentStatus 恢复
-    if (isCurrentAgent(targetAgentId)) {
-      showConfirm(
-        payload.message || '请确认',
-        () => {
-          sendConfirmResult(true, targetAgentId)
-        },
-        () => {
-          sendConfirmResult(false, targetAgentId)
-        },
-        payload.default !== undefined ? payload.default : true
-      )
-    }
+    // 确认请求使用单行输入模式，避免多行输入框抢占焦点
+    inputMode.value = 'single'
+    panelInputModes.value.set(targetAgentId, 'single')
+    inputTip.value = payload.message || '请确认 (y/n/Enter)'
+    panelInputTips.value.set(targetAgentId, payload.message || '请确认 (y/n/Enter)')
+    // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)
     // 只在首次创建终端时创建输出项
@@ -8476,17 +8482,7 @@ function isCursorAtFirstLine(textarea) {
   return !textBeforeCursor.includes('\n')
 }
 
-// 处理单行输入框的键盘事件
-function handleSinglelineKeydown(event) {
-  // Enter 键提交输入
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    submitInput()
-    // 提交后自动切换回多行输入模式
-    inputMode.value = 'multi'
-    return
-  }
-}
+
 
 // 检查光标是否在最后一行
 function isCursorAtLastLine(textarea) {
@@ -8514,22 +8510,7 @@ function handleFileUploadResponse(payload) {
   }
 }
 
-// 处理粘贴事件
-function handlePaste(event) {
-  const items = event.clipboardData?.items
-  if (!items) return
 
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      event.preventDefault()
-      const file = item.getAsFile()
-      if (file) {
-        uploadImageToNode(file)
-      }
-      break
-    }
-  }
-}
 
 // 上传图片到节点
 async function uploadImageToNode(file, agentId = null) {
@@ -8599,95 +8580,9 @@ function insertTextAtCursor(text, agentId = null) {
   textarea.focus()
 }
 
-// 处理 textarea 的输入事件（支持中文输入法）
-function handleTextareaInput(event) {
-  const target = event.target
-  const cursorPosition = target.selectionStart
-  const textBeforeCursor = target.value.substring(0, cursorPosition)
-  
-  // 检测是否刚刚输入了@符号（包括中文输入法）
-  if (textBeforeCursor.endsWith('@')) {
-    // 检查前一个字符是否是@，如果是则说明刚输入了@
-    const lastChar = textBeforeCursor.slice(-1)
-    if (lastChar === '@') {
-      completionCursorPos.value = cursorPosition - 1
-      openCompletions()
-    }
-  }
-}
 
-// 处理 textarea 的键盘事件
-function handleTextareaKeydown(event) {
-  // @ 键：打开补全列表
-  if (event.key === '@') {
-    event.preventDefault()
-    completionCursorPos.value = event.target.selectionStart
-    openCompletions()
-    return
-  }
-  
-  // Ctrl+Enter / Ctrl+D 提交输入
-  if (event.ctrlKey && (event.key === 'Enter' || event.key.toLowerCase() === 'd')) {
-    event.preventDefault()
-    submitInput()
-    return
-  }
-  
-  // Alt+T 触发终端命令执行
-  // 使用 event.code 而不是 event.key 来避免大小写问题
-  // event.code 在按键位置相同的情况下返回相同的值，不受大小写影响
-  if (event.altKey && (event.code === 'KeyT' || event.key === 't' || event.key === 'T')) {
-    event.preventDefault()
-    event.stopPropagation() // 阻止事件冒泡
-    inputText.value = '__ALT_T_PRESSED__'
-    submitInput()
-    return
-  }
-  
-  // Ctrl+C 在等待多行输入且输入框为空时，触发完成功能
-  // Ctrl+C 在非输入模式下且输入框为空时，发送人工介入消息
-  if (event.ctrlKey && event.key === 'c') {
-    const userInput = inputText.value.trim()
-    const agentId = currentAgentId.value
-    const statusData = agentStatuses.value.get(agentId)
 
-    const executionStatus = statusData?.execution_status || 'running'
 
-    // 场景1：在等待多行输入且输入框为空时，触发完成功能
-    if (executionStatus === 'waiting_multi' && !userInput) {
-      event.preventDefault()
-      submitCompletion()
-      return
-    }
-
-    // 场景2：在非输入模式下（running）且输入框为空时，发送人工介入消息
-    if (executionStatus === 'running' && !userInput) {
-      event.preventDefault()
-      sendManualInterrupt()
-      return
-    }
-  }
-  
-  // 向上箭头：检查是否在第一行，是才触发历史
-  if (event.key === 'ArrowUp') {
-    const textarea = event.target
-    if (isCursorAtFirstLine(textarea)) {
-      event.preventDefault()
-      navigateHistory('up')
-    }
-    return
-  }
-  
-  // 向下箭头：检查是否在最后一行，是才触发历史
-  if (event.key === 'ArrowDown') {
-    const textarea = event.target
-    if (isCursorAtLastLine(textarea)) {
-      event.preventDefault()
-      navigateHistory('down')
-    }
-    return
-  }
-}
 
 function updateInputBuffer(agentId, nextValue) {
   inputBuffers.value.set(agentId, nextValue)
@@ -8705,56 +8600,7 @@ function appendToInputBuffer(agentId, text) {
   updateInputBuffer(agentId, nextValue)
 }
 
-function submitInput() {
-  const agentId = currentAgentId.value
-  if (!agentId) {
-    console.warn('[SUBMIT] No current agent ID, cannot submit input')
-    return
-  }
-  
-  // 单行输入模式：允许发送空字符串
-  // 多行输入模式：不允许发送空字符串
-  let userInput
-  if (inputMode.value === 'single') {
-    // 单行输入：不trim，允许空字符串
-    userInput = inputText.value
-  } else {
-    // 多行输入：trim并检查空值
-    userInput = inputText.value.trim()
-    if (!userInput) {
-      return
-    }
-  }
-  
-  // 获取当前运行状态
-  const statusData = agentStatuses.value.get(agentId)
-  const executionStatus = statusData?.execution_status || 'running'
-  
-  // 判断是发送到缓冲区还是直接发送
-  // 单行输入模式：直接发送（后端正在等待）
-  // 多行输入模式：只有当运行状态是 waiting_multi 时，才直接发送
-  // 其他情况（running）保存到缓冲区
-  if (inputMode.value === 'single' || executionStatus === 'waiting_multi') {
-    // 后端正在等待输入，直接发送
-    console.log('[SUBMIT] Sending input directly to backend (inputMode:', inputMode.value, ', execution_status:', executionStatus, ')')
-    sendInputDirectly(userInput, inputMode.value)
-  } else {
-    // 后端没有等待输入，保存到缓冲区
-    console.log('[SUBMIT] Saving input to buffer (execution_status:', executionStatus, ')')
-    appendToInputBuffer(agentId, userInput)
-    appendOutput({
-      output_type: 'system',
-      agent_name: 'system',
-      text: '✓ 输入已追加到缓冲区，等待后端请求',
-      lang: 'text',
-    })
-  }
-  
-  // 保存到历史记录
-  saveToHistory(userInput)
-  
-  inputText.value = ''
-}
+
 
 function submitCompletion() {
   const agentId = currentAgentId.value
@@ -8922,6 +8768,11 @@ function sendConfirmResult(confirmed, agentId = null) {
     }
     // 清除 Panel 内嵌确认数据
     panelConfirmData.value.delete(targetAgentId)
+    // 恢复输入模式为多行
+    inputMode.value = 'multi'
+    panelInputModes.value.set(targetAgentId, 'multi')
+    inputTip.value = ''
+    panelInputTips.value.set(targetAgentId, '')
   }
   pendingConfirmAgentId.value = null
 }
@@ -8945,16 +8796,7 @@ function restoreWaitingConfirmUI(agentId) {
   if (confirmData) {
     console.log('[AGENT] Restoring waiting_confirm UI for agent', agentId, ':', confirmData.message)
     pendingConfirmAgentId.value = agentId
-    showConfirm(
-      confirmData.message || '请确认',
-      () => {
-        sendConfirmResult(true, agentId)
-      },
-      () => {
-        sendConfirmResult(false, agentId)
-      },
-      confirmData.defaultConfirm !== undefined ? confirmData.defaultConfirm : true
-    )
+    // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else {
     console.warn('[AGENT] No panel confirm data found for agent', agentId)
   }
@@ -10521,16 +10363,7 @@ function handleGlobalKeydown(event) {
     }
   }
 
-  // Alt + T 在 textarea 中切换代码编辑器
-  if (event.altKey && event.key === 't') {
-    const tagName = event.target.tagName.toLowerCase()
-    if (tagName === 'textarea') {
-      event.preventDefault()
-      event.stopPropagation()
-      // 手动调用 textarea 的 keydown 处理
-      handleTextareaKeydown(event)
-    }
-  }
+
 
   // Ctrl + Alt + Enter 发送缓冲区内容（当缓冲区有内容时生效）
   if (event.ctrlKey && event.altKey && event.key === 'Enter') {
