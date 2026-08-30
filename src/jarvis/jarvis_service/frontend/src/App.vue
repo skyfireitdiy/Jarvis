@@ -126,6 +126,7 @@
         :input-text="getPanelInputText(panel)"
         :input-mode="getPanelInputMode(panel)"
         :input-tip="getPanelInputTip(panel)"
+        :is-password="getPanelInputPassword(panel)"
         :is-input-disabled="getPanelInputDisabled(panel)"
         :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(panel)"
         :has-buffered-input="getPanelHasBufferedInput(panel)"
@@ -2998,6 +2999,7 @@ const inputTip = ref('') // 当前显示Agent的输入提示
 const panelInputTexts = ref(new Map()) // 每个 Panel 的输入文本（key: agentId, value: string）
 const panelInputModes = ref(new Map()) // 每个 Panel 的输入模式（key: agentId, value: 'multi'|'single'）
 const panelInputTips = ref(new Map()) // 每个 Panel 的输入提示（key: agentId, value: string）
+const panelInputPasswords = ref(new Map()) // 每个 Panel 的密码输入标志（key: agentId, value: boolean）
 const multilineInput = ref(null)
 const singlelineInput = ref(null)
 const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
@@ -3346,6 +3348,12 @@ function getPanelInputMode(panel) {
 function getPanelInputTip(panel) {
   if (!panel || !panel.agentId) return ''
   return panelInputTips.value.get(panel.agentId) || ''
+}
+
+// 获取 Panel 的密码输入标志
+function getPanelInputPassword(panel) {
+  if (!panel || !panel.agentId) return false
+  return panelInputPasswords.value.get(panel.agentId) || false
 }
 
 // 获取 Panel 的输入请求
@@ -7245,6 +7253,7 @@ function handleMessage(message, agentId = null) {
       // 同步到 Panel 隔离状态
       panelInputTips.value.set(currentAgentIdLocal, inputRequest.tip || '')
       panelInputModes.value.set(currentAgentIdLocal, inputRequest.mode || 'multi')
+      panelInputPasswords.value.set(currentAgentIdLocal, inputRequest.is_password || false)
       if (inputRequest.preset) {
         panelInputTexts.value.set(currentAgentIdLocal, inputRequest.preset)
       }
@@ -7466,6 +7475,7 @@ function handleMessage(message, agentId = null) {
       tip: payload.tip || '',
       mode: payload.mode || 'multi',
       preset: payload.preset || '',
+      is_password: payload.is_password || false,
       request_id: payload.request_id
     })
     console.log('[ws] Saved input request for agent', targetAgentId, ':', payload.mode)
@@ -7478,6 +7488,7 @@ function handleMessage(message, agentId = null) {
       // 同步到 Panel 隔离状态
       panelInputTips.value.set(targetAgentId, payload.tip || '')
       panelInputModes.value.set(targetAgentId, payload.mode || 'multi')
+      panelInputPasswords.value.set(targetAgentId, payload.is_password || false)
       if (payload.preset) {
         panelInputTexts.value.set(targetAgentId, payload.preset)
       }

@@ -89,7 +89,7 @@
             v-else
             :value="inputText"
             :data-agent-id="agent?.agent_id || ''"
-            type="text"
+            :type="isPassword ? 'password' : 'text'"
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
             :disabled="isInputDisabled"
             @input="$emit('input-change', $event)"
@@ -152,6 +152,7 @@ const props = defineProps({
   inputText: { type: String, default: '' },
   inputMode: { type: String, default: 'multi' },
   inputTip: { type: String, default: '' },
+  isPassword: { type: Boolean, default: false },
   isInputDisabled: { type: Boolean, default: true },
   isWaitingMultiDisabled: { type: Boolean, default: true },
   hasBufferedInput: { type: Boolean, default: false },
