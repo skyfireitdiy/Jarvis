@@ -752,4 +752,11 @@ function getTerminalStyle(terminalContent) {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
+
+.panel-confirm-btn.default {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px rgba(32, 200, 255, 0.3);
+}
 </style>
