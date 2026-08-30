@@ -70,6 +70,11 @@ echo_info "检测到系统: $OS $ARCH"
 
 # ===== 安装 uv（必须） =====
 install_uv() {
+	if check_state "uv"; then
+		echo_info "uv 已安装，跳过"
+		return 0
+	fi
+
 	if command -v uv &>/dev/null; then
 		echo_info "uv 已安装: $(uv --version)"
 		return 0
@@ -170,6 +175,11 @@ get_latest_tag() {
 
 # ===== 克隆或更新源码 =====
 prepare_source() {
+	if check_state "source"; then
+		echo_info "源码已就绪，跳过"
+		return 0
+	fi
+
 	local tag=$(get_latest_tag)
 	local source_url="$GITHUB_URL"
 	local ref="${tag:-$DEFAULT_BRANCH}"
