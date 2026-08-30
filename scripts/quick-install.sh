@@ -16,7 +16,7 @@ DEFAULT_BRANCH="main"
 
 # 镜像配置（国内用户加速）
 export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
-export UV_INDEX_URL="https://pypi.mirrors.ustc.edu.cn/simple/"
+export UV_INDEX_URL="https://pypi.org/simple/"
 # 限制并行下载数，避免触发远端源限流（403）
 export UV_CONCURRENT_DOWNLOADS=10
 
