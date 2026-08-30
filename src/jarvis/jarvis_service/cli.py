@@ -1588,8 +1588,16 @@ def start_service_command(
     else:
         PrettyOutput.auto_print(f"⚠ 启用{mode_lower}服务失败，但服务仍在运行")
 
-    # 禁用另一个模式的服务
+    # 先停止另一个模式的服务（避免端口冲突或单实例锁）
     other_mode = "child" if mode_lower == "master" else "master"
+    if _run_systemctl_action("is-active", other_mode):
+        PrettyOutput.auto_print(f"🛑 正在停止 {other_mode} 服务...")
+        if _run_systemctl_action("stop", other_mode):
+            PrettyOutput.auto_print(f"✅ {other_mode} 服务已停止")
+        else:
+            PrettyOutput.auto_print(f"⚠ 停止{other_mode}服务失败")
+
+    # 禁用另一个模式的服务
     PrettyOutput.auto_print(f"🔧 正在禁用 {other_mode} 服务...")
     if _run_systemctl_enable_disable("disable", other_mode):
         PrettyOutput.auto_print(f"✅ {other_mode} 服务已禁用")
