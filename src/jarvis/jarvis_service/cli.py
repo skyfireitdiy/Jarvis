@@ -1041,15 +1041,34 @@ class ServiceController:
 
     def _require_command(self, command_name: str, error_message: str) -> None:
         """确保命令存在。"""
-        if not shutil.which(command_name):
+        if self._find_command(command_name) is None:
             PrettyOutput.auto_print(f"❌ {error_message}")
             raise typer.Exit(code=1)
+
+    def _find_command(self, command_name: str) -> Optional[str]:
+        """查找命令完整路径，优先 PATH，其次常见用户目录。"""
+        found = shutil.which(command_name)
+        if found:
+            return found
+        # 额外检查常见用户 bin 目录
+        candidates = [
+            Path.home() / ".local" / "bin" / command_name,
+            Path(sys.executable).parent / command_name,
+        ]
+        for candidate in candidates:
+            if candidate.exists() and os.access(candidate, os.X_OK):
+                return str(candidate)
+        return None
 
     def _start_gateway_process(self) -> subprocess.Popen[bytes]:
         """启动 Web Gateway 进程。"""
         PrettyOutput.auto_print("⏳ 启动网关服务")
+        jwg_path = self._find_command("jwg")
+        if jwg_path is None:
+            PrettyOutput.auto_print("❌ 未找到 jwg 命令，请确保 Jarvis 已正确安装")
+            raise typer.Exit(code=1)
         command = [
-            "jwg",
+            jwg_path,
             "--host",
             self._config.gateway_host,
             "--port",
