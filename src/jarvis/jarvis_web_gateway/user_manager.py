@@ -129,12 +129,6 @@ class UserManager:
             return None
         if not self._verify_password(password, user.get("password_hash", "")):
             user["login_fail_count"] = user.get("login_fail_count", 0) + 1
-            if user["login_fail_count"] >= MAX_LOGIN_FAIL:
-                user["status"] = "locked"
-                user["locked_reason"] = "Too many failed login attempts"
-                logger.warning(
-                    f"User {username} locked due to too many failed attempts"
-                )
             self._save_data()
             return None
         # 登录成功
