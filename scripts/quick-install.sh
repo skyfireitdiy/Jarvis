@@ -16,10 +16,10 @@ DEFAULT_BRANCH="main"
 
 # 镜像配置（国内用户加速）
 export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
-export UV_DEFAULT_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
-export UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+export UV_DEFAULT_INDEX="https://mirrors.aliyun.com/pypi/simple/"
+export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 # 限制并行下载数，避免触发远端源限流（403）
-export UV_CONCURRENT_DOWNLOADS=10
+export UV_CONCURRENT_DOWNLOADS=4
 
 # ===== 颜色输出 =====
 RED='\033[0;31m'
@@ -227,10 +227,28 @@ install_jarvis() {
 	cd "$DEST_DIR"
 
 	echo_info "正在安装 Jarvis (Python 3.12)..."
-	uv tool install -e . --python 3.12 --default-index https://pypi.tuna.tsinghua.edu.cn/simple || {
+
+	# 多源重试：阿里云 → 清华 → 官方
+	local PYPI_INDEXES=(
+		"https://mirrors.aliyun.com/pypi/simple/"
+		"https://pypi.tuna.tsinghua.edu.cn/simple"
+		"https://pypi.org/simple/"
+	)
+
+	local INSTALL_OK=0
+	for index in "${PYPI_INDEXES[@]}"; do
+		echo_info "尝试 PyPI 源: $index"
+		if uv tool install -e . --python 3.12 --default-index "$index"; then
+			INSTALL_OK=1
+			break
+		fi
+		echo_warn "PyPI 源失败，尝试下一个..."
+	done
+
+	if [ "$INSTALL_OK" -ne 1 ]; then
 		echo_error "Jarvis 安装失败"
 		exit 1
-	}
+	fi
 
 	# 更新 shell 环境
 	uv tool update-shell 2>/dev/null || true
