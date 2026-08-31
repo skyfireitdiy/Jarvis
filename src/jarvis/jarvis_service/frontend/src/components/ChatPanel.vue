@@ -2,11 +2,11 @@
   <aside
     v-show="visible"
     class="chat-panel"
-    :class="{ 'chat-panel-dragging': interaction.active }"
+    :class="{ 'chat-panel-dragging': interaction.active, 'chat-panel-embedded': embedded }"
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <div class="chat-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
+    <div class="chat-panel-header" @mousedown="!embedded && $emit('startMove', $event)" @dblclick.stop="!embedded && $emit('toggleMaximize')">
       <div class="chat-panel-title-group">
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
@@ -16,6 +16,7 @@
         <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
         </button>
+        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
@@ -204,6 +205,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
+  embedded: Boolean,
   interaction: Object,
   panelStyle: Object,
   socket: [Object, null],
@@ -230,6 +232,7 @@ const emit = defineEmits([
   'focus',
   'startMove',
   'toggleMaximize',
+  'detach',
   'close',
   'createRoom',
   'joinRoom',
@@ -545,6 +548,15 @@ watch(
 
 .chat-panel-dragging {
   user-select: none;
+}
+
+.chat-panel-embedded {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: auto !important;
+  left: auto !important;
+  border-radius: 4px;
 }
 
 /* 侧边栏展开按钮 */

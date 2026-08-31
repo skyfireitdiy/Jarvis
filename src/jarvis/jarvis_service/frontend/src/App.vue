@@ -120,7 +120,9 @@
     <main class="panel-grid" :style="panelGridStyle">
       <SessionPanel
         v-for="panel in panels"
+        v-show="!sessionDetachedPanels.has(panel.id)"
         :key="panel.id"
+        :embedded="!sessionDetachedPanels.has(panel.id)"
         :agent="getPanelAgent(panel)"
         :messages="getPanelMessages(panel)"
         :input-text="getPanelInputText(panel)"
@@ -149,8 +151,366 @@
         @set-output-list="setPanelOutputList(panel, $event)"
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
+        @detach="detachPanel('session', panel.id)"
       />
+
+      <!-- 内嵌终端面板 -->
+      <TerminalPanel
+        v-if="showTerminalPanel && !terminalDetached"
+        :visible="showTerminalPanel"
+        :active="activeWindow === 'terminal'"
+        :interaction="terminalPanelInteraction"
+        :panelStyle="terminalPanelStyle"
+        :nodeOptions="filteredNodeOptionsForCreateAgent"
+        :selectedNodeId="selectedTerminalNodeId"
+        :socket="socket"
+        :isMaximized="isTerminalMaximized"
+        :sessions="terminalSessions"
+        :activeId="activeTerminalId"
+        :resizeDirections="terminalResizeDirections"
+        :formatNodeLabel="formatNodeOptionLabel"
+        :embedded="true"
+        @focus="focusWindow"
+        @startMove="startTerminalPanelMove"
+        @toggleMaximize="toggleTerminalMaximize"
+        @update:selectedNodeId="selectedTerminalNodeId = $event"
+        @createTerminal="createTerminalForSelectedNode"
+        @close="showTerminalPanel = false"
+        @switch="switchTerminal"
+        @closeTerminal="closeTerminal"
+        @setHostRef="setTerminalHostRef"
+        @startResize="startTerminalPanelResize"
+        @detach="detachPanel('terminal')"
+      />
+
+      <!-- 内嵌聊天室面板 -->
+      <ChatPanel
+        v-if="showChatPanel && !chatDetached"
+        :visible="showChatPanel"
+        :interaction="chatPanelInteraction"
+        :panelStyle="chatPanelStyle"
+        :socket="socket"
+        :isMaximized="isChatMaximized"
+        :rooms="chatRooms"
+        :clients="chatClients"
+        :roomMembers="chatRoomMembers"
+        :myClientId="myClientId"
+        :isAdmin="auth.userInfo?.is_admin"
+        :currentUserId="auth.userInfo?.user_id"
+        :activeRoomId="activeChatRoomId"
+        :activePrivateId="activePrivateClientId"
+        :resizeDirections="chatResizeDirections"
+        :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
+        :myName="chatName"
+        :collapsed="chatPanelCollapsed"
+        :sidebarWidth="chatSidebarWidth"
+        :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
+        :embedded="true"
+        @focus="focusWindow"
+        @startMove="startChatPanelMove"
+        @toggleMaximize="toggleChatMaximize"
+        @close="showChatPanel = false"
+        @createRoom="createChatRoom"
+        @joinRoom="joinChatRoom"
+        @sendMessage="sendChatMessage"
+        @selectPrivate="selectPrivateClient"
+        @startResize="startChatPanelResize"
+        @toggleCollapse="toggleChatPanelCollapse"
+        @leaveRoom="leaveChatRoom"
+        @deleteRoom="deleteChatRoom"
+        @renameRoom="renameChatRoom"
+        @startSidebarResize="startChatSidebarResize"
+        @clearMessages="clearChatMessages"
+        @detach="detachPanel('chat')"
+      />
+
+      <!-- 内嵌编辑器面板 -->
+      <EditorPanel
+        v-if="showEditorPanel && !editorDetached"
+        ref="editorPanelRef"
+        :visible="showEditorPanel"
+        :active="activeWindow === 'editor'"
+        :interaction="editorPanelInteraction"
+        :panelStyle="editorPanelStyle"
+        :agentName="activeEditorSession?.agent_name"
+        :activeTab="activeEditorTab"
+        :activeTabPath="activeEditorTabPath"
+        :tabs="editorTabs"
+        :isMaximized="isEditorMaximized"
+        :isEditable="isEditorEditable"
+        :showSidebar="showEditorSidebar"
+        :sidebarView="editorSidebarView"
+        :resizeDirections="editorResizeDirections"
+        :embedded="true"
+        @focus="focusWindow('editor')"
+        @startMove="startEditorPanelMove"
+        @toggleMaximize="toggleEditorMaximize"
+        @save="saveActiveEditorTab"
+        @close="closeEditorPanel"
+        @activateTab="activateEditorTab"
+        @closeTab="closeEditorTab"
+        @toggleEditable="toggleEditorEditable"
+        @setSidebarView="setEditorSidebarView"
+        @startResize="startEditorPanelResize"
+        @detach="detachPanel('editor')"
+      >
+        <template #sidebar>
+          <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
+            <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
+            <div class="editor-sidebar-header">
+              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
+              <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+            </div>
+            <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
+              <div class="editor-file-tree-panel">
+                <!-- 活跃 Agent 节点列表 -->
+                <div
+                  v-for="agent in activeAgents"
+                  :key="agent.agent_id"
+                  class="editor-agent-node"
+                  :class="{
+                    'selected': selectedAgentId === agent.agent_id,
+                    'waiting-input': isWaitingInput(agent)
+                  }"
+                >
+                  <div
+                    class="tree-node-content agent-node-content"
+                    @click.stop="toggleAgentExpanded(agent.agent_id)"
+                  >
+                    <span
+                      class="tree-node-icon expand-arrow"
+                      :class="{ expanded: expandedAgents.has(agent.agent_id) }"
+                    >▶</span>
+                    <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
+                    <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
+                    <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
+                    <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                  </div>
+                  <!-- Agent 的文件树 -->
+                  <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
+                    <div
+                      class="editor-file-tree-root"
+                      @click.stop="ensureEditorSidebarFileTree(agent)"
+                    >
+                      {{ agent.working_dir }}
+                    </div>
+                    <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                      当前工作目录下暂无可显示内容
+                    </div>
+                    <div v-else class="editor-file-tree-list">
+                      <div
+                        v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
+                        :key="visibleNode.node.path"
+                        class="tree-node editor-tree-node"
+                      >
+                        <div
+                          class="tree-node-content"
+                          :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                          @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                        >
+                          <span
+                            v-if="visibleNode.node.type === 'directory'"
+                            class="tree-node-icon expand-arrow"
+                            :class="{ expanded: visibleNode.node.expanded }"
+                          >▶</span>
+                          <span v-else class="tree-node-icon"></span>
+                          <span
+                            class="tree-node-icon"
+                            :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                          >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                          <span
+                            class="tree-node-text"
+                            :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                          >{{ visibleNode.node.name }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 已停止 Agent 按节点分组 -->
+                <template v-for="(agents, nodeId) in stoppedAgentsByNode" :key="nodeId">
+                  <div class="stopped-agents-group">
+                    <div
+                      class="stopped-agents-header"
+                      @click="toggleStoppedNodeCollapse(nodeId)"
+                    >
+                      <span class="expand-arrow" :class="{ expanded: !isStoppedNodeCollapsed(nodeId) }">▶</span>
+                      <span class="stopped-agents-title">{{ nodeId }}已停止的Agent ({{ agents.length }})</span>
+                    </div>
+                    <div v-if="!isStoppedNodeCollapsed(nodeId)" class="stopped-agents-list">
+                      <div
+                        v-for="agent in agents"
+                        :key="agent.agent_id"
+                        class="editor-agent-node stopped"
+                        :class="{ 'selected': selectedAgentId === agent.agent_id }"
+                      >
+                        <div
+                          class="tree-node-content agent-node-content"
+                          @click.stop="toggleAgentExpanded(agent.agent_id)"
+                        >
+                          <span
+                            class="tree-node-icon expand-arrow"
+                            :class="{ expanded: expandedAgents.has(agent.agent_id) }"
+                          >▶</span>
+                          <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
+                          <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
+                          <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
+                          <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                        </div>
+                        <!-- Agent 的文件树 -->
+                        <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
+                          <div
+                            class="editor-file-tree-root"
+                            @click.stop="ensureEditorSidebarFileTree(agent)"
+                          >
+                            {{ agent.working_dir }}
+                          </div>
+                          <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                            当前工作目录下暂无可显示内容
+                          </div>
+                          <div v-else class="editor-file-tree-list">
+                            <div
+                              v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
+                              :key="visibleNode.node.path"
+                              class="tree-node editor-tree-node"
+                            >
+                              <div
+                                class="tree-node-content"
+                                :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                                @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                              >
+                                <span
+                                  v-if="visibleNode.node.type === 'directory'"
+                                  class="tree-node-icon expand-arrow"
+                                  :class="{ expanded: visibleNode.node.expanded }"
+                                >▶</span>
+                                <span v-else class="tree-node-icon"></span>
+                                <span
+                                  class="tree-node-icon"
+                                  :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                                >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                                <span
+                                  class="tree-node-text"
+                                  :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                                >{{ visibleNode.node.name }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <!-- 无 Agent 提示 -->
+                <div v-if="agentList.length === 0" class="editor-file-tree-empty">
+                  暂无 Agent，请先创建 Agent
+                </div>
+              </div>
+            </div>
+            <div v-else class="editor-sidebar-content">
+              <div class="editor-global-search-panel">
+                <input
+                  v-model="globalSearchQuery"
+                  class="editor-global-search-input"
+                  type="text"
+                  placeholder="全局搜索文件内容..."
+                  :disabled="globalSearchLoading || !currentAgentId"
+                  @keydown.enter.prevent="runGlobalSearch"
+                >
+                <input
+                  v-model="globalSearchFileGlob"
+                  class="editor-global-search-input editor-global-search-glob-input"
+                  type="text"
+                  placeholder="文件过滤，如 *.py,!tests/**"
+                  :disabled="globalSearchLoading || !currentAgentId"
+                  @keydown.enter.prevent="runGlobalSearch"
+                >
+                <div class="editor-global-search-toolbar">
+                  <label class="editor-global-search-toggle">
+                    <input v-model="globalSearchCaseSensitive" type="checkbox">
+                    <span>区分大小写</span>
+                  </label>
+                  <label class="editor-global-search-toggle">
+                    <input v-model="globalSearchWholeWord" type="checkbox">
+                    <span>全词匹配</span>
+                  </label>
+                  <div class="editor-global-search-actions">
+                    <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+                    <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+                  </div>
+                </div>
+              </div>
+              <div class="editor-global-search-results">
+                <div class="editor-global-search-summary">
+                  <span v-if="globalSearchLoading">搜索中...</span>
+                  <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
+                  <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
+                  <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
+                </div>
+                <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                  未找到匹配结果
+                </div>
+                <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
+                  <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                    {{ result.file_path }}
+                    <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                  </div>
+                  <button
+                    v-for="match in result.matches"
+                    :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
+                    class="editor-global-search-match"
+                    @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                  >
+                    <span class="editor-global-search-line">{{ match.line_number }}</span>
+                    <span class="editor-global-search-text">
+                      {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </template>
+      </EditorPanel>
     </main>
+
+    <!-- 浮动 SessionPanel（已分离的会话面板） -->
+    <template v-for="panel in panels" :key="'floating-' + panel.id">
+      <SessionPanel
+        v-if="sessionDetachedPanels.has(panel.id)"
+        :embedded="false"
+        :agent="getPanelAgent(panel)"
+        :messages="getPanelMessages(panel)"
+        :input-text="getPanelInputText(panel)"
+        :input-mode="getPanelInputMode(panel)"
+        :input-tip="getPanelInputTip(panel)"
+        :is-password="getPanelInputPassword(panel)"
+        :is-input-disabled="getPanelInputDisabled(panel)"
+        :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(panel)"
+        :has-buffered-input="getPanelHasBufferedInput(panel)"
+        :agent-status="getPanelAgentStatus(panel)"
+        :active="panel.id === activePanelId"
+        :confirm-data="getPanelConfirmData(panel)"
+        @confirm="handlePanelConfirm(panel)"
+        @cancel-confirm="handlePanelCancelConfirm(panel)"
+        @activate="activatePanel(panel.id)"
+        @close-agent="closeAgentInPanel(panel.id)"
+        @close-panel="closePanel(panel.id)"
+        @send="sendFromPanel(panel)"
+        @complete="completeFromPanel(panel)"
+        @open-completions="openCompletionsFromPanel(panel)"
+        @input-change="handlePanelInputChange(panel, $event)"
+        @keydown="handlePanelKeydown(panel, $event)"
+        @paste="handlePanelPaste(panel, $event)"
+        @show-buffer="showBufferPanel = true"
+        @clear-buffer="clearBufferFromPanel(panel)"
+        @set-output-list="setPanelOutputList(panel, $event)"
+        @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
+        @show-toast="showToast"
+        @detach="detachPanel('session', panel.id)"
+        style="position: fixed; top: 80px; left: 50%; transform: translateX(-50%); width: 600px; height: 500px; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
+      />
+    </template>
 
     <!-- 确认对话框（弹出式） -->
     <ConfirmDialog
@@ -161,8 +521,9 @@
       @cancel="handleConfirmDialogCancel"
     />
 
-<!-- 终端面板 -->
+<!-- 终端面板（浮动模式） -->
     <TerminalPanel
+      v-if="terminalDetached"
       :visible="showTerminalPanel"
       :active="activeWindow === 'terminal'"
       :interaction="terminalPanelInteraction"
@@ -185,10 +546,12 @@
       @closeTerminal="closeTerminal"
       @setHostRef="setTerminalHostRef"
       @startResize="startTerminalPanelResize"
+      @detach="detachPanel('terminal')"
     />
 
-    <!-- 聊天室面板 -->
+    <!-- 聊天室面板（浮动模式） -->
     <ChatPanel
+      v-if="chatDetached"
       :visible="showChatPanel"
       :interaction="chatPanelInteraction"
       :panelStyle="chatPanelStyle"
@@ -223,10 +586,12 @@
       @renameRoom="renameChatRoom"
       @startSidebarResize="startChatSidebarResize"
       @clearMessages="clearChatMessages"
+      @detach="detachPanel('chat')"
     />
 
     <!-- 浮动编辑器面板 -->
     <EditorPanel
+      v-if="editorDetached"
       ref="editorPanelRef"
       :visible="showEditorPanel"
       :active="activeWindow === 'editor'"
@@ -251,6 +616,7 @@
       @toggleEditable="toggleEditorEditable"
       @setSidebarView="setEditorSidebarView"
       @startResize="startEditorPanelResize"
+      @detach="detachPanel('editor')"
     >
       <template #sidebar>
         <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
@@ -1544,6 +1910,10 @@ const showAgentSidebar = ref(true)    // Agent 侧边栏
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
+const terminalDetached = ref(false)  // 终端面板是否已分离为浮动模式
+const chatDetached = ref(false)     // 聊天室面板是否已分离为浮动模式
+const editorDetached = ref(false)   // 编辑器面板是否已分离为浮动模式
+const sessionDetachedPanels = ref(new Set())  // 已分离为浮动模式的 SessionPanel ID 集合
 const showMobileMenu = ref(false)     // 移动端菜单
 const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
 
@@ -3297,6 +3667,11 @@ function closePanel(panelId) {
   }
   panels.value.splice(index, 1)
   panelOutputLists.delete(panelId)
+  // 如果该 Panel 已 detach，同时从 detach 集合中移除
+  if (sessionDetachedPanels.value.has(panelId)) {
+    sessionDetachedPanels.value.delete(panelId)
+    triggerRef(sessionDetachedPanels)
+  }
   // 如果关闭的是当前激活的 Panel，激活相邻 Panel
   if (activePanelId.value === panelId) {
     if (panels.value.length > 0) {
@@ -3506,7 +3881,14 @@ function getPanelHistoryState(panel) {
 
 // 获取 Panel 的布局样式
 function getPanelLayout() {
-  const count = panels.value.length
+  // 计算内嵌面板数量（非 detach 且可见的面板）
+  let embeddedCount = 0
+  if (showTerminalPanel.value && !terminalDetached.value) embeddedCount++
+  if (showChatPanel.value && !chatDetached.value) embeddedCount++
+  if (showEditorPanel.value && !editorDetached.value) embeddedCount++
+  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数
+  const embeddedSessionCount = panels.value.filter(p => !sessionDetachedPanels.value.has(p.id)).length
+  const count = embeddedSessionCount + embeddedCount
   if (count === 0) return {}
   if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }
   if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' }
@@ -3514,6 +3896,24 @@ function getPanelLayout() {
   if (count === 4) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }
   if (count === 5) return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' }
   return { gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr' }
+}
+
+// 切换面板的 detach 状态（内嵌 <-> 浮动）
+function detachPanel(type, panelId = null) {
+  if (type === 'terminal') {
+    terminalDetached.value = !terminalDetached.value
+  } else if (type === 'chat') {
+    chatDetached.value = !chatDetached.value
+  } else if (type === 'editor') {
+    editorDetached.value = !editorDetached.value
+  } else if (type === 'session' && panelId) {
+    if (sessionDetachedPanels.value.has(panelId)) {
+      sessionDetachedPanels.value.delete(panelId)
+    } else {
+      sessionDetachedPanels.value.add(panelId)
+    }
+    triggerRef(sessionDetachedPanels)
+  }
 }
 
 // Panel 网格布局样式（计算属性）

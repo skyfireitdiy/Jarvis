@@ -2,14 +2,14 @@
   <aside
     v-show="visible"
     class="editor-panel"
-    :class="{ 'editor-panel-dragging': interaction.active, 'editor-panel-active': active }"
+    :class="{ 'editor-panel-dragging': interaction.active, 'editor-panel-active': active, 'editor-panel-embedded': embedded }"
     :style="panelStyle"
     @mousedown="$emit('focus', 'editor')"
   >
     <div
       class="editor-panel-header"
-      @mousedown="$emit('startMove', $event)"
-      @dblclick.stop="$emit('toggleMaximize')"
+      @mousedown="!embedded && $emit('startMove', $event)"
+      @dblclick.stop="!embedded && $emit('toggleMaximize')"
     >
       <div class="editor-panel-title-group">
         <h3>编辑器 - {{ agentName || '未选择 Agent' }}</h3>
@@ -20,6 +20,7 @@
         <button class="icon-btn maximize-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
         </button>
+        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭编辑器">✕</button>
       </div>
     </div>
@@ -93,6 +94,7 @@ import { ref, defineProps, defineEmits } from 'vue'
 const props = defineProps({
   visible: Boolean,
   active: Boolean,
+  embedded: Boolean,
   interaction: Object,
   panelStyle: Object,
   agentName: String,
@@ -110,6 +112,7 @@ const emit = defineEmits([
   'focus',
   'startMove',
   'toggleMaximize',
+  'detach',
   'save',
   'close',
   'activateTab',
@@ -147,6 +150,15 @@ defineExpose({
 
 .editor-panel-dragging {
   transition: none;
+}
+
+.editor-panel-embedded {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: auto !important;
+  left: auto !important;
+  border-radius: 4px;
 }
 
 .editor-panel-header {

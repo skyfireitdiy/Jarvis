@@ -1,5 +1,5 @@
 <template>
-  <div class="session-panel" :class="{ 'active': active }" @click="handlePanelClick">
+  <div class="session-panel" :class="{ 'active': active, 'session-panel-embedded': embedded }" @click="handlePanelClick">
     <!-- 空白占位 -->
     <div v-if="!agent" class="session-panel-empty">
       <div class="empty-icon">▦</div>
@@ -14,6 +14,7 @@
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <div class="session-header-actions">
+          <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
         </div>
       </div>
@@ -159,10 +160,11 @@ const props = defineProps({
   agentStatus: { type: Object, default: null },
   active: { type: Boolean, default: false },
   confirmData: { type: Object, default: null },
+  embedded: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
-  'activate', 'close-agent', 'close-panel',
+  'activate', 'detach', 'close-agent', 'close-panel',
   'send', 'complete', 'open-completions',
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
@@ -172,6 +174,10 @@ const emit = defineEmits([
 ])
 
 function handlePanelClick() {
+  // 浮动模式下不触发 activate（不在 grid 内，激活无意义）
+  if (!props.embedded) {
+    return
+  }
   // 当前已激活的 Panel 不重复触发 activate
   if (props.active) {
     return
@@ -283,6 +289,14 @@ function getTerminalStyle(terminalContent) {
 .session-panel.active {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(32, 200, 255, 0.15);
+}
+
+.session-panel-embedded {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: auto !important;
+  left: auto !important;
 }
 
 .session-panel-empty {
