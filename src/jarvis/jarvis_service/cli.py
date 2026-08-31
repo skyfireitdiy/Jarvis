@@ -1941,11 +1941,11 @@ WantedBy=default.target
         PrettyOutput.auto_print(f"⚠️  检查/启用 linger 时出错: {e}")
         PrettyOutput.auto_print("💡 服务可能需要在用户登录时运行，或手动启用 linger")
 
-    PrettyOutput.auto_print("📋 服务管理命令:")
-    PrettyOutput.auto_print("  systemctl --user daemon-reload")
-    PrettyOutput.auto_print(f"  systemctl --user enable {service_name}")
-    PrettyOutput.auto_print(f"  systemctl --user start {service_name}")
-    PrettyOutput.auto_print(f"  systemctl --user status {service_name}")
+    PrettyOutput.auto_print("📋 jservice 管理命令:")
+    PrettyOutput.auto_print("  jservice start")
+    PrettyOutput.auto_print("  jservice stop")
+    PrettyOutput.auto_print("  jservice status")
+    PrettyOutput.auto_print("  jservice restart")
 
 
 def main() -> None:
