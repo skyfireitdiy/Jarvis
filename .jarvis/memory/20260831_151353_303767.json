@@ -1,0 +1,8 @@
+{
+  "id": "20260831_151353_303767",
+  "type": "project_long_term",
+  "tags": ["SessionPanel", "浮动面板", "拖动", "resize", "前端"],
+  "content": "SessionPanel 浮动模式拖动/调整大小功能已完成。实现模式：仿照 TerminalPanel，App.vue 定义 sessionPanelRect/sessionPanelInteraction + startSessionPanelMove/startSessionPanelResize/onSessionPanelPointerMove/stopSessionPanelInteraction，SessionPanel.vue 通过 @startMove/@startResize 事件触发。位置/大小持久化到 localStorage（key: jarvis_session_panel_rect），最小尺寸 400×300，8 方向 resize 手柄。编译验证通过。",
+  "created_at": "2026-08-31T15:13:53.303814",
+  "updated_at": "2026-08-31T15:13:53.303833"
+}
