@@ -9340,6 +9340,9 @@ function sendConfirmResult(confirmed, agentId = null) {
     panelInputModes.value.set(targetAgentId, 'multi')
     inputTip.value = ''
     panelInputTips.value.set(targetAgentId, '')
+    // 清空输入框
+    panelInputTexts.value.set(targetAgentId, '')
+    inputText.value = ''
   }
   pendingConfirmAgentId.value = null
 }
@@ -9351,6 +9354,9 @@ function handlePanelConfirm(panel) {
   if (confirmData?.onConfirm) {
     confirmData.onConfirm()
     panelConfirmData.value.delete(panel.agentId)
+    // 清空输入框
+    panelInputTexts.value.set(panel.agentId, '')
+    inputText.value = ''
     return
   }
   sendConfirmResult(true, panel.agentId)
@@ -9363,6 +9369,9 @@ function handlePanelCancelConfirm(panel) {
   if (confirmData?.onCancel) {
     confirmData.onCancel()
     panelConfirmData.value.delete(panel.agentId)
+    // 清空输入框
+    panelInputTexts.value.set(panel.agentId, '')
+    inputText.value = ''
     return
   }
   sendConfirmResult(false, panel.agentId)

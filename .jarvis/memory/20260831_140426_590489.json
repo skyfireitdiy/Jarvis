@@ -1,0 +1,8 @@
+{
+  "id": "20260831_140426_590489",
+  "type": "project_long_term",
+  "tags": ["Ctrl+C确认流程", "y残留", "输入框清空", "已完成"],
+  "content": "Ctrl+C 确认流程中 y 残留输入框问题已修复。修复内容：1) handlePanelConfirm 和 handlePanelCancelConfirm 在调用 onConfirm/onCancel 回调后清空 panelInputTexts 和 inputText；2) sendConfirmResult 在发送确认结果后清空 panelInputTexts 和 inputText。编译通过（✓ built in 35.22s）。",
+  "created_at": "2026-08-31T14:04:26.590531",
+  "updated_at": "2026-08-31T14:04:26.590539"
+}
