@@ -217,6 +217,8 @@ BUILTIN_COMMANDS = [
     ("OrganizeAgents", "批量编排创建Agent"),
     # 文件操作命令
     ("Cat", "查看文件内容"),
+    # Git 命令
+    ("GitPush", "推送代码到远端"),
 ]
 
 _ADDITIONAL_COMPLETION_DIRS: List[str] = []
