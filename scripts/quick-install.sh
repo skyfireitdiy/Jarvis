@@ -14,6 +14,9 @@ GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
 DEFAULT_BRANCH="main"
 
+# 安装模式: pypi(默认) / source
+INSTALL_MODE="pypi"
+
 # 镜像配置（国内用户加速）
 export UV_PYTHON_INSTALL_MIRROR="https://python-standalone.org/mirror/astral-sh/python-build-standalone/"
 export UV_DEFAULT_INDEX="https://mirrors.aliyun.com/pypi/simple/"
@@ -220,34 +223,49 @@ prepare_source() {
 # ===== 安装 Jarvis =====
 install_jarvis() {
 	if check_state "jarvis"; then
-		echo_info "Jarvis 已安装，跳过"
-		return 0
+	echo_info "Jarvis 已安装，跳过"
+	return 0
 	fi
-
-	cd "$DEST_DIR"
-
-	echo_info "正在安装 Jarvis (Python 3.12)..."
 
 	# 多源重试：阿里云 → 清华 → 官方
 	local PYPI_INDEXES=(
-		"https://mirrors.aliyun.com/pypi/simple/"
-		"https://pypi.tuna.tsinghua.edu.cn/simple"
-		"https://pypi.org/simple/"
+	"https://mirrors.aliyun.com/pypi/simple/"
+	"https://pypi.tuna.tsinghua.edu.cn/simple"
+	"https://pypi.org/simple/"
 	)
 
 	local INSTALL_OK=0
+
+	if [ "$INSTALL_MODE" = "source" ]; then
+	# 源码安装模式
+	cd "$DEST_DIR"
+	echo_info "正在从源码安装 Jarvis (Python 3.12)..."
+
 	for index in "${PYPI_INDEXES[@]}"; do
-		echo_info "尝试 PyPI 源: $index"
-		if uv tool install -e . --python 3.12 --default-index "$index"; then
-			INSTALL_OK=1
-			break
-		fi
-		echo_warn "PyPI 源失败，尝试下一个..."
+	echo_info "尝试 PyPI 源: $index"
+	if uv tool install -e . --python 3.12 --default-index "$index"; then
+	INSTALL_OK=1
+	break
+	fi
+	echo_warn "PyPI 源失败，尝试下一个..."
 	done
+	else
+	# PyPI 安装模式（默认）
+	echo_info "正在从 PyPI 安装 Jarvis (Python 3.12)..."
+
+	for index in "${PYPI_INDEXES[@]}"; do
+	echo_info "尝试 PyPI 源: $index"
+	if uv tool install jarvis-ai-assistant --python 3.12 --default-index "$index"; then
+	INSTALL_OK=1
+	break
+	fi
+	echo_warn "PyPI 源失败，尝试下一个..."
+	done
+	fi
 
 	if [ "$INSTALL_OK" -ne 1 ]; then
-		echo_error "Jarvis 安装失败"
-		exit 1
+	echo_error "Jarvis 安装失败"
+	exit 1
 	fi
 
 	# 更新 shell 环境
@@ -255,7 +273,7 @@ install_jarvis() {
 
 	set_state "jarvis"
 	echo_info "Jarvis 安装完成"
-}
+	}
 # ===== 验证安装 =====
 verify_installation() {
 	export PATH="$HOME/.local/bin:$PATH"
@@ -275,21 +293,43 @@ main() {
 	echo "========================================"
 	echo ""
 
+	# 解析参数
+	for arg in "$@"; do
+	case "$arg" in
+	--source)
+	INSTALL_MODE="source"
+	echo_info "安装模式: 源码安装"
+	;;
+	--help|-h)
+	echo "用法: $0 [--source]"
+	echo "  --source  从源码安装（默认从 PyPI 安装）"
+	exit 0
+	;;
+	*)
+	echo_warn "未知参数: $arg（使用 --help 查看用法）"
+	;;
+	esac
+	done
+
 	# 检查前置条件
 	command -v git &>/dev/null || {
-		echo_error "需要 git，请先安装"
-		exit 1
+	echo_error "需要 git，请先安装"
+	exit 1
 	}
 	command -v curl &>/dev/null || {
-		echo_error "需要 curl，请先安装"
-		exit 1
+	echo_error "需要 curl，请先安装"
+	exit 1
 	}
 
 	# 执行安装
 	install_uv || exit 1
 	set_state "uv"
+
+	if [ "$INSTALL_MODE" = "source" ]; then
 	prepare_source
 	set_state "source"
+	fi
+
 	install_jarvis
 	install_optional_tools
 	verify_installation
@@ -298,14 +338,24 @@ main() {
 	echo "========================================"
 	echo "✓ 安装完成！"
 	echo "========================================"
+
+	if [ "$INSTALL_MODE" = "source" ]; then
 	echo "安装位置: $DEST_DIR"
+	fi
+
 	echo ""
 	echo "快速开始:"
 	echo "  1. 如 jarvis 命令不可用，执行: source ~/.bashrc"
 	echo "  2. 启动 Jarvis: jarvis"
+
+	if [ "$INSTALL_MODE" = "source" ]; then
 	echo "  3. 升级 Jarvis: cd $DEST_DIR && git fetch --depth 1 && git reset --hard origin/main && uv tool install -e . --python 3.12"
+	else
+	echo "  3. 升级 Jarvis: uv tool upgrade jarvis-ai-assistant"
+	fi
+
 	echo ""
 	echo "========================================"
-}
+	}
 
 main "$@"
