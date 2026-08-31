@@ -1,5 +1,5 @@
 <template>
-  <div class="session-panel" :class="{ 'active': active, 'session-panel-embedded': embedded }" @click="handlePanelClick">
+  <div class="session-panel" :class="{ 'active': active, 'session-panel-embedded': embedded, 'session-panel-dragging': interaction?.active }" :style="panelStyle" @click="handlePanelClick">
     <!-- 空白占位 -->
     <div v-if="!agent" class="session-panel-empty">
       <div class="empty-icon">▦</div>
@@ -10,7 +10,7 @@
     <!-- 有 Agent 的会话 -->
     <template v-else>
       <!-- 会话头部 -->
-      <div class="session-panel-header">
+      <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <div class="session-header-actions">
@@ -50,6 +50,14 @@
           </div>
         </article>
       </div>
+
+      <!-- 调整大小手柄 -->
+      <div
+        v-for="direction in resizeDirections"
+        :key="direction"
+        :class="['session-resize-handle', `session-resize-${direction}`]"
+        @mousedown="$emit('startResize', $event, direction)"
+      ></div>
 
       <!-- 内嵌确认区域 -->
       <div v-if="confirmData" class="panel-confirm-bar">
@@ -163,6 +171,9 @@ const props = defineProps({
   active: { type: Boolean, default: false },
   confirmData: { type: Object, default: null },
   embedded: { type: Boolean, default: false },
+  interaction: { type: Object, default: null },
+  resizeDirections: { type: Array, default: () => [] },
+  panelStyle: { type: Object, default: null },
 })
 
 const emit = defineEmits([
@@ -173,6 +184,7 @@ const emit = defineEmits([
   'set-output-list', 'set-terminal-ref',
   'show-toast',
   'confirm', 'cancel-confirm',
+  'startMove', 'startResize',
 ])
 
 function handlePanelClick() {
@@ -296,12 +308,14 @@ function getTerminalStyle(terminalContent) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  position: fixed;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-subtle);
   border-radius: 4px;
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
 .session-panel.active {
@@ -315,6 +329,80 @@ function getTerminalStyle(terminalContent) {
   height: 100% !important;
   top: auto !important;
   left: auto !important;
+}
+
+.session-panel-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.session-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+
+.session-resize-n {
+  top: -3px;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.session-resize-s {
+  bottom: -3px;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.session-resize-e {
+  right: -3px;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.session-resize-w {
+  left: -3px;
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.session-resize-ne {
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  cursor: nesw-resize;
+}
+
+.session-resize-nw {
+  top: -3px;
+  left: -3px;
+  width: 10px;
+  height: 10px;
+  cursor: nwse-resize;
+}
+
+.session-resize-se {
+  bottom: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  cursor: nwse-resize;
+}
+
+.session-resize-sw {
+  bottom: -3px;
+  left: -3px;
+  width: 10px;
+  height: 10px;
+  cursor: nesw-resize;
 }
 
 .session-panel-empty {

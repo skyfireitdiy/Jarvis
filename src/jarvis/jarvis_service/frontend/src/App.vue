@@ -491,6 +491,9 @@
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
         :confirm-data="getPanelConfirmData(panel)"
+        :interaction="sessionPanelInteraction"
+        :resizeDirections="sessionResizeDirections"
+        :panelStyle="sessionPanelStyle"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -508,7 +511,8 @@
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
         @detach="detachPanel('session', panel.id)"
-        style="position: fixed; top: 80px; left: 50%; transform: translateX(-50%); width: 600px; height: 500px; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
+        @startMove="startSessionPanelMove"
+        @startResize="startSessionPanelResize"
       />
     </template>
 
@@ -1925,7 +1929,7 @@ function setSessionPanelRef(panelId, el) {
 }
 
 const showMobileMenu = ref(false)     // 移动端菜单
-const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
+const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | 'chat' | 'session' | null
 
 // Diff 浮动窗口状态
 const showDiffModal = ref(false)      // 显示diff浮动窗口
@@ -10037,6 +10041,234 @@ function saveTerminalPanelRect() {
 }
 
 const terminalPanelRect = ref(loadTerminalPanelRect())
+// SessionPanel 浮动面板
+const SESSION_PANEL_MIN_WIDTH = 400
+const SESSION_PANEL_MIN_HEIGHT = 300
+const SESSION_PANEL_STORAGE_KEY = 'jarvis_session_panel_rect'
+const sessionResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+
+function getDefaultSessionPanelRect() {
+  return {
+    top: 80,
+    left: Math.max(window.innerWidth - 824, 16),
+    width: 600,
+    height: 500,
+  }
+}
+
+function loadSessionPanelRect() {
+  const defaultRect = getDefaultSessionPanelRect()
+  const savedValue = localStorage.getItem(SESSION_PANEL_STORAGE_KEY)
+  if (!savedValue) {
+    return defaultRect
+  }
+
+  try {
+    const parsedValue = JSON.parse(savedValue)
+    if (
+      typeof parsedValue.top !== 'number' ||
+      typeof parsedValue.left !== 'number' ||
+      typeof parsedValue.width !== 'number' ||
+      typeof parsedValue.height !== 'number'
+    ) {
+      return defaultRect
+    }
+
+    return parsedValue
+  } catch {
+    return defaultRect
+  }
+}
+
+function saveSessionPanelRect() {
+  localStorage.setItem(SESSION_PANEL_STORAGE_KEY, JSON.stringify(sessionPanelRect.value))
+}
+
+const sessionPanelRect = ref(loadSessionPanelRect())
+const sessionPanelInteraction = ref({
+  active: false,
+  mode: null,
+  direction: null,
+  startX: 0,
+  startY: 0,
+  startTop: 0,
+  startLeft: 0,
+  startWidth: 0,
+  startHeight: 0,
+})
+
+const sessionPanelStyle = computed(() => ({
+  top: `${sessionPanelRect.value.top}px`,
+  left: `${sessionPanelRect.value.left}px`,
+  width: `${sessionPanelRect.value.width}px`,
+  height: `${sessionPanelRect.value.height}px`,
+  zIndex: activeWindow.value === 'session' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+}))
+
+function getSessionPanelBounds() {
+  const HEADER_HEIGHT = 32
+  const MIN_VISIBLE_WIDTH = 100
+  return {
+    minTop: 0,
+    minLeft: 0,
+    maxLeft: window.innerWidth - MIN_VISIBLE_WIDTH,
+    maxTop: window.innerHeight - HEADER_HEIGHT,
+  }
+}
+
+function ensureSessionPanelInViewport() {
+  const HEADER_HEIGHT = 32
+  const MIN_VISIBLE_WIDTH = 100
+  const maxWidth = Math.max(window.innerWidth, SESSION_PANEL_MIN_WIDTH)
+  const maxHeight = Math.max(window.innerHeight, SESSION_PANEL_MIN_HEIGHT)
+
+  sessionPanelRect.value.width = clamp(sessionPanelRect.value.width, SESSION_PANEL_MIN_WIDTH, maxWidth)
+  sessionPanelRect.value.height = clamp(sessionPanelRect.value.height, SESSION_PANEL_MIN_HEIGHT, maxHeight)
+
+  sessionPanelRect.value.left = clamp(
+    sessionPanelRect.value.left,
+    0,
+    window.innerWidth - MIN_VISIBLE_WIDTH
+  )
+  sessionPanelRect.value.top = clamp(
+    sessionPanelRect.value.top,
+    0,
+    window.innerHeight - HEADER_HEIGHT
+  )
+}
+
+function startSessionPanelMove(event) {
+  if (windowWidth.value <= 768) return
+  if (event.target.closest('.session-header-actions')) return
+
+  focusWindow('session')
+
+  sessionPanelInteraction.value = {
+    active: false,
+    mode: 'move',
+    direction: null,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: sessionPanelRect.value.top,
+    startLeft: sessionPanelRect.value.left,
+    startWidth: sessionPanelRect.value.width,
+    startHeight: sessionPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onSessionPanelPointerMove)
+  document.addEventListener('mouseup', stopSessionPanelInteraction)
+}
+
+function startSessionPanelResize(event, direction) {
+  if (windowWidth.value <= 768) return
+
+  sessionPanelInteraction.value = {
+    active: true,
+    mode: 'resize',
+    direction,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTop: sessionPanelRect.value.top,
+    startLeft: sessionPanelRect.value.left,
+    startWidth: sessionPanelRect.value.width,
+    startHeight: sessionPanelRect.value.height,
+  }
+
+  document.addEventListener('mousemove', onSessionPanelPointerMove)
+  document.addEventListener('mouseup', stopSessionPanelInteraction)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onSessionPanelPointerMove(event) {
+  const deltaX = event.clientX - sessionPanelInteraction.value.startX
+  const deltaY = event.clientY - sessionPanelInteraction.value.startY
+
+  if (sessionPanelInteraction.value.mode === 'move' && !sessionPanelInteraction.value.active) {
+    const dragDistance = Math.hypot(deltaX, deltaY)
+    if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
+      return
+    }
+
+    sessionPanelInteraction.value = {
+      ...sessionPanelInteraction.value,
+      active: true,
+    }
+    event.preventDefault()
+  }
+
+  if (!sessionPanelInteraction.value.active) return
+
+  if (sessionPanelInteraction.value.mode === 'move') {
+    const bounds = getSessionPanelBounds()
+    sessionPanelRect.value.left = clamp(sessionPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    sessionPanelRect.value.top = clamp(sessionPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+    return
+  }
+
+  const direction = sessionPanelInteraction.value.direction || ''
+  const startLeft = sessionPanelInteraction.value.startLeft
+  const startTop = sessionPanelInteraction.value.startTop
+  const startWidth = sessionPanelInteraction.value.startWidth
+  const startHeight = sessionPanelInteraction.value.startHeight
+
+  let nextLeft = startLeft
+  let nextTop = startTop
+  let nextWidth = startWidth
+  let nextHeight = startHeight
+
+  if (direction.includes('e')) {
+    nextWidth = clamp(startWidth + deltaX, SESSION_PANEL_MIN_WIDTH, Math.max(window.innerWidth - startLeft, SESSION_PANEL_MIN_WIDTH))
+  }
+
+  if (direction.includes('s')) {
+    nextHeight = clamp(startHeight + deltaY, SESSION_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - startTop, SESSION_PANEL_MIN_HEIGHT))
+  }
+
+  if (direction.includes('w')) {
+    const desiredLeft = clamp(startLeft + deltaX, 0, startLeft + startWidth - SESSION_PANEL_MIN_WIDTH)
+    nextLeft = desiredLeft
+    nextWidth = startWidth - (desiredLeft - startLeft)
+  }
+
+  if (direction.includes('n')) {
+    const desiredTop = clamp(startTop + deltaY, 0, startTop + startHeight - SESSION_PANEL_MIN_HEIGHT)
+    nextTop = desiredTop
+    nextHeight = startHeight - (desiredTop - startTop)
+  }
+
+  if (nextLeft + nextWidth > window.innerWidth) {
+    nextWidth = Math.max(SESSION_PANEL_MIN_WIDTH, window.innerWidth - nextLeft)
+  }
+
+  if (nextTop + nextHeight > window.innerHeight) {
+    nextHeight = Math.max(SESSION_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
+  }
+
+  sessionPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  sessionPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  sessionPanelRect.value.width = clamp(nextWidth, SESSION_PANEL_MIN_WIDTH, Math.max(window.innerWidth - sessionPanelRect.value.left, SESSION_PANEL_MIN_WIDTH))
+  sessionPanelRect.value.height = clamp(nextHeight, SESSION_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - sessionPanelRect.value.top, SESSION_PANEL_MIN_HEIGHT))
+}
+
+function stopSessionPanelInteraction() {
+  sessionPanelInteraction.value = {
+    active: false,
+    mode: null,
+    direction: null,
+    startX: 0,
+    startY: 0,
+    startTop: 0,
+    startLeft: 0,
+    startWidth: 0,
+    startHeight: 0,
+  }
+
+  document.removeEventListener('mousemove', onSessionPanelPointerMove)
+  document.removeEventListener('mouseup', stopSessionPanelInteraction)
+  saveSessionPanelRect()
+}
+
 const terminalPanelInteraction = ref({
   active: false,
   mode: null,
@@ -11161,9 +11393,11 @@ onMounted(() => {
     ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
+    ensureSessionPanelInViewport()
     saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
+    saveSessionPanelRect()
     layoutCodeMirrorEditor()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
