@@ -2,11 +2,11 @@
   <aside
     v-show="visible"
     class="terminal-panel"
-    :class="{ 'terminal-panel-dragging': interaction.active, 'terminal-panel-active': active }"
+    :class="{ 'terminal-panel-dragging': interaction.active, 'terminal-panel-active': active, 'terminal-panel-embedded': embedded }"
     :style="panelStyle"
     @mousedown="$emit('focus', 'terminal')"
   >
-    <div class="terminal-panel-header" @mousedown="$emit('startMove', $event)" @dblclick.stop="$emit('toggleMaximize')">
+    <div class="terminal-panel-header" @mousedown="!embedded && $emit('startMove', $event)" @dblclick.stop="!embedded && $emit('toggleMaximize')">
       <div class="terminal-panel-title-group">
         <h3>终端</h3>
       </div>
@@ -24,9 +24,10 @@
           </option>
         </select>
         <button class="icon-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
-        <button class="icon-btn maximize-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
+        <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
         </button>
+        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
@@ -75,6 +76,7 @@ import { defineProps, defineEmits } from 'vue'
 const props = defineProps({
   visible: Boolean,
   active: Boolean,
+  embedded: Boolean,
   interaction: Object,
   panelStyle: Object,
   nodeOptions: Array,
@@ -91,6 +93,7 @@ const emit = defineEmits([
   'focus',
   'startMove',
   'toggleMaximize',
+  'detach',
   'update:selectedNodeId',
   'createTerminal',
   'close',
@@ -151,6 +154,15 @@ const emit = defineEmits([
 
 .terminal-panel-dragging {
   user-select: none;
+}
+
+.terminal-panel-embedded {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: auto !important;
+  left: auto !important;
+  border-radius: 4px;
 }
 
 .terminal-panel-header {
