@@ -493,7 +493,7 @@
         :confirm-data="getPanelConfirmData(panel)"
         :interaction="sessionPanelInteraction"
         :resizeDirections="sessionResizeDirections"
-        :panelStyle="sessionPanelStyle"
+        :panelStyle="getSessionPanelStyle(panel.id)"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -511,8 +511,8 @@
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
         @detach="detachPanel('session', panel.id)"
-        @startMove="startSessionPanelMove"
-        @startResize="startSessionPanelResize"
+        @startMove="startSessionPanelMove($event, panel.id)"
+        @startResize="(event, direction) => startSessionPanelResize(event, direction, panel.id)"
       />
     </template>
 
@@ -3926,6 +3926,10 @@ function detachPanel(type, panelId = null) {
       sessionDetachedPanels.value.delete(panelId)
     } else {
       sessionDetachedPanels.value.add(panelId)
+      // 初始化该面板的浮动位置
+      if (!sessionPanelRects.value[panelId]) {
+        sessionPanelRects.value[panelId] = loadSessionPanelRect(panelId)
+      }
     }
     triggerRef(sessionDetachedPanels)
   }
@@ -10044,21 +10048,24 @@ const terminalPanelRect = ref(loadTerminalPanelRect())
 // SessionPanel 浮动面板
 const SESSION_PANEL_MIN_WIDTH = 400
 const SESSION_PANEL_MIN_HEIGHT = 300
-const SESSION_PANEL_STORAGE_KEY = 'jarvis_session_panel_rect'
+const SESSION_PANEL_STORAGE_KEY_PREFIX = 'jarvis_session_panel_rect_'
 const sessionResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
-function getDefaultSessionPanelRect() {
+function getDefaultSessionPanelRect(panelId) {
+  // 按 panelId 偏移位置，避免多个浮动面板重叠
+  const index = Array.from(sessionDetachedPanels.value).indexOf(panelId)
+  const offset = index * 40
   return {
-    top: 80,
-    left: Math.max(window.innerWidth - 824, 16),
+    top: 80 + offset,
+    left: Math.max(window.innerWidth - 824 - offset, 16),
     width: 600,
     height: 500,
   }
 }
 
-function loadSessionPanelRect() {
-  const defaultRect = getDefaultSessionPanelRect()
-  const savedValue = localStorage.getItem(SESSION_PANEL_STORAGE_KEY)
+function loadSessionPanelRect(panelId) {
+  const defaultRect = getDefaultSessionPanelRect(panelId)
+  const savedValue = localStorage.getItem(SESSION_PANEL_STORAGE_KEY_PREFIX + panelId)
   if (!savedValue) {
     return defaultRect
   }
@@ -10080,15 +10087,19 @@ function loadSessionPanelRect() {
   }
 }
 
-function saveSessionPanelRect() {
-  localStorage.setItem(SESSION_PANEL_STORAGE_KEY, JSON.stringify(sessionPanelRect.value))
+function saveSessionPanelRect(panelId) {
+  const rect = sessionPanelRects.value[panelId]
+  if (rect) {
+    localStorage.setItem(SESSION_PANEL_STORAGE_KEY_PREFIX + panelId, JSON.stringify(rect))
+  }
 }
 
-const sessionPanelRect = ref(loadSessionPanelRect())
+const sessionPanelRects = ref({})  // panelId -> rect
 const sessionPanelInteraction = ref({
   active: false,
   mode: null,
   direction: null,
+  panelId: null,
   startX: 0,
   startY: 0,
   startTop: 0,
@@ -10097,13 +10108,17 @@ const sessionPanelInteraction = ref({
   startHeight: 0,
 })
 
-const sessionPanelStyle = computed(() => ({
-  top: `${sessionPanelRect.value.top}px`,
-  left: `${sessionPanelRect.value.left}px`,
-  width: `${sessionPanelRect.value.width}px`,
-  height: `${sessionPanelRect.value.height}px`,
-  zIndex: activeWindow.value === 'session' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
-}))
+function getSessionPanelStyle(panelId) {
+  const rect = sessionPanelRects.value[panelId]
+  if (!rect) return {}
+  return {
+    top: `${rect.top}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    zIndex: activeWindow.value === 'session' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+  }
+}
 
 function getSessionPanelBounds() {
   const HEADER_HEIGHT = 32
@@ -10116,62 +10131,72 @@ function getSessionPanelBounds() {
   }
 }
 
-function ensureSessionPanelInViewport() {
+function ensureSessionPanelInViewport(panelId) {
+  const rect = sessionPanelRects.value[panelId]
+  if (!rect) return
   const HEADER_HEIGHT = 32
   const MIN_VISIBLE_WIDTH = 100
   const maxWidth = Math.max(window.innerWidth, SESSION_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, SESSION_PANEL_MIN_HEIGHT)
 
-  sessionPanelRect.value.width = clamp(sessionPanelRect.value.width, SESSION_PANEL_MIN_WIDTH, maxWidth)
-  sessionPanelRect.value.height = clamp(sessionPanelRect.value.height, SESSION_PANEL_MIN_HEIGHT, maxHeight)
+  rect.width = clamp(rect.width, SESSION_PANEL_MIN_WIDTH, maxWidth)
+  rect.height = clamp(rect.height, SESSION_PANEL_MIN_HEIGHT, maxHeight)
 
-  sessionPanelRect.value.left = clamp(
-    sessionPanelRect.value.left,
+  rect.left = clamp(
+    rect.left,
     0,
     window.innerWidth - MIN_VISIBLE_WIDTH
   )
-  sessionPanelRect.value.top = clamp(
-    sessionPanelRect.value.top,
+  rect.top = clamp(
+    rect.top,
     0,
     window.innerHeight - HEADER_HEIGHT
   )
 }
 
-function startSessionPanelMove(event) {
+function startSessionPanelMove(event, panelId) {
   if (windowWidth.value <= 768) return
   if (event.target.closest('.session-header-actions')) return
 
   focusWindow('session')
 
+  const rect = sessionPanelRects.value[panelId]
+  if (!rect) return
+
   sessionPanelInteraction.value = {
     active: false,
     mode: 'move',
     direction: null,
+    panelId,
     startX: event.clientX,
     startY: event.clientY,
-    startTop: sessionPanelRect.value.top,
-    startLeft: sessionPanelRect.value.left,
-    startWidth: sessionPanelRect.value.width,
-    startHeight: sessionPanelRect.value.height,
+    startTop: rect.top,
+    startLeft: rect.left,
+    startWidth: rect.width,
+    startHeight: rect.height,
   }
 
   document.addEventListener('mousemove', onSessionPanelPointerMove)
   document.addEventListener('mouseup', stopSessionPanelInteraction)
 }
 
-function startSessionPanelResize(event, direction) {
+function startSessionPanelResize(event, direction, panelId) {
   if (windowWidth.value <= 768) return
+
+  const rect = sessionPanelRects.value[panelId]
+  if (!rect) return
 
   sessionPanelInteraction.value = {
     active: true,
     mode: 'resize',
     direction,
+    panelId,
     startX: event.clientX,
     startY: event.clientY,
-    startTop: sessionPanelRect.value.top,
-    startLeft: sessionPanelRect.value.left,
-    startWidth: sessionPanelRect.value.width,
-    startHeight: sessionPanelRect.value.height,
+    startTop: rect.top,
+    startLeft: rect.left,
+    startWidth: rect.width,
+    startHeight: rect.height,
   }
 
   document.addEventListener('mousemove', onSessionPanelPointerMove)
@@ -10181,17 +10206,22 @@ function startSessionPanelResize(event, direction) {
 }
 
 function onSessionPanelPointerMove(event) {
-  const deltaX = event.clientX - sessionPanelInteraction.value.startX
-  const deltaY = event.clientY - sessionPanelInteraction.value.startY
+  const interaction = sessionPanelInteraction.value
+  const panelId = interaction.panelId
+  const rect = sessionPanelRects.value[panelId]
+  if (!rect) return
 
-  if (sessionPanelInteraction.value.mode === 'move' && !sessionPanelInteraction.value.active) {
+  const deltaX = event.clientX - interaction.startX
+  const deltaY = event.clientY - interaction.startY
+
+  if (interaction.mode === 'move' && !interaction.active) {
     const dragDistance = Math.hypot(deltaX, deltaY)
     if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
       return
     }
 
     sessionPanelInteraction.value = {
-      ...sessionPanelInteraction.value,
+      ...interaction,
       active: true,
     }
     event.preventDefault()
@@ -10201,8 +10231,8 @@ function onSessionPanelPointerMove(event) {
 
   if (sessionPanelInteraction.value.mode === 'move') {
     const bounds = getSessionPanelBounds()
-    sessionPanelRect.value.left = clamp(sessionPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
-    sessionPanelRect.value.top = clamp(sessionPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+    rect.left = clamp(interaction.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    rect.top = clamp(interaction.startTop + deltaY, bounds.minTop, bounds.maxTop)
     return
   }
 
@@ -10245,17 +10275,19 @@ function onSessionPanelPointerMove(event) {
     nextHeight = Math.max(SESSION_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
   }
 
-  sessionPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
-  sessionPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
-  sessionPanelRect.value.width = clamp(nextWidth, SESSION_PANEL_MIN_WIDTH, Math.max(window.innerWidth - sessionPanelRect.value.left, SESSION_PANEL_MIN_WIDTH))
-  sessionPanelRect.value.height = clamp(nextHeight, SESSION_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - sessionPanelRect.value.top, SESSION_PANEL_MIN_HEIGHT))
+  rect.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  rect.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  rect.width = clamp(nextWidth, SESSION_PANEL_MIN_WIDTH, Math.max(window.innerWidth - rect.left, SESSION_PANEL_MIN_WIDTH))
+  rect.height = clamp(nextHeight, SESSION_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - rect.top, SESSION_PANEL_MIN_HEIGHT))
 }
 
 function stopSessionPanelInteraction() {
+  const panelId = sessionPanelInteraction.value.panelId
   sessionPanelInteraction.value = {
     active: false,
     mode: null,
     direction: null,
+    panelId: null,
     startX: 0,
     startY: 0,
     startTop: 0,
@@ -10266,7 +10298,9 @@ function stopSessionPanelInteraction() {
 
   document.removeEventListener('mousemove', onSessionPanelPointerMove)
   document.removeEventListener('mouseup', stopSessionPanelInteraction)
-  saveSessionPanelRect()
+  if (panelId) {
+    saveSessionPanelRect(panelId)
+  }
 }
 
 const terminalPanelInteraction = ref({
@@ -11393,11 +11427,13 @@ onMounted(() => {
     ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
-    ensureSessionPanelInViewport()
+    sessionDetachedPanels.value.forEach(panelId => {
+      ensureSessionPanelInViewport(panelId)
+      saveSessionPanelRect(panelId)
+    })
     saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
-    saveSessionPanelRect()
     layoutCodeMirrorEditor()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
