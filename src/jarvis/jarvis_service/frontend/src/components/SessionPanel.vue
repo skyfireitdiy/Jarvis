@@ -1,5 +1,5 @@
 <template>
-  <div class="session-panel" :class="{ 'active': active }" @click="$emit('activate')">
+  <div class="session-panel" :class="{ 'active': active }" @click="handlePanelClick">
     <!-- 空白占位 -->
     <div v-if="!agent" class="session-panel-empty">
       <div class="empty-icon">▦</div>
@@ -170,6 +170,19 @@ const emit = defineEmits([
   'show-toast',
   'confirm', 'cancel-confirm',
 ])
+
+function handlePanelClick() {
+  // 当前已激活的 Panel 不重复触发 activate
+  if (props.active) {
+    return
+  }
+  // 若用户正在选中文本，不触发 activate
+  const selection = window.getSelection()
+  if (selection && selection.toString().trim()) {
+    return
+  }
+  emit('activate')
+}
 
 const outputListRef = ref(null)
 const inputCollapsed = ref(false)
