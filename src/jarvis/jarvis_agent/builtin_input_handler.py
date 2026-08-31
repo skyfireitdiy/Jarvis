@@ -1187,6 +1187,37 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 True,
             )
 
+        elif tag == "GitPush":
+            # 处理GitPush命令，推送代码到远端
+            try:
+                find_git_root()
+            except Exception:
+                PrettyOutput.auto_print("⚠ 当前目录不在 Git 仓库中，无法推送代码")
+                return "", True
+
+            PrettyOutput.auto_print("🚀 正在推送代码到远端...")
+            try:
+                from jarvis.jarvis_tools.execute_script import ScriptTool
+
+                script_tool = ScriptTool()
+                result = script_tool.execute(
+                    {
+                        "script_content": "git push",
+                        "execution_mode": "interactive",
+                    }
+                )
+                if result.get("success"):
+                    PrettyOutput.auto_print("✅ 代码推送成功")
+                    stdout = result.get("stdout", "")
+                    if stdout.strip():
+                        PrettyOutput.auto_print(stdout.strip())
+                else:
+                    stderr = result.get("stderr", "未知错误")
+                    PrettyOutput.auto_print(f"❌ 代码推送失败: {stderr}")
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 代码推送异常: {e}")
+            return "", True
+
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
             continue
