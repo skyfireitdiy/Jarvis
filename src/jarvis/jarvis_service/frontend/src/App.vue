@@ -4057,11 +4057,32 @@ function completeFromPanel(panel) {
           lang: 'text',
         }, agentId)
       }
+      // 恢复输入模式为多行
+      inputMode.value = 'multi'
+      panelInputModes.value.set(agentId, 'multi')
+      inputTip.value = ''
+      panelInputTips.value.set(agentId, '')
+      // 恢复 Agent 状态为 running
+      agentStatuses.value.set(agentId, {execution_status: 'running'})
     },
     onCancel: () => {
-      // 取消时无需额外操作，panelConfirmData 已在 handlePanelCancelConfirm 中清除
+      // 取消时恢复输入模式为多行
+      inputMode.value = 'multi'
+      panelInputModes.value.set(agentId, 'multi')
+      inputTip.value = ''
+      panelInputTips.value.set(agentId, '')
+      // 恢复 Agent 状态为 running
+      agentStatuses.value.set(agentId, {execution_status: 'running'})
     },
   })
+
+  // 同步设置 waiting_confirm 状态，使 handlePanelKeydown 中 Enter/y/n 键可响应
+  agentStatuses.value.set(agentId, {execution_status: 'waiting_confirm'})
+  // 确认请求使用单行输入模式，避免多行输入框抢占焦点
+  inputMode.value = 'single'
+  panelInputModes.value.set(agentId, 'single')
+  inputTip.value = '确定要发送完成信号吗？ (Enter/y 确认, n 取消)'
+  panelInputTips.value.set(agentId, '确定要发送完成信号吗？ (Enter/y 确认, n 取消)')
 }
 
 // 从 Panel 打开补全
@@ -4152,12 +4173,24 @@ function handlePanelKeydown(panel, event) {
   if (executionStatus === 'waiting_confirm') {
     if (event.key === 'y' || event.key === 'Y') {
       event.preventDefault()
-      sendConfirmResult(true, agentId)
+      // 优先走 panelConfirmData 的 onConfirm 回调（如 completeFromPanel 场景）
+      const confirmData = panelConfirmData.value.get(agentId)
+      if (confirmData?.onConfirm) {
+        handlePanelConfirm(panel)
+      } else {
+        sendConfirmResult(true, agentId)
+      }
       return
     }
     if (event.key === 'n' || event.key === 'N') {
       event.preventDefault()
-      sendConfirmResult(false, agentId)
+      // 优先走 panelConfirmData 的 onCancel 回调（如 completeFromPanel 场景）
+      const confirmData = panelConfirmData.value.get(agentId)
+      if (confirmData?.onCancel) {
+        handlePanelCancelConfirm(panel)
+      } else {
+        sendConfirmResult(false, agentId)
+      }
       return
     }
     if (event.key === 'Enter') {
