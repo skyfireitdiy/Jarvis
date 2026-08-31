@@ -253,7 +253,8 @@
       @startResize="startEditorPanelResize"
     >
       <template #sidebar>
-        <aside v-if="showEditorSidebar" class="editor-sidebar">
+        <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
+          <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
           <div class="editor-sidebar-header">
             <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
             <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
@@ -1565,6 +1566,10 @@ const AGENT_SIDEBAR_DEFAULT_WIDTH = 320
 const AGENT_SIDEBAR_MIN_WIDTH = 240
 const AGENT_SIDEBAR_MAX_WIDTH = 560
 const AGENT_SIDEBAR_STORAGE_KEY = 'jarvis_agent_sidebar_width'
+const EDITOR_SIDEBAR_DEFAULT_WIDTH = 320
+const EDITOR_SIDEBAR_MIN_WIDTH = 200
+const EDITOR_SIDEBAR_MAX_WIDTH = 560
+const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_editor_sidebar_width'
 
 function normalizeAgentSidebarWidth(width) {
   return clamp(width, AGENT_SIDEBAR_MIN_WIDTH, AGENT_SIDEBAR_MAX_WIDTH)
@@ -1588,11 +1593,39 @@ function saveAgentSidebarWidth() {
   localStorage.setItem(AGENT_SIDEBAR_STORAGE_KEY, String(agentSidebarWidth.value))
 }
 
+function normalizeEditorSidebarWidth(width) {
+  return clamp(width, EDITOR_SIDEBAR_MIN_WIDTH, EDITOR_SIDEBAR_MAX_WIDTH)
+}
+
+function loadEditorSidebarWidth() {
+  const savedValue = localStorage.getItem(EDITOR_SIDEBAR_STORAGE_KEY)
+  if (!savedValue) {
+    return EDITOR_SIDEBAR_DEFAULT_WIDTH
+  }
+
+  const parsedWidth = Number(savedValue)
+  if (!Number.isFinite(parsedWidth)) {
+    return EDITOR_SIDEBAR_DEFAULT_WIDTH
+  }
+
+  return normalizeEditorSidebarWidth(parsedWidth)
+}
+
+function saveEditorSidebarWidth() {
+  localStorage.setItem(EDITOR_SIDEBAR_STORAGE_KEY, String(editorSidebarWidth.value))
+}
+
 const agentSidebarWidth = ref(loadAgentSidebarWidth())
 const agentSidebarResizeState = ref({
   active: false,
   startX: 0,
   startWidth: AGENT_SIDEBAR_DEFAULT_WIDTH,
+})
+const editorSidebarWidth = ref(loadEditorSidebarWidth())
+const editorSidebarResizeState = ref({
+  active: false,
+  startX: 0,
+  startWidth: EDITOR_SIDEBAR_DEFAULT_WIDTH,
 })
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
@@ -1895,6 +1928,47 @@ function stopAgentSidebarResize() {
   document.removeEventListener('mousemove', onAgentSidebarResize)
   document.removeEventListener('mouseup', stopAgentSidebarResize)
   saveAgentSidebarWidth()
+}
+
+function startEditorSidebarResize(event) {
+  if (windowWidth.value <= 768 || !showEditorSidebar.value) return
+
+  editorSidebarResizeState.value = {
+    active: true,
+    startX: event.clientX,
+    startWidth: editorSidebarWidth.value,
+  }
+
+  document.addEventListener('mousemove', onEditorSidebarResize)
+  document.addEventListener('mouseup', stopEditorSidebarResize)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onEditorSidebarResize(event) {
+  if (!editorSidebarResizeState.value.active) return
+
+  const deltaX = event.clientX - editorSidebarResizeState.value.startX
+  const nextWidth = editorSidebarResizeState.value.startWidth + deltaX
+  editorSidebarWidth.value = normalizeEditorSidebarWidth(nextWidth)
+}
+
+function stopEditorSidebarResize() {
+  if (!editorSidebarResizeState.value.active) {
+    document.removeEventListener('mousemove', onEditorSidebarResize)
+    document.removeEventListener('mouseup', stopEditorSidebarResize)
+    return
+  }
+
+  editorSidebarResizeState.value = {
+    active: false,
+    startX: 0,
+    startWidth: editorSidebarWidth.value,
+  }
+
+  document.removeEventListener('mousemove', onEditorSidebarResize)
+  document.removeEventListener('mouseup', stopEditorSidebarResize)
+  saveEditorSidebarWidth()
 }
 
 // 设置焦点窗口
@@ -11220,14 +11294,41 @@ body::-webkit-scrollbar {
 }
 
 .editor-sidebar {
-  width: 320px;
-  min-width: 280px;
-  max-width: 420px;
+  position: relative;
+  min-width: 200px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--color-border-subtle);
   background: transparent;
+  flex-shrink: 0;
+}
+
+.editor-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 5;
+}
+
+.editor-sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.editor-sidebar-resize-handle:hover::after {
+  background: #20c8ff;
 }
 
 .editor-sidebar-header {
