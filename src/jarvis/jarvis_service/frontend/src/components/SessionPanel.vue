@@ -76,6 +76,7 @@
           <!-- 多行输入框 -->
           <textarea
             v-if="inputMode === 'multi'"
+            ref="multiInputRef"
             :value="inputText"
             :data-agent-id="agent?.agent_id || ''"
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
@@ -88,6 +89,7 @@
           <!-- 单行输入框 -->
           <input
             v-else
+            ref="singleInputRef"
             :value="inputText"
             :data-agent-id="agent?.agent_id || ''"
             :type="isPassword ? 'password' : 'text'"
@@ -192,6 +194,22 @@ function handlePanelClick() {
 
 const outputListRef = ref(null)
 const inputCollapsed = ref(false)
+const multiInputRef = ref(null)
+const singleInputRef = ref(null)
+
+// 聚焦输入框
+function focusInput() {
+  inputCollapsed.value = false
+  // 等待 DOM 更新后再聚焦
+  setTimeout(() => {
+    const el = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
+    if (el) {
+      el.focus()
+    }
+  }, 50)
+}
+
+defineExpose({ focusInput })
 
 function setOutputListRef(el) {
   outputListRef.value = el

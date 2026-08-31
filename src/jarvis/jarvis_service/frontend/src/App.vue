@@ -119,6 +119,7 @@
     <!-- Panel 网格布局 -->
     <main class="panel-grid" :style="panelGridStyle">
       <SessionPanel
+        :ref="(el) => setSessionPanelRef(panel.id, el)"
         v-for="panel in panels"
         v-show="!sessionDetachedPanels.has(panel.id)"
         :key="panel.id"
@@ -473,10 +474,9 @@
         </template>
       </EditorPanel>
     </main>
-
-    <!-- 浮动 SessionPanel（已分离的会话面板） -->
     <template v-for="panel in panels" :key="'floating-' + panel.id">
       <SessionPanel
+        :ref="(el) => setSessionPanelRef(panel.id, el)"
         v-if="sessionDetachedPanels.has(panel.id)"
         :embedded="false"
         :agent="getPanelAgent(panel)"
@@ -1914,6 +1914,16 @@ const terminalDetached = ref(false)  // 终端面板是否已分离为浮动模�
 const chatDetached = ref(false)     // 聊天室面板是否已分离为浮动模式
 const editorDetached = ref(false)   // 编辑器面板是否已分离为浮动模式
 const sessionDetachedPanels = ref(new Set())  // 已分离为浮动模式的 SessionPanel ID 集合
+const sessionPanelRefs = new Map()  // panelId -> SessionPanel 组件实例
+
+function setSessionPanelRef(panelId, el) {
+  if (el) {
+    sessionPanelRefs.set(panelId, el)
+  } else {
+    sessionPanelRefs.delete(panelId)
+  }
+}
+
 const showMobileMenu = ref(false)     // 移动端菜单
 const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | null
 
@@ -3667,6 +3677,7 @@ function closePanel(panelId) {
   }
   panels.value.splice(index, 1)
   panelOutputLists.delete(panelId)
+  sessionPanelRefs.delete(panelId)
   // 如果该 Panel 已 detach，同时从 detach 集合中移除
   if (sessionDetachedPanels.value.has(panelId)) {
     sessionDetachedPanels.value.delete(panelId)
@@ -4029,6 +4040,8 @@ function completeFromPanel(panel) {
   const agentId = panel.agentId
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
+  // 记住原始状态，确认/取消后恢复
+  const originalStatus = executionStatus
 
   // 使用 Panel 内嵌确认，而非全局弹出对话框
   panelConfirmData.value.set(agentId, {
@@ -4062,8 +4075,8 @@ function completeFromPanel(panel) {
       panelInputModes.value.set(agentId, 'multi')
       inputTip.value = ''
       panelInputTips.value.set(agentId, '')
-      // 恢复 Agent 状态为 running
-      agentStatuses.value.set(agentId, {execution_status: 'running'})
+      // 恢复 Agent 状态为原始状态
+      agentStatuses.value.set(agentId, {execution_status: originalStatus})
     },
     onCancel: () => {
       // 取消时恢复输入模式为多行
@@ -4071,8 +4084,8 @@ function completeFromPanel(panel) {
       panelInputModes.value.set(agentId, 'multi')
       inputTip.value = ''
       panelInputTips.value.set(agentId, '')
-      // 恢复 Agent 状态为 running
-      agentStatuses.value.set(agentId, {execution_status: 'running'})
+      // 恢复 Agent 状态为原始状态
+      agentStatuses.value.set(agentId, {execution_status: originalStatus})
     },
   })
 
@@ -4083,6 +4096,12 @@ function completeFromPanel(panel) {
   panelInputModes.value.set(agentId, 'single')
   inputTip.value = '确定要发送完成信号吗？ (Enter/y 确认, n 取消)'
   panelInputTips.value.set(agentId, '确定要发送完成信号吗？ (Enter/y 确认, n 取消)')
+
+  // 聚焦输入框
+  const sessionPanel = sessionPanelRefs.get(panel.id)
+  if (sessionPanel?.focusInput) {
+    sessionPanel.focusInput()
+  }
 }
 
 // 从 Panel 打开补全
@@ -5955,10 +5974,18 @@ async function fetchAgentStatus(agent) {
         inputMode.value = 'single'
         panelInputModes.value.set(agent.agent_id, 'single')
         console.log('[AGENT STATUS] Set inputMode to single')
+        // 聚焦输入框
+        const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+        const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+        if (sp?.focusInput) sp.focusInput()
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
         console.log('[AGENT STATUS] Set inputMode to multi')
+        // 聚焦输入框
+        const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+        const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+        if (sp?.focusInput) sp.focusInput()
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
@@ -5976,6 +6003,10 @@ async function fetchAgentStatus(agent) {
           panelInputModes.value.set(agent.agent_id, 'single')
           inputTip.value = payload.message || '请确认 (y/n/Enter)'
           panelInputTips.value.set(agent.agent_id, payload.message || '请确认 (y/n/Enter)')
+          // 聚焦输入框
+          const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+          const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+          if (sp?.focusInput) sp.focusInput()
           // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
         } else {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
@@ -7983,7 +8014,14 @@ function handleMessage(message, agentId = null) {
 
     const requestAgentId = targetAgentId
     pendingInputAgentId.value = requestAgentId
-    
+
+    // 检查当前是否处于 waiting_confirm 状态，如果是则跳过状态更新（不覆盖确认状态）
+    const currentStatus = requestAgentId ? agentStatuses.value.get(requestAgentId)?.execution_status : null
+    if (currentStatus === 'waiting_confirm') {
+      console.log('[ws] Skipping input_request, agent is in waiting_confirm state')
+      return
+    }
+
     // 根据 mode 设置 agentStatuses
     if (requestAgentId && payload.mode) {
       const statusKey = payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single'
@@ -8035,6 +8073,10 @@ function handleMessage(message, agentId = null) {
       }
       pendingInputAgentId.value = targetAgentId
 
+      // 聚焦输入框
+      const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
+      const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+      if (sp?.focusInput) sp.focusInput()
 
     }
     
@@ -8081,6 +8123,10 @@ function handleMessage(message, agentId = null) {
     panelInputModes.value.set(targetAgentId, 'single')
     inputTip.value = payload.message || '请确认 (y/n/Enter)'
     panelInputTips.value.set(targetAgentId, payload.message || '请确认 (y/n/Enter)')
+    // 聚焦输入框
+    const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
+    const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+    if (sp?.focusInput) sp.focusInput()
     // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)

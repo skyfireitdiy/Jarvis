@@ -1,0 +1,8 @@
+{
+  "id": "20260831_120629_989388",
+  "type": "project_long_term",
+  "tags": ["SessionPanel", "输入框聚焦", "focusInput", "架构决策"],
+  "content": "SessionPanel 输入框自动聚焦已完成。实现方案：1) SessionPanel.vue 添加 multiInputRef/singleInputRef ref 和 focusInput 方法（defineExpose 暴露），focusInput 中先展开 inputCollapsed 再 setTimeout 50ms 后聚焦对应输入框；2) App.vue 添加 sessionPanelRefs Map（panelId -> 组件实例）和 setSessionPanelRef 函数，内嵌和浮动 SessionPanel 均通过 :ref 绑定；3) 在 completeFromPanel、handleMessage 的 confirm/input_request 分支、fetchAgentStatus 的 waiting_single/waiting_multi/waiting_confirm 分支中调用 focusInput；4) closePanel 中清理 sessionPanelRefs。注意：sessionPanelRefs 的 key 是 panel.id，需要通过 panels.value.find(p => p.agentId === agentId) 找到 panel 再取 panel.id。编译通过（✓ built in 35.99s）。",
+  "created_at": "2026-08-31T12:06:29.989443",
+  "updated_at": "2026-08-31T12:06:29.989451"
+}

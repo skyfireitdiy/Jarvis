@@ -1,0 +1,8 @@
+{
+  "id": "20260831_123318_767326",
+  "type": "project_long_term",
+  "tags": ["Ctrl+C确认流程", "waiting_confirm", "状态修复", "已完成"],
+  "content": "Ctrl+C 确认流程状态混乱修复已完成（Commits: 9f84ea3, b1cf492, f038319）。修复内容：1) handleMessage 的 input_request 分支检查 waiting_confirm 状态时跳过状态更新（不覆盖确认状态）；2) completeFromPanel 的 onConfirm/onCancel 回调恢复为原始状态 originalStatus 而非硬编码 running。编译通过（✓ built in 34.09s）。所有关键代码路径已验证：handlePanelKeydown 中 waiting_confirm 状态 y/n/Enter 正确调用 handlePanelConfirm/handlePanelCancelConfirm；handlePanelConfirm/handlePanelCancelConfirm 正确调用 onConfirm/onCancel 回调；fetchAgentStatus 的 waiting_single/waiting_multi/waiting_confirm 分支均正确设置状态和 focusInput。",
+  "created_at": "2026-08-31T12:33:18.767400",
+  "updated_at": "2026-08-31T12:33:18.767406"
+}
