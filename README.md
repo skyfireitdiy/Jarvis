@@ -9,7 +9,7 @@
 
 **一句话**：本地运行、开箱即用、可深度定制的 AI 开发助手——写代码、做审查、跑自动化、做安全分析、搞 C→Rust 迁移，一个命令行搞定。
 
-[为什么选 Jarvis](#-为什么选-jarvis) · [快速开始](#-快速开始) · [访问方式](#-访问方式) · [常用命令](#-常用命令) · [文档导航](#-文档导航) · [系统架构](#-系统架构) · [参与贡献](#-贡献指南)
+[为什么选 Jarvis](#-为什么选-jarvis) · [访问方式](#-访问方式) · [核心能力](#-核心能力) · [快速开始](#-快速开始) · [常用命令](#-常用命令) · [文档导航](#-文档导航) · [Python SDK](#-python-sdk-集成) · [系统架构](#-系统架构) · [配置说明](#-配置说明) · [扩展能力](#-扩展能力) · [贡献指南](#-贡献指南)
 
 ---
 
@@ -37,6 +37,21 @@ Jarvis 是一个面向开发者的 **AI 助手平台**。它不只是对话工�
 - 🧠 **越用越聪明**：方法论沉淀、记忆分层、规则按需加载，经验可复用
 - 🔒 **本地可控**：数据留在本机，支持 Windows GUI 自动化，无 vendor lock-in
 - 🔌 **高度可扩展**：自定义工具、MCP 集成、元代理自举、新平台适配，想加就加
+
+### 与其他方案对比
+
+| 项目          | 定位              | 形态             | 核心场景                        |
+| ------------- | ----------------- | ---------------- | ------------------------------- |
+| **Jarvis**    | AI 助手平台       | CLI + Python SDK | 代码开发、安全分析、C→Rust 迁移 |
+| **LangChain** | LLM 应用框架      | Python 库        | 通用 Agent、RAG、工作流编排     |
+| **AutoGPT**   | 自主 AI Agent     | 独立应用         | 目标驱动的自主任务执行          |
+| **OpenClaw**  | 个人 AI 助手框架  | Node.js 应用     | 多通道消息、24/7 自主运行       |
+| **ZeroClaw**  | OpenClaw 轻量替代 | Rust 二进制      | 同 OpenClaw                     |
+
+- **Jarvis**：面向代码开发，采用分层架构（Agent / CodeAgent），强调本地化、轻量记忆、任务分离、规则按需加载，并支持 Windows GUI 自动化。
+- **LangChain**：通用编排框架，侧重生产级 RAG 与工作流，适合构建 LLM 应用。
+- **AutoGPT**：早期自主 Agent 代表，目标驱动明显，但成本和稳定性控制要求更高。
+- **OpenClaw / ZeroClaw**：更偏向消息渠道和日常自动化场景。
 
 ### 你可以用它做什么？
 
@@ -111,35 +126,12 @@ jarvis-service --node-mode child \
 
 Jarvis 支持完整的多用户认证、权限管理与团队协作能力，适合团队共享使用。
 
-**多用户认证**：
+- **多用户认证**：基于 JWT 的认证体系，支持注册/登录/登出，管理员与普通用户角色区分
+- **权限管理**：分组权限体系（内置组 + 自定义组）、权限矩阵可视化配置、节点级权限控制、Agent 访问控制（ACL）持久化
+- **聊天室协作**：群聊/私聊、在线用户实时同步、未读消息角标、图片发送、聊天记录持久化与清空
+- **多用户会话**：多端广播、WebSocket 会话隔离、终端操作与文件上传权限校验
 
-- 基于 JWT 的用户认证体系，支持用户注册、登录、登出
-- 管理员（admin）与普通用户角色区分，管理员可管理用户与权限
-- 用户显示名称（display_name）支持，聊天与界面中展示友好名称
-- 移除旧版密码认证，统一使用 JWT Token
-
-**权限管理**：
-
-- 分组权限体系：内置组（admin/owner/user）+ 自定义组
-- 权限矩阵：管理面板中可视化配置各组的操作权限
-- 节点级权限控制：不同用户可访问不同节点
-- Agent 访问控制（ACL）：每个 Agent 可配置允许访问的用户列表
-- ACL 持久化存储，重启后自动恢复
-
-**聊天室协作**：
-
-- 创建/加入聊天室，支持群聊与私聊
-- 在线用户列表实时同步广播
-- 未读消息数角标，按房间与私聊维度分别计数
-- 聊天室持久化，刷新后自动恢复已加入的房间
-- 消息中支持图片发送与预览
-- 清空聊天记录功能
-
-**多用户会话**：
-
-- 多端同时连接时，Agent 输出自动广播至所有活跃会话
-- WebSocket 会话隔离，不同用户互不干扰
-- 终端操作与文件上传增加权限校验
+详细说明见 [Web 界面与网关](docs/用户手册/04_web_界面与网关/)。
 
 ---
 
@@ -162,20 +154,7 @@ Jarvis 支持完整的多用户认证、权限管理与团队协作能力，适�
 | **智能提示**     | 根据任务优化系统提示词，使 Agent 更贴合当前场景                                                                  |
 | **Windows 支持** | 支持 Windows，可自动化操作 Windows GUI 程序                                                                      |
 
-### 与其他方案对比
-
-| 项目          | 定位              | 形态             | 核心场景                        |
-| ------------- | ----------------- | ---------------- | ------------------------------- |
-| **Jarvis**    | AI 助手平台       | CLI + Python SDK | 代码开发、安全分析、C→Rust 迁移 |
-| **LangChain** | LLM 应用框架      | Python 库        | 通用 Agent、RAG、工作流编排     |
-| **AutoGPT**   | 自主 AI Agent     | 独立应用         | 目标驱动的自主任务执行          |
-| **OpenClaw**  | 个人 AI 助手框架  | Node.js 应用     | 多通道消息、24/7 自主运行       |
-| **ZeroClaw**  | OpenClaw 轻量替代 | Rust 二进制      | 同 OpenClaw                     |
-
-- **Jarvis**：面向代码开发，采用分层架构（Agent / CodeAgent），强调本地化、轻量记忆、任务分离、规则按需加载，并支持 Windows GUI 自动化。
-- **LangChain**：通用编排框架，侧重生产级 RAG 与工作流，适合构建 LLM 应用。
-- **AutoGPT**：早期自主 Agent 代表，目标驱动明显，但成本和稳定性控制要求更高。
-- **OpenClaw / ZeroClaw**：更偏向消息渠道和日常自动化场景。
+---
 
 ---
 
@@ -390,6 +369,9 @@ llm_group: default
 llm_groups:
   default:
     normal_llm: gpt-5
+    fast_llm: gpt-5-mini
+  code:
+    normal_llm: claude-sonnet
 
 llms:
   gpt-5:
@@ -398,6 +380,18 @@ llms:
     max_input_token_count: 128000
     llm_config:
       openai_api_key: "your-api-key-here"
+  gpt-5-mini:
+    platform: openai
+    model: gpt-5-mini
+    max_input_token_count: 64000
+    llm_config:
+      openai_api_key: "your-api-key-here"
+  claude-sonnet:
+    platform: anthropic
+    model: claude-sonnet-4
+    max_input_token_count: 128000
+    llm_config:
+      anthropic_api_key: "your-anthropic-key-here"
 ```
 
 更多配置项见 [使用指南](docs/jarvis_book/4.使用指南.md)。
@@ -411,12 +405,6 @@ llms:
 - **MCP 集成**：通过配置文件接入命令协议
 
 详见 [功能扩展](docs/jarvis_book/5.功能扩展.md)。
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/image?repos=skyfireitdiy/Jarvis&type=date&legend=top-left)](https://www.star-history.com/#skyfireitdiy/Jarvis&Date)
 
 ---
 
