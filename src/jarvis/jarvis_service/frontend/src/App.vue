@@ -9642,9 +9642,19 @@ function setTerminalHostRef(terminalId, el) {
   const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
   if (el) {
     console.log(`[independent-terminal] Setting ref for terminal ${terminalId}`)
+    // 如果 hostEl 相同且 terminal 已存在，说明是组件更新触发的 ref 回调，不需要重新初始化
+    if (session && session.hostEl === el && session.terminal) {
+      console.log(`[independent-terminal] Host element unchanged, skipping re-init for ${terminalId}`)
+      return
+    }
     independentTerminalHosts.value.set(terminalId, el)
     if (session) {
       session.hostEl = el
+      // 如果 terminal 实例已存在（面板 detach 切换导致组件重建），重新打开
+      if (session.terminal) {
+        console.log(`[independent-terminal] Terminal ${terminalId} already exists, reopening on new host element`)
+        initIndependentTerminal(terminalId, el)
+      }
     }
   } else {
     independentTerminalHosts.value.delete(terminalId)
@@ -9661,50 +9671,24 @@ function initIndependentTerminal(terminalId, el) {
     return
   }
   
-  // 如果 terminal 实例已存在（面板隐藏后又显示），重新打开并恢复历史输出
+  // 如果 terminal 实例已存在（面板 detach 切换导致组件重建），先 dispose 旧实例再创建新的
   if (session.terminal) {
     console.log(`[independent-terminal] Reopening terminal ${terminalId} with ${session.history.length} history entries`)
     try {
-      session.terminal.open(el)
-      session.hostEl = el
-      
-      // 等待 DOM 更新后再恢复内容
-      nextTick(() => {
-        // 先 fit 一次，确保终端大小正确
-        session.fitAddon.fit()
-        console.log(`[independent-terminal] Terminal size before reset: ${session.terminal.cols} cols x ${session.terminal.rows} rows`)
-        // 清空终端，避免历史输出重复显示
-        session.terminal.reset()
-        // reset 后需要再次 fit，确保终端大小适应容器
-        session.fitAddon.fit()
-        console.log(`[independent-terminal] Terminal size after reset: ${session.terminal.cols} cols x ${session.terminal.rows} rows`)
-        // 恢复 ResizeObserver
-        if (typeof ResizeObserver !== 'undefined') {
-          const resizeObserver = new ResizeObserver(() => {
-            if (session.fitAddon && session.terminal) {
-              session.fitAddon.fit()
-              sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
-            }
-          })
-          resizeObserver.observe(el)
-          session.resizeObserver = resizeObserver
-        }
-        // 恢复历史输出
-        console.log(`[independent-terminal] Restoring ${session.history.length} history entries`)
-        session.history.forEach((item, index) => {
-          if (session.terminal) {
-            console.log(`[independent-terminal] History [${index}]: ${JSON.stringify(item.data.substring(0, 50))}...`)
-            session.terminal.write(item.data)
-          }
-        })
-        console.log(`[independent-terminal] Terminal ${terminalId} reopened successfully`)
-      })
+      // xterm.js 的 Terminal.open() 不能对同一实例调用两次，必须先 dispose 再创建新实例
+      // 注意：不设置 session.terminal = null，避免触发响应式更新导致无限循环
+      session.terminal.dispose()
+      session.fitAddon = null
+      if (session.resizeObserver) {
+        session.resizeObserver.disconnect()
+        session.resizeObserver = null
+      }
     } catch (error) {
-      console.error(`[independent-terminal] Failed to reopen terminal ${terminalId}:`, error)
+      console.warn(`[independent-terminal] Failed to dispose old terminal ${terminalId}:`, error)
     }
-    return
+    // 继续走下面的新实例创建逻辑（session.terminal 会被下面的 new Terminal() 覆盖）
   }
-  
+
   console.log(`[independent-terminal] Initializing terminal ${terminalId}`)
   
   // 创建终端实例
@@ -9777,11 +9761,15 @@ function initIndependentTerminal(terminalId, el) {
       session.fitAddon.fit()
       sendTerminalResize(terminalId, session.terminal.rows, session.terminal.cols)
       
-      // 写入缓冲的输出
-      if (session.pending_output && session.pending_output.length > 0) {
-        console.log(`[independent-terminal] Writing ${session.pending_output.length} buffered outputs to terminal ${terminalId}`)
+      // 写入缓冲的输出（history + pending_output）
+      const allOutputs = [
+        ...(session.history || []).map(item => item.data),
+        ...(session.pending_output || []),
+      ]
+      if (allOutputs.length > 0) {
+        console.log(`[independent-terminal] Writing ${allOutputs.length} buffered outputs to terminal ${terminalId}`)
         try {
-          for (const bufferedData of session.pending_output) {
+          for (const bufferedData of allOutputs) {
             session.terminal.write(bufferedData)
           }
           console.log(`[independent-terminal] Successfully wrote buffered outputs`)
