@@ -1591,7 +1591,7 @@ class Agent:
         # 处理输入
         if run_input_handlers:
             message = self._process_input(message)
-            if not message:
+            if not message or self._last_handler_returned:
                 return ""
 
         # 添加附加提示
@@ -1945,6 +1945,7 @@ class Agent:
         except Exception:
             # 检查是否为中断导致的异常
             from jarvis.jarvis_utils.utils import get_interrupt
+
             if get_interrupt() > 0:
                 raise KeyboardInterrupt("用户中断")
             PrettyOutput.auto_print("❌ 总结对话历史失败")
