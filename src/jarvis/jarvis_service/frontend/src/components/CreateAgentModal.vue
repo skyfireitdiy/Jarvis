@@ -98,7 +98,7 @@
                   class="recent-dir-tag"
                   @click="$emit('update:workDir', dir)"
                   :title="dir">
-                  {{ dir.length > 40 ? dir.substring(0, 10) + '...' + dir.substring(dir.length - 27) : dir }}
+                  {{ dir.split('/').filter(Boolean).pop() || dir }}
                 </span>
               </div>
             </div>
