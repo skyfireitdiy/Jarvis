@@ -630,6 +630,9 @@ function getTerminalStyle(terminalContent) {
   background: var(--color-bg-primary);
   border-radius: var(--tile-radius-xs);
   overflow: hidden;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
 .terminal-history-header {
@@ -645,9 +648,12 @@ function getTerminalStyle(terminalContent) {
   font-size: 12px;
   line-height: 1.4;
   overflow-x: auto;
+  overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 .input-area {
