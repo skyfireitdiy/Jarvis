@@ -194,6 +194,8 @@ prepare_source() {
 		cd "$DEST_DIR"
 		git fetch --depth 1 origin "$ref" 2>/dev/null || git fetch origin 2>/dev/null
 		git checkout -f "$ref" 2>/dev/null || git checkout -f "origin/$ref" 2>/dev/null
+		# 切回 main 分支，避免分离头指针影响自动升级
+		git checkout -f "$DEFAULT_BRANCH" 2>/dev/null || true
 		echo_info "源码更新完成"
 		# 源码更新后需重新安装 Jarvis
 		if check_state "jarvis"; then
@@ -214,41 +216,43 @@ prepare_source() {
 				exit 1
 			}
 		fi
+		# 切回 main 分支，避免分离头指针影响自动升级
+		cd "$DEST_DIR" && git checkout -f "$DEFAULT_BRANCH" 2>/dev/null || true
 	fi
 }
 
 # ===== 安装 Jarvis =====
 install_jarvis() {
 	if check_state "jarvis"; then
-	echo_info "Jarvis 已安装，跳过"
-	return 0
+		echo_info "Jarvis 已安装，跳过"
+		return 0
 	fi
 
 	# 多源重试：阿里云 → 清华 → 官方
 	local PYPI_INDEXES=(
-	"https://mirrors.aliyun.com/pypi/simple/"
-	"https://pypi.tuna.tsinghua.edu.cn/simple"
-	"https://pypi.org/simple/"
+		"https://mirrors.aliyun.com/pypi/simple/"
+		"https://pypi.tuna.tsinghua.edu.cn/simple"
+		"https://pypi.org/simple/"
 	)
 
 	local INSTALL_OK=0
 
-# 源码安装模式
-cd "$DEST_DIR"
-echo_info "正在从源码安装 Jarvis (Python 3.12)..."
+	# 源码安装模式
+	cd "$DEST_DIR"
+	echo_info "正在从源码安装 Jarvis (Python 3.12)..."
 
-for index in "${PYPI_INDEXES[@]}"; do
-	echo_info "尝试 PyPI 源: $index"
-	if uv tool install -e . --python 3.12 --default-index "$index"; then
-		INSTALL_OK=1
-		break
-	fi
-	echo_warn "PyPI 源失败，尝试下一个..."
-done
+	for index in "${PYPI_INDEXES[@]}"; do
+		echo_info "尝试 PyPI 源: $index"
+		if uv tool install -e . --python 3.12 --default-index "$index"; then
+			INSTALL_OK=1
+			break
+		fi
+		echo_warn "PyPI 源失败，尝试下一个..."
+	done
 
 	if [ "$INSTALL_OK" -ne 1 ]; then
-	echo_error "Jarvis 安装失败"
-	exit 1
+		echo_error "Jarvis 安装失败"
+		exit 1
 	fi
 
 	# 更新 shell 环境
@@ -256,7 +260,7 @@ done
 
 	set_state "jarvis"
 	echo_info "Jarvis 安装完成"
-	}
+}
 # ===== 验证安装 =====
 verify_installation() {
 	export PATH="$HOME/.local/bin:$PATH"
@@ -276,22 +280,22 @@ main() {
 	echo "========================================"
 	echo ""
 
-# 检查前置条件
+	# 检查前置条件
 	command -v git &>/dev/null || {
-	echo_error "需要 git，请先安装"
-	exit 1
+		echo_error "需要 git，请先安装"
+		exit 1
 	}
 	command -v curl &>/dev/null || {
-	echo_error "需要 curl，请先安装"
-	exit 1
+		echo_error "需要 curl，请先安装"
+		exit 1
 	}
 
 	# 执行安装
 	install_uv || exit 1
 	set_state "uv"
 
-prepare_source
-set_state "source"
+	prepare_source
+	set_state "source"
 
 	install_jarvis
 	install_optional_tools
@@ -302,17 +306,17 @@ set_state "source"
 	echo "✓ 安装完成！"
 	echo "========================================"
 
-echo "安装位置: $DEST_DIR"
+	echo "安装位置: $DEST_DIR"
 
 	echo ""
 	echo "快速开始:"
 	echo "  1. 如 jarvis 命令不可用，执行: source ~/.bashrc"
 	echo "  2. 启动 Jarvis: jarvis"
 
-echo "  3. 升级 Jarvis: cd $DEST_DIR && git fetch --depth 1 && git reset --hard origin/main && uv tool install -e . --python 3.12"
+	echo "  3. 升级 Jarvis: cd $DEST_DIR && git fetch --depth 1 && git reset --hard origin/main && uv tool install -e . --python 3.12"
 
 	echo ""
 	echo "========================================"
-	}
+}
 
 main

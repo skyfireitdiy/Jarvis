@@ -804,7 +804,17 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
                 # 版本解析失败时，保持原有行为继续升级
                 pass
 
-            # 执行小版本更新：git checkout
+            # 执行小版本更新：先确保目标tag的提交对象存在（兼容浅克隆），再git checkout
+            try:
+                subprocess.run(
+                    ["git", "fetch", "--depth", "1", "origin", "tag", remote_tag],
+                    cwd=git_root,
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                # fetch失败时静默处理，尝试直接checkout
+                pass
             subprocess.run(
                 ["git", "checkout", remote_tag],
                 cwd=git_root,
@@ -1000,6 +1010,17 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                     return False
             except Exception:
                 # 版本解析失败时,保持原有行为继续升级
+                pass
+            # 先确保目标tag的提交对象存在（兼容浅克隆），再git checkout
+            try:
+                subprocess.run(
+                    ["git", "fetch", "--depth", "1", "origin", "tag", remote_tag],
+                    cwd=git_root,
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                # fetch失败时静默处理，尝试直接checkout
                 pass
             subprocess.run(
                 ["git", "checkout", remote_tag],
