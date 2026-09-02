@@ -1,0 +1,8 @@
+{
+  "id": "20260902_150325_283057",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "gateway", "聊天消息", "owner身份"],
+  "content": "修复Agent经gateway发送聊天室/私聊消息时以owner身份显示的问题。修改：1) gateway_manager.py 中 _chat_send_room_message 与 _chat_send_private_message 请求体附加 agent_id: jglobals.agent_id；2) app.py 中 api_chat_send_room_message 与 api_chat_send_private_message 据 agent_id 查 agent_manager.get_agent(agent_id).owner_id，再查 user_manager.get_user(owner_id) 得 display_name 覆写 sender_name；3) 私聊中 owner 在线 client 查找改为 user_id == owner_id，临时注册时 user_id 设为 owner_id。提交：9c391f4（gateway_manager.py）、3a497ed 与 5fb3cd2（app.py）。",
+  "created_at": "2026-09-02T15:03:25.283129",
+  "updated_at": "2026-09-02T15:03:25.283136"
+}
