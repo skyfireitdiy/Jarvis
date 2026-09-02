@@ -2245,6 +2245,7 @@ class GatewayManagerTool:
                 "room_id": room_id,
                 "content": prefixed_message,
                 "sender_name": agent_name,
+                "agent_id": jglobals.agent_id,
             },
             error_prefix=f"Failed to send message to room {room_id}",
         )
@@ -2285,6 +2286,7 @@ class GatewayManagerTool:
                 "receiver_id": receiver_id,
                 "content": prefixed_message,
                 "sender_name": agent_name,
+                "agent_id": jglobals.agent_id,
             },
             error_prefix=f"Failed to send private message to {receiver_id}",
         )

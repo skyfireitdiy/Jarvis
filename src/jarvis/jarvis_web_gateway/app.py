@@ -1978,6 +1978,19 @@ def create_app(
         sender_name = body.get("sender_name", "Agent")
         if not room_id or not content:
             return {"success": False, "error": "room_id and content are required"}
+        # 据agent_id查owner的display_name
+        agent_id = body.get("agent_id", "")
+        owner_display_name = None
+        if agent_id:
+            agent_info = agent_manager.get_agent(agent_id)
+            if agent_info and agent_info.owner_id:
+                user_data = user_manager.get_user(agent_info.owner_id)
+                if user_data:
+                    owner_display_name = user_data.get("display_name") or user_data.get(
+                        "username"
+                    )
+        if owner_display_name:
+            sender_name = owner_display_name
         # 构造消息并广播
         msg = {
             "type": "chat_message",
@@ -2002,12 +2015,28 @@ def create_app(
         sender_name = body.get("sender_name", "Agent")
         if not receiver_id or not content:
             return {"success": False, "error": "receiver_id and content are required"}
+        # 据agent_id查owner的display_name与owner_id
+        agent_id = body.get("agent_id", "")
+        owner_id = None
+        owner_display_name = None
+        if agent_id:
+            agent_info = agent_manager.get_agent(agent_id)
+            if agent_info and agent_info.owner_id:
+                owner_id = agent_info.owner_id
+                user_data = user_manager.get_user(owner_id)
+                if user_data:
+                    owner_display_name = user_data.get("display_name") or user_data.get(
+                        "username"
+                    )
+        if owner_display_name:
+            sender_name = owner_display_name
         # 查找owner的在线client作为sender
         owner_client = None
-        for cid, info in manager._chat_manager._chat_clients.items():
-            if info.get("user_id") == "owner":
-                owner_client = cid
-                break
+        if owner_id:
+            for cid, info in manager._chat_manager._chat_clients.items():
+                if info.get("user_id") == owner_id:
+                    owner_client = cid
+                    break
         sender_id = owner_client or "agent"
         # 若sender未注册，先注册临时client
         if sender_id not in manager._chat_manager._chat_clients:
@@ -2019,7 +2048,7 @@ def create_app(
                 "connection_id": "agent_temp",
                 "websocket": temp_ws,
                 "registered_at": time.time(),
-                "user_id": "owner",
+                "user_id": owner_id or "agent",
             }
         result = await manager._chat_manager.send_private(
             sender_id, receiver_id, content
