@@ -7228,6 +7228,13 @@ async function deleteAgent(agentId) {
         fileTreeState.value.delete(agentId)
         fileTreeExpanded.value.delete(agentId)
         fileTreeLoading.value.delete(agentId)
+
+        // 销毁该 Agent 对应的 Panel
+        for (const panel of [...panels.value]) {
+          if (panel.agentId === agentId) {
+            closePanel(panel.id)
+          }
+        }
         
         // 如果是当前 Agent，清空当前 Agent ID
         if (currentAgentId.value === agentId) {
@@ -7294,6 +7301,12 @@ async function batchDeleteAgents() {
               fileTreeState.value.delete(agentId)
               fileTreeExpanded.value.delete(agentId)
               fileTreeLoading.value.delete(agentId)
+              // 销毁该 Agent 对应的 Panel
+              for (const panel of [...panels.value]) {
+                if (panel.agentId === agentId) {
+                  closePanel(panel.id)
+                }
+              }
               // 如果是当前 Agent，清空当前 Agent ID
               if (currentAgentId.value === agentId) {
                 currentAgentId.value = null
