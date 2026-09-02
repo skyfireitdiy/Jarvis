@@ -687,12 +687,12 @@ class AgentRunLoop:
 
     def _track_no_tool_call(
         self, ag, safe_tool_prompt: str, current_response: str
-    ) -> Any:
+    ) -> tuple[bool, Any]:
         """跟踪无工具调用情况并在必要时尝试修复
 
         核心逻辑：
-        - 首轮检测：若 ag.first=True（首轮）且无工具调用，触发 cheap LLM 判断是否应调用工具
-        - 后续轮次：若 ag.first=False（非首轮），沿用原有逻辑（连续2次无工具调用时修复）
+        - 首轮检测：若为首轮且无工具调用，触发 cheap LLM 判断是否应调用工具
+        - 后续轮次：沿用原有逻辑（连续2次无工具调用时修复）
 
         参数:
             ag: agent实例
@@ -700,7 +700,10 @@ class AgentRunLoop:
             current_response: 当前响应内容
 
         返回:
-            Any: 如果需要立即返回结果，返回该结果；否则返回None
+            tuple[bool, Any]: (是否继续下一轮, 返回的结果或None)
+                - 如果需要继续下一轮，返回 (True, None)
+                - 如果需要返回结果，返回 (False, result)
+                - 否则返回 (False, None) 继续执行后续逻辑
         """
         # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
         has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
@@ -752,16 +755,17 @@ class AgentRunLoop:
                     )
                     ag.set_addon_prompt(fix_prompt)
                     ag._no_tool_call_count = 0
-                    return None
+                    # 注入修复提示后立即继续下一轮，与LLM交互
+                    return True, None
                 else:
                     # 不应调用工具或判断不明确，静默跳过
                     ag._no_tool_call_count = 0
-                    return None
+                    return False, None
 
             except Exception:
                 # 异常时静默跳过，不影响主流程
                 ag._no_tool_call_count = 0
-                return None
+                return False, None
 
         # 【原有逻辑】非首轮或已有工具调用时，沿用原有逻辑
         # 在非交互模式下，跟踪连续没有工具调用的次数
@@ -791,7 +795,7 @@ class AgentRunLoop:
                         # 如果工具要求立即返回结果，直接返回该结果
                         if need_return:
                             ag._no_tool_call_count = 0
-                            return tool_prompt
+                            return False, tool_prompt
 
                         # 将上一个提示和工具提示安全地拼接起来
                         safe_tool_prompt = (
@@ -808,6 +812,9 @@ class AgentRunLoop:
 
                     # 重置计数器，避免重复添加
                     ag._no_tool_call_count = 0
+
+        # 默认不继续，走主循环后续逻辑
+        return False, None
 
     def _check_auto_complete(self, ag, current_response: str) -> tuple[bool, Any]:
         """检查并处理自动完成
@@ -1061,9 +1068,11 @@ class AgentRunLoop:
                     return result
 
                 # 跟踪无工具调用情况
-                track_result = self._track_no_tool_call(
+                should_continue, track_result = self._track_no_tool_call(
                     ag, safe_tool_prompt, current_response
                 )
+                if should_continue:
+                    continue
                 if track_result is not None:
                     return track_result
 
