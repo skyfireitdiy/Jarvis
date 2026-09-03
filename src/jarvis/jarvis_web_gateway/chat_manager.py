@@ -138,6 +138,7 @@ class ChatManager:
                 "type": "chat_client_joined",
                 "payload": {
                     "client_id": client_id,
+                    "user_id": user_id or client_id,
                     "name": name,
                     "display_name": display_name or name,
                 },
@@ -147,6 +148,7 @@ class ChatManager:
         return {
             "success": True,
             "client_id": client_id,
+            "user_id": user_id or client_id,
             "name": name,
             "display_name": display_name or name,
         }
@@ -164,6 +166,12 @@ class ChatManager:
             # 不从聊天室members中移除user_id，保持持久化
         # 广播下线通知（锁外执行，避免死锁）
         if client_info:
+            still_online = False
+            if user_id:
+                still_online = any(
+                    info.get("user_id") == user_id
+                    for info in self._chat_clients.values()
+                )
             await self.broadcast_to_all(
                 {
                     "type": "chat_client_left",
@@ -171,15 +179,12 @@ class ChatManager:
                         "client_id": client_id,
                         "name": client_info.get("name", ""),
                         "user_id": user_id or client_id,
+                        "still_online": still_online,
                     },
                 },
             )
             # 【新增】向该用户所在房间广播成员更新通知
             if user_id:
-                still_online = any(
-                    info.get("user_id") == user_id
-                    for info in self._chat_clients.values()
-                )
                 for room_id, room in self._chat_rooms.items():
                     if user_id in room["members"]:
                         await self.broadcast_to_room(
