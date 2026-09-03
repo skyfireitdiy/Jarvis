@@ -5286,7 +5286,6 @@ function handleUpdateCodeToMain() {
 
 // 确认更新代码到 main 分支
 function confirmUpdateCodeToMain() {
-  showSettingsModal.value = false
   showConfirm(
     '确定要更新所有节点的代码到 main 分支吗？\n\n此操作将：\n1. 切换所有节点到 main 分支\n2. 拉取最新代码\n3. 可能需要重启服务',
     () => {
@@ -5302,7 +5301,6 @@ function confirmRestartGateway() {
     return
   }
 
-  showSettingsModal.value = false
   const targetNodeId = restartNodeId.value
 
   const confirmMessage = targetNodeId
@@ -5320,7 +5318,6 @@ function confirmRestartGateway() {
 
 // 确认重启所有节点（依次重启子节点，最后 master）
 async function confirmRestartAllNodes() {
-  showSettingsModal.value = false
   showConfirm(
     '确认要一键重启所有节点吗？\n\n操作顺序：\n1. 依次重启所有子节点\n2. 最后重启 master 节点\n\n这将短暂中断所有节点的连接。',
     () => {

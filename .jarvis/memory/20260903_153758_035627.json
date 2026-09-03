@@ -1,0 +1,8 @@
+{
+  "id": "20260903_153758_035627",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "前端", "z-index", "ConfirmDialog", "AdminPanel"],
+  "content": "修复点击重启本节点服务时系统管理弹窗被关闭的问题。根因：Bug3修复时在confirmRestartGateway等函数中关闭showAdminPanel，导致面板被关闭。正确方案：将ConfirmDialog z-index从2100提升至3100（高于AdminPanel的3000），并移除三个函数中关闭showAdminPanel的逻辑。涉及文件：ConfirmDialog.vue（z-index 2100→3100）、App.vue（移除三处showAdminPanel.value=false）。commit 9f4d84f。npm run build编译通过。",
+  "created_at": "2026-09-03T15:37:58.035659",
+  "updated_at": "2026-09-03T15:37:58.035665"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260903_153358_056441",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "前端", "z-index", "AdminPanel", "ConfirmDialog"],
+  "content": "修复前端弹窗层级问题（3个Bug全部完成）：\n1. Bug1 终端面板z-index(1100)遮盖弹窗(1000)：12处弹窗z-index从1000提升至3000，commit 6f840bfc3\n2. Bug2 跨节点创建agent时owner_id丢失：app.py payload添加owner_id，node_manager.py create_agent传递owner_id，commit 8ac09e6da\n3. Bug3 AdminPanel确认框被管理对话框遮挡：confirmRestartGateway、confirmRestartAllNodes、confirmUpdateCodeToMain三个函数从SettingsModal触发改为从AdminPanel触发，关闭showAdminPanel而非showSettingsModal，commit b3f866b01\n验证：npm run build编译通过",
+  "created_at": "2026-09-03T15:33:58.056491",
+  "updated_at": "2026-09-03T15:33:58.056497"
+}
