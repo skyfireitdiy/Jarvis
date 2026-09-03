@@ -1,0 +1,8 @@
+{
+  "id": "20260903_151254_117447",
+  "type": "project_long_term",
+  "tags": ["z-index", "弹窗", "终端面板", "Bug修复"],
+  "content": "修复终端面板z-index(1100)遮盖弹窗(1000)问题完成。方案：所有弹窗z-index从1000提升至3000。共修改12处：App.vue(.modal-overlay L14391, .diff-modal-overlay L15639)、AdminPanel.vue L673、AgentSidebar.vue L654、BufferPanel.vue L76、CompletionsModal.vue L87、ConnectModal.vue L51、CreateAgentModal.vue L319、DirectoryDialog.vue L93、RenameAgentModal.vue L58、SessionDialog.vue L60、SettingsModal.vue L195。npm run build编译通过。",
+  "created_at": "2026-09-03T15:12:54.117483",
+  "updated_at": "2026-09-03T15:12:54.117489"
+}
