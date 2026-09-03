@@ -3416,6 +3416,9 @@ const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> out
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
 const panelOutputLists = new Map() // panelId -> outputList element
+let historyScrollListenerEl = null // 当前绑定滚动监听的元素
+let historyScrollHandler = null // 滚动监听处理函数
+let historyScrollDebounceTimer = null // 滚动防抖定时器
 
 // 从历史记录中获取指定 agent 的最后一条消息的 seq
 function getAgentLastSeq(agentId) {
@@ -4334,12 +4337,58 @@ function clearBufferFromPanel(panel) {
   }, agentId)
 }
 
+// 设置滚动监听，实现滚动到顶部时加载更多历史
+// 支持动态切换滚动容器（Panel 创建/切换时调用）
+function setupHistoryScrollListener(el) {
+  const SCROLL_THRESHOLD = 50 // 滚动到顶部50px以内触发
+  const DEBOUNCE_DELAY = 500 // 防抖延迟500ms
+
+  // 移除旧元素上的监听
+  if (historyScrollListenerEl && historyScrollHandler) {
+    historyScrollListenerEl.removeEventListener('scroll', historyScrollHandler)
+  }
+
+  // 清除旧的防抖定时器
+  if (historyScrollDebounceTimer) {
+    clearTimeout(historyScrollDebounceTimer)
+    historyScrollDebounceTimer = null
+  }
+
+  if (!el) {
+    historyScrollListenerEl = null
+    historyScrollHandler = null
+    return
+  }
+
+  historyScrollListenerEl = el
+  historyScrollHandler = () => {
+    // 清除之前的定时器
+    if (historyScrollDebounceTimer) {
+      clearTimeout(historyScrollDebounceTimer)
+    }
+
+    // 设置新的定时器
+    historyScrollDebounceTimer = setTimeout(() => {
+      const scrollTop = el.scrollTop
+      if (scrollTop <= SCROLL_THRESHOLD && !isLoadingHistory.value && hasMoreHistory.value) {
+        console.log('[HISTORY] Scrolled to top, loading more history')
+        loadHistoryMessages(true) // prepend = true, 插入到开头
+      }
+    }, DEBOUNCE_DELAY)
+  }
+
+  el.addEventListener('scroll', historyScrollHandler)
+  console.log('[HISTORY] Scroll listener attached')
+}
+
 // 设置 Panel 的输出列表引用
 function setPanelOutputList(panel, el) {
   if (!panel || !panel.agentId) return
   panelOutputLists.set(panel.id, el)
   if (panel.agentId === currentAgentId.value) {
     outputList.value = el
+    // Panel 动态创建后补绑滚动监听，确保滚动到顶部可加载历史
+    setupHistoryScrollListener(el)
   }
 }
 
@@ -7508,6 +7557,13 @@ async function switchAgent(agent) {
     console.log('[AGENT] Agent is stopped, skipping all network activities')
     // 只更新当前 agent ID，让用户可以看到该 agent 的本地历史记录
     currentAgentId.value = agent.agent_id
+    // 更新 outputList 指向新 Panel 的 .messages 元素，并补绑滚动监听
+    const stoppedTargetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+    const stoppedTargetOutputList = stoppedTargetPanel ? panelOutputLists.get(stoppedTargetPanel.id) : null
+    if (stoppedTargetOutputList) {
+      outputList.value = stoppedTargetOutputList
+      setupHistoryScrollListener(stoppedTargetOutputList)
+    }
     historyOffset.value = 0
     hasMoreHistory.value = true
     // 从本地存储加载历史消息（不涉及网络请求）
@@ -7611,6 +7667,14 @@ async function switchAgent(agent) {
   // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
   console.log('[AGENT] Current agent ID updated to:', currentAgentId.value)
+
+  // 更新 outputList 指向新 Panel 的 .messages 元素，并补绑滚动监听
+  const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+  const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
+  if (targetOutputList) {
+    outputList.value = targetOutputList
+    setupHistoryScrollListener(targetOutputList)
+  }
   
   // 重置历史偏移量和消息状态
   historyOffset.value = 0
@@ -8303,11 +8367,16 @@ function handleChatMessage(type, payload) {
     case 'chat_register_response':
       if (payload?.success) {
         myClientId.value = payload.client_id || myClientId.value
-        // 将自身加入在线用户列表（使用display_name）
+        // 将自身加入在线用户列表（使用display_name，按user_id去重）
         if (payload.client_id) {
-          const exists = chatClients.value.some(c => c.client_id === payload.client_id)
-          if (!exists) {
-            chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name, display_name: payload.display_name || payload.name }]
+          const uid = payload.user_id || payload.client_id
+          const existing = chatClients.value.find(c => (c.user_id || c.client_id) === uid)
+          if (existing) {
+            existing.client_id = payload.client_id
+            existing.name = payload.name
+            existing.display_name = payload.display_name || payload.name
+          } else {
+            chatClients.value = [...chatClients.value, { client_id: payload.client_id, user_id: uid, name: payload.name, display_name: payload.display_name || payload.name }]
           }
         }
         // 从API恢复用户已加入的房间（优先于localStorage缓存）
@@ -8362,15 +8431,21 @@ function handleChatMessage(type, payload) {
       break
     case 'chat_client_joined':
       if (payload?.client_id && payload?.client_id !== myClientId.value) {
-        const exists = chatClients.value.some(c => c.client_id === payload.client_id)
-        if (!exists) {
-          chatClients.value = [...chatClients.value, { client_id: payload.client_id, name: payload.name, display_name: payload.display_name || payload.name }]
+        const uid = payload.user_id || payload.client_id
+        const existing = chatClients.value.find(c => (c.user_id || c.client_id) === uid)
+        if (existing) {
+          existing.client_id = payload.client_id
+          existing.name = payload.name
+          existing.display_name = payload.display_name || payload.name
+        } else {
+          chatClients.value = [...chatClients.value, { client_id: payload.client_id, user_id: uid, name: payload.name, display_name: payload.display_name || payload.name }]
         }
       }
       break
     case 'chat_client_left':
-      if (payload?.client_id) {
-        chatClients.value = chatClients.value.filter(c => c.client_id !== payload.client_id)
+      if (payload?.client_id && !payload?.still_online) {
+        const uid = payload.user_id || payload.client_id
+        chatClients.value = chatClients.value.filter(c => (c.user_id || c.client_id) !== uid)
       }
       break
     case 'chat_get_room_members_response':
@@ -11405,29 +11480,7 @@ onMounted(() => {
   }
   
   // 添加滚动事件监听，实现滚动到顶部时加载更多历史
-  let scrollDebounceTimer = null
-  const SCROLL_THRESHOLD = 50 // 滚动到顶部50px以内触发
-  const DEBOUNCE_DELAY = 500 // 防抖延迟500ms
-  
-  if (outputList.value) {
-    outputList.value.addEventListener('scroll', () => {
-      // 清除之前的定时器
-      if (scrollDebounceTimer) {
-        clearTimeout(scrollDebounceTimer)
-      }
-      
-      // 设置新的定时器
-      scrollDebounceTimer = setTimeout(() => {
-        const scrollTop = outputList.value.scrollTop
-        if (scrollTop <= SCROLL_THRESHOLD && !isLoadingHistory.value && hasMoreHistory.value) {
-          console.log('[HISTORY] Scrolled to top, loading more history')
-          loadHistoryMessages(true) // prepend = true, 插入到开头
-        }
-      }, DEBOUNCE_DELAY)
-    })
-    
-    console.log('[HISTORY] Scroll listener added')
-  }
+  setupHistoryScrollListener(outputList.value)
   
   // 添加全局键盘事件监听（在捕获阶段处理 Ctrl+T 等快捷键）
   document.addEventListener('keydown', handleGlobalKeydown, { capture: true })
@@ -11527,6 +11580,17 @@ onUnmounted(() => {
     socketState: socket.value?.readyState,
     connecting: connecting.value,
   })
+
+  // 清理滚动监听
+  if (historyScrollListenerEl && historyScrollHandler) {
+    historyScrollListenerEl.removeEventListener('scroll', historyScrollHandler)
+    historyScrollListenerEl = null
+    historyScrollHandler = null
+  }
+  if (historyScrollDebounceTimer) {
+    clearTimeout(historyScrollDebounceTimer)
+    historyScrollDebounceTimer = null
+  }
   
   // 清理心跳定时器
   if (heartbeatTimer) {
