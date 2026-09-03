@@ -1,0 +1,14 @@
+{
+  "id": "20260903_011234_285309",
+  "type": "project_long_term",
+  "tags": [
+    "bug-fix",
+    "code-update",
+    "error-message",
+    "template_utils",
+    "node_manager"
+  ],
+  "content": "修复更新代码到main分支失败时错误消息不反馈前端的问题。根因：template_utils.py中checkout_jarvis_branch与pull_jarvis_code仅返回bool，git stderr被丢弃；node_manager.py中_handle_code_update_to_main_request失败时仅返回笼统消息。修复：两函数改为返回(bool, str)元组携带错误详情，node_manager.py解构元组并将错误拼入error.message。涉及文件：src/jarvis/jarvis_utils/template_utils.py、src/jarvis/jarvis_web_gateway/node_manager.py。",
+  "created_at": "2026-09-03T01:12:34.285355",
+  "updated_at": "2026-09-03T01:12:34.285362"
+}
