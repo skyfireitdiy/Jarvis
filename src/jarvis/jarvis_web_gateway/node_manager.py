@@ -432,6 +432,7 @@ class NodeConnectionManager:
                 restore_session=payload.get("restore_session"),
                 no_interaction_mode=bool(payload.get("no_interaction_mode", False)),
                 proxy_node=payload.get("proxy_node"),
+                owner_id=payload.get("owner_id"),
                 access_acl=payload.get("access_acl"),
             )
             self._node_runtime.agent_route_registry.register(
