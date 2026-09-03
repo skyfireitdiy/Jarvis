@@ -2125,7 +2125,7 @@ class ChildNodeClient:
                 )
 
             # 切换到 main 分支
-            checkout_success = checkout_jarvis_branch("main")
+            checkout_success, checkout_error = checkout_jarvis_branch("main")
             if not checkout_success:
                 return build_node_message(
                     CODE_UPDATE_TO_MAIN_RESPONSE,
@@ -2133,14 +2133,14 @@ class ChildNodeClient:
                         "success": False,
                         "error": {
                             "code": "CHECKOUT_FAILED",
-                            "message": "切换到 main 分支失败",
+                            "message": f"切换到 main 分支失败: {checkout_error}",
                         },
                     },
                     request_id=request_id,
                 )
 
             # 拉取最新代码
-            pull_success = pull_jarvis_code()
+            pull_success, pull_error = pull_jarvis_code()
             if not pull_success:
                 return build_node_message(
                     CODE_UPDATE_TO_MAIN_RESPONSE,
@@ -2148,7 +2148,7 @@ class ChildNodeClient:
                         "success": False,
                         "error": {
                             "code": "PULL_FAILED",
-                            "message": "拉取最新代码失败",
+                            "message": f"拉取最新代码失败: {pull_error}",
                         },
                     },
                     request_id=request_id,

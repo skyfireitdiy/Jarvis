@@ -200,14 +200,14 @@ def get_jarvis_branch() -> Optional[str]:
         return None
 
 
-def checkout_jarvis_branch(branch_name: str) -> bool:
+def checkout_jarvis_branch(branch_name: str) -> tuple[bool, str]:
     """切换 Jarvis 源码到指定的分支或 Tag
 
     参数:
         branch_name: 分支名称或 Tag 名称
 
     返回:
-        bool: 切换成功返回 True，失败返回 False
+        tuple[bool, str]: (切换成功返回 True，失败返回 False, 错误详情)
     """
     try:
         # 获取 Jarvis 源码目录
@@ -223,17 +223,22 @@ def checkout_jarvis_branch(branch_name: str) -> bool:
         )
 
         if result.returncode == 0:
-            return True
-        return False
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return False
+            return True, ""
+        error_msg = (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or f"git checkout {branch_name} 失败"
+        )
+        return False, error_msg
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        return False, str(e)
 
 
-def pull_jarvis_code() -> bool:
+def pull_jarvis_code() -> tuple[bool, str]:
     """拉取 Jarvis 源码的最新更新
 
     返回:
-        bool: 拉取成功返回 True，失败返回 False
+        tuple[bool, str]: (拉取成功返回 True，失败返回 False, 错误详情)
     """
     try:
         # 获取 Jarvis 源码目录
@@ -252,13 +257,16 @@ def pull_jarvis_code() -> bool:
 
         if result.returncode == 0:
             PrettyOutput.auto_print("✅ Jarvis 源码拉取成功")
-            return True
+            return True, ""
         else:
-            PrettyOutput.auto_print(f"❌ Jarvis 源码拉取失败：{result.stderr.strip()}")
-            return False
+            error_msg = (
+                result.stderr.strip() or result.stdout.strip() or "git pull 失败"
+            )
+            PrettyOutput.auto_print(f"❌ Jarvis 源码拉取失败：{error_msg}")
+            return False, error_msg
     except (FileNotFoundError, subprocess.SubprocessError) as e:
         PrettyOutput.auto_print(f"❌ Jarvis 源码拉取失败：{str(e)}")
-        return False
+        return False, str(e)
 
 
 def get_jarvis_src_dir() -> str:
