@@ -97,7 +97,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2100 !important;
+  z-index: 3100 !important;
 }
 
 .confirm-modal {
