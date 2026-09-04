@@ -657,7 +657,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                 agent_name = agent_cfg.get("name", f"agent_{i + 1}")  # type: ignore
                 agent_type = agent_cfg.get("type", "code_agent")  # type: ignore
-                working_dir = agent_cfg.get("working_dir", os.getcwd())  # type: ignore
+                working_dir = os.path.abspath(
+                    os.path.expanduser(agent_cfg.get("working_dir", os.getcwd()))
+                )  # type: ignore
 
                 # 必填字段校验
                 if not agent_type or not working_dir:
