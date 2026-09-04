@@ -1,6 +1,4 @@
-# Jarvis：面向开发者的多智能体协作与 AI 编程平台
-
-> **Slogan**：让 Agent 与众共事。
+# 让 Agent 与众共事
 
 > **一句话定位**：Jarvis 是首个完整覆盖「单人单 Agent、单人多 Agent、多人单 Agent、多人多 Agent」四种协作模式的 AI 开发平台——独当一面，与众共事。
 
