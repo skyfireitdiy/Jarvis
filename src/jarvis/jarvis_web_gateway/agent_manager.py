@@ -58,7 +58,7 @@ class AgentInfo:
         self.name = name
         self.pid = pid
         self.port = port
-        self.working_dir = working_dir
+        self.working_dir = os.path.abspath(os.path.expanduser(working_dir))
         self.process = process
         self.llm_group = llm_group
         self.worktree = worktree
@@ -182,8 +182,8 @@ class AgentManager:
                 f"must be one of {list(self.AGENT_ENTRY_POINTS.keys())}"
             )
 
-        # 展开工作目录中的 ~ 符号
-        working_dir = os.path.expanduser(working_dir)
+        # 展开工作目录中的 ~ 符号并转为绝对路径
+        working_dir = os.path.abspath(os.path.expanduser(working_dir))
 
         # 验证工作目录：不存在则尝试创建，创建失败则回退到用户主目录
         if not os.path.isdir(working_dir):
