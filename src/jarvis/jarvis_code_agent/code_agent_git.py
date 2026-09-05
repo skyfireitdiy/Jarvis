@@ -87,7 +87,10 @@ class GitManager:
         return git_dir
 
     def update_gitignore(self, git_dir: str) -> None:
-        """检查并更新.gitignore文件，添加各语言默认忽略规则（若缺失）
+        """检查并更新.gitignore文件
+
+        - .gitignore 不存在时，创建并写入各语言默认忽略规则
+        - .gitignore 已存在但无 .jarvis 时，仅追加 .jarvis/
 
         参数:
             git_dir: git根目录路径
@@ -106,22 +109,20 @@ class GitManager:
         if ".jarvis" in existing_content:
             return
 
-        # 获取所有语言的默认忽略模板
-        default_templates = get_default_gitignore_templates()
-
         if not os.path.exists(gitignore_path):
-            # 新建 .gitignore
+            # 新建 .gitignore，写入各语言默认忽略规则
+            default_templates = get_default_gitignore_templates()
             with open(gitignore_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(default_templates + "\n")
             PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加各语言默认忽略规则")
         else:
-            # 追加到现有文件
+            # .gitignore 已存在但无 .jarvis，仅追加 .jarvis/
             with open(gitignore_path, "a", encoding="utf-8", newline="\n") as f:
                 # 若原文件不以换行结尾，先补一行
                 if existing_content and not existing_content.endswith("\n"):
                     f.write("\n")
-                f.write("\n" + default_templates + "\n")
-            PrettyOutput.auto_print("✅ 已更新 .gitignore，添加各语言默认忽略规则")
+                f.write("\n.jarvis/\n")
+            PrettyOutput.auto_print("✅ 已更新 .gitignore，添加 .jarvis/ 忽略规则")
 
     def handle_git_changes(self, prefix: str, suffix: str, agent: Any) -> None:
         """处理git仓库中的未提交修改"""

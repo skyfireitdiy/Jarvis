@@ -136,6 +136,8 @@
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
         :confirm-data="getPanelConfirmData(panel)"
+        :auto-scroll="getPanelAutoScroll(panel)"
+        @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -491,6 +493,8 @@
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
         :confirm-data="getPanelConfirmData(panel)"
+        :auto-scroll="getPanelAutoScroll(panel)"
+        @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         :interaction="sessionPanelInteraction"
         :resizeDirections="sessionResizeDirections"
         :panelStyle="getSessionPanelStyle(panel.id)"
@@ -3465,6 +3469,7 @@ const panelInputPasswords = ref(new Map()) // 每个 Panel 的密码输入标志
 const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent（用于聚焦正确的输入框）
 const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
 const panelConfirmData = ref(new Map()) // 每个 Panel 的确认数据（key: agentId, value: {message, defaultConfirm}）
+const panelAutoScrolls = ref(new Map()) // 每个 Panel 的自动滚动开关（key: agentId, value: boolean，默认 true）
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
 // 历史输入记录
@@ -3711,6 +3716,8 @@ function closeAgentInPanel(panelId) {
   panelOutputLists.delete(panelId)
   // 清除该 Agent 的 Panel 内嵌确认数据
   panelConfirmData.value.delete(agentId)
+  // 清除该 Agent 的 Panel 自动滚动开关
+  panelAutoScrolls.value.delete(agentId)
   // 清除该 Agent 的 Panel 输入状态
   panelInputTexts.value.delete(agentId)
   panelInputTips.value.delete(agentId)
@@ -3838,6 +3845,24 @@ function getPanelAgentStatus(panel) {
 function getPanelConfirmData(panel) {
   if (!panel || !panel.agentId) return null
   return panelConfirmData.value.get(panel.agentId) || null
+}
+
+// 获取 Panel 的自动滚动开关状态
+function getPanelAutoScroll(panel) {
+  if (!panel || !panel.agentId) return true
+  return panelAutoScrolls.value.get(panel.agentId) !== false
+}
+
+// 切换 Panel 的自动滚动开关
+function togglePanelAutoScroll(panel, value) {
+  if (!panel || !panel.agentId) return
+  panelAutoScrolls.value.set(panel.agentId, value)
+}
+
+// 判断指定 Agent 是否启用自动滚动（默认 true）
+function isAutoScrollEnabled(agentId) {
+  if (!agentId) return true
+  return panelAutoScrolls.value.get(agentId) !== false
 }
 
 // 获取 Panel 的终端列表
@@ -4604,9 +4629,9 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
         })
       })
     } else {
-      // 首次加载历史，滚动到底部
+      // 首次加载历史，滚动到底部（仅当自动滚动开启时）
       nextTick(() => {
-        if (outputList.value) {
+        if (outputList.value && isAutoScrollEnabled(targetAgentId)) {
           outputList.value.scrollTop = outputList.value.scrollHeight
           console.log('[HISTORY] Scrolled to bottom on initial load')
         }
@@ -8063,9 +8088,9 @@ function handleMessage(message, agentId = null) {
         streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
         streamingMessage.html = renderMessageHtml(streamingMessage)
-        // 仅当前 Agent 的流式消息触发滚动
+        // 仅当前 Agent 的流式消息触发滚动（且自动滚动开启时）
         nextTick(() => {
-          if (isCurrentAgent(targetAgentId) && outputList.value) {
+          if (isCurrentAgent(targetAgentId) && outputList.value && isAutoScrollEnabled(targetAgentId)) {
             outputList.value.scrollTop = outputList.value.scrollHeight
           }
         })
@@ -8176,8 +8201,8 @@ function handleMessage(message, agentId = null) {
     
     nextTick(() => {
       
-      // 输入框显示后，如果之前在底部且请求属于当前 Agent，就滚动到底部
-      if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value) {
+      // 输入框显示后，如果之前在底部且请求属于当前 Agent，就滚动到底部（且自动滚动开启时）
+      if (isCurrentAgent(requestAgentId) && shouldScrollAfterInputShow && outputList.value && isAutoScrollEnabled(requestAgentId)) {
         requestAnimationFrame(() => {
           const scrollHeight = outputList.value.scrollHeight
           const scrollTop = outputList.value.scrollTop
@@ -8328,8 +8353,8 @@ function handleMessage(message, agentId = null) {
         }
       }
 
-      // 当当前 Agent 开始思考时，自动滚动到底部
-      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId)) {
+      // 当当前 Agent 开始思考时，自动滚动到底部（且自动滚动开启时）
+      if (payload.execution_status === 'running' && isCurrentAgent(targetAgentId) && isAutoScrollEnabled(targetAgentId)) {
         nextTick(() => {
           if (outputList.value) {
             outputList.value.scrollTop = outputList.value.scrollHeight
@@ -8735,10 +8760,10 @@ function appendOutput(payload, agentId = null) {
     console.warn('[HISTORY] Failed to save message:', error)
   }
   
-  // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发）
+  // DOM更新后自动滚动到底部（Mermaid/dot 渲染由 MutationObserver 自动触发，且自动滚动开启时）
   nextTick(() => {
     requestAnimationFrame(() => {
-      if (!shouldAutoScroll) return
+      if (!shouldAutoScroll || !isAutoScrollEnabled(targetAgentId)) return
       // 优先使用 Panel 对应的 outputList，其次使用全局 outputList
       const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
       const scrollEl = targetOutputList || outputList.value
