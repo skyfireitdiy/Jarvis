@@ -351,6 +351,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Clear":
             agent.clear_history()
             return "", True
+        elif tag == "ClearPin":
+            agent.pin_content = ""
+            PrettyOutput.auto_print("🧹 已清理固定内容")
+            return "", True
         elif tag == "ToolUsage":
             agent.set_addon_prompt(agent.get_tool_usage_prompt())
             continue

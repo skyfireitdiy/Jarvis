@@ -168,6 +168,7 @@ def _update_completion_usage(file_path: str) -> None:
 BUILTIN_COMMANDS = [
     ("Summary", "总结"),
     ("Pin", "固定/置顶内容"),
+    ("ClearPin", "清理固定内容"),
     ("Clear", "清除历史"),
     ("Commit", "提交代码"),
     ("ToolUsage", "工具使用说明"),
