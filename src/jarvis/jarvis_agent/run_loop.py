@@ -710,10 +710,8 @@ class AgentRunLoop:
         # 保存当前响应内容供用户手动修复工具调用
         ag._last_response_content = current_response
 
-        # 【新增】首轮检测：若为首轮且无工具调用，触发cheap LLM判断
-        if getattr(ag, "_first_run_occurred", False) and not has_tool_call:
-            # 标记首轮检测已执行，避免后续轮次重复触发
-            ag._first_run_occurred = False
+        # 无工具调用时，触发cheap LLM判断是否应调用工具
+        if not has_tool_call:
             try:
                 from jarvis.jarvis_platform.registry import PlatformRegistry
                 from jarvis.jarvis_agent.utils import build_fix_prompt
@@ -731,7 +729,7 @@ class AgentRunLoop:
                     )
 
                 ask_prompt = (
-                    "以下是Agent首轮的输出，请判断是否需要调用工具。\n\n"
+                    "以下是Agent的输出，请判断是否需要调用工具。\n\n"
                     f"用户输入：{ag.original_user_input}\n\n"
                     f"Agent响应：{current_response[:1000]}\n\n"
                     f"可用工具摘要：{tool_list_summary}\n\n"
@@ -746,11 +744,11 @@ class AgentRunLoop:
                 if "<!!!YES!!!>" in judgment:
                     # 应调用工具，注入FixToolCall提示词
                     PrettyOutput.auto_print(
-                        "🔍 首轮无工具调用，cheap LLM判断应调用工具，注入修复提示词"
+                        "🔍 无工具调用，cheap LLM判断应调用工具，注入修复提示词"
                     )
                     fix_prompt = build_fix_prompt(
                         content=current_response,
-                        error_msg="首轮未调用工具，请据工具说明修正输出",
+                        error_msg="未调用工具，请据工具说明修正输出",
                         tool_usage=ag.get_tool_usage_prompt(),
                     )
                     ag.set_addon_prompt(fix_prompt)
@@ -767,7 +765,7 @@ class AgentRunLoop:
                 ag._no_tool_call_count = 0
                 return False, None
 
-        # 【原有逻辑】非首轮或已有工具调用时，沿用原有逻辑
+        # 【原有逻辑】已有工具调用或cheap LLM判断后，沿用原有逻辑
         # 在非交互模式下，跟踪连续没有工具调用的次数
         if ag.non_interactive:
             if has_tool_call:
