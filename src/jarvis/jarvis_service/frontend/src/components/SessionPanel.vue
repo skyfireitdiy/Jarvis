@@ -13,6 +13,14 @@
       <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
+        <button
+          class="session-auto-scroll-btn"
+          :class="{ 'active': autoScroll }"
+          @click.stop="$emit('toggle-auto-scroll', !autoScroll)"
+          :title="autoScroll ? '自动滚动已开启' : '自动滚动已关闭'"
+        >
+          {{ autoScroll ? '⤓' : '⤒' }}
+        </button>
         <div class="session-header-actions">
           <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
@@ -174,6 +182,7 @@ const props = defineProps({
   interaction: { type: Object, default: null },
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
+  autoScroll: { type: Boolean, default: true },
 })
 
 const emit = defineEmits([
@@ -182,6 +191,7 @@ const emit = defineEmits([
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
+  'toggle-auto-scroll',
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
@@ -492,6 +502,31 @@ function getTerminalStyle(terminalContent) {
 .session-agent-status.waiting_confirm {
   background: rgba(255, 133, 32, 0.2);
   color: var(--color-warning);
+}
+
+.session-auto-scroll-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.session-auto-scroll-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.session-auto-scroll-btn.active {
+  color: var(--color-accent);
 }
 
 .session-header-actions {
