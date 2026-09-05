@@ -1349,16 +1349,20 @@ def _get_agent_hint() -> str:
 
 
 def _get_non_interactive_response(auto_complete: bool) -> str:
-    """获取非交互模式下的响应文本。"""
+    """
+    获取非交互模式下的响应文本。"""
     hint = _get_agent_hint()
     if auto_complete:
         base_msg = (
-            "当前是非交互模式，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
+            "当前轮没有检测到工具调用。当前是非交互模式，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
             + ot("!!!COMPLETE!!!")
         )
         return base_msg + hint
+
     else:
-        return "当前是非交互模式，所有的事情你都自我决策" + hint
+        return (
+            "当前轮没有检测到工具调用。当前是非交互模式，所有的事情你都自我决策" + hint
+        )
 
 
 def user_confirm(tip: str, default: bool = True) -> bool:
