@@ -60,9 +60,7 @@
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
-          <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
-            🛑
-          </button>
+
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
             ⚙
           </button>
@@ -101,9 +99,6 @@
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
           </button>
-          <button class="icon-btn" v-if="agentStatuses.get(currentAgent?.agent_id)?.execution_status === 'running'" @click="sendManualInterrupt" :disabled="!socket" title="人工介入">
-            🛑
-          </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙
           </button>
@@ -140,6 +135,7 @@
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
+        @manual-interrupt="sendManualInterruptToPanel(panel)"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -499,6 +495,7 @@
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
+        @manual-interrupt="sendManualInterruptToPanel(panel)"
         :interaction="sessionPanelInteraction"
         :resizeDirections="sessionResizeDirections"
         :panelStyle="getSessionPanelStyle(panel.id)"
@@ -9574,13 +9571,17 @@ function sendInterrupt() {
   sendMessageToAgent(message)
 }
 
-function sendManualInterrupt() {
+function sendManualInterruptToPanel(panel) {
+  if (!panel || !panel.agentId) {
+    console.warn('[SEND] Invalid panel for manual interrupt')
+    return
+  }
   const message = {
     type: 'manual_interrupt',
     payload: {},
   }
-  console.log('[ws] send manual interrupt', message)
-  sendMessageToAgent(message)
+  console.log('[ws] send manual interrupt to panel agent', panel.agentId, message)
+  sendMessageToAgentById(panel.agentId, message)
 }
 
 function confirmClearHistory() {

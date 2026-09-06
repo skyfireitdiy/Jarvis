@@ -29,6 +29,14 @@
         >
           🔓 退出非交互
         </button>
+        <button
+          v-if="(agentStatus?.execution_status ?? 'running') === 'running'"
+          class="session-manual-interrupt-btn"
+          @click.stop="$emit('manual-interrupt')"
+          title="人工介入（中断当前执行）"
+        >
+          🛑
+        </button>
         <div class="session-header-actions">
           <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
@@ -202,6 +210,7 @@ const emit = defineEmits([
   'set-output-list', 'set-terminal-ref',
   'toggle-auto-scroll',
   'exit-non-interactive',
+  'manual-interrupt',
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
@@ -558,6 +567,27 @@ function getTerminalStyle(terminalContent) {
 
 .session-exit-non-interactive-btn:hover {
   background: rgba(255, 133, 32, 0.3);
+  color: var(--color-text-primary);
+}
+
+.session-manual-interrupt-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: rgba(255, 60, 72, 0.15);
+  color: var(--color-error);
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.session-manual-interrupt-btn:hover {
+  background: rgba(255, 60, 72, 0.3);
   color: var(--color-text-primary);
 }
 
