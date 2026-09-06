@@ -22,7 +22,6 @@
           {{ autoScroll ? '⤓' : '⤒' }}
         </button>
         <button
-          v-if="nonInteractive"
           class="session-exit-non-interactive-btn"
           @click.stop="$emit('exit-non-interactive')"
           title="退出非交互模式（不中断当前对话）"
