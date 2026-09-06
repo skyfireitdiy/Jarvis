@@ -8,6 +8,7 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 - 保持与现有异常处理、工具调用、用户交互完全一致
 """
 
+import datetime
 import os
 import re
 from enum import Enum
@@ -858,6 +859,10 @@ class AgentRunLoop:
 
             confirm_prompt = "\n".join(confirm_prompt_parts)
 
+            # 注入当前时间日期到确认提示词
+            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            confirm_prompt = f"[当前时间：{current_time_str}]\n\n" + confirm_prompt
+
             # 询问 LLM
             try:
                 llm_response = ag._call_model(confirm_prompt, False, False)
@@ -957,6 +962,16 @@ class AgentRunLoop:
                                 "text": "\n\n[用户补充]\n" + user_supplement,
                             }
                         ]
+
+                # 注入当前时间日期到提示词
+                current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                time_prompt = f"[当前时间：{current_time_str}]\n\n"
+                if isinstance(ag.session.prompt, str):
+                    ag.session.prompt = time_prompt + ag.session.prompt
+                else:
+                    ag.session.prompt = [
+                        {"type": "text", "text": time_prompt}
+                    ] + ag.session.prompt
 
                 # 调用模型获取响应
                 try:
