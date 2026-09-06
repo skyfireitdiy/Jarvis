@@ -20,6 +20,96 @@
 
 ---
 
+## 快速摘要
+
+**Jarvis 是什么？** 一个让 AI 从「独自工作」走向「与众共事」的协作式 AI 开发平台——首个完整覆盖「单人单 Agent、单人多 Agent、多人单 Agent、多人多 Agent」四种协作模式的开源项目。
+
+**四象限速览**：
+
+| 协作模式     | 一句话价值       | 核心能力                                     |
+| ------------ | ---------------- | -------------------------------------------- |
+| 单人单 Agent | 独当一面         | 符号级代码理解、影响分析、无人值守、交叉验证 |
+| 单人多 Agent | 一人驱动一个团队 | 编排网络、Agent 间通信、多面板同屏操作       |
+| 多人单 Agent | 团队共享一个 AI  | 多用户认证、ACL 权限、共享协作、聊天室       |
+| 多人多 Agent | 分布式协作网络   | 多节点多网关、跨节点通信、节点级运维         |
+
+**与主流工具的本质区别**：Claude Code、CodeX、CodeBuddy 聚焦「单人单 Agent」场景；Jarvis 完整覆盖人 × Agent 两个维度的四种协作模式，且经受了企业级（中兴通讯）与竞赛级（开放原子大赛总冠军）双重验证。
+
+```plantuml
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #94A3B8
+  FontSize 13
+}
+
+package "① 单人单 Agent：独当一面" as p1 {
+  actor "开发者" as u1
+  component "Agent" as a1
+  u1 --> a1 : 直接对话
+}
+
+package "② 单人多 Agent：一人驱动一个团队" as p2 {
+  actor "开发者" as u2
+  component "开发 Agent" as a2a
+  component "测试 Agent" as a2b
+  component "部署 Agent" as a2c
+  u2 --> a2a : 指令
+  u2 --> a2b : 指令
+  u2 --> a2c : 指令
+  a2a <--> a2b : 群聊/点对点
+  a2b <--> a2c : 群聊/点对点
+}
+
+package "③ 多人单 Agent：团队共享一个 AI" as p3 {
+  actor "开发者 A" as u3a
+  actor "开发者 B" as u3b
+  actor "开发者 C" as u3c
+  component "共享 Agent" as a3
+  u3a --> a3 : 消息（自动标识）
+  u3b --> a3 : 消息（自动标识）
+  u3c --> a3 : 消息（自动标识）
+  u3a <--> u3b : 聊天室讨论
+  u3b <--> u3c : 聊天室讨论
+}
+
+package "④ 多人多 Agent：分布式协作网络" as p4 {
+  actor "开发者 A" as u4a
+  actor "开发者 B" as u4b
+  component "节点 1 Agent" as a4a
+  component "节点 2 Agent" as a4b
+  component "节点 3 Agent" as a4c
+  u4a --> a4a : 指令
+  u4b --> a4c : 指令
+  a4a <--> a4b : 跨节点通信
+  a4b <--> a4c : 跨节点通信
+}
+
+p1 -[hidden]right- p2
+p3 -[hidden]right- p4
+p1 -[hidden]down- p3
+p2 -[hidden]down- p4
+
+@enduml
+```
+
+---
+
 ## 一、项目背景
 
 ### 1.1 一个真实的问题：AI 编程工具为何「独自工作」？
@@ -270,6 +360,63 @@ Jarvis 使用 SQLite 存储代码符号与依赖边，而非简单的文本索�
 
 **差异化**：主流 AI 编程工具（Claude Code、CodeX 等）每次查询通常重新读取文件（grep 实时搜索或模型上下文读取），不维护持久化的符号索引；Jarvis 的符号数据库以「mtime 增量检测 + 单文件粒度更新」实现索引与代码的实时同步，既避免全量重建的开销，又保证查询结果的准确性。
 
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
+
+component "源代码文件" as src
+component "tree-sitter 解析器\n（8 种语言）" as parser
+component "符号数据库\nSQLite（40.5 MB）" as db
+component "图遍历引擎\nBFS 前向/后向" as graph
+component "影响分析器\nImpactAnalyzer" as impact
+component "编辑上下文\nEditContext" as ctx
+
+src -down-> parser : 读取文件
+parser -down-> db : 提取符号与依赖边
+
+db -down-> graph : 符号查询
+
+graph -right-> ctx : ① 读代码时\n提供结构化上下文
+graph -right-> impact : ② 修改后\n影响范围分析
+
+note right of db
+  增量维护：
+  - 首次读取建索引
+  - mtime 惰性刷新
+  - 编辑后主动更新
+end note
+
+note right of ctx
+  五类上下文：
+  作用域 · 使用符号
+  导入符号 · 相关文件
+  上下文摘要
+end note
+
+note right of impact
+  五类影响：
+  引用 · 依赖 · 测试
+  接口变更 · 依赖链
+  附风险等级
+end note
+@enduml
+```
+
 **符号数据库的两大应用场景**：
 
 1. **读代码时提供丰富上下文**：`read_code` 工具读取文件时，调用 `get_edit_context` 基于符号数据库构建编辑上下文（`EditContext`），包含五类信息——当前作用域（光标所在函数/类）、使用符号（编辑区域内引用的符号及其定义位置）、导入符号（文件的 import 关系）、相关文件（依赖与被依赖的文件）、上下文摘要（自然语言描述）。Agent 据此理解「这段代码在哪个函数里、调用了哪些符号、这些符号定义在哪、与哪些文件有关联」，而非仅看到孤立的代码片段。
@@ -305,6 +452,57 @@ Tree-sitter 则完全不同：
 
 **差异化**：主流工具最多提供「查找引用」功能，返回一个文件列表。Jarvis 提供的是**带风险等级的影响评估报告**，区分直接/间接影响、区分代码/测试影响，让开发者真正「心中有数」。
 
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+  FontSize 11
+}
+
+component "被修改函数\nparse_config" as target
+component "模块 A\nconfig_loader.py" as modA
+component "模块 B\napp_init.py" as modB
+component "模块 C\napi_handler.py" as modC
+component "模块 D\ntest_config.py" as modD
+component "模块 E\nplugin_system.py" as modE
+
+modA -down-> target : 直接调用
+modB -down-> target : 直接调用
+modC -down-> modA : 间接调用
+modE -down-> modB : 间接调用
+modD -down-> target : 测试引用
+
+note right of target
+  修改 parse_config()
+  影响分析结果：
+  - 3 个模块受影响
+  - 12 个函数受影响
+  - 5 个测试受影响
+  - 风险等级：高
+end note
+
+note bottom of modC
+  引用影响（直接）
+  依赖影响（间接）
+  测试影响
+  接口变更影响
+  依赖链影响
+end note
+@enduml
+```
+
 影响分析建立在符号图之上——而符号图的精度，取决于符号提取引擎对**多种语言**的支持能力。下一节展开 Jarvis 的多语言解析体系。
 
 #### 3.1.3 多语言支持
@@ -314,6 +512,46 @@ Tree-sitter 则完全不同：
 **技术深度**：tree-sitter 提供的是**增量解析**能力——代码修改后无需重新解析整个文件，只重新解析变化的子树。这意味着符号数据库可以**增量更新**，而非每次全量重建。对于百万行代码的项目，这是性能的关键。
 
 **差异化**：主流工具多基于文本匹配或模型上下文理解代码，结构化符号级解析能力有限。Jarvis 的八种语言都经过 tree-sitter 的 AST 级解析，符号提取的精度一致。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "Python 解析器" as py
+component "Go 解析器" as go
+component "Java 解析器" as java
+component "JS/TS 解析器" as js
+component "Rust 解析器" as rust
+component "C/C++ 解析器" as c
+component "语言注册表" as registry
+component "符号数据库" as db
+
+py -down-> registry
+go -down-> registry
+java -down-> registry
+js -down-> registry
+rust -down-> registry
+c -down-> registry
+registry -down-> db : 统一符号提取
+
+note bottom of registry
+  语言注册表机制：
+  - 每种语言独立解析器
+  - 可扩展新语言
+  - 增量解析（tree-sitter）
+end note
+@enduml
+```
 
 至此，「理解层」三节已完整——符号数据库提供结构化理解，影响分析提供改动预判，多语言保证覆盖面。但「看懂代码」只是手段，**「自主干活」才是目的**。从下一节起进入「执行层」：Agent 如何无人值守、如何定时调度。
 
@@ -357,6 +595,57 @@ Jarvis 内置完整的定时任务体系：
 
 **差异化**：主流工具的「代码审查」通常是**同一个 Agent 的自我检查**——它用同样的上下文、同样的思维模式审视自己的输出，存在固有局限（Claude Code 的 subagent 审查需手动配置，非内置的「审查→修复」闭环）。Jarvis 的 `CodeReviewer` 内置独立的审查 Agent，支持「审查→修复」循环，是**真正的第二意见**。
 
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
+
+participant "开发 Agent\n（编写代码）" as dev
+participant "CodeReviewer\n（审查协调器）" as coordinator
+participant "CodeReview-Agent-N\n（每轮新建独立审查 Agent）" as reviewer
+
+== 审查 → 修复循环（默认最多 3 轮） ==
+loop 第 N 轮审查（N = 1, 2, 3...）
+  dev -> coordinator : 触发审查
+  coordinator -> coordinator : 获取 git diff\n截断 token 限制
+  coordinator -> coordinator : 生成审查目标\n构建专用 prompts
+  coordinator -> reviewer : 创建独立审查 Agent\n（专用系统提示词）
+  reviewer -> reviewer : 独立审查\n（use_methodology=False\nuse_analysis=False）
+  reviewer --> coordinator : 返回审查结果
+  coordinator -> coordinator : 结构化解析\n（JSON 格式错误自动修复）
+
+  alt 审查通过（ok=True）
+    coordinator --> dev : ✅ 审查通过，结束循环
+  else 发现问题
+    coordinator -> dev : ⚠ 列出 issues\n（类型/描述/位置/建议）
+    coordinator -> dev : 构建 fix_prompt\n调用 on_fix 回调
+    dev -> dev : 修复问题
+    dev -> coordinator : 生成修复总结\n追加到修改历史
+  end
+end
+
+note over dev, reviewer
+  循环终止条件：
+  - 审查通过（ok=True）
+  - 达到最大迭代次数（默认 3 轮）
+  - 用户取消审查
+end note
+@enduml
+```
+
 交叉验证用「独立 Agent」消除局限——但独立 Agent 如何**获得完整上下文**？如果审查 Agent 或子 Agent 拿到的信息是「二手转述」，效果反而会打折扣。下一节展开 fork 式子 Agent 的上下文零丢失设计。
 
 #### 3.1.7 Fork 式子 Agent
@@ -373,6 +662,42 @@ Jarvis 内置完整的定时任务体系：
 **技术深度**：fork 式设计的核心价值是**解决上下文传递丢失问题**，而非并行。单个 Agent 本身不支持并行执行；如果只是创建一个子 Agent、再由父 Agent 复制任务信息传递给它，中间难免有信息丢失——父 Agent 需要把「背景、约束、已完成的步骤、发现的问题」全部重新描述一遍，任何遗漏都会导致子 Agent 重复劳动或做出错误决策。Jarvis 的做法是**让子 Agent 直接继承父 Agent 的完整上下文**：对话历史、工具集、规则、配置全部原样继承，子 Agent 一启动就「知道父 Agent 知道的一切」，无需父 Agent 重新转述。这既更好地封装了缓存（上下文不经过二次加工），又提供了完整的上下文信息（零丢失）。
 
 **差异化**：主流工具的「子任务」机制中，普通 subagent（如 Claude Code 默认的 subagent）需要父 Agent 在任务描述中整理并传递上下文，信息在「父 Agent → 任务描述 → 子 Agent」的链路中可能有所损耗；虽部分工具（如 Claude Code 的 Fork Subagent）也支持上下文继承，但需显式配置或特定触发条件。Jarvis 的 fork 子 Agent **默认即 fork**——`sub_agent`/`sub_code_agent` 无需任何配置即继承父 Agent 的完整上下文（对话历史、工具集、规则、配置全部原样继承），跳过了「任务描述转述」这一环节，实现上下文的零丢失传递。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "父 Agent" as parent
+component "子 Agent" as child
+
+parent -down-> child : fork（默认即继承）
+
+note right of parent
+  父 Agent 完整上下文：
+  - 对话历史
+  - 工具集
+  - 规则
+  - 配置
+end note
+
+note right of child
+  子 Agent 直接继承：
+  - 无需任务描述转述
+  - 上下文零丢失
+  - 跳过首次初始化
+end note
+@enduml
+```
 
 「协作层」两节已完整——交叉验证消除局限，fork 子 Agent 零丢失传递上下文。但**所有这些能力，开发者如何触达？** 如果每次使用都要启动完整的多节点架构，那「独当一面」就失去了轻量性。下一节展开 CLI 这一轻量入口。
 
@@ -448,6 +773,49 @@ agents:
 
 `builtin/agent_orchestration/self_evolving_network.yaml` 定义了四类协作 Agent：**knowledge_base_agent**（知识库 Agent）、**monitoring_agent**（监控 Agent）、**tech_learning_agent**（技术学习 Agent）、**dispatcher_agent**（调度 Agent），形成自演化闭环。该范式的完整论述详见 3.2.3 节。
 
+```plantuml
+@startuml
+skinparam activityStyle
+skinparam backgroundColor #FEFEFE
+skinparam activity {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+start
+:用户输入编排文件路径
+（支持多行，每行一个 YAML 路径）;
+
+if (文件存在且格式合法？) then (是)
+  :解析 YAML，提取 agents 列表;
+  :合并多个编排文件的 Agent 配置;
+else (否)
+  :提示错误，跳过该文件;
+endif
+
+if (Web Gateway 已连接？) then (是)
+  :遍历 agents 配置;
+  :校验必填字段
+  （type、working_dir）;
+  :调用 gateway._create_agent
+  批量创建 Agent;
+else (否)
+  :提示「Web Gateway 未连接」;
+  stop
+endif
+
+:汇总创建结果
+（成功数 / 失败数 / 明细表）;
+
+stop
+@enduml
+```
+
 #### 3.2.2 Agent 间通信：群聊、点对点与指挥控制
 
 Jarvis 为 Agent 之间设计了专门的关系组织机制：
@@ -473,6 +841,86 @@ Jarvis 为 Agent 之间设计了专门的关系组织机制：
 **关键洞察**：自演化网络将「知识沉淀」从「任务执行」中独立出来，形成专门的反馈回路。主流 AI 工具的经验记录（如 Claude Code 的 Auto Memory）是「笔记式」——Agent 自行判断何时记录、记录什么，结构化索引与主动召回能力有限；Jarvis 通过知识库 Agent 将经验持久化为结构化知识，通过调度 Agent 在后续任务中主动复用，通过技术学习 Agent 持续引入外部新知，逐步构建起对用户工作习惯、技术栈、项目背景的深度理解（用户画像），使工作区从「被动执行工具」进化为「主动支撑日常工作的自进化环境」。
 
 **方法论价值**：该范式是记忆系统的高阶形态，可推广至个人知识管理、持续学习、工作区智能化等场景。其编排配置见 3.2.1 节「内置编排案例二」。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "dispatcher_agent\n（调度 Agent）" as dispatcher
+component "knowledge_base_agent\n（知识库 Agent）" as kb
+component "monitoring_agent\n（监控 Agent）" as monitor
+component "tech_learning_agent\n（技术学习 Agent）" as learner
+
+monitor -down-> dispatcher : 状态监控
+learner -down-> kb : 新技术沉淀
+dispatcher -right-> kb : 任务分派
+kb -down-> dispatcher : 知识复用
+
+note bottom of dispatcher
+  自演化闭环：
+  调度 → 执行 → 沉淀 → 监控 → 学习
+end note
+@enduml
+```
+
+```plantuml
+@startuml
+skinparam sequence {
+  BackgroundColor #FEFEFE
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantBorderColor #4A90D9
+  ParticipantFontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F5A623
+}
+
+actor 用户 as user
+participant "dispatcher_agent\n（调度 Agent）" as dispatcher
+participant "knowledge_base_agent\n（知识库 Agent）" as kb
+participant "执行 Agent\n（按需创建）" as executor
+participant "monitoring_agent\n（监控 Agent）" as monitor
+participant "tech_learning_agent\n（技术学习 Agent）" as learner
+
+user -> dispatcher : 提交任务
+
+dispatcher -> kb : ① 查询相关经验与良法
+kb --> dispatcher : 返回知识条目
+
+dispatcher -> executor : ② 分派任务
+（无合适 Agent 时按需创建 code_agent）
+
+executor -> kb : ③ 执行完成后沉淀经验
+（experiences / best_practices / solutions）
+
+monitor -> dispatcher : ④ 定期报告网络健康状态
+（心跳 / 资源 / 任务队列）
+
+learner -> kb : ⑤ 搜索新技术并存入知识库
+（memory 工具，带标签）
+
+note over dispatcher, learner
+  自演化闭环：
+  调度 → 执行 → 沉淀 → 监控 → 学习
+  工作区能力随使用持续增强
+end note
+@enduml
+```
 
 #### 3.2.4 对抗式 Agent 优化专家系统
 
@@ -500,6 +948,99 @@ jsec（Jarvis Security Scanner）是 Jarvis 的 C/C++ 安全漏洞静态扫描�
 
 **方法论价值**：对抗式 Agent 的核心是「逐步将模型的不确定能力沉淀为专家系统的确定规则」。该方法可推广至故障定位、专家运维、安全合规审计、代码审查等专家系统与 Agent 混合场景。其编排配置见 3.2.1 节「内置编排案例一」。
 
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "jsec_rule_developer\n（规则开发 Agent）" as developer
+component "jsec_adversary\n（对抗 Agent）" as adversary
+component "专家系统规则库" as rules
+
+adversary -right-> developer : ① 发现漏洞反馈
+developer -down-> rules : ② 改进检测规则
+rules -up-> adversary : ③ 验证改进效果
+
+note bottom of rules
+  对抗迭代闭环：
+  开发 → 对抗 → 反馈 → 改进 → 再对抗
+  直至对抗 Agent 无法找到规避方法
+end note
+@enduml
+```
+
+```plantuml
+@startuml
+skinparam sequence {
+  BackgroundColor #FEFEFE
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantBorderColor #4A90D9
+  ParticipantFontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F5A623
+}
+
+actor 用户 as user
+participant "jsec_adversary\n（对抗 Agent）" as adversary
+participant "jsec_rule_developer\n（规则开发 Agent）" as developer
+participant "专家系统规则库\n（jarvis_sec）" as rules
+
+user -> adversary : 提供代码仓库 / 指定扫描目标
+
+loop 对抗迭代循环
+  adversary -> adversary : ① 主动发现漏洞
+  （联网搜 CVE/CWE / 扫描仓库 / 分析用例）
+
+  adversary -> adversary : ② 抽象普适用例
+  （脱敏泛化，正例 + 反例）
+
+  adversary -> developer : ③ 反馈漏报/误报
+  （含漏洞模式与期望检测方式）
+
+  developer -> developer : ④ 分析反馈并改进规则
+  （污点传播 / 调用图分析，禁用正则）
+
+  developer -> rules : ⑤ 更新检测规则
+  developer -> adversary : ⑥ 通知验证
+
+  adversary -> rules : ⑦ 验证改进效果
+  rules --> adversary : 返回检测结果
+
+  alt 验证通过
+    adversary -> adversary : ⑧ 深度对抗阶段
+    （阅读源码，尝试构造规避用例）
+    note right
+      若找到规避方法，
+      继续反馈给规则开发 Agent
+    end note
+  else 验证未通过
+    adversary -> developer : ⑨ 反馈具体原因，继续改进
+  end
+end
+
+note over adversary, developer
+  对抗压力驱动架构演进：
+  正则 → SQLite 数据流分析 → 污点传播
+  直至对抗 Agent 无法找到规避方法
+end note
+@enduml
+```
+
 #### 3.2.5 多面板平铺：同时查看与交互多个 Agent
 
 Jarvis 的前端界面支持**多面板（Panel）平铺布局**，用户可同时打开最多 **6 个 Agent 会话面板**，每个面板独立展示一个 Agent 的对话、输出与状态，形成网格布局（1 个面板单列、2 个双列、3-4 个 2×2、5-6 个 3×2）。这是单人多 Agent 协作的**交互层基础设施**——编排与通信解决了「多个 Agent 如何一起工作」的机制问题，多面板平铺解决了「用户如何同时观察和驱动多个 Agent」的体验问题。
@@ -525,27 +1066,83 @@ Jarvis 的前端界面支持**多面板（Panel）平铺布局**，用户可同�
 
 **技术深度**：多面板的核心是**前端状态隔离**。每个面板维护独立的输入缓冲、输出列表、确认数据与终端引用，通过 `panelId` 与 `agentId` 的映射关系实现 Agent 会话与面板的一一对应。面板关闭时自动清理关联的 Agent 会话状态，避免内存泄漏。移动端（≤768px）自动降级为单面板模式，保证小屏设备的可用性。
 
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+package "1 个面板（单列）" {
+  component "Agent A" as a1
+}
+
+package "2 个面板（双列）" {
+  component "Agent A" as a2a
+  component "Agent B" as a2b
+}
+
+package "3-4 个面板（2×2 网格）" {
+  component "Agent A" as a3a
+  component "Agent B" as a3b
+  component "Agent C" as a3c
+  component "Agent D" as a3d
+}
+
+package "5-6 个面板（3×2 网格）" {
+  component "Agent A" as a4a
+  component "Agent B" as a4b
+  component "Agent C" as a4c
+  component "Agent D" as a4d
+  component "Agent E" as a4e
+  component "Agent F" as a4f
+}
+
+note bottom
+  每个面板独立维护：
+  输入缓冲 / 输出列表 / 确认数据 / 终端引用
+  通过 panelId ↔ agentId 映射实现会话绑定
+  移动端（≤768px）自动降级为单面板
+end note
+@enduml
+```
+
 ---
 
 ### 3.3 多人单 Agent：共享与权限
 
 当多个开发者需要共享同一个 Agent 时，Jarvis 提供了完整的多用户认证、权限控制与并发操作能力。这是从「单人」到「团队」的关键一步。
 
-多人单 Agent 的核心价值在于：**多用户登录**——基于 JWT 认证，每个用户拥有独立身份与会话；**Agent 共享协作**——同一个 Agent 实例可被团队多个成员共同使用，消息带用户标识，天然适配结对编程；**聊天室群聊**——内置聊天室系统，团队成员可实时讨论、协调，同时随时召唤 Agent 参与。
+多人单 Agent 的核心价值在于：**多用户登录**——每个用户拥有独立身份与会话，团队可围绕同一个 Agent 协作；**Agent 共享协作**——同一个 Agent 实例可被团队多个成员共同使用，消息自动携带发送人信息，天然适配结对编程；**双群组协作**——纯人讨论群（聊天室）用于团队内部讨论决策，人-Agent 协作群（共享 Agent 会话）用于将结论交给 Agent 执行。
 
 > **接入方式说明**：多人单 Agent 的共享与权限能力**仅通过 Web 接口提供**，CLI 不支持多用户共享。
 
-#### 3.3.1 多用户认证与权限组
+本节六个子章节分三层：**身份层**（3.3.1 多用户认证、3.3.2 权限控制）解决「谁能用、能用什么」；**协作层**（3.3.3 Agent 共享、3.3.4 会话与用户标识）解决「多人如何共用一个 Agent」；**交互层**（3.3.5 双群组协作、3.3.6 典型工作流）解决「团队如何围绕 Agent 协同」。
 
-Jarvis 内置完整的用户认证与权限体系：
+#### 3.3.1 多用户认证：团队成员的独立身份
 
-- **JWT 多用户认证**：基于 JWT（JSON Web Token）的用户认证机制，支持多用户登录
-- **权限组（ACL）**：基于访问控制列表（ACL）的权限管理，不同用户拥有不同的操作权限
+Jarvis 内置完整的用户认证体系，让每个团队成员拥有独立身份：
+
+- **JWT 认证**：基于 JWT（JSON Web Token）的认证机制，登录后获得独立会话，支持多用户同时在线
+- **密码安全**：密码经 bcrypt 加密存储，登录失败 5 次自动锁定，保障账号安全
 - **用户隔离**：每个用户拥有独立的会话、记忆与配置，互不干扰
 
-**技术深度**：Jarvis 的权限体系不是简单的「登录/未登录」二元判断，而是**两层细粒度 ACL 权限模型**：
+**典型场景**：团队 5 人同时登录 Jarvis，每人看到自己的会话列表与共享 Agent，互不干扰。管理员可随时查看在线用户、管理账号状态。
 
-**第一层：管理员系统级权限**。管理员负责系统级权限管理，精确控制每个用户能执行哪些操作：
+**差异化**：主流 AI 开发工具（如 Claude Code、CodeX）以**单用户本地工具**为主，本地多用户协作能力有限（Claude Code 的 Team 计划是 SaaS 账号体系，非本地多用户协作）。Jarvis 是**团队级协作平台**，开箱即用，无需额外订阅。
+
+#### 3.3.2 两层权限控制：管理员管系统，创建者管资源
+
+Jarvis 的权限体系不是简单的「登录/未登录」二元判断，而是**两层细粒度权限模型**：
+
+**第一层：管理员系统级权限**。管理员精确控制每个用户能执行哪些操作：
 
 - 是否可以创建 Agent
 - 是否可以创建集成终端
@@ -553,42 +1150,120 @@ Jarvis 内置完整的用户认证与权限体系：
 - 是否可以修改配置
 - 是否可以访问某节点
 
+系统内置四档权限组，开箱即用：**系统管理员**（全部权限）、**运维人员**（Agent/终端/定时任务管理）、**开发者**（Agent 创建与终端使用）、**访客**（只读）。
+
 **第二层：Agent 创建者资源级权限**。每个 Agent 的创建者可以自主控制该 Agent 的访问权限，分为三个级别：
 
 - **无权限**：用户完全看不到该 Agent
 - **只读权限**：用户可以查看该 Agent 的信息，但不能与其交互
 - **交互权限**：用户可以与该 Agent 进行完整的对话交互
 
+**典型场景**：小 A 创建了一个代码修改 Agent，将「交互权限」授予小 B（业务方），将「只读权限」授予小 C（观察者）。小 B 可直接与 Agent 对话提需求，小 C 只能查看进度，无法干预。
+
 这种「管理员管系统、创建者管资源」的分层权限模型，既保证了平台级的安全管控，又赋予资源所有者灵活的自主权。
 
-**差异化**：主流 AI 开发工具（如 Claude Code、CodeX）以**单用户本地工具**为主，本地多用户协作能力有限（Claude Code 的 Team 计划是 SaaS 账号体系，非本地多用户协作）。Jarvis 是**团队级协作平台**，支持多人共享同一个 Agent 实例。
+**差异化**：主流工具中，Agent 的共享通常意味着「所有人都有全部权限」。Jarvis 让 Agent 创建者像管理「团队资产」一样精细控制谁能用、能用什么。
 
-#### 3.3.2 Agent 共享与并发操作
+#### 3.3.3 Agent 共享：一个 Agent，多人协作
 
-多个用户可以同时操作同一个 Agent：
+多个用户可以同时操作同一个 Agent，这是「多人单 Agent」的核心场景：
 
 - **共享 Agent**：多个用户可通过网关访问同一个 Agent，实现 Agent 的团队共享
 - **并发操作**：多个用户可同时向同一个 Agent 发送消息，消息进入 Agent 的输入队列，按序处理
 - **会话共享**：所有用户与 Agent 的对话在同一个会话中，彼此可见对方的消息，天然适配结对编程场景
-- **用户标识**：每个用户发给 Agent 的消息会自动增加用户标识，Agent 能区分「这是谁在跟我说话」
 
-**技术深度**：Agent 共享的核心是**消息队列 + 会话共享 + 用户标识**。多个用户的消息进入同一个 Agent 的输入队列，Agent 按序处理；所有消息在同一会话中共享可见，但每条消息自动附带用户标识，Agent 能准确区分消息来源。这种设计使多人可以围绕同一个 Agent 进行结对编程、协同调试，实时看到彼此的输入与 Agent 的响应。
+**典型场景**：小 A 和小 B 结对编程——小 A 描述需求，Agent 生成代码，小 B 实时看到对话并补充修改意见。两人与 Agent 的对话在同一会话中连续展开，无需切换上下文。
 
 **差异化**：主流工具以「一人一 Agent」模式为主，Agent 的团队共享能力有限。Jarvis 的 Agent 是**团队资产**，可以被多个成员共同使用。
 
-#### 3.3.3 聊天室：群聊与私聊
+#### 3.3.4 用户标识：Agent 知道「谁在跟我说话」
 
-Jarvis 内置完整的聊天室系统，支持人与人之间的实时协作：
+在共享场景中，Agent 需要区分消息来源——这是多人协作的基础能力：
+
+- **自动标识**：每个用户发给 Agent 的消息自动携带发送人信息，Agent 能区分「这是谁在跟我说话」
+- **多行输入模式**：在多行输入场景下，消息自动添加发送人前缀（如「张三：请帮我修改这个函数」），Agent 与所有协作者都能清晰看到消息来源
+- **消息序号**：每条消息分配唯一序号，保证多人并发时的消息顺序一致
+
+**典型场景**：小 A 和小 B 同时向同一个 Agent 提问。Agent 看到「张三：请分析这个 bug」和「李四：我建议用 Rust 重写」，能准确理解这是两个不同的人提出的不同诉求，分别回应。
+
+**差异化**：主流工具中，多人共享 Agent 时消息往往「匿名化」——Agent 无法区分消息来源。Jarvis 让 Agent 天然理解「谁在说话」，为结对编程、多方评审等场景提供了基础。
+
+#### 3.3.5 双群组协作：纯人讨论群与人-Agent 协作群
+
+多人单 Agent 场景下，Jarvis 提供**两个并行的协作群组**：
+
+**群组一：纯人讨论群（聊天室）**。成员全部是人，用于团队内部讨论与决策：
 
 - **聊天室列表**：查看所有聊天室
 - **在线用户列表**：查看当前在线用户
 - **聊天室成员列表**：查看聊天室成员
-- **聊天室消息**：发送聊天室消息（自动添加 [Agent名字] 前缀）
+- **聊天室消息**：发送聊天室消息
 - **私聊消息**：发送私聊消息（支持 client_id 或 user_id）
 
-**技术深度**：聊天室系统让 Jarvis 不仅是「AI 工具」，更是「团队协作空间」。开发者可以在聊天室中讨论问题、分享进展、协调工作，同时随时召唤 Agent 参与讨论。
+**群组二：人-Agent 协作群（共享 Agent 会话）**。成员是人 + Agent，用于将讨论结论交给 Agent 执行：
 
-**差异化**：主流 AI 开发工具通常不内置聊天室，团队协作需要切换到 Slack、钉钉等外部工具。Jarvis 将「人-人协作」与「人-Agent 协作」统一在同一个平台内。
+- 所有成员与 Agent 的对话在同一个共享会话中，彼此可见
+- 消息自动携带发送人信息，Agent 能区分「谁在说话」
+- Agent 的回复对群内所有人可见
+
+**典型协作流程**：团队先在纯人讨论群（聊天室）中讨论「这个接口要不要改」，达成一致后，将结论带到人-Agent 协作群（共享 Agent 会话）——「Agent，按我们讨论的方案修改这个接口」。Agent 执行修改，进度与结果在共享会话中对所有人可见。
+
+**差异化**：主流 AI 开发工具通常不内置聊天室，团队协作需要切换到 Slack、钉钉等外部工具。Jarvis 将「人-人讨论」与「人-Agent 执行」统一在同一个平台内——讨论、决策、执行无需切换工具。
+
+#### 3.3.6 多人单 Agent 的典型工作流：结对编程与多方评审
+
+将上述能力串联，形成两个典型工作流：
+
+**工作流一：结对编程**
+
+1. 小 A 创建代码修改 Agent，授予小 B「交互权限」
+2. 小 A 描述需求：「请将登录模块的密码加密从 MD5 升级为 bcrypt」
+3. Agent 开始分析代码，小 B 实时看到进度，补充：「注意兼容旧数据的迁移」
+4. Agent 综合两人意见完成修改，小 A 审查后确认
+
+**工作流二：多方评审**
+
+1. 小 A 创建评审 Agent，授予小 B（业务）、小 C（架构）「交互权限」
+2. 小 A 让 Agent 分析一段代码的安全风险
+3. Agent 输出分析报告，小 B 从业务角度提问，小 C 从架构角度补充
+4. Agent 综合多方意见，输出最终评审结论
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+participant "小 A" as A
+participant "小 B" as B
+participant "Agent" as agent
+
+== 结对编程 ==
+A -> agent : 创建 Agent，授予小 B 交互权限
+A -> agent : 描述需求（MD5 → bcrypt）
+agent -> agent : 分析代码
+B -> agent : 补充意见（注意旧数据迁移）
+agent -> A : 综合意见完成修改
+A -> agent : 审查后确认
+
+== 多方评审 ==
+A -> agent : 创建评审 Agent，授予小 B/C 交互权限
+A -> agent : 分析代码安全风险
+agent -> A : 输出分析报告
+B -> agent : 业务角度提问
+C -> agent : 架构角度补充
+agent -> A : 输出最终评审结论
+@enduml
+```
+
+**核心价值**：多人单 Agent 让「一个 Agent + 一个团队」成为可能——Agent 不再是某个人的私有工具，而是团队的共享协作者。
 
 ---
 
@@ -611,6 +1286,56 @@ Jarvis 的核心架构是**多节点、多 Agent、多网关**：
 **技术深度**：多节点架构的核心是**网关路由 + 节点注册**。每个节点是自治的（独立运行 Agent），但通过网关互联（消息可跨节点路由）。这类似于微服务架构中的服务注册与发现，但针对 Agent 场景做了专门设计。
 
 **差异化**：主流 AI 开发工具以**单机单进程**架构为主，跨机器协作能力有限。Jarvis 的多节点架构让团队可以构建**分布式的 Agent 协作网络**，Agent 可以运行在不同的机器上，通过网关协同工作。
+
+**多节点部署架构**：
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "主节点（Master）\nWeb 网关 + Agent 服务" as master
+component "子节点 1（Worker）\nWeb 网关 + Agent 服务" as worker1
+component "子节点 2（Worker）\nWeb 网关 + Agent 服务" as worker2
+component "子节点 N（Worker）\nWeb 网关 + Agent 服务" as workerN
+
+worker1 -up-> master : ① 获取 node_secret\n（Unix Domain Socket）
+worker2 -up-> master : ① 获取 node_secret
+workerN -up-> master : ① 获取 node_secret
+
+worker1 -up-> master : ② WebSocket 注册\n（NODE_AUTH: node_id + secret）
+worker2 -up-> master : ② WebSocket 注册
+workerN -up-> master : ② WebSocket 注册
+
+master --> worker1 : ③ 注册成功\n（返回 token + heartbeat_interval）
+master --> worker2 : ③ 注册成功
+master --> workerN : ③ 注册成功
+
+note bottom of master
+  主节点职责：
+  - 验证子节点身份（node_secret）
+  - 维护节点注册表（node_registry）
+  - 路由跨节点请求
+  - 心跳检测（10s 间隔）
+end note
+
+note bottom of worker1
+  子节点职责：
+  - 运行本节点 Agent 服务
+  - 经 WebSocket 长连接与主节点通信
+  - 处理主节点转发的请求
+end note
+@enduml
+```
 
 #### 3.4.2 跨节点 Agent 通信
 
@@ -684,6 +1409,51 @@ end note
 
 **差异化**：主流工具以单机通信为主，跨机器的 Agent 通信能力有限。Jarvis 的跨节点通信让 Agent 可以**分布在不同机器上协同工作**，突破了单机的资源限制。
 
+**跨节点 Agent 通信时序**：
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
+
+participant "Agent A\n（节点 1）" as agentA
+participant "子网关 1\n（节点 1）" as gw1
+participant "主网关\n（Master）" as master
+participant "子网关 2\n（节点 2）" as gw2
+participant "Agent B\n（节点 2）" as agentB
+
+agentA -> gw1 : ① send_to_agent\n（目标 Agent B）
+gw1 -> gw1 : ② 查询路由表\n（agent_route_registry）
+gw1 -> master : ③ 转发请求\n（AGENT_HTTP_REQUEST）
+master -> master : ④ 查找目标节点\n（node_registry）
+master -> gw2 : ⑤ 转发请求\n（send_request_to_node）
+gw2 -> agentB : ⑥ Agent 反向代理\n（HTTP 等协议）
+agentB --> gw2 : ⑦ 返回结果
+gw2 --> master : ⑧ 回传结果
+master --> gw1 : ⑨ 回传结果
+gw1 --> agentA : ⑩ 返回结果
+
+note over agentA, agentB
+  整个过程对 Agent 透明：
+  Agent A 只需调用 send_to_agent，
+  无需知道 Agent B 在哪个节点
+end note
+@enduml
+```
+
 #### 3.4.3 节点级运维：一键更新与重启
 
 Jarvis 提供节点级的运维能力：
@@ -741,6 +1511,43 @@ Jarvis 采用三层记忆体系，模拟人类记忆的分层机制：
 **技术深度**：三层记忆的核心是**按需召回 + 标签过滤**。短期记忆保证当前任务的连贯性；项目长期记忆让 Agent 在多次会话间「记住」项目细节；全局长期记忆让 Agent 在不同项目间「迁移」经验。
 
 **差异化**：Claude Code 的记忆是 Markdown 文件（CLAUDE.md + Auto Memory），CodeBuddy 依赖 RAG 向量检索。Jarvis 采用标签化存储 + 智能语义检索，**不依赖向量数据库**，轻量、可解释、无额外基础设施依赖；且三层记忆（短期/项目长期/全局长期）可跨 Agent 共享，在多 Agent 协作场景下，子 Agent 可继承父 Agent 的项目记忆与全局经验。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "短期记忆\n（当前会话）" as short
+component "项目长期记忆\n（项目经验/决策）" as project
+component "全局长期记忆\n（跨项目通用经验）" as global
+
+short -down-> project : 会话结束沉淀
+project -down-> global : 跨项目迁移
+
+note right of short
+  随会话结束而清理
+end note
+
+note right of project
+  架构决策、技术约束、历史经验
+  跨会话记住项目细节
+end note
+
+note right of global
+  最佳实践、方法论、通用知识
+  跨项目迁移经验
+end note
+@enduml
+```
 
 #### 3.5.3 知识沉淀与共享（方法论 / 规则 / 工具）
 
@@ -806,6 +1613,39 @@ Jarvis 支持规则文件的按需加载：
 **技术深度**：这些专项能力覆盖了 AI 开发工具从「代码生成」到「工程落地」的完整链路。C→Rust 迁移解决遗留系统现代化问题；安全分析解决代码安全审计问题；GUI/终端/浏览器自动化解决跨环境操作问题。
 
 **差异化**：主流工具覆盖「代码生成 + 终端操作 + 文件编辑」的常规开发链路，领域专项能力相对有限。Jarvis 的专项能力（C→Rust 迁移流水线、污点分析安全审计、GUI/终端/浏览器自动化）让 AI 助手从「写代码」延伸到「改代码、审代码、迁移代码、操作环境」，覆盖更深的工程场景。
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+
+component "scan\n（扫描分析）" as scan
+component "lib-replace\n（库替换）" as lib
+component "prepare\n（预处理）" as prep
+component "transpile\n（代码转换）" as trans
+component "optimize\n（优化）" as opt
+
+scan -right-> lib : ①
+lib -right-> prep : ②
+prep -right-> trans : ③
+trans -right-> opt : ④
+
+note bottom of opt
+  完整流水线：
+  scan → lib-replace → prepare → transpile → optimize
+  支持断点续跑
+end note
+@enduml
+```
 
 ---
 
@@ -928,7 +1768,7 @@ Jarvis 的四种协作模式对应四类真实开发场景，从个人日常开�
 
 - **共享 Agent**：小 A 和小 B 通过 Jarvis 的多用户认证登录，共享同一个 CodeAgent
 - **权限控制**：ACL 控制——小 A 可修改业务模块，小 B 可修改平台侧模块（中间件、调度），互不越界
-- **聊天室讨论**：两人在聊天室中讨论集成方案，随时召唤 Agent 参与——「Agent，帮我看下这个接口的调用链」
+- **双群组协作**：两人先在纯人讨论群（聊天室）中讨论集成方案，达成一致后，将结论带到人-Agent 协作群（共享 Agent 会话）——「Agent，帮我看下这个接口的调用链」，Agent 的分析结论在共享会话中对两人可见
 - **Agent 协调**：Agent 理解两人的分工，分别在不同模块中完成各自的任务，避免冲突
 
 **适用场景**：多人合作开发同一需求——一人熟悉业务、一人熟悉技术，需要将两部分集成。多人单 Agent 让「共享一个 AI 助手」成为可能，而非各自为战。
@@ -1294,6 +2134,5 @@ Jarvis 的独特之处在于：**它用自己开发自己**——超 1 万次 Ag
 
 ---
 
-_文档版本：3.6（本轮：修正「对抗式」的层次定位——对抗式 Agent 是「单人多 Agent」象限下的一种应用范式，而非独立的协作模式。将「编排、群聊、点对点、对抗式」并列的 6 处表述修正为「编排、群聊、点对点」，对抗式保留在应用范式/案例的论述中）_
-
-_最后更新：2026-08-22_
+_文档版本：3.7（本轮：将 3.2 节 4 处「待补充截图」替换为 PlantUML 图——Agent 编排流程图、自演化网络时序图、对抗式 Agent 时序图、多面板布局示意图，全部基于实际实现代码绘制）_
+_最后更新：2026-09-06_

@@ -1,0 +1,8 @@
+{
+  "id": "20260906_065550_231858",
+  "type": "project_long_term",
+  "tags": ["参赛文档", "collaboration_modes", "截图占位", "PlantUML"],
+  "content": "docs/competition/collaboration_modes.md 3.2 节 4 处「待补充截图」已全部替换为 PlantUML 图（版本 3.7）：1) 行 782 Agent 编排 → 活动图（基于 builtin_input_handler.py:545-700 OrganizeAgents 流程）；2) 行 843 自演化网络 → 时序图（基于 self_evolving_network.yaml 四 Agent 协作）；3) 行 901 对抗式 Agent → 时序图（基于 jsec_adversarial.yaml 对抗迭代循环）；4) 行 928 多面板平铺 → 布局示意图（基于 App.vue getPanelLayout() 1/2/3-4/5-6 面板网格规则）。文档中剩余 4 处 images/ 引用（变更影响.png/编排.png/多Agent界面.png/安全扫描套件.png）图片文件均存在。",
+  "created_at": "2026-09-06T06:55:50.231910",
+  "updated_at": "2026-09-06T06:55:50.231916"
+}
