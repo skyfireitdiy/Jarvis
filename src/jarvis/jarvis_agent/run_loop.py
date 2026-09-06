@@ -870,9 +870,10 @@ class AgentRunLoop:
 
             confirm_prompt = "\n".join(confirm_prompt_parts)
 
-            # 注入当前时间日期到确认提示词
-            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            confirm_prompt = f"[当前时间：{current_time_str}]\n\n" + confirm_prompt
+            # 注入当前时间日期到确认提示词（仅当提示词非空时注入）
+            if confirm_prompt.strip():
+                current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                confirm_prompt = f"[当前时间：{current_time_str}]\n\n" + confirm_prompt
 
             # 询问 LLM
             try:
@@ -974,15 +975,23 @@ class AgentRunLoop:
                             }
                         ]
 
-                # 注入当前时间日期到提示词
-                current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                time_prompt = f"[当前时间：{current_time_str}]\n\n"
-                if isinstance(ag.session.prompt, str):
-                    ag.session.prompt = time_prompt + ag.session.prompt
-                else:
-                    ag.session.prompt = [
-                        {"type": "text", "text": time_prompt}
-                    ] + ag.session.prompt
+                # 注入当前时间日期到提示词（仅当提示词非空时注入）
+                has_prompt_content = (
+                    bool(ag.session.prompt.strip())
+                    if isinstance(ag.session.prompt, str)
+                    else len(ag.session.prompt) > 0
+                )
+                if has_prompt_content:
+                    current_time_str = datetime.datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    time_prompt = f"[当前时间：{current_time_str}]\n\n"
+                    if isinstance(ag.session.prompt, str):
+                        ag.session.prompt = time_prompt + ag.session.prompt
+                    else:
+                        ag.session.prompt = [
+                            {"type": "text", "text": time_prompt}
+                        ] + ag.session.prompt
 
                 # 调用模型获取响应
                 try:
