@@ -963,6 +963,25 @@ function getTerminalStyle(terminalContent) {
     padding: 10px 20px;
     font-size: 15px;
   }
+
+  /* 移动端：头部图标过多时自动换行显示 */
+  .session-panel-header {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .session-agent-name {
+    flex: 1 1 auto;
+    min-width: 60px;
+  }
+
+  .session-agent-status {
+    flex-shrink: 0;
+  }
+
+  .session-header-actions {
+    margin-left: auto;
+  }
 }
 
 /* 内嵌确认区域 */
