@@ -723,9 +723,10 @@ class AgentRunLoop:
         ag._last_response_content = current_response
 
         # 【新增】首轮检测：若为首轮且无工具调用，触发cheap LLM判断
-        if getattr(ag, "_first_run_occurred", False) and not has_tool_call:
-            # 标记首轮检测已执行，避免后续轮次重复触发
-            ag._first_run_occurred = False
+        # 注意：无论首轮是否有工具调用，都需重置标志，避免后续轮次误触发
+        is_first_run = getattr(ag, "_first_run_occurred", False)
+        ag._first_run_occurred = False
+        if is_first_run and not has_tool_call:
             try:
                 from jarvis.jarvis_platform.registry import PlatformRegistry
                 from jarvis.jarvis_agent.utils import build_fix_prompt
