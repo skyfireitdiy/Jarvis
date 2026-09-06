@@ -1087,6 +1087,8 @@ class AgentRunLoop:
                     ag, current_response
                 )
                 if should_return:
+                    # 首轮检测标志已消费（无论是否有工具调用），避免后续轮次误触发
+                    ag._first_run_occurred = False
                     if result is not None:
                         # 工具要求立即返回结果
                         return result
