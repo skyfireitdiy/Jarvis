@@ -1,0 +1,15 @@
+{
+  "id": "20260906_114925_574223",
+  "type": "project_long_term",
+  "tags": [
+    "run_loop",
+    "预压缩",
+    "后台总结",
+    "bug_fix",
+    "pre_compression",
+    "状态清理"
+  ],
+  "content": "修复后台预压缩状态未清理问题（2026-09-06）：\n\n问题：当 _check_and_use_pre_compressed_summary 失败（等待超时/异常/set_messages失败）后回退到前台压缩（_sliding_window_compression 或 _summarize_and_clear_history），预压缩状态（_pre_compressing、_pre_compressed_summary、_pre_compress_snapshot_count）未被清理，导致下次压缩误用过期摘要或无法启动新预压缩。\n\n修改文件：src/jarvis/jarvis_agent/__init__.py\n\n修改内容（5处）：\n1. _sliding_window_compression 成功路径：set_messages 后清理三个预压缩状态\n2. _check_and_use_pre_compressed_summary 所有失败路径（无结果/无历史/全系统消息/不支持set_messages/异常）：清理三个状态\n3. _adaptive_compression 回退路径及异常路径：清理三个状态\n4. _handle_history_with_summary 前台总结清理历史后：清理三个状态\n5. 后台线程 _background_compress 存储结果前检查 _pre_compressing：若已被外部置 False（前台已自行压缩），不存储过期摘要\n\n效果：所有压缩路径均确保预压缩状态被正确清理，避免残留过期状态。",
+  "created_at": "2026-09-06T11:49:25.574279",
+  "updated_at": "2026-09-06T11:49:25.574288"
+}

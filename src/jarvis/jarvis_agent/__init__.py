@@ -2168,6 +2168,10 @@ class Agent:
                 # 更新模型的消息历史，使用 set_messages 方法确保正确更新 conversation_turn
                 if hasattr(self.model, "set_messages"):
                     self.model.set_messages(new_history)
+                    # 清理预压缩状态（防止残留过期状态影响后续压缩）
+                    self._pre_compressed_summary = None
+                    self._pre_compress_snapshot_count = 0
+                    self._pre_compressing = False
                     # 统计保留的消息类型
                     user_tool_count_kept = sum(
                         1
@@ -2307,8 +2311,9 @@ class Agent:
                         compressed_summary.strip()
                     )
 
-                    # 存储预压缩结果
-                    self._pre_compressed_summary = formatted_summary
+                    # 存储预压缩结果前检查是否已被外部取消（如前台已自行压缩）
+                    if self._pre_compressing:
+                        self._pre_compressed_summary = formatted_summary
                 except Exception:
                     pass
                 finally:
@@ -2347,11 +2352,19 @@ class Agent:
 
             # 检查是否有预压缩结果
             if not self._pre_compressed_summary:
+                # 清理预压缩状态（可能等待超时或后台压缩失败）
+                self._pre_compressed_summary = None
+                self._pre_compress_snapshot_count = 0
+                self._pre_compressing = False
                 return False
 
             # 获取当前消息
             history = self.model.get_messages()
             if not history:
+                # 清理预压缩状态
+                self._pre_compressed_summary = None
+                self._pre_compress_snapshot_count = 0
+                self._pre_compressing = False
                 return False
 
             # 找到系统消息的结束位置
@@ -2361,6 +2374,10 @@ class Agent:
                     system_end_idx = i
                     break
             else:
+                # 清理预压缩状态
+                self._pre_compressed_summary = None
+                self._pre_compress_snapshot_count = 0
+                self._pre_compressing = False
                 return False
 
             system_messages = history[:system_end_idx]
@@ -2406,9 +2423,17 @@ class Agent:
                 self._pre_compressing = False
                 return True
 
+            # 模型不支持 set_messages，清理预压缩状态
+            self._pre_compressed_summary = None
+            self._pre_compress_snapshot_count = 0
+            self._pre_compressing = False
             return False
 
         except Exception:
+            # 异常时清理预压缩状态，避免残留过期状态
+            self._pre_compressed_summary = None
+            self._pre_compress_snapshot_count = 0
+            self._pre_compressing = False
             return False
 
     def _format_compressed_summary(self, compressed_summary: str) -> str:
@@ -2537,9 +2562,16 @@ class Agent:
                 PrettyOutput.auto_print("✅ 使用后台预压缩摘要完成上下文压缩")
                 return True
 
-            # 预压缩不可用，回退到滑动窗口压缩
+            # 预压缩不可用（等待超时或后台压缩失败），清理预压缩状态后回退到滑动窗口压缩
+            self._pre_compressed_summary = None
+            self._pre_compress_snapshot_count = 0
+            self._pre_compressing = False
             return self._sliding_window_compression()
         except Exception:
+            # 异常时清理预压缩状态，避免残留过期状态
+            self._pre_compressed_summary = None
+            self._pre_compress_snapshot_count = 0
+            self._pre_compressing = False
             PrettyOutput.auto_print("⚠ 自适应压缩失败，回退到滑动窗口压缩")
             return False
 
@@ -2656,6 +2688,10 @@ class Agent:
             self.model.reset()
             # 重置后重新设置系统提示词，确保系统约束仍然生效
             self._setup_system_prompt()
+        # 清理预压缩状态（前台总结已清理历史，预压缩摘要基于旧快照已过期）
+        self._pre_compressed_summary = None
+        self._pre_compress_snapshot_count = 0
+        self._pre_compressing = False
         # 重置会话
         self.session.clear_history()
         # 重置 addon_prompt 跳过轮数计数器
