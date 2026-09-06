@@ -1293,11 +1293,32 @@ def cli(
                 返回状态说明：
                 - execution_status: 任务执行状态（running/waiting_multi/waiting_single）
                 - status: 进程状态（永远返回 running，因为进程还在运行）
+                - non_interactive: 是否处于非交互模式
                 """
+                from jarvis.jarvis_utils.globals import get_current_agent
+
+                agent = get_current_agent()
                 return {
                     "execution_status": get_current_execution_status(),
                     "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                    "non_interactive": bool(getattr(agent, "non_interactive", False))
+                    if agent
+                    else False,
                 }
+
+            @custom_app.post("/exit_non_interactive")
+            async def exit_non_interactive():
+                """退出非交互模式，不中断当前对话执行。"""
+                from jarvis.jarvis_utils.globals import get_current_agent
+
+                agent = get_current_agent()
+                if agent is None:
+                    return {"success": False, "error": "No active agent"}
+                try:
+                    agent.set_non_interactive(False)
+                    return {"success": True, "message": "已退出非交互模式"}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
 
             @custom_app.get("/diff")
             async def get_diff_api() -> dict:

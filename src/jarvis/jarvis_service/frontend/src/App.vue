@@ -138,6 +138,8 @@
         :confirm-data="getPanelConfirmData(panel)"
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
+        :non-interactive="getPanelNonInteractive(panel)"
+        @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -495,6 +497,8 @@
         :confirm-data="getPanelConfirmData(panel)"
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
+        :non-interactive="getPanelNonInteractive(panel)"
+        @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
         :interaction="sessionPanelInteraction"
         :resizeDirections="sessionResizeDirections"
         :panelStyle="getSessionPanelStyle(panel.id)"
@@ -3841,6 +3845,13 @@ function getPanelAgentStatus(panel) {
   return agentStatuses.value.get(panel.agentId) || null
 }
 
+// 获取 Panel 的 Agent 是否处于非交互模式
+function getPanelNonInteractive(panel) {
+  if (!panel || !panel.agentId) return false
+  const status = agentStatuses.value.get(panel.agentId)
+  return !!(status && status.non_interactive)
+}
+
 // 获取 Panel 的确认数据
 function getPanelConfirmData(panel) {
   if (!panel || !panel.agentId) return null
@@ -6044,7 +6055,7 @@ async function fetchAgentStatus(agent) {
     const executionStatus = result.execution_status || 'running'
     
     // 更新状态映射（存储对象格式）
-    agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus})
+    agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus, non_interactive: !!result.non_interactive})
 
     // 当前 Agent 连接后根据 execution_status 恢复输入 UI
     if (agent.agent_id === currentAgentId.value) {
@@ -7096,6 +7107,38 @@ async function viewRules(agent) {
     rulesLoadedContent.value = ''
   } finally {
     rulesLoading.value = false
+  }
+}
+
+async function exitNonInteractiveMode(agent) {
+  if (!agent || !agent.agent_id) {
+    console.warn('[EXIT NON-INTERACTIVE] Invalid agent:', agent)
+    return
+  }
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/exit_non_interactive`), {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      console.warn(`[EXIT NON-INTERACTIVE] Failed for agent ${agent.agent_id}:`, response.status)
+      return
+    }
+
+    const result = await response.json()
+    if (result.success) {
+      // 更新本地状态
+      const current = agentStatuses.value.get(agent.agent_id) || {}
+      agentStatuses.value.set(agent.agent_id, {...current, non_interactive: false})
+      console.log(`[EXIT NON-INTERACTIVE] Agent ${agent.agent_id} exited non-interactive mode`)
+    } else {
+      console.warn(`[EXIT NON-INTERACTIVE] Failed for agent ${agent.agent_id}:`, result.error || 'Unknown error')
+    }
+  } catch (error) {
+    console.error(`[EXIT NON-INTERACTIVE] Error for agent ${agent.agent_id}:`, error)
   }
 }
 
