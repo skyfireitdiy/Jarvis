@@ -2099,11 +2099,12 @@ class Agent:
                 temp_model.set_messages(messages_to_set)
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
-                # 无限重试直到验证通过，3次常规重试后进入补充模式
+                # 最多重试 MAX_COMPRESS_RETRIES 次，3次常规重试后进入补充模式，超限则放弃本次压缩
+                MAX_COMPRESS_RETRIES = 5
                 retry_count = 0
                 compressed_summary = ""
                 missing_sections = []
-                while True:
+                while retry_count <= MAX_COMPRESS_RETRIES:
                     if retry_count == 0:
                         compressed_summary = temp_model.chat_until_success(
                             SUMMARY_REQUEST_PROMPT
@@ -2137,6 +2138,11 @@ class Agent:
                         summary_stripped
                     )
                     if not is_valid:
+                        if retry_count >= MAX_COMPRESS_RETRIES:
+                            PrettyOutput.auto_print(
+                                f"⚠滑动窗口压缩：已达最大重试次数({MAX_COMPRESS_RETRIES})，放弃本次压缩"
+                            )
+                            return False
                         retry_count += 1
                         PrettyOutput.auto_print(
                             f"⚠滑动窗口压缩：摘要格式验证失败，缺失章节: {', '.join(missing_sections)}，正在重试..."
