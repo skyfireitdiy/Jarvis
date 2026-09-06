@@ -1,0 +1,8 @@
+{
+  "id": "20260906_194552_575777",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.5.1", "插件包", "config.yaml", "可插件化"],
+  "content": "collaboration_modes.md 3.5.1节已更新，体现插件包的全面能力。修改内容：1) 1630行改为'config.yaml 支持的任意配置项均可插件化'；2) 新增'可插件化的配置项'列表（1646-1655行），涵盖工具(tool_load_dirs/tool_groups/central_tool_repo)、规则(rules_load_dirs/default_rule_names)、方法论(methodology_dirs/central_methodology_repo)、模型配置(llms/llm_groups含normal_llm/cheap_llm/smart_llm分级)、Agent定义与角色(agent_definition_dirs/roles_dirs)、回调实现(before_tool_call_cb_dirs/after_tool_call_cb_dirs/before_model_call_cb_dirs/summary_cb_dirs)、MCP集成(mcp支持sse/streamable/stdio)、环境与行为(ENV/replace_map)；3) G9图全局配置注释改为'工具/规则/方法论 模型/Agent/回调'；4) 图后解释文字更新为'不仅是新工具，还包括规则、方法论、模型配置、Agent定义、回调实现等config.yaml支持的任意配置项'；5) 技术深度和差异化段落同步更新。PlantUML渲染492x436px。Commits: a2a94b2, 278019b, 5a134ae, f1fbd95, 6cbec1a, 104a115 (CheckPoints #132-137)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T19:45:52.575812",
+  "updated_at": "2026-09-06T19:45:52.575816"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260906_192742_701400",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.4.4", "节点级运维"],
+  "content": "collaboration_modes.md 3.4.4节最终状态：未添加额外内容。用户明确：无损重生和 gateway 重启无关，3.4.4节核心观点是前端、Gateway、Agent 三者相互独立，可分别重启而不影响其他组件。之前添加的'重启后的 Agent 恢复'段落已删除（Commit: 6ac0e1d, CheckPoint #115）。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T19:27:42.701416",
+  "updated_at": "2026-09-06T19:27:42.701418"
+}

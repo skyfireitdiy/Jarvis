@@ -1,0 +1,8 @@
+{
+  "id": "20260906_180109_411977",
+  "type": "project_long_term",
+  "tags": ["graphviz", "collaboration_modes", "G2图", "rank=same", "纵向排列"],
+  "content": "graphviz LR模式下cluster内节点纵向排列的解决方案：使用 `{ rank=same; node1; node2; node3; }` 强制节点在同一rank，在LR模式下同一rank的节点会垂直排列（上下）。不可见边（style=invis）和rankdir=TB在cluster内均不生效。Commit adaf316 (CheckPoint #60) 已应用此方案到G2图。",
+  "created_at": "2026-09-06T18:01:09.411995",
+  "updated_at": "2026-09-06T18:01:09.411998"
+}

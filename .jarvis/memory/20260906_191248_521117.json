@@ -1,0 +1,8 @@
+{
+  "id": "20260906_191248_521117",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.4.4", "节点级运维", "无损重生"],
+  "content": "任务完成：collaboration_modes.md 3.4.4节已补充'重启后的 Agent 恢复'文字描述（1618行）。内容：restart_nodes 重启节点服务时 Agent 进程终止，Gateway 重启后通过 .jarvis_agents.json 恢复 Agent 列表并标记 stopped，用户通过 regenerate_agent 无损重生 Agent（保存会话→删除→同参重建→恢复会话），指向 3.2.2 节「指挥与控制其他 Agent」。Commit: 2ee1604 (CheckPoint #111)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T19:12:48.521134",
+  "updated_at": "2026-09-06T19:12:48.521137"
+}

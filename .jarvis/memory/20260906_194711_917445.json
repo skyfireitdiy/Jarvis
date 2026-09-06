@@ -1,0 +1,8 @@
+{
+  "id": "20260906_194711_917445",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.5.1", "内置模块", "插件包", "修正"],
+  "content": "collaboration_modes.md 3.5.1节1633行已修正：jarvis_code_agent、jarvis_mcp、jarvis_sec、jarvis_c2rust 是 src/jarvis/ 下的内置模块，不是插件。修正后：1633行改为'内置模块（如 jarvis_code_agent、jarvis_mcp、jarvis_sec、jarvis_c2rust）以独立模块形式扩展能力'，1634行改为'插件包面向第三方扩展，独立开发、无需修改内核'。Commits: c264512, 8b410b3 (CheckPoints #139-140)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T19:47:11.917485",
+  "updated_at": "2026-09-06T19:47:11.917489"
+}

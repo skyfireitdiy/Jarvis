@@ -1,0 +1,8 @@
+{
+  "id": "20260906_193404_249674",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.5.1", "插件包", "G9"],
+  "content": "任务完成：collaboration_modes.md 3.5.1节已添加G9图（插件包注入主程序流程）。图展示完整链路：插件包(config.yaml+代码) → 安装(校验/解压防路径遍历) → ~/.jarvis/plugins/ → 自动发现 → 模板渲染config.yaml → 配置合并 → 全局配置(工具集扩展) → Agent可调用新工具。图后附解释文字。graphviz语法验证通过（dot -Tsvg），SVG渲染1641x142pt无警告。Commit: 1ec923b (CheckPoint #117)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T19:34:04.249708",
+  "updated_at": "2026-09-06T19:34:04.249713"
+}

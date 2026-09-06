@@ -1,0 +1,8 @@
+{
+  "id": "20260906_182859_784997",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.2.2", "Agent通信", "graphviz"],
+  "content": "任务完成：collaboration_modes.md 3.2.2节G5图后已添加解释文字（876行）。文字解释图中核心机制：Web Gateway统一消息中枢、跨节点群组协作（A/B/C三Agent分属不同节点但同入一群组）、点对点通信、跨节点转发、指挥控制。Commit: 96dea0b (CheckPoint #84)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T18:28:59.785018",
+  "updated_at": "2026-09-06T18:28:59.785021"
+}

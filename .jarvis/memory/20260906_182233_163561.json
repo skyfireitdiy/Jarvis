@@ -1,0 +1,8 @@
+{
+  "id": "20260906_182233_163561",
+  "type": "project_long_term",
+  "tags": ["collaboration_modes", "3.2.2", "Agent通信", "时序图"],
+  "content": "任务完成：collaboration_modes.md 3.2.2节'Agent间通信：群聊、点对点与指挥控制'已丰富。800-877行为新内容，包含四种通信机制详细描述（群聊生命周期、点对点批量发送与跨节点路由、Chat聊天室、指挥控制含create_agent/delete_agent/regenerate_agent/create_timer）及PlantUML时序图（828-877行）。时序图展示四场景：群聊、点对点通信、跨节点路由、指挥控制。PlantUML语法验证通过（plantuml -pipe -tsvg），SVG渲染成功977x1353px。Commit: f8541aa (CheckPoint #73)。markdownlint报错皆文件原有问题。",
+  "created_at": "2026-09-06T18:22:33.163588",
+  "updated_at": "2026-09-06T18:22:33.163591"
+}
