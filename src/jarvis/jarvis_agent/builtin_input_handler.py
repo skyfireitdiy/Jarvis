@@ -2027,13 +2027,6 @@ def switch_platform_type(
         # 将新模型设置到现有的 session 中
         agent.session.model = agent.model
 
-        # 打印新模型的 max_input_token_count
-        try:
-            max_tokens = agent.model._get_platform_max_input_token_count()
-            PrettyOutput.auto_print(f"📊 新模型 max_input_token_count: {max_tokens}")
-        except Exception:
-            pass
-
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换平台类型失败: {e}")
@@ -2164,14 +2157,6 @@ def switch_model_group(agent: Any) -> bool:
             PrettyOutput.auto_print(f"✅ 已成功切换到模型组 '{new_group}'")
             # 设置手动切换标记，禁用后续自动切换
             agent._manual_model_switch = True
-            # 打印新模型的 max_input_token_count
-            try:
-                max_tokens = agent.model._get_platform_max_input_token_count()
-                PrettyOutput.auto_print(
-                    f"📊 新模型 max_input_token_count: {max_tokens}"
-                )
-            except Exception:
-                pass
             return True
         else:
             return False
@@ -2393,12 +2378,6 @@ def switch_model(agent: Any) -> bool:
         PrettyOutput.auto_print(f"✅ 已成功切换到 {type_name} 模型 '{model_name}'")
         # 设置手动切换标记，禁用后续自动切换
         agent._manual_model_switch = True
-        # 打印新模型的 max_input_token_count
-        try:
-            max_tokens = agent.model._get_platform_max_input_token_count()
-            PrettyOutput.auto_print(f"📊 新模型 max_input_token_count: {max_tokens}")
-        except Exception:
-            pass
         return True
     else:
         PrettyOutput.auto_print("❌ 切换模型失败")
