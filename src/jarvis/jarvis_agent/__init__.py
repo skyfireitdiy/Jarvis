@@ -3151,6 +3151,8 @@ class Agent:
         if memory_tags_prompt:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
 
+        # 标记首次运行初始化已执行（供首轮无工具调用检测使用）
+        self._first_run_occurred = True
         self.first = False
 
     def _create_temp_model(

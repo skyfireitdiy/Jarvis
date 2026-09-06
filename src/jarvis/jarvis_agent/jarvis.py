@@ -1266,10 +1266,30 @@ def run_cli(
             @custom_app.get("/status")
             async def get_status():
                 """获取 Agent 运行状态（任务级别）。"""
+                from jarvis.jarvis_utils.globals import get_current_agent
+
+                agent = get_current_agent()
                 return {
                     "execution_status": status_manager.get_status(),
                     "status": "running",  # Agent 进程状态（永远返回 running，因为进程还在运行）
+                    "non_interactive": bool(getattr(agent, "non_interactive", False))
+                    if agent
+                    else False,
                 }
+
+            @custom_app.post("/exit_non_interactive")
+            async def exit_non_interactive():
+                """退出非交互模式，不中断当前对话执行。"""
+                from jarvis.jarvis_utils.globals import get_current_agent
+
+                agent = get_current_agent()
+                if agent is None:
+                    return {"success": False, "error": "No active agent"}
+                try:
+                    agent.set_non_interactive(False)
+                    return {"success": True, "message": "已退出非交互模式"}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
 
             @custom_app.get("/diff")
             async def get_diff_api() -> dict:

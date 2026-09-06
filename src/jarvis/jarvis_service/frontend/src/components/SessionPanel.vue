@@ -21,6 +21,14 @@
         >
           {{ autoScroll ? '⤓' : '⤒' }}
         </button>
+        <button
+          v-if="nonInteractive"
+          class="session-exit-non-interactive-btn"
+          @click.stop="$emit('exit-non-interactive')"
+          title="退出非交互模式（不中断当前对话）"
+        >
+          🔓 退出非交互
+        </button>
         <div class="session-header-actions">
           <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
@@ -183,6 +191,7 @@ const props = defineProps({
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
   autoScroll: { type: Boolean, default: true },
+  nonInteractive: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -192,6 +201,7 @@ const emit = defineEmits([
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
   'toggle-auto-scroll',
+  'exit-non-interactive',
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
@@ -527,6 +537,28 @@ function getTerminalStyle(terminalContent) {
 
 .session-auto-scroll-btn.active {
   color: var(--color-accent);
+}
+
+.session-exit-non-interactive-btn {
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: rgba(255, 133, 32, 0.15);
+  color: var(--color-warning);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.session-exit-non-interactive-btn:hover {
+  background: rgba(255, 133, 32, 0.3);
+  color: var(--color-text-primary);
 }
 
 .session-header-actions {
