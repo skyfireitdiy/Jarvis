@@ -12,7 +12,6 @@
       :agentList="agentList"
       :windowWidth="windowWidth"
       :isAllSelected="isAllSelected"
-      :socket="socket"
       :agentStatuses="agentStatuses"
       :getStatusClass="getStatusClass"
       :getStatusText="getStatusText"
@@ -27,7 +26,6 @@
       @createAgent="openCreateAgentModal"
       @agentClick="handleAgentItemClick"
       @toggleSelectAgent="toggleSelectAgent"
-      @createTerminal="createTerminalForAgent"
       @renameAgent="renameAgent"
       @copyAgent="copyAgent"
       @deleteAgent="deleteAgent"
@@ -37,10 +35,6 @@
       @addToGroup="addSelectedToGroup"
       @createGroupWithAgents="createGroupWithAgents"
       @startResize="startAgentSidebarResize"
-      @viewDiff="viewDiff"
-      @viewRules="viewRules"
-      @viewTools="viewTools"
-      @openEditor="createEditorForAgent"
       @editAccess="editAgentAccess"
     />
 
@@ -134,6 +128,7 @@
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
+        :socket="socket"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
         @manual-interrupt="sendManualInterruptToPanel(panel)"
         @confirm="handlePanelConfirm(panel)"
@@ -153,6 +148,11 @@
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
         @detach="detachPanel('session', panel.id)"
+        @viewDiff="viewDiff(getPanelAgent(panel))"
+        @viewRules="viewRules(getPanelAgent(panel))"
+        @viewTools="viewTools(getPanelAgent(panel))"
+        @createTerminal="createTerminalForAgent(getPanelAgent(panel))"
+        @openEditor="createEditorForAgent(getPanelAgent(panel))"
       />
 
       <!-- 内嵌终端面板 -->
@@ -494,6 +494,7 @@
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
+        :socket="socket"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
         @manual-interrupt="sendManualInterruptToPanel(panel)"
         :interaction="sessionPanelInteraction"
@@ -518,6 +519,11 @@
         @detach="detachPanel('session', panel.id)"
         @startMove="startSessionPanelMove($event, panel.id)"
         @startResize="(event, direction) => startSessionPanelResize(event, direction, panel.id)"
+        @viewDiff="viewDiff(getPanelAgent(panel))"
+        @viewRules="viewRules(getPanelAgent(panel))"
+        @viewTools="viewTools(getPanelAgent(panel))"
+        @createTerminal="createTerminalForAgent(getPanelAgent(panel))"
+        @openEditor="createEditorForAgent(getPanelAgent(panel))"
       />
     </template>
 
