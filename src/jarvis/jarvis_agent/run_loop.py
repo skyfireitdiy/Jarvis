@@ -283,6 +283,17 @@ class AgentRunLoop:
             conversation_turn_threshold = get_conversation_turn_threshold()
             turn_limit_triggered = (conversation_turn + 1) > conversation_turn_threshold
 
+            # 预压缩触发条件：剩余token低于25%（即已使用超过75%）
+            # 在后台启动预压缩，提前生成摘要，80%真正触发时直接使用
+            pre_compress_triggered = (
+                max_input_tokens > 0
+                and remaining_tokens <= int(max_input_tokens * 0.25)
+                and not token_limit_triggered
+            )
+            if pre_compress_triggered:
+                # 启动后台预压缩（静默执行，不阻塞主流程）
+                self.agent._start_background_pre_compression()
+
             should_compress = token_limit_triggered or turn_limit_triggered
 
             if should_compress:

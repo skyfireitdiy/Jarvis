@@ -1272,6 +1272,13 @@ class SessionManager:
                 "memory_tags": list(getattr(self.agent, "memory_tags", set())),
                 "first": getattr(self.agent, "first", True),
                 "pin_content": getattr(self.agent, "pin_content", ""),
+                "pre_compressed_summary": getattr(
+                    self.agent, "_pre_compressed_summary", None
+                ),
+                "pre_compressing": getattr(self.agent, "_pre_compressing", False),
+                "pre_compress_snapshot_count": getattr(
+                    self.agent, "_pre_compress_snapshot_count", 0
+                ),
             },
             "metadata": {
                 "agent_name": self.agent_name,
@@ -1441,18 +1448,35 @@ class SessionManager:
                 memory_tags = agent_runtime_state.get("memory_tags", [])
                 if memory_tags:
                     self.agent.memory_tags = set(memory_tags)
-                    PrettyOutput.auto_print(
-                        f"✅ 已恢复 {len(self.agent.memory_tags)} 个记忆标签"
-                    )
-                if self.agent.recent_memories:
-                    PrettyOutput.auto_print(
-                        f"✅ 已恢复 {len(self.agent.recent_memories)} 条最近记忆"
-                    )
                 # 恢复Pin内容
                 pin_content = agent_runtime_state.get("pin_content", "")
                 if pin_content:
                     self.agent.pin_content = pin_content
                     PrettyOutput.auto_print(f"✅ 已恢复固定内容: {pin_content[:50]}...")
+
+                # 恢复预压缩状态
+                pre_compressed_summary = agent_runtime_state.get(
+                    "pre_compressed_summary", None
+                )
+                if pre_compressed_summary:
+                    self.agent._pre_compressed_summary = pre_compressed_summary
+                    # 压缩已完成，恢复后无需重新预压缩
+                    self.agent._pre_compressing = False
+                else:
+                    self.agent._pre_compressed_summary = None
+                    # 如果保存时正在压缩，恢复后重新启动预压缩
+                    was_pre_compressing = agent_runtime_state.get(
+                        "pre_compressing", False
+                    )
+                    self.agent._pre_compressing = False
+                    if was_pre_compressing:
+                        # 重新启动后台预压缩
+                        self.agent._start_background_pre_compression()
+
+                self.agent._pre_compress_snapshot_count = agent_runtime_state.get(
+                    "pre_compress_snapshot_count", 0
+                )
+
                 PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
 
             # 恢复CodeAgent特定状态
