@@ -1,0 +1,8 @@
+{
+  "id": "20260906_053130_707317",
+  "type": "project_long_term",
+  "tags": ["首轮检测", "cheap LLM", "修复提示词", "run_loop"],
+  "content": "修复 run_loop.py _track_no_tool_call 中 _first_run_occurred 标志重置逻辑：原实现仅在触发条件满足时才重置标志，导致首轮有工具调用时标志残留为 True，后续轮次无工具调用时误触发 cheap LLM 判断。修复方案：将标志读取与重置分离——先读取 is_first_run，然后无条件重置 _first_run_occurred=False，再判断是否触发。",
+  "created_at": "2026-09-06T05:31:30.707360",
+  "updated_at": "2026-09-06T05:31:30.707368"
+}
