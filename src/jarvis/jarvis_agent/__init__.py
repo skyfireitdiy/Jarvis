@@ -700,6 +700,11 @@ class Agent:
         self._repeat_detected = False  # 是否已检测到重复响应
         self._repeat_count = 0  # 连续相同响应计数
 
+        # 后台预压缩相关属性
+        self._pre_compressed_summary: Optional[str] = None  # 后台预压缩生成的摘要
+        self._pre_compressing: bool = False  # 是否正在后台预压缩
+        self._pre_compress_snapshot_count: int = 0  # 预压缩时快照的消息数量
+
     def add_memory_tags(self, tags: List[str]) -> None:
         """添加记忆标签到 memory_tags 集合
 
@@ -2130,6 +2135,213 @@ class Agent:
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 滑动窗口压缩出错: {str(e)}")
+
+    def _start_background_pre_compression(self) -> None:
+        """启动后台预压缩：在75%阈值时提前生成摘要，80%真正触发时直接使用。
+
+        该方法快照当前消息，创建临时模型（静默模式），在后台线程中生成摘要。
+        完成后将格式化摘要存入 _pre_compressed_summary，供真正压缩时使用。
+        """
+        import threading
+
+        # 如果已在压缩中或已有预压缩结果，不重复启动
+        if self._pre_compressing or self._pre_compressed_summary:
+            return
+
+        try:
+            # 获取对话历史
+            history = self.model.get_messages()
+            if not history:
+                return
+
+            # 找到系统消息的结束位置
+            system_end_idx = 0
+            for i, msg in enumerate(history):
+                if msg.get("role", "").lower() != "system":
+                    system_end_idx = i
+                    break
+            else:
+                return  # 所有消息都是系统消息，无法压缩
+
+            # 快照消息
+            system_messages = history[:system_end_idx]
+            non_system_messages = history[system_end_idx:]
+
+            # 使用与 _sliding_window_compression 相同的窗口大小
+            from jarvis.jarvis_utils.config import get_sliding_window_size
+
+            window_size = get_sliding_window_size()
+
+            # 如果非系统消息数量不足，不需要预压缩
+            if len(non_system_messages) < window_size * 2:
+                return
+            # 分离需要压缩的部分（窗口大小之前的消息）
+            old_messages = non_system_messages[: -window_size + 1]
+
+            if not old_messages:
+                return
+
+            # 记录快照消息数量
+            self._pre_compress_snapshot_count = len(history)
+            self._pre_compressing = True
+
+            def _background_compress() -> None:
+                """后台线程执行压缩摘要生成"""
+                try:
+                    # 创建临时模型，静默模式
+                    temp_model = self._create_temp_model()
+                    temp_model.set_suppress_output(True)
+
+                    # 使用 set_messages 设置对话历史
+                    messages_to_set = system_messages + old_messages
+                    temp_model.set_messages(messages_to_set)
+
+                    # 使用 SUMMARY_REQUEST_PROMPT 生成摘要
+                    compressed_summary = temp_model.chat_until_success(
+                        SUMMARY_REQUEST_PROMPT
+                    )
+
+                    if not compressed_summary or not compressed_summary.strip():
+                        self._pre_compressing = False
+                        return
+
+                    # 验证摘要格式（最多重试2次）
+                    max_retries = 2
+                    retry_count = 0
+                    missing_sections = []
+                    while retry_count <= max_retries:
+                        if retry_count > 0:
+                            retry_prompt = (
+                                f"汝先前所撰之摘要缺以下要章：{', '.join(missing_sections)}。"
+                                f"祈重撰完整之摘要，务必含所有缺失之章。"
+                            )
+                            compressed_summary = temp_model.chat_until_success(
+                                retry_prompt
+                            )
+
+                        if not compressed_summary or not compressed_summary.strip():
+                            break
+
+                        if retry_count < max_retries:
+                            is_valid, missing_sections = self._validate_summary(
+                                compressed_summary.strip()
+                            )
+                            if not is_valid:
+                                retry_count += 1
+                                continue
+                        break
+
+                    if not compressed_summary or not compressed_summary.strip():
+                        self._pre_compressing = False
+                        return
+
+                    # 格式化压缩摘要（静默，不打印）
+                    formatted_summary = self._format_compressed_summary(
+                        compressed_summary.strip()
+                    )
+
+                    # 存储预压缩结果
+                    self._pre_compressed_summary = formatted_summary
+                except Exception:
+                    pass
+                finally:
+                    self._pre_compressing = False
+
+            # 启动后台线程
+            thread = threading.Thread(
+                target=_background_compress,
+                name="background-pre-compression",
+                daemon=True,
+            )
+            thread.start()
+
+        except Exception:
+            # 预压缩失败不影响主流程
+            self._pre_compressing = False
+
+    def _check_and_use_pre_compressed_summary(self) -> bool:
+        """检查并使用预压缩摘要重建会话。
+
+        当80%真正触发压缩时调用此方法。若预压缩已完成，直接使用预生成摘要重建消息历史；
+        若仍在压缩中，等待其完成后再使用。
+
+        返回:
+            bool: 如果成功使用预压缩摘要重建会话返回True，否则返回False
+        """
+        try:
+            # 如果正在预压缩，等待完成（最多等待60秒）
+            if self._pre_compressing:
+                import time
+
+                wait_count = 0
+                while self._pre_compressing and wait_count < 120:  # 最多等60秒
+                    time.sleep(0.5)
+                    wait_count += 1
+
+            # 检查是否有预压缩结果
+            if not self._pre_compressed_summary:
+                return False
+
+            # 获取当前消息
+            history = self.model.get_messages()
+            if not history:
+                return False
+
+            # 找到系统消息的结束位置
+            system_end_idx = 0
+            for i, msg in enumerate(history):
+                if msg.get("role", "").lower() != "system":
+                    system_end_idx = i
+                    break
+            else:
+                return False
+
+            system_messages = history[:system_end_idx]
+            non_system_messages = history[system_end_idx:]
+
+            # 使用与 _sliding_window_compression 相同的窗口大小
+            from jarvis.jarvis_utils.config import get_sliding_window_size
+
+            window_size = get_sliding_window_size()
+
+            # 根据快照点划分消息：
+            # 快照时记录的消息数量之前的非系统消息为"已压缩部分"（由预压缩摘要覆盖），
+            # 快照之后新增的消息应保留为 recent_messages
+            if self._pre_compress_snapshot_count > 0:
+                # 快照点 = 系统消息数 + 快照时非系统消息数
+                snapshot_non_system_count = max(
+                    0, self._pre_compress_snapshot_count - system_end_idx
+                )
+                # 快照点之后新增的非系统消息
+                recent_messages = non_system_messages[snapshot_non_system_count:]
+                # 若快照后无新增消息，则保留最后 window_size 条作为上下文衔接
+                if not recent_messages:
+                    recent_messages = non_system_messages[-window_size:]
+            else:
+                # 无快照记录时，回退到滑动窗口逻辑
+                recent_messages = non_system_messages[-window_size:]
+
+            # 构建压缩后的消息
+            compressed_msg = {
+                "role": "user",
+                "content": self._pre_compressed_summary,
+            }
+
+            # 重建消息列表：系统消息 + 压缩摘要 + 快照后新增的消息
+            new_history = system_messages + [compressed_msg] + recent_messages
+
+            # 更新模型的消息历史
+            if hasattr(self.model, "set_messages"):
+                self.model.set_messages(new_history)
+                # 清理预压缩状态
+                self._pre_compressed_summary = None
+                self._pre_compress_snapshot_count = 0
+                self._pre_compressing = False
+                return True
+
+            return False
+
+        except Exception:
             return False
 
     def _format_compressed_summary(self, compressed_summary: str) -> str:
@@ -2171,16 +2383,13 @@ class Agent:
                 self._agent_run_loop, AgentRunLoop
             ):
                 agent_run_loop = self._agent_run_loop
-            else:
-                # 创建临时 AgentRunLoop 实例来获取 git diff
-                agent_run_loop = AgentRunLoop(self)
+                # 获取diff统计信息
+                git_diff_stat = agent_run_loop.get_git_diff_stat()
 
-            # 获取diff统计信息
-            git_diff_stat = agent_run_loop.get_git_diff_stat()
-
-            # 生成查看命令
-            if hasattr(self, "start_commit") and self.start_commit:
-                git_view_command = f"git diff {self.start_commit}..HEAD"
+                # 生成查看命令
+                if hasattr(self, "start_commit") and self.start_commit:
+                    git_view_command = f"git diff {self.start_commit}..HEAD"
+            # 若 _agent_run_loop 不存在（如后台线程中），跳过 git diff 统计
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -2256,9 +2465,15 @@ class Agent:
             bool: 如果成功执行压缩返回True，否则返回False
         """
         try:
+            # 先尝试使用预压缩摘要（后台预压缩在75%时已启动）
+            if self._check_and_use_pre_compressed_summary():
+                PrettyOutput.auto_print("✅ 使用后台预压缩摘要完成上下文压缩")
+                return True
+
+            # 预压缩不可用，回退到滑动窗口压缩
             return self._sliding_window_compression()
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 自适应压缩出错: {str(e)}")
+        except Exception:
+            PrettyOutput.auto_print("⚠ 自适应压缩失败，回退到滑动窗口压缩")
             return False
 
     def _summarize_and_clear_history(
