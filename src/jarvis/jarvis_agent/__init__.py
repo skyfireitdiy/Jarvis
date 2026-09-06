@@ -1829,6 +1829,73 @@ class Agent:
 
         return is_valid, unmatched_keywords
 
+    def _build_supplement_prompt(self, missing_sections: list[str]) -> str:
+        """根据缺失的关键字构造补充提示词，引导模型补齐缺失字段。
+
+        参数:
+            missing_sections: 未匹配的关键字列表
+
+        返回:
+            str: 补充提示词，包含缺失字段的详细格式指引
+        """
+        # 关键字到章节格式指引的映射
+        section_guidance = {
+            # 1. 目标层次结构
+            "整体目标": '- **整体目标**（顶层愿景）：必含业务意义、成功标准，格式："[目标类型] 实现[具体成果]，达到[量化指标]"',
+            "阶段目标": '- **阶段目标**（当前阶段交付）：必含当前阶段边界、可验证之交付物，格式："阶段[序号]：[具体目标] → [验收标准]"',
+            "目标变化": "- **[WARNING] 目标变化识别**：若整体目标变化，必明言变化之由与影响",
+            # 2. 任务状态矩阵
+            "已完成": '- **已完成**：仅含已通过验证之交付成果，必供验证证据（测试结果、运行日志、审查记录等），格式："[优先级] [交付物] - [验证方式] - [验证证据]"',
+            "进行中": '- **进行中**：已开始而未完成之任务，必言明当前进度与剩余工作，格式："[优先级] [任务描述] - [当前进度] - [剩余工作]"',
+            "部分完成": '- **部分完成**：已完成部分而未达完整验收标准，必言明已完成部分与缺失部分，格式："[优先级] [任务描述] - [已完成部分] - [缺失部分]"',
+            "待完成": '- **待完成**：尚未开始或待前置依赖之任务，必含任务边界与赖系，格式："[优先级] [任务描述] - [前置依赖]"',
+            # 3. 关键信息导航系统
+            "关键信息位置": "- **关键信息位置**：用记忆标签建立索引（项目长期记忆、全局长期记忆、短期记忆）",
+            "关键文件路径": "- **关键文件路径**：建立项目核心文件映射，必列所有已修改/待修改文件之完整路径与关键函数位置",
+            # 4. 代码开发专项信息
+            "代码变更": "- **码变详情**：已修改文件清单（完整路径、修改类型）、关键变更点（函数/类名、修改位置、变更之由）、影响域分析",
+            "错误与调试": "- **误与调讯**：编译错误（错误类型、位置、之由、修复状态）、遇到之错误（堆栈、行号）、调试过程（解决方案尝试、失败之由）",
+            "测试与验证": "- **测与验**：编译/构建验证状态、测试结果、验证方式、未通过之测试、功能验证",
+            "技术决策": "- **技决与权衡**：技选（选择之方案、其他方案不可行之由）、设决（架构设计理由）、权衡考虑、已知限制",
+            "未完成工作": "- **未竟工与待办**：部分完成之功能、待修复之问题、待补充之内容、后续优化方向",
+            # 5. 上下文完整性检查
+            "完整性检查": "- **完整性检查**：总结前自检清单，所有结论必经验证，任务状态分类准确",
+            "检查清单": "- **检查清单**：已完成任务验证检查、任务状态分类准确、关键信息可快速定位、后续行动建议具体可操作",
+            # 6. 核心技术与业务信息
+            "技术栈": "- **技栈与版**：经实际检测验证之Python版本、框架版本、关键依赖",
+            "架构决策": "- **构决**：据实际代码验证之技选理由、权衡考虑、未来扩展性",
+            "配置参数": "- **配参**：据实际配置验证之数据库配置、API密钥、环境变量",
+            "代码位置": "- **码位**：经实际代码验证之核心函数、配置文件、关键算法实现（必含精确文件路径与函数签名）",
+            "调试信息": "- **调讯**：据实际运行验证之错误日志、性能数据、测试结果（必含完整错误堆栈与调试过程）",
+            "接口定义": "- **口定**：经代码验证之API端点、参数格式、响应结构（必含函数签名、参数类型、返回值类型）",
+            "数据模型": "- **数模**：据实际数据库或ORM验证之数据库表结构、字段定义、关系映射",
+            "代码变更历史": "- **码变史**：据实际git log验证之diff摘要、关键变更点、可验证之回滚点",
+            # 7. 我的偏好与约束
+            "偏好与约束": "- **偏好与约束**：质求（代码规范、测试覆盖率）、性束（响应时间、资源限制）、容求（系统版本、兼容性）",
+            "禁忌项": "- **禁项**：明确禁止之技术方案或实现方式，必明确记录，免后续偏离",
+            "代码风格": "- **码风**：缩进、命名规范、注释要求、代码组织方式",
+        }
+
+        # 构造补充提示词
+        guidance_lines = []
+        for section in missing_sections:
+            if section in section_guidance:
+                guidance_lines.append(section_guidance[section])
+
+        if not guidance_lines:
+            # 若缺失关键字无对应指引，使用通用要求
+            guidance_text = "请确保总结内容完整覆盖所有关键信息，包括目标、任务状态、代码变更、错误调试、测试验证等。"
+        else:
+            guidance_text = "\n".join(guidance_lines)
+
+        supplement_prompt = (
+            f"汝先前所撰之摘要仍缺以下关键字段：{', '.join(missing_sections)}。\n"
+            f"祈基于原始对话历史重新撰写完整摘要，务必包含上述所有缺失字段。\n"
+            f"以下为缺失字段之详细格式要求，务必严格遵循：\n{guidance_text}\n\n"
+            f"请重新生成完整摘要，确保所有字段均已覆盖。"
+        )
+        return supplement_prompt
+
     def generate_summary(self, for_token_limit: bool = False) -> str:
         """生成对话历史摘要
 
@@ -2047,42 +2114,51 @@ class Agent:
                 temp_model.set_messages(messages_to_set)
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
-                # 最多重试 2 次，验证压缩摘要格式
-                max_retries = 2
+                # 无限重试直到验证通过，3次常规重试后进入补充模式
                 retry_count = 0
                 compressed_summary = ""
                 missing_sections = []
-                while retry_count <= max_retries:
+                while True:
                     if retry_count == 0:
                         compressed_summary = temp_model.chat_until_success(
                             SUMMARY_REQUEST_PROMPT
                         )
-                    else:
+                    elif retry_count <= 3:
                         # 重试时将缺失信息反馈给模型，要求补充
                         retry_prompt = (
                             f"汝先前所撰之摘要缺以下要章：{', '.join(missing_sections)}。"
                             f"祈重撰完整之摘要，务必含所有缺失之章。"
                         )
                         compressed_summary = temp_model.chat_until_success(retry_prompt)
+                    else:
+                        # 超过3次常规重试，进入补充模式：提供缺失字段的详细格式指引
+                        supplement_prompt = self._build_supplement_prompt(
+                            missing_sections
+                        )
+                        PrettyOutput.auto_print(
+                            f"⚠滑动窗口压缩：进入补充模式，缺失章节: {', '.join(missing_sections)}"
+                        )
+                        compressed_summary = temp_model.chat_until_success(
+                            supplement_prompt
+                        )
 
                     if not compressed_summary or not compressed_summary.strip():
                         PrettyOutput.auto_print("⚠滑动窗口压缩：生成摘要失败，跳过压缩")
                         return False
 
-                    # 验证摘要格式（仅在未达到最大重试次数时验证）
-                    if retry_count < max_retries:
-                        summary_stripped = compressed_summary.strip()
-                        is_valid, missing_sections = self._validate_summary(
-                            summary_stripped
+                    # 验证摘要格式
+                    summary_stripped = compressed_summary.strip()
+                    is_valid, missing_sections = self._validate_summary(
+                        summary_stripped
+                    )
+                    if not is_valid:
+                        retry_count += 1
+                        PrettyOutput.auto_print(
+                            f"⚠滑动窗口压缩：摘要格式验证失败，缺失章节: {', '.join(missing_sections)}，正在重试..."
                         )
-                        if not is_valid:
-                            retry_count += 1
-                            PrettyOutput.auto_print(
-                                f"⚠滑动窗口压缩：摘要格式验证失败，缺失章节: {', '.join(missing_sections)}，正在重试..."
-                            )
-                            continue
+                        continue
 
-                    # 验证通过或达到最大重试次数，退出循环
+                    # 验证通过，退出循环
                     break
 
                 # 打印压缩摘要
@@ -2205,12 +2281,11 @@ class Agent:
                         self._pre_compressing = False
                         return
 
-                    # 验证摘要格式（最多重试2次）
-                    max_retries = 2
+                    # 验证摘要格式（无限重试直到验证通过，3次常规重试后进入补充模式）
                     retry_count = 0
                     missing_sections = []
-                    while retry_count <= max_retries:
-                        if retry_count > 0:
+                    while True:
+                        if retry_count > 0 and retry_count <= 3:
                             retry_prompt = (
                                 f"汝先前所撰之摘要缺以下要章：{', '.join(missing_sections)}。"
                                 f"祈重撰完整之摘要，务必含所有缺失之章。"
@@ -2218,17 +2293,24 @@ class Agent:
                             compressed_summary = temp_model.chat_until_success(
                                 retry_prompt
                             )
+                        elif retry_count > 3:
+                            # 超过3次常规重试，进入补充模式：提供缺失字段的详细格式指引
+                            supplement_prompt = self._build_supplement_prompt(
+                                missing_sections
+                            )
+                            compressed_summary = temp_model.chat_until_success(
+                                supplement_prompt
+                            )
 
                         if not compressed_summary or not compressed_summary.strip():
                             break
 
-                        if retry_count < max_retries:
-                            is_valid, missing_sections = self._validate_summary(
-                                compressed_summary.strip()
-                            )
-                            if not is_valid:
-                                retry_count += 1
-                                continue
+                        is_valid, missing_sections = self._validate_summary(
+                            compressed_summary.strip()
+                        )
+                        if not is_valid:
+                            retry_count += 1
+                            continue
                         break
 
                     if not compressed_summary or not compressed_summary.strip():
