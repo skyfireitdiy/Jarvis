@@ -26,7 +26,7 @@
           @click.stop="$emit('exit-non-interactive')"
           title="退出非交互模式（不中断当前对话）"
         >
-          🔓 退出非交互
+          🔓
         </button>
         <button
           v-if="(agentStatus?.execution_status ?? 'running') === 'running'"
