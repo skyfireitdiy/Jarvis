@@ -13,6 +13,11 @@
       <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
+        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
+        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
+        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
+        <button class="session-action-btn" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
+        <button class="session-action-btn" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
         <button
           class="session-auto-scroll-btn"
           :class="{ 'active': autoScroll }"
@@ -199,6 +204,7 @@ const props = defineProps({
   panelStyle: { type: Object, default: null },
   autoScroll: { type: Boolean, default: true },
   nonInteractive: { type: Boolean, default: false },
+  socket: { type: [Object, null], default: null },
 })
 
 const emit = defineEmits([
@@ -213,6 +219,8 @@ const emit = defineEmits([
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
+  'viewDiff', 'viewRules', 'viewTools',
+  'createTerminal', 'openEditor',
 ])
 
 function handlePanelClick() {
@@ -520,6 +528,32 @@ function getTerminalStyle(terminalContent) {
 .session-agent-status.waiting_confirm {
   background: rgba(255, 133, 32, 0.2);
   color: var(--color-warning);
+}
+
+.session-action-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.session-action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.session-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .session-auto-scroll-btn {

@@ -52,11 +52,6 @@
                 <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
               </div>
               <div class="agent-item-actions">
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-                <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-                <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-                <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
                 <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
@@ -90,11 +85,6 @@
               <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
             </div>
             <div class="agent-item-actions">
-              <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-              <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-              <button v-if="getStatusClass(agent) !== 'stopped'" class="icon-btn-small" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-              <button class="icon-btn-small" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-              <button class="icon-btn-small" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
               <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
@@ -254,7 +244,6 @@ const props = defineProps({
   agentList: Array,
   windowWidth: Number,
   isAllSelected: Boolean,
-  socket: [Object, null],
   agentStatuses: Map,  // Agent状态映射 (agent_id -> {execution_status})
   getStatusClass: Function,
   getStatusText: Function,
@@ -311,7 +300,6 @@ const emit = defineEmits([
   'createAgent',
   'agentClick',
   'toggleSelectAgent',
-  'createTerminal',
   'renameAgent',
   'copyAgent',
   'deleteAgent',
@@ -321,10 +309,6 @@ const emit = defineEmits([
   'addToGroup',
   'createGroupWithAgents',
   'startResize',
-  'viewDiff',
-  'viewRules',
-  'viewTools',
-  'openEditor',
   'editAccess',
 ])
 
