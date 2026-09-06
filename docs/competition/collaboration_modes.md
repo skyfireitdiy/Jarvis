@@ -14,9 +14,13 @@
 >
 > - 🏆 **第三届开放原子大赛「智锻代码·开源鸿蒙全球 AI Agent 代码生成挑战赛」总冠军**（99 支团队中一等奖）
 > - 🤖 **超 1 万次 Agent 自举提交**（99% 由 Jarvis 的 CodeAgent 自主完成）
-> - 🏢 **中兴通讯研发流程基座**（真实企业落地）
+> - 🏢 **中兴通讯内部落地**（工具集成 + 用户协作）
 
-> **这个项目，用自己开发自己。** 超 1 万次提交中，99% 由 Jarvis 的 CodeAgent 自主完成——它不仅是 AI 编程工具，更是自身进化的活样本。
+> **协作不是空谈，而是被自身开发验证的实践。** 超 1 万次提交中，99% 由 Jarvis 的 CodeAgent 自主完成——Agent 与 Agent 的协作，每天都在 Jarvis 自己的开发中发生。
+
+![多Agent界面](images/多Agent界面.png)
+
+_Jarvis 前端多分区界面：同时查看多个 Agent 的运行状态与输出，每个 panel 集成终端、聊天室、编辑器等开发工具。_
 
 ---
 
@@ -33,80 +37,7 @@
 | 多人单 Agent | 团队共享一个 AI  | 多用户认证、ACL 权限、共享协作、聊天室       |
 | 多人多 Agent | 分布式协作网络   | 多节点多网关、跨节点通信、节点级运维         |
 
-**与主流工具的本质区别**：Claude Code、CodeX、CodeBuddy 聚焦「单人单 Agent」场景；Jarvis 完整覆盖人 × Agent 两个维度的四种协作模式，且经受了企业级（中兴通讯）与竞赛级（开放原子大赛总冠军）双重验证。
-
-```plantuml
-@startuml
-skinparam backgroundColor #FFFFFF
-skinparam component {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90D9
-  FontSize 12
-}
-skinparam actor {
-  BackgroundColor #FFF3E0
-  BorderColor #E65100
-  FontSize 12
-}
-skinparam arrow {
-  Color #4A90D9
-  FontSize 11
-}
-skinparam package {
-  BackgroundColor #F8FAFC
-  BorderColor #94A3B8
-  FontSize 13
-}
-
-package "① 单人单 Agent：独当一面" as p1 {
-  actor "开发者" as u1
-  component "Agent" as a1
-  u1 --> a1 : 直接对话
-}
-
-package "② 单人多 Agent：一人驱动一个团队" as p2 {
-  actor "开发者" as u2
-  component "开发 Agent" as a2a
-  component "测试 Agent" as a2b
-  component "部署 Agent" as a2c
-  u2 --> a2a : 指令
-  u2 --> a2b : 指令
-  u2 --> a2c : 指令
-  a2a <--> a2b : 群聊/点对点
-  a2b <--> a2c : 群聊/点对点
-}
-
-package "③ 多人单 Agent：团队共享一个 AI" as p3 {
-  actor "开发者 A" as u3a
-  actor "开发者 B" as u3b
-  actor "开发者 C" as u3c
-  component "共享 Agent" as a3
-  u3a --> a3 : 消息（自动标识）
-  u3b --> a3 : 消息（自动标识）
-  u3c --> a3 : 消息（自动标识）
-  u3a <--> u3b : 聊天室讨论
-  u3b <--> u3c : 聊天室讨论
-}
-
-package "④ 多人多 Agent：分布式协作网络" as p4 {
-  actor "开发者 A" as u4a
-  actor "开发者 B" as u4b
-  component "节点 1 Agent" as a4a
-  component "节点 2 Agent" as a4b
-  component "节点 3 Agent" as a4c
-  u4a --> a4a : 指令
-  u4b --> a4c : 指令
-  a4a <--> a4b : 跨节点通信
-  a4b <--> a4c : 跨节点通信
-}
-
-p1 -[hidden]right- p2
-p3 -[hidden]right- p4
-p1 -[hidden]down- p3
-p2 -[hidden]down- p4
-
-@enduml
-```
+**与主流工具的本质区别**：Claude Code、CodeX、CodeBuddy 聚焦「单人单 Agent」场景；Jarvis 完整覆盖人 × Agent 两个维度的四种协作模式，且经受了真实企业环境（中兴通讯内部工具集成）与竞赛级（开放原子大赛总冠军）双重验证。
 
 ---
 
@@ -165,11 +96,11 @@ AI 开发工具的协作能力，可以从两个维度交叉分析：
 
 Jarvis 的开发过程本身就是「Agent 开发 Agent」的最佳证明。据 GitHub 官方统计，2025 年提交 5795 次、2026 年提交 4524 次，两年累计**超 1 万次提交，其中 99% 以上由 Jarvis 的 CodeAgent 自主完成**——涵盖功能开发、重构、Bug 修复、文档撰写等各类任务。这不是宣传口号，而是有 git 历史可查的客观事实。
 
-**🏢 事实三：中兴通讯研发流程基座（多人单 Agent / 多人多 Agent）**
+**🏢 事实三：中兴通讯内部落地（工具集成 + 用户协作）**
 
-Jarvis 已在中兴通讯研发流程中实际使用，作为公司内部多个系统的基座：自主评审系统、特定代码修改 Agent 等团队共享同一 Agent 的场景，以及研发全流程覆盖（需求分析、需求开发、故障定位、性能优化、环境部署）、跨团队协作开发等多 Agent 分布式协作场景。这验证了 Jarvis 经受了企业级研发流程的考验。
+Jarvis 已在中兴通讯内部落地：部分内部工具将 Jarvis 作为 SDK 嵌入（如自主评审系统、特定代码修改工具），也有少批用户通过 Jarvis 进行日常开发协作。这验证了 Jarvis 具备「作为 SDK 被集成」的开放能力，以及在实际企业环境中被使用的可用性。
 
-这三个事实共同指向一个结论：**Jarvis 不是「又一个 AI 编程工具」，而是首个完整覆盖四象限协作模式的 AI 开发平台**——从单人单 Agent 的深度自主开发，到单人多 Agent 的编排协同，再到多人单 Agent 的团队共享、多人多 Agent 的企业级分布式协作，均有真实落地验证。而这一切的基础，是 Jarvis 的**多节点、多 Agent、多网关**架构设计。三个事实的详细论述分别见 5.6 节（落地验证）与 6.8 节（开发活跃度）。
+这三个事实共同指向一个结论：**Jarvis 不是「又一个 AI 编程工具」，而是完整覆盖四象限协作模式的 AI 开发平台**——从单人单 Agent 的深度自主开发，到单人多 Agent 的编排协同，再到多人单 Agent 的团队共享、多人多 Agent 的分布式协作，均有实际落地验证。而这一切的基础，是 Jarvis 的**多节点、多 Agent、多网关**架构设计。三个事实的详细论述分别见 5.6 节（落地验证）与 6.8 节（开发活跃度）。
 
 ---
 
@@ -297,6 +228,31 @@ Jarvis 的核心能力可概括为两大支柱：**独立工作能力**与**协�
 
 ### 3.1 单人单 Agent：独当一面
 
+```dot
+digraph G1 {
+  graph [rankdir="LR", splines=ortho, fontname="Sans-serif", label="① 单人单 Agent：独当一面", labelloc="t", nodesep=0.5, ranksep=1.5];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_dev {
+    label = "开发者";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    d1 [label="开发者"];
+  }
+  subgraph cluster_node {
+    label = "节点";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    a1 [label="Agent"];
+  }
+  d1 -> a1 [label="直接对话"];
+}
+```
+
 这是最基础的协作模式，也是 Jarvis 技术深度的根基。单个 CodeAgent 不仅具备超越主流工具的深度代码理解能力——不是「看到」代码，而是「看懂」代码的依赖关系、影响范围、调用链——更拥有一整套完整的**自主工作能力体系**：方法论系统沉淀可复用的解题经验，三层记忆系统让 Agent 跨会话记住项目细节，规则系统按需加载专业规范，上下文感知让 Agent 理解「这段代码在哪个函数里、依赖什么、影响什么」，影响分析预判改动波及范围，交叉 Review 用独立审查 Agent 兜底质量，集成终端与集成编辑器让 Agent 直接操作真实开发环境。
 
 本节八个子章节围绕「独当一面」这一目标，按「理解 → 执行 → 协作 → 入口」四层递进展开：
@@ -312,16 +268,16 @@ Jarvis 的核心能力可概括为两大支柱：**独立工作能力**与**协�
 
 #### 3.1.1 SQLite 符号数据库 + 图遍历
 
-Jarvis 使用 SQLite 存储代码符号与依赖边，而非简单的文本索引。核心实现共 1641 行代码（`symbol_table_db.py` 327 行 + `impact_analyzer.py` 934 行 + `graph_traverser.py` 257 行 + `database.py` 123 行）：
+Jarvis 使用 SQLite 存储代码符号与依赖边，而非简单的文本索引。核心实现包含四大能力：
 
 - **符号表**：`SymbolTableDB` 存储函数、类、方法、变量等符号及其位置信息，支持按名称、类型、文件路径多维查询
 - **依赖边**：记录符号间的调用、引用、继承关系，构成完整的有向依赖图
 - **图遍历**：`GraphTraverser` 支持 BFS 前向/后向遍历，可查询「谁调用了这个函数」「这个函数依赖什么」，支持最大深度限制避免遍历爆炸
 - **预编译 SQL**：`QueryBuilder` 预编译 SQL 语句，避免运行时 SQL 拼接开销，查询性能优异
 
-**技术深度**：符号数据库不是简单的「文本索引」，而是真正的**代码知识图谱**。每个符号是一个节点，每条依赖关系是一条有向边。当开发者问「修改 `parse_config` 函数会影响哪些地方」时，Jarvis 不是模糊匹配关键词，而是在图上做精确的 BFS 遍历，返回确切的调用链。
+**技术深度**：符号数据库不是简单的「文本索引」，而是真正的**代码知识图谱**。每个符号是一个节点，每条依赖关系是一条有向边。当 Agent 读取代码或修改代码时，符号数据库在图上做精确的 BFS 遍历，精确识别当前上下文中涉及的符号及其关联关系，并在修改后确定改动的影响范围。
 
-**差异化**：主流工具或基于向量检索（CodeBuddy 的 RAG）、或基于 grep 文本搜索（Claude Code）、或依赖模型上下文窗口直接读取文件（CodeX），在回答「修改这个函数会影响哪些地方」这类问题时各有局限。向量检索找到的是「语义相似」的代码片段，grep 找到的是「包含这个字符串的文件」，模型上下文受窗口大小限制且对跨文件依赖的感知有限。Jarvis 的符号图可以精确回答，且结果可解释、可验证。
+**差异化**：主流工具或基于向量检索（CodeBuddy 的 RAG）、或基于 grep 文本搜索（Claude Code）、或依赖模型上下文窗口直接读取文件（CodeX），在识别代码上下文与影响范围时各有局限。向量检索找到的是「语义相似」的代码片段，grep 找到的是「包含这个字符串的文件」，模型上下文受窗口大小限制且对跨文件依赖的感知有限。Jarvis 的符号图可以精确识别关联上下文与影响范围，且结果可解释、可验证。
 
 **符号数据库 vs 向量检索：理论上的必然优势**
 
@@ -435,6 +391,8 @@ Tree-sitter 则完全不同：
 3. **无需构建配置**：LSP 依赖项目的构建系统（如 CMake、Maven、Cargo）才能正确解析类型与引用；Tree-sitter 只需语法规则，对任意代码片段都能立即解析，不依赖项目是否可编译。
 
 **差异化**：主流 AI 编程工具（Claude Code、CodeX 等）不做符号级分析（Claude Code 用 grep 文本搜索，CodeX 依赖模型上下文）；Jarvis 选择 Tree-sitter 作为符号提取引擎，正是针对「AI 修改代码片段」这一核心场景——容错、轻量、零配置，使符号数据库在代码的任何中间态都能稳定工作。
+
+**备选方案：jarvis-lsp**：Jarvis 同时提供外部工具 `jarvis-lsp`（命令行 LSP 客户端），可作为备选 LSP 实现。Agent 可通过该工具与语言服务器通信，获取编译时的类型信息与符号分析结果（如列出文件符号、查询定义与引用）。但 LSP 并非 Jarvis 的主要功能——它需要代码处于可编译状态、依赖构建配置，且需为每种语言启动独立的语言服务器进程。jarvis-lsp 定位为**补充手段**：当代码处于完整可编译状态、且需要编译时类型信息时，Agent 可选用它作为 Tree-sitter 符号提取的补充。
 
 符号数据库解决了「看懂代码」的基础问题——但「看懂」只是第一步，Agent 还需要回答一个更实际的问题：**「看懂之后，改动会波及哪里？」** 这正是下一节影响范围分析要回答的。
 
@@ -576,9 +534,9 @@ Jarvis 内置完整的定时任务体系：
 - **跨节点定时任务**：通过网关可创建定时任务，支持定时创建 Agent 或执行 Shell 命令。
 - **全工具延迟调用**：所有工具调用均支持 `after`（延时执行）、`at`（定时执行）、`loop`（循环执行）三个参数，无需额外封装即可实现定时自动化。
 
-**技术深度**：这是**时间维度的自动化**。传统工具只能「立即执行」，Jarvis 让 Agent 可以「延时执行」「定时执行」「循环执行」。这意味着 Agent 可以自主安排未来的工作。
+**技术深度**：这是**时间维度的自动化**。多数 AI 编程工具以「立即执行」为主，Jarvis 让 Agent 可以「延时执行」「定时执行」「循环执行」。这意味着 Agent 可以自主安排未来的工作。
 
-**差异化**：主流工具（如 Claude Code 的 Hooks）是「事件触发」——在固定生命周期节点执行命令，不提供「延时执行」或「定时执行」能力。Jarvis 的定时任务让 Agent 从「被动响应」变为「主动调度」，支持相对时间、绝对时间、循环间隔三种方式，且全工具支持 `after`/`at`/`loop` 参数。
+**差异化**：部分工具（如 Claude Code 的 Hooks）以「事件触发」为主——在固定生命周期节点执行命令；OpenClaw 等工具虽支持 cron 表达式定时任务与心跳机制，但需额外配置且面向聊天驱动的个人助手场景。Jarvis 的定时任务让 Agent 从「被动响应」变为「主动调度」，支持相对时间、绝对时间、循环间隔三种方式，且**全工具**支持 `after`/`at`/`loop` 参数——无需额外封装，任何工具调用均可直接定时执行，覆盖从「延时一次」到「循环周期」的完整时间维度。
 
 「执行层」两节已完整——Agent 既能无人值守，又能定时调度。但**自主执行越强，质量风险越大**：Agent 自主写的代码，谁来把关？从下一节起进入「协作层」：用多 Agent 交叉验证与 fork 子 Agent 为自主执行兜底。
 
@@ -719,16 +677,48 @@ Jarvis 的 CLI 背后是**同一个符号数据库与影响分析引擎**——�
 
 除上述四层能力外，Jarvis 的 CodeAgent 还内置一套完整的**知识管理与环境操作体系**，让「独当一面」不止于「会写代码」：
 
-- **方法论系统**：成功的问题解决经验被自动提取为可复用的方法论，按问题类型索引，下次遇到同类问题时自动加载——Agent 不是每次从零开始，而是站在过往经验之上（详见 3.5.3 节）
-- **三层记忆系统**：短期记忆保证当前任务连贯，项目长期记忆让 Agent 跨会话记住项目细节，全局长期记忆让经验在不同项目间迁移——Agent 不是「失忆」的，而是越用越懂你（详见 3.5.2 节）
-- **规则系统**：按需加载专业规范与最佳实践，`auto_select_rule` 基于任务描述自动匹配最相关规则，避免上下文膨胀（详见 3.5.4 节）
+- **方法论系统**：成功的问题解决经验被自动提取为可复用的方法论，按问题类型索引，下次遇到同类问题时自动加载——Agent 不是每次从零开始，而是站在过往经验之上（详见 3.5.4 节）
+- **三层记忆系统**：短期记忆保证当前任务连贯，项目长期记忆让 Agent 跨会话记住项目细节，全局长期记忆让经验在不同项目间迁移——Agent 不是「失忆」的，而是越用越懂你（详见 3.5.3 节）
+- **规则系统**：按需加载专业规范与最佳实践，`auto_select_rule` 基于任务描述自动匹配最相关规则，避免上下文膨胀（详见 3.5.5 节）
 - **上下文感知**：`read_code` 读取文件时，基于符号数据库构建结构化编辑上下文——当前作用域、使用符号、导入关系、相关文件、上下文摘要，让 Agent 理解「这段代码在哪个函数里、依赖什么、影响什么」，而非仅看到孤立代码片段（详见 3.1.1 节）
-- **集成终端**：虚拟终端支持持久会话与 ssh/gdb 等交互式操作，智能 Shell 将自然语言转为 shell 命令——Agent 可以直接操作真实开发环境（详见 3.5.7 节）
+- **集成终端**：虚拟终端支持持久会话与 ssh/gdb 等交互式操作，智能 Shell 将自然语言转为 shell 命令——Agent 可以直接操作真实开发环境（详见 3.5.8 节）
 - **集成编辑器**：`edit_file` 工具支持精确的 search/replace 编辑与行号范围编辑，修改后自动触发符号数据库增量更新与影响分析——Agent 的每一次修改都有结构化反馈（详见 3.1.1 节）
 
 **但独立再强，也只是一个人 + 一个 Agent。** 当开发者需要同时驱动多个 Agent 协作时，就需要进入下一节——「单人多 Agent」的编排与通信。
 
 ### 3.2 单人多 Agent：编排与通信
+
+```dot
+digraph G2 {
+  graph [rankdir="LR", splines=ortho, fontname="Sans-serif", label="② 单人多 Agent：一人驱动一个团队", labelloc="t", nodesep=0.5, ranksep=1.5];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_dev {
+    label = "开发者";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    d2 [label="开发者"];
+  }
+  subgraph cluster_node {
+    label = "节点";
+    style = "filled";
+    color = "#6C8EBF";
+    fillcolor = "#DAE8FC";
+    node [fillcolor="#DAE8FC", color="#6C8EBF"];
+    a2_dev [label="开发 Agent"];
+    a2_test [label="测试 Agent"];
+    a2_deploy [label="部署 Agent"];
+    { rank=same; a2_dev; a2_test; a2_deploy; }
+  }
+  d2 -> a2_dev [label="指令"];
+  d2 -> a2_test [label="指令"];
+  d2 -> a2_deploy [label="指令"];
+  a2_dev -> a2_test [label="群聊/点对点", dir=both];
+  a2_test -> a2_deploy [label="群聊/点对点", dir=both];
+}
+```
 
 当单个开发者需要同时驱动多个 Agent 协作时，Jarvis 提供了完整的编排与通信能力。这是从「独自」到「共事」的第一步扩展。
 
@@ -746,6 +736,48 @@ Jarvis 内置 **Agent 编排（Orchestration）** 机制，通过 `<OrganizeAgen
 - **解析 Agent 配置**：从 YAML 的 `agents` 列表中解析每个 Agent 的名称、类型、工作目录、任务描述等配置
 - **批量创建 Agent**：通过网关的 `create_agent` 接口批量创建所有配置的 Agent
 - **汇总结果**：以表格形式展示每个 Agent 的创建状态（成功/失败计数）
+
+```plantuml
+@startuml
+skinparam sequence {
+  BackgroundColor #FEFEFE
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantBorderColor #4A90D9
+  ParticipantFontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F5A623
+}
+
+actor 用户 as user
+participant "Web Gateway" as gateway
+participant "Agent" as agent
+
+user -> gateway : 提交编排文件路径\n（支持多行，每行一个 YAML 路径）
+
+alt 文件存在且格式合法
+  gateway -> gateway : 解析 YAML，提取 agents 列表
+  gateway -> gateway : 合并多个编排文件的 Agent 配置
+else 文件不存在或格式非法
+  gateway --> user : 提示错误，跳过该文件
+end
+
+alt Web Gateway 已连接
+  loop 遍历 agents 配置
+    gateway -> gateway : 校验必填字段\n（type、working_dir）
+    gateway -> agent : 调用 create_agent\n批量创建 Agent
+  end
+  gateway --> user : 汇总创建结果\n（成功数 / 失败数 / 明细表）
+else Web Gateway 未连接
+  gateway --> user : 提示「Web Gateway 未连接」
+end
+@enduml
+```
 
 **编排文件格式**：
 
@@ -765,65 +797,85 @@ agents:
 - **灵活扩展**：可编排任意数量的 Agent，构建复杂的多 Agent 协作拓扑
 - **开箱即用**：`builtin/agent_orchestration/` 目录内置两个现成的编排配置，开箱即用
 
-**内置编排案例一：对抗式 Agent（jsec_adversarial.yaml）**
-
-`builtin/agent_orchestration/jsec_adversarial.yaml` 定义了两个角色对立的 Agent：**jsec_rule_developer**（规则开发 Agent，code_agent 类型）与 **jsec_adversary**（对抗 Agent，agent 类型），形成对抗式协作闭环。该范式的完整论述与真实成果详见 3.2.4 节。
-
-**内置编排案例二：自演化 Agent 网络（self_evolving_network.yaml）**
-
-`builtin/agent_orchestration/self_evolving_network.yaml` 定义了四类协作 Agent：**knowledge_base_agent**（知识库 Agent）、**monitoring_agent**（监控 Agent）、**tech_learning_agent**（技术学习 Agent）、**dispatcher_agent**（调度 Agent），形成自演化闭环。该范式的完整论述详见 3.2.3 节。
-
-```plantuml
-@startuml
-skinparam activityStyle
-skinparam backgroundColor #FEFEFE
-skinparam activity {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90D9
-  FontSize 12
-}
-skinparam arrow {
-  Color #4A90D9
-  FontSize 11
-}
-
-start
-:用户输入编排文件路径
-（支持多行，每行一个 YAML 路径）;
-
-if (文件存在且格式合法？) then (是)
-  :解析 YAML，提取 agents 列表;
-  :合并多个编排文件的 Agent 配置;
-else (否)
-  :提示错误，跳过该文件;
-endif
-
-if (Web Gateway 已连接？) then (是)
-  :遍历 agents 配置;
-  :校验必填字段
-  （type、working_dir）;
-  :调用 gateway._create_agent
-  批量创建 Agent;
-else (否)
-  :提示「Web Gateway 未连接」;
-  stop
-endif
-
-:汇总创建结果
-（成功数 / 失败数 / 明细表）;
-
-stop
-@enduml
-```
+`builtin/agent_orchestration/` 目录内置两个编排配置：**对抗式 Agent**（jsec_adversarial.yaml）与**自演化 Agent 网络**（self_evolving_network.yaml），其协作模式与完整论述分别详见 3.2.4 节与 3.2.3 节。
 
 #### 3.2.2 Agent 间通信：群聊、点对点与指挥控制
 
-Jarvis 为 Agent 之间设计了专门的关系组织机制：
+Jarvis 为 Agent 之间设计了专门的关系组织机制，所有通信均经 Web Gateway 统一路由。Agent 通过 `gateway_manager` 工具调用网关接口，网关负责消息路由、跨节点转发与成员管理。
 
-- **Agent 群聊**：多个 Agent 可在同一群组中交流，实现多 Agent 协同讨论。Agent 可**自发创建群聊组织**——当某个 Agent 发现任务需要多方协作时，可主动创建群组并邀请其他 Agent 加入，围绕同一目标协同推进
-- **Agent 点对点通信**：`send_to_agent` 允许 Agent 直接向其他 Agent 发送消息，实现一对一的协作
-- **通过网关发布消息**：Agent 可通过网关向其他 Agent 发布消息，消息经网关路由至目标 Agent 所在节点，实现跨节点的 Agent 协作
-- **指挥与控制其他 Agent**：Agent 可通过网关接口指挥和控制其他 Agent，实现任务分解、结果汇总、协作编排等高级功能
+**Agent 群聊**：多个 Agent 可在同一群组中交流，实现多 Agent 协同讨论。Agent 可**自发创建群聊组织**——当某个 Agent 发现任务需要多方协作时，可主动创建群组并邀请其他 Agent 加入，围绕同一目标协同推进。群聊的完整生命周期由网关管理：
+
+- **创建群组**：`create_group` 在网关注册新群组，生成唯一 `group_id`
+- **加入/退出**：`join_group`/`leave_group` 将当前 Agent 加入或移出群组成员集合
+- **发送群消息**：`send_group_message` 将消息提交至网关，网关遍历群组成员（排除发送者），逐个调用目标 Agent 的 `/message` 接口，消息携带 `group_id`、`group_name`、`message_type: "group_message"` 元数据
+- **消息送达**：目标 Agent 的 `/message` 接口将消息格式化为 `Agent {sender_id} 发来消息：{content}`——若 Agent 正在等待输入则直接注入输入流实现**即时送达**，否则存入输入缓冲区，在下一轮循环消费
+
+**Agent 点对点通信**：`send_to_agent` 允许 Agent 直接向其他 Agent 发送消息，实现一对一的协作。该操作支持**批量发送**（逗号分隔或列表），并具备**跨节点路由**能力：
+
+- 发送时自动查询目标 Agent 所在节点（`agent_node_map`），若目标在子节点则通过 `/api/node/{node_id}/agent/{agent_id}/message` 路由转发
+- 消息末尾自动附加回复提示：`回复此消息请用: gateway_manager action=send_to_agent agent_id={sender_id} message=<汝之回复>`，引导对方以相同工具回复
+- 发送成功后提示 `<Wait>`，Agent 可等待对方响应后继续协作
+
+**通过网关发布消息（Chat）**：Agent 可通过网关的聊天室机制向用户或其他在线客户端发布消息，实现 Agent 与人的协作。`chat_send_room_message` 发送聊天室消息、`chat_send_private_message` 发送私聊消息，消息自动添加 `[Agent名字]` 前缀以标识来源，经 WebSocket 实时广播至接收方。
+
+**指挥与控制其他 Agent**：Agent 可通过网关接口指挥和控制其他 Agent，实现任务分解、结果汇总、协作编排等高级功能：
+
+- **创建 Agent**：`create_agent` 在指定节点创建新 Agent 并分配初始任务，支持 `no_interaction_mode` 无交互模式
+- **删除 Agent**：`delete_agent` 删除指定 Agent，支持批量删除
+- **无损重生**：`regenerate_agent` 实现 Agent 的无损重生——先保存会话、再删除、以相同参数重建并恢复会话，适用于 Agent 异常或需升级场景
+- **定时任务**：`create_timer` 可创建定时任务，定时创建 Agent 或执行命令，实现无人值守的自动化编排
+
+下图展示了多个 Agent 之间的通信与群组关系：
+
+```dot
+digraph G5 {
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="Agent 间通信与群组关系", labelloc="t", nodesep=0.6, ranksep=1.5];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+
+  subgraph cluster_gateway {
+    label = "Web Gateway";
+    style = "filled";
+    color = "#6C3483";
+    fillcolor = "#F4ECF7";
+    node [fillcolor="#E8DAEF", color="#6C3483"];
+    gw [label="网关\n消息路由 · 群组管理\n跨节点转发"];
+  }
+
+  subgraph cluster_node1 {
+    label = "节点 1";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    a1 [label="Agent A\n(发起者)"];
+    a2 [label="Agent B"];
+  }
+
+  subgraph cluster_node2 {
+    label = "节点 2";
+    style = "filled";
+    color = "#E67E22";
+    fillcolor = "#FEF5E7";
+    node [fillcolor="#FDEBD0", color="#E67E22"];
+    a3 [label="Agent C"];
+  }
+
+  grp [shape=ellipse, style="dashed,filled", fillcolor="#EAFAF1", color="#27AE60", fontcolor="#1E8449", label="群组\n项目讨论组"];
+
+  a1 -> gw [label="创建群组\n加入群组\n发送群消息", color="#27AE60"];
+  a2 -> gw [label="加入群组", color="#27AE60"];
+  a3 -> gw [label="加入群组", color="#27AE60"];
+  a1 -> a2 [label="点对点通信", style=dashed, color="#4A90D9"];
+  gw -> a3 [label="跨节点转发", color="#E67E22"];
+  a1 -> gw [label="指挥控制", style=dotted, color="#6C3483"];
+  a1 -> grp [label="成员", style=dashed, color="#27AE60", constraint=false];
+  a2 -> grp [label="成员", style=dashed, color="#27AE60", constraint=false];
+  a3 -> grp [label="成员", style=dashed, color="#27AE60", constraint=false];
+}
+```
+
+图中展示了 Agent 间通信的核心机制：**Web Gateway** 作为统一消息中枢，负责消息路由、群组管理与跨节点转发。**节点 1** 中的 Agent A 与 Agent B、**节点 2** 中的 Agent C 分属不同物理服务器，但三者均可加入同一个群组（如"项目讨论组"），实现跨节点的群聊协作——群消息经网关广播至各成员。Agent 之间还可通过网关进行**点对点通信**（如 A 与 B 直接对话），或由网关将消息**跨节点转发**至其他节点上的 Agent（如 A 经网关向 C 发送消息）。此外，Agent A 作为发起者，可通过网关对其他 Agent 进行**指挥控制**（创建、删除、重生等操作），实现任务分解与协作编排。
 
 #### 3.2.3 自演化 Agent 网络：记忆系统的高阶形态
 
@@ -902,17 +954,13 @@ user -> dispatcher : 提交任务
 dispatcher -> kb : ① 查询相关经验与良法
 kb --> dispatcher : 返回知识条目
 
-dispatcher -> executor : ② 分派任务
-（无合适 Agent 时按需创建 code_agent）
+dispatcher -> executor : ② 分派任务\n（无合适 Agent 时按需创建 code_agent）
 
-executor -> kb : ③ 执行完成后沉淀经验
-（experiences / best_practices / solutions）
+executor -> kb : ③ 执行完成后沉淀经验\n（experiences / best_practices / solutions）
 
-monitor -> dispatcher : ④ 定期报告网络健康状态
-（心跳 / 资源 / 任务队列）
+monitor -> dispatcher : ④ 定期报告网络健康状态\n（心跳 / 资源 / 任务队列）
 
-learner -> kb : ⑤ 搜索新技术并存入知识库
-（memory 工具，带标签）
+learner -> kb : ⑤ 搜索新技术并存入知识库\n（memory 工具，带标签）
 
 note over dispatcher, learner
   自演化闭环：
@@ -1003,17 +1051,13 @@ participant "专家系统规则库\n（jarvis_sec）" as rules
 user -> adversary : 提供代码仓库 / 指定扫描目标
 
 loop 对抗迭代循环
-  adversary -> adversary : ① 主动发现漏洞
-  （联网搜 CVE/CWE / 扫描仓库 / 分析用例）
+  adversary -> adversary : ① 主动发现漏洞\n（联网搜 CVE/CWE / 扫描仓库 / 分析用例）
 
-  adversary -> adversary : ② 抽象普适用例
-  （脱敏泛化，正例 + 反例）
+  adversary -> adversary : ② 抽象普适用例\n（脱敏泛化，正例 + 反例）
 
-  adversary -> developer : ③ 反馈漏报/误报
-  （含漏洞模式与期望检测方式）
+  adversary -> developer : ③ 反馈漏报/误报\n（含漏洞模式与期望检测方式）
 
-  developer -> developer : ④ 分析反馈并改进规则
-  （污点传播 / 调用图分析，禁用正则）
+  developer -> developer : ④ 分析反馈并改进规则\n（污点传播 / 调用图分析，禁用正则）
 
   developer -> rules : ⑤ 更新检测规则
   developer -> adversary : ⑥ 通知验证
@@ -1022,8 +1066,7 @@ loop 对抗迭代循环
   rules --> adversary : 返回检测结果
 
   alt 验证通过
-    adversary -> adversary : ⑧ 深度对抗阶段
-    （阅读源码，尝试构造规避用例）
+    adversary -> adversary : ⑧ 深度对抗阶段\n（阅读源码，尝试构造规避用例）
     note right
       若找到规避方法，
       继续反馈给规则开发 Agent
@@ -1066,57 +1109,40 @@ Jarvis 的前端界面支持**多面板（Panel）平铺布局**，用户可同�
 
 **技术深度**：多面板的核心是**前端状态隔离**。每个面板维护独立的输入缓冲、输出列表、确认数据与终端引用，通过 `panelId` 与 `agentId` 的映射关系实现 Agent 会话与面板的一一对应。面板关闭时自动清理关联的 Agent 会话状态，避免内存泄漏。移动端（≤768px）自动降级为单面板模式，保证小屏设备的可用性。
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-skinparam backgroundColor #FEFEFE
-skinparam component {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90D9
-  FontSize 12
-}
-skinparam arrow {
-  Color #4A90D9
-  FontSize 11
-}
-
-package "1 个面板（单列）" {
-  component "Agent A" as a1
-}
-
-package "2 个面板（双列）" {
-  component "Agent A" as a2a
-  component "Agent B" as a2b
-}
-
-package "3-4 个面板（2×2 网格）" {
-  component "Agent A" as a3a
-  component "Agent B" as a3b
-  component "Agent C" as a3c
-  component "Agent D" as a3d
-}
-
-package "5-6 个面板（3×2 网格）" {
-  component "Agent A" as a4a
-  component "Agent B" as a4b
-  component "Agent C" as a4c
-  component "Agent D" as a4d
-  component "Agent E" as a4e
-  component "Agent F" as a4f
-}
-
-note bottom
-  每个面板独立维护：
-  输入缓冲 / 输出列表 / 确认数据 / 终端引用
-  通过 panelId ↔ agentId 映射实现会话绑定
-  移动端（≤768px）自动降级为单面板
-end note
-@enduml
-```
-
 ---
 
 ### 3.3 多人单 Agent：共享与权限
+
+```dot
+digraph G3 {
+  graph [rankdir="LR", splines=ortho, fontname="Sans-serif", label="③ 多人单 Agent：团队共享一个 AI", labelloc="t", nodesep=0.5, ranksep=1.5];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_devs {
+    label = "开发者";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    d3a [label="开发者 A"];
+    d3b [label="开发者 B"];
+    d3c [label="开发者 C"];
+  }
+  subgraph cluster_node {
+    label = "节点";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    a3 [label="共享 Agent"];
+  }
+  d3a -> a3 [label="消息"];
+  d3b -> a3 [label="消息"];
+  d3c -> a3 [label="消息"];
+  d3a -> d3b [label="聊天室", dir=both, style=dashed];
+  d3b -> d3c [label="聊天室", dir=both, style=dashed];
+}
+```
 
 当多个开发者需要共享同一个 Agent 时，Jarvis 提供了完整的多用户认证、权限控制与并发操作能力。这是从「单人」到「团队」的关键一步。
 
@@ -1124,7 +1150,7 @@ end note
 
 > **接入方式说明**：多人单 Agent 的共享与权限能力**仅通过 Web 接口提供**，CLI 不支持多用户共享。
 
-本节六个子章节分三层：**身份层**（3.3.1 多用户认证、3.3.2 权限控制）解决「谁能用、能用什么」；**协作层**（3.3.3 Agent 共享、3.3.4 会话与用户标识）解决「多人如何共用一个 Agent」；**交互层**（3.3.5 双群组协作、3.3.6 典型工作流）解决「团队如何围绕 Agent 协同」。
+本节五个子章节分三层：**身份层**（3.3.1 多用户认证、3.3.2 权限控制）解决「谁能用、能用什么」；**协作层**（3.3.3 Agent 共享、3.3.4 会话与用户标识）解决「多人如何共用一个 Agent」；**交互层**（3.3.5 典型工作流）解决「团队如何围绕 Agent 协同」。
 
 #### 3.3.1 多用户认证：团队成员的独立身份
 
@@ -1142,6 +1168,11 @@ Jarvis 内置完整的用户认证体系，让每个团队成员拥有独立身�
 
 Jarvis 的权限体系不是简单的「登录/未登录」二元判断，而是**两层细粒度权限模型**：
 
+| 层级               | 管理者       | 管理对象        | 控制粒度                   | 典型操作                                               |
+| ------------------ | ------------ | --------------- | -------------------------- | ------------------------------------------------------ |
+| **第一层：系统级** | 系统管理员   | 用户与系统资源  | 操作级（能否执行某操作）   | 创建 Agent、创建终端、创建定时任务、修改配置、访问节点 |
+| **第二层：资源级** | Agent 创建者 | 单个 Agent 资源 | 资源级（谁能访问某 Agent） | 授予/撤销某用户对某 Agent 的访问权限                   |
+
 **第一层：管理员系统级权限**。管理员精确控制每个用户能执行哪些操作：
 
 - 是否可以创建 Agent
@@ -1150,13 +1181,22 @@ Jarvis 的权限体系不是简单的「登录/未登录」二元判断，而是
 - 是否可以修改配置
 - 是否可以访问某节点
 
-系统内置四档权限组，开箱即用：**系统管理员**（全部权限）、**运维人员**（Agent/终端/定时任务管理）、**开发者**（Agent 创建与终端使用）、**访客**（只读）。
+系统内置四档权限组，开箱即用：
+
+| 权限组         | 权限范围                                          | 可访问节点       |
+| -------------- | ------------------------------------------------- | ---------------- |
+| **系统管理员** | 全部权限（`*:*`）                                 | 所有节点         |
+| **运维人员**   | Agent 创建/删除、终端管理、定时任务管理、配置修改 | 所有节点         |
+| **开发者**     | Agent 创建/删除、终端使用、文件上传               | 无（需单独授权） |
+| **访客**       | 只读，无操作权限                                  | 无               |
 
 **第二层：Agent 创建者资源级权限**。每个 Agent 的创建者可以自主控制该 Agent 的访问权限，分为三个级别：
 
-- **无权限**：用户完全看不到该 Agent
-- **只读权限**：用户可以查看该 Agent 的信息，但不能与其交互
-- **交互权限**：用户可以与该 Agent 进行完整的对话交互
+| 权限级别     | 可见 Agent   | 查看信息 | 对话交互 | 适用场景         |
+| ------------ | ------------ | -------- | -------- | ---------------- |
+| **无权限**   | ✗ 完全不可见 | ✗        | ✗        | 无关人员         |
+| **只读权限** | ✓ 可见       | ✓        | ✗        | 观察者、审计人员 |
+| **交互权限** | ✓ 可见       | ✓        | ✓        | 协作者、业务方   |
 
 **典型场景**：小 A 创建了一个代码修改 Agent，将「交互权限」授予小 B（业务方），将「只读权限」授予小 C（观察者）。小 B 可直接与 Agent 对话提需求，小 C 只能查看进度，无法干预。
 
@@ -1188,29 +1228,34 @@ Jarvis 的权限体系不是简单的「登录/未登录」二元判断，而是
 
 **差异化**：主流工具中，多人共享 Agent 时消息往往「匿名化」——Agent 无法区分消息来源。Jarvis 让 Agent 天然理解「谁在说话」，为结对编程、多方评审等场景提供了基础。
 
-#### 3.3.5 双群组协作：纯人讨论群与人-Agent 协作群
+```dot
+digraph G6 {
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="用户标识：Agent 知道「谁在跟我说话」", labelloc="t", nodesep=0.5, ranksep=1.2];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_users {
+    label = "用户";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    u1 [label="小 A"];
+    u2 [label="小 B"];
+  }
+  subgraph cluster_agent {
+    label = "共享 Agent";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    ag [label="Agent"];
+  }
+  u1 -> ag [label="「小A：请分析这个 bug」"];
+  u2 -> ag [label="「小B：我建议用 Rust 重写」"];
+}
+```
 
-多人单 Agent 场景下，Jarvis 提供**两个并行的协作群组**：
-
-**群组一：纯人讨论群（聊天室）**。成员全部是人，用于团队内部讨论与决策：
-
-- **聊天室列表**：查看所有聊天室
-- **在线用户列表**：查看当前在线用户
-- **聊天室成员列表**：查看聊天室成员
-- **聊天室消息**：发送聊天室消息
-- **私聊消息**：发送私聊消息（支持 client_id 或 user_id）
-
-**群组二：人-Agent 协作群（共享 Agent 会话）**。成员是人 + Agent，用于将讨论结论交给 Agent 执行：
-
-- 所有成员与 Agent 的对话在同一个共享会话中，彼此可见
-- 消息自动携带发送人信息，Agent 能区分「谁在说话」
-- Agent 的回复对群内所有人可见
-
-**典型协作流程**：团队先在纯人讨论群（聊天室）中讨论「这个接口要不要改」，达成一致后，将结论带到人-Agent 协作群（共享 Agent 会话）——「Agent，按我们讨论的方案修改这个接口」。Agent 执行修改，进度与结果在共享会话中对所有人可见。
-
-**差异化**：主流 AI 开发工具通常不内置聊天室，团队协作需要切换到 Slack、钉钉等外部工具。Jarvis 将「人-人讨论」与「人-Agent 执行」统一在同一个平台内——讨论、决策、执行无需切换工具。
-
-#### 3.3.6 多人单 Agent 的典型工作流：结对编程与多方评审
+#### 3.3.5 多人单 Agent 的典型工作流：结对编程与多方评审
 
 将上述能力串联，形成两个典型工作流：
 
@@ -1269,6 +1314,57 @@ agent -> A : 输出最终评审结论
 
 ### 3.4 多人多 Agent：多节点多网关的终极形态
 
+```dot
+digraph G4 {
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="④ 多人多 Agent：多用户 × 多节点 × 多 Agent", labelloc="t", nodesep=0.5, ranksep=1.2];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_users {
+    label = "用户";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    u1 [label="用户 A"];
+    u2 [label="用户 B"];
+  }
+  subgraph cluster_master {
+    label = "主节点";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    gw_m [label="网关"];
+    ag_m [label="Agent"];
+  }
+  subgraph cluster_worker1 {
+    label = "子节点 1";
+    style = "filled";
+    color = "#9673A6";
+    fillcolor = "#E1D5E7";
+    node [fillcolor="#E1D5E7", color="#9673A6"];
+    gw_w1 [label="网关"];
+    ag_w1 [label="Agent"];
+  }
+  subgraph cluster_worker2 {
+    label = "子节点 2";
+    style = "filled";
+    color = "#9673A6";
+    fillcolor = "#E1D5E7";
+    node [fillcolor="#E1D5E7", color="#9673A6"];
+    gw_w2 [label="网关"];
+    ag_w2 [label="Agent"];
+  }
+  u1 -> gw_m [label="使用"];
+  u2 -> gw_m [label="使用"];
+  gw_m -> ag_m [dir=both];
+  gw_w1 -> ag_w1 [dir=both];
+  gw_w2 -> ag_w2 [dir=both];
+  gw_m -> gw_w1 [label="协作", dir=both, style=dashed];
+  gw_m -> gw_w2 [label="协作", dir=both, style=dashed];
+}
+```
+
 这是四象限的终极形态：多个开发者、多个 Agent、分布在多个节点上，通过多个网关协同工作。这是 Jarvis 区别于所有主流 AI 开发工具的根本架构优势。
 
 多人多 Agent 的核心价值在于：**多网关节点集群部署**——Jarvis 可部署在多个物理或虚拟节点上，每个节点运行独立的 Web 网关，子节点向主网关注册形成节点网络，支持跨节点 Agent 协作与节点级运维；**权限控制 ACL**——网关是唯一对外入口，可在此统一实现鉴权与权限控制，管理员管理系统级权限，Agent 创建者控制资源级权限，确保分布式协作中的安全隔离。
@@ -1286,56 +1382,6 @@ Jarvis 的核心架构是**多节点、多 Agent、多网关**：
 **技术深度**：多节点架构的核心是**网关路由 + 节点注册**。每个节点是自治的（独立运行 Agent），但通过网关互联（消息可跨节点路由）。这类似于微服务架构中的服务注册与发现，但针对 Agent 场景做了专门设计。
 
 **差异化**：主流 AI 开发工具以**单机单进程**架构为主，跨机器协作能力有限。Jarvis 的多节点架构让团队可以构建**分布式的 Agent 协作网络**，Agent 可以运行在不同的机器上，通过网关协同工作。
-
-**多节点部署架构**：
-
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-skinparam backgroundColor #FEFEFE
-skinparam component {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90D9
-  FontSize 12
-}
-skinparam arrow {
-  Color #4A90D9
-  FontSize 11
-}
-
-component "主节点（Master）\nWeb 网关 + Agent 服务" as master
-component "子节点 1（Worker）\nWeb 网关 + Agent 服务" as worker1
-component "子节点 2（Worker）\nWeb 网关 + Agent 服务" as worker2
-component "子节点 N（Worker）\nWeb 网关 + Agent 服务" as workerN
-
-worker1 -up-> master : ① 获取 node_secret\n（Unix Domain Socket）
-worker2 -up-> master : ① 获取 node_secret
-workerN -up-> master : ① 获取 node_secret
-
-worker1 -up-> master : ② WebSocket 注册\n（NODE_AUTH: node_id + secret）
-worker2 -up-> master : ② WebSocket 注册
-workerN -up-> master : ② WebSocket 注册
-
-master --> worker1 : ③ 注册成功\n（返回 token + heartbeat_interval）
-master --> worker2 : ③ 注册成功
-master --> workerN : ③ 注册成功
-
-note bottom of master
-  主节点职责：
-  - 验证子节点身份（node_secret）
-  - 维护节点注册表（node_registry）
-  - 路由跨节点请求
-  - 心跳检测（10s 间隔）
-end note
-
-note bottom of worker1
-  子节点职责：
-  - 运行本节点 Agent 服务
-  - 经 WebSocket 长连接与主节点通信
-  - 处理主节点转发的请求
-end note
-@enduml
-```
 
 #### 3.4.2 跨节点 Agent 通信
 
@@ -1454,7 +1500,75 @@ end note
 @enduml
 ```
 
-#### 3.4.3 节点级运维：一键更新与重启
+#### 3.4.3 双群组协作：用户群聊与 Agent 群聊并行
+
+在多人多 Agent 场景下，Jarvis 提供**两个并行的群聊空间**：
+
+**群组一：用户群聊（聊天室）**。成员全部是用户，用于团队内部讨论与决策：
+
+- **聊天室列表**：查看所有聊天室
+- **在线用户列表**：查看当前在线用户
+- **聊天室成员列表**：查看聊天室成员
+- **聊天室消息**：发送聊天室消息
+- **私聊消息**：发送私聊消息（支持 client_id 或 user_id）
+
+**群组二：Agent 群聊（Agent 级群组）**。成员是 Agent，Agent 之间可创建群聊并发送群聊消息：
+
+- **创建群组**：Agent 可创建群组，邀请其他 Agent 加入
+- **群聊消息**：Agent 可向群组发送消息，群内所有 Agent 可见
+- **跨节点群组**：群组成员可分布在不同节点，消息经网关路由
+
+**用户视角**：甲乙丙三个用户登录后，可以看到两类群聊——**用户群聊**（与甲乙丙交流）和 **Agent 群聊**（观察 ABC 三个 Agent 的协作）。同时，甲乙丙分别都可以与 ABC 三个 Agent 直接通信。
+
+```dot
+digraph G7 {
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="双群组协作", labelloc="t", nodesep=0.3, ranksep=0.6];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=14];
+  edge [fontname="Sans-serif", fontsize=11];
+  subgraph cluster_users {
+    label = "用户群聊";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    { rank=same; ua [label="甲"]; ub [label="乙"]; uc [label="丙"]; }
+  }
+  subgraph cluster_gateway {
+    label = "Web Gateway";
+    style = "filled";
+    color = "#6C3483";
+    fillcolor = "#F4ECF7";
+    node [fillcolor="#E8DAEF", color="#6C3483"];
+    gw [label="Gateway"];
+  }
+  subgraph cluster_agents {
+    label = "Agent 群聊";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    { rank=same; aa [label="Agent A"]; ab [label="Agent B"]; ac [label="Agent C"]; }
+  }
+  ua -> ub [label="讨论", dir=both, style=dashed];
+  ub -> uc [label="讨论", dir=both, style=dashed];
+  ua -> uc [label="讨论", dir=both, style=dashed];
+  aa -> ab [label="群聊消息", dir=both, style=dashed];
+  ab -> ac [label="群聊消息", dir=both, style=dashed];
+  aa -> ac [label="群聊消息", dir=both, style=dashed];
+  ua -> gw [label="指令", color="#27AE60"];
+  ub -> gw [label="指令", color="#27AE60"];
+  uc -> gw [label="指令", color="#27AE60"];
+  gw -> aa [label="路由", color="#27AE60"];
+  gw -> ab [label="路由", color="#27AE60"];
+  gw -> ac [label="路由", color="#27AE60"];
+}
+```
+
+**典型协作流程**：甲乙丙在用户群聊（聊天室）中讨论「这个接口要不要改」，达成一致后，分别向 Agent A、B、C 发送指令——「按我们讨论的方案修改这个接口」。三个 Agent 在 Agent 群聊中协调分工，各自执行修改，进度与结果对甲乙丙可见。
+
+**差异化**：主流 AI 开发工具通常不内置聊天室，团队协作需要切换到 Slack、钉钉等外部工具。Jarvis 将「用户讨论」与「Agent 协作」统一在同一个平台内——讨论、决策、执行无需切换工具。
+
+#### 3.4.4 节点级运维：一键更新与重启
 
 Jarvis 提供节点级的运维能力：
 
@@ -1462,7 +1576,46 @@ Jarvis 提供节点级的运维能力：
 - **一键重启服务**：`restart_nodes` 一键重启所有节点服务，跳过当前节点，先启动子节点，最后启动 master 节点
 - **节点状态查询**：`list_nodes` 查看节点配置、运行状态、已注册子节点等
 
-**技术深度**：节点级运维的核心是**拓扑感知的重启顺序**。重启时先启动子节点，最后启动 master 节点，确保 master 节点启动时所有子节点已就绪。这种拓扑感知的运维能力是分布式系统的关键。
+**服务组成与关系**：
+
+```dot
+digraph G8 {
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="节点服务组成：前端 × 网关 × Agent", labelloc="t", nodesep=0.5, ranksep=1.2];
+  node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
+  edge [fontname="Sans-serif", fontsize=10];
+  subgraph cluster_user {
+    label = "用户";
+    style = "filled";
+    color = "#D79B00";
+    fillcolor = "#FFF8E7";
+    node [fillcolor="#FFE6CC", color="#D79B00"];
+    browser [label="浏览器"];
+  }
+  subgraph cluster_node {
+    label = "节点";
+    style = "filled";
+    color = "#4A90D9";
+    fillcolor = "#E8F4FD";
+    node [fillcolor="#DAE8FC", color="#4A90D9"];
+    fe [label="前端服务"];
+    gw [label="Gateway 服务"];
+    ag1 [label="Agent 1"];
+    ag2 [label="Agent 2"];
+  }
+  browser -> fe [label="访问"];
+  fe -> gw [label="API 请求"];
+  gw -> ag1 [label="代理"];
+  gw -> ag2 [label="代理"];
+}
+```
+
+三者是**相互独立的进程**，通过 API 与反向代理解耦，因此可以分别重启：
+
+- **前端服务**：独立进程（`npm run dev/preview`），通过 HTTP/WebSocket API 与 Gateway 通信。重启前端不影响 Gateway 与 Agent。
+- **Gateway 服务**：独立进程（`jwg`），负责 Agent 管理与消息路由。重启 Gateway 时前端短暂无法访问，但 Agent 进程不受影响。
+- **Agent 服务**：每个 Agent 运行在独立端口，Gateway 通过反向代理将请求转发至 Agent。重启 Agent 不影响其他 Agent 与前端。
+
+`restart_nodes` 支持 `restart_frontend` 参数：为 `true` 时重启所有服务（含前端），为 `false` 时仅重启 Gateway 服务（前端保持运行）。
 
 **差异化**：主流工具通常没有节点概念，节点级运维能力有限。Jarvis 的节点级运维让团队可以**像管理微服务一样管理 Agent 网络**。
 
@@ -1472,16 +1625,14 @@ Jarvis 提供节点级的运维能力：
 
 四象限协作模式是 Jarvis 的骨架，但 Jarvis 的创新能力不止于此。以下能力让 Jarvis 从「协作平台」进一步进化为「可自我进化的 AI 开发生态」。本节聚焦能力本身，与主流工具的系统对比见第四章。
 
-本节七个能力分四组：**扩展机制**（3.5.1 工具自扩展）让工具集随需求增长；**知识管理**（3.5.2 分层记忆、3.5.3 知识沉淀、3.5.4 规则加载）让经验可沉淀、可复用；**生态与调度**（3.5.5 MCP 集成、3.5.6 多模型调度）让 Jarvis 融入开放生态并优化成本；**工程深水区**（3.5.7 专项能力）覆盖主流工具未触及的迁移、审计、跨环境操作。
+本节八个能力分四组：**扩展机制**（3.5.1 插件机制、3.5.2 工具自扩展）让内核能力按需扩展、让工具集随需求增长；**知识管理**（3.5.3 分层记忆、3.5.4 知识沉淀、3.5.5 规则加载）让经验可沉淀、可复用；**生态与调度**（3.5.6 MCP 集成、3.5.7 多模型调度）让 Jarvis 融入开放生态并优化成本；**工程深水区**（3.5.8 专项能力）覆盖主流工具未触及的迁移、审计、跨环境操作。
 
-#### 3.5.1 工具自扩展与 Agent 自举开发
+#### 3.5.1 插件机制：内核能力按需扩展
 
-Jarvis 采用**内核 + 插件包**的扩展架构，工具集可随需求增长：
+Jarvis 采用**内核 + 插件包**的扩展架构，`config.yaml` 支持的任意配置项均可插件化：
 
 - 内核提供 Agent 基类、网关、记忆、规则等核心能力
-- 插件包（如 `jarvis_code_agent`、`jarvis_mcp`、`jarvis_sec`、`jarvis_c2rust`）以独立模块形式扩展能力
-- 第三方可独立开发插件包，无需修改内核
-- 元代理（`meta_agent`）支持根据自然语言描述生成新工具代码并注册，实现工具集的自我扩展
+- 插件包面向第三方扩展，独立开发、无需修改内核
 
 **插件包的设计与实现**：
 
@@ -1492,15 +1643,141 @@ Jarvis 采用**内核 + 插件包**的扩展架构，工具集可随需求增长
 - **配置合并**：`_load_plugin_configs` 自动加载所有插件的配置并合并到主配置，支持 Jinja2 模板渲染
 - **生命周期管理**：`list_plugins` 扫描插件目录，`uninstall_plugin` 安全删除插件目录
 
-**Agent 自举开发实证**：Jarvis 的开发过程本身就是「Agent 开发 Agent」的最佳证明——超 1 万次提交中 99% 以上由 CodeAgent 自主完成（详见 1.3 节事实二）。
+**可插件化的配置项**：插件包可携带 `config.yaml` 支持的任意配置，包括但不限于：
 
-> 注：项目经历过两次大规模瘦身与 git 历史压缩，本地 git 统计因 backup 分支重复提交而不准确，故以 GitHub 官方统计为准。
+- **工具**：`tool_load_dirs` 指定工具代码目录，`tool_groups` 定义工具分组，`central_tool_repo` 引用中心工具仓库
+- **规则**：`rules_load_dirs` 指定规则文件目录，`default_rule_names` 预置默认加载的规则
+- **方法论**：`methodology_dirs` 指定方法论目录，`central_methodology_repo` 引用中心方法论仓库
+- **模型配置**：`llms` 定义可复用的 LLM 配置，`llm_groups` 预置模型组（含 `normal_llm` / `cheap_llm` / `smart_llm` 分级）
+- **Agent 定义与角色**：`agent_definition_dirs` 指定 Agent 定义目录，`roles_dirs` 指定角色目录
+- **回调实现**：`before_tool_call_cb_dirs` / `after_tool_call_cb_dirs` / `before_model_call_cb_dirs` / `summary_cb_dirs` 指定各阶段回调函数代码目录
+- **MCP 集成**：`mcp` 配置外部 MCP 服务器连接（支持 `sse` / `streamable` / `stdio` 三种类型）
+- **环境与行为**：`ENV` 设置环境变量，`replace_map` 自定义提示词模板替换映射
 
-**技术深度**：这是**可扩展性设计在 AI 工具领域的应用**。Jarvis 的内核 + 插件包架构让工具集可以按需扩展，且扩展过程不影响内核稳定性。更关键的是，Jarvis 用自己开发自己——超 1 万次 Agent 自主提交证明了这个闭环的真实性。
+插件包内容注入主程序的完整流程如下：
 
-**差异化**：主流工具通过 MCP 接入外部工具（Claude Code 作为 MCP 创造者、CodeX/CodeBuddy 均已支持），但 MCP 是「外部工具接入」，工具逻辑在外部进程，Agent 对工具行为的修改能力有限。Jarvis 的插件包机制是「内核能力扩展」——插件直接纳入内核工具集，Agent 可调用、可修改、可编排；且扩展过程完全自动化，不需要开发者写代码、不需要重新部署、不需要重启服务。更重要的是，Jarvis 的「自举开发」不是宣传口号，而是有 git 历史可查的客观事实。
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
 
-#### 3.5.2 分层记忆：无向量计算的轻量记忆
+participant "插件包" as pkg
+participant "安装\n(校验+解压)" as install
+participant "插件目录" as dir
+participant "配置加载\n(发现+渲染+合并)" as load
+participant "全局配置" as global
+participant "Agent" as agent
+
+pkg -> install : 提供
+install -> dir : 写入
+note right of install
+  校验 config.yaml
+  防路径遍历
+end note
+dir -> load : 扫描
+note right of load
+  自动发现插件
+  Jinja2 模板渲染
+  配置合并
+end note
+load -> global : 合并
+note right of global
+  工具/规则/方法论
+  模型/Agent/回调
+end note
+global -> agent : 生效
+@enduml
+```
+
+图中展示了插件包从安装到生效的完整链路：**插件包**（含 `config.yaml` 与代码）经**安装**阶段校验后解压至 `~/.jarvis/plugins/` 目录；主程序启动时**自动发现**该目录下的插件，读取并**模板渲染** `config.yaml`，经**配置合并**后注入**全局配置**，最终使 Agent 获得插件包声明的全部能力——不仅是新工具，还包括规则、方法论、模型配置、Agent 定义、回调实现等 `config.yaml` 支持的任意配置项。整个过程无需修改内核代码、无需重新部署。
+
+**技术深度**：这是**可扩展性设计在 AI 工具领域的应用**。Jarvis 的内核 + 插件包架构让 `config.yaml` 支持的任意能力（工具、规则、方法论、模型配置、Agent 定义、回调实现等）都可以按需扩展，且扩展过程不影响内核稳定性。
+
+**差异化**：主流工具通过 MCP 接入外部工具（Claude Code 作为 MCP 创造者、CodeX/CodeBuddy 均已支持），但 MCP 是「外部工具接入」，工具逻辑在外部进程，Agent 对工具行为的修改能力有限。Jarvis 的插件包机制是「内核能力扩展」——插件直接纳入内核配置体系，Agent 可调用、可修改、可编排；且扩展过程完全自动化，不需要开发者写代码、不需要重新部署、不需要重启服务。
+
+#### 3.5.2 工具自扩展与 Agent 自举开发
+
+**元代理（`meta_agent`）**是 Jarvis 自举能力的核心实现——它本身就是一个工具，但它的功能是**创造和改造其他工具**。当 Agent 遇到新类型任务时，可调用 `meta_agent` 工具，传入 `tool_name` 与 `function_description`，即可自动完成新工具的生成与注册。
+
+**meta_agent 的实现机制**：
+
+- **阅读框架自身代码**：`meta_agent` 构建增强提示词时，自动注入 Jarvis 框架的关键源码路径——工具注册表（`registry.py`）、Tool 基类（`base.py`）、Agent 类（`jarvis_agent/__init__.py`）、CodeAgent（`code_agent.py`）、配置与输出模块等，并明确指示「他文件亦可酌情参考」。生成的 CodeAgent 可自由阅读框架源码，理解工具接口规范与 Agent 工作流。
+- **调用自身 API**：提示词指导新工具可直接调用 Jarvis 的内部 API——使用 `Agent` 进行需求分析与任务编排（ARCHER 工作流）、使用 `CodeAgent` 处理代码修改与验证、甚至可递归调用 `meta_agent` 对自身进行改进。新工具不是孤立的脚本，而是 Jarvis 生态的一等公民。
+- **自动注册到当前运行的 Agent**：工具代码生成后，`meta_agent` 通过 `agent.get_tool_registry()` 获取**当前 Agent 的工具注册表**，调用 `register_tool_by_file()` 将新工具**立即注册**——无需重启、无需重新部署，当前正在运行的 Agent 即刻获得新能力。注册失败时自动清理生成的文件，保证系统整洁。
+
+meta_agent 自举开发的完整流程如下：
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
+
+participant "Agent" as agent
+participant "meta_agent" as meta
+participant "CodeAgent" as code
+participant "框架源码" as src
+participant "工具注册表" as registry
+
+agent -> meta : 调用
+note right of agent
+  传入 tool_name
+  与 function_description
+end note
+meta -> meta : 构建增强提示词
+note right of meta
+  注入框架关键源码路径
+  工具接口规范
+end note
+meta -> code : 启动代码生成
+code -> src : 阅读框架源码
+note right of code
+  理解工具接口规范
+  与 Agent 工作流
+end note
+code -> code : 生成新工具代码
+code -> meta : 返回工具文件
+meta -> registry : 注册新工具
+note right of registry
+  立即生效
+  无需重启
+end note
+registry -> agent : 新能力可用
+@enduml
+```
+
+图中展示了 meta_agent 自举开发的完整链路：**Agent** 遇到新类型任务时调用 **meta_agent** 工具，传入工具名称与功能描述；meta_agent **构建增强提示词**，自动注入框架关键源码路径（工具注册表、Tool 基类、Agent 类、CodeAgent 等）；随后启动 **CodeAgent** 生成新工具代码——CodeAgent 可**阅读框架源码**理解工具接口规范与 Agent 工作流，也可调用 Jarvis 内部 API（Agent、CodeAgent 甚至 meta_agent 自身）；工具代码生成后，meta_agent 将新工具**注册到当前运行的 Agent 的工具注册表**，使 Agent **即刻获得新能力**——整个过程无需重启、无需重新部署。
+
+**技术深度**：这是**元编程（Meta-Programming）在 AI 工具领域的应用**。Jarvis 的 Agent 不仅能使用工具，还能**生成工具**——元代理将自然语言需求转化为可注册的工具代码，使工具集随使用持续增长。这种「Agent 开发 Agent」的闭环，让 Jarvis 的能力边界不再受限于预置工具集，而是随任务需求动态扩展。
+
+**差异化**：主流工具的工具集是**静态预置**的——开发者预先定义好工具，Agent 只能调用不能扩展。Jarvis 的元代理让 Agent 具备**自我扩展能力**：遇到新类型任务时，Agent 可自主生成新工具并注册，下次同类任务直接复用。
+
+#### 3.5.3 分层记忆：无向量计算的轻量记忆
 
 Jarvis 采用三层记忆体系，模拟人类记忆的分层机制：
 
@@ -1549,7 +1826,7 @@ end note
 @enduml
 ```
 
-#### 3.5.3 知识沉淀与共享（方法论 / 规则 / 工具）
+#### 3.5.4 知识沉淀与共享（方法论 / 规则 / 工具）
 
 Jarvis 支持三类知识资产经中心 Git 仓库实现团队级共享：
 
@@ -1557,11 +1834,58 @@ Jarvis 支持三类知识资产经中心 Git 仓库实现团队级共享：
 - **规则**：规则文件支持中心仓库统一管理（Git 仓库 URL 或本地目录），克隆后每日自动更新，团队规则一处维护、全员生效
 - **工具**：自定义工具支持中心仓库统一管理（Git 仓库 URL 或本地目录），克隆后每日自动更新，团队工具一处发布、全员可用
 
+多个用户与中心知识库的关系如下：
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam component {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam package {
+  BackgroundColor #F5F5F5
+  BorderColor #999999
+  FontSize 12
+}
+
+package "用户" {
+  component "用户 A" as ua
+  component "用户 B" as ub
+  component "用户 C" as uc
+  component "..." as ux
+}
+
+component "Jarvis Agent" as agent
+
+package "中心知识库" {
+  component "方法论中心库" as mrepo
+  component "规则中心库" as rrepo
+  component "工具中心库" as trepo
+}
+
+ua --> agent
+ub --> agent
+uc --> agent
+ux --> agent
+
+agent --> mrepo : 发布 / 拉取
+agent --> rrepo : 发布 / 拉取
+agent --> trepo : 发布 / 拉取
+@enduml
+```
+
+图中展示了多用户与中心知识库的关系：**多个用户**（用户 A、B、C…）各自运行本地的 **Jarvis Agent**，Agent 将本地沉淀的方法论、规则、工具**发布**至对应的**中心知识库**（方法论中心库、规则中心库、工具中心库），同时从中心库**拉取**团队共享的知识资产——一处发布、全员生效。
 **技术深度**：这是**知识管理在 AI 工具中的落地**。Claude Code 的 Auto Memory 以 Markdown 笔记形式记录经验，结构化索引能力有限，召回依赖 Agent 自行判断。Jarvis 将成功经验自动提取为结构化方法论，按问题类型索引，下次遇到同类问题时自动加载，召回更精准、更可预期；规则与工具经中心仓库统一分发，团队级知识资产一处维护、全员生效。
 
 **差异化**：Claude Code 的 Auto Memory 是个人笔记，CodeBuddy 的 RAG 是文档检索，「按问题类型索引 + 自动加载」的结构化方法论机制是 Jarvis 的特色。Jarvis 让团队经验从「散落的笔记」升级为「可索引、可复用、可共享的知识资产」，且方法论、规则、工具三类知识资产均支持中心 Git 仓库共享，实现团队级知识沉淀。
 
-#### 3.5.4 规则按需加载
+#### 3.5.5 规则按需加载
 
 Jarvis 支持规则文件的按需加载：
 
@@ -1575,7 +1899,7 @@ Jarvis 支持规则文件的按需加载：
 
 **差异化**：Claude Code 的 Skills 也采用渐进式披露（按需加载），但需 Agent 自行判断何时加载哪个 Skill。Jarvis 的 `auto_select_rule` 基于任务描述**自动匹配**最相关规则（至多 5 个），无需 Agent 自行判断；且 rule 兼容 skill 生态，可直接复用技能市场资源，同时以 Jinja2 模板渲染能力（环境变量动态渲染）超越 skill。
 
-#### 3.5.5 MCP 集成
+#### 3.5.6 MCP 集成
 
 完整支持 MCP（Model Context Protocol）三种传输方式：
 
@@ -1583,11 +1907,59 @@ Jarvis 支持规则文件的按需加载：
 - **sse**：Server-Sent Events
 - **streamable**：流式传输
 
+MCP 工具经工具注册表调用的完整流程如下：
+
+```plantuml
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+  BackgroundColor #E8F4FD
+  BorderColor #4A90D9
+  FontSize 12
+}
+skinparam arrow {
+  Color #4A90D9
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #F57F17
+  FontSize 11
+}
+
+participant "Agent" as agent
+participant "工具注册表" as registry
+participant "MCP 客户端" as client
+participant "MCP 服务器" as server
+
+agent -> registry : 调用 MCP 工具
+note right of agent
+  与调用普通工具
+  无差别
+end note
+registry -> client : 转发调用
+note right of registry
+  工具已注册
+  可直接调用
+end note
+client -> server : 协议通信
+note right of client
+  stdio / sse
+  / streamable
+end note
+server -> client : 返回结果
+client -> registry : 返回结果
+registry -> agent : 返回结果
+@enduml
+```
+
+图中展示了 MCP 工具经工具注册表调用的完整链路：**Agent** 调用 MCP 工具时与调用普通工具**无差别**——MCP 工具在启动时已通过**工具注册表**注册（`register_tool`），Agent 只需按工具名调用；工具注册表将调用**转发**至对应的 **MCP 客户端**，客户端经 **stdio / sse / streamable** 三种协议之一与 **MCP 服务器**通信，执行外部工具并返回结果。
+
 **技术深度**：MCP 是 AI 工具生态的「USB 接口」标准。Jarvis 完整支持三种传输方式，意味着可以接入任何符合 MCP 标准的第三方工具——从数据库客户端到浏览器自动化，从文件系统到云服务。
 
 **差异化**：Claude Code 作为 MCP 的创造者支持完整，CodeX、CodeBuddy 也已支持 MCP。Jarvis 完整支持 stdio/sse/streamable 三种传输方式，与主流对齐，且 MCP 工具可直接纳入 Jarvis 的多 Agent 协作体系——Agent 间可通过网关共享 MCP 工具能力。
 
-#### 3.5.6 多模型分层调度
+#### 3.5.7 多模型分层调度
 
 支持 **normal / cheap / smart** 三档模型：
 
@@ -1601,7 +1973,7 @@ Jarvis 支持规则文件的按需加载：
 
 **差异化**：主流工具支持手动切换模型（Claude Code 的 Haiku/Sonnet/Opus、CodeBuddy 的混元/DeepSeek），但需开发者自行判断任务复杂度并手动切换。Jarvis 的 normal/cheap/smart 三档模型**按任务复杂度自动调度**，无需人工干预，在保证质量的同时自动优化成本。
 
-#### 3.5.7 专项能力
+#### 3.5.8 专项能力
 
 - **C→Rust 迁移流水线**：完整流水线（scan → lib-replace → prepare → transpile → optimize），支持断点续跑
 - **安全分析**：污点分析框架（Joern / PhASAR / SVF 后端）、数据流分析、启发式 C/Rust 检查器
@@ -1614,66 +1986,33 @@ Jarvis 支持规则文件的按需加载：
 
 **差异化**：主流工具覆盖「代码生成 + 终端操作 + 文件编辑」的常规开发链路，领域专项能力相对有限。Jarvis 的专项能力（C→Rust 迁移流水线、污点分析安全审计、GUI/终端/浏览器自动化）让 AI 助手从「写代码」延伸到「改代码、审代码、迁移代码、操作环境」，覆盖更深的工程场景。
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-skinparam backgroundColor #FEFEFE
-skinparam component {
-  BackgroundColor #E8F4FD
-  BorderColor #4A90D9
-  FontSize 12
-}
-skinparam arrow {
-  Color #4A90D9
-  FontSize 11
-}
-
-component "scan\n（扫描分析）" as scan
-component "lib-replace\n（库替换）" as lib
-component "prepare\n（预处理）" as prep
-component "transpile\n（代码转换）" as trans
-component "optimize\n（优化）" as opt
-
-scan -right-> lib : ①
-lib -right-> prep : ②
-prep -right-> trans : ③
-trans -right-> opt : ④
-
-note bottom of opt
-  完整流水线：
-  scan → lib-replace → prepare → transpile → optimize
-  支持断点续跑
-end note
-@enduml
-```
-
 ---
 
 ## 四、与主流 AI 开发工具的对比
 
-第三章已完整展示 Jarvis 的能力全景，本章将 Jarvis 与当前主流的 AI 开发工具（Claude Code、CodeX、CodeBuddy）进行系统对比，从「差异化」角度回答一个问题：**Jarvis 与主流工具的本质区别是什么？**
+第三章已完整展示 Jarvis 的能力全景，本章将 Jarvis 与当前主流的 AI 开发工具（Claude Code、CodeX、CodeBuddy、OpenClaw）进行系统对比，从「差异化」角度回答一个问题：**Jarvis 与主流工具的本质区别是什么？**
 
 ### 4.1 对比总览
 
-| 维度             | Jarvis                              | Claude Code                | CodeX                       | CodeBuddy               |
-| ---------------- | ----------------------------------- | -------------------------- | --------------------------- | ----------------------- |
-| **架构**         | 多节点多网关多 Agent                | 单机单进程                 | 单机单进程                  | 单机单进程              |
-| **协作模式**     | 人×Agent 四象限全覆盖               | 单人单 Agent 为主          | 单人单 Agent 为主           | 单用户多 Agent          |
-| **多用户**       | JWT + ACL 权限组                    | 未提供                     | 未提供                      | 未提供                  |
-| **多 Agent**     | 编排、群聊、点对点                  | Subagents + Agent Teams    | Subagents（manager-worker） | Subagents + Agent Teams |
-| **代码理解**     | SQLite 符号图 + BFS 遍历            | grep 文本搜索              | 文本匹配                    | 向量检索                |
-| **影响分析**     | 五类影响 + 风险等级                 | 查找引用                   | 未提供                      | 查找引用                |
-| **多语言**       | 8 种（tree-sitter AST）             | 文本级（无 AST）           | 文本级（无 AST）            | 文本级（无 AST）        |
-| **Agent 自举**   | CodeAgent 自主开发（超 1 万次提交） | 未提供                     | 未提供                      | 未提供                  |
-| **分层记忆**     | 短期/项目/全局（无向量）            | Markdown 笔记              | 未提供                      | RAG 向量检索            |
-| **方法论沉淀**   | 内置方法论管理系统                  | 未提供                     | 未提供                      | 未提供                  |
-| **规则按需加载** | auto_select_rule 自动匹配           | Skills 渐进式披露          | 未提供                      | 未提供                  |
-| **MCP 集成**     | stdio/sse/streamable                | 完整（MCP 创造者）         | 支持                        | 支持                    |
-| **多模型分层**   | normal/cheap/smart 三档自动调度     | Haiku/Sonnet/Opus 手动切换 | 多模型可选                  | 混元/DeepSeek 双模型    |
-| **定时任务**     | 全工具延迟调用 + 跨节点定时         | 未提供                     | 未提供                      | 未提供                  |
-| **节点级运维**   | 一键更新/重启/拓扑感知              | 未提供                     | 未提供                      | 未提供                  |
-| **开源协议**     | MIT（完全开源）                     | 闭源                       | 闭源                        | 闭源                    |
-| **部署方式**     | 多节点分布式                        | 单机                       | 单机                        | 单机                    |
+| 维度             | Jarvis                              | Claude Code                | CodeX                       | CodeBuddy               | OpenClaw              |
+| ---------------- | ----------------------------------- | -------------------------- | --------------------------- | ----------------------- | --------------------- |
+| **架构**         | 多节点多网关多 Agent                | 单机单进程                 | 单机单进程                  | 单机单进程              | Gateway + 消息渠道    |
+| **协作模式**     | 人×Agent 四象限全覆盖               | 单人单 Agent 为主          | 单人单 Agent 为主           | 单用户多 Agent          | 单人/团队共享 Gateway |
+| **多用户**       | JWT + ACL 权限组                    | 未提供                     | 未提供                      | 未提供                  | 团队共享部署          |
+| **多 Agent**     | 编排、群聊、点对点                  | Subagents + Agent Teams    | Subagents（manager-worker） | Subagents + Agent Teams | 单 Agent 为主         |
+| **代码理解**     | SQLite 符号图 + BFS 遍历            | grep 文本搜索              | 文本匹配                    | 向量检索                | 未提供                |
+| **影响分析**     | 五类影响 + 风险等级                 | 查找引用                   | 未提供                      | 查找引用                | 未提供                |
+| **多语言**       | 8 种（tree-sitter AST）             | 文本级（无 AST）           | 文本级（无 AST）            | 文本级（无 AST）        | 未提供                |
+| **Agent 自举**   | CodeAgent 自主开发（超 1 万次提交） | 未提供                     | 未提供                      | 未提供                  | 未提供                |
+| **分层记忆**     | 短期/项目/全局（无向量）            | Markdown 笔记              | 未提供                      | RAG 向量检索            | 会话上下文            |
+| **方法论沉淀**   | 内置方法论管理系统                  | 未提供                     | 未提供                      | 未提供                  | Skills 扩展           |
+| **规则按需加载** | auto_select_rule 自动匹配           | Skills 渐进式披露          | 未提供                      | 未提供                  | Skills 扩展           |
+| **MCP 集成**     | stdio/sse/streamable                | 完整（MCP 创造者）         | 支持                        | 支持                    | 支持                  |
+| **多模型分层**   | normal/cheap/smart 三档自动调度     | Haiku/Sonnet/Opus 手动切换 | 多模型可选                  | 混元/DeepSeek 双模型    | 多模型可选            |
+| **定时任务**     | 全工具延迟调用 + 跨节点定时         | 未提供                     | 未提供                      | 未提供                  | 后台任务/cron         |
+| **节点级运维**   | 一键更新/重启/拓扑感知              | 未提供                     | 未提供                      | 未提供                  | 未提供                |
+| **开源协议**     | MIT（完全开源）                     | 闭源                       | 闭源                        | 闭源                    | MIT（完全开源）       |
+| **部署方式**     | 多节点分布式                        | 单机                       | 单机                        | 单机                    | 单机/自托管 Gateway   |
 
 ### 4.2 核心差异化：从「工具」到「平台」
 
@@ -1699,7 +2038,7 @@ Jarvis 的本质是**协作式 AI 开发平台**：
 
 在「多人多 Agent」象限，Jarvis 的优势是**根本性的**：
 
-- **主流工具以单用户本地工具为主**：Claude Code、CodeX、CodeBuddy 的本地多用户共享能力有限（Claude Code 的 Team 计划是 SaaS 账号体系，非本地多用户协作）
+- **主流工具以单用户本地工具为主**：Claude Code、CodeX、CodeBuddy 的本地多用户共享能力有限（Claude Code 的 Team 计划是 SaaS 账号体系，非本地多用户协作）；OpenClaw 支持团队共享同一 Gateway，但基于信任成员模型，无 JWT 认证与 ACL 权限组等细粒度权限控制
 - **主流工具的多 Agent 以子代理模式为主**：CodeX 的 Subagents 是「主 Agent 分解任务、子 Agent 并行执行」的树状结构；Claude Code 与 CodeBuddy 的 Agent Teams 支持多实例点对点通信，但以单机内的多实例协作为主。Jarvis 则提供编排（YAML 声明式）、群聊（Agent 间自由对话）、点对点（Agent 直连通信）等更丰富的协作形态
 - **主流工具以单机架构为主**：跨机器协作能力有限，构建分布式 Agent 网络是 Jarvis 的特色
 - **主流工具缺少对抗式优化机制**：通过 Agent 对抗迭代沉淀专家系统规则是 Jarvis 的独特能力
@@ -1746,10 +2085,6 @@ Jarvis 的四种协作模式对应四类真实开发场景，从个人日常开�
 - 影响分析评估修改风险
 - 依赖分析精准定位相关代码
 
-**运行截图**：
-
-![变更影响](images/变更影响.png)
-
 ### 5.2 场景二：单人多 Agent——一人扛全流程
 
 **场景描述**：小 A 独立负责一个微服务项目，既要设计方案、又要编码、测试、部署。他编排一个 Agent Team 来分担工作。
@@ -1789,11 +2124,6 @@ Jarvis 的四种协作模式对应四类真实开发场景，从个人日常开�
 
 该流程展示了跨节点资源协作、多用户共享、实时通信和协作决策的完整闭环。
 
-**运行截图**：
-
-![编排](images/编排.png)
-![多Agent](images/多Agent界面.png)
-
 ### 5.5 专项能力：安全扫描、自举开发与知识沉淀
 
 第三章 3.2.4 与 3.5 节已从机制层面论述对抗式 Agent 与工具自扩展，本节从**应用场景**角度展示这些能力的实际成果与使用方式。
@@ -1810,8 +2140,6 @@ Jarvis 的四种协作模式对应四类真实开发场景，从个人日常开�
 4. **回归验证**：所有发现的漏洞被抽象为测试用例（positive 样本验证漏报、negative 样本验证误报），通过 pytest 自动执行，确保修复不引入回归
 
 **实际成果**（jsec 案例）：
-
-![安全扫描套件](images/安全扫描套件.png)
 
 - 约 2 天内完成 13 次提交迭代（2026 年 6 月 26 日-28 日）
 - C/C++ 检查器增长至 **62 条检测规则**（内存安全 15、整数/缓冲区 9、并发安全 12、输入/注入 10、API/编码实践 17），Rust 检查器 **34 条规则**
@@ -1876,22 +2204,20 @@ A2 -> 开发者B: 按方法论指导执行
 
 ### 5.6 真实落地验证
 
-**场景一：中兴通讯研发流程基座**
+**场景一：中兴通讯内部落地**
 
-Jarvis 已在中兴通讯研发流程中实际使用，并作为公司内部多个系统的基座：
+Jarvis 已在中兴通讯内部落地，主要有两种使用方式：
 
-- **自主评审系统**：将 Jarvis 作为执行智能体，驱动代码评审流程的自动化
-- **特定代码修改 Agent**：将 Jarvis 的 CodeAgent 作为 SDK 使用，嵌入到特定的代码修改工具中
-- **研发全流程覆盖**：Jarvis 在研发内部被大量用于需求分析、需求开发、故障定位、性能优化、环境部署等场景
-- **跨团队协作开发**：多个研发团队通过 Jarvis 的多节点多网关架构进行跨团队协作开发，Agent 在不同团队、不同节点间协同工作
+- **作为 SDK 嵌入内部工具**：部分内部工具将 Jarvis 的 CodeAgent 作为 SDK 嵌入（如自主评审系统、特定代码修改工具），利用其代码理解与生成能力驱动特定业务流程
+- **少批用户日常协作**：部分研发人员通过 Jarvis 进行日常开发协作，利用其代码分析、修改与生成能力提升开发效率
 
-这验证了 Jarvis 在真实企业环境中的可用性与稳定性——经受了企业级研发流程的考验，且具备「作为 SDK 被集成」的开放能力。
+这验证了 Jarvis 具备「作为 SDK 被集成」的开放能力，以及在实际企业环境中被使用的可用性。
 
 > 注：中兴通讯内部的具体使用规模、效率数据与协作细节属企业研发机密，不便在公开文档中披露。
 
 **场景二：第三届开放原子大赛总冠军**
 
-Jarvis 参加了**第三届开放原子大赛「智锻代码·开源鸿蒙全球 AI Agent 代码生成挑战赛」**（主办：开放原子开源基金会，承办：CSDN，协办：Rust 基金会等），在 **99 支报名团队**中脱颖而出，**获得一等奖（总冠军）**。
+Jarvis 参加了**第三届开放原子大赛「智锻代码·开源鸿蒙全球 AI Agent 代码生成挑战赛」**（主办：开放原子开源基金会，承办：CSDN，协办：Rust 基金会等），在 **99 支报名团队**中脱颖而出，**获得一等奖（总冠军）**。参赛时 Jarvis 尚处于早期 CLI 形态（多节点、多网关、前端界面等尚未开发），大赛主要检验的是其**单兵能力**——代码安全分析与代码生成 Agent 的深度与准确性。
 
 - **赛题**：基础软件的智能安全演进——开发智能化的 AI Agent 系统，自主分析、改进和演进开源鸿蒙基础软件（C/C++/Rust）的安全性，推动生态向内存安全方向演进
 - **两大技术方向**：
@@ -1903,6 +2229,20 @@ Jarvis 参加了**第三届开放原子大赛「智锻代码·开源鸿蒙全球
 - **技术沉淀**：参赛所用的 jsec 与 jc2r 正是当前 Jarvis 系统中的安全分析与 C2Rust 框架，经过一年时间，这两个框架已演化的更强
 
 这一成绩验证了 Jarvis 在代码安全分析与代码生成 Agent 能力上的技术领先性，也证明了其在真实竞赛环境中的竞争力。
+
+**运行截图**：
+
+下图展示了 Agent 修改文件后自动进行**影响分析**的过程——Agent 基于符号数据库精确识别修改所涉及的影响范围，并给出风险等级评估，帮助开发者理解每次代码变更的潜在影响。
+
+![变更影响](images/变更影响.png)
+
+下图展示了利用**编排文件自动批量生成 Agent** 的过程——通过 YAML 声明式编排文件，一键批量创建多个 Agent，截图中红框框起的是创建 Agent 的结果表格，清晰呈现每个 Agent 的创建状态与配置信息。
+
+![编排](images/编排.png)
+
+下图展示了 Jarvis 前端的**多分区界面**——可以同时查看多个 Agent 的运行状态与输出，每个 panel 中还集成了终端、聊天室、编辑器等开发工具（编辑器在图中未直接体现），实现一站式多 Agent 监控与交互。图中可见三个 Agent 分别创建在不同的节点上，体现了跨节点分布式部署的能力。
+
+![多Agent](images/多Agent界面.png)
 
 ---
 
@@ -1982,7 +2322,7 @@ Jarvis 的许可证合规实践：
 
 **真实场景验证**：
 
-- 项目已在中兴通讯研发流程中作为基座落地
+- 项目已在中兴通讯内部落地（工具集成 + 用户协作）
 - 获第三届开放原子大赛总冠军
 - 真实场景验证先于社区热度，体现了「先落地、后推广」的务实路线
 
@@ -1990,14 +2330,14 @@ Jarvis 的许可证合规实践：
 
 - Star 133、Fork 29、贡献者 2（核心团队）
 - Issue 41（已关闭 2）、PR 6
-- 社区规模尚在早期，但项目以「先落地、后推广」为路线——真实场景验证（中兴通讯、开放原子大赛）先于社区热度，符合「开源向实」的赛事主题
+- 社区规模尚在早期，但项目以「先落地、后推广」为路线——真实场景验证（中兴通讯内部落地、开放原子大赛）先于社区热度，符合「开源向实」的赛事主题
 
 **运营规划**：
 
 - **双平台运营**：Gitee（主仓库）+ GitHub（镜像），同步发布 Release
 - **内容运营**：定期发布技术博客、使用教程、最佳实践案例
 - **社区活动**：参与开源大赛、技术沙龙、开发者大会，扩大影响力
-- **企业对接**：以中兴通讯落地案例为样板，拓展更多企业用户
+- **企业对接**：以中兴通讯内部落地为参考，拓展更多企业用户
 
 **贡献机制**（详见 6.3 节）：
 
@@ -2056,7 +2396,7 @@ Jarvis 采用**内核 + 插件包**的治理路径：
 
 ### 7.3 社区支撑
 
-- **企业落地**：中兴通讯等企业的实际使用验证
+- **企业落地**：中兴通讯内部工具集成与用户协作
 - **大赛验证**：开放原子大赛一等奖（总冠军）
 - **开源社区**：Gitee 与 GitHub 双平台托管，持续迭代
 - **文档完善**：完善的文档体系，降低上手门槛
@@ -2128,9 +2468,9 @@ Jarvis 的**核心价值**，是**人 × Agent 多维度协作**：
 - **符号数据库与影响分析**：让 Agent 在协作中「看得懂代码」，为协作提供精确的代码理解基础
 - **Agent 自举与工具自扩展**：让协作网络具备自我进化能力，超 1 万次 Agent 自主提交是实证
 - **分层记忆与方法论沉淀**：让协作产生的经验可积累、可复用，而非随会话消失
-- **真实场景验证**：中兴通讯研发流程基座、开放原子大赛总冠军，证明协作能力经受了企业级与竞赛级考验
+- **真实场景验证**：中兴通讯内部落地（工具集成 + 用户协作）、开放原子大赛总冠军（单兵能力竞赛验证）
 
-Jarvis 的独特之处在于：**它用自己开发自己**——超 1 万次 Agent 自主提交是「开源向实」最有力的注脚。
+Jarvis 的独特之处在于：**它不是「更强的单兵」，而是「协作的平台」**——让开发者与 Agent 在多维度上真正协同工作，这是其区别于一切主流 AI 开发工具的根本所在。
 
 ---
 
