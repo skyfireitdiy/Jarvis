@@ -1,0 +1,8 @@
+{
+  "id": "20260906_045247_968279",
+  "type": "project_long_term",
+  "tags": ["HTTPS", "WSS", "Nginx", "反向代理", "SSL", "调研结论"],
+  "content": "Jarvis 项目 HTTPS/WSS 经 Nginx 反向代理调研结论：1. 前端（Vite+Vue3）App.vue 已完整支持协议自动检测（getHttpProtocol/getWebSocketProtocol 基于 window.location.protocol），gatewayUrl 默认 127.0.0.1:8000 存于 localStorage，用户可配置为 https://domain 格式，parseGatewayAddress 支持完整 URL 解析（wss/https 默认端口 443）。2. 后端网关（FastAPI/uvicorn）run() 无 SSL 参数，但 WebSocket 路由（/ws、/api/node/master/ws、/ws/node、/api/agent/{agent_id}/ws、/api/node/{node_id}/agent/{agent_id}/ws）无 origin 校验，CORS 全开（allow_origins=[*]），Nginx 代理无阻碍。3. 子节点连接 node_manager.py:1487-1490 支持 https→wss、http→ws 自动转换，master_url 配置为 https:// 开头即可。app.py:1619-1621 将 wss:// 转 https:// 存入 jglobals.master_url。4. 前端静态服务经 npm run preview（Vite）启动，无 SSL 配置，需 Nginx 代理。5. 结论：经 Nginx 反向代理 + SSL 无代码阻碍，前端自动适配 https/wss，后端无 origin 校验，CORS 全开。唯一注意：前端 gatewayUrl 需配置为 Nginx 域名（https://domain），子节点 master_url 需配置为 https:// 开头。",
+  "created_at": "2026-09-06T04:52:47.968324",
+  "updated_at": "2026-09-06T04:52:47.968331"
+}
