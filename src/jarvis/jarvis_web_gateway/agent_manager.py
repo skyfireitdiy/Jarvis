@@ -52,6 +52,10 @@ class AgentInfo:
         proxy_node: Optional[str] = None,
         owner_id: Optional[str] = None,
         access_acl: Optional[Dict[str, List[str]]] = None,
+        tool_group: str = "default",
+        config_file: Optional[str] = None,
+        task: Optional[str] = None,
+        additional_args: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.agent_id = agent_id
         self.agent_type = agent_type
@@ -70,6 +74,10 @@ class AgentInfo:
         self.node_id = node_id
         self.owner_id = owner_id
         self.access_acl = access_acl or {}
+        self.tool_group = tool_group
+        self.config_file = config_file
+        self.task = task
+        self.additional_args = additional_args
         self.created_at = datetime.now().isoformat()
         self._monitor_task: Optional[asyncio.Task] = None
 
@@ -92,6 +100,10 @@ class AgentInfo:
             "node_id": self.node_id,
             "owner_id": self.owner_id,
             "access_acl": self.access_acl,
+            "tool_group": self.tool_group,
+            "config_file": self.config_file,
+            "task": self.task,
+            "additional_args": self.additional_args,
             "created_at": self.created_at,
         }
 
@@ -263,6 +275,10 @@ class AgentManager:
             proxy_node=proxy_node,
             owner_id=owner_id,
             access_acl=access_acl,
+            tool_group=tool_group,
+            config_file=config_file,
+            task=task,
+            additional_args=additional_args,
         )
 
         # 保存到内存
@@ -882,6 +898,10 @@ class AgentManager:
                         proxy_node=agent_data.get("proxy_node"),
                         owner_id=agent_data.get("owner_id"),
                         access_acl=agent_data.get("access_acl", {}),
+                        tool_group=agent_data.get("tool_group", "default"),
+                        config_file=agent_data.get("config_file"),
+                        task=agent_data.get("task"),
+                        additional_args=agent_data.get("additional_args"),
                     )
 
                     # 检查进程是否还在运行
