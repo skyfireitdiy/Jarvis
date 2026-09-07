@@ -26,6 +26,7 @@ from fastapi import WebSocket
 from websockets.asyncio.connection import State
 
 from .agent_manager import AgentManager
+from .ws_codec import send_json_compressed, receive_json_compressed
 from .node_protocol import (
     AGENT_CREATE_REQUEST,
     AGENT_CREATE_RESPONSE,
@@ -109,22 +110,26 @@ class NodeConnectionManager:
         await websocket.accept()
         connection_id = str(uuid.uuid4())
         try:
-            message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+            message = await asyncio.wait_for(
+                receive_json_compressed(websocket), timeout=10
+            )
         except Exception:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 build_error_message(
                     "NODE_AUTH_REQUIRED",
                     "first message must be node_auth",
-                )
+                ),
             )
             await websocket.close(code=4401)
             return
 
         if not isinstance(message, dict) or message.get("type") != NODE_AUTH:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 build_error_message(
                     "INVALID_NODE_MESSAGE", "first message must be node_auth"
-                )
+                ),
             )
             await websocket.close(code=4401)
             return
@@ -133,28 +138,31 @@ class NodeConnectionManager:
         node_id = str(payload.get("node_id") or "").strip()
         secret = str(payload.get("secret") or "").strip()
         if not node_id or not secret:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 build_error_message(
                     "NODE_AUTH_FAILED", "node_id and secret are required"
-                )
+                ),
             )
             await websocket.close(code=4401)
             return
 
         expected_secret = (self._node_runtime.config.node_secret or "").strip()
         if not expected_secret or secret != expected_secret:
-            await websocket.send_json(
-                build_error_message("NODE_AUTH_FAILED", "invalid node credentials")
+            await send_json_compressed(
+                websocket,
+                build_error_message("NODE_AUTH_FAILED", "invalid node credentials"),
             )
             await websocket.close(code=4401)
             return
 
         # 检查是否已存在同名节点
         if node_id in self._connections:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 build_error_message(
                     "NODE_ALREADY_CONNECTED", f"node {node_id} is already connected"
-                )
+                ),
             )
             await websocket.close(code=4403)
             return
@@ -170,7 +178,8 @@ class NodeConnectionManager:
                 metadata={},
             )
         )
-        await websocket.send_json(
+        await send_json_compressed(
+            websocket,
             build_node_message(
                 "node_auth_result",
                 {
@@ -180,12 +189,12 @@ class NodeConnectionManager:
                     "heartbeat_interval": 10,
                 },
                 request_id=message.get("request_id"),
-            )
+            ),
         )
 
         try:
             while True:
-                next_message = await websocket.receive_json()
+                next_message = await receive_json_compressed(websocket)
                 if not isinstance(next_message, dict):
                     continue
                 message_type = next_message.get("type")
@@ -222,50 +231,50 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_CREATE_REQUEST:
                     response = self._handle_agent_create_request(next_message, node_id)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
                     response = await self._handle_agent_http_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == NODE_HTTP_PROXY_REQUEST:
                     response = await self._handle_node_http_proxy_request(
                         websocket, next_message
                     )
                     if response is not None:
-                        await websocket.send_json(response)
+                        await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_LIST_REQUEST:
                     response = self._handle_agent_list_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_STOP_REQUEST:
                     response = self._handle_agent_stop_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_DELETE_REQUEST:
                     response = self._handle_agent_delete_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = await self._handle_agent_ws_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_WS_OPEN_REQUEST:
                     response = await self._handle_agent_ws_open_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_WS_SEND_REQUEST:
                     response = await self._handle_agent_ws_send_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_WS_RECV_REQUEST:
                     response = await self._handle_agent_ws_recv_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == AGENT_WS_CLOSE_REQUEST:
                     response = await self._handle_agent_ws_close_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
                     logger.info(
@@ -274,7 +283,7 @@ class NodeConnectionManager:
                         request_id,
                     )
                     response = self._handle_directory_list_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     logger.info(
                         "[NODE] sent directory list response node_id=%s request_id=%s",
                         node_id,
@@ -288,7 +297,7 @@ class NodeConnectionManager:
                         request_id,
                     )
                     response = await self._handle_config_sync_request(next_message)
-                    await websocket.send_json(response)
+                    await send_json_compressed(websocket, response)
                     logger.info(
                         "[NODE] sent config sync response node_id=%s request_id=%s",
                         node_id,
@@ -332,8 +341,9 @@ class NodeConnectionManager:
                 message_type,
                 request_id,
             )
-            await websocket.send_json(
-                build_node_message(message_type, payload, request_id=request_id)
+            await send_json_compressed(
+                websocket,
+                build_node_message(message_type, payload, request_id=request_id),
             )
             try:
                 response = await asyncio.wait_for(future, timeout=timeout)
@@ -383,8 +393,9 @@ class NodeConnectionManager:
         queue: asyncio.Queue = asyncio.Queue()
         self._streaming_queues[request_id] = queue
         try:
-            await websocket.send_json(
-                build_node_message(message_type, payload, request_id=request_id)
+            await send_json_compressed(
+                websocket,
+                build_node_message(message_type, payload, request_id=request_id),
             )
 
             # 等待并逐个 yield 响应消息

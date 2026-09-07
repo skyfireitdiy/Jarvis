@@ -58,6 +58,10 @@ from jarvis.jarvis_web_gateway.token_manager import (
     validate_gateway_token,
     extract_token_from_authorization_header,
 )
+from jarvis.jarvis_web_gateway.ws_codec import (
+    send_json_compressed,
+    receive_json_compressed,
+)
 from jarvis.jarvis_web_gateway.user_manager import UserManager
 from jarvis.jarvis_web_gateway.permission_manager import PermissionManager
 from jarvis.jarvis_web_gateway.jwt_utils import (
@@ -690,8 +694,8 @@ class WebSocketConnectionManager:
             connections = self._active_connections.setdefault(session_id, {})
             connections[connection_id] = (connection_id, websocket)
         self._input_registry.register_provider(session_id)
-        await websocket.send_json(
-            {"type": "ready", "payload": {"session_id": session_id}}
+        await send_json_compressed(
+            websocket, {"type": "ready", "payload": {"session_id": session_id}}
         )
         # 消息历史通过前端发送 sync_request 按需增量同步，不在连接建立时主动推送
         # 恢复待处理的输入请求
@@ -699,7 +703,7 @@ class WebSocketConnectionManager:
         if pending_request:
             session = self._input_registry.get_or_create(session_id)
             session.reconnect()
-            await websocket.send_json(pending_request)
+            await send_json_compressed(websocket, pending_request)
         # 恢复待处理的确认请求
         pending_confirm = self._input_registry.get_confirm_request(session_id)
         if pending_confirm:
@@ -707,10 +711,10 @@ class WebSocketConnectionManager:
                 session_id
             )
             confirm_session.reconnect()
-            await websocket.send_json(pending_confirm)
+            await send_json_compressed(websocket, pending_confirm)
         try:
             while True:
-                message = await websocket.receive_json()
+                message = await receive_json_compressed(websocket)
                 await self._handle_message(session_id, message, websocket)
         except WebSocketDisconnect:
             print(
@@ -809,11 +813,12 @@ class WebSocketConnectionManager:
             f"[SYNC_REQUEST] sending sync_response with "
             f"{len(matched_messages)} messages"
         )
-        await websocket.send_json(
+        await send_json_compressed(
+            websocket,
             {
                 "type": "sync_response",
                 "payload": {"messages": matched_messages},
-            }
+            },
         )
         print("[SYNC_REQUEST] sync_response sent successfully")
 
@@ -1294,17 +1299,18 @@ class WebSocketConnectionManager:
             elif message_type == "chat_get_private_history":
                 await self._handle_chat_get_private_history(payload, websocket)
             else:
-                await websocket.send_json(
+                await send_json_compressed(
+                    websocket,
                     {
                         "type": "chat_error",
                         "payload": {"error": f"未知消息类型: {message_type}"},
-                    }
+                    },
                 )
         except Exception as e:
             logger.error(f"[CHAT] Error handling {message_type}: {e}", exc_info=True)
             try:
-                await websocket.send_json(
-                    {"type": "chat_error", "payload": {"error": str(e)}}
+                await send_json_compressed(
+                    websocket, {"type": "chat_error", "payload": {"error": str(e)}}
                 )
             except Exception:
                 pass
@@ -1316,11 +1322,12 @@ class WebSocketConnectionManager:
         client_id = payload.get("client_id", "")
         name = payload.get("name", "匿名用户")
         if not client_id:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 {
                     "type": "chat_register_response",
                     "payload": {"success": False, "error": "client_id 不能为空"},
-                }
+                },
             )
             return
         connection_id = str(uuid.uuid4())
@@ -1345,16 +1352,19 @@ class WebSocketConnectionManager:
             user_id=user_id,
             display_name=display_name,
         )
-        await websocket.send_json({"type": "chat_register_response", "payload": result})
+        await send_json_compressed(
+            websocket, {"type": "chat_register_response", "payload": result}
+        )
 
     async def _handle_chat_get_rooms(self, websocket: WebSocket) -> None:
         """获取聊天室列表。"""
         rooms = self._chat_manager.get_rooms()
-        await websocket.send_json(
+        await send_json_compressed(
+            websocket,
             {
                 "type": "chat_get_rooms_response",
                 "payload": {"success": True, "rooms": rooms},
-            }
+            },
         )
 
     async def _handle_chat_create_room(
@@ -1364,19 +1374,20 @@ class WebSocketConnectionManager:
         name = payload.get("name", "")
         creator_id = payload.get("client_id", "")
         if not name:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 {
                     "type": "chat_create_room_response",
                     "payload": {"success": False, "error": "聊天室名称不能为空"},
-                }
+                },
             )
             return
         # 从client_id查user_id
         client_info = self._chat_manager.get_client(creator_id)
         user_id = client_info.get("user_id") if client_info else None
         result = await self._chat_manager.create_room(name, creator_id, user_id=user_id)
-        await websocket.send_json(
-            {"type": "chat_create_room_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_create_room_response", "payload": result}
         )
         # 广播新房间通知给所有其他在线用户
         if result.get("success"):
@@ -1400,8 +1411,8 @@ class WebSocketConnectionManager:
         room_id = payload.get("room_id", "")
         client_id = payload.get("client_id", "")
         result = await self._chat_manager.join_room(room_id, client_id)
-        await websocket.send_json(
-            {"type": "chat_join_room_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_join_room_response", "payload": result}
         )
 
     async def _handle_chat_leave_room(
@@ -1411,8 +1422,8 @@ class WebSocketConnectionManager:
         room_id = payload.get("room_id", "")
         client_id = payload.get("client_id", "")
         result = await self._chat_manager.leave_room(room_id, client_id)
-        await websocket.send_json(
-            {"type": "chat_leave_room_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_leave_room_response", "payload": result}
         )
 
     async def _handle_chat_delete_room(
@@ -1432,16 +1443,17 @@ class WebSocketConnectionManager:
                 client = self._chat_manager.get_client(mid)
                 if client and client.get("websocket"):
                     try:
-                        await client["websocket"].send_json(
+                        await send_json_compressed(
+                            client["websocket"],
                             {
                                 "type": "chat_room_deleted",
                                 "payload": {"room_id": room_id, "name": room_name},
-                            }
+                            },
                         )
                     except Exception:
                         pass
-        await websocket.send_json(
-            {"type": "chat_delete_room_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_delete_room_response", "payload": result}
         )
 
     async def _handle_chat_rename_room(
@@ -1460,7 +1472,8 @@ class WebSocketConnectionManager:
                     client = self._chat_manager.get_client(mid)
                     if client and client.get("websocket"):
                         try:
-                            await client["websocket"].send_json(
+                            await send_json_compressed(
+                                client["websocket"],
                                 {
                                     "type": "chat_room_renamed",
                                     "payload": {
@@ -1468,12 +1481,12 @@ class WebSocketConnectionManager:
                                         "old_name": result.get("old_name", ""),
                                         "new_name": result.get("new_name", ""),
                                     },
-                                }
+                                },
                             )
                         except Exception:
                             pass
-        await websocket.send_json(
-            {"type": "chat_rename_room_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_rename_room_response", "payload": result}
         )
 
     async def _handle_chat_send_message(
@@ -1486,11 +1499,12 @@ class WebSocketConnectionManager:
         image_url = payload.get("image_url", "")
         client = self._chat_manager.get_client(client_id)
         if not client:
-            await websocket.send_json(
+            await send_json_compressed(
+                websocket,
                 {
                     "type": "chat_send_message_response",
                     "payload": {"success": False, "error": "客户端未注册"},
-                }
+                },
             )
             return
         msg = {
@@ -1509,18 +1523,20 @@ class WebSocketConnectionManager:
         await self._chat_manager.broadcast_to_room(
             room_id, msg, exclude_client_id=client_id
         )
-        await websocket.send_json(
-            {"type": "chat_send_message_response", "payload": {"success": True}}
+        await send_json_compressed(
+            websocket,
+            {"type": "chat_send_message_response", "payload": {"success": True}},
         )
 
     async def _handle_chat_get_clients(self, websocket: WebSocket) -> None:
         """获取在线客户端列表。"""
         clients = self._chat_manager.get_clients()
-        await websocket.send_json(
+        await send_json_compressed(
+            websocket,
             {
                 "type": "chat_get_clients_response",
                 "payload": {"success": True, "clients": clients},
-            }
+            },
         )
 
     async def _handle_chat_get_room_members(
@@ -1529,11 +1545,12 @@ class WebSocketConnectionManager:
         """获取聊天室成员列表。"""
         room_id = payload.get("room_id", "")
         members = self._chat_manager.get_room_members(room_id)
-        await websocket.send_json(
+        await send_json_compressed(
+            websocket,
             {
                 "type": "chat_get_room_members_response",
                 "payload": {"success": True, "room_id": room_id, "members": members},
-            }
+            },
         )
 
     async def _handle_chat_send_private(
@@ -1547,8 +1564,8 @@ class WebSocketConnectionManager:
         result = await self._chat_manager.send_private(
             sender_id, receiver_id, content, image_url=image_url
         )
-        await websocket.send_json(
-            {"type": "chat_send_private_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_send_private_response", "payload": result}
         )
 
     async def _handle_chat_get_private_history(
@@ -1558,8 +1575,8 @@ class WebSocketConnectionManager:
         client_id = payload.get("client_id", "")
         other_id = payload.get("other_id", "")
         result = self._chat_manager.get_private_history(client_id, other_id)
-        await websocket.send_json(
-            {"type": "chat_get_private_history_response", "payload": result}
+        await send_json_compressed(
+            websocket, {"type": "chat_get_private_history_response", "payload": result}
         )
 
 
@@ -2902,14 +2919,15 @@ def create_app(
                                             access_acl.get("interact") or []
                                         )
                                         if not has_interact:
-                                            await websocket.send_json(
+                                            await send_json_compressed(
+                                                websocket,
                                                 {
                                                     "type": "error",
                                                     "payload": {
                                                         "code": "FORBIDDEN",
                                                         "message": "No interact access to this agent",
                                                     },
-                                                }
+                                                },
                                             )
                                             continue
                             except (json.JSONDecodeError, AttributeError):
@@ -3019,14 +3037,15 @@ def create_app(
                             access_acl = agent_info.access_acl or {}
                             has_interact = user_id in (access_acl.get("interact") or [])
                             if not has_interact:
-                                await websocket.send_json(
+                                await send_json_compressed(
+                                    websocket,
                                     {
                                         "type": "error",
                                         "payload": {
                                             "code": "FORBIDDEN",
                                             "message": "No interact access to this agent",
                                         },
-                                    }
+                                    },
                                 )
                                 return await _checked_receive_text()
                 except (json.JSONDecodeError, AttributeError):
@@ -7287,7 +7306,7 @@ def _build_sender(websocket: WebSocket, loop: asyncio.AbstractEventLoop):
     def _sender(message: Dict[str, Any]) -> None:
         async def _send():
             try:
-                await websocket.send_json(message)
+                await send_json_compressed(websocket, message)
             except Exception as e:
                 save_exception(e, module="jarvis_web_gateway.app", function="_sender")
                 pass
@@ -7385,4 +7404,4 @@ async def _handle_file_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
     error_msg = {"type": "error", "payload": {"code": code, "message": message}}
-    await websocket.send_json(error_msg)
+    await send_json_compressed(websocket, error_msg)
