@@ -8248,10 +8248,14 @@ function handleMessage(message, agentId = null) {
         streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
         streamingMessage.html = renderMessageHtml(streamingMessage)
-        // 仅当前 Agent 的流式消息触发滚动（且自动滚动开启时）
+        // 流式消息触发滚动（自动滚动开启时），优先使用对应 Panel 的滚动容器
+        const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
         nextTick(() => {
-          if (isCurrentAgent(targetAgentId) && outputList.value && isAutoScrollEnabled(targetAgentId)) {
-            outputList.value.scrollTop = outputList.value.scrollHeight
+          if (!isAutoScrollEnabled(targetAgentId)) return
+          const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
+          const scrollEl = targetOutputList || outputList.value
+          if (scrollEl) {
+            scrollEl.scrollTop = scrollEl.scrollHeight
           }
         })
       } else {
