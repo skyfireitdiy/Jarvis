@@ -196,16 +196,19 @@ class SubAgentTool:
                 else True,
                 rule_names=rule_names,
             )
+            # 标记当前 agent 为 sub_agent，禁止其创建 sub 类型任务或嵌套 sub_agent
+            agent.set_user_data("__is_sub_agent__", True)
 
             # 设置继承的对话历史到子 Agent（在 Agent 创建后）
             if parent_messages and hasattr(agent, "model"):
                 try:
                     # 在第一个用户消息前插入角色切换说明
                     role_switch_note = """【角色切换说明】
-你现在是子Agent，已继承父Agent的完整对话历史。
-你了解之前的分析过程和发现的问题。
+你现在是子Agent（sub_agent），已集成父Agent的完整对话历史与上下文。
+你了解之前的分析过程和发现的问题，可直接基于此上下文执行任务。
 
 重要说明：
+- 你当前已是子Agent，禁止再创建 sub 类型任务或嵌套子Agent
 - 任务列表已清空，你不继承父Agent的任务列表
 - 专注于完成以下子任务，无需重复已完成的步骤
 """
