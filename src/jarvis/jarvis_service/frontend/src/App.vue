@@ -29,6 +29,7 @@
       @renameAgent="renameAgent"
       @copyAgent="copyAgent"
       @deleteAgent="deleteAgent"
+      @regenerateAgent="regenerateAgent"
       @toggleSelectAll="toggleSelectAll"
       @batchCopy="batchCopyAgents"
       @batchDelete="batchDeleteAgents"
@@ -7377,6 +7378,109 @@ async function deleteAgent(agentId) {
       } catch (error) {
         console.error('[AGENT] Delete failed:', error)
         alert(`删除失败: ${error.message}`)
+      }
+    }
+  )
+}
+
+// 无损重生 Agent - 保存会话 → 删除 → 重建 → 恢复会话
+async function regenerateAgent(agent) {
+  if (!agent || !agent.agent_id) return
+  // 隐藏 agent 侧边栏，避免遮挡确认对话框（仅移动端）
+  if (windowWidth.value <= 768) showAgentSidebar.value = false
+  showConfirm(
+    `确认无损重生 Agent「${agent.name || agent.agent_id}」？\n\n将保存当前会话后删除并重建，配置（模型组/工具组/任务等）将保留。`,
+    async () => {
+      try {
+        const { host, port } = getGatewayAddress()
+        const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+
+        // 第一步：保存会话
+        let sessionFile = null
+        try {
+          const saveResp = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/sessions/save`), {
+            method: 'POST'
+          })
+          const saveResult = await saveResp.json()
+          if (saveResp.ok && saveResult.success) {
+            sessionFile = saveResult.session_file || saveResult.data?.session_file || null
+            console.log('[REGENERATE] Session saved:', sessionFile)
+          } else {
+            console.warn('[REGENERATE] Session save failed:', saveResult)
+          }
+        } catch (saveError) {
+          console.warn('[REGENERATE] Session save error:', saveError.message)
+        }
+
+        // 第二步：删除旧 Agent
+        const delResp = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${agent.agent_id}`), {
+          method: 'DELETE'
+        })
+        const delResult = await delResp.json()
+        if (!delResp.ok || !delResult.success) {
+          alert(`重生失败（删除阶段）：${delResult.error?.message || '未知错误'}`)
+          return
+        }
+
+        // 清除本地状态
+        historyStorage.clearHistoryForAgent(agent.agent_id)
+        fileTreeState.value.delete(agent.agent_id)
+        fileTreeExpanded.value.delete(agent.agent_id)
+        fileTreeLoading.value.delete(agent.agent_id)
+        for (const panel of [...panels.value]) {
+          if (panel.agentId === agent.agent_id) {
+            closePanel(panel.id)
+          }
+        }
+        if (currentAgentId.value === agent.agent_id) {
+          currentAgentId.value = null
+          outputs.value = []
+          historyOffset.value = 0
+          hasMoreHistory.value = true
+        }
+
+        // 第三步：用原配置重建（含恢复会话）
+        const payload = {
+          agent_type: agent.agent_type,
+          working_dir: agent.working_dir,
+          name: agent.name || undefined,
+          llm_group: agent.llm_group || 'default',
+          tool_group: agent.tool_group || 'default',
+          config_file: agent.config_file || undefined,
+          worktree: agent.agent_type === 'code_agent' ? Boolean(agent.worktree) : false,
+          quick_mode: Boolean(agent.quick_mode),
+          restore_session: sessionFile || Boolean(agent.restore_session),
+          no_interaction_mode: Boolean(agent.no_interaction_mode),
+          task: agent.task || undefined,
+          node_id: targetNodeId,
+          proxy_node: agent.proxy_node || undefined,
+          access_acl: agent.access_acl || undefined,
+        }
+        const createResp = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        })
+        const createResult = await createResp.json()
+        if (!createResp.ok || !createResult.success) {
+          alert(`重生失败（重建阶段）：${createResult.error?.message || createResult.detail || '未知错误'}`)
+          return
+        }
+
+        console.log('[REGENERATE] Agent regenerated:', createResult.data?.agent_id)
+        showToast('Agent 无损重生成功', 'success')
+        // 刷新列表
+        await fetchAgentList()
+        // 打开新 Agent
+        if (createResult.data) {
+          const newAgent = {
+            ...createResult.data,
+            node_id: String(createResult.data?.node_id || '').trim() || 'master',
+          }
+          await openAgentInPanel(newAgent)
+        }
+      } catch (error) {
+        console.error('[REGENERATE] Failed:', error)
+        alert(`重生失败: ${error.message}`)
       }
     }
   )

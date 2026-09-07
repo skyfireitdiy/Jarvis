@@ -55,6 +55,7 @@
                 <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
                 <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
                 <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
+                <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('regenerateAgent', agent)" title="无损重生">🔄</button>
                 <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
               </div>
             </div>
@@ -88,6 +89,7 @@
               <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
               <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
               <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
+              <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('regenerateAgent', agent)" title="无损重生">🔄</button>
               <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
             </div>
           </div>
@@ -310,6 +312,7 @@ const emit = defineEmits([
   'createGroupWithAgents',
   'startResize',
   'editAccess',
+  'regenerateAgent',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
