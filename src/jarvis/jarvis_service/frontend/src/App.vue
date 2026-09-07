@@ -917,6 +917,7 @@
       :accessAclInteract="newAgentAccessAclInteract"
       :userOptions="availableUserOptions.filter(u => !u.is_admin && u.user_id !== auth.userInfo?.user_id)"
       :recentWorkDirs="recentWorkDirs"
+      :currentNodeId="newAgentNodeId"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"
@@ -2154,11 +2155,17 @@ const recentWorkDirs = ref([])             // 最近使用的工作目录列表�
 const renameInput = ref(null)               // 重命名输入框引用
 
 // 最近使用的工作目录管理（localStorage持久化存储）
+// 元素格式：{ path: string, nodeId: string }，按节点区分
 function loadRecentWorkDirs() {
   try {
     const stored = localStorage.getItem('jarvis_recent_work_dirs')
     if (stored) {
-      recentWorkDirs.value = JSON.parse(stored)
+      const parsed = JSON.parse(stored)
+      // 兼容旧数据：旧格式为纯字符串数组，类型不匹配则清空
+      const isValid = Array.isArray(parsed) && parsed.every(item =>
+        item && typeof item === 'object' && typeof item.path === 'string' && typeof item.nodeId === 'string'
+      )
+      recentWorkDirs.value = isValid ? parsed : []
     } else {
       recentWorkDirs.value = []
     }
@@ -2168,12 +2175,15 @@ function loadRecentWorkDirs() {
   }
 }
 
-function saveRecentWorkDir(path) {
+function saveRecentWorkDir(path, nodeId) {
   try {
-    // 去重：过滤掉已存在的路径
-    const filtered = recentWorkDirs.value.filter(p => p !== path)
+    const normalizedNodeId = String(nodeId || '').trim() || 'master'
+    // 去重：过滤掉已存在的同节点同路径
+    const filtered = recentWorkDirs.value.filter(item =>
+      !(item.path === path && item.nodeId === normalizedNodeId)
+    )
     // 新路径加到最前面
-    const updated = [path, ...filtered]
+    const updated = [{ path, nodeId: normalizedNodeId }, ...filtered]
     // 只保留最近20个
     recentWorkDirs.value = updated.slice(0, 20)
     // 保存到localStorage
@@ -6327,8 +6337,8 @@ async function goToParentDir() {
 async function confirmDirectory() {
   if (selectedDir.value) {
     newAgentDir.value = selectedDir.value
-    // 保存工作目录到历史记录
-    saveRecentWorkDir(selectedDir.value)
+    // 保存工作目录到历史记录（按节点区分）
+    saveRecentWorkDir(selectedDir.value, getCreateAgentDirectoryNodeId())
     showDirDialog.value = false
   }
 }

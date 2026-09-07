@@ -1,0 +1,8 @@
+{
+  "id": "20260907_015201_199402",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "最近工作目录", "节点区分", "已完成"],
+  "content": "Bug 3（最近使用工作目录未按节点区分）已修复完成。改动：1) App.vue saveRecentWorkDir(path, nodeId) 元素改 {path, nodeId}，去重键 path+nodeId，nodeId 空时归一 'master'；2) loadRecentWorkDirs 校验元素为对象且含 path/nodeId 字符串，否则清空 []；3) confirmDirectory 传 getCreateAgentDirectoryNodeId()；4) App.vue 模板传 :currentNodeId=\"newAgentNodeId\"；5) CreateAgentModal.vue 新增 currentNodeId prop + filteredRecentWorkDirs computed 过滤显示，点击设 dir.path。提交：c085370（App.vue 模板）、cfdd097（props）、5b591fe（模板过滤）、587c4f5（computed）、1489bc0（import computed）。",
+  "created_at": "2026-09-07T01:52:01.199440",
+  "updated_at": "2026-09-07T01:52:01.199446"
+}

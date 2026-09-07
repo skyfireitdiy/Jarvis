@@ -88,17 +88,17 @@
               <input :value="workDir" @input="$emit('update:workDir', $event.target.value)" type="text" class="form-control" placeholder="/path/to/workspace" />
               <button class="btn select-dir-btn" @click="$emit('selectDir')">选择目录</button>
             </div>
-            <!-- 历史工作目录 -->
-            <div v-if="recentWorkDirs && recentWorkDirs.length > 0" class="recent-dirs-section">
+            <!-- 历史工作目录（按节点过滤） -->
+            <div v-if="filteredRecentWorkDirs && filteredRecentWorkDirs.length > 0" class="recent-dirs-section">
               <div class="recent-dirs-title">最近使用的工作目录</div>
               <div class="recent-dirs-list">
-                <span 
-                  v-for="(dir, index) in recentWorkDirs" 
+                <span
+                  v-for="(dir, index) in filteredRecentWorkDirs"
                   :key="index"
                   class="recent-dir-tag"
-                  @click="$emit('update:workDir', dir)"
-                  :title="dir">
-                  {{ dir.split('/').filter(Boolean).pop() || dir }}
+                  @click="$emit('update:workDir', dir.path)"
+                  :title="dir.path">
+                  {{ dir.path.split('/').filter(Boolean).pop() || dir.path }}
                 </span>
               </div>
             </div>
@@ -168,6 +168,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   visible: Boolean,
   nodeOptions: { type: Array, default: () => [] },
@@ -189,7 +191,8 @@ const props = defineProps({
   accessAclRead: { type: Array, default: () => [] },
   accessAclInteract: { type: Array, default: () => [] },
   userOptions: { type: Array, default: () => [] },
-  recentWorkDirs: { type: Array, default: () => [] }
+  recentWorkDirs: { type: Array, default: () => [] },
+  currentNodeId: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -210,6 +213,12 @@ const emit = defineEmits([
   'create',
   'selectDir'
 ])
+
+// 按当前节点过滤最近使用的工作目录
+const filteredRecentWorkDirs = computed(() => {
+  if (!props.currentNodeId) return []
+  return (props.recentWorkDirs || []).filter(d => d && d.nodeId === props.currentNodeId)
+})
 
 function toggleAclRead(userId, event) {
   const current = [...props.accessAclRead]
