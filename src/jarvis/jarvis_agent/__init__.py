@@ -514,7 +514,6 @@ class Agent:
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = True,
         in_multi_agent: Optional[bool] = None,
-        agent_type: str = "agent",
         allow_savesession: bool = False,
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,

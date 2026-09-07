@@ -1303,6 +1303,20 @@ class task_list_manager:
         self, args: Dict[str, Any], task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
+        # 禁止 sub_agent 创建 sub 类型任务，避免嵌套子 Agent
+        if agent and agent.get_user_data("__is_sub_agent__"):
+            tasks_info = args.get("tasks_info")
+            if tasks_info and isinstance(tasks_info, list):
+                for task_info in tasks_info:
+                    if (
+                        isinstance(task_info, dict)
+                        and task_info.get("agent_type") == "sub"
+                    ):
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "拒绝创建 sub 类型任务：当前 Agent 已是子 Agent（sub_agent），不允许再创建 sub 类型任务或嵌套子 Agent。请使用 main 类型任务由当前 Agent 直接执行。",
+                        }
         task_list_id = self._get_task_list_id(agent)
         tasks_info = args.get("tasks_info")
 
@@ -1834,6 +1848,13 @@ class task_list_manager:
                 }
 
             elif task.agent_type.value == "sub":
+                # 禁止 sub_agent 执行 sub 类型任务，避免嵌套子 Agent
+                if parent_agent and parent_agent.get_user_data("__is_sub_agent__"):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "拒绝执行 sub 类型任务：当前 Agent 已是子 Agent（sub_agent），不允许再执行 sub 类型任务或嵌套子 Agent。请使用 main 类型任务由当前 Agent 直接执行。",
+                    }
                 # 子 Agent 执行：自动识别使用合适的子 Agent 工具
                 # 执行后需要验证任务是否真正完成，如果未完成则继续迭代执行
                 # 初始化变量，确保在 try-except 外部可以访问
