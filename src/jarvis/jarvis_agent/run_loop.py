@@ -1013,7 +1013,7 @@ class AgentRunLoop:
                 ag.session.prompt = ""
                 run_input_handlers = False
 
-                # 重复响应检测：连续5次相同响应时判定为重复
+                # 重复响应检测：连续3次相同响应时判定为重复
                 if current_response and current_response.strip():
                     filtered_for_detect = self._filter_tool_calls_from_response(
                         current_response
@@ -1031,20 +1031,72 @@ class AgentRunLoop:
                         if len(ag._last_responses) > 10:
                             ag._last_responses = ag._last_responses[-10:]
 
-                        # 连续5次相同响应，判定为重复
-                        if ag._repeat_count >= 5 and not ag._repeat_detected:
+                        # 连续3次相同响应，判定为重复，按升级级别递进处理
+                        if ag._repeat_count >= 3 and not ag._repeat_detected:
                             ag._repeat_detected = True
                             ag._repeat_count = 0
-                            # 不删除重复消息，而是在提示词末尾追加勿重复提示
-                            ag.session.prompt = join_prompts(
-                                [
-                                    ag.session.prompt,
-                                    "汝今重复矣，勿复前答，祈予新答。",
-                                ]
-                            )
-                            PrettyOutput.auto_print(
-                                f"⚠ 检测到LLM连续{5}次重复响应，已添加勿重复提示"
-                            )
+                            level = ag._repeat_escalation_level
+                            if level == 0:
+                                # 第1级：加提示词 + 截断最近重复轮次
+                                ag.session.prompt = join_prompts(
+                                    [
+                                        ag.session.prompt,
+                                        "汝今重复矣，勿复前答，祈予新答。",
+                                    ]
+                                )
+                                # 截断最近重复的assistant消息，切断模型自我反馈
+                                try:
+                                    history = ag.model.get_messages()
+                                    if history:
+                                        # 从末尾向前移除连续重复的assistant消息
+                                        new_history = list(history)
+                                        removed = 0
+                                        while new_history and removed < 3:
+                                            last_msg = new_history[-1]
+                                            if (
+                                                last_msg.get("role", "").lower()
+                                                == "assistant"
+                                            ):
+                                                new_history.pop()
+                                                removed += 1
+                                            else:
+                                                break
+                                        if removed > 0 and hasattr(
+                                            ag.model, "set_messages"
+                                        ):
+                                            ag.model.set_messages(new_history)
+                                except Exception:
+                                    pass
+                                PrettyOutput.auto_print(
+                                    f"⚠ 检测到LLM连续{3}次重复响应（第1级），已截断重复轮次并添加勿重复提示"
+                                )
+                            elif level == 1:
+                                # 第2级：滑窗压缩 + 更强指令
+                                try:
+                                    ag._sliding_window_compression()
+                                except Exception:
+                                    pass
+                                ag.session.prompt = join_prompts(
+                                    [
+                                        ag.session.prompt,
+                                        "汝已多次重复矣。吾已压缩上下文以助汝脱困。祈仔细审当前任务，给出全新之答，勿复前答。",
+                                    ]
+                                )
+                                PrettyOutput.auto_print(
+                                    f"⚠ 检测到LLM连续{3}次重复响应（第2级），已压缩上下文并加强指令"
+                                )
+                            else:
+                                # 第3级：终止循环，请求用户介入
+                                PrettyOutput.auto_print(
+                                    f"⚠ 检测到LLM连续{3}次重复响应（第3级），终止循环，请求用户介入"
+                                )
+                                ag.session.prompt = join_prompts(
+                                    [
+                                        ag.session.prompt,
+                                        "汝已多次重复，无法自行脱困。请停止当前输出，等待用户指示。",
+                                    ]
+                                )
+                            ag._repeat_escalation_level += 1
 
                 # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
                 if current_response and current_response.strip():

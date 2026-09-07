@@ -698,6 +698,7 @@ class Agent:
         self._last_responses: List[str] = []  # 记录最近LLM响应（用于重复检测）
         self._repeat_detected = False  # 是否已检测到重复响应
         self._repeat_count = 0  # 连续相同响应计数
+        self._repeat_escalation_level = 0  # 重复响应升级级别（0/1/2）
 
         # 后台预压缩相关属性
         self._pre_compressed_summary: Optional[str] = None  # 后台预压缩生成的摘要
@@ -3447,6 +3448,7 @@ class Agent:
                     ]
                 )
                 self._repeat_detected = False
+                self._repeat_escalation_level = 0
             # 使用显式动作信号，保留返回类型注释以保持兼容
             return LoopAction.CONTINUE
         else:
