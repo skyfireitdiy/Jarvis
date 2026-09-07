@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import WebSocket
 
+from jarvis.jarvis_web_gateway.ws_codec import send_json_compressed
+
 
 class ChatManager:
     """聊天室管理器。
@@ -243,7 +245,7 @@ class ChatManager:
                 continue
             if client and client["websocket"]:
                 try:
-                    await client["websocket"].send_json(message)
+                    await send_json_compressed(client["websocket"], message)
                 except Exception:
                     pass
 
@@ -446,7 +448,7 @@ class ChatManager:
             )
             if client and client.get("websocket"):
                 try:
-                    await client["websocket"].send_json(message)
+                    await send_json_compressed(client["websocket"], message)
                     print(
                         f"[CHAT BROADCAST] sent to uid={uid} client_id={client.get('client_id')}"
                     )
@@ -510,11 +512,12 @@ class ChatManager:
             if info.get("user_id") == receiver_user_id:
                 if info["websocket"]:
                     try:
-                        await info["websocket"].send_json(
+                        await send_json_compressed(
+                            info["websocket"],
                             {
                                 "type": "chat_private_message",
                                 "payload": {"session_id": session_id, "message": msg},
-                            }
+                            },
                         )
                         sent_count += 1
                     except Exception:
