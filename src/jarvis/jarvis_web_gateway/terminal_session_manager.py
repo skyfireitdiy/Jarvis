@@ -308,18 +308,18 @@ class TerminalSessionManager:
         except Exception as e:
             try:
                 os.close(master_fd)
-            except Exception as e:
+            except Exception as inner_e:
                 save_exception(
-                    e,
+                    inner_e,
                     module="jarvis_web_gateway.terminal_session_manager",
                     function="_create_session_unix",
                 )
                 pass
             try:
                 os.close(slave_fd)
-            except Exception as e:
+            except Exception as inner_e:
                 save_exception(
-                    e,
+                    inner_e,
                     module="jarvis_web_gateway.terminal_session_manager",
                     function="_create_session_unix",
                 )

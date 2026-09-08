@@ -1,0 +1,8 @@
+{
+  "id": "20260908_155619_247595",
+  "type": "project_long_term",
+  "tags": ["jarvis", "ty", "context_manager", "SymbolTableDB", "告警修复"],
+  "content": "Jarvis ty 告警修复：context_manager.py 的 30 个告警已消除。根因：ContextManager.__init__ 用 use_db 参数切换 symbol_table 为 SymbolTableDB 或 SymbolTable，但 context_manager 所有方法只兼容 SymbolTable 的 Symbol 接口（line_start/line_end/add_symbol(symbol)/_file_mtimes/save_cache），而 SymbolTableDB 返回 Node（start_line/end_line/add_symbol 位置参数/无 _file_mtimes/save_cache）。use_db=True（默认）时 DB 路径从未真正工作（update_context_for_file 静默失败）。修复：context_manager 统一用 SymbolTable（内存版），删除 SymbolTableDB import。理由：impact_analyzer 的 DB 图遍历 _traverser 是死代码（只赋值未使用）；symbol_dependency.py 独立用 SymbolTableDB 不受影响；无测试依赖 context_manager 的 DB 行为。另删除死代码 llm_context_recommender.py（ContextRecommender 无调用方，只在 __init__.py 导出）。诊断数 140→101。",
+  "created_at": "2026-09-08T15:56:19.247645",
+  "updated_at": "2026-09-08T15:56:19.247651"
+}

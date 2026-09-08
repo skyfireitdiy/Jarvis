@@ -1,0 +1,8 @@
+{
+  "id": "20260908_154238_929375",
+  "type": "project_long_term",
+  "tags": ["ty", "possibly-unresolved-reference", "jarvis", "task-16"],
+  "content": "possibly-unresolved-reference 已全部清零（本会话从约40处→0）。本会话修复的文件：task_list_manager.py（删除冗余局部 import PrettyOutput×2、内层 except e→inner_e×2、方法级预初始化 final_verification_passed/iteration/all_verification_results）、execute_script.py（内层 except e→inner_e、删除冗余局部 import PrettyOutput）、read_code.py（abs_path 预初始化）、virtual_tty.py（_subprocess import 移到函数级）、jarvis_agent/utils.py（temp_dir 预初始化）、agent_manager.py（selected_task 海象加 ty:ignore×2）、jarvis_agent/__init__.py（subprocess 移到模块顶部，删2处局部import）、config.py（subprocess 移到模块顶部）、quick_config.py（normal/smart/cheap_model 预初始化）、jarvis_utils/utils.py（cmd_list/update_cmd 预初始化、删除冗余局部 import threading/sys）、java/javascript/typescript_language.py（except 中加 Node=None + ty:ignore[invalid-assignment]）。验证：ty check src 中 possibly-unresolved-reference=0，相关 pytest 全通过，模块导入正常。剩余140个ty诊断均为其他类别（invalid-argument-type/unresolved-attribute/invalid-method-override等），按约定不处理。",
+  "created_at": "2026-09-08T15:42:38.929418",
+  "updated_at": "2026-09-08T15:42:38.929424"
+}

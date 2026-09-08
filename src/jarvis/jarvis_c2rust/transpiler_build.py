@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# type: ignore
+
 """
 构建和修复模块
 """

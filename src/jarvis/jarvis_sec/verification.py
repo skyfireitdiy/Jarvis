@@ -6,6 +6,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import cast
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -324,9 +325,10 @@ def run_verification_agent_with_retry(
                 prev_parse_error_verify = None
                 if isinstance(verification_parsed, list):
                     if verification_parsed and all(
-                        is_valid_verification_item(item) for item in verification_parsed
+                        is_valid_verification_item(cast(Dict[str, Any], item))
+                        for item in verification_parsed
                     ):
-                        return verification_parsed, None
+                        return cast(List[Dict[str, Any]], verification_parsed), None
 
         # 格式校验失败，后续重试使用直接模型调用
         use_direct_model_verify = True

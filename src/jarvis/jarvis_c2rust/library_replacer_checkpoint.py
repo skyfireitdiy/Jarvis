@@ -38,7 +38,7 @@ def make_checkpoint_key(
         "max_funcs": (
             int(max_funcs)
             if isinstance(max_funcs, int)
-            or (isinstance(max_funcs, float) and max_funcs.is_integer())  # type: ignore
+            or (isinstance(max_funcs, float) and max_funcs.is_integer())
             else None
         ),
     }

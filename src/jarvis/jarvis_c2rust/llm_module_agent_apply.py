@@ -9,6 +9,7 @@ from typing import Dict
 from typing import List
 from typing import Set
 from typing import Union
+from typing import cast
 
 from jarvis.jarvis_c2rust.llm_module_agent_utils import parse_project_json_entries
 
@@ -22,7 +23,7 @@ def ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> st
     - 返回更新后的完整文本（保留结尾换行）。
     """
     try:
-        lines = (existing_text or "").splitlines()
+        lines = cast(List[str], (existing_text or "").splitlines())
     except Exception:
         lines = []
     mod_decl_pattern = re.compile(
@@ -89,7 +90,7 @@ def apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
             is_src_root_dir = new_dir == base_path / "src"
 
             # 先创建子项
-            for child in children or []:
+            for child in cast(List[Any], children or []):
                 if isinstance(child, str):
                     apply_item(child, new_dir)
                     # 收集 .rs 文件作为子模块

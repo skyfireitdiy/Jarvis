@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import count
 import threading
 from typing import Any
@@ -129,7 +129,10 @@ def serialize_output_event(
     payload: Dict[str, Any] = {
         "type": "output",
         "source": source,
-        "emitted_at": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+        "emitted_at": datetime.now(timezone.utc)
+        .replace(tzinfo=None)
+        .isoformat(timespec="milliseconds")
+        + "Z",
         "output_type": event.output_type.value,
         "icon": OUTPUT_ICONS.get(event.output_type, ""),
         "text": event.text,

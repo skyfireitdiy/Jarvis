@@ -142,11 +142,13 @@ class LSPDaemon:
             await self.server.wait_closed()
 
         # 删除 socket 文件（仅 Unix）
-        if self._is_unix and os.path.exists(self.addr):  # type: ignore[arg-type]
-            try:
-                os.unlink(self.addr)  # type: ignore[arg-type]
-            except OSError:
-                pass
+        if self._is_unix and isinstance(self.addr, str):
+            socket_path = self.addr
+            if os.path.exists(socket_path):
+                try:
+                    os.unlink(socket_path)
+                except OSError:
+                    pass
         elif not self._is_unix:
             port_file = Path(get_data_dir()) / LSP_DAEMON_PORT_FILE
             if port_file.exists():

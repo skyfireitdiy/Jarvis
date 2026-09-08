@@ -1,0 +1,8 @@
+{
+  "id": "20260908_154428_801701",
+  "type": "project_long_term",
+  "tags": ["jarvis", "ty", "possibly-unresolved-reference", "状态"],
+  "content": "Jarvis 项目 ty 检查约定：ty.toml root 是 ./src，tests 不在检查范围；验证命令 `cd /home/skyfire/code/Jarvis && .venv/bin/ty check src 2>&1 | grep possibly-unresolved-reference`；possibly-unresolved-reference 已全部清零（2026-09-08）；剩余约140个诊断均为其他类别（invalid-argument-type/unresolved-attribute/invalid-method-override/call-top-callable 等），按约定不处理；execute_script.py 的 msvcrt.kbhit/getwch 是 Windows 专用代码，已有 # type: ignore[attr-defined] 但 ty 不认，属既有问题。",
+  "created_at": "2026-09-08T15:44:28.801730",
+  "updated_at": "2026-09-08T15:44:28.801735"
+}

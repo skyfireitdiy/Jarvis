@@ -815,7 +815,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,  # noqa: PGH001, invalid-argument-type
+                subprotocols=subprotocols,  # ty: ignore[invalid-argument-type]
             ) as agent_ws:
                 for item in payload.get("messages") or []:
                     await agent_ws.send(str(item))
@@ -885,7 +885,7 @@ class NodeConnectionManager:
                 agent_url,
                 close_timeout=30,
                 proxy=None,
-                subprotocols=subprotocols,  # noqa: PGH001, invalid-argument-type
+                subprotocols=subprotocols,  # ty: ignore[invalid-argument-type]
             )
             self._agent_ws_sessions[session_id] = agent_ws
             logger.info(
@@ -1196,6 +1196,8 @@ class NodeConnectionManager:
             config_sections,
         )
 
+        config_file = None
+        backup_file = None
         try:
             # 获取配置文件路径
             config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
@@ -1205,7 +1207,6 @@ class NodeConnectionManager:
             if config_file.exists():
                 shutil.copy2(config_file, backup_file)
                 logger.info("[NODE CONFIG SYNC] backed up config to %s", backup_file)
-
             # 读取现有配置
             existing_config: Dict[str, Any] = {}
             if config_file.exists():
@@ -1249,7 +1250,11 @@ class NodeConnectionManager:
             )
             # 尝试恢复备份
             try:
-                if backup_file.exists():
+                if (
+                    backup_file is not None
+                    and config_file is not None
+                    and backup_file.exists()
+                ):
                     shutil.copy2(backup_file, config_file)
                     logger.info("[NODE CONFIG SYNC] restored config from backup")
             except Exception as restore_exc:
@@ -1340,6 +1345,8 @@ class NodeConnectionManager:
             request_id,
         )
 
+        config_file = None
+        backup_file = None
         try:
             # 获取配置文件路径
             config_file = pathlib.Path.home() / ".jarvis" / "config.yaml"
@@ -1349,7 +1356,6 @@ class NodeConnectionManager:
             if config_file.exists():
                 shutil.copy2(config_file, backup_file)
                 logger.info("[NODE CONFIG SET] backed up config to %s", backup_file)
-
             # 读取现有配置
             existing_config: Dict[str, Any] = {}
             if config_file.exists():
@@ -1390,7 +1396,11 @@ class NodeConnectionManager:
             )
             # 尝试恢复备份
             try:
-                if backup_file.exists():
+                if (
+                    backup_file is not None
+                    and config_file is not None
+                    and backup_file.exists()
+                ):
                     shutil.copy2(backup_file, config_file)
                     logger.info("[NODE CONFIG SET] restored config from backup")
             except Exception as restore_exc:

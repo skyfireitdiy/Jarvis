@@ -179,6 +179,7 @@ def install_plugin(source_path: str) -> bool:
     from jarvis.jarvis_utils.exception_utils import save_exception
     from jarvis.jarvis_utils.output import PrettyOutput
 
+    temp_dir = None  # 预初始化，确保 except 分支可访问（ty 推断局限）
     try:
         source = Path(source_path).resolve()
 

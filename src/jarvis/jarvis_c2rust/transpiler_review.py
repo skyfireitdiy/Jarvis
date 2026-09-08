@@ -787,7 +787,7 @@ class ReviewManager:
                 try:
                     # 尝试直接使用model属性（如果存在）以提高效率
                     if hasattr(agent, "model"):
-                        response = agent.model.chat_until_success(full_prompt)
+                        response = agent.model.chat_until_success(full_prompt)  # ty: ignore[unresolved-attribute]
                         summary = str(response or "")
                     else:
                         # 回退到run()方法

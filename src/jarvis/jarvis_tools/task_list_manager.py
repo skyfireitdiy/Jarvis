@@ -629,8 +629,6 @@ class task_list_manager:
             tuple[bool, str]: (是否完成, 验证结果或失败原因)
         """
         try:
-            from jarvis.jarvis_utils.output import PrettyOutput
-
             # 创建验证 Agent
             verification_agent = self._create_verification_agent(
                 task, parent_agent, verification_iteration, verification_method
@@ -820,9 +818,9 @@ class task_list_manager:
                         },
                     )
                 )
-            except Exception as e:
+            except Exception as inner_e:
                 save_exception(
-                    e,
+                    inner_e,
                     module="jarvis_tools.task_list_manager",
                     function="_verify_task_completion",
                 )
@@ -1741,6 +1739,11 @@ class task_list_manager:
                 # 订阅失败不影响任务执行
                 pass
 
+        # 预初始化，确保在 try-except 外部可访问（ty 跨分支推断局限）
+        final_verification_passed = False
+        iteration = 0
+        all_verification_results: List[str] = []
+
         try:
             # 记录执行前的commit
             start_commit = get_latest_commit_hash()
@@ -1830,7 +1833,6 @@ class task_list_manager:
 
                     while not verification_passed:
                         iteration += 1
-                        from jarvis.jarvis_utils.output import PrettyOutput
 
                         PrettyOutput.auto_print(
                             f"🔄 执行任务 [{task.task_name}] (第 {iteration} 次迭代)..."
@@ -2220,9 +2222,9 @@ class task_list_manager:
                     is_main_agent=is_main_agent,
                     actual_output=f"执行异常: {str(e)}",
                 )
-            except Exception as e:
+            except Exception as inner_e:
                 save_exception(
-                    e,
+                    inner_e,
                     module="jarvis_tools.task_list_manager",
                     function="model_call_callback",
                 )

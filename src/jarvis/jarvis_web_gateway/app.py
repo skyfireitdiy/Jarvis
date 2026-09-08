@@ -1050,7 +1050,7 @@ class WebSocketConnectionManager:
                     self._router.publish(error_msg, session_id=session_id)
                     return
                 # 节点访问校验
-                check_node_id = terminal_node_id if terminal_node_id else "master"
+                check_node_id = terminal_node_id if terminal_node_id else "master"  # ty: ignore[possibly-unresolved-reference]
                 if not self._permission_manager.check_node_access(
                     user_id, check_node_id
                 ):
@@ -2793,6 +2793,7 @@ def create_app(
 
         # 检查read权限：非owner需在access_acl.read中
         user_id = None
+        user_info = {}
         if auth_payload is not None:
             user_info = auth_payload.get("user_info") or {}
             user_id = user_info.get("user_id")
@@ -3033,7 +3034,7 @@ def create_app(
                     pass
                 return data
 
-            websocket.receive_text = _checked_receive_text  # type: ignore[assignment]
+            websocket.receive_text = _checked_receive_text  # ty: ignore[invalid-assignment]
 
         try:
             await agent_proxy_manager.proxy_websocket(websocket, agent_id)
@@ -4261,6 +4262,8 @@ def create_app(
     @app.post("/api/nodes/{node_id}/code-update", dependencies=[Depends(verify_token)])
     async def node_code_update(node_id: str, request: Request) -> Dict[str, Any]:
         """更新指定节点的代码到 main 分支（需要admin:config权限）。"""
+        import subprocess
+
         from fastapi import HTTPException
 
         user_info = getattr(request.state, "user_info", None)
@@ -4283,8 +4286,6 @@ def create_app(
             if node_id in (node_runtime.local_node_id, "master"):
                 # 本地节点直接执行更新
                 try:
-                    import subprocess
-
                     result = subprocess.run(
                         ["git", "pull", "origin", "main"],
                         capture_output=True,
@@ -6449,20 +6450,20 @@ def create_app(
             normalized_path = "/" + normalized_path[len("/api/") :].lstrip("/")
 
         # 构造模拟Request，传递user_info给需要request参数的API函数
-        class _MockRequest:
-            pass
+        class _MockRequest(Request):
+            state: Any
 
-        _mock_req = _MockRequest()
+        _mock_req = _MockRequest.__new__(_MockRequest)
         _mock_req.state = type("state", (), {"user_info": user_info})()
         # 若无user_info，尝试从headers解析JWT
         if user_info is None:
             auth_header = headers.get("authorization", headers.get("Authorization", ""))
             if auth_header and auth_header.startswith("Bearer "):
                 try:
-                    from jarvis.jarvis_web_gateway.jwt_utils import verify_jwt_token
+                    from jarvis.jarvis_web_gateway.jwt_utils import validate_jwt_token
 
                     token = auth_header[7:]
-                    token_payload = verify_jwt_token(token)
+                    token_payload = validate_jwt_token(token)
                     if token_payload:
                         _mock_req.state.user_info = token_payload
                 except Exception:

@@ -230,7 +230,7 @@ class OutputEvent:
 
     text: str
     output_type: OutputType
-    timestamp: Optional[str] = None  # ISO格式时间字符串
+    timestamp: Optional[str | bool] = None  # ISO格式时间字符串
     lang: Optional[str] = None
     traceback: bool = False
     section: Optional[str] = None
@@ -717,7 +717,7 @@ class PrettyOutput:
             return default_lang
 
     @staticmethod
-    def _format(output_type: OutputType, timestamp: Optional[str] = None) -> str:
+    def _format(output_type: OutputType, timestamp: Optional[str | bool] = None) -> str:
         """
         返回Agent名字格式（时间戳由前端显示）。
 
@@ -755,7 +755,7 @@ class PrettyOutput:
     def _print(
         text: str,
         output_type: OutputType,
-        timestamp: Optional[str] = None,
+        timestamp: Optional[str | bool] = None,
         lang: Optional[str] = None,
         traceback: bool = False,
         context: Optional[Dict[str, Any]] = None,
@@ -909,7 +909,7 @@ class PrettyOutput:
     @staticmethod
     def auto_print(
         text: str,
-        timestamp: Optional[str] = None,
+        timestamp: Optional[str | bool] = None,
         lang: Optional[str] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:

@@ -10,6 +10,10 @@ root = ["./src"]
 allowed-unresolved-imports = [
     "requests",
     "tabulate",
+    "clang",
+    "_jsonnet",
+    "winpty",
+    "pywinauto",
     "jarvis.jarvis_utils.http",
     "jarvis.jarvis_utils.quick_config",
     "jarvis.jarvis_tools.read_webpage",
@@ -22,6 +26,10 @@ allowed-unresolved-imports = [
 replace-imports-with-any = [
     "requests",
     "tabulate",
+    "clang",
+    "_jsonnet",
+    "winpty",
+    "pywinauto",
     "jarvis.jarvis_utils.http",
     "jarvis.jarvis_utils.quick_config",
     "jarvis.jarvis_tools.read_webpage",
@@ -66,32 +74,3 @@ include = ["src/jarvis/jarvis_mcp/**"]
 # MCP module uses third-party libraries - be more permissive
 unresolved-import = "ignore"
 
-[[overrides]]
-include = ["src/jarvis/jarvis_sec/**"]
-[overrides.rules]
-# Critical modules - stricter checking
-# untyped-definition = "error"  # Unknown rule, commented out
-
-[[overrides]]
-include = ["src/jarvis/jarvis_c2rust/**"]
-[overrides.rules]
-# Critical modules - stricter checking
-# untyped-definition = "error"  # Unknown rule, commented out
-
-[[overrides]]
-include = ["src/jarvis/jarvis_code_agent/**"]
-[overrides.rules]
-# Critical modules - stricter checking
-# untyped-definition = "error"  # Unknown rule, commented out
-
-[[overrides]]
-include = ["src/jarvis/jarvis_tools/**"]
-[overrides.rules]
-# Legacy code - allow gradual migration
-# untyped-definition = "warn"  # Unknown rule, commented out
-
-[[overrides]]
-include = ["tests/**"]
-[overrides.rules]
-# Test files can be more permissive
-# untyped-definition = "ignore"  # Unknown rule, commented out

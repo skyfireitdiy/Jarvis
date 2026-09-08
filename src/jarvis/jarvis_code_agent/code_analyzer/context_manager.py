@@ -17,7 +17,6 @@ from .language_support import get_dependency_analyzer
 from .language_support import get_symbol_extractor
 from .symbol_extractor import Symbol
 from .symbol_extractor import SymbolTable
-from .symbol_table_db import SymbolTableDB
 
 
 @dataclass
@@ -52,11 +51,9 @@ class ContextManager:
         # Create cache directory path relative to project root
         cache_dir = os.path.join(project_root, ".jarvis", "symbol_cache")
 
-        # Use SQLite-backed symbol table if enabled
-        if use_db:
-            self.symbol_table = SymbolTableDB(cache_dir)
-        else:
-            self.symbol_table = SymbolTable(cache_dir)
+        # 使用内存符号表（SymbolTableDB 的 DB 接口与 Symbol 接口不一致，
+        # 本类所有方法均按 SymbolTable 的 Symbol 接口实现，故统一使用 SymbolTable）
+        self.symbol_table = SymbolTable(cache_dir)
 
         self.dependency_graph = DependencyGraph()
         self._file_cache: dict[str, str] = {}  # Cache file contents

@@ -949,6 +949,7 @@ class AgentRunLoop:
         while True:
             # 任务开始，设置为运行状态
             status_manager.set_running()
+            ag = self.agent
             try:
                 current_round = self.agent.model.get_conversation_turn()
                 # 原生 function calling 激活时不注入文本工具清单/提醒（工具由 API tools 提供）

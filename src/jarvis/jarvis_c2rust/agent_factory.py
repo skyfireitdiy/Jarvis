@@ -8,6 +8,7 @@ Agent工厂模块
 
 from typing import Any
 from typing import Optional
+from typing import cast
 
 from jarvis.jarvis_c2rust.agent_protocol import AgentType
 from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
@@ -66,17 +67,20 @@ def create_agent(
     # 自动去重：从 kwargs 中弹出 enable_auto_rule_select（如果存在），避免重复传递
     _enable_auto_rule_select = kwargs.pop("enable_auto_rule_select", False)
 
-    return Agent(  # type: ignore[return-value]
-        system_prompt=system_prompt,
-        name=name,
-        non_interactive=non_interactive,
-        use_methodology=_use_methodology,
-        use_analysis=_use_analysis,
-        need_summary=need_summary,
-        rule_names=_rule_names,
-        enable_auto_rule_select=_enable_auto_rule_select,
-        model_type=model_type,
-        **kwargs,
+    return cast(
+        AgentType,
+        Agent(  # type: ignore[return-value]
+            system_prompt=system_prompt,
+            name=name,
+            non_interactive=non_interactive,
+            use_methodology=_use_methodology,
+            use_analysis=_use_analysis,
+            need_summary=need_summary,
+            rule_names=_rule_names,
+            enable_auto_rule_select=_enable_auto_rule_select,
+            model_type=model_type,
+            **kwargs,
+        ),
     )
 
 
@@ -138,19 +142,22 @@ def create_code_agent(
     # 自动去重：从 kwargs 中弹出 enable_auto_rule_select（如果存在），避免重复传递
     _enable_auto_rule_select = kwargs.pop("enable_auto_rule_select", False)
 
-    return CodeAgent(  # type: ignore[return-value]
-        name=name,
-        non_interactive=non_interactive,
-        need_summary=need_summary,
-        summary_prompt=summary_prompt,
-        append_tools=append_tools,
-        use_methodology=_use_methodology,
-        use_analysis=_use_analysis,
-        disable_review=disable_review,
-        enable_task_list_manager=enable_task_list_manager,
-        force_save_memory=force_save_memory,
-        tool_group=tool_group,
-        rule_names=_rule_names,
-        enable_auto_rule_select=_enable_auto_rule_select,
-        **kwargs,
+    return cast(
+        CodeAgentType,
+        CodeAgent(  # type: ignore[return-value]
+            name=name,
+            non_interactive=non_interactive,
+            need_summary=need_summary,
+            summary_prompt=summary_prompt,
+            append_tools=append_tools,
+            use_methodology=_use_methodology,
+            use_analysis=_use_analysis,
+            disable_review=disable_review,
+            enable_task_list_manager=enable_task_list_manager,
+            force_save_memory=force_save_memory,
+            tool_group=tool_group,
+            rule_names=_rule_names,
+            enable_auto_rule_select=_enable_auto_rule_select,
+            **kwargs,
+        ),
     )

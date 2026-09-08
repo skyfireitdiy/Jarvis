@@ -47,6 +47,9 @@ from jarvis.jarvis_platform.content_types import ContentBlock
 class BasePlatform(ABC):
     """大语言模型基类"""
 
+    # 对话消息历史（子类在 __init__ 中初始化）
+    messages: List[Dict[str, Any]]
+
     def __init__(
         self,
         platform_type: str = "normal",

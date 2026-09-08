@@ -7,7 +7,7 @@
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from typing import Dict
@@ -51,7 +51,9 @@ class StatusManager:
     def _write_status(self, status: Dict[str, Any]) -> None:
         """写入状态文件"""
         try:
-            status["last_updated"] = datetime.utcnow().isoformat() + "Z"
+            status["last_updated"] = (
+                datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+            )
             with self.status_path.open("w", encoding="utf-8") as f:
                 json.dump(status, f, ensure_ascii=False, indent=2)
         except Exception:
@@ -105,7 +107,13 @@ class StatusManager:
         last_stage = status.get("stage")
         if last_stage != stage:
             status["stage_history"].append(
-                {"stage": stage, "started_at": datetime.utcnow().isoformat() + "Z"}
+                {
+                    "stage": stage,
+                    "started_at": datetime.now(timezone.utc)
+                    .replace(tzinfo=None)
+                    .isoformat()
+                    + "Z",
+                }
             )
 
         self._write_status(status)

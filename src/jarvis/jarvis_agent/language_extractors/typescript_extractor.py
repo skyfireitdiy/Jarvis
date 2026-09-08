@@ -51,24 +51,29 @@ def create_typescript_extractor() -> Optional[Any]:
 
             def extract_symbols(self, file_path: str, content: str) -> List[Any]:
                 try:
-                    tree = self.parser.parse(bytes(content, "utf8"))
-                    query = self.language.query(self.symbol_query)
-                    captures = query.captures(tree.root_node)  # type: ignore[attr-defined]
+                    from tree_sitter import Query, QueryCursor
 
+                    tree = self.parser.parse(bytes(content, "utf8"))
+                    query = Query(self.language, self.symbol_query)
+                    cursor = QueryCursor(query)
+                    captures = cursor.captures(tree.root_node)
+
+                    kind_map = {
+                        "function.name": "function",
+                        "method.name": "method",
+                        "class.name": "class",
+                        "interface.name": "interface",
+                        "variable.name": "variable",
+                    }
                     symbols = []
-                    for node, name in captures:
-                        kind_map = {
-                            "function.name": "function",
-                            "method.name": "method",
-                            "class.name": "class",
-                            "interface.name": "interface",
-                            "variable.name": "variable",
-                        }
+                    for name, nodes in captures.items():
                         symbol_kind = kind_map.get(name)
-                        if symbol_kind:
+                        if not symbol_kind:
+                            continue
+                        for node in nodes:
                             symbols.append(
                                 Symbol(
-                                    name=node.text.decode("utf8"),
+                                    name=(node.text or b"").decode("utf8"),
                                     kind=symbol_kind,
                                     file_path=file_path,
                                     line_start=node.start_point[0] + 1,

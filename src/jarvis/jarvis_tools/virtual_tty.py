@@ -574,12 +574,12 @@ class VirtualTTYTool:
                 "stderr": "",
             }
 
+        import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
+
         try:
             process = agent.tty_sessions[tty_id]["process"]
             # 终止进程
             try:
-                import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
-
                 process.terminate()
                 process.wait(timeout=2)
             except _subprocess.TimeoutExpired:

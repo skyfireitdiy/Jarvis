@@ -147,6 +147,9 @@ def load_or_run_heuristic_scan(
                 )
                 candidates = []  # 重置以便执行完整扫描
 
+    # 预初始化启发式扫描结果文件路径（供下方完整扫描写入）
+    _heuristic_path = sec_dir / "heuristic_issues.jsonl"
+
     if not candidates:
         _progress_append(
             {"event": "pre_scan_start", "entry_path": entry_path, "languages": langs}

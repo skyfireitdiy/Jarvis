@@ -52,7 +52,7 @@ from jarvis.jarvis_c2rust.transpiler_planning import PlanningManager
 from jarvis.jarvis_c2rust.transpiler_symbols import SymbolMapper
 from jarvis.jarvis_c2rust.utils import check_and_handle_test_deletion
 from jarvis.jarvis_c2rust.utils import default_crate_dir
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 from jarvis.jarvis_utils.config import get_llm_group
 
 
@@ -405,17 +405,17 @@ class Transpiler:
             agent, current_response, need_return, tool_prompt, **kwargs
         )
 
-    def _get_code_agent(self) -> CodeAgent:
+    def _get_code_agent(self) -> CodeAgentType:
         """获取代码生成/修复Agent（委托给 AgentManager，保持向后兼容）"""
-        return self.agent_manager.get_code_agent()  # type: ignore[return-value]
+        return self.agent_manager.get_code_agent()
 
-    def _get_generation_agent(self) -> CodeAgent:
+    def _get_generation_agent(self) -> CodeAgentType:
         """获取代码生成Agent（委托给 AgentManager）"""
-        return self.agent_manager.get_generation_agent()  # type: ignore[return-value]
+        return self.agent_manager.get_generation_agent()
 
-    def _get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgent:
+    def _get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgentType:
         """获取修复Agent（委托给 AgentManager，每次重新创建）"""
-        return self.agent_manager.get_fix_agent(c_code)  # type: ignore[return-value]
+        return self.agent_manager.get_fix_agent(c_code)
 
     def _refresh_compact_context(
         self, rec: FnRecord, module: str, rust_sig: str

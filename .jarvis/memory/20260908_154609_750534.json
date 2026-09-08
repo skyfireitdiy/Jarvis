@@ -1,0 +1,8 @@
+{
+  "id": "20260908_154609_750534",
+  "type": "project_long_term",
+  "tags": ["jarvis", "ty", "possibly-unresolved-reference", "告警修复"],
+  "content": "Jarvis ty 告警修复进度：possibly-unresolved-reference 已全部清零（从约40处→0）。总诊断数从 271→209→140。剩余 140 个诊断分布：invalid-argument-type(53)、unresolved-attribute(38)、invalid-return-type(16)、invalid-assignment(10)、unknown-argument(9)、no-matching-overload(3)、redundant-cast(2)、missing-argument(2)、invalid-method-override(2)、call-top-callable(2)、unresolved-reference(1)、not-iterable(1)、invalid-parameter-default(1)。这些属于任务4/5（核心文件类型错误+其余分散文件）。修复模式已验证有效：1) try/except 变量作用域→try前预初始化+except中None检查；2) 延迟import→移到函数/模块顶部；3) 海象运算符if条件赋值在块内引用→ty误报，加 # ty: ignore[possibly-unresolved-reference]；4) 嵌套except同名变量e遮蔽→重命名内层变量；5) 冗余局部import遮蔽模块级→删除局部import。注意：# type: ignore[...] 不被 ty 识别，须用 # ty: ignore[rule-name]。",
+  "created_at": "2026-09-08T15:46:09.750565",
+  "updated_at": "2026-09-08T15:46:09.750571"
+}

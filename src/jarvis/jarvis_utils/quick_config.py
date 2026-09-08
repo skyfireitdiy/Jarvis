@@ -288,6 +288,11 @@ def run_quick_config():
 
     role_candidate_models = list(dict.fromkeys(role_candidate_models))
 
+    # 预初始化，确保后续分支外可访问（ty 跨分支推断局限）
+    normal_model = ""
+    smart_model = ""
+    cheap_model = ""
+
     # 选择 normal/smart/cheap 模型
     if len(role_candidate_models) == 1:
         normal_model = smart_model = cheap_model = role_candidate_models[0]

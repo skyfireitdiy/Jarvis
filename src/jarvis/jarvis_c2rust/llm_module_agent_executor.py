@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List
 from typing import Optional
 from typing import Union
+from typing import cast
 
 from jarvis.jarvis_c2rust.llm_module_agent_apply import (
     apply_project_structure_from_json,
@@ -196,7 +197,9 @@ def execute_llm_plan(
                     PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}"
                     )
-                agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
+                cast(CodeAgent, agent).run(
+                    requirement_text, prefix="[c2rust-llm-planner]", suffix=""
+                )
                 PrettyOutput.auto_print(
                     "[c2rust-llm-planner] 初始 CodeAgent 运行完成。"
                 )
@@ -280,7 +283,7 @@ def execute_llm_plan(
                         enable_auto_rule_select=False,
                         quick_mode=True,
                     )
-                    repair_agent.run(
+                    cast(CodeAgent, repair_agent).run(
                         repair_prompt,
                         prefix=f"[c2rust-llm-planner][iter={iter_count}]",
                         suffix="",

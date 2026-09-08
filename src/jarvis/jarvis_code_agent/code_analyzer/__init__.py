@@ -26,7 +26,6 @@ from .language_registry import register_language
 from .language_support import detect_language
 from .language_support import get_dependency_analyzer
 from .language_support import get_symbol_extractor
-from .llm_context_recommender import ContextRecommender
 from .symbol_extractor import Symbol
 from .symbol_extractor import SymbolExtractor
 from .symbol_extractor import SymbolTable
@@ -45,7 +44,6 @@ __all__ = [
     "EditContext",
     "Reference",
     # Context recommendation
-    "ContextRecommender",
     "ContextRecommendation",
     # Language support
     "detect_language",

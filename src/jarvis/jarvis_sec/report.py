@@ -57,6 +57,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
+from typing import cast
 
 # 依赖 Issue 结构，但本模块不直接导入 dataclass，接受 dict/Issue 两种形态
 try:
@@ -91,7 +92,7 @@ def _as_dict(item: Union[Issue, Dict[str, Any]]) -> Dict[str, Any]:
     将 Issue/dataclass 或 dict 统一为 dict。
     """
     if isinstance(item, dict):
-        return item
+        return cast(Dict[str, Any], item)
     # dataclass: 尝试属性访问
     d: Dict[str, Any] = {}
     for k in (

@@ -138,34 +138,27 @@ def _parse_tool_call_info(
     try:
         # 使用纯 JSON 扫描提取工具调用
         from jarvis.jarvis_utils.utils import extract_json_from_text
+        from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
-        matches = extract_json_from_text(response)
-
-        if not matches:
-            return {"name": handler_name}
-
-        # 解析所有工具调用
+        # 解析所有工具调用：扫描文本中每个 JSON 对象起始位置并逐个提取
         tool_infos = []
-        for match_content in matches:
-            try:
-                # 解析 JSON
-                try:
-                    from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
-
-                    tool_call = json_loads(match_content)
-                except Exception:
-                    tool_call = json.loads(match_content)
-
-                name = tool_call.get("name", handler_name)
-                args = tool_call.get("arguments", {})
-
-                # 生成参数摘要
-                param_summary = _generate_param_summary(args)
-
-                tool_infos.append({"name": name, "param_summary": param_summary})
-            except Exception:
-                # 单个工具调用解析失败，跳过
+        for i, ch in enumerate(response):
+            if ch not in ("{", "["):
                 continue
+            json_str, _ = extract_json_from_text(response, i)
+            if not json_str:
+                continue
+            try:
+                tool_call = json_loads(json_str)
+            except Exception:
+                tool_call = json.loads(json_str)
+            if not isinstance(tool_call, dict):
+                continue
+            name = tool_call.get("name", handler_name)
+            args = tool_call.get("arguments", {})
+            # 生成参数摘要
+            param_summary = _generate_param_summary(args)
+            tool_infos.append({"name": name, "param_summary": param_summary})
 
         if len(tool_infos) == 0:
             return {"name": handler_name}

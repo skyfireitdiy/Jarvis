@@ -18,6 +18,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import cast
 
 
 class EditFileNormalTool:
@@ -31,7 +32,7 @@ class EditFileNormalTool:
         "1) search/replace（默认）：给 search（要替换的旧文本，精确匹配、不支持正则）与 replace（新文本，可为空）。"
         "search 必须带足上下文以唯一确定位置（建议含所在函数签名或前后几行）。"
         "同一位置若匹配到多处：设 replace_all=true 全部替换，否则该 diff 报错。"
-        "整文件覆写：把 search 设为空字符串 \"\"、replace 设为文件完整新内容（作为该文件首个 diff；其后 diffs 被忽略）。\n"
+        '整文件覆写：把 search 设为空字符串 ""、replace 设为文件完整新内容（作为该文件首个 diff；其后 diffs 被忽略）。\n'
         "2) 行号模式：给 start_line 与 end_line（均从 1 开始、闭区间 [start,end]）和 replace，直接替换该行区间的文本；此时会忽略 search。\n\n"
         "调用示例：\n"
         'files=[{"file_path":"src/a.py","diffs":[{"search":"旧文本上下文…","replace":"新文本"}]}]\n'
@@ -132,8 +133,8 @@ class EditFileNormalTool:
                     "stderr": f"files数组第 {idx + 1} 项必须是字典类型",
                 }
 
-            file_path = file_item.get("file_path")
-            diffs = file_item.get("diffs", [])
+            file_path = cast(Dict[str, Any], file_item).get("file_path")
+            diffs = cast(Dict[str, Any], file_item).get("diffs", [])
 
             if not file_path:
                 return {
