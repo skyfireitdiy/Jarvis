@@ -27,7 +27,7 @@ class MethodologyTool:
         "properties": {
             "operation": {
                 "type": "string",
-                "description": "操作类型（delete/update/add）",
+                "description": "操作：add 新增 / update 更新 / delete 删除",
                 "enum": ["delete", "update", "add"],
             },
             "problem_type": {
