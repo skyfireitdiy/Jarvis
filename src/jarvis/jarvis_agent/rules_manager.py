@@ -1406,6 +1406,98 @@ class RulesManager:
             PrettyOutput.auto_print(f"⚠️  过滤规则失败：{e}")
             return rule_names  # 发生异常时返回原始规则列表
 
+    def _build_entry_catalog(self) -> List[list]:
+        """构建（规则名, 描述）候选目录，供强触发 cheap 判定使用。"""
+        all_rules_dict = self.get_all_available_rule_names()
+        names: List[str] = []
+        for rules in all_rules_dict.values():
+            names.extend(rules)
+        rows: List[list] = []
+        for name in names:
+            rule_path = self.get_rule_file_path(name)
+            desc = ""
+            if rule_path and rule_path != "--":
+                desc = (self._extract_rule_description(rule_path) or "").strip()
+            if not desc:
+                preview = self.get_rule_preview(name)
+                desc = preview if preview and preview != "--" else ""
+            rows.append([name, desc[:200]])
+        return rows
+
+    def match_task_cheap(self, task_description: str, max_rules: int = 3) -> List[str]:
+        """强触发：用 cheap 模型对新任务做"可能相关"的宽松判定。
+
+        只要判定可能与某规则相关即返回其名（供 Agent 强制载入），以对齐
+        "≥1% 命中就载入"的语义。无 cheap 平台 / 判定失败 / 明显无关时返回空。
+        """
+        try:
+            registry = PlatformRegistry.get_global_platform_registry()
+            cheap_model = registry.create_platform(platform_type="cheap")
+        except Exception:
+            cheap_model = None
+        if cheap_model is None:
+            return []
+
+        if not hasattr(self, "_catalog_cache") or self._catalog_cache is None:
+            self._catalog_cache = self._build_entry_catalog()
+        rows = self._catalog_cache
+        if not rows:
+            return []
+
+        import re
+
+        compact_lines = "\n".join(
+            f"{i}. {name}：{desc}" for i, (name, desc) in enumerate(rows, 1)
+        )
+        prompt = f"""判断下面的任务是否需要载入专项规则/技能。
+
+<task_description>
+{task_description}
+</task_description>
+
+<candidate_rules>
+{compact_lines}
+</candidate_rules>
+
+要求：
+一、若任务与某些规则【可能】相关（哪怕可能性不高），列出其编号，至多 {max_rules} 个；宁可多选
+二、明显无关或只是寒暄/闲聊时返回 none
+三、按下式返回：<NUM>编号1,编号2</NUM> 或 <NUM>none</NUM>
+
+结果："""
+        try:
+            cheap_model.set_suppress_output(False)
+            response = cheap_model.chat_until_success(prompt).strip()
+        except Exception:
+            # cheap 不可用/失败时不强行载入规则，保持安静降级
+            try:
+                cheap_model.set_suppress_output(True)
+            except Exception:
+                pass
+            return []
+        cheap_model.set_suppress_output(True)
+
+        num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
+        raw = num_match.group(1).strip() if num_match else response.strip()
+        if not raw or raw.lower() == "none":
+            return []
+
+        picked: List[str] = []
+        seen = set()
+        for part in raw.split(","):
+            try:
+                idx = int(part.strip())
+            except ValueError:
+                continue
+            if 1 <= idx <= len(rows):
+                name = rows[idx - 1][0]
+                if name not in seen:
+                    seen.add(name)
+                    picked.append(name)
+                    if len(picked) >= max_rules:
+                        break
+        return picked
+
     def match_rules_to_task(self, task_description: str) -> List[str]:
         """
         为任务匹配规则（扩展现有方法，支持远程技能搜索）
