@@ -251,6 +251,42 @@ class AgentRunLoop:
                 raise  # 用户再次中断，直接退出
         return None
 
+    def _recover_interrupt_addon(self, ag) -> None:
+        """KeyboardInterrupt 恢复：把用户补充信息并入 addon，并置下一轮运行 input handler。"""
+        addon_info = self._handle_interrupt_with_input()
+        if addon_info:
+            ag.session.addon_prompt = ensure_str(
+                join_prompts([ag.session.addon_prompt, addon_info])
+            )
+        ag.run_input_handlers_next_turn = True
+
+    def _augment_round_prompt(self, prompt) -> Any:
+        """组装本轮模型输入：追加全局输入缓冲、并在非空时前置当前时间。
+
+        统一 str / 多模态 List[ContentBlock] 两种形态的注入逻辑。
+        """
+        from jarvis.jarvis_utils.globals import get_input_buffer
+
+        buffered_messages = get_input_buffer()
+        if buffered_messages:
+            supplement = "\n\n[用户补充]\n" + "\n".join(buffered_messages)
+            if isinstance(prompt, str):
+                prompt = prompt + supplement
+            else:
+                prompt = list(prompt) + [{"type": "text", "text": supplement}]
+
+        has_prompt_content = (
+            bool(prompt.strip()) if isinstance(prompt, str) else len(prompt) > 0
+        )
+        if has_prompt_content:
+            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            time_prompt = f"[当前时间：{current_time_str}]\n\n"
+            if isinstance(prompt, str):
+                prompt = time_prompt + prompt
+            else:
+                prompt = [{"type": "text", "text": time_prompt}] + prompt
+        return prompt
+
     def check_and_compress_context(
         self,
         model_instance,
@@ -487,13 +523,7 @@ class AgentRunLoop:
             need_return, tool_prompt = ag._call_tools(current_response)
         except KeyboardInterrupt:
             # 获取用户补充信息并继续执行
-            addon_info = self._handle_interrupt_with_input()
-            if addon_info:
-                ag.session.addon_prompt = ensure_str(
-                    join_prompts([ag.session.addon_prompt, addon_info])
-                )
-            # 在中断后，设置标志以在下一轮执行input handler
-            ag.run_input_handlers_next_turn = True
+            self._recover_interrupt_addon(ag)
             need_return = False
             tool_prompt = ""
 
@@ -885,12 +915,7 @@ class AgentRunLoop:
             try:
                 llm_response = ag._call_model(confirm_prompt, False, False)
             except KeyboardInterrupt:
-                addon_info = self._handle_interrupt_with_input()
-                if addon_info:
-                    ag.session.addon_prompt = ensure_str(
-                        join_prompts([ag.session.addon_prompt, addon_info])
-                    )
-                ag.run_input_handlers_next_turn = True
+                self._recover_interrupt_addon(ag)
                 return True, None
 
             # 解析响应
@@ -965,42 +990,8 @@ class AgentRunLoop:
                     current_message_tokens=current_message_tokens,
                 )
 
-                # 检查全局输入缓冲区，如果有内容则附加到提示词后面
-                from jarvis.jarvis_utils.globals import get_input_buffer
-
-                buffered_messages = get_input_buffer()
-                if buffered_messages:
-                    user_supplement = "\n".join(buffered_messages)
-                    if isinstance(ag.session.prompt, str):
-                        ag.session.prompt = (
-                            ag.session.prompt + "\n\n[用户补充]\n" + user_supplement
-                        )
-                    else:
-                        # 对于多模态内容，将补充信息作为文本块添加
-                        ag.session.prompt = ag.session.prompt + [
-                            {
-                                "type": "text",
-                                "text": "\n\n[用户补充]\n" + user_supplement,
-                            }
-                        ]
-
-                # 注入当前时间日期到提示词（仅当提示词非空时注入）
-                has_prompt_content = (
-                    bool(ag.session.prompt.strip())
-                    if isinstance(ag.session.prompt, str)
-                    else len(ag.session.prompt) > 0
-                )
-                if has_prompt_content:
-                    current_time_str = datetime.datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                    time_prompt = f"[当前时间：{current_time_str}]\n\n"
-                    if isinstance(ag.session.prompt, str):
-                        ag.session.prompt = time_prompt + ag.session.prompt
-                    else:
-                        ag.session.prompt = [
-                            {"type": "text", "text": time_prompt}
-                        ] + ag.session.prompt
+                # 组装本轮输入：追加全局输入缓冲 + 前置当前时间（str/多模态统一处理）
+                ag.session.prompt = self._augment_round_prompt(ag.session.prompt)
 
                 # 调用模型获取响应
                 try:
@@ -1009,13 +1000,7 @@ class AgentRunLoop:
                     )
                 except KeyboardInterrupt:
                     # 获取用户补充信息并继续下一轮
-                    addon_info = self._handle_interrupt_with_input()
-                    if addon_info:
-                        ag.session.addon_prompt = ensure_str(
-                            join_prompts([ag.session.addon_prompt, addon_info])
-                        )
-                    # 在中断后，设置标志以在下一轮执行input handler
-                    ag.run_input_handlers_next_turn = True
+                    self._recover_interrupt_addon(ag)
                     continue
 
                 ag.session.prompt = ""
@@ -1183,13 +1168,7 @@ class AgentRunLoop:
                     next_action = ag._get_next_user_action()
                 except KeyboardInterrupt:
                     # 获取用户补充信息并继续下一轮
-                    addon_info = self._handle_interrupt_with_input()
-                    if addon_info:
-                        ag.session.addon_prompt = ensure_str(
-                            join_prompts([ag.session.addon_prompt, addon_info])
-                        )
-                    # 在中断后，设置标志以在下一轮执行input handler
-                    ag.run_input_handlers_next_turn = True
+                    self._recover_interrupt_addon(ag)
                     continue
                 action = normalize_next_action(next_action)
                 if action == "continue":
@@ -1203,13 +1182,7 @@ class AgentRunLoop:
 
             except KeyboardInterrupt:
                 # 获取用户补充信息并继续执行
-                addon_info = self._handle_interrupt_with_input()
-                if addon_info:
-                    ag.session.addon_prompt = ensure_str(
-                        join_prompts([ag.session.addon_prompt, addon_info])
-                    )
-                # 在中断后，设置标志以在下一轮执行input handler
-                ag.run_input_handlers_next_turn = True
+                self._recover_interrupt_addon(ag)
                 continue
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
