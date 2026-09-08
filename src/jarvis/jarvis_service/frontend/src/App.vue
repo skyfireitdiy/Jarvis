@@ -8939,6 +8939,21 @@ function appendOutput(payload, agentId = null) {
   })
 }
 
+// 将指定 Agent 的 session 对话容器滚动到底部（自动滚动开启时）
+// 用于 execute_script 等 execution 输出写入 xterm 后，外层对话容器跟随滚动
+function scrollSessionToBottom(targetAgentId) {
+  if (!targetAgentId || !isAutoScrollEnabled(targetAgentId)) return
+  const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
+  const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
+  const scrollEl = targetOutputList || outputList.value
+  if (!scrollEl) return
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      scrollEl.scrollTop = scrollEl.scrollHeight
+    })
+  })
+}
+
 // 复制消息内容到剪贴板
 async function copyToClipboard(text, index) {
   if (!text) {
@@ -9186,6 +9201,9 @@ function appendExecution(payload, agentId = null) {
     const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     terminalHosts.value.delete(executionSessionKey)
     console.log(`[terminal] Disposed terminal and cleaned up terminalHost for completed execution: ${executionId}`)
+
+    // xterm 销毁并切换为 Terminal Output 文本块后，滚动外层 session 对话容器一次（自动滚动开启时）
+    scrollSessionToBottom(targetAgentId)
   }
   
   // 输出到终端
@@ -9855,6 +9873,15 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.terminal.loadAddon(termInfo.fitAddon)
   termInfo.fitAddon.fit()
   console.log(`[terminal] FitAddon fit: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
+
+  // xterm 创建并渲染完成后，滚动外层 session 对话容器一次（自动滚动开启时）
+  // 仅当该 execution 是当前 Agent 消息列表中的最后一条（新执行刚创建）时触发，
+  // 避免切换回 Agent 重建 xterm 时干扰用户查看历史
+  const currentOutputs = allOutputs.value.get(targetAgentId) || []
+  const lastMsg = currentOutputs[currentOutputs.length - 1]
+  if (lastMsg?.output_type === 'execution' && lastMsg.execution_id === executionId && !lastMsg.is_finished) {
+    scrollSessionToBottom(targetAgentId)
+  }
 
   if (typeof ResizeObserver !== 'undefined') {
     termInfo.resizeObserver = new ResizeObserver(() => {
