@@ -41,17 +41,17 @@ class MemoryTool:
     """统一的记忆管理工具，支持保存、检索和清除记忆"""
 
     name = "memory"
-    description = """统一忆管工具，支三种操：
+    description = """统一的记忆管理工具，支持三种操作（每次只执行一种，参数随操作而异）：
 
-1. **save**: 存讯入长短期忆统，支批存。记忆类型：project_long_term（目久）、global_long_term（全久）、short_term（短）
+1. **save**：把信息存入短期/长期记忆库（支持批量）；记忆类型 project_long_term=项目长期、global_long_term=全局长期、short_term=短期
 
-2. **retrieve**: 检长短期忆统之讯，支按类与签滤，支智义检
+2. **retrieve**：检索记忆库中的信息，支持按类型与标签过滤、可选语义检索
 
-3. **clear**: 清指忆。按类/签/ID 清。注意：清不可复
+3. **clear**：按类型/标签/ID 清除指定记忆。注意：清除不可恢复
 
-**要示**：
-- 每调只能执一操（save/retrieve/clear）
-- 参据操类而异"""
+**要点**：
+- 每次只能执行一种操作（save/retrieve/clear）
+- 参数随操作类型不同"""
 
     parameters = {
         "type": "object",
@@ -102,7 +102,7 @@ class MemoryTool:
                         "all",
                     ],
                 },
-                "description": "欲检之记忆类型列（仅 retrieve 操用）",
+                "description": "要检索的记忆类型列表（仅 retrieve 使用；all 表示全部）",
             },
             "tags": {
                 "type": "array",
@@ -127,7 +127,7 @@ class MemoryTool:
             "memory_ids": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "欲清之忆ID列（可选，仅 clear 操用）",
+                "description": "要清除的记忆 ID 列表（可选，仅 clear 使用）",
             },
             "confirm": {
                 "type": "boolean",
