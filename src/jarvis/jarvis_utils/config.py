@@ -1098,6 +1098,19 @@ def is_enable_quick_mode() -> bool:
     return bool(GLOBAL_CONFIG_DATA.get("enable_quick_mode", False))
 
 
+def is_enable_native_tool_calls() -> bool:
+    """
+    获取是否启用原生 function calling（向支持 tools 的模型发送结构化工具定义）。
+
+    默认开启；对不支持 tools 的端点，平台会自动降级为纯文本协议，不影响使用。
+    可通过配置文件设置 enable_native_tool_calls: false 禁用。
+
+    返回：
+        bool: 如果启用原生工具调用则返回 True，默认为 True
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_native_tool_calls", True))
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。

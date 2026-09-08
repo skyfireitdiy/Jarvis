@@ -15,6 +15,7 @@ from typing import cast
 from openai import OpenAI
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_platform.native_tools import to_openai_messages
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
@@ -22,6 +23,52 @@ import jarvis.jarvis_utils.globals as jglobals
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+
+def _accumulate_openai_stream(
+    stream: Any,
+) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+    """累积 OpenAI 流式响应，返回 (content, tool_calls)。
+
+    tool_calls 为规范格式 [{"id","name","arguments": <dict>}]；无工具调用时为 None。
+    按 delta.tool_calls 的 index 归并 id/name/arguments 片段。
+    """
+    content_parts: List[str] = []
+    tool_calls_acc: Dict[int, Dict[str, str]] = {}
+    for chunk in stream:
+        if not getattr(chunk, "choices", None):
+            continue
+        delta = chunk.choices[0].delta
+        if delta is None:
+            continue
+        content_piece = getattr(delta, "content", None)
+        if content_piece:
+            content_parts.append(content_piece)
+        for tc in getattr(delta, "tool_calls", None) or []:
+            idx = getattr(tc, "index", 0) or 0
+            entry = tool_calls_acc.setdefault(
+                idx, {"id": "", "name": "", "arguments": ""}
+            )
+            if getattr(tc, "id", None):
+                entry["id"] = tc.id
+            fn = getattr(tc, "function", None)
+            if fn is not None:
+                if getattr(fn, "name", None):
+                    entry["name"] = fn.name
+                if getattr(fn, "arguments", None):
+                    entry["arguments"] += fn.arguments or ""
+
+    content = "".join(content_parts)
+    tool_calls: List[Dict[str, Any]] = []
+    for idx in sorted(tool_calls_acc.keys()):
+        e = tool_calls_acc[idx]
+        raw_args = e.get("arguments", "")
+        try:
+            args = json.loads(raw_args) if raw_args.strip() else {}
+        except Exception:
+            args = {"raw_arguments": raw_args}
+        tool_calls.append({"id": e.get("id", ""), "name": e.get("name", ""), "arguments": args})
+    return (content or None), (tool_calls or None)
 
 
 class OpenAIModel(BasePlatform):
@@ -380,10 +427,11 @@ class OpenAIModel(BasePlatform):
 
             # 循环处理，直到不是因为长度限制而结束
             # 构造 API 调用参数
+            # 用规范消息序列化发送，保证历史中出现 role=tool/tool_calls 时也能正确表达
             use_streaming = not self._streaming_disabled
             api_params: Dict[str, Any] = {
                 "model": self.model_name,
-                "messages": self.messages,
+                "messages": to_openai_messages(self.messages),
                 "stream": use_streaming,
                 "temperature": 0.1,
                 "top_p": 0.3,
@@ -495,6 +543,93 @@ class OpenAIModel(BasePlatform):
             if len(self.messages) > messages_before_user:
                 self.messages = self.messages[:messages_before_user]
             raise Exception(f"Chat failed: {str(e)}")
+
+    def supports_native_tool_calls(self) -> bool:
+        return True
+
+    def chat_native_once(
+        self,
+        message: Optional[Union[str, List[ContentBlock]]],
+        tools: List[Dict[str, Any]],
+        append_user: bool = True,
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+        """流式执行一次带原生 tools 的对话。
+
+        返回 (content, tool_calls)：
+        - content：assistant 的文本（可能为 None）
+        - tool_calls：规范格式 [{"id","name","arguments": <dict>}]；无工具调用时为 None
+
+        调用成功会以规范消息追加 assistant 消息（含 tool_calls）进历史。
+        若端点不支持 tools，会降级为纯文本并置 _native_disabled，之后本实例不再尝试。
+        """
+        # 已经降级或未启用原生能力，走纯文本
+        if self._native_disabled or not tools:
+            content, _ = self._native_fallback_text(message, append_user)
+            return content, None
+
+        # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
+        if append_user and message:
+            if isinstance(message, str):
+                self.messages.append({"role": "user", "content": message})
+            else:
+                self.messages.append({"role": "user", "content": message})
+
+        # 轮询切换下一个 key
+        next_key = self._get_next_api_key()
+        if next_key:
+            self.api_key = next_key
+            self.client.api_key = next_key
+
+        proxy_headers = self._get_proxy_extra_headers()
+        api_params: Dict[str, Any] = {
+            "model": self.model_name,
+            "messages": to_openai_messages(self.messages),
+            "stream": True,
+            "temperature": 0.1,
+            "top_p": 0.3,
+            "tools": tools,
+        }
+        if self.reasoning_effort:
+            api_params["reasoning_effort"] = self.reasoning_effort
+        if self.extra_body:
+            api_params["extra_body"] = self.extra_body
+        if proxy_headers:
+            api_params["extra_headers"] = proxy_headers
+
+        try:
+            response = self.client.chat.completions.create(**api_params)
+            content, tool_calls = _accumulate_openai_stream(response)
+            assistant_msg: Dict[str, Any] = {"role": "assistant", "content": content}
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+            self.messages.append(assistant_msg)
+            return content, tool_calls
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
+            )
+            self._native_disabled = True
+            # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
+            if append_user and message and self.messages and self.messages[-1].get("role") == "user":
+                self.messages.pop()
+            content, _ = self._native_fallback_text(message, append_user)
+            return content, None
+
+    def _native_fallback_text(
+        self,
+        message: Optional[Union[str, List[ContentBlock]]],
+        append_user: bool,
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+        """原生失败后的纯文本回退：复用既有 chat() 文本协议。"""
+        if message is None:
+            # 理论上工具轮不该出现纯文本轮；若发生，仅返回 None
+            return None, None
+        text_parts: List[str] = []
+        for typ, text in self.chat(message):
+            if typ == "content":
+                text_parts.append(text)
+        joined = "".join(text_parts)
+        return (joined or None), None
 
     def name(self) -> str:
         """
