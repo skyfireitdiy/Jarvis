@@ -13,6 +13,7 @@ from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.content_types import ContentBlock
+from jarvis.jarvis_platform.native_tools import to_anthropic_messages
 from jarvis.jarvis_utils.output import PrettyOutput
 import jarvis.jarvis_utils.globals as jglobals
 
@@ -262,20 +263,10 @@ class ClaudeModel(BasePlatform):
             self.client.api_key = next_key
 
         try:
-            # 转换消息格式为 Anthropic 格式，同时提取系统消息
-            anthropic_messages: List[MessageParam] = []
-            system_content = None
-            for msg in self.messages:
-                role = msg.get("role")
-                content = msg.get("content")
-                if role == "system" and content:
-                    # 提取系统消息用于 API 调用，并同步到 system_message 属性
-                    system_content = content
-                    self.system_message = content
-                elif role == "user" and content:
-                    anthropic_messages.append({"role": "user", "content": content})
-                elif role == "assistant" and content:
-                    anthropic_messages.append({"role": "assistant", "content": content})
+            # 转换消息格式为 Anthropic 格式（兼容 role=tool / assistant tool_calls 规范消息），同时提取系统消息
+            system_content, anthropic_messages = to_anthropic_messages(self.messages)
+            if system_content:
+                self.system_message = system_content
 
             # 添加当前用户消息
             # 处理多模态消息
@@ -399,6 +390,113 @@ class ClaudeModel(BasePlatform):
             if len(self.messages) > messages_before_user:
                 self.messages = self.messages[:messages_before_user]
             raise Exception(f"Chat failed: {str(e)}")
+
+    def supports_native_tool_calls(self) -> bool:
+        return True
+
+    def chat_native_once(
+        self,
+        message: Optional[Union[str, List[ContentBlock]]],
+        tools: List[Dict[str, Any]],
+        append_user: bool = True,
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+        """带原生 tools 的流式对话，返回 (content, tool_calls)。
+
+        - tool_calls 为规范格式 [{"id","name","arguments": <dict>}]；无工具调用时为 None
+        - 成功会以规范消息追加 assistant（含 tool_calls）进历史
+        - 端点不支持 tools 时降级为纯文本并置 _native_disabled
+        """
+        if self._native_disabled or not tools:
+            content, _ = self._claude_fallback_text(message, append_user)
+            return content, None
+        if not self.client:
+            raise Exception("Anthropic client not initialized")
+
+        # 多模态列表消息暂不走原生（主路径为纯文本）；None 表示工具续轮，仍需原生
+        if message is not None and not isinstance(message, str):
+            content, _ = self._claude_fallback_text(message, append_user)
+            return content, None
+
+        next_key = self._get_next_api_key()
+        if next_key:
+            self.api_key = next_key
+            self.client.api_key = next_key
+
+        system_text, anthropic_messages = to_anthropic_messages(self.messages)
+        if append_user and message:
+            anthropic_messages.append({"role": "user", "content": message})
+
+        stream_kwargs: Dict[str, Any] = {
+            "model": self.model_name,
+            "messages": anthropic_messages,
+            "max_tokens": 4096,
+            "tools": tools,
+        }
+        if system_text:
+            stream_kwargs["system"] = [{"type": "text", "text": system_text}]
+        proxy_headers = self._get_proxy_extra_headers()
+        if proxy_headers:
+            stream_kwargs["extra_headers"] = proxy_headers
+
+        try:
+            with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
+                content_parts: List[str] = []
+                for text in stream.text_stream:
+                    content_parts.append(text)
+                final_message = stream.get_final_message()
+
+            content = "".join(content_parts)
+            tool_calls: List[Dict[str, Any]] = []
+            for block in getattr(final_message, "content", None) or []:
+                if getattr(block, "type", None) == "tool_use":
+                    tool_calls.append(
+                        {
+                            "id": getattr(block, "id", ""),
+                            "name": getattr(block, "name", ""),
+                            "arguments": getattr(block, "input", None) or {},
+                        }
+                    )
+
+            if append_user and message:
+                self.messages.append({"role": "user", "content": message})
+            assistant_msg: Dict[str, Any] = {
+                "role": "assistant",
+                "content": content or None,
+            }
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+            self.messages.append(assistant_msg)
+            return (content or None), (tool_calls or None)
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
+            )
+            self._native_disabled = True
+            # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
+            if (
+                append_user
+                and message
+                and self.messages
+                and self.messages[-1].get("role") == "user"
+            ):
+                self.messages.pop()
+            content, _ = self._claude_fallback_text(message, append_user)
+            return content, None
+
+    def _claude_fallback_text(
+        self,
+        message: Optional[Union[str, List[ContentBlock]]],
+        append_user: bool,
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+        """原生失败后的纯文本回退：复用既有 chat() 文本协议。"""
+        if message is None:
+            return None, None
+        parts: List[str] = []
+        for typ, text in self.chat(message):
+            if typ == "content":
+                parts.append(text)
+        joined = "".join(parts)
+        return (joined or None), None
 
     def name(self) -> str:
         """
