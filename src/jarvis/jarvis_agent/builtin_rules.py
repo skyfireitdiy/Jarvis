@@ -7,6 +7,7 @@
 """
 
 import os
+import re
 
 from pathlib import Path
 
@@ -132,6 +133,24 @@ def list_builtin_rule_entries() -> list[str]:
     if not base_dir.exists():
         return []
 
+    def _entry_md(path: Path) -> bool:
+        # 仅带 name + description front matter 的 .md 才作为可自动选择的规则；
+        # references/章节文档等无描述伴生文件仍可按路径 load_rule，但不参与自动选择。
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            return False
+        if not text.startswith("---"):
+            return False
+        fm = re.search(r"^---\n(.*?)\n---", text, re.S)
+        if not fm:
+            return False
+        head = fm.group(1)
+        return bool(
+            re.search(r"^name\s*:", head, re.M)
+            and re.search(r"^description\s*:", head, re.M)
+        )
+
     entries: list[str] = []
     for root, dirs, files in os.walk(base_dir, topdown=True):
         root_path = Path(root)
@@ -140,14 +159,18 @@ def list_builtin_rule_entries() -> list[str]:
         )
         if skill_file is not None:
             rel = (root_path / skill_file).relative_to(base_dir).as_posix()
-            if rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES:
+            if (rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES) and _entry_md(
+                root_path / skill_file
+            ):
                 entries.append(rel)
             dirs.clear()
             continue
         for filename in files:
             if filename.lower().endswith(".md"):
                 rel = (root_path / filename).relative_to(base_dir).as_posix()
-                if rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES:
+                if (rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES) and _entry_md(
+                    root_path / filename
+                ):
                     entries.append(rel)
     return sorted(set(entries))
 
