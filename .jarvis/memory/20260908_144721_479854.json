@@ -1,0 +1,8 @@
+{
+  "id": "20260908_144721_479854",
+  "type": "project_long_term",
+  "tags": ["native-tool-calling", "raw_arguments", "compat", "openai"],
+  "content": "原生工具调用 raw_arguments 兼容修复：部分模型（如 deepseek 等 openai 兼容模型）在 tool_calls 里返回 {\"raw_arguments\": \"<真正的参数JSON字符串>\"} 而非直接返回顶级参数，导致工具执行层（如 edit_file）找不到真正的参数（如 files）而报错。修复：openai.py 新增模块级辅助函数 _unwrap_raw_arguments(args)，当解析后的 arguments 顶层含 raw_arguments 键时，把其值（字符串 json.loads 或 dict）解析为真正的参数 dict（raw_arguments 解析结果为基底，其余显式键覆盖/补充）；无法解析则保留原样。在 _accumulate_openai_stream 和 chat_native_once 两处 tool_calls 解析的 json.loads 后调用。验证：单测 6 passed（含新增 test_raw_arguments_wrapped_unwrapped、test_raw_arguments_dict_value_unwrapped），端到端 mock 验证 chat_native_once 正确展开。注意：Anthropic 官方 API 的 tool_use input 是结构化 dict 不会包 raw_arguments，故 claude.py 未处理。ty.toml root 是 ./src 不检查 tests，测试文件 ty 报错非 gate。",
+  "created_at": "2026-09-08T14:47:21.479886",
+  "updated_at": "2026-09-08T14:47:21.479892"
+}
