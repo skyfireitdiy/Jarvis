@@ -1563,9 +1563,10 @@ class Agent:
             guard += 1
             outputs = self._execute_native_batch(calls)
             for call, out in zip(calls, outputs):
-                call_id = call.get("id", "")
-                name = call.get("name", "")
-                if name:
+                call_id = call.get("id", "") or ""
+                name = call.get("name", "") or "unknown"
+                # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
+                if call_id:
                     model.append_native_tool_result(call_id, name, out)
             content, calls = model.chat_native_once(None, tools, append_user=False)
         return content or ""

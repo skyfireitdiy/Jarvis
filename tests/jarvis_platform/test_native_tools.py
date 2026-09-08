@@ -51,6 +51,53 @@ class TestMessageModel:
         assert to_text({"role": "assistant", "content": None}) == ""
 
 
+class TestToolPairing:
+    def _asst_tool_call(self, cid="c1", name="read_code"):
+        return make_tool_call_msg(
+            None, [make_tool_call(cid, name, {"path": "a.py"})]
+        )
+
+    def test_drops_trailing_tool_calls_without_results(self):
+        msgs = [
+            {"role": "user", "content": "hi"},
+            self._asst_tool_call(),
+        ]
+        out = to_openai_messages(msgs)
+        # 末尾孤立 tool_calls 的 assistant 被丢弃，避免 pairing 400
+        assert out == [{"role": "user", "content": "hi"}]
+
+    def test_drops_orphan_tool_result(self):
+        msgs = [
+            {"role": "user", "content": "hi"},
+            make_tool_result_msg("gone_id", "read_code", "x"),
+        ]
+        out = to_openai_messages(msgs)
+        assert out == [{"role": "user", "content": "hi"}]
+
+    def test_keeps_valid_pair(self):
+        msgs = [
+            {"role": "user", "content": "hi"},
+            self._asst_tool_call(),
+            make_tool_result_msg("c1", "read_code", "内容"),
+            {"role": "assistant", "content": "完成"},
+        ]
+        out = to_openai_messages(msgs)
+        assert len(out) == 4
+        assert out[1]["tool_calls"][0]["id"] == "c1"
+        assert out[2]["role"] == "tool"
+
+    def test_anthropic_drops_unpaired_tool_use(self):
+        msgs = [
+            {"role": "user", "content": "hi"},
+            self._asst_tool_call(),
+            {"role": "assistant", "content": "完成了"},
+        ]
+        system, amsgs = to_anthropic_messages(msgs)
+        # 孤立的 tool_use assistant 被丢弃；只剩 user 与后续 assistant 文本
+        roles = [m["role"] for m in amsgs]
+        assert roles == ["user", "assistant"]
+
+
 class TestOpenAISerialization:
     def test_tool_call_and_result(self):
         history = [
@@ -77,7 +124,13 @@ class TestAnthropicSerialization:
         history = [
             {"role": "system", "content": "系统提示"},
             {"role": "user", "content": "hi"},
-            _sample_tool_call_msg(),
+            make_tool_call_msg(
+                "让我查一下",
+                [
+                    make_tool_call("call_1", "read_code", {"path": "a.py"}),
+                    make_tool_call("call_2", "search_web", {"q": "x"}),
+                ],
+            ),
             make_tool_result_msg("call_1", "read_code", "结果A"),
             make_tool_result_msg("call_2", "search_web", "结果B"),
             {"role": "assistant", "content": "完成"},

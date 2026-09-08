@@ -1894,10 +1894,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 else None
             )
             if not result.get("success", False):
-                PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败")
-                err_output = self._format_tool_output(
-                    result.get("stdout", ""), result.get("stderr", ""), platform
-                )
+                _stderr = result.get("stderr", "") or ""
+                _stdout = result.get("stdout", "") or ""
+                _reason = _stderr or _stdout or "未知错误"
+                PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败: {_reason}")
+                err_output = self._format_tool_output(_stdout, _stderr, platform)
                 return err_output
 
             output = self._format_tool_output(
