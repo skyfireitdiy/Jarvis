@@ -793,7 +793,7 @@ class AgentRunLoop:
                 if ag._no_tool_call_count >= 2:
                     from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
 
-                    error_msg = "连续2次对话无工具调用，请用工具以竟其事"
+                    error_msg = "连续2次对话无工具调用，请使用工具来完成当前任务"
                     PrettyOutput.auto_print(f"⚠ {error_msg}")
 
                     # 尝试使用大模型修复
@@ -927,7 +927,7 @@ class AgentRunLoop:
                             [
                                 self.agent.session.addon_prompt,
                                 self.agent.get_tool_usage_prompt(),
-                                "请用工具以竟其事。",
+                                "请使用工具来推进当前任务。",
                             ]
                         )
                     )
@@ -1041,7 +1041,7 @@ class AgentRunLoop:
                                 ag.session.prompt = join_prompts(
                                     [
                                         ag.session.prompt,
-                                        "汝今重复矣，勿复前答，祈予新答。",
+                                        "你刚才重复了同样的回答，请停止复述，给出新的回答。",
                                     ]
                                 )
                                 # 截断最近重复的assistant消息，切断模型自我反馈
@@ -1079,7 +1079,7 @@ class AgentRunLoop:
                                 ag.session.prompt = join_prompts(
                                     [
                                         ag.session.prompt,
-                                        "汝已多次重复矣。吾已压缩上下文以助汝脱困。祈仔细审当前任务，给出全新之答，勿复前答。",
+                                        "你已多次重复同样的回答。我已压缩上下文来帮助你脱离循环。请仔细审视当前任务，给出全新的回答，不要复述之前的输出。",
                                     ]
                                 )
                                 PrettyOutput.auto_print(
@@ -1093,7 +1093,7 @@ class AgentRunLoop:
                                 ag.session.prompt = join_prompts(
                                     [
                                         ag.session.prompt,
-                                        "汝已多次重复，无法自行脱困。请停止当前输出，等待用户指示。",
+                                        "你已多次重复且无法自行脱困。请停止当前输出，等待用户指示。",
                                     ]
                                 )
                             ag._repeat_escalation_level += 1

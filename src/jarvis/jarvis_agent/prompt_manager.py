@@ -140,7 +140,7 @@ class PromptManager:
 
         # 任务完成提示
         complete_prompt = (
-            f"- 若任已竟，唯出 {ot('!!!COMPLETE!!!')}，勿出他文。任结将于后交互中见询。"
+            f"- 若整个任务已完成，只输出 {ot('!!!COMPLETE!!!')}，不要输出其他内容；任务总结将在后续交互中询问。"
             if need_complete and self.agent.auto_complete
             else ""
         )
@@ -173,16 +173,21 @@ class PromptManager:
 
         addon_prompt = f"""
 <system_prompt>
-    请判任已竟否，若竟：
-    {complete_prompt if complete_prompt else "- 直出竟之由，毋需再作新操"}
-    若未竟，请行下步：
-    - 唯含一操
-    - 调工具时，忌一性写或执大内，写文应分写，以免为上下限所截
-    - 若讯不明，请询用补
-    - 若执中连败5次，请询用操
-    - 操列：{action_handlers}{memory_prompts}{mode_hint}
+    先判断整个任务是否已完成：
+
+    - 若已完成：
+        {complete_prompt if complete_prompt else "- 说明完成原因并停止，不要再发起新的工具调用"}
+    - 若未完成，继续推进下一步：
+        - 工具调用直接输出 JSON 对象，无需任何标签包裹
+        - 一次可调用一个或多个工具，但多个工具之间必须**互不依赖**（前者的结果/副作用不能作为后者的输入）；存在依赖时先调用被依赖的工具，等结果后再调下一个
+        - 写文件等大段内容时不要一次性写满，应分多次写入，以免被长度上限截断
+        - 需求或信息不明确时，先向用户询问补充
+        - 连续 5 次执行失败时，停止并向用户询问应如何继续
+        - 可用操作：{action_handlers}{memory_prompts}{mode_hint}
+
+    补充：若当前这阶段的任务已完成、之前上下文价值不大，可输出 {ot("!!!SUMMARY!!!")} 触发压缩并清空历史，以便开启新阶段。
 </system_prompt>
 
-请续。
+请继续。
 """
         return addon_prompt
