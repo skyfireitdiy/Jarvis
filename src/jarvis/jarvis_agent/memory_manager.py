@@ -145,16 +145,16 @@ class MemoryManager:
         if tool_registry:
             tool_names = [tool.name for tool in tool_registry.tools.values()]
 
-            # 如果有memory工具，添加相关提示
+            # 如果有memory工具，添加相关提示（save 与 retrieve 各一行）
             if "memory" in tool_names:
-                memory_prompts += "\n    - 若有关键信息需记忆，请调memory工具（action=save）存忆："
-                memory_prompts += "\n      * project_long_term: 保存与当前项目相关的长期信息（如：架构决策、关键配置、特定实现）"
-                memory_prompts += "\n      * global_long_term: 保存通用的信息、用户喜好、知识、方法等（如：常用命令、个人偏好、解决方案）"
-                memory_prompts += "\n      * short_term: 保存当前任务相关的临时信息（如：当前处理的文件、用户中间需求）"
-
-            # 如果有memory工具，添加相关提示
-            if "memory" in tool_names:
-                memory_prompts += "\n    - 若需获取上下文或寻解决方案，请调memory工具（action=retrieve）检相关记忆"
+                memory_prompts += (
+                    "\n    - 有关键信息需要沉淀时，用 memory(action=save) 保存："
+                    "project_long_term 存项目相关（架构决策、关键配置、实现约定），"
+                    "global_long_term 存通用经验与用户偏好，short_term 存当前任务临时信息"
+                )
+                memory_prompts += (
+                    "\n    - 需要过往上下文或方案时，用 memory(action=retrieve) 检索相关记忆"
+                )
 
         return memory_prompts
 

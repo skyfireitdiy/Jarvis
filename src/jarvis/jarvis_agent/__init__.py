@@ -2546,7 +2546,7 @@ class Agent:
         initial_commit_info = ""
         try:
             if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务始时之初始 commit 乃：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -2797,7 +2797,7 @@ class Agent:
 
         if loaded_rule_infos:
             rules_info = "\n".join(loaded_rule_infos)
-            rules_section = f"\n\n\n**📋 当前已加载之规则列表：**\n\n{rules_info}\n\n提示：如需查看规则详尽内容，祈用 `load_rule` 工具载对应之规则文件。\n\n"
+            rules_section = f"\n\n\n**📋 当前已加载的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则的详细内容，用 `load_rule` 工具加载对应的规则文件。\n\n"
 
         # 获取会话文件路径信息
         session_file_info = ""
@@ -2808,7 +2808,7 @@ class Agent:
             recorder = get_global_recorder()
             session_file_path = recorder.get_session_file_path()
             if Path(session_file_path).exists():
-                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整对话历史已自存于下文，若需察详尽之历史讯，可读此文件：\n`{session_file_path}`\n\n此文件含先前所有对话之全录（JSONL格式），每行一消息录，含时戳、角色与内容。"
+                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整的对话历史已保存在下面这个文件中，需要查更详细的上下文时可以直接读取：\n`{session_file_path}`\n\n该文件包含先前所有对话的完整记录（JSONL 格式），每行一条消息，含时间戳、角色与内容。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -2817,33 +2817,27 @@ class Agent:
         initial_commit_info = ""
         try:
             if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务始时之初始 commit 乃：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
 
         formatted_message = f"""
-以下乃先前对话之要讯摘要：
+以下是从先前对话提取的要点摘要：
 
 <content>
 {summary}
 </content>{rules_section}
 
-**⚠ 严规**：
-一. **每响应唯含一工具调用**：每个响应必含且仅含一工具调用（任务已竟时除外）。同时调用多工具必致误。
-二. **禁虚构结果**：一切操作必据实果，禁推测、假设或虚构。必待工具执行既毕而获实果后方行下步。
-三. **待工具结果**：续行之前，必待现工具之果，不得臆其果。
-四. **据实验证**：一切结论必据实果与验证之据，禁据推测或假设。
-五. **代码任务竟之标准（严行）**：
-   - **编译/构建必通**：代码必能成编/构建，无编误、无语误、无链误
-   - **功能必验**：功能必经实运验证，不得仅凭代码之存即谓已竟
-   - **误必修**：若有编误、运时之误、测败，任务必标为"部分竟"或"进行中"，不得标为"已竟"
-   - **不得因"代码已撰"即谓任务竟**：必验编通、功能常行、测通
+**重要约束**：
+- 一切操作依据工具实际返回的结果，禁止推测、假设或虚构；每个结论都要有验证依据。
+- 工具调用：一次可调用一个或多个**互不依赖**的工具；存在依赖时先执行被依赖的工具，等待结果后再继续。
+- 需要编译/构建/测试验证的代码改动，必须验证通过后才能视为完成；不要因为"代码写了"就宣称任务完成。
 
 **🎯 核心任务目标提醒**：
-祈始终牢记用户之最新任务目标（已于"用户之原始需求与要求"部分明列）。一切操作皆宜围绕竟最新任务目标而行。若当前进度偏离最新目标，祈及时调向。注意：用户之任务目标或于对话过程中生变，祈以最新之目标为准。
+请始终牢记用户的最新任务目标（见上方"用户原始需求与要求"部分）。所有操作都围绕该目标进行；若当前进度偏离最新目标，请及时调整方向。注意：用户的目标可能在对话过程中变化，请以最新表述为准。
 
-祈据以上信息续行任务。注意，此乃先前对话之摘要，上下文长度已逾限而重置。祈径续行任务，无需重复已竟之步骤。若有需要，可询用户以获更多信息。{session_file_info}{initial_commit_info}
+请基于以上信息继续推进任务。注意：这是先前对话的摘要，上下文因超限已重置。请直接继续，无需重复已完成步骤；如需更多信息，可询问用户。{session_file_info}{initial_commit_info}
         """
 
         # 如果有任务列表信息，添加到消息后面
@@ -3084,7 +3078,7 @@ class Agent:
 
         # 任务完成提示
         complete_prompt = (
-            f"- 若任务已竟，只输出 {ot('!!!COMPLETE!!!')}，勿输出其他任何内容。任务撮要将于后交互中见询。"
+            f"- 若整个任务已完成，只输出 {ot('!!!COMPLETE!!!')}，不要输出其他内容；任务总结将在后续交互中询问。"
             if need_complete and self.auto_complete
             else ""
         )
@@ -3096,17 +3090,23 @@ class Agent:
         )
 
         addon_prompt = f"""
-    祈判任已竟否，若竟：
-    {complete_prompt if complete_prompt else "- 径出完成原因，无需再有新操作"}
-    若未竟，祈行下步：
-    - 唯含一操
-    - 若讯不明，祈询用补
-    - 若执中连败五次，祈询用操
-    - 工具调用径出纯 JSON 对象，无需任何标签包裹
-    - 操列：{action_handlers}{memory_prompts}
-    注意：若当前部分任务已竟，之前之上下文价值不大，可输出{ot("!!!SUMMARY!!!")}标记以触发撮要并清空历史，以便开始新任务阶段。
+<system_prompt>
+    先判断整个任务是否已完成：
+
+    - 若已完成：
+        {complete_prompt if complete_prompt else "- 说明完成原因并停止，不要再发起新的工具调用"}
+    - 若未完成，继续推进下一步：
+        - 工具调用直接输出 JSON 对象，无需任何标签包裹
+        - 一次可调用一个或多个工具，但多个工具之间必须**互不依赖**（前者的结果/副作用不能作为后者的输入）；存在依赖时先调用被依赖的工具，等结果后再调下一个
+        - 写文件等大段内容时不要一次性写满，应分多次写入，以免被长度上限截断
+        - 需求或信息不明确时，先向用户询问补充
+        - 连续 5 次执行失败时，停止并向用户询问应如何继续
+        - 可用操作：{action_handlers}{memory_prompts}
+
+    补充：若当前这阶段的任务已完成、之前上下文价值不大，可输出 {ot("!!!SUMMARY!!!")} 触发压缩并清空历史，以便开启新阶段。
 </system_prompt>
-祈续。
+
+请继续。
 """
 
         return addon_prompt
@@ -3426,7 +3426,7 @@ class Agent:
             LoopAction.CONTINUE 或 LoopAction.COMPLETE（兼容旧字符串值 "continue"/"complete"）
         """
         user_input = self._multiline_input(
-            f"{self.name}: 请输入（Ctrl+C 以竟当前之务）", False
+            f"{self.name}: 请输入（Ctrl+C 结束当前任务）", False
         )
 
         if user_input:
@@ -3444,7 +3444,7 @@ class Agent:
                 self.session.prompt = join_prompts(
                     [
                         self.session.prompt,
-                        "祈勿再复前答，祈予异答。",
+                        "请不要复述之前的回答，请给出不同的回答。",
                     ]
                 )
                 self._repeat_detected = False
@@ -3607,18 +3607,18 @@ class Agent:
             tools_prompt_part += f"{i}. {tool['name']}: {tool['description']}\n"
 
         selection_prompt = f"""
-用户之务：
+用户任务：
 <task>
 {task}
 </task>
 
-此乃可用工具之列：
+可用工具列表：
 <tools>
 {tools_prompt_part}
 </tools>
 
-祈据用户之务，从列中择最相关之工具。
-祈仅返所选工具之编号，以逗号分隔。例如：1, 5, 12
+请根据用户任务，从中选择最相关的工具。
+只返回所选工具的编号，用逗号分隔。例如：1, 5, 12
 """
         PrettyOutput.auto_print(
             f"ℹ️ 工具数量超过{threshold}个，正在使用AI筛选相关工具..."
