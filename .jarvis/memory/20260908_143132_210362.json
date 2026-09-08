@@ -1,0 +1,8 @@
+{
+  "id": "20260908_143132_210362",
+  "type": "project_long_term",
+  "tags": ["native-tool-calling", "repeat-detection", "retry", "bug-fix"],
+  "content": "原生工具调用重复检测重试逻辑的边界 bug 修复：当重试耗尽（最后一次迭代仍检测到重复）时，原代码错误地追加了空 assistant 消息并返回。修复：openai.py 与 claude.py 的 chat_native_once 中，当 `not content and not tool_calls` 且 `attempt >= max_retries - 1`（重试耗尽）时改为 `break` 跳出循环，统一走循环后的用户消息回滚逻辑（messages 回滚为 0，返回 (None, None)）。验证：重试耗尽场景 messages 回滚为 0、create 调用 6 次；第2次成功场景 messages 正确（user+assistant）、create 调用 2 次；工具调用场景（content 空但有 tool_calls）不触发重试、create 调用 1 次。测试坑：claude 的 panel 渲染版本（stream_chat_with_panel）对第一个 chunk 不做重复检测（output.py 1446-1487 first_chunk 特殊处理），mock 时需用多个 chunk 模拟真实流式才能触发重复检测；单 chunk 一次性返回整个重复文本时 panel 版本漏检（既有行为，真实流式逐 token 场景不受影响）。",
+  "created_at": "2026-09-08T14:31:32.210404",
+  "updated_at": "2026-09-08T14:31:32.210413"
+}

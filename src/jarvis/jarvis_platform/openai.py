@@ -582,10 +582,7 @@ class OpenAIModel(BasePlatform):
 
         # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
         if append_user and message:
-            if isinstance(message, str):
-                self.messages.append({"role": "user", "content": message})
-            else:
-                self.messages.append({"role": "user", "content": message})
+            self.messages.append({"role": "user", "content": message})
 
         # 轮询切换下一个 key
         next_key = self._get_next_api_key()
@@ -609,98 +606,133 @@ class OpenAIModel(BasePlatform):
         if proxy_headers:
             api_params["extra_headers"] = proxy_headers
 
-        try:
-            response = self.client.chat.completions.create(**api_params)
+        # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
+        import time
+        from jarvis.jarvis_utils.config import get_pretty_output
 
-            # 累积器：content 逐块 yield 供流式渲染，tool_calls 分片按 index 归并
-            content_parts: List[str] = []
-            tool_calls_acc: Dict[int, Dict[str, str]] = {}
+        # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
+        render_message: Union[str, List[ContentBlock]] = (
+            message if message is not None else ""
+        )
 
-            def _gen() -> Generator[Tuple[str, str], None, None]:
-                for chunk in response:
-                    if not getattr(chunk, "choices", None):
-                        continue
-                    delta = chunk.choices[0].delta
-                    if delta is None:
-                        continue
-                    piece = getattr(delta, "content", None)
-                    if piece:
-                        content_parts.append(piece)
-                        yield ("content", piece)
-                    for tc in getattr(delta, "tool_calls", None) or []:
-                        idx = getattr(tc, "index", 0) or 0
-                        entry = tool_calls_acc.setdefault(
-                            idx, {"id": "", "name": "", "arguments": ""}
+        # 重试循环：渲染管线检测到输出陷入重复（返回空 content 且无 tool_calls）时重试，
+        # 与文本协议路径 chat_until_success 的 while_true 重试机制对齐。
+        max_retries = 6
+        for attempt in range(max_retries):
+            try:
+                response = self.client.chat.completions.create(**api_params)
+
+                # 累积器：content 逐块 yield 供流式渲染，tool_calls 分片按 index 归并
+                content_parts: List[str] = []
+                tool_calls_acc: Dict[int, Dict[str, str]] = {}
+
+                def _gen() -> Generator[Tuple[str, str], None, None]:
+                    for chunk in response:
+                        if not getattr(chunk, "choices", None):
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta is None:
+                            continue
+                        piece = getattr(delta, "content", None)
+                        if piece:
+                            content_parts.append(piece)
+                            yield ("content", piece)
+                        for tc in getattr(delta, "tool_calls", None) or []:
+                            idx = getattr(tc, "index", 0) or 0
+                            entry = tool_calls_acc.setdefault(
+                                idx, {"id": "", "name": "", "arguments": ""}
+                            )
+                            if getattr(tc, "id", None):
+                                entry["id"] = tc.id
+                            fn = getattr(tc, "function", None)
+                            if fn is not None:
+                                if getattr(fn, "name", None):
+                                    entry["name"] = fn.name
+                                if getattr(fn, "arguments", None):
+                                    entry["arguments"] += fn.arguments or ""
+
+                start_time = time.time()
+                if not self.suppress_output:
+                    if get_pretty_output():
+                        content, _reasoning, _ft = self._chat_with_pretty_output(
+                            render_message, start_time, chat_iterator=_gen()
                         )
-                        if getattr(tc, "id", None):
-                            entry["id"] = tc.id
-                        fn = getattr(tc, "function", None)
-                        if fn is not None:
-                            if getattr(fn, "name", None):
-                                entry["name"] = fn.name
-                            if getattr(fn, "arguments", None):
-                                entry["arguments"] += fn.arguments or ""
-
-            # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
-            import time
-            from jarvis.jarvis_utils.config import get_pretty_output
-
-            start_time = time.time()
-            # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
-            render_message: Union[str, List[ContentBlock]] = (
-                message if message is not None else ""
-            )
-            if not self.suppress_output:
-                if get_pretty_output():
-                    content, _reasoning, _ft = self._chat_with_pretty_output(
-                        render_message, start_time, chat_iterator=_gen()
+                    else:
+                        content, _reasoning, _ft = self._chat_with_simple_output(
+                            render_message, start_time, chat_iterator=_gen()
+                        )
+                    # 与文本协议 _chat 对齐：打印模型响应统计信息
+                    self._print_response_stats(
+                        content or "", _reasoning or "", _ft, start_time
                     )
                 else:
-                    content, _reasoning, _ft = self._chat_with_simple_output(
-                        render_message, start_time, chat_iterator=_gen()
+                    content, _reasoning = self._chat_with_suppressed_output(
+                        render_message, chat_iterator=_gen()
                     )
-            else:
-                content, _reasoning = self._chat_with_suppressed_output(
-                    render_message, chat_iterator=_gen()
-                )
 
-            # 从累积的 tool_calls 分片解析规范格式
-            tool_calls: List[Dict[str, Any]] = []
-            for idx in sorted(tool_calls_acc.keys()):
-                e = tool_calls_acc[idx]
-                raw_args = e.get("arguments", "")
-                try:
-                    args = json.loads(raw_args) if raw_args.strip() else {}
-                except Exception:
-                    args = {"raw_arguments": raw_args}
-                tool_calls.append(
-                    {
-                        "id": e.get("id", ""),
-                        "name": e.get("name", ""),
-                        "arguments": args,
-                    }
-                )
+                # 从累积的 tool_calls 分片解析规范格式
+                tool_calls: List[Dict[str, Any]] = []
+                for idx in sorted(tool_calls_acc.keys()):
+                    e = tool_calls_acc[idx]
+                    raw_args = e.get("arguments", "")
+                    try:
+                        args = json.loads(raw_args) if raw_args.strip() else {}
+                    except Exception:
+                        args = {"raw_arguments": raw_args}
+                    tool_calls.append(
+                        {
+                            "id": e.get("id", ""),
+                            "name": e.get("name", ""),
+                            "arguments": args,
+                        }
+                    )
 
-            assistant_msg: Dict[str, Any] = {"role": "assistant", "content": content}
-            if tool_calls:
-                assistant_msg["tool_calls"] = tool_calls
-            self.messages.append(assistant_msg)
-            return (content or None), (tool_calls or None)
-        except Exception as e:
-            PrettyOutput.auto_print(
-                f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
-            )
-            self._native_disabled = True
-            # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
-            if (
-                append_user
-                and message
-                and self.messages
-                and self.messages[-1].get("role") == "user"
-            ):
-                self.messages.pop()
-            content, _ = self._native_fallback_text(message, append_user)
-            return content, None
+                # 渲染管线检测到输出陷入重复时返回空 content；若同时无 tool_calls，
+                # 判定为重复导致空输出，回滚本轮并重试（与文本协议路径一致）。
+                if not content and not tool_calls:
+                    if attempt < max_retries - 1:
+                        sleep_time = 2**attempt
+                        PrettyOutput.auto_print(
+                            f"⚠️ 模型输出为空或陷入重复，重试中 ({attempt + 1}/{max_retries})，等待 {sleep_time}s..."
+                        )
+                        time.sleep(sleep_time)
+                        continue
+                    # 重试耗尽仍未获得有效输出，跳出循环统一回滚
+                    break
+
+                assistant_msg: Dict[str, Any] = {
+                    "role": "assistant",
+                    "content": content,
+                }
+                if tool_calls:
+                    assistant_msg["tool_calls"] = tool_calls
+                self.messages.append(assistant_msg)
+                return (content or None), (tool_calls or None)
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
+                )
+                self._native_disabled = True
+                # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
+                if (
+                    append_user
+                    and message
+                    and self.messages
+                    and self.messages[-1].get("role") == "user"
+                ):
+                    self.messages.pop()
+                content, _ = self._native_fallback_text(message, append_user)
+                return content, None
+
+        # 重试耗尽仍未获得有效输出，回滚用户消息并返回空
+        if (
+            append_user
+            and message
+            and self.messages
+            and self.messages[-1].get("role") == "user"
+        ):
+            self.messages.pop()
+        return None, None
 
     def _native_fallback_text(
         self,

@@ -254,6 +254,57 @@ class BasePlatform(ABC):
         except Exception:
             return 0.0, "green", ""
 
+    def _print_response_stats(
+        self,
+        response: str,
+        reasoning_content: str,
+        first_token_time: float,
+        start_time: float,
+    ) -> None:
+        """打印模型响应统计信息（与 _chat 对齐，供原生工具路径复用）。"""
+        import time
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        # 计算性能指标
+        response_tokens = get_context_token_count(response) + get_context_token_count(
+            reasoning_content
+        )
+        generation_time = max(
+            0.0,
+            duration - first_token_time if duration > first_token_time else duration,
+        )
+        tokens_per_second = (
+            response_tokens / generation_time if generation_time > 0 else 0.0
+        )
+
+        # 获取Token使用信息
+        try:
+            usage_percent, percent_color, progress_bar = self._get_token_usage_info(
+                response
+            )
+            threshold = get_conversation_turn_threshold()
+            # 计算当前使用的token数和总token数
+            used_tokens = (
+                self.get_used_token_count()
+                + get_context_token_count(response)
+                + get_context_token_count(reasoning_content)
+            )
+            max_tokens = self._get_platform_max_input_token_count()
+            PrettyOutput.auto_print(
+                f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
+                f"Token: {used_tokens}/{max_tokens} ({usage_percent:.1f}%)"
+            )
+        except Exception:
+            threshold = get_conversation_turn_threshold()
+            PrettyOutput.auto_print(
+                f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
+                f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
+            )
+            pass
+
     def _chat_with_pretty_output(
         self,
         message: Union[str, List[ContentBlock]],
@@ -404,49 +455,10 @@ class BasePlatform(ABC):
                     self._chat_with_simple_output(message, start_time, max_output)
                 )
 
-            # 计算响应时间并打印总结
-            end_time = time.time()
-            duration = end_time - start_time
-
-            # 计算性能指标
-            response_tokens = get_context_token_count(
-                response
-            ) + get_context_token_count(reasoning_content)
-            generation_time = max(
-                0.0,
-                duration - first_token_time
-                if duration > first_token_time
-                else duration,
+            # 计算响应时间并打印总结（与原生工具路径共用 _print_response_stats）
+            self._print_response_stats(
+                response, reasoning_content, first_token_time, start_time
             )
-            tokens_per_second = (
-                response_tokens / generation_time if generation_time > 0 else 0.0
-            )
-
-            # 获取Token使用信息
-            try:
-                usage_percent, percent_color, progress_bar = self._get_token_usage_info(
-                    response
-                )
-                threshold = get_conversation_turn_threshold()
-                # 计算当前使用的token数和总token数
-                used_tokens = (
-                    self.get_used_token_count()
-                    + get_context_token_count(response)
-                    + get_context_token_count(reasoning_content)
-                )
-                max_tokens = self._get_platform_max_input_token_count()
-                PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
-                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s | "
-                    f"Token: {used_tokens}/{max_tokens} ({usage_percent:.1f}%)"
-                )
-            except Exception:
-                threshold = get_conversation_turn_threshold()
-                PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | "
-                    f"首token: {first_token_time:.2f}秒 | 速度: {tokens_per_second:.1f} tokens/s"
-                )
-                pass
         else:
             response, reasoning_content = self._chat_with_suppressed_output(
                 message, max_output
