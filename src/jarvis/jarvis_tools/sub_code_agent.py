@@ -47,7 +47,7 @@ class SubCodeAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_code_agent"
-    description = "将子任交 CodeAgent 执而归果（自竟并成总）。"
+    description = "把相对独立的编码子任务交给新的 CodeAgent 在隔离会话中执行并返回总结，避免污染主上下文；子代理内禁止再嵌套。"
     parameters = {
         "type": "object",
         "properties": {

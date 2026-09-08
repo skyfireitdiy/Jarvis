@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 class ReadCodeTool:
     name = "read_code"
-    description = "读取源代码文件之指定行号范围，并为每行加行号而归。"
+    description = "读取源代码文件：可按 path + start_line/end_line 读取指定行号范围，输出带行号，便于定位与回看。"
 
     def _get_preferred_encodings(self) -> List[str]:
         """获取工具级优先编码顺序。Windows 优先 gbk，其他平台优先 utf-8。"""

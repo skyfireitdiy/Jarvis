@@ -136,7 +136,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "执脚本而归果，支任意解释器。Windows 默用 powershell，Unix 默用 bash。免出过多，议用 grep、Select-String 等令滤限出长。\n\n示例用法（Unix/Linux）：\n• 查错：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 览首20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜函定：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 览目：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
+    description = "在指定的解释器/终端执行脚本并返回结果。Windows 默用 powershell，Unix 默用 bash。免出过多，议用 grep、Select-String 等令滤限出长。\n\n示例用法（Unix/Linux）：\n• 查错：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 览首20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜函定：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 览目：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
     parameters = {
         "type": "object",
         "properties": {

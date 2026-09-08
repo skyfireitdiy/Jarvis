@@ -24,7 +24,7 @@ else:
 
 class VirtualTTYTool:
     name = "virtual_tty"
-    description = "控虚拟终端行交式操（如ssh、sftp、gdb等）。与execute_script异，此工具建持久会话，保终端态。Windows平功有限。"
+    description = "管理持久虚拟终端会话做交互式操作（ssh/sftp/gdb 等）；与一次性执行不同，本工具保留终端状态供多条命令连续交互。Windows 支持有限。"
     parameters = {
         "type": "object",
         "properties": {
