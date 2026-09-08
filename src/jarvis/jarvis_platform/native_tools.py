@@ -95,6 +95,51 @@ def to_text(msg: Any) -> str:
     return msg_content_text(msg)
 
 
+def ensure_tool_pairing(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """清洗规范消息历史，保证 tool_calls 与 role=tool 回包配对完整。
+
+    历史被裁剪/压缩切断配对时，OpenAI/Anthropic 会 400（assistant tool_calls 后
+    缺对应 tool 消息）。此函数：
+    - 丢弃"带 tool_calls 但后续无任何匹配 tool 回包"的 assistant 消息；
+    - 丢弃没有对应前置 tool_calls 的孤立 tool 结果；
+    - 保留正常配对。
+    """
+    out: List[Dict[str, Any]] = []
+    pending_ids = set()
+    open_idx: Optional[int] = None
+
+    for msg in messages:
+        if is_tool_call_msg(msg):
+            if open_idx is not None:
+                del out[open_idx]
+            ids = {(tc.get("id") or "") for tc in msg.get("tool_calls") or []}
+            ids.discard("")
+            if not ids:
+                out.append(msg)
+            else:
+                out.append(msg)
+                pending_ids = set(ids)
+                open_idx = len(out) - 1
+        elif is_tool_result_msg(msg):
+            tid = msg.get("tool_call_id") or ""
+            if tid and tid in pending_ids:
+                pending_ids.discard(tid)
+                out.append(msg)
+                if not pending_ids:
+                    open_idx = None
+            # 孤立 tool 结果：丢弃
+        else:
+            if open_idx is not None:
+                del out[open_idx]
+            open_idx = None
+            pending_ids = set()
+            out.append(msg)
+
+    if open_idx is not None:
+        del out[open_idx]
+    return out
+
+
 def to_openai_message(msg: Dict[str, Any]) -> Dict[str, Any]:
     """单条规范消息 -> OpenAI ChatCompletion 消息。"""
     role = msg.get("role")
@@ -132,7 +177,7 @@ def to_openai_message(msg: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def to_openai_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return [to_openai_message(m) for m in messages]
+    return [to_openai_message(m) for m in ensure_tool_pairing(messages)]
 
 
 def to_anthropic_messages(
@@ -164,7 +209,7 @@ def to_anthropic_messages(
         # 因此总是新开一条仅含 tool_result 的 user 消息（Anthropic 允许）。
         out.append({"role": "user", "content": blocks})
 
-    for msg in messages:
+    for msg in ensure_tool_pairing(messages):
         role = msg.get("role")
         if role == "system":
             system_parts.append(msg_content_text(msg))

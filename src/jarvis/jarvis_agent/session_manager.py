@@ -809,7 +809,50 @@ class SessionManager:
         # 如果是CodeAgent，恢复start_commit信息
         self._restore_start_commit_info()
 
+        # 打印最近几条对话，便于用户确认恢复是否正确
+        self._print_recent_conversation(session_file)
+
         return True
+
+    def _print_recent_conversation(
+        self, session_file: str, count: int = 4
+    ) -> None:
+        """恢复会话后打印最近几条对话，便于用户确认恢复是否正确。
+
+        参数:
+            session_file: 会话文件路径
+            count: 要打印的最近对话消息条数
+        """
+        try:
+            with open(session_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            messages = state.get("messages", [])
+
+            # 筛选出真正的对话消息（用户提问与助手文本回复），
+            # 跳过工具调用/结果与系统消息
+            dialog = []
+            for msg in messages:
+                role = msg.get("role")
+                content = msg.get("content")
+                if not content:
+                    continue
+                if role == "user" and not msg.get("tool_call_id"):
+                    dialog.append(("👤 用户", content))
+                elif role == "assistant":
+                    dialog.append(("🤖 助手", content))
+
+            if not dialog:
+                return
+
+            PrettyOutput.auto_print("📜 最近对话（用于确认恢复是否正确）：")
+            for label, content in dialog[-count:]:
+                # 截断过长内容，避免刷屏
+                text = content.strip()
+                if len(text) > 200:
+                    text = text[:200] + "…"
+                PrettyOutput.auto_print(f"{label}: {text}")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 打印最近对话失败: {e}")
 
     def _check_token_compatibility_before_restore(self, session_file: str) -> bool:
         """在恢复会话之前检查历史消息的token数量是否满足要求
@@ -908,6 +951,8 @@ class SessionManager:
                 self._restore_task_lists()
                 # 如果是CodeAgent，恢复start_commit信息
                 self._restore_start_commit_info()
+                # 打印最近几条对话，便于用户确认恢复是否正确
+                self._print_recent_conversation(session_file)
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -948,6 +993,8 @@ class SessionManager:
                 self._restore_task_lists()
                 # 如果是CodeAgent，恢复start_commit信息
                 self._restore_start_commit_info()
+                # 打印最近几条对话，便于用户确认恢复是否正确
+                self._print_recent_conversation(session_file)
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -1032,6 +1079,8 @@ class SessionManager:
                 self._restore_task_lists()
                 # 如果是CodeAgent，恢复start_commit信息
                 self._restore_start_commit_info()
+                # 打印最近几条对话，便于用户确认恢复是否正确
+                self._print_recent_conversation(session_file)
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
