@@ -1796,13 +1796,19 @@ class ToolRegistry(OutputHandlerProtocol):
         return result
 
     def execute_native_tool_call(
-        self, name: str, arguments: Dict[str, Any], agent: Any
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        agent: Any,
+        record: bool = True,
     ) -> str:
         """按原生 function call 执行单个工具并返回格式化结果文本。
 
         与文本协议的区别：name/arguments 由模型以结构化形式给出，无需解析；
         执行与输出处理（格式/压缩/超限摘要）复用文本协议同款路径。
         确认（confirm）门控由调用方（run_loop）负责。
+        record=False 用于并行批处理场景：跳过对共享 agent 状态的写入，
+        由调用方在执行结束后统一记录已执行工具。
         """
         try:
             from jarvis.jarvis_agent import Agent
@@ -1859,20 +1865,22 @@ class ToolRegistry(OutputHandlerProtocol):
             elapsed_time = time.time() - start_time
 
             # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
-            try:
-                agent_instance.set_user_data("__last_executed_tool__", name)
-                executed_list = agent_instance.get_user_data("__executed_tools__")
-                if not isinstance(executed_list, list):
-                    executed_list = []
-                executed_list.append(name)
-                agent_instance.set_user_data("__executed_tools__", executed_list)
-            except Exception as e:
-                save_exception(
-                    e,
-                    module="jarvis_tools.registry",
-                    function="execute_native_tool_call",
-                )
-                pass
+            # 并行批处理（record=False）时跳过，由调用方统一记录，避免共享状态竞态
+            if record:
+                try:
+                    agent_instance.set_user_data("__last_executed_tool__", name)
+                    executed_list = agent_instance.get_user_data("__executed_tools__")
+                    if not isinstance(executed_list, list):
+                        executed_list = []
+                    executed_list.append(name)
+                    agent_instance.set_user_data("__executed_tools__", executed_list)
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.registry",
+                        function="execute_native_tool_call",
+                    )
+                    pass
 
             platform = (
                 getattr(agent_instance, "model", None)
