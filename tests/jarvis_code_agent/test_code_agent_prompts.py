@@ -58,3 +58,16 @@ class TestGetSystemPrompt:
             assert isinstance(prompt, str) and prompt.strip(), f"{scenario} 系统提示词为空"
             assert "[MODE:" not in prompt, f"{scenario} 不应强制 [MODE:] 前缀"
             assert "汝" not in prompt and "文言文" not in prompt, f"{scenario} 不应使用文言风格"
+
+    def test_inherit_core_scenario_composes_with_default_core(self):
+        """声明 inherit_core 的场景 = 自身要点 + default 共享核心"""
+        prompt = get_system_prompt("feature")
+        assert "功能开发要点" in prompt
+        assert "## 工作主线" in prompt
+        assert "## 工具使用" in prompt
+
+    def test_detailed_design_stays_standalone(self):
+        """detailed_design 不含共享代码核心，保持独立模板"""
+        prompt = get_system_prompt("detailed_design")
+        assert "详细设计文档模板" in prompt
+        assert "## 工作主线" not in prompt

@@ -21,3 +21,10 @@ class TestAgentSystemPrompts:
             assert "[MODE:" not in prompt, f"{scenario} 不应强制 [MODE:] 前缀"
             assert "汝" not in prompt and "文言文" not in prompt, f"{scenario} 不应使用文言风格"
             assert "工作方法" in prompt, f"{scenario} 应包含共享的工作方法段落"
+
+    def test_inherit_core_scenario_composes_with_default_core(self):
+        """声明 inherit_core 的场景 = 自身要点 + default 共享核心"""
+        prompt = get_system_prompt("planning", scenario_subdir=_SCENARIO_SUBDIR)
+        assert "规划决策要点" in prompt
+        assert "## 工作方法" in prompt
+        assert "## 沟通" in prompt
