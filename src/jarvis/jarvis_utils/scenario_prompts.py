@@ -7,7 +7,7 @@
 """
 
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml  # type: ignore[import-untyped]
 
@@ -216,7 +216,12 @@ def classify_user_request(
         user_input = "\n".join(text_parts) if text_parts else "[多模态内容]"
 
     try:
-        platform = PlatformRegistry().get_normal_platform()
+        # 分类/路由属低风险判断，优先使用 cheap 档以节省成本；未配置 cheap 时回退 normal
+        registry = PlatformRegistry()
+        try:
+            platform = registry.get_cheap_platform()
+        except Exception:
+            platform = registry.get_normal_platform()
         platform.set_suppress_output(False)
 
         scenarios = _load_scenario_types(scenario_subdir)
@@ -296,10 +301,45 @@ difficulty: <难度>
         return "default", "medium"
 
 
+def _front_matter_dict(
+    prompt_dirs: List[Path], scenario: str
+) -> Optional[Dict[str, Any]]:
+    """读取首个存在的场景文件并解析其 front matter
+
+    用于检测场景文件是否声明继承 default 的共享核心（inherit_core: true）。
+
+    参数:
+        prompt_dirs: 提示词目录列表（优先级从高到低）
+        scenario: 场景文件名（不含 .md 后缀）
+
+    返回:
+        Optional[Dict]: front matter 字典；文件不存在或解析失败返回 None
+    """
+    for prompt_dir in prompt_dirs:
+        prompt_file = prompt_dir / f"{scenario}.md"
+        if prompt_file.exists():
+            try:
+                content = prompt_file.read_text(encoding="utf-8")
+                if content.startswith("---"):
+                    end_marker = content.find("\n---", 4)
+                    if end_marker != -1:
+                        front_matter = yaml.safe_load(content[4:end_marker])
+                        if isinstance(front_matter, dict):
+                            return front_matter
+            except Exception:
+                pass
+            return {}
+    return None
+
+
 def get_system_prompt(
     scenario: str = "default", scenario_subdir: str = "agent_system"
 ) -> str:
     """根据场景类型获取对应的系统提示词
+
+    - 未声明继承的场景文件：原样返回（向后兼容，用户自定义文件不受影响）。
+    - 声明了 ``inherit_core: true`` 的场景文件：返回"场景正文 + default 场景的共享核心"，
+      使公共段落只维护在 default 一处，避免各场景复制漂移。
 
     参数:
         scenario: 场景类型
@@ -308,4 +348,23 @@ def get_system_prompt(
     返回:
         str: 对应场景的完整系统提示词
     """
-    return _load_prompt_from_file(scenario, scenario_subdir)
+    content = _load_prompt_from_file(scenario, scenario_subdir)
+    if scenario == "default":
+        return content
+
+    prompt_dirs = _get_prompt_dirs(scenario_subdir)
+    front_matter = _front_matter_dict(prompt_dirs, scenario)
+    if not (front_matter and front_matter.get("inherit_core", False)):
+        return content
+
+    # 共享核心从 default 正文的 core_marker 章节起（见 default 文件的 front matter）。
+    # 无 core_marker 时退化为取 default 正文第一个 "## " 章节。
+    base = _load_prompt_from_file("default", scenario_subdir)
+    default_fm = _front_matter_dict(prompt_dirs, "default") or {}
+    marker = default_fm.get("core_marker")
+    if marker and marker in base:
+        core = base[base.find(marker) :]
+    else:
+        idx = base.find("\n## ")
+        core = base[idx + 1 :] if idx != -1 else base
+    return content.rstrip() + "\n\n" + core
