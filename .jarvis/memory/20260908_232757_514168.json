@@ -1,0 +1,8 @@
+{
+  "id": "20260908_232757_514168",
+  "type": "project_long_term",
+  "tags": ["jarvis", "context-management", "claude-code", "方案设计"],
+  "content": "将 Claude Code 上下文机制引入 Jarvis 的方案已设计完成，文档在 docs/design/context-management-claude-code.md（207行，待评审）。核心：Jarvis 已有后台预压缩(75%)+80%触发压缩+滑动窗口，缺 Claude Code 的两层——L0大工具结果落盘截断(超阈值写文件留预览+路径，接入点 base.py:118 append_native_tool_result)和 L1剥离旧工具结果微压缩(无模型调用，接入点 run_loop.check_and_compress_context 75%预压缩之前)。分3阶段落地：A=L0落盘、B=L1微压缩、C=联调调参。关键风险：文本协议工具结果回填路径(_handle_tool_calls run_loop.py:522)与原生不同需单独核实；剥离必须保证 tool_calls 与 role=tool 配对完整(复用 ensure_tool_pairing)否则 API 400。配置项默认值保守：tool_result_disk_threshold=20000字符、microcompact_trigger_ratio=0.35。",
+  "created_at": "2026-09-08T23:27:57.514201",
+  "updated_at": "2026-09-08T23:27:57.514207"
+}

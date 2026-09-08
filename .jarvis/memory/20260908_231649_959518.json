@@ -1,0 +1,15 @@
+{
+  "id": "20260908_231649_959518",
+  "type": "project_long_term",
+  "tags": [
+    "pre_compression",
+    "后台压缩",
+    "立即生效",
+    "run_loop",
+    "check_and_compress_context",
+    "bug_fix"
+  ],
+  "content": "修复：后台预压缩完成后立即生效（原需等到80%阈值才应用）。机制：run_loop.py check_and_compress_context 每轮模型调用前执行，75%阈值(pre_compress_triggered,剩余≤25%)启动 _start_background_pre_compression 后台生成摘要存入 _pre_compressed_summary；80%阈值(token_limit_triggered,剩余≤20%)才走 _adaptive_compression→_check_and_use_pre_compressed_summary 应用。修改：在 should_compress 计算后、if should_compress 前插入新逻辑——当 not should_compress 且 _pre_compressed_summary 非空且 not _pre_compressing（后台已完成）时，调用 _check_and_use_pre_compressed_summary() 立即应用摘要并 return。安全性：check_and_compress_context 只在主线程模型调用前执行，此时 set_messages 安全（与80%压缩时机一致）；后台线程本身不直接改主模型历史，只存摘要。_check_and_use_pre_compressed_summary 用快照点(_pre_compress_snapshot_count)划分：快照前消息由摘要覆盖、快照后新增消息保留为 recent_messages，已处理后台完成时历史增长的情况。应用后 _pre_compressed_summary 被清空避免重复应用。验证：jarvis_agent 92测试通过；mock验证后台完成时立即调用、未完成时不调用、80%时走原路径。注意：ty 静态扫描 run_loop.py:98 self.agent.state_manager.set_mode 告警为既有误报（state_manager 动态属性），与本次改动无关。",
+  "created_at": "2026-09-08T23:16:49.959552",
+  "updated_at": "2026-09-08T23:16:49.959559"
+}
