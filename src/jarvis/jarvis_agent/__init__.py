@@ -1605,17 +1605,30 @@ class Agent:
             "add_images",
             "meta_agent",
         }
+        registry = self.get_tool_registry()
+
+        def _is_serial(name: str) -> bool:
+            # 内置名单或工具声明 interactive（用户自定义工具可用 interactive=True 声明）
+            if name in non_parallel:
+                return True
+            if registry is None:
+                return False
+            tool = registry.get_tool(name)
+            if tool is None:
+                return False
+            return bool(getattr(tool, "interactive", False))
+
         names = [c.get("name", "") for c in calls]
+        any_serial = any(_is_serial(n) for n in names if n)
         parallel_ok = (
             not getattr(self, "execute_tool_confirm", False)
             and len(calls) > 1
             and bool(names)
-            and all(n not in non_parallel for n in names)
+            and not any_serial
         )
         if not parallel_ok:
             return [self._exec_native_one(c) for c in calls]
 
-        registry = self.get_tool_registry()
         from concurrent.futures import ThreadPoolExecutor
 
         def run(call: Dict[str, Any]) -> str:

@@ -61,6 +61,18 @@ def test_execute_native_missing_tool_reports_error(monkeypatch):
     assert "不存在" in out
 
 
+def test_register_tool_preserves_interactive():
+    reg = ToolRegistry()
+    reg.register_tool(
+        "echo",
+        "回显",
+        {"type": "object", "properties": {}},
+        lambda arguments: {"success": True, "stdout": "ok", "stderr": ""},
+        interactive=True,
+    )
+    assert reg.get_tool("echo").interactive is True
+
+
 def test_execute_native_with_after_schedules_timer(monkeypatch):
     from jarvis.jarvis_tools import timer as timer_mod
 

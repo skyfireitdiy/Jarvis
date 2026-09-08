@@ -717,7 +717,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         # 实例化工具类
                         tool_instance = item()
 
-                        # 注册工具
+                        # 注册工具（用户工具类可声明 interactive=True 以要求串行执行）
                         self.register_tool(
                             name=tool_instance.name,
                             description=tool_instance.description,
@@ -726,6 +726,7 @@ class ToolRegistry(OutputHandlerProtocol):
                             protocol_version=getattr(
                                 tool_instance, "protocol_version", "1.0"
                             ),
+                            interactive=getattr(tool_instance, "interactive", False),
                         )
                         tool_found = True
                         break
@@ -1683,6 +1684,7 @@ class ToolRegistry(OutputHandlerProtocol):
         parameters: Any,
         func: Callable[..., Dict[str, Any]],
         protocol_version: str = "1.0",
+        interactive: bool = False,
     ) -> None:
         """注册新工具
 
@@ -1691,10 +1693,14 @@ class ToolRegistry(OutputHandlerProtocol):
             description: 工具描述
             parameters: 工具参数定义
             func: 工具执行函数
+            protocol_version: 工具协议版本
+            interactive: 是否可交互/独占（True 时原生并行调用降级为串行）
         """
         if name in self.tools:
             PrettyOutput.auto_print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
-        tool = Tool(name, description, parameters, func, protocol_version)
+        tool = Tool(
+            name, description, parameters, func, protocol_version, interactive
+        )
         self.tools[name] = tool
         # 同时更新 _all_tools，确保新注册的工具可以被调用
         if hasattr(self, "_all_tools"):
