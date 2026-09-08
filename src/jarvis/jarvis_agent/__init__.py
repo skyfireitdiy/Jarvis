@@ -1557,10 +1557,19 @@ class Agent:
         if not tools:
             return model.chat_until_success(message)
 
+        from jarvis.jarvis_utils.globals import get_interrupt
+
         content, calls = model.chat_native_once(message, tools, append_user=True)
         guard = 0
         while calls and guard < 30:
             guard += 1
+            # 回显工具轮的旁白内容（与文本协议"每轮打印模型输出"对齐）
+            if content and content.strip():
+                try:
+                    PrettyOutput.print_markdown(content, border_style="bright_blue")
+                except Exception:
+                    pass
+
             outputs = self._execute_native_batch(calls)
             for call, out in zip(calls, outputs):
                 call_id = call.get("id", "") or ""
@@ -1572,6 +1581,10 @@ class Agent:
             # 与文本协议一致：工具执行后触发 AFTER_TOOL_CALL 回调与事件
             # （供 diff 可视化 / 自动提交 / 构建验证 / lint 等旁路使用）
             self._fire_after_tool_call()
+
+            # 轮间检查用户中断标志（与文本协议逐轮中断检查对齐）
+            if get_interrupt():
+                break
 
             content, calls = model.chat_native_once(None, tools, append_user=False)
         return content or ""

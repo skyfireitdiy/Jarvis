@@ -15,6 +15,27 @@ from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.exception_utils import save_exception
 
+# 原生 function calling 激活时的任务分析提示：保留原决策逻辑，仅改现代白话、去文本 JSON
+_NATIVE_TASK_ANALYSIS_PROMPT = """对刚结束的任务做一次复盘。需要操作时**直接调用工具**，不要输出 JSON 文本。按以下顺序判断：
+
+1. **记忆沉淀**：用 memory(action=save) 保存值得长期留存的信息：
+   - project_long_term：项目相关（架构决策、关键约定、重要实现）
+   - global_long_term：通用经验、用户偏好、方法技巧
+   没有值得存的就不存。
+2. **现有能力评估**：先判断当前已有工具/方法论是否已能覆盖本任务解法——
+   - 若能覆盖：直接说明用哪个即可，不需要新建。
+   - 若不能、且该任务确实值得沉淀：
+     a) 若是一个**可复用、成体系的解法/流程**：用 methodology 新增或更新
+        （operation add/update；scope：项目相关用 project、通用用 global；
+        content 按 rule 文档结构组织：规则简介、必须遵守的原则、必须执行的操作、
+        实践指导/自检，便于后续复用与检索）。
+     b) 若缺的是一个**自动化工具**：用 meta_agent 生成
+        （function_description 写清目标功能与预期行为；工具须含参数定义与错误处理）。
+3. **规则建议（可选）**：仅当现有规则确有明显缺口时才简述建议；没有就不提。
+4. 最后用一句话总结本次复盘结论。
+
+规则：以事实为准、不编造；宁缺毋滥；methodology/meta_agent 仅在真正值得时用，不为了生成而生成。"""
+
 
 class TaskAnalyzer:
     """任务分析器，负责任务分析和满意度反馈处理"""
@@ -85,16 +106,35 @@ class TaskAnalyzer:
             )
             pass
 
-        # 根据配置获取相应的提示词
-        analysis_prompt = get_task_analysis_prompt(
-            has_memory_tool=has_memory_tool, has_generate_new_tool=has_generate_new_tool
-        )
+        # 原生 function calling 激活时用简洁现代提示（工具直接调用，不走文本 JSON）
+        if self.agent._native_active():
+            analysis_prompt = _NATIVE_TASK_ANALYSIS_PROMPT
+        else:
+            # 文本协议路径：使用带 JSON 调用格式说明的历史提示词
+            analysis_prompt = get_task_analysis_prompt(
+                has_memory_tool=has_memory_tool,
+                has_generate_new_tool=has_generate_new_tool,
+            )
 
         return join_prompts([analysis_prompt, satisfaction_feedback])
 
     def _process_analysis_loop(self) -> None:
         """处理分析循环"""
         while True:
+            # 原生 function calling 激活时，走 Agent._invoke_model 的原生通道：
+            # 工具（memory/methodology/meta_agent 等）由内部原生循环执行并触发 AFTER_TOOL_CALL，
+            # 不再用文本 JSON 解析。
+            if (
+                self.agent._native_active()
+                and isinstance(self.agent.session.prompt, str)
+                and self.agent.session.prompt.strip()
+            ):
+                try:
+                    self.agent._invoke_model(self.agent.session.prompt)
+                finally:
+                    self.agent.session.prompt = ""
+                return
+
             response = self.agent.model.chat_until_success(self.agent.session.prompt)
             self.agent.session.prompt = ""
 
