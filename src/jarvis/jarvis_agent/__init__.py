@@ -1501,6 +1501,85 @@ class Agent:
         """获取工具注册表实例"""
         return get_tool_registry(self.output_handler)
 
+    def _native_active(self) -> bool:
+        """当前 agent 是否应走原生 function calling。"""
+        try:
+            from jarvis.jarvis_utils.config import is_enable_native_tool_calls
+
+            if not is_enable_native_tool_calls():
+                return False
+            model = getattr(self, "model", None)
+            if model is None:
+                return False
+            if not getattr(model, "supports_native_tool_calls", lambda: False)():
+                return False
+            if getattr(model, "_native_disabled", False):
+                return False
+            registry = self.get_tool_registry()
+            if not registry or not getattr(registry, "tools", None):
+                return False
+            return True
+        except Exception:
+            return False
+
+    def _native_tools(self) -> list:
+        """构建当前平台所需的原生工具 schema。"""
+        from jarvis.jarvis_platform.native_tools import build_openai_tools
+        from jarvis.jarvis_platform.openai import OpenAIModel
+
+        registry = self.get_tool_registry()
+        if not registry:
+            return []
+        if isinstance(self.model, OpenAIModel):
+            return build_openai_tools(registry)
+        return []
+
+    def _run_native_tool_loop(self, message: str) -> str:
+        """原生工具调用主循环：反复执行 tool_calls 并回填 role=tool，直到模型给出纯内容。
+
+        返回最终 assistant 内容文本（可能为空）。仅在平台支持原生且 schema 非空时被调用。
+        """
+        from jarvis.jarvis_platform.openai import OpenAIModel
+
+        model = self.model
+        registry = self.get_tool_registry()
+        if not isinstance(model, OpenAIModel) or not registry:
+            return model.chat_until_success(message)
+
+        tools = self._native_tools()
+        if not tools:
+            return model.chat_until_success(message)
+
+        content, calls = model.chat_native_once(message, tools, append_user=True)
+        guard = 0
+        while calls and guard < 30:
+            guard += 1
+            for call in calls:
+                call_id = call.get("id", "")
+                name = call.get("name", "")
+                arguments = call.get("arguments") or {}
+                if not name:
+                    continue
+                if getattr(self, "execute_tool_confirm", False):
+                    try:
+                        ok = self.confirm_callback(
+                            f"执行原生工具 {name} ？", False
+                        )
+                    except Exception:
+                        ok = False
+                    if not ok:
+                        model.append_native_tool_result(
+                            call_id, name, "用户拒绝执行该工具，请据此调整方案。"
+                        )
+                        continue
+                try:
+                    out = registry.execute_native_tool_call(name, arguments, self)
+                except Exception as e:
+                    out = f"工具 {name} 执行异常: {e}"
+                model.append_native_tool_result(call_id, name, out)
+            content, calls = model.chat_native_once(None, tools, append_user=False)
+        return content or ""
+
     def _ensure_save_memory_tool(self) -> None:
         """如果配置了强制保存记忆，确保 memory 工具在 use_tools 列表中"""
         try:
@@ -1721,7 +1800,11 @@ class Agent:
             save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
             pass
 
-        response = self.model.chat_until_success(message)
+        if self._native_active() and isinstance(message, str) and message.strip():
+            # 原生 function calling：内部执行工具并回填 role=tool，最终只返回内容文本
+            response = self._run_native_tool_loop(message)
+        else:
+            response = self.model.chat_until_success(message)
         # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
         if not response:
             try:
