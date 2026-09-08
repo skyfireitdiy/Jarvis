@@ -700,6 +700,14 @@ class Agent:
         self._repeat_count = 0  # 连续相同响应计数
         self._repeat_escalation_level = 0  # 重复响应升级级别（0/1/2）
 
+        # 原生工具调用状态（方案A：循环展开到 run_loop 主循环，每轮经过压缩/注入）
+        self._pending_native_tool_calls: Optional[List[Dict[str, Any]]] = (
+            None  # 待执行的原生 tool_calls
+        )
+        self._native_continue: bool = (
+            False  # 是否处于原生工具续轮状态（上一轮已回填 tool 结果）
+        )
+
         # 后台预压缩相关属性
         self._pre_compressed_summary: Optional[str] = None  # 后台预压缩生成的摘要
         self._pre_compressing: bool = False  # 是否正在后台预压缩
@@ -1540,53 +1548,58 @@ class Agent:
             return build_anthropic_tools(registry)
         return []
 
-    def _run_native_tool_loop(self, message: str) -> str:
-        """原生工具调用主循环：反复执行 tool_calls 并回填 role=tool，直到模型给出纯内容。
+    def _execute_pending_native_calls(self) -> None:
+        """执行待处理的原生 tool_calls 并回填 role=tool 结果。
 
-        返回最终 assistant 内容文本（可能为空）。仅在平台支持原生且 schema 非空时被调用。
+        由 run_loop 主循环在每轮模型调用后调用（方案A：原生工具循环展开到主循环）。
+        执行后清空 _pending_native_tool_calls，并置 _native_continue 供下一轮续轮。
+        """
+        calls = self._pending_native_tool_calls or []
+        if not calls:
+            return
+        model = self.model
+        outputs = self._execute_native_batch(calls)
+        for call, out in zip(calls, outputs):
+            call_id = call.get("id", "") or ""
+            name = call.get("name", "") or "unknown"
+            # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
+            if call_id:
+                model.append_native_tool_result(call_id, name, out)
+        # 与文本协议一致：工具执行后触发 AFTER_TOOL_CALL 回调与事件
+        # （供 diff 可视化 / 自动提交 / 构建验证 / lint 等旁路使用）
+        self._fire_after_tool_call()
+        self._pending_native_tool_calls = None
+        self._native_continue = True
+
+    def _run_native_until_content(self, message: str) -> str:
+        """执行原生工具循环直到模型返回纯 content（供非主循环场景使用）。
+
+        与主循环展开方案不同，此方法在内部完成多轮 tool_calls 执行与回填，
+        适用于 memory_manager / task_analyzer 等不经过 run_loop 主循环的调用方。
         """
         from jarvis.jarvis_platform.claude import ClaudeModel
         from jarvis.jarvis_platform.openai import OpenAIModel
-
-        model = self.model
-        registry = self.get_tool_registry()
-        if not isinstance(model, (OpenAIModel, ClaudeModel)) or not registry:
-            return model.chat_until_success(message)
-
-        tools = self._native_tools()
-        if not tools:
-            return model.chat_until_success(message)
-
         from jarvis.jarvis_utils.globals import get_interrupt
 
-        content, calls = model.chat_native_once(message, tools, append_user=True)
+        model = self.model
+        if not isinstance(model, (OpenAIModel, ClaudeModel)):
+            return model.chat_until_success(message)
+
+        content, calls = model.chat_native_once(
+            message, self._native_tools(), append_user=True
+        )
         guard = 0
         while calls and guard < 30:
             guard += 1
-            # 回显工具轮的旁白内容（与文本协议"每轮打印模型输出"对齐）
-            if content and content.strip():
-                try:
-                    PrettyOutput.print_markdown(content, border_style="bright_blue")
-                except Exception:
-                    pass
-
-            outputs = self._execute_native_batch(calls)
-            for call, out in zip(calls, outputs):
-                call_id = call.get("id", "") or ""
-                name = call.get("name", "") or "unknown"
-                # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
-                if call_id:
-                    model.append_native_tool_result(call_id, name, out)
-
-            # 与文本协议一致：工具执行后触发 AFTER_TOOL_CALL 回调与事件
-            # （供 diff 可视化 / 自动提交 / 构建验证 / lint 等旁路使用）
-            self._fire_after_tool_call()
-
-            # 轮间检查用户中断标志（与文本协议逐轮中断检查对齐）
+            self._pending_native_tool_calls = calls
+            self._execute_pending_native_calls()
             if get_interrupt():
                 break
-
-            content, calls = model.chat_native_once(None, tools, append_user=False)
+            content, calls = model.chat_native_once(
+                None, self._native_tools(), append_user=False
+            )
+        self._pending_native_tool_calls = None
+        self._native_continue = False
         return content or ""
 
     def _fire_after_tool_call(self) -> None:
@@ -1875,7 +1888,8 @@ class Agent:
                 message = join_prompts([message, addon_text])
                 should_add = True
             # 条件2：连续10轮都没有添加过 addon_prompt，强制添加一次
-            elif self._addon_prompt_skip_rounds >= 10:
+            # 原生工具调用下不自动注入默认 addon（工具由 API tools 提供，避免干扰原生循环）
+            elif self._addon_prompt_skip_rounds >= 10 and not self._native_active():
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
                 should_add = True
@@ -1932,9 +1946,37 @@ class Agent:
             save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
             pass
 
-        if self._native_active() and isinstance(message, str) and message.strip():
-            # 原生 function calling：内部执行工具并回填 role=tool，最终只返回内容文本
-            response = self._run_native_tool_loop(message)
+        if self._native_active():
+            # 原生 function calling：每次只做一次模型调用，返回 content 并把 tool_calls 存入
+            # _pending_native_tool_calls，由 run_loop 主循环执行工具、回填 role=tool 后继续下一轮，
+            # 从而每轮都经过主循环的上下文压缩 / input_buffer 注入 / 轮次检查。
+            from jarvis.jarvis_platform.claude import ClaudeModel
+            from jarvis.jarvis_platform.openai import OpenAIModel
+
+            model = self.model
+            if not isinstance(model, (OpenAIModel, ClaudeModel)):
+                response = model.chat_until_success(message)
+            else:
+                if self._native_continue:
+                    # 续轮：上一轮 tool_calls 已回填 role=tool。若本轮有补充消息
+                    # （input_buffer 注入 / addon），作为 user 消息追加使其生效；否则基于历史继续。
+                    if isinstance(message, str) and message.strip():
+                        content, calls = model.chat_native_once(
+                            message, self._native_tools(), append_user=True
+                        )
+                    else:
+                        content, calls = model.chat_native_once(
+                            None, self._native_tools(), append_user=False
+                        )
+                    self._native_continue = False
+                elif isinstance(message, str) and message.strip():
+                    content, calls = model.chat_native_once(
+                        message, self._native_tools(), append_user=True
+                    )
+                else:
+                    content, calls = None, None
+                self._pending_native_tool_calls = calls
+                response = content or ""
         else:
             response = self.model.chat_until_success(message)
         # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
@@ -3678,9 +3720,7 @@ class Agent:
                 if self.rules_manager.load_rule(rule_name):
                     newly.append(rule_name)
             if newly:
-                PrettyOutput.auto_print(
-                    "⚡ 强触发载入规则: " + ", ".join(newly)
-                )
+                PrettyOutput.auto_print("⚡ 强触发载入规则: " + ", ".join(newly))
                 self.session.prompt = self._wrap_loaded_rules(
                     self.session.prompt or task
                 )

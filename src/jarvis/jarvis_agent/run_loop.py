@@ -1127,9 +1127,16 @@ class AgentRunLoop:
                     # 中断处理器返回了最终结果，任务结束
                     return interrupt_result
 
-                # 处理工具调用（原生模式工具已在模型调用层执行，跳过文本解析）
+                # 处理工具调用
                 if ag._native_active():
-                    should_return, result, safe_tool_prompt = False, None, ""
+                    # 原生模式：模型调用层只做一次调用，tool_calls 存于 _pending_native_tool_calls。
+                    # 若有待执行工具，则执行并回填 role=tool，然后 continue 回主循环顶部，
+                    # 使下一轮经过上下文压缩 / input_buffer 注入 / 轮次检查（与文本协议一致）。
+                    if getattr(ag, "_pending_native_tool_calls", None):
+                        ag._execute_pending_native_calls()
+                        should_return, result, safe_tool_prompt = True, None, ""
+                    else:
+                        should_return, result, safe_tool_prompt = False, None, ""
                 else:
                     should_return, result, safe_tool_prompt = self._handle_tool_calls(
                         ag, current_response
