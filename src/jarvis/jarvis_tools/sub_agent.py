@@ -20,6 +20,24 @@ from typing import Any, Dict
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.config import get_llm_group
 
+_MAX_CHILD_MESSAGES = 60
+_MAX_CHILD_MSG_CHARS = 8000
+
+
+def _trim_child_context(messages):
+    """裁剪继承给子 Agent 的父上下文，避免大工具输出/长历史被逐个子代理重复计费。"""
+    out = []
+    for msg in messages[-_MAX_CHILD_MESSAGES:]:
+        if not isinstance(msg, dict):
+            out.append(msg)
+            continue
+        m = dict(msg)
+        content = m.get("content")
+        if isinstance(content, str) and len(content) > _MAX_CHILD_MSG_CHARS:
+            m["content"] = content[:_MAX_CHILD_MSG_CHARS] + "\n...(上下文过长，已截断)"
+        out.append(m)
+    return out
+
 
 class SubAgentTool:
     """
@@ -108,6 +126,8 @@ class SubAgentTool:
                     parent_messages = [
                         msg for msg in all_messages if msg.get("role") != "system"
                     ]
+                    if parent_messages:
+                        parent_messages = _trim_child_context(parent_messages)
                 except Exception:
                     # 获取失败不影响主流程
                     pass

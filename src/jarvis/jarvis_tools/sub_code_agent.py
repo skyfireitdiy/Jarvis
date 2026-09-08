@@ -15,6 +15,27 @@ from typing import Any, Dict, List
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.exception_utils import save_exception
 
+_MAX_CHILD_MESSAGES = 60
+_MAX_CHILD_MSG_CHARS = 8000
+
+
+def _trim_child_context(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """裁剪继承给子 Agent 的父上下文，避免大工具输出/长历史被逐个子代理重复计费。
+
+    只保留最近若干条消息，并把单条超长文本内容截断。
+    """
+    out: List[Dict[str, Any]] = []
+    for msg in messages[-_MAX_CHILD_MESSAGES:]:
+        if not isinstance(msg, dict):
+            out.append(msg)
+            continue
+        m = dict(msg)
+        content = m.get("content")
+        if isinstance(content, str) and len(content) > _MAX_CHILD_MSG_CHARS:
+            m["content"] = content[:_MAX_CHILD_MSG_CHARS] + "\n...(上下文过长，已截断)"
+        out.append(m)
+    return out
+
 
 class SubCodeAgentTool:
     """
@@ -104,6 +125,8 @@ class SubCodeAgentTool:
                     parent_messages = [
                         msg for msg in all_messages if msg.get("role") != "system"
                     ]
+                    if parent_messages:
+                        parent_messages = _trim_child_context(parent_messages)
                 except Exception:
                     # 获取失败不影响主流程
                     pass
