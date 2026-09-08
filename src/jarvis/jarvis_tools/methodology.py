@@ -21,7 +21,7 @@ class MethodologyTool:
     """
 
     name = "methodology"
-    description = "管问题解之法论，支项目级与全局级，支增、更、删之操"
+    description = "管理「问题解决方法论」（可复用解法库）：支持项目级/全局级的新增、更新、删除与查看。"
     parameters = {
         "type": "object",
         "properties": {

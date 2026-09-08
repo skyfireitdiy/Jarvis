@@ -49,7 +49,7 @@ class SubAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_agent"
-    description = "将子任交通用 Agent 执而归果（承父Agent部配，自竟并成总）。"
+    description = "把独立子任务交给新的通用 Agent 在隔离会话中执行并返回总结，避免污染主上下文；子代理内禁止再嵌套。"
     parameters = {
         "type": "object",
         "properties": {

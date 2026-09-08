@@ -41,7 +41,7 @@ class SymbolDependencyTool:
 
     # 文件名必须与工具名一致，便于注册表自动加载
     name = "symbol_dependency"
-    description = "询符之依，支符寻、引查、依析与图历"
+    description = "查询代码符号（函数/类/变量）的定义与引用：按名查找、查引用、查依赖、列文件符号或画依赖图；用于定位调用链与影响分析。"
 
     parameters = {
         "type": "object",

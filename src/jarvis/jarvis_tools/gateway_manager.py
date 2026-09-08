@@ -49,7 +49,7 @@ class GatewayManagerTool:
         """检查工具是否可用，仅当 Gateway 存在时启用（通过 agent_id 是否设置判断）。"""
         return jglobals.agent_id is not None
 
-    description = """管 Agent 间通协之工具。
+    description = """管理多 Agent 与网关的通信协作（Agent 互发消息、节点/模型组、定时任务、群组聊天等编排操作）。
 
 支之操：
 1. **send_to_agent**: 发讯于 Agent，经 Web Gateway 代至目之 /message 口，入其入缓
