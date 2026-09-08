@@ -1869,7 +1869,28 @@ class ToolRegistry(OutputHandlerProtocol):
                         return error_msg
                 arguments = effective_args
 
-            PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
+            # 打印调用参数摘要（与文本协议一致：敏感键打码、超长截断）
+            param_summary = ""
+            if isinstance(arguments, dict) and arguments:
+                sensitive = {"password", "token", "key", "secret", "auth", "credential"}
+                parts = []
+                for k, v in arguments.items():
+                    if str(k).lower() in sensitive:
+                        parts.append(f"{k}='***'")
+                    elif isinstance(v, (dict, list)):
+                        parts.append(f"{k}={type(v).__name__}({len(v)})")
+                    elif isinstance(v, str) and len(v) > 50:
+                        parts.append(f"{k}='{v[:47]}...'")
+                    else:
+                        parts.append(f"{k}={v!r}")
+                if parts:
+                    param_summary = " | ".join(
+                        str(p).replace("\n", " ").replace("\r", " ") for p in parts
+                    )
+            if param_summary:
+                PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name} [{param_summary}]")
+            else:
+                PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
             start_time = time.time()
             result = self.execute_tool(name, arguments, agent)
             elapsed_time = time.time() - start_time

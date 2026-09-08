@@ -105,10 +105,13 @@ class MemoryManager:
                 )
                 pass
 
-            response = self.agent.model.chat_until_success(prompt)
-
-            # 执行工具调用（如果有）
-            need_return, result = self.agent._call_tools(response)
+            if self.agent._native_active():
+                # 原生：模型直接调用 memory 工具（内部原生循环执行），无需文本 JSON 解析
+                self.agent._invoke_model(prompt)
+            else:
+                response = self.agent.model.chat_until_success(prompt)
+                # 执行工具调用（如果有）
+                need_return, result = self.agent._call_tools(response)
 
             # 根据实际执行的工具判断是否保存了记忆
             saved = False
