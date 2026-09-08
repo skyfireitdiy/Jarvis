@@ -1809,6 +1809,50 @@ class ToolRegistry(OutputHandlerProtocol):
 
             agent_instance: Agent = agent
 
+            # 支持延迟/定时/循环调用（after/at/loop），与文本协议一致：
+            # 命中定时参数则创建定时任务而非立即执行
+            if isinstance(arguments, dict):
+                effective_args = dict(arguments)
+                timer_params: Dict[str, Any] = {}
+                if "after" in effective_args:
+                    timer_params["time_type"] = "relative"
+                    timer_params["time_value"] = effective_args.pop("after")
+                elif "at" in effective_args:
+                    timer_params["time_type"] = "absolute"
+                    timer_params["time_value"] = effective_args.pop("at")
+                elif "loop" in effective_args:
+                    timer_params["time_type"] = "interval"
+                    timer_params["time_value"] = effective_args.pop("loop")
+                    timer_params["interval_seconds"] = timer_params["time_value"]
+                if timer_params:
+                    from jarvis.jarvis_tools.timer import get_timer_manager
+
+                    try:
+                        timer_manager = get_timer_manager()
+                        task = timer_manager.add_task(
+                            task_type="tool_call",
+                            time_type=timer_params["time_type"],
+                            time_value=timer_params["time_value"],
+                            tool_name=name,
+                            tool_args=effective_args,
+                            interval_seconds=timer_params.get("interval_seconds"),
+                        )
+                        time_desc = ""
+                        if timer_params["time_type"] == "relative":
+                            time_desc = f"{timer_params['time_value']}秒后"
+                        elif timer_params["time_type"] == "absolute":
+                            time_desc = f"在 {timer_params['time_value']}"
+                        elif timer_params["time_type"] == "interval":
+                            time_desc = f"每 {timer_params['time_value']}秒"
+                        msg = f"✅ 已创建定时任务 #{task.task_id}：{time_desc}执行工具 {name}"
+                        PrettyOutput.auto_print(msg)
+                        return msg
+                    except Exception as e:
+                        error_msg = f"❌ 创建定时任务失败: {e}"
+                        PrettyOutput.auto_print(error_msg)
+                        return error_msg
+                arguments = effective_args
+
             PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
             start_time = time.time()
             result = self.execute_tool(name, arguments, agent)

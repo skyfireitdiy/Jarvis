@@ -133,3 +133,20 @@ class TestSchema:
         tools = build_anthropic_tools(reg)
         assert tools[0]["name"] == "read_code"
         assert tools[0]["input_schema"]["properties"]["path"]["type"] == "string"
+
+    def test_timer_params_advertised_in_schema(self):
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "read_code",
+                    "读取文件",
+                    {"type": "object", "properties": {"path": {"type": "string"}}},
+                )
+            ]
+        )
+        otools = build_openai_tools(reg)
+        props = otools[0]["function"]["parameters"]["properties"]
+        assert "after" in props and "loop" in props and "at" in props
+
+        atools = build_anthropic_tools(reg)
+        assert "after" in atools[0]["input_schema"]["properties"]
