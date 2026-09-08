@@ -1,0 +1,8 @@
+{
+  "id": "20260908_191823_760572",
+  "type": "project_long_term",
+  "tags": ["session_manager", "会话名称", "jieba", "LLM", "功能开发"],
+  "content": "会话名称生成从 jieba 换成 LLM：修改 src/jarvis/jarvis_agent/session_manager.py 的 _generate_session_name 方法（原59-126行）。新逻辑：提取对话文本（保留原逻辑）→ 截断4000字符 → 构造中文命名 prompt → 通过 _iter_name_platforms() 迭代平台调用 complete() 生成名称。_iter_name_platforms 优先用 cheap 模型（PlatformRegistry.get_global_platform_registry().get_cheap_platform()），失败回退 self.model.complete()（无状态不影响主对话历史），再失败返回'未命名会话'。名称清理：去特殊字符（保留中文/英文/数字/下划线/连字符）、限长15字符。测试在 tests/jarvis_agent/test_session_manager.py 新增5个用例。注意：session_manager.py 中 last_backup_commit 相关的2个 ty 类型错误（约519、1679行）是预先存在的，与本次改动无关。",
+  "created_at": "2026-09-08T19:18:23.760601",
+  "updated_at": "2026-09-08T19:18:23.760605"
+}
