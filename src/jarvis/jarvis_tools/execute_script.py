@@ -136,7 +136,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "在指定的解释器/终端执行脚本并返回结果。Windows 默用 powershell，Unix 默用 bash。免出过多，议用 grep、Select-String 等令滤限出长。\n\n示例用法（Unix/Linux）：\n• 查错：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 览首20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜函定：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 览目：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
+    description = "在指定的解释器/终端执行脚本并返回结果。Windows 默认用 powershell，Unix 默认用 bash。输出可能很长：请用 grep/Select-String 过滤、head/tail 限行，避免一次打爆上下文。\n\n示例用法（Unix/Linux）：\n• 查错：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 览首20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 搜函定：interpreter='bash', script_content=\"grep -rn '^def ' src/\"\n\n示例用法（Windows）：\n• 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" -Path .\\app.log'\n• 览目：interpreter='powershell', script_content='Get-ChildItem | Select-Object -First 20'\n• 执 Python 脚本：interpreter='python', script_content='print(\"hello\")'"
     parameters = {
         "type": "object",
         "properties": {
@@ -146,7 +146,7 @@ class ScriptTool:
             },
             "script_content": {
                 "type": "string",
-                "description": "欲执之脚本内容。免出过多，议用滤令：\n例：\n• grep -i 'error' filename  # 查含'error'之行\n• grep -rn 'pattern' filename     # 搜文内\n• tail -n 50 filename       # 示文末50行\n• head -n 20 filename       # 示文首20行\n• command | head -n 100     # 限出首100行",
+                "description": "要执行的脚本内容。注意控制输出量，建议用过滤/限行命令：\n例：\n• grep -i 'error' filename  # 查含'error'之行\n• grep -rn 'pattern' filename     # 搜文内\n• tail -n 50 filename       # 示文末50行\n• head -n 20 filename       # 示文首20行\n• command | head -n 100     # 限出首100行",
             },
         },
         "required": ["script_content"],

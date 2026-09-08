@@ -955,7 +955,7 @@ class task_list_manager:
         Returns:
             str: 工具描述
         """
-        description = """任务列管工具，供 LLM 管复任拆分与行。
+        description = """任务列管理工具，供模型把复杂任务拆解成子任务并逐项推进执行。
 
 **核心能：**
 - `add_tasks`: 批加任（荐 PLAN 阶用）
