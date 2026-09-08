@@ -5,6 +5,14 @@ from jarvis.jarvis_agent import Agent
 
 
 class _FakeReg:
+    def __init__(self, interactive_names=()):
+        self.interactive_names = set(interactive_names)
+
+    def get_tool(self, name):
+        if name in self.interactive_names:
+            return type("T", (), {"interactive": True})()
+        return None
+
     def execute_native_tool_call(self, name, arguments, agent, record=True):
         return f"res:{name}"
 
@@ -50,3 +58,15 @@ def test_confirm_deny_returns_rejection():
         [{"id": "1", "name": "read_code", "arguments": {}}]
     )
     assert "拒绝" in out[0]
+
+
+def test_user_tool_marked_interactive_forces_serial():
+    a, store = _make()
+    # 用户自定义工具声明 interactive=True（不在内置名单），也应整批串行执行
+    a.get_tool_registry = lambda: _FakeReg(interactive_names={"my_custom"})
+    calls = [
+        {"id": "1", "name": "read_code", "arguments": {}},
+        {"id": "2", "name": "my_custom", "arguments": {}},
+    ]
+    out = a._execute_native_batch(calls)
+    assert out == ["res:read_code", "res:my_custom"]

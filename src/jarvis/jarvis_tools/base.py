@@ -15,6 +15,7 @@ class Tool:
         parameters: Dict[str, Any],
         func: Callable[[Dict[str, Any]], Dict[str, Any]],
         protocol_version: str = "1.0",
+        interactive: bool = False,
     ) -> None:
         """
         初始化工具对象
@@ -25,12 +26,15 @@ class Tool:
             parameters (Dict[str, Any]): 工具参数定义
             func (Callable): 工具执行函数
             protocol_version (str): 工具协议版本，默认"1.0"；支持"1.0"或"2.0"
+            interactive (bool): 是否可交互/独占。True 表示该工具与用户/终端有交互
+                （如 execute_script、virtual_tty），原生并行调用时整批降级为串行。
         """
         self.name = name
         self.description = description
         self.parameters = parameters
         self.func = func
         self.protocol_version = protocol_version
+        self.interactive = interactive
 
     def to_dict(self) -> Dict[str, Any]:
         """将工具对象转换为字典格式，主要用于序列化"""
