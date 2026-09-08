@@ -1795,6 +1795,73 @@ class ToolRegistry(OutputHandlerProtocol):
 
         return result
 
+    def execute_native_tool_call(
+        self, name: str, arguments: Dict[str, Any], agent: Any
+    ) -> str:
+        """按原生 function call 执行单个工具并返回格式化结果文本。
+
+        与文本协议的区别：name/arguments 由模型以结构化形式给出，无需解析；
+        执行与输出处理（格式/压缩/超限摘要）复用文本协议同款路径。
+        确认（confirm）门控由调用方（run_loop）负责。
+        """
+        try:
+            from jarvis.jarvis_agent import Agent
+
+            agent_instance: Agent = agent
+
+            PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
+            start_time = time.time()
+            result = self.execute_tool(name, arguments, agent)
+            elapsed_time = time.time() - start_time
+
+            # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
+            try:
+                agent_instance.set_user_data("__last_executed_tool__", name)
+                executed_list = agent_instance.get_user_data("__executed_tools__")
+                if not isinstance(executed_list, list):
+                    executed_list = []
+                executed_list.append(name)
+                agent_instance.set_user_data("__executed_tools__", executed_list)
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_tools.registry",
+                    function="execute_native_tool_call",
+                )
+                pass
+
+            platform = (
+                getattr(agent_instance, "model", None)
+                if agent_instance
+                else None
+            )
+            if not result.get("success", False):
+                PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败")
+                err_output = self._format_tool_output(
+                    result.get("stdout", ""), result.get("stderr", ""), platform
+                )
+                return err_output
+
+            output = self._format_tool_output(
+                result.get("stdout", ""), result.get("stderr", ""), platform
+            )
+            output = self._compress_output(output)
+
+            # 添加执行时间信息供LLM参考
+            if elapsed_time > 0:
+                output = (
+                    output
+                    + f"\n\n<execution_time>\n工具名称: {name}\n执行耗时: {elapsed_time:.2f}秒\n</execution_time>"
+                )
+
+            # 内容过大时用 cheap 模型提取关键信息
+            if is_context_overflow(output, platform):
+                return self._summarize_with_cheap_model(output)
+            return output
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败：{str(e)}")
+            return f"工具 {name} 执行异常: {str(e)}"
+
     def _format_tool_output(
         self, stdout: str, stderr: str, platform: Any = None
     ) -> str:
