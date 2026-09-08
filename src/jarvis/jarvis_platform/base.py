@@ -1,3 +1,4 @@
+import json
 import os
 
 # -*- coding: utf-8 -*-
@@ -780,6 +781,18 @@ class BasePlatform(ABC):
             content = message.get("content", "")
             if content:
                 total_tokens += get_multimodal_token_count(content)
+            # 原生工具调用：assistant 消息的工具调用参数存在 tool_calls 字段
+            # （不在 content 里），需一并计入上下文长度，避免低估已用 token。
+            tool_calls = message.get("tool_calls")
+            if tool_calls:
+                for tc in tool_calls:
+                    args = tc.get("arguments")
+                    if isinstance(args, dict):
+                        total_tokens += get_multimodal_token_count(
+                            json.dumps(args, ensure_ascii=False)
+                        )
+                    elif args:
+                        total_tokens += get_multimodal_token_count(str(args))
 
         return total_tokens
 
