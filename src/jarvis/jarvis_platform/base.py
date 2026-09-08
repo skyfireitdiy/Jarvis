@@ -111,7 +111,9 @@ class BasePlatform(ABC):
         """
         return False
 
-    def append_native_tool_result(self, tool_call_id: str, name: str, content: str) -> None:
+    def append_native_tool_result(
+        self, tool_call_id: str, name: str, content: str
+    ) -> None:
         """把一次原生工具执行结果以 role=tool 消息追加进历史。"""
         from jarvis.jarvis_platform.native_tools import make_tool_result_msg
 
@@ -257,12 +259,20 @@ class BasePlatform(ABC):
         message: Union[str, List[ContentBlock]],
         start_time: float,
         max_output: int = 0,
+        chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
     ) -> Tuple[str, str, float]:
-        """使用 pretty output 模式进行聊天（封装到 PrettyOutput）"""
+        """使用 pretty output 模式进行聊天（封装到 PrettyOutput）
+
+        参数:
+            chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
+                供原生工具调用等需要自定义生成器的场景复用同一渲染管线。
+        """
         # 对于多模态消息，只传递提示字符串给PrettyOutput
         display_message = message if isinstance(message, str) else "[多模态消息]"
+        if chat_iterator is None:
+            chat_iterator = self.chat(message)
         return PrettyOutput.stream_chat_with_panel(
-            chat_iterator=self.chat(message),
+            chat_iterator=chat_iterator,
             title=self.name(),
             status_message=f"🤔 {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()} 正在思考中...",
             get_used_token_count=self.get_used_token_count,
@@ -282,12 +292,19 @@ class BasePlatform(ABC):
         message: Union[str, List[ContentBlock]],
         start_time: float,
         max_output: int = 0,
+        chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
     ) -> Tuple[str, str, float]:
-        """使用简单输出模式进行聊天（封装到 PrettyOutput）"""
+        """使用简单输出模式进行聊天（封装到 PrettyOutput）
+
+        参数:
+            chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
+        """
         # 对于多模态消息，只传递提示字符串给PrettyOutput
         display_message = message if isinstance(message, str) else "[多模态消息]"
+        if chat_iterator is None:
+            chat_iterator = self.chat(message)
         response, reasoning_content, first_token_time = PrettyOutput.stream_chat_simple(
-            chat_iterator=self.chat(message),
+            chat_iterator=chat_iterator,
             prefix=f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
             start_time=start_time,
             message=display_message,
@@ -301,21 +318,27 @@ class BasePlatform(ABC):
         return response, reasoning_content, first_token_time
 
     def _chat_with_suppressed_output(
-        self, message: Union[str, List[ContentBlock]], max_output: int = 0
+        self,
+        message: Union[str, List[ContentBlock]],
+        max_output: int = 0,
+        chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
     ) -> Tuple[str, str]:
         """使用无人值守模式进行聊天
 
         参数:
             message: 用户消息
             max_output: 最大输出长度，0表示无限制
+            chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
 
         返回:
             Tuple[str, str]: (模型响应, 推理内容)
         """
         response = ""
         reasoning_content = ""
+        if chat_iterator is None:
+            chat_iterator = self.chat(message)
         try:
-            for chunk_type, chunk_content in self.chat(message):
+            for chunk_type, chunk_content in chat_iterator:
                 # 拼接 content 类型
                 if chunk_type == "content":
                     response += chunk_content

@@ -1,0 +1,14 @@
+{
+  "id": "20260908_132154_973680",
+  "type": "project_long_term",
+  "tags": [
+    "native-tool-calling",
+    "streaming",
+    "chat_native_once",
+    "claude",
+    "openai"
+  ],
+  "content": "Jarvis 原生工具调用流式改造完成。核心方案：改动集中在 platform 层 + base.py 加参数，agent 层 _run_native_tool_loop 与 run_loop 零改动。\n\n1) base.py 三个方法(_chat_with_pretty_output/_chat_with_simple_output/_chat_with_suppressed_output)加 chat_iterator=None 可选参数，默认行为不变。\n2) openai.py/claude.py 的 chat_native_once 内部改为构造生成器 _gen() 逐块 yield content，用 _chat_with_* 消费渲染，返回契约 (content, tool_calls) 不变。\n3) 关键坑：claude.py 的 tool_calls 从 final_message.content 的 tool_use block 解析，若解析代码放生成器内部、渲染层提前 break 则不会执行。解决：final_message 存闭包(nonlocal)，tool_calls 解析移到 _chat_with_* 调用之后，并用 'for _ in gen: pass' 显式耗尽生成器确保 final_message 被获取。openai.py 的 tool_calls 分片在 chunk 流内累积，无此问题。\n4) ty 静态扫描对 **kwargs 展开误报：用 _build_client(**overrides) 辅助闭包 + Dict[str, Any] 承载参数解决。\n5) 测试坑：test_claude_native.py 用 object.__new__ 绕过 __init__，缺 suppress_output 和 _panel_lock 两个渲染管线所需实例属性，需在 mock 补齐(断言意图不变)。\n6) 真实网络验证(deepseek-v4-flash)：纯文本场景 content 分 18 块流式到达，首块 164ms(改造前=整段完成时间)，tool_calls 解析正确。",
+  "created_at": "2026-09-08T13:21:54.973716",
+  "updated_at": "2026-09-08T13:21:54.973722"
+}

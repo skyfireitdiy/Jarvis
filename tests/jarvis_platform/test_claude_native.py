@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """claude 原生 function calling 单测（fake Anthropic 流）"""
 
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -19,6 +20,9 @@ def _make_model(stream):
     m._api_key_index = 0
     m.model_name = "claude-test"
     m.agent = None
+    # 渲染管线所需实例属性（BasePlatform.__init__ 中定义，object.__new__ 绕过后需补齐）
+    m.suppress_output = False
+    m._panel_lock = threading.RLock()
     m.client = MagicMock()
     m.client.messages.stream.return_value = stream
     return m
@@ -64,6 +68,8 @@ def test_tool_round_without_new_user_message():
     m._api_key_index = 0
     m.model_name = "claude-test"
     m.agent = None
+    m.suppress_output = False
+    m._panel_lock = threading.RLock()
     stream = _text_stream(
         [],
         [_tool_use_block("tu_1", "add", {"a": 1, "b": 2})],

@@ -1,0 +1,8 @@
+{
+  "id": "20260908_130011_631271",
+  "type": "project_long_term",
+  "tags": ["native_tools", "streaming", "流式输出", "工具调用", "架构"],
+  "content": "技术调研结论：模型原生工具调用(native tool calling)场景下，底层确实使用流式API(openai.py chat_native_once 设 stream=True 并调 _accumulate_openai_stream；claude.py 用 client.messages.stream)，但对外是'一次性累积返回'而非'逐块流式渲染'。\n\n两条路径对比：\n1) 文本协议路径(非原生)：_call_model→_invoke_model→chat_until_success→_chat→_chat_with_pretty_output/_chat_with_simple_output，消费 self.chat() 生成器，经 PrettyOutput.stream_chat_with_panel/stream_chat_simple 逐块流式渲染(支持首token时间、tokens/s、Ctrl+C中断)。\n2) 原生工具路径：_invoke_model 检测 _native_active() 时走 _run_native_tool_loop→model.chat_native_once，内部一次性累积整个流返回(content, tool_calls)，不逐块yield。工具轮旁白用 print_markdown 一次性打印(__init__.py:1569)，最终文本由 run_loop.py:1105 一次性 print_markdown。\n\n关键文件：src/jarvis/jarvis_platform/openai.py(chat_native_once:563, _accumulate_openai_stream:28)、claude.py(chat_native_once:405)、src/jarvis/jarvis_agent/__init__.py(_run_native_tool_loop:1543, _invoke_model:1906, _native_active:1504)、run_loop.py(1094-1107)。\n\n结论：原生工具调用模式当前不支持真正的流式输出(逐token/逐块渲染)，仅支持'整段完成后一次性打印'。若要支持流式，需改造 chat_native_once 为生成器逐块yield content，并在 _run_native_tool_loop 中边收边渲染，同时处理 tool_calls 与 content 混合流。",
+  "created_at": "2026-09-08T13:00:11.631303",
+  "updated_at": "2026-09-08T13:00:11.631309"
+}

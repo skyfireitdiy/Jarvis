@@ -99,18 +99,20 @@ class ClaudeModel(BasePlatform):
             from jarvis.jarvis_utils.config import get_request_timeout
 
             _req_timeout = get_request_timeout()
-            _timeout_kwargs = {"timeout": _req_timeout} if _req_timeout else {}
-            if self.base_url:
-                self.client = Anthropic(
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                    **_timeout_kwargs,
-                )
-            else:
-                self.client = Anthropic(
-                    api_key=self.api_key,
-                    **_timeout_kwargs,
-                )
+
+            def _build_client(**overrides: Any) -> Anthropic:
+                # 用 Dict[str, Any] 承载可选参数，避免类型检查器对 **kwargs 展开的误报
+                params: Dict[str, Any] = {
+                    "api_key": self.api_key,
+                }
+                if self.base_url:
+                    params["base_url"] = self.base_url
+                if _req_timeout is not None:
+                    params["timeout"] = _req_timeout
+                params.update(overrides)
+                return Anthropic(**params)
+
+            self.client = _build_client()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
         # 消息历史
@@ -447,13 +449,46 @@ class ClaudeModel(BasePlatform):
             stream_kwargs["extra_headers"] = proxy_headers
 
         try:
-            with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
-                content_parts: List[str] = []
-                for text in stream.text_stream:
-                    content_parts.append(text)
-                final_message = stream.get_final_message()
+            # 累积器：content 逐块 yield 供流式渲染；final_message 在流结束后存入闭包供外部解析 tool_calls
+            content_parts: List[str] = []
+            final_message = None
 
-            content = "".join(content_parts)
+            def _gen() -> Generator[Tuple[str, str], None, None]:
+                nonlocal final_message
+                with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
+                    for text in stream.text_stream:
+                        content_parts.append(text)
+                        yield ("content", text)
+                    final_message = stream.get_final_message()
+
+            # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
+            import time
+            from jarvis.jarvis_utils.config import get_pretty_output
+
+            start_time = time.time()
+            # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
+            render_message: Union[str, List[ContentBlock]] = (
+                message if message is not None else ""
+            )
+            gen = _gen()
+            if not self.suppress_output:
+                if get_pretty_output():
+                    content, _reasoning, _ft = self._chat_with_pretty_output(
+                        render_message, start_time, chat_iterator=gen
+                    )
+                else:
+                    content, _reasoning, _ft = self._chat_with_simple_output(
+                        render_message, start_time, chat_iterator=gen
+                    )
+            else:
+                content, _reasoning = self._chat_with_suppressed_output(
+                    render_message, chat_iterator=gen
+                )
+            # 渲染层可能提前 break 未耗尽生成器，此处显式耗尽以触发 get_final_message 与 tool_calls 解析
+            for _ in gen:
+                pass
+
+            # 从 final_message 解析规范 tool_calls
             tool_calls: List[Dict[str, Any]] = []
             for block in getattr(final_message, "content", None) or []:
                 if getattr(block, "type", None) == "tool_use":
