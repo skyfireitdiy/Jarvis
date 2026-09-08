@@ -432,6 +432,10 @@ class ClaudeModel(BasePlatform):
             self.api_key = next_key
             self.client.api_key = next_key
 
+        # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
+        if append_user and message:
+            self.messages.append({"role": "user", "content": message})
+
         system_text, anthropic_messages = to_anthropic_messages(self.messages)
         if append_user and message:
             anthropic_messages.append({"role": "user", "content": message})
@@ -448,83 +452,113 @@ class ClaudeModel(BasePlatform):
         if proxy_headers:
             stream_kwargs["extra_headers"] = proxy_headers
 
-        try:
-            # 累积器：content 逐块 yield 供流式渲染；final_message 在流结束后存入闭包供外部解析 tool_calls
-            content_parts: List[str] = []
-            final_message = None
+        # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
+        import time
+        from jarvis.jarvis_utils.config import get_pretty_output
 
-            def _gen() -> Generator[Tuple[str, str], None, None]:
-                nonlocal final_message
-                with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
-                    for text in stream.text_stream:
-                        content_parts.append(text)
-                        yield ("content", text)
-                    final_message = stream.get_final_message()
+        # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
+        render_message: Union[str, List[ContentBlock]] = (
+            message if message is not None else ""
+        )
 
-            # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
-            import time
-            from jarvis.jarvis_utils.config import get_pretty_output
+        # 重试循环：渲染管线检测到输出陷入重复（返回空 content 且无 tool_calls）时重试，
+        # 与文本协议路径 chat_until_success 的 while_true 重试机制对齐。
+        max_retries = 6
+        for attempt in range(max_retries):
+            try:
+                # 累积器：content 逐块 yield 供流式渲染；final_message 在流结束后存入闭包供外部解析 tool_calls
+                content_parts: List[str] = []
+                final_message = None
 
-            start_time = time.time()
-            # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
-            render_message: Union[str, List[ContentBlock]] = (
-                message if message is not None else ""
-            )
-            gen = _gen()
-            if not self.suppress_output:
-                if get_pretty_output():
-                    content, _reasoning, _ft = self._chat_with_pretty_output(
-                        render_message, start_time, chat_iterator=gen
+                def _gen() -> Generator[Tuple[str, str], None, None]:
+                    nonlocal final_message
+                    with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
+                        for text in stream.text_stream:
+                            content_parts.append(text)
+                            yield ("content", text)
+                        final_message = stream.get_final_message()
+
+                start_time = time.time()
+                gen = _gen()
+                if not self.suppress_output:
+                    if get_pretty_output():
+                        content, _reasoning, _ft = self._chat_with_pretty_output(
+                            render_message, start_time, chat_iterator=gen
+                        )
+                    else:
+                        content, _reasoning, _ft = self._chat_with_simple_output(
+                            render_message, start_time, chat_iterator=gen
+                        )
+                    # 与文本协议 _chat 对齐：打印模型响应统计信息
+                    self._print_response_stats(
+                        content or "", _reasoning or "", _ft, start_time
                     )
                 else:
-                    content, _reasoning, _ft = self._chat_with_simple_output(
-                        render_message, start_time, chat_iterator=gen
+                    content, _reasoning = self._chat_with_suppressed_output(
+                        render_message, chat_iterator=gen
                     )
-            else:
-                content, _reasoning = self._chat_with_suppressed_output(
-                    render_message, chat_iterator=gen
+                # 渲染层可能提前 break 未耗尽生成器，此处显式耗尽以触发 get_final_message 与 tool_calls 解析
+                for _ in gen:
+                    pass
+
+                # 从 final_message 解析规范 tool_calls
+                tool_calls: List[Dict[str, Any]] = []
+                for block in getattr(final_message, "content", None) or []:
+                    if getattr(block, "type", None) == "tool_use":
+                        tool_calls.append(
+                            {
+                                "id": getattr(block, "id", ""),
+                                "name": getattr(block, "name", ""),
+                                "arguments": getattr(block, "input", None) or {},
+                            }
+                        )
+
+                # 渲染管线检测到输出陷入重复时返回空 content；若同时无 tool_calls，
+                # 判定为重复导致空输出，回滚本轮并重试（与文本协议路径一致）。
+                if not content and not tool_calls:
+                    if attempt < max_retries - 1:
+                        sleep_time = 2**attempt
+                        PrettyOutput.auto_print(
+                            f"⚠️ 模型输出为空或陷入重复，重试中 ({attempt + 1}/{max_retries})，等待 {sleep_time}s..."
+                        )
+                        time.sleep(sleep_time)
+                        continue
+                    # 重试耗尽仍未获得有效输出，跳出循环统一回滚
+                    break
+
+                assistant_msg: Dict[str, Any] = {
+                    "role": "assistant",
+                    "content": content or None,
+                }
+                if tool_calls:
+                    assistant_msg["tool_calls"] = tool_calls
+                self.messages.append(assistant_msg)
+                return (content or None), (tool_calls or None)
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
                 )
-            # 渲染层可能提前 break 未耗尽生成器，此处显式耗尽以触发 get_final_message 与 tool_calls 解析
-            for _ in gen:
-                pass
+                self._native_disabled = True
+                # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
+                if (
+                    append_user
+                    and message
+                    and self.messages
+                    and self.messages[-1].get("role") == "user"
+                ):
+                    self.messages.pop()
+                content, _ = self._claude_fallback_text(message, append_user)
+                return content, None
 
-            # 从 final_message 解析规范 tool_calls
-            tool_calls: List[Dict[str, Any]] = []
-            for block in getattr(final_message, "content", None) or []:
-                if getattr(block, "type", None) == "tool_use":
-                    tool_calls.append(
-                        {
-                            "id": getattr(block, "id", ""),
-                            "name": getattr(block, "name", ""),
-                            "arguments": getattr(block, "input", None) or {},
-                        }
-                    )
-
-            if append_user and message:
-                self.messages.append({"role": "user", "content": message})
-            assistant_msg: Dict[str, Any] = {
-                "role": "assistant",
-                "content": content or None,
-            }
-            if tool_calls:
-                assistant_msg["tool_calls"] = tool_calls
-            self.messages.append(assistant_msg)
-            return (content or None), (tool_calls or None)
-        except Exception as e:
-            PrettyOutput.auto_print(
-                f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
-            )
-            self._native_disabled = True
-            # 回滚本轮已追加的用户消息，交给纯文本路径重新处理
-            if (
-                append_user
-                and message
-                and self.messages
-                and self.messages[-1].get("role") == "user"
-            ):
-                self.messages.pop()
-            content, _ = self._claude_fallback_text(message, append_user)
-            return content, None
+        # 重试耗尽仍未获得有效输出，回滚用户消息并返回空
+        if (
+            append_user
+            and message
+            and self.messages
+            and self.messages[-1].get("role") == "user"
+        ):
+            self.messages.pop()
+        return None, None
 
     def _claude_fallback_text(
         self,
