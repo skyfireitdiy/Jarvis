@@ -1,8 +1,0 @@
-{
-  "id": "20260907_164848_628634",
-  "type": "project_long_term",
-  "tags": ["WebSocket压缩", "执行完成", "L1+L2"],
-  "content": "Jarvis WebSocket 压缩（L1+L2）已全部实施完成。变更文件：ws_codec.py（新增）、app.py、chat_manager.py、node_manager.py、App.vue、package.json。前端 pako 导入需用 `import * as pako from 'pako'`（ESM 无 default 导出）。App.vue 中 compressSend 7 处调用、decompressReceive 2 处调用，无残留 ws.send(JSON.stringify。npm run build 构建通过。最新 commit: 9459b9a",
-  "created_at": "2026-09-07T16:48:48.628683",
-  "updated_at": "2026-09-07T16:48:48.628690"
-}

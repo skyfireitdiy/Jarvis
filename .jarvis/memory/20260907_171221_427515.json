@@ -1,8 +1,0 @@
-{
-  "id": "20260907_171221_427515",
-  "type": "project_long_term",
-  "tags": ["WebSocket压缩", "bug修复", "receive_json_compressed"],
-  "content": "ws_codec.py receive_json_compressed 曾误用 ASGI 消息 type 字段判断消息类型（恒为 websocket.receive），导致所有接收消息被丢弃。已修复为直接判断 message.get('bytes')/message.get('text') 键是否存在。Commit: a254555",
-  "created_at": "2026-09-07T17:12:21.427563",
-  "updated_at": "2026-09-07T17:12:21.427570"
-}

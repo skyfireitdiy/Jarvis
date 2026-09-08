@@ -1158,7 +1158,6 @@
 </template>
 
 <script setup>
-import * as pako from 'pako'
 import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialChars, drawSelection, rectangularSelection, crosshairCursor, placeholder } from '@codemirror/view'
 import { EditorState, Compartment } from '@codemirror/state'
@@ -1819,49 +1818,6 @@ function getHttpProtocol() {
 // 获取当前页面的 WebSocket 协议（ws:// 或 wss://）
 function getWebSocketProtocol() {
   return window.location.protocol === 'https:' ? 'wss' : 'ws'
-}
-
-// ========== WebSocket 消息压缩/解压 ==========
-// 协议：首字节 0x78 标记 zlib 压缩，{ 开头为普通 JSON 文本
-// 小消息（<1KB）跳过压缩
-const WS_COMPRESS_THRESHOLD = 1024
-
-// 压缩并发送 JSON 消息
-function compressSend(ws, message) {
-  const text = JSON.stringify(message)
-  if (text.length < WS_COMPRESS_THRESHOLD) {
-    ws.send(text)
-    return
-  }
-  const compressed = pako.deflate(text, { level: 6 })
-  if (compressed.length < text.length) {
-    ws.send(compressed)
-  } else {
-    ws.send(text)
-  }
-}
-
-// 解压接收到的消息，返回解析后的 JSON 对象或 null
-function decompressReceive(event) {
-  const data = event.data
-  try {
-    if (typeof data === 'string') {
-      // 普通文本 JSON
-      return JSON.parse(data)
-    }
-    // 二进制数据：检查是否为 zlib 压缩（首字节 0x78）
-    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer || data)
-    if (bytes.length > 0 && bytes[0] === 0x78) {
-      const decompressed = pako.inflate(bytes, { to: 'string' })
-      return JSON.parse(decompressed)
-    }
-    // 非压缩二进制，尝试按 UTF-8 解析
-    const text = new TextDecoder().decode(bytes)
-    return JSON.parse(text)
-  } catch (error) {
-    console.warn('[WS] message parse failed', error)
-    return null
-  }
 }
 
 // 解析网关地址，支持完整URL格式（如 ws://example.com:8080/ws 或 example.com:8080）
@@ -4515,7 +4471,7 @@ function sendMessageToAgent(message, agentId = null) {
   }
 
   console.log(`[SEND] Sending message to agent ${targetAgentId}:`, message)
-  compressSend(ws, message)
+  ws.send(JSON.stringify(message))
 }
 
 // 加载指定 Agent 的历史消息
@@ -5261,8 +5217,11 @@ async function connect() {
       console.log('[ws] Ignoring message from stale connection')
       return
     }
-    const message = decompressReceive(event)
-    if (message === null) {
+    let message = null
+    try {
+      message = JSON.parse(event.data)
+    } catch (error) {
+      console.warn('[ws] message parse failed', event.data)
       return
     }
 
@@ -5861,8 +5820,11 @@ async function connectToAgent(agent, retryCount = 0) {
       
       // 绑定消息处理
       ws.onmessage = (event) => {
-        const message = decompressReceive(event)
-        if (message === null) {
+        let message = null
+        try {
+          message = JSON.parse(event.data)
+        } catch (error) {
+          console.warn(`[AGENT ${agentId}] message parse failed`, event.data)
           return
         }
         
@@ -5899,10 +5861,10 @@ async function connectToAgent(agent, retryCount = 0) {
         // 发送该 Agent 的增量同步请求
         const lastSeq = getAgentLastSeq(agentId)
         const agent_seqs = { [agentId]: lastSeq }
-        compressSend(ws, {
+        ws.send(JSON.stringify({
           type: 'sync_request',
           payload: { agent_seqs }
-        })
+        }))
         console.log(`[AGENT ${agentId}] Sent sync_request with seq:`, lastSeq)
 
         // 标记连接已完成（在onclose中用于判断是否需要重试）
@@ -9568,7 +9530,7 @@ function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
   if (targetAgentId) {
     const ws = sockets.value.get(targetAgentId)
     if (ws && ws.readyState === WebSocket.OPEN) {
-      compressSend(ws, message)
+      ws.send(JSON.stringify(message))
     } else {
       console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
     }
@@ -9649,7 +9611,7 @@ function sendConfirmResult(confirmed, agentId = null) {
   if (targetAgentId) {
     const ws = sockets.value.get(targetAgentId)
     if (ws && ws.readyState === WebSocket.OPEN) {
-      compressSend(ws, message)
+      ws.send(JSON.stringify(message))
     } else {
       console.warn(`[SEND] No open WebSocket for agent ${targetAgentId}`)
     }
@@ -9718,7 +9680,7 @@ function sendMessageToAgentById(agentId, message) {
 
   const ws = sockets.value.get(agentId)
   if (ws && ws.readyState === WebSocket.OPEN) {
-    compressSend(ws, message)
+    ws.send(JSON.stringify(message))
   } else {
     console.warn(`[SEND] No open WebSocket for agent ${agentId}`)
   }
@@ -9912,7 +9874,7 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     }
     const ws = targetAgentId ? sockets.value.get(targetAgentId) : null
     if (ws && ws.readyState === WebSocket.OPEN) {
-      compressSend(ws, message)
+      ws.send(JSON.stringify(message))
     } else {
       console.warn(`[terminal] No open WebSocket for agent ${targetAgentId}, execution ${executionId}`)
     }
@@ -11665,7 +11627,7 @@ function sendHeartbeat() {
       console.log(`[HEARTBEAT] Sending ping to agent ${agentId}`)
       // 记录发送时间（用于超时检测）
       lastPongTime.value.set(agentId, now) // 先更新为发送时间，收到 pong 后会再次更新
-      compressSend(ws, { type: 'ping' })
+      ws.send(JSON.stringify({ type: 'ping' }))
     }
   })
   
