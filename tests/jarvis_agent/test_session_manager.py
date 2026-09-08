@@ -124,8 +124,6 @@ class TestSessionManager:
                 f"路径格式不匹配: {actual_path}"
             )
 
-
-
     @patch("os.path.exists")
     def test_restore_session_file_not_exists(self, mock_exists, session_manager):
         """测试会话文件不存在的情况"""
@@ -136,6 +134,64 @@ class TestSessionManager:
 
             assert result is False
 
+    def test_generate_session_name_empty_conversation(
+        self, session_manager, mock_model
+    ):
+        """对话记录为空时返回默认名称"""
+        mock_model.get_messages.return_value = []
+        assert session_manager._generate_session_name() == "未命名会话"
 
+    def test_generate_session_name_llm_success(self, session_manager, mock_model):
+        """LLM成功生成会话名称"""
+        mock_model.get_messages.return_value = [
+            {"role": "user", "content": "帮我分析这段代码的性能问题"},
+            {"role": "assistant", "content": "好的，我来分析性能瓶颈"},
+        ]
+        mock_model.complete.return_value = "代码性能分析"
 
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            assert session_manager._generate_session_name() == "代码性能分析"
 
+    def test_generate_session_name_llm_cleans_special_chars(
+        self, session_manager, mock_model
+    ):
+        """LLM返回的名称会清理特殊字符并限制长度"""
+        mock_model.get_messages.return_value = [
+            {"role": "user", "content": "帮我写一个Python脚本"}
+        ]
+        mock_model.complete.return_value = "「Python脚本」编写指南！"
+
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            name = session_manager._generate_session_name()
+            # 特殊字符被清理，只保留中文、英文、数字、下划线和连字符
+            assert name == "Python脚本编写指南"
+
+    def test_generate_session_name_all_platforms_fail(
+        self, session_manager, mock_model
+    ):
+        """所有平台都失败时返回默认名称"""
+        mock_model.get_messages.return_value = [
+            {"role": "user", "content": "帮我分析代码"}
+        ]
+        mock_model.complete.side_effect = Exception("LLM调用失败")
+
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            assert session_manager._generate_session_name() == "未命名会话"
+
+    def test_generate_session_name_llm_empty_result(self, session_manager, mock_model):
+        """LLM返回空结果时回退到默认名称"""
+        mock_model.get_messages.return_value = [
+            {"role": "user", "content": "帮我分析代码"}
+        ]
+        mock_model.complete.return_value = ""
+
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            assert session_manager._generate_session_name() == "未命名会话"

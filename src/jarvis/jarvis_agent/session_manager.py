@@ -57,13 +57,15 @@ class SessionManager:
         self.addon_prompt = addon_prompt
 
     def _generate_session_name(self) -> str:
-        """根据对话记录使用TextRank算法生成会话名称
+        """根据对话记录使用LLM生成会话名称
+
+        优先使用cheap模型生成简洁的会话名称，失败时回退到当前对话模型，
+        再失败则返回默认名称。
 
         Returns:
-            str: 使用TextRank算法从对话记录提取关键词生成的会话名称
+            str: 使用LLM从对话记录生成的会话名称
         """
         import re
-        import jieba.analyse
 
         # 从对话记录中提取文本
         conversation_text = ""
@@ -88,42 +90,51 @@ class SessionManager:
         if not conversation_text.strip():
             return "未命名会话"
 
-        # 使用TextRank提取关键词
+        # 截断过长的对话文本，避免超出模型上下文
+        if len(conversation_text) > 4000:
+            conversation_text = conversation_text[:4000]
+
+        prompt = (
+            "请根据以下对话内容，为这次会话生成一个简短、贴切的会话名称。\n"
+            "要求：\n"
+            "1. 用中文概括对话主题，长度控制在2-10个汉字\n"
+            "2. 不要使用标点符号、引号或任何特殊字符\n"
+            "3. 只输出会话名称本身，不要任何解释或前后缀\n\n"
+            f"对话内容：\n{conversation_text}"
+        )
+
+        # 依次尝试用cheap模型和当前对话模型生成会话名称
+        for platform in self._iter_name_platforms():
+            try:
+                result = platform.complete(prompt)
+                if result and result != "<输出被用户中断>":
+                    # 清理特殊字符，只保留中文、英文、数字、下划线和连字符
+                    session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", result)
+                    # 限制长度（最多15个字符）
+                    if len(session_name) > 15:
+                        session_name = session_name[:15]
+                    if session_name:
+                        return session_name
+            except Exception:
+                # 当前平台生成失败，尝试下一个平台
+                continue
+
+        # 所有平台都失败时返回默认名称
+        return "未命名会话"
+
+    def _iter_name_platforms(self):
+        """返回用于生成会话名称的平台迭代器（cheap模型优先，回退到当前对话模型）"""
         try:
-            keywords = jieba.analyse.textrank(
-                conversation_text,
-                topK=5,
-                withWeight=False,
-                allowPOS=(
-                    "ns",
-                    "n",
-                    "vn",
-                    "v",
-                    "nz",
-                ),  # 地名、名词、动名词、动词、其他名词
-            )
+            from jarvis.jarvis_platform.registry import PlatformRegistry
 
-            # 取前3个关键词组合成会话名称
-            if keywords:
-                session_name = "".join(keywords[:3])
-            else:
-                # 如果没有提取到关键词，返回默认名称
-                return "未命名会话"
+            cheap = PlatformRegistry.get_global_platform_registry().get_cheap_platform()
+            if cheap is not None:
+                yield cheap
         except Exception:
-            # TextRank失败时返回默认名称
-            return "未命名会话"
+            pass
 
-        # 清理特殊字符，只保留中文、英文、数字、下划线和连字符
-        session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", session_name)
-
-        # 限制长度（最多15个字符）
-        if len(session_name) > 15:
-            session_name = session_name[:15]
-
-        if not session_name:
-            return "未命名会话"
-
-        return session_name
+        # 回退到当前对话模型（无状态补全，不影响主对话历史）
+        yield self.model
 
     def _list_session_files(self) -> List[str]:
         """
@@ -814,9 +825,7 @@ class SessionManager:
 
         return True
 
-    def _print_recent_conversation(
-        self, session_file: str, count: int = 4
-    ) -> None:
+    def _print_recent_conversation(self, session_file: str, count: int = 4) -> None:
         """恢复会话后打印最近几条对话，便于用户确认恢复是否正确。
 
         参数:
