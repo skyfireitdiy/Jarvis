@@ -198,6 +198,41 @@ def to_anthropic_messages(
     return ("\n".join(system_parts) if system_parts else None, out)
 
 
+# 与文本协议一致的定时/延迟调用参数：可附加到任意工具参数 schema，
+# 供模型以原生方式声明 after/at/loop。
+_TIMER_PROPERTIES: Dict[str, Any] = {
+    "after": {
+        "type": "integer",
+        "description": "延迟执行：N 秒后执行本工具（与其它实参一起用，不要单独使用）",
+    },
+    "at": {
+        "type": "string",
+        "description": "定时执行：ISO8601 时间点执行本工具（与其它实参一起用，不要单独使用）",
+    },
+    "loop": {
+        "type": "integer",
+        "description": "循环执行：每 N 秒执行一次本工具（与其它实参一起用，不要单独使用）",
+    },
+}
+_TIMER_KEYS = ("after", "at", "loop")
+
+
+def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """在工具参数 schema 上附加可选定时参数（若工具自身未定义同名参数）。"""
+    if not isinstance(schema, dict):
+        return schema
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return schema
+    if any(key in properties for key in _TIMER_KEYS):
+        return schema
+    merged = dict(properties)
+    merged.update(_TIMER_PROPERTIES)
+    out = dict(schema)
+    out["properties"] = merged
+    return out
+
+
 def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     """从 ToolRegistry 构建 OpenAI tools 数组。"""
     tools = []
@@ -212,7 +247,7 @@ def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
                 "function": {
                     "name": tool.name,
                     "description": getattr(tool, "description", "") or "",
-                    "parameters": parameters,
+                    "parameters": with_timer_params(parameters),
                 },
             }
         )
@@ -231,7 +266,7 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
             {
                 "name": tool.name,
                 "description": getattr(tool, "description", "") or "",
-                "input_schema": parameters,
+                "input_schema": with_timer_params(parameters),
             }
         )
     return tools
