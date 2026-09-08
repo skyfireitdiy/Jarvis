@@ -332,6 +332,19 @@ class AgentRunLoop:
 
             should_compress = token_limit_triggered or turn_limit_triggered
 
+            # 后台预压缩已完成：立即应用摘要压缩上下文，无需等到 80% 阈值
+            # （80% 触发时 _adaptive_compression 内部也会应用，此处处理未到 80% 的情况）
+            if (
+                not should_compress
+                and self.agent._pre_compressed_summary
+                and not self.agent._pre_compressing
+            ):
+                if self.agent._check_and_use_pre_compressed_summary():
+                    PrettyOutput.auto_print(
+                        "✅ 后台预压缩已完成，立即应用摘要压缩上下文"
+                    )
+                    return
+
             if should_compress:
                 # 检查是否由当前消息过长导致
                 current_prompt = self.agent.session.prompt
