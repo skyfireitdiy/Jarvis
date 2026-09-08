@@ -1524,7 +1524,11 @@ class Agent:
 
     def _native_tools(self) -> list:
         """构建当前平台所需的原生工具 schema。"""
-        from jarvis.jarvis_platform.native_tools import build_openai_tools
+        from jarvis.jarvis_platform.claude import ClaudeModel
+        from jarvis.jarvis_platform.native_tools import (
+            build_anthropic_tools,
+            build_openai_tools,
+        )
         from jarvis.jarvis_platform.openai import OpenAIModel
 
         registry = self.get_tool_registry()
@@ -1532,6 +1536,8 @@ class Agent:
             return []
         if isinstance(self.model, OpenAIModel):
             return build_openai_tools(registry)
+        if isinstance(self.model, ClaudeModel):
+            return build_anthropic_tools(registry)
         return []
 
     def _run_native_tool_loop(self, message: str) -> str:
@@ -1539,11 +1545,12 @@ class Agent:
 
         返回最终 assistant 内容文本（可能为空）。仅在平台支持原生且 schema 非空时被调用。
         """
+        from jarvis.jarvis_platform.claude import ClaudeModel
         from jarvis.jarvis_platform.openai import OpenAIModel
 
         model = self.model
         registry = self.get_tool_registry()
-        if not isinstance(model, OpenAIModel) or not registry:
+        if not isinstance(model, (OpenAIModel, ClaudeModel)) or not registry:
             return model.chat_until_success(message)
 
         tools = self._native_tools()
