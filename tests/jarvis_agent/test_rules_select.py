@@ -41,3 +41,51 @@ def test_cheap_shortlist_limits_and_dedup():
     names = ["a.md", "b.md", "c.md", "d.md", "e.md"]
     out = mgr._select_cheap_shortlist(cheap, "任务", names, {n: "" for n in names}, max_pre=2)
     assert out == ["a.md", "c.md"]
+
+
+def test_match_task_cheap_uses_catalog_and_parses(monkeypatch):
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+
+    mgr = object.__new__(RulesManager)
+    mgr._catalog_cache = [
+        ["builtin:security.md", "安全审查"],
+        ["builtin:tdd.md", "测试驱动"],
+    ]
+    cheap = _FakeCheap("<NUM>2,1</NUM>")
+
+    class _Reg:
+        def create_platform(self, platform_type="cheap"):
+            return cheap
+
+    monkeypatch.setattr(PlatformRegistry, "get_global_platform_registry", lambda: _Reg())
+    out = mgr.match_task_cheap("帮我做个安全代码审查", max_rules=3)
+    assert out == ["builtin:tdd.md", "builtin:security.md"]
+
+
+def test_match_task_cheap_no_cheap_returns_empty(monkeypatch):
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+
+    mgr = object.__new__(RulesManager)
+    mgr._catalog_cache = [["builtin:security.md", "安全审查"]]
+
+    class _NoCheap:
+        def create_platform(self, platform_type="cheap"):
+            return None
+
+    monkeypatch.setattr(PlatformRegistry, "get_global_platform_registry", lambda: _NoCheap())
+    assert mgr.match_task_cheap("你好") == []
+
+
+def test_match_task_cheap_none_answer_returns_empty(monkeypatch):
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+
+    mgr = object.__new__(RulesManager)
+    mgr._catalog_cache = [["builtin:security.md", "安全审查"]]
+    cheap = _FakeCheap("<NUM>none</NUM>")
+
+    class _Reg:
+        def create_platform(self, platform_type="cheap"):
+            return cheap
+
+    monkeypatch.setattr(PlatformRegistry, "get_global_platform_registry", lambda: _Reg())
+    assert mgr.match_task_cheap("今天天气不错") == []

@@ -3488,6 +3488,8 @@ class Agent:
                 return LoopAction.CONTINUE
 
             self.session.prompt = processed_input
+            # 会话中途的新任务：强触发可能相关的规则并包进本条上下文
+            self._hard_trigger_rules(processed_input)
             # 检测到重复响应时，在提示词末尾补充不要重复的提示
             if self._repeat_detected:
                 self.session.prompt = join_prompts(
@@ -3627,6 +3629,52 @@ class Agent:
         except Exception as e:
             # 规则选择失败不影响主流程，静默处理
             PrettyOutput.auto_print(f"⚠️  自动选择规则失败: {e}")
+
+    def _wrap_loaded_rules(self, text: str) -> str:
+        """把当前已加载规则包成 <rules> 前缀（替换旧块），返回新文本。"""
+        try:
+            import re
+
+            content = self.rules_manager.get_loaded_rules_content()
+            if not content:
+                return text
+            block = f"<rules>\n{content}\n</rules>"
+            cleaned = re.sub(r"<rules>.*?</rules>", "", text, flags=re.S).strip()
+            return block + "\n\n" + cleaned
+        except Exception:
+            return text
+
+    def _hard_trigger_rules(self, task: str) -> None:
+        """强触发：新任务进入处理前用 cheap 判定并强制载入可能相关的规则。
+
+        首次任务的自动选择已在 _first_run 完成；这里负责会话中途出现的新任务，
+        保证规则/技能"≥1% 命中就载入"，并把已载规则包进本条任务上下文。
+        """
+        try:
+            if getattr(self, "quick_mode", False) or not getattr(
+                self, "_enable_auto_rule_select", False
+            ):
+                return
+            if not task or len(task.strip()) < 40:
+                return
+            picked = self.rules_manager.match_task_cheap(task)
+            if not picked:
+                return
+            newly = []
+            for rule_name in picked:
+                if rule_name in (self.loaded_rule_names or []):
+                    continue
+                if self.rules_manager.load_rule(rule_name):
+                    newly.append(rule_name)
+            if newly:
+                PrettyOutput.auto_print(
+                    "⚡ 强触发载入规则: " + ", ".join(newly)
+                )
+                self.session.prompt = self._wrap_loaded_rules(
+                    self.session.prompt or task
+                )
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  强触发载入规则失败: {e}")
 
     def _filter_tools_if_needed(self, task: str) -> None:
         """如果工具数量超过阈值，使用大模型筛选相关工具
