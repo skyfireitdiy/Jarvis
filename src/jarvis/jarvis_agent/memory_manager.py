@@ -107,7 +107,7 @@ class MemoryManager:
 
             if self.agent._native_active():
                 # 原生：模型直接调用 memory 工具（内部原生循环执行），无需文本 JSON 解析
-                self.agent._invoke_model(prompt)
+                self.agent._run_native_until_content(prompt)
             else:
                 response = self.agent.model.chat_until_success(prompt)
                 # 执行工具调用（如果有）
@@ -155,9 +155,7 @@ class MemoryManager:
                     "project_long_term 存项目相关（架构决策、关键配置、实现约定），"
                     "global_long_term 存通用经验与用户偏好，short_term 存当前任务临时信息"
                 )
-                memory_prompts += (
-                    "\n    - 需要过往上下文或方案时，用 memory(action=retrieve) 检索相关记忆"
-                )
+                memory_prompts += "\n    - 需要过往上下文或方案时，用 memory(action=retrieve) 检索相关记忆"
 
         return memory_prompts
 
