@@ -674,6 +674,11 @@ class AgentRunLoop:
                     ),
                     skip_confirm=True,
                 )
+                # 标记自动完成已提交，避免 CodeAgent.run 再次提交
+                try:
+                    ag._auto_commit_done = True
+                except Exception:
+                    pass
             except Exception as e:
                 save_exception(
                     e, module="jarvis_agent.run_loop", function="_execute_auto_complete"
@@ -1137,10 +1142,13 @@ class AgentRunLoop:
                     # 中断处理器返回了最终结果，任务结束
                     return interrupt_result
 
-                # 处理工具调用
-                should_return, result, safe_tool_prompt = self._handle_tool_calls(
-                    ag, current_response
-                )
+                # 处理工具调用（原生模式工具已在模型调用层执行，跳过文本解析）
+                if ag._native_active():
+                    should_return, result, safe_tool_prompt = False, None, ""
+                else:
+                    should_return, result, safe_tool_prompt = self._handle_tool_calls(
+                        ag, current_response
+                    )
                 if should_return:
                     # 首轮检测标志已消费（无论是否有工具调用），避免后续轮次误触发
                     ag._first_run_occurred = False
@@ -1160,14 +1168,15 @@ class AgentRunLoop:
                 if result is not None:
                     return result
 
-                # 跟踪无工具调用情况
-                should_continue, track_result = self._track_no_tool_call(
-                    ag, safe_tool_prompt, current_response
-                )
-                if should_continue:
-                    continue
-                if track_result is not None:
-                    return track_result
+                # 跟踪无工具调用情况（原生模式已无文本 JSON，启发式不再适用）
+                if not ag._native_active():
+                    should_continue, track_result = self._track_no_tool_call(
+                        ag, safe_tool_prompt, current_response
+                    )
+                    if should_continue:
+                        continue
+                    if track_result is not None:
+                        return track_result
 
                 # 获取下一步用户输入
                 try:

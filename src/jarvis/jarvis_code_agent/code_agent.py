@@ -400,6 +400,8 @@ class CodeAgent(Agent):
         _should_save_session = True
         # 重置 review 标志，确保每次 run 调用时 review 状态干净
         self._review_already_done = False
+        # 重置自动完成提交标记（AutoComplete 路径已提交时跳过本处重复提交）
+        self._auto_commit_done = False
         try:
             set_current_agent(self.name, self)
 
@@ -615,18 +617,20 @@ git reset --hard {start_commit}
                         # 分析失败不应该影响主流程，仅记录错误
                         PrettyOutput.auto_print(f"⚠️ 任务分析失败: {str(e)}")
 
-            end_commit = get_latest_commit_hash()
-            commits = self.git_manager.show_commit_between(
-                self.start_commit, end_commit
-            )
-            self.git_manager.handle_commit_confirmation(
-                commits,
-                self.start_commit,
-                prefix,
-                suffix,
-                self,
-                self.post_process_manager.post_process_modified_files,
-            )
+            # 自动完成路径已提交（_execute_auto_complete），此处避免重复提交
+            if not getattr(self, "_auto_commit_done", False):
+                end_commit = get_latest_commit_hash()
+                commits = self.git_manager.show_commit_between(
+                    self.start_commit, end_commit
+                )
+                self.git_manager.handle_commit_confirmation(
+                    commits,
+                    self.start_commit,
+                    prefix,
+                    suffix,
+                    self,
+                    self.post_process_manager.post_process_modified_files,
+                )
 
             return result_str
 
