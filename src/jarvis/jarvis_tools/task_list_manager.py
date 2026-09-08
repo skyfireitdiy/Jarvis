@@ -328,41 +328,41 @@ class task_list_manager:
             verification_method_section = f"""\n\n**验证方法说明（由任务执行者提供）：**
 {verification_method}
 
-请据上述验证方法说明进行验证，此乃任务执行者指定之验证方式。"""
+请严格按上述验证方法进行验证，这是任务执行者指定的验收方式。"""
 
         # 构建验证任务的系统提示词
-        verification_system_prompt = f"""汝乃任务验证专家。汝之任务乃验证任务是否真已竟，仅验证任务预期输出与产物。
+        verification_system_prompt = f"""你是一名任务验证专家。你的职责是验证任务是否真正完成，只核验任务的预期输出与产物。
 
 **任务信息：**
 - 任务名称：{task.task_name}
 - 任务描述：{task.task_desc}
-- 预期输出（建议为分条列出之结构化条目，例如 1)、2)、3) 或 markdown 列表 - item）：{task.expected_output}{verification_method_section}
+- 预期输出（请按每条列出，例如 1)、2)、3) 或 markdown 列表）：{task.expected_output}{verification_method_section}
 
 **验证要求：**
-1. 将预期输出解析为一组**逐条之预期结果条目**（例如按换行、编号 1)、2)、3) 或 markdown 列表 - item 进行切分）
-2. 对**每一条预期结果条目**分别进行验证：检查对应之代码、文件或其他产物是否真实存在且满足该条要求
-3. 用 read_code 工具验证任务产生之代码或文件是否符合对应条目之要求
-4. 仅检查任务明确要求之产物是否存在且正确
-5. 勿验证与任务预期输出无关之项目（如整体项目编译、无关测试等）
-6. 关注任务描述中明确提到之具体交付物
+1. 把预期输出解析成一组【逐条】的预期结果条目（按换行、编号 1)、2)、3) 或 markdown 列表拆分）
+2. 对每一条预期结果分别验证：检查对应的代码、文件或其他产物是否真实存在并满足该条要求
+3. 用 read_code 工具核对任务产生的代码或文件是否符合对应条目
+4. 只检查任务明确要求产生的产物是否存在且正确
+5. 不要验证与任务预期输出无关的项目（如整体项目编译、无关测试等）
+6. 关注任务描述里明确提到的具体交付物
 
 **验证标准：**
-- 每一条预期输出条目是否皆已实际生成对应产物
-- 每一条条目对应之产物是否符合任务描述中之具体要求
-- 不验证无关之编译状态、测试覆盖率或代码风格
+- 每一条预期输出是否都已实际生成对应产物
+- 每一条产出的内容是否符合任务描述里的具体要求
+- 不核验无关的编译状态、测试覆盖率或代码风格
 
-**重要限制（强制性）：**
+**重要限制（强制）：**
 - 只能用 read_code 与 execute_script 工具进行验证
-- 必据实际验证结果，勿推测或假设
-- 仅验证任务预期输出与直接相关之产物
-- 若验证通过，径出 {ot("!!!COMPLETE!!!")}，勿输出其他任何内容。
-- **禁止实际修复行为**：严禁执行任何代码修改、文件操作或配置更改
-- **允许修复建议**：可细析问题原因并提供具体之修复建议与指导
-- **明确区分建议与执行**：可说明"应如何修正"，但必强调此仅为建议
+- 必须依据实际验证结果，不要推测或假设
+- 只验证任务预期输出及直接相关的产物
+- 若全部验证通过，只输出 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容
+- **禁止实际修复**：严禁执行任何代码修改、文件操作或配置更改
+- **允许给出修复建议**：可以分析问题原因并提供具体的修复建议与指导
+- **要明确区分建议与执行**：可以说"应如何修正"，但要强调这只是建议
 """
 
         # 构建验证任务的总结提示词（结构化格式要求）
-        verification_summary_prompt = f"""请以结构化之格式总结任务验证结果。必严依下式输出：
+        verification_summary_prompt = f"""请按结构化格式总结任务验证结果，严格按下面的模板输出：
 
 ## 任务验证结果
 
@@ -425,19 +425,14 @@ class task_list_manager:
         verification_agent = Agent(
             system_prompt=verification_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
-            description="Task verification agent",
+            description="任务验证代理（只读核验）",
             summary_prompt=verification_summary_prompt,
             auto_complete=True,
             need_summary=True,
-            use_tools=[
-                "read_code",
-                "execute_script",
-                "memory",
-                "methodology",
-            ],
+            use_tools=["read_code", "execute_script"],
             non_interactive=True,
-            use_methodology=True,
-            use_analysis=True,
+            use_methodology=False,
+            use_analysis=False,
             model_type=model_type,
         )
 
@@ -569,6 +564,48 @@ class task_list_manager:
 
         return "\n\n".join(background_parts) if background_parts else ""
 
+    def _build_iteration_task_content(
+        self, task_content: str, iteration: int, all_verification_results: list
+    ) -> str:
+        """第二次及以后迭代：把上一次验证反馈拼进任务内容。"""
+        if iteration <= 1 or not all_verification_results:
+            return task_content
+        return f"""{task_content}
+
+**之前的验证反馈（需要修复的问题）：**
+{all_verification_results[-1]}
+
+请根据上述验证反馈修复问题，确保任务真正完成。
+"""
+
+    def _run_sub_execution(
+        self,
+        is_code_task: bool,
+        parent_agent: Any,
+        agent_name: str,
+        enhanced_task_content: str,
+        background: str,
+    ) -> dict:
+        """按任务类型分发到 sub_code_agent / sub_agent 执行。"""
+        if is_code_task:
+            from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
+
+            tool = SubCodeAgentTool()
+        else:
+            from jarvis.jarvis_tools.sub_agent import SubAgentTool
+
+            tool = SubAgentTool()
+
+        return tool.execute(
+            {
+                "task": enhanced_task_content,
+                "background": background,
+                "name": agent_name,
+                "agent": parent_agent,
+                "quick_mode": getattr(parent_agent, "quick_mode", False),
+            }
+        )
+
     def _verify_task_completion(
         self,
         task: Any,
@@ -600,20 +637,20 @@ class task_list_manager:
             )
 
             # 构建验证任务
-            verification_task = f"""请验证以下任务是否真已竟，且**对预期输出中之每一条条目分别进行验证**：
+            verification_task = f"""请验证以下任务是否真正完成，并对预期输出中的每一条分别验证：
 
 {task_content}
 
 背景信息：
 {background}
 
-请用 read_code 与 execute_script 工具进行验证，重点检查：
-1. 将预期输出解析为多条具体条目（按换行 / 编号 1)、2)、3) / markdown 列表 - item 等方式拆分）
-2. 对每一条预期输出条目，检查是否有对应之代码、文件或其他实际产物支撑
-3. 若某条条目无法找到对应产物、产物不完整或与描述不符，需单独标记为 FAILED，并说明原因
-4. 仅在**所有预期输出条目**皆验证通过时，方可整体判定为 PASSED
+请用 read_code 与 execute_script 工具验证，重点检查：
+1. 把预期输出解析为多条具体条目（按换行 / 编号 1)、2)、3) / markdown 列表等方式拆分）
+2. 对每一条预期输出条目，检查是否有对应的代码、文件或其他实际产物支撑
+3. 若某条找不到对应产物、产物不完整或与描述不符，单独标记 FAILED 并说明原因
+4. 只有【所有】预期输出条目都验证通过，整体才能判定为 PASSED
 
-若存在编译错误、运行时错误、测试失败，或任意一条预期输出条目未满足要求，必明确标记整体为未完成，并详述原因。
+若存在编译错误、运行时错误、测试失败，或任意一条预期输出未满足要求，必须明确标记整体未完成并详述原因。
 """
 
             PrettyOutput.auto_print(
@@ -955,104 +992,19 @@ class task_list_manager:
         Returns:
             str: 工具描述
         """
-        description = """任务列管理工具，供模型把复杂任务拆解成子任务并逐项推进执行。
+        description = """任务列管理工具：把复杂任务拆解成子任务、逐项推进并跟踪状态。
 
-**核心能：**
-- `add_tasks`: 批加任（荐 PLAN 阶用）
-- `execute_task`: 行任（自动建子 Agent）
-- `get_task_list_summary`: 览任状
-- `clear_tasks`: 清现任列（删全任）
+核心操作：add_tasks 批量加任务（规划阶段一次加全）；get_task_list_summary 查看任务状态；execute_task 执行某个任务；update_task 更新任务状态与结果；clear_tasks 清空任务列。
 
-**任类择：**
-- `main`: 简任（1-3步、单文件）主 Agent 直行
-- `sub`: 复任（多步、多文）自动建子 Agent
+任务类型 agent_type：
+- main：简单任务（1~3 步、单文件），由主 Agent 直接执行
+- sub：复杂任务（多步、多文件），自动交给子 Agent 执行
 
-**⚠ 慎用 sub：**
-- 除非任极独立（如全隔之模、独之测套），否则先 `main` 类
-- 若建 `sub` 类任，务必于 `task_desc` 与 `additional_info` 供全上下：
-  - 明确之文径与目录构
-  - 相关之赖系与口定
-  - 必要之环配与技栈讯
-  - 任行之先决与限
+⚠️ sub 慎用：任务不够独立就别用 sub；一旦用 sub，必须在 task_desc 与 additional_info 提供完整上下文（涉及文件与目录结构、依赖与接口、所需环境/技术栈、执行前提与限制）。
 
-**强制：**
-- execute_task 必供 non-empty additional_info 参
-- 禁过拆简任
-- 每 Agent 只能有一任列
+强制要求：execute_task 必须带非空的 additional_info；不要把简单任务拆得过细；每个 Agent 同一时刻只能维护一个任务列。
 
-**用景：**
-- PLAN 阶：一次性加全子任
-- 数据切分：按目录/文/模分处理
-- 赖管：自动验任赖系
-
-**要则：**
-简任用 main，复任用 sub，免过拆。
-
-**用例**
-建任列：
-```json
-{
-    "name": "task_list_manager",
-    "arguments": {
-        "action": "add_tasks",
-        "main_goal": "创建任务列表",
-        "background": "背景信息",
-        "tasks_info": [
-            {
-                "task_name": "任务1",
-                "task_desc": "任务1描述",
-                "expected_output": "任务1预期输出",
-                "agent_type": "main",
-                "dependencies": []
-            },
-            {
-                "task_name": "任务2",
-                "task_desc": "任务2描述",
-                "expected_output": "任务2预期输出",
-                "agent_type": "sub",
-                "dependencies": ["任务1"]
-            }
-        ]
-    }
-}
-```
-
-行任：
-```json
-{
-    "name": "task_list_manager",
-    "arguments": {
-        "action": "execute_task",
-        "task_id": "任务ID",
-        "additional_info": "任务详细信息"
-    }
-}
-```
-
-更任状：
-```json
-{
-    "name": "task_list_manager",
-    "arguments": {
-        "action": "update_task",
-        "task_id": "任务ID",
-        "task_update_info": {
-            "status": "completed",
-            "actual_output": "任务实际输出"
-        }
-    }
-}
-```
-
-清全任：
-```json
-{
-    "name": "task_list_manager",
-    "arguments": {
-        "action": "clear_tasks"
-    }
-}
-```
+典型流程：先用 add_tasks 建好任务列，再逐个 execute_task 推进，期间用 update_task 更新状态与结果。
 """
 
         return description
@@ -1906,74 +1858,18 @@ class task_list_manager:
                             )
                             pass
 
-                        if is_code_task:
-                            # 代码相关任务：使用 sub_code_agent 工具
-                            from jarvis.jarvis_tools.sub_code_agent import (
-                                SubCodeAgentTool,
-                            )
-
-                            sub_code_agent_tool = SubCodeAgentTool()
-
-                            # 构建子Agent名称：使用任务名称和ID，便于识别
-                            agent_name = f"{task.task_name} (task_{task_id})"
-
-                            # 如果是第二次及以后的迭代，添加验证反馈信息
-                            enhanced_task_content = task_content
-                            if iteration > 1 and all_verification_results:
-                                last_verification = all_verification_results[-1]
-                                enhanced_task_content = f"""{task_content}
-
-**之前的验证反馈（需要修复的问题）：**
-{last_verification}
-
-宜据以上验证反馈修正问题，确保任务真正完成。
-"""
-
-                            # 调用 sub_code_agent 执行任务
-                            tool_result = sub_code_agent_tool.execute(
-                                {
-                                    "task": enhanced_task_content,
-                                    "background": background,
-                                    "name": agent_name,
-                                    "agent": parent_agent,
-                                    "quick_mode": getattr(
-                                        parent_agent, "quick_mode", False
-                                    ),
-                                }
-                            )
-                        else:
-                            # 通用任务：使用 sub_agent 工具
-                            from jarvis.jarvis_tools.sub_agent import SubAgentTool
-
-                            sub_general_agent_tool = SubAgentTool()
-
-                            # 构建子Agent名称：使用任务名称和ID，便于识别
-                            agent_name = f"{task.task_name} (task_{task_id})"
-
-                            # 如果是第二次及以后的迭代，添加验证反馈信息
-                            enhanced_task_content = task_content
-                            if iteration > 1 and all_verification_results:
-                                last_verification = all_verification_results[-1]
-                                enhanced_task_content = f"""{task_content}
-
-**之前的验证反馈（需要修复的问题）：**
-{last_verification}
-
-宜据以上验证反馈修正问题，确保任务真正完成。
-"""
-
-                            # 调用 sub_agent 执行任务
-                            tool_result = sub_general_agent_tool.execute(
-                                {
-                                    "task": enhanced_task_content,
-                                    "background": background,
-                                    "name": agent_name,
-                                    "agent": parent_agent,
-                                    "quick_mode": getattr(
-                                        parent_agent, "quick_mode", False
-                                    ),
-                                }
-                            )
+                        # 代码 vs 通用任务统一走子代理分发；第二次起自动附带验证反馈
+                        agent_name = f"{task.task_name} (task_{task_id})"
+                        enhanced_task_content = self._build_iteration_task_content(
+                            task_content, iteration, all_verification_results
+                        )
+                        tool_result = self._run_sub_execution(
+                            is_code_task=is_code_task,
+                            parent_agent=parent_agent,
+                            agent_name=agent_name,
+                            enhanced_task_content=enhanced_task_content,
+                            background=background,
+                        )
 
                         execution_result = tool_result.get("stdout", "")
                         execution_success = tool_result.get("success", False)
@@ -2545,7 +2441,7 @@ class task_list_manager:
    • 任务状态将保持为 {task.status.value}，不会更新为 completed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-任务 [{task.task_name}] 验证未通过，宜据上述反馈修正之。
+任务 [{task.task_name}] 验证未通过，请根据上述反馈修复后再更新状态。
 """
                         return {
                             "success": False,

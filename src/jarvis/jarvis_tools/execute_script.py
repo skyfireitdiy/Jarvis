@@ -146,7 +146,12 @@ class ScriptTool:
             },
             "script_content": {
                 "type": "string",
-                "description": "要执行的脚本内容。注意控制输出量，建议用过滤/限行命令：\n例：\n• grep -i 'error' filename  # 查含'error'之行\n• grep -rn 'pattern' filename     # 搜文内\n• tail -n 50 filename       # 示文末50行\n• head -n 20 filename       # 示文首20行\n• command | head -n 100     # 限出首100行",
+                "description": "要执行的脚本内容。注意控制输出量，建议用过滤/限行命令：\n例：\n• grep -i 'error' filename  # 查包含 'error' 的行\n• grep -rn 'pattern' filename     # 搜文内\n• tail -n 50 filename       # 示文末50行\n• head -n 20 filename       # 示文首20行\n• command | head -n 100     # 限出首100行",
+            },
+            "execution_mode": {
+                "type": "string",
+                "enum": ["auto", "captured", "interactive"],
+                "description": "执行模式（可选，默认 auto）：captured=捕获输出返回；interactive=保留终端让用户交互（适合需 stdin 的程序，如调试器）；auto=根据当前是否非交互自动选择。通常用默认即可，无需填写。",
             },
         },
         "required": ["script_content"],
@@ -1246,17 +1251,25 @@ class ScriptTool:
             Dictionary with execution results
         """
         try:
-            script_content = args.get("script_content", "").strip()
+            # 兼容不同调用方的键名（script_content/code/command/script）
+            raw_script = (
+                args.get("script_content")
+                or args.get("script")
+                or args.get("command")
+                or args.get("code")
+                or ""
+            )
+            script_content = str(raw_script).strip()
             if not script_content:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "Missing or empty script_content parameter",
+                    "stderr": "缺少或为空：script_content（脚本内容）",
                 }
 
-            # Get interpreter: Windows 默认 powershell，Unix 默认 bash
-            interpreter = args.get(
-                "interpreter", "powershell" if self._is_windows() else "bash"
+            # Get interpreter: Windows 默认 powershell，Unix 默认 bash；兼容旧键 script_type
+            interpreter = args.get("interpreter") or args.get("script_type") or (
+                "powershell" if self._is_windows() else "bash"
             )
             execution_mode = str(args.get("execution_mode", "auto"))
             session_id = args.get("session_id")

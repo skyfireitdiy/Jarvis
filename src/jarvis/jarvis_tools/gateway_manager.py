@@ -49,40 +49,16 @@ class GatewayManagerTool:
         """检查工具是否可用，仅当 Gateway 存在时启用（通过 agent_id 是否设置判断）。"""
         return jglobals.agent_id is not None
 
-    description = """管理多 Agent 与网关的通信协作（Agent 互发消息、节点/模型组、定时任务、群组聊天等编排操作）。
+    description = """管理多 Agent 与网关的通信协作，以及节点、定时任务、群组与聊天等编排操作。
 
-支之操：
-1. **send_to_agent**: 发讯于 Agent，经 Web Gateway 代至目之 /message 口，入其入缓
-2. **list_agents**: 得全 Agent 列
-3. **list_nodes**: 得节讯，含节配、行状、已注子节等
-4. **list_model_groups**: 得指节之模组列，含模组名、各档模配等
-5. **create_agent**: 建新 Agent，支指类、工目、模组、任等参
-6. **list_directory**: 览指径文/目录，支跨节询
-7. **delete_agent**: 删指 Agent，支跨节删
-8. **get_node_secret**: 得网关节连私钥，用于子节连主网关时之身验
-9. **update_nodes_code**: 更全节码至 main 分并拉最新
-10. **restart_nodes**: 一键重启全节服，跳过现节，次启子节后终启 master 节
-11. **create_timer**: 建定任，支指节，可定建 Agent 或执 Shell 令
-12. **list_timers**: 询全节之定任并汇
-13. **get_timer**: 询单定任详
-14. **delete_timer**: 删指定任
-15. **create_group**: 建群组
-16. **list_groups**: 询全群组
-17. **get_group**: 询群组详
-18. **join_group**: 入群组
-19. **leave_group**: 出群组
-20. **send_group_message**: 发群组讯
-21. **regenerate_agent**: 无损重生指 Agent
-22. **chat_list_rooms**: 获取聊天室列表
-23. **chat_get_online_clients**: 获取在线用户列表
-24. **chat_get_room_members**: 获取聊天室成员列表
-25. **chat_send_room_message**: 发送聊天室消息（自动添加[Agent名字]前缀）
-26. **chat_send_private_message**: 发送私聊消息（自动添加[Agent名字]前缀）
+每次调用只能执行一个 operation（见 operation 参数），其余参数随 operation 而异。操作大致分几类：
+- Agent：send_to_agent 向 Agent 发消息；list_agents 列出 Agent；create_agent 创建 Agent；delete_agent 删除 Agent；regenerate_agent 无损重生 Agent；get_node_secret 取节点连接密钥
+- 节点/网关：list_nodes 节点信息；list_model_groups 模型组列表；list_directory 目录浏览；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
+- 定时任务：create_timer / list_timers / get_timer / delete_timer
+- 群组：create_group / list_groups / get_group / join_group / leave_group / send_group_message
+- 聊天：chat_list_rooms / chat_get_online_clients / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）
 
-**要示**：
-- 每调只能执一操（send_to_agent、list_agents、list_nodes、list_model_groups、create_agent、list_directory、delete_agent、get_node_secret、update_nodes_code、restart_nodes、create_timer、list_timers、get_timer、delete_timer、create_group、list_groups、get_group、join_group、leave_group、send_group_message、regenerate_agent、chat_list_rooms、chat_get_online_clients、chat_get_room_members、chat_send_room_message、chat_send_private_message）
-- 参据操类而异
-- 聊天室消息自动添加[Agent名字]前缀，以owner用户身份发送"""
+多数操作需要指定目标节点/Agent；具体字段与取值以 operation 参数说明为准。"""
 
     parameters = {
         "type": "object",

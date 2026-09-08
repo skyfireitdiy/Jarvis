@@ -25,25 +25,18 @@ class EditFileNormalTool:
 
     name = "edit_file"
     description = (
-        "以 search/replace 或行号范围对文件行普通文本之编，支同改多文。\n\n"
-        "💡 用法：\n"
-        "1. 直指欲编之文径\n"
-        "2. 为每文供一组编操（search/replace 或行号范围）\n"
-        "3. 以精匹查 search 文，匹得后换为新文\n\n"
-        "🚀 特能：\n"
-        '- 当 search 为空串 "" 时，表直覆整文，replace 之内容为文之全新内\n'
-        "- 若有数 diffs 且首 diff 之 search 为空串，只应首 diff（覆整文），略后诸 diffs\n"
-        "- **支部成**：当某文之数 diffs 有部败时，已成之改仍留文中，且详报每 diff 之果\n"
-        "- **支行号范编**：以 start_line 与 end_line 参指行范，直替该范内之文\n\n"
-        "⚠️ 示：\n"
-        "- search 用精串匹，不支正则式\n"
-        "- **要：search 必供足上下以独定其位**，免匹错位。议含：\n"
-        "  * 目标码前后数行上下（至少含目标码所在函之签或键识）\n"
-        "  * 目标码近旁之独识符（如函名、变名、注等）\n"
-        "  * 避用过短之 search 文（如单辞、短串），除能保其独\n"
-        "- 若某 search 在文中觅不得精匹（search非空时），该 diff 败，然已成之改仍留\n"
-        "- 议于 search 中含足之上文，保能独匹其位，免误匹\n"
-        "- 行号范编模：当指 start_line 与 end_line 时，忽 search 参，直替指行范（自1起，闭区 [start_line, end_line]，含 start_line 至 end_line 行）"
+        "用 search/replace 或行号范围精确修改文件文本，可一次改多个文件（files 数组，逐文件应用）。"
+        "每个文件给一组 diffs（逐个应用，支持多文件、每个文件多 diff）。\n\n"
+        "每个 diff 只能选一种模式：\n"
+        "1) search/replace（默认）：给 search（要替换的旧文本，精确匹配、不支持正则）与 replace（新文本，可为空）。"
+        "search 必须带足上下文以唯一确定位置（建议含所在函数签名或前后几行）。"
+        "同一位置若匹配到多处：设 replace_all=true 全部替换，否则该 diff 报错。"
+        "整文件覆写：把 search 设为空字符串 \"\"、replace 设为文件完整新内容（作为该文件首个 diff；其后 diffs 被忽略）。\n"
+        "2) 行号模式：给 start_line 与 end_line（均从 1 开始、闭区间 [start,end]）和 replace，直接替换该行区间的文本；此时会忽略 search。\n\n"
+        "调用示例：\n"
+        'files=[{"file_path":"src/a.py","diffs":[{"search":"旧文本上下文…","replace":"新文本"}]}]\n'
+        'files=[{"file_path":"a.txt","diffs":[{"start_line":3,"end_line":5,"replace":"新段落"}]}]\n\n'
+        "注意：多个 diff 有依赖或同一文件多处改动时仍可一次给全，按顺序应用；失败的不应用、成功的保留，并会逐条报告。"
     )
 
     parameters = {
