@@ -5,12 +5,14 @@ import json
 import os
 import platform
 import re
+import subprocess
 import sys
 import traceback
 from enum import Enum
 from pathlib import Path
 from typing import Any
 from typing import Callable
+from typing import cast
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -51,7 +53,7 @@ from jarvis.jarvis_agent.prompt_manager import PromptManager
 from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
 from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT
 from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
-from jarvis.jarvis_agent.run_loop import AgentRunLoop
+from jarvis.jarvis_agent.run_loop import AgentRunLoop, ensure_str
 from jarvis.jarvis_agent.session_manager import SessionManager
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
@@ -368,6 +370,13 @@ class Agent:
     tool_group: Optional[str]
     root_dir: str
     start_commit: Optional[str]
+    last_backup_commit: Optional[str]
+
+    # tmux 布局是否已设置（类级标志）
+    _tmux_layout_set: bool = False
+
+    # review 是否已执行（CodeAgent 使用，避免重复 review）
+    _review_already_done: bool = False
 
     def agent_type(self) -> str:
         """获取Agent类型"""
@@ -448,7 +457,7 @@ class Agent:
             return
 
         # 检查是否支持多模态
-        if hasattr(self, "platform") and not self.platform.supports_multimodal():
+        if hasattr(self, "model") and not self.model.supports_multimodal():
             warning_msg = "⚠️ 当前模型不支持多模态输入，已跳过多模态内容添加。如需使用多模态功能，请在 llm_config 中设置 supports_multimodal: true"
             PrettyOutput.auto_print(warning_msg)
             return
@@ -1160,8 +1169,6 @@ class Agent:
                                 f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
                             )
                             try:
-                                import subprocess
-
                                 result = subprocess.run(
                                     ["uv", "pip", "install"] + requirements,
                                     capture_output=True,
@@ -1331,8 +1338,6 @@ class Agent:
                                 f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
                             )
                             try:
-                                import subprocess
-
                                 result = subprocess.run(
                                     ["uv", "pip", "install"] + requirements,
                                     capture_output=True,
@@ -1654,6 +1659,8 @@ class Agent:
                 return "用户拒绝执行该工具，请据此调整方案。"
         try:
             registry = self.get_tool_registry()
+            if registry is None:
+                return f"工具 {name} 执行失败: 工具注册表不可用"
             return registry.execute_native_tool_call(
                 name, call.get("arguments") or {}, self
             )
@@ -1704,6 +1711,8 @@ class Agent:
         def run(call: Dict[str, Any]) -> str:
             n = call.get("name", "")
             try:
+                if registry is None:
+                    return f"工具 {n} 执行失败: 工具注册表不可用"
                 return registry.execute_native_tool_call(
                     n, call.get("arguments") or {}, self, record=False
                 )
@@ -2316,6 +2325,7 @@ class Agent:
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 滑动窗口压缩出错: {str(e)}")
+            return False
 
     def _start_background_pre_compression(self) -> None:
         """启动后台预压缩：在75%阈值时提前生成摘要，80%真正触发时直接使用。
@@ -3273,13 +3283,14 @@ class Agent:
             if has_content:
                 self.optimize_system_prompt(text_input)
                 self._system_prompt_optimized = True
-
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
         # 延迟导入CodeAgent以避免循环依赖
         try:
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
-        except ImportError:
-            CodeAgent = None  # type: ignore[assignment, misc]
+        except ImportError as e:
+            raise RuntimeError(
+                "CodeAgent could not be imported. Please ensure jarvis_code_agent is installed correctly."
+            ) from e
 
         try:
             # 保存原始任务目标（用于长期运行时的上下文保持）
@@ -3319,14 +3330,16 @@ class Agent:
                 # 非交互模式下不再自动设置pin_content
 
             # 将非交互模式说明添加到用户输入中
+            enhanced_input: Union[str, List[ContentBlock]]
             if non_interactive_note:
                 if isinstance(user_input, str):
                     enhanced_input = user_input + non_interactive_note
                 else:
                     # 对于多模态内容，将说明作为文本块添加到末尾
-                    enhanced_input = user_input + [
-                        {"type": "text", "text": non_interactive_note}
-                    ]
+                    enhanced_input = user_input + cast(
+                        List[ContentBlock],
+                        [{"type": "text", "text": non_interactive_note}],
+                    )
             else:
                 enhanced_input = user_input
 
@@ -3543,7 +3556,7 @@ class Agent:
 
             self.session.prompt = processed_input
             # 会话中途的新任务：强触发可能相关的规则并包进本条上下文
-            self._hard_trigger_rules(processed_input)
+            self._hard_trigger_rules(ensure_str(processed_input))
             # 检测到重复响应时，在提示词末尾补充不要重复的提示
             if self._repeat_detected:
                 self.session.prompt = join_prompts(
@@ -3563,7 +3576,7 @@ class Agent:
         """首次运行初始化"""
         # 如果工具过多，使用AI进行筛选
         if self.session.prompt:
-            self._filter_tools_if_needed(self.session.prompt)
+            self._filter_tools_if_needed(ensure_str(self.session.prompt))
 
         # 准备记忆标签提示
         memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
@@ -3575,7 +3588,7 @@ class Agent:
 
             # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
             if self.session.prompt and self._enable_auto_rule_select:
-                self.auto_select_and_load_rules(self.session.prompt)
+                self.auto_select_and_load_rules(ensure_str(self.session.prompt))
 
         # 添加记忆标签提示
         if memory_tags_prompt:
@@ -3723,7 +3736,7 @@ class Agent:
             if newly:
                 PrettyOutput.auto_print("⚡ 强触发载入规则: " + ", ".join(newly))
                 self.session.prompt = self._wrap_loaded_rules(
-                    self.session.prompt or task
+                    ensure_str(self.session.prompt or task)
                 )
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  强触发载入规则失败: {e}")

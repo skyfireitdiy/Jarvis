@@ -2,6 +2,7 @@
 import os
 from typing import Any
 from typing import Tuple
+from typing import cast
 
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.input import user_confirm
@@ -100,12 +101,15 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                     ]
                 )
                 return (
-                    join_prompts(
-                        [
-                            filtered_input,
-                            f"用户执行以下脚本：\n{script}",
-                            f"执行结果：\n{output}",
-                        ]
+                    cast(
+                        str,
+                        join_prompts(
+                            [
+                                filtered_input,
+                                f"用户执行以下脚本：\n{script}",
+                                f"执行结果：\n{output}",
+                            ]
+                        ),
                     ),
                     False,
                 )

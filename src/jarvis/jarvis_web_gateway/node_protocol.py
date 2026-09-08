@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 PROTOCOL_VERSION = 1
@@ -62,7 +62,7 @@ def build_node_message(
         "payload": payload,
         "meta": {
             "protocol_version": PROTOCOL_VERSION,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         },
     }
 

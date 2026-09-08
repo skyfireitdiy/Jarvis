@@ -29,7 +29,7 @@ class CodeReviewer:
         self,
         model: Any = None,
         start_commit: Optional[str] = None,
-        non_interactive: bool = True,
+        non_interactive: Optional[bool] = True,
         quick_mode: bool = False,
     ) -> None:
         """初始化代码审查器。

@@ -13,7 +13,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
 import typer
 
@@ -25,6 +25,7 @@ from jarvis.jarvis_code_agent.code_agent_build import BuildValidationManager
 from jarvis.jarvis_code_agent.code_agent_diff import DiffManager
 from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
+from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_agent.builtin_input_handler import (
@@ -77,6 +78,9 @@ class CodeAgent(Agent):
 
     负责处理代码分析、修改和git操作。
     """
+
+    # 标记 review 是否已执行（避免 CodeAgent.run 重复执行 review）
+    _review_already_done: bool = False
 
     def __init__(
         self,
@@ -964,10 +968,8 @@ git reset --hard {start_commit}
             PrettyOutput.auto_print(f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理")
             return False
 
-    def _get_code_reviewer(self) -> "CodeReviewer":
+    def _get_code_reviewer(self) -> CodeReviewer:
         """获取 CodeReviewer 实例。"""
-        from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
-
         return CodeReviewer(
             model=self.model,
             start_commit=self.start_commit,
@@ -1695,7 +1697,9 @@ def cli(
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
-                    output_content = agent.run(task, prefix=prefix, suffix=suffix)
+                    output_content = cast(CodeAgent, agent).run(
+                        task, prefix=prefix, suffix=suffix
+                    )
                     # 单次任务模式：任务完成后直接退出
                     raise typer.Exit(code=0)
                 else:
@@ -1779,7 +1783,9 @@ def cli(
                         raise typer.Exit(code=0)
 
                     # 使用当前 agent 执行任务
-                    output_content = agent.run(user_input, prefix=prefix, suffix=suffix)
+                    output_content = cast(CodeAgent, agent).run(
+                        user_input, prefix=prefix, suffix=suffix
+                    )
 
                     # 任务正常退出
                     raise typer.Exit(code=0)

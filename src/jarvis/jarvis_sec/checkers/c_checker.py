@@ -752,7 +752,7 @@ def _ast_unsafe_api_check(
     # 解析 #define 宏，构建宏名到不安全API的映射
     macro_to_unsafe: dict[str, str] = {}
     for raw_line in lines:
-        m = re.match(r'^\s*#define\s+(\w+)\s*\([^)]*\)\s*(\w+)\s*\(', raw_line)
+        m = re.match(r"^\s*#define\s+(\w+)\s*\([^)]*\)\s*(\w+)\s*\(", raw_line)
         if m:
             macro_name = m.group(1)
             real_api = m.group(2).lower()
@@ -774,9 +774,9 @@ def _ast_unsafe_api_check(
                     line_num = node.start_point[0] + 1
                     if line_num not in existing_lines:
                         existing_lines.add(line_num)
-                        evidence = code_bytes[
-                            node.start_byte : node.end_byte
-                        ].decode("utf-8", errors="replace")
+                        evidence = code_bytes[node.start_byte : node.end_byte].decode(
+                            "utf-8", errors="replace"
+                        )
                         # 只取第一行作为 evidence
                         evidence_line = evidence.split("\n")[0].strip()
                         conf = 0.75  # AST检测置信度稍低
@@ -1824,6 +1824,7 @@ def _rule_unchecked_io(
 
         # 从database查询value_check变量集合，用于过滤受值检查保护的IO调用
         value_checked_vars: set[str] = set()
+        df_nodes = []
         if database:
             try:
                 df_nodes = database.get_data_flow_by_file(relpath)
@@ -4997,9 +4998,11 @@ def _ast_null_deref_check(
                     "utf-8", errors="replace"
                 )
                 if lhs_name in global_vars and right:
-                    rhs_text = code_bytes[right.start_byte : right.end_byte].decode(
-                        "utf-8", errors="replace"
-                    ).strip()
+                    rhs_text = (
+                        code_bytes[right.start_byte : right.end_byte]
+                        .decode("utf-8", errors="replace")
+                        .strip()
+                    )
                     if rhs_text in ("NULL", "0", "nullptr"):
                         null_assigned_global_vars.add(lhs_name)
         for child in node.children:
@@ -9165,7 +9168,7 @@ def _is_strcpy_false_positive(
     # 仅对直接 API 调用应用 NULL 检查保护过滤
     # 宏包装调用（如 SAFE_COPY(dst, src)）虽然内部调用 strcpy，
     # 但 NULL 检查（if (dst == NULL)）并不能消除 strcpy 的缓冲区溢出风险
-    pattern = getattr(issue, 'pattern', None)
+    pattern = getattr(issue, "pattern", None)
     if not pattern:
         return False
     if not issue.evidence.lstrip().startswith(pattern + "("):

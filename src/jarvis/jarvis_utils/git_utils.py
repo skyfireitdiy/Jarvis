@@ -755,6 +755,7 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
             cwd=git_root,
             capture_output=True,
         )
+        remote_tag = ""
         if remote_tag_result.returncode == 0:
             # 提取最新的tag名称
             tags = [
@@ -959,6 +960,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             cwd=git_root,
             capture_output=True,
         )
+        remote_tag = ""
         if remote_tag_result.returncode == 0:
             # 提取最新的tag名称
             tags = [

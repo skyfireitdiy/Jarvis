@@ -29,6 +29,7 @@ try:
     )
 except (ImportError, Exception):
     TS_LANGUAGE = None
+    Node = None  # ty: ignore[invalid-assignment]
 
 
 # --- TypeScript Symbol Extractor ---

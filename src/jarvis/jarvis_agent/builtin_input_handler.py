@@ -659,11 +659,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     fail_count += 1
                     continue
 
-                agent_name = agent_cfg.get("name", f"agent_{i + 1}")  # type: ignore
-                agent_type = agent_cfg.get("type", "code_agent")  # type: ignore
+                agent_name = agent_cfg.get("name", f"agent_{i + 1}")
+                agent_type = agent_cfg.get("type", "code_agent")
                 working_dir = os.path.abspath(
                     os.path.expanduser(agent_cfg.get("working_dir", os.getcwd()))
-                )  # type: ignore
+                )
 
                 # 必填字段校验
                 if not agent_type or not working_dir:
@@ -678,16 +678,16 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                         agent_type=agent_type,
                         working_dir=working_dir,
                         name=agent_name,
-                        llm_group=agent_cfg.get("llm_group"),  # type: ignore
-                        tool_group=agent_cfg.get("tool_group"),  # type: ignore
-                        config_file=agent_cfg.get("config_file"),  # type: ignore
-                        task=agent_cfg.get("task"),  # type: ignore
-                        additional_args=agent_cfg.get("additional_args"),  # type: ignore
-                        worktree=bool(agent_cfg.get("worktree", False)),  # type: ignore
-                        quick_mode=bool(agent_cfg.get("quick_mode", False)),  # type: ignore
+                        llm_group=agent_cfg.get("llm_group"),
+                        tool_group=agent_cfg.get("tool_group"),
+                        config_file=agent_cfg.get("config_file"),
+                        task=agent_cfg.get("task"),
+                        additional_args=agent_cfg.get("additional_args"),
+                        worktree=bool(agent_cfg.get("worktree", False)),
+                        quick_mode=bool(agent_cfg.get("quick_mode", False)),
                         no_interaction_mode=bool(
                             agent_cfg.get("no_interaction_mode", False)
-                        ),  # type: ignore
+                        ),
                     )
                     if result.get("success"):
                         success_count += 1

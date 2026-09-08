@@ -491,9 +491,9 @@ class ScriptTool:
 
                 while proc.isalive():
                     poll_resize()
-                    if msvcrt.kbhit():  # type: ignore[attr-defined]
+                    if msvcrt.kbhit():  # ty: ignore[unresolved-attribute]
                         try:
-                            input_char = msvcrt.getwch()  # type: ignore[attr-defined]
+                            input_char = msvcrt.getwch()  # ty: ignore[unresolved-attribute]
                             publish_input_chunk(input_char)
                         except (EOFError, OSError, UnicodeEncodeError):
                             break
@@ -559,9 +559,9 @@ class ScriptTool:
                     try:
                         terminate_method()
                         break
-                    except Exception as e:
+                    except Exception as inner_e:
                         save_exception(
-                            e,
+                            inner_e,
                             module="jarvis_tools.execute_script",
                             function="stdin_forward",
                         )
@@ -1148,8 +1148,6 @@ class ScriptTool:
                 with open(script_path, "w", encoding=enc, errors="ignore") as f:
                     f.write(script_content)
 
-                from jarvis.jarvis_utils.output import PrettyOutput
-
                 PrettyOutput.print_script_panel(
                     content=script_content,
                     title=f"📜 执行脚本 ({interpreter})",
@@ -1268,8 +1266,10 @@ class ScriptTool:
                 }
 
             # Get interpreter: Windows 默认 powershell，Unix 默认 bash；兼容旧键 script_type
-            interpreter = args.get("interpreter") or args.get("script_type") or (
-                "powershell" if self._is_windows() else "bash"
+            interpreter = (
+                args.get("interpreter")
+                or args.get("script_type")
+                or ("powershell" if self._is_windows() else "bash")
             )
             execution_mode = str(args.get("execution_mode", "auto"))
             session_id = args.get("session_id")

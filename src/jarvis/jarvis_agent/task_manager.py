@@ -2,6 +2,7 @@
 """任务管理模块，负责加载和选择预定义任务"""
 
 import os
+from typing import cast
 
 
 import yaml  # type: ignore[import-untyped]
@@ -106,8 +107,11 @@ class TaskManager:
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息")
                         if additional_input:
-                            selected_task = join_prompts(
-                                [selected_task, f"补充信息:\n{additional_input}"]
+                            selected_task = cast(
+                                str,
+                                join_prompts(
+                                    [selected_task, f"补充信息:\n{additional_input}"]
+                                ),
                             )
                     return selected_task
             except Exception:
@@ -135,8 +139,11 @@ class TaskManager:
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息")
                         if additional_input:
-                            selected_task = join_prompts(
-                                [selected_task, f"补充信息:\n{additional_input}"]
+                            selected_task = cast(
+                                str,
+                                join_prompts(
+                                    [selected_task, f"补充信息:\n{additional_input}"]
+                                ),
                             )
                     return selected_task
                 PrettyOutput.auto_print("⚠️ 无效的选择。请选择列表中的一个号码。")

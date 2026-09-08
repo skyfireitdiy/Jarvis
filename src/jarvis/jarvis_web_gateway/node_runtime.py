@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from .node_config import DEFAULT_LOCAL_NODE_ID, NodeRuntimeConfig
@@ -48,7 +48,7 @@ class AgentRouteRegistry:
         self._routes: Dict[str, AgentRouteInfo] = {}
 
     def register(self, route: AgentRouteInfo) -> None:
-        route.updated_at = datetime.utcnow().isoformat()
+        route.updated_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         self._routes[route.agent_id] = route
 
     def get(self, agent_id: str) -> Optional[AgentRouteInfo]:
@@ -67,8 +67,12 @@ class NodeRegistry:
 
     def upsert(self, node_info: NodeInfo) -> None:
         if node_info.connected_at is None:
-            node_info.connected_at = datetime.utcnow().isoformat()
-        node_info.last_heartbeat_at = datetime.utcnow().isoformat()
+            node_info.connected_at = (
+                datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+            )
+        node_info.last_heartbeat_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        )
         self._nodes[node_info.node_id] = node_info
 
     def mark_heartbeat(
@@ -80,7 +84,9 @@ class NodeRegistry:
         node = self._nodes.get(node_id)
         if node is None:
             return
-        node.last_heartbeat_at = datetime.utcnow().isoformat()
+        node.last_heartbeat_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        )
         node.status = "online"
         if system_info is not None:
             node.system_info = system_info
@@ -108,7 +114,9 @@ class NodeTokenSyncState:
         self.error_message: Optional[str] = None
 
     def mark_success(self, source_node_id: str) -> None:
-        self.last_synced_at = datetime.utcnow().isoformat()
+        self.last_synced_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        )
         self.sync_status = "success"
         self.source_node_id = source_node_id
         self.error_message = None
@@ -116,7 +124,9 @@ class NodeTokenSyncState:
     def mark_failed(
         self, error_message: str, source_node_id: Optional[str] = None
     ) -> None:
-        self.last_synced_at = datetime.utcnow().isoformat()
+        self.last_synced_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        )
         self.sync_status = "failed"
         self.source_node_id = source_node_id
         self.error_message = error_message

@@ -29,6 +29,7 @@ try:
     )
 except (ImportError, Exception):
     JS_LANGUAGE = None
+    Node = None  # ty: ignore[invalid-assignment]
 
 
 # --- JavaScript Symbol Extractor ---

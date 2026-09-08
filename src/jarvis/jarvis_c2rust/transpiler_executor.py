@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# type: ignore
+
 """
 转译执行器模块
 

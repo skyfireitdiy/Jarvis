@@ -609,6 +609,7 @@ def handle_builtin_config_selector(
                         name = fpath.stem
                         desc = ""
                         roles_count = 0
+                        data = {}
                         try:
                             with open(
                                 fpath, "r", encoding="utf-8", errors="ignore"
@@ -1006,6 +1007,7 @@ def run_cli(
         return
 
     web_gateway_server = None
+    thread = None
 
     # 处理 --quick-config 参数：启动快速配置向导
     if handle_quick_config_option(quick_config):
@@ -1639,10 +1641,10 @@ def run_cli(
                     task_manager = TaskManager()
                     tasks = task_manager.load_tasks()
                     if tasks and (selected_task := task_manager.select_task(tasks)):
-                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")  # ty: ignore[possibly-unresolved-reference]
                         # 先经过 builtin_input_handler 处理
                         processed_input, should_skip = _run_with_builtin_handler(
-                            selected_task,
+                            selected_task,  # ty: ignore[possibly-unresolved-reference]
                             agent,
                             [output_content],
                             [exit_code],
@@ -1704,7 +1706,8 @@ def run_cli(
                     # 强制退出标志，不等待连接关闭（避免阻塞）
                     web_gateway_server.force_exit = True
                     # 等待 uvicorn 线程结束（最多等待 2 秒）
-                    thread.join(timeout=2)
+                    if thread is not None:
+                        thread.join(timeout=2)
                 except Exception as e:
                     save_exception(
                         e, module="jarvis_agent.jarvis", function="on_status_update"

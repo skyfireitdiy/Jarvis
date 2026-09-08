@@ -13,7 +13,7 @@ class DatabaseConnection:
 
     def __init__(self, db_path: str, conn: sqlite3.Connection) -> None:
         self._db_path = db_path
-        self._conn = conn
+        self._conn: Optional[sqlite3.Connection] = conn
         self._queries: Optional[QueryBuilder] = None
         self._traverser: Optional[GraphTraverser] = None
 
@@ -87,6 +87,8 @@ class DatabaseConnection:
             QueryBuilder instance.
         """
         if self._queries is None:
+            if self._conn is None:
+                raise RuntimeError("Database connection is closed")
             self._queries = QueryBuilder(self._conn)
         return self._queries
 
@@ -113,7 +115,7 @@ class DatabaseConnection:
         self.close()
 
     @property
-    def connection(self) -> sqlite3.Connection:
+    def connection(self) -> Optional[sqlite3.Connection]:
         """Get the underlying SQLite connection."""
         return self._conn
 

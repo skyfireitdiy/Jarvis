@@ -27,7 +27,7 @@ try:
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     TREE_SITTER_AVAILABLE = False
-    Node = None  # 类型回退
+    Node = None  # 类型回退  # ty: ignore[invalid-assignment]
 
 # Rust解析器
 try:
@@ -497,7 +497,7 @@ class DataCollector:
             result: 结果字典
         """
         type_name = None
-        kind = None
+        kind: str = ""
         members = []
 
         if node.type == "struct_specifier":

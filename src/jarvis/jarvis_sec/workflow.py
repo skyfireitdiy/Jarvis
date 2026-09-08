@@ -17,7 +17,7 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 from jarvis.jarvis_utils.exception_utils import save_exception
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, cast
+from typing import Any, Dict, Iterable, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.input import get_single_line_input
@@ -292,8 +292,8 @@ def direct_scan(
     }
     file_score: Dict[str, int] = {}
     # Safely update language/category counts with explicit typing
-    lang_counts = cast(Dict[str, int], summary["by_language"])
-    cat_counts = cast(Dict[str, int], summary["by_category"])
+    lang_counts = summary["by_language"]
+    cat_counts = summary["by_category"]
     for it in issues:
         lang_counts[it.language] = lang_counts.get(it.language, 0) + 1
         cat_counts[it.category] = cat_counts.get(it.category, 0) + 1
@@ -794,7 +794,7 @@ def analyze_from_json(
         )
 
         # 生成最终报告
-        result = build_json_and_markdown(all_issues, str(sec_dir))  # type: ignore[arg-type]
+        result = build_json_and_markdown(all_issues, str(sec_dir))  # ty: ignore[invalid-argument-type]
 
         # 保存到输出文件（如果指定）
         if output_file:

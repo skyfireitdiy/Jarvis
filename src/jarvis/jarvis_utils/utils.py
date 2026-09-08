@@ -15,7 +15,7 @@ from datetime import date, datetime
 from pathlib import Path
 from pathlib import PurePath
 from pathlib import PureWindowsPath
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -336,10 +336,10 @@ def _setup_signal_handler() -> None:
         if get_in_chat():
             set_interrupt(True)
             if get_interrupt() > 5 and original_sigint and callable(original_sigint):
-                original_sigint(signum, frame)
+                cast(Callable[[int, Any], Any], original_sigint)(signum, frame)
         else:
             if original_sigint and callable(original_sigint):
-                original_sigint(signum, frame)
+                cast(Callable[[int, Any], Any], original_sigint)(signum, frame)
 
     signal.signal(signal.SIGINT, sigint_handler)
 
@@ -602,6 +602,10 @@ def _check_pip_updates() -> bool:
                     # 更新检查日期,避免重复提示
                     last_check_file.write_text(today_str)
                     return False
+
+            # 预初始化，确保后续分支外可访问（ty 跨分支推断局限）
+            cmd_list: List[str] = []
+            update_cmd = ""
 
             # 检测是否通过uv tool安装
             is_uv_tool_install = _is_installed_via_uv_tool()
@@ -1053,8 +1057,6 @@ def init_env(
     if welcome_str:
         try:
             # 在后台线程中显示统计，避免阻塞主流程
-            import threading
-
             def show_stats_async() -> None:
                 try:
                     _show_usage_stats(welcome_str)
@@ -1183,8 +1185,6 @@ def _interactive_config_setup(config_file_path: Path) -> None:
     try:
         # 导入 quick_config 模块
         # 由于 jqc (quick_config) 现在没有任何参数了，直接调用 quick_config.app()
-        import sys
-
         from jarvis.jarvis_utils import quick_config
 
         original_argv = sys.argv
@@ -1447,7 +1447,7 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 
 
 def _load_plugin_configs(
-    merged_config: Dict[str, Any], config_file_dir: str = None
+    merged_config: Dict[str, Any], config_file_dir: Optional[str] = None
 ) -> Dict[str, Any]:
     """加载并合并插件配置
 

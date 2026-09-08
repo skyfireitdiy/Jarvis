@@ -149,6 +149,7 @@ class ReadCodeTool:
         Returns:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
+        abs_path = ""  # 预初始化，确保 except 分支可访问（ty 推断局限）
         try:
             expanded_path = os.path.expanduser(filepath)
             abs_path = os.path.abspath(expanded_path)

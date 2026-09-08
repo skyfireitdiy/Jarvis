@@ -134,8 +134,8 @@ class AgentManager:
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):
-                PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
-                self.agent.run(selected_task)
+                PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")  # ty: ignore[possibly-unresolved-reference]
+                self.agent.run(selected_task)  # ty: ignore[possibly-unresolved-reference]
                 raise typer.Exit(code=0)
 
         # 获取用户输入

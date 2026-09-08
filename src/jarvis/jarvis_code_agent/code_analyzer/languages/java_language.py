@@ -29,6 +29,7 @@ try:
     )
 except (ImportError, Exception):
     JAVA_LANGUAGE = None
+    Node = None  # ty: ignore[invalid-assignment]
 
 
 # --- Java Symbol Extractor ---

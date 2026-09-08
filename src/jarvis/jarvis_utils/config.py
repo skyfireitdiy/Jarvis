@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import subprocess
 import sys
 from functools import lru_cache
 from typing import Any
@@ -71,8 +72,6 @@ def detect_file_encoding(
     try:
         if not os.path.exists(file_path):
             return None
-
-        import subprocess
 
         result = subprocess.run(
             ["file", "--mime-encoding", "-b", file_path],
@@ -1454,7 +1453,7 @@ def get_submit_keys() -> List[str]:
     value = GLOBAL_CONFIG_DATA.get("submit_keys")
     # 如果配置是列表，直接返回
     if isinstance(value, list):
-        return cast(List[str], [str(k) for k in value if k])
+        return [str(k) for k in value if k]
     # 如果配置是字符串（支持逗号分隔），按逗号分割
     if isinstance(value, str) and value.strip():
         return [key.strip() for key in value.split(",") if key.strip()]
