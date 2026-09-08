@@ -9,7 +9,7 @@
 - 图遍历（BFS/DFS）
 
 参数:
-- action (str): 操作类型，支持：
+- action (str): 操作：find_symbol 按名查符号定义/引用位置，get_file_symbols 列文件全部符号，find_references 查谁引用了该符号，find_dependencies 查模块/符号依赖，traverse 遍历依赖图，支持：
   - "find_symbol": 查找符号
   - "get_file_symbols": 获取文件的符号列表
   - "find_references": 查找符号引用
@@ -48,7 +48,7 @@ class SymbolDependencyTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "操作类型",
+                "description": "操作：find_symbol 按名查符号定义/引用位置，get_file_symbols 列文件全部符号，find_references 查谁引用了该符号，find_dependencies 查模块/符号依赖，traverse 遍历依赖图",
                 "enum": [
                     "find_symbol",
                     "get_file_symbols",

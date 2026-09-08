@@ -30,7 +30,7 @@ class VirtualTTYTool:
         "properties": {
             "action": {
                 "type": "string",
-                "description": "要执行的终端操作类型",
+                "description": "操作：launch 启动会话 / send_keys 发送按键或输入命令 / output 读取最新输出 / close 关闭 / get_screen 取当前屏幕 / list 列出会话",
                 "enum": [
                     "launch",
                     "send_keys",

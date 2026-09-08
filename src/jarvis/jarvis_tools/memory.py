@@ -43,7 +43,7 @@ class MemoryTool:
     name = "memory"
     description = """统一忆管工具，支三种操：
 
-1. **save**: 存讯入长短期忆统，支批存。忆类：project_long_term（目久）、global_long_term（全久）、short_term（短）
+1. **save**: 存讯入长短期忆统，支批存。记忆类型：project_long_term（目久）、global_long_term（全久）、short_term（短）
 
 2. **retrieve**: 检长短期忆统之讯，支按类与签滤，支智义检
 
@@ -59,7 +59,7 @@ class MemoryTool:
             "action": {
                 "type": "string",
                 "enum": ["save", "retrieve", "clear"],
-                "description": "操类：save（存忆）、retrieve（检忆）、clear（清忆）",
+                "description": "要执行的操作：save 保存 / retrieve 检索 / clear 清除",
             },
             # save 操作的参数
             "memories": {
@@ -74,21 +74,21 @@ class MemoryTool:
                                 "global_long_term",
                                 "short_term",
                             ],
-                            "description": "忆类",
+                            "description": "记忆类型",
                         },
                         "tags": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "忆之标签",
+                            "description": "关联标签（用于检索过滤）",
                         },
                         "content": {
                             "type": "string",
-                            "description": "欲存之忆容",
+                            "description": "要保存的记忆内容",
                         },
                     },
                     "required": ["memory_type", "tags", "content"],
                 },
-                "description": "欲存之忆列（仅 save 操用）",
+                "description": "待保存的记忆数组（仅 save 操作使用）",
             },
             # retrieve 操作的参数
             "memory_types": {
@@ -102,26 +102,26 @@ class MemoryTool:
                         "all",
                     ],
                 },
-                "description": "欲检之忆类列（仅 retrieve 操用）",
+                "description": "欲检之记忆类型列（仅 retrieve 操用）",
             },
             "tags": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "滤用之签（可选，retrieve 与 clear 操用）",
+                "description": "按标签过滤（可选，retrieve 与 clear 操作使用）",
             },
             "limit": {
                 "type": "integer",
-                "description": "返果之限数（可选，仅 retrieve 操用）",
+                "description": "返回结果条数上限（可选，仅 retrieve 操作使用）",
                 "minimum": 1,
             },
             "smart_search": {
                 "type": "boolean",
-                "description": "启智义检模否（可选，仅 retrieve 操用）",
+                "description": "是否启用语义检索（可选，仅 retrieve 操作使用）",
                 "default": False,
             },
             "query": {
                 "type": "string",
-                "description": "智义检之问文（仅 retrieve 操于 smart_search=True 时用）",
+                "description": "语义检索的查询文本（smart_search=True 且操作为 retrieve 时使用）",
             },
             # clear 操作的参数
             "memory_ids": {
@@ -131,7 +131,7 @@ class MemoryTool:
             },
             "confirm": {
                 "type": "boolean",
-                "description": "确认清操（仅 clear 操用，必为 true 方行清）",
+                "description": "确认清除（仅 clear 操作使用；必须为 true 才会执行删除）",
                 "default": False,
             },
         },
@@ -144,13 +144,13 @@ class MemoryTool:
         self.global_memory_dir = Path(get_data_dir()) / "memory"
 
     def _get_memory_dir(self, memory_type: str) -> Path:
-        """根据记忆类型获取存储目录"""
+        """根据记记忆类型型获取存储目录"""
         if memory_type == "project_long_term":
             return Path(self.project_memory_dir)
         elif memory_type in ["global_long_term", "short_term"]:
             return Path(self.global_memory_dir) / memory_type
         else:
-            raise ValueError(f"未知的记忆类型: {memory_type}")
+            raise ValueError(f"未知的记记忆类型型: {memory_type}")
 
     def _generate_memory_id(self) -> str:
         """生成唯一的记忆ID"""
@@ -358,7 +358,7 @@ class MemoryTool:
             if smart_search:
                 return self._execute_smart_search(args, memory_types, query, limit)
 
-            # 确定要检索的记忆类型
+            # 确定要检索的记记忆类型型
             if "all" in memory_types:
                 types_to_search = [
                     "project_long_term",
@@ -431,7 +431,7 @@ class MemoryTool:
             if tags:
                 markdown_output += f"**使用标签过滤**: {', '.join(tags)}\n\n"
 
-            markdown_output += f"**记忆类型**: {', '.join(types_to_search)}\n\n"
+            markdown_output += f"**记记忆类型型**: {', '.join(types_to_search)}\n\n"
 
             markdown_output += "---\n\n"
 
@@ -490,7 +490,7 @@ class MemoryTool:
                     "stderr": "智能检索模式需要提供 query 参数",
                 }
 
-            # 确定要检索的记忆类型（智能检索不支持 short_term）
+            # 确定要检索的记记忆类型型（智能检索不支持 short_term）
             if "all" in memory_types:
                 types_to_search = ["project_long_term", "global_long_term"]
             else:
@@ -520,7 +520,7 @@ class MemoryTool:
             markdown_output = "# 智能语义检索结果\n\n"
             markdown_output += f"**查询**: {query}\n\n"
             markdown_output += f"**检索到 {len(memories)} 条相关记忆**\n\n"
-            markdown_output += f"**记忆类型**: {', '.join(types_to_search)}\n\n"
+            markdown_output += f"**记记忆类型型**: {', '.join(types_to_search)}\n\n"
             markdown_output += "---\n\n"
 
             # 输出所有记忆
@@ -654,7 +654,7 @@ class MemoryTool:
                     "stderr": "必须设置 confirm=true 才能执行清除操作",
                 }
 
-            # 确定要清除的记忆类型
+            # 确定要清除的记记忆类型型
             if "all" in memory_types:
                 types_to_clear = ["project_long_term", "global_long_term", "short_term"]
             else:
