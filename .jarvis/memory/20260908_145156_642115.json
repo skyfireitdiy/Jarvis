@@ -1,0 +1,8 @@
+{
+  "id": "20260908_145156_642115",
+  "type": "project_long_term",
+  "tags": ["native-tool-calling", "empty-response", "warning", "bug-fix"],
+  "content": "原生工具调用空响应告警误报修复：_invoke_model（src/jarvis/jarvis_agent/__init__.py:1982）中，当原生工具调用返回 tool_calls 但 content 为空时（模型决定调用工具而非回复文本，属正常情况），原代码 `if not response:` 会误打印 '⚠️ 模型返回空响应，已使用空字符串回退。'。修复：改为 `if not response and not self._pending_native_tool_calls:`，即当有 pending tool_calls 时不告警。验证：场景1（返回 tool_calls content 空）不告警、_pending_native_tool_calls 正确设置；场景2（真正空响应 content 空且无 tool_calls）仍告警。tests/jarvis_agent/ 92 passed 无回归。",
+  "created_at": "2026-09-08T14:51:56.642151",
+  "updated_at": "2026-09-08T14:51:56.642158"
+}

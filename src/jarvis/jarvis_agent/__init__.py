@@ -1979,8 +1979,9 @@ class Agent:
                 response = content or ""
         else:
             response = self.model.chat_until_success(message)
-        # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
-        if not response:
+        # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警。
+        # 但原生工具调用返回 tool_calls 时 content 为空是正常情况（模型决定调用工具而非回复文本），不告警。
+        if not response and not self._pending_native_tool_calls:
             try:
                 PrettyOutput.auto_print("⚠️ 模型返回空响应，已使用空字符串回退。")
             except Exception as e:
