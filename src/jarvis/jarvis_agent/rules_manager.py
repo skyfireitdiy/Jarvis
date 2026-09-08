@@ -1116,7 +1116,7 @@ class RulesManager:
                 numbered_rules += f"{i}. {rule_name}\n   描述: {description}\n"
 
             # 构造 prompt，要求模型返回编号
-            prompt = f"""宜据以下任务描述，从可用规则中择最合之规则。
+            prompt = f"""请根据以下任务描述，从可用规则中选出最合适的规则。
 
 <task_description>
 {task_description}
@@ -1127,15 +1127,15 @@ class RulesManager:
 </available_rules>
 
 要求：
-一、细析任务描述，择最匹配之规则
-二、**数量限制**：至多可选一至五则，严禁逾五
-三、若有多则相关，择最相关之一至五，勿选过多
-四、**重要**：若无合适规则或规则与任务无关，可返"NONE"或"none"
-五、**任务不需规则**：若任务甚简（如寒暄、简单计算、查询时间等），不需任何规则/技能即可成，祈返"__NO_RULES_NEEDED__"
-六、严依下式返序号：<NUM>序号1,序号2,序号3,序号4,序号5</NUM>
-七、例如：<NUM>5</NUM>或<NUM>2,3,5,7,9</NUM>或<NUM>none</NUM>或<NUM>__NO_RULES_NEEDED__</NUM>
-八、多序号间以逗号分隔，勿留空格
-九、只返<NUM>标签内之内容，勿有其他任何输出
+一、仔细分析任务描述，选出与之匹配的规则
+二、**数量限制**：最多选 1 到 5 条，不要超过 5 条
+三、如有多个相关规则，只选最相关的 1 到 5 条，不要选太多
+四、**重要**：如果没有合适规则、或规则与任务无关，可返回 "NONE" 或 "none"
+五、**任务不需要规则**：如果任务非常简单（如寒暄、简单计算、查询时间等），不需要任何规则/技能就能完成，请返回 "__NO_RULES_NEEDED__"
+六、请按下式返回序号：<NUM>序号1,序号2,序号3,序号4,序号5</NUM>
+七、示例：<NUM>5</NUM> 或 <NUM>2,3,5,7,9</NUM> 或 <NUM>none</NUM> 或 <NUM>__NO_RULES_NEEDED__</NUM>
+八、多个序号之间用逗号分隔，不要留空格
+九、只返回 <NUM> 标签内的内容，不要有其他任何输出
 
 所选规则序号："""
 
@@ -1255,7 +1255,7 @@ class RulesManager:
                 [f"规则{i + 1}:\n{content}" for i, content in enumerate(rules_content)]
             )
 
-            prompt = f"""宜据任务描述，从以下规则中择真正相关之规则。
+            prompt = f"""请根据任务描述，从下面的规则中选出真正相关的规则。
 
 <task_description>
 {task_description}
@@ -1266,15 +1266,15 @@ class RulesManager:
 </candidate_rules>
 
 要求：
-一、细析每则规则之完整内容，判其是否真与任务相关
-二、**保守策略**：若不确定规则是否相关，倾向保留该规则
-三、只择规则内容确与任务匹配之规则
-四、若无相关规则，返"none"
-五、**任务不需规则**：若任务甚简（如寒暄、简单计算、查询时间等），不需任何规则/技能即可成，祈返"__NO_RULES_NEEDED__"
-六、严依下式返规则名称：<VALID>规则名称1,规则名称2</VALID>
-七、例如：<VALID>builtin:xxx.md</VALID>或<VALID>project:yyy.md,global:zzz.md</VALID>或<VALID>__NO_RULES_NEEDED__</VALID>
-八、多规则名称间以逗号分隔，勿留空格
-九、只返<VALID>标签内之内容，勿有其他任何输出
+一、仔细阅读每条规则的完整内容，判断它是否真的与任务相关
+二、**保守策略**：如果不确定某条规则是否相关，倾向保留它
+三、只选内容确实与任务匹配的规则
+四、如果没有相关规则，返回 "none"
+五、**任务不需要规则**：如果任务非常简单（如寒暄、简单计算、查询时间等），不需要任何规则/技能就能完成，请返回 "__NO_RULES_NEEDED__"
+六、请按下式返回规则名称：<VALID>规则名称1,规则名称2</VALID>
+七、示例：<VALID>builtin:xxx.md</VALID> 或 <VALID>project:yyy.md,global:zzz.md</VALID> 或 <VALID>__NO_RULES_NEEDED__</VALID>
+八、多个规则名称之间用逗号分隔，不要留空格
+九、只返回 <VALID> 标签内的内容，不要有其他任何输出
 
 所选规则名称："""
 

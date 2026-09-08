@@ -929,9 +929,10 @@ class Agent:
         if getattr(self, "_manual_model_switch", False):
             return
 
-        # 难度到模型类型的映射
+        # 难度到模型类型的映射：只做质量升级（hard->smart），不做廉价降级，
+        # 避免难度误判把真实任务丢给 cheap 档模型而牺牲质量。
         difficulty_to_model_type = {
-            "easy": "cheap",
+            "easy": "normal",
             "medium": "normal",
             "hard": "smart",
         }
@@ -1747,72 +1748,18 @@ class Agent:
         return response
 
     def _validate_summary(self, summary: str) -> tuple[bool, list[str]]:
-        """验证总结内容是否包含足够的关键词
+        """检查摘要是否可接受。
 
-        直接检测关键字（扁平化），匹配5个以上关键字即通过。
-        关键字集合基于 SUMMARY_REQUEST_PROMPT 的8个章节结构。
-
-        参数:
-            summary: 生成的总结内容
+        仅做基础长度检查，不再强制命中固定关键词，避免无谓的重写循环与额外推理成本。
 
         返回:
-            tuple[bool, list[str]]: (是否通过验证，未匹配的关键字列表)
+            tuple[bool, list[str]]: (是否通过, 问题列表)。仅当内容过短或为空时判定失败。
         """
         if not summary:
             return False, ["总结内容为空"]
-
-        # 基于 SUMMARY_REQUEST_PROMPT 的关键字集合（扁平化，直接检测）
-        keywords = [
-            # 1. 目标层次结构
-            "整体目标",
-            "阶段目标",
-            "目标变化",
-            # 2. 任务状态矩阵
-            "已完成",
-            "进行中",
-            "部分完成",
-            "待完成",
-            # 3. 关键信息导航系统
-            "关键信息位置",
-            "关键文件路径",
-            # 4. 代码开发专项信息
-            "代码变更",
-            "错误与调试",
-            "测试与验证",
-            "技术决策",
-            "未完成工作",
-            # 5. 上下文完整性检查
-            "完整性检查",
-            "检查清单",
-            # 6. 核心技术与业务信息
-            "技术栈",
-            "架构决策",
-            "配置参数",
-            "代码位置",
-            "调试信息",
-            "接口定义",
-            "数据模型",
-            "代码变更历史",
-            # 7. 我的偏好与约束
-            "偏好与约束",
-            "禁忌项",
-            "代码风格",
-            # 8. 可省略的冗余内容（无关键字，此章节为排除性指引）
-        ]
-
-        unmatched_keywords = []
-        matched_count = 0
-
-        for keyword in keywords:
-            if keyword in summary:
-                matched_count += 1
-            else:
-                unmatched_keywords.append(keyword)
-
-        # 匹配5个以上关键字即通过
-        is_valid = matched_count >= 5
-
-        return is_valid, unmatched_keywords
+        if len(summary.strip()) < 20:
+            return False, ["总结内容过短"]
+        return True, []
 
     def _build_supplement_prompt(self, missing_sections: list[str]) -> str:
         """根据缺失的关键字构造补充提示词，引导模型补齐缺失字段。
