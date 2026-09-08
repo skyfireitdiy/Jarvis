@@ -146,7 +146,7 @@ class TaskAnalyzer:
             bool: True 继续分析，False 退出分析
         """
         set_interrupt(False)
-        user_input = self.agent._multiline_input("析任期间为所断，祈入干预之讯", False)
+        user_input = self.agent._multiline_input("分析期间被中断，请输入干预信息", False)
 
         if not user_input:
             # 用户输入为空，退出分析
@@ -157,7 +157,7 @@ class TaskAnalyzer:
                 user_input
             )
         else:
-            self.agent.session.prompt = f"为用户所中断，用户补讯为：{user_input}"
+            self.agent.session.prompt = f"任务被用户中断，用户补充信息为：{user_input}"
 
         return True
 
@@ -169,15 +169,18 @@ class TaskAnalyzer:
 
     def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
         """处理有工具调用时的中断"""
-        if self.agent.confirm_callback("察有工具调用，祈续行否？", False):
+        if self.agent.confirm_callback("检测到工具调用，是否继续执行？", False):
             return join_prompts(
-                [f"为用户所中断，用户补讯为：{user_input}", "用户允续行工具调用。"]
+                [
+                    f"任务被用户中断，用户补充信息为：{user_input}",
+                    "用户允许继续工具调用。",
+                ]
             )
         else:
             return join_prompts(
                 [
-                    f"为用户所中断，用户补讯为：{user_input}",
-                    "察有工具调用，然为用户所拒。宜据用户之补讯重思下步之操。",
+                    f"任务被用户中断，用户补充信息为：{user_input}",
+                    "检测到工具调用，但被用户拒绝。请根据用户的补充信息重新考虑下一步操作。",
                 ]
             )
 
@@ -190,21 +193,21 @@ class TaskAnalyzer:
             return ""
 
         if not auto_completed and self.agent.use_analysis:
-            if self.agent.confirm_callback("于本次任务之竟，足下满意否？", True):
-                satisfaction_feedback = "用户于本次任务之竟表满意。"
+            if self.agent.confirm_callback("本次任务完成，您是否满意？", True):
+                satisfaction_feedback = "用户对本次任务的完成表示满意。"
             else:
                 feedback = self.agent._multiline_input(
-                    "祈供反馈之见（可留空径回车）", False
+                    "请提供改进反馈（可直接回车跳过）", False
                 )
                 if feedback:
                     satisfaction_feedback = (
-                        f"用户于本次任务之竟不满，反馈如下：\n{feedback}"
+                        f"用户对本次任务的完成不满意，反馈如下：\n{feedback}"
                     )
                 else:
-                    satisfaction_feedback = "用户于本次任务之竟不满，未供具体反馈。"
+                    satisfaction_feedback = "用户对本次任务的完成不满意，未提供具体反馈。"
         elif auto_completed and self.agent.use_analysis:
             # 自动完成模式下，仍然执行分析，但不收集用户反馈
-            satisfaction_feedback = "任务已自竟，无需用户反馈。"
+            satisfaction_feedback = "任务已自动完成，无需用户反馈。"
 
         return satisfaction_feedback
 
@@ -231,7 +234,7 @@ class TaskAnalyzer:
 
         # 任务完成后统一默认启用任务分析（默认True），不再区分场景
         if not self.agent.confirm_callback(
-            "任务已竟，是否行任务析（存忆、生方法论等）？",
+            "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？",
             True,
         ):
             self._analysis_done = True
