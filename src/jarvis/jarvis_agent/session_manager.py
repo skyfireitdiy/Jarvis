@@ -853,13 +853,20 @@ class SessionManager:
             if not dialog:
                 return
 
-            PrettyOutput.auto_print("📜 最近对话（用于确认恢复是否正确）：")
+            # 合并为一条 Markdown 消息打印（引用块），避免拆分成多条影响观感
+            lines = []
             for label, content in dialog[-count:]:
                 # 截断过长内容，避免刷屏
                 text = content.strip()
                 if len(text) > 200:
                     text = text[:200] + "…"
-                PrettyOutput.auto_print(f"{label}: {text}")
+                # 将内容中的换行替换为空格，保证引用块为单行结构
+                text = text.replace("\n", " ")
+                lines.append(f"> {label}: {text}")
+            PrettyOutput.print_markdown(
+                "\n".join(lines),
+                title="📜 最近对话（用于确认恢复是否正确）",
+            )
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 打印最近对话失败: {e}")
 
