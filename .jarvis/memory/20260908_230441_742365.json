@@ -1,0 +1,16 @@
+{
+  "id": "20260908_230441_742365",
+  "type": "project_long_term",
+  "tags": [
+    "native-tool-calling",
+    "llm_context",
+    "token",
+    "context_manager",
+    "get_used_token_count",
+    "tool_calls",
+    "调研结论"
+  ],
+  "content": "调研结论：原生工具调用时工具内容是否计入上下文长度。核心方法 get_used_token_count（base.py:766-784）只遍历每条消息的 content 字段（message.get('content','')），完全不读 tool_calls 字段。原生工具调用消息结构：1) assistant 工具调用消息（openai.py:733-739）把工具参数 arguments 存在 tool_calls 字段（不在 content）；2) role=tool 工具结果消息（base.py:117-123→make_tool_result_msg）把执行结果存在 content 字段。结论：工具执行结果（role=tool content）会被统计✅；工具调用参数（assistant tool_calls.arguments）不会被统计❌（统计盲区）。影响：长对话多次工具调用累积，get_remaining_token_count 会高估剩余空间，可能使 trim_messages/_truncate_message_if_needed 裁剪不及时，极端有超真实上下文窗口风险。补充：get_used_token_count 用 tiktoken 估算（embedding.py get_context_token_count，10/7倍调整）本身是近似值。get_used_token_count 仅在 base.py 定义一次无子类覆写，base.py/embedding.py 均无 tool_calls token 统计。属潜在缺陷非崩溃 bug。",
+  "created_at": "2026-09-08T23:04:41.742394",
+  "updated_at": "2026-09-08T23:04:41.742400"
+}
