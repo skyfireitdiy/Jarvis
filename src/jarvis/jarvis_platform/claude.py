@@ -96,13 +96,21 @@ class ClaudeModel(BasePlatform):
         try:
             # 注意：X-Jarvis-Token 不再通过 default_headers 静态注入，
             # 改为每次 API 调用时通过 extra_headers 动态注入
+            from jarvis.jarvis_utils.config import get_request_timeout
+
+            _req_timeout = get_request_timeout()
+            _timeout_kwargs = {"timeout": _req_timeout} if _req_timeout else {}
             if self.base_url:
                 self.client = Anthropic(
                     api_key=self.api_key,
                     base_url=self.base_url,
+                    **_timeout_kwargs,
                 )
             else:
-                self.client = Anthropic(api_key=self.api_key)
+                self.client = Anthropic(
+                    api_key=self.api_key,
+                    **_timeout_kwargs,
+                )
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
         # 消息历史

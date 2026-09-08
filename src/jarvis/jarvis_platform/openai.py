@@ -224,18 +224,31 @@ class OpenAIModel(BasePlatform):
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 设置 OpenAI 代理失败: {e}")
         # Initialize OpenAI client, try to pass default headers if SDK supports it
+        from jarvis.jarvis_utils.config import get_request_timeout
+
+        _req_timeout = get_request_timeout()
+        _timeout_kwargs = {"timeout": _req_timeout} if _req_timeout else {}
         try:
             if self.extra_headers:
                 self.client = OpenAI(
                     api_key=self.api_key,
                     base_url=self.base_url,
                     default_headers=self.extra_headers,
+                    **_timeout_kwargs,
                 )
             else:
-                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+                self.client = OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    **_timeout_kwargs,
+                )
         except TypeError:
             # Fallback: SDK version may not support default_headers
-            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                **_timeout_kwargs,
+            )
             if self.extra_headers:
                 PrettyOutput.auto_print(
                     "⚠️ 当前 OpenAI SDK 版本不支持 default_headers，已忽略 extra_headers"

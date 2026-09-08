@@ -1111,6 +1111,25 @@ def is_enable_native_tool_calls() -> bool:
     return bool(GLOBAL_CONFIG_DATA.get("enable_native_tool_calls", True))
 
 
+def get_request_timeout() -> Optional[float]:
+    """
+    获取 SDK 请求超时（秒）。
+
+    request_timeout 配置缺失或为 0/空时返回 None，表示不显式设置、使用各 SDK 默认超时。
+
+    返回：
+        Optional[float]: 请求超时秒数；未配置时为 None
+    """
+    value = GLOBAL_CONFIG_DATA.get("request_timeout")
+    if value is None or value == "":
+        return None
+    try:
+        timeout = float(value)
+    except (TypeError, ValueError):
+        return None
+    return timeout if timeout > 0 else None
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。
