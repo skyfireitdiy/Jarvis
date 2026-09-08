@@ -65,6 +65,8 @@ class BasePlatform(ABC):
         self._session_history_file: Optional[str] = None
         self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
+        # 原生 function calling 一旦因端点不支持而失败即置位，之后本实例回退纯文本协议
+        self._native_disabled = False
 
         # 根据 platform_type 获取对应的 model_name
         if platform_type == "cheap":
@@ -101,6 +103,19 @@ class BasePlatform(ABC):
     def supports_multimodal(self) -> bool:
         """检查是否支持多模态输入"""
         return self._supports_multimodal
+
+    def supports_native_tool_calls(self) -> bool:
+        """当前平台是否支持原生 function calling。
+
+        默认 False；OpenAI 兼容与 Anthropic 平台覆写为 True。
+        """
+        return False
+
+    def append_native_tool_result(self, tool_call_id: str, name: str, content: str) -> None:
+        """把一次原生工具执行结果以 role=tool 消息追加进历史。"""
+        from jarvis.jarvis_platform.native_tools import make_tool_result_msg
+
+        self.messages.append(make_tool_result_msg(tool_call_id, name, content))
 
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
