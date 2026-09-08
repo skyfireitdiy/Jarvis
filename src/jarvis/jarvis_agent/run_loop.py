@@ -921,7 +921,10 @@ class AgentRunLoop:
             status_manager.set_running()
             try:
                 current_round = self.agent.model.get_conversation_turn()
-                if current_round <= 1 or current_round % self.tool_reminder_rounds == 0:
+                # 原生 function calling 激活时不注入文本工具清单/提醒（工具由 API tools 提供）
+                if (
+                    current_round <= 1 or current_round % self.tool_reminder_rounds == 0
+                ) and not self.agent._native_active():
                     self.agent.session.addon_prompt = ensure_str(
                         join_prompts(
                             [

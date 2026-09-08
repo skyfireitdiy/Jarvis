@@ -3120,11 +3120,24 @@ class Agent:
             else ""
         )
 
-        # 检查工具列表并添加记忆工具相关提示
-        tool_registry = self.get_tool_registry()
-        memory_prompts = self.memory_manager.add_memory_prompts_to_addon(
-            "", tool_registry
-        )
+        # 原生 function calling 激活时不注入文本 JSON/操作清单指令
+        if self._native_active():
+            tool_lines = (
+                "- 需要执行操作时，直接发起工具调用；工具名与参数以当前上下文给出的工具定义为准"
+                "\n        - 一次可调用一个或多个互不依赖的工具；有依赖则先等前一个结果再调用下一个"
+            )
+            actions_line = ""
+        else:
+            tool_registry = self.get_tool_registry()
+            memory_prompts = self.memory_manager.add_memory_prompts_to_addon(
+                "", tool_registry
+            )
+            tool_lines = (
+                "- 工具调用直接输出 JSON 对象，无需任何标签包裹"
+                "\n        - 一次可调用一个或多个工具，但多个工具之间必须**互不依赖**"
+                "（前者的结果/副作用不能作为后者的输入）；存在依赖时先调用被依赖的工具，等结果后再调下一个"
+            )
+            actions_line = f"- 可用操作：{action_handlers}{memory_prompts}"
 
         addon_prompt = f"""
 <system_prompt>
@@ -3133,12 +3146,11 @@ class Agent:
     - 若已完成：
         {complete_prompt if complete_prompt else "- 说明完成原因并停止，不要再发起新的工具调用"}
     - 若未完成，继续推进下一步：
-        - 工具调用直接输出 JSON 对象，无需任何标签包裹
-        - 一次可调用一个或多个工具，但多个工具之间必须**互不依赖**（前者的结果/副作用不能作为后者的输入）；存在依赖时先调用被依赖的工具，等结果后再调下一个
         - 写文件等大段内容时不要一次性写满，应分多次写入，以免被长度上限截断
         - 需求或信息不明确时，先向用户询问补充
         - 连续 5 次执行失败时，停止并向用户询问应如何继续
-        - 可用操作：{action_handlers}{memory_prompts}
+        {tool_lines}
+        {actions_line}
 
     补充：若当前这阶段的任务已完成、之前上下文价值不大，可输出 {ot("!!!SUMMARY!!!")} 触发压缩并清空历史，以便开启新阶段。
 </system_prompt>
