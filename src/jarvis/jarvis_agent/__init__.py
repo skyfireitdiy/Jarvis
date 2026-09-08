@@ -1561,31 +1561,86 @@ class Agent:
         guard = 0
         while calls and guard < 30:
             guard += 1
-            for call in calls:
+            outputs = self._execute_native_batch(calls)
+            for call, out in zip(calls, outputs):
                 call_id = call.get("id", "")
                 name = call.get("name", "")
-                arguments = call.get("arguments") or {}
-                if not name:
-                    continue
-                if getattr(self, "execute_tool_confirm", False):
-                    try:
-                        ok = self.confirm_callback(
-                            f"执行原生工具 {name} ？", False
-                        )
-                    except Exception:
-                        ok = False
-                    if not ok:
-                        model.append_native_tool_result(
-                            call_id, name, "用户拒绝执行该工具，请据此调整方案。"
-                        )
-                        continue
-                try:
-                    out = registry.execute_native_tool_call(name, arguments, self)
-                except Exception as e:
-                    out = f"工具 {name} 执行异常: {e}"
-                model.append_native_tool_result(call_id, name, out)
+                if name:
+                    model.append_native_tool_result(call_id, name, out)
             content, calls = model.chat_native_once(None, tools, append_user=False)
         return content or ""
+
+    def _exec_native_one(self, call: Dict[str, Any]) -> str:
+        """串行执行单个原生工具调用（含确认门控与拒绝处理）。"""
+        name = call.get("name", "")
+        if not name:
+            return ""
+        if getattr(self, "execute_tool_confirm", False):
+            try:
+                ok = self.confirm_callback(f"执行原生工具 {name} ？", False)
+            except Exception:
+                ok = False
+            if not ok:
+                return "用户拒绝执行该工具，请据此调整方案。"
+        try:
+            registry = self.get_tool_registry()
+            return registry.execute_native_tool_call(
+                name, call.get("arguments") or {}, self
+            )
+        except Exception as e:
+            return f"工具 {name} 执行异常: {e}"
+
+    def _execute_native_batch(self, calls: List[Dict[str, Any]]) -> List[str]:
+        """执行一批原生 tool_calls，按原顺序返回各工具的结果文本。
+
+        - 含可交互/独占工具（execute_script/virtual_tty 等）、需要用户确认、或仅单条时：逐条串行；
+        - 否则对互不依赖的只读类工具并行执行（线程池，最多 4 并发）。
+        """
+        non_parallel = {
+            "execute_script",
+            "virtual_tty",
+            "task_list_manager",
+            "gateway_manager",
+            "edit_file",
+            "add_images",
+            "meta_agent",
+        }
+        names = [c.get("name", "") for c in calls]
+        parallel_ok = (
+            not getattr(self, "execute_tool_confirm", False)
+            and len(calls) > 1
+            and bool(names)
+            and all(n not in non_parallel for n in names)
+        )
+        if not parallel_ok:
+            return [self._exec_native_one(c) for c in calls]
+
+        registry = self.get_tool_registry()
+        from concurrent.futures import ThreadPoolExecutor
+
+        def run(call: Dict[str, Any]) -> str:
+            n = call.get("name", "")
+            try:
+                return registry.execute_native_tool_call(
+                    n, call.get("arguments") or {}, self, record=False
+                )
+            except Exception as e:
+                return f"工具 {n} 执行异常: {e}"
+
+        with ThreadPoolExecutor(max_workers=min(len(calls), 4)) as executor:
+            futures = [executor.submit(run, c) for c in calls]
+            outputs = [f.result() for f in futures]
+
+        # 并行下统一记录已执行工具，避免共享状态竞态
+        try:
+            prev = self.get_user_data("__executed_tools__")
+            prev = prev if isinstance(prev, list) else []
+            self.set_user_data("__executed_tools__", prev + [n for n in names if n])
+            if names:
+                self.set_user_data("__last_executed_tool__", names[-1])
+        except Exception:
+            pass
+        return outputs
 
     def _ensure_save_memory_tool(self) -> None:
         """如果配置了强制保存记忆，确保 memory 工具在 use_tools 列表中"""
