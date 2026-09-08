@@ -6,6 +6,8 @@
 此模块可供所有 agent 使用。
 """
 
+import os
+
 from pathlib import Path
 
 from jarvis.jarvis_utils.template_utils import _get_builtin_dir, render_rule_template
@@ -114,6 +116,40 @@ def list_builtin_rules() -> list[str]:
         list[str]: 规则名称列表
     """
     return list(BUILTIN_RULES.keys())
+
+
+def list_builtin_rule_entries() -> list[str]:
+    """列出可被"自动选择"的内置规则入口名称。
+
+    与文件型规则扫描保持一致：目录内若含 ``skill.md``（不区分大小写），
+    仅把该入口文件作为可选项、且不递归其子目录；references/scripts 及
+    SKILL.md 的伴生 .md 只作资源，不参与自动选择（仍可按路径直接 load_rule）。
+    """
+    builtin_dir = _get_builtin_dir()
+    if builtin_dir is None:
+        return []
+    base_dir = builtin_dir / "rules"
+    if not base_dir.exists():
+        return []
+
+    entries: list[str] = []
+    for root, dirs, files in os.walk(base_dir, topdown=True):
+        root_path = Path(root)
+        skill_file = next(
+            (f for f in files if f.lower() == "skill.md"), None
+        )
+        if skill_file is not None:
+            rel = (root_path / skill_file).relative_to(base_dir).as_posix()
+            if rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES:
+                entries.append(rel)
+            dirs.clear()
+            continue
+        for filename in files:
+            if filename.lower().endswith(".md"):
+                rel = (root_path / filename).relative_to(base_dir).as_posix()
+                if rel in BUILTIN_RULES or rel.lower() in BUILTIN_RULES:
+                    entries.append(rel)
+    return sorted(set(entries))
 
 
 def get_builtin_rule_path(rule_name: str) -> str | None:

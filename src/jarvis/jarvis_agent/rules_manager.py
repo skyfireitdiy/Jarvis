@@ -667,10 +667,11 @@ class RulesManager:
                 - "builtin": 内置规则列表
                 - "files": 规则目录中的文件规则列表（带来源前缀）
         """
-        from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
+        from jarvis.jarvis_agent.builtin_rules import list_builtin_rule_entries
 
+        # 自动选择候选只取"入口"规则（SKILL.md / 顶层 .md），伴生文档不作独立可选规则
         result = {
-            "builtin": [f"builtin:{rule}" for rule in list_builtin_rules()],
+            "builtin": [f"builtin:{rule}" for rule in list_builtin_rule_entries()],
             "files": [],
         }
 
@@ -1088,24 +1089,13 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  没有可用的规则")
                 return None
 
-            # 创建 normal 类型的模型
-            registry = PlatformRegistry.get_global_platform_registry()
-            model = registry.create_platform(platform_type="normal")
-            if model is None:
-                PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
-                return None
-
-            # 直接使用全部规则（skill.md 索引已大幅减少规则数量，无需 BM25 粗筛）
-            top_rules = all_rules_list
-
-            # 构造编号列表（包含规则名称和描述，供模型选择）
-            numbered_rules = ""
-            for i, rule_name in enumerate(top_rules, 1):
-                # 获取规则描述：优先从 YAML Front Matter 提取，否则用内容预览
+            # 预取全部候选描述，供两级选择复用（描述优先取 YAML Front Matter）
+            desc_by_name = {}
+            for rule_name in all_rules_list:
                 rule_path = self.get_rule_file_path(rule_name)
                 description = ""
                 if rule_path and rule_path != "--":
-                    description = self._extract_rule_description(rule_path)
+                    description = self._extract_rule_description(rule_path) or ""
                 if not description:
                     preview = self.get_rule_preview(rule_name)
                     description = (
@@ -1113,6 +1103,33 @@ class RulesManager:
                         if preview and preview != "--"
                         else "（无描述）"
                     )
+                desc_by_name[rule_name] = description
+
+            # 两级选择：先用 cheap 模型把全量候选粗筛成短名单，再用 normal 精确选
+            top_rules = all_rules_list
+            try:
+                registry = PlatformRegistry.get_global_platform_registry()
+                cheap_model = registry.create_platform(platform_type="cheap")
+            except Exception:
+                cheap_model = None
+            if cheap_model is not None:
+                shortlist = self._select_cheap_shortlist(
+                    cheap_model, task_description, all_rules_list, desc_by_name
+                )
+                if shortlist:
+                    top_rules = shortlist
+
+            # 创建 normal 类型的模型
+            registry = PlatformRegistry.get_global_platform_registry()
+            model = registry.create_platform(platform_type="normal")
+            if model is None:
+                PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
+                return None
+
+            # 构造编号列表（候选为短名单；无 cheap 时回退全量）
+            numbered_rules = ""
+            for i, rule_name in enumerate(top_rules, 1):
+                description = desc_by_name.get(rule_name, "（无描述）")
                 numbered_rules += f"{i}. {rule_name}\n   描述: {description}\n"
 
             # 构造 prompt，要求模型返回编号
@@ -1171,7 +1188,7 @@ class RulesManager:
                 for idx_str in index_strings:
                     idx = int(idx_str.strip())
                     # 验证编号范围
-                    if 1 <= idx <= len(all_rules_list):
+                    if 1 <= idx <= len(top_rules):
                         selected_indices.append(idx)
                     else:
                         PrettyOutput.auto_print(f"⚠️  模型返回的编号超出范围: {idx}")
@@ -1191,7 +1208,7 @@ class RulesManager:
             # 获取规则名称列表（带前缀）
             rule_names = []
             for index in selected_indices:
-                rule_name = all_rules_list[index - 1]
+                rule_name = top_rules[index - 1]
                 # 验证规则是否存在
                 if self.get_named_rule(rule_name):
                     rule_names.append(rule_name)
@@ -1215,6 +1232,71 @@ class RulesManager:
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
+            return None
+
+    def _select_cheap_shortlist(
+        self,
+        cheap_model: Any,
+        task_description: str,
+        candidate_names: List[str],
+        desc_by_name: Dict[str, str],
+        max_pre: int = 12,
+    ) -> Optional[List[str]]:
+        """两级选择的第一级：用 cheap 模型把全量候选粗筛成短名单。
+
+        返回短名单里的规则名（相对候选顺序）；失败或判断"都不相关"返回空列表，
+        由调用方决定是否回退全量（调用方仅在返回非空时采用短名单）。
+        """
+        try:
+            import re
+
+            compact_lines = "\n".join(
+                f"{i}. {name}: {desc_by_name.get(name, '')[:120]}"
+                for i, name in enumerate(candidate_names, 1)
+            )
+            prompt = f"""请根据任务描述，从以下候选规则中粗筛出【可能相关】的规则（宁可多选，稍后会精确筛选）。
+
+<task_description>
+{task_description}
+</task_description>
+
+<candidate_rules>
+{compact_lines}
+</candidate_rules>
+
+要求：
+一、只依据名称与描述粗筛，选择可能与任务相关的规则，至多 {max_pre} 个
+二、若确无任何相关规则，返回 <NUM>none</NUM>
+三、请按下式返回编号：<NUM>编号1,编号2,...</NUM>
+
+所选编号："""
+
+            cheap_model.set_suppress_output(False)
+            response = cheap_model.chat_until_success(prompt).strip()
+            cheap_model.set_suppress_output(True)
+
+            num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
+            raw = num_match.group(1).strip() if num_match else response.strip()
+            if not raw or raw.lower() == "none":
+                return []
+
+            selected = []
+            seen = set()
+            for part in raw.split(","):
+                try:
+                    idx = int(part.strip())
+                except ValueError:
+                    continue
+                if 1 <= idx <= len(candidate_names):
+                    name = candidate_names[idx - 1]
+                    if name not in seen:
+                        seen.add(name)
+                        selected.append(name)
+                        if len(selected) >= max_pre:
+                            break
+            return selected
+        except Exception:
+            # 粗筛失败不阻塞：由调用方回退全量
             return None
 
     def _filter_rules_by_content(
