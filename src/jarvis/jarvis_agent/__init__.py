@@ -1568,8 +1568,51 @@ class Agent:
                 # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
                 if call_id:
                     model.append_native_tool_result(call_id, name, out)
+
+            # 与文本协议一致：工具执行后触发 AFTER_TOOL_CALL 回调与事件
+            # （供 diff 可视化 / 自动提交 / 构建验证 / lint 等旁路使用）
+            self._fire_after_tool_call()
+
             content, calls = model.chat_native_once(None, tools, append_user=False)
         return content or ""
+
+    def _fire_after_tool_call(self) -> None:
+        """触发 AFTER_TOOL_CALL：先调用订阅回调，再广播事件（镜像文本协议路径）。"""
+        try:
+            listeners = self.event_bus._listeners.get(AFTER_TOOL_CALL, [])
+            for _, _, callback in list(listeners):
+                try:
+                    callback(
+                        agent=self,
+                        current_response="",
+                        need_return=False,
+                        tool_prompt="",
+                    )
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_agent.__init__",
+                        function="_fire_after_tool_call",
+                    )
+                    pass
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_fire_after_tool_call"
+            )
+            pass
+        try:
+            self.event_bus.emit(
+                AFTER_TOOL_CALL,
+                agent=self,
+                current_response="",
+                need_return=False,
+                tool_prompt="",
+            )
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_fire_after_tool_call"
+            )
+            pass
 
     def _exec_native_one(self, call: Dict[str, Any]) -> str:
         """串行执行单个原生工具调用（含确认门控与拒绝处理）。"""
@@ -3077,6 +3120,8 @@ class Agent:
         if self._native_active():
             tool_lines = (
                 "- 需要执行操作时，直接发起工具调用；工具名与参数以当前上下文给出的工具定义为准"
+                "\n        - 每次工具调用请在 arguments 中带 `want`：用一句话说明本次调用的目的"
+                "（写给用户看，让用户明白你为何调用；纯查询也写一句用途）。want 仅作说明、不会传给工具执行"
                 "\n        - 一次可调用一个或多个互不依赖的工具；有依赖则先等前一个结果再调用下一个"
             )
             actions_line = ""

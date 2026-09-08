@@ -1825,6 +1825,10 @@ class ToolRegistry(OutputHandlerProtocol):
             # 命中定时参数则创建定时任务而非立即执行
             if isinstance(arguments, dict):
                 effective_args = dict(arguments)
+                # 若模型在实参里带上 want（文本协议的意图说明），打印出来并从执行参数中剥离
+                want_text = effective_args.pop("want", None)
+                if want_text:
+                    PrettyOutput.auto_print(f"💡 {str(want_text)[:500]}")
                 timer_params: Dict[str, Any] = {}
                 if "after" in effective_args:
                     timer_params["time_type"] = "relative"

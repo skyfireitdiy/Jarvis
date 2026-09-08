@@ -2,6 +2,7 @@
 """Agent._execute_native_batch 并行/串行分发单元测试"""
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 
 
 class _FakeReg:
@@ -48,6 +49,31 @@ def test_interactive_tool_forces_sequential():
     ]
     out = a._execute_native_batch(calls)
     assert out == ["res:read_code", "res:execute_script"]
+
+
+class _FakeBus:
+    def __init__(self, listener=None):
+        self._listeners = {AFTER_TOOL_CALL: [(0, 0, listener)] if listener else []}
+        self.emitted = []
+
+    def emit(self, event, **kwargs):
+        self.emitted.append(event)
+
+
+def test_fire_after_tool_call_invokes_listener_and_emits():
+    called = {}
+
+    def listener(agent=None, **kwargs):
+        called["agent"] = agent
+        called["kwargs"] = kwargs
+
+    bus = _FakeBus(listener)
+    a = object.__new__(Agent)
+    a.event_bus = bus
+    a._fire_after_tool_call()
+    assert called["agent"] is a
+    assert called["kwargs"]["current_response"] == ""
+    assert AFTER_TOOL_CALL in bus.emitted
 
 
 def test_confirm_deny_returns_rejection():

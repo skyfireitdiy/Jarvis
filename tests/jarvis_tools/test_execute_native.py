@@ -45,6 +45,24 @@ def test_execute_native_failure_returns_error(monkeypatch):
     assert "boom" in out
 
 
+def test_execute_native_strips_and_executes_want(monkeypatch):
+    reg = ToolRegistry()
+    captured = {}
+
+    def fake_execute(name, args, agent=None):
+        captured["args"] = args
+        return {"success": True, "stdout": "ok", "stderr": ""}
+
+    monkeypatch.setattr(reg, "execute_tool", fake_execute)
+    agent = _fake_agent()
+    out = reg.execute_native_tool_call(
+        "read_code", {"path": "a.py", "want": "看看文件内容"}, agent
+    )
+    assert "ok" in out
+    # want 只用于提示，不应下发给工具
+    assert captured["args"] == {"path": "a.py"}
+
+
 def test_execute_native_missing_tool_reports_error(monkeypatch):
     reg = ToolRegistry()
     monkeypatch.setattr(

@@ -214,6 +214,22 @@ class TestSchema:
         otools = build_openai_tools(reg)
         assert otools[0]["function"]["parameters"]["type"] == "object"
 
+    def test_want_advertised_in_schema(self):
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "read_code",
+                    "读取文件",
+                    {"type": "object", "properties": {"path": {"type": "string"}}},
+                )
+            ]
+        )
+        otools = build_openai_tools(reg)
+        props = otools[0]["function"]["parameters"]["properties"]
+        assert props["want"]["type"] == "string"
+        atools = build_anthropic_tools(reg)
+        assert atools[0]["input_schema"]["properties"]["want"]["type"] == "string"
+
     def test_timer_params_advertised_in_schema(self):
         reg = _FakeRegistry(
             [

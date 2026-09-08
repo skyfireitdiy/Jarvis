@@ -1105,19 +1105,8 @@ class RulesManager:
                     )
                 desc_by_name[rule_name] = description
 
-            # 两级选择：先用 cheap 模型把全量候选粗筛成短名单，再用 normal 精确选
+            # 直接对全量候选做一次 normal 选择（不再经 cheap 窄化，避免弱模型筛丢正确规则）
             top_rules = all_rules_list
-            try:
-                registry = PlatformRegistry.get_global_platform_registry()
-                cheap_model = registry.create_platform(platform_type="cheap")
-            except Exception:
-                cheap_model = None
-            if cheap_model is not None:
-                shortlist = self._select_cheap_shortlist(
-                    cheap_model, task_description, all_rules_list, desc_by_name
-                )
-                if shortlist:
-                    top_rules = shortlist
 
             # 创建 normal 类型的模型
             registry = PlatformRegistry.get_global_platform_registry()
@@ -1126,7 +1115,7 @@ class RulesManager:
                 PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
                 return None
 
-            # 构造编号列表（候选为短名单；无 cheap 时回退全量）
+            # 构造编号列表（全量候选）
             numbered_rules = ""
             for i, rule_name in enumerate(top_rules, 1):
                 description = desc_by_name.get(rule_name, "（无描述）")
@@ -1232,71 +1221,6 @@ class RulesManager:
 
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  根据任务选择规则失败: {e}")
-            return None
-
-    def _select_cheap_shortlist(
-        self,
-        cheap_model: Any,
-        task_description: str,
-        candidate_names: List[str],
-        desc_by_name: Dict[str, str],
-        max_pre: int = 12,
-    ) -> Optional[List[str]]:
-        """两级选择的第一级：用 cheap 模型把全量候选粗筛成短名单。
-
-        返回短名单里的规则名（相对候选顺序）；失败或判断"都不相关"返回空列表，
-        由调用方决定是否回退全量（调用方仅在返回非空时采用短名单）。
-        """
-        try:
-            import re
-
-            compact_lines = "\n".join(
-                f"{i}. {name}: {desc_by_name.get(name, '')[:120]}"
-                for i, name in enumerate(candidate_names, 1)
-            )
-            prompt = f"""请根据任务描述，从以下候选规则中粗筛出【可能相关】的规则（宁可多选，稍后会精确筛选）。
-
-<task_description>
-{task_description}
-</task_description>
-
-<candidate_rules>
-{compact_lines}
-</candidate_rules>
-
-要求：
-一、只依据名称与描述粗筛，选择可能与任务相关的规则，至多 {max_pre} 个
-二、若确无任何相关规则，返回 <NUM>none</NUM>
-三、请按下式返回编号：<NUM>编号1,编号2,...</NUM>
-
-所选编号："""
-
-            cheap_model.set_suppress_output(False)
-            response = cheap_model.chat_until_success(prompt).strip()
-            cheap_model.set_suppress_output(True)
-
-            num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
-            raw = num_match.group(1).strip() if num_match else response.strip()
-            if not raw or raw.lower() == "none":
-                return []
-
-            selected = []
-            seen = set()
-            for part in raw.split(","):
-                try:
-                    idx = int(part.strip())
-                except ValueError:
-                    continue
-                if 1 <= idx <= len(candidate_names):
-                    name = candidate_names[idx - 1]
-                    if name not in seen:
-                        seen.add(name)
-                        selected.append(name)
-                        if len(selected) >= max_pre:
-                            break
-            return selected
-        except Exception:
-            # 粗筛失败不阻塞：由调用方回退全量
             return None
 
     def _filter_rules_by_content(

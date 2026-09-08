@@ -261,6 +261,13 @@ _TIMER_PROPERTIES: Dict[str, Any] = {
 }
 _TIMER_KEYS = ("after", "at", "loop")
 
+_WANT_PROPERTY: Dict[str, Any] = {
+    "want": {
+        "type": "string",
+        "description": "（意图说明，可选）用一句话向用户说明本次工具调用的目的与期望；仅用于展示调用意图，不会作为参数传给工具",
+    }
+}
+
 
 def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
     """在工具参数 schema 上附加可选定时参数（若工具自身未定义同名参数）。"""
@@ -273,6 +280,26 @@ def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
         return schema
     merged = dict(properties)
     merged.update(_TIMER_PROPERTIES)
+    out = dict(schema)
+    out["properties"] = merged
+    return out
+
+
+def with_want(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """在工具参数 schema 上附加可选 intent 字段 want（若工具自身未定义同名参数）。
+
+    模型在发起工具调用时可在 arguments 中带 ``want`` 一句话说明目的，
+    供执行前打印给用户看；执行时会从实参中剥离，不传给工具。
+    """
+    if not isinstance(schema, dict):
+        return schema
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return schema
+    if "want" in properties:
+        return schema
+    merged = dict(properties)
+    merged.update(_WANT_PROPERTY)
     out = dict(schema)
     out["properties"] = merged
     return out
@@ -300,14 +327,14 @@ def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
-        parameters = ensure_object_schema(parameters)
+        parameters = with_want(with_timer_params(ensure_object_schema(parameters)))
         tools.append(
             {
                 "type": "function",
                 "function": {
                     "name": tool.name,
                     "description": getattr(tool, "description", "") or "",
-                    "parameters": with_timer_params(parameters),
+                    "parameters": parameters,
                 },
             }
         )
@@ -319,12 +346,12 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
-        parameters = ensure_object_schema(parameters)
+        parameters = with_want(with_timer_params(ensure_object_schema(parameters)))
         tools.append(
             {
                 "name": tool.name,
                 "description": getattr(tool, "description", "") or "",
-                "input_schema": with_timer_params(parameters),
+                "input_schema": parameters,
             }
         )
     return tools
