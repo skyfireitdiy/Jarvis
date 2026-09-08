@@ -134,6 +134,33 @@ class TestSchema:
         assert tools[0]["name"] == "read_code"
         assert tools[0]["input_schema"]["properties"]["path"]["type"] == "string"
 
+    def test_missing_top_level_type_normalized_to_object(self):
+        reg = _FakeRegistry(
+            [
+                # 像 read_code 那样只写 properties/required、缺顶层 type 的工具
+                _FakeTool(
+                    "read_code",
+                    "读取文件",
+                    {
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                    },
+                )
+            ]
+        )
+        otools = build_openai_tools(reg)
+        params = otools[0]["function"]["parameters"]
+        assert params.get("type") == "object"
+        assert params["properties"]["path"]["type"] == "string"
+
+        atools = build_anthropic_tools(reg)
+        assert atools[0]["input_schema"].get("type") == "object"
+
+    def test_empty_parameters_become_object_schema(self):
+        reg = _FakeRegistry([_FakeTool("noop", "无参", {})])
+        otools = build_openai_tools(reg)
+        assert otools[0]["function"]["parameters"]["type"] == "object"
+
     def test_timer_params_advertised_in_schema(self):
         reg = _FakeRegistry(
             [

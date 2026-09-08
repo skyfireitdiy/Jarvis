@@ -233,14 +233,29 @@ def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def ensure_object_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
+    """把工具参数 schema 归一为函数所需的 object 型 JSON Schema。
+
+    不少内置/自定义工具的 parameters 只写 properties/required 而缺顶层 type，
+    被 OpenAI/Anthropic 拒绝（"schema must be a JSON Schema of type object"）。
+    这里补上顶层 type=object，并保证 properties 存在。
+    """
+    if not isinstance(schema, dict):
+        return {"type": "object", "properties": {}}
+    out = dict(schema)
+    if not out.get("type"):
+        out["type"] = "object"
+    if not isinstance(out.get("properties"), dict):
+        out["properties"] = {}
+    return out
+
+
 def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     """从 ToolRegistry 构建 OpenAI tools 数组。"""
     tools = []
     for tool in registry.tools.values():
-        parameters = getattr(tool, "parameters", None) or {
-            "type": "object",
-            "properties": {},
-        }
+        parameters = getattr(tool, "parameters", None) or {}
+        parameters = ensure_object_schema(parameters)
         tools.append(
             {
                 "type": "function",
@@ -258,10 +273,8 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
     """从 ToolRegistry 构建 Anthropic tools 数组。"""
     tools = []
     for tool in registry.tools.values():
-        parameters = getattr(tool, "parameters", None) or {
-            "type": "object",
-            "properties": {},
-        }
+        parameters = getattr(tool, "parameters", None) or {}
+        parameters = ensure_object_schema(parameters)
         tools.append(
             {
                 "name": tool.name,
