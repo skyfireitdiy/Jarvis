@@ -22,9 +22,9 @@ class LoadRuleTool:
 
     name = "load_rule"
     description = (
-        "读规文件内并以 jinja2 渲模板变。"
-        "支之变：current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir。"
-        "以 'jri' 令可取全规列。"
+        "读取规则文件内容并用 jinja2 渲染其中的模板变量。"
+        "支持的变量：current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir。"
+        "用 'jri' 命令可查看全部规则列表。"
     )
     parameters = {
         "type": "object",
