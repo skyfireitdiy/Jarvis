@@ -55,10 +55,6 @@ class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
         self.tool_reminder_rounds = int(os.environ.get("tool_reminder_rounds", 20))
-        # 基于剩余token数量的自动总结阈值：当剩余token低于输入窗口的25%时触发
-        # 使用模型的平台特定配置，确保阈值计算与运行时检查使用相同的配置
-        max_input_tokens = self.agent.model._get_platform_max_input_token_count()
-        self.summary_remaining_token_threshold = int(max_input_tokens * 0.25)
         self.conversation_turn_threshold = get_conversation_turn_threshold()
 
         # Git diff相关属性
@@ -310,9 +306,9 @@ class AgentRunLoop:
             remaining_tokens -= current_message_tokens
 
             # 检查是否满足压缩触发条件
-            # 条件1：剩余token低于20%（即已使用超过80%）
+            # 条件1：剩余token低于10%（即已使用超过90%）
             token_limit_triggered = max_input_tokens > 0 and remaining_tokens <= int(
-                max_input_tokens * 0.20
+                max_input_tokens * 0.10
             )
 
             # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
@@ -320,7 +316,7 @@ class AgentRunLoop:
             turn_limit_triggered = (conversation_turn + 1) > conversation_turn_threshold
 
             # 预压缩触发条件：剩余token低于25%（即已使用超过75%）
-            # 在后台启动预压缩，提前生成摘要，80%真正触发时直接使用
+            # 在后台启动预压缩，提前生成摘要，90%真正触发时直接使用
             pre_compress_triggered = (
                 max_input_tokens > 0
                 and remaining_tokens <= int(max_input_tokens * 0.25)
@@ -332,8 +328,8 @@ class AgentRunLoop:
 
             should_compress = token_limit_triggered or turn_limit_triggered
 
-            # 后台预压缩已完成：立即应用摘要压缩上下文，无需等到 80% 阈值
-            # （80% 触发时 _adaptive_compression 内部也会应用，此处处理未到 80% 的情况）
+            # 后台预压缩已完成：立即应用摘要压缩上下文，无需等到 90% 阈值
+            # （90% 触发时 _adaptive_compression 内部也会应用，此处处理未到 90% 的情况）
             if (
                 not should_compress
                 and self.agent._pre_compressed_summary
@@ -396,7 +392,7 @@ class AgentRunLoop:
                         remaining_tokens -= current_message_tokens
                         token_limit_triggered = (
                             max_input_tokens > 0
-                            and remaining_tokens <= int(max_input_tokens * 0.20)
+                            and remaining_tokens <= int(max_input_tokens * 0.10)
                         )
                         should_compress = token_limit_triggered or turn_limit_triggered
 
