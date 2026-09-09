@@ -53,6 +53,29 @@ def _git(root: Path, *args: str) -> None:
     subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
 
 
+def _load_global_config() -> None:
+    """加载用户配置(~/.jarvis/config.yaml 或 $JARVIS_CONFIG_FILE)进全局配置。
+
+    直接 import 后 GLOBAL_CONFIG_DATA 是空的，导致 llm_group 虽设置但
+    llms/llm_groups 未定义，平台会回退成默认 api.openai.com/gpt-5。
+    同时把配置里的 ENV（如 http_proxy）应用为进程环境变量，与 jarvis 本体行为一致。
+    """
+    import yaml as _yaml
+
+    from jarvis.jarvis_utils.config import set_global_config_data
+
+    path = os.environ.get("JARVIS_CONFIG_FILE") or str(
+        Path.home() / ".jarvis" / "config.yaml"
+    )
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        data = _yaml.safe_load(f) or {}
+    set_global_config_data(data)
+    for key, value in (data.get("ENV") or {}).items():
+        os.environ.setdefault(str(key), str(value))
+
+
 def _make_repo(task_dir: Path, files: dict) -> None:
     task_dir.mkdir(parents=True, exist_ok=True)
     _git(task_dir, "init", "-q")
@@ -133,6 +156,7 @@ def main() -> None:
     ap.add_argument("--profile", default=None, help="只跑某个 profile（current/lean）")
     ap.add_argument("--group", default="ds_zn", help="llm_group（需可达），默认 ds_zn=scnet")
     args = ap.parse_args()
+    _load_global_config()
     out_dir = ROOT / ".ab_harness_out"
     out_dir.mkdir(parents=True, exist_ok=True)
     summary = []
