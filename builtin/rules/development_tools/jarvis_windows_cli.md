@@ -7,14 +7,14 @@ description: 当需要在Windows平台进行桌面程序自动化或GUI测试时
 
 ## 概述
 
-`jw`（或`jarvis-windows`）乃基于pywinauto之Windows桌面程序自动化命令行工具，支持启动应用、连接至已有窗口、执行点击、输入、截图、获取控件树、列举窗口，以及修改常用系统配置（主题、电源、代理等）。**仅支持Windows平台**。
+`jw`（或`jarvis-windows`）乃基于pywinauto的Windows桌面程序自动化命令行工具，支持启动应用、连接至已有窗口、执行点击、输入、截图、获取控件树、列举窗口，以及修改常用系统配置（主题、电源、代理等）。**仅支持Windows平台**。
 
 > **⚠️ 重要提醒**
 >
 > 1. **截图功能限制**：除非用户明确要求，否则勿用`screenshot`命令。截图主要用于调试与验证目的，非默认行为。
-> 2. **输出完整性**：`jw`之所有命令皆返回JSON格式之完整结果（含`success`、`stdout`、`stderr`字段）。**绝对不允许对jw执行命令之结果进行任何形式之过滤、截断或修改**，必完整返回原始JSON输出，以确保用户能准确判断操作是否成功。
+> 2. **输出完整性**：`jw`的所有命令皆返回JSON格式的完整结果（含`success`、`stdout`、`stderr`字段）。**绝对不允许对jw执行命令的结果进行任何形式的过滤、截断或修改**，必完整返回原始JSON输出，以确保用户能准确判断操作是否成功。
 
-通过`~/.jarvis/jw_sessions.json`持久化连接信息，后续命令可复用已保存之会话。
+通过`~/.jarvis/jw_sessions.json`持久化连接信息，后续命令可复用已保存的会话。
 
 ## 快速开始
 
@@ -70,7 +70,7 @@ jw start --path "C:\Program Files\app\app.exe" --args "C:\file.txt"
 
 #### connect - 连接至已运行窗口
 
-连接至已运行之窗口并保存会话。
+连接至已运行的窗口并保存会话。
 
 **参数：**
 
@@ -79,7 +79,7 @@ jw start --path "C:\Program Files\app\app.exe" --args "C:\file.txt"
 - `--pid INT`: 进程ID
 - `--app-id TEXT`: 会话ID（默认：`default`）
 
-至少需`--process`、`--title`或`--pid`之一。
+至少需`--process`、`--title`或`--pid`的一。
 
 **示例：**
 
@@ -91,7 +91,7 @@ jw connect --pid 12345
 
 #### list - 列出会话
 
-列出所有已注册之应用会话。
+列出所有已注册的应用会话。
 
 **参数：**
 
@@ -105,7 +105,7 @@ jw list
 
 #### list-windows - 列举窗口
 
-列举当前可见之顶层窗口，便于选择要connect之目标。
+列举当前可见的顶层窗口，便于选择要connect的目标。
 
 **参数：**
 
@@ -148,7 +148,7 @@ jw close --no-kill  # 仅断开会话，进程继续运行
 
 - `-c, --control TEXT`: 控件标题、AutomationId或`title_regex=模式`
 - `-m, --menu TEXT`: 菜单路径，如`文件(&F)->打开(&O)`
-- `-i, --index INT`: 同类型控件中之索引（从0开始）
+- `-i, --index INT`: 同类型控件中的索引（从0开始）
 
 **示例：**
 
@@ -232,7 +232,7 @@ jw drag --to-x 200 --to-y 200
 
 **参数：**
 
-- `-t, --text TEXT`: 要输入之文本（必需）
+- `-t, --text TEXT`: 要输入的文本（必需）
 - `-c, --control TEXT`: 目标控件（可选，不指定则为当前焦点）
 
 **示例：**
@@ -244,7 +244,7 @@ jw type --control "Edit" --text "内容"
 
 #### type-keys - 发送按键序列
 
-发送键盘按键序列，支持pywinauto之`type_keys`语法。
+发送键盘按键序列，支持pywinauto的`type_keys`语法。
 
 **参数：**
 
@@ -276,7 +276,7 @@ jw screenshot --path C:\temp\capture.png
 
 #### get-tree - 获取控件树
 
-获取窗口控件树结构，用于生成选择器，序号#N可用于click/type之`--control #N`或`--index N`。
+获取窗口控件树结构，用于生成选择器，序号#N可用于click/type的`--control #N`或`--index N`。
 
 **参数：**
 
@@ -353,7 +353,7 @@ jw config remote-desktop disable
 
 #### config startup - 启动项
 
-管理当前用户「启动」文件夹中之启动项（通过重命名添加/移除.disabled后缀）。
+管理当前用户「启动」文件夹中的启动项（通过重命名添加/移除.disabled后缀）。
 
 ```bash
 jw config startup list
@@ -431,7 +431,7 @@ jw list-windows              # 列举所有
 jw list-windows --title Cursor   # 过滤标题
 ```
 
-根据返回之`title`或`pid`用`jw connect --title "..."`或`jw connect --pid <pid>`。
+根据返回的`title`或`pid`用`jw connect --title "..."`或`jw connect --pid <pid>`。
 
 ### 2. 用get-tree定位控件
 

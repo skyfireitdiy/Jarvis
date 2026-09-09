@@ -7,7 +7,7 @@ description: 当需要使用或学习Jarvis工具系统时触发。每当用户�
 
 ## 规则简介
 
-此规则说明如何使用 `jarvis-tool` 命令行工具来管理与查看 Jarvis 工具系统中之工具信息。
+此规则说明如何使用 `jarvis-tool` 命令行工具来管理与查看 Jarvis 工具系统中的工具信息。
 
 ## 可用命令
 
@@ -44,7 +44,7 @@ jarvis-tool list --detailed --json
 
 ### 2. show 命令
 
-**功能：** 显示指定工具之详细信息
+**功能：** 显示指定工具的详细信息
 
 **语法：**
 
@@ -54,7 +54,7 @@ jarvis-tool show TOOL_NAME [OPTIONS]
 
 **参数：**
 
-- `TOOL_NAME`: 要查看之工具名称（必填）
+- `TOOL_NAME`: 要查看的工具名称（必填）
 
 **选项：**
 
@@ -78,7 +78,7 @@ jarvis-tool show execute_script --json
 jarvis-tool list
 ```
 
-### 场景2：查看某工具之详细参数
+### 场景2：查看某工具的详细参数
 
 ```bash
 jarvis-tool show read_code
@@ -90,7 +90,7 @@ jarvis-tool show read_code
 jarvis-tool show edit_tool --json
 ```
 
-### 场景4：查看含参数定义之工具列表
+### 场景4：查看含参数定义的工具列表
 
 ```bash
 jarvis-tool list --detailed
