@@ -53,9 +53,7 @@ class TestMessageModel:
 
 class TestToolPairing:
     def _asst_tool_call(self, cid="c1", name="read_code"):
-        return make_tool_call_msg(
-            None, [make_tool_call(cid, name, {"path": "a.py"})]
-        )
+        return make_tool_call_msg(None, [make_tool_call(cid, name, {"path": "a.py"})])
 
     def test_drops_trailing_tool_calls_without_results(self):
         msgs = [
@@ -85,6 +83,43 @@ class TestToolPairing:
         assert len(out) == 4
         assert out[1]["tool_calls"][0]["id"] == "c1"
         assert out[2]["role"] == "tool"
+
+    def test_drops_partial_multi_call_and_its_results(self):
+        # assistant 发起多个 tool_calls，仅部分回包后接新消息：
+        # 整组（assistant + 已回包的 tool 结果）都应被丢弃，不能残留孤立 tool 消息。
+        msgs = [
+            {"role": "user", "content": "hi"},
+            make_tool_call_msg(
+                None,
+                [
+                    make_tool_call("c1", "read_code", {"path": "a.py"}),
+                    make_tool_call("c2", "read_code", {"path": "b.py"}),
+                ],
+            ),
+            make_tool_result_msg("c1", "read_code", "内容a"),
+            {"role": "user", "content": "继续"},
+        ]
+        out = to_openai_messages(msgs)
+        assert out == [
+            {"role": "user", "content": "hi"},
+            {"role": "user", "content": "继续"},
+        ]
+
+    def test_drops_partial_multi_call_at_end(self):
+        # 末尾未闭合的多 tool_calls：已回包的结果也要一并丢弃
+        msgs = [
+            {"role": "user", "content": "hi"},
+            make_tool_call_msg(
+                None,
+                [
+                    make_tool_call("c1", "read_code", {"path": "a.py"}),
+                    make_tool_call("c2", "read_code", {"path": "b.py"}),
+                ],
+            ),
+            make_tool_result_msg("c1", "read_code", "内容a"),
+        ]
+        out = to_openai_messages(msgs)
+        assert out == [{"role": "user", "content": "hi"}]
 
     def test_anthropic_drops_unpaired_tool_use(self):
         msgs = [
@@ -171,7 +206,9 @@ class TestSchema:
         tools = build_openai_tools(reg)
         assert tools[0]["type"] == "function"
         assert tools[0]["function"]["name"] == "read_code"
-        assert tools[0]["function"]["parameters"]["properties"]["path"]["type"] == "string"
+        assert (
+            tools[0]["function"]["parameters"]["properties"]["path"]["type"] == "string"
+        )
 
     def test_build_anthropic_tools(self):
         reg = _FakeRegistry(
