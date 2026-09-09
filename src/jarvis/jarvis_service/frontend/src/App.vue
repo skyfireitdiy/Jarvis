@@ -8442,14 +8442,15 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
   } else if (type === 'eval_js_request') {
-    handleEvalJsRequest(payload)
+    handleEvalJsRequest(payload, targetAgentId)
   } else if (type && type.startsWith('chat_')) {
     handleChatMessage(type, payload)
   }
 }
 
 // 处理后端下发的 JS 执行请求，执行后将结果回传
-async function handleEvalJsRequest(payload) {
+// agentId：收到该请求的 Agent 连接对应的 agent_id（主网关消息为 null）
+async function handleEvalJsRequest(payload, agentId = null) {
   const callId = payload?.call_id
   const code = payload?.code
   if (!callId) return
@@ -8461,8 +8462,11 @@ async function handleEvalJsRequest(payload) {
   } catch (e) {
     response = { call_id: callId, success: false, error: String(e?.stack || e) }
   }
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-    socket.value.send(JSON.stringify({ type: 'eval_js_result', payload: response }))
+  // 结果必须回传到收到请求的那条连接：Agent 请求走 sockets 中的 Agent 连接，
+  // 而非主网关连接 socket.value（否则主网关无对应 waiter，结果会被丢弃）
+  const replyWs = agentId ? sockets.value.get(agentId) : socket.value
+  if (replyWs && replyWs.readyState === WebSocket.OPEN) {
+    replyWs.send(JSON.stringify({ type: 'eval_js_result', payload: response }))
   }
 }
 
