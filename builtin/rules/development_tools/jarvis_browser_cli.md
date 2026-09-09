@@ -7,7 +7,7 @@ description: 当需要使用浏览器进行自动化操作时触发。每当用�
 
 ## 概述
 
-`jb`（或`jarvis-browser`）乃基于Playwright的浏览器自动化命令行工具，支持守护进程模式，可跨多个CLI调用维护浏览器会话。
+`jb`（或`jarvis-browser`）是基于Playwright的浏览器自动化命令行工具，支持守护进程模式，可跨多个CLI调用维护浏览器会话。
 
 ## 快速开始
 
@@ -30,7 +30,7 @@ jb screenshot --browser-id demo --path /tmp/screenshot.png
 
 ## 通用参数
 
-所有命令皆支持以下可选参数：
+所有命令都支持以下可选参数：
 
 - `--browser-id TEXT`: 浏览器会话ID（默认：`default`）
 
@@ -887,7 +887,7 @@ jb launch --browser-id task2
 
 ### 2. 用等待而非睡眠
 
-勿用固定的等待时间，当用`waitforselector`或`waitfortext`：
+不要用固定的等待时间，当用`waitforselector`或`waitfortext`：
 
 ```bash
 # 不推荐
