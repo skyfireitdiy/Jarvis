@@ -1892,12 +1892,12 @@ class Agent:
                     for b in message
                 )
             )
-            if message_len > threshold:
+            # 原生工具调用下不自动注入默认 addon（工具由 API tools 提供，避免每轮重复指令/干扰原生循环）
+            if message_len > threshold and not self._native_active():
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
                 should_add = True
-            # 条件2：连续10轮都没有添加过 addon_prompt，强制添加一次
-            # 原生工具调用下不自动注入默认 addon（工具由 API tools 提供，避免干扰原生循环）
+            # 条件2：连续10轮都没有添加过 addon_prompt，强制添加一次（仅文本协议）
             elif self._addon_prompt_skip_rounds >= 10 and not self._native_active():
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
