@@ -25,14 +25,14 @@ def make_tool_call_msg(
     }
 
 
-def make_tool_call(call_id: str, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def make_tool_call(
+    call_id: str, name: str, arguments: Dict[str, Any]
+) -> Dict[str, Any]:
     """构造单个工具调用项。"""
     return {"id": call_id, "name": name, "arguments": dict(arguments)}
 
 
-def make_tool_result_msg(
-    tool_call_id: str, name: str, content: str
-) -> Dict[str, Any]:
+def make_tool_result_msg(tool_call_id: str, name: str, content: str) -> Dict[str, Any]:
     """构造工具结果消息（role=tool）。"""
     return {
         "role": "tool",
@@ -107,11 +107,26 @@ def ensure_tool_pairing(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     pending_ids = set()
     open_idx: Optional[int] = None
+    # 当前未闭合 assistant(tool_calls) 下已保留的 tool 结果在 out 中的索引。
+    # 一旦该 assistant 因配对不完整被删除，这些结果也必须一并删除，
+    # 否则会残留孤立 tool 消息，导致 API 400。
+    matched_result_idx: List[int] = []
+
+    def _drop_open_assistant() -> None:
+        """删除未闭合的 assistant(tool_calls) 及其已保留的 tool 结果。"""
+        nonlocal open_idx
+        if open_idx is None:
+            return
+        # 先删索引更大的结果，避免删除后索引错位
+        for idx in sorted(matched_result_idx, reverse=True):
+            del out[idx]
+        del out[open_idx]
+        open_idx = None
+        matched_result_idx.clear()
 
     for msg in messages:
         if is_tool_call_msg(msg):
-            if open_idx is not None:
-                del out[open_idx]
+            _drop_open_assistant()
             ids = {(tc.get("id") or "") for tc in msg.get("tool_calls") or []}
             ids.discard("")
             if not ids:
@@ -120,23 +135,23 @@ def ensure_tool_pairing(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 out.append(msg)
                 pending_ids = set(ids)
                 open_idx = len(out) - 1
+                matched_result_idx = []
         elif is_tool_result_msg(msg):
             tid = msg.get("tool_call_id") or ""
             if tid and tid in pending_ids:
                 pending_ids.discard(tid)
                 out.append(msg)
+                matched_result_idx.append(len(out) - 1)
                 if not pending_ids:
                     open_idx = None
+                    matched_result_idx = []
             # 孤立 tool 结果：丢弃
         else:
-            if open_idx is not None:
-                del out[open_idx]
-            open_idx = None
+            _drop_open_assistant()
             pending_ids = set()
             out.append(msg)
 
-    if open_idx is not None:
-        del out[open_idx]
+    _drop_open_assistant()
     return out
 
 
@@ -236,9 +251,7 @@ def to_anthropic_messages(
             out.append({"role": "assistant", "content": blocks})
             continue
         content = msg.get("content")
-        out.append(
-            {"role": role, "content": content if content is not None else ""}
-        )
+        out.append({"role": role, "content": content if content is not None else ""})
     flush_results()
     return ("\n".join(system_parts) if system_parts else None, out)
 
