@@ -1,0 +1,8 @@
+{
+  "id": "20260909_000108_143349",
+  "type": "project_long_term",
+  "tags": ["jarvis", "tool_registry", "落盘", "上下文压缩", "L0"],
+  "content": "给 Jarvis 当前工具输出截断机制增加落盘：registry.py 新增 _dump_tool_output(output, tool_name)，把超长工具输出完整写入 <data>/tool_results/，带目录上限自清理(100文件)。_summarize_with_cheap_model 增加 tool_name 参数，函数开头先落盘完整 output，返回结果(无论摘要成功还是失败回退 _truncate_output)都附加 <tool_output_disk> 标记+文件路径，引导模型 read_code 读取。两个调用点(execute_native_tool_call 原生路径、handle_tool_calls 文本路径)都传入 name。关键认知：ToolRegistry 是原生+文本两条工具路径的公共执行入口(都汇聚到 execute_tool + _format_tool_output + _compress_output + _summarize_with_cheap_model)，L0 落盘在此实现一处覆盖两条路径，而非 base.py append_native_tool_result(那只是原生回填)。",
+  "created_at": "2026-09-09T00:01:08.143383",
+  "updated_at": "2026-09-09T00:01:08.143389"
+}

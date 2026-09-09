@@ -1,0 +1,8 @@
+{
+  "id": "20260908_234205_708727",
+  "type": "project_long_term",
+  "tags": ["context-management", "prompt-caching", "L1-microcompact", "调研"],
+  "content": "调研结论：Claude Code 为何敢用'剥离旧工具结果'(microcompact)策略——因为它连 Anthropic，缓存是'显式 cache_control 断点 + 20 block 回溯窗口'，可多断点分层把高价值静态前缀(system/tools/CLAUDE.md)钉住；剥离发生在断点之后的动态对话区，不触碰静态断点缓存，只牺牲变化最快、命中价值最低的对话层。Claude Code 把缓存命中率当 SEV 级监控指标。而 Jarvis 连的是 OpenAI 兼容 API(vLLM/DeepSeek/ModelScope)，是'纯自动前缀匹配'无显式断点，命中=整个请求最长公共前缀，剥离点后一刀切全失效、无法分层保护。故 L1 剥离在 Jarvis 环境性价比低于 Claude Code。对 Jarvis 方案含义：L1 剥离点应尽量靠后(对话尾部)而非最旧前部，以缩小失效范围；L0 落盘(回填时截断)不改变已发送历史、缓存友好应优先。DeepSeek 上下文硬盘缓存默认开启、按'缓存前缀单元'完整匹配、usage 返回 prompt_cache_hit_tokens/miss_tokens。vLLM APC 按16-token block 哈希、最长公共前缀命中。",
+  "created_at": "2026-09-08T23:42:05.708758",
+  "updated_at": "2026-09-08T23:42:05.708764"
+}
