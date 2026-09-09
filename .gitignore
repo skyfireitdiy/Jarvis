@@ -168,3 +168,6 @@ analysis.db
 
 offline_package
 test
+
+# A/B harness 输出
+.ab_harness_out/
