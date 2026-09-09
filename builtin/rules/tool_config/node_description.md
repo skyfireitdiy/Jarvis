@@ -9,7 +9,7 @@ description: 当需要设置或更新节点描述信息时触发。每当用户�
 
 此规则用于将用户提供之节点描述信息写入`~/.jarvis/gateway/node_description.md`文件。该文件会被系统信息模块自动读取，并在Child-Master心跳中上报至Master节点，供`gateway_manager`工具之`list_nodes`操作返回。
 
-## 汝必守之原则
+## 你必须遵守的原则
 
 ### 1. 描述内容来源
 
@@ -78,7 +78,7 @@ xxx
 
 ## 检查清单
 
-完成任务后，汝必确认：
+完成任务后，请务必确认：
 
 - [ ] 描述文件已写入`~/.jarvis/gateway/node_description.md`
 - [ ] 文件大小未超过10KB

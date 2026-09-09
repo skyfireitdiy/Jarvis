@@ -1,6 +1,6 @@
 ---
 name: rust_performance
-description: 当需要优化Rust代码性能或进行Rust性能分析时触发。每当用户提及"Rust性能"、"Rust优化"、"Rust调优"、"Rust性能分析"、"Rust代码性能"、"Perf分析"时触发。不触发：非Rust代码之性能优化；仅编写Rust代码不涉及性能；仅阅读Rust代码不修改。
+description: 当需要优化Rust代码性能或进行Rust性能分析时触发。每当用户提及"Rust性能"、"Rust优化"、"Rust调优"、"Rust性能分析"、"Rust代码性能"、"Perf分析"时触发。不触发：非Rust代码的性能优化；仅编写Rust代码不涉及性能；仅阅读Rust代码不修改。
 ---
 
 # Rust性能优化规范

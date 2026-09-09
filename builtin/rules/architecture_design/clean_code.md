@@ -136,7 +136,7 @@ def filter_and_double_positive_numbers(numbers: list[int]) -> list[int]:
 
 ## 代码质量检查清单
 
-提交代码前，汝必确认：
+提交代码前，请务必确认：
 
 - [ ] 所有变量与函数皆有义之名
 - [ ] 函数长度不过二十行（或合理之度）

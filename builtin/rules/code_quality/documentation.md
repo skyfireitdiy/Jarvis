@@ -140,7 +140,7 @@ def calculate_total(items: list[Item], discount: float = 0.0) -> float:
 
 ## 文档编写检查清单
 
-完成代码后，汝必确认：
+完成代码后，请务必确认：
 
 **代码注释：**
 
