@@ -717,16 +717,12 @@ class PrettyOutput:
             return default_lang
 
     @staticmethod
-    def _format(output_type: OutputType, timestamp: Optional[str | bool] = None) -> str:
+    def get_agent_list_with_emoji() -> str:
         """
-        返回Agent名字格式（时间戳由前端显示）。
-
-        参数：
-            output_type: 输出类型（不再使用）
-            timestamp: ISO格式时间字符串（保留参数兼容性，但不再使用）
+        获取带交互状态 emoji 的 Agent 列表字符串。
 
         返回：
-            str: Agent名字字符串
+            str: 形如 "[2]name1🔊, name2🔇" 的字符串；无 Agent 时返回空字符串
         """
         agent_info = get_agent_list()
         if not agent_info:
@@ -750,6 +746,20 @@ class PrettyOutput:
             agent_info = f"[{count}]{', '.join(agent_names_with_emoji)}"
 
         return agent_info
+
+    @staticmethod
+    def _format(output_type: OutputType, timestamp: Optional[str | bool] = None) -> str:
+        """
+        返回Agent名字格式（时间戳由前端显示）。
+
+        参数：
+            output_type: 输出类型（不再使用）
+            timestamp: ISO格式时间字符串（保留参数兼容性，但不再使用）
+
+        返回：
+            str: Agent名字字符串
+        """
+        return PrettyOutput.get_agent_list_with_emoji()
 
     @staticmethod
     def _print(
@@ -803,6 +813,14 @@ class PrettyOutput:
             non_interactive = is_non_interactive()
             if "non_interactive" not in context:
                 context["non_interactive"] = non_interactive
+        except Exception as e:
+            save_exception(e, module="jarvis_utils.output", function="_print")
+            pass
+
+        # 获取当前进程内的 agent 链列表（带交互状态 emoji）
+        try:
+            if "agent_list" not in context:
+                context["agent_list"] = PrettyOutput.get_agent_list_with_emoji()
         except Exception as e:
             save_exception(e, module="jarvis_utils.output", function="_print")
             pass
