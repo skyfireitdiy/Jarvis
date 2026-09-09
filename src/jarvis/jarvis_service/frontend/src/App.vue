@@ -878,7 +878,7 @@
       :filteredCompletions="filteredCompletions"
       :selectedIndex="selectedIndex"
       @update:searchText="completionSearch = $event"
-      @close="insertAtPosition('@', completionCursorPos.value, completionAgentId.value); showCompletions = false; completionCursorPos.value = -1; completionAgentId.value = null"
+      @close="closeCompletionsWithoutSelect()"
       @select="(item) => insertCompletion(item, completionAgentId.value)"
       @keydown="handleCompletionKeydown"
     />
@@ -4176,10 +4176,18 @@ async function openCompletionsFromPanel(panel) {
   }
 
   completionAgentId.value = panel.agentId
+  // 由 @ 按钮触发时（未经过 handlePanelInputChange / handlePanelKeydown），
+  // 输入框中并没有 @ 符号，需记录当前光标位置作为插入点，并标记无需删除 @
+  if (completionCursorPos.value === -1) {
+    const textarea = document.querySelector(`.input-wrapper textarea[data-agent-id="${panel.agentId}"]`) || document.querySelector('.input-wrapper textarea')
+    if (textarea) {
+      completionCursorPos.value = textarea.selectionStart
+    }
+    completionHasAtSymbol.value = false
+  }
   completionSearch.value = ''
   selectedIndex.value = -1
   showCompletions.value = true
-  // 获取补全列表
   try {
     const { host, port } = getGatewayAddress()
     const targetNodeId = String(agent?.node_id || '').trim() || 'master'
@@ -4229,6 +4237,7 @@ function handlePanelInputChange(panel, event) {
     const lastChar = textBeforeCursor.slice(-1)
     if (lastChar === '@') {
       completionCursorPos.value = cursorPosition - 1
+      completionHasAtSymbol.value = true
       openCompletionsFromPanel(panel)
     }
   }
@@ -4243,6 +4252,7 @@ function handlePanelKeydown(panel, event) {
   if (event.key === '@') {
     event.preventDefault()
     completionCursorPos.value = event.target.selectionStart
+    completionHasAtSymbol.value = true
     openCompletionsFromPanel(panel)
     return
   }
@@ -5049,6 +5059,7 @@ function handleConfirmDialogCancel() {
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表
 const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位置
+const completionHasAtSymbol = ref(false) // 打开补全时输入框中是否已存在待替换的 @ 符号
 const completionAgentId = ref(null) // 记录打开补全列表时的 Panel agentId
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
@@ -6669,17 +6680,25 @@ const filteredCompletions = computed(() => {
   return sortCompletionItems(filteredOriginal)
 })
 
+// 关闭补全对话框（取消选择）：键盘输入 @ 触发时保留 @ 符号，按钮触发时无需插入任何字符
+function closeCompletionsWithoutSelect() {
+  if (completionHasAtSymbol.value) {
+    insertAtPosition('@', completionCursorPos.value, completionAgentId.value)
+  }
+  showCompletions.value = false
+  selectedIndex.value = -1
+  completionCursorPos.value = -1
+  completionHasAtSymbol.value = false
+  completionAgentId.value = null
+}
+
 // 处理补全对话框的键盘事件
 function handleCompletionKeydown(event) {
   const maxIndex = filteredCompletions.value.length - 1
 
   if (event.key === 'Escape') {
-    // ESC 键关闭对话框，插入 @ 符号
-    insertAtPosition('@', completionCursorPos.value, completionAgentId.value)
-    showCompletions.value = false
-    selectedIndex.value = -1
-    completionCursorPos.value = -1
-    completionAgentId.value = null
+    // ESC 键关闭对话框
+    closeCompletionsWithoutSelect()
     event.preventDefault()
     return
   }
@@ -6786,40 +6805,49 @@ function insertCompletion(item, agentId = null) {
   const textarea = targetAgentId
     ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
     : document.querySelector('.input-wrapper textarea')
-  if (!textarea) return
 
-  const start = textarea.selectionStart
-  const end = textarea.selectionEnd
+  // 数据源以 panelInputTexts / inputText 为准，textarea 仅用于同步光标；
+  // 移动端点击补全项时 textarea 可能已失焦甚至查询不到，不能因此直接放弃插入
   const text = targetAgentId
     ? (panelInputTexts.value.get(targetAgentId) || '')
-    : textarea.value
+    : (textarea ? textarea.value : inputText.value)
 
   recordCompletionSelection(item)
 
-  // 删除@符号及其后的内容（如果有）
-  let deleteStart = completionCursorPos.value
-  if (deleteStart === -1) {
-    deleteStart = start
+  // 键盘输入 @ 触发的补全：删除 @ 符号；按钮触发的补全：输入框中没有 @，直接在光标处插入
+  let deleteStart
+  if (completionHasAtSymbol.value && completionCursorPos.value !== -1) {
+    deleteStart = completionCursorPos.value
+  } else {
+    // 无 @ 可删：优先用打开补全时记录的光标位置，否则退回到末尾
+    deleteStart = completionCursorPos.value === -1 ? text.length : completionCursorPos.value
   }
+  if (deleteStart > text.length) deleteStart = text.length
 
-  // 在删除@符号的位置插入补全（添加单引号包裹）
+  // 在 deleteStart 位置插入补全（添加单引号包裹）
   const valueToInsert = `'${item.value}'`
-  const newText = text.substring(0, deleteStart) + valueToInsert + text.substring(end)
+  const newText = text.substring(0, deleteStart) + valueToInsert + text.substring(deleteStart)
   if (targetAgentId) {
-    panelInputTexts.value.set(targetAgentId, newText)
+    // 替换整个 Map 以触发 Vue 响应式更新（Map.set 不会）
+    const nextMap = new Map(panelInputTexts.value)
+    nextMap.set(targetAgentId, newText)
+    panelInputTexts.value = nextMap
   }
   inputText.value = newText
 
-  // 设置新的光标位置
-  textarea.value = newText
-  const newCursorPos = deleteStart + valueToInsert.length
-  textarea.setSelectionRange(newCursorPos, newCursorPos)
-  textarea.focus()
+  // 同步 DOM 与光标位置（textarea 存在时才操作）
+  if (textarea) {
+    textarea.value = newText
+    const newCursorPos = deleteStart + valueToInsert.length
+    textarea.setSelectionRange(newCursorPos, newCursorPos)
+    textarea.focus()
+  }
 
   // 关闭弹窗
   showCompletions.value = false
   selectedIndex.value = -1
   completionCursorPos.value = -1
+  completionHasAtSymbol.value = false
   completionAgentId.value = null
 }
 

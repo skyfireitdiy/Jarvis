@@ -67,6 +67,13 @@
               <span class="message-separator" v-if="(item.agent_name || item.agent_list || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
               <span class="message-silent" v-if="item.non_interactive === true" title="静默模式">🔇</span>
               <span class="message-silent" v-if="item.non_interactive === false" title="交互模式">🔊</span>
+              <button
+                v-if="ttsSupported && item.text"
+                class="message-speak-btn"
+                :class="{ 'speaking': isSpeaking(item) }"
+                @click.stop="toggleSpeak(item)"
+                :title="isSpeaking(item) ? '停止朗读' : '朗读此消息'"
+              >{{ isSpeaking(item) ? '⏹' : '🔈' }}</button>
             </div>
           </div>
           <!-- 终端嵌入 -->
@@ -171,6 +178,16 @@
               @
             </button>
             <button
+              v-if="asrSupported"
+              class="action-btn asr-btn"
+              :class="{ 'recording': isRecording }"
+              @click="toggleRecord"
+              :disabled="isInputDisabled"
+              :title="isRecording ? '停止语音输入' : '语音输入'"
+            >
+              {{ isRecording ? '⏹' : '🎤' }}
+            </button>
+            <button
               class="send-btn"
               @click="$emit('send')"
               :disabled="isInputDisabled || (!inputText.trim() && (!hasBufferedInput || (agentStatus?.execution_status ?? 'running') === 'waiting_multi'))"
@@ -185,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   agent: { type: Object, default: null },
@@ -303,6 +320,143 @@ async function copyToClipboard(text, index) {
 
 function formatMessageTime(timestamp) {
   return timestamp || ''
+}
+
+// ---- 语音朗读（浏览器内置 SpeechSynthesis） ----
+const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+const speakingKey = ref(null)
+
+function messageKey(item, index) {
+  return item._stableId != null ? String(item._stableId) : `idx-${index}`
+}
+
+function isSpeaking(item) {
+  if (!ttsSupported || speakingKey.value === null) return false
+  return speakingKey.value === messageKey(item, props.messages.indexOf(item))
+}
+
+// 从渲染后的 HTML 提取纯文本，避免把 Markdown 标记（##、**、``` 等）念出来
+function extractSpeakText(item) {
+  if (item.html) {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = item.html
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim()
+  }
+  return (item.text || '').trim()
+}
+
+function stopSpeak() {
+  if (!ttsSupported) return
+  window.speechSynthesis.cancel()
+  speakingKey.value = null
+}
+
+function toggleSpeak(item) {
+  if (!ttsSupported) return
+  // 再次点击同一条消息：停止
+  if (isSpeaking(item)) {
+    stopSpeak()
+    return
+  }
+  const text = extractSpeakText(item)
+  if (!text) return
+  const key = messageKey(item, props.messages.indexOf(item))
+  // 先停掉正在播放的
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'zh-CN'
+  utterance.rate = 2.0
+  utterance.onend = () => {
+    if (speakingKey.value === key) speakingKey.value = null
+  }
+  utterance.onerror = () => {
+    if (speakingKey.value === key) speakingKey.value = null
+  }
+  speakingKey.value = key
+  window.speechSynthesis.speak(utterance)
+}
+
+onBeforeUnmount(() => {
+  if (ttsSupported) {
+    window.speechSynthesis.cancel()
+  }
+  stopRecord()
+})
+
+// ---- 语音输入（Web Speech API，仅 Chromium 系 + 安全上下文可用） ----
+// 麦克风受安全上下文限制：https、localhost、127.0.0.1 可用；http + 其他 IP 会被浏览器拒绝。
+// isSecureContext 由浏览器直接判定，比手动解析地址更可靠。
+const SpeechRecognitionImpl =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null
+const asrSupported =
+  !!SpeechRecognitionImpl &&
+  typeof window !== 'undefined' &&
+  window.isSecureContext
+const isRecording = ref(false)
+let recognizer = null
+// 识别前输入框已有内容，作为前缀保留
+let recordPrefix = ''
+
+function stopRecord() {
+  if (recognizer) {
+    try {
+      recognizer.stop()
+    } catch (e) {
+      // 忽略重复停止的异常
+    }
+  }
+  isRecording.value = false
+}
+
+function toggleRecord() {
+  if (!asrSupported) return
+  if (isRecording.value) {
+    stopRecord()
+    return
+  }
+  recordPrefix = props.inputText || ''
+  recognizer = new SpeechRecognitionImpl()
+  recognizer.lang = 'zh-CN'
+  recognizer.continuous = true
+  recognizer.interimResults = true
+
+  recognizer.onresult = (event) => {
+    let finalText = ''
+    let interimText = ''
+    for (let i = 0; i < event.results.length; i++) {
+      const result = event.results[i]
+      if (result.isFinal) {
+        finalText += result[0].transcript
+      } else {
+        interimText += result[0].transcript
+      }
+    }
+    const merged = recordPrefix + finalText + interimText
+    emit('input-change', { target: { value: merged, selectionStart: merged.length } })
+  }
+
+  recognizer.onerror = (event) => {
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      emit('show-toast', '麦克风未授权，请在浏览器中允许麦克风访问', 'error')
+    } else if (event.error !== 'aborted') {
+      emit('show-toast', `语音识别失败：${event.error}`, 'error')
+    }
+    isRecording.value = false
+  }
+
+  recognizer.onend = () => {
+    isRecording.value = false
+  }
+
+  try {
+    recognizer.start()
+    isRecording.value = true
+  } catch (e) {
+    emit('show-toast', '无法启动语音识别', 'error')
+    isRecording.value = false
+  }
 }
 
 function getStatusClass(agent) {
@@ -728,6 +882,29 @@ function getTerminalStyle(terminalContent) {
   font-size: 10px;
 }
 
+.message-speak-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.message-speak-btn:hover {
+  opacity: 1;
+  color: var(--color-text-primary);
+}
+
+.message-speak-btn.speaking {
+  opacity: 1;
+  color: var(--color-accent, #4a9eff);
+}
+
 .copy-message-btn {
   position: absolute;
   top: 0;
@@ -936,6 +1113,17 @@ function getTerminalStyle(terminalContent) {
 .action-btn:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
+}
+
+.asr-btn.recording {
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff5050;
+  animation: asr-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes asr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .complete-btn {
